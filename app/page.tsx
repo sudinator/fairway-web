@@ -169,6 +169,11 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState(index != null ? String(index) : "");
   const [showCustom, setShowCustom] = useState(false);
+  // live search state
+  const [searching, setSearching] = useState(false);
+  const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [results, setResults] = useState<{ id: number; name: string; location: string }[] | null>(null);
+  const [searchErr, setSearchErr] = useState<string | null>(null);
   // custom course fields
   const [cName, setCName] = useState("");
   const [cLoc, setCLoc] = useState("");
@@ -176,7 +181,42 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
   const [cRating, setCRating] = useState("");
   const [cSlope, setCSlope] = useState("");
 
-  const matches = q.trim().length
+  // Search the online golf course database (falls back to starter list on error).
+  const runSearch = async () => {
+    if (!q.trim()) return;
+    setSearching(true); setSearchErr(null); setResults(null);
+    try {
+      const res = await fetch(`/api/courses?q=${encodeURIComponent(q.trim())}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Search failed");
+      setResults(data.courses || []);
+    } catch (e: any) {
+      setSearchErr(e.message || "Couldn't reach the course database.");
+      setResults([]);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  // When a search result is tapped, pull its full tee + hole data.
+  const pickFromApi = async (id: number) => {
+    setLoadingId(id); setSearchErr(null);
+    try {
+      const res = await fetch(`/api/courses?id=${id}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Course load failed");
+      const c = data.course;
+      if (!c.tees || !c.tees.length) { setSearchErr("That course has no tee data — try another or add it manually."); return; }
+      setPicked(c); setTeeIdx(0);
+    } catch (e: any) {
+      setSearchErr(e.message || "Couldn't load that course.");
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  // Starter-list matches (shown before any search, and as a fallback).
+  const starterMatches = q.trim().length
     ? STARTER_COURSES.filter((c) =>
         (c.name + " " + c.location).toLowerCase().includes(q.trim().toLowerCase()))
     : STARTER_COURSES;
@@ -217,20 +257,54 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
       {!picked && !showCustom && (
         <>
           <div style={{ marginTop: 14 }}>
-            <label style={{ color: C.sage, fontSize: 12 }}>Search for your course</label>
-            <input style={{ ...inputStyle, marginTop: 6 }} value={q} placeholder="Type a course name…" onChange={(e) => setQ(e.target.value)} />
-          </div>
-          <div style={{ marginTop: 12 }}>
-            {matches.map((c) => (
-              <button key={c.id} onClick={() => { setPicked(c); setTeeIdx(0); }}
-                style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 14px" }}>
-                <span style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{c.name}</span>
-                <span style={{ color: C.faint, fontSize: 13 }}> · {c.location}</span>
+            <label style={{ color: C.sage, fontSize: 12 }}>Search for your course (≈30,000 courses worldwide)</label>
+            <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+              <input style={inputStyle} value={q} placeholder="Type a course name…"
+                onChange={(e) => setQ(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && q.trim() && runSearch()} />
+              <button style={{ ...btn(true), whiteSpace: "nowrap", opacity: q.trim() ? 1 : 0.5 }}
+                disabled={!q.trim() || searching} onClick={runSearch}>
+                {searching ? "Searching…" : "Search"}
               </button>
-            ))}
-            {matches.length === 0 && <div style={{ color: C.sage, fontSize: 13, padding: 8 }}>No match in the starter list.</div>}
+            </div>
           </div>
-          <button style={{ ...btn(false), marginTop: 14 }} onClick={() => setShowCustom(true)}>＋ Add a course not listed</button>
+
+          {searchErr && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{searchErr}</div>}
+
+          {/* Live database results */}
+          {results && results.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <Eyebrow>DATABASE RESULTS</Eyebrow>
+              {results.map((c) => (
+                <button key={c.id} onClick={() => pickFromApi(c.id)} disabled={loadingId != null}
+                  style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 14px", opacity: loadingId != null && loadingId !== c.id ? 0.5 : 1 }}>
+                  <span style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{c.name}</span>
+                  {c.location ? <span style={{ color: C.faint, fontSize: 13 }}> · {c.location}</span> : null}
+                  {loadingId === c.id ? <span style={{ color: C.gold, fontSize: 12 }}> · loading…</span> : null}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {results && results.length === 0 && !searchErr && (
+            <div style={{ color: C.sage, fontSize: 13, marginTop: 10 }}>No courses found in the database for that name.</div>
+          )}
+
+          {/* Starter list — shown before searching, or as a fallback */}
+          {(!results || results.length === 0) && starterMatches.length > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <Eyebrow>{results ? "OR PICK FROM BUILT-IN" : "POPULAR COURSES"}</Eyebrow>
+              {starterMatches.map((c) => (
+                <button key={c.id} onClick={() => { setPicked(c); setTeeIdx(0); }}
+                  style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 14px" }}>
+                  <span style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{c.name}</span>
+                  <span style={{ color: C.faint, fontSize: 13 }}> · {c.location}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <button style={{ ...btn(false), marginTop: 14 }} onClick={() => setShowCustom(true)}>＋ Add a course manually</button>
         </>
       )}
 
