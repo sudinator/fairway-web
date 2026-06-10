@@ -169,6 +169,10 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState(index != null ? String(index) : "");
   const [showCustom, setShowCustom] = useState(false);
+  // favorites
+  const [favorites, setFavorites] = useState<{ id: string; name: string; location: string; data: Course }[]>([]);
+  const [favSaving, setFavSaving] = useState(false);
+  const [favMsg, setFavMsg] = useState<string | null>(null);
   // live search state
   const [searching, setSearching] = useState(false);
   const [loadingId, setLoadingId] = useState<number | null>(null);
@@ -180,6 +184,31 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
   const [cPar, setCPar] = useState("72");
   const [cRating, setCRating] = useState("");
   const [cSlope, setCSlope] = useState("");
+
+  // Load this user's saved favorite courses (with their corrected data).
+  const loadFavorites = async () => {
+    const { data } = await supabase.from("favorite_courses").select("*").order("name");
+    if (data) setFavorites(data.map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", data: f.data })));
+  };
+  useEffect(() => { loadFavorites(); }, []);
+
+  // Save the currently-picked course (including any corrections) as a favorite.
+  const saveFavorite = async () => {
+    if (!picked) return;
+    setFavSaving(true); setFavMsg(null);
+    try {
+      const { error } = await supabase.from("favorite_courses").insert({
+        name: picked.name, location: picked.location, data: picked,
+      });
+      if (error) throw error;
+      setFavMsg("Saved to favorites ★");
+      await loadFavorites();
+    } catch (e: any) {
+      setFavMsg("Couldn't save: " + (e.message || "error"));
+    } finally {
+      setFavSaving(false);
+    }
+  };
 
   // Search the online golf course database (falls back to starter list on error).
   const runSearch = async () => {
@@ -258,6 +287,20 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
 
       {!picked && !showCustom && (
         <>
+          {favorites.length > 0 && (
+            <div style={{ marginTop: 14 }}>
+              <Eyebrow>★ YOUR FAVORITES</Eyebrow>
+              {favorites.map((f) => (
+                <button key={f.id} onClick={() => { setPicked(f.data); setTeeIdx(0); }}
+                  style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.card, border: `1px solid ${C.gold}`, borderRadius: 10, padding: "12px 14px" }}>
+                  <span style={{ color: C.gold, fontWeight: 800 }}>★ </span>
+                  <span style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{f.name}</span>
+                  {f.location ? <span style={{ color: C.faint, fontSize: 13 }}> · {f.location}</span> : null}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div style={{ marginTop: 14 }}>
             <label style={{ color: C.sage, fontSize: 12 }}>Search for your course (≈30,000 courses worldwide)</label>
             <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
@@ -376,10 +419,14 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
               </div>
             </div>
           )}
-          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-            <button style={btn(false)} onClick={() => setPicked(null)}>‹ Change course</button>
+          <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
+            <button style={btn(false)} onClick={() => { setPicked(null); setFavMsg(null); }}>‹ Change course</button>
+            <button style={{ ...btn(false), opacity: favSaving ? 0.5 : 1 }} disabled={favSaving} onClick={saveFavorite}>
+              {favSaving ? "Saving…" : "★ Save as favorite"}
+            </button>
             <button style={btn(true)} onClick={start}>Continue to scorecard ›</button>
           </div>
+          {favMsg && <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>{favMsg}</div>}
         </div>
       )}
 
@@ -395,11 +442,44 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
   const [holes, setHoles] = useState<Hole[]>(round.holes);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [favMsg, setFavMsg] = useState<string | null>(null);
+
+  // Save the corrected par/stroke-index back as a favorite course for next time.
+  const saveCorrectedFavorite = async () => {
+    setFavMsg(null);
+    const course = {
+      id: "corrected",
+      name: round.course,
+      location: round.tee_name || "",
+      tees: [{
+        name: round.tee_name || "Default",
+        rating: round.rating ?? 72, slope: round.slope ?? 113, course_par: round.course_par,
+        par: round.course_par ?? holes.reduce((s, h) => s + h.par, 0),
+        holes: holes.map((h) => ({ n: h.hole_number, par: h.par, si: h.stroke_index })),
+      }],
+    };
+    try {
+      const { error } = await supabase.from("favorite_courses").insert({
+        name: round.course, location: round.tee_name || "", data: course,
+      });
+      if (error) throw error;
+      setFavMsg("Corrected course saved to favorites ★");
+    } catch (e: any) {
+      setFavMsg("Couldn't save: " + (e.message || "error"));
+    }
+  };
 
   const setHole = (i: number, patch: Partial<Hole>) =>
     setHoles((hs) => hs.map((h, j) => (j === i ? { ...h, ...patch } : h)));
   const num = (v: string, max: number) =>
     v === "" ? null : (Math.max(0, Math.min(max, parseInt(v, 10) || 0)) || null);
+
+  // Editing the stroke index must recompute how many strokes you receive on that hole.
+  const setStrokeIndex = (i: number, v: string) => {
+    const si = v === "" ? null : Math.max(1, Math.min(18, parseInt(v, 10) || 0)) || null;
+    const recv = strokesReceived(si, round.course_handicap);
+    setHole(i, { stroke_index: si, recv });
+  };
 
   const live: Round = { ...round, holes };
   const anyPlayed = holes.some((h) => h.strokes);
@@ -461,7 +541,11 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
                     {[3, 4, 5, 6].map((p) => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </td>
-                <td style={{ padding: 3, textAlign: "center", color: C.faint, fontSize: 12 }}>{h.stroke_index ?? "–"}</td>
+                <td style={{ padding: 3 }}>
+                  <input inputMode="numeric" value={h.stroke_index ?? ""} placeholder="–"
+                    onChange={(e) => setStrokeIndex(i, e.target.value)}
+                    style={{ ...inputStyle, padding: "5px 4px", width: 42, textAlign: "center", fontSize: 14, color: C.faint }} />
+                </td>
                 <td style={{ padding: 3, textAlign: "center" }}>
                   <span style={{ color: C.gold, fontSize: 12, fontWeight: 700 }}>{h.recv ? "●".repeat(Math.min(h.recv, 3)) : ""}</span>
                 </td>
@@ -504,7 +588,9 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
       <div style={{ color: C.sage, fontSize: 13, marginBottom: 10 }}>
         {round.course}{round.tee_name ? ` · ${round.tee_name} tees (${round.rating}/${round.slope})` : ""}
         {round.course_handicap != null ? ` · course handicap ${round.course_handicap}` : " · no handicap — Stableford scored gross"}
-        {"  ·  FW: tap to cycle ✓ hit / ✗ miss (par 4s & 5s)"}
+      </div>
+      <div style={{ color: C.gold, fontSize: 12, marginBottom: 10 }}>
+        Par and S.I. (stroke index) are editable — fix any wrong values here, then save the course as a favorite to reuse your corrections. FW: tap to cycle ✓ hit / ✗ miss.
       </div>
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
         <Nine from={0} to={Math.min(9, holes.length)} label="FRONT NINE" />
@@ -521,11 +607,13 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
           </div>
         )}
         <div style={{ flex: 1 }} />
+        <button style={btn(false)} onClick={saveCorrectedFavorite}>★ Save course</button>
         <button style={btn(false)} onClick={onCancel}>Cancel</button>
         <button style={{ ...btn(true), opacity: anyPlayed && !saving ? 1 : 0.5 }} disabled={!anyPlayed || saving} onClick={save}>
           {saving ? "Saving…" : "Save round"}
         </button>
       </div>
+      {favMsg && <div style={{ color: C.gold, fontSize: 12, marginTop: 8, textAlign: "right" }}>{favMsg}</div>}
     </div>
   );
 }
