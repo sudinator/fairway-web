@@ -236,7 +236,9 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
   const start = () => {
     if (!picked || !tee) return;
     if (idxVal != null && idxVal !== index) saveIndex(idxVal);
-    const holes: Hole[] = picked.holes.map((h) => ({
+    // API courses carry holes on each tee; built-in starter courses carry them on the course.
+    const sourceHoles = tee.holes && tee.holes.length ? tee.holes : picked.holes;
+    const holes: Hole[] = (sourceHoles || []).map((h: any) => ({
       hole_number: h.n, par: h.par, stroke_index: h.si,
       strokes: null, putts: null, fairway: null, penalties: 0,
       recv: realCH != null ? strokesReceived(h.si, realCH) : 0,

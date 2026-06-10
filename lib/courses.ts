@@ -5,7 +5,7 @@
 // NOTE: ratings/slopes here are representative published values; players should
 // confirm against the physical scorecard, which is the authoritative source.
 
-export type CourseTee = { name: string; rating: number; slope: number; par: number };
+export type CourseTee = { name: string; rating: number; slope: number; par: number; holes?: CourseHole[] };
 export type CourseHole = { n: number; par: number; si: number };
 export type Course = {
   id: string;
