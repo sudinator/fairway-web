@@ -13,6 +13,7 @@ import {
 } from "@/lib/golf";
 import { STARTER_COURSES, buildCustomCourse, Course } from "@/lib/courses";
 import { btn, inputStyle, Eyebrow, StatCard, ClassicCard } from "@/components/ui";
+import Tournaments from "@/components/tournaments";
 
 const supabase = createClient();
 
@@ -65,7 +66,7 @@ function Home({ session }: { session: any }) {
   const [rounds, setRounds] = useState<Round[]>([]);
   const [loading, setLoading] = useState(true);
   const [index, setIndex] = useState<number | null>(null);
-  const [tab, setTab] = useState<"dashboard" | "rounds">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "rounds" | "games">("dashboard");
   const [stage, setStage] = useState<null | "setup" | { round: Round }>(null);
   const [viewing, setViewing] = useState<Round | null>(null);
 
@@ -124,13 +125,13 @@ function Home({ session }: { session: any }) {
       </div>
 
       <div style={{ display: "flex", gap: 6, marginTop: 16, borderBottom: `1px solid ${C.greenMid}` }}>
-        {(["dashboard", "rounds"] as const).map((k) => (
+        {(["dashboard", "rounds", "games"] as const).map((k) => (
           <button key={k} onClick={() => { setTab(k); setStage(null); setViewing(null); }}
             style={{
               background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: 14, fontWeight: 700,
               color: tab === k && !inFlow ? C.gold : C.sage,
               borderBottom: tab === k && !inFlow ? `2px solid ${C.gold}` : "2px solid transparent",
-            }}>{k === "dashboard" ? "Dashboard" : "Rounds"}</button>
+            }}>{k === "dashboard" ? "Dashboard" : k === "rounds" ? "Rounds" : "Games"}</button>
         ))}
       </div>
 
@@ -147,6 +148,8 @@ function Home({ session }: { session: any }) {
             onDelete={async () => { await deleteRound(viewing.id); setViewing(null); }} />
         ) : loading ? (
           <div style={{ color: C.sage, textAlign: "center", padding: 40 }}>Loading your rounds…</div>
+        ) : tab === "games" ? (
+          <Tournaments session={session} />
         ) : tab === "dashboard" ? (
           <Dashboard rounds={rounds} name={displayName} onOpen={setViewing} />
         ) : (
@@ -176,6 +179,7 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
   // tee override
   const [editingTee, setEditingTee] = useState(false);
   const [loadedFavId, setLoadedFavId] = useState<string | null>(null);
+  const [ratingText, setRatingText] = useState("");
   // live search state
   const [searching, setSearching] = useState(false);
   const [loadingId, setLoadingId] = useState<number | null>(null);
@@ -330,6 +334,11 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
   const coursePar = picked ? picked.holes.reduce((s, h) => s + (h.par || 0), 0) : null;
   const realCH = tee && idxVal != null && coursePar ? courseHandicap(idxVal, tee.slope, tee.rating, coursePar) : null;
 
+  // Keep the rating text box in sync with the selected tee (so decimals type freely).
+  useEffect(() => {
+    if (tee) setRatingText(tee.rating != null && !isNaN(tee.rating) ? String(tee.rating) : "");
+  }, [teeIdx, editingTee, picked?.id]);
+
   const makeCustom = () => {
     const c = buildCustomCourse(
       cName.trim() || "My course", cLoc.trim(),
@@ -462,7 +471,8 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
             </div>
             <div style={{ flex: 1, minWidth: 90 }}>
               <label style={{ color: C.sage, fontSize: 12 }}>Rating</label>
-              <input style={{ ...inputStyle, marginTop: 4 }} inputMode="decimal" placeholder="72.1" value={cRating} onChange={(e) => setCRating(e.target.value)} />
+              <input style={{ ...inputStyle, marginTop: 4 }} inputMode="decimal" placeholder="72.1" value={cRating}
+                onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setCRating(v); }} />
             </div>
             <div style={{ flex: 1, minWidth: 90 }}>
               <label style={{ color: C.sage, fontSize: 12 }}>Slope</label>
@@ -516,7 +526,15 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
                   <div style={{ flex: 1, minWidth: 90 }}>
                     <label style={{ color: C.sage, fontSize: 11 }}>Rating</label>
                     <input style={{ ...inputStyle, marginTop: 4 }} inputMode="decimal" placeholder="72.1"
-                      value={tee.rating ?? ""} onChange={(e) => updateTee({ rating: e.target.value === "" ? 0 : parseFloat(e.target.value) })} />
+                      value={ratingText}
+                      onChange={(e) => {
+                        // Allow digits and a single decimal point (e.g. "72.1") while typing.
+                        const raw = e.target.value;
+                        if (raw !== "" && !/^\d*\.?\d*$/.test(raw)) return;
+                        setRatingText(raw);
+                        const n = parseFloat(raw);
+                        updateTee({ rating: isNaN(n) ? 0 : n });
+                      }} />
                   </div>
                   <div style={{ flex: 1, minWidth: 90 }}>
                     <label style={{ color: C.sage, fontSize: 11 }}>Slope</label>

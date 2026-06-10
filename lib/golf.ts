@@ -87,3 +87,11 @@ export function holeBuckets(rounds: Round[]) {
   );
   return b;
 }
+
+// Stableford points for each six-hole segment: holes 1-6, 7-12, 13-18.
+// Returns [first, middle, last] — used to score the classic "three sixes" game.
+export function stablefordBySix(holes: Hole[]): [number, number, number] {
+  const seg = (from: number, to: number) =>
+    holes.slice(from, to).reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
+  return [seg(0, 6), seg(6, 12), seg(12, 18)];
+}
