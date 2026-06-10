@@ -173,6 +173,9 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
   const [favorites, setFavorites] = useState<{ id: string; name: string; location: string; data: Course }[]>([]);
   const [favSaving, setFavSaving] = useState(false);
   const [favMsg, setFavMsg] = useState<string | null>(null);
+  // tee override
+  const [editingTee, setEditingTee] = useState(false);
+  const [loadedFavId, setLoadedFavId] = useState<string | null>(null);
   // live search state
   const [searching, setSearching] = useState(false);
   const [loadingId, setLoadingId] = useState<number | null>(null);
@@ -188,7 +191,19 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
   // Load this user's saved favorite courses (with their corrected data).
   const loadFavorites = async () => {
     const { data } = await supabase.from("favorite_courses").select("*").order("name");
-    if (data) setFavorites(data.map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", data: f.data })));
+    if (!data) return;
+    setFavorites(data.map((f: any) => {
+      const d = f.data || {};
+      // Older favorites stored holes inside a tee; lift them to the course level.
+      if ((!d.holes || !d.holes.length) && Array.isArray(d.tees)) {
+        const teeWithHoles = d.tees.find((t: any) => t.holes && t.holes.length);
+        if (teeWithHoles) {
+          d.holes = teeWithHoles.holes;
+          d.tees = d.tees.map((t: any) => ({ name: t.name, rating: t.rating, slope: t.slope, par: t.par }));
+        }
+      }
+      return { id: f.id, name: f.name, location: f.location || "", data: d };
+    }));
   };
   useEffect(() => { loadFavorites(); }, []);
 
@@ -208,6 +223,66 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
     } finally {
       setFavSaving(false);
     }
+  };
+
+  // Update the favorite that's currently loaded with the latest edits.
+  const updateFavorite = async () => {
+    if (!picked || !loadedFavId) return;
+    setFavSaving(true); setFavMsg(null);
+    try {
+      const { error } = await supabase.from("favorite_courses")
+        .update({ name: picked.name, location: picked.location, data: picked })
+        .eq("id", loadedFavId);
+      if (error) throw error;
+      setFavMsg("Favorite updated ★");
+      await loadFavorites();
+    } catch (e: any) {
+      setFavMsg("Couldn't update: " + (e.message || "error"));
+    } finally {
+      setFavSaving(false);
+    }
+  };
+
+  // Remove a favorite course.
+  const deleteFavorite = async (id: string) => {
+    try {
+      await supabase.from("favorite_courses").delete().eq("id", id);
+      if (loadedFavId === id) setLoadedFavId(null);
+      await loadFavorites();
+    } catch (e: any) {
+      setFavMsg("Couldn't remove: " + (e.message || "error"));
+    }
+  };
+
+  // Update a field on the currently-selected tee (for overriding rating/slope/name).
+  const updateTee = (patch: Partial<{ name: string; rating: number; slope: number }>) => {
+    if (!picked) return;
+    const tees = picked.tees.map((t, i) => (i === teeIdx ? { ...t, ...patch } : t));
+    setPicked({ ...picked, tees });
+  };
+
+  // Update a single hole's par or stroke index — these belong to the course (all tees share them).
+  const updateHole = (holeIdx: number, patch: Partial<{ par: number; si: number | null }>) => {
+    if (!picked) return;
+    const holes = picked.holes.map((h, j) => (j === holeIdx ? { ...h, ...patch } : h));
+    setPicked({ ...picked, holes });
+  };
+
+  // Add a brand-new tee (e.g. the one you actually played isn't listed) and select it.
+  const addTee = () => {
+    if (!picked) return;
+    const template = picked.tees[teeIdx];
+    const coursePar = picked.holes.reduce((s, h) => s + (h.par || 0), 0);
+    const newTee = {
+      name: "New tee",
+      rating: template?.rating ?? 72,
+      slope: template?.slope ?? 113,
+      par: coursePar || template?.par || 72,
+    };
+    const tees = [...picked.tees, newTee];
+    setPicked({ ...picked, tees });
+    setTeeIdx(tees.length - 1);
+    setEditingTee(true);
   };
 
   // Search the online golf course database (falls back to starter list on error).
@@ -252,7 +327,8 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
 
   const tee = picked?.tees[teeIdx];
   const idxVal = idxStr.trim() === "" ? null : parseFloat(idxStr);
-  const realCH = tee && idxVal != null ? courseHandicap(idxVal, tee.slope, tee.rating, tee.par) : null;
+  const coursePar = picked ? picked.holes.reduce((s, h) => s + (h.par || 0), 0) : null;
+  const realCH = tee && idxVal != null && coursePar ? courseHandicap(idxVal, tee.slope, tee.rating, coursePar) : null;
 
   const makeCustom = () => {
     const c = buildCustomCourse(
@@ -265,16 +341,15 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
   const start = () => {
     if (!picked || !tee) return;
     if (idxVal != null && idxVal !== index) saveIndex(idxVal);
-    // API courses carry holes on each tee; built-in starter courses carry them on the course.
-    const sourceHoles = tee.holes && tee.holes.length ? tee.holes : picked.holes;
-    const holes: Hole[] = (sourceHoles || []).map((h: any) => ({
+    const coursePar = picked.holes.reduce((s, h) => s + (h.par || 0), 0);
+    const holes: Hole[] = picked.holes.map((h) => ({
       hole_number: h.n, par: h.par, stroke_index: h.si,
       strokes: null, putts: null, fairway: null, penalties: 0,
       recv: realCH != null ? strokesReceived(h.si, realCH) : 0,
     }));
     onReady({
       id: "", course: picked.name, tee_name: tee.name,
-      rating: tee.rating, slope: tee.slope, course_par: tee.par,
+      rating: tee.rating, slope: tee.slope, course_par: coursePar,
       handicap_index: idxVal, course_handicap: realCH,
       played_at: new Date().toISOString().slice(0, 10),
       holes,
@@ -291,13 +366,24 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
             <div style={{ marginTop: 14 }}>
               <Eyebrow>★ YOUR FAVORITES</Eyebrow>
               {favorites.map((f) => (
-                <button key={f.id} onClick={() => { setPicked(f.data); setTeeIdx(0); }}
-                  style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.card, border: `1px solid ${C.gold}`, borderRadius: 10, padding: "12px 14px" }}>
-                  <span style={{ color: C.gold, fontWeight: 800 }}>★ </span>
-                  <span style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{f.name}</span>
-                  {f.location ? <span style={{ color: C.faint, fontSize: 13 }}> · {f.location}</span> : null}
-                </button>
+                <div key={f.id}
+                  style={{ display: "flex", alignItems: "stretch", marginTop: 8, background: C.card, border: `1px solid ${C.gold}`, borderRadius: 10, overflow: "hidden" }}>
+                  <button onClick={() => { setPicked(f.data); setTeeIdx(0); setLoadedFavId(f.id); setEditingTee(false); setFavMsg(null); }}
+                    style={{ flex: 1, textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: "12px 14px" }}>
+                    <span style={{ color: C.gold, fontWeight: 800 }}>★ </span>
+                    <span style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{f.name}</span>
+                    {f.location ? <span style={{ color: C.faint, fontSize: 13 }}> · {f.location}</span> : null}
+                  </button>
+                  <button title="Remove from favorites"
+                    onClick={() => { if (confirm(`Remove "${f.name}" from favorites?`)) deleteFavorite(f.id); }}
+                    style={{ background: "none", border: "none", borderLeft: `1px solid ${C.line}`, color: C.birdie, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>
+                    ✕
+                  </button>
+                </div>
               ))}
+              <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+                Tap a favorite to load it. You can edit its tees/ratings below, or its pars &amp; stroke index on the scorecard, then update it.
+              </div>
             </div>
           )}
 
@@ -398,14 +484,86 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
           <div style={{ color: C.cream, fontWeight: 800, fontSize: 16 }}>{picked.name}</div>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{picked.location}</div>
           <div style={{ marginTop: 12 }}>
-            <label style={{ color: C.sage, fontSize: 12 }}>Tees</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <label style={{ color: C.sage, fontSize: 12 }}>Tees</label>
+              <button onClick={() => setEditingTee((v) => !v)}
+                style={{ background: "none", border: "none", color: C.gold, fontSize: 12, fontWeight: 700, cursor: "pointer", padding: 0 }}>
+                {editingTee ? "done editing" : "✎ override / add tee"}
+              </button>
+            </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
               {picked.tees.map((t, i) => (
                 <button key={i} onClick={() => setTeeIdx(i)} style={{ ...btn(i === teeIdx), padding: "8px 14px", fontSize: 13 }}>
                   {t.name} · {t.rating}/{t.slope}
                 </button>
               ))}
+              {editingTee && (
+                <button onClick={addTee} style={{ ...btn(false), padding: "8px 14px", fontSize: 13, border: `1px dashed ${C.gold}` }}>＋ add tee</button>
+              )}
             </div>
+
+            {editingTee && tee && (
+              <div style={{ background: C.green, borderRadius: 10, padding: 12, marginTop: 10 }}>
+                <div style={{ color: C.sage, fontSize: 11, marginBottom: 8 }}>
+                  <b style={{ color: C.cream }}>{tee.name}</b> tee — rating &amp; slope are specific to this tee (they change your course handicap).
+                </div>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <div style={{ flex: 2, minWidth: 140 }}>
+                    <label style={{ color: C.sage, fontSize: 11 }}>Tee name</label>
+                    <input style={{ ...inputStyle, marginTop: 4 }} value={tee.name}
+                      onChange={(e) => updateTee({ name: e.target.value })} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 90 }}>
+                    <label style={{ color: C.sage, fontSize: 11 }}>Rating</label>
+                    <input style={{ ...inputStyle, marginTop: 4 }} inputMode="decimal" placeholder="72.1"
+                      value={tee.rating ?? ""} onChange={(e) => updateTee({ rating: e.target.value === "" ? 0 : parseFloat(e.target.value) })} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 90 }}>
+                    <label style={{ color: C.sage, fontSize: 11 }}>Slope</label>
+                    <input style={{ ...inputStyle, marginTop: 4 }} inputMode="numeric" placeholder="130"
+                      value={tee.slope ?? ""} onChange={(e) => updateTee({ slope: e.target.value === "" ? 0 : parseInt(e.target.value, 10) || 0 })} />
+                  </div>
+                </div>
+
+                {picked.holes && picked.holes.length > 0 && (
+                  <div style={{ marginTop: 14 }}>
+                    <div style={{ color: C.sage, fontSize: 11, marginBottom: 6 }}>
+                      Par &amp; stroke index — these are the same for every tee. Total par: <b style={{ color: C.cream }}>{coursePar}</b>
+                    </div>
+                    <div style={{ overflowX: "auto" }}>
+                      <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                        <tbody>
+                          <tr>
+                            <td style={{ color: C.faint, fontSize: 10, padding: "2px 4px" }}>Hole</td>
+                            {picked.holes.map((h) => <td key={h.n} style={{ color: C.faint, fontSize: 10, padding: "2px 4px", textAlign: "center" }}>{h.n}</td>)}
+                          </tr>
+                          <tr>
+                            <td style={{ color: C.sage, fontSize: 10, padding: "2px 4px" }}>Par</td>
+                            {picked.holes.map((h, j) => (
+                              <td key={j} style={{ padding: 2 }}>
+                                <input inputMode="numeric" value={h.par ?? ""}
+                                  onChange={(e) => updateHole(j, { par: Math.max(3, Math.min(6, parseInt(e.target.value, 10) || 3)) })}
+                                  style={{ ...inputStyle, padding: "3px 2px", width: 32, textAlign: "center", fontSize: 13 }} />
+                              </td>
+                            ))}
+                          </tr>
+                          <tr>
+                            <td style={{ color: C.sage, fontSize: 10, padding: "2px 4px" }}>S.I.</td>
+                            {picked.holes.map((h, j) => (
+                              <td key={j} style={{ padding: 2 }}>
+                                <input inputMode="numeric" value={h.si ?? ""}
+                                  onChange={(e) => updateHole(j, { si: e.target.value === "" ? null : Math.max(1, Math.min(18, parseInt(e.target.value, 10) || 0)) || null })}
+                                  style={{ ...inputStyle, padding: "3px 2px", width: 32, textAlign: "center", fontSize: 13 }} />
+                              </td>
+                            ))}
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <div style={{ marginTop: 12 }}>
             <label style={{ color: C.sage, fontSize: 12 }}>Your handicap index (optional — needed for Stableford)</label>
@@ -420,10 +578,16 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
             </div>
           )}
           <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
-            <button style={btn(false)} onClick={() => { setPicked(null); setFavMsg(null); }}>‹ Change course</button>
-            <button style={{ ...btn(false), opacity: favSaving ? 0.5 : 1 }} disabled={favSaving} onClick={saveFavorite}>
-              {favSaving ? "Saving…" : "★ Save as favorite"}
-            </button>
+            <button style={btn(false)} onClick={() => { setPicked(null); setFavMsg(null); setLoadedFavId(null); }}>‹ Change course</button>
+            {loadedFavId ? (
+              <button style={{ ...btn(false), opacity: favSaving ? 0.5 : 1 }} disabled={favSaving} onClick={updateFavorite}>
+                {favSaving ? "Updating…" : "★ Update this favorite"}
+              </button>
+            ) : (
+              <button style={{ ...btn(false), opacity: favSaving ? 0.5 : 1 }} disabled={favSaving} onClick={saveFavorite}>
+                {favSaving ? "Saving…" : "★ Save as favorite"}
+              </button>
+            )}
             <button style={btn(true)} onClick={start}>Continue to scorecard ›</button>
           </div>
           {favMsg && <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>{favMsg}</div>}
@@ -447,16 +611,16 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
   // Save the corrected par/stroke-index back as a favorite course for next time.
   const saveCorrectedFavorite = async () => {
     setFavMsg(null);
+    const coursePar = holes.reduce((s, h) => s + h.par, 0);
     const course = {
       id: "corrected",
       name: round.course,
       location: round.tee_name || "",
       tees: [{
         name: round.tee_name || "Default",
-        rating: round.rating ?? 72, slope: round.slope ?? 113, course_par: round.course_par,
-        par: round.course_par ?? holes.reduce((s, h) => s + h.par, 0),
-        holes: holes.map((h) => ({ n: h.hole_number, par: h.par, si: h.stroke_index })),
+        rating: round.rating ?? 72, slope: round.slope ?? 113, par: coursePar,
       }],
+      holes: holes.map((h) => ({ n: h.hole_number, par: h.par, si: h.stroke_index })),
     };
     try {
       const { error } = await supabase.from("favorite_courses").insert({

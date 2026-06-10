@@ -69,6 +69,7 @@ function locationString(loc: any): string {
 function normalizeCourse(c: any) {
   const teeGroups = c.tees || {};
   const allTees: any[] = [];
+  let courseHoles: any[] = [];
   ["male", "female"].forEach((g) => {
     (teeGroups[g] || []).forEach((t: any) => {
       const holes = (t.holes || []).map((h: any, i: number) => ({
@@ -76,12 +77,13 @@ function normalizeCourse(c: any) {
         par: h.par,
         si: h.handicap ?? null,
       }));
+      // Par and stroke index are the same across tees — capture them once.
+      if (holes.length > courseHoles.length) courseHoles = holes;
       allTees.push({
         name: t.tee_name + (g === "female" ? " (W)" : ""),
         rating: t.course_rating,
         slope: t.slope_rating,
         par: t.par_total || holes.reduce((s: number, h: any) => s + (h.par || 0), 0),
-        holes,
       });
     });
   });
@@ -89,6 +91,7 @@ function normalizeCourse(c: any) {
     id: c.id,
     name: c.course_name || c.club_name,
     location: locationString(c.location),
-    tees: allTees.filter((t) => t.holes.length > 0),
+    tees: allTees,
+    holes: courseHoles,
   };
 }
