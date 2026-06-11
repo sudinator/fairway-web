@@ -596,18 +596,48 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
               <tr>{["Hole", "Par", "Score", "Putts"].map((h) => <th key={h} style={{ color: C.faint, fontSize: 11, textAlign: "center", padding: 4 }}>{h}</th>)}</tr>
             </thead>
             <tbody>
-              {holes.map((h, i) => (
-                <tr key={i}>
-                  <td style={{ textAlign: "center", color: C.ink, fontWeight: 700, padding: 3 }}>{h.hole_number}</td>
-                  <td style={{ textAlign: "center", color: C.sage, padding: 3 }}>{h.par}</td>
-                  <td style={{ textAlign: "center", padding: 3 }}>
-                    <NumPicker value={h.strokes} from={1} to={h.par * 2 + (editing.course_handicap != null ? (h.recv || 0) : 0)} onChange={(v) => setHole(i, { strokes: v })} />
-                  </td>
-                  <td style={{ textAlign: "center", padding: 3 }}>
-                    <NumPicker value={h.putts} from={0} to={6} onChange={(v) => setHole(i, { putts: v })} />
-                  </td>
-                </tr>
-              ))}
+              {holes.map((h, i) => {
+                const subtotalAfter = (i === 8 && holes.length > 9) || i === holes.length - 1;
+                const segStart = i < 9 ? 0 : 9;
+                const seg = holes.slice(segStart, i + 1);
+                const sPar = seg.reduce((s, x) => s + (x.par || 0), 0);
+                const sScore = seg.reduce((s, x) => s + (x.strokes || 0), 0);
+                const sPutts = seg.reduce((s, x) => s + (x.putts || 0), 0);
+                return (
+                  <React.Fragment key={i}>
+                    <tr>
+                      <td style={{ textAlign: "center", color: C.ink, fontWeight: 700, padding: 3 }}>{h.hole_number}</td>
+                      <td style={{ textAlign: "center", color: C.sage, padding: 3 }}>{h.par}</td>
+                      <td style={{ textAlign: "center", padding: 3 }}>
+                        <NumPicker value={h.strokes} from={1} to={h.par * 2 + (editing.course_handicap != null ? (h.recv || 0) : 0)} onChange={(v) => setHole(i, { strokes: v })} />
+                      </td>
+                      <td style={{ textAlign: "center", padding: 3 }}>
+                        <NumPicker value={h.putts} from={0} to={6} onChange={(v) => setHole(i, { putts: v })} />
+                      </td>
+                    </tr>
+                    {subtotalAfter && (
+                      <tr style={{ background: C.greenLight, borderTop: `2px solid ${C.greenMid}` }}>
+                        <td style={{ textAlign: "center", color: C.gold, fontWeight: 800, fontSize: 11, padding: 4 }}>{segStart === 0 ? "OUT" : "IN"}</td>
+                        <td style={{ textAlign: "center", color: C.ink, fontWeight: 800, padding: 4 }}>{sPar}</td>
+                        <td style={{ textAlign: "center", color: C.green, fontWeight: 800, padding: 4 }}>{sScore || "–"}</td>
+                        <td style={{ textAlign: "center", color: C.faint, fontWeight: 700, padding: 4 }}>{sPutts || "–"}</td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+              {holes.length > 9 && (() => {
+                const tot = holes.reduce((s, x) => s + (x.strokes || 0), 0);
+                const totPutts = holes.reduce((s, x) => s + (x.putts || 0), 0);
+                return (
+                  <tr style={{ background: C.green }}>
+                    <td style={{ textAlign: "center", color: C.cream, fontWeight: 800, fontSize: 11, padding: 5 }}>TOTAL</td>
+                    <td></td>
+                    <td style={{ textAlign: "center", color: "#fff", fontWeight: 800, padding: 5 }}>{tot || "–"}</td>
+                    <td style={{ textAlign: "center", color: C.cream, fontWeight: 700, padding: 5 }}>{totPutts || "–"}</td>
+                  </tr>
+                );
+              })()}
             </tbody>
           </table>
         </div>

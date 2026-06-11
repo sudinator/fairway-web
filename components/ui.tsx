@@ -52,6 +52,8 @@ export function ClassicCard({ round }: { round: Round }) {
         const start = ni * 9;
         const par = nine.reduce((s, h) => s + h.par, 0);
         const str = nine.reduce((s, h) => s + (h.strokes || 0), 0);
+        const putts = nine.reduce((s, h) => s + (h.putts || 0), 0);
+        const hasPutts = nine.some((h) => h.putts != null);
         const pts = nine.reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
         return (
           <table key={ni} style={{ borderCollapse: "collapse", width: "100%", marginBottom: 12 }}>
@@ -76,6 +78,13 @@ export function ClassicCard({ round }: { round: Round }) {
                 {nine.map((h, i) => <td key={i} style={{ ...cardTd(), padding: 2 }}><ScoreMark hole={h} /></td>)}
                 <td style={{ ...cardTd(), fontWeight: 800 }}>{str || "—"}</td>
               </tr>
+              {hasPutts && (
+                <tr>
+                  <td style={cardTd()}>Putts</td>
+                  {nine.map((h, i) => <td key={i} style={{ ...cardTd(), color: C.faint }}>{h.putts ?? "·"}</td>)}
+                  <td style={{ ...cardTd(), fontWeight: 700 }}>{putts || "—"}</td>
+                </tr>
+              )}
               <tr>
                 <td style={cardTd()}>Pts</td>
                 {nine.map((h, i) => {
@@ -88,6 +97,27 @@ export function ClassicCard({ round }: { round: Round }) {
           </table>
         );
       })}
+      {round.holes.length > 9 && (() => {
+        const out = round.holes.slice(0, 9).reduce((s, h) => s + (h.strokes || 0), 0);
+        const inn = round.holes.slice(9, 18).reduce((s, h) => s + (h.strokes || 0), 0);
+        if (!out && !inn) return null;
+        return (
+          <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 12, flexWrap: "wrap" }}>
+            <div style={{ border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 16px", textAlign: "center" }}>
+              <div style={{ color: C.faint, fontSize: 10, letterSpacing: 2 }}>OUT</div>
+              <div style={{ color: C.ink, fontWeight: 800, fontSize: 18 }}>{out || "–"}</div>
+            </div>
+            <div style={{ border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 16px", textAlign: "center" }}>
+              <div style={{ color: C.faint, fontSize: 10, letterSpacing: 2 }}>IN</div>
+              <div style={{ color: C.ink, fontWeight: 800, fontSize: 18 }}>{inn || "–"}</div>
+            </div>
+            <div style={{ background: C.green, borderRadius: 8, padding: "6px 16px", textAlign: "center" }}>
+              <div style={{ color: C.cream, fontSize: 10, letterSpacing: 2 }}>TOTAL</div>
+              <div style={{ color: "#fff", fontWeight: 800, fontSize: 18 }}>{out + inn || "–"}</div>
+            </div>
+          </div>
+        );
+      })()}
       <div style={{ display: "flex", gap: 16, justifyContent: "center", fontSize: 11, color: C.faint, flexWrap: "wrap" }}>
         <span><span style={{ display: "inline-block", width: 12, height: 12, border: `1.5px solid ${C.birdie}`, borderRadius: "50%", verticalAlign: -2, marginRight: 5 }} />under par</span>
         <span><span style={{ display: "inline-block", width: 12, height: 12, border: `1.5px solid ${C.bogey}`, borderRadius: 3, verticalAlign: -2, marginRight: 5 }} />over par</span>

@@ -781,12 +781,34 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
                   </button>
                 </td>
                 <td style={{ padding: 3, textAlign: "center" }}>
-                  <NumPicker value={h.penalties || null} from={0} to={3} onChange={(v) => setHole(i, { penalties: v ?? 0 })} width={42} />
+                  <NumPicker value={h.penalties || null} from={1} to={3} onChange={(v) => setHole(i, { penalties: v ?? 0 })} width={42} />
                 </td>
                 <td style={{ padding: 3, textAlign: "center", fontWeight: 800, color: (pts ?? 0) >= 3 ? C.birdie : pts === 0 ? C.faint : C.ink }}>{pts ?? "·"}</td>
               </tr>
             );
           })}
+          {(() => {
+            const seg = holes.slice(from, to);
+            const sumPar = seg.reduce((s, h) => s + (h.par || 0), 0);
+            const sumStr = seg.reduce((s, h) => s + (h.strokes || 0), 0);
+            const sumPutts = seg.reduce((s, h) => s + (h.putts || 0), 0);
+            const sumPen = seg.reduce((s, h) => s + (h.penalties || 0), 0);
+            const sumPts = seg.reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
+            const tag = from === 0 ? "OUT" : "IN";
+            return (
+              <tr style={{ borderTop: `2px solid ${C.greenMid}`, background: C.greenLight }}>
+                <td style={{ padding: 5, fontWeight: 800, color: C.gold, textAlign: "center", letterSpacing: 1 }}>{tag}</td>
+                <td style={{ padding: 5, fontWeight: 800, color: C.ink, textAlign: "center" }}>{sumPar}</td>
+                <td></td>
+                <td></td>
+                <td style={{ padding: 5, fontWeight: 800, color: C.ink, textAlign: "center" }}>{sumStr || "–"}</td>
+                <td style={{ padding: 5, fontWeight: 800, color: C.ink, textAlign: "center" }}>{sumPutts || "–"}</td>
+                <td></td>
+                <td style={{ padding: 5, fontWeight: 800, color: C.ink, textAlign: "center" }}>{sumPen || "–"}</td>
+                <td style={{ padding: 5, fontWeight: 800, color: C.green, textAlign: "center" }}>{sumPts}</td>
+              </tr>
+            );
+          })()}
         </tbody>
       </table>
     </div>
@@ -806,6 +828,26 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
         {holes.length > 9 && <Nine from={9} to={18} label="BACK NINE" />}
       </div>
       {err && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{err}</div>}
+      {anyPlayed && holes.length > 9 && (() => {
+        const out = holes.slice(0, 9).reduce((s, h) => s + (h.strokes || 0), 0);
+        const inn = holes.slice(9, 18).reduce((s, h) => s + (h.strokes || 0), 0);
+        return (
+          <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
+            <div style={{ background: C.greenLight, borderRadius: 10, padding: "8px 18px", textAlign: "center" }}>
+              <div style={{ color: C.sage, fontSize: 10, letterSpacing: 2 }}>OUT</div>
+              <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800 }}>{out || "–"}</div>
+            </div>
+            <div style={{ background: C.greenLight, borderRadius: 10, padding: "8px 18px", textAlign: "center" }}>
+              <div style={{ color: C.sage, fontSize: 10, letterSpacing: 2 }}>IN</div>
+              <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800 }}>{inn || "–"}</div>
+            </div>
+            <div style={{ background: C.gold, borderRadius: 10, padding: "8px 18px", textAlign: "center" }}>
+              <div style={{ color: "#3B2A00", fontSize: 10, letterSpacing: 2 }}>TOTAL</div>
+              <div style={{ color: "#3B2A00", fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800 }}>{out + inn || "–"}</div>
+            </div>
+          </div>
+        );
+      })()}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 16, flexWrap: "wrap" }}>
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 24, fontWeight: 700 }}>
           {anyPlayed ? `${strokesOf(live)} (${toParStr(diffOf(live))}) · ${ptsOf(live)} pts` : "Enter scores above"}

@@ -515,16 +515,52 @@ function ScoreGrid({ game, me, savingHole, onSetHole }: {
               );
             })}
           </tr>
+          {(() => {
+            const seg = game.holes_meta.slice(from, to);
+            const sPar = seg.reduce((s, m) => s + (m.par || 0), 0);
+            const sScore = seg.reduce((s, m, j) => s + (me.scores?.[from + j] || 0), 0);
+            const sPutts = seg.reduce((s, m, j) => s + (me.putts?.[from + j] || 0), 0);
+            return (
+              <tr style={{ borderTop: `2px solid ${C.greenMid}` }}>
+                <td style={{ color: C.gold, fontSize: 11, fontWeight: 800, padding: "4px" }}>{from === 0 ? "OUT" : "IN"}</td>
+                <td colSpan={seg.length} style={{ padding: "4px", color: C.ink, fontSize: 12, fontWeight: 700 }}>
+                  par {sPar} · <span style={{ color: C.green, fontWeight: 800 }}>{sScore || "–"} strokes</span>{sPutts ? ` · ${sPutts} putts` : ""}
+                </td>
+              </tr>
+            );
+          })()}
         </tbody>
       </table>
     </div>
   );
 
+  const outScore = game.holes_meta.slice(0, 9).reduce((s, m, j) => s + (me.scores?.[j] || 0), 0);
+  const inScore = game.holes_meta.slice(9, 18).reduce((s, m, j) => s + (me.scores?.[9 + j] || 0), 0);
+  const has18 = game.holes_meta.length > 9;
+
   return (
-    <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 10 }}>
-      {nine(0, Math.min(9, game.holes_meta.length), "FRONT NINE")}
-      {game.holes_meta.length > 9 && nine(9, 18, "BACK NINE")}
-    </div>
+    <>
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 10 }}>
+        {nine(0, Math.min(9, game.holes_meta.length), "FRONT NINE")}
+        {has18 && nine(9, 18, "BACK NINE")}
+      </div>
+      {has18 && (outScore > 0 || inScore > 0) && (
+        <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+          <div style={{ background: C.card, borderRadius: 10, padding: "8px 18px", textAlign: "center" }}>
+            <div style={{ color: C.sage, fontSize: 10, letterSpacing: 2 }}>OUT</div>
+            <div style={{ color: C.ink, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif" }}>{outScore || "–"}</div>
+          </div>
+          <div style={{ background: C.card, borderRadius: 10, padding: "8px 18px", textAlign: "center" }}>
+            <div style={{ color: C.sage, fontSize: 10, letterSpacing: 2 }}>IN</div>
+            <div style={{ color: C.ink, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif" }}>{inScore || "–"}</div>
+          </div>
+          <div style={{ background: C.green, borderRadius: 10, padding: "8px 18px", textAlign: "center" }}>
+            <div style={{ color: C.cream, fontSize: 10, letterSpacing: 2 }}>TOTAL</div>
+            <div style={{ color: "#fff", fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif" }}>{outScore + inScore || "–"}</div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
