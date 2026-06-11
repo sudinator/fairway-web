@@ -263,7 +263,17 @@ function CourseForm({ course, setCourse, existingId, saving, setSaving, err, set
 
       {/* Par + stroke index */}
       <div style={{ marginTop: 16 }}>
-        <div style={{ color: C.sage, fontSize: 12, marginBottom: 6 }}>Par &amp; stroke index (same for all tees) · total par {coursePar}</div>
+        {(() => {
+          const front = course.holes.slice(0, 9).reduce((s, h) => s + (h.par || 0), 0);
+          const back = course.holes.slice(9, 18).reduce((s, h) => s + (h.par || 0), 0);
+          return (
+            <div style={{ color: C.sage, fontSize: 12, marginBottom: 6 }}>
+              Par &amp; stroke index (same for all tees) · <b style={{ color: C.cream }}>Out {front}</b>
+              {course.holes.length > 9 ? <> · <b style={{ color: C.cream }}>In {back}</b></> : null}
+              {" · "}<b style={{ color: C.gold }}>Total {coursePar}</b>
+            </div>
+          );
+        })()}
         <div style={{ background: C.card, borderRadius: 10, padding: 10, overflowX: "auto" }}>
           <table style={{ borderCollapse: "collapse", width: "100%" }}>
             <tbody>
@@ -275,8 +285,10 @@ function CourseForm({ course, setCourse, existingId, saving, setSaving, err, set
                 <td style={{ color: C.sage, fontSize: 10, padding: "2px 4px" }}>Par</td>
                 {course.holes.map((h, j) => (
                   <td key={j} style={{ padding: 2 }}>
-                    <input inputMode="numeric" value={h.par ?? ""} onChange={(e) => updateHole(j, { par: Math.max(3, Math.min(6, parseInt(e.target.value, 10) || 3)) })}
-                      style={{ ...inputStyle, padding: "3px 2px", width: 30, textAlign: "center", fontSize: 13 }} />
+                    <select value={h.par ?? 4} onChange={(e) => updateHole(j, { par: parseInt(e.target.value, 10) })}
+                      style={{ ...inputStyle, padding: "3px 0", width: 38, textAlign: "center", fontSize: 13 }}>
+                      {[3, 4, 5, 6].map((p) => <option key={p} value={p}>{p}</option>)}
+                    </select>
                   </td>
                 ))}
               </tr>
@@ -284,8 +296,11 @@ function CourseForm({ course, setCourse, existingId, saving, setSaving, err, set
                 <td style={{ color: C.sage, fontSize: 10, padding: "2px 4px" }}>S.I.</td>
                 {course.holes.map((h, j) => (
                   <td key={j} style={{ padding: 2 }}>
-                    <input inputMode="numeric" value={h.si ?? ""} onChange={(e) => updateHole(j, { si: e.target.value === "" ? null : Math.max(1, Math.min(18, parseInt(e.target.value, 10) || 0)) || null })}
-                      style={{ ...inputStyle, padding: "3px 2px", width: 30, textAlign: "center", fontSize: 13 }} />
+                    <select value={h.si ?? ""} onChange={(e) => updateHole(j, { si: e.target.value === "" ? null : parseInt(e.target.value, 10) })}
+                      style={{ ...inputStyle, padding: "3px 0", width: 42, textAlign: "center", fontSize: 13 }}>
+                      <option value="">–</option>
+                      {Array.from({ length: 18 }, (_, k) => k + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
                   </td>
                 ))}
               </tr>

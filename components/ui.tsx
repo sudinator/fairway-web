@@ -96,3 +96,26 @@ export function ClassicCard({ round }: { round: Round }) {
     </div>
   );
 }
+
+// A compact numeric dropdown for score entry on mobile (tap instead of type).
+// `from`/`to` set the range; `dash` shows a blank "–" option for "not entered".
+export function NumPicker({ value, from, to, onChange, width = 46, dash = true, accent }: {
+  value: number | null; from: number; to: number;
+  onChange: (v: number | null) => void; width?: number; dash?: boolean; accent?: boolean;
+}) {
+  const opts: number[] = [];
+  for (let n = from; n <= to; n++) opts.push(n);
+  return (
+    <select
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value === "" ? null : parseInt(e.target.value, 10))}
+      style={{
+        background: accent ? C.cream : C.card, border: `1px solid ${C.line}`, borderRadius: 8,
+        padding: "6px 2px", fontSize: 15, color: C.ink, width, textAlign: "center", textAlignLast: "center",
+      } as React.CSSProperties}
+    >
+      {dash && <option value="">–</option>}
+      {opts.map((n) => <option key={n} value={n}>{n}</option>)}
+    </select>
+  );
+}

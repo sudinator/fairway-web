@@ -6,7 +6,7 @@ import {
   C, Hole, courseHandicap, strokesReceived, stablefordPts, stablefordBySix,
   matchStatus, matchAllowance,
 } from "@/lib/golf";
-import { btn, inputStyle, Eyebrow } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, NumPicker } from "@/components/ui";
 
 const supabase = createClient();
 
@@ -475,10 +475,10 @@ function ScoreGrid({ game, me, savingHole, onSetHole }: {
             {game.holes_meta.slice(from, to).map((m, j) => {
               const i = from + j;
               return (
-                <td key={j} style={{ padding: 2 }}>
-                  <input inputMode="numeric" value={me.scores?.[i] ?? ""} placeholder="–"
-                    onChange={(e) => onSetHole(i, { strokes: e.target.value === "" ? null : Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 0)) || null })}
-                    style={{ ...inputStyle, padding: "5px 2px", width: 36, textAlign: "center", fontSize: 15, borderColor: savingHole === i ? C.gold : C.line }} />
+                <td key={j} style={{ padding: 2, textAlign: "center" }}>
+                  <NumPicker value={me.scores?.[i] ?? null} from={1} to={12}
+                    onChange={(v) => onSetHole(i, { strokes: v })}
+                    width={40} accent={savingHole === i} />
                 </td>
               );
             })}
@@ -488,10 +488,9 @@ function ScoreGrid({ game, me, savingHole, onSetHole }: {
             {game.holes_meta.slice(from, to).map((m, j) => {
               const i = from + j;
               return (
-                <td key={j} style={{ padding: 2 }}>
-                  <input inputMode="numeric" value={me.putts?.[i] ?? ""} placeholder="–"
-                    onChange={(e) => onSetHole(i, { putts: e.target.value === "" ? null : Math.max(0, Math.min(9, parseInt(e.target.value, 10) || 0)) })}
-                    style={{ ...inputStyle, padding: "5px 2px", width: 36, textAlign: "center", fontSize: 14 }} />
+                <td key={j} style={{ padding: 2, textAlign: "center" }}>
+                  <NumPicker value={me.putts?.[i] ?? null} from={0} to={6}
+                    onChange={(v) => onSetHole(i, { putts: v })} width={40} />
                 </td>
               );
             })}

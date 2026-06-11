@@ -12,7 +12,7 @@ import {
   girStats, firStats, pct, holeBuckets, avgByPar, roundDifferential, runningHandicap,
 } from "@/lib/golf";
 import { STARTER_COURSES, buildCustomCourse, Course } from "@/lib/courses";
-import { btn, inputStyle, Eyebrow, StatCard, ClassicCard } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, StatCard, ClassicCard, NumPicker } from "@/components/ui";
 import Tournaments from "@/components/tournaments";
 import { CoursesLibrary, ProfilePanel } from "@/components/manage";
 
@@ -759,15 +759,11 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
                 <td style={{ padding: 3, textAlign: "center" }}>
                   <span style={{ color: C.gold, fontSize: 12, fontWeight: 700 }}>{h.recv ? "●".repeat(Math.min(h.recv, 3)) : ""}</span>
                 </td>
-                <td style={{ padding: 3 }}>
-                  <input inputMode="numeric" value={h.strokes ?? ""} placeholder="–"
-                    onChange={(e) => setHole(i, { strokes: num(e.target.value, 20) })}
-                    style={{ ...inputStyle, padding: "5px 4px", width: 46, textAlign: "center", fontSize: 15 }} />
+                <td style={{ padding: 3, textAlign: "center" }}>
+                  <NumPicker value={h.strokes} from={1} to={12} onChange={(v) => setHole(i, { strokes: v })} />
                 </td>
-                <td style={{ padding: 3 }}>
-                  <input inputMode="numeric" value={h.putts ?? ""} placeholder="–"
-                    onChange={(e) => setHole(i, { putts: num(e.target.value, 9) })}
-                    style={{ ...inputStyle, padding: "5px 4px", width: 46, textAlign: "center", fontSize: 15 }} />
+                <td style={{ padding: 3, textAlign: "center" }}>
+                  <NumPicker value={h.putts} from={0} to={6} onChange={(v) => setHole(i, { putts: v })} />
                 </td>
                 <td style={{ padding: 3, textAlign: "center" }}>
                   <button onClick={() => cycleFw(i, h)} disabled={h.par < 4}
@@ -779,10 +775,8 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
                     {h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "miss" ? "✗" : "·"}
                   </button>
                 </td>
-                <td style={{ padding: 3 }}>
-                  <input inputMode="numeric" value={h.penalties || ""} placeholder="0"
-                    onChange={(e) => setHole(i, { penalties: e.target.value === "" ? 0 : Math.max(0, Math.min(9, parseInt(e.target.value, 10) || 0)) })}
-                    style={{ ...inputStyle, padding: "5px 4px", width: 42, textAlign: "center", fontSize: 15 }} />
+                <td style={{ padding: 3, textAlign: "center" }}>
+                  <NumPicker value={h.penalties || null} from={0} to={5} onChange={(v) => setHole(i, { penalties: v ?? 0 })} width={42} />
                 </td>
                 <td style={{ padding: 3, textAlign: "center", fontWeight: 800, color: (pts ?? 0) >= 3 ? C.birdie : pts === 0 ? C.faint : C.ink }}>{pts ?? "·"}</td>
               </tr>
