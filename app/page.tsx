@@ -11,7 +11,7 @@ import {
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate,
   girStats, firStats, pct, holeBuckets, avgByPar, roundDifferential, runningHandicap,
 } from "@/lib/golf";
-import { STARTER_COURSES, buildCustomCourse, Course } from "@/lib/courses";
+import { buildCustomCourse, Course } from "@/lib/courses";
 import { btn, inputStyle, Eyebrow, StatCard, ClassicCard, NumPicker } from "@/components/ui";
 import Tournaments from "@/components/tournaments";
 import { CoursesLibrary, ProfilePanel, NotificationBell } from "@/components/manage";
@@ -352,11 +352,8 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
     }
   };
 
-  // Starter-list matches (shown before any search, and as a fallback).
-  const starterMatches = q.trim().length
-    ? STARTER_COURSES.filter((c) =>
-        (c.name + " " + c.location).toLowerCase().includes(q.trim().toLowerCase()))
-    : STARTER_COURSES;
+  // Built-in "popular courses" suggestions were removed — rely on database search and the shared library.
+  const starterMatches: Course[] = [];
 
   const tee = picked?.tees[teeIdx];
   const idxVal = idxStr.trim() === "" ? null : parseFloat(idxStr);
