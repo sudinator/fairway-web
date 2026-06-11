@@ -760,7 +760,9 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
                   <span style={{ color: C.gold, fontSize: 12, fontWeight: 700 }}>{h.recv ? "●".repeat(Math.min(h.recv, 3)) : ""}</span>
                 </td>
                 <td style={{ padding: 3, textAlign: "center" }}>
-                  <NumPicker value={h.strokes} from={1} to={12} onChange={(v) => setHole(i, { strokes: v })} />
+                  <NumPicker value={h.strokes} from={1}
+                    to={round.course_handicap != null ? h.par + 2 + (h.recv || 0) : h.par * 2}
+                    onChange={(v) => setHole(i, { strokes: v })} />
                 </td>
                 <td style={{ padding: 3, textAlign: "center" }}>
                   <NumPicker value={h.putts} from={0} to={6} onChange={(v) => setHole(i, { putts: v })} />
@@ -776,7 +778,7 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
                   </button>
                 </td>
                 <td style={{ padding: 3, textAlign: "center" }}>
-                  <NumPicker value={h.penalties || null} from={0} to={5} onChange={(v) => setHole(i, { penalties: v ?? 0 })} width={42} />
+                  <NumPicker value={h.penalties || null} from={0} to={3} onChange={(v) => setHole(i, { penalties: v ?? 0 })} width={42} />
                 </td>
                 <td style={{ padding: 3, textAlign: "center", fontWeight: 800, color: (pts ?? 0) >= 3 ? C.birdie : pts === 0 ? C.faint : C.ink }}>{pts ?? "·"}</td>
               </tr>

@@ -476,7 +476,8 @@ function ScoreGrid({ game, me, savingHole, onSetHole }: {
               const i = from + j;
               return (
                 <td key={j} style={{ padding: 2, textAlign: "center" }}>
-                  <NumPicker value={me.scores?.[i] ?? null} from={1} to={12}
+                  <NumPicker value={me.scores?.[i] ?? null} from={1}
+                    to={me.course_handicap != null ? m.par + 2 + strokesReceived(m.si, me.course_handicap) : m.par * 2}
                     onChange={(v) => onSetHole(i, { strokes: v })}
                     width={40} accent={savingHole === i} />
                 </td>
