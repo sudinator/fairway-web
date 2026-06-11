@@ -501,89 +501,85 @@ function ScoreGrid({ game, me, savingHole, onSetHole }: {
     onSetHole(i, { fairway: next });
   };
 
-  const nine = (from: number, to: number, label: string) => (
-    <div style={{ background: C.card, borderRadius: 12, padding: 12, flex: 1, minWidth: 340, overflowX: "auto" }}>
-      <div style={{ color: C.faint, fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 6 }}>{label}</div>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <tbody>
-          <tr>
-            <td style={{ color: C.faint, fontSize: 10, padding: "2px 4px" }}>Hole</td>
-            {game.holes_meta.slice(from, to).map((m) => <td key={m.n} style={{ textAlign: "center", color: C.faint, fontSize: 10 }}>{m.n}</td>)}
-          </tr>
-          <tr>
-            <td style={{ color: C.sage, fontSize: 10, padding: "2px 4px" }}>Par</td>
-            {game.holes_meta.slice(from, to).map((m, j) => <td key={j} style={{ textAlign: "center", color: C.ink, fontSize: 12 }}>{m.par}</td>)}
-          </tr>
-          <tr>
-            <td style={{ color: C.sage, fontSize: 10, padding: "2px 4px" }}>Score</td>
-            {game.holes_meta.slice(from, to).map((m, j) => {
-              const i = from + j;
-              return (
-                <td key={j} style={{ padding: 2, textAlign: "center" }}>
-                  <NumPicker value={me.scores?.[i] ?? null} from={1}
-                    to={me.course_handicap != null ? m.par + 2 + strokesReceived(m.si, me.course_handicap) : m.par * 2}
-                    onChange={(v) => onSetHole(i, { strokes: v })}
-                    width={40} accent={savingHole === i} />
-                </td>
-              );
-            })}
-          </tr>
-          <tr>
-            <td style={{ color: C.sage, fontSize: 10, padding: "2px 4px" }}>Putts</td>
-            {game.holes_meta.slice(from, to).map((m, j) => {
-              const i = from + j;
-              return (
-                <td key={j} style={{ padding: 2, textAlign: "center" }}>
-                  <NumPicker value={me.putts?.[i] ?? null} from={0} to={6}
-                    onChange={(v) => onSetHole(i, { putts: v })} width={40} />
-                </td>
-              );
-            })}
-          </tr>
-          <tr>
-            <td style={{ color: C.sage, fontSize: 10, padding: "2px 4px" }}>FW</td>
-            {game.holes_meta.slice(from, to).map((m, j) => {
-              const i = from + j;
-              const fw = me.fairways?.[i] ?? null;
-              return (
-                <td key={j} style={{ padding: 2, textAlign: "center" }}>
-                  <button onClick={() => cycleFw(i, fw, m.par)} disabled={m.par < 4}
-                    style={{
-                      border: `1px solid ${C.line}`, borderRadius: 6, width: 30, height: 28, cursor: m.par < 4 ? "default" : "pointer",
-                      background: fw === "hit" ? "#DDF0DF" : fw === "miss" ? "#F6DEDB" : C.card,
-                      color: fw === "hit" ? C.greenMid : fw === "miss" ? C.birdie : C.faint, fontWeight: 800, fontSize: 13,
-                    }}>
-                    {m.par < 4 ? "—" : fw === "hit" ? "✓" : fw === "miss" ? "✗" : "·"}
-                  </button>
-                </td>
-              );
-            })}
-          </tr>
-          {(() => {
-            const seg = game.holes_meta.slice(from, to);
-            const sPar = seg.reduce((s, m) => s + (m.par || 0), 0);
-            const sScore = seg.reduce((s, m, j) => s + (me.scores?.[from + j] || 0), 0);
-            const sPutts = seg.reduce((s, m, j) => s + (me.putts?.[from + j] || 0), 0);
-            return (
-              <tr style={{ borderTop: `2px solid ${C.greenMid}` }}>
-                <td style={{ color: C.gold, fontSize: 11, fontWeight: 800, padding: "4px" }}>{from === 0 ? "OUT" : "IN"}</td>
-                <td colSpan={seg.length} style={{ padding: "4px", color: C.ink, fontSize: 12, fontWeight: 700 }}>
-                  par {sPar} · <span style={{ color: C.green, fontWeight: 800 }}>{sScore || "–"} strokes</span>{sPutts ? ` · ${sPutts} putts` : ""}
-                </td>
-              </tr>
-            );
-          })()}
-        </tbody>
-      </table>
-    </div>
-  );
+  // One vertical block per nine: a row per hole so you scroll down, not sideways.
+  const nine = (from: number, to: number, label: string) => {
+    const seg = game.holes_meta.slice(from, to);
+    const sPar = seg.reduce((s, m) => s + (m.par || 0), 0);
+    const sScore = seg.reduce((s, m, j) => s + (me.scores?.[from + j] || 0), 0);
+    const sPutts = seg.reduce((s, m, j) => s + (me.putts?.[from + j] || 0), 0);
+    return (
+      <div style={{ background: C.card, borderRadius: 12, padding: 12, flex: 1, minWidth: 300 }}>
+        <div style={{ color: C.faint, fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 8 }}>{label}</div>
+        {/* column headers */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 4px 6px", color: C.faint, fontSize: 10, letterSpacing: 1, borderBottom: `1px solid ${C.line}` }}>
+          <div style={{ width: 58 }}>HOLE</div>
+          <div style={{ width: 34, textAlign: "center" }}>PAR</div>
+          <div style={{ flex: 1, textAlign: "center" }}>SCORE</div>
+          <div style={{ textAlign: "center" }}>PUTTS</div>
+          <div style={{ width: 34, textAlign: "center" }}>FW</div>
+        </div>
+        {seg.map((m, j) => {
+          const i = from + j;
+          const recv = me.course_handicap != null ? strokesReceived(m.si, me.course_handicap) : 0;
+          const fw = me.fairways?.[i] ?? null;
+          return (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", borderBottom: `1px solid ${C.line}` }}>
+              <div style={{ width: 58 }}>
+                <span style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{m.n}</span>
+                {recv > 0 && (
+                  <span title={`${recv} handicap stroke${recv > 1 ? "s" : ""}`} style={{ color: C.gold, fontWeight: 700, fontSize: 12, marginLeft: 4 }}>
+                    {"•".repeat(Math.min(recv, 3))}
+                  </span>
+                )}
+                <div style={{ color: C.faint, fontSize: 9 }}>S.I. {m.si ?? "–"}</div>
+              </div>
+              <div style={{ width: 34, textAlign: "center", color: C.sage, fontSize: 14 }}>{m.par}</div>
+              <div style={{ flex: 1, textAlign: "center" }}>
+                <NumPicker value={me.scores?.[i] ?? null} from={1}
+                  to={me.course_handicap != null ? m.par + 2 + recv : m.par * 2}
+                  onChange={(v) => onSetHole(i, { strokes: v })}
+                  width={52} accent={savingHole === i} />
+              </div>
+              <div style={{ textAlign: "center" }}>
+                <NumPicker value={me.putts?.[i] ?? null} from={0} to={6}
+                  onChange={(v) => onSetHole(i, { putts: v })} width={48} />
+              </div>
+              <div style={{ width: 34, textAlign: "center" }}>
+                <button onClick={() => cycleFw(i, fw, m.par)} disabled={m.par < 4}
+                  style={{
+                    border: `1px solid ${C.line}`, borderRadius: 6, width: 32, height: 30, cursor: m.par < 4 ? "default" : "pointer",
+                    background: fw === "hit" ? "#DDF0DF" : fw === "miss" ? "#F6DEDB" : C.card,
+                    color: fw === "hit" ? C.greenMid : fw === "miss" ? C.birdie : C.faint, fontWeight: 800, fontSize: 14,
+                  }}>
+                  {m.par < 4 ? "—" : fw === "hit" ? "✓" : fw === "miss" ? "✗" : "·"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 4px 0", fontWeight: 800 }}>
+          <div style={{ width: 58, color: C.gold, fontSize: 12 }}>{from === 0 ? "OUT" : "IN"}</div>
+          <div style={{ width: 34, textAlign: "center", color: C.ink, fontSize: 13 }}>{sPar}</div>
+          <div style={{ flex: 1, textAlign: "center", color: C.green, fontSize: 15 }}>{sScore || "–"}</div>
+          <div style={{ textAlign: "center", color: C.faint, fontSize: 13 }}>{sPutts || "–"}</div>
+          <div style={{ width: 34 }} />
+        </div>
+      </div>
+    );
+  };
 
   const outScore = game.holes_meta.slice(0, 9).reduce((s, m, j) => s + (me.scores?.[j] || 0), 0);
   const inScore = game.holes_meta.slice(9, 18).reduce((s, m, j) => s + (me.scores?.[9 + j] || 0), 0);
   const has18 = game.holes_meta.length > 9;
+  const anyStroke = game.holes_meta.some((m) => me.course_handicap != null && strokesReceived(m.si, me.course_handicap) > 0);
 
   return (
     <>
+      {anyStroke && (
+        <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>
+          • dots next to a hole number show the handicap strokes you receive there{me.course_handicap != null ? ` (course handicap ${me.course_handicap})` : ""}.
+        </div>
+      )}
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 10 }}>
         {nine(0, Math.min(9, game.holes_meta.length), "FRONT NINE")}
         {has18 && nine(9, 18, "BACK NINE")}
