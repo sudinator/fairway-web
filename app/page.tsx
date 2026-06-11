@@ -14,7 +14,7 @@ import {
 import { STARTER_COURSES, buildCustomCourse, Course } from "@/lib/courses";
 import { btn, inputStyle, Eyebrow, StatCard, ClassicCard, NumPicker } from "@/components/ui";
 import Tournaments from "@/components/tournaments";
-import { CoursesLibrary, ProfilePanel } from "@/components/manage";
+import { CoursesLibrary, ProfilePanel, NotificationBell } from "@/components/manage";
 
 const supabase = createClient();
 
@@ -78,11 +78,16 @@ function Home({ session }: { session: any }) {
   // Load (or create) this user's profile: display name, handicap index, GHIN number.
   const loadProfile = useCallback(async () => {
     const { data } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
-    if (data) { setProfile(data); return; }
+    if (data) {
+      setProfile(data);
+      // Heartbeat: record that this user is active now (and backfill email if missing).
+      supabase.from("profiles").update({ last_active: new Date().toISOString(), email: user.email }).eq("id", user.id).then(() => {});
+      return;
+    }
     // First login — create a profile row.
     const fallbackName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Golfer";
     const { data: created } = await supabase.from("profiles")
-      .insert({ id: user.id, display_name: fallbackName }).select().maybeSingle();
+      .insert({ id: user.id, display_name: fallbackName, email: user.email, last_active: new Date().toISOString() }).select().maybeSingle();
     setProfile(created || { id: user.id, display_name: fallbackName, handicap_index: null, ghin_number: null, is_admin: false });
   }, [user.id, user.email, user.user_metadata]);
   useEffect(() => { loadProfile(); }, [loadProfile]);
@@ -128,6 +133,7 @@ function Home({ session }: { session: any }) {
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 28, fontWeight: 700 }}>Fairway Card</div>
         <div style={{ color: C.sage, fontSize: 13 }}>{displayName}{index != null ? ` · HCP ${index}` : ""}</div>
         <div style={{ flex: 1 }} />
+        <NotificationBell user={user} />
         <button style={{ ...btn(false), fontSize: 12 }} onClick={() => supabase.auth.signOut()}>Sign out</button>
         <button style={btn(true)} onClick={() => { setStage("setup"); setViewing(null); }}>＋ New round</button>
       </div>

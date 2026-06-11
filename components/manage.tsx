@@ -2,11 +2,26 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
-import { C } from "@/lib/golf";
+import { C, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf } from "@/lib/golf";
 import { buildCustomCourse, Course, CourseHole } from "@/lib/courses";
-import { btn, inputStyle, Eyebrow } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, NumPicker } from "@/components/ui";
 
 const supabase = createClient();
+
+// Create an in-app notification for a user.
+async function notify(userId: string, message: string) {
+  try { await supabase.from("notifications").insert({ user_id: userId, message }); } catch {}
+}
+
+// "3h ago" style relative time.
+function timeAgo(iso: string | null): string {
+  if (!iso) return "never";
+  const s = Math.floor((Date.now() - +new Date(iso)) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
 
 // Normalize a stored favorite into the current {tees:[{name,rating,slope,par}], holes:[{n,par,si}]} shape.
 function normalize(d: any): Course {
@@ -322,6 +337,7 @@ function CourseForm({ course, setCourse, existingId, saving, setSaving, err, set
 export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: any; onSaved: () => void }) {
   const [name, setName] = useState(profile?.display_name || "");
   const [ghin, setGhin] = useState(profile?.ghin_number || "");
+  const [phone, setPhone] = useState(profile?.phone || "");
   const [idxStr, setIdxStr] = useState(profile?.handicap_index != null ? String(profile.handicap_index) : "");
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -329,6 +345,7 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
   useEffect(() => {
     setName(profile?.display_name || "");
     setGhin(profile?.ghin_number || "");
+    setPhone(profile?.phone || "");
     setIdxStr(profile?.handicap_index != null ? String(profile.handicap_index) : "");
   }, [profile]);
 
@@ -338,6 +355,7 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
     const { error } = await supabase.from("profiles").update({
       display_name: name.trim() || "Golfer",
       ghin_number: ghin.trim() || null,
+      phone: phone.trim() || null,
       handicap_index: idx,
     }).eq("id", user.id);
     setSaving(false);
@@ -353,6 +371,11 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
         <div>
           <label style={{ color: C.sage, fontSize: 12 }}>Display name</label>
           <input style={{ ...inputStyle, marginTop: 6 }} value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <label style={{ color: C.sage, fontSize: 12 }}>Phone (optional)</label>
+          <input style={{ ...inputStyle, marginTop: 6, maxWidth: 220 }} inputMode="tel" placeholder="(555) 123-4567"
+            value={phone} onChange={(e) => setPhone(e.target.value)} />
         </div>
         <div style={{ marginTop: 14 }}>
           <label style={{ color: C.sage, fontSize: 12 }}>Handicap index (enter manually)</label>
@@ -381,33 +404,64 @@ function AdminPanel({ user }: { user: any }) {
   const [profiles, setProfiles] = useState<any[] | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [scoringFor, setScoringFor] = useState<any | null>(null);
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from("profiles").select("*").order("display_name");
+    const { data } = await supabase.from("profiles").select("*").order("last_active", { ascending: false });
     setProfiles(data || []);
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const saveHandicap = async (id: string) => {
-    const raw = edits[id];
-    const idx = raw === undefined ? undefined : (raw.trim() === "" ? null : parseFloat(raw));
-    if (idx === undefined) return;
-    setSavingId(id);
-    await supabase.from("profiles").update({ handicap_index: idx }).eq("id", id);
+  const now = Date.now();
+  const active24 = (profiles || []).filter((p) => p.last_active && now - +new Date(p.last_active) < 86400000).length;
+  const active7d = (profiles || []).filter((p) => p.last_active && now - +new Date(p.last_active) < 7 * 86400000).length;
+
+  const saveHandicap = async (p: any) => {
+    const raw = edits[p.id];
+    if (raw === undefined) return;
+    const idx = raw.trim() === "" ? null : parseFloat(raw);
+    setSavingId(p.id);
+    await supabase.from("profiles").update({ handicap_index: idx }).eq("id", p.id);
+    // Notify both the player and the admin.
+    const who = p.display_name || "a player";
+    await notify(p.id, `Your handicap index was set to ${idx ?? "—"} by an admin.`);
+    await notify(user.id, `You changed ${who}'s handicap index to ${idx ?? "—"}.`);
     setSavingId(null);
     await load();
   };
 
+  if (scoringFor) {
+    return <AdminScoreEditor admin={user} player={scoringFor} onBack={() => setScoringFor(null)} />;
+  }
+
   return (
     <div style={{ marginTop: 24 }}>
       <Eyebrow>★ ADMIN · ALL PLAYERS</Eyebrow>
-      <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>You can view every player and adjust their handicap index. Changes affect their net scores in games.</div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: "10px 14px", flex: 1, minWidth: 110 }}>
+          <div style={{ color: C.cream, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{profiles?.length ?? "—"}</div>
+          <div style={{ color: C.sage, fontSize: 11 }}>Total users</div>
+        </div>
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: "10px 14px", flex: 1, minWidth: 110 }}>
+          <div style={{ color: C.cream, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{active24}</div>
+          <div style={{ color: C.sage, fontSize: 11 }}>Active 24h</div>
+        </div>
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: "10px 14px", flex: 1, minWidth: 110 }}>
+          <div style={{ color: C.cream, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{active7d}</div>
+          <div style={{ color: C.sage, fontSize: 11 }}>Active 7d</div>
+        </div>
+      </div>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 10 }}>Adjust any player's handicap; they (and you) get a notification. To edit a player's scores, use “Edit scores” to enter admin mode on their rounds.</div>
+
       {profiles === null && <div style={{ color: C.sage, marginTop: 12 }}>Loading…</div>}
       {profiles?.map((p) => (
         <div key={p.id} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 160 }}>
+          <div style={{ flex: 1, minWidth: 180 }}>
             <div style={{ color: C.ink, fontWeight: 700 }}>{p.display_name || "Golfer"}{p.id === user.id ? " (you)" : ""}{p.is_admin ? " ★" : ""}</div>
-            <div style={{ color: C.faint, fontSize: 12 }}>{p.ghin_number ? `GHIN ${p.ghin_number}` : "no GHIN"}</div>
+            <div style={{ color: C.faint, fontSize: 12 }}>
+              {p.email || "no email"}{p.phone ? ` · ${p.phone}` : ""}{p.ghin_number ? ` · GHIN ${p.ghin_number}` : ""}
+            </div>
+            <div style={{ color: C.faint, fontSize: 11, marginTop: 1 }}>active {timeAgo(p.last_active)}</div>
           </div>
           <div>
             <label style={{ color: C.sage, fontSize: 10 }}>Handicap index</label>
@@ -415,9 +469,172 @@ function AdminPanel({ user }: { user: any }) {
               <input inputMode="decimal" defaultValue={p.handicap_index != null ? String(p.handicap_index) : ""}
                 onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setEdits((m) => ({ ...m, [p.id]: v })); }}
                 style={{ ...inputStyle, padding: "6px 8px", width: 80, textAlign: "center" }} />
-              <button style={{ ...btn(true), padding: "6px 12px", fontSize: 12, opacity: savingId === p.id ? 0.5 : 1 }} disabled={savingId === p.id} onClick={() => saveHandicap(p.id)}>Save</button>
+              <button style={{ ...btn(true), padding: "6px 12px", fontSize: 12, opacity: savingId === p.id ? 0.5 : 1 }} disabled={savingId === p.id} onClick={() => saveHandicap(p)}>Save</button>
             </div>
           </div>
+          <button style={{ ...btn(false), padding: "6px 12px", fontSize: 12 }} onClick={() => setScoringFor(p)}>Edit scores</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ================= Notification bell =================
+export function NotificationBell({ user }: { user: any }) {
+  const [open, setOpen] = useState(false);
+  const [items, setItems] = useState<any[]>([]);
+
+  const load = useCallback(async () => {
+    const { data } = await supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30);
+    setItems(data || []);
+  }, [user.id]);
+  useEffect(() => { load(); }, [load]);
+
+  const unread = items.filter((n) => !n.read).length;
+
+  const openPanel = async () => {
+    setOpen((v) => !v);
+    if (!open && unread > 0) {
+      await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
+      setItems((xs) => xs.map((n) => ({ ...n, read: true })));
+    }
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button onClick={openPanel} style={{ ...btn(false), fontSize: 14, padding: "8px 12px", position: "relative" }}>
+        🔔
+        {unread > 0 && (
+          <span style={{ position: "absolute", top: -4, right: -4, background: C.birdie, color: "#fff", borderRadius: 10, fontSize: 10, fontWeight: 800, padding: "1px 6px" }}>{unread}</span>
+        )}
+      </button>
+      {open && (
+        <div style={{ position: "absolute", right: 0, top: 44, width: 280, maxHeight: 360, overflowY: "auto", background: C.card, borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", zIndex: 50, padding: 8 }}>
+          <div style={{ color: C.faint, fontSize: 11, letterSpacing: 2, fontWeight: 700, padding: "6px 8px" }}>NOTIFICATIONS</div>
+          {items.length === 0 && <div style={{ color: C.faint, fontSize: 13, padding: 12 }}>Nothing yet.</div>}
+          {items.map((n) => (
+            <div key={n.id} style={{ padding: "10px 8px", borderTop: `1px solid ${C.line}` }}>
+              <div style={{ color: C.ink, fontSize: 13 }}>{n.message}</div>
+              <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>{timeAgo(n.created_at)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Exported so other parts of the app (e.g. admin score edits) can raise notifications.
+export { notify };
+
+// ================= Admin score editor =================
+// Lets an admin browse a player's rounds and edit hole scores/putts.
+// Saving notifies both the player and the admin.
+function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; onBack: () => void }) {
+  const [rounds, setRounds] = useState<Round[] | null>(null);
+  const [editing, setEditing] = useState<Round | null>(null);
+  const [holes, setHoles] = useState<Hole[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const { data: rs } = await supabase.from("rounds").select("*").eq("user_id", player.id).order("played_at", { ascending: false });
+    if (!rs) { setRounds([]); return; }
+    const ids = rs.map((r: any) => r.id);
+    const { data: hs } = await supabase.from("holes").select("*").in("round_id", ids.length ? ids : ["none"]);
+    const byRound: Record<string, Hole[]> = {};
+    (hs || []).forEach((h: any) => { (byRound[h.round_id] ||= []).push(h); });
+    const merged: Round[] = rs.map((r: any) => ({
+      ...r,
+      holes: (byRound[r.id] || []).sort((a, b) => a.hole_number - b.hole_number)
+        .map((h) => ({ ...h, recv: strokesReceived(h.stroke_index, r.course_handicap) })),
+    }));
+    setRounds(merged);
+  }, [player.id]);
+  useEffect(() => { load(); }, [load]);
+
+  const openRound = (r: Round) => { setEditing(r); setHoles(r.holes.map((h) => ({ ...h }))); setMsg(null); };
+  const setHole = (i: number, patch: Partial<Hole>) => setHoles((hs) => hs.map((h, j) => (j === i ? { ...h, ...patch } : h)));
+
+  const saveRound = async () => {
+    if (!editing) return;
+    setSaving(true); setMsg(null);
+    try {
+      for (const h of holes) {
+        const { error } = await supabase.from("holes")
+          .update({ strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties })
+          .eq("round_id", editing.id).eq("hole_number", h.hole_number);
+        if (error) throw error;
+      }
+      const who = player.display_name || "the player";
+      await notify(player.id, `An admin edited your scores for ${editing.course} (${fmtDate(editing.played_at)}).`);
+      await notify(admin.id, `You edited ${who}'s scores for ${editing.course} (${fmtDate(editing.played_at)}).`);
+      setMsg("Saved & player notified ✓");
+      await load();
+      setEditing(null);
+    } catch (e: any) {
+      setMsg("Couldn't save: " + (e.message || "error"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (editing) {
+    return (
+      <div style={{ marginTop: 24 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button style={btn(false)} onClick={() => setEditing(null)}>‹ Back</button>
+          <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 20 }}>Admin edit · {player.display_name}</div>
+        </div>
+        <div style={{ background: "#5A1E1E", color: "#F6DEDB", borderRadius: 10, padding: "8px 12px", marginTop: 10, fontSize: 12 }}>
+          ⚠ Admin mode — you are editing another player's official scores. They will be notified.
+        </div>
+        <div style={{ color: C.sage, fontSize: 13, marginTop: 10 }}>{editing.course}{editing.tee_name ? ` · ${editing.tee_name}` : ""} · {fmtDate(editing.played_at)}</div>
+        <div style={{ background: C.card, borderRadius: 12, padding: 12, marginTop: 10, overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr>{["Hole", "Par", "Score", "Putts"].map((h) => <th key={h} style={{ color: C.faint, fontSize: 11, textAlign: "center", padding: 4 }}>{h}</th>)}</tr>
+            </thead>
+            <tbody>
+              {holes.map((h, i) => (
+                <tr key={i}>
+                  <td style={{ textAlign: "center", color: C.ink, fontWeight: 700, padding: 3 }}>{h.hole_number}</td>
+                  <td style={{ textAlign: "center", color: C.sage, padding: 3 }}>{h.par}</td>
+                  <td style={{ textAlign: "center", padding: 3 }}>
+                    <NumPicker value={h.strokes} from={1} to={h.par * 2 + (editing.course_handicap != null ? (h.recv || 0) : 0)} onChange={(v) => setHole(i, { strokes: v })} />
+                  </td>
+                  <td style={{ textAlign: "center", padding: 3 }}>
+                    <NumPicker value={h.putts} from={0} to={6} onChange={(v) => setHole(i, { putts: v })} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>{msg}</div>}
+        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+          <button style={btn(false)} onClick={() => setEditing(null)}>Cancel</button>
+          <button style={{ ...btn(true), opacity: saving ? 0.5 : 1 }} disabled={saving} onClick={saveRound}>{saving ? "Saving…" : "Save changes"}</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <button style={btn(false)} onClick={onBack}>‹ Players</button>
+        <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 20 }}>{player.display_name}'s rounds</div>
+      </div>
+      {rounds === null && <div style={{ color: C.sage, marginTop: 12 }}>Loading…</div>}
+      {rounds?.length === 0 && <div style={{ color: C.sage, marginTop: 12 }}>This player has no rounds.</div>}
+      {rounds?.map((r) => (
+        <div key={r.id} onClick={() => openRound(r)} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 8, cursor: "pointer", display: "flex", alignItems: "center" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: C.ink, fontWeight: 700 }}>{r.course}</div>
+            <div style={{ color: C.faint, fontSize: 12 }}>{fmtDate(r.played_at)} · {played(r).length} holes</div>
+          </div>
+          <div style={{ color: C.green, fontWeight: 800, fontFamily: "Georgia, serif", fontSize: 18 }}>{played(r).length ? strokesOf(r) : "—"}</div>
         </div>
       ))}
     </div>
