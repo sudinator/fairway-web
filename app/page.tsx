@@ -229,16 +229,21 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
   };
   useEffect(() => { loadFavorites(); }, []);
 
-  // Save the currently-picked course (including any corrections) as a favorite.
+  // Save the currently-picked course; if one with the same name exists, update it instead of duplicating.
   const saveFavorite = async () => {
     if (!picked) return;
     setFavSaving(true); setFavMsg(null);
     try {
-      const { error } = await supabase.from("favorite_courses").insert({
-        name: picked.name, location: picked.location, data: picked,
-      });
-      if (error) throw error;
-      setFavMsg("Saved to favorites ★");
+      const { data: existing } = await supabase.from("favorite_courses").select("id").eq("name", picked.name).maybeSingle();
+      if (existing) {
+        const { error } = await supabase.from("favorite_courses").update({ location: picked.location, data: picked }).eq("id", existing.id);
+        if (error) throw error;
+        setFavMsg("Updated in course library ★");
+      } else {
+        const { error } = await supabase.from("favorite_courses").insert({ name: picked.name, location: picked.location, data: picked });
+        if (error) throw error;
+        setFavMsg("Saved to course library ★");
+      }
       await loadFavorites();
     } catch (e: any) {
       setFavMsg("Couldn't save: " + (e.message || "error"));
@@ -659,11 +664,16 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
       holes: holes.map((h) => ({ n: h.hole_number, par: h.par, si: h.stroke_index })),
     };
     try {
-      const { error } = await supabase.from("favorite_courses").insert({
-        name: round.course, location: round.tee_name || "", data: course,
-      });
-      if (error) throw error;
-      setFavMsg("Corrected course saved to favorites ★");
+      const { data: existing } = await supabase.from("favorite_courses").select("id").eq("name", round.course).maybeSingle();
+      if (existing) {
+        const { error } = await supabase.from("favorite_courses").update({ location: round.tee_name || "", data: course }).eq("id", existing.id);
+        if (error) throw error;
+        setFavMsg("Course library updated ★");
+      } else {
+        const { error } = await supabase.from("favorite_courses").insert({ name: round.course, location: round.tee_name || "", data: course });
+        if (error) throw error;
+        setFavMsg("Saved to course library ★");
+      }
     } catch (e: any) {
       setFavMsg("Couldn't save: " + (e.message || "error"));
     }

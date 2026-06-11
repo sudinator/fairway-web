@@ -186,8 +186,15 @@ function CourseForm({ course, setCourse, existingId, saving, setSaving, err, set
         const { error } = await supabase.from("favorite_courses").update(payload).eq("id", existingId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("favorite_courses").insert(payload);
-        if (error) throw error;
+        // Avoid duplicates: update a same-named course if one already exists.
+        const { data: dup } = await supabase.from("favorite_courses").select("id").eq("name", payload.name).maybeSingle();
+        if (dup) {
+          const { error } = await supabase.from("favorite_courses").update({ location: payload.location, data: payload.data }).eq("id", dup.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from("favorite_courses").insert(payload);
+          if (error) throw error;
+        }
       }
       onSaved();
     } catch (e: any) { setErr(e.message || "Save failed."); setSaving(false); }
