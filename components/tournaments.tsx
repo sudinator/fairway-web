@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import {
   C, Hole, courseHandicap, strokesReceived, stablefordPts, stablefordBySix,
+  matchStatus, matchAllowance,
 } from "@/lib/golf";
 import { btn, inputStyle, Eyebrow } from "@/components/ui";
 
@@ -24,6 +25,8 @@ type Game = {
   course: string;
   course_par: number | null;
   holes_meta: { n: number; par: number; si: number | null }[]; // par + stroke index per hole
+  game_type: "stableford" | "match";
+  pairings: { a: string; b: string }[]; // for match play: user_id vs user_id
   created_by: string;
   created_at: string;
 };
@@ -39,6 +42,8 @@ type Player = {
   tee_name: string | null;
   course_handicap: number | null;
   scores: (number | null)[]; // strokes per hole
+  putts: (number | null)[]; // putts per hole
+  fairways: ("hit" | "miss" | null)[]; // fairway result per hole (par 4/5)
 };
 
 // ---------------- Root tournament tab ----------------
@@ -82,7 +87,7 @@ function GameList({ displayName, onOpen, onCreate }: { displayName: string; onOp
       const { data: existing } = await supabase.from("game_players").select("id").eq("game_id", game.id).eq("user_id", (await supabase.auth.getUser()).data.user!.id);
       if (!existing || !existing.length) {
         const { error: e2 } = await supabase.from("game_players").insert({
-          game_id: game.id, display_name: displayName, scores: Array(game.holes_meta.length).fill(null),
+          game_id: game.id, display_name: displayName, scores: Array(game.holes_meta.length).fill(null), putts: Array(game.holes_meta.length).fill(null), fairways: Array(game.holes_meta.length).fill(null),
         });
         if (e2) throw e2;
       }
@@ -141,6 +146,7 @@ function CreateGame({ displayName, onCancel, onCreated }: { displayName: string;
   const [pickedFav, setPickedFav] = useState<any | null>(null);
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState("");
+  const [gameType, setGameType] = useState<"stableford" | "match">("stableford");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -169,15 +175,15 @@ function CreateGame({ displayName, onCancel, onCreated }: { displayName: string;
       const code = makeCode();
       const holesMeta = pickedFav.holes.map((h: any) => ({ n: h.n, par: h.par, si: h.si }));
       const { data: game, error } = await supabase.from("games").insert({
-        code, name: name.trim() || "Tournament", course: pickedFav.name,
-        course_par: coursePar, holes_meta: holesMeta,
+        code, name: name.trim() || (gameType === "match" ? "Match Play" : "Tournament"), course: pickedFav.name,
+        course_par: coursePar, holes_meta: holesMeta, game_type: gameType, pairings: [],
       }).select().single();
       if (error || !game) throw error || new Error("Could not create game");
       // Add creator as first player.
       const { error: e2 } = await supabase.from("game_players").insert({
         game_id: game.id, display_name: displayName,
         handicap_index: idxVal, rating: tee.rating, slope: tee.slope, tee_name: tee.name,
-        course_handicap: ch, scores: Array(holesMeta.length).fill(null),
+        course_handicap: ch, scores: Array(holesMeta.length).fill(null), putts: Array(holesMeta.length).fill(null), fairways: Array(holesMeta.length).fill(null),
       });
       if (e2) throw e2;
       onCreated(game.id);
@@ -193,6 +199,23 @@ function CreateGame({ displayName, onCancel, onCreated }: { displayName: string;
       <div style={{ marginTop: 12 }}>
         <label style={{ color: C.sage, fontSize: 12 }}>Game name</label>
         <input style={{ ...inputStyle, marginTop: 6 }} value={name} placeholder="Saturday Skins" onChange={(e) => setName(e.target.value)} />
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <label style={{ color: C.sage, fontSize: 12 }}>Format</label>
+        <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+          <button onClick={() => setGameType("stableford")} style={{ ...btn(gameType === "stableford"), flex: 1, fontSize: 13 }}>
+            Stableford tournament
+          </button>
+          <button onClick={() => setGameType("match")} style={{ ...btn(gameType === "match"), flex: 1, fontSize: 13 }}>
+            Singles match play
+          </button>
+        </div>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+          {gameType === "stableford"
+            ? "Everyone competes on one net-Stableford leaderboard."
+            : "Players are paired 1-on-1. After friends join, you'll set the matchups. Lower handicap plays off scratch; opponent gets the difference."}
+        </div>
       </div>
 
       <div style={{ marginTop: 14 }}>
@@ -270,7 +293,7 @@ function GameRoom({ gameId, user, displayName, onBack }: { gameId: string; user:
     if (!game) return [];
     return game.holes_meta.map((m, i) => ({
       hole_number: m.n, par: m.par, stroke_index: m.si,
-      strokes: p.scores?.[i] ?? null, putts: null, fairway: null, penalties: 0,
+      strokes: p.scores?.[i] ?? null, putts: p.putts?.[i] ?? null, fairway: p.fairways?.[i] ?? null, penalties: 0,
       recv: strokesReceived(m.si, p.course_handicap),
     }));
   };
@@ -280,15 +303,21 @@ function GameRoom({ gameId, user, displayName, onBack }: { gameId: string; user:
 
   const playerThru = (p: Player) => (p.scores || []).filter((s) => s != null && s > 0).length;
 
-  // Save one hole's strokes for me.
-  const setMyScore = async (holeIdx: number, value: number | null) => {
+  // Save one hole's data (strokes / putts / fairway) for me.
+  const setMyHole = async (holeIdx: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | null }) => {
     if (!me) return;
-    const scores = [...(me.scores || [])];
-    scores[holeIdx] = value;
-    setMe({ ...me, scores });
-    setPlayers((ps) => ps.map((p) => (p.id === me.id ? { ...p, scores } : p)));
+    const n = game?.holes_meta.length || 18;
+    const scores = [...(me.scores || Array(n).fill(null))];
+    const putts = [...(me.putts || Array(n).fill(null))];
+    const fairways = [...(me.fairways || Array(n).fill(null))];
+    if ("strokes" in patch) scores[holeIdx] = patch.strokes ?? null;
+    if ("putts" in patch) putts[holeIdx] = patch.putts ?? null;
+    if ("fairway" in patch) fairways[holeIdx] = patch.fairway ?? null;
+    const updated = { ...me, scores, putts, fairways };
+    setMe(updated);
+    setPlayers((ps) => ps.map((p) => (p.id === me.id ? updated : p)));
     setSavingHole(holeIdx);
-    await supabase.from("game_players").update({ scores }).eq("id", me.id);
+    await supabase.from("game_players").update({ scores, putts, fairways }).eq("id", me.id);
     setSavingHole(null);
   };
 
@@ -361,61 +390,75 @@ function GameRoom({ gameId, user, displayName, onBack }: { gameId: string; user:
         </div>
       )}
 
-      {/* Leaderboard */}
-      <div style={{ marginTop: 18 }}>
-        <Eyebrow>LEADERBOARD · NET STABLEFORD</Eyebrow>
-        {leaderboard.map((p, i) => (
-          <div key={p.id} style={{ background: p.user_id === user.id ? C.cream : C.card, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center" }}>
-            <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700, width: 28, fontSize: 18 }}>{i + 1}</div>
-            <div style={{ flex: 1 }}>
-              <div style={{ color: C.ink, fontWeight: 700 }}>{p.display_name}{p.user_id === user.id ? " (you)" : ""}</div>
-              <div style={{ color: C.faint, fontSize: 12 }}>
-                thru {playerThru(p)}{p.course_handicap != null ? ` · CH ${p.course_handicap}` : " · no handicap set"}
+      {game.game_type === "match" ? (
+        <MatchView game={game} players={players} user={user} isCreator={game.created_by === user.id} onChanged={load} />
+      ) : (
+        <>
+          {/* Leaderboard */}
+          <div style={{ marginTop: 18 }}>
+            <Eyebrow>LEADERBOARD · NET STABLEFORD</Eyebrow>
+            {leaderboard.map((p, i) => (
+              <div key={p.id} style={{ background: p.user_id === user.id ? C.cream : C.card, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center" }}>
+                <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700, width: 28, fontSize: 18 }}>{i + 1}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: C.ink, fontWeight: 700 }}>{p.display_name}{p.user_id === user.id ? " (you)" : ""}</div>
+                  <div style={{ color: C.faint, fontSize: 12 }}>
+                    thru {playerThru(p)}{p.course_handicap != null ? ` · CH ${p.course_handicap}` : " · no handicap set"}
+                  </div>
+                </div>
+                <div style={{ color: C.green, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{playerPoints(p)}</div>
+                <div style={{ color: C.faint, fontSize: 11, marginLeft: 6 }}>pts</div>
               </div>
-            </div>
-            <div style={{ color: C.green, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{playerPoints(p)}</div>
-            <div style={{ color: C.faint, fontSize: 11, marginLeft: 6 }}>pts</div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Three sixes */}
-      <div style={{ marginTop: 18 }}>
-        <Eyebrow>SIX-HOLE SEGMENTS (NET STABLEFORD)</Eyebrow>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
-          {segWinners.map((s, i) => (
-            <div key={i} style={{ flex: 1, minWidth: 150, background: C.greenLight, borderRadius: 12, padding: 14 }}>
-              <div style={{ color: C.sage, fontSize: 12 }}>{s.label}</div>
-              {s.best < 0 ? (
-                <div style={{ color: C.faint, fontSize: 13, marginTop: 6 }}>Not complete yet</div>
-              ) : (
-                <>
-                  <div style={{ color: C.cream, fontWeight: 800, marginTop: 6 }}>{s.who.join(", ")}</div>
-                  <div style={{ color: C.gold, fontSize: 13 }}>{s.best} pts {s.who.length > 1 ? "(tie)" : ""}</div>
-                </>
-              )}
+          {/* Three sixes */}
+          <div style={{ marginTop: 18 }}>
+            <Eyebrow>SIX-HOLE SEGMENTS (NET STABLEFORD)</Eyebrow>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
+              {segWinners.map((s, i) => (
+                <div key={i} style={{ flex: 1, minWidth: 150, background: C.greenLight, borderRadius: 12, padding: 14 }}>
+                  <div style={{ color: C.sage, fontSize: 12 }}>{s.label}</div>
+                  {s.best < 0 ? (
+                    <div style={{ color: C.faint, fontSize: 13, marginTop: 6 }}>Not complete yet</div>
+                  ) : (
+                    <>
+                      <div style={{ color: C.cream, fontWeight: 800, marginTop: 6 }}>{s.who.join(", ")}</div>
+                      <div style={{ color: C.gold, fontSize: 13 }}>{s.best} pts {s.who.length > 1 ? "(tie)" : ""}</div>
+                    </>
+                  )}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+        </>
+      )}
 
       {/* My score entry */}
       {me && !needsSetup && (
         <div style={{ marginTop: 22 }}>
           <Eyebrow>ENTER YOUR SCORES</Eyebrow>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>Tap a hole and type your strokes — it saves and updates the leaderboard. Tap ⟳ Refresh to see others' latest.</div>
-          <ScoreGrid game={game} me={me} savingHole={savingHole} onSet={setMyScore} />
+          <ScoreGrid game={game} me={me} savingHole={savingHole} onSetHole={setMyHole} />
+          <MyStatsLine me={me} holes={playerHoles(me)} />
         </div>
       )}
     </div>
   );
 }
 
-function ScoreGrid({ game, me, savingHole, onSet }: {
-  game: Game; me: Player; savingHole: number | null; onSet: (i: number, v: number | null) => void;
+function ScoreGrid({ game, me, savingHole, onSetHole }: {
+  game: Game; me: Player; savingHole: number | null;
+  onSetHole: (i: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | null }) => void;
 }) {
+  const cycleFw = (i: number, cur: "hit" | "miss" | null, par: number) => {
+    if (par < 4) return;
+    const next = cur == null ? "hit" : cur === "hit" ? "miss" : null;
+    onSetHole(i, { fairway: next });
+  };
+
   const nine = (from: number, to: number, label: string) => (
-    <div style={{ background: C.card, borderRadius: 12, padding: 12, flex: 1, minWidth: 320, overflowX: "auto" }}>
+    <div style={{ background: C.card, borderRadius: 12, padding: 12, flex: 1, minWidth: 340, overflowX: "auto" }}>
       <div style={{ color: C.faint, fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 6 }}>{label}</div>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <tbody>
@@ -434,11 +477,40 @@ function ScoreGrid({ game, me, savingHole, onSet }: {
               return (
                 <td key={j} style={{ padding: 2 }}>
                   <input inputMode="numeric" value={me.scores?.[i] ?? ""} placeholder="–"
-                    onChange={(e) => {
-                      const v = e.target.value === "" ? null : Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 0)) || null;
-                      onSet(i, v);
-                    }}
-                    style={{ ...inputStyle, padding: "5px 2px", width: 38, textAlign: "center", fontSize: 15, borderColor: savingHole === i ? C.gold : C.line }} />
+                    onChange={(e) => onSetHole(i, { strokes: e.target.value === "" ? null : Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 0)) || null })}
+                    style={{ ...inputStyle, padding: "5px 2px", width: 36, textAlign: "center", fontSize: 15, borderColor: savingHole === i ? C.gold : C.line }} />
+                </td>
+              );
+            })}
+          </tr>
+          <tr>
+            <td style={{ color: C.sage, fontSize: 10, padding: "2px 4px" }}>Putts</td>
+            {game.holes_meta.slice(from, to).map((m, j) => {
+              const i = from + j;
+              return (
+                <td key={j} style={{ padding: 2 }}>
+                  <input inputMode="numeric" value={me.putts?.[i] ?? ""} placeholder="–"
+                    onChange={(e) => onSetHole(i, { putts: e.target.value === "" ? null : Math.max(0, Math.min(9, parseInt(e.target.value, 10) || 0)) })}
+                    style={{ ...inputStyle, padding: "5px 2px", width: 36, textAlign: "center", fontSize: 14 }} />
+                </td>
+              );
+            })}
+          </tr>
+          <tr>
+            <td style={{ color: C.sage, fontSize: 10, padding: "2px 4px" }}>FW</td>
+            {game.holes_meta.slice(from, to).map((m, j) => {
+              const i = from + j;
+              const fw = me.fairways?.[i] ?? null;
+              return (
+                <td key={j} style={{ padding: 2, textAlign: "center" }}>
+                  <button onClick={() => cycleFw(i, fw, m.par)} disabled={m.par < 4}
+                    style={{
+                      border: `1px solid ${C.line}`, borderRadius: 6, width: 30, height: 28, cursor: m.par < 4 ? "default" : "pointer",
+                      background: fw === "hit" ? "#DDF0DF" : fw === "miss" ? "#F6DEDB" : C.card,
+                      color: fw === "hit" ? C.greenMid : fw === "miss" ? C.birdie : C.faint, fontWeight: 800, fontSize: 13,
+                    }}>
+                    {m.par < 4 ? "—" : fw === "hit" ? "✓" : fw === "miss" ? "✗" : "·"}
+                  </button>
                 </td>
               );
             })}
@@ -452,6 +524,124 @@ function ScoreGrid({ game, me, savingHole, onSet }: {
     <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 10 }}>
       {nine(0, Math.min(9, game.holes_meta.length), "FRONT NINE")}
       {game.holes_meta.length > 9 && nine(9, 18, "BACK NINE")}
+    </div>
+  );
+}
+
+function MyStatsLine({ me, holes }: { me: Player; holes: Hole[] }) {
+  const withPutts = holes.filter((h) => h.putts != null);
+  const totalPutts = withPutts.reduce((s, h) => s + (h.putts || 0), 0);
+  const girHit = withPutts.filter((h) => h.strokes != null && h.strokes - (h.putts || 0) <= h.par - 2).length;
+  const fwHoles = holes.filter((h) => h.par >= 4 && (h.fairway === "hit" || h.fairway === "miss"));
+  const fwHit = fwHoles.filter((h) => h.fairway === "hit").length;
+  return (
+    <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
+      Your round: {totalPutts} putts{withPutts.length ? ` (${(totalPutts / withPutts.length).toFixed(1)}/hole)` : ""}
+      {" · "}GIR {withPutts.length ? Math.round((100 * girHit) / withPutts.length) + "%" : "—"}
+      {" · "}Fairways {fwHoles.length ? Math.round((100 * fwHit) / fwHoles.length) + "%" : "—"}
+    </div>
+  );
+}
+
+// ---------------- Match play view ----------------
+function MatchView({ game, players, user, isCreator, onChanged }: {
+  game: Game; players: Player[]; user: any; isCreator: boolean; onChanged: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [aSel, setASel] = useState("");
+  const [bSel, setBSel] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const nameOf = (uid: string) => players.find((p) => p.user_id === uid)?.display_name || "—";
+  const playerOf = (uid: string) => players.find((p) => p.user_id === uid) || null;
+  const paired = new Set(game.pairings.flatMap((pr) => [pr.a, pr.b]));
+  const unpaired = players.filter((p) => !paired.has(p.user_id));
+
+  const addPairing = async () => {
+    if (!aSel || !bSel || aSel === bSel) return;
+    setBusy(true);
+    const pairings = [...game.pairings, { a: aSel, b: bSel }];
+    await supabase.from("games").update({ pairings }).eq("id", game.id);
+    setASel(""); setBSel(""); setBusy(false);
+    onChanged();
+  };
+  const removePairing = async (idx: number) => {
+    const pairings = game.pairings.filter((_, i) => i !== idx);
+    await supabase.from("games").update({ pairings }).eq("id", game.id);
+    onChanged();
+  };
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <Eyebrow>MATCHES</Eyebrow>
+        <div style={{ flex: 1 }} />
+        {isCreator && (
+          <button style={{ ...btn(false), fontSize: 12 }} onClick={() => setEditing((v) => !v)}>
+            {editing ? "Done" : "✎ Set matchups"}
+          </button>
+        )}
+      </div>
+
+      {editing && isCreator && (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
+          <div style={{ color: C.sage, fontSize: 12, marginBottom: 8 }}>Pair two players who have joined:</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <select value={aSel} onChange={(e) => setASel(e.target.value)} style={{ ...inputStyle, width: "auto", minWidth: 130 }}>
+              <option value="">Player A…</option>
+              {players.map((p) => <option key={p.user_id} value={p.user_id}>{p.display_name}</option>)}
+            </select>
+            <span style={{ color: C.sage }}>vs</span>
+            <select value={bSel} onChange={(e) => setBSel(e.target.value)} style={{ ...inputStyle, width: "auto", minWidth: 130 }}>
+              <option value="">Player B…</option>
+              {players.map((p) => <option key={p.user_id} value={p.user_id}>{p.display_name}</option>)}
+            </select>
+            <button style={{ ...btn(true), opacity: aSel && bSel && aSel !== bSel ? 1 : 0.5 }} disabled={!aSel || !bSel || aSel === bSel || busy} onClick={addPairing}>Add</button>
+          </div>
+          {unpaired.length > 0 && (
+            <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Not yet paired: {unpaired.map((p) => p.display_name).join(", ")}</div>
+          )}
+        </div>
+      )}
+
+      {game.pairings.length === 0 && (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: 20, marginTop: 10, color: C.sage, textAlign: "center" }}>
+          No matchups set yet. {isCreator ? "Tap “Set matchups” to pair players once they've joined." : "Waiting for the organizer to set the matchups."}
+        </div>
+      )}
+
+      {game.pairings.map((pr, idx) => {
+        const pa = playerOf(pr.a), pb = playerOf(pr.b);
+        if (!pa || !pb) return null;
+        const st = matchStatus(game.holes_meta, pa.scores || [], pb.scores || [], pa.course_handicap, pb.course_handicap);
+        const allow = matchAllowance(pa.course_handicap, pb.course_handicap);
+        const leader = st.lead > 0 ? pa.display_name : st.lead < 0 ? pb.display_name : null;
+        const statusText = st.result
+          ? `${leader} wins ${st.result}`
+          : st.lead === 0 ? "All square" : `${leader} ${Math.abs(st.lead)} UP`;
+        const iAmIn = pr.a === user.id || pr.b === user.id;
+        return (
+          <div key={idx} style={{ background: C.card, borderRadius: 12, padding: 14, marginTop: 10, border: iAmIn ? `1px solid ${C.gold}` : "none" }}>
+            <div style={{ display: "flex", alignItems: "center" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>
+                  {pa.display_name} <span style={{ color: C.faint, fontWeight: 400 }}>vs</span> {pb.display_name}
+                </div>
+                <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
+                  thru {st.thru} · {pa.display_name} {allow.a === 0 ? "scratch" : `+${allow.a}`}, {pb.display_name} {allow.b === 0 ? "scratch" : `+${allow.b}`}
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: st.result ? C.birdie : C.green, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{statusText}</div>
+                <div style={{ color: C.faint, fontSize: 11 }}>{pa.display_name} {st.aWins}–{st.bWins} {pb.display_name}{st.halves ? ` · ${st.halves} halved` : ""}</div>
+              </div>
+              {isCreator && editing && (
+                <button onClick={() => removePairing(idx)} style={{ background: "none", border: "none", color: C.birdie, cursor: "pointer", marginLeft: 10, fontWeight: 800 }}>✕</button>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

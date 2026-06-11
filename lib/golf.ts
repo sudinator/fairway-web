@@ -95,3 +95,52 @@ export function stablefordBySix(holes: Hole[]): [number, number, number] {
     holes.slice(from, to).reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
   return [seg(0, 6), seg(6, 12), seg(12, 18)];
 }
+
+// ---------------- Singles match play ----------------
+// Relative allowance: the lower course handicap plays off scratch; the opponent
+// receives the difference in strokes, allocated by stroke index.
+export type MatchHoleMeta = { n: number; par: number; si: number | null };
+
+export function matchStrokesFor(diff: number, si: number | null): number {
+  // diff = strokes this player receives over the match (>=0); allocate by SI.
+  if (si == null || diff <= 0) return 0;
+  return Math.floor(diff / 18) + (si <= diff % 18 ? 1 : 0);
+}
+
+// Given two players' course handicaps, returns the per-player match allowance.
+export function matchAllowance(chA: number | null, chB: number | null): { a: number; b: number } {
+  const A = chA ?? 0, B = chB ?? 0;
+  const low = Math.min(A, B);
+  return { a: A - low, b: B - low };
+}
+
+// Compute the match status from each player's gross scores.
+// Returns holes played, A's lead (positive = A up), and a settled result string.
+export function matchStatus(
+  holes: MatchHoleMeta[],
+  grossA: (number | null)[],
+  grossB: (number | null)[],
+  chA: number | null,
+  chB: number | null
+): { thru: number; lead: number; aWins: number; bWins: number; halves: number; result: string } {
+  const allow = matchAllowance(chA, chB);
+  let lead = 0, thru = 0, aWins = 0, bWins = 0, halves = 0;
+  holes.forEach((h, i) => {
+    const ga = grossA[i], gb = grossB[i];
+    if (ga == null || gb == null || ga <= 0 || gb <= 0) return;
+    thru++;
+    const netA = ga - matchStrokesFor(allow.a, h.si);
+    const netB = gb - matchStrokesFor(allow.b, h.si);
+    if (netA < netB) { lead++; aWins++; }
+    else if (netB < netA) { lead--; bWins++; }
+    else halves++;
+  });
+  const remaining = holes.length - thru;
+  let result = "";
+  if (Math.abs(lead) > remaining && thru > 0) {
+    // Match decided: "X & Y" (up by X with Y to play, before the last counted hole)
+    const upBy = Math.abs(lead);
+    result = remaining === 0 ? `${upBy} UP` : `${upBy} & ${remaining}`;
+  }
+  return { thru, lead, aWins, bWins, halves, result };
+}

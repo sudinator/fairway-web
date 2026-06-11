@@ -14,6 +14,7 @@ import {
 import { STARTER_COURSES, buildCustomCourse, Course } from "@/lib/courses";
 import { btn, inputStyle, Eyebrow, StatCard, ClassicCard } from "@/components/ui";
 import Tournaments from "@/components/tournaments";
+import { CoursesLibrary, ProfilePanel } from "@/components/manage";
 
 const supabase = createClient();
 
@@ -65,23 +66,30 @@ function Shell({ children }: { children: React.ReactNode }) {
 function Home({ session }: { session: any }) {
   const [rounds, setRounds] = useState<Round[]>([]);
   const [loading, setLoading] = useState(true);
-  const [index, setIndex] = useState<number | null>(null);
-  const [tab, setTab] = useState<"dashboard" | "rounds" | "games">("dashboard");
+  const [profile, setProfile] = useState<any>(null);
+  const [tab, setTab] = useState<"dashboard" | "rounds" | "games" | "courses" | "profile">("dashboard");
   const [stage, setStage] = useState<null | "setup" | { round: Round }>(null);
   const [viewing, setViewing] = useState<Round | null>(null);
 
   const user = session.user;
-  const displayName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Golfer";
+  const displayName = profile?.display_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "Golfer";
+  const index = profile?.handicap_index ?? null;
 
-  // Load this user's handicap index from localStorage (per-device, simple)
-  useEffect(() => {
-    const saved = localStorage.getItem("fc-index-" + user.id);
-    if (saved) setIndex(parseFloat(saved));
-  }, [user.id]);
-  const saveIndex = (idx: number | null) => {
-    setIndex(idx);
-    if (idx == null) localStorage.removeItem("fc-index-" + user.id);
-    else localStorage.setItem("fc-index-" + user.id, String(idx));
+  // Load (or create) this user's profile: display name, handicap index, GHIN number.
+  const loadProfile = useCallback(async () => {
+    const { data } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
+    if (data) { setProfile(data); return; }
+    // First login — create a profile row.
+    const fallbackName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Golfer";
+    const { data: created } = await supabase.from("profiles")
+      .insert({ id: user.id, display_name: fallbackName }).select().maybeSingle();
+    setProfile(created || { id: user.id, display_name: fallbackName, handicap_index: null, ghin_number: null, is_admin: false });
+  }, [user.id, user.email, user.user_metadata]);
+  useEffect(() => { loadProfile(); }, [loadProfile]);
+
+  const saveIndex = async (idx: number | null) => {
+    setProfile((p: any) => ({ ...p, handicap_index: idx }));
+    await supabase.from("profiles").update({ handicap_index: idx }).eq("id", user.id);
   };
 
   const loadRounds = useCallback(async () => {
@@ -124,15 +132,21 @@ function Home({ session }: { session: any }) {
         <button style={btn(true)} onClick={() => { setStage("setup"); setViewing(null); }}>＋ New round</button>
       </div>
 
-      <div style={{ display: "flex", gap: 6, marginTop: 16, borderBottom: `1px solid ${C.greenMid}` }}>
-        {(["dashboard", "rounds", "games"] as const).map((k) => (
+      <div style={{ display: "flex", gap: 6, marginTop: 16, borderBottom: `1px solid ${C.greenMid}`, flexWrap: "wrap" }}>
+        {(["dashboard", "rounds", "games", "courses"] as const).map((k) => (
           <button key={k} onClick={() => { setTab(k); setStage(null); setViewing(null); }}
             style={{
               background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: 14, fontWeight: 700,
               color: tab === k && !inFlow ? C.gold : C.sage,
               borderBottom: tab === k && !inFlow ? `2px solid ${C.gold}` : "2px solid transparent",
-            }}>{k === "dashboard" ? "Dashboard" : k === "rounds" ? "Rounds" : "Games"}</button>
+            }}>{k === "dashboard" ? "Dashboard" : k === "rounds" ? "Rounds" : k === "games" ? "Games" : "Courses"}</button>
         ))}
+        <button onClick={() => { setTab("profile"); setStage(null); setViewing(null); }}
+          style={{
+            background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: 14, fontWeight: 700,
+            color: tab === "profile" && !inFlow ? C.gold : C.sage,
+            borderBottom: tab === "profile" && !inFlow ? `2px solid ${C.gold}` : "2px solid transparent",
+          }}>Profile{profile?.is_admin ? " ★" : ""}</button>
       </div>
 
       <div style={{ marginTop: 20 }}>
@@ -146,10 +160,14 @@ function Home({ session }: { session: any }) {
           <RoundDetail round={viewing} onBack={() => setViewing(null)}
             onEdit={() => { setStage({ round: viewing }); setViewing(null); }}
             onDelete={async () => { await deleteRound(viewing.id); setViewing(null); }} />
-        ) : loading ? (
-          <div style={{ color: C.sage, textAlign: "center", padding: 40 }}>Loading your rounds…</div>
+        ) : tab === "courses" ? (
+          <CoursesLibrary user={user} />
+        ) : tab === "profile" ? (
+          <ProfilePanel profile={profile} user={user} onSaved={loadProfile} />
         ) : tab === "games" ? (
           <Tournaments session={session} />
+        ) : loading ? (
+          <div style={{ color: C.sage, textAlign: "center", padding: 40 }}>Loading your rounds…</div>
         ) : tab === "dashboard" ? (
           <Dashboard rounds={rounds} name={displayName} onOpen={setViewing} />
         ) : (
