@@ -83,11 +83,18 @@ function GameList({ displayName, onOpen, onCreate }: { displayName: string; onOp
     try {
       const { data: game, error } = await supabase.from("games").select("*").eq("code", c).single();
       if (error || !game) throw new Error("No game found with that code.");
+      const uid = (await supabase.auth.getUser()).data.user!.id;
       // Add me as a player if not already in.
-      const { data: existing } = await supabase.from("game_players").select("id").eq("game_id", game.id).eq("user_id", (await supabase.auth.getUser()).data.user!.id);
+      const { data: existing } = await supabase.from("game_players").select("id").eq("game_id", game.id).eq("user_id", uid);
       if (!existing || !existing.length) {
+        // Borrow course rating/slope/tee from an existing player so handicaps can compute.
+        const { data: others } = await supabase.from("game_players").select("rating,slope,tee_name").eq("game_id", game.id).not("rating", "is", null).limit(1);
+        const ref = others && others[0] ? others[0] : {};
+        const n = game.holes_meta.length;
         const { error: e2 } = await supabase.from("game_players").insert({
-          game_id: game.id, display_name: displayName, scores: Array(game.holes_meta.length).fill(null), putts: Array(game.holes_meta.length).fill(null), fairways: Array(game.holes_meta.length).fill(null),
+          game_id: game.id, user_id: uid, display_name: displayName,
+          rating: (ref as any).rating ?? null, slope: (ref as any).slope ?? null, tee_name: (ref as any).tee_name ?? null,
+          scores: Array(n).fill(null), putts: Array(n).fill(null), fairways: Array(n).fill(null),
         });
         if (e2) throw e2;
       }
@@ -323,23 +330,41 @@ function GameRoom({ gameId, user, displayName, onBack }: { gameId: string; user:
 
   const completeSetup = async () => {
     if (!game || !me) return;
-    // course data comes from the game's first player who has tee info, else ask via favorites — simplified: reuse game course par
     const idxVal = idxStr.trim() === "" ? null : parseFloat(idxStr);
-    // We need rating/slope; pull from any player who has them, or leave handicap null.
-    const ref = players.find((p) => p.rating != null && p.slope != null);
+    // Use this player's own rating/slope if set, else borrow from another player who has them.
+    const ref = (me.rating != null && me.slope != null) ? me : players.find((p) => p.rating != null && p.slope != null);
     const rating = ref?.rating ?? null, slope = ref?.slope ?? null;
     const ch = idxVal != null && rating != null && slope != null && game.course_par != null
       ? courseHandicap(idxVal, slope, rating, game.course_par) : null;
     await supabase.from("game_players").update({
-      handicap_index: idxVal, rating, slope, tee_name: ref?.tee_name ?? null, course_handicap: ch,
+      handicap_index: idxVal, rating, slope, tee_name: ref?.tee_name ?? me.tee_name ?? null, course_handicap: ch,
     }).eq("id", me.id);
     setNeedsSetup(false);
+    await load();
+  };
+
+  // Organizer: override any player's handicap index for this game (recomputes course handicap).
+  const overridePlayerHandicap = async (p: Player, idxVal: number | null) => {
+    if (!game) return;
+    // Use the player's rating/slope, else the organizer's row.
+    const ref = (p.rating != null && p.slope != null) ? p : players.find((x) => x.rating != null && x.slope != null);
+    const rating = ref?.rating ?? null, slope = ref?.slope ?? null;
+    const ch = idxVal != null && rating != null && slope != null && game.course_par != null
+      ? courseHandicap(idxVal, slope, rating, game.course_par) : null;
+    await supabase.from("game_players").update({
+      handicap_index: idxVal, rating, slope, course_handicap: ch,
+    }).eq("id", p.id);
+    // Notify the player their game handicap was set by the organizer (if it's not the organizer themselves).
+    if (p.user_id !== user.id) {
+      try { await supabase.from("notifications").insert({ user_id: p.user_id, message: `Your handicap for "${game.name}" was set to ${idxVal ?? "—"} (course handicap ${ch ?? "—"}) by the organizer.` }); } catch {}
+    }
     await load();
   };
 
   if (loading) return <div style={{ color: C.sage, padding: 20 }}>Loading game…</div>;
   if (!game) return <div style={{ color: C.sage, padding: 20 }}>Game not found. <button style={btn(false)} onClick={onBack}>Back</button></div>;
 
+  const isOrganizer = game.created_by === user.id;
   const leaderboard = [...players].sort((a, b) => playerPoints(b) - playerPoints(a));
 
   // Segment winners (three sixes), by net Stableford.
@@ -377,18 +402,21 @@ function GameRoom({ gameId, user, displayName, onBack }: { gameId: string; user:
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 16 }}>
           <Eyebrow>SET YOUR HANDICAP</Eyebrow>
           <div style={{ color: C.sage, fontSize: 13, marginTop: 8 }}>
-            Enter your handicap index so your net Stableford is scored correctly. (Tees use the game creator's course rating/slope.)
+            Enter your handicap index so your net Stableford is scored correctly. You can still enter scores below without it — it only affects net scoring.
           </div>
-          <div style={{ display: "flex", gap: 10, marginTop: 12, alignItems: "flex-end" }}>
+          <div style={{ display: "flex", gap: 10, marginTop: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
             <div>
               <label style={{ color: C.sage, fontSize: 12 }}>Handicap index</label>
               <input style={{ ...inputStyle, marginTop: 6, maxWidth: 140 }} inputMode="decimal" placeholder="14.2"
                 value={idxStr} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setIdxStr(v); }} />
             </div>
             <button style={btn(true)} onClick={completeSetup}>Save</button>
+            <button style={btn(false)} onClick={() => setNeedsSetup(false)}>Skip for now</button>
           </div>
         </div>
       )}
+
+      {isOrganizer && <OrganizerPanel game={game} players={players} onOverride={overridePlayerHandicap} />}
 
       {game.game_type === "match" ? (
         <MatchView game={game} players={players} user={user} isCreator={game.created_by === user.id} onChanged={load} />
@@ -435,12 +463,17 @@ function GameRoom({ gameId, user, displayName, onBack }: { gameId: string; user:
       )}
 
       {/* My score entry */}
-      {me && !needsSetup && (
+      {me && (
         <div style={{ marginTop: 22 }}>
           <Eyebrow>ENTER YOUR SCORES</Eyebrow>
-          <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>Tap a hole and type your strokes — it saves and updates the leaderboard. Tap ⟳ Refresh to see others' latest.</div>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>Tap a hole and pick your strokes — it saves and updates the leaderboard. Tap ⟳ Refresh to see others' latest.</div>
           <ScoreGrid game={game} me={me} savingHole={savingHole} onSetHole={setMyHole} />
           <MyStatsLine me={me} holes={playerHoles(me)} />
+        </div>
+      )}
+      {!me && (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: 18, marginTop: 18, color: C.sage }}>
+          You're viewing this game but haven't joined it as a player yet. Re-open it from the Games list with the share code to join and enter scores.
         </div>
       )}
     </div>
@@ -678,6 +711,70 @@ function MatchView({ game, players, user, isCreator, onChanged }: {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ---------------- Organizer panel (game creator) ----------------
+// Lets the game's creator confirm who's in and set/override each player's handicap.
+function OrganizerPanel({ game, players, onOverride }: {
+  game: Game; players: Player[]; onOverride: (p: Player, idx: number | null) => Promise<void>;
+}) {
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [open, setOpen] = useState(true);
+
+  const withHcp = players.filter((p) => p.course_handicap != null).length;
+  const allSet = players.length > 0 && withHcp === players.length;
+
+  const save = async (p: Player) => {
+    const raw = edits[p.id];
+    if (raw === undefined) return;
+    const idx = raw.trim() === "" ? null : parseFloat(raw);
+    setSavingId(p.id);
+    await onOverride(p, idx);
+    setSavingId(null);
+  };
+
+  return (
+    <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 16 }}>
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <Eyebrow>★ ORGANIZER · MANAGE PLAYERS</Eyebrow>
+        <div style={{ flex: 1 }} />
+        <button style={{ ...btn(false), fontSize: 12 }} onClick={() => setOpen((v) => !v)}>{open ? "Hide" : "Show"}</button>
+      </div>
+      <div style={{ color: allSet ? C.green : C.gold, fontSize: 13, marginTop: 8, fontWeight: 700 }}>
+        {players.length} player{players.length === 1 ? "" : "s"} joined · {withHcp}/{players.length} have a handicap set
+        {allSet ? " ✓ everyone's ready" : " — set the rest below"}
+      </div>
+
+      {open && (
+        <div style={{ marginTop: 10 }}>
+          {players.map((p) => (
+            <div key={p.id} style={{ background: C.card, borderRadius: 10, padding: "10px 14px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 150 }}>
+                <div style={{ color: C.ink, fontWeight: 700 }}>{p.display_name}{p.user_id === game.created_by ? " (organizer)" : ""}</div>
+                <div style={{ color: C.faint, fontSize: 12 }}>
+                  {p.course_handicap != null ? `course handicap ${p.course_handicap}` : "no handicap yet"}
+                  {p.rating != null && p.slope != null ? ` · ${p.rating}/${p.slope}` : ""}
+                </div>
+              </div>
+              <div>
+                <label style={{ color: C.sage, fontSize: 10 }}>Handicap index</label>
+                <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
+                  <input inputMode="decimal" defaultValue={p.handicap_index != null ? String(p.handicap_index) : ""}
+                    onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setEdits((m) => ({ ...m, [p.id]: v })); }}
+                    style={{ ...inputStyle, padding: "6px 8px", width: 80, textAlign: "center" }} />
+                  <button style={{ ...btn(true), padding: "6px 12px", fontSize: 12, opacity: savingId === p.id ? 0.5 : 1 }} disabled={savingId === p.id} onClick={() => save(p)}>Set</button>
+                </div>
+              </div>
+            </div>
+          ))}
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>
+            As organizer you can set or correct any player's handicap for this game at any time. Players are notified when you change theirs.
+          </div>
+        </div>
+      )}
     </div>
   );
 }
