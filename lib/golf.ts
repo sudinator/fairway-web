@@ -144,3 +144,75 @@ export function matchStatus(
   }
   return { thru, lead, aWins, bWins, halves, result };
 }
+
+// ---------------- Dashboard analytics ----------------
+// Average strokes by par (3/4/5), across all completed holes in the given rounds.
+export function avgByPar(rounds: Round[]): { par3: number | null; par4: number | null; par5: number | null } {
+  const buckets: Record<number, number[]> = { 3: [], 4: [], 5: [] };
+  rounds.forEach((r) =>
+    played(r).forEach((h) => {
+      if (buckets[h.par] && h.strokes != null) buckets[h.par].push(h.strokes);
+    })
+  );
+  const avg = (a: number[]) => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : null);
+  return { par3: avg(buckets[3]), par4: avg(buckets[4]), par5: avg(buckets[5]) };
+}
+
+// Net double bogey cap for a hole: par + 2 + strokes received on that hole.
+export function adjustedHoleScore(h: Hole): number | null {
+  if (h.strokes == null || h.strokes <= 0) return null;
+  const cap = h.par + 2 + (h.recv || 0);
+  return Math.min(h.strokes, cap);
+}
+
+// WHS-style score differential for one round (needs full 18 with rating & slope):
+//   (113 / slope) * (adjusted gross - course rating)
+export function roundDifferential(r: Round): number | null {
+  if (r.rating == null || r.slope == null) return null;
+  const holes = played(r);
+  if (holes.length < 18) return null; // differential is an 18-hole figure
+  let adjusted = 0;
+  for (const h of holes) {
+    const a = adjustedHoleScore(h);
+    if (a == null) return null;
+    adjusted += a;
+  }
+  return (113 / r.slope) * (adjusted - r.rating);
+}
+
+// ---------------- Running handicap index (WHS) ----------------
+// WHS uses the best N of your most recent 20 differentials, where N and any
+// adjustment depend on how many scores you have. Below ~3 rounds there's no
+// official index yet. This is a faithful approximation of the WHS table.
+const WHS_TABLE: { upTo: number; best: number; adj: number }[] = [
+  { upTo: 3, best: 1, adj: -2.0 },
+  { upTo: 4, best: 1, adj: -1.0 },
+  { upTo: 5, best: 1, adj: 0 },
+  { upTo: 6, best: 2, adj: -1.0 },
+  { upTo: 8, best: 2, adj: 0 },
+  { upTo: 11, best: 3, adj: 0 },
+  { upTo: 14, best: 4, adj: 0 },
+  { upTo: 16, best: 5, adj: 0 },
+  { upTo: 18, best: 6, adj: 0 },
+  { upTo: 19, best: 7, adj: 0 },
+  { upTo: 20, best: 8, adj: 0 },
+];
+
+// rounds should be newest-first or any order; we sort by date inside.
+export function runningHandicap(rounds: Round[]): { index: number | null; used: number; total: number } {
+  // Collect valid 18-hole differentials, most recent first.
+  const withDiff = rounds
+    .map((r) => ({ d: roundDifferential(r), date: r.played_at }))
+    .filter((x): x is { d: number; date: string } => x.d != null)
+    .sort((a, b) => +new Date(b.date) - +new Date(a.date));
+  const total = withDiff.length;
+  if (total < 3) return { index: null, used: 0, total };
+
+  const recent = withDiff.slice(0, 20).map((x) => x.d);
+  const row = WHS_TABLE.find((t) => recent.length <= t.upTo) || WHS_TABLE[WHS_TABLE.length - 1];
+  const best = [...recent].sort((a, b) => a - b).slice(0, row.best);
+  const avg = best.reduce((s, x) => s + x, 0) / best.length;
+  // Index is rounded to one decimal; the table adjustment nudges small samples.
+  const index = Math.round((avg + row.adj) * 10) / 10;
+  return { index, used: row.best, total };
+}

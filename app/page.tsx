@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, stablefordPts,
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate,
-  girStats, firStats, pct, holeBuckets,
+  girStats, firStats, pct, holeBuckets, avgByPar, roundDifferential, runningHandicap,
 } from "@/lib/golf";
 import { STARTER_COURSES, buildCustomCourse, Course } from "@/lib/courses";
 import { btn, inputStyle, Eyebrow, StatCard, ClassicCard } from "@/components/ui";
@@ -169,7 +169,7 @@ function Home({ session }: { session: any }) {
         ) : loading ? (
           <div style={{ color: C.sage, textAlign: "center", padding: 40 }}>Loading your rounds…</div>
         ) : tab === "dashboard" ? (
-          <Dashboard rounds={rounds} name={displayName} onOpen={setViewing} />
+          <Dashboard rounds={rounds} name={displayName} onOpen={setViewing} currentIndex={index} saveIndex={saveIndex} />
         ) : (
           <RoundsList rounds={rounds} onOpen={setViewing} />
         )}
@@ -855,7 +855,10 @@ function RoundDetail({ round, onBack, onEdit, onDelete }: {
 }
 
 // ---------------- Dashboard ----------------
-function Dashboard({ rounds, name, onOpen }: { rounds: Round[]; name: string; onOpen: (r: Round) => void }) {
+function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
+  rounds: Round[]; name: string; onOpen: (r: Round) => void;
+  currentIndex: number | null; saveIndex: (i: number | null) => void;
+}) {
   const done = rounds.filter((r) => played(r).length > 0);
   const sorted = [...done].sort((a, b) => +new Date(a.played_at) - +new Date(b.played_at));
   const avgDiff = done.length ? done.reduce((s, r) => s + diffOf(r), 0) / done.length : null;
@@ -868,6 +871,10 @@ function Dashboard({ rounds, name, onOpen }: { rounds: Round[]; name: string; on
   const fulls = done.filter((r) => played(r).length >= 14);
   const avgPts = fulls.length ? fulls.reduce((s, r) => s + ptsOf(r), 0) / fulls.length : null;
   const buckets = holeBuckets(done);
+  const byPar = avgByPar(done);
+  const diffs = done.map(roundDifferential).filter((d): d is number => d != null);
+  const avgDifferential = diffs.length ? diffs.reduce((s, d) => s + d, 0) / diffs.length : null;
+  const hcp = runningHandicap(done);
 
   const trend = sorted.map((r, i) => ({ i: i + 1, name: fmtDate(r.played_at), diff: diffOf(r), pts: ptsOf(r), course: r.course }));
   const distData = [
@@ -880,10 +887,43 @@ function Dashboard({ rounds, name, onOpen }: { rounds: Round[]; name: string; on
 
   return (
     <div>
+      <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginBottom: 12, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+        <div>
+          <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 700 }}>RUNNING HANDICAP INDEX</div>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
+            {hcp.index == null
+              ? `Need at least 3 full 18-hole rounds (with rating & slope). You have ${hcp.total}.`
+              : `Best ${hcp.used} of your last ${Math.min(hcp.total, 20)} differentials · WHS method`}
+          </div>
+        </div>
+        <div style={{ flex: 1 }} />
+        <div style={{ textAlign: "right" }}>
+          <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 44, fontWeight: 800 }}>
+            {hcp.index == null ? "—" : hcp.index.toFixed(1)}
+          </div>
+          {hcp.index != null && (
+            currentIndex === hcp.index ? (
+              <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>✓ in use as your handicap</div>
+            ) : (
+              <button style={{ ...btn(true), padding: "6px 12px", fontSize: 12, marginTop: 4 }}
+                onClick={() => saveIndex(hcp.index)}>
+                Use as my handicap
+              </button>
+            )
+          )}
+        </div>
+      </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <StatCard label="Rounds" value={done.length} />
         <StatCard label="Avg vs par" value={avgDiff == null ? "—" : (avgDiff >= 0 ? "+" : "") + avgDiff.toFixed(1)} />
         <StatCard label="Best round" value={best == null ? "—" : toParStr(best)} />
+        <StatCard label="Avg differential" value={avgDifferential == null ? "—" : avgDifferential.toFixed(1)}
+          sub={diffs.length ? `${diffs.length} full round${diffs.length === 1 ? "" : "s"} w/ rating·slope` : "needs 18 holes + rating/slope"} />
+      </div>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+        <StatCard label="Avg on par 3s" value={byPar.par3 == null ? "—" : byPar.par3.toFixed(2)} sub={byPar.par3 == null ? "" : (byPar.par3 - 3 >= 0 ? "+" : "") + (byPar.par3 - 3).toFixed(2) + " vs par"} />
+        <StatCard label="Avg on par 4s" value={byPar.par4 == null ? "—" : byPar.par4.toFixed(2)} sub={byPar.par4 == null ? "" : (byPar.par4 - 4 >= 0 ? "+" : "") + (byPar.par4 - 4).toFixed(2) + " vs par"} />
+        <StatCard label="Avg on par 5s" value={byPar.par5 == null ? "—" : byPar.par5.toFixed(2)} sub={byPar.par5 == null ? "" : (byPar.par5 - 5 >= 0 ? "+" : "") + (byPar.par5 - 5).toFixed(2) + " vs par"} />
         <StatCard label="Stableford avg" value={avgPts == null ? "—" : avgPts.toFixed(1)} sub="full rounds" />
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>

@@ -170,10 +170,27 @@ function CourseForm({ course, setCourse, existingId, saving, setSaving, err, set
 }) {
   const coursePar = course.holes.reduce((s, h) => s + (h.par || 0), 0);
 
+  // Keep rating fields as raw text while editing so a typed decimal point survives.
+  const [ratingTexts, setRatingTexts] = useState<Record<number, string>>(() => {
+    const m: Record<number, string> = {};
+    course.tees.forEach((t, i) => { m[i] = t.rating != null && !isNaN(t.rating) ? String(t.rating) : ""; });
+    return m;
+  });
+
   const setName = (name: string) => setCourse({ ...course, name });
   const setLoc = (location: string) => setCourse({ ...course, location });
   const updateTee = (i: number, patch: any) => setCourse({ ...course, tees: course.tees.map((t, j) => j === i ? { ...t, ...patch } : t) });
-  const addTee = () => setCourse({ ...course, tees: [...course.tees, { name: "New tee", rating: 72, slope: 113, par: coursePar }] });
+  const setRating = (i: number, raw: string) => {
+    if (raw !== "" && !/^\d*\.?\d*$/.test(raw)) return;
+    setRatingTexts((m) => ({ ...m, [i]: raw }));
+    const n = parseFloat(raw);
+    updateTee(i, { rating: isNaN(n) ? 0 : n });
+  };
+  const addTee = () => {
+    const idx = course.tees.length;
+    setRatingTexts((m) => ({ ...m, [idx]: "72" }));
+    setCourse({ ...course, tees: [...course.tees, { name: "New tee", rating: 72, slope: 113, par: coursePar }] });
+  };
   const removeTee = (i: number) => setCourse({ ...course, tees: course.tees.filter((_, j) => j !== i) });
   const updateHole = (i: number, patch: Partial<CourseHole>) => setCourse({ ...course, holes: course.holes.map((h, j) => j === i ? { ...h, ...patch } : h) });
 
@@ -230,7 +247,7 @@ function CourseForm({ course, setCourse, existingId, saving, setSaving, err, set
             <div style={{ flex: 1, minWidth: 80 }}>
               <label style={{ color: C.sage, fontSize: 10 }}>Rating</label>
               <input style={{ ...inputStyle, marginTop: 2 }} inputMode="decimal" placeholder="72.1"
-                value={t.rating ?? ""} onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) updateTee(i, { rating: v === "" ? 0 : parseFloat(v) }); }} />
+                value={ratingTexts[i] ?? ""} onChange={(e) => setRating(i, e.target.value)} />
             </div>
             <div style={{ flex: 1, minWidth: 80 }}>
               <label style={{ color: C.sage, fontSize: 10 }}>Slope</label>
