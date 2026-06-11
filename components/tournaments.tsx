@@ -310,6 +310,13 @@ function GameRoom({ gameId, user, displayName, onBack }: { gameId: string; user:
 
   const playerThru = (p: Player) => (p.scores || []).filter((s) => s != null && s > 0).length;
 
+  // Net score relative to par, derived from Stableford: par = 2 pts/hole, so rel = 2*thru − points.
+  // Negative = under par. Returned as a display string like "-1", "E", "+2".
+  const relToParStr = (p: Player) => {
+    const rel = 2 * playerThru(p) - playerPoints(p);
+    return rel === 0 ? "E" : rel > 0 ? `+${rel}` : `${rel}`;
+  };
+
   // Save one hole's data (strokes / putts / fairway) for me.
   const setMyHole = async (holeIdx: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | null }) => {
     if (!me) return;
@@ -433,6 +440,10 @@ function GameRoom({ gameId, user, displayName, onBack }: { gameId: string; user:
                   <div style={{ color: C.faint, fontSize: 12 }}>
                     thru {playerThru(p)}{p.course_handicap != null ? ` · CH ${p.course_handicap}` : " · no handicap set"}
                   </div>
+                </div>
+                <div style={{ textAlign: "right", marginRight: 14 }}>
+                  <div style={{ color: C.ink, fontWeight: 800, fontSize: 18, fontFamily: "Georgia, serif" }}>{relToParStr(p)}</div>
+                  <div style={{ color: C.faint, fontSize: 10 }}>thru {playerThru(p)}</div>
                 </div>
                 <div style={{ color: C.green, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{playerPoints(p)}</div>
                 <div style={{ color: C.faint, fontSize: 11, marginLeft: 6 }}>pts</div>
