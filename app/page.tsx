@@ -942,6 +942,17 @@ function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
   const threePutts = threePuttsPerRound(done);
 
   const trend = sorted.map((r, i) => ({ i: i + 1, name: fmtDate(r.played_at), diff: diffOf(r), pts: ptsOf(r), course: r.course }));
+  // Dynamic axis domains: fit the data range with a little padding, instead of anchoring at 0.
+  const niceDomain = (vals: number[], pad: number): [number, number] => {
+    if (vals.length === 0) return [0, 1];
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (lo === hi) { lo -= pad; hi += pad; }       // flat series → give it some room
+    else { const p = Math.max(pad, Math.round((hi - lo) * 0.15)); lo -= p; hi += p; }
+    return [Math.floor(lo), Math.ceil(hi)];
+  };
+  const diffDomain = niceDomain(trend.map((t) => t.diff), 2);
+  const ptsVals = trend.map((t) => t.pts).filter((v) => v > 0);
+  const ptsDomain = niceDomain(ptsVals, 2);
   const distTotal = buckets.eagle + buckets.birdie + buckets.par + buckets.bogey + buckets.double;
   const distData = [
     { name: "Eagle+", v: buckets.eagle, c: "#C77DFF" },
@@ -1058,10 +1069,10 @@ function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
           <Eyebrow>SCORING TREND</Eyebrow>
           <div style={{ height: 200, marginTop: 10 }}>
             <ResponsiveContainer>
-              <ComposedChart data={trend} margin={{ top: 5, right: 6, left: -20, bottom: 0 }}>
+              <ComposedChart data={trend} margin={{ top: 5, right: 6, left: -8, bottom: 0 }}>
                 <XAxis dataKey="i" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} />
-                <YAxis yAxisId="left" tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis yAxisId="right" orientation="right" tick={{ fill: C.gold, fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
+                <YAxis yAxisId="left" domain={diffDomain} allowDecimals={false} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
+                <YAxis yAxisId="right" orientation="right" domain={ptsDomain} allowDecimals={false} tick={{ fill: C.gold, fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
                 <Tooltip
                   contentStyle={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12 }}
                   formatter={(v: any, k: any) => [k === "diff" ? toParStr(v) : v, k === "diff" ? "vs par" : "Stableford pts"]}
