@@ -47,7 +47,10 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
   const isAdmin = active?.role === "admin";
   const [members, setMembers] = useState<Member[] | null>(null);
   const [newGroup, setNewGroup] = useState("");
-  const [inviteEmail, setInviteEmail] = useState("");
+  const [renameText, setRenameText] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -71,6 +74,14 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
   }, [active?.id]);
 
   useEffect(() => { loadMembers(); }, [loadMembers]);
+  useEffect(() => {
+    if (active) {
+      setRenameText(active.name);
+      setRenaming(false);
+      setInviteLink(null);
+      setCopyMsg(null);
+    }
+  }, [active?.id, active?.name]);
 
   const createGroup = async () => {
     const name = newGroup.trim();
@@ -96,27 +107,52 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
     } finally { setBusy(false); }
   };
 
-  const invite = async () => {
+  const renameGroup = async () => {
     if (!active || !isAdmin) return;
-    const email = inviteEmail.trim().toLowerCase();
-    if (!email || !email.includes("@")) { setMsg("Enter a valid email address."); return; }
+    const name = renameText.trim();
+    if (!name) { setMsg("Group name cannot be blank."); return; }
     setBusy(true); setMsg(null);
     try {
-      const { data: prof } = await supabase.from("profiles").select("id").ilike("email", email).maybeSingle();
-      const { error } = await supabase.from("group_members").upsert({
-        group_id: active.id,
-        user_id: prof?.id || null,
-        email,
-        role: "member",
-        status: prof?.id ? "active" : "invited",
-      }, { onConflict: "group_id,email" });
+      const { error } = await supabase.from("groups").update({ name }).eq("id", active.id);
       if (error) throw error;
-      setInviteEmail("");
-      await loadMembers();
-      setMsg(prof?.id ? `Added ${email}.` : `Invited ${email}. They will join this group when they sign in with that email.`);
+      setRenaming(false);
+      await onGroupsChanged();
+      setMsg("Group renamed.");
     } catch (e: any) {
-      setMsg("Couldn't invite member: " + (e.message || "error"));
+      setMsg("Couldn't rename group: " + (e.message || "error"));
     } finally { setBusy(false); }
+  };
+
+  const generateInvite = async () => {
+    if (!active || !isAdmin) return;
+    setBusy(true); setMsg(null); setInviteLink(null); setCopyMsg(null);
+    try {
+      const { data, error } = await supabase.rpc("create_group_invite", {
+        group_uuid: active.id,
+        invite_role: "member",
+        valid_days: 30,
+      });
+      if (error) throw error;
+      const code = String(data || "");
+      if (!/^\d{6}$/.test(code)) throw new Error("Invite code was not generated correctly.");
+      const origin = typeof window !== "undefined" ? window.location.origin : "https://birdienumnum.vercel.app";
+      const link = `${origin}/join/${code}`;
+      setInviteLink(link);
+      setMsg("Invite link generated. Share it with the player you want to add.");
+    } catch (e: any) {
+      setMsg("Couldn't generate invite link: " + (e.message || "error"));
+    } finally { setBusy(false); }
+  };
+
+  const copyInviteLink = async () => {
+    if (!inviteLink) return;
+    try {
+      await navigator.clipboard?.writeText(inviteLink);
+      setCopyMsg("Copied ✓");
+      setTimeout(() => setCopyMsg(null), 1800);
+    } catch {
+      setCopyMsg("Copy failed — select the link and copy it manually.");
+    }
   };
 
   const updateMember = async (m: Member, patch: Partial<Member>) => {
@@ -155,16 +191,40 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}{g.role === "admin" ? " ★ admin" : ""}</option>)}
             </select>
           </div>
-          <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 24, fontWeight: 800, marginTop: 10 }}>{active.name}</div>
+          <div style={{ marginTop: 10 }}>
+            {isAdmin && renaming ? (
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                <input style={{ ...inputStyle, maxWidth: 320 }} value={renameText} onChange={(e) => setRenameText(e.target.value)} />
+                <button style={{ ...btn(true), opacity: renameText.trim() && !busy ? 1 : 0.5 }} disabled={!renameText.trim() || busy} onClick={renameGroup}>Save name</button>
+                <button style={btn(false)} disabled={busy} onClick={() => { setRenaming(false); setRenameText(active.name); }}>Cancel</button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 24, fontWeight: 800 }}>{active.name}</div>
+                {isAdmin && <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px" }} onClick={() => setRenaming(true)}>Rename</button>}
+              </div>
+            )}
+          </div>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>Your role: {active.role}</div>
 
           {isAdmin && (
             <div style={{ marginTop: 16 }}>
               <Eyebrow>INVITE MEMBER</Eyebrow>
-              <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
-                <input style={{ ...inputStyle, maxWidth: 340 }} placeholder="friend@example.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} />
-                <button style={{ ...btn(true), opacity: inviteEmail.trim() && !busy ? 1 : 0.5 }} disabled={!inviteEmail.trim() || busy} onClick={invite}>Invite / add</button>
+              <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
+                Generate a one-time invite link. Send it to a player; after Google sign-in they will be added to this group automatically.
               </div>
+              <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <button style={{ ...btn(true), opacity: !busy ? 1 : 0.5 }} disabled={busy} onClick={generateInvite}>Generate invite link</button>
+                {inviteLink && <button style={btn(false)} onClick={copyInviteLink}>Copy link</button>}
+                {copyMsg && <span style={{ color: C.gold, fontSize: 12 }}>{copyMsg}</span>}
+              </div>
+              {inviteLink && (
+                <div style={{ background: C.card, borderRadius: 10, padding: 12, marginTop: 10 }}>
+                  <div style={{ color: C.faint, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>SHARE THIS LINK</div>
+                  <div style={{ color: C.green, fontSize: 13, marginTop: 6, wordBreak: "break-all", fontWeight: 800 }}>{inviteLink}</div>
+                  <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Expires in 30 days and can only be used once.</div>
+                </div>
+              )}
             </div>
           )}
 
