@@ -366,6 +366,51 @@ function GameRoom({ gameId, user, displayName, onBack }: { gameId: string; user:
     await load();
   };
 
+  // Organizer: add a registered player straight into the game (auto-joined), seeded with their handicap.
+  const addRegisteredPlayer = async (prof: { id: string; display_name: string; handicap_index: number | null }) => {
+    if (!game) return;
+    if (players.some((p) => p.user_id === prof.id)) return; // already in
+    const ref = players.find((x) => x.rating != null && x.slope != null);
+    const rating = ref?.rating ?? null, slope = ref?.slope ?? null;
+    const ch = prof.handicap_index != null && rating != null && slope != null && game.course_par != null
+      ? courseHandicap(prof.handicap_index, slope, rating, game.course_par) : null;
+    const n = game.holes_meta.length;
+    await supabase.from("game_players").insert({
+      game_id: game.id, user_id: prof.id, display_name: prof.display_name || "Player",
+      handicap_index: prof.handicap_index ?? null, rating, slope, tee_name: ref?.tee_name ?? null, course_handicap: ch,
+      scores: Array(n).fill(null), putts: Array(n).fill(null), fairways: Array(n).fill(null),
+    });
+    try { await supabase.from("notifications").insert({ user_id: prof.id, message: `You've been added to the game "${game.name}". Open the Games tab to enter your scores (code ${game.code}).` }); } catch {}
+    await load();
+  };
+
+  // Organizer: remove a player from the game (not the organizer).
+  const removePlayer = async (p: Player) => {
+    if (!game || p.user_id === game.created_by) return;
+    if (!confirm(`Remove ${p.display_name} from "${game.name}"? Their scores in this game will be deleted.`)) return;
+    await supabase.from("game_players").delete().eq("id", p.id);
+    if (p.user_id !== user.id) {
+      try { await supabase.from("notifications").insert({ user_id: p.user_id, message: `You were removed from the game "${game.name}" by the organizer.` }); } catch {}
+    }
+    await load();
+  };
+
+  // Organizer: rename the game.
+  const renameGame = async (newName: string) => {
+    if (!game || !newName.trim()) return;
+    await supabase.from("games").update({ name: newName.trim() }).eq("id", game.id);
+    await load();
+  };
+
+  // Organizer: delete the entire game and all its player rows.
+  const deleteGame = async () => {
+    if (!game) return;
+    if (!confirm(`Delete the game "${game.name}"? This removes it for everyone and can't be undone.`)) return;
+    await supabase.from("game_players").delete().eq("game_id", game.id);
+    await supabase.from("games").delete().eq("id", game.id);
+    onBack();
+  };
+
   if (loading) return <div style={{ color: C.sage, padding: 20 }}>Loading game…</div>;
   if (!game) return <div style={{ color: C.sage, padding: 20 }}>Game not found. <button style={btn(false)} onClick={onBack}>Back</button></div>;
 
@@ -421,7 +466,7 @@ function GameRoom({ gameId, user, displayName, onBack }: { gameId: string; user:
         </div>
       )}
 
-      {isOrganizer && <OrganizerPanel game={game} players={players} onOverride={overridePlayerHandicap} />}
+      {isOrganizer && <OrganizerPanel game={game} players={players} user={user} onOverride={overridePlayerHandicap} onAdd={addRegisteredPlayer} onRemove={removePlayer} onRename={renameGame} onDelete={deleteGame} />}
 
       {game.game_type === "match" ? (
         <MatchView game={game} players={players} user={user} isCreator={game.created_by === user.id} onChanged={load} />
@@ -627,13 +672,31 @@ function MatchView({ game, players, user, isCreator, onChanged }: {
 }
 
 // ---------------- Organizer panel (game creator) ----------------
-// Lets the game's creator confirm who's in and set/override each player's handicap.
-function OrganizerPanel({ game, players, onOverride }: {
-  game: Game; players: Player[]; onOverride: (p: Player, idx: number | null) => Promise<void>;
+// Lets the game's creator manage the roster, handicaps, and the game itself.
+function OrganizerPanel({ game, players, user, onOverride, onAdd, onRemove, onRename, onDelete }: {
+  game: Game; players: Player[]; user: any;
+  onOverride: (p: Player, idx: number | null) => Promise<void>;
+  onAdd: (prof: { id: string; display_name: string; handicap_index: number | null }) => Promise<void>;
+  onRemove: (p: Player) => Promise<void>;
+  onRename: (name: string) => Promise<void>;
+  onDelete: () => Promise<void>;
 }) {
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [open, setOpen] = useState(true);
+  const [roster, setRoster] = useState<{ id: string; display_name: string; handicap_index: number | null }[]>([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [nameEdit, setNameEdit] = useState(game.name);
+
+  // Load registered players not already in this game.
+  useEffect(() => {
+    if (!showAdd) return;
+    (async () => {
+      const { data } = await supabase.from("profiles").select("id, display_name, handicap_index").order("display_name");
+      const inGame = new Set(players.map((p) => p.user_id));
+      setRoster((data || []).filter((p: any) => !inGame.has(p.id)));
+    })();
+  }, [showAdd, players]);
 
   const withHcp = players.filter((p) => p.course_handicap != null).length;
   const allSet = players.length > 0 && withHcp === players.length;
@@ -650,17 +713,40 @@ function OrganizerPanel({ game, players, onOverride }: {
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 16 }}>
       <div style={{ display: "flex", alignItems: "center" }}>
-        <Eyebrow>★ ORGANIZER · MANAGE PLAYERS</Eyebrow>
+        <Eyebrow>★ ORGANIZER · MANAGE GAME</Eyebrow>
         <div style={{ flex: 1 }} />
         <button style={{ ...btn(false), fontSize: 12 }} onClick={() => setOpen((v) => !v)}>{open ? "Hide" : "Show"}</button>
       </div>
-      <div style={{ color: allSet ? C.green : C.gold, fontSize: 13, marginTop: 8, fontWeight: 700 }}>
-        {players.length} player{players.length === 1 ? "" : "s"} joined · {withHcp}/{players.length} have a handicap set
-        {allSet ? " ✓ everyone's ready" : " — set the rest below"}
+      <div style={{ color: allSet ? C.cream : C.gold, fontSize: 13, marginTop: 8, fontWeight: 700 }}>
+        {players.length} player{players.length === 1 ? "" : "s"} in game · {withHcp}/{players.length} have a handicap set
+        {allSet ? " ✓ everyone's ready" : ""}
       </div>
 
       {open && (
         <div style={{ marginTop: 10 }}>
+          {/* Add registered players */}
+          <button style={{ ...btn(true), fontSize: 13 }} onClick={() => setShowAdd((v) => !v)}>
+            {showAdd ? "Done adding" : "＋ Add players"}
+          </button>
+          {showAdd && (
+            <div style={{ background: C.card, borderRadius: 10, padding: 12, marginTop: 8 }}>
+              <div style={{ color: C.faint, fontSize: 12, marginBottom: 6 }}>
+                Tap a registered player to add them straight into the game. They'll be notified and can open it from their Games tab (or with the code {game.code}).
+              </div>
+              {roster.length === 0 && <div style={{ color: C.faint, fontSize: 13 }}>No other registered players to add.</div>}
+              {roster.map((r) => (
+                <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 4px", borderBottom: `1px solid ${C.line}` }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: C.ink, fontWeight: 700 }}>{r.display_name || "Player"}</div>
+                    <div style={{ color: C.faint, fontSize: 12 }}>{r.handicap_index != null ? `index ${r.handicap_index}` : "no handicap on file"}</div>
+                  </div>
+                  <button style={{ ...btn(true), padding: "6px 12px", fontSize: 12 }} onClick={() => onAdd(r)}>Add</button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Current players */}
           {players.map((p) => (
             <div key={p.id} style={{ background: C.card, borderRadius: 10, padding: "10px 14px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <div style={{ flex: 1, minWidth: 150 }}>
@@ -679,10 +765,27 @@ function OrganizerPanel({ game, players, onOverride }: {
                   <button style={{ ...btn(true), padding: "6px 12px", fontSize: 12, opacity: savingId === p.id ? 0.5 : 1 }} disabled={savingId === p.id} onClick={() => save(p)}>Set</button>
                 </div>
               </div>
+              {p.user_id !== game.created_by && (
+                <button title="Remove player" style={{ background: "none", border: `1px solid ${C.line}`, borderRadius: 6, color: C.birdie, fontWeight: 800, cursor: "pointer", padding: "6px 10px", fontSize: 13 }} onClick={() => onRemove(p)}>Remove</button>
+              )}
             </div>
           ))}
           <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>
-            As organizer you can set or correct any player's handicap for this game at any time. Players are notified when you change theirs.
+            You can add or remove players and set anyone's handicap at any time. Players are notified of changes.
+          </div>
+
+          {/* Game settings */}
+          <div style={{ borderTop: `1px solid ${C.greenMid}`, marginTop: 14, paddingTop: 14 }}>
+            <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2, fontWeight: 700 }}>GAME SETTINGS</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <input value={nameEdit} onChange={(e) => setNameEdit(e.target.value)}
+                style={{ ...inputStyle, padding: "8px 10px", flex: 1, minWidth: 160 }} placeholder="Game name" />
+              <button style={{ ...btn(false), fontSize: 13, opacity: nameEdit.trim() && nameEdit !== game.name ? 1 : 0.5 }}
+                disabled={!nameEdit.trim() || nameEdit === game.name} onClick={() => onRename(nameEdit)}>Rename</button>
+            </div>
+            <button style={{ background: "#5A1E1E", color: "#F6DEDB", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", marginTop: 10, fontSize: 13 }} onClick={onDelete}>
+              Delete this game
+            </button>
           </div>
         </div>
       )}
