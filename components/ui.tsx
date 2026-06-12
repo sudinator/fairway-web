@@ -271,43 +271,69 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
 // READ-ONLY VIEW — vertical scorecard for a completed round. Fits screen width.
 export function ScoreViewCard({ round }: { round: Round }) {
   const hasPutts = round.holes.some((h) => h.putts != null);
+  const hasPens = round.holes.some((h) => (h.penalties || 0) > 0);
+  const hasDots = round.holes.some((h) => (h.recv || 0) > 0);
+
+  const headStyle: React.CSSProperties = { color: C.faint, fontSize: 9, letterSpacing: 0.5, fontWeight: 700, textTransform: "uppercase" };
+
   const block = (from: number, to: number, label: string) => {
     const seg = round.holes.slice(from, to);
     if (seg.length === 0) return null;
     const sPar = seg.reduce((s, h) => s + h.par, 0);
     const sStr = seg.reduce((s, h) => s + (h.strokes || 0), 0);
     const sPutts = seg.reduce((s, h) => s + (h.putts || 0), 0);
+    const sPen = seg.reduce((s, h) => s + (h.penalties || 0), 0);
     const sPts = seg.reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
+    const Row = (cells: React.ReactNode[], opts?: { header?: boolean; foot?: boolean }) => (
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: `34px 30px 30px${hasDots ? " 34px" : ""} 1fr${hasPutts ? " 38px" : ""}${hasPens ? " 30px" : ""} 34px`,
+        alignItems: "center", gap: 4,
+        padding: opts?.header ? "0 4px 6px" : "6px 4px",
+        borderBottom: opts?.header ? `1px solid ${C.line}` : opts?.foot ? "none" : `1px solid ${C.line}`,
+        borderTop: opts?.foot ? `2px solid ${C.greenMid}` : "none",
+        marginTop: opts?.foot ? 4 : 0,
+      }}>
+        {cells}
+      </div>
+    );
     return (
-      <div style={{ background: C.card, borderRadius: 12, padding: 10, flex: 1, minWidth: 280 }}>
-        <div style={{ color: C.faint, fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 6 }}>{label}</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 2px 5px", color: C.faint, fontSize: 9, letterSpacing: 1, borderBottom: `1px solid ${C.line}` }}>
-          <div style={{ width: 52 }}>HOLE</div>
-          <div style={{ width: 28, textAlign: "center" }}>PAR</div>
-          <div style={{ flex: 1, textAlign: "center" }}>SCORE</div>
-          {hasPutts && <div style={{ width: 44, textAlign: "center" }}>PUTTS</div>}
-          <div style={{ width: 34, textAlign: "center" }}>PTS</div>
-        </div>
-        {seg.map((h, j) => (
-          <div key={j} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 2px", borderBottom: `1px solid ${C.line}` }}>
-            <div style={{ width: 52 }}>
-              <span style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.hole_number}</span>
-              {(h.recv || 0) > 0 && <span style={{ color: C.gold, fontWeight: 700, fontSize: 11, marginLeft: 3 }}>{"•".repeat(Math.min(h.recv || 0, 3))}</span>}
-              <div style={{ color: C.faint, fontSize: 9 }}>S.I. {h.stroke_index ?? "–"}</div>
-            </div>
-            <div style={{ width: 28, textAlign: "center", color: C.sage, fontSize: 14 }}>{h.par}</div>
-            <div style={{ flex: 1, textAlign: "center" }}><ScoreMark hole={h} /></div>
-            {hasPutts && <div style={{ width: 44, textAlign: "center", color: C.faint, fontSize: 13 }}>{h.putts ?? "·"}</div>}
-            <div style={{ width: 34, textAlign: "center", color: C.green, fontWeight: 700, fontSize: 13 }}>{stablefordPts(h.strokes, h.par, h.recv || 0) ?? "·"}</div>
-          </div>
-        ))}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 2px 0", fontWeight: 800 }}>
-          <div style={{ width: 52, color: C.gold, fontSize: 12 }}>{from === 0 ? "OUT" : "IN"}</div>
-          <div style={{ width: 28, textAlign: "center", color: C.ink, fontSize: 13 }}>{sPar}</div>
-          <div style={{ flex: 1, textAlign: "center", color: C.ink, fontSize: 15 }}>{sStr || "—"}</div>
-          {hasPutts && <div style={{ width: 44, textAlign: "center", color: C.faint, fontSize: 13 }}>{sPutts || "—"}</div>}
-          <div style={{ width: 34, textAlign: "center", color: C.green, fontSize: 13 }}>{sPts}</div>
-        </div>
+      <div style={{ background: C.card, borderRadius: 12, padding: 12, flex: 1, minWidth: 300 }}>
+        <div style={{ color: C.green, fontSize: 11, letterSpacing: 2, fontWeight: 800, marginBottom: 8 }}>{label}</div>
+        {Row([
+          <div key="h" style={headStyle}>Hole</div>,
+          <div key="p" style={{ ...headStyle, textAlign: "center" }}>Par</div>,
+          <div key="si" style={{ ...headStyle, textAlign: "center" }}>S.I.</div>,
+          ...(hasDots ? [<div key="d" style={{ ...headStyle, textAlign: "center" }}>Hcp</div>] : []),
+          <div key="sc" style={{ ...headStyle, textAlign: "center" }}>Score</div>,
+          ...(hasPutts ? [<div key="pu" style={{ ...headStyle, textAlign: "center" }}>Putt</div>] : []),
+          ...(hasPens ? [<div key="pe" style={{ ...headStyle, textAlign: "center" }}>Pen</div>] : []),
+          <div key="pt" style={{ ...headStyle, textAlign: "center" }}>Pts</div>,
+        ], { header: true })}
+        {seg.map((h, j) => {
+          const recv = h.recv || 0;
+          const pts = stablefordPts(h.strokes, h.par, h.recv || 0);
+          return Row([
+            <div key="h" style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.hole_number}</div>,
+            <div key="p" style={{ textAlign: "center", color: C.sage, fontSize: 14 }}>{h.par}</div>,
+            <div key="si" style={{ textAlign: "center", color: C.faint, fontSize: 12 }}>{h.stroke_index ?? "–"}</div>,
+            ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: C.gold, fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>{recv > 0 ? "•".repeat(Math.min(recv, 3)) : ""}</div>] : []),
+            <div key="sc" style={{ textAlign: "center" }}><ScoreMark hole={h} /></div>,
+            ...(hasPutts ? [<div key="pu" style={{ textAlign: "center", color: C.faint, fontSize: 13 }}>{h.putts ?? "·"}</div>] : []),
+            ...(hasPens ? [<div key="pe" style={{ textAlign: "center", color: (h.penalties || 0) > 0 ? C.birdie : C.faint, fontSize: 13 }}>{h.penalties || "·"}</div>] : []),
+            <div key="pt" style={{ textAlign: "center", color: C.green, fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
+          ]);
+        })}
+        {Row([
+          <div key="h" style={{ color: C.gold, fontWeight: 800, fontSize: 12 }}>{from === 0 ? "OUT" : "IN"}</div>,
+          <div key="p" style={{ textAlign: "center", color: C.ink, fontWeight: 800, fontSize: 13 }}>{sPar}</div>,
+          <div key="si" />,
+          ...(hasDots ? [<div key="d" />] : []),
+          <div key="sc" style={{ textAlign: "center", color: C.ink, fontWeight: 800, fontSize: 15 }}>{sStr || "—"}</div>,
+          ...(hasPutts ? [<div key="pu" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 13 }}>{sPutts || "—"}</div>] : []),
+          ...(hasPens ? [<div key="pe" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 13 }}>{sPen || "—"}</div>] : []),
+          <div key="pt" style={{ textAlign: "center", color: C.green, fontWeight: 800, fontSize: 14 }}>{sPts}</div>,
+        ], { foot: true })}
       </div>
     );
   };
@@ -315,6 +341,12 @@ export function ScoreViewCard({ round }: { round: Round }) {
   const out = round.holes.slice(0, 9).reduce((s, h) => s + (h.strokes || 0), 0);
   const inn = round.holes.slice(9, 18).reduce((s, h) => s + (h.strokes || 0), 0);
   const has18 = round.holes.length > 9;
+  const summaryBox = (label: string, val: number, primary?: boolean) => (
+    <div style={{ background: primary ? C.gold : C.card, borderRadius: 10, padding: "8px 20px", textAlign: "center", minWidth: 70 }}>
+      <div style={{ color: primary ? "#3B2A00" : C.faint, fontSize: 10, letterSpacing: 2, fontWeight: 700 }}>{label}</div>
+      <div style={{ color: primary ? "#3B2A00" : C.ink, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{val || "–"}</div>
+    </div>
+  );
 
   return (
     <div>
@@ -324,18 +356,9 @@ export function ScoreViewCard({ round }: { round: Round }) {
       </div>
       {has18 && (out > 0 || inn > 0) && (
         <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap", justifyContent: "center" }}>
-          <div style={{ border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 16px", textAlign: "center" }}>
-            <div style={{ color: C.faint, fontSize: 10, letterSpacing: 2 }}>OUT</div>
-            <div style={{ color: C.ink, fontWeight: 800, fontSize: 18 }}>{out || "–"}</div>
-          </div>
-          <div style={{ border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 16px", textAlign: "center" }}>
-            <div style={{ color: C.faint, fontSize: 10, letterSpacing: 2 }}>IN</div>
-            <div style={{ color: C.ink, fontWeight: 800, fontSize: 18 }}>{inn || "–"}</div>
-          </div>
-          <div style={{ background: C.green, borderRadius: 8, padding: "6px 16px", textAlign: "center" }}>
-            <div style={{ color: C.cream, fontSize: 10, letterSpacing: 2 }}>TOTAL</div>
-            <div style={{ color: "#fff", fontWeight: 800, fontSize: 18 }}>{out + inn || "–"}</div>
-          </div>
+          {summaryBox("OUT", out)}
+          {summaryBox("IN", inn)}
+          {summaryBox("TOTAL", out + inn, true)}
         </div>
       )}
     </div>
