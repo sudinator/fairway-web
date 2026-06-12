@@ -906,15 +906,27 @@ function RoundDetail({ round, onBack, onEdit, onDelete }: {
     ].join("\n");
   };
 
+  const ghinPostUrl = "https://www.ghin.com/post-score/hole-by-hole/select-course";
+
   const postToGhin = async () => {
     const summary = ghinSummary();
+
+    // Open the tab immediately from the button click so browsers do not block it.
+    // Some browsers block popups opened after an async clipboard call.
+    const ghinTab = window.open("about:blank", "_blank");
+
     try {
       await navigator.clipboard?.writeText(summary);
-      setGhinMsg("Copied GHIN-ready score details. GHIN is opening now — paste/check the details there.");
+      setGhinMsg("Copied GHIN-ready score details. GHIN is opening now — paste/check the details there. If GHIN does not open, use the button below.");
     } catch {
-      setGhinMsg("GHIN is opening now. If copy did not work, use the score details shown on this page.");
+      setGhinMsg("GHIN is opening now. Copy may not have worked, so use the score details on this page. If GHIN does not open, use the button below.");
     }
-    window.open("https://www.ghin.com/post-score/hole-by-hole/post", "_blank", "noopener,noreferrer");
+
+    if (ghinTab) {
+      ghinTab.location.href = ghinPostUrl;
+    } else {
+      window.location.href = ghinPostUrl;
+    }
   };
 
   return (
@@ -937,7 +949,11 @@ function RoundDetail({ round, onBack, onEdit, onDelete }: {
       </div>
       {ghinMsg && (
         <div style={{ background: C.greenLight, borderRadius: 10, padding: "10px 12px", marginTop: 12, color: C.gold, fontSize: 12 }}>
-          {ghinMsg}
+          <div>{ghinMsg}</div>
+          <a href={ghinPostUrl} target="_blank" rel="noopener noreferrer"
+            style={{ display: "inline-block", color: C.cream, fontWeight: 800, marginTop: 8 }}>
+            Open GHIN score posting
+          </a>
         </div>
       )}
       {gross ? (
