@@ -493,6 +493,7 @@ function GameRoom({ gameId, user, displayName, onBack }: { gameId: string; user:
             hasHandicap={me.course_handicap != null}
             onSet={(i, patch) => setMyHole(i, patch)}
             savingHole={savingHole}
+            showPenalties={false}
           />
           <MyStatsLine me={me} holes={playerHoles(me)} />
         </div>

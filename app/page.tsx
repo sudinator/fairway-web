@@ -724,11 +724,18 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
       <ScoreEntryCard
         holes={holes.map((h) => ({
           n: h.hole_number, par: h.par, si: h.stroke_index,
-          strokes: h.strokes, putts: h.putts, fairway: h.fairway,
+          strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties,
           recv: round.course_handicap != null ? strokesReceived(h.stroke_index, round.course_handicap) : 0,
         }))}
         hasHandicap={round.course_handicap != null}
-        onSet={(i, patch) => setHole(i, patch)}
+        onSet={(i, patch) => {
+          const p: Partial<Hole> = {};
+          if (patch.strokes !== undefined) p.strokes = patch.strokes;
+          if (patch.putts !== undefined) p.putts = patch.putts;
+          if (patch.fairway !== undefined) p.fairway = patch.fairway;
+          if (patch.penalties !== undefined) p.penalties = patch.penalties ?? 0;
+          setHole(i, p);
+        }}
       />
       {err && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{err}</div>}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 16, flexWrap: "wrap" }}>

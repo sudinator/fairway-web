@@ -155,24 +155,28 @@ export function NumPicker({ value, from, to, onChange, width = 46, dash = true, 
 export type EntryHole = {
   n: number; par: number; si: number | null;
   strokes: number | null; putts: number | null; fairway: "hit" | "miss" | null;
+  penalties?: number | null;
   recv: number; // handicap strokes received on this hole
 };
 
 // SCORE ENTRY — vertical, one row per hole, fits screen width (no horizontal scroll).
 // Used by both individual stroke play and group play so the card is identical everywhere.
-export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true }: {
+export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true }: {
   holes: EntryHole[];
   hasHandicap: boolean;
-  onSet: (i: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | null }) => void;
+  onSet: (i: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | null; penalties?: number | null }) => void;
   savingHole?: number | null;
   showFairway?: boolean;
   showPutts?: boolean;
+  showPenalties?: boolean;
 }) {
   const cycleFw = (i: number, cur: "hit" | "miss" | null, par: number) => {
     if (par < 4) return;
     onSet(i, { fairway: cur == null ? "hit" : cur === "hit" ? "miss" : null });
   };
   const anyStroke = holes.some((h) => h.recv > 0);
+  const hasDots = anyStroke && hasHandicap;
+  const headStyle: React.CSSProperties = { color: C.faint, fontSize: 9, letterSpacing: 0.5, fontWeight: 700, textTransform: "uppercase" };
 
   const block = (from: number, to: number, label: string) => {
     const seg = holes.slice(from, to);
@@ -180,57 +184,79 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     const sPar = seg.reduce((s, h) => s + (h.par || 0), 0);
     const sScore = seg.reduce((s, h) => s + (h.strokes || 0), 0);
     const sPutts = seg.reduce((s, h) => s + (h.putts || 0), 0);
+    const sPen = seg.reduce((s, h) => s + (h.penalties || 0), 0);
+    const sPts = seg.reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
+    const cols = `26px 24px 24px${hasDots ? " 28px" : ""} 1fr${showFairway ? " 30px" : ""}${showPutts ? " 54px" : ""}${showPenalties ? " 48px" : ""} 28px`;
+    const Row = (cells: React.ReactNode[], opts?: { header?: boolean; foot?: boolean }) => (
+      <div style={{
+        display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4,
+        padding: opts?.header ? "0 2px 6px" : "5px 2px",
+        borderBottom: opts?.foot ? "none" : `1px solid ${C.line}`,
+        borderTop: opts?.foot ? `2px solid ${C.greenMid}` : "none",
+        marginTop: opts?.foot ? 4 : 0,
+      }}>{cells}</div>
+    );
     return (
-      <div style={{ background: C.card, borderRadius: 12, padding: 10, flex: 1, minWidth: 280 }}>
-        <div style={{ color: C.faint, fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 6 }}>{label}</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 2px 5px", color: C.faint, fontSize: 9, letterSpacing: 1, borderBottom: `1px solid ${C.line}` }}>
-          <div style={{ width: 52 }}>HOLE</div>
-          <div style={{ width: 28, textAlign: "center" }}>PAR</div>
-          <div style={{ flex: 1, textAlign: "center" }}>SCORE</div>
-          {showPutts && <div style={{ width: 50, textAlign: "center" }}>PUTTS</div>}
-          {showFairway && <div style={{ width: 30, textAlign: "center" }}>FW</div>}
-        </div>
+      <div style={{ background: C.card, borderRadius: 12, padding: 10, flex: 1, minWidth: 300 }}>
+        <div style={{ color: C.green, fontSize: 11, letterSpacing: 2, fontWeight: 800, marginBottom: 8 }}>{label}</div>
+        {Row([
+          <div key="h" style={headStyle}>Hole</div>,
+          <div key="p" style={{ ...headStyle, textAlign: "center" }}>Par</div>,
+          <div key="si" style={{ ...headStyle, textAlign: "center" }}>S.I.</div>,
+          ...(hasDots ? [<div key="d" style={{ ...headStyle, textAlign: "center" }}>Hcp</div>] : []),
+          <div key="sc" style={{ ...headStyle, textAlign: "center" }}>Score</div>,
+          ...(showFairway ? [<div key="fw" style={{ ...headStyle, textAlign: "center" }}>FW</div>] : []),
+          ...(showPutts ? [<div key="pu" style={{ ...headStyle, textAlign: "center" }}>Putt</div>] : []),
+          ...(showPenalties ? [<div key="pe" style={{ ...headStyle, textAlign: "center" }}>Pen</div>] : []),
+          <div key="pt" style={{ ...headStyle, textAlign: "center" }}>Pts</div>,
+        ], { header: true })}
         {seg.map((h, j) => {
           const i = from + j;
           const maxStrokes = hasHandicap ? h.par + 2 + h.recv : h.par * 2;
-          // Putts can't exceed the strokes taken on the hole.
           const maxPutts = h.strokes != null && h.strokes > 0 ? Math.min(h.strokes, 6) : 6;
-          return (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 2px", borderBottom: `1px solid ${C.line}` }}>
-              <div style={{ width: 52 }}>
-                <span style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.n}</span>
-                {h.recv > 0 && <span title={`${h.recv} stroke(s)`} style={{ color: C.gold, fontWeight: 700, fontSize: 11, marginLeft: 3 }}>{"•".repeat(Math.min(h.recv, 3))}</span>}
-                <div style={{ color: C.faint, fontSize: 9 }}>S.I. {h.si ?? "–"}</div>
-              </div>
-              <div style={{ width: 28, textAlign: "center", color: C.sage, fontSize: 14 }}>{h.par}</div>
-              <div style={{ flex: 1, textAlign: "center" }}>
-                <NumPicker value={h.strokes} from={1} to={maxStrokes} onChange={(v) => onSet(i, { strokes: v })} width={52} accent={savingHole === i} />
-              </div>
-              {showPutts && (
-                <div style={{ width: 50, textAlign: "center" }}>
-                  <NumPicker value={h.putts} from={0} to={maxPutts} onChange={(v) => onSet(i, { putts: v })} width={46} />
-                </div>
-              )}
-              {showFairway && (
-                <div style={{ width: 30, textAlign: "center" }}>
-                  <button onClick={() => cycleFw(i, h.fairway, h.par)} disabled={h.par < 4}
-                    style={{ border: `1px solid ${C.line}`, borderRadius: 6, width: 30, height: 30, cursor: h.par < 4 ? "default" : "pointer",
-                      background: h.fairway === "hit" ? "#DDF0DF" : h.fairway === "miss" ? "#F6DEDB" : C.card,
-                      color: h.fairway === "hit" ? C.greenMid : h.fairway === "miss" ? C.birdie : C.faint, fontWeight: 800, fontSize: 14 }}>
-                    {h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "miss" ? "✗" : "·"}
-                  </button>
-                </div>
-              )}
-            </div>
-          );
+          const pts = stablefordPts(h.strokes, h.par, h.recv || 0);
+          return Row([
+            <div key="h" style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.n}</div>,
+            <div key="p" style={{ textAlign: "center", color: C.sage, fontSize: 14 }}>{h.par}</div>,
+            <div key="si" style={{ textAlign: "center", color: C.faint, fontSize: 12 }}>{h.si ?? "–"}</div>,
+            ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: C.gold, fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>{h.recv > 0 ? "•".repeat(Math.min(h.recv, 3)) : ""}</div>] : []),
+            <div key="sc" style={{ textAlign: "center" }}>
+              <NumPicker value={h.strokes} from={1} to={maxStrokes} onChange={(v) => onSet(i, { strokes: v })} width={48} accent={savingHole === i} />
+            </div>,
+            ...(showFairway ? [
+              <div key="fw" style={{ textAlign: "center" }}>
+                <button onClick={() => cycleFw(i, h.fairway, h.par)} disabled={h.par < 4}
+                  style={{ border: `1px solid ${C.line}`, borderRadius: 6, width: 28, height: 30, cursor: h.par < 4 ? "default" : "pointer",
+                    background: h.fairway === "hit" ? "#DDF0DF" : h.fairway === "miss" ? "#F6DEDB" : C.card,
+                    color: h.fairway === "hit" ? C.greenMid : h.fairway === "miss" ? C.birdie : C.faint, fontWeight: 800, fontSize: 13 }}>
+                  {h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "miss" ? "✗" : "·"}
+                </button>
+              </div>,
+            ] : []),
+            ...(showPutts ? [
+              <div key="pu" style={{ textAlign: "center" }}>
+                <NumPicker value={h.putts} from={0} to={maxPutts} onChange={(v) => onSet(i, { putts: v })} width={48} />
+              </div>,
+            ] : []),
+            ...(showPenalties ? [
+              <div key="pe" style={{ textAlign: "center" }}>
+                <NumPicker value={h.penalties || null} from={1} to={3} onChange={(v) => onSet(i, { penalties: v ?? 0 })} width={44} />
+              </div>,
+            ] : []),
+            <div key="pt" style={{ textAlign: "center", color: C.green, fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
+          ]);
         })}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 2px 0", fontWeight: 800 }}>
-          <div style={{ width: 52, color: C.gold, fontSize: 12 }}>{from === 0 ? "OUT" : "IN"}</div>
-          <div style={{ width: 28, textAlign: "center", color: C.ink, fontSize: 13 }}>{sPar}</div>
-          <div style={{ flex: 1, textAlign: "center", color: C.green, fontSize: 15 }}>{sScore || "–"}</div>
-          {showPutts && <div style={{ width: 50, textAlign: "center", color: C.faint, fontSize: 13 }}>{sPutts || "–"}</div>}
-          {showFairway && <div style={{ width: 30 }} />}
-        </div>
+        {Row([
+          <div key="h" style={{ color: C.gold, fontWeight: 800, fontSize: 12 }}>{from === 0 ? "OUT" : "IN"}</div>,
+          <div key="p" style={{ textAlign: "center", color: C.ink, fontWeight: 800, fontSize: 13 }}>{sPar}</div>,
+          <div key="si" />,
+          ...(hasDots ? [<div key="d" />] : []),
+          <div key="sc" style={{ textAlign: "center", color: C.green, fontWeight: 800, fontSize: 15 }}>{sScore || "–"}</div>,
+          ...(showFairway ? [<div key="fw" />] : []),
+          ...(showPutts ? [<div key="pu" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 13 }}>{sPutts || "–"}</div>] : []),
+          ...(showPenalties ? [<div key="pe" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 13 }}>{sPen || "–"}</div>] : []),
+          <div key="pt" style={{ textAlign: "center", color: C.green, fontWeight: 800, fontSize: 14 }}>{sPts}</div>,
+        ], { foot: true })}
       </div>
     );
   };
