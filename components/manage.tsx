@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { C, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes } from "@/lib/golf";
 import { buildCustomCourse, Course, CourseHole, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
+import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, NumPicker } from "@/components/ui";
 
 const supabase = createClient();
@@ -47,6 +48,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   const [showCommunity, setShowCommunity] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [myName, setMyName] = useState<string>("Someone");
 
   const load = useCallback(async () => {
     // This group's courses (via the group_courses link table — one shared record per course).
@@ -65,15 +67,18 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
     vlist.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
     setCommunity(vlist);
 
-    const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).maybeSingle();
+    const { data: prof } = await supabase.from("profiles").select("is_admin, display_name").eq("id", user.id).maybeSingle();
     setIsAdmin(!!prof?.is_admin);
+    setMyName(prof?.display_name || user.email || "Someone");
   }, [user.id, activeGroupId]);
   useEffect(() => { load(); }, [load]);
 
   // App-admin toggles whether a course is part of the shared community library.
   const toggleVetted = async (c: LibCourse) => {
     setBusyId(c.id); setMsg(null);
-    await supabase.from("favorite_courses").update({ vetted: !c.vetted }).eq("id", c.id);
+    const next = !c.vetted;
+    await supabase.from("favorite_courses").update({ vetted: next }).eq("id", c.id);
+    await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: next ? "course_vetted" : "course_unvetted", summary: `${next ? "Vetted" : "Un-vetted"} community course "${c.name}"` });
     setBusyId(null);
     await load();
   };
@@ -90,6 +95,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   // Remove a course FROM THIS GROUP only (unlink). The shared record and other groups are untouched.
   const remove = async (id: string, courseName: string) => {
     await supabase.from("group_courses").delete().eq("group_id", activeGroupId).eq("course_id", id);
+    await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_removed", group_id: activeGroupId, summary: `Removed course "${courseName}" from a group` });
     await load();
   };
 
@@ -312,6 +318,7 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
             .select("id").single();
           if (error || !created) throw error || new Error("Could not create course");
           courseId = created.id;
+          await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Someone", action: "course_created", group_id: activeGroupId, summary: `Created course "${name}"` });
         }
         await linkCourseToGroup(supabase, activeGroupId, courseId!, user.id);
       }
@@ -532,6 +539,7 @@ function AdminPanel({ user }: { user: any }) {
     const who = p.display_name || "a player";
     await notify(p.id, `Your handicap index was set to ${idx ?? "—"} by an admin.`);
     await notify(user.id, `You changed ${who}'s handicap index to ${idx ?? "—"}.`);
+    await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "handicap_changed", target_user_id: p.id, summary: `Set ${who}'s handicap index to ${idx ?? "—"}` });
     setSavingId(null);
     await load();
   };
@@ -828,6 +836,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
     const { error } = await supabase.from("profiles").update({ handicap_index: idx }).eq("id", row.user_id);
     if (error) { setMsg("Couldn't update handicap: " + error.message); setBusyId(null); return; }
     if (row.user_id !== user.id) await notify(row.user_id, `Your handicap index was set to ${idx ?? "—"} by a group admin.`);
+    await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Group admin", action: "handicap_changed", group_id: activeGroupId, target_user_id: row.user_id, summary: `Set ${row.profiles?.display_name || row.email}'s handicap to ${idx ?? "—"}` });
     setBusyId(null);
     await load();
     setMsg("Handicap updated.");
@@ -837,6 +846,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
   const toggleRole = async (row: any) => {
     setBusyId(row.id); setMsg(null);
     await supabase.from("group_members").update({ role: row.role === "admin" ? "member" : "admin" }).eq("id", row.id);
+    await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Group admin", action: "role_changed", group_id: activeGroupId, target_user_id: row.user_id, summary: `Changed ${row.profiles?.display_name || row.email} to ${row.role === "admin" ? "member" : "admin"}` });
     setBusyId(null);
     await load(); onChanged?.();
   };
@@ -847,6 +857,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
     setBusyId(row.id); setMsg(null);
     await supabase.from("group_members").update({ status: "removed" }).eq("id", row.id);
     if (row.user_id && row.user_id !== user.id) await notify(row.user_id, `You were removed from a group by an admin.`);
+    await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Group admin", action: "member_removed", group_id: activeGroupId, target_user_id: row.user_id, summary: `Removed ${row.profiles?.display_name || row.email} from a group` });
     setBusyId(null);
     await load(); onChanged?.();
   };
@@ -904,6 +915,99 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// ================= Admin Activity (audit trail) =================
+export function ActivityTab() {
+  const [rows, setRows] = useState<any[] | null>(null);
+  const [filter, setFilter] = useState<string>("all");
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("activity_log").select("*").order("created_at", { ascending: false }).limit(300);
+      setRows(data || []);
+    })();
+  }, []);
+
+  const cats: Record<string, string[]> = {
+    all: [],
+    rounds: ["round_completed", "round_deleted"],
+    players: ["handicap_changed", "member_added", "member_removed", "role_changed", "score_edited"],
+    courses: ["course_created", "course_vetted", "course_unvetted", "course_removed"],
+    games: ["game_created", "game_deleted"],
+  };
+  const shown = (rows || []).filter((r) => filter === "all" || cats[filter]?.includes(r.action));
+
+  return (
+    <div>
+      <Eyebrow>★ ACTIVITY · AUDIT TRAIL</Eyebrow>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
+        Major changes across the app — who did what, and when. Newest first. Logging began when this feature was deployed, so earlier history isn't shown.
+      </div>
+      <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
+        {["all", "rounds", "players", "courses", "games"].map((f) => (
+          <button key={f} onClick={() => setFilter(f)}
+            style={{ ...btn(filter === f), fontSize: 12, padding: "6px 12px", textTransform: "capitalize" }}>{f}</button>
+        ))}
+      </div>
+      {rows === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
+      {rows !== null && shown.length === 0 && (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: 20, marginTop: 14, color: C.sage, textAlign: "center" }}>
+          No activity recorded yet{filter !== "all" ? " in this category" : ""}.
+        </div>
+      )}
+      {shown.map((r) => (
+        <div key={r.id} style={{ background: C.card, borderRadius: 12, padding: "11px 14px", marginTop: 8 }}>
+          <div style={{ color: C.ink, fontSize: 14 }}>{r.summary}</div>
+          <div style={{ color: C.faint, fontSize: 11, marginTop: 3 }}>
+            {r.actor_name || "Someone"} · {timeAgo(r.created_at)} · {fmtDate(r.created_at)}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ================= Help page =================
+export function HelpPage({ isAdmin }: { isAdmin: boolean }) {
+  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>
+      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 700 }}>{title}</div>
+      <div style={{ color: C.sage, fontSize: 13, marginTop: 8, lineHeight: 1.55 }}>{children}</div>
+    </div>
+  );
+  return (
+    <div>
+      <Eyebrow>HELP · HOW BIRDIE NUM NUM WORKS</Eyebrow>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>A quick guide to the basics. Tap the SCREEN selector at the top to move around.</div>
+
+      <Section title="Recording a round">
+        Tap <b>＋ New round</b>, pick a course and tee, set the date, then enter your score. You can go <b>hole-by-hole</b> (full stats: GIR, putts, penalties, Stableford) or enter a <b>quick total score</b> for a past round. Quick totals still count toward your handicap and scoring average — you can add hole detail later from the round.
+      </Section>
+
+      <Section title="Your handicap">
+        As you log rounds, the app calculates a running handicap using the standard "best 8 of your last 20" differentials. You can also type in a handicap index on your Profile if you already have one. Your <b>My Dashboard</b> shows your trend, scoring averages, and stats.
+      </Section>
+
+      <Section title="Games with friends">
+        In <b>Games</b>, an organizer creates a Stableford or match-play game and shares a 6-digit code. Players enter the code to join, or the organizer adds them. Tap the code to copy it for a text. The organizer can set everyone's handicap and manage the roster.
+      </Section>
+
+      <Section title="Courses">
+        Each group has its own course list. Anyone can add a course (search or type it from a scorecard). Fixing a course's pars or stroke indexes fixes it for everyone using it. Browse <b>★ Community Courses</b> to add vetted courses other groups have shared.
+      </Section>
+
+      <Section title="Groups">
+        A group keeps games, players, and courses together for the people you play with. Group admins invite members with a one-time link, set roles, and manage players from the <b>Players</b> tab. Your dashboard and rounds always cover all of your groups together.
+      </Section>
+
+      {isAdmin && (
+        <Section title="Admin tools (you only)">
+          As an app admin you can mark courses as vetted community courses (the ★), adjust any player's handicap, edit scores, and review the <b>Activity</b> tab — an audit trail of major changes across the app.
+        </Section>
+      )}
     </div>
   );
 }

@@ -51,6 +51,12 @@ export default function JoinGroupPage({ params }: { params: { code: string } }) 
       }
 
       await supabase.from("profiles").update({ active_group_id: groupId }).eq("id", data.session.user.id);
+      try {
+        await supabase.from("activity_log").insert({
+          actor_id: data.session.user.id, actor_name: data.session.user.email || "A player",
+          action: "member_added", group_id: groupId, summary: `Joined a group via invite link`,
+        });
+      } catch {}
       if (!cancelled) {
         setState("success");
         setMessage("You joined the group. Opening Birdie Num Num…");

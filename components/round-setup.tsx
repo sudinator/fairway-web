@@ -8,6 +8,7 @@ import {
   girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay,
 } from "@/lib/golf";
 import { buildCustomCourse, Course, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
+import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
 
 const supabase = createClient();
@@ -248,6 +249,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
     });
     setGrossSaving(false);
     if (error) { setGrossErr("Couldn't save: " + error.message); return; }
+    await logActivity(supabase, { actor_id: u.user!.id, actor_name: u.user?.email || "A player", action: "round_completed", group_id: activeGroupId, summary: `Logged a round at ${picked.name} (${g})` });
     onCancel(); // back to home; dashboard reloads
   };
 

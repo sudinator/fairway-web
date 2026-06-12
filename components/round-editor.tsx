@@ -8,6 +8,7 @@ import {
   girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay,
 } from "@/lib/golf";
 import { buildCustomCourse, linkCourseToGroup } from "@/lib/courses";
+import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
 
 const supabase = createClient();
@@ -115,6 +116,11 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
       }));
       const { error: e2 } = await supabase.from("holes").insert(rows);
       if (e2) throw e2;
+      try {
+        const { data: u } = await supabase.auth.getUser();
+        const total = holes.reduce((s, h) => s + (h.strokes || 0), 0);
+        await logActivity(supabase, { actor_id: u.user!.id, actor_name: u.user?.email || "A player", action: "round_completed", group_id: round.group_id || null, summary: `Completed a round at ${round.course}${total ? ` (${total})` : ""}` });
+      } catch {}
       onSaved();
     } catch (e: any) {
       setErr(e.message || "Save failed. Check your connection and try again.");

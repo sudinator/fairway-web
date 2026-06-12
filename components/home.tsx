@@ -3,9 +3,10 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { C, Round, Hole, allocateStrokes } from "@/lib/golf";
+import { logActivity } from "@/lib/activity";
 import { btn, Wordmark } from "@/components/ui";
 import Tournaments from "@/components/tournaments";
-import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab } from "@/components/manage";
+import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab, ActivityTab, HelpPage } from "@/components/manage";
 import { RoundSetup } from "@/components/round-setup";
 import { RoundEditor } from "@/components/round-editor";
 import { RoundDetail } from "@/components/round-detail";
@@ -17,7 +18,7 @@ import type { AppGroup } from "@/lib/groups";
 
 const supabase = createClient();
 
-type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" | "profile";
+type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" | "activity" | "help" | "profile";
 
 export function Home({ session }: { session: any }) {
   const [rounds, setRounds] = useState<Round[]>([]);
@@ -123,7 +124,9 @@ export function Home({ session }: { session: any }) {
   useEffect(() => { loadRounds(); }, [loadRounds]);
 
   const deleteRound = async (id: string) => {
+    const r = rounds.find((x) => x.id === id);
     await supabase.from("rounds").delete().eq("id", id);
+    await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "round_deleted", summary: `Deleted a round${r ? ` at ${r.course}` : ""}` });
     await loadRounds();
   };
 
@@ -160,21 +163,37 @@ export function Home({ session }: { session: any }) {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 6, marginTop: 16, borderBottom: `1px solid ${C.greenMid}`, flexWrap: "wrap" }}>
-        {((["dashboard", "rounds", "games", "courses", "players"] as const).concat(showGroupsTab ? (["groups"] as const) : [] as any)).map((k) => (
-          <button key={k} onClick={() => { setTab(k); setStage(null); setViewing(null); }}
-            style={{
-              background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: 14, fontWeight: 700,
-              color: tab === k && !inFlow ? C.gold : C.sage,
-              borderBottom: tab === k && !inFlow ? `2px solid ${C.gold}` : "2px solid transparent",
-            }}>{k === "dashboard" ? "My Dashboard" : k === "rounds" ? "My Rounds" : k === "games" ? "Games" : k === "courses" ? "Courses" : k === "players" ? "Players" : "Groups"}</button>
-        ))}
-        <button onClick={() => { setTab("profile"); setStage(null); setViewing(null); }}
-          style={{
-            background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: 14, fontWeight: 700,
-            color: tab === "profile" && !inFlow ? C.gold : C.sage,
-            borderBottom: tab === "profile" && !inFlow ? `2px solid ${C.gold}` : "2px solid transparent",
-          }}>Profile{profile?.is_admin ? " ★" : ""}</button>
+      <div style={{ marginTop: 16 }}>
+        {(() => {
+          const labels: Record<string, string> = {
+            dashboard: "My Dashboard", rounds: "My Rounds", games: "Games",
+            courses: "Courses", players: "Players", groups: "Groups",
+            activity: "Activity ★", help: "Help", profile: profile?.is_admin ? "Profile ★" : "Profile",
+          };
+          const keys: string[] = ["dashboard", "rounds", "games", "courses", "players"];
+          if (showGroupsTab) keys.push("groups");
+          if (profile?.is_admin) keys.push("activity");
+          keys.push("help");
+          keys.push("profile");
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ color: C.sage, fontSize: 11, letterSpacing: 1.5, fontWeight: 800 }}>SCREEN</span>
+              <select
+                value={inFlow ? "" : tab}
+                onChange={(e) => { setTab(e.target.value as Tab); setStage(null); setViewing(null); }}
+                style={{
+                  flex: 1, maxWidth: 360, background: C.greenLight, color: C.cream, fontWeight: 800, fontSize: 16,
+                  border: `1px solid ${C.greenMid}`, borderRadius: 12, padding: "12px 14px", cursor: "pointer",
+                  WebkitAppearance: "none", appearance: "none",
+                  backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23C9A227' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>")`,
+                  backgroundRepeat: "no-repeat", backgroundPosition: "right 14px center",
+                }}>
+                {inFlow && <option value="">{stage === "setup" ? "New round" : viewing ? "Round detail" : "Editing"}</option>}
+                {keys.map((k) => <option key={k} value={k} style={{ color: "#111" }}>{labels[k]}</option>)}
+              </select>
+            </div>
+          );
+        })()}
       </div>
 
       <div style={{ marginTop: 20 }}>
@@ -194,6 +213,10 @@ export function Home({ session }: { session: any }) {
           <PlayersTab user={user} activeGroupId={activeGroup.id} isGroupAdmin={activeGroup.role === "admin"} onChanged={loadGroups} />
         ) : tab === "groups" ? (
           <GroupsPanel user={user} groups={groups} activeGroupId={activeGroupId} onGroupsChanged={loadGroups} onActiveGroupChange={chooseGroup} />
+        ) : tab === "activity" && profile?.is_admin ? (
+          <ActivityTab />
+        ) : tab === "help" ? (
+          <HelpPage isAdmin={!!profile?.is_admin} />
         ) : tab === "profile" ? (
           <ProfilePanel profile={profile} user={user} onSaved={loadProfile} />
         ) : tab === "games" && activeGroup ? (

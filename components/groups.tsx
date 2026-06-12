@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
 import { btn, inputStyle, Eyebrow } from "@/components/ui";
 import type { AppGroup } from "@/lib/groups";
+import { logActivity } from "@/lib/activity";
 
 const supabase = createClient();
 
@@ -161,6 +162,12 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
     try {
       const { error } = await supabase.from("group_members").update(patch).eq("id", m.id);
       if (error) throw error;
+      const who = m.profiles?.display_name || m.email;
+      if (patch.status === "removed") {
+        await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Group admin", action: "member_removed", group_id: active.id, target_user_id: m.user_id, summary: `Removed ${who} from ${active.name}` });
+      } else if (patch.role) {
+        await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Group admin", action: "role_changed", group_id: active.id, target_user_id: m.user_id, summary: `Made ${who} a ${patch.role} in ${active.name}` });
+      }
       await loadMembers();
       await onGroupsChanged();
     } catch (e: any) { setMsg("Couldn't update member: " + (e.message || "error")); }

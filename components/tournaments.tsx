@@ -14,6 +14,7 @@ import {
   matchAllowance,
 } from "@/lib/golf";
 import { loadCoursesForGroup } from "@/lib/courses";
+import { logActivity } from "@/lib/activity";
 import {
   btn,
   inputStyle,
@@ -442,6 +443,7 @@ function CreateGame({
       });
       const { error: e2 } = await supabase.from("game_players").insert(rows);
       if (e2) throw e2;
+      await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_created", group_id: activeGroupId, summary: `Created the game "${game.name}" at ${pickedFav.name}` });
       for (const row of rows) {
         if (row.user_id !== user.id) {
           try {
@@ -947,6 +949,7 @@ function GameRoom({
       return;
     await supabase.from("game_players").delete().eq("game_id", game.id);
     await supabase.from("games").delete().eq("id", game.id);
+    await logActivity(supabase, { actor_id: user.id, actor_name: (user.email || "Someone"), action: "game_deleted", group_id: (game as any).group_id || null, summary: `Deleted the game "${game.name}"` });
     onBack();
   };
 
