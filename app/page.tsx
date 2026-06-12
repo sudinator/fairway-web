@@ -875,9 +875,50 @@ function RoundDetail({ round, onBack, onEdit, onDelete }: {
 }) {
   const gross = isGrossOnly(round);
   const [ghinMsg, setGhinMsg] = useState<string | null>(null);
+  const [ghinPayload, setGhinPayload] = useState<string>("");
+  const [ghinRoundType, setGhinRoundType] = useState<"Away" | "Home" | "Competition">("Away");
+  const [ghinStartingHole, setGhinStartingHole] = useState(1);
 
-  const ghinSummary = () => {
-    const playedHoles = played(round);
+  const playedHoles = played(round).sort((a, b) => a.hole_number - b.hole_number);
+  const holeCount = playedHoles.length || (round.gross_score ? 18 : 0);
+
+  const ghinAutoFillData = () => {
+    const holes = playedHoles.map((h) => ({
+      hole: h.hole_number,
+      par: h.par,
+      score: h.strokes,
+      putts: h.putts,
+      penalties: h.penalties || 0,
+      fairway: h.par >= 4 ? (h.fairway || null) : null,
+      gir: h.strokes != null && h.putts != null ? (h.strokes - h.putts <= h.par - 2) : null,
+    }));
+
+    return {
+      source: "BirdieNumNum",
+      version: 1,
+      course: round.course,
+      tee: round.tee_name || "",
+      datePlayed: round.played_at?.slice(0, 10),
+      roundType: ghinRoundType,
+      startingHole: ghinStartingHole,
+      holesPlayed: holes.length,
+      rating: round.rating,
+      slope: round.slope,
+      coursePar: round.course_par,
+      totalScore: strokesOf(round),
+      grossOnly: gross,
+      scores: holes.map((h) => h.score),
+      putts: holes.map((h) => h.putts),
+      penalties: holes.map((h) => h.penalties),
+      fairways: holes.map((h) => h.fairway),
+      gir: holes.map((h) => h.gir),
+      holes,
+      notes: "On GHIN: pick this course, choose the matching tee, set round type and starting hole, open hole-by-hole entry, turn Advanced Stats on, then paste/use this data with the BirdieNumNum GHIN AutoFill bookmarklet.",
+    };
+  };
+
+  const ghinHumanSummary = () => {
+    const data = ghinAutoFillData();
     const holeLines = playedHoles.length
       ? playedHoles.map((h) => {
           const parts = [
@@ -893,40 +934,44 @@ function RoundDetail({ round, onBack, onEdit, onDelete }: {
 
     return [
       "GHIN score posting details",
-      `Course: ${round.course}`,
-      `Tee: ${round.tee_name || "Not specified"}`,
-      `Date played: ${fmtDate(round.played_at)}`,
-      `Total score: ${strokesOf(round)} (${toParStr(diffOf(round))})`,
-      `Course par: ${round.course_par ?? "Not specified"}`,
-      `Rating/Slope: ${round.rating ?? "?"}/${round.slope ?? "?"}`,
-      `Round type: ${playedHoles.length >= 18 ? "18 holes" : playedHoles.length >= 9 ? "9 holes" : "Total score"}`,
+      `Course: ${data.course}`,
+      `Tee: ${data.tee || "Not specified"}`,
+      `Date played: ${data.datePlayed}`,
+      `Round type: ${data.roundType}`,
+      `Starting hole: ${data.startingHole}`,
+      `Total score: ${data.totalScore} (${toParStr(diffOf(round))})`,
+      `Course par: ${data.coursePar ?? "Not specified"}`,
+      `Rating/Slope: ${data.rating ?? "?"}/${data.slope ?? "?"}`,
       "",
       "Hole scores:",
       holeLines,
     ].join("\n");
   };
 
-  const ghinPostUrl = "https://www.ghin.com/post-score/hole-by-hole/select-course";
+  const copyGhinAutoFillData = async () => {
+    const json = JSON.stringify(ghinAutoFillData(), null, 2);
+    setGhinPayload(json);
+    try {
+      await navigator.clipboard?.writeText(json);
+      setGhinMsg("Copied GHIN Auto-Fill JSON. Open GHIN, get to the hole-by-hole score screen, turn Advanced Stats ON, then run the BirdieNumNum GHIN AutoFill bookmarklet and paste this JSON.");
+    } catch {
+      setGhinMsg("Could not copy automatically. Use the JSON box below, copy it manually, then paste it into the GHIN AutoFill bookmarklet.");
+    }
+  };
 
-  const postToGhin = async () => {
-    const summary = ghinSummary();
-
-    // Open the tab immediately from the button click so browsers do not block it.
-    // Some browsers block popups opened after an async clipboard call.
-    const ghinTab = window.open("about:blank", "_blank");
-
+  const copyGhinSummary = async () => {
+    const summary = ghinHumanSummary();
     try {
       await navigator.clipboard?.writeText(summary);
-      setGhinMsg("Copied GHIN-ready score details. GHIN is opening now — paste/check the details there. If GHIN does not open, use the button below.");
+      setGhinMsg("Copied a human-readable GHIN posting summary.");
     } catch {
-      setGhinMsg("GHIN is opening now. Copy may not have worked, so use the score details on this page. If GHIN does not open, use the button below.");
+      setGhinMsg("Could not copy automatically. Use the details shown on this page.");
     }
+  };
 
-    if (ghinTab) {
-      ghinTab.location.href = ghinPostUrl;
-    } else {
-      window.location.href = ghinPostUrl;
-    }
+  const openGhin = async () => {
+    await copyGhinAutoFillData();
+    window.open("https://www.ghin.com/post-score/hole-by-hole/select-course", "_blank", "noopener,noreferrer");
   };
 
   return (
@@ -943,19 +988,47 @@ function RoundDetail({ round, onBack, onEdit, onDelete }: {
           </div>
         </div>
         <div style={{ flex: 1 }} />
-        <button style={btn(true)} onClick={postToGhin}>Post to GHIN</button>
         <button style={{ ...btn(false), background: "#7A2F28" }}
           onClick={() => { if (confirm("Delete this round?")) onDelete(); }}>Delete</button>
       </div>
-      {ghinMsg && (
-        <div style={{ background: C.greenLight, borderRadius: 10, padding: "10px 12px", marginTop: 12, color: C.gold, fontSize: 12 }}>
-          <div>{ghinMsg}</div>
-          <a href={ghinPostUrl} target="_blank" rel="noopener noreferrer"
-            style={{ display: "inline-block", color: C.cream, fontWeight: 800, marginTop: 8 }}>
-            Open GHIN score posting
-          </a>
+
+      <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 14 }}>
+        <Eyebrow>GHIN AUTO-FILL HANDOFF</Eyebrow>
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
+          This copies a structured score package for GHIN. In GHIN, select the matching course and tee, open the hole-by-hole score entry screen, turn Advanced Stats ON, then paste this package into the BirdieNumNum GHIN AutoFill bookmarklet.
         </div>
-      )}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end", marginTop: 12 }}>
+          <div style={{ minWidth: 150 }}>
+            <label style={{ color: C.sage, fontSize: 12 }}>Round type</label>
+            <select value={ghinRoundType} onChange={(e) => setGhinRoundType(e.target.value as any)} style={{ ...inputStyle, marginTop: 4 }}>
+              <option value="Away">Away</option>
+              <option value="Home">Home</option>
+              <option value="Competition">Competition</option>
+            </select>
+          </div>
+          <div style={{ minWidth: 140 }}>
+            <label style={{ color: C.sage, fontSize: 12 }}>Starting hole</label>
+            <select value={ghinStartingHole} onChange={(e) => setGhinStartingHole(parseInt(e.target.value, 10))} style={{ ...inputStyle, marginTop: 4 }}>
+              {Array.from({ length: 18 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+          <button style={btn(true)} onClick={openGhin}>Copy Auto-Fill Data + Open GHIN</button>
+          <button style={btn(false)} onClick={copyGhinAutoFillData}>Copy Auto-Fill Data</button>
+          <button style={btn(false)} onClick={copyGhinSummary}>Copy readable summary</button>
+        </div>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>
+          Included: {holeCount || "—"} hole scores, putts, penalties, GIR, and fairway hit/miss where available. GHIN may still ask you to confirm the course/tee match before final submission.
+        </div>
+        {ghinMsg && (
+          <div style={{ background: C.green, borderRadius: 10, padding: "10px 12px", marginTop: 12, color: C.gold, fontSize: 12 }}>
+            {ghinMsg} <a href="https://www.ghin.com/post-score/hole-by-hole/select-course" target="_blank" rel="noreferrer" style={{ color: C.cream, fontWeight: 800 }}>Open GHIN</a>
+          </div>
+        )}
+        {ghinPayload && (
+          <textarea readOnly value={ghinPayload} style={{ ...inputStyle, minHeight: 180, marginTop: 12, fontFamily: "monospace", fontSize: 12 }} />
+        )}
+      </div>
+
       {gross ? (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 20, marginTop: 14 }}>
           <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 40, fontWeight: 800 }}>{round.gross_score}</div>
