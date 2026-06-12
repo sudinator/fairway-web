@@ -7,7 +7,7 @@ import {
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, isGrossOnly, hasHoleDetail,
   girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay,
 } from "@/lib/golf";
-import { buildCustomCourse } from "@/lib/courses";
+import { buildCustomCourse, linkCourseToGroup } from "@/lib/courses";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
 
 const supabase = createClient();
@@ -57,18 +57,21 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     const siErr = validateStrokeIndexes(course.holes.map((h) => ({ n: h.n, si: h.si })));
     if (siErr) { setFavMsg("Can't save — " + siErr); return; }
     try {
-      let existingQuery = supabase.from("favorite_courses").select("id").eq("name", round.course);
-      if (round.group_id) existingQuery = existingQuery.eq("group_id", round.group_id);
-      const { data: existing } = await existingQuery.maybeSingle();
-      if (existing) {
-        const { error } = await supabase.from("favorite_courses").update({ location: round.tee_name || "", data: course }).eq("id", existing.id);
+      const { data: existing } = await supabase.from("favorite_courses").select("id").eq("name", round.course).maybeSingle();
+      let courseId = existing?.id as string | undefined;
+      if (courseId) {
+        const { error } = await supabase.from("favorite_courses").update({ location: round.tee_name || "", data: course }).eq("id", courseId);
         if (error) throw error;
         setFavMsg("Course library updated ★");
       } else {
-        const { error } = await supabase.from("favorite_courses").insert({ group_id: round.group_id || null, name: round.course, location: round.tee_name || "", data: course });
-        if (error) throw error;
+        const { data: created, error } = await supabase.from("favorite_courses")
+          .insert({ group_id: round.group_id || null, name: round.course, location: round.tee_name || "", data: course })
+          .select("id").single();
+        if (error || !created) throw error || new Error("save failed");
+        courseId = created.id;
         setFavMsg("Saved to course library ★");
       }
+      if (round.group_id && courseId) await linkCourseToGroup(supabase, round.group_id, courseId, null);
     } catch (e: any) {
       setFavMsg("Couldn't save: " + (e.message || "error"));
     }

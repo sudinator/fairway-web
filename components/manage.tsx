@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { C, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes } from "@/lib/golf";
-import { buildCustomCourse, Course, CourseHole } from "@/lib/courses";
+import { buildCustomCourse, Course, CourseHole, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { btn, inputStyle, Eyebrow, NumPicker } from "@/components/ui";
 
 const supabase = createClient();
@@ -49,24 +49,21 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   const [msg, setMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    // This group's own courses.
-    const { data } = await supabase.from("favorite_courses").select("*").eq("group_id", activeGroupId).order("name");
-    const list = (data || [])
-      .filter((f: any) => !f.deleted)
+    // This group's courses (via the group_courses link table — one shared record per course).
+    const linked = await loadCoursesForGroup(supabase, activeGroupId);
+    const list = linked
       .map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", user_id: f.user_id, data: normalize(f.data), vetted: !!f.vetted }));
     list.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
     setCourses(list);
 
-    // Community (vetted) courses from across all groups — available for anyone to add.
+    // Community (vetted) courses NOT already linked to this group — available to add by reference.
+    const linkedIds = new Set(list.map((c: LibCourse) => c.id));
     const { data: vet } = await supabase.from("favorite_courses").select("*").eq("vetted", true).order("name");
     const vlist = (vet || [])
-      .filter((f: any) => !f.deleted)
+      .filter((f: any) => !f.deleted && !linkedIds.has(f.id))
       .map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", user_id: f.user_id, data: normalize(f.data), vetted: true }));
-    // De-dupe by name (a group may have its own copy already).
-    const seen = new Set<string>();
-    const vded = vlist.filter((c: LibCourse) => { const k = c.name.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
-    vded.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-    setCommunity(vded);
+    vlist.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    setCommunity(vlist);
 
     const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).maybeSingle();
     setIsAdmin(!!prof?.is_admin);
@@ -81,35 +78,24 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
     await load();
   };
 
-  // Any member can copy a vetted community course into their own group's library.
+  // Add a vetted community course to this group BY REFERENCE (one shared record, no copy).
   const addToMyGroup = async (c: LibCourse) => {
     setBusyId(c.id); setMsg(null);
-    const already = (courses || []).some((x) => x.name.toLowerCase() === c.name.toLowerCase());
-    if (already) { setMsg(`"${c.name}" is already in your group's library.`); setBusyId(null); return; }
-    const { error } = await supabase.from("favorite_courses").insert({
-      name: c.name, location: c.location, data: c.data, group_id: activeGroupId, user_id: user.id, vetted: false,
-    });
+    await linkCourseToGroup(supabase, activeGroupId, c.id, user.id);
     setBusyId(null);
-    if (error) { setMsg("Couldn't add: " + error.message); return; }
     setMsg(`Added "${c.name}" to your group.`);
     await load();
   };
 
-  // Soft-delete: archive the course (hidden from everyone) and notify admins so they can restore it.
+  // Remove a course FROM THIS GROUP only (unlink). The shared record and other groups are untouched.
   const remove = async (id: string, courseName: string) => {
-    const { data: me } = await supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
-    const who = me?.display_name || "Someone";
-    await supabase.from("favorite_courses").update({ deleted: true, deleted_by: user.id, deleted_at: new Date().toISOString() }).eq("id", id);
-    // Notify all admins.
-    const { data: admins } = await supabase.from("profiles").select("id").eq("is_admin", true);
-    for (const a of admins || []) {
-      if (a.id !== user.id) await notify(a.id, `${who} deleted the course "${courseName}". You can restore it from the Admin panel.`);
-    }
+    await supabase.from("group_courses").delete().eq("group_id", activeGroupId).eq("course_id", id);
     await load();
   };
 
   if (editing) {
     return <CourseEditor
+      user={user}
       activeGroupId={activeGroupId}
       initial={editing === "new" ? null : editing.data}
       existingId={editing === "new" ? null : editing.id}
@@ -155,7 +141,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
             </div>
           </button>
           <button title="Delete course"
-            onClick={() => { if (confirm(`Delete "${c.name}" from this group's library?\n\nIt will be archived (not erased) and an admin can restore it.`)) remove(c.id, c.name); }}
+            onClick={() => { if (confirm(`Remove "${c.name}" from this group's library?\n\nThe course itself isn't deleted — other groups keep it, and you can re-add it from Community Courses if it's vetted.`)) remove(c.id, c.name); }}
             style={{ background: "none", border: "none", borderLeft: `1px solid ${C.line}`, color: C.birdie, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>✕</button>
         </div>
       ))}
@@ -198,8 +184,8 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
 }
 
 // ================= Course editor (add/edit a library course) =================
-function CourseEditor({ activeGroupId, initial, existingId, onCancel, onSaved }: {
-  activeGroupId: string; initial: Course | null; existingId: string | null; onCancel: () => void; onSaved: () => void;
+function CourseEditor({ user, activeGroupId, initial, existingId, onCancel, onSaved }: {
+  user: any; activeGroupId: string; initial: Course | null; existingId: string | null; onCancel: () => void; onSaved: () => void;
 }) {
   const [mode, setMode] = useState<"choose" | "form">(initial ? "form" : "choose");
   const [course, setCourse] = useState<Course | null>(initial);
@@ -268,11 +254,11 @@ function CourseEditor({ activeGroupId, initial, existingId, onCancel, onSaved }:
   }
 
   if (!course) return null;
-  return <CourseForm activeGroupId={activeGroupId} course={course} setCourse={setCourse} existingId={existingId} saving={saving} setSaving={setSaving} err={err} setErr={setErr} onCancel={onCancel} onSaved={onSaved} />;
+  return <CourseForm user={user} activeGroupId={activeGroupId} course={course} setCourse={setCourse} existingId={existingId} saving={saving} setSaving={setSaving} err={err} setErr={setErr} onCancel={onCancel} onSaved={onSaved} />;
 }
 
-function CourseForm({ activeGroupId, course, setCourse, existingId, saving, setSaving, err, setErr, onCancel, onSaved }: {
-  activeGroupId: string; course: Course; setCourse: (c: Course) => void; existingId: string | null;
+function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving, setSaving, err, setErr, onCancel, onSaved }: {
+  user: any; activeGroupId: string; course: Course; setCourse: (c: Course) => void; existingId: string | null;
   saving: boolean; setSaving: (b: boolean) => void; err: string | null; setErr: (s: string | null) => void;
   onCancel: () => void; onSaved: () => void;
 }) {
@@ -308,20 +294,26 @@ function CourseForm({ activeGroupId, course, setCourse, existingId, saving, setS
     if (siErr) { setErr("Can't save — " + siErr); return; }
     setSaving(true); setErr(null);
     try {
-      const payload = { group_id: activeGroupId, name: course.name.trim(), location: course.location || "", data: course };
+      const name = course.name.trim();
       if (existingId) {
-        const { error } = await supabase.from("favorite_courses").update(payload).eq("id", existingId);
+        // Editing the shared record — affects every group that references it.
+        const { error } = await supabase.from("favorite_courses").update({ name, location: course.location || "", data: course }).eq("id", existingId);
         if (error) throw error;
+        await linkCourseToGroup(supabase, activeGroupId, existingId, user.id);
       } else {
-        // Avoid duplicates: update a same-named course if one already exists.
-        const { data: dup } = await supabase.from("favorite_courses").select("id").eq("group_id", activeGroupId).eq("name", payload.name).maybeSingle();
-        if (dup) {
-          const { error } = await supabase.from("favorite_courses").update({ location: payload.location, data: payload.data }).eq("id", dup.id);
-          if (error) throw error;
+        // New course: if a canonical record with this name already exists, link it; otherwise create it.
+        const { data: existsByName } = await supabase.from("favorite_courses").select("id").eq("name", name).maybeSingle();
+        let courseId = existsByName?.id as string | undefined;
+        if (courseId) {
+          await supabase.from("favorite_courses").update({ location: course.location || "", data: course }).eq("id", courseId);
         } else {
-          const { error } = await supabase.from("favorite_courses").insert(payload);
-          if (error) throw error;
+          const { data: created, error } = await supabase.from("favorite_courses")
+            .insert({ group_id: activeGroupId, name, location: course.location || "", data: course, user_id: user.id })
+            .select("id").single();
+          if (error || !created) throw error || new Error("Could not create course");
+          courseId = created.id;
         }
+        await linkCourseToGroup(supabase, activeGroupId, courseId!, user.id);
       }
       onSaved();
     } catch (e: any) { setErr(e.message || "Save failed."); setSaving(false); }

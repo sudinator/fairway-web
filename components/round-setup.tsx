@@ -7,7 +7,7 @@ import {
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, isGrossOnly, hasHoleDetail,
   girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay,
 } from "@/lib/golf";
-import { buildCustomCourse, Course } from "@/lib/courses";
+import { buildCustomCourse, Course, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
 
 const supabase = createClient();
@@ -48,13 +48,12 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   const [cRating, setCRating] = useState("");
   const [cSlope, setCSlope] = useState("");
 
-  // Load this user's saved favorite courses (with their corrected data).
+  // Load this group's courses (via the group_courses link table — shared records).
   const loadFavorites = async () => {
-    const { data } = await supabase.from("favorite_courses").select("*").eq("group_id", activeGroupId).order("name");
+    const data = await loadCoursesForGroup(supabase, activeGroupId);
     if (!data) return;
     setFavorites(data.map((f: any) => {
       const d = f.data || {};
-      // Older favorites stored holes inside a tee; lift them to the course level.
       if ((!d.holes || !d.holes.length) && Array.isArray(d.tees)) {
         const teeWithHoles = d.tees.find((t: any) => t.holes && t.holes.length);
         if (teeWithHoles) {
@@ -74,16 +73,21 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
     if (siErr) { setFavMsg("Can't save — " + siErr + " Fix it in the override panel or Courses tab."); return; }
     setFavSaving(true); setFavMsg(null);
     try {
-      const { data: existing } = await supabase.from("favorite_courses").select("id").eq("group_id", activeGroupId).eq("name", picked.name).maybeSingle();
-      if (existing) {
-        const { error } = await supabase.from("favorite_courses").update({ location: picked.location, data: picked }).eq("id", existing.id);
+      const { data: existing } = await supabase.from("favorite_courses").select("id").eq("name", picked.name).maybeSingle();
+      let courseId = existing?.id as string | undefined;
+      if (courseId) {
+        const { error } = await supabase.from("favorite_courses").update({ location: picked.location, data: picked }).eq("id", courseId);
         if (error) throw error;
         setFavMsg("Updated in course library ★");
       } else {
-        const { error } = await supabase.from("favorite_courses").insert({ group_id: activeGroupId, name: picked.name, location: picked.location, data: picked });
-        if (error) throw error;
+        const { data: created, error } = await supabase.from("favorite_courses")
+          .insert({ group_id: activeGroupId, name: picked.name, location: picked.location, data: picked })
+          .select("id").single();
+        if (error || !created) throw error || new Error("save failed");
+        courseId = created.id;
         setFavMsg("Saved to course library ★");
       }
+      await linkCourseToGroup(supabase, activeGroupId, courseId!, null);
       await loadFavorites();
     } catch (e: any) {
       setFavMsg("Couldn't save: " + (e.message || "error"));
@@ -99,7 +103,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
     try {
       const { error } = await supabase.from("favorite_courses")
         .update({ name: picked.name, location: picked.location, data: picked })
-        .eq("id", loadedFavId).eq("group_id", activeGroupId);
+        .eq("id", loadedFavId);
       if (error) throw error;
       setFavMsg("Favorite updated ★");
       await loadFavorites();
@@ -110,10 +114,10 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
     }
   };
 
-  // Remove a favorite course.
+  // Remove a course from THIS group (unlink — the shared record stays).
   const deleteFavorite = async (id: string) => {
     try {
-      await supabase.from("favorite_courses").delete().eq("id", id).eq("group_id", activeGroupId);
+      await supabase.from("group_courses").delete().eq("group_id", activeGroupId).eq("course_id", id);
       if (loadedFavId === id) setLoadedFavId(null);
       await loadFavorites();
     } catch (e: any) {

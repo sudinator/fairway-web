@@ -13,6 +13,7 @@ import {
   matchStatus,
   matchAllowance,
 } from "@/lib/golf";
+import { loadCoursesForGroup } from "@/lib/courses";
 import {
   btn,
   inputStyle,
@@ -309,32 +310,27 @@ function CreateGame({
   >({});
 
   useEffect(() => {
-    supabase
-      .from("favorite_courses")
-      .select("*")
-      .eq("group_id", activeGroupId)
-      .order("name")
-      .then(({ data }) => {
-        if (data)
-          setFavorites(
-            data.map((f: any) => {
-              const d = f.data || {};
-              if ((!d.holes || !d.holes.length) && Array.isArray(d.tees)) {
-                const t = d.tees.find((x: any) => x.holes && x.holes.length);
-                if (t) {
-                  d.holes = t.holes;
-                  d.tees = d.tees.map((x: any) => ({
-                    name: x.name,
-                    rating: x.rating,
-                    slope: x.slope,
-                    par: x.par,
-                  }));
-                }
+    loadCoursesForGroup(supabase, activeGroupId).then((data) => {
+      if (data)
+        setFavorites(
+          data.map((f: any) => {
+            const d = f.data || {};
+            if ((!d.holes || !d.holes.length) && Array.isArray(d.tees)) {
+              const t = d.tees.find((x: any) => x.holes && x.holes.length);
+              if (t) {
+                d.holes = t.holes;
+                d.tees = d.tees.map((x: any) => ({
+                  name: x.name,
+                  rating: x.rating,
+                  slope: x.slope,
+                  par: x.par,
+                }));
               }
-              return d;
-            }),
-          );
-      });
+            }
+            return d;
+          }),
+        );
+    });
 
     (async () => {
       const { data: members } = await supabase
