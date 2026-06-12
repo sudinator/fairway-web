@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
-import { C, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf } from "@/lib/golf";
+import { C, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes } from "@/lib/golf";
 import { buildCustomCourse, Course, CourseHole } from "@/lib/courses";
 import { btn, inputStyle, Eyebrow, NumPicker } from "@/components/ui";
 
@@ -44,7 +44,9 @@ export function CoursesLibrary({ user }: { user: any }) {
 
   const load = useCallback(async () => {
     const { data } = await supabase.from("favorite_courses").select("*").order("name");
-    const list = (data || []).map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", user_id: f.user_id, data: normalize(f.data) }));
+    const list = (data || [])
+      .filter((f: any) => !f.deleted)
+      .map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", user_id: f.user_id, data: normalize(f.data) }));
     list.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
     setCourses(list);
     const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).maybeSingle();
@@ -52,8 +54,16 @@ export function CoursesLibrary({ user }: { user: any }) {
   }, [user.id]);
   useEffect(() => { load(); }, [load]);
 
-  const remove = async (id: string) => {
-    await supabase.from("favorite_courses").delete().eq("id", id);
+  // Soft-delete: archive the course (hidden from everyone) and notify admins so they can restore it.
+  const remove = async (id: string, courseName: string) => {
+    const { data: me } = await supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
+    const who = me?.display_name || "Someone";
+    await supabase.from("favorite_courses").update({ deleted: true, deleted_by: user.id, deleted_at: new Date().toISOString() }).eq("id", id);
+    // Notify all admins.
+    const { data: admins } = await supabase.from("profiles").select("id").eq("is_admin", true);
+    for (const a of admins || []) {
+      if (a.id !== user.id) await notify(a.id, `${who} deleted the course "${courseName}". You can restore it from the Admin panel.`);
+    }
     await load();
   };
 
@@ -74,7 +84,7 @@ export function CoursesLibrary({ user }: { user: any }) {
         <button style={btn(true)} onClick={() => setEditing("new")}>＋ Add course</button>
       </div>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
-        These courses are shared with everyone using the app. Anyone can add or edit a course; only the person who added it (or an admin) can delete it. Fixing a course here fixes it for the whole group.
+        These courses are shared with everyone using the app. Anyone can add, edit, or delete a course. Deleting archives it (it's hidden, not erased) and notifies an admin, who can restore it if needed. Fixing a course here fixes it for the whole group.
       </div>
 
       {courses === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
@@ -84,7 +94,6 @@ export function CoursesLibrary({ user }: { user: any }) {
         </div>
       )}
       {courses?.map((c) => {
-        const canDelete = c.user_id === user.id || isAdmin;
         return (
           <div key={c.id} style={{ display: "flex", alignItems: "stretch", marginTop: 10, background: C.card, borderRadius: 12, overflow: "hidden" }}>
             <button onClick={() => setEditing({ id: c.id, data: c.data, user_id: c.user_id })}
@@ -94,11 +103,9 @@ export function CoursesLibrary({ user }: { user: any }) {
                 {c.location ? c.location + " · " : ""}{c.data.tees?.length || 0} tee{(c.data.tees?.length || 0) === 1 ? "" : "s"} · tap to edit
               </div>
             </button>
-            {canDelete && (
-              <button title="Delete course"
-                onClick={() => { if (confirm(`Delete "${c.name}" from the shared library?`)) remove(c.id); }}
-                style={{ background: "none", border: "none", borderLeft: `1px solid ${C.line}`, color: C.birdie, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>✕</button>
-            )}
+            <button title="Delete course"
+              onClick={() => { if (confirm(`Delete "${c.name}" from the shared library?\n\nIt will be archived (not erased) and an admin can restore it.`)) remove(c.id, c.name); }}
+              style={{ background: "none", border: "none", borderLeft: `1px solid ${C.line}`, color: C.birdie, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>✕</button>
           </div>
         );
       })}
@@ -213,6 +220,8 @@ function CourseForm({ course, setCourse, existingId, saving, setSaving, err, set
 
   const save = async () => {
     if (!course.name.trim()) { setErr("Give the course a name."); return; }
+    const siErr = validateStrokeIndexes(course.holes.map((h) => ({ n: h.n, si: h.si })));
+    if (siErr) { setErr("Can't save — " + siErr); return; }
     setSaving(true); setErr(null);
     try {
       const payload = { name: course.name.trim(), location: course.location || "", data: course };
@@ -407,12 +416,23 @@ function AdminPanel({ user }: { user: any }) {
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [scoringFor, setScoringFor] = useState<any | null>(null);
+  const [deletedCourses, setDeletedCourses] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     const { data } = await supabase.from("profiles").select("*").order("last_active", { ascending: false });
     setProfiles(data || []);
+    const { data: del } = await supabase.from("favorite_courses").select("*").eq("deleted", true).order("deleted_at", { ascending: false });
+    setDeletedCourses(del || []);
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  const restoreCourse = async (c: any) => {
+    await supabase.from("favorite_courses").update({ deleted: false, deleted_by: null, deleted_at: null }).eq("id", c.id);
+    if (c.deleted_by && c.deleted_by !== user.id) {
+      await notify(c.deleted_by, `An admin restored the course "${c.name}" you deleted.`);
+    }
+    await load();
+  };
 
   const now = Date.now();
   const active24 = (profiles || []).filter((p) => p.last_active && now - +new Date(p.last_active) < 86400000).length;
@@ -477,6 +497,25 @@ function AdminPanel({ user }: { user: any }) {
           <button style={{ ...btn(false), padding: "6px 12px", fontSize: 12 }} onClick={() => setScoringFor(p)}>Edit scores</button>
         </div>
       ))}
+
+      <div style={{ marginTop: 24 }}>
+        <Eyebrow>★ DELETED COURSES</Eyebrow>
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
+          Courses anyone has deleted are archived here. Restore one to return it to the shared library.
+        </div>
+        {deletedCourses.length === 0 && (
+          <div style={{ background: C.greenLight, borderRadius: 12, padding: 16, marginTop: 8, color: C.sage }}>No deleted courses.</div>
+        )}
+        {deletedCourses.map((c) => (
+          <div key={c.id} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 160 }}>
+              <div style={{ color: C.ink, fontWeight: 700 }}>{c.name}</div>
+              <div style={{ color: C.faint, fontSize: 12 }}>{c.location ? c.location + " · " : ""}deleted {timeAgo(c.deleted_at)}</div>
+            </div>
+            <button style={{ ...btn(true), padding: "6px 14px", fontSize: 12 }} onClick={() => restoreCourse(c)}>Restore</button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

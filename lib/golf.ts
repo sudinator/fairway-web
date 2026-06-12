@@ -52,6 +52,29 @@ export function strokesReceived(si: number | null, ch: number | null): number {
   return si > 18 + ch ? -1 : 0;
 }
 
+// Robust allocation: distribute exactly `ch` strokes across the given holes by
+// their stroke-index *ranking* (hardest first). Immune to duplicate / missing /
+// out-of-range S.I. values that would make the simple per-hole formula over-allocate.
+// Returns a map of hole_number -> strokes received.
+export function allocateStrokes(holes: { hole_number: number; stroke_index: number | null }[], ch: number | null): Record<number, number> {
+  const out: Record<number, number> = {};
+  for (const h of holes) out[h.hole_number] = 0;
+  if (ch == null || holes.length === 0) return out;
+  const n = holes.length;
+  const ranked = [...holes].sort((a, b) => {
+    const sa = a.stroke_index ?? 999, sb = b.stroke_index ?? 999;
+    if (sa !== sb) return sa - sb;
+    return a.hole_number - b.hole_number;
+  });
+  const total = Math.abs(ch);
+  const sign = ch >= 0 ? 1 : -1;
+  for (let k = 0; k < total; k++) {
+    const idx = sign > 0 ? (k % n) : (n - 1 - (k % n));
+    out[ranked[idx].hole_number] += sign;
+  }
+  return out;
+}
+
 export function stablefordPts(strokes: number | null, par: number, recv: number): number | null {
   if (!strokes) return null;
   return Math.max(0, 2 - ((strokes - recv) - par));
@@ -236,4 +259,23 @@ export function threePuttsPerRound(rounds: Round[]): number | null {
   if (!withPutts.length) return null;
   const total = withPutts.reduce((s, r) => s + played(r).filter((h) => (h.putts || 0) >= 3).length, 0);
   return total / withPutts.length;
+}
+
+// Validate that a course's stroke indexes are a clean set of 1..N with no dupes/gaps.
+// Returns an error string if invalid, or null if OK.
+export function validateStrokeIndexes(holes: { n: number; si: number | null }[]): string | null {
+  const n = holes.length;
+  if (n === 0) return "This course has no holes.";
+  const sis = holes.map((h) => h.si);
+  if (sis.some((s) => s == null)) return "Every hole needs a stroke index (1–" + n + ").";
+  const nums = sis as number[];
+  const seen = new Set<number>();
+  for (const s of nums) {
+    if (s < 1 || s > n) return `Stroke index ${s} is out of range (must be 1–${n}).`;
+    if (seen.has(s)) return `Stroke index ${s} is used more than once — each must be unique (1–${n}).`;
+    seen.add(s);
+  }
+  // Confirm full coverage 1..n
+  for (let i = 1; i <= n; i++) if (!seen.has(i)) return `Stroke index ${i} is missing — indexes must be 1–${n} with none skipped.`;
+  return null;
 }

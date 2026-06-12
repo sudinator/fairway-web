@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import {
-  C, Hole, courseHandicap, strokesReceived, stablefordPts, stablefordBySix,
+  C, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, stablefordBySix,
   matchStatus, matchAllowance,
 } from "@/lib/golf";
 import { btn, inputStyle, Eyebrow, NumPicker, ScoreEntryCard } from "@/components/ui";
@@ -295,10 +295,11 @@ function GameRoom({ gameId, user, displayName, onBack }: { gameId: string; user:
   // Build a player's per-hole Hole[] (with strokes received) for scoring math.
   const playerHoles = (p: Player): Hole[] => {
     if (!game) return [];
+    const alloc = allocateStrokes(game.holes_meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })), p.course_handicap);
     return game.holes_meta.map((m, i) => ({
       hole_number: m.n, par: m.par, stroke_index: m.si,
       strokes: p.scores?.[i] ?? null, putts: p.putts?.[i] ?? null, fairway: p.fairways?.[i] ?? null, penalties: 0,
-      recv: strokesReceived(m.si, p.course_handicap),
+      recv: alloc[m.n] || 0,
     }));
   };
 
@@ -482,11 +483,14 @@ function GameRoom({ gameId, user, displayName, onBack }: { gameId: string; user:
           <Eyebrow>ENTER YOUR SCORES</Eyebrow>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>Tap a hole and pick your strokes — it saves and updates the leaderboard. Tap ⟳ Refresh to see others' latest.</div>
           <ScoreEntryCard
-            holes={game.holes_meta.map((m, i) => ({
-              n: m.n, par: m.par, si: m.si,
-              strokes: me.scores?.[i] ?? null, putts: me.putts?.[i] ?? null, fairway: me.fairways?.[i] ?? null,
-              recv: me.course_handicap != null ? strokesReceived(m.si, me.course_handicap) : 0,
-            }))}
+            holes={(() => {
+              const alloc = allocateStrokes(game.holes_meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })), me.course_handicap);
+              return game.holes_meta.map((m, i) => ({
+                n: m.n, par: m.par, si: m.si,
+                strokes: me.scores?.[i] ?? null, putts: me.putts?.[i] ?? null, fairway: me.fairways?.[i] ?? null,
+                recv: alloc[m.n] || 0,
+              }));
+            })()}
             hasHandicap={me.course_handicap != null}
             onSet={(i, patch) => setMyHole(i, patch)}
             savingHole={savingHole}

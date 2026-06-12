@@ -7,7 +7,7 @@ import {
 } from "recharts";
 import { createClient } from "@/lib/supabase";
 import {
-  C, Round, Hole, courseHandicap, strokesReceived, stablefordPts,
+  C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate,
   girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound,
 } from "@/lib/golf";
@@ -110,8 +110,9 @@ function Home({ session }: { session: any }) {
       (byRound[h.round_id] ||= []).push(h);
     });
     const merged: Round[] = rs.map((r: any) => {
-      const holes = (byRound[r.id] || []).sort((a, b) => a.hole_number - b.hole_number)
-        .map((h) => ({ ...h, recv: strokesReceived(h.stroke_index, r.course_handicap) }));
+      const sorted = (byRound[r.id] || []).sort((a, b) => a.hole_number - b.hole_number);
+      const alloc = allocateStrokes(sorted, r.course_handicap);
+      const holes = sorted.map((h) => ({ ...h, recv: alloc[h.hole_number] || 0 }));
       return { ...r, holes };
     });
     setRounds(merged);
@@ -238,6 +239,8 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
   // Save the currently-picked course; if one with the same name exists, update it instead of duplicating.
   const saveFavorite = async () => {
     if (!picked) return;
+    const siErr = validateStrokeIndexes(picked.holes.map((h) => ({ n: h.n, si: h.si })));
+    if (siErr) { setFavMsg("Can't save — " + siErr + " Fix it in the override panel or Courses tab."); return; }
     setFavSaving(true); setFavMsg(null);
     try {
       const { data: existing } = await supabase.from("favorite_courses").select("id").eq("name", picked.name).maybeSingle();
@@ -377,10 +380,11 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
     if (!picked || !tee) return;
     if (idxVal != null && idxVal !== index) saveIndex(idxVal);
     const coursePar = picked.holes.reduce((s, h) => s + (h.par || 0), 0);
+    const alloc = allocateStrokes(picked.holes.map((h) => ({ hole_number: h.n, stroke_index: h.si })), realCH);
     const holes: Hole[] = picked.holes.map((h) => ({
       hole_number: h.n, par: h.par, stroke_index: h.si,
       strokes: null, putts: null, fairway: null, penalties: 0,
-      recv: realCH != null ? strokesReceived(h.si, realCH) : 0,
+      recv: alloc[h.n] || 0,
     }));
     onReady({
       id: "", course: picked.name, tee_name: tee.name,
@@ -666,6 +670,8 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
       }],
       holes: holes.map((h) => ({ n: h.hole_number, par: h.par, si: h.stroke_index })),
     };
+    const siErr = validateStrokeIndexes(course.holes.map((h) => ({ n: h.n, si: h.si })));
+    if (siErr) { setFavMsg("Can't save — " + siErr); return; }
     try {
       const { data: existing } = await supabase.from("favorite_courses").select("id").eq("name", round.course).maybeSingle();
       if (existing) {
@@ -722,11 +728,14 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
         {round.course_handicap != null ? ` · course handicap ${round.course_handicap}` : " · no handicap — Stableford scored gross"}
       </div>
       <ScoreEntryCard
-        holes={holes.map((h) => ({
-          n: h.hole_number, par: h.par, si: h.stroke_index,
-          strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties,
-          recv: round.course_handicap != null ? strokesReceived(h.stroke_index, round.course_handicap) : 0,
-        }))}
+        holes={(() => {
+          const alloc = allocateStrokes(holes.map((h) => ({ hole_number: h.hole_number, stroke_index: h.stroke_index })), round.course_handicap);
+          return holes.map((h) => ({
+            n: h.hole_number, par: h.par, si: h.stroke_index,
+            strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties,
+            recv: alloc[h.hole_number] || 0,
+          }));
+        })()}
         hasHandicap={round.course_handicap != null}
         onSet={(i, patch) => {
           const p: Partial<Hole> = {};
