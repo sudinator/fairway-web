@@ -300,39 +300,47 @@ function CourseForm({ course, setCourse, existingId, saving, setSaving, err, set
             </div>
           );
         })()}
-        <div style={{ background: C.card, borderRadius: 10, padding: 10, overflowX: "auto" }}>
-          <table style={{ borderCollapse: "collapse", width: "100%" }}>
-            <tbody>
-              <tr>
-                <td style={{ color: C.faint, fontSize: 10, padding: "2px 4px" }}>Hole</td>
-                {course.holes.map((h) => <td key={h.n} style={{ textAlign: "center", color: C.faint, fontSize: 10, padding: "2px" }}>{h.n}</td>)}
-              </tr>
-              <tr>
-                <td style={{ color: C.sage, fontSize: 10, padding: "2px 4px" }}>Par</td>
-                {course.holes.map((h, j) => (
-                  <td key={j} style={{ padding: 2 }}>
-                    <select value={h.par ?? 4} onChange={(e) => updateHole(j, { par: parseInt(e.target.value, 10) })}
-                      style={{ ...inputStyle, padding: "3px 0", width: 38, textAlign: "center", fontSize: 13 }}>
-                      {[3, 4, 5, 6].map((p) => <option key={p} value={p}>{p}</option>)}
-                    </select>
-                  </td>
-                ))}
-              </tr>
-              <tr>
-                <td style={{ color: C.sage, fontSize: 10, padding: "2px 4px" }}>S.I.</td>
-                {course.holes.map((h, j) => (
-                  <td key={j} style={{ padding: 2 }}>
-                    <select value={h.si ?? ""} onChange={(e) => updateHole(j, { si: e.target.value === "" ? null : parseInt(e.target.value, 10) })}
-                      style={{ ...inputStyle, padding: "3px 0", width: 42, textAlign: "center", fontSize: 13 }}>
-                      <option value="">–</option>
-                      {Array.from({ length: 18 }, (_, k) => k + 1).map((n) => <option key={n} value={n}>{n}</option>)}
-                    </select>
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        {(() => {
+          const nine = (from: number, to: number, label: string) => {
+            const seg = course.holes.slice(from, to);
+            if (seg.length === 0) return null;
+            return (
+              <div style={{ background: C.card, borderRadius: 10, padding: 10, flex: 1, minWidth: 240 }}>
+                <div style={{ color: C.green, fontSize: 11, letterSpacing: 2, fontWeight: 800, marginBottom: 6 }}>{label}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr", gap: 6, padding: "0 2px 5px", color: C.faint, fontSize: 9, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.line}` }}>
+                  <div>HOLE</div><div style={{ textAlign: "center" }}>PAR</div><div style={{ textAlign: "center" }}>S.I.</div>
+                </div>
+                {seg.map((h, jj) => {
+                  const j = from + jj;
+                  return (
+                    <div key={j} style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr", gap: 6, alignItems: "center", padding: "5px 2px", borderBottom: `1px solid ${C.line}` }}>
+                      <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.n}</div>
+                      <div style={{ textAlign: "center" }}>
+                        <select value={h.par ?? 4} onChange={(e) => updateHole(j, { par: parseInt(e.target.value, 10) })}
+                          style={{ ...inputStyle, padding: "5px 0", width: "100%", maxWidth: 70, textAlign: "center", fontSize: 14 }}>
+                          {[3, 4, 5, 6].map((p) => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <select value={h.si ?? ""} onChange={(e) => updateHole(j, { si: e.target.value === "" ? null : parseInt(e.target.value, 10) })}
+                          style={{ ...inputStyle, padding: "5px 0", width: "100%", maxWidth: 70, textAlign: "center", fontSize: 14 }}>
+                          <option value="">–</option>
+                          {Array.from({ length: 18 }, (_, k) => k + 1).map((n) => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          };
+          return (
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {nine(0, Math.min(9, course.holes.length), "FRONT NINE")}
+              {course.holes.length > 9 && nine(9, 18, "BACK NINE")}
+            </div>
+          );
+        })()}
       </div>
 
       {err && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{err}</div>}
@@ -631,56 +639,52 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
           ⚠ Admin mode — you are editing another player's official scores. They will be notified.
         </div>
         <div style={{ color: C.sage, fontSize: 13, marginTop: 10 }}>{editing.course}{editing.tee_name ? ` · ${editing.tee_name}` : ""} · {fmtDate(editing.played_at)}</div>
-        <div style={{ background: C.card, borderRadius: 12, padding: 12, marginTop: 10, overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>{["Hole", "Par", "Score", "Putts"].map((h) => <th key={h} style={{ color: C.faint, fontSize: 11, textAlign: "center", padding: 4 }}>{h}</th>)}</tr>
-            </thead>
-            <tbody>
-              {holes.map((h, i) => {
-                const subtotalAfter = (i === 8 && holes.length > 9) || i === holes.length - 1;
-                const segStart = i < 9 ? 0 : 9;
-                const seg = holes.slice(segStart, i + 1);
-                const sPar = seg.reduce((s, x) => s + (x.par || 0), 0);
-                const sScore = seg.reduce((s, x) => s + (x.strokes || 0), 0);
-                const sPutts = seg.reduce((s, x) => s + (x.putts || 0), 0);
-                return (
-                  <React.Fragment key={i}>
-                    <tr>
-                      <td style={{ textAlign: "center", color: C.ink, fontWeight: 700, padding: 3 }}>{h.hole_number}</td>
-                      <td style={{ textAlign: "center", color: C.sage, padding: 3 }}>{h.par}</td>
-                      <td style={{ textAlign: "center", padding: 3 }}>
-                        <NumPicker value={h.strokes} from={1} to={h.par * 2 + (editing.course_handicap != null ? (h.recv || 0) : 0)} onChange={(v) => setHole(i, { strokes: v })} />
-                      </td>
-                      <td style={{ textAlign: "center", padding: 3 }}>
-                        <NumPicker value={h.putts} from={0} to={6} onChange={(v) => setHole(i, { putts: v })} />
-                      </td>
-                    </tr>
-                    {subtotalAfter && (
-                      <tr style={{ background: C.greenLight, borderTop: `2px solid ${C.greenMid}` }}>
-                        <td style={{ textAlign: "center", color: C.gold, fontWeight: 800, fontSize: 11, padding: 4 }}>{segStart === 0 ? "OUT" : "IN"}</td>
-                        <td style={{ textAlign: "center", color: C.ink, fontWeight: 800, padding: 4 }}>{sPar}</td>
-                        <td style={{ textAlign: "center", color: C.green, fontWeight: 800, padding: 4 }}>{sScore || "–"}</td>
-                        <td style={{ textAlign: "center", color: C.faint, fontWeight: 700, padding: 4 }}>{sPutts || "–"}</td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-              {holes.length > 9 && (() => {
-                const tot = holes.reduce((s, x) => s + (x.strokes || 0), 0);
-                const totPutts = holes.reduce((s, x) => s + (x.putts || 0), 0);
-                return (
-                  <tr style={{ background: C.green }}>
-                    <td style={{ textAlign: "center", color: C.cream, fontWeight: 800, fontSize: 11, padding: 5 }}>TOTAL</td>
-                    <td></td>
-                    <td style={{ textAlign: "center", color: "#fff", fontWeight: 800, padding: 5 }}>{tot || "–"}</td>
-                    <td style={{ textAlign: "center", color: C.cream, fontWeight: 700, padding: 5 }}>{totPutts || "–"}</td>
-                  </tr>
-                );
-              })()}
-            </tbody>
-          </table>
+        <div style={{ background: C.card, borderRadius: 12, padding: 12, marginTop: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, padding: "0 2px 6px", color: C.faint, fontSize: 10, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.line}` }}>
+            <div>HOLE</div><div style={{ textAlign: "center" }}>PAR</div><div style={{ textAlign: "center" }}>SCORE</div><div style={{ textAlign: "center" }}>PUTTS</div>
+          </div>
+          {holes.map((h, i) => {
+            const subtotalAfter = (i === 8 && holes.length > 9) || i === holes.length - 1;
+            const segStart = i < 9 ? 0 : 9;
+            const seg = holes.slice(segStart, i + 1);
+            const sPar = seg.reduce((s, x) => s + (x.par || 0), 0);
+            const sScore = seg.reduce((s, x) => s + (x.strokes || 0), 0);
+            const sPutts = seg.reduce((s, x) => s + (x.putts || 0), 0);
+            return (
+              <React.Fragment key={i}>
+                <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, alignItems: "center", padding: "5px 2px", borderBottom: `1px solid ${C.line}` }}>
+                  <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.hole_number}</div>
+                  <div style={{ textAlign: "center", color: C.parBlue, fontWeight: 700 }}>{h.par}</div>
+                  <div style={{ textAlign: "center" }}>
+                    <NumPicker value={h.strokes} from={1} to={h.par * 2 + (editing.course_handicap != null ? (h.recv || 0) : 0)} onChange={(v) => setHole(i, { strokes: v })} width={52} />
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <NumPicker value={h.putts} from={0} to={h.strokes && h.strokes > 0 ? Math.min(h.strokes, 6) : 6} onChange={(v) => setHole(i, { putts: v })} width={52} />
+                  </div>
+                </div>
+                {subtotalAfter && (
+                  <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, padding: "6px 2px", background: C.greenLight, borderTop: `2px solid ${C.greenMid}`, fontWeight: 800 }}>
+                    <div style={{ color: C.gold, fontSize: 11 }}>{segStart === 0 ? "OUT" : "IN"}</div>
+                    <div style={{ textAlign: "center", color: C.ink }}>{sPar}</div>
+                    <div style={{ textAlign: "center", color: C.green }}>{sScore || "–"}</div>
+                    <div style={{ textAlign: "center", color: C.faint }}>{sPutts || "–"}</div>
+                  </div>
+                )}
+              </React.Fragment>
+            );
+          })}
+          {holes.length > 9 && (() => {
+            const tot = holes.reduce((s, x) => s + (x.strokes || 0), 0);
+            const totPutts = holes.reduce((s, x) => s + (x.putts || 0), 0);
+            return (
+              <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, padding: "7px 2px", background: C.green, fontWeight: 800 }}>
+                <div style={{ color: C.cream, fontSize: 11 }}>TOTAL</div>
+                <div />
+                <div style={{ textAlign: "center", color: "#fff" }}>{tot || "–"}</div>
+                <div style={{ textAlign: "center", color: C.cream }}>{totPutts || "–"}</div>
+              </div>
+            );
+          })()}
         </div>
         {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>{msg}</div>}
         <div style={{ display: "flex", gap: 10, marginTop: 14 }}>

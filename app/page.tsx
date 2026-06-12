@@ -12,7 +12,7 @@ import {
   girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound,
 } from "@/lib/golf";
 import { buildCustomCourse, Course } from "@/lib/courses";
-import { btn, inputStyle, Eyebrow, StatCard, ClassicCard, NumPicker, ScoreEntryCard, ScoreViewCard } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard } from "@/components/ui";
 import Tournaments from "@/components/tournaments";
 import { CoursesLibrary, ProfilePanel, NotificationBell } from "@/components/manage";
 
@@ -578,36 +578,44 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
                     <div style={{ color: C.sage, fontSize: 11, marginBottom: 6 }}>
                       Par &amp; stroke index — these are the same for every tee. Total par: <b style={{ color: C.cream }}>{coursePar}</b>
                     </div>
-                    <div style={{ overflowX: "auto" }}>
-                      <table style={{ borderCollapse: "collapse", width: "100%" }}>
-                        <tbody>
-                          <tr>
-                            <td style={{ color: C.faint, fontSize: 10, padding: "2px 4px" }}>Hole</td>
-                            {picked.holes.map((h) => <td key={h.n} style={{ color: C.faint, fontSize: 10, padding: "2px 4px", textAlign: "center" }}>{h.n}</td>)}
-                          </tr>
-                          <tr>
-                            <td style={{ color: C.sage, fontSize: 10, padding: "2px 4px" }}>Par</td>
-                            {picked.holes.map((h, j) => (
-                              <td key={j} style={{ padding: 2 }}>
-                                <input inputMode="numeric" value={h.par ?? ""}
-                                  onChange={(e) => updateHole(j, { par: Math.max(3, Math.min(6, parseInt(e.target.value, 10) || 3)) })}
-                                  style={{ ...inputStyle, padding: "3px 2px", width: 32, textAlign: "center", fontSize: 13 }} />
-                              </td>
-                            ))}
-                          </tr>
-                          <tr>
-                            <td style={{ color: C.sage, fontSize: 10, padding: "2px 4px" }}>S.I.</td>
-                            {picked.holes.map((h, j) => (
-                              <td key={j} style={{ padding: 2 }}>
-                                <input inputMode="numeric" value={h.si ?? ""}
-                                  onChange={(e) => updateHole(j, { si: e.target.value === "" ? null : Math.max(1, Math.min(18, parseInt(e.target.value, 10) || 0)) || null })}
-                                  style={{ ...inputStyle, padding: "3px 2px", width: 32, textAlign: "center", fontSize: 13 }} />
-                              </td>
-                            ))}
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                    {(() => {
+                      const nine = (from: number, to: number, label: string) => {
+                        const seg = picked.holes.slice(from, to);
+                        if (seg.length === 0) return null;
+                        return (
+                          <div style={{ background: C.card, borderRadius: 10, padding: 10, flex: 1, minWidth: 240 }}>
+                            <div style={{ color: C.green, fontSize: 11, letterSpacing: 2, fontWeight: 800, marginBottom: 6 }}>{label}</div>
+                            <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr", gap: 6, padding: "0 2px 5px", color: C.faint, fontSize: 9, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.line}` }}>
+                              <div>HOLE</div><div style={{ textAlign: "center" }}>PAR</div><div style={{ textAlign: "center" }}>S.I.</div>
+                            </div>
+                            {seg.map((h, jj) => {
+                              const j = from + jj;
+                              return (
+                                <div key={j} style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr", gap: 6, alignItems: "center", padding: "5px 2px", borderBottom: `1px solid ${C.line}` }}>
+                                  <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.n}</div>
+                                  <div style={{ textAlign: "center" }}>
+                                    <input inputMode="numeric" value={h.par ?? ""}
+                                      onChange={(e) => updateHole(j, { par: Math.max(3, Math.min(6, parseInt(e.target.value, 10) || 3)) })}
+                                      style={{ ...inputStyle, padding: "5px 2px", width: "100%", maxWidth: 70, textAlign: "center", fontSize: 14 }} />
+                                  </div>
+                                  <div style={{ textAlign: "center" }}>
+                                    <input inputMode="numeric" value={h.si ?? ""}
+                                      onChange={(e) => updateHole(j, { si: e.target.value === "" ? null : Math.max(1, Math.min(18, parseInt(e.target.value, 10) || 0)) || null })}
+                                      style={{ ...inputStyle, padding: "5px 2px", width: "100%", maxWidth: 70, textAlign: "center", fontSize: 14 }} />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      };
+                      return (
+                        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                          {nine(0, Math.min(9, picked.holes.length), "FRONT NINE")}
+                          {picked.holes.length > 9 && nine(9, 18, "BACK NINE")}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
