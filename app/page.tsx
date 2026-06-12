@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, stablefordPts,
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate,
-  girStats, firStats, pct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound,
+  girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound,
 } from "@/lib/golf";
 import { buildCustomCourse, Course } from "@/lib/courses";
 import { btn, inputStyle, Eyebrow, StatCard, ClassicCard, NumPicker, ScoreEntryCard, ScoreViewCard } from "@/components/ui";
@@ -766,7 +766,7 @@ function RoundDetail({ round, onBack, onEdit, onDelete }: {
           </div>
           <div style={{ color: C.sage, fontSize: 13 }}>
             {fmtDate(round.played_at)} · {strokesOf(round)} ({toParStr(diffOf(round))}) · {ptsOf(round)} pts
-            {round.course_handicap != null ? ` · CH ${round.course_handicap}` : ""} · GIR {pct(girStats([round]))} · FW {pct(firStats([round]))} · {puttsOf(round)} putts · {pensOf(round)} pen
+            {round.course_handicap != null ? ` · CH ${round.course_handicap}` : ""} · GIR {fracPct(girStats([round]))} · FW {fracPct(firStats([round]))} · {puttsOf(round)} putts · {pensOf(round)} pen
           </div>
         </div>
         <div style={{ flex: 1 }} />
@@ -852,8 +852,8 @@ function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
         <StatCard label="Stableford avg" value={avgPts == null ? "—" : avgPts.toFixed(1)} sub="full rounds" />
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
-        <StatCard label="GIR" value={pct(gir)} sub={gir.total ? `${gir.hit}/${gir.total} holes` : "needs putts"} />
-        <StatCard label="Fairways hit" value={pct(fir)} sub={fir.total ? `${fir.hit}/${fir.total} par 4s/5s` : "tap FW"} />
+        <StatCard label="GIR" value={fracPct(gir)} sub={gir.total ? "greens in regulation" : "needs putts"} />
+        <StatCard label="Fairways hit" value={fracPct(fir)} sub={fir.total ? "excludes par 3s" : "tap FW"} />
         <StatCard label="Putts / hole" value={avgPutts == null ? "—" : avgPutts.toFixed(2)} />
         <StatCard label="3+ putts / round" value={threePutts == null ? "—" : threePutts.toFixed(1)} sub="three-putt holes" />
         <StatCard label="Penalties" value={done.length ? (pens / done.length).toFixed(1) : "—"} sub="per round" />

@@ -73,6 +73,10 @@ export const firStats = (rs: Round[]) => {
 export const pct = (s: { hit: number; total: number }) =>
   s.total ? Math.round((100 * s.hit) / s.total) + "%" : "—";
 
+// "12/18 (66%)" style — fraction plus percentage.
+export const fracPct = (s: { hit: number; total: number }) =>
+  s.total ? `${s.hit}/${s.total} (${Math.round((100 * s.hit) / s.total)}%)` : "—";
+
 export function holeBuckets(rounds: Round[]) {
   const b = { eagle: 0, birdie: 0, par: 0, bogey: 0, double: 0 };
   rounds.forEach((r) =>

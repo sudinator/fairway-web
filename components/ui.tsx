@@ -273,6 +273,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
   const hasPutts = round.holes.some((h) => h.putts != null);
   const hasPens = round.holes.some((h) => (h.penalties || 0) > 0);
   const hasDots = round.holes.some((h) => (h.recv || 0) > 0);
+  const hasFw = round.holes.some((h) => h.fairway === "hit" || h.fairway === "miss");
 
   const headStyle: React.CSSProperties = { color: C.faint, fontSize: 9, letterSpacing: 0.5, fontWeight: 700, textTransform: "uppercase" };
 
@@ -284,10 +285,12 @@ export function ScoreViewCard({ round }: { round: Round }) {
     const sPutts = seg.reduce((s, h) => s + (h.putts || 0), 0);
     const sPen = seg.reduce((s, h) => s + (h.penalties || 0), 0);
     const sPts = seg.reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
+    const fwElig = seg.filter((h) => h.par >= 4 && (h.fairway === "hit" || h.fairway === "miss")).length;
+    const fwHit = seg.filter((h) => h.par >= 4 && h.fairway === "hit").length;
     const Row = (cells: React.ReactNode[], opts?: { header?: boolean; foot?: boolean }) => (
       <div style={{
         display: "grid",
-        gridTemplateColumns: `34px 30px 30px${hasDots ? " 34px" : ""} 1fr${hasPutts ? " 38px" : ""}${hasPens ? " 30px" : ""} 34px`,
+        gridTemplateColumns: `34px 30px 30px${hasDots ? " 34px" : ""} 1fr${hasFw ? " 30px" : ""}${hasPutts ? " 38px" : ""}${hasPens ? " 30px" : ""} 34px`,
         alignItems: "center", gap: 4,
         padding: opts?.header ? "0 4px 6px" : "6px 4px",
         borderBottom: opts?.header ? `1px solid ${C.line}` : opts?.foot ? "none" : `1px solid ${C.line}`,
@@ -306,6 +309,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
           <div key="si" style={{ ...headStyle, textAlign: "center" }}>S.I.</div>,
           ...(hasDots ? [<div key="d" style={{ ...headStyle, textAlign: "center" }}>Hcp</div>] : []),
           <div key="sc" style={{ ...headStyle, textAlign: "center" }}>Score</div>,
+          ...(hasFw ? [<div key="fw" style={{ ...headStyle, textAlign: "center" }}>FW</div>] : []),
           ...(hasPutts ? [<div key="pu" style={{ ...headStyle, textAlign: "center" }}>Putt</div>] : []),
           ...(hasPens ? [<div key="pe" style={{ ...headStyle, textAlign: "center" }}>Pen</div>] : []),
           <div key="pt" style={{ ...headStyle, textAlign: "center" }}>Pts</div>,
@@ -319,6 +323,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
             <div key="si" style={{ textAlign: "center", color: C.faint, fontSize: 12 }}>{h.stroke_index ?? "–"}</div>,
             ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: C.gold, fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>{recv > 0 ? "•".repeat(Math.min(recv, 3)) : ""}</div>] : []),
             <div key="sc" style={{ textAlign: "center" }}><ScoreMark hole={h} /></div>,
+            ...(hasFw ? [<div key="fw" style={{ textAlign: "center", fontWeight: 800, fontSize: 13, color: h.fairway === "hit" ? C.greenMid : h.fairway === "miss" ? C.birdie : C.faint }}>{h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "miss" ? "✗" : "·"}</div>] : []),
             ...(hasPutts ? [<div key="pu" style={{ textAlign: "center", color: C.faint, fontSize: 13 }}>{h.putts ?? "·"}</div>] : []),
             ...(hasPens ? [<div key="pe" style={{ textAlign: "center", color: (h.penalties || 0) > 0 ? C.birdie : C.faint, fontSize: 13 }}>{h.penalties || "·"}</div>] : []),
             <div key="pt" style={{ textAlign: "center", color: C.green, fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
@@ -330,6 +335,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
           <div key="si" />,
           ...(hasDots ? [<div key="d" />] : []),
           <div key="sc" style={{ textAlign: "center", color: C.ink, fontWeight: 800, fontSize: 15 }}>{sStr || "—"}</div>,
+          ...(hasFw ? [<div key="fw" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 11 }}>{fwElig ? `${fwHit}/${fwElig}` : "—"}</div>] : []),
           ...(hasPutts ? [<div key="pu" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 13 }}>{sPutts || "—"}</div>] : []),
           ...(hasPens ? [<div key="pe" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 13 }}>{sPen || "—"}</div>] : []),
           <div key="pt" style={{ textAlign: "center", color: C.green, fontWeight: 800, fontSize: 14 }}>{sPts}</div>,
