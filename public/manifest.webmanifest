@@ -1,0 +1,12 @@
+{
+  "name": "Birdie Num Num",
+  "short_name": "Birdie",
+  "description": "Track your golf scores, handicap, and stats.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0E3B2E",
+  "theme_color": "#0E3B2E",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

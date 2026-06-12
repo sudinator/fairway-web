@@ -1,6 +1,11 @@
 export const metadata = {
-  title: "Fairway Card",
+  title: "Birdie Num Num",
   description: "Track your golf scores, handicap, and stats.",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export const viewport = {

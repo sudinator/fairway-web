@@ -12,7 +12,7 @@ import {
   girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound,
 } from "@/lib/golf";
 import { buildCustomCourse, Course } from "@/lib/courses";
-import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
 import Tournaments from "@/components/tournaments";
 import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab } from "@/components/manage";
 
@@ -42,8 +42,8 @@ function Login() {
   };
   return (
     <div style={{ maxWidth: 420, margin: "80px auto", padding: 24, textAlign: "center" }}>
-      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 42, fontWeight: 700 }}>Fairway Card</div>
-      <div style={{ color: C.sage, fontSize: 15, marginTop: 8 }}>Track your scores, handicap & stats.</div>
+      <div style={{ display: "flex", justifyContent: "center" }}><Wordmark width={300} /></div>
+      <div style={{ color: C.sage, fontSize: 15, marginTop: 16 }}>Track your scores, handicap & stats.</div>
       <div style={{ background: C.greenLight, borderRadius: 16, padding: 28, marginTop: 30 }}>
         <button onClick={signIn}
           style={{ ...btn(true), width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "14px" }}>
@@ -130,8 +130,8 @@ function Home({ session }: { session: any }) {
 
   return (
     <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 60px" }}>
-      <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", gap: 12 }}>
-        <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 28, fontWeight: 700 }}>Fairway Card</div>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+        <Wordmark width={150} />
         <div style={{ color: C.sage, fontSize: 13 }}>{displayName}{index != null ? ` · HCP ${index}` : ""}</div>
         <div style={{ flex: 1 }} />
         <NotificationBell user={user} />

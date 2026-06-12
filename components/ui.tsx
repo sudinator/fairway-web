@@ -311,3 +311,20 @@ export function ScoreViewCard({ round }: { round: Round }) {
     </div>
   );
 }
+
+// ================= Brand wordmark =================
+// Dark green badge with gold accents — "Birdie / Num Num" in serif.
+export function Wordmark({ width = 280 }: { width?: number }) {
+  const h = width * (150 / 400);
+  return (
+    <svg width={width} height={h} viewBox="0 0 400 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Birdie Num Num">
+      <rect x="1.5" y="1.5" width="397" height="147" rx="18" fill="#0E3B2E" stroke="#C9A227" strokeWidth="2.5" />
+      <line x1="40" y1="42" x2="120" y2="42" stroke="#C9A227" strokeWidth="1.5" />
+      <circle cx="200" cy="42" r="3.5" fill="#C9A227" />
+      <line x1="280" y1="42" x2="360" y2="42" stroke="#C9A227" strokeWidth="1.5" />
+      <text x="200" y="78" textAnchor="middle" fontFamily="Georgia, serif" fontSize="40" fontWeight="700" fill="#F7F3E8">Birdie</text>
+      <text x="200" y="116" textAnchor="middle" fontFamily="Georgia, serif" fontSize="30" fontWeight="700" fontStyle="italic" fill="#C9A227">Num Num</text>
+      <line x1="40" y1="130" x2="360" y2="130" stroke="#16503D" strokeWidth="1" />
+    </svg>
+  );
+}
