@@ -9,10 +9,10 @@ import { createClient } from "@/lib/supabase";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, stablefordPts,
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate,
-  girStats, firStats, pct, holeBuckets, avgByPar, roundDifferential, runningHandicap,
+  girStats, firStats, pct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound,
 } from "@/lib/golf";
 import { buildCustomCourse, Course } from "@/lib/courses";
-import { btn, inputStyle, Eyebrow, StatCard, ClassicCard, NumPicker } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, StatCard, ClassicCard, NumPicker, ScoreEntryCard, ScoreViewCard } from "@/components/ui";
 import Tournaments from "@/components/tournaments";
 import { CoursesLibrary, ProfilePanel, NotificationBell } from "@/components/manage";
 
@@ -684,25 +684,10 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
 
   const setHole = (i: number, patch: Partial<Hole>) =>
     setHoles((hs) => hs.map((h, j) => (j === i ? { ...h, ...patch } : h)));
-  const num = (v: string, max: number) =>
-    v === "" ? null : (Math.max(0, Math.min(max, parseInt(v, 10) || 0)) || null);
-
-  // Editing the stroke index must recompute how many strokes you receive on that hole.
-  const setStrokeIndex = (i: number, v: string) => {
-    const si = v === "" ? null : Math.max(1, Math.min(18, parseInt(v, 10) || 0)) || null;
-    const recv = strokesReceived(si, round.course_handicap);
-    setHole(i, { stroke_index: si, recv });
-  };
 
   const live: Round = { ...round, holes };
   const anyPlayed = holes.some((h) => h.strokes);
   const gir = girStats([live]), fir = firStats([live]);
-
-  const cycleFw = (i: number, h: Hole) => {
-    if (h.par < 4) return;
-    const next = h.fairway == null ? "hit" : h.fairway === "hit" ? "miss" : null;
-    setHole(i, { fairway: next });
-  };
 
   const save = async () => {
     setSaving(true); setErr(null);
@@ -730,131 +715,29 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
     }
   };
 
-  const Nine = ({ from, to, label }: { from: number; to: number; label: string }) => (
-    <div style={{ background: C.card, borderRadius: 12, padding: 12, flex: 1, minWidth: 380, overflowX: "auto" }}>
-      <div style={{ color: C.faint, fontSize: 11, letterSpacing: 2, fontWeight: 700, marginBottom: 6 }}>{label}</div>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            {["Hole", "Par", "S.I.", "Str", "Score", "Putts", "FW", "Pen", "Pts"].map((h) => (
-              <th key={h} style={{ color: C.faint, fontSize: 9, letterSpacing: 1, textAlign: "center", padding: "3px 4px" }}>{h.toUpperCase()}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {holes.slice(from, to).map((h, idx) => {
-            const i = from + idx;
-            const pts = stablefordPts(h.strokes, h.par, h.recv || 0);
-            return (
-              <tr key={i} style={{ borderTop: `1px solid ${C.line}` }}>
-                <td style={{ padding: 5, fontWeight: 700, color: C.ink, textAlign: "center" }}>{h.hole_number}</td>
-                <td style={{ padding: 3 }}>
-                  <select value={h.par} onChange={(e) => setHole(i, { par: +e.target.value, fairway: +e.target.value < 4 ? null : h.fairway })}
-                    style={{ ...inputStyle, padding: "5px 6px", width: 52, fontSize: 14 }}>
-                    {[3, 4, 5, 6].map((p) => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </td>
-                <td style={{ padding: 3 }}>
-                  <input inputMode="numeric" value={h.stroke_index ?? ""} placeholder="–"
-                    onChange={(e) => setStrokeIndex(i, e.target.value)}
-                    style={{ ...inputStyle, padding: "5px 4px", width: 42, textAlign: "center", fontSize: 14, color: C.faint }} />
-                </td>
-                <td style={{ padding: 3, textAlign: "center" }}>
-                  <span style={{ color: C.gold, fontSize: 12, fontWeight: 700 }}>{h.recv ? "●".repeat(Math.min(h.recv, 3)) : ""}</span>
-                </td>
-                <td style={{ padding: 3, textAlign: "center" }}>
-                  <NumPicker value={h.strokes} from={1}
-                    to={round.course_handicap != null ? h.par + 2 + (h.recv || 0) : h.par * 2}
-                    onChange={(v) => setHole(i, { strokes: v })} />
-                </td>
-                <td style={{ padding: 3, textAlign: "center" }}>
-                  <NumPicker value={h.putts} from={0} to={6} onChange={(v) => setHole(i, { putts: v })} />
-                </td>
-                <td style={{ padding: 3, textAlign: "center" }}>
-                  <button onClick={() => cycleFw(i, h)} disabled={h.par < 4}
-                    style={{
-                      border: `1px solid ${C.line}`, borderRadius: 8, width: 38, height: 32, cursor: h.par < 4 ? "default" : "pointer",
-                      background: h.fairway === "hit" ? "#DDF0DF" : h.fairway === "miss" ? "#F6DEDB" : C.card,
-                      color: h.fairway === "hit" ? C.greenMid : h.fairway === "miss" ? C.birdie : C.faint, fontWeight: 800,
-                    }}>
-                    {h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "miss" ? "✗" : "·"}
-                  </button>
-                </td>
-                <td style={{ padding: 3, textAlign: "center" }}>
-                  <NumPicker value={h.penalties || null} from={1} to={3} onChange={(v) => setHole(i, { penalties: v ?? 0 })} width={42} />
-                </td>
-                <td style={{ padding: 3, textAlign: "center", fontWeight: 800, color: (pts ?? 0) >= 3 ? C.birdie : pts === 0 ? C.faint : C.ink }}>{pts ?? "·"}</td>
-              </tr>
-            );
-          })}
-          {(() => {
-            const seg = holes.slice(from, to);
-            const sumPar = seg.reduce((s, h) => s + (h.par || 0), 0);
-            const sumStr = seg.reduce((s, h) => s + (h.strokes || 0), 0);
-            const sumPutts = seg.reduce((s, h) => s + (h.putts || 0), 0);
-            const sumPen = seg.reduce((s, h) => s + (h.penalties || 0), 0);
-            const sumPts = seg.reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
-            const tag = from === 0 ? "OUT" : "IN";
-            return (
-              <tr style={{ borderTop: `2px solid ${C.greenMid}`, background: C.greenLight }}>
-                <td style={{ padding: 5, fontWeight: 800, color: C.gold, textAlign: "center", letterSpacing: 1 }}>{tag}</td>
-                <td style={{ padding: 5, fontWeight: 800, color: C.ink, textAlign: "center" }}>{sumPar}</td>
-                <td></td>
-                <td></td>
-                <td style={{ padding: 5, fontWeight: 800, color: C.ink, textAlign: "center" }}>{sumStr || "–"}</td>
-                <td style={{ padding: 5, fontWeight: 800, color: C.ink, textAlign: "center" }}>{sumPutts || "–"}</td>
-                <td></td>
-                <td style={{ padding: 5, fontWeight: 800, color: C.ink, textAlign: "center" }}>{sumPen || "–"}</td>
-                <td style={{ padding: 5, fontWeight: 800, color: C.green, textAlign: "center" }}>{sumPts}</td>
-              </tr>
-            );
-          })()}
-        </tbody>
-      </table>
-    </div>
-  );
-
   return (
     <div>
       <div style={{ color: C.sage, fontSize: 13, marginBottom: 10 }}>
         {round.course}{round.tee_name ? ` · ${round.tee_name} tees (${round.rating}/${round.slope})` : ""}
         {round.course_handicap != null ? ` · course handicap ${round.course_handicap}` : " · no handicap — Stableford scored gross"}
       </div>
-      <div style={{ color: C.gold, fontSize: 12, marginBottom: 10 }}>
-        Par and S.I. (stroke index) are editable — fix any wrong values here, then save the course as a favorite to reuse your corrections. FW: tap to cycle ✓ hit / ✗ miss.
-      </div>
-      <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-        <Nine from={0} to={Math.min(9, holes.length)} label="FRONT NINE" />
-        {holes.length > 9 && <Nine from={9} to={18} label="BACK NINE" />}
-      </div>
+      <ScoreEntryCard
+        holes={holes.map((h) => ({
+          n: h.hole_number, par: h.par, si: h.stroke_index,
+          strokes: h.strokes, putts: h.putts, fairway: h.fairway,
+          recv: round.course_handicap != null ? strokesReceived(h.stroke_index, round.course_handicap) : 0,
+        }))}
+        hasHandicap={round.course_handicap != null}
+        onSet={(i, patch) => setHole(i, patch)}
+      />
       {err && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{err}</div>}
-      {anyPlayed && holes.length > 9 && (() => {
-        const out = holes.slice(0, 9).reduce((s, h) => s + (h.strokes || 0), 0);
-        const inn = holes.slice(9, 18).reduce((s, h) => s + (h.strokes || 0), 0);
-        return (
-          <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
-            <div style={{ background: C.greenLight, borderRadius: 10, padding: "8px 18px", textAlign: "center" }}>
-              <div style={{ color: C.sage, fontSize: 10, letterSpacing: 2 }}>OUT</div>
-              <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800 }}>{out || "–"}</div>
-            </div>
-            <div style={{ background: C.greenLight, borderRadius: 10, padding: "8px 18px", textAlign: "center" }}>
-              <div style={{ color: C.sage, fontSize: 10, letterSpacing: 2 }}>IN</div>
-              <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800 }}>{inn || "–"}</div>
-            </div>
-            <div style={{ background: C.gold, borderRadius: 10, padding: "8px 18px", textAlign: "center" }}>
-              <div style={{ color: "#3B2A00", fontSize: 10, letterSpacing: 2 }}>TOTAL</div>
-              <div style={{ color: "#3B2A00", fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800 }}>{out + inn || "–"}</div>
-            </div>
-          </div>
-        );
-      })()}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 16, flexWrap: "wrap" }}>
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 24, fontWeight: 700 }}>
           {anyPlayed ? `${strokesOf(live)} (${toParStr(diffOf(live))}) · ${ptsOf(live)} pts` : "Enter scores above"}
         </div>
         {anyPlayed && (
           <div style={{ color: C.sage, fontSize: 13 }}>
-            GIR {pct(gir)} · FIR {pct(fir)} · {puttsOf(live)} putts · {pensOf(live)} penalt{pensOf(live) === 1 ? "y" : "ies"}
+            GIR {pct(gir)} · FIR {pct(fir)} · {puttsOf(live)} putts
           </div>
         )}
         <div style={{ flex: 1 }} />
@@ -890,7 +773,7 @@ function RoundDetail({ round, onBack, onEdit, onDelete }: {
         <button style={{ ...btn(false), background: "#7A2F28" }}
           onClick={() => { if (confirm("Delete this round?")) onDelete(); }}>Delete</button>
       </div>
-      <div style={{ marginTop: 14 }}><ClassicCard round={round} /></div>
+      <div style={{ marginTop: 14 }}><ScoreViewCard round={round} /></div>
     </div>
   );
 }
@@ -916,6 +799,7 @@ function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
   const diffs = done.map(roundDifferential).filter((d): d is number => d != null);
   const avgDifferential = diffs.length ? diffs.reduce((s, d) => s + d, 0) / diffs.length : null;
   const hcp = runningHandicap(done);
+  const threePutts = threePuttsPerRound(done);
 
   const trend = sorted.map((r, i) => ({ i: i + 1, name: fmtDate(r.played_at), diff: diffOf(r), pts: ptsOf(r), course: r.course }));
   const distData = [
@@ -971,6 +855,7 @@ function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
         <StatCard label="GIR" value={pct(gir)} sub={gir.total ? `${gir.hit}/${gir.total} holes` : "needs putts"} />
         <StatCard label="Fairways hit" value={pct(fir)} sub={fir.total ? `${fir.hit}/${fir.total} par 4s/5s` : "tap FW"} />
         <StatCard label="Putts / hole" value={avgPutts == null ? "—" : avgPutts.toFixed(2)} />
+        <StatCard label="3+ putts / round" value={threePutts == null ? "—" : threePutts.toFixed(1)} sub="three-putt holes" />
         <StatCard label="Penalties" value={done.length ? (pens / done.length).toFixed(1) : "—"} sub="per round" />
       </div>
 

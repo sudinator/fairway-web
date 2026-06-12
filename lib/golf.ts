@@ -216,3 +216,11 @@ export function runningHandicap(rounds: Round[]): { index: number | null; used: 
   const index = Math.round((avg + row.adj) * 10) / 10;
   return { index, used: row.best, total };
 }
+
+// Average number of three-or-more-putt holes per round (only counts rounds with putts recorded).
+export function threePuttsPerRound(rounds: Round[]): number | null {
+  const withPutts = rounds.filter((r) => played(r).some((h) => h.putts != null));
+  if (!withPutts.length) return null;
+  const total = withPutts.reduce((s, r) => s + played(r).filter((h) => (h.putts || 0) >= 3).length, 0);
+  return total / withPutts.length;
+}
