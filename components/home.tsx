@@ -11,6 +11,7 @@ import { RoundEditor } from "@/components/round-editor";
 import { RoundDetail } from "@/components/round-detail";
 import { Dashboard } from "@/components/dashboard";
 import { RoundsList } from "@/components/rounds-list";
+import { GroupSelector, GroupsPanel } from "@/components/groups";
 
 import type { AppGroup } from "@/lib/groups";
 
@@ -66,12 +67,15 @@ export function Home({ session }: { session: any }) {
     }
 
     setGroups(list);
-    const saved = typeof window !== "undefined" ? window.localStorage.getItem("birdienumnum.activeGroupId") : null;
-    const next = (saved && list.some((g) => g.id === saved)) ? saved : list[0]?.id || null;
+    const preferred = profile?.active_group_id || null;
+    const next = (preferred && list.some((g) => g.id === preferred)) ? preferred : list[0]?.id || null;
     setActiveGroupId(next);
-    if (next && typeof window !== "undefined") window.localStorage.setItem("birdienumnum.activeGroupId", next);
+    if (next && next !== profile?.active_group_id) {
+      supabase.from("profiles").update({ active_group_id: next }).eq("id", user.id).then(() => {});
+      setProfile((p: any) => p ? ({ ...p, active_group_id: next }) : p);
+    }
     setGroupsLoading(false);
-  }, [activateEmailInvites, user.id, user.email]);
+  }, [activateEmailInvites, user.id, user.email, profile?.active_group_id]);
 
   // Load (or create) this user's profile: display name, handicap index, GHIN number.
   const loadProfile = useCallback(async () => {
@@ -88,7 +92,7 @@ export function Home({ session }: { session: any }) {
   }, [user.id, user.email, user.user_metadata]);
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
-  useEffect(() => { loadGroups(); }, [loadGroups]);
+  useEffect(() => { if (profile) loadGroups(); }, [loadGroups, profile]);
 
   const saveIndex = async (idx: number | null) => {
     setProfile((p: any) => ({ ...p, handicap_index: idx }));
@@ -123,13 +127,16 @@ export function Home({ session }: { session: any }) {
     await loadRounds();
   };
 
-  const chooseGroup = (id: string) => {
+  const chooseGroup = async (id: string) => {
     setActiveGroupId(id);
-    if (typeof window !== "undefined") window.localStorage.setItem("birdienumnum.activeGroupId", id);
+    setProfile((p: any) => p ? ({ ...p, active_group_id: id }) : p);
+    await supabase.from("profiles").update({ active_group_id: id }).eq("id", user.id);
   };
 
   const inFlow = stage || viewing;
   const activeGroup = groups.find((g) => g.id === activeGroupId) || groups[0] || null;
+  const isAdminOfAnyGroup = groups.some((g) => g.role === "admin");
+  const showGroupsTab = isAdminOfAnyGroup || groups.length > 1;
 
   if (groupsLoading) {
     return <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 60px", color: C.sage }}>Loading groups…</div>;
@@ -140,7 +147,7 @@ export function Home({ session }: { session: any }) {
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
         <Wordmark width={150} />
         <div style={{ color: C.sage, fontSize: 13 }}>{displayName}{index != null ? ` · HCP ${index}` : ""}</div>
-        
+        <GroupSelector groups={groups} activeGroupId={activeGroupId} onChange={chooseGroup} />
         <div style={{ flex: 1 }} />
         <NotificationBell user={user} />
         <button style={{ ...btn(false), fontSize: 12 }} onClick={() => supabase.auth.signOut()}>Sign out</button>
@@ -154,7 +161,7 @@ export function Home({ session }: { session: any }) {
       )}
 
       <div style={{ display: "flex", gap: 6, marginTop: 16, borderBottom: `1px solid ${C.greenMid}`, flexWrap: "wrap" }}>
-        {(["dashboard", "rounds", "games", "courses", "players", "groups"] as const).map((k) => (
+        {((["dashboard", "rounds", "games", "courses", "players"] as const).concat(showGroupsTab ? (["groups"] as const) : [] as any)).map((k) => (
           <button key={k} onClick={() => { setTab(k); setStage(null); setViewing(null); }}
             style={{
               background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: 14, fontWeight: 700,
@@ -186,7 +193,7 @@ export function Home({ session }: { session: any }) {
         ) : tab === "players" && activeGroup ? (
           <PlayersTab activeGroupId={activeGroup.id} />
         ) : tab === "groups" ? (
-          <div />
+          <GroupsPanel user={user} groups={groups} activeGroupId={activeGroupId} onGroupsChanged={loadGroups} onActiveGroupChange={chooseGroup} />
         ) : tab === "profile" ? (
           <ProfilePanel profile={profile} user={user} onSaved={loadProfile} />
         ) : tab === "games" && activeGroup ? (

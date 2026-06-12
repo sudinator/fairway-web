@@ -20,13 +20,18 @@ type Member = {
 
 export function GroupSelector({ groups, activeGroupId, onChange }: { groups: AppGroup[]; activeGroupId: string | null; onChange: (id: string) => void }) {
   if (!groups.length) return null;
+  const active = groups.find((g) => g.id === activeGroupId) || groups[0];
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, background: C.greenLight, borderRadius: 10, padding: "7px 10px" }}>
       <span style={{ color: C.sage, fontSize: 11, letterSpacing: 1.5, fontWeight: 800 }}>GROUP</span>
-      <select value={activeGroupId || groups[0].id} onChange={(e) => onChange(e.target.value)}
-        style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, color: C.ink, fontWeight: 700, padding: "6px 8px", maxWidth: 180 }}>
-        {groups.map((g) => <option key={g.id} value={g.id}>{g.name}{g.role === "admin" ? " ★" : ""}</option>)}
-      </select>
+      {groups.length === 1 ? (
+        <span style={{ color: C.cream, fontSize: 13, fontWeight: 800 }}>{active.name}{active.role === "admin" ? " ★" : ""}</span>
+      ) : (
+        <select value={activeGroupId || groups[0].id} onChange={(e) => onChange(e.target.value)}
+          style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, color: C.ink, fontWeight: 700, padding: "6px 8px", maxWidth: 180 }}>
+          {groups.map((g) => <option key={g.id} value={g.id}>{g.name}{g.role === "admin" ? " ★" : ""}</option>)}
+        </select>
+      )}
     </div>
   );
 }
