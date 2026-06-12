@@ -191,7 +191,7 @@ export function Home({ session }: { session: any }) {
         ) : tab === "courses" && activeGroup ? (
           <CoursesLibrary user={user} activeGroupId={activeGroup.id} />
         ) : tab === "players" && activeGroup ? (
-          <PlayersTab activeGroupId={activeGroup.id} />
+          <PlayersTab user={user} activeGroupId={activeGroup.id} isGroupAdmin={activeGroup.role === "admin"} onChanged={loadGroups} />
         ) : tab === "groups" ? (
           <GroupsPanel user={user} groups={groups} activeGroupId={activeGroupId} onGroupsChanged={loadGroups} onActiveGroupChange={chooseGroup} />
         ) : tab === "profile" ? (

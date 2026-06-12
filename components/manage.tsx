@@ -37,22 +37,63 @@ function normalize(d: any): Course {
 }
 
 // ================= Shared Course Library =================
+type LibCourse = { id: string; name: string; location: string; user_id: string; data: Course; vetted?: boolean };
+
 export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroupId: string }) {
-  const [courses, setCourses] = useState<{ id: string; name: string; location: string; user_id: string; data: Course }[] | null>(null);
+  const [courses, setCourses] = useState<LibCourse[] | null>(null);
+  const [community, setCommunity] = useState<LibCourse[] | null>(null);
   const [editing, setEditing] = useState<null | "new" | { id: string; data: Course; user_id: string }>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showCommunity, setShowCommunity] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    // This group's own courses.
     const { data } = await supabase.from("favorite_courses").select("*").eq("group_id", activeGroupId).order("name");
     const list = (data || [])
       .filter((f: any) => !f.deleted)
-      .map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", user_id: f.user_id, data: normalize(f.data) }));
+      .map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", user_id: f.user_id, data: normalize(f.data), vetted: !!f.vetted }));
     list.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
     setCourses(list);
+
+    // Community (vetted) courses from across all groups — available for anyone to add.
+    const { data: vet } = await supabase.from("favorite_courses").select("*").eq("vetted", true).order("name");
+    const vlist = (vet || [])
+      .filter((f: any) => !f.deleted)
+      .map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", user_id: f.user_id, data: normalize(f.data), vetted: true }));
+    // De-dupe by name (a group may have its own copy already).
+    const seen = new Set<string>();
+    const vded = vlist.filter((c: LibCourse) => { const k = c.name.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+    vded.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    setCommunity(vded);
+
     const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).maybeSingle();
     setIsAdmin(!!prof?.is_admin);
   }, [user.id, activeGroupId]);
   useEffect(() => { load(); }, [load]);
+
+  // App-admin toggles whether a course is part of the shared community library.
+  const toggleVetted = async (c: LibCourse) => {
+    setBusyId(c.id); setMsg(null);
+    await supabase.from("favorite_courses").update({ vetted: !c.vetted }).eq("id", c.id);
+    setBusyId(null);
+    await load();
+  };
+
+  // Any member can copy a vetted community course into their own group's library.
+  const addToMyGroup = async (c: LibCourse) => {
+    setBusyId(c.id); setMsg(null);
+    const already = (courses || []).some((x) => x.name.toLowerCase() === c.name.toLowerCase());
+    if (already) { setMsg(`"${c.name}" is already in your group's library.`); setBusyId(null); return; }
+    const { error } = await supabase.from("favorite_courses").insert({
+      name: c.name, location: c.location, data: c.data, group_id: activeGroupId, user_id: user.id, vetted: false,
+    });
+    setBusyId(null);
+    if (error) { setMsg("Couldn't add: " + error.message); return; }
+    setMsg(`Added "${c.name}" to your group.`);
+    await load();
+  };
 
   // Soft-delete: archive the course (hidden from everyone) and notify admins so they can restore it.
   const remove = async (id: string, courseName: string) => {
@@ -85,31 +126,73 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
         <button style={btn(true)} onClick={() => setEditing("new")}>＋ Add course</button>
       </div>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
-        These courses are shared with everyone using the app. Anyone can add, edit, or delete a course. Deleting archives it (it's hidden, not erased) and notifies an admin, who can restore it if needed. Fixing a course here fixes it for the whole group.
+        Courses in your group's library. Anyone can add, edit, or delete a course (deleting archives it for an admin to restore).
+        {isAdmin ? " As an app admin, tap the ★ to mark a course as a vetted community course available to every group." : ""}
       </div>
+
+      {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
 
       {courses === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
       {courses?.length === 0 && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 24, marginTop: 14, color: C.sage, textAlign: "center" }}>
-          No courses yet. Add one — search the database or enter it from a scorecard.
+          No courses in this group yet. Add one, or browse the community courses below.
         </div>
       )}
-      {courses?.map((c) => {
-        return (
-          <div key={c.id} style={{ display: "flex", alignItems: "stretch", marginTop: 10, background: C.card, borderRadius: 12, overflow: "hidden" }}>
-            <button onClick={() => setEditing({ id: c.id, data: c.data, user_id: c.user_id })}
-              style={{ flex: 1, textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: "13px 16px" }}>
-              <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{c.name}</div>
-              <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
-                {c.location ? c.location + " · " : ""}{c.data.tees?.length || 0} tee{(c.data.tees?.length || 0) === 1 ? "" : "s"} · tap to edit
-              </div>
+      {courses?.map((c) => (
+        <div key={c.id} style={{ display: "flex", alignItems: "stretch", marginTop: 10, background: C.card, borderRadius: 12, overflow: "hidden" }}>
+          {isAdmin && (
+            <button title={c.vetted ? "Vetted community course — tap to unshare" : "Mark as vetted community course"}
+              onClick={() => toggleVetted(c)} disabled={busyId === c.id}
+              style={{ background: "none", border: "none", borderRight: `1px solid ${C.line}`, color: c.vetted ? C.gold : C.faint, fontSize: 18, cursor: "pointer", padding: "0 14px" }}>
+              {c.vetted ? "★" : "☆"}
             </button>
-            <button title="Delete course"
-              onClick={() => { if (confirm(`Delete "${c.name}" from the shared library?\n\nIt will be archived (not erased) and an admin can restore it.`)) remove(c.id, c.name); }}
-              style={{ background: "none", border: "none", borderLeft: `1px solid ${C.line}`, color: C.birdie, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>✕</button>
+          )}
+          <button onClick={() => setEditing({ id: c.id, data: c.data, user_id: c.user_id })}
+            style={{ flex: 1, textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: "13px 16px" }}>
+            <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{c.name}{c.vetted ? <span style={{ color: C.gold, fontSize: 12 }}> · community ★</span> : null}</div>
+            <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
+              {c.location ? c.location + " · " : ""}{c.data.tees?.length || 0} tee{(c.data.tees?.length || 0) === 1 ? "" : "s"} · tap to edit
+            </div>
+          </button>
+          <button title="Delete course"
+            onClick={() => { if (confirm(`Delete "${c.name}" from this group's library?\n\nIt will be archived (not erased) and an admin can restore it.`)) remove(c.id, c.name); }}
+            style={{ background: "none", border: "none", borderLeft: `1px solid ${C.line}`, color: C.birdie, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>✕</button>
+        </div>
+      ))}
+
+      {/* Community (vetted) courses anyone can add */}
+      <div style={{ marginTop: 24 }}>
+        <button onClick={() => setShowCommunity((v) => !v)}
+          style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 8 }}>
+          <Eyebrow>★ COMMUNITY COURSES{community ? ` (${community.length})` : ""}</Eyebrow>
+          <span style={{ color: C.sage, fontSize: 12 }}>{showCommunity ? "hide" : "browse"}</span>
+        </button>
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
+          Vetted courses shared by the whole community. Add any to your group's library with one tap — the whole community benefits as more get vetted.
+        </div>
+        {showCommunity && (
+          <div style={{ marginTop: 10 }}>
+            {community === null && <div style={{ color: C.sage }}>Loading…</div>}
+            {community?.length === 0 && <div style={{ color: C.faint, fontSize: 13 }}>No community courses have been vetted yet.</div>}
+            {community?.map((c) => {
+              const inGroup = (courses || []).some((x) => x.name.toLowerCase() === c.name.toLowerCase());
+              return (
+                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, background: C.card, borderRadius: 12, padding: "12px 16px", flexWrap: "wrap" }}>
+                  <div style={{ flex: 1, minWidth: 160 }}>
+                    <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{c.name}</div>
+                    <div style={{ color: C.faint, fontSize: 12 }}>{c.location ? c.location + " · " : ""}{c.data.tees?.length || 0} tee{(c.data.tees?.length || 0) === 1 ? "" : "s"}</div>
+                  </div>
+                  {inGroup ? (
+                    <span style={{ color: C.sage, fontSize: 12 }}>in your group ✓</span>
+                  ) : (
+                    <button style={{ ...btn(true), padding: "7px 12px", fontSize: 12, opacity: busyId === c.id ? 0.5 : 1 }} disabled={busyId === c.id} onClick={() => addToMyGroup(c)}>＋ Add to my group</button>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        );
-      })}
+        )}
+      </div>
     </div>
   );
 }
@@ -719,53 +802,112 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
 
 // ================= Players directory =================
 // Everyone can see who else has access: name, handicap (if set), and phone to reach them.
-export function PlayersTab({ activeGroupId }: { activeGroupId: string }) {
+export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { user: any; activeGroupId: string; isGroupAdmin: boolean; onChanged?: () => void }) {
   const [players, setPlayers] = useState<any[] | null>(null);
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const { data } = await supabase
-        .from("group_members")
-        .select("user_id, email, role, status")
-        .eq("group_id", activeGroupId)
-        .neq("status", "removed")
-        .order("email");
-      const rows = data || [];
-      const ids = rows.map((r: any) => r.user_id).filter(Boolean);
-      let profilesById: Record<string, any> = {};
-      if (ids.length) {
-        const { data: profs } = await supabase.from("profiles").select("id, display_name, handicap_index, phone, ghin_number").in("id", ids);
-        profilesById = Object.fromEntries((profs || []).map((p: any) => [p.id, p]));
-      }
-      setPlayers(rows.map((r: any) => ({ ...r, profiles: r.user_id ? profilesById[r.user_id] || null : null })));
-    })();
+  const load = useCallback(async () => {
+    const { data } = await supabase
+      .from("group_members")
+      .select("id, user_id, email, role, status")
+      .eq("group_id", activeGroupId)
+      .neq("status", "removed")
+      .order("role")
+      .order("email");
+    const rows = data || [];
+    const ids = rows.map((r: any) => r.user_id).filter(Boolean);
+    let profilesById: Record<string, any> = {};
+    if (ids.length) {
+      const { data: profs } = await supabase.from("profiles").select("id, display_name, handicap_index, phone, ghin_number").in("id", ids);
+      profilesById = Object.fromEntries((profs || []).map((p: any) => [p.id, p]));
+    }
+    setPlayers(rows.map((r: any) => ({ ...r, profiles: r.user_id ? profilesById[r.user_id] || null : null })));
   }, [activeGroupId]);
+  useEffect(() => { load(); }, [load]);
+
+  // Group admin: set a member's handicap index (updates their profile; notifies them).
+  const saveHandicap = async (row: any) => {
+    const raw = edits[row.id];
+    if (raw === undefined || !row.user_id) return;
+    const idx = raw.trim() === "" ? null : parseFloat(raw);
+    setBusyId(row.id); setMsg(null);
+    const { error } = await supabase.from("profiles").update({ handicap_index: idx }).eq("id", row.user_id);
+    if (error) { setMsg("Couldn't update handicap: " + error.message); setBusyId(null); return; }
+    if (row.user_id !== user.id) await notify(row.user_id, `Your handicap index was set to ${idx ?? "—"} by a group admin.`);
+    setBusyId(null);
+    await load();
+    setMsg("Handicap updated.");
+  };
+
+  // Group admin: promote/demote within the group.
+  const toggleRole = async (row: any) => {
+    setBusyId(row.id); setMsg(null);
+    await supabase.from("group_members").update({ role: row.role === "admin" ? "member" : "admin" }).eq("id", row.id);
+    setBusyId(null);
+    await load(); onChanged?.();
+  };
+
+  // Group admin: remove a member from THIS group (does not delete their account or other groups).
+  const removeFromGroup = async (row: any) => {
+    if (!confirm(`Remove ${row.profiles?.display_name || row.email} from this group?\n\nThis only affects this group — their account and other groups are untouched.`)) return;
+    setBusyId(row.id); setMsg(null);
+    await supabase.from("group_members").update({ status: "removed" }).eq("id", row.id);
+    if (row.user_id && row.user_id !== user.id) await notify(row.user_id, `You were removed from a group by an admin.`);
+    setBusyId(null);
+    await load(); onChanged?.();
+  };
 
   return (
     <div>
       <Eyebrow>PLAYERS · CURRENT GROUP</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
         Members and invited players in the selected group. Tap a phone number to call or text.
+        {isGroupAdmin ? " As a group admin you can set handicaps, change roles, and remove players from this group." : ""}
       </div>
+      {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
       {players === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
       {players?.length === 0 && <div style={{ color: C.sage, marginTop: 14 }}>No players yet.</div>}
-      {players?.map((row: any, i) => {
+      {players?.map((row: any) => {
         const p = row.profiles || {};
+        const self = row.user_id === user.id;
         return (
-          <div key={i} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 10, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-            <div style={{ flex: 1, minWidth: 150 }}>
-              <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{p.display_name || row.email}</div>
-              <div style={{ color: C.faint, fontSize: 12 }}>
-                {p.handicap_index != null ? `Handicap ${p.handicap_index}` : row.status === "invited" ? "Invited" : "No handicap set"}
-                {p.ghin_number ? ` · GHIN ${p.ghin_number}` : ""}{row.role === "admin" ? " · admin" : ""}
+          <div key={row.id} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 150 }}>
+                <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{p.display_name || row.email}{self ? " (you)" : ""}{row.role === "admin" ? " · admin" : ""}</div>
+                <div style={{ color: C.faint, fontSize: 12 }}>
+                  {p.handicap_index != null ? `Handicap ${p.handicap_index}` : row.status === "invited" ? "Invited" : "No handicap set"}
+                  {p.ghin_number ? ` · GHIN ${p.ghin_number}` : ""}
+                </div>
               </div>
+              {p.phone ? (
+                <a href={`tel:${p.phone}`} style={{ color: C.green, fontWeight: 700, fontSize: 14, textDecoration: "none", background: C.cream, borderRadius: 8, padding: "8px 12px" }}>{p.phone}</a>
+              ) : (
+                <span style={{ color: C.faint, fontSize: 12 }}>{row.email}</span>
+              )}
             </div>
-            {p.phone ? (
-              <a href={`tel:${p.phone}`} style={{ color: C.green, fontWeight: 700, fontSize: 14, textDecoration: "none", background: C.cream, borderRadius: 8, padding: "8px 12px" }}>
-                {p.phone}
-              </a>
-            ) : (
-              <span style={{ color: C.faint, fontSize: 12 }}>{row.email}</span>
+
+            {isGroupAdmin && row.user_id && (
+              <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "flex-end", flexWrap: "wrap", borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
+                <div>
+                  <label style={{ color: C.sage, fontSize: 10 }}>Handicap index</label>
+                  <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
+                    <input inputMode="decimal" defaultValue={p.handicap_index != null ? String(p.handicap_index) : ""}
+                      onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setEdits((m) => ({ ...m, [row.id]: v })); }}
+                      style={{ ...inputStyle, padding: "6px 8px", width: 78, textAlign: "center" }} />
+                    <button style={{ ...btn(true), padding: "6px 10px", fontSize: 12, opacity: busyId === row.id ? 0.5 : 1 }} disabled={busyId === row.id} onClick={() => saveHandicap(row)}>Set</button>
+                  </div>
+                </div>
+                <div style={{ flex: 1 }} />
+                {!self && (
+                  <>
+                    <button style={{ ...btn(false), padding: "7px 10px", fontSize: 12 }} disabled={busyId === row.id} onClick={() => toggleRole(row)}>{row.role === "admin" ? "Make member" : "Make admin"}</button>
+                    <button style={{ ...btn(false), padding: "7px 10px", fontSize: 12, color: C.birdie }} disabled={busyId === row.id} onClick={() => removeFromGroup(row)}>Remove</button>
+                  </>
+                )}
+              </div>
             )}
           </div>
         );
