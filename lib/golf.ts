@@ -5,7 +5,16 @@ export const C = {
   cream: "#F7F3E8", card: "#FFFDF6", ink: "#26251F",
   faint: "#8B8775", line: "#D8D2BE",
   birdie: "#B83A2E", bogey: "#2E5AB8", gold: "#C9A227", sage: "#A9C4B5",
+  dot: "#E8730C", parBlue: "#1E3A8A",
 };
+
+// Color for a hole's Stableford points: >2 green, =2 blue, <2 red, none faint.
+export function ptsColor(pts: number | null): string {
+  if (pts == null) return C.faint;
+  if (pts > 2) return "#1A7A3C";
+  if (pts === 2) return C.bogey;
+  return C.birdie;
+}
 
 export type Hole = {
   hole_number: number;

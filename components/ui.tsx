@@ -2,7 +2,7 @@
 
 import React from "react";
 import {
-  C, Hole, Round, stablefordPts,
+  C, Hole, Round, stablefordPts, ptsColor,
 } from "@/lib/golf";
 
 export const btn = (primary?: boolean): React.CSSProperties => ({
@@ -217,9 +217,9 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           const pts = stablefordPts(h.strokes, h.par, h.recv || 0);
           return Row([
             <div key="h" style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.n}</div>,
-            <div key="p" style={{ textAlign: "center", color: C.sage, fontSize: 14 }}>{h.par}</div>,
+            <div key="p" style={{ textAlign: "center", color: C.parBlue, fontWeight: 700, fontSize: 14 }}>{h.par}</div>,
             <div key="si" style={{ textAlign: "center", color: C.faint, fontSize: 12 }}>{h.si ?? "–"}</div>,
-            ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: C.gold, fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>{h.recv > 0 ? "•".repeat(Math.min(h.recv, 3)) : ""}</div>] : []),
+            ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: C.dot, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{h.recv > 0 ? "•".repeat(Math.min(h.recv, 3)) : ""}</div>] : []),
             <div key="sc" style={{ textAlign: "center" }}>
               <NumPicker value={h.strokes} from={1} to={maxStrokes} onChange={(v) => onSet(i, { strokes: v })} width={48} accent={savingHole === i} />
             </div>,
@@ -243,7 +243,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
                 <NumPicker value={h.penalties || null} from={1} to={3} onChange={(v) => onSet(i, { penalties: v ?? 0 })} width={44} />
               </div>,
             ] : []),
-            <div key="pt" style={{ textAlign: "center", color: C.green, fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
+            <div key="pt" style={{ textAlign: "center", color: ptsColor(pts), fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
           ]);
         })}
         {Row([
@@ -345,14 +345,14 @@ export function ScoreViewCard({ round }: { round: Round }) {
           const pts = stablefordPts(h.strokes, h.par, h.recv || 0);
           return Row([
             <div key="h" style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.hole_number}</div>,
-            <div key="p" style={{ textAlign: "center", color: C.sage, fontSize: 14 }}>{h.par}</div>,
+            <div key="p" style={{ textAlign: "center", color: C.parBlue, fontWeight: 700, fontSize: 14 }}>{h.par}</div>,
             <div key="si" style={{ textAlign: "center", color: C.faint, fontSize: 12 }}>{h.stroke_index ?? "–"}</div>,
-            ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: C.gold, fontWeight: 700, fontSize: 13, letterSpacing: 1 }}>{recv > 0 ? "•".repeat(Math.min(recv, 3)) : ""}</div>] : []),
+            ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: C.dot, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{recv > 0 ? "•".repeat(Math.min(recv, 3)) : ""}</div>] : []),
             <div key="sc" style={{ textAlign: "center" }}><ScoreMark hole={h} /></div>,
             ...(hasFw ? [<div key="fw" style={{ textAlign: "center", fontWeight: 800, fontSize: 13, color: h.fairway === "hit" ? C.greenMid : h.fairway === "miss" ? C.birdie : C.faint }}>{h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "miss" ? "✗" : "·"}</div>] : []),
             ...(hasPutts ? [<div key="pu" style={{ textAlign: "center", color: C.faint, fontSize: 13 }}>{h.putts ?? "·"}</div>] : []),
             ...(hasPens ? [<div key="pe" style={{ textAlign: "center", color: (h.penalties || 0) > 0 ? C.birdie : C.faint, fontSize: 13 }}>{h.penalties || "·"}</div>] : []),
-            <div key="pt" style={{ textAlign: "center", color: C.green, fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
+            <div key="pt" style={{ textAlign: "center", color: ptsColor(pts), fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
           ]);
         })}
         {Row([
