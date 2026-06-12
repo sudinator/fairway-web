@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  ReferenceLine, BarChart, Bar, Cell,
+  ReferenceLine, BarChart, Bar, Cell, ComposedChart, PieChart, Pie, Legend,
 } from "recharts";
 import { createClient } from "@/lib/supabase";
 import {
@@ -786,6 +786,15 @@ function RoundDetail({ round, onBack, onEdit, onDelete }: {
 }
 
 // ---------------- Dashboard ----------------
+function Clk<T extends string>({ k, d, set, children }: { k: T; d: T | null; set: (v: T | null) => void; children: React.ReactNode }) {
+  return (
+    <div onClick={() => set(d === k ? null : k)}
+      style={{ cursor: "pointer", borderRadius: 12, outline: d === k ? `2px solid ${C.gold}` : "none", flex: "1 1 auto", display: "flex" }}>
+      {children}
+    </div>
+  );
+}
+
 function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
   rounds: Round[]; name: string; onOpen: (r: Round) => void;
   currentIndex: number | null; saveIndex: (i: number | null) => void;
@@ -809,13 +818,41 @@ function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
   const threePutts = threePuttsPerRound(done);
 
   const trend = sorted.map((r, i) => ({ i: i + 1, name: fmtDate(r.played_at), diff: diffOf(r), pts: ptsOf(r), course: r.course }));
+  const distTotal = buckets.eagle + buckets.birdie + buckets.par + buckets.bogey + buckets.double;
   const distData = [
     { name: "Eagle+", v: buckets.eagle, c: "#7A2E86" },
     { name: "Birdie", v: buckets.birdie, c: C.birdie },
     { name: "Par", v: buckets.par, c: C.greenMid },
     { name: "Bogey", v: buckets.bogey, c: C.bogey },
     { name: "Dbl+", v: buckets.double, c: "#6B6B6B" },
-  ];
+  ].map((d) => ({ ...d, label: `${d.name}: ${d.v} (${distTotal ? Math.round((100 * d.v) / distTotal) : 0}%)` }));
+
+  // Per-round value for each stat, for the click-to-expand drill-down.
+  type StatKey = "rounds" | "avgpar" | "best" | "diff" | "par3" | "par4" | "par5" | "pts" | "gir" | "fir" | "putts" | "threeputt" | "pen";
+  const [detail, setDetail] = useState<StatKey | null>(null);
+  const perRound = (key: StatKey, r: Round): string => {
+    const hs = played(r);
+    switch (key) {
+      case "rounds": return `${strokesOf(r)} (${toParStr(diffOf(r))})`;
+      case "avgpar": return toParStr(diffOf(r));
+      case "best": return toParStr(diffOf(r));
+      case "diff": { const d = roundDifferential(r); return d == null ? "— (needs 18 + rating/slope)" : d.toFixed(1); }
+      case "par3": { const a = hs.filter((h) => h.par === 3); return a.length ? (a.reduce((s, h) => s + (h.strokes || 0), 0) / a.length).toFixed(2) : "—"; }
+      case "par4": { const a = hs.filter((h) => h.par === 4); return a.length ? (a.reduce((s, h) => s + (h.strokes || 0), 0) / a.length).toFixed(2) : "—"; }
+      case "par5": { const a = hs.filter((h) => h.par === 5); return a.length ? (a.reduce((s, h) => s + (h.strokes || 0), 0) / a.length).toFixed(2) : "—"; }
+      case "pts": return `${ptsOf(r)} pts`;
+      case "gir": { const g = girStats([r]); return g.total ? `${g.hit}/${g.total} (${Math.round(100 * g.hit / g.total)}%)` : "— (needs putts)"; }
+      case "fir": { const f = firStats([r]); return f.total ? `${f.hit}/${f.total} (${Math.round(100 * f.hit / f.total)}%)` : "—"; }
+      case "putts": { const p = hs.filter((h) => h.putts != null); return p.length ? `${puttsOf(r)} (${(puttsOf(r) / p.length).toFixed(2)}/hole)` : "—"; }
+      case "threeputt": return `${hs.filter((h) => (h.putts || 0) >= 3).length}`;
+      case "pen": return `${pensOf(r)}`;
+    }
+  };
+  const detailLabels: Record<StatKey, string> = {
+    rounds: "Score", avgpar: "vs par", best: "vs par", diff: "Differential",
+    par3: "Avg par 3", par4: "Avg par 4", par5: "Avg par 5", pts: "Stableford",
+    gir: "GIR", fir: "Fairways", putts: "Putts", threeputt: "3+ putts", pen: "Penalties",
+  };
 
   return (
     <div>
@@ -827,6 +864,13 @@ function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
               ? `Need at least 3 full 18-hole rounds (with rating & slope). You have ${hcp.total}.`
               : `Best ${hcp.used} of your last ${Math.min(hcp.total, 20)} differentials · WHS method`}
           </div>
+          {hcp.index != null && hcp.usedDiffs.length > 0 && (
+            <div style={{ color: C.cream, fontSize: 12, marginTop: 6 }}>
+              Differential{hcp.usedDiffs.length > 1 ? "s" : ""} used: <b>{hcp.usedDiffs.map((d) => d.toFixed(1)).join(", ")}</b>
+              {hcp.adj !== 0 ? ` · adjustment ${hcp.adj > 0 ? "+" : ""}${hcp.adj.toFixed(1)}` : ""}
+              <span style={{ color: C.sage }}> (of {hcp.allDiffs.map((d) => d.toFixed(1)).join(", ")})</span>
+            </div>
+          )}
         </div>
         <div style={{ flex: 1 }} />
         <div style={{ textAlign: "right" }}>
@@ -846,62 +890,93 @@ function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
         </div>
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-        <StatCard label="Rounds" value={done.length} />
-        <StatCard label="Avg vs par" value={avgDiff == null ? "—" : (avgDiff >= 0 ? "+" : "") + avgDiff.toFixed(1)} />
-        <StatCard label="Best round" value={best == null ? "—" : toParStr(best)} />
-        <StatCard label="Avg differential" value={avgDifferential == null ? "—" : avgDifferential.toFixed(1)}
-          sub={diffs.length ? `${diffs.length} full round${diffs.length === 1 ? "" : "s"} w/ rating·slope` : "needs 18 holes + rating/slope"} />
+        <Clk k="rounds" d={detail} set={setDetail}><StatCard label="Rounds" value={done.length} /></Clk>
+        <Clk k="avgpar" d={detail} set={setDetail}><StatCard label="Avg vs par" value={avgDiff == null ? "—" : (avgDiff >= 0 ? "+" : "") + avgDiff.toFixed(1)} /></Clk>
+        <Clk k="best" d={detail} set={setDetail}><StatCard label="Best round" value={best == null ? "—" : toParStr(best)} /></Clk>
+        <Clk k="diff" d={detail} set={setDetail}><StatCard label="Avg differential" value={avgDifferential == null ? "—" : avgDifferential.toFixed(1)}
+          sub={diffs.length ? `${diffs.length} full round${diffs.length === 1 ? "" : "s"} w/ rating·slope` : "needs 18 holes + rating/slope"} /></Clk>
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
-        <StatCard label="Avg on par 3s" value={byPar.par3 == null ? "—" : byPar.par3.toFixed(2)} sub={byPar.par3 == null ? "" : (byPar.par3 - 3 >= 0 ? "+" : "") + (byPar.par3 - 3).toFixed(2) + " vs par"} />
-        <StatCard label="Avg on par 4s" value={byPar.par4 == null ? "—" : byPar.par4.toFixed(2)} sub={byPar.par4 == null ? "" : (byPar.par4 - 4 >= 0 ? "+" : "") + (byPar.par4 - 4).toFixed(2) + " vs par"} />
-        <StatCard label="Avg on par 5s" value={byPar.par5 == null ? "—" : byPar.par5.toFixed(2)} sub={byPar.par5 == null ? "" : (byPar.par5 - 5 >= 0 ? "+" : "") + (byPar.par5 - 5).toFixed(2) + " vs par"} />
-        <StatCard label="Stableford avg" value={avgPts == null ? "—" : avgPts.toFixed(1)} sub="full rounds" />
+        <Clk k="par3" d={detail} set={setDetail}><StatCard label="Avg on par 3s" value={byPar.par3 == null ? "—" : byPar.par3.toFixed(2)} sub={byPar.par3 == null ? "" : (byPar.par3 - 3 >= 0 ? "+" : "") + (byPar.par3 - 3).toFixed(2) + " vs par"} /></Clk>
+        <Clk k="par4" d={detail} set={setDetail}><StatCard label="Avg on par 4s" value={byPar.par4 == null ? "—" : byPar.par4.toFixed(2)} sub={byPar.par4 == null ? "" : (byPar.par4 - 4 >= 0 ? "+" : "") + (byPar.par4 - 4).toFixed(2) + " vs par"} /></Clk>
+        <Clk k="par5" d={detail} set={setDetail}><StatCard label="Avg on par 5s" value={byPar.par5 == null ? "—" : byPar.par5.toFixed(2)} sub={byPar.par5 == null ? "" : (byPar.par5 - 5 >= 0 ? "+" : "") + (byPar.par5 - 5).toFixed(2) + " vs par"} /></Clk>
+        <Clk k="pts" d={detail} set={setDetail}><StatCard label="Stableford avg" value={avgPts == null ? "—" : avgPts.toFixed(1)} sub="full rounds" /></Clk>
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
-        <StatCard label="GIR" value={fracPct(gir)} sub={gir.total ? "greens in regulation" : "needs putts"} />
-        <StatCard label="Fairways hit" value={fracPct(fir)} sub={fir.total ? "excludes par 3s" : "tap FW"} />
-        <StatCard label="Putts / hole" value={avgPutts == null ? "—" : avgPutts.toFixed(2)} />
-        <StatCard label="3+ putts / round" value={threePutts == null ? "—" : threePutts.toFixed(1)} sub="three-putt holes" />
-        <StatCard label="Penalties" value={done.length ? (pens / done.length).toFixed(1) : "—"} sub="per round" />
+        <Clk k="gir" d={detail} set={setDetail}><StatCard label="GIR" value={fracPct(gir)} sub={gir.total ? "greens in regulation" : "needs putts"} /></Clk>
+        <Clk k="fir" d={detail} set={setDetail}><StatCard label="Fairways hit" value={fracPct(fir)} sub={fir.total ? "excludes par 3s" : "tap FW"} /></Clk>
+        <Clk k="putts" d={detail} set={setDetail}><StatCard label="Putts / hole" value={avgPutts == null ? "—" : avgPutts.toFixed(2)} /></Clk>
+        <Clk k="threeputt" d={detail} set={setDetail}><StatCard label="3+ putts / round" value={threePutts == null ? "—" : threePutts.toFixed(1)} sub="three-putt holes" /></Clk>
+        <Clk k="pen" d={detail} set={setDetail}><StatCard label="Penalties" value={done.length ? (pens / done.length).toFixed(1) : "—"} sub="per round" /></Clk>
       </div>
+
+      {detail && (
+        <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <Eyebrow>{detailLabels[detail]} · BY ROUND</Eyebrow>
+            <div style={{ flex: 1 }} />
+            <button style={{ ...btn(false), fontSize: 12 }} onClick={() => setDetail(null)}>Close ✕</button>
+          </div>
+          {sorted.slice().reverse().map((r) => (
+            <div key={r.id} onClick={() => onOpen(r)} style={{ display: "flex", alignItems: "center", padding: "10px 4px", borderBottom: `1px solid ${C.greenMid}`, cursor: "pointer" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ color: C.cream, fontSize: 14, fontWeight: 600 }}>{r.course}</div>
+                <div style={{ color: C.sage, fontSize: 11 }}>{fmtDate(r.played_at)}</div>
+              </div>
+              <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700, fontSize: 15 }}>{perRound(detail, r)}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {trend.length >= 2 && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 16 }}>
           <Eyebrow>SCORING TREND</Eyebrow>
           <div style={{ height: 200, marginTop: 10 }}>
             <ResponsiveContainer>
-              <LineChart data={trend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+              <ComposedChart data={trend} margin={{ top: 5, right: 6, left: -20, bottom: 0 }}>
                 <XAxis dataKey="i" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} />
-                <YAxis tick={{ fill: C.sage, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis yAxisId="left" tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis yAxisId="right" orientation="right" tick={{ fill: C.gold, fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
                 <Tooltip
                   contentStyle={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12 }}
                   formatter={(v: any, k: any) => [k === "diff" ? toParStr(v) : v, k === "diff" ? "vs par" : "Stableford pts"]}
                   labelFormatter={(l: any, p: any) => (p && p[0] ? `${p[0].payload.course} · ${p[0].payload.name}` : l)} />
-                <ReferenceLine y={0} stroke={C.gold} strokeDasharray="4 4" />
-                <Line type="monotone" dataKey="diff" stroke={C.cream} strokeWidth={2} dot={{ fill: C.gold, r: 3 }} />
-                <Line type="monotone" dataKey="pts" stroke={C.gold} strokeWidth={1.5} strokeDasharray="5 3" dot={false} />
-              </LineChart>
+                <ReferenceLine yAxisId="left" y={0} stroke={C.cream} strokeDasharray="4 4" />
+                <Line yAxisId="left" type="monotone" dataKey="diff" stroke={C.cream} strokeWidth={2} dot={{ fill: C.cream, r: 3 }} />
+                <Line yAxisId="right" type="monotone" dataKey="pts" stroke={C.gold} strokeWidth={2} strokeDasharray="5 3" dot={{ fill: C.gold, r: 3 }} />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
-          <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Solid = strokes vs par (lower better) · Dashed = Stableford points (higher better)</div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Cream (left axis) = strokes vs par (lower better) · Gold (right axis) = Stableford points (higher better)</div>
         </div>
       )}
 
       {allHoles.length > 0 && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 16 }}>
           <Eyebrow>HOLE OUTCOMES · {allHoles.length} HOLES</Eyebrow>
-          <div style={{ height: 150, marginTop: 10 }}>
-            <ResponsiveContainer>
-              <BarChart data={distData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                <XAxis dataKey="name" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} />
-                <YAxis tick={{ fill: C.sage, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12 }} formatter={(v: any) => [v, "holes"]} />
-                <Bar dataKey="v" radius={[4, 4, 0, 0]}>
-                  {distData.map((d, i) => <Cell key={i} fill={d.c} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16, marginTop: 10 }}>
+            <div style={{ width: 200, height: 200 }}>
+              <ResponsiveContainer>
+                <PieChart>
+                  <Pie data={distData} dataKey="v" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={2}>
+                    {distData.map((d, i) => <Cell key={i} fill={d.c} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12 }}
+                    formatter={(v: any, n: any) => [`${v} holes (${distTotal ? Math.round(100 * v / distTotal) : 0}%)`, n]} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              {distData.map((d, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" }}>
+                  <span style={{ width: 12, height: 12, borderRadius: 3, background: d.c, display: "inline-block" }} />
+                  <span style={{ color: C.cream, fontSize: 13, flex: 1 }}>{d.name}</span>
+                  <span style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>{d.v}</span>
+                  <span style={{ color: C.sage, fontSize: 12, width: 44, textAlign: "right" }}>{distTotal ? Math.round(100 * d.v / distTotal) : 0}%</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

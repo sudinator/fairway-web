@@ -10,12 +10,9 @@ import { btn, inputStyle, Eyebrow, NumPicker, ScoreEntryCard } from "@/component
 
 const supabase = createClient();
 
-// A short, friendly join code (avoids ambiguous chars).
+// A 6-digit numeric join code (100000–999999).
 function makeCode() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let s = "";
-  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return s;
+  return String(Math.floor(100000 + Math.random() * 900000));
 }
 
 type Game = {
@@ -77,7 +74,7 @@ function GameList({ displayName, onOpen, onCreate }: { displayName: string; onOp
   useEffect(() => { load(); }, [load]);
 
   const join = async () => {
-    const c = code.trim().toUpperCase();
+    const c = code.trim();
     if (!c) return;
     setJoining(true); setJoinErr(null);
     try {
@@ -110,11 +107,11 @@ function GameList({ displayName, onOpen, onCreate }: { displayName: string; onOp
     <div>
       <div style={{ background: C.greenLight, borderRadius: 14, padding: 18 }}>
         <Eyebrow>JOIN A GAME</Eyebrow>
-        <div style={{ color: C.sage, fontSize: 13, marginTop: 8 }}>Enter the 6-character code a friend shared with you.</div>
+        <div style={{ color: C.sage, fontSize: 13, marginTop: 8 }}>Enter the 6-digit code a friend shared with you.</div>
         <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-          <input style={{ ...inputStyle, textTransform: "uppercase", letterSpacing: 3, fontWeight: 700 }}
-            value={code} placeholder="ABC123" maxLength={6}
-            onChange={(e) => setCode(e.target.value)}
+          <input style={{ ...inputStyle, letterSpacing: 3, fontWeight: 700 }}
+            value={code} placeholder="123456" maxLength={6} inputMode="numeric"
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
             onKeyDown={(e) => e.key === "Enter" && join()} />
           <button style={{ ...btn(true), whiteSpace: "nowrap", opacity: code.trim() ? 1 : 0.5 }} disabled={!code.trim() || joining} onClick={join}>
             {joining ? "Joining…" : "Join"}
@@ -516,8 +513,8 @@ function MyStatsLine({ me, holes }: { me: Player; holes: Hole[] }) {
   return (
     <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
       Your round: {totalPutts} putts{withPutts.length ? ` (${(totalPutts / withPutts.length).toFixed(1)}/hole)` : ""}
-      {" · "}GIR {withPutts.length ? Math.round((100 * girHit) / withPutts.length) + "%" : "—"}
-      {" · "}Fairways {fwHoles.length ? Math.round((100 * fwHit) / fwHoles.length) + "%" : "—"}
+      {" · "}GIR {withPutts.length ? `${girHit}/${withPutts.length} (${Math.round((100 * girHit) / withPutts.length)}%)` : "—"}
+      {" · "}Fairways {fwHoles.length ? `${fwHit}/${fwHoles.length} (${Math.round((100 * fwHit) / fwHoles.length)}%)` : "—"}
     </div>
   );
 }

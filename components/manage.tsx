@@ -44,7 +44,9 @@ export function CoursesLibrary({ user }: { user: any }) {
 
   const load = useCallback(async () => {
     const { data } = await supabase.from("favorite_courses").select("*").order("name");
-    setCourses((data || []).map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", user_id: f.user_id, data: normalize(f.data) })));
+    const list = (data || []).map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", user_id: f.user_id, data: normalize(f.data) }));
+    list.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    setCourses(list);
     const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).maybeSingle();
     setIsAdmin(!!prof?.is_admin);
   }, [user.id]);

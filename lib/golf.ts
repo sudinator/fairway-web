@@ -212,14 +212,14 @@ const WHS_TABLE: { upTo: number; best: number; adj: number }[] = [
 ];
 
 // rounds should be newest-first or any order; we sort by date inside.
-export function runningHandicap(rounds: Round[]): { index: number | null; used: number; total: number } {
+export function runningHandicap(rounds: Round[]): { index: number | null; used: number; total: number; usedDiffs: number[]; allDiffs: number[]; adj: number } {
   // Collect valid 18-hole differentials, most recent first.
   const withDiff = rounds
     .map((r) => ({ d: roundDifferential(r), date: r.played_at }))
     .filter((x): x is { d: number; date: string } => x.d != null)
     .sort((a, b) => +new Date(b.date) - +new Date(a.date));
   const total = withDiff.length;
-  if (total < 3) return { index: null, used: 0, total };
+  if (total < 3) return { index: null, used: 0, total, usedDiffs: [], allDiffs: withDiff.map((x) => x.d), adj: 0 };
 
   const recent = withDiff.slice(0, 20).map((x) => x.d);
   const row = WHS_TABLE.find((t) => recent.length <= t.upTo) || WHS_TABLE[WHS_TABLE.length - 1];
@@ -227,7 +227,7 @@ export function runningHandicap(rounds: Round[]): { index: number | null; used: 
   const avg = best.reduce((s, x) => s + x, 0) / best.length;
   // Index is rounded to one decimal; the table adjustment nudges small samples.
   const index = Math.round((avg + row.adj) * 10) / 10;
-  return { index, used: row.best, total };
+  return { index, used: row.best, total, usedDiffs: best, allDiffs: recent, adj: row.adj };
 }
 
 // Average number of three-or-more-putt holes per round (only counts rounds with putts recorded).
