@@ -17,6 +17,7 @@ function makeCode() {
 
 type Game = {
   id: string;
+  group_id?: string | null;
   code: string;
   name: string;
   course: string;
@@ -44,20 +45,20 @@ type Player = {
 };
 
 // ---------------- Root tournament tab ----------------
-export default function Tournaments({ session }: { session: any }) {
+export default function Tournaments({ session, activeGroupId }: { session: any; activeGroupId: string }) {
   const [view, setView] = useState<"list" | "create" | { gameId: string }>("list");
   const user = session.user;
   const displayName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Golfer";
 
   if (view === "create")
-    return <CreateGame displayName={displayName} onCancel={() => setView("list")} onCreated={(gameId) => setView({ gameId })} />;
+    return <CreateGame displayName={displayName} activeGroupId={activeGroupId} onCancel={() => setView("list")} onCreated={(gameId) => setView({ gameId })} />;
   if (typeof view === "object")
     return <GameRoom gameId={view.gameId} user={user} displayName={displayName} onBack={() => setView("list")} />;
-  return <GameList displayName={displayName} onOpen={(gameId) => setView({ gameId })} onCreate={() => setView("create")} />;
+  return <GameList displayName={displayName} activeGroupId={activeGroupId} onOpen={(gameId) => setView({ gameId })} onCreate={() => setView("create")} />;
 }
 
 // ---------------- List + join ----------------
-function GameList({ displayName, onOpen, onCreate }: { displayName: string; onOpen: (id: string) => void; onCreate: () => void }) {
+function GameList({ displayName, activeGroupId, onOpen, onCreate }: { displayName: string; activeGroupId: string; onOpen: (id: string) => void; onCreate: () => void }) {
   const [games, setGames] = useState<Game[] | null>(null);
   const [code, setCode] = useState("");
   const [joinErr, setJoinErr] = useState<string | null>(null);
@@ -68,9 +69,9 @@ function GameList({ displayName, onOpen, onCreate }: { displayName: string; onOp
     const { data: mine } = await supabase.from("game_players").select("game_id");
     const ids = (mine || []).map((m: any) => m.game_id);
     if (!ids.length) { setGames([]); return; }
-    const { data } = await supabase.from("games").select("*").in("id", ids).order("created_at", { ascending: false });
+    const { data } = await supabase.from("games").select("*").in("id", ids).eq("group_id", activeGroupId).order("created_at", { ascending: false });
     setGames(data || []);
-  }, []);
+  }, [activeGroupId]);
   useEffect(() => { load(); }, [load]);
 
   const join = async () => {
@@ -78,7 +79,7 @@ function GameList({ displayName, onOpen, onCreate }: { displayName: string; onOp
     if (!c) return;
     setJoining(true); setJoinErr(null);
     try {
-      const { data: game, error } = await supabase.from("games").select("*").eq("code", c).single();
+      const { data: game, error } = await supabase.from("games").select("*").eq("code", c).eq("group_id", activeGroupId).single();
       if (error || !game) throw new Error("No game found with that code.");
       const uid = (await supabase.auth.getUser()).data.user!.id;
       // Add me as a player if not already in.
@@ -144,7 +145,7 @@ function GameList({ displayName, onOpen, onCreate }: { displayName: string; onOp
 }
 
 // ---------------- Create a game ----------------
-function CreateGame({ displayName, onCancel, onCreated }: { displayName: string; onCancel: () => void; onCreated: (id: string) => void }) {
+function CreateGame({ displayName, activeGroupId, onCancel, onCreated }: { displayName: string; activeGroupId: string; onCancel: () => void; onCreated: (id: string) => void }) {
   const [name, setName] = useState("");
   const [favorites, setFavorites] = useState<any[]>([]);
   const [pickedFav, setPickedFav] = useState<any | null>(null);
@@ -155,7 +156,7 @@ function CreateGame({ displayName, onCancel, onCreated }: { displayName: string;
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.from("favorite_courses").select("*").order("name").then(({ data }) => {
+    supabase.from("favorite_courses").select("*").eq("group_id", activeGroupId).order("name").then(({ data }) => {
       if (data) setFavorites(data.map((f: any) => {
         const d = f.data || {};
         if ((!d.holes || !d.holes.length) && Array.isArray(d.tees)) {
@@ -165,7 +166,7 @@ function CreateGame({ displayName, onCancel, onCreated }: { displayName: string;
         return d;
       }));
     });
-  }, []);
+  }, [activeGroupId]);
 
   const tee = pickedFav?.tees?.[teeIdx];
   const coursePar = pickedFav ? pickedFav.holes.reduce((s: number, h: any) => s + (h.par || 0), 0) : null;
@@ -179,7 +180,7 @@ function CreateGame({ displayName, onCancel, onCreated }: { displayName: string;
       const code = makeCode();
       const holesMeta = pickedFav.holes.map((h: any) => ({ n: h.n, par: h.par, si: h.si }));
       const { data: game, error } = await supabase.from("games").insert({
-        code, name: name.trim() || (gameType === "match" ? "Match Play" : "Tournament"), course: pickedFav.name,
+        code, group_id: activeGroupId, name: name.trim() || (gameType === "match" ? "Match Play" : "Tournament"), course: pickedFav.name,
         course_par: coursePar, holes_meta: holesMeta, game_type: gameType, pairings: [],
       }).select().single();
       if (error || !game) throw error || new Error("Could not create game");
@@ -695,9 +696,17 @@ function OrganizerPanel({ game, players, user, onOverride, onAdd, onRemove, onRe
   useEffect(() => {
     if (!showAdd) return;
     (async () => {
-      const { data } = await supabase.from("profiles").select("id, display_name, handicap_index").order("display_name");
+      const { data } = await supabase
+        .from("group_members")
+        .select("user_id")
+        .eq("group_id", game.group_id)
+        .eq("status", "active");
+      const ids = (data || []).map((r: any) => r.user_id).filter(Boolean);
+      const { data: profs } = ids.length
+        ? await supabase.from("profiles").select("id, display_name, handicap_index").in("id", ids)
+        : { data: [] as any[] } as any;
       const inGame = new Set(players.map((p) => p.user_id));
-      setRoster((data || []).filter((p: any) => !inGame.has(p.id)));
+      setRoster((profs || []).filter((p: any) => !inGame.has(p.id)));
     })();
   }, [showAdd, players]);
 

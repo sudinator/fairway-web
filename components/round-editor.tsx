@@ -20,7 +20,9 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     if (round.holes.length > 0) return;
     (async () => {
       // Try to pull the real par/S.I. from the saved course library.
-      const { data: fav } = await supabase.from("favorite_courses").select("data").eq("name", round.course).maybeSingle();
+      let favQuery = supabase.from("favorite_courses").select("data").eq("name", round.course);
+      if (round.group_id) favQuery = favQuery.eq("group_id", round.group_id);
+      const { data: fav } = await favQuery.maybeSingle();
       const courseHoles = (fav?.data?.holes || []) as { n: number; par: number; si: number | null }[];
       const base = courseHoles.length >= 9
         ? courseHoles
@@ -55,13 +57,15 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     const siErr = validateStrokeIndexes(course.holes.map((h) => ({ n: h.n, si: h.si })));
     if (siErr) { setFavMsg("Can't save — " + siErr); return; }
     try {
-      const { data: existing } = await supabase.from("favorite_courses").select("id").eq("name", round.course).maybeSingle();
+      let existingQuery = supabase.from("favorite_courses").select("id").eq("name", round.course);
+      if (round.group_id) existingQuery = existingQuery.eq("group_id", round.group_id);
+      const { data: existing } = await existingQuery.maybeSingle();
       if (existing) {
         const { error } = await supabase.from("favorite_courses").update({ location: round.tee_name || "", data: course }).eq("id", existing.id);
         if (error) throw error;
         setFavMsg("Course library updated ★");
       } else {
-        const { error } = await supabase.from("favorite_courses").insert({ name: round.course, location: round.tee_name || "", data: course });
+        const { error } = await supabase.from("favorite_courses").insert({ group_id: round.group_id || null, name: round.course, location: round.tee_name || "", data: course });
         if (error) throw error;
         setFavMsg("Saved to course library ★");
       }
@@ -89,11 +93,13 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         if (eu) throw eu;
         await supabase.from("holes").delete().eq("round_id", roundId);
       } else {
+        const { data: u } = await supabase.auth.getUser();
         const { data: r, error: e1 } = await supabase.from("rounds").insert({
+          user_id: u.user!.id,
           course: round.course, tee_name: round.tee_name,
           rating: round.rating, slope: round.slope, course_par: round.course_par,
           handicap_index: round.handicap_index, course_handicap: round.course_handicap,
-          played_at: round.played_at,
+          played_at: round.played_at, group_id: round.group_id || null,
         }).select().single();
         if (e1 || !r) throw e1 || new Error("Could not save round");
         roundId = r.id;

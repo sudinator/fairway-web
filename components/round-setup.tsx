@@ -12,9 +12,11 @@ import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreVie
 
 const supabase = createClient();
 
-export function RoundSetup({ index, saveIndex, onReady, onCancel }: {
+export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, onReady, onCancel }: {
   index: number | null;
   saveIndex: (i: number | null) => void;
+  activeGroupId: string;
+  activeGroupName: string;
   onReady: (r: Round) => void;
   onCancel: () => void;
 }) {
@@ -48,7 +50,7 @@ export function RoundSetup({ index, saveIndex, onReady, onCancel }: {
 
   // Load this user's saved favorite courses (with their corrected data).
   const loadFavorites = async () => {
-    const { data } = await supabase.from("favorite_courses").select("*").order("name");
+    const { data } = await supabase.from("favorite_courses").select("*").eq("group_id", activeGroupId).order("name");
     if (!data) return;
     setFavorites(data.map((f: any) => {
       const d = f.data || {};
@@ -63,7 +65,7 @@ export function RoundSetup({ index, saveIndex, onReady, onCancel }: {
       return { id: f.id, name: f.name, location: f.location || "", data: d };
     }));
   };
-  useEffect(() => { loadFavorites(); }, []);
+  useEffect(() => { loadFavorites(); }, [activeGroupId]);
 
   // Save the currently-picked course; if one with the same name exists, update it instead of duplicating.
   const saveFavorite = async () => {
@@ -72,13 +74,13 @@ export function RoundSetup({ index, saveIndex, onReady, onCancel }: {
     if (siErr) { setFavMsg("Can't save — " + siErr + " Fix it in the override panel or Courses tab."); return; }
     setFavSaving(true); setFavMsg(null);
     try {
-      const { data: existing } = await supabase.from("favorite_courses").select("id").eq("name", picked.name).maybeSingle();
+      const { data: existing } = await supabase.from("favorite_courses").select("id").eq("group_id", activeGroupId).eq("name", picked.name).maybeSingle();
       if (existing) {
         const { error } = await supabase.from("favorite_courses").update({ location: picked.location, data: picked }).eq("id", existing.id);
         if (error) throw error;
         setFavMsg("Updated in course library ★");
       } else {
-        const { error } = await supabase.from("favorite_courses").insert({ name: picked.name, location: picked.location, data: picked });
+        const { error } = await supabase.from("favorite_courses").insert({ group_id: activeGroupId, name: picked.name, location: picked.location, data: picked });
         if (error) throw error;
         setFavMsg("Saved to course library ★");
       }
@@ -97,7 +99,7 @@ export function RoundSetup({ index, saveIndex, onReady, onCancel }: {
     try {
       const { error } = await supabase.from("favorite_courses")
         .update({ name: picked.name, location: picked.location, data: picked })
-        .eq("id", loadedFavId);
+        .eq("id", loadedFavId).eq("group_id", activeGroupId);
       if (error) throw error;
       setFavMsg("Favorite updated ★");
       await loadFavorites();
@@ -111,7 +113,7 @@ export function RoundSetup({ index, saveIndex, onReady, onCancel }: {
   // Remove a favorite course.
   const deleteFavorite = async (id: string) => {
     try {
-      await supabase.from("favorite_courses").delete().eq("id", id);
+      await supabase.from("favorite_courses").delete().eq("id", id).eq("group_id", activeGroupId);
       if (loadedFavId === id) setLoadedFavId(null);
       await loadFavorites();
     } catch (e: any) {
@@ -216,7 +218,7 @@ export function RoundSetup({ index, saveIndex, onReady, onCancel }: {
       recv: alloc[h.n] || 0,
     }));
     onReady({
-      id: "", course: picked.name, tee_name: tee.name,
+      id: "", group_id: activeGroupId, group_name: activeGroupName, course: picked.name, tee_name: tee.name,
       rating: tee.rating, slope: tee.slope, course_par: coursePar,
       handicap_index: idxVal, course_handicap: realCH,
       played_at: playDate,
@@ -235,7 +237,7 @@ export function RoundSetup({ index, saveIndex, onReady, onCancel }: {
     const coursePar = picked.holes.reduce((s, h) => s + (h.par || 0), 0);
     const { data: u } = await supabase.auth.getUser();
     const { error } = await supabase.from("rounds").insert({
-      user_id: u.user!.id, course: picked.name, tee_name: tee.name,
+      user_id: u.user!.id, group_id: activeGroupId, course: picked.name, tee_name: tee.name,
       rating: tee.rating, slope: tee.slope, course_par: coursePar,
       handicap_index: idxVal, course_handicap: realCH,
       played_at: playDate, gross_score: g,
@@ -248,6 +250,7 @@ export function RoundSetup({ index, saveIndex, onReady, onCancel }: {
   return (
     <div style={{ maxWidth: 600 }}>
       <Eyebrow>NEW ROUND · STEP 1 OF 2</Eyebrow>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>Posting to group: <b style={{ color: C.gold }}>{activeGroupName}</b></div>
 
       {!picked && !showCustom && (
         <>

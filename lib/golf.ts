@@ -29,6 +29,8 @@ export type Hole = {
 
 export type Round = {
   id: string;
+  group_id?: string | null;
+  group_name?: string | null;
   course: string;
   tee_name: string | null;
   rating: number | null;

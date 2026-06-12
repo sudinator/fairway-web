@@ -37,13 +37,13 @@ function normalize(d: any): Course {
 }
 
 // ================= Shared Course Library =================
-export function CoursesLibrary({ user }: { user: any }) {
+export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroupId: string }) {
   const [courses, setCourses] = useState<{ id: string; name: string; location: string; user_id: string; data: Course }[] | null>(null);
   const [editing, setEditing] = useState<null | "new" | { id: string; data: Course; user_id: string }>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from("favorite_courses").select("*").order("name");
+    const { data } = await supabase.from("favorite_courses").select("*").eq("group_id", activeGroupId).order("name");
     const list = (data || [])
       .filter((f: any) => !f.deleted)
       .map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", user_id: f.user_id, data: normalize(f.data) }));
@@ -51,7 +51,7 @@ export function CoursesLibrary({ user }: { user: any }) {
     setCourses(list);
     const { data: prof } = await supabase.from("profiles").select("is_admin").eq("id", user.id).maybeSingle();
     setIsAdmin(!!prof?.is_admin);
-  }, [user.id]);
+  }, [user.id, activeGroupId]);
   useEffect(() => { load(); }, [load]);
 
   // Soft-delete: archive the course (hidden from everyone) and notify admins so they can restore it.
@@ -69,6 +69,7 @@ export function CoursesLibrary({ user }: { user: any }) {
 
   if (editing) {
     return <CourseEditor
+      activeGroupId={activeGroupId}
       initial={editing === "new" ? null : editing.data}
       existingId={editing === "new" ? null : editing.id}
       onCancel={() => setEditing(null)}
@@ -114,8 +115,8 @@ export function CoursesLibrary({ user }: { user: any }) {
 }
 
 // ================= Course editor (add/edit a library course) =================
-function CourseEditor({ initial, existingId, onCancel, onSaved }: {
-  initial: Course | null; existingId: string | null; onCancel: () => void; onSaved: () => void;
+function CourseEditor({ activeGroupId, initial, existingId, onCancel, onSaved }: {
+  activeGroupId: string; initial: Course | null; existingId: string | null; onCancel: () => void; onSaved: () => void;
 }) {
   const [mode, setMode] = useState<"choose" | "form">(initial ? "form" : "choose");
   const [course, setCourse] = useState<Course | null>(initial);
@@ -184,11 +185,11 @@ function CourseEditor({ initial, existingId, onCancel, onSaved }: {
   }
 
   if (!course) return null;
-  return <CourseForm course={course} setCourse={setCourse} existingId={existingId} saving={saving} setSaving={setSaving} err={err} setErr={setErr} onCancel={onCancel} onSaved={onSaved} />;
+  return <CourseForm activeGroupId={activeGroupId} course={course} setCourse={setCourse} existingId={existingId} saving={saving} setSaving={setSaving} err={err} setErr={setErr} onCancel={onCancel} onSaved={onSaved} />;
 }
 
-function CourseForm({ course, setCourse, existingId, saving, setSaving, err, setErr, onCancel, onSaved }: {
-  course: Course; setCourse: (c: Course) => void; existingId: string | null;
+function CourseForm({ activeGroupId, course, setCourse, existingId, saving, setSaving, err, setErr, onCancel, onSaved }: {
+  activeGroupId: string; course: Course; setCourse: (c: Course) => void; existingId: string | null;
   saving: boolean; setSaving: (b: boolean) => void; err: string | null; setErr: (s: string | null) => void;
   onCancel: () => void; onSaved: () => void;
 }) {
@@ -224,13 +225,13 @@ function CourseForm({ course, setCourse, existingId, saving, setSaving, err, set
     if (siErr) { setErr("Can't save — " + siErr); return; }
     setSaving(true); setErr(null);
     try {
-      const payload = { name: course.name.trim(), location: course.location || "", data: course };
+      const payload = { group_id: activeGroupId, name: course.name.trim(), location: course.location || "", data: course };
       if (existingId) {
         const { error } = await supabase.from("favorite_courses").update(payload).eq("id", existingId);
         if (error) throw error;
       } else {
         // Avoid duplicates: update a same-named course if one already exists.
-        const { data: dup } = await supabase.from("favorite_courses").select("id").eq("name", payload.name).maybeSingle();
+        const { data: dup } = await supabase.from("favorite_courses").select("id").eq("group_id", activeGroupId).eq("name", payload.name).maybeSingle();
         if (dup) {
           const { error } = await supabase.from("favorite_courses").update({ location: payload.location, data: payload.data }).eq("id", dup.id);
           if (error) throw error;
@@ -718,42 +719,57 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
 
 // ================= Players directory =================
 // Everyone can see who else has access: name, handicap (if set), and phone to reach them.
-export function PlayersTab() {
+export function PlayersTab({ activeGroupId }: { activeGroupId: string }) {
   const [players, setPlayers] = useState<any[] | null>(null);
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("profiles").select("display_name, handicap_index, phone, ghin_number").order("display_name");
-      setPlayers(data || []);
+      const { data } = await supabase
+        .from("group_members")
+        .select("user_id, email, role, status")
+        .eq("group_id", activeGroupId)
+        .neq("status", "removed")
+        .order("email");
+      const rows = data || [];
+      const ids = rows.map((r: any) => r.user_id).filter(Boolean);
+      let profilesById: Record<string, any> = {};
+      if (ids.length) {
+        const { data: profs } = await supabase.from("profiles").select("id, display_name, handicap_index, phone, ghin_number").in("id", ids);
+        profilesById = Object.fromEntries((profs || []).map((p: any) => [p.id, p]));
+      }
+      setPlayers(rows.map((r: any) => ({ ...r, profiles: r.user_id ? profilesById[r.user_id] || null : null })));
     })();
-  }, []);
+  }, [activeGroupId]);
 
   return (
     <div>
-      <Eyebrow>PLAYERS · WHO HAS ACCESS</Eyebrow>
+      <Eyebrow>PLAYERS · CURRENT GROUP</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
-        Everyone using the app. Tap a phone number to call or text.
+        Members and invited players in the selected group. Tap a phone number to call or text.
       </div>
       {players === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
       {players?.length === 0 && <div style={{ color: C.sage, marginTop: 14 }}>No players yet.</div>}
-      {players?.map((p, i) => (
-        <div key={i} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 10, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 150 }}>
-            <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{p.display_name || "Player"}</div>
-            <div style={{ color: C.faint, fontSize: 12 }}>
-              {p.handicap_index != null ? `Handicap ${p.handicap_index}` : "No handicap set"}
-              {p.ghin_number ? ` · GHIN ${p.ghin_number}` : ""}
+      {players?.map((row: any, i) => {
+        const p = row.profiles || {};
+        return (
+          <div key={i} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 10, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 150 }}>
+              <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{p.display_name || row.email}</div>
+              <div style={{ color: C.faint, fontSize: 12 }}>
+                {p.handicap_index != null ? `Handicap ${p.handicap_index}` : row.status === "invited" ? "Invited" : "No handicap set"}
+                {p.ghin_number ? ` · GHIN ${p.ghin_number}` : ""}{row.role === "admin" ? " · admin" : ""}
+              </div>
             </div>
+            {p.phone ? (
+              <a href={`tel:${p.phone}`} style={{ color: C.green, fontWeight: 700, fontSize: 14, textDecoration: "none", background: C.cream, borderRadius: 8, padding: "8px 12px" }}>
+                {p.phone}
+              </a>
+            ) : (
+              <span style={{ color: C.faint, fontSize: 12 }}>{row.email}</span>
+            )}
           </div>
-          {p.phone ? (
-            <a href={`tel:${p.phone}`} style={{ color: C.green, fontWeight: 700, fontSize: 14, textDecoration: "none", background: C.cream, borderRadius: 8, padding: "8px 12px" }}>
-              {p.phone}
-            </a>
-          ) : (
-            <span style={{ color: C.faint, fontSize: 12 }}>no phone</span>
-          )}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

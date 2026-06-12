@@ -21,7 +21,7 @@ export function RoundRow({ r, onOpen }: { r: Round; onOpen: (r: Round) => void }
       <div style={{ flex: 1, minWidth: 200 }}>
         <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{r.course}{r.tee_name ? ` · ${r.tee_name}` : ""}</div>
         <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
-          {fmtDate(r.played_at)} · {played(r).length}/{r.holes.length} holes · GIR {pct(girStats([r]))} · FW {pct(firStats([r]))} · {puttsOf(r)} putts{pensOf(r) ? ` · ${pensOf(r)} pen` : ""}
+          {r.group_name ? `${r.group_name} · ` : ""}{fmtDate(r.played_at)} · {played(r).length}/{r.holes.length} holes · GIR {pct(girStats([r]))} · FW {pct(firStats([r]))} · {puttsOf(r)} putts{pensOf(r) ? ` · ${pensOf(r)} pen` : ""}
         </div>
       </div>
       <div style={{ textAlign: "right" }}>
