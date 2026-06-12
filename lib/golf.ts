@@ -92,6 +92,42 @@ export const puttsOf = (r: Round) => played(r).reduce((s, h) => s + (h.putts || 
 export const pensOf = (r: Round) => played(r).reduce((s, h) => s + (h.penalties || 0), 0);
 export const ptsOf = (r: Round) =>
   played(r).reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
+
+// When a round has missing hole-by-hole scores, Stableford cannot be exact.
+// This estimate keeps dashboards useful:
+// - Gross-only rounds: estimate points from total gross score, par, and course handicap.
+//   A net-par round estimates to 36 points for 18 holes.
+// - Partial hole detail: use actual points for entered holes and assume net par
+//   (2 Stableford points) for unentered holes.
+export function estimatedStablefordPts(r: Round): number {
+  const entered = played(r);
+  const actual = ptsOf(r);
+  const totalHoles = r.holes?.length || (r.gross_score ? 18 : entered.length);
+
+  let ch = r.course_handicap;
+  if (ch == null && r.handicap_index != null && r.rating != null && r.slope != null && r.course_par != null) {
+    ch = courseHandicap(r.handicap_index, r.slope, r.rating, r.course_par);
+  }
+
+  if (isGrossOnly(r) && r.gross_score != null && r.course_par != null) {
+    const holesFactor = totalHoles > 0 ? totalHoles / 18 : 1;
+    const parForRound = r.course_par * holesFactor;
+    const chForRound = (ch ?? 0) * holesFactor;
+    const netToPar = r.gross_score - chForRound - parForRound;
+    return Math.max(0, Math.round(totalHoles * 2 - netToPar));
+  }
+
+  const missing = Math.max(0, totalHoles - entered.length);
+  return actual + missing * 2;
+}
+
+export function hasEstimatedStableford(r: Round): boolean {
+  const totalHoles = r.holes?.length || (r.gross_score ? 18 : played(r).length);
+  return isGrossOnly(r) || played(r).length < totalHoles;
+}
+
+export const stablefordDisplay = (r: Round) =>
+  hasEstimatedStableford(r) ? `${estimatedStablefordPts(r)} est pts` : `${ptsOf(r)} pts`;
 export const toParStr = (d: number) => (d === 0 ? "E" : d > 0 ? `+${d}` : `${d}`);
 export const fmtDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });

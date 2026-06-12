@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, isGrossOnly, hasHoleDetail,
-  girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound,
+  girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay,
 } from "@/lib/golf";
 import { buildCustomCourse, Course } from "@/lib/courses";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
@@ -874,106 +874,6 @@ function RoundDetail({ round, onBack, onEdit, onDelete }: {
   round: Round; onBack: () => void; onEdit: () => void; onDelete: () => void;
 }) {
   const gross = isGrossOnly(round);
-  const [ghinMsg, setGhinMsg] = useState<string | null>(null);
-  const [ghinPayload, setGhinPayload] = useState<string>("");
-  const [ghinRoundType, setGhinRoundType] = useState<"Away" | "Home" | "Competition">("Away");
-  const [ghinStartingHole, setGhinStartingHole] = useState(1);
-
-  const playedHoles = played(round).sort((a, b) => a.hole_number - b.hole_number);
-  const holeCount = playedHoles.length || (round.gross_score ? 18 : 0);
-
-  const ghinAutoFillData = () => {
-    const holes = playedHoles.map((h) => ({
-      hole: h.hole_number,
-      par: h.par,
-      score: h.strokes,
-      putts: h.putts,
-      penalties: h.penalties || 0,
-      fairway: h.par >= 4 ? (h.fairway || null) : null,
-      gir: h.strokes != null && h.putts != null ? (h.strokes - h.putts <= h.par - 2) : null,
-    }));
-
-    return {
-      source: "BirdieNumNum",
-      version: 1,
-      course: round.course,
-      tee: round.tee_name || "",
-      datePlayed: round.played_at?.slice(0, 10),
-      roundType: ghinRoundType,
-      startingHole: ghinStartingHole,
-      holesPlayed: holes.length,
-      rating: round.rating,
-      slope: round.slope,
-      coursePar: round.course_par,
-      totalScore: strokesOf(round),
-      grossOnly: gross,
-      scores: holes.map((h) => h.score),
-      putts: holes.map((h) => h.putts),
-      penalties: holes.map((h) => h.penalties),
-      fairways: holes.map((h) => h.fairway),
-      gir: holes.map((h) => h.gir),
-      holes,
-      notes: "On GHIN: pick this course, choose the matching tee, set round type and starting hole, open hole-by-hole entry, turn Advanced Stats on, then paste/use this data with the BirdieNumNum GHIN AutoFill bookmarklet.",
-    };
-  };
-
-  const ghinHumanSummary = () => {
-    const data = ghinAutoFillData();
-    const holeLines = playedHoles.length
-      ? playedHoles.map((h) => {
-          const parts = [
-            `Hole ${h.hole_number}: ${h.strokes ?? "-"}`,
-            `par ${h.par}`,
-          ];
-          if (h.putts != null) parts.push(`${h.putts} putts`);
-          if (h.fairway) parts.push(`FW ${h.fairway}`);
-          if ((h.penalties || 0) > 0) parts.push(`${h.penalties} pen`);
-          return parts.join(" · ");
-        }).join("\n")
-      : "No hole-by-hole detail saved — post this as a total score in GHIN.";
-
-    return [
-      "GHIN score posting details",
-      `Course: ${data.course}`,
-      `Tee: ${data.tee || "Not specified"}`,
-      `Date played: ${data.datePlayed}`,
-      `Round type: ${data.roundType}`,
-      `Starting hole: ${data.startingHole}`,
-      `Total score: ${data.totalScore} (${toParStr(diffOf(round))})`,
-      `Course par: ${data.coursePar ?? "Not specified"}`,
-      `Rating/Slope: ${data.rating ?? "?"}/${data.slope ?? "?"}`,
-      "",
-      "Hole scores:",
-      holeLines,
-    ].join("\n");
-  };
-
-  const copyGhinAutoFillData = async () => {
-    const json = JSON.stringify(ghinAutoFillData(), null, 2);
-    setGhinPayload(json);
-    try {
-      await navigator.clipboard?.writeText(json);
-      setGhinMsg("Copied GHIN Auto-Fill JSON. Open GHIN, get to the hole-by-hole score screen, turn Advanced Stats ON, then run the BirdieNumNum GHIN AutoFill bookmarklet and paste this JSON.");
-    } catch {
-      setGhinMsg("Could not copy automatically. Use the JSON box below, copy it manually, then paste it into the GHIN AutoFill bookmarklet.");
-    }
-  };
-
-  const copyGhinSummary = async () => {
-    const summary = ghinHumanSummary();
-    try {
-      await navigator.clipboard?.writeText(summary);
-      setGhinMsg("Copied a human-readable GHIN posting summary.");
-    } catch {
-      setGhinMsg("Could not copy automatically. Use the details shown on this page.");
-    }
-  };
-
-  const openGhin = async () => {
-    await copyGhinAutoFillData();
-    window.open("https://www.ghin.com/post-score/hole-by-hole/select-course", "_blank", "noopener,noreferrer");
-  };
-
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -984,50 +884,15 @@ function RoundDetail({ round, onBack, onEdit, onDelete }: {
           </div>
           <div style={{ color: C.sage, fontSize: 13 }}>
             {fmtDate(round.played_at)} · {strokesOf(round)} ({toParStr(diffOf(round))})
-            {gross ? " · total score only" : ` · ${ptsOf(round)} pts${round.course_handicap != null ? ` · CH ${round.course_handicap}` : ""} · GIR ${fracPct(girStats([round]))} · FW ${fracPct(firStats([round]))} · ${puttsOf(round)} putts · ${pensOf(round)} pen`}
+            {gross ? ` · ${stablefordDisplay(round)} · total score only${round.course_handicap != null ? ` · CH ${round.course_handicap}` : ""}` : ` · ${stablefordDisplay(round)}${round.course_handicap != null ? ` · CH ${round.course_handicap}` : ""} · GIR ${fracPct(girStats([round]))} · FW ${fracPct(firStats([round]))} · ${puttsOf(round)} putts · ${pensOf(round)} pen`}
           </div>
         </div>
         <div style={{ flex: 1 }} />
+        <button style={btn(true)} onClick={onEdit}>Edit round</button>
         <button style={{ ...btn(false), background: "#7A2F28" }}
           onClick={() => { if (confirm("Delete this round?")) onDelete(); }}>Delete</button>
       </div>
 
-      <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 14 }}>
-        <Eyebrow>GHIN AUTO-FILL HANDOFF</Eyebrow>
-        <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
-          This copies a structured score package for GHIN. In GHIN, select the matching course and tee, open the hole-by-hole score entry screen, turn Advanced Stats ON, then paste this package into the BirdieNumNum GHIN AutoFill bookmarklet.
-        </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end", marginTop: 12 }}>
-          <div style={{ minWidth: 150 }}>
-            <label style={{ color: C.sage, fontSize: 12 }}>Round type</label>
-            <select value={ghinRoundType} onChange={(e) => setGhinRoundType(e.target.value as any)} style={{ ...inputStyle, marginTop: 4 }}>
-              <option value="Away">Away</option>
-              <option value="Home">Home</option>
-              <option value="Competition">Competition</option>
-            </select>
-          </div>
-          <div style={{ minWidth: 140 }}>
-            <label style={{ color: C.sage, fontSize: 12 }}>Starting hole</label>
-            <select value={ghinStartingHole} onChange={(e) => setGhinStartingHole(parseInt(e.target.value, 10))} style={{ ...inputStyle, marginTop: 4 }}>
-              {Array.from({ length: 18 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </div>
-          <button style={btn(true)} onClick={openGhin}>Copy Auto-Fill Data + Open GHIN</button>
-          <button style={btn(false)} onClick={copyGhinAutoFillData}>Copy Auto-Fill Data</button>
-          <button style={btn(false)} onClick={copyGhinSummary}>Copy readable summary</button>
-        </div>
-        <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>
-          Included: {holeCount || "—"} hole scores, putts, penalties, GIR, and fairway hit/miss where available. GHIN may still ask you to confirm the course/tee match before final submission.
-        </div>
-        {ghinMsg && (
-          <div style={{ background: C.green, borderRadius: 10, padding: "10px 12px", marginTop: 12, color: C.gold, fontSize: 12 }}>
-            {ghinMsg} <a href="https://www.ghin.com/post-score/hole-by-hole/select-course" target="_blank" rel="noreferrer" style={{ color: C.cream, fontWeight: 800 }}>Open GHIN</a>
-          </div>
-        )}
-        {ghinPayload && (
-          <textarea readOnly value={ghinPayload} style={{ ...inputStyle, minHeight: 180, marginTop: 12, fontFamily: "monospace", fontSize: 12 }} />
-        )}
-      </div>
 
       {gross ? (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 20, marginTop: 14 }}>
@@ -1036,7 +901,7 @@ function RoundDetail({ round, onBack, onEdit, onDelete }: {
             Total score · {toParStr(diffOf(round))} vs par{round.rating != null && round.slope != null ? ` · differential ${roundDifferential(round)?.toFixed(1) ?? "—"}` : ""}
           </div>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 12 }}>
-            This round was logged as a total only — it counts toward your handicap and scoring average. Add hole-by-hole detail to also get Stableford, GIR, putts, and par-type stats.
+            This round was logged as a total only — it counts toward your handicap and scoring average. Stableford is estimated from total score, par, and course handicap. Add hole-by-hole detail to get exact Stableford, GIR, putts, and par-type stats.
           </div>
           <button style={{ ...btn(true), marginTop: 12 }} onClick={onEdit}>＋ Add hole-by-hole detail</button>
         </div>
@@ -1070,8 +935,9 @@ function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
   const avgPutts = withPutts.length ? withPutts.reduce((s, h) => s + (h.putts || 0), 0) / withPutts.length : null;
   const gir = girStats(done), fir = firStats(done);
   const pens = done.reduce((s, r) => s + pensOf(r), 0);
-  const fulls = done.filter((r) => played(r).length >= 14);
-  const avgPts = fulls.length ? fulls.reduce((s, r) => s + ptsOf(r), 0) / fulls.length : null;
+  const fulls = done.filter((r) => played(r).length >= 14 || isGrossOnly(r));
+  const avgPts = fulls.length ? fulls.reduce((s, r) => s + estimatedStablefordPts(r), 0) / fulls.length : null;
+  const anyEstimatedPts = fulls.some(hasEstimatedStableford);
   const buckets = holeBuckets(done);
   const byPar = avgByPar(done);
   const diffs = done.map(roundDifferential).filter((d): d is number => d != null);
@@ -1079,7 +945,7 @@ function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
   const hcp = runningHandicap(done);
   const threePutts = threePuttsPerRound(done);
 
-  const trend = sorted.map((r, i) => ({ i: i + 1, name: fmtDate(r.played_at), diff: diffOf(r), pts: ptsOf(r), course: r.course }));
+  const trend = sorted.map((r, i) => ({ i: i + 1, name: fmtDate(r.played_at), diff: diffOf(r), pts: estimatedStablefordPts(r), course: r.course, estimated: hasEstimatedStableford(r) }));
   // Dynamic axis domains: fit the data range with a little padding, instead of anchoring at 0.
   const niceDomain = (vals: number[], pad: number): [number, number] => {
     if (vals.length === 0) return [0, 1];
@@ -1113,7 +979,7 @@ function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
       case "par3": { const a = hs.filter((h) => h.par === 3); return a.length ? (a.reduce((s, h) => s + (h.strokes || 0), 0) / a.length).toFixed(2) : "—"; }
       case "par4": { const a = hs.filter((h) => h.par === 4); return a.length ? (a.reduce((s, h) => s + (h.strokes || 0), 0) / a.length).toFixed(2) : "—"; }
       case "par5": { const a = hs.filter((h) => h.par === 5); return a.length ? (a.reduce((s, h) => s + (h.strokes || 0), 0) / a.length).toFixed(2) : "—"; }
-      case "pts": return `${ptsOf(r)} pts`;
+      case "pts": return stablefordDisplay(r);
       case "gir": { const g = girStats([r]); return g.total ? `${g.hit}/${g.total} (${Math.round(100 * g.hit / g.total)}%)` : "— (needs putts)"; }
       case "fir": { const f = firStats([r]); return f.total ? `${f.hit}/${f.total} (${Math.round(100 * f.hit / f.total)}%)` : "—"; }
       case "putts": { const p = hs.filter((h) => h.putts != null); return p.length ? `${puttsOf(r)} (${(puttsOf(r) / p.length).toFixed(2)}/hole)` : "—"; }
@@ -1173,7 +1039,7 @@ function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
         <Clk k="par3" d={detail} set={setDetail}><StatCard label="Avg on par 3s" value={byPar.par3 == null ? "—" : byPar.par3.toFixed(2)} sub={byPar.par3 == null ? "" : (byPar.par3 - 3 >= 0 ? "+" : "") + (byPar.par3 - 3).toFixed(2) + " vs par"} /></Clk>
         <Clk k="par4" d={detail} set={setDetail}><StatCard label="Avg on par 4s" value={byPar.par4 == null ? "—" : byPar.par4.toFixed(2)} sub={byPar.par4 == null ? "" : (byPar.par4 - 4 >= 0 ? "+" : "") + (byPar.par4 - 4).toFixed(2) + " vs par"} /></Clk>
         <Clk k="par5" d={detail} set={setDetail}><StatCard label="Avg on par 5s" value={byPar.par5 == null ? "—" : byPar.par5.toFixed(2)} sub={byPar.par5 == null ? "" : (byPar.par5 - 5 >= 0 ? "+" : "") + (byPar.par5 - 5).toFixed(2) + " vs par"} /></Clk>
-        <Clk k="pts" d={detail} set={setDetail}><StatCard label="Stableford avg" value={avgPts == null ? "—" : avgPts.toFixed(1)} sub="full rounds" /></Clk>
+        <Clk k="pts" d={detail} set={setDetail}><StatCard label="Stableford avg" value={avgPts == null ? "—" : avgPts.toFixed(1)} sub={anyEstimatedPts ? "includes estimates" : "full rounds"} /></Clk>
       </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
         <Clk k="gir" d={detail} set={setDetail}><StatCard label="GIR" value={fracPct(gir)} sub={gir.total ? "greens in regulation" : "needs putts"} /></Clk>
@@ -1297,7 +1163,7 @@ function RoundRow({ r, onOpen }: { r: Round; onOpen: (r: Round) => void }) {
         <span style={{ color: C.ink, fontSize: 20, fontWeight: 800, fontFamily: "Georgia, serif" }}>{strokesOf(r)}</span>
         <span style={{ color: C.green, fontWeight: 700, marginLeft: 8 }}>{toParStr(diffOf(r))}</span>
       </div>
-      <div style={{ background: C.cream, borderRadius: 8, padding: "4px 10px", color: C.green, fontWeight: 800, fontSize: 13 }}>{ptsOf(r)} pts</div>
+      <div style={{ background: C.cream, borderRadius: 8, padding: "4px 10px", color: C.green, fontWeight: 800, fontSize: 13 }}>{stablefordDisplay(r)}</div>
     </div>
   );
 }
