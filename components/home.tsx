@@ -46,21 +46,24 @@ export function Home({ session }: { session: any }) {
     await activateEmailInvites();
     const { data } = await supabase
       .from("group_members")
-      .select("group_id, role, status, groups(id, name)")
+      .select("group_id, role, status, groups(id, name, status)")
       .eq("user_id", user.id)
       .eq("status", "active")
       .order("created_at", { ascending: true });
 
-    let list: AppGroup[] = (data || []).map((m: any) => ({
-      id: m.groups?.id || m.group_id,
-      name: m.groups?.name || "Group",
-      role: m.role,
-      status: m.status,
-    })).filter((g: AppGroup) => !!g.id);
+    let list: AppGroup[] = (data || [])
+      // Hide groups still awaiting admin approval (legacy groups have no status → treated as active).
+      .filter((m: any) => (m.groups?.status ?? "active") === "active")
+      .map((m: any) => ({
+        id: m.groups?.id || m.group_id,
+        name: m.groups?.name || "Group",
+        role: m.role,
+        status: m.status,
+      })).filter((g: AppGroup) => !!g.id);
 
     if (!list.length) {
-      // Safety net for brand-new databases: create a Main group for the first signed-in user.
-      const { data: g } = await supabase.from("groups").insert({ name: "Main", created_by: user.id }).select("id, name").single();
+      // Safety net: every user gets one personal "Main" group (active, no approval needed).
+      const { data: g } = await supabase.from("groups").insert({ name: "Main", created_by: user.id, status: "active" }).select("id, name").single();
       if (g) {
         await supabase.from("group_members").insert({ group_id: g.id, user_id: user.id, email: (user.email || "").toLowerCase(), role: "admin", status: "active" });
         list = [{ id: g.id, name: g.name, role: "admin", status: "active" }];

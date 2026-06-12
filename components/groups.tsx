@@ -48,6 +48,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
   const isAdmin = active?.role === "admin";
   const [members, setMembers] = useState<Member[] | null>(null);
   const [newGroup, setNewGroup] = useState("");
+  const [newNote, setNewNote] = useState("");
   const [renameText, setRenameText] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
@@ -89,22 +90,26 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
     if (!name) return;
     setBusy(true); setMsg(null);
     try {
-      const { data: group, error } = await supabase.from("groups").insert({ name, created_by: user.id }).select("id, name").single();
-      if (error || !group) throw error || new Error("Could not create group");
+      // Members can't create groups directly — they submit a request the app admin approves.
+      const { data: group, error } = await supabase.from("groups")
+        .insert({ name, created_by: user.id, status: "pending", request_note: newNote.trim() || null })
+        .select("id, name").single();
+      if (error || !group) throw error || new Error("Could not submit request");
+      // Pre-add the requester as the group's admin (kept hidden until the group is approved).
       const { error: mErr } = await supabase.from("group_members").insert({
-        group_id: group.id,
-        user_id: user.id,
-        email: (user.email || "").toLowerCase(),
-        role: "admin",
-        status: "active",
+        group_id: group.id, user_id: user.id, email: (user.email || "").toLowerCase(), role: "admin", status: "active",
       });
       if (mErr) throw mErr;
-      setNewGroup("");
-      await onGroupsChanged();
-      onActiveGroupChange(group.id);
-      setMsg(`Created ${name}.`);
+      // Notify every app admin that a request is waiting.
+      const { data: admins } = await supabase.from("profiles").select("id").eq("is_admin", true);
+      for (const a of admins || []) {
+        try { await supabase.from("notifications").insert({ user_id: a.id, message: `New group request: "${name}" from ${user.email}. Approve or decline it in the admin panel.` }); } catch {}
+      }
+      await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "A member", action: "group_requested", summary: `Requested a new group "${name}"` });
+      setNewGroup(""); setNewNote("");
+      setMsg(`Request submitted for "${name}". An admin will review it — you'll be notified when it's approved.`);
     } catch (e: any) {
-      setMsg("Couldn't create group: " + (e.message || "error"));
+      setMsg("Couldn't submit request: " + (e.message || "error"));
     } finally { setBusy(false); }
   };
 
@@ -182,10 +187,14 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
       </div>
 
       <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 14 }}>
-        <Eyebrow>CREATE NEW GROUP</Eyebrow>
-        <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
-          <input style={{ ...inputStyle, maxWidth: 320 }} placeholder="e.g. Saturday Nassau" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} />
-          <button style={{ ...btn(true), opacity: newGroup.trim() && !busy ? 1 : 0.5 }} disabled={!newGroup.trim() || busy} onClick={createGroup}>Create group</button>
+        <Eyebrow>REQUEST A NEW GROUP</Eyebrow>
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
+          New groups are approved by an app admin. Fill in the name and a short note on what it's for — you'll be notified when it's approved.
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+          <input style={{ ...inputStyle, maxWidth: 360 }} placeholder="Group name (e.g. Saturday Nassau)" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} />
+          <input style={{ ...inputStyle, maxWidth: 360 }} placeholder="What's it for? (optional)" value={newNote} onChange={(e) => setNewNote(e.target.value)} />
+          <button style={{ ...btn(true), maxWidth: 200, opacity: newGroup.trim() && !busy ? 1 : 0.5 }} disabled={!newGroup.trim() || busy} onClick={createGroup}>Submit request</button>
         </div>
       </div>
 

@@ -508,14 +508,42 @@ function AdminPanel({ user }: { user: any }) {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [scoringFor, setScoringFor] = useState<any | null>(null);
   const [deletedCourses, setDeletedCourses] = useState<any[]>([]);
+  const [pendingGroups, setPendingGroups] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     const { data } = await supabase.from("profiles").select("*").order("last_active", { ascending: false });
     setProfiles(data || []);
     const { data: del } = await supabase.from("favorite_courses").select("*").eq("deleted", true).order("deleted_at", { ascending: false });
     setDeletedCourses(del || []);
+    const { data: reqs } = await supabase.from("groups").select("id, name, request_note, created_by, status").eq("status", "pending").order("created_at", { ascending: true });
+    // Attach requester info.
+    const reqList = reqs || [];
+    const reqIds = reqList.map((r: any) => r.created_by).filter(Boolean);
+    let byId: Record<string, any> = {};
+    if (reqIds.length) {
+      const { data: ps } = await supabase.from("profiles").select("id, display_name, email").in("id", reqIds);
+      byId = Object.fromEntries((ps || []).map((p: any) => [p.id, p]));
+    }
+    setPendingGroups(reqList.map((r: any) => ({ ...r, requester: byId[r.created_by] || null })));
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  // Approve a pending group request → it becomes active and appears for its members.
+  const approveGroup = async (g: any) => {
+    await supabase.from("groups").update({ status: "active" }).eq("id", g.id);
+    if (g.created_by) await notify(g.created_by, `Your group "${g.name}" was approved. It's now active.`);
+    await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "group_approved", group_id: g.id, summary: `Approved the group "${g.name}"` });
+    await load();
+  };
+
+  // Decline a request → mark declined (kept for the record) and notify the requester.
+  const declineGroup = async (g: any) => {
+    if (!confirm(`Decline the group request "${g.name}"?`)) return;
+    await supabase.from("groups").update({ status: "declined" }).eq("id", g.id);
+    if (g.created_by) await notify(g.created_by, `Your group request "${g.name}" was declined.`);
+    await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "group_declined", summary: `Declined the group request "${g.name}"` });
+    await load();
+  };
 
   const restoreCourse = async (c: any) => {
     await supabase.from("favorite_courses").update({ deleted: false, deleted_by: null, deleted_at: null }).eq("id", c.id);
@@ -589,6 +617,28 @@ function AdminPanel({ user }: { user: any }) {
           <button style={{ ...btn(false), padding: "6px 12px", fontSize: 12 }} onClick={() => setScoringFor(p)}>Edit scores</button>
         </div>
       ))}
+
+      <div style={{ marginTop: 20 }}>
+        <Eyebrow>★ GROUP REQUESTS{pendingGroups.length ? ` (${pendingGroups.length})` : ""}</Eyebrow>
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
+          New groups need your approval. Approve to make a group active for its members, or decline the request.
+        </div>
+        {pendingGroups.length === 0 && (
+          <div style={{ background: C.greenLight, borderRadius: 12, padding: 16, marginTop: 8, color: C.sage }}>No pending requests.</div>
+        )}
+        {pendingGroups.map((g) => (
+          <div key={g.id} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 180 }}>
+              <div style={{ color: C.ink, fontWeight: 700 }}>{g.name}</div>
+              <div style={{ color: C.faint, fontSize: 12 }}>
+                from {g.requester?.display_name || g.requester?.email || "a member"}{g.request_note ? ` · "${g.request_note}"` : ""}
+              </div>
+            </div>
+            <button style={{ ...btn(true), padding: "7px 12px", fontSize: 12 }} onClick={() => approveGroup(g)}>Approve</button>
+            <button style={{ ...btn(false), padding: "7px 12px", fontSize: 12, color: C.birdie }} onClick={() => declineGroup(g)}>Decline</button>
+          </div>
+        ))}
+      </div>
 
       <div style={{ marginTop: 24 }}>
         <Eyebrow>★ DELETED COURSES</Eyebrow>
