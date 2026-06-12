@@ -277,6 +277,7 @@ function GameRoom({ gameId, user, displayName, onBack }: { gameId: string; user:
   const [savingHole, setSavingHole] = useState<number | null>(null);
   // join-setup if I'm in the game but haven't set my tee/handicap
   const [needsSetup, setNeedsSetup] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState("");
 
@@ -441,10 +442,12 @@ function GameRoom({ gameId, user, displayName, onBack }: { gameId: string; user:
           <div style={{ color: C.sage, fontSize: 13 }}>{game.course}</div>
         </div>
         <div style={{ flex: 1 }} />
-        <div style={{ background: C.greenLight, borderRadius: 10, padding: "8px 14px", textAlign: "center" }}>
-          <div style={{ color: C.sage, fontSize: 10, letterSpacing: 2 }}>SHARE CODE</div>
+        <button onClick={() => { navigator.clipboard?.writeText(game.code).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {}); }}
+          title="Tap to copy"
+          style={{ background: C.greenLight, border: "none", borderRadius: 10, padding: "8px 14px", textAlign: "center", cursor: "pointer" }}>
+          <div style={{ color: C.sage, fontSize: 10, letterSpacing: 2 }}>{copied ? "COPIED ✓" : "SHARE CODE · TAP TO COPY"}</div>
           <div style={{ color: C.gold, fontWeight: 800, fontSize: 20, letterSpacing: 3 }}>{game.code}</div>
-        </div>
+        </button>
         <button style={btn(false)} onClick={load}>⟳ Refresh</button>
       </div>
 

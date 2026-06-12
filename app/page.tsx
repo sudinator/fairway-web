@@ -8,13 +8,13 @@ import {
 import { createClient } from "@/lib/supabase";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
-  played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate,
+  played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, isGrossOnly, hasHoleDetail,
   girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound,
 } from "@/lib/golf";
 import { buildCustomCourse, Course } from "@/lib/courses";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard } from "@/components/ui";
 import Tournaments from "@/components/tournaments";
-import { CoursesLibrary, ProfilePanel, NotificationBell } from "@/components/manage";
+import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab } from "@/components/manage";
 
 const supabase = createClient();
 
@@ -67,7 +67,7 @@ function Home({ session }: { session: any }) {
   const [rounds, setRounds] = useState<Round[]>([]);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
-  const [tab, setTab] = useState<"dashboard" | "rounds" | "games" | "courses" | "profile">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "rounds" | "games" | "courses" | "players" | "profile">("dashboard");
   const [stage, setStage] = useState<null | "setup" | { round: Round }>(null);
   const [viewing, setViewing] = useState<Round | null>(null);
 
@@ -140,13 +140,13 @@ function Home({ session }: { session: any }) {
       </div>
 
       <div style={{ display: "flex", gap: 6, marginTop: 16, borderBottom: `1px solid ${C.greenMid}`, flexWrap: "wrap" }}>
-        {(["dashboard", "rounds", "games", "courses"] as const).map((k) => (
+        {(["dashboard", "rounds", "games", "courses", "players"] as const).map((k) => (
           <button key={k} onClick={() => { setTab(k); setStage(null); setViewing(null); }}
             style={{
               background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: 14, fontWeight: 700,
               color: tab === k && !inFlow ? C.gold : C.sage,
               borderBottom: tab === k && !inFlow ? `2px solid ${C.gold}` : "2px solid transparent",
-            }}>{k === "dashboard" ? "Dashboard" : k === "rounds" ? "Rounds" : k === "games" ? "Games" : "Courses"}</button>
+            }}>{k === "dashboard" ? "Dashboard" : k === "rounds" ? "Rounds" : k === "games" ? "Games" : k === "courses" ? "Courses" : "Players"}</button>
         ))}
         <button onClick={() => { setTab("profile"); setStage(null); setViewing(null); }}
           style={{
@@ -169,6 +169,8 @@ function Home({ session }: { session: any }) {
             onDelete={async () => { await deleteRound(viewing.id); setViewing(null); }} />
         ) : tab === "courses" ? (
           <CoursesLibrary user={user} />
+        ) : tab === "players" ? (
+          <PlayersTab />
         ) : tab === "profile" ? (
           <ProfilePanel profile={profile} user={user} onSaved={loadProfile} />
         ) : tab === "games" ? (
@@ -197,6 +199,9 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState(index != null ? String(index) : "");
   const [showCustom, setShowCustom] = useState(false);
+  const [playDate, setPlayDate] = useState(new Date().toISOString().slice(0, 10));
+  const [grossMode, setGrossMode] = useState(false);
+  const [grossStr, setGrossStr] = useState("");
   // favorites
   const [favorites, setFavorites] = useState<{ id: string; name: string; location: string; data: Course }[]>([]);
   const [favSaving, setFavSaving] = useState(false);
@@ -390,9 +395,30 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
       id: "", course: picked.name, tee_name: tee.name,
       rating: tee.rating, slope: tee.slope, course_par: coursePar,
       handicap_index: idxVal, course_handicap: realCH,
-      played_at: new Date().toISOString().slice(0, 10),
+      played_at: playDate,
       holes,
     });
+  };
+
+  const [grossSaving, setGrossSaving] = useState(false);
+  const [grossErr, setGrossErr] = useState<string | null>(null);
+  const startGross = async () => {
+    if (!picked || !tee) return;
+    const g = parseInt(grossStr, 10);
+    if (!g || g < 18 || g > 200) { setGrossErr("Enter a valid total score (e.g. 86)."); return; }
+    if (idxVal != null && idxVal !== index) saveIndex(idxVal);
+    setGrossSaving(true); setGrossErr(null);
+    const coursePar = picked.holes.reduce((s, h) => s + (h.par || 0), 0);
+    const { data: u } = await supabase.auth.getUser();
+    const { error } = await supabase.from("rounds").insert({
+      user_id: u.user!.id, course: picked.name, tee_name: tee.name,
+      rating: tee.rating, slope: tee.slope, course_par: coursePar,
+      handicap_index: idxVal, course_handicap: realCH,
+      played_at: playDate, gross_score: g,
+    });
+    setGrossSaving(false);
+    if (error) { setGrossErr("Couldn't save: " + error.message); return; }
+    onCancel(); // back to home; dashboard reloads
   };
 
   return (
@@ -625,6 +651,16 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
             <label style={{ color: C.sage, fontSize: 12 }}>Your handicap index (optional — needed for Stableford)</label>
             <input style={{ ...inputStyle, marginTop: 6, maxWidth: 140 }} inputMode="decimal" placeholder="14.2" value={idxStr} onChange={(e) => setIdxStr(e.target.value)} />
           </div>
+          <div style={{ marginTop: 12, display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <div>
+              <label style={{ color: C.sage, fontSize: 12 }}>Date played</label>
+              <input type="date" max={new Date().toISOString().slice(0, 10)} style={{ ...inputStyle, marginTop: 6, maxWidth: 180 }}
+                value={playDate} onChange={(e) => setPlayDate(e.target.value)} />
+            </div>
+            <div style={{ color: C.sage, fontSize: 12 }}>
+              {playDate === new Date().toISOString().slice(0, 10) ? "Playing today" : "Logging a past round"}
+            </div>
+          </div>
           {realCH != null && (
             <div style={{ color: C.gold, fontWeight: 800, marginTop: 12, fontSize: 15 }}>
               Course handicap: {realCH} {realCH >= 0 ? `(you get ${realCH} stroke${realCH === 1 ? "" : "s"})` : "(plus handicap)"}
@@ -633,6 +669,29 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
               </div>
             </div>
           )}
+
+          {/* Entry mode: full scorecard vs quick gross total */}
+          <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 14 }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button style={grossMode ? btn(false) : btn(true)} onClick={() => setGrossMode(false)}>Hole-by-hole</button>
+              <button style={grossMode ? btn(true) : btn(false)} onClick={() => setGrossMode(true)}>Quick total score</button>
+            </div>
+            {grossMode ? (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ color: C.sage, fontSize: 12, marginBottom: 8 }}>
+                  Enter your total (gross) strokes for the round. This counts toward your handicap and scoring average. You can add hole-by-hole detail to it later from the round.
+                </div>
+                <label style={{ color: C.sage, fontSize: 12 }}>Total score (par {picked.holes.reduce((s, h) => s + (h.par || 0), 0)})</label>
+                <input inputMode="numeric" placeholder="86" value={grossStr}
+                  onChange={(e) => setGrossStr(e.target.value.replace(/\D/g, ""))}
+                  style={{ ...inputStyle, marginTop: 6, maxWidth: 140 }} />
+                {grossErr && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 8 }}>{grossErr}</div>}
+              </div>
+            ) : (
+              <div style={{ color: C.sage, fontSize: 12, marginTop: 10 }}>Enter each hole's score on the next screen.</div>
+            )}
+          </div>
+
           <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
             <button style={btn(false)} onClick={() => { setPicked(null); setFavMsg(null); setLoadedFavId(null); }}>‹ Change course</button>
             {loadedFavId ? (
@@ -644,7 +703,11 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
                 {favSaving ? "Saving…" : "★ Save as favorite"}
               </button>
             )}
-            <button style={btn(true)} onClick={start}>Continue to scorecard ›</button>
+            {grossMode ? (
+              <button style={{ ...btn(true), opacity: grossSaving ? 0.5 : 1 }} disabled={grossSaving} onClick={startGross}>{grossSaving ? "Saving…" : "Save round"}</button>
+            ) : (
+              <button style={btn(true)} onClick={start}>Continue to scorecard ›</button>
+            )}
           </div>
           {favMsg && <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>{favMsg}</div>}
         </div>
@@ -660,6 +723,26 @@ function RoundSetup({ index, saveIndex, onReady, onCancel }: {
 // ---------------- Round editor ----------------
 function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () => void; onCancel: () => void }) {
   const [holes, setHoles] = useState<Hole[]>(round.holes);
+
+  // If this round has no per-hole data (a gross-only round gaining detail), build a hole layout.
+  useEffect(() => {
+    if (round.holes.length > 0) return;
+    (async () => {
+      // Try to pull the real par/S.I. from the saved course library.
+      const { data: fav } = await supabase.from("favorite_courses").select("data").eq("name", round.course).maybeSingle();
+      const courseHoles = (fav?.data?.holes || []) as { n: number; par: number; si: number | null }[];
+      const base = courseHoles.length >= 9
+        ? courseHoles
+        : Array.from({ length: 18 }, (_, i) => ({ n: i + 1, par: 4, si: i + 1 }));
+      const alloc = allocateStrokes(base.map((h) => ({ hole_number: h.n, stroke_index: h.si })), round.course_handicap);
+      setHoles(base.map((h) => ({
+        hole_number: h.n, par: h.par, stroke_index: h.si,
+        strokes: null, putts: null, fairway: null, penalties: 0,
+        recv: alloc[h.n] || 0,
+      })));
+    })();
+  }, [round.id]);
+
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [favMsg, setFavMsg] = useState<string | null>(null);
@@ -706,17 +789,27 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
   const save = async () => {
     setSaving(true); setErr(null);
     try {
-      // Insert the round; user_id is filled automatically by the DB default (auth.uid()).
-      const { data: r, error: e1 } = await supabase.from("rounds").insert({
-        course: round.course, tee_name: round.tee_name,
-        rating: round.rating, slope: round.slope, course_par: round.course_par,
-        handicap_index: round.handicap_index, course_handicap: round.course_handicap,
-        played_at: round.played_at,
-      }).select().single();
-      if (e1 || !r) throw e1 || new Error("Could not save round");
+      let roundId = round.id;
+      if (roundId) {
+        // Existing round (e.g. adding detail to a gross round): clear gross_score, replace holes.
+        const { error: eu } = await supabase.from("rounds").update({
+          course_par: round.course_par, gross_score: null,
+        }).eq("id", roundId);
+        if (eu) throw eu;
+        await supabase.from("holes").delete().eq("round_id", roundId);
+      } else {
+        const { data: r, error: e1 } = await supabase.from("rounds").insert({
+          course: round.course, tee_name: round.tee_name,
+          rating: round.rating, slope: round.slope, course_par: round.course_par,
+          handicap_index: round.handicap_index, course_handicap: round.course_handicap,
+          played_at: round.played_at,
+        }).select().single();
+        if (e1 || !r) throw e1 || new Error("Could not save round");
+        roundId = r.id;
+      }
 
       const rows = holes.map((h) => ({
-        round_id: r.id, hole_number: h.hole_number, par: h.par,
+        round_id: roundId, hole_number: h.hole_number, par: h.par,
         stroke_index: h.stroke_index, strokes: h.strokes, putts: h.putts,
         fairway: h.fairway, penalties: h.penalties || 0,
       }));
@@ -780,6 +873,7 @@ function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () =
 function RoundDetail({ round, onBack, onEdit, onDelete }: {
   round: Round; onBack: () => void; onEdit: () => void; onDelete: () => void;
 }) {
+  const gross = isGrossOnly(round);
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -789,15 +883,28 @@ function RoundDetail({ round, onBack, onEdit, onDelete }: {
             {round.course}{round.tee_name ? ` · ${round.tee_name}` : ""}
           </div>
           <div style={{ color: C.sage, fontSize: 13 }}>
-            {fmtDate(round.played_at)} · {strokesOf(round)} ({toParStr(diffOf(round))}) · {ptsOf(round)} pts
-            {round.course_handicap != null ? ` · CH ${round.course_handicap}` : ""} · GIR {fracPct(girStats([round]))} · FW {fracPct(firStats([round]))} · {puttsOf(round)} putts · {pensOf(round)} pen
+            {fmtDate(round.played_at)} · {strokesOf(round)} ({toParStr(diffOf(round))})
+            {gross ? " · total score only" : ` · ${ptsOf(round)} pts${round.course_handicap != null ? ` · CH ${round.course_handicap}` : ""} · GIR ${fracPct(girStats([round]))} · FW ${fracPct(firStats([round]))} · ${puttsOf(round)} putts · ${pensOf(round)} pen`}
           </div>
         </div>
         <div style={{ flex: 1 }} />
         <button style={{ ...btn(false), background: "#7A2F28" }}
           onClick={() => { if (confirm("Delete this round?")) onDelete(); }}>Delete</button>
       </div>
-      <div style={{ marginTop: 14 }}><ScoreViewCard round={round} /></div>
+      {gross ? (
+        <div style={{ background: C.greenLight, borderRadius: 14, padding: 20, marginTop: 14 }}>
+          <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 40, fontWeight: 800 }}>{round.gross_score}</div>
+          <div style={{ color: C.sage, fontSize: 13, marginTop: 4 }}>
+            Total score · {toParStr(diffOf(round))} vs par{round.rating != null && round.slope != null ? ` · differential ${roundDifferential(round)?.toFixed(1) ?? "—"}` : ""}
+          </div>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 12 }}>
+            This round was logged as a total only — it counts toward your handicap and scoring average. Add hole-by-hole detail to also get Stableford, GIR, putts, and par-type stats.
+          </div>
+          <button style={{ ...btn(true), marginTop: 12 }} onClick={onEdit}>＋ Add hole-by-hole detail</button>
+        </div>
+      ) : (
+        <div style={{ marginTop: 14 }}><ScoreViewCard round={round} /></div>
+      )}
     </div>
   );
 }
@@ -816,7 +923,7 @@ function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
   rounds: Round[]; name: string; onOpen: (r: Round) => void;
   currentIndex: number | null; saveIndex: (i: number | null) => void;
 }) {
-  const done = rounds.filter((r) => played(r).length > 0);
+  const done = rounds.filter((r) => played(r).length > 0 || isGrossOnly(r));
   const sorted = [...done].sort((a, b) => +new Date(a.played_at) - +new Date(b.played_at));
   const avgDiff = done.length ? done.reduce((s, r) => s + diffOf(r), 0) / done.length : null;
   const best = done.length ? Math.min(...done.map(diffOf)) : null;
@@ -837,11 +944,11 @@ function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
   const trend = sorted.map((r, i) => ({ i: i + 1, name: fmtDate(r.played_at), diff: diffOf(r), pts: ptsOf(r), course: r.course }));
   const distTotal = buckets.eagle + buckets.birdie + buckets.par + buckets.bogey + buckets.double;
   const distData = [
-    { name: "Eagle+", v: buckets.eagle, c: "#7A2E86" },
-    { name: "Birdie", v: buckets.birdie, c: C.birdie },
-    { name: "Par", v: buckets.par, c: C.greenMid },
-    { name: "Bogey", v: buckets.bogey, c: C.bogey },
-    { name: "Dbl+", v: buckets.double, c: "#6B6B6B" },
+    { name: "Eagle+", v: buckets.eagle, c: "#C77DFF" },
+    { name: "Birdie", v: buckets.birdie, c: "#4ADE80" },
+    { name: "Par", v: buckets.par, c: "#38BDF8" },
+    { name: "Bogey", v: buckets.bogey, c: "#FBBF24" },
+    { name: "Dbl+", v: buckets.double, c: "#FB7185" },
   ].map((d) => ({ ...d, label: `${d.name}: ${d.v} (${distTotal ? Math.round((100 * d.v) / distTotal) : 0}%)` }));
 
   // Per-round value for each stat, for the click-to-expand drill-down.
@@ -973,16 +1080,20 @@ function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 16 }}>
           <Eyebrow>HOLE OUTCOMES · {allHoles.length} HOLES</Eyebrow>
           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16, marginTop: 10 }}>
-            <div style={{ width: 200, height: 200 }}>
+            <div style={{ width: 200, height: 200, position: "relative" }}>
               <ResponsiveContainer>
                 <PieChart>
-                  <Pie data={distData} dataKey="v" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={85} paddingAngle={2}>
+                  <Pie data={distData} dataKey="v" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={88} paddingAngle={2} stroke="none">
                     {distData.map((d, i) => <Cell key={i} fill={d.c} />)}
                   </Pie>
                   <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12 }}
                     formatter={(v: any, n: any) => [`${v} holes (${distTotal ? Math.round(100 * v / distTotal) : 0}%)`, n]} />
                 </PieChart>
               </ResponsiveContainer>
+              <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+                <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 32, fontWeight: 800, lineHeight: 1 }}>{distTotal}</div>
+                <div style={{ color: C.sage, fontSize: 10, letterSpacing: 1 }}>HOLES</div>
+              </div>
             </div>
             <div style={{ flex: 1, minWidth: 180 }}>
               {distData.map((d, i) => (
@@ -993,6 +1104,12 @@ function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
                   <span style={{ color: C.sage, fontSize: 12, width: 44, textAlign: "right" }}>{distTotal ? Math.round(100 * d.v / distTotal) : 0}%</span>
                 </div>
               ))}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0 0", marginTop: 4, borderTop: `1px solid ${C.greenMid}` }}>
+                <span style={{ width: 12 }} />
+                <span style={{ color: C.gold, fontSize: 13, flex: 1, fontWeight: 700 }}>Total holes</span>
+                <span style={{ color: C.gold, fontWeight: 800, fontSize: 13 }}>{distTotal}</span>
+                <span style={{ width: 44 }} />
+              </div>
             </div>
           </div>
         </div>

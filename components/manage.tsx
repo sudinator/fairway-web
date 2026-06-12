@@ -715,3 +715,45 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
     </div>
   );
 }
+
+// ================= Players directory =================
+// Everyone can see who else has access: name, handicap (if set), and phone to reach them.
+export function PlayersTab() {
+  const [players, setPlayers] = useState<any[] | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from("profiles").select("display_name, handicap_index, phone, ghin_number").order("display_name");
+      setPlayers(data || []);
+    })();
+  }, []);
+
+  return (
+    <div>
+      <Eyebrow>PLAYERS · WHO HAS ACCESS</Eyebrow>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
+        Everyone using the app. Tap a phone number to call or text.
+      </div>
+      {players === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
+      {players?.length === 0 && <div style={{ color: C.sage, marginTop: 14 }}>No players yet.</div>}
+      {players?.map((p, i) => (
+        <div key={i} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 10, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 150 }}>
+            <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{p.display_name || "Player"}</div>
+            <div style={{ color: C.faint, fontSize: 12 }}>
+              {p.handicap_index != null ? `Handicap ${p.handicap_index}` : "No handicap set"}
+              {p.ghin_number ? ` · GHIN ${p.ghin_number}` : ""}
+            </div>
+          </div>
+          {p.phone ? (
+            <a href={`tel:${p.phone}`} style={{ color: C.green, fontWeight: 700, fontSize: 14, textDecoration: "none", background: C.cream, borderRadius: 8, padding: "8px 12px" }}>
+              {p.phone}
+            </a>
+          ) : (
+            <span style={{ color: C.faint, fontSize: 12 }}>no phone</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}

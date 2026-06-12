@@ -37,6 +37,7 @@ export type Round = {
   handicap_index: number | null;
   course_handicap: number | null;
   played_at: string;
+  gross_score?: number | null; // for gross-only historical rounds (no per-hole detail)
   holes: Hole[];
 };
 
@@ -81,8 +82,11 @@ export function stablefordPts(strokes: number | null, par: number, recv: number)
 }
 
 export const played = (r: Round) => r.holes.filter((h) => h.strokes != null && h.strokes > 0);
-export const strokesOf = (r: Round) => played(r).reduce((s, h) => s + (h.strokes || 0), 0);
-export const parOf = (r: Round) => played(r).reduce((s, h) => s + h.par, 0);
+// A "gross-only" round has a recorded total but no per-hole detail.
+export const isGrossOnly = (r: Round) => played(r).length === 0 && r.gross_score != null;
+export const hasHoleDetail = (r: Round) => played(r).length > 0;
+export const strokesOf = (r: Round) => isGrossOnly(r) ? (r.gross_score || 0) : played(r).reduce((s, h) => s + (h.strokes || 0), 0);
+export const parOf = (r: Round) => isGrossOnly(r) ? (r.course_par || 0) : played(r).reduce((s, h) => s + h.par, 0);
 export const diffOf = (r: Round) => strokesOf(r) - parOf(r);
 export const puttsOf = (r: Round) => played(r).reduce((s, h) => s + (h.putts || 0), 0);
 export const pensOf = (r: Round) => played(r).reduce((s, h) => s + (h.penalties || 0), 0);
@@ -205,6 +209,10 @@ export function adjustedHoleScore(h: Hole): number | null {
 //   (113 / slope) * (adjusted gross - course rating)
 export function roundDifferential(r: Round): number | null {
   if (r.rating == null || r.slope == null) return null;
+  // Gross-only round: use the recorded total directly (no per-hole adjustment available).
+  if (isGrossOnly(r)) {
+    return (113 / r.slope) * ((r.gross_score || 0) - r.rating);
+  }
   const holes = played(r);
   if (holes.length < 18) return null; // differential is an 18-hole figure
   let adjusted = 0;
