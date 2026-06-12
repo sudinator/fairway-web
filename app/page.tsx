@@ -874,6 +874,49 @@ function RoundDetail({ round, onBack, onEdit, onDelete }: {
   round: Round; onBack: () => void; onEdit: () => void; onDelete: () => void;
 }) {
   const gross = isGrossOnly(round);
+  const [ghinMsg, setGhinMsg] = useState<string | null>(null);
+
+  const ghinSummary = () => {
+    const playedHoles = played(round);
+    const holeLines = playedHoles.length
+      ? playedHoles.map((h) => {
+          const parts = [
+            `Hole ${h.hole_number}: ${h.strokes ?? "-"}`,
+            `par ${h.par}`,
+          ];
+          if (h.putts != null) parts.push(`${h.putts} putts`);
+          if (h.fairway) parts.push(`FW ${h.fairway}`);
+          if ((h.penalties || 0) > 0) parts.push(`${h.penalties} pen`);
+          return parts.join(" · ");
+        }).join("\n")
+      : "No hole-by-hole detail saved — post this as a total score in GHIN.";
+
+    return [
+      "GHIN score posting details",
+      `Course: ${round.course}`,
+      `Tee: ${round.tee_name || "Not specified"}`,
+      `Date played: ${fmtDate(round.played_at)}`,
+      `Total score: ${strokesOf(round)} (${toParStr(diffOf(round))})`,
+      `Course par: ${round.course_par ?? "Not specified"}`,
+      `Rating/Slope: ${round.rating ?? "?"}/${round.slope ?? "?"}`,
+      `Round type: ${playedHoles.length >= 18 ? "18 holes" : playedHoles.length >= 9 ? "9 holes" : "Total score"}`,
+      "",
+      "Hole scores:",
+      holeLines,
+    ].join("\n");
+  };
+
+  const postToGhin = async () => {
+    const summary = ghinSummary();
+    try {
+      await navigator.clipboard?.writeText(summary);
+      setGhinMsg("Copied GHIN-ready score details. GHIN is opening now — paste/check the details there.");
+    } catch {
+      setGhinMsg("GHIN is opening now. If copy did not work, use the score details shown on this page.");
+    }
+    window.open("https://www.ghin.com/post-score/hole-by-hole/post", "_blank", "noopener,noreferrer");
+  };
+
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -888,9 +931,15 @@ function RoundDetail({ round, onBack, onEdit, onDelete }: {
           </div>
         </div>
         <div style={{ flex: 1 }} />
+        <button style={btn(true)} onClick={postToGhin}>Post to GHIN</button>
         <button style={{ ...btn(false), background: "#7A2F28" }}
           onClick={() => { if (confirm("Delete this round?")) onDelete(); }}>Delete</button>
       </div>
+      {ghinMsg && (
+        <div style={{ background: C.greenLight, borderRadius: 10, padding: "10px 12px", marginTop: 12, color: C.gold, fontSize: 12 }}>
+          {ghinMsg}
+        </div>
+      )}
       {gross ? (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 20, marginTop: 14 }}>
           <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 40, fontWeight: 800 }}>{round.gross_score}</div>
