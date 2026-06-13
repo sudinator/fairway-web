@@ -76,7 +76,7 @@ export type EntryHole = {
 
 // SCORE ENTRY — vertical, one row per hole, fits screen width (no horizontal scroll).
 // Used by both individual stroke play and group play so the card is identical everywhere.
-export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true }: {
+export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel }: {
   holes: EntryHole[];
   hasHandicap: boolean;
   onSet: (i: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | null; penalties?: number | null }) => void;
@@ -84,7 +84,10 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   showFairway?: boolean;
   showPutts?: boolean;
   showPenalties?: boolean;
+  opp?: (number | null)[];     // optional opponent gross per hole (match play) — read-only column
+  oppLabel?: string;           // short opponent name for the column header
 }) {
+  const showOpp = Array.isArray(opp);
   const cycleFw = (i: number, cur: "hit" | "miss" | null, par: number) => {
     if (par < 4) return;
     onSet(i, { fairway: cur == null ? "hit" : cur === "hit" ? "miss" : null });
@@ -101,7 +104,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     const sPutts = seg.reduce((s, h) => s + (h.putts || 0), 0);
     const sPen = seg.reduce((s, h) => s + (h.penalties || 0), 0);
     const sPts = seg.reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
-    const cols = `26px 24px 24px${hasDots ? " 28px" : ""} 1fr${showFairway ? " 30px" : ""}${showPutts ? " 54px" : ""}${showPenalties ? " 48px" : ""} 28px`;
+    const cols = `26px 24px 24px${showOpp ? " 40px" : ""}${hasDots ? " 28px" : ""} 1fr${showFairway ? " 30px" : ""}${showPutts ? " 54px" : ""}${showPenalties ? " 48px" : ""} 28px`;
     const Row = (cells: React.ReactNode[], opts?: { header?: boolean; foot?: boolean }) => (
       <div style={{
         display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4,
@@ -118,6 +121,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           <div key="h" style={headStyle}>Hole</div>,
           <div key="p" style={{ ...headStyle, textAlign: "center" }}>Par</div>,
           <div key="si" style={{ ...headStyle, textAlign: "center" }}>S.I.</div>,
+          ...(showOpp ? [<div key="op" style={{ ...headStyle, textAlign: "center", color: C.gold }}>{oppLabel || "Opp"}</div>] : []),
           ...(hasDots ? [<div key="d" style={{ ...headStyle, textAlign: "center" }}>Hcp</div>] : []),
           <div key="sc" style={{ ...headStyle, textAlign: "center" }}>Score</div>,
           ...(showFairway ? [<div key="fw" style={{ ...headStyle, textAlign: "center" }}>FW</div>] : []),
@@ -134,6 +138,12 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
             <div key="h" style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.n}</div>,
             <div key="p" style={{ textAlign: "center", color: C.parBlue, fontWeight: 700, fontSize: 14 }}>{h.par}</div>,
             <div key="si" style={{ textAlign: "center", color: C.faint, fontSize: 12 }}>{h.si ?? "–"}</div>,
+            ...(showOpp ? [(() => {
+              const ov = opp![i] ?? null;
+              const mine = h.strokes;
+              const col = ov == null || mine == null ? C.faint : ov < mine ? C.birdie : ov > mine ? C.greenMid : C.ink;
+              return <div key="op" style={{ textAlign: "center", color: col, fontWeight: 800, fontSize: 15 }}>{ov ?? "·"}</div>;
+            })()] : []),
             ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: C.dot, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{h.recv > 0 ? "•".repeat(Math.min(h.recv, 3)) : ""}</div>] : []),
             <div key="sc" style={{ textAlign: "center" }}>
               <NumPicker value={h.strokes} from={1} to={maxStrokes} onChange={(v) => onSet(i, { strokes: v })} width={48} accent={savingHole === i} />
@@ -165,6 +175,10 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           <div key="h" style={{ color: C.gold, fontWeight: 800, fontSize: 12 }}>{from === 0 ? "OUT" : "IN"}</div>,
           <div key="p" style={{ textAlign: "center", color: C.ink, fontWeight: 800, fontSize: 13 }}>{sPar}</div>,
           <div key="si" />,
+          ...(showOpp ? [(() => {
+            const oSum = opp!.slice(from, to).reduce((s: number, v) => s + (v || 0), 0);
+            return <div key="op" style={{ textAlign: "center", color: C.gold, fontWeight: 800, fontSize: 14 }}>{oSum || "–"}</div>;
+          })()] : []),
           ...(hasDots ? [<div key="d" />] : []),
           <div key="sc" style={{ textAlign: "center", color: C.green, fontWeight: 800, fontSize: 15 }}>{sScore || "–"}</div>,
           ...(showFairway ? [<div key="fw" />] : []),

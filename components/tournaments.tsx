@@ -1340,6 +1340,22 @@ function GameRoom({
             onSet={(i, patch) => { if (!isEnded) setMyHole(i, patch); }}
             savingHole={savingHole}
             showPenalties={false}
+            opp={(() => {
+              if (game.game_type !== "match") return undefined;
+              const pr = game.pairings.find((p) => p.a === user.id || p.b === user.id);
+              if (!pr) return undefined;
+              const oppId = pr.a === user.id ? pr.b : pr.a;
+              const oppP = players.find((p) => p.user_id === oppId);
+              return oppP?.scores || undefined;
+            })()}
+            oppLabel={(() => {
+              if (game.game_type !== "match") return undefined;
+              const pr = game.pairings.find((p) => p.a === user.id || p.b === user.id);
+              if (!pr) return undefined;
+              const oppId = pr.a === user.id ? pr.b : pr.a;
+              const oppP = players.find((p) => p.user_id === oppId);
+              return oppP?.display_name?.split(" ")[0] || "Opp";
+            })()}
           />
           <MyStatsLine me={me} holes={playerHoles(me)} />
         </div>
@@ -1612,6 +1628,7 @@ function MatchView({
     </div>
   );
 }
+
 
 // ---------------- Organizer panel (game creator) ----------------
 // Lets the game's creator manage the roster, handicaps, and the game itself.
