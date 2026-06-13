@@ -175,6 +175,7 @@ export function Home({ session }: { session: any }) {
   };
 
   const inFlow = stage || viewing;
+  const [moreOpen, setMoreOpen] = useState(false);
   const activeGroup = groups.find((g) => g.id === activeGroupId) || groups[0] || null;
   const isAdminOfAnyGroup = groups.some((g) => g.role === "admin");
   const showGroupsTab = isAdminOfAnyGroup || groups.length > 1;
@@ -197,7 +198,7 @@ export function Home({ session }: { session: any }) {
   }
 
   return (
-    <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 60px" }}>
+    <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 96px" }}>
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
         <Wordmark width={150} />
         <div style={{ color: C.sage, fontSize: 13 }}>{displayName}{index != null ? ` · HCP ${index}` : ""}</div>
@@ -213,34 +214,6 @@ export function Home({ session }: { session: any }) {
           You are not in a group yet. Create one from the Groups tab.
         </div>
       )}
-
-      <div style={{ display: "flex", gap: 6, marginTop: 16, borderBottom: `1px solid ${C.greenMid}`, flexWrap: "wrap" }}>
-        {(() => {
-          const labels: Record<string, string> = {
-            dashboard: "My Dashboard", rounds: "My Rounds", games: "Games",
-            courses: "Courses", players: "Players", groups: "Groups",
-            activity: "Activity ★", help: "Help",
-          };
-          const keys: string[] = ["dashboard", "rounds", "games", "courses", "players"];
-          if (showGroupsTab) keys.push("groups");
-          if (profile?.is_admin) keys.push("activity");
-          keys.push("help");
-          return keys.map((k) => (
-            <button key={k} onClick={() => { setTab(k as Tab); setStage(null); setViewing(null); }}
-              style={{
-                background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: 14, fontWeight: 700,
-                color: tab === k && !inFlow ? C.gold : C.sage,
-                borderBottom: tab === k && !inFlow ? `2px solid ${C.gold}` : "2px solid transparent",
-              }}>{labels[k]}</button>
-          ));
-        })()}
-        <button onClick={() => { setTab("profile"); setStage(null); setViewing(null); }}
-          style={{
-            background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: 14, fontWeight: 700,
-            color: tab === "profile" && !inFlow ? C.gold : C.sage,
-            borderBottom: tab === "profile" && !inFlow ? `2px solid ${C.gold}` : "2px solid transparent",
-          }}>Profile{profile?.is_admin ? " ★" : ""}</button>
-      </div>
 
       <div style={{ marginTop: 20 }}>
         {stage === "setup" && activeGroup ? (
@@ -275,6 +248,75 @@ export function Home({ session }: { session: any }) {
           <RoundsList rounds={rounds} onOpen={setViewing} />
         )}
       </div>
+
+      {/* Bottom navigation bar (mobile-first). 4 primary destinations + More. */}
+      <nav style={{
+        position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50,
+        background: C.green, borderTop: `1px solid ${C.greenMid}`,
+        display: "flex", justifyContent: "space-around", alignItems: "stretch",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }}>
+        {(() => {
+          const primary: { key: Tab; label: string; icon: string }[] = [
+            { key: "dashboard", label: "Home", icon: "⌂" },
+            { key: "rounds", label: "Rounds", icon: "⛳" },
+            { key: "games", label: "Games", icon: "🏆" },
+            { key: "courses", label: "Courses", icon: "🗺" },
+          ];
+          const item = (active: boolean, icon: string, label: string, onClick: () => void) => (
+            <button onClick={onClick} style={{
+              flex: 1, background: "none", border: "none", cursor: "pointer",
+              padding: "10px 4px 8px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+              color: active ? C.gold : C.sage,
+            }}>
+              <span style={{ fontSize: 19, lineHeight: 1 }}>{icon}</span>
+              <span style={{ fontSize: 10, fontWeight: 700 }}>{label}</span>
+            </button>
+          );
+          return (
+            <>
+              {primary.map((p) =>
+                <React.Fragment key={p.key}>
+                  {item(tab === p.key && !inFlow, p.icon, p.label, () => { setTab(p.key); setStage(null); setViewing(null); setMoreOpen(false); })}
+                </React.Fragment>
+              )}
+              {item(moreOpen || (["players","groups","activity","help","profile"].includes(tab) && !inFlow), "⋯", "More", () => setMoreOpen((v) => !v))}
+            </>
+          );
+        })()}
+      </nav>
+
+      {/* "More" sheet */}
+      {moreOpen && (
+        <>
+          <div onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 60 }} />
+          <div style={{
+            position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 70,
+            background: C.greenLight, borderTopLeftRadius: 18, borderTopRightRadius: 18,
+            padding: "10px 12px calc(16px + env(safe-area-inset-bottom))",
+          }}>
+            <div style={{ width: 40, height: 4, background: C.greenMid, borderRadius: 2, margin: "6px auto 12px" }} />
+            {(() => {
+              const more: { key: Tab; label: string; show: boolean }[] = [
+                { key: "players", label: "Players", show: true },
+                { key: "groups", label: "Groups", show: showGroupsTab },
+                { key: "activity", label: "Activity ★", show: !!profile?.is_admin },
+                { key: "help", label: "Help", show: true },
+                { key: "profile", label: profile?.is_admin ? "Profile ★" : "Profile", show: true },
+              ];
+              return more.filter((m) => m.show).map((m) => (
+                <button key={m.key} onClick={() => { setTab(m.key); setStage(null); setViewing(null); setMoreOpen(false); }}
+                  style={{
+                    display: "block", width: "100%", textAlign: "left",
+                    background: tab === m.key && !inFlow ? C.green : "none", border: "none", cursor: "pointer",
+                    padding: "14px 16px", borderRadius: 10, marginBottom: 4,
+                    color: tab === m.key && !inFlow ? C.gold : C.cream, fontSize: 16, fontWeight: 700,
+                  }}>{m.label}</button>
+              ));
+            })()}
+          </div>
+        </>
+      )}
     </div>
   );
 }
