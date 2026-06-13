@@ -6,7 +6,7 @@ import { C, Round, Hole, allocateStrokes } from "@/lib/golf";
 import { logActivity } from "@/lib/activity";
 import { loadDraft, draftHasScores } from "@/lib/draft";
 import { loadActiveGame } from "@/lib/draft";
-import { btn, Wordmark } from "@/components/ui";
+import { btn, Wordmark, inputStyle } from "@/components/ui";
 import Tournaments from "@/components/tournaments";
 import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab, ActivityTab, HelpPage } from "@/components/manage";
 import { RoundSetup } from "@/components/round-setup";
@@ -14,7 +14,7 @@ import { RoundEditor } from "@/components/round-editor";
 import { RoundDetail } from "@/components/round-detail";
 import { Dashboard } from "@/components/dashboard";
 import { RoundsList } from "@/components/rounds-list";
-import { GroupSelector, GroupsPanel } from "@/components/groups";
+import { GroupsPanel } from "@/components/groups";
 
 import type { AppGroup } from "@/lib/groups";
 
@@ -118,10 +118,12 @@ export function Home({ session }: { session: any }) {
       supabase.from("profiles").update({ last_active: new Date().toISOString(), email: user.email }).eq("id", user.id).then(() => {});
       return;
     }
-    const fallbackName = user.user_metadata?.full_name || user.email?.split("@")[0] || "Golfer";
+    // Only trust a real name from the Google account; never fabricate one from the
+    // email local-part, so group-mates don't see "jsmith123" instead of a name.
+    const googleName = (user.user_metadata?.full_name || user.user_metadata?.name || "").trim();
     const { data: created } = await supabase.from("profiles")
-      .insert({ id: user.id, display_name: fallbackName, email: user.email, last_active: new Date().toISOString() }).select().maybeSingle();
-    setProfile(created || { id: user.id, display_name: fallbackName, handicap_index: null, ghin_number: null, is_admin: false });
+      .insert({ id: user.id, display_name: googleName || null, email: user.email, last_active: new Date().toISOString() }).select().maybeSingle();
+    setProfile(created || { id: user.id, display_name: googleName || null, handicap_index: null, ghin_number: null, is_admin: false });
   }, [user.id, user.email, user.user_metadata]);
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
@@ -197,15 +199,30 @@ export function Home({ session }: { session: any }) {
     );
   }
 
+  // Require a real name before using the app, so group-mates see a name, not an email.
+  if (profile && !((profile.display_name || "").trim())) {
+    return <NameGate user={user} onSaved={loadProfile} />;
+  }
+
   return (
     <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 96px" }}>
-      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+      {/* Line 1: logo + active group (display only — change it in the Groups tab) */}
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <Wordmark width={150} />
-        <div style={{ color: C.sage, fontSize: 13 }}>{displayName}{index != null ? ` · HCP ${index}` : ""}</div>
-        <GroupSelector groups={groups} activeGroupId={activeGroupId} onChange={chooseGroup} />
-        <div style={{ flex: 1 }} />
+        {activeGroup && (
+          <span style={{ background: C.greenLight, color: C.cream, fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 20 }}>
+            {activeGroup.name}
+          </span>
+        )}
+      </div>
+
+      {/* Line 2: name + handicap, notifications, new round */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 12 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: C.cream, fontSize: 15, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayName}</div>
+          <div style={{ color: C.sage, fontSize: 12 }}>{index != null ? `Handicap ${index}` : "Set your handicap in Profile"}</div>
+        </div>
         <NotificationBell user={user} />
-        <button style={{ ...btn(false), fontSize: 12 }} onClick={() => supabase.auth.signOut()}>Sign out</button>
         <button style={{ ...btn(true), opacity: activeGroup ? 1 : 0.5 }} disabled={!activeGroup} onClick={() => { setStage("setup"); setViewing(null); }}>＋ New round</button>
       </div>
 
@@ -317,6 +334,43 @@ export function Home({ session }: { session: any }) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// One-time gate: a new user must enter their name before using the app, so
+// group-mates see a real name instead of an email-derived placeholder.
+function NameGate({ user, onSaved }: { user: any; onSaved: () => void }) {
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const save = async () => {
+    if (name.trim().length < 2) { setErr("Please enter your name."); return; }
+    setSaving(true); setErr(null);
+    const { error } = await supabase.from("profiles").update({ display_name: name.trim() }).eq("id", user.id);
+    setSaving(false);
+    if (error) { setErr("Couldn't save your name. Please try again."); return; }
+    onSaved();
+  };
+  return (
+    <div style={{ maxWidth: 440, margin: "70px auto", padding: 24, textAlign: "center" }}>
+      <div style={{ display: "flex", justifyContent: "center" }}><Wordmark width={240} /></div>
+      <div style={{ background: C.greenLight, borderRadius: 16, padding: 26, marginTop: 26, textAlign: "left" }}>
+        <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 800 }}>WELCOME</div>
+        <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, marginTop: 8 }}>
+          What's your name?
+        </div>
+        <div style={{ color: C.sage, fontSize: 13, marginTop: 8, lineHeight: 1.5 }}>
+          This is how you'll appear to others in your group — on leaderboards, matches, and rosters.
+        </div>
+        <input autoFocus style={{ ...inputStyle, marginTop: 16, fontSize: 16 }} placeholder="e.g. Amit Sharma"
+          value={name} onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") save(); }} />
+        {err && <div style={{ color: "#E8A199", fontSize: 12, marginTop: 8 }}>{err}</div>}
+        <button style={{ ...btn(true), width: "100%", marginTop: 16, padding: "13px", opacity: saving ? 0.5 : 1 }} disabled={saving} onClick={save}>
+          {saving ? "Saving…" : "Continue"}
+        </button>
+      </div>
     </div>
   );
 }

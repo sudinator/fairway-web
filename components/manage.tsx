@@ -455,10 +455,11 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
   }, [profile]);
 
   const save = async () => {
+    if (!name.trim()) { setMsg("Please enter your name so others in your group can recognize you."); return; }
     setSaving(true); setMsg(null);
     const idx = idxStr.trim() === "" ? null : parseFloat(idxStr);
     const { error } = await supabase.from("profiles").update({
-      display_name: name.trim() || "Golfer",
+      display_name: name.trim(),
       ghin_number: ghin.trim() || null,
       phone: phone.trim() || null,
       handicap_index: idx,
@@ -474,8 +475,8 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
       <Eyebrow>YOUR PROFILE</Eyebrow>
       <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 12 }}>
         <div>
-          <label style={{ color: C.sage, fontSize: 12 }}>Display name</label>
-          <input style={{ ...inputStyle, marginTop: 6 }} value={name} onChange={(e) => setName(e.target.value)} />
+          <label style={{ color: C.sage, fontSize: 12 }}>Display name <span style={{ color: C.gold }}>(required)</span></label>
+          <input style={{ ...inputStyle, marginTop: 6 }} value={name} placeholder="e.g. Amit Sharma" onChange={(e) => setName(e.target.value)} />
         </div>
         <div style={{ marginTop: 14 }}>
           <label style={{ color: C.sage, fontSize: 12 }}>Phone (optional)</label>
@@ -500,6 +501,10 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
       </div>
 
       {profile?.is_admin && <AdminPanel user={user} />}
+
+      <div style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${C.greenMid}` }}>
+        <button style={{ ...btn(false), fontSize: 13 }} onClick={() => supabase.auth.signOut()}>Sign out</button>
+      </div>
     </div>
   );
 }
