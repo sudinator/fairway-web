@@ -166,37 +166,32 @@ export function Home({ session }: { session: any }) {
         </div>
       )}
 
-      <div style={{ marginTop: 16 }}>
+      <div style={{ display: "flex", gap: 6, marginTop: 16, borderBottom: `1px solid ${C.greenMid}`, flexWrap: "wrap" }}>
         {(() => {
           const labels: Record<string, string> = {
             dashboard: "My Dashboard", rounds: "My Rounds", games: "Games",
             courses: "Courses", players: "Players", groups: "Groups",
-            activity: "Activity ★", help: "Help", profile: profile?.is_admin ? "Profile ★" : "Profile",
+            activity: "Activity ★", help: "Help",
           };
           const keys: string[] = ["dashboard", "rounds", "games", "courses", "players"];
           if (showGroupsTab) keys.push("groups");
           if (profile?.is_admin) keys.push("activity");
           keys.push("help");
-          keys.push("profile");
-          return (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ color: C.sage, fontSize: 11, letterSpacing: 1.5, fontWeight: 800 }}>SCREEN</span>
-              <select
-                value={inFlow ? "" : tab}
-                onChange={(e) => { setTab(e.target.value as Tab); setStage(null); setViewing(null); }}
-                style={{
-                  flex: 1, maxWidth: 360, background: C.greenLight, color: C.cream, fontWeight: 800, fontSize: 16,
-                  border: `1px solid ${C.greenMid}`, borderRadius: 12, padding: "12px 14px", cursor: "pointer",
-                  WebkitAppearance: "none", appearance: "none",
-                  backgroundImage: `url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23C9A227' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>")`,
-                  backgroundRepeat: "no-repeat", backgroundPosition: "right 14px center",
-                }}>
-                {inFlow && <option value="">{stage === "setup" ? "New round" : viewing ? "Round detail" : "Editing"}</option>}
-                {keys.map((k) => <option key={k} value={k} style={{ color: "#111" }}>{labels[k]}</option>)}
-              </select>
-            </div>
-          );
+          return keys.map((k) => (
+            <button key={k} onClick={() => { setTab(k as Tab); setStage(null); setViewing(null); }}
+              style={{
+                background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: 14, fontWeight: 700,
+                color: tab === k && !inFlow ? C.gold : C.sage,
+                borderBottom: tab === k && !inFlow ? `2px solid ${C.gold}` : "2px solid transparent",
+              }}>{labels[k]}</button>
+          ));
         })()}
+        <button onClick={() => { setTab("profile"); setStage(null); setViewing(null); }}
+          style={{
+            background: "none", border: "none", cursor: "pointer", padding: "10px 16px", fontSize: 14, fontWeight: 700,
+            color: tab === "profile" && !inFlow ? C.gold : C.sage,
+            borderBottom: tab === "profile" && !inFlow ? `2px solid ${C.gold}` : "2px solid transparent",
+          }}>Profile{profile?.is_admin ? " ★" : ""}</button>
       </div>
 
       <div style={{ marginTop: 20 }}>

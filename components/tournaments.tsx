@@ -478,79 +478,6 @@ function CreateGame({
       </div>
 
       <div style={{ marginTop: 14 }}>
-        <label style={{ color: C.sage, fontSize: 12 }}>Format</label>
-        <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-          <button
-            onClick={() => setGameType("stableford")}
-            style={{ ...btn(gameType === "stableford"), flex: 1, fontSize: 13 }}
-          >
-            Stableford tournament
-          </button>
-          <button
-            onClick={() => setGameType("match")}
-            style={{ ...btn(gameType === "match"), flex: 1, fontSize: 13 }}
-          >
-            Singles match play
-          </button>
-        </div>
-        <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
-          {gameType === "stableford"
-            ? "Everyone competes on one net-Stableford leaderboard."
-            : "Players are paired 1-on-1. After friends join, you'll set the matchups. Lower handicap plays off scratch; opponent gets the difference."}
-        </div>
-      </div>
-
-      <div style={{ marginTop: 14 }}>
-        <label style={{ color: C.sage, fontSize: 12 }}>
-          Course (from your favorites — so par &amp; stroke index are correct)
-        </label>
-        {favorites.length === 0 && (
-          <div
-            style={{
-              color: C.sage,
-              fontSize: 13,
-              marginTop: 8,
-              background: C.greenLight,
-              borderRadius: 10,
-              padding: 12,
-            }}
-          >
-            You have no favorite courses yet. Go to a New round, pick a course,
-            fix its data, and save it as a favorite first — then it'll appear
-            here.
-          </div>
-        )}
-        {favorites.map((f, i) => (
-          <button
-            key={i}
-            onClick={() => {
-              setPickedFav(f);
-              setTeeIdx(0);
-            }}
-            style={{
-              display: "block",
-              width: "100%",
-              textAlign: "left",
-              marginTop: 8,
-              cursor: "pointer",
-              background: pickedFav?.name === f.name ? C.cream : C.card,
-              border: `1px solid ${pickedFav?.name === f.name ? C.gold : C.line}`,
-              borderRadius: 10,
-              padding: "10px 14px",
-            }}
-          >
-            <span style={{ color: C.ink, fontWeight: 700 }}>{f.name}</span>
-            {f.location ? (
-              <span style={{ color: C.faint, fontSize: 13 }}>
-                {" "}
-                · {f.location}
-              </span>
-            ) : null}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ marginTop: 14 }}>
         <label style={{ color: C.sage, fontSize: 12 }}>
           Players from this group
         </label>
@@ -612,6 +539,56 @@ function CreateGame({
         </div>
       </div>
 
+      <div style={{ marginTop: 14 }}>
+        <label style={{ color: C.sage, fontSize: 12 }}>
+          Course (from your favorites — so par &amp; stroke index are correct)
+        </label>
+        {favorites.length === 0 && (
+          <div
+            style={{
+              color: C.sage,
+              fontSize: 13,
+              marginTop: 8,
+              background: C.greenLight,
+              borderRadius: 10,
+              padding: 12,
+            }}
+          >
+            You have no favorite courses yet. Go to a New round, pick a course,
+            fix its data, and save it as a favorite first — then it'll appear
+            here.
+          </div>
+        )}
+        {favorites.map((f, i) => (
+          <button
+            key={i}
+            onClick={() => {
+              setPickedFav(f);
+              setTeeIdx(0);
+            }}
+            style={{
+              display: "block",
+              width: "100%",
+              textAlign: "left",
+              marginTop: 8,
+              cursor: "pointer",
+              background: pickedFav?.name === f.name ? C.cream : C.card,
+              border: `1px solid ${pickedFav?.name === f.name ? C.gold : C.line}`,
+              borderRadius: 10,
+              padding: "10px 14px",
+            }}
+          >
+            <span style={{ color: C.ink, fontWeight: 700 }}>{f.name}</span>
+            {f.location ? (
+              <span style={{ color: C.faint, fontSize: 13 }}>
+                {" "}
+                · {f.location}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </div>
+
       {pickedFav && (
         <div
           style={{
@@ -661,6 +638,29 @@ function CreateGame({
           )}
         </div>
       )}
+
+      <div style={{ marginTop: 14 }}>
+        <label style={{ color: C.sage, fontSize: 12 }}>Format</label>
+        <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+          <button
+            onClick={() => setGameType("stableford")}
+            style={{ ...btn(gameType === "stableford"), flex: 1, fontSize: 13 }}
+          >
+            Stableford tournament
+          </button>
+          <button
+            onClick={() => setGameType("match")}
+            style={{ ...btn(gameType === "match"), flex: 1, fontSize: 13 }}
+          >
+            Singles match play
+          </button>
+        </div>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+          {gameType === "stableford"
+            ? "Everyone competes on one net-Stableford leaderboard."
+            : "Players are paired 1-on-1. After friends join, you'll set the matchups. Lower handicap plays off scratch; opponent gets the difference."}
+        </div>
+      </div>
 
       {err && (
         <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>
@@ -728,6 +728,18 @@ function GameRoom({
     load();
   }, [load]);
 
+  // Auto-refresh every minute so players see each other's scores without manual refresh.
+  // Pauses while actively entering a score (a save in the last 25s, or one in progress).
+  const lastEditRef = React.useRef(0);
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (savingHole != null) return;
+      if (Date.now() - (lastEditRef.current || 0) < 25000) return;
+      load();
+    }, 60000);
+    return () => clearInterval(t);
+  }, [load, savingHole]);
+
   // Build a player's per-hole Hole[] (with strokes received) for scoring math.
   const playerHoles = (p: Player): Hole[] => {
     if (!game) return [];
@@ -784,10 +796,12 @@ function GameRoom({
     setMe(updated);
     setPlayers((ps) => ps.map((p) => (p.id === me.id ? updated : p)));
     setSavingHole(holeIdx);
+    lastEditRef.current = Date.now();
     await supabase
       .from("game_players")
       .update({ scores, putts, fairways })
       .eq("id", me.id);
+    lastEditRef.current = Date.now();
     setSavingHole(null);
   };
 
@@ -1120,6 +1134,15 @@ function GameRoom({
           onDelete={deleteGame}
         />
       )}
+
+      <div style={{ marginTop: 16, background: game.game_type === "match" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+        <span style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>
+          {game.game_type === "match" ? "⛳ Singles Match Play" : "🏆 Stableford Tournament"}
+        </span>
+        <span style={{ color: C.cream, opacity: 0.8, fontSize: 12 }}>
+          {game.game_type === "match" ? "1-on-1 pairings" : "net Stableford leaderboard"}
+        </span>
+      </div>
 
       {game.game_type === "match" ? (
         <MatchView
