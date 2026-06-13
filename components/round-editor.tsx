@@ -90,6 +90,31 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     });
   };
 
+  // iOS Safari can defer flushing localStorage to disk and lose a just-made write if
+  // the page is frozen by a screen lock immediately after. Re-saving in the
+  // visibilitychange/pagehide handlers forces the write at the last reliable moment.
+  const holesRef = React.useRef(holes);
+  holesRef.current = holes;
+  useEffect(() => {
+    const flush = () => {
+      if (holesRef.current.some((h) => h.strokes != null)) {
+        saveDraft({ ...round, holes: holesRef.current });
+      }
+    };
+    const onVis = () => { if (document.visibilityState === "hidden") flush(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("beforeunload", flush);
+    window.addEventListener("blur", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("beforeunload", flush);
+      window.removeEventListener("blur", flush);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [round]);
+
   const live: Round = { ...round, holes };
   const anyPlayed = holes.some((h) => h.strokes);
   const gir = girStats([live]), fir = firStats([live]);
