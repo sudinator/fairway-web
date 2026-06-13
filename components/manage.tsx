@@ -215,13 +215,16 @@ function CourseEditor({ user, activeGroupId, initial, existingId, onCancel, onSa
     } catch (e: any) { setErr(e.message); setResults([]); }
     finally { setSearching(false); }
   };
-  const pick = async (id: number) => {
+  const pick = async (id: number, fallbackLoc?: string) => {
     setLoadingId(id); setErr(null);
     try {
       const res = await fetch(`/api/courses?id=${id}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Load failed");
-      setCourse(data.course); setMode("form");
+      const c = data.course;
+      // If the detail payload didn't include a location, keep the one shown in search.
+      if (c && !c.location && fallbackLoc) c.location = fallbackLoc;
+      setCourse(c); setMode("form");
     } catch (e: any) { setErr(e.message); }
     finally { setLoadingId(null); }
   };
@@ -243,7 +246,7 @@ function CourseEditor({ user, activeGroupId, initial, existingId, onCancel, onSa
         </div>
         {err && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 8 }}>{err}</div>}
         {results?.map((r) => (
-          <button key={r.id} onClick={() => pick(r.id)} disabled={loadingId != null}
+          <button key={r.id} onClick={() => pick(r.id, r.location)} disabled={loadingId != null}
             style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 14px" }}>
             <span style={{ color: C.ink, fontWeight: 700 }}>{r.name}</span>
             {r.location ? <span style={{ color: C.faint, fontSize: 13 }}> · {r.location}</span> : null}
@@ -335,8 +338,8 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
           <input style={{ ...inputStyle, marginTop: 4 }} value={course.name} onChange={(e) => setName(e.target.value)} />
         </div>
         <div style={{ flex: 1, minWidth: 140 }}>
-          <label style={{ color: C.sage, fontSize: 12 }}>Location</label>
-          <input style={{ ...inputStyle, marginTop: 4 }} value={course.location} onChange={(e) => setLoc(e.target.value)} />
+          <label style={{ color: C.sage, fontSize: 12 }}>Town, State</label>
+          <input style={{ ...inputStyle, marginTop: 4 }} value={course.location} placeholder="e.g. Livingston, NJ" onChange={(e) => setLoc(e.target.value)} />
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { C, Round, Hole, allocateStrokes } from "@/lib/golf";
 import { logActivity } from "@/lib/activity";
+import { loadDraft, draftHasScores } from "@/lib/draft";
 import { btn, Wordmark } from "@/components/ui";
 import Tournaments from "@/components/tournaments";
 import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab, ActivityTab, HelpPage } from "@/components/manage";
@@ -30,6 +31,18 @@ export function Home({ session }: { session: any }) {
   const [tab, setTab] = useState<Tab>("dashboard");
   const [stage, setStage] = useState<null | "setup" | { round: Round }>(null);
   const [viewing, setViewing] = useState<Round | null>(null);
+  const [resumeChecked, setResumeChecked] = useState(false);
+
+  // On open, if there's an in-progress round saved on this device, jump straight
+  // back into the scorecard — that's the only screen that matters mid-round.
+  useEffect(() => {
+    if (resumeChecked) return;
+    setResumeChecked(true);
+    const d = loadDraft();
+    if (d && draftHasScores(d.round)) {
+      setStage({ round: d.round });
+    }
+  }, [resumeChecked]);
 
   const user = session.user;
   const displayName = profile?.display_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "Golfer";

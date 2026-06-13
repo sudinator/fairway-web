@@ -47,7 +47,7 @@ export async function GET(request: Request) {
         id: c.id,
         club: c.club_name,
         name: c.course_name || c.club_name,
-        location: locationString(c.location),
+        location: courseLocation(c),
       }));
       return NextResponse.json({ courses });
     }
@@ -61,7 +61,22 @@ export async function GET(request: Request) {
 function locationString(loc: any): string {
   if (!loc) return "";
   if (typeof loc === "string") return loc;
-  return [loc.city, loc.state, loc.country].filter(Boolean).join(", ") || loc.address || "";
+  // golfcourseapi returns location either as a nested object or as flat fields.
+  const city = loc.city || loc.town || "";
+  const state = loc.state || loc.region || loc.province || "";
+  const country = loc.country || "";
+  const joined = [city, state, country].filter(Boolean).join(", ");
+  return joined || loc.address || "";
+}
+
+// Pull a location string from a course payload that may carry it nested under
+// `location` OR as flat top-level fields (city/state) depending on the endpoint.
+function courseLocation(c: any): string {
+  const fromObj = locationString(c.location);
+  if (fromObj) return fromObj;
+  const flat = [c.city || c.club_city, c.state || c.club_state, c.country || c.club_country]
+    .filter(Boolean).join(", ");
+  return flat;
 }
 
 // golfcourseapi returns tees grouped by gender, each with rating/slope and a
@@ -90,7 +105,7 @@ function normalizeCourse(c: any) {
   return {
     id: c.id,
     name: c.course_name || c.club_name,
-    location: locationString(c.location),
+    location: courseLocation(c),
     tees: allTees,
     holes: courseHoles,
   };

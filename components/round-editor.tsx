@@ -8,6 +8,7 @@ import {
   girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay,
 } from "@/lib/golf";
 import { buildCustomCourse, linkCourseToGroup } from "@/lib/courses";
+import { saveDraft, clearDraft, draftHasScores } from "@/lib/draft";
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
 
@@ -40,71 +41,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [favMsg, setFavMsg] = useState<string | null>(null);
-  // Auto-save: the round is created lazily on the first hole tap, then each hole
-  // is written to the DB as you enter it — so a phone lock or refresh can't wipe scores.
-  const [roundId, setRoundId] = useState<string>(round.id || "");
-  const [autoSaveMsg, setAutoSaveMsg] = useState<string | null>(null);
-  const creatingRef = React.useRef<Promise<string> | null>(null);
-  const rowsEnsuredRef = React.useRef(false);
-
-  // Ensure a round row + 18 (or N) blank hole rows exist; returns the round id.
-  const ensureRound = useCallback(async (holeLayout: Hole[]): Promise<string> => {
-    if (roundId) {
-      // Round already exists (new round already auto-created, or a gross round gaining detail).
-      // Make sure a row exists for every hole so per-hole updates land.
-      if (!rowsEnsuredRef.current) {
-        rowsEnsuredRef.current = true;
-        const { data: existing } = await supabase.from("holes").select("hole_number").eq("round_id", roundId);
-        const have = new Set((existing || []).map((r: any) => r.hole_number));
-        const missing = holeLayout.filter((h) => !have.has(h.hole_number));
-        if (missing.length) {
-          await supabase.from("holes").insert(missing.map((h) => ({
-            round_id: roundId, hole_number: h.hole_number, par: h.par,
-            stroke_index: h.stroke_index, strokes: null, putts: null, fairway: null, penalties: 0,
-          })));
-        }
-      }
-      return roundId;
-    }
-    if (creatingRef.current) return creatingRef.current;
-    const p = (async () => {
-      const { data: u } = await supabase.auth.getUser();
-      const { data: r, error: e1 } = await supabase.from("rounds").insert({
-        user_id: u.user!.id,
-        course: round.course, tee_name: round.tee_name,
-        rating: round.rating, slope: round.slope, course_par: round.course_par,
-        handicap_index: round.handicap_index, course_handicap: round.course_handicap,
-        played_at: round.played_at, group_id: round.group_id || null,
-      }).select().single();
-      if (e1 || !r) throw e1 || new Error("Could not start round");
-      // Pre-create a row per hole so each tap is a simple update (no constraints needed).
-      const blankRows = holeLayout.map((h) => ({
-        round_id: r.id, hole_number: h.hole_number, par: h.par,
-        stroke_index: h.stroke_index, strokes: null, putts: null, fairway: null, penalties: 0,
-      }));
-      await supabase.from("holes").insert(blankRows);
-      setRoundId(r.id);
-      return r.id as string;
-    })();
-    creatingRef.current = p;
-    return p;
-  }, [roundId, round]);
-
-  // Persist a single hole to the DB (auto-save).
-  const persistHole = useCallback(async (h: Hole, layout: Hole[]) => {
-    try {
-      setAutoSaveMsg("Saving…");
-      const rid = await ensureRound(layout);
-      await supabase.from("holes").update({
-        strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties || 0,
-      }).eq("round_id", rid).eq("hole_number", h.hole_number);
-      setAutoSaveMsg("Saved ✓");
-      setTimeout(() => setAutoSaveMsg(null), 1200);
-    } catch (e: any) {
-      setAutoSaveMsg(null);
-      setErr("Couldn't auto-save that hole — check your connection. Your other saved holes are safe.");
-    }
-  }, [ensureRound]);
+  const isResumed = !!round.id || draftHasScores(round);
 
   // Save the corrected par/stroke-index back as a favorite course for next time.
   const saveCorrectedFavorite = async () => {
@@ -146,8 +83,9 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   const setHole = (i: number, patch: Partial<Hole>) => {
     setHoles((hs) => {
       const next = hs.map((h, j) => (j === i ? { ...h, ...patch } : h));
-      // Auto-save this hole to the DB (fire and forget).
-      persistHole(next[i], next);
+      // Save instantly to local storage — synchronous, so it survives a phone lock
+      // or refresh even if it happens the moment after this tap.
+      saveDraft({ ...round, holes: next });
       return next;
     });
   };
@@ -159,30 +97,51 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   const save = async () => {
     setSaving(true); setErr(null);
     try {
-      // Holes are auto-saved as you tap, so by now the round + holes already exist.
-      // Make sure the round exists (covers the rare case of tapping Save with no prior persist),
-      // then write the current hole values once more to guarantee the latest state is stored.
-      const rid = await ensureRound(holes);
-      // If this was an existing gross-only round gaining detail, clear its gross_score.
-      if (round.id) {
-        await supabase.from("rounds").update({ gross_score: null, course_par: round.course_par }).eq("id", rid);
+      let roundId = round.id;
+      if (roundId) {
+        // Existing round (e.g. adding detail to a gross round): clear gross_score, replace holes.
+        const { error: eu } = await supabase.from("rounds").update({
+          course_par: round.course_par, gross_score: null,
+        }).eq("id", roundId);
+        if (eu) throw eu;
+        await supabase.from("holes").delete().eq("round_id", roundId);
+      } else {
+        const { data: u } = await supabase.auth.getUser();
+        const { data: r, error: e1 } = await supabase.from("rounds").insert({
+          user_id: u.user!.id,
+          course: round.course, tee_name: round.tee_name,
+          rating: round.rating, slope: round.slope, course_par: round.course_par,
+          handicap_index: round.handicap_index, course_handicap: round.course_handicap,
+          played_at: round.played_at, group_id: round.group_id || null,
+        }).select().single();
+        if (e1 || !r) throw e1 || new Error("Could not save round");
+        roundId = r.id;
       }
-      // Upsert-by-update every hole to be safe (rows were pre-created).
-      for (const h of holes) {
-        await supabase.from("holes").update({
-          strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties || 0,
-        }).eq("round_id", rid).eq("hole_number", h.hole_number);
-      }
+      const rows = holes.map((h) => ({
+        round_id: roundId, hole_number: h.hole_number, par: h.par,
+        stroke_index: h.stroke_index, strokes: h.strokes, putts: h.putts,
+        fairway: h.fairway, penalties: h.penalties || 0,
+      }));
+      const { error: e2 } = await supabase.from("holes").insert(rows);
+      if (e2) throw e2;
       try {
         const { data: u } = await supabase.auth.getUser();
         const total = holes.reduce((s, h) => s + (h.strokes || 0), 0);
         await logActivity(supabase, { actor_id: u.user!.id, actor_name: u.user?.email || "A player", action: "round_completed", group_id: round.group_id || null, summary: `Completed a round at ${round.course}${total ? ` (${total})` : ""}` });
       } catch {}
+      clearDraft(); // round is now the official record — drop the local draft
       onSaved();
     } catch (e: any) {
       setErr(e.message || "Save failed. Check your connection and try again.");
       setSaving(false);
     }
+  };
+
+  const cancel = () => {
+    // Discard the in-progress draft so it doesn't reopen next time.
+    if (draftHasScores({ ...round, holes }) && !confirm("Discard this in-progress round? Your entered scores will be cleared.")) return;
+    clearDraft();
+    onCancel();
   };
 
   return (
@@ -192,7 +151,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         {round.course_handicap != null ? ` · course handicap ${round.course_handicap}` : " · no handicap — Stableford scored gross"}
       </div>
       <div style={{ color: C.gold, fontSize: 12, marginBottom: 10 }}>
-        Scores save automatically as you tap — you can lock your phone or close the app and pick up where you left off.
+        Scores save to this device as you tap — lock your phone or close the app and you'll come right back to this scorecard. Tap "Finish round" when you're done to record it.
       </div>
       <ScoreEntryCard
         holes={(() => {
@@ -224,9 +183,8 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
           </div>
         )}
         <div style={{ flex: 1 }} />
-        {autoSaveMsg && <span style={{ color: C.gold, fontSize: 12 }}>{autoSaveMsg}</span>}
         <button style={btn(false)} onClick={saveCorrectedFavorite}>★ Save course</button>
-        <button style={btn(false)} onClick={onCancel}>{roundId ? "Done" : "Cancel"}</button>
+        <button style={btn(false)} onClick={cancel}>{isResumed ? "Discard" : "Cancel"}</button>
         <button style={{ ...btn(true), opacity: anyPlayed && !saving ? 1 : 0.5 }} disabled={!anyPlayed || saving} onClick={save}>
           {saving ? "Saving…" : "Finish round"}
         </button>
