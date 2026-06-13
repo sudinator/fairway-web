@@ -512,17 +512,42 @@ function AdminPanel({ user }: { user: any }) {
   const [allGroups, setAllGroups] = useState<any[]>([]);
   const [memberships, setMemberships] = useState<any[]>([]);
   const [manageGroupsFor, setManageGroupsFor] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");        // debounced/applied search term
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const PAGE = 50;
+
+  // Load one page of players (search-filtered), and fetch group memberships only for those players.
+  const loadProfiles = useCallback(async (from: number, q: string, existing: any[]) => {
+    let qb = supabase.from("profiles").select("*").order("last_active", { ascending: false }).range(from, from + PAGE - 1);
+    if (q.trim()) qb = qb.or(`display_name.ilike.%${q.trim()}%,email.ilike.%${q.trim()}%`);
+    const { data } = await qb;
+    const page = data || [];
+    const merged = from === 0 ? page : [...existing, ...page];
+    setProfiles(merged);
+    setHasMore(page.length === PAGE);
+    const ids = merged.map((p: any) => p.id);
+    if (ids.length) {
+      const { data: mem } = await supabase.from("group_members").select("id, group_id, user_id, role, status").in("user_id", ids).neq("status", "removed");
+      setMemberships(mem || []);
+    }
+  }, []);
+
+  const loadMorePlayers = async () => {
+    setLoadingMore(true);
+    const current = profiles || [];
+    await loadProfiles(current.length, query, current);
+    setLoadingMore(false);
+  };
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from("profiles").select("*").order("last_active", { ascending: false });
-    setProfiles(data || []);
+    await loadProfiles(0, query, []);
     const { data: del } = await supabase.from("favorite_courses").select("*").eq("deleted", true).order("deleted_at", { ascending: false });
     setDeletedCourses(del || []);
-    // All active groups + every membership, for global player management.
+    // Groups list is small (count of groups, not users) — fine to load fully for the add-to-group picker.
     const { data: gs } = await supabase.from("groups").select("id, name, status").neq("status", "declined").order("name");
     setAllGroups((gs || []).filter((g: any) => (g.status ?? "active") === "active"));
-    const { data: mem } = await supabase.from("group_members").select("id, group_id, user_id, role, status").neq("status", "removed");
-    setMemberships(mem || []);
     const { data: reqs } = await supabase.from("groups").select("id, name, request_note, created_by, status").eq("status", "pending").order("created_at", { ascending: true });
     const reqList = reqs || [];
     const reqIds = reqList.map((r: any) => r.created_by).filter(Boolean);
@@ -532,7 +557,7 @@ function AdminPanel({ user }: { user: any }) {
       byId = Object.fromEntries((ps || []).map((p: any) => [p.id, p]));
     }
     setPendingGroups(reqList.map((r: any) => ({ ...r, requester: byId[r.created_by] || null })));
-  }, []);
+  }, [query]);
   useEffect(() => { load(); }, [load]);
 
   // --- Global player ↔ group management (admin governance) ---
@@ -639,8 +664,8 @@ function AdminPanel({ user }: { user: any }) {
       <Eyebrow>★ ADMIN · ALL PLAYERS</Eyebrow>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
         <div style={{ background: C.greenLight, borderRadius: 12, padding: "10px 14px", flex: 1, minWidth: 110 }}>
-          <div style={{ color: C.cream, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{profiles?.length ?? "—"}</div>
-          <div style={{ color: C.sage, fontSize: 11 }}>Total users</div>
+          <div style={{ color: C.cream, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{profiles?.length ?? "—"}{hasMore ? "+" : ""}</div>
+          <div style={{ color: C.sage, fontSize: 11 }}>{query ? "Matches loaded" : "Users loaded"}</div>
         </div>
         <div style={{ background: C.greenLight, borderRadius: 12, padding: "10px 14px", flex: 1, minWidth: 110 }}>
           <div style={{ color: C.cream, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{active24}</div>
@@ -652,6 +677,18 @@ function AdminPanel({ user }: { user: any }) {
         </div>
       </div>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 10 }}>Adjust any player's handicap; they (and you) get a notification. To edit a player's scores, use “Edit scores” to enter admin mode on their rounds.</div>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") setQuery(search); }}
+          placeholder="Search players by name or email…"
+          style={{ ...inputStyle, flex: 1, minWidth: 200 }}
+        />
+        <button style={{ ...btn(true), fontSize: 13 }} onClick={() => setQuery(search)}>Search</button>
+        {query && <button style={{ ...btn(false), fontSize: 13 }} onClick={() => { setSearch(""); setQuery(""); }}>Clear</button>}
+      </div>
 
       {profiles === null && <div style={{ color: C.sage, marginTop: 12 }}>Loading…</div>}
       {profiles?.map((p) => (
@@ -750,6 +787,11 @@ function AdminPanel({ user }: { user: any }) {
           )}
         </div>
       ))}
+      {hasMore && (
+        <button style={{ ...btn(false), marginTop: 10, fontSize: 13, opacity: loadingMore ? 0.5 : 1 }} disabled={loadingMore} onClick={loadMorePlayers}>
+          {loadingMore ? "Loading…" : "Load more players"}
+        </button>
+      )}
 
       <div style={{ marginTop: 20 }}>
         <Eyebrow>★ GROUP REQUESTS{pendingGroups.length ? ` (${pendingGroups.length})` : ""}</Eyebrow>

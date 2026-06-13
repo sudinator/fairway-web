@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
 import {
   C,
@@ -1040,8 +1040,10 @@ function GameRoom({
 
   const isOrganizer = game.created_by === user.id;
   const isEnded = game.status === "ended";
-  const leaderboard = [...players].sort(
-    (a, b) => playerPoints(b) - playerPoints(a),
+  const leaderboard = useMemo(
+    () => [...players].sort((a, b) => playerPoints(b) - playerPoints(a)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [players, game?.holes_meta],
   );
 
   // Segment winners (three sixes), by net Stableford.
