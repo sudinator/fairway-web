@@ -802,6 +802,15 @@ function GameRoom({
   const playerThru = (p: Player) =>
     (p.scores || []).filter((s) => s != null && s > 0).length;
 
+  // Gross = total strokes on holes played. Net = gross minus strokes received on those holes.
+  const playerGross = (p: Player) =>
+    playerHoles(p).reduce((s, h) => s + (h.strokes && h.strokes > 0 ? h.strokes : 0), 0);
+  const playerNet = (p: Player) =>
+    playerHoles(p).reduce(
+      (s, h) => s + (h.strokes && h.strokes > 0 ? h.strokes - (h.recv || 0) : 0),
+      0,
+    );
+
   // Net score relative to par, derived from Stableford: par = 2 pts/hole, so rel = 2*thru − points.
   // Negative = under par. Returned as a display string like "-1", "E", "+2".
   const relToParStr = (p: Player) => {
@@ -1214,80 +1223,47 @@ function GameRoom({
           {/* Leaderboard */}
           <div style={{ marginTop: 18 }}>
             <Eyebrow>LEADERBOARD · NET STABLEFORD</Eyebrow>
-            {leaderboard.map((p, i) => {
-              // Standard competition ranking: ties share a position, next position skips (1,1,3).
+            {/* Column header */}
+            <div style={{ display: "flex", alignItems: "center", padding: "6px 16px 4px", color: C.sage, fontSize: 10, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase" }}>
+              <div style={{ width: 30 }}>#</div>
+              <div style={{ flex: 1 }}>Player</div>
+              <div style={{ width: 46, textAlign: "center" }}>Gross</div>
+              <div style={{ width: 40, textAlign: "center" }}>Net</div>
+              <div style={{ width: 52, textAlign: "center" }}>Net±Par</div>
+              <div style={{ width: 40, textAlign: "center" }}>Pts</div>
+            </div>
+            {leaderboard.map((p) => {
               const pts = playerPoints(p);
-              const pos =
-                leaderboard.findIndex((x) => playerPoints(x) === pts) + 1;
-              const tied =
-                leaderboard.filter((x) => playerPoints(x) === pts).length > 1;
+              const pos = leaderboard.findIndex((x) => playerPoints(x) === pts) + 1;
+              const tied = leaderboard.filter((x) => playerPoints(x) === pts).length > 1;
+              const thru = playerThru(p);
               return (
-                <div
-                  key={p.id}
-                  style={{
-                    background: p.user_id === user.id ? C.cream : C.card,
-                    borderRadius: 12,
-                    padding: "12px 16px",
-                    marginTop: 8,
-                    display: "flex",
-                    alignItems: "center",
-                  }}
-                >
-                  <div
-                    style={{
-                      color: C.gold,
-                      fontFamily: "Georgia, serif",
-                      fontWeight: 700,
-                      width: 36,
-                      fontSize: 18,
-                    }}
-                  >
-                    {tied ? "T" : ""}
-                    {pos}
+                <div key={p.id} style={{
+                  background: p.user_id === user.id ? C.cream : C.card,
+                  borderRadius: 12, padding: "10px 16px", marginTop: 8,
+                  display: "flex", alignItems: "center",
+                }}>
+                  <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700, width: 30, fontSize: 17 }}>
+                    {tied ? "T" : ""}{pos}
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ color: C.ink, fontWeight: 700 }}>
-                      {p.display_name}
-                      {p.user_id === user.id ? " (you)" : ""}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: C.ink, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {p.display_name}{p.user_id === user.id ? " (you)" : ""}
                     </div>
-                    <div style={{ color: C.faint, fontSize: 12 }}>
-                      thru {playerThru(p)}
-                      {p.course_handicap != null
-                        ? ` · CH ${p.course_handicap}`
-                        : " · no handicap set"}
+                    <div style={{ color: C.faint, fontSize: 11 }}>
+                      thru {thru}{p.course_handicap != null ? ` · CH ${p.course_handicap}` : " · no hcp"}
                     </div>
                   </div>
-                  <div style={{ textAlign: "right", marginRight: 14 }}>
-                    <div
-                      style={{
-                        color: C.ink,
-                        fontWeight: 800,
-                        fontSize: 18,
-                        fontFamily: "Georgia, serif",
-                      }}
-                    >
-                      {relToParStr(p)}
-                    </div>
-                    <div style={{ color: C.faint, fontSize: 10 }}>
-                      thru {playerThru(p)}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      color: C.green,
-                      fontWeight: 800,
-                      fontSize: 22,
-                      fontFamily: "Georgia, serif",
-                    }}
-                  >
-                    {playerPoints(p)}
-                  </div>
-                  <div style={{ color: C.faint, fontSize: 11, marginLeft: 6 }}>
-                    pts
-                  </div>
+                  <div style={{ width: 46, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 16 }}>{thru ? playerGross(p) : "–"}</div>
+                  <div style={{ width: 40, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 16 }}>{thru ? playerNet(p) : "–"}</div>
+                  <div style={{ width: 52, textAlign: "center", color: C.ink, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{thru ? relToParStr(p) : "–"}</div>
+                  <div style={{ width: 40, textAlign: "center", color: C.green, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif" }}>{pts}</div>
                 </div>
               );
             })}
+            <div style={{ color: C.sage, fontSize: 10, marginTop: 8 }}>
+              Gross = total strokes · Net = gross minus handicap strokes · Net±Par = net score vs. par · Pts = net Stableford points.
+            </div>
           </div>
 
           {/* Three sixes */}
