@@ -11,6 +11,9 @@ import {
   stablefordPts,
   stablefordBySix,
   matchStatus,
+  matchStrokesFor,
+  matchProgress,
+  matchLeadLabel,
   matchAllowance,
 } from "@/lib/golf";
 import { loadCoursesForGroup } from "@/lib/courses";
@@ -41,6 +44,7 @@ type Game = {
   game_type: "stableford" | "match";
   pairings: { a: string; b: string }[]; // for match play: user_id vs user_id
   status?: "active" | "ended" | null;
+  teams?: { key: string; name: string }[] | null; // two named teams for team match play
   created_by: string;
   created_at: string;
 };
@@ -58,6 +62,7 @@ type Player = {
   scores: (number | null)[]; // strokes per hole
   putts: (number | null)[]; // putts per hole
   fairways: ("hit" | "miss" | null)[]; // fairway result per hole (par 4/5)
+  team?: string | null; // team key ("A"/"B") for team match play
 };
 
 // ---------------- Root tournament tab ----------------
@@ -303,6 +308,9 @@ function CreateGame({
   const [gameType, setGameType] = useState<"stableford" | "match">(
     "stableford",
   );
+  const [teamMode, setTeamMode] = useState(false);
+  const [team1, setTeam1] = useState("Team 1");
+  const [team2, setTeam2] = useState("Team 2");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [groupRoster, setGroupRoster] = useState<
@@ -406,6 +414,13 @@ function CreateGame({
           holes_meta: holesMeta,
           game_type: gameType,
           pairings: [],
+          teams:
+            gameType === "match" && teamMode
+              ? [
+                  { key: "A", name: team1.trim() || "Team 1" },
+                  { key: "B", name: team2.trim() || "Team 2" },
+                ]
+              : null,
         })
         .select()
         .single();
@@ -662,6 +677,23 @@ function CreateGame({
             ? "Everyone competes on one net-Stableford leaderboard."
             : "Players are paired 1-on-1. After friends join, you'll set the matchups. Lower handicap plays off scratch; opponent gets the difference."}
         </div>
+        {gameType === "match" && (
+          <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input type="checkbox" checked={teamMode} onChange={(e) => setTeamMode(e.target.checked)} />
+              <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>Team match (e.g. 4 v 4)</span>
+            </label>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
+              Two teams. Each 1-on-1 pairing is worth a point; the team total is the sum (halved matches = ½ each). You'll assign players to teams after creating.
+            </div>
+            {teamMode && (
+              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
+                <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {err && (
@@ -1319,6 +1351,17 @@ function GameRoom({
           </div>
           <ScoreEntryCard
             holes={(() => {
+              // In match play, dots reflect the RELATIVE allowance (strokes given/received
+              // vs. the opponent), not full course handicap. Stroke-play uses full allocation.
+              let matchAllow: number | null = null;
+              if (game.game_type === "match") {
+                const pr = game.pairings.find((p) => p.a === user.id || p.b === user.id);
+                if (pr) {
+                  const oppId = pr.a === user.id ? pr.b : pr.a;
+                  const oppP = players.find((p) => p.user_id === oppId);
+                  matchAllow = matchAllowance(me.course_handicap, oppP?.course_handicap ?? null).a;
+                }
+              }
               const alloc = allocateStrokes(
                 game.holes_meta.map((m) => ({
                   hole_number: m.n,
@@ -1333,7 +1376,7 @@ function GameRoom({
                 strokes: me.scores?.[i] ?? null,
                 putts: me.putts?.[i] ?? null,
                 fairway: me.fairways?.[i] ?? null,
-                recv: alloc[m.n] || 0,
+                recv: matchAllow != null ? matchStrokesFor(matchAllow, m.si) : (alloc[m.n] || 0),
               }));
             })()}
             hasHandicap={me.course_handicap != null}
@@ -1355,6 +1398,23 @@ function GameRoom({
               const oppId = pr.a === user.id ? pr.b : pr.a;
               const oppP = players.find((p) => p.user_id === oppId);
               return oppP?.display_name?.split(" ")[0] || "Opp";
+            })()}
+            matchRun={(() => {
+              if (game.game_type !== "match") return undefined;
+              const pr = game.pairings.find((p) => p.a === user.id || p.b === user.id);
+              if (!pr) return undefined;
+              const oppId = pr.a === user.id ? pr.b : pr.a;
+              const oppP = players.find((p) => p.user_id === oppId);
+              if (!oppP) return undefined;
+              // Compute from MY perspective: me = A.
+              const prog = matchProgress(
+                game.holes_meta,
+                me.scores || [],
+                oppP.scores || [],
+                me.course_handicap,
+                oppP.course_handicap,
+              );
+              return prog.map((lead) => matchLeadLabel(lead));
             })()}
           />
           <MyStatsLine me={me} holes={playerHoles(me)} />
@@ -1449,8 +1509,84 @@ function MatchView({
     onChanged();
   };
 
+  // ---- Team match play ----
+  const teams = game.teams || null;
+  const isTeam = Array.isArray(teams) && teams.length === 2;
+  const teamName = (key: string | null | undefined) => teams?.find((t) => t.key === key)?.name || "—";
+
+  const assignTeam = async (p: Player, key: string | null) => {
+    await supabase.from("game_players").update({ team: key }).eq("id", p.id);
+    onChanged();
+  };
+
+  // Running team points: each decided/leading pairing contributes to a team. Halved = ½ each.
+  const teamStandings = (() => {
+    if (!isTeam) return null;
+    const pts: Record<string, number> = { A: 0, B: 0 };
+    let decidedPts: Record<string, number> = { A: 0, B: 0 };
+    game.pairings.forEach((pr) => {
+      const pa = playerOf(pr.a), pb = playerOf(pr.b);
+      if (!pa || !pb) return;
+      const st = matchStatus(game.holes_meta, pa.scores || [], pb.scores || [], pa.course_handicap, pb.course_handicap);
+      // Determine which team each player is on.
+      const ta = pa.team, tb = pb.team;
+      if (!ta || !tb || ta === tb) return; // need a cross-team pairing
+      const decided = !!st.result;
+      const award = (winnerTeam: string, half: boolean) => {
+        if (half) { pts.A += 0.5; pts.B += 0.5; if (decided) { decidedPts.A += 0.5; decidedPts.B += 0.5; } }
+        else { pts[winnerTeam] += 1; if (decided) decidedPts[winnerTeam] += 1; }
+      };
+      if (st.thru === 0) return; // not started
+      if (st.lead === 0) award("", true);
+      else {
+        const leadTeam = st.lead > 0 ? ta : tb;
+        award(leadTeam, false);
+      }
+    });
+    return { pts, decidedPts };
+  })();
+
+  const fmtPts = (n: number) => (n === Math.floor(n) ? String(n) : `${Math.floor(n)}½`);
+
   return (
     <div style={{ marginTop: 18 }}>
+      {isTeam && teamStandings && (
+        <div style={{ background: C.green, borderRadius: 14, padding: 16, marginBottom: 16 }}>
+          <div style={{ color: C.cream, fontSize: 10, letterSpacing: 2, fontWeight: 800, opacity: 0.8 }}>TEAM MATCH · RUNNING SCORE</div>
+          <div style={{ display: "flex", alignItems: "center", marginTop: 10 }}>
+            <div style={{ flex: 1, textAlign: "center" }}>
+              <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![0].name}</div>
+              <div style={{ color: teamStandings.pts.A >= teamStandings.pts.B ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.pts.A)}</div>
+            </div>
+            <div style={{ color: C.cream, fontSize: 18, opacity: 0.7, padding: "0 8px" }}>–</div>
+            <div style={{ flex: 1, textAlign: "center" }}>
+              <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![1].name}</div>
+              <div style={{ color: teamStandings.pts.B >= teamStandings.pts.A ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.pts.B)}</div>
+            </div>
+          </div>
+          <div style={{ color: C.cream, opacity: 0.7, fontSize: 11, textAlign: "center", marginTop: 8 }}>
+            Projected from current match states · {fmtPts(teamStandings.decidedPts.A)}–{fmtPts(teamStandings.decidedPts.B)} decided
+          </div>
+        </div>
+      )}
+
+      {/* Organizer: assign players to teams */}
+      {isTeam && isCreator && (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginBottom: 16 }}>
+          <Eyebrow>ASSIGN TEAMS</Eyebrow>
+          {players.map((p) => (
+            <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: `1px solid ${C.greenMid}` }}>
+              <div style={{ flex: 1, color: C.cream, fontWeight: 700, fontSize: 14 }}>{p.display_name}</div>
+              {teams!.map((t) => (
+                <button key={t.key} onClick={() => assignTeam(p, t.key)}
+                  style={{ ...btn(p.team === t.key), fontSize: 11, padding: "5px 10px" }}>{t.name}</button>
+              ))}
+            </div>
+          ))}
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Assign each player to a team, then set the 1-on-1 matchups below (pair players from opposite teams).</div>
+        </div>
+      )}
+
       <div style={{ display: "flex", alignItems: "center" }}>
         <Eyebrow>MATCHES</Eyebrow>
         <div style={{ flex: 1 }} />
@@ -1580,9 +1716,9 @@ function MatchView({
             <div style={{ display: "flex", alignItems: "center" }}>
               <div style={{ flex: 1 }}>
                 <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>
-                  {pa.display_name}{" "}
+                  {pa.display_name}{isTeam ? <span style={{ color: C.gold, fontWeight: 400, fontSize: 12 }}> ({teamName(pa.team)})</span> : null}{" "}
                   <span style={{ color: C.faint, fontWeight: 400 }}>vs</span>{" "}
-                  {pb.display_name}
+                  {pb.display_name}{isTeam ? <span style={{ color: C.gold, fontWeight: 400, fontSize: 12 }}> ({teamName(pb.team)})</span> : null}
                 </div>
                 <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
                   thru {st.thru} · {pa.display_name}{" "}

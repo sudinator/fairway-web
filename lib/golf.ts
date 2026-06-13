@@ -194,6 +194,36 @@ export function matchAllowance(chA: number | null, chB: number | null): { a: num
 
 // Compute the match status from each player's gross scores.
 // Returns holes played, A's lead (positive = A up), and a settled result string.
+// Per-hole running match lead from player A's perspective.
+// Returns an array aligned to holes: cumulative lead after each *played* hole
+// (positive = A up, negative = A down, 0 = all square), or null for holes not yet played by both.
+export function matchProgress(
+  holes: MatchHoleMeta[],
+  grossA: (number | null)[],
+  grossB: (number | null)[],
+  chA: number | null,
+  chB: number | null
+): (number | null)[] {
+  const allow = matchAllowance(chA, chB);
+  let lead = 0;
+  return holes.map((h, i) => {
+    const ga = grossA[i], gb = grossB[i];
+    if (ga == null || gb == null || ga <= 0 || gb <= 0) return null;
+    const netA = ga - matchStrokesFor(allow.a, h.si);
+    const netB = gb - matchStrokesFor(allow.b, h.si);
+    if (netA < netB) lead++;
+    else if (netB < netA) lead--;
+    return lead;
+  });
+}
+
+// Short label for a running lead from the scorer's perspective.
+export function matchLeadLabel(lead: number | null): string {
+  if (lead == null) return "";
+  if (lead === 0) return "AS";
+  return `${Math.abs(lead)}${lead > 0 ? "↑" : "↓"}`;
+}
+
 export function matchStatus(
   holes: MatchHoleMeta[],
   grossA: (number | null)[],

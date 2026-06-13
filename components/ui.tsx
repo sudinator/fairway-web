@@ -76,7 +76,7 @@ export type EntryHole = {
 
 // SCORE ENTRY — vertical, one row per hole, fits screen width (no horizontal scroll).
 // Used by both individual stroke play and group play so the card is identical everywhere.
-export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel }: {
+export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun }: {
   holes: EntryHole[];
   hasHandicap: boolean;
   onSet: (i: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | null; penalties?: number | null }) => void;
@@ -86,8 +86,10 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   showPenalties?: boolean;
   opp?: (number | null)[];     // optional opponent gross per hole (match play) — read-only column
   oppLabel?: string;           // short opponent name for the column header
+  matchRun?: (string | null)[]; // optional per-hole running match status labels (e.g. "1↑", "AS")
 }) {
   const showOpp = Array.isArray(opp);
+  const showRun = Array.isArray(matchRun);
   const cycleFw = (i: number, cur: "hit" | "miss" | null, par: number) => {
     if (par < 4) return;
     onSet(i, { fairway: cur == null ? "hit" : cur === "hit" ? "miss" : null });
@@ -104,7 +106,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     const sPutts = seg.reduce((s, h) => s + (h.putts || 0), 0);
     const sPen = seg.reduce((s, h) => s + (h.penalties || 0), 0);
     const sPts = seg.reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
-    const cols = `26px 24px 24px${showOpp ? " 40px" : ""}${hasDots ? " 28px" : ""} 1fr${showFairway ? " 30px" : ""}${showPutts ? " 54px" : ""}${showPenalties ? " 48px" : ""} 28px`;
+    const cols = `26px 24px 24px${showOpp ? " 40px" : ""}${hasDots ? " 28px" : ""} 1fr${showFairway ? " 30px" : ""}${showPutts ? " 54px" : ""}${showPenalties ? " 48px" : ""} 28px${showRun ? " 40px" : ""}`;
     const Row = (cells: React.ReactNode[], opts?: { header?: boolean; foot?: boolean }) => (
       <div style={{
         display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4,
@@ -128,6 +130,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           ...(showPutts ? [<div key="pu" style={{ ...headStyle, textAlign: "center" }}>Putt</div>] : []),
           ...(showPenalties ? [<div key="pe" style={{ ...headStyle, textAlign: "center" }}>Pen</div>] : []),
           <div key="pt" style={{ ...headStyle, textAlign: "center" }}>Pts</div>,
+          ...(showRun ? [<div key="ms" style={{ ...headStyle, textAlign: "center", color: C.gold }}>Match</div>] : []),
         ], { header: true })}
         {seg.map((h, j) => {
           const i = from + j;
@@ -169,6 +172,11 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
               </div>,
             ] : []),
             <div key="pt" style={{ textAlign: "center", color: ptsColor(pts), fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
+            ...(showRun ? [(() => {
+              const lbl = matchRun![i] || "";
+              const col = lbl === "" ? C.faint : lbl === "AS" ? C.ink : lbl.includes("↑") ? C.greenMid : C.birdie;
+              return <div key="ms" style={{ textAlign: "center", color: col, fontWeight: 800, fontSize: 13 }}>{lbl || "·"}</div>;
+            })()] : []),
           ]);
         })}
         {Row([
@@ -185,6 +193,12 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           ...(showPutts ? [<div key="pu" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 13 }}>{sPutts || "–"}</div>] : []),
           ...(showPenalties ? [<div key="pe" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 13 }}>{sPen || "–"}</div>] : []),
           <div key="pt" style={{ textAlign: "center", color: C.green, fontWeight: 800, fontSize: 14 }}>{sPts}</div>,
+          ...(showRun ? [(() => {
+            let lbl = "";
+            for (let k = to - 1; k >= from; k--) { if (matchRun![k]) { lbl = matchRun![k] as string; break; } }
+            const col = lbl === "" ? C.faint : lbl === "AS" ? C.ink : lbl.includes("↑") ? C.greenMid : C.birdie;
+            return <div key="ms" style={{ textAlign: "center", color: col, fontWeight: 800, fontSize: 13 }}>{lbl || "–"}</div>;
+          })()] : []),
         ], { foot: true })}
       </div>
     );
