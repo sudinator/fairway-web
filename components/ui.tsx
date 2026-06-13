@@ -90,6 +90,14 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
 }) {
   const showOpp = Array.isArray(opp);
   const showRun = Array.isArray(matchRun);
+  // iOS WebKit can paint a controlled <select> blank when its value is set as the
+  // screen first renders (e.g. resuming a round). Flipping this flag right after
+  // mount forces the dropdowns to re-render so they show their saved value.
+  const [hydrated, setHydrated] = React.useState(false);
+  React.useEffect(() => {
+    const r = requestAnimationFrame(() => setHydrated(true));
+    return () => cancelAnimationFrame(r);
+  }, []);
   const cycleFw = (i: number, cur: "hit" | "miss" | null, par: number) => {
     if (par < 4) return;
     onSet(i, { fairway: cur == null ? "hit" : cur === "hit" ? "miss" : null });
@@ -149,7 +157,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
             })()] : []),
             ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: C.dot, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{h.recv > 0 ? "•".repeat(Math.min(h.recv, 3)) : ""}</div>] : []),
             <div key="sc" style={{ textAlign: "center" }}>
-              <NumPicker value={h.strokes} from={1} to={maxStrokes} onChange={(v) => onSet(i, { strokes: v })} width={48} accent={savingHole === i} />
+              <NumPicker key={`sc-${hydrated}`} value={h.strokes} from={1} to={maxStrokes} onChange={(v) => onSet(i, { strokes: v })} width={48} accent={savingHole === i} />
             </div>,
             ...(showFairway ? [
               <div key="fw" style={{ textAlign: "center" }}>
@@ -163,12 +171,12 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
             ] : []),
             ...(showPutts ? [
               <div key="pu" style={{ textAlign: "center" }}>
-                <NumPicker value={h.putts} from={0} to={maxPutts} onChange={(v) => onSet(i, { putts: v })} width={48} />
+                <NumPicker key={`pu-${hydrated}`} value={h.putts} from={0} to={maxPutts} onChange={(v) => onSet(i, { putts: v })} width={48} />
               </div>,
             ] : []),
             ...(showPenalties ? [
               <div key="pe" style={{ textAlign: "center" }}>
-                <NumPicker value={h.penalties || null} from={1} to={3} onChange={(v) => onSet(i, { penalties: v ?? 0 })} width={44} />
+                <NumPicker key={`pe-${hydrated}`} value={h.penalties || null} from={1} to={3} onChange={(v) => onSet(i, { penalties: v ?? 0 })} width={44} />
               </div>,
             ] : []),
             <div key="pt" style={{ textAlign: "center", color: ptsColor(pts), fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
