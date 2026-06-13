@@ -40,6 +40,7 @@ type Game = {
   holes_meta: { n: number; par: number; si: number | null }[]; // par + stroke index per hole
   game_type: "stableford" | "match";
   pairings: { a: string; b: string }[]; // for match play: user_id vs user_id
+  status?: "active" | "ended" | null;
   created_by: string;
   created_at: string;
 };
@@ -269,6 +270,7 @@ function GameList({
         >
           <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>
             {g.name}
+            {g.status === "ended" ? <span style={{ color: "#1A1A1A", background: C.gold, borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 800, marginLeft: 8 }}>FINAL</span> : null}
           </div>
           <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
             {g.course} · code <b style={{ color: C.green }}>{g.code}</b>
@@ -738,7 +740,7 @@ function GameRoom({
       load();
     }, 60000);
     return () => clearInterval(t);
-  }, [load, savingHole]);
+  }, [load, savingHole, game?.status]);
 
   // Build a player's per-hole Hole[] (with strokes received) for scoring math.
   const playerHoles = (p: Player): Hole[] => {
@@ -952,6 +954,22 @@ function GameRoom({
     await load();
   };
 
+  // Organizer: end the game — freezes scores and shows final results.
+  const endGame = async () => {
+    if (!game) return;
+    if (!confirm(`End "${game.name}"? Final standings are locked in and players can no longer change scores.`)) return;
+    await supabase.from("games").update({ status: "ended" }).eq("id", game.id);
+    await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_ended", group_id: (game as any).group_id || null, summary: `Ended the game "${game.name}"` });
+    await load();
+  };
+
+  // Organizer: reopen an ended game if it was ended by mistake.
+  const reopenGame = async () => {
+    if (!game) return;
+    await supabase.from("games").update({ status: "active" }).eq("id", game.id);
+    await load();
+  };
+
   // Organizer: delete the entire game and all its player rows.
   const deleteGame = async () => {
     if (!game) return;
@@ -980,6 +998,7 @@ function GameRoom({
     );
 
   const isOrganizer = game.created_by === user.id;
+  const isEnded = game.status === "ended";
   const leaderboard = [...players].sort(
     (a, b) => playerPoints(b) - playerPoints(a),
   );
@@ -1132,16 +1151,22 @@ function GameRoom({
           onRemove={removePlayer}
           onRename={renameGame}
           onDelete={deleteGame}
+          onEnd={endGame}
+          onReopen={reopenGame}
         />
       )}
 
-      <div style={{ marginTop: 16, background: game.game_type === "match" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10 }}>
+      <div style={{ marginTop: 16, background: isEnded ? "#3A3A3A" : game.game_type === "match" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>
           {game.game_type === "match" ? "⛳ Singles Match Play" : "🏆 Stableford Tournament"}
         </span>
-        <span style={{ color: C.cream, opacity: 0.8, fontSize: 12 }}>
-          {game.game_type === "match" ? "1-on-1 pairings" : "net Stableford leaderboard"}
-        </span>
+        {isEnded ? (
+          <span style={{ fontSize: 12, fontWeight: 800, background: C.gold, color: "#1A1A1A", borderRadius: 20, padding: "3px 10px" }}>FINAL · GAME ENDED</span>
+        ) : (
+          <span style={{ color: C.cream, opacity: 0.8, fontSize: 12 }}>
+            {game.game_type === "match" ? "1-on-1 pairings" : "net Stableford leaderboard"}
+          </span>
+        )}
       </div>
 
       {game.game_type === "match" ? (
@@ -1286,10 +1311,11 @@ function GameRoom({
       {/* My score entry */}
       {me && (
         <div style={{ marginTop: 22 }}>
-          <Eyebrow>ENTER YOUR SCORES</Eyebrow>
+          <Eyebrow>{isEnded ? "YOUR FINAL SCORES" : "ENTER YOUR SCORES"}</Eyebrow>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
-            Tap a hole and pick your strokes — it saves and updates the
-            leaderboard. Tap ⟳ Refresh to see others' latest.
+            {isEnded
+              ? "This game has ended — scores are locked in."
+              : "Tap a hole and pick your strokes — it saves and updates the leaderboard. Tap ⟳ Refresh to see others' latest."}
           </div>
           <ScoreEntryCard
             holes={(() => {
@@ -1311,7 +1337,7 @@ function GameRoom({
               }));
             })()}
             hasHandicap={me.course_handicap != null}
-            onSet={(i, patch) => setMyHole(i, patch)}
+            onSet={(i, patch) => { if (!isEnded) setMyHole(i, patch); }}
             savingHole={savingHole}
             showPenalties={false}
           />
@@ -1598,6 +1624,8 @@ function OrganizerPanel({
   onRemove,
   onRename,
   onDelete,
+  onEnd,
+  onReopen,
 }: {
   game: Game;
   players: Player[];
@@ -1611,6 +1639,8 @@ function OrganizerPanel({
   onRemove: (p: Player) => Promise<void>;
   onRename: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
+  onEnd: () => Promise<void>;
+  onReopen: () => Promise<void>;
 }) {
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -1886,6 +1916,21 @@ function OrganizerPanel({
                 Rename
               </button>
             </div>
+            {game.status === "ended" ? (
+              <button
+                style={{ ...btn(false), marginTop: 10, fontSize: 13 }}
+                onClick={onReopen}
+              >
+                ↺ Reopen game
+              </button>
+            ) : (
+              <button
+                style={{ ...btn(true), marginTop: 10, fontSize: 13, display: "block" }}
+                onClick={onEnd}
+              >
+                🏁 End game (lock final results)
+              </button>
+            )}
             <button
               style={{
                 background: "#5A1E1E",
@@ -1897,6 +1942,7 @@ function OrganizerPanel({
                 cursor: "pointer",
                 marginTop: 10,
                 fontSize: 13,
+                display: "block",
               }}
               onClick={onDelete}
             >
