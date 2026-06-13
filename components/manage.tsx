@@ -509,14 +509,21 @@ function AdminPanel({ user }: { user: any }) {
   const [scoringFor, setScoringFor] = useState<any | null>(null);
   const [deletedCourses, setDeletedCourses] = useState<any[]>([]);
   const [pendingGroups, setPendingGroups] = useState<any[]>([]);
+  const [allGroups, setAllGroups] = useState<any[]>([]);
+  const [memberships, setMemberships] = useState<any[]>([]);
+  const [manageGroupsFor, setManageGroupsFor] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const { data } = await supabase.from("profiles").select("*").order("last_active", { ascending: false });
     setProfiles(data || []);
     const { data: del } = await supabase.from("favorite_courses").select("*").eq("deleted", true).order("deleted_at", { ascending: false });
     setDeletedCourses(del || []);
+    // All active groups + every membership, for global player management.
+    const { data: gs } = await supabase.from("groups").select("id, name, status").neq("status", "declined").order("name");
+    setAllGroups((gs || []).filter((g: any) => (g.status ?? "active") === "active"));
+    const { data: mem } = await supabase.from("group_members").select("id, group_id, user_id, role, status").neq("status", "removed");
+    setMemberships(mem || []);
     const { data: reqs } = await supabase.from("groups").select("id, name, request_note, created_by, status").eq("status", "pending").order("created_at", { ascending: true });
-    // Attach requester info.
     const reqList = reqs || [];
     const reqIds = reqList.map((r: any) => r.created_by).filter(Boolean);
     let byId: Record<string, any> = {};
@@ -527,6 +534,57 @@ function AdminPanel({ user }: { user: any }) {
     setPendingGroups(reqList.map((r: any) => ({ ...r, requester: byId[r.created_by] || null })));
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  // --- Global player ↔ group management (admin governance) ---
+  const addToGroup = async (p: any, groupId: string) => {
+    const existing = memberships.find((m) => m.user_id === p.id && m.group_id === groupId);
+    if (existing) return;
+    await supabase.from("group_members").insert({
+      group_id: groupId, user_id: p.id, email: (p.email || "").toLowerCase(), role: "member", status: "active",
+    });
+    await notify(p.id, `An admin added you to a group.`);
+    await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "member_added", group_id: groupId, target_user_id: p.id, summary: `Added ${p.display_name || p.email} to a group` });
+    await load();
+  };
+
+  const removeFromGroup = async (p: any, m: any, groupName: string) => {
+    if (!confirm(`Remove ${p.display_name || p.email} from "${groupName}"?`)) return;
+    await supabase.from("group_members").update({ status: "removed" }).eq("id", m.id);
+    await notify(p.id, `An admin removed you from "${groupName}".`);
+    await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "member_removed", group_id: m.group_id, target_user_id: p.id, summary: `Removed ${p.display_name || p.email} from "${groupName}"` });
+    await load();
+  };
+
+  // Deactivate: remove from all groups + block access, but keep their data.
+  const deactivatePlayer = async (p: any) => {
+    if (!confirm(`Deactivate ${p.display_name || p.email}?\n\nThey'll be removed from all groups and blocked from using the app, but their rounds and history are kept. You can reactivate them later.`)) return;
+    await supabase.from("group_members").update({ status: "removed" }).eq("user_id", p.id);
+    await supabase.from("profiles").update({ deactivated: true }).eq("id", p.id);
+    await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "player_deactivated", target_user_id: p.id, summary: `Deactivated ${p.display_name || p.email}` });
+    await load();
+  };
+
+  const reactivatePlayer = async (p: any) => {
+    await supabase.from("profiles").update({ deactivated: false }).eq("id", p.id);
+    await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "player_reactivated", target_user_id: p.id, summary: `Reactivated ${p.display_name || p.email}` });
+    await load();
+  };
+
+  // Hard delete: erase the player and all their data permanently.
+  const deletePlayer = async (p: any) => {
+    const typed = prompt(`PERMANENTLY DELETE ${p.display_name || p.email} and ALL their rounds and scores?\n\nThis cannot be undone. Type DELETE to confirm.`);
+    if (typed !== "DELETE") return;
+    // Remove their rounds (and holes cascade if FK set), group memberships, then profile.
+    const { data: rs } = await supabase.from("rounds").select("id").eq("user_id", p.id);
+    const roundIds = (rs || []).map((r: any) => r.id);
+    if (roundIds.length) { await supabase.from("holes").delete().in("round_id", roundIds); }
+    await supabase.from("rounds").delete().eq("user_id", p.id);
+    await supabase.from("game_players").delete().eq("user_id", p.id);
+    await supabase.from("group_members").delete().eq("user_id", p.id);
+    await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "player_deleted", summary: `Permanently deleted ${p.display_name || p.email}` });
+    await supabase.from("profiles").delete().eq("id", p.id);
+    await load();
+  };
 
   // Approve a pending group request → it becomes active and appears for its members.
   const approveGroup = async (g: any) => {
@@ -615,6 +673,61 @@ function AdminPanel({ user }: { user: any }) {
             </div>
           </div>
           <button style={{ ...btn(false), padding: "6px 12px", fontSize: 12 }} onClick={() => setScoringFor(p)}>Edit scores</button>
+          <button style={{ ...btn(false), padding: "6px 12px", fontSize: 12 }} onClick={() => setManageGroupsFor(manageGroupsFor === p.id ? null : p.id)}>
+            {manageGroupsFor === p.id ? "Close" : "Manage"}
+          </button>
+          {p.deactivated && <span style={{ color: C.birdie, fontSize: 11, fontWeight: 800 }}>DEACTIVATED</span>}
+
+          {manageGroupsFor === p.id && (
+            <div style={{ width: "100%", background: C.greenLight, borderRadius: 10, padding: 12, marginTop: 8 }}>
+              <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>GROUPS</div>
+              {(() => {
+                const mine = memberships.filter((m) => m.user_id === p.id);
+                const myGroupIds = new Set(mine.map((m) => m.group_id));
+                return (
+                  <>
+                    {mine.length === 0 && <div style={{ color: C.faint, fontSize: 12, marginTop: 6 }}>Not in any group.</div>}
+                    {mine.map((m) => {
+                      const g = allGroups.find((x) => x.id === m.group_id);
+                      return (
+                        <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: `1px solid ${C.greenMid}` }}>
+                          <span style={{ flex: 1, color: C.cream, fontSize: 13 }}>{g?.name || "Group"}{m.role === "admin" ? " · admin" : ""}</span>
+                          <button style={{ ...btn(false), padding: "4px 10px", fontSize: 11, color: C.birdie }} onClick={() => removeFromGroup(p, m, g?.name || "this group")}>Remove</button>
+                        </div>
+                      );
+                    })}
+                    <div style={{ display: "flex", gap: 6, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
+                      <label style={{ color: C.sage, fontSize: 11 }}>Add to group:</label>
+                      <select defaultValue="" onChange={(e) => { if (e.target.value) { addToGroup(p, e.target.value); e.target.value = ""; } }}
+                        style={{ ...inputStyle, padding: "6px 8px", fontSize: 12, maxWidth: 180 }}>
+                        <option value="">Select…</option>
+                        {allGroups.filter((g) => !myGroupIds.has(g.id)).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                      </select>
+                    </div>
+
+                    <div style={{ borderTop: `1px solid ${C.greenMid}`, marginTop: 12, paddingTop: 10 }}>
+                      <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>REMOVE FROM APP</div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                        {p.deactivated ? (
+                          <button style={{ ...btn(true), padding: "7px 12px", fontSize: 12 }} onClick={() => reactivatePlayer(p)}>Reactivate</button>
+                        ) : (
+                          <button style={{ background: "#7A4E18", color: "#F6E9D6", border: "none", borderRadius: 8, padding: "7px 12px", fontWeight: 700, cursor: "pointer", fontSize: 12 }} onClick={() => deactivatePlayer(p)}>
+                            Deactivate (keep data)
+                          </button>
+                        )}
+                        <button style={{ background: "#5A1E1E", color: "#F6DEDB", border: "none", borderRadius: 8, padding: "7px 12px", fontWeight: 700, cursor: "pointer", fontSize: 12 }} onClick={() => deletePlayer(p)}>
+                          Delete permanently
+                        </button>
+                      </div>
+                      <div style={{ color: C.sage, fontSize: 10, marginTop: 6 }}>
+                        Deactivate removes them from all groups and blocks access but keeps history (reversible). Delete erases the player and all their rounds for good.
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </div>
       ))}
 

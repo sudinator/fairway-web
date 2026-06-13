@@ -148,6 +148,19 @@ export function Home({ session }: { session: any }) {
     return <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 60px", color: C.sage }}>Loading groups…</div>;
   }
 
+  if (profile?.deactivated) {
+    return (
+      <div style={{ maxWidth: 480, margin: "80px auto", padding: 24, textAlign: "center" }}>
+        <Wordmark width={220} />
+        <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 20, marginTop: 24 }}>Your access is paused</div>
+        <div style={{ color: C.sage, fontSize: 14, marginTop: 10, lineHeight: 1.6 }}>
+          An administrator has deactivated your account. Your history is saved. If you think this is a mistake, please reach out to your group admin.
+        </div>
+        <button style={{ ...btn(false), marginTop: 20 }} onClick={() => supabase.auth.signOut()}>Sign out</button>
+      </div>
+    );
+  }
+
   return (
     <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 60px" }}>
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>

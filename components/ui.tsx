@@ -106,7 +106,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     const sPutts = seg.reduce((s, h) => s + (h.putts || 0), 0);
     const sPen = seg.reduce((s, h) => s + (h.penalties || 0), 0);
     const sPts = seg.reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
-    const cols = `26px 24px 24px${showOpp ? " 40px" : ""}${hasDots ? " 28px" : ""} 1fr${showFairway ? " 30px" : ""}${showPutts ? " 54px" : ""}${showPenalties ? " 48px" : ""} 28px${showRun ? " 40px" : ""}`;
+    const cols = `26px 24px 24px${showOpp ? " 40px" : ""}${hasDots ? " 28px" : ""} 1fr${showFairway ? " 30px" : ""}${showPutts ? " 54px" : ""}${showPenalties ? " 48px" : ""} 28px${showRun ? " 44px" : ""}`;
     const Row = (cells: React.ReactNode[], opts?: { header?: boolean; foot?: boolean }) => (
       <div style={{
         display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4,
@@ -174,7 +174,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
             <div key="pt" style={{ textAlign: "center", color: ptsColor(pts), fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
             ...(showRun ? [(() => {
               const lbl = matchRun![i] || "";
-              const col = lbl === "" ? C.faint : lbl === "AS" ? C.ink : lbl.includes("↑") ? C.greenMid : C.birdie;
+              const col = lbl === "" ? C.faint : lbl === "AS" ? C.ink : lbl.includes("UP") ? C.greenMid : C.birdie;
               return <div key="ms" style={{ textAlign: "center", color: col, fontWeight: 800, fontSize: 13 }}>{lbl || "·"}</div>;
             })()] : []),
           ]);
@@ -196,7 +196,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           ...(showRun ? [(() => {
             let lbl = "";
             for (let k = to - 1; k >= from; k--) { if (matchRun![k]) { lbl = matchRun![k] as string; break; } }
-            const col = lbl === "" ? C.faint : lbl === "AS" ? C.ink : lbl.includes("↑") ? C.greenMid : C.birdie;
+            const col = lbl === "" ? C.faint : lbl === "AS" ? C.ink : lbl.includes("UP") ? C.greenMid : C.birdie;
             return <div key="ms" style={{ textAlign: "center", color: col, fontWeight: 800, fontSize: 13 }}>{lbl || "–"}</div>;
           })()] : []),
         ], { foot: true })}

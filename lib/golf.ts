@@ -221,7 +221,7 @@ export function matchProgress(
 export function matchLeadLabel(lead: number | null): string {
   if (lead == null) return "";
   if (lead === 0) return "AS";
-  return `${Math.abs(lead)}${lead > 0 ? "↑" : "↓"}`;
+  return `${Math.abs(lead)}${lead > 0 ? "UP" : "DN"}`;
 }
 
 export function matchStatus(
