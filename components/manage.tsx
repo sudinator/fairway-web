@@ -661,7 +661,27 @@ function AdminPanel({ user }: { user: any }) {
             <div style={{ color: C.faint, fontSize: 12 }}>
               {p.email || "no email"}{p.phone ? ` · ${p.phone}` : ""}{p.ghin_number ? ` · GHIN ${p.ghin_number}` : ""}
             </div>
-            <div style={{ color: C.faint, fontSize: 11, marginTop: 1 }}>active {timeAgo(p.last_active)}</div>
+            <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
+              Handicap: {p.handicap_index != null ? p.handicap_index : "—"}
+            </div>
+            {(() => {
+              const mine = memberships.filter((m) => m.user_id === p.id);
+              if (mine.length === 0) return <div style={{ color: C.birdie, fontSize: 12, marginTop: 2 }}>Groups: none</div>;
+              return (
+                <div style={{ color: C.green, fontSize: 12, marginTop: 2, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  <span style={{ color: C.faint }}>Groups:</span>
+                  {mine.map((m) => {
+                    const g = allGroups.find((x) => x.id === m.group_id);
+                    return (
+                      <span key={m.id} style={{ background: C.greenLight, color: C.cream, borderRadius: 12, padding: "1px 9px", fontSize: 11, fontWeight: 700 }}>
+                        {g?.name || "Group"}{m.role === "admin" ? " ★" : ""}
+                      </span>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+            <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>active {timeAgo(p.last_active)}</div>
           </div>
           <div>
             <label style={{ color: C.sage, fontSize: 10 }}>Handicap index</label>
