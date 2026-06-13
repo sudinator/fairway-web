@@ -42,6 +42,57 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   const [err, setErr] = useState<string | null>(null);
   const [favMsg, setFavMsg] = useState<string | null>(null);
   const isResumed = !!round.id || draftHasScores(round);
+  // Server-side backup: the DB round id once a background save has created it.
+  const dbIdRef = React.useRef<string>(round.id || "");
+  const blanksRef = React.useRef(false);
+  const saveTimerRef = React.useRef<any>(null);
+
+  // Best-effort background save to the database. Never blocks entry and swallows
+  // errors — local storage is the instant guarantee; this is server redundancy
+  // so a round survives even if device storage is cleared or you switch devices.
+  const backgroundSave = useCallback(async (currentHoles: Hole[]) => {
+    try {
+      let rid = dbIdRef.current;
+      if (!rid) {
+        const { data: u } = await supabase.auth.getUser();
+        const { data: r } = await supabase.from("rounds").insert({
+          user_id: u.user!.id,
+          course: round.course, tee_name: round.tee_name,
+          rating: round.rating, slope: round.slope, course_par: round.course_par,
+          handicap_index: round.handicap_index, course_handicap: round.course_handicap,
+          played_at: round.played_at, group_id: round.group_id || null,
+          status: "in_progress",
+        }).select().single();
+        if (!r) return;
+        rid = r.id;
+        dbIdRef.current = rid;
+      }
+      if (!blanksRef.current) {
+        blanksRef.current = true;
+        const { data: existing } = await supabase.from("holes").select("hole_number").eq("round_id", rid);
+        const have = new Set((existing || []).map((x: any) => x.hole_number));
+        const missing = currentHoles.filter((h) => !have.has(h.hole_number));
+        if (missing.length) {
+          await supabase.from("holes").insert(missing.map((h) => ({
+            round_id: rid, hole_number: h.hole_number, par: h.par,
+            stroke_index: h.stroke_index, strokes: null, putts: null, fairway: null, penalties: 0,
+          })));
+        }
+      }
+      for (const h of currentHoles) {
+        await supabase.from("holes").update({
+          strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties || 0,
+        }).eq("round_id", rid).eq("hole_number", h.hole_number);
+      }
+    } catch {
+      // Ignore — local storage already has the data; we'll retry on the next change.
+    }
+  }, [round]);
+
+  const scheduleBackgroundSave = (currentHoles: Hole[]) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => backgroundSave(currentHoles), 1500);
+  };
 
   // Save the corrected par/stroke-index back as a favorite course for next time.
   const saveCorrectedFavorite = async () => {
@@ -85,7 +136,9 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
       const next = hs.map((h, j) => (j === i ? { ...h, ...patch } : h));
       // Save instantly to local storage — synchronous, so it survives a phone lock
       // or refresh even if it happens the moment after this tap.
-      saveDraft({ ...round, holes: next });
+      saveDraft({ ...round, holes: next, id: dbIdRef.current || round.id });
+      // Background server backup (debounced, non-blocking).
+      scheduleBackgroundSave(next);
       return next;
     });
   };
@@ -98,16 +151,25 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   useEffect(() => {
     const flush = () => {
       if (holesRef.current.some((h) => h.strokes != null)) {
-        saveDraft({ ...round, holes: holesRef.current });
+        saveDraft({ ...round, holes: holesRef.current, id: dbIdRef.current || round.id });
+        backgroundSave(holesRef.current); // best-effort server write too
       }
     };
     const onVis = () => { if (document.visibilityState === "hidden") flush(); };
+    // Cover every browser's "page is being hidden / suspended" signal:
+    //  - visibilitychange→hidden: all browsers, fires on lock/background/tab-switch
+    //  - pagehide: iOS Safari & Chrome (WebKit) on background/navigation
+    //  - blur: extra iOS lock coverage
+    //  - freeze: Android Chrome (Page Lifecycle API) when a backgrounded tab is frozen
+    //  - beforeunload: desktop refresh/close
     document.addEventListener("visibilitychange", onVis);
+    document.addEventListener("freeze", flush);
     window.addEventListener("pagehide", flush);
     window.addEventListener("beforeunload", flush);
     window.addEventListener("blur", flush);
     return () => {
       document.removeEventListener("visibilitychange", onVis);
+      document.removeEventListener("freeze", flush);
       window.removeEventListener("pagehide", flush);
       window.removeEventListener("beforeunload", flush);
       window.removeEventListener("blur", flush);
@@ -122,14 +184,26 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   const save = async () => {
     setSaving(true); setErr(null);
     try {
-      let roundId = round.id;
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      let roundId = dbIdRef.current || round.id;
       if (roundId) {
-        // Existing round (e.g. adding detail to a gross round): clear gross_score, replace holes.
-        const { error: eu } = await supabase.from("rounds").update({
-          course_par: round.course_par, gross_score: null,
-        }).eq("id", roundId);
-        if (eu) throw eu;
-        await supabase.from("holes").delete().eq("round_id", roundId);
+        // Round already exists (from the background save, or a gross round gaining detail).
+        // Make sure every hole row exists, then write current values and mark it final.
+        const { data: existing } = await supabase.from("holes").select("hole_number").eq("round_id", roundId);
+        const have = new Set((existing || []).map((x: any) => x.hole_number));
+        const missing = holes.filter((h) => !have.has(h.hole_number));
+        if (missing.length) {
+          await supabase.from("holes").insert(missing.map((h) => ({
+            round_id: roundId, hole_number: h.hole_number, par: h.par,
+            stroke_index: h.stroke_index, strokes: null, putts: null, fairway: null, penalties: 0,
+          })));
+        }
+        for (const h of holes) {
+          await supabase.from("holes").update({
+            strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties || 0,
+          }).eq("round_id", roundId).eq("hole_number", h.hole_number);
+        }
+        await supabase.from("rounds").update({ course_par: round.course_par, gross_score: null, status: "final" }).eq("id", roundId);
       } else {
         const { data: u } = await supabase.auth.getUser();
         const { data: r, error: e1 } = await supabase.from("rounds").insert({
@@ -137,24 +211,24 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
           course: round.course, tee_name: round.tee_name,
           rating: round.rating, slope: round.slope, course_par: round.course_par,
           handicap_index: round.handicap_index, course_handicap: round.course_handicap,
-          played_at: round.played_at, group_id: round.group_id || null,
+          played_at: round.played_at, group_id: round.group_id || null, status: "final",
         }).select().single();
         if (e1 || !r) throw e1 || new Error("Could not save round");
         roundId = r.id;
+        const rows = holes.map((h) => ({
+          round_id: roundId, hole_number: h.hole_number, par: h.par,
+          stroke_index: h.stroke_index, strokes: h.strokes, putts: h.putts,
+          fairway: h.fairway, penalties: h.penalties || 0,
+        }));
+        const { error: e2 } = await supabase.from("holes").insert(rows);
+        if (e2) throw e2;
       }
-      const rows = holes.map((h) => ({
-        round_id: roundId, hole_number: h.hole_number, par: h.par,
-        stroke_index: h.stroke_index, strokes: h.strokes, putts: h.putts,
-        fairway: h.fairway, penalties: h.penalties || 0,
-      }));
-      const { error: e2 } = await supabase.from("holes").insert(rows);
-      if (e2) throw e2;
       try {
         const { data: u } = await supabase.auth.getUser();
         const total = holes.reduce((s, h) => s + (h.strokes || 0), 0);
         await logActivity(supabase, { actor_id: u.user!.id, actor_name: u.user?.email || "A player", action: "round_completed", group_id: round.group_id || null, summary: `Completed a round at ${round.course}${total ? ` (${total})` : ""}` });
       } catch {}
-      clearDraft(); // round is now the official record — drop the local draft
+      clearDraft();
       onSaved();
     } catch (e: any) {
       setErr(e.message || "Save failed. Check your connection and try again.");
@@ -162,10 +236,18 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     }
   };
 
-  const cancel = () => {
-    // Discard the in-progress draft so it doesn't reopen next time.
+  const cancel = async () => {
     if (draftHasScores({ ...round, holes }) && !confirm("Discard this in-progress round? Your entered scores will be cleared.")) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     clearDraft();
+    // Remove the background in-progress round from the server, if one was created.
+    const rid = dbIdRef.current;
+    if (rid && !round.id) {
+      try {
+        await supabase.from("holes").delete().eq("round_id", rid);
+        await supabase.from("rounds").delete().eq("id", rid);
+      } catch {}
+    }
     onCancel();
   };
 

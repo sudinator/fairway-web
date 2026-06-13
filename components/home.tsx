@@ -23,6 +23,7 @@ type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" |
 
 export function Home({ session }: { session: any }) {
   const [rounds, setRounds] = useState<Round[]>([]);
+  const [dbInProgress, setDbInProgress] = useState<Round | null>(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   const [groups, setGroups] = useState<AppGroup[]>([]);
@@ -33,16 +34,24 @@ export function Home({ session }: { session: any }) {
   const [viewing, setViewing] = useState<Round | null>(null);
   const [resumeChecked, setResumeChecked] = useState(false);
 
-  // On open, if there's an in-progress round saved on this device, jump straight
-  // back into the scorecard — that's the only screen that matters mid-round.
+  // On open, resume an in-progress round straight into the scorecard.
+  // Priority: this device's local draft (most current) → otherwise the server's
+  // in-progress round (recovers a cleared-storage or different-device situation).
   useEffect(() => {
     if (resumeChecked) return;
-    setResumeChecked(true);
     const d = loadDraft();
     if (d && draftHasScores(d.round)) {
+      setResumeChecked(true);
       setStage({ round: d.round });
+      return;
     }
-  }, [resumeChecked]);
+    // No local draft — wait until rounds have loaded, then check the server.
+    if (loading) return;
+    setResumeChecked(true);
+    if (dbInProgress && draftHasScores(dbInProgress)) {
+      setStage({ round: dbInProgress });
+    }
+  }, [resumeChecked, loading, dbInProgress]);
 
   const user = session.user;
   const displayName = profile?.display_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "Golfer";
@@ -133,7 +142,13 @@ export function Home({ session }: { session: any }) {
       const holes = sorted.map((h) => ({ ...h, recv: alloc[h.hole_number] || 0 }));
       return { ...r, group_name: r.groups?.name || null, holes };
     });
-    setRounds(merged);
+    // Keep in-progress rounds out of the normal list (no clutter); surface the most
+    // recent one for resume (covers a cleared-storage or different-device case).
+    const finished = merged.filter((r: any) => (r.status ?? "final") !== "in_progress");
+    const inProg = merged.filter((r: any) => (r.status ?? "final") === "in_progress")
+      .sort((a: any, b: any) => +new Date(b.played_at) - +new Date(a.played_at))[0] || null;
+    setRounds(finished);
+    setDbInProgress(inProg);
     setLoading(false);
   }, [user.id]);
 
