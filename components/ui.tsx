@@ -33,8 +33,16 @@ export function ScoreMark({ hole }: { hole: Hole }) {
   if (!hole.strokes) return <span style={{ color: C.line }}>·</span>;
   const d = hole.strokes - hole.par;
   const base: React.CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, fontWeight: 700, fontSize: 13 };
-  if (d <= -1) return <span style={{ ...base, border: `1.5px solid ${C.birdie}`, borderRadius: "50%", color: C.birdie }}>{hole.strokes}</span>;
-  if (d >= 1) return <span style={{ ...base, border: `1.5px solid ${C.bogey}`, borderRadius: 4, color: C.bogey }}>{hole.strokes}</span>;
+  // Birdie or better: circle (eagle gets a double circle).
+  if (d <= -2) return (
+    <span style={{ ...base, border: `1.5px solid ${C.birdie}`, borderRadius: "50%", color: C.birdie, boxShadow: `0 0 0 2.5px ${C.card}, 0 0 0 4px ${C.birdie}` }}>{hole.strokes}</span>
+  );
+  if (d === -1) return <span style={{ ...base, border: `1.5px solid ${C.birdie}`, borderRadius: "50%", color: C.birdie }}>{hole.strokes}</span>;
+  // Double bogey or worse: double (nested) square. Bogey: single square.
+  if (d >= 2) return (
+    <span style={{ ...base, border: `1.5px solid ${C.bogey}`, borderRadius: 4, color: C.bogey, boxShadow: `0 0 0 2.5px ${C.card}, 0 0 0 4px ${C.bogey}` }}>{hole.strokes}</span>
+  );
+  if (d === 1) return <span style={{ ...base, border: `1.5px solid ${C.bogey}`, borderRadius: 4, color: C.bogey }}>{hole.strokes}</span>;
   return <span style={{ ...base, color: C.ink }}>{hole.strokes}</span>;
 }
 

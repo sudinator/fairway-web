@@ -86,61 +86,65 @@ function GhinPanel({ round, ghinNumber, playerName }: { round: Round; ghinNumber
   ].filter(Boolean).join("\n");
 
   const field = (label: string, value: string, key: string) => (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: `1px solid ${C.greenMid}` }}>
-      <div style={{ color: C.sage, fontSize: 12, width: 120 }}>{label}</div>
-      <div style={{ color: C.cream, fontSize: 14, fontWeight: 700, flex: 1 }}>{value}</div>
-      <button style={{ ...btn(false), fontSize: 11, padding: "4px 10px" }} onClick={() => copy(key, value)}>{copied === key ? "✓" : "Copy"}</button>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: `1px solid ${C.greenMid}` }}>
+      <div style={{ color: C.cream, opacity: 0.85, fontSize: 13, width: 120 }}>{label}</div>
+      <div style={{ color: "#FFFFFF", fontSize: 15, fontWeight: 800, flex: 1 }}>{value}</div>
+      <button style={{ ...btn(false), fontSize: 11, padding: "4px 10px" }} onClick={() => copy(key, value)}>{copied === key ? "✓ Copied" : "Copy"}</button>
     </div>
   );
 
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 14 }}>
       <Eyebrow>POST THIS ROUND TO GHIN</Eyebrow>
-      <div style={{ color: C.sage, fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
-        GHIN is the official handicap of record. Birdie Num Num can't post for you yet, but here's everything formatted for a quick manual entry.
-        {detail
-          ? " Use Hole-by-Hole in the GHIN app and enter the scores below — GHIN applies the max-score (net double bogey) cap automatically."
-          : " For a total-only round, enter the Adjusted gross below (it already has the net double bogey cap applied)."}
+
+      {/* Recommended: one-number total post — fastest, no hole-by-hole typing. */}
+      <div style={{ background: C.green, borderRadius: 12, padding: 16, marginTop: 10 }}>
+        <div style={{ color: "#FFE08A", fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>FASTEST · POST AS A TOTAL SCORE</div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+          <div style={{ color: "#FFFFFF", fontFamily: "Georgia, serif", fontSize: 46, fontWeight: 800, lineHeight: 1 }}>{adjTotal}</div>
+          <div style={{ color: C.cream, fontSize: 13 }}>adjusted gross<br/>(net double bogey applied)</div>
+          <div style={{ flex: 1 }} />
+          <button style={{ ...btn(true), fontSize: 14 }} onClick={() => copy("adj", String(adjTotal))}>{copied === "adj" ? "✓ Copied" : "Copy number"}</button>
+        </div>
+        <div style={{ color: C.cream, fontSize: 12, marginTop: 10, lineHeight: 1.5 }}>
+          In the GHIN app, choose <b>Post Score → Total Score</b>, pick the course/date, and enter this one number. That's it — one field, no hole-by-hole entry.
+        </div>
       </div>
 
-      {!ghinNumber && (
-        <div style={{ color: "#E8A199", fontSize: 12, marginTop: 8 }}>
-          Tip: add your GHIN number in your Profile and it'll show here for easy reference.
-        </div>
-      )}
-
-      <div style={{ background: C.card, borderRadius: 10, padding: "10px 14px", marginTop: 12 }}>
+      {/* Round details, all high-contrast. */}
+      <div style={{ background: C.card, borderRadius: 10, padding: "4px 14px", marginTop: 12 }}>
         {playerName ? field("Player", playerName, "name") : null}
         {ghinNumber ? field("GHIN #", String(ghinNumber), "ghin") : null}
         {field("Course", `${round.course}${round.tee_name ? ` (${round.tee_name})` : ""}`, "course")}
         {round.rating != null && round.slope != null ? field("Rating / Slope", `${round.rating} / ${round.slope}`, "rs") : null}
         {field("Date", fmtDate(round.played_at), "date")}
-        {field(detail ? "Gross total" : "Total score", String(grossTotal), "gross")}
-        {field("Adjusted gross", String(adjTotal), "adj")}
+        {detail ? field("Gross total", String(grossTotal), "gross") : null}
       </div>
 
-      {detail && (
-        <div style={{ marginTop: 12 }}>
-          <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginBottom: 6 }}>HOLE-BY-HOLE (GROSS)</div>
-          <div style={{ overflowX: "auto" }}>
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(${holeRows.length}, 1fr)`, gap: 3, minWidth: holeRows.length * 28 }}>
-              {holeRows.map((r) => <div key={r.n} style={{ color: C.sage, fontSize: 9, textAlign: "center" }}>{r.n}</div>)}
-              {holeRows.map((r) => <div key={r.n} style={{ color: C.cream, fontSize: 14, fontWeight: 700, textAlign: "center", background: C.card, borderRadius: 4, padding: "3px 0" }}>{r.gross}</div>)}
-            </div>
-          </div>
-          <button style={{ ...btn(true), fontSize: 12, marginTop: 8 }} onClick={() => copy("holes", holesLine)}>{copied === "holes" ? "Copied ✓" : "Copy hole-by-hole scores"}</button>
+      {!ghinNumber && (
+        <div style={{ color: "#FFC9C2", fontSize: 12, marginTop: 10 }}>
+          Tip: add your GHIN number in your Profile and it'll show here for easy reference.
         </div>
       )}
 
-      <button style={{ ...btn(true), marginTop: 12 }} onClick={() => copy("all", summary)}>{copied === "all" ? "Copied full summary ✓" : "Copy full summary"}</button>
+      {detail && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ color: C.cream, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginBottom: 6 }}>
+            PREFER HOLE-BY-HOLE? READ THESE OFF AS YOU TYPE
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${holeRows.length}, 1fr)`, gap: 4, minWidth: holeRows.length * 34 }}>
+              {holeRows.map((r) => <div key={r.n} style={{ color: C.cream, opacity: 0.8, fontSize: 10, textAlign: "center", fontWeight: 700 }}>{r.n}</div>)}
+              {holeRows.map((r) => <div key={r.n} style={{ color: "#16201C", background: C.cream, fontSize: 17, fontWeight: 800, textAlign: "center", borderRadius: 5, padding: "6px 0" }}>{r.gross}</div>)}
+            </div>
+          </div>
+          <div style={{ color: C.cream, fontSize: 11, marginTop: 6, opacity: 0.85 }}>
+            GHIN's hole-by-hole screen has a separate box per hole, so these are typed in one at a time — the big numbers above are easy to read while you do. (No app can paste all 18 into GHIN at once; only the Total Score above is a single field.)
+          </div>
+        </div>
+      )}
 
-      <ol style={{ color: C.sage, fontSize: 12, marginTop: 12, paddingLeft: 18, lineHeight: 1.6 }}>
-        <li>Open the GHIN app (or ghin.com) and sign in.</li>
-        <li>Tap <b>Post Score</b> → {detail ? <b>Hole-by-Hole</b> : <b>Total Score</b>}.</li>
-        <li>Pick <b>{round.course}</b>{round.tee_name ? ` · ${round.tee_name}` : ""} and set the date to <b>{fmtDate(round.played_at)}</b>.</li>
-        <li>{detail ? "Enter each hole's score from the row above." : `Enter the Adjusted gross (${adjTotal}).`}</li>
-        <li>Submit. GHIN is now your official record for this round.</li>
-      </ol>
+      <button style={{ ...btn(false), marginTop: 14, fontSize: 12 }} onClick={() => copy("all", summary)}>{copied === "all" ? "✓ Copied full summary" : "Copy full summary (for notes/text)"}</button>
     </div>
   );
 }
