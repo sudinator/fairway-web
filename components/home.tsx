@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase";
 import { C, Round, Hole, allocateStrokes } from "@/lib/golf";
 import { logActivity } from "@/lib/activity";
 import { loadDraft, draftHasScores } from "@/lib/draft";
+import { loadActiveGame } from "@/lib/draft";
 import { btn, Wordmark } from "@/components/ui";
 import Tournaments from "@/components/tournaments";
 import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab, ActivityTab, HelpPage } from "@/components/manage";
@@ -35,10 +36,16 @@ export function Home({ session }: { session: any }) {
   const [resumeChecked, setResumeChecked] = useState(false);
 
   // On open, resume an in-progress round straight into the scorecard.
-  // Priority: this device's local draft (most current) → otherwise the server's
-  // in-progress round (recovers a cleared-storage or different-device situation).
+  // Priority: an active game → this device's round draft → the server's in-progress round.
   useEffect(() => {
     if (resumeChecked) return;
+    // If the user was in a game room, reopen the Games tab so it can restore the room.
+    if (loadActiveGame()) {
+      setResumeChecked(true);
+      setStage(null);
+      setTab("games");
+      return;
+    }
     const d = loadDraft();
     if (d && draftHasScores(d.round)) {
       setResumeChecked(true);

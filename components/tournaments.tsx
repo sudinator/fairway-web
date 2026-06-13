@@ -1364,7 +1364,11 @@ function GameRoom({
       {/* My score entry */}
       {roomTab === "play" && me && (
         <div style={{ marginTop: 22 }}>
-          <Eyebrow>{isEnded ? "YOUR FINAL SCORES" : "ENTER YOUR SCORES"}</Eyebrow>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <Eyebrow>{isEnded ? "YOUR FINAL SCORES" : "ENTER YOUR SCORES"}</Eyebrow>
+            <div style={{ flex: 1 }} />
+            <button style={{ ...btn(false), fontSize: 12, padding: "6px 12px" }} onClick={load}>⟳ Refresh</button>
+          </div>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
             {isEnded
               ? "This game has ended — scores are locked in."
