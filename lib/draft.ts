@@ -45,3 +45,33 @@ export function draftHasScores(round: Round | null | undefined): boolean {
   if (!round?.holes?.length) return false;
   return round.holes.some((h) => h.strokes != null && (h.strokes as number) > 0);
 }
+
+// --- Active game resume (game room) ---
+// Remembers which game room the user was in (and which sub-tab) so a lock or
+// refresh returns them to the scorecard instead of the games list.
+const GKEY = "bnn_active_game_v1";
+
+export function saveActiveGame(gameId: string, tab: "play" | "setup"): void {
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(GKEY, JSON.stringify({ gameId, tab, at: Date.now() }));
+  } catch {}
+}
+
+export function loadActiveGame(): { gameId: string; tab: "play" | "setup" } | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem(GKEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (!p?.gameId) return null;
+    return { gameId: p.gameId, tab: p.tab === "setup" ? "setup" : "play" };
+  } catch { return null; }
+}
+
+export function clearActiveGame(): void {
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem(GKEY);
+  } catch {}
+}

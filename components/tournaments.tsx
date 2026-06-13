@@ -18,6 +18,7 @@ import {
 } from "@/lib/golf";
 import { loadCoursesForGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
+import { saveActiveGame, loadActiveGame, clearActiveGame } from "@/lib/draft";
 import {
   btn,
   inputStyle,
@@ -76,6 +77,13 @@ export default function Tournaments({
   const [view, setView] = useState<"list" | "create" | { gameId: string }>(
     "list",
   );
+  // Resume the game room the user was in (survives lock/refresh) instead of
+  // dropping them back at the games list.
+  useEffect(() => {
+    const g = loadActiveGame();
+    if (g) setView({ gameId: g.gameId });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const user = session.user;
   const displayName =
     user.user_metadata?.full_name || user.email?.split("@")[0] || "Golfer";
@@ -96,7 +104,7 @@ export default function Tournaments({
         gameId={view.gameId}
         user={user}
         displayName={displayName}
-        onBack={() => setView("list")}
+        onBack={() => { clearActiveGame(); setView("list"); }}
       />
     );
   return (
@@ -737,6 +745,16 @@ function GameRoom({
   // join-setup if I'm in the game but haven't set my tee/handicap
   const [needsSetup, setNeedsSetup] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Sub-tab inside the game room: "play" (scorecard, default) vs "setup"
+  // (assign teams, matchups, manage game). Restored from the saved active game.
+  const [roomTab, setRoomTab] = useState<"play" | "setup">(
+    () => loadActiveGame()?.tab || "play",
+  );
+  useEffect(() => { saveActiveGame(gameId, roomTab); }, [gameId, roomTab]);
+  // Non-organizers only ever see the scorecard.
+  useEffect(() => {
+    if (roomTab === "setup" && game && game.created_by !== user.id) setRoomTab("play");
+  }, [roomTab, game, user.id]);
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState("");
 
@@ -1143,7 +1161,21 @@ function GameRoom({
         </button>
       </div>
 
-      {needsSetup && me && (
+      {/* Sub-tabs: Scorecard (play) vs Setup (organizer/teams/matchups) */}
+      <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+        <button onClick={() => setRoomTab("play")}
+          style={{ ...btn(roomTab === "play"), flex: 1, fontSize: 14 }}>
+          ⛳ Scorecard
+        </button>
+        {isOrganizer && (
+          <button onClick={() => setRoomTab("setup")}
+            style={{ ...btn(roomTab === "setup"), flex: 1, fontSize: 14 }}>
+            ⚙ Game setup
+          </button>
+        )}
+      </div>
+
+      {roomTab === "play" && needsSetup && me && (
         <div
           style={{
             background: C.greenLight,
@@ -1192,7 +1224,7 @@ function GameRoom({
         </div>
       )}
 
-      {isOrganizer && (
+      {roomTab === "setup" && isOrganizer && (
         <OrganizerPanel
           game={game}
           players={players}
@@ -1207,6 +1239,7 @@ function GameRoom({
         />
       )}
 
+      {roomTab === "play" && (
       <div style={{ marginTop: 16, background: isEnded ? "#3A3A3A" : game.game_type === "match" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>
           {game.game_type === "match" ? "⛳ Singles Match Play" : "🏆 Stableford Tournament"}
@@ -1219,16 +1252,18 @@ function GameRoom({
           </span>
         )}
       </div>
+      )}
 
-      {game.game_type === "match" ? (
+      {(roomTab === "play" || roomTab === "setup") && game.game_type === "match" ? (
         <MatchView
           game={game}
           players={players}
           user={user}
           isCreator={game.created_by === user.id}
+          mode={roomTab}
           onChanged={load}
         />
-      ) : (
+      ) : roomTab === "play" ? (
         <>
           {/* Leaderboard */}
           <div style={{ marginTop: 18 }}>
@@ -1324,10 +1359,10 @@ function GameRoom({
             </div>
           </div>
         </>
-      )}
+      ) : null}
 
       {/* My score entry */}
-      {me && (
+      {roomTab === "play" && me && (
         <div style={{ marginTop: 22 }}>
           <Eyebrow>{isEnded ? "YOUR FINAL SCORES" : "ENTER YOUR SCORES"}</Eyebrow>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
@@ -1459,12 +1494,14 @@ function MatchView({
   players,
   user,
   isCreator,
+  mode = "play",
   onChanged,
 }: {
   game: Game;
   players: Player[];
   user: any;
   isCreator: boolean;
+  mode?: "play" | "setup";
   onChanged: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -1536,7 +1573,7 @@ function MatchView({
 
   return (
     <div style={{ marginTop: 18 }}>
-      {isTeam && teamStandings && (
+      {mode === "play" && isTeam && teamStandings && (
         <div style={{ background: C.green, borderRadius: 14, padding: 16, marginBottom: 16 }}>
           <div style={{ color: C.cream, fontSize: 10, letterSpacing: 2, fontWeight: 800, opacity: 0.8 }}>TEAM MATCH · RUNNING SCORE</div>
           <div style={{ display: "flex", alignItems: "center", marginTop: 10 }}>
@@ -1557,7 +1594,7 @@ function MatchView({
       )}
 
       {/* Organizer: assign players to teams */}
-      {isTeam && isCreator && (
+      {mode === "setup" && isTeam && isCreator && (
         <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginBottom: 16 }}>
           <Eyebrow>ASSIGN TEAMS</Eyebrow>
           {players.map((p) => (
@@ -1574,19 +1611,19 @@ function MatchView({
       )}
 
       <div style={{ display: "flex", alignItems: "center" }}>
-        <Eyebrow>MATCHES</Eyebrow>
+        <Eyebrow>{mode === "setup" ? "SET MATCHUPS" : "MATCHES"}</Eyebrow>
         <div style={{ flex: 1 }} />
-        {isCreator && (
+        {mode === "setup" && isCreator && (
           <button
             style={{ ...btn(false), fontSize: 12 }}
             onClick={() => setEditing((v) => !v)}
           >
-            {editing ? "Done" : "✎ Set matchups"}
+            {editing ? "Done" : "✎ Add / edit"}
           </button>
         )}
       </div>
 
-      {editing && isCreator && (
+      {mode === "setup" && editing && isCreator && (
         <div
           style={{
             background: C.greenLight,
