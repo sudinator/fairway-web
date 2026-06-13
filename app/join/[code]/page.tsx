@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
 import { btn, Wordmark } from "@/components/ui";
 import { Shell } from "@/components/auth";
+import { describeError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
 
@@ -45,12 +46,22 @@ export default function JoinGroupPage({ params }: { params: { code: string } }) 
       if (error || !groupId) {
         if (!cancelled) {
           setState("error");
-          setMessage(error?.message || "This invite code could not be redeemed. It may be expired or already used.");
+          setMessage(
+            error
+              ? describeError("redeem this invite", error)
+              : "This invite code could not be redeemed — it may be expired or already used. Ask the group admin for a new link.",
+          );
         }
         return;
       }
 
-      await supabase.from("profiles").update({ active_group_id: groupId }).eq("id", data.session.user.id);
+      const { error: upErr } = await supabase.from("profiles").update({ active_group_id: groupId }).eq("id", data.session.user.id);
+      if (upErr && !cancelled) {
+        // The membership was created by the RPC; only setting the active group failed.
+        setState("error");
+        setMessage(describeError("set this as your active group", upErr) + " You're in the group — open the app and switch to it from the group selector.");
+        return;
+      }
       try {
         await supabase.from("activity_log").insert({
           actor_id: data.session.user.id, actor_name: data.session.user.email || "A player",
