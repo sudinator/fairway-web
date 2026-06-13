@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import {
   C,
@@ -750,11 +750,21 @@ function GameRoom({
       .from("game_players")
       .select("*")
       .eq("game_id", gameId);
-    setGame(g);
+    // Defensively normalize: a freshly created or legacy game may have null
+    // pairings/teams/holes_meta, which would crash the match views downstream.
+    const safeGame = g
+      ? {
+          ...g,
+          pairings: Array.isArray((g as any).pairings) ? (g as any).pairings : [],
+          teams: Array.isArray((g as any).teams) ? (g as any).teams : null,
+          holes_meta: Array.isArray((g as any).holes_meta) ? (g as any).holes_meta : [],
+        }
+      : g;
+    setGame(safeGame as any);
     setPlayers(ps || []);
     const mine = (ps || []).find((p: any) => p.user_id === user.id) || null;
     setMe(mine);
-    if (mine && mine.course_handicap == null && (g as any)?.holes_meta)
+    if (mine && mine.course_handicap == null && (safeGame as any)?.holes_meta?.length)
       setNeedsSetup(true);
     setLoading(false);
   }, [gameId, user.id]);
@@ -1040,10 +1050,8 @@ function GameRoom({
 
   const isOrganizer = game.created_by === user.id;
   const isEnded = game.status === "ended";
-  const leaderboard = useMemo(
-    () => [...players].sort((a, b) => playerPoints(b) - playerPoints(a)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [players, game?.holes_meta],
+  const leaderboard = [...players].sort(
+    (a, b) => playerPoints(b) - playerPoints(a),
   );
 
   // Segment winners (three sixes), by net Stableford.
