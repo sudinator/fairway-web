@@ -1,167 +1,99 @@
 # Birdie Num Num — Database Schema & Conventions
 
-This is the single source of truth (in the repo) for what the app expects the
-database to look like. The **authoritative** schema lives in Supabase; this file
-documents it and how to keep them in sync.
-
-> **Reconstruction notice:** the schema here and in
-> `supabase/migrations/0001_baseline.sql` was reconstructed from the app code and
-> the history of manual `alter table` changes. Verify it against a real Supabase
-> export (see "Exporting the real schema" below) and correct anything that differs.
+Single source of truth (in the repo) for the database. **This version has been
+verified against a live Supabase export** (information_schema, pg_policies,
+pg_indexes) — it reflects the real database, not a guess.
 
 ---
 
 ## Migration convention
-
-- All schema changes live in `supabase/migrations/` as numbered SQL files:
-  `0001_baseline.sql`, `0002_add_xyz.sql`, …
-- Each file is **idempotent** where possible (`if not exists`, `add column if not
-  exists`) so re-running is safe.
-- **Process going forward:** any DB change ships as a new numbered migration file
-  committed *with* the code that needs it. Run it in Supabase, then commit. The
-  repo then always records exactly what structure the deployed app expects.
-- Never edit an already-committed migration; add a new one.
+- Schema changes live in `supabase/migrations/` as numbered files (`0001_baseline.sql`, `0002_…`).
+- Files are idempotent (`if not exists`) so re-running is safe.
+- Each DB change ships as a new numbered file committed with the code; run it in Supabase, then commit. Never edit a committed migration.
 
 ---
 
-## Tables
+## Known gaps: code expects columns the live DB is missing
+These were found during the schema export. Add them to keep DB ⟷ code in sync:
 
-### profiles — one row per signed-in user (`id` = `auth.users.id`)
-`id`, `display_name`, `email`, `handicap_index`, `ghin_number`, `phone`,
-`is_admin` (app-admin gate for the admin panel), `deactivated` (blocks app
-access), `active_group_id` (currently selected group), `last_active`.
+| Column | Why | Status |
+|---|---|---|
+| `rounds.status` | round auto-save backup (in_progress vs final) | **add it** (`alter table rounds add column if not exists status text not null default 'final';`) |
+| `rounds.gross_score` | total-only rounds | recommended (`alter table rounds add column if not exists gross_score int;`) |
+| `profiles.deactivated` | admin "deactivate player" feature | **add it if you use that feature** (`alter table profiles add column if not exists deactivated boolean not null default false;`) |
 
-### groups
-`id`, `name`, `created_by`, `status` (`active`/`pending`/`declined` — new groups
-need admin approval), `request_note`.
-
-### group_members
-`id`, `group_id`, `user_id`, `email`, `role` (`member`/`admin`), `status`
-(`active`/`removed`). Email is stored so invites can be matched before a user
-has a profile.
-
-### favorite_courses — canonical, community-shared course records
-`id`, `name`, `location` (Town, State), `tees` (jsonb), `holes` (jsonb),
-`created_by`, `vetted` (admin-marked shared course, ★), `deleted` /`deleted_by`/
-`deleted_at` (soft delete). **`favorite_courses_name_unique`** enforces global
-name uniqueness for the shared library — **do not drop it.**
-
-### group_courses — link table
-`group_id` ↔ `course_id`. Which groups have adopted which vetted course. One
-canonical course row, linked to many groups (no copies).
-
-### rounds
-`id`, `user_id`, `course`, `tee_name`, `rating`, `slope`, `course_par`,
-`handicap_index`, `course_handicap`, `gross_score` (set only for total-only
-rounds), `group_id`, `status` (`final`/`in_progress` — in-progress rounds are the
-background auto-save backup and are hidden from the rounds list), `played_at`.
-
-### holes — per-hole detail for a round
-`id`, `round_id`, `hole_number`, `par`, `stroke_index`, `strokes`, `putts`,
-`fairway` (`hit`/`miss`/null), `penalties`.
-
-### games
-`id`, `code` (join code), `name`, `course`, `course_par`, `holes_meta` (jsonb
-`[{n,par,si}]`), `group_id`, `game_type` (`stableford`/`match`/`fourball`),
-`status` (`active`/`ended`), `pairings` (jsonb, singles match `[{a,b}]`), `teams`
-(jsonb, team match `[{key,name}]`), `foursomes` (jsonb, four-ball
-`[{id,name,a:[],b:[]}]`), `created_by`.
-
-### game_players
-`id`, `game_id`, `user_id`, `display_name`, `email`, `handicap_index`, `rating`,
-`slope`, `tee_name`, `course_handicap`, `scores` (jsonb per hole), `putts`,
-`fairways`, `team` (`A`/`B` for team match).
-
-### activity_log — admin audit trail
-`id`, `actor_id`, `actor_name`, `action`, `group_id`, `target_user_id`,
-`summary`, `created_at`. Captures events going forward only.
-
-### notifications
-`id`, `user_id`, `message`, `read`, `created_at`.
+Until added, those features silently no-op (the writes go nowhere).
 
 ---
+
+## Tables (verified)
+
+**profiles** (`id` = auth.users.id): `display_name`, `email`, `handicap_index`, `ghin_number`, `phone`, `is_admin`, `active_group_id`, `last_active`, `updated_at`. *(No `deactivated` column in live DB — see gaps above.)*
+
+**groups**: `id`, `name`, `created_by`, `status` (active/pending/declined), `request_note`, `created_at`.
+
+**group_members**: `id`, `group_id`, `user_id`, `email` (**citext** — case-insensitive), `role` (member/admin), `status` (active/removed), `created_at`. Unique on (`group_id`, `email`).
+
+**group_invites** (powers invite links): `id`, `group_id`, `invite_code`, `role`, `status`, `created_by`, `used_by`, `used_at`, `expires_at` (default now + 30 days), `created_at`.
+
+**favorite_courses** (canonical, community-shared): `id`, `user_id` (default auth.uid()), `name`, `location`, **`data` (jsonb — holds tees + holes + meta, one column)**, `group_id`, `vetted`, `deleted`/`deleted_by`/`deleted_at`, `created_at`. Unique on (`group_id`, `name`) — per-group, not global.
+
+**group_courses** (link table): `id`, `group_id`, `course_id`, `added_by`, `created_at`. Unique on (`group_id`, `course_id`).
+
+**rounds**: `id`, `user_id`, `course`, `tee_name`, `rating`, `slope`, `course_par`, `handicap_index`, `course_handicap`, `group_id`, `played_at`, `created_at` (+ `status`, `gross_score` once added).
+
+**holes**: `id`, `round_id`, `hole_number`, `par`, `stroke_index`, `strokes`, `putts`, `fairway`, `penalties`.
+
+**games**: `id`, `code`, `name`, `course`, `course_par`, `holes_meta` (jsonb), `group_id`, `game_type` (stableford/match/fourball), `status` (active/ended), `pairings` (jsonb), `teams` (jsonb), `foursomes` (jsonb), `created_by`, `created_at`. Unique on `code`.
+
+**game_players**: `id`, `game_id`, `user_id` (default auth.uid()), `display_name`, `handicap_index`, `rating`, `slope`, `tee_name`, `course_handicap`, `scores`/`putts`/`fairways` (jsonb), `team`, `created_at`. Unique on (`game_id`, `user_id`).
+
+**activity_log**: `id`, `actor_id`, `actor_name`, `action`, `summary`, `group_id`, `target_user_id`, `created_at`.
+
+**notifications**: `id`, `user_id`, `message`, `read`, `group_id`, `created_at`.
+
+---
+
+## Helper functions (exist in live DB)
+- `is_admin()` → bool (caller is an app-admin)
+- `is_group_member(group_id, user_id)` → bool
+- `is_group_admin(group_id, user_id)` → bool
+- `is_game_member(game_id)` → bool
 
 ## RPCs
-
-- **`create_group_invite(...)`** — creates/stores a 6-digit invite code for a group.
-- **`redeem_group_invite(code text) → group_id`** — adds the caller to the group
-  for that code and returns the group id. Used by `/join/[code]`.
-
-Export the exact bodies from Supabase and paste them into the baseline migration
-when you want the file to fully recreate the DB from scratch.
+- `create_group_invite(...)` → text (6-digit code)
+- `redeem_group_invite(code text)` → uuid (group joined)
 
 ---
 
-## RLS policies the app ASSUMES (verification checklist)
+## RLS policies (VERIFIED from the live DB — these are real, not assumed)
 
-The app cannot read your live RLS policies, so this is the set of permissions the
-code relies on. **Verify each in Supabase → Authentication → Policies.** If a
-write "silently fails," it's almost always a missing/too-strict policy here.
+**profiles**: read own or admin-all; update own or admin-all; insert own. ✓
+**groups**: members/creator can select; authenticated can insert (creator = self); group-admins (and app-admins) can update. ✓
+**group_members**: select if member/self/your-email; insert if group-admin or self-as-admin; update if group-admin or matching email (invite acceptance). ✓
+**group_invites**: group-admins select/update/delete. ✓
+**rounds**: own rounds full access; group members can select group rounds; group owner/admin can update/delete; admins read/update all. ✓
+**holes**: own holes (via round ownership) full access; admins read/update all. ✓
+**games**: anyone authenticated can select; creator inserts/updates/deletes; group members full access. ✓
+**game_players**: edit own scores; join as self; organizer adds/updates/removes players; co-players can see each other. ✓
+**favorite_courses**: read vetted or authenticated; anyone authenticated adds/edits; creator-or-admin deletes; group-member access by group_id. ✓
+**group_courses**: authenticated read; active group members add/remove. ✓
+**activity_log**: insert own; admins read. ✓
+**notifications**: insert if signed in; read/update own. ✓
 
-**profiles**
-- A user can `select`/`update` their own row (`id = auth.uid()`).
-- A user can read other profiles in their groups (for rosters/leaderboards).
-- App-admins (`is_admin = true`) can `select`/`update`/`delete` any profile
-  (handicap edits, deactivate, hard-delete).
-
-**groups / group_members**
-- A user can read groups they belong to, and their own memberships.
-- Group admins can insert/update/remove members of their groups.
-- App-admins can read all groups/memberships and modify any (global management).
-- `redeem_group_invite` typically runs `security definer` so it can insert a
-  membership regardless of the caller's direct rights.
-
-**rounds / holes**
-- A user can full-CRUD their own rounds and the holes of their own rounds.
-- Group members can read each other's rounds if your group features require it.
-- App-admins can read/update/delete any round & holes (admin score editing,
-  hard-delete).
-
-**games / game_players**
-- Group members can read games in their group and insert/update their own
-  `game_players` row (score entry).
-- The game creator can update the game (`pairings`, `teams`, `foursomes`,
-  `status`, rename) and manage its players.
-
-**favorite_courses / group_courses**
-- Authenticated users can read vetted courses and insert new ones.
-- Editing a shared course affects all groups (intended).
-- App-admins can mark `vetted` and soft-delete.
-- Any group member can insert a `group_courses` link to adopt a vetted course.
-
-**activity_log / notifications**
-- Inserts allowed for the acting user; admins can read the full `activity_log`;
-  users read their own `notifications`.
-
-> If any admin/cross-user action fails silently, the matching policy above is the
-> first thing to check.
+**Takeaway:** RLS is solid and consistent. Past "silent failures" were app-side
+(localStorage/display), not permissions — except the missing-column gaps above,
+which are the real cause of any deactivate/in-progress writes going nowhere.
 
 ---
 
-## Exporting the real (authoritative) schema
-
-To replace the reconstruction with an exact dump:
-
-**Option A — Supabase CLI (best, includes RLS + RPC bodies)**
+## Exporting the authoritative schema (to refresh this doc)
+**Supabase CLI (best — includes RLS + function bodies):**
 ```
 supabase login
 supabase link --project-ref epmbsmykyrnoiccwnoxq
-supabase db dump --schema public > supabase/migrations/0001_baseline.sql      # structure
-supabase db dump --schema public --data-only > supabase/seed.sql              # optional data
+supabase db dump --schema public > supabase/migrations/0001_baseline.sql
 ```
-The CLI dump includes tables, indexes, RLS policies, and function bodies — commit
-it as the real baseline and delete the reconstruction note.
-
-**Option B — Dashboard**
-Supabase → Database → (schema visualizer / SQL editor). You can run
-`select` against `information_schema` and `pg_policies` to list columns and
-policies, or use the table editor's "export" where available.
-
-**Option C — pg_dump directly**
-```
-pg_dump --schema-only --no-owner "postgresql://...connection string..." > schema.sql
-```
-(Connection string is in Supabase → Project Settings → Database.)
-
-Once you have a real dump, reconcile it against `0001_baseline.sql`, fix any
-differences, and from then on add changes only as new numbered migrations.
+**Browser (no install):** run read-only queries against `information_schema.columns`,
+`pg_policies`, `information_schema.routines`, `pg_indexes` in the SQL editor and
+compare to this file.

@@ -1,27 +1,20 @@
 -- ============================================================================
 -- Birdie Num Num — baseline schema (migration 0001)
 -- ============================================================================
--- RECONSTRUCTION NOTICE
--- This file was reconstructed from the application code and the history of
--- manual `alter table` statements run in the Supabase SQL editor. It is the
--- app's best understanding of the schema it depends on, NOT a guaranteed-exact
--- dump of the live database. The AUTHORITATIVE schema lives in your Supabase
--- project — see SCHEMA.md for how to export it and reconcile against this file.
+-- This file was VERIFIED against a live Supabase export (information_schema +
+-- pg_policies + pg_indexes) and corrected to match the real database, with two
+-- additions the app code expects that were missing from the live DB:
+--   * rounds.status      (in-progress vs final, for round auto-save backup)
+--   * rounds.gross_score (total-only rounds)
+-- Both are added below with `if not exists` and safe defaults.
 --
--- Everything here is written to be SAFE and IDEMPOTENT:
---   * `create table if not exists`  → no-op if the table already exists
---   * `add column if not exists`    → no-op if the column already exists
---   * `create index if not exists`  → no-op if the index already exists
--- So running this against your existing database will NOT drop or overwrite
--- data; it only fills in anything missing. New/empty databases get the full
--- structure.
---
--- RLS policies are intentionally NOT created here (the app cannot see the live
--- policies, and creating them blindly could lock you out or open access). The
--- policies the app ASSUMES are documented in SCHEMA.md as a checklist.
+-- Everything here is SAFE / IDEMPOTENT (`if not exists`), so running it against
+-- the existing database only fills in anything missing; it never drops data.
+-- RLS policies are documented in SCHEMA.md (they already exist in the live DB
+-- and are not recreated here).
 -- ============================================================================
 
--- ---------- profiles (one row per signed-in user; id = auth.users.id) ----------
+-- ---------- profiles (id = auth.users.id) ----------
 create table if not exists profiles (
   id uuid primary key,
   display_name text,
@@ -30,17 +23,13 @@ create table if not exists profiles (
   ghin_number text,
   phone text,
   is_admin boolean not null default false,
-  deactivated boolean not null default false,
   active_group_id uuid,
-  last_active timestamptz default now(),
-  created_at timestamptz default now()
+  last_active timestamptz,
+  updated_at timestamptz default now()
 );
-alter table profiles add column if not exists ghin_number text;
-alter table profiles add column if not exists phone text;
-alter table profiles add column if not exists is_admin boolean not null default false;
-alter table profiles add column if not exists deactivated boolean not null default false;
-alter table profiles add column if not exists active_group_id uuid;
-alter table profiles add column if not exists last_active timestamptz default now();
+-- NOTE: the live DB has no `deactivated` column. If you want the admin
+-- "deactivate player" feature to persist, add it:
+--   alter table profiles add column if not exists deactivated boolean not null default false;
 
 -- ---------- groups ----------
 create table if not exists groups (
@@ -49,49 +38,58 @@ create table if not exists groups (
   created_by uuid,
   status text not null default 'active',   -- 'active' | 'pending' | 'declined'
   request_note text,
-  created_at timestamptz default now()
+  created_at timestamptz not null default now()
 );
-alter table groups add column if not exists status text not null default 'active';
-alter table groups add column if not exists request_note text;
 
--- ---------- group_members ----------
+-- ---------- group_members (email is citext) ----------
 create table if not exists group_members (
   id uuid primary key default gen_random_uuid(),
   group_id uuid not null,
   user_id uuid,
-  email text,
-  role text not null default 'member',      -- 'member' | 'admin'
-  status text not null default 'active',     -- 'active' | 'removed'
-  created_at timestamptz default now()
+  email citext not null,
+  role text not null default 'member',
+  status text not null default 'active',
+  created_at timestamptz not null default now()
 );
 
--- ---------- favorite_courses (canonical course records; community-shared) ----------
+-- ---------- group_invites (powers invite links) ----------
+create table if not exists group_invites (
+  id uuid primary key default gen_random_uuid(),
+  group_id uuid not null,
+  invite_code text not null,
+  role text not null default 'member',
+  status text not null default 'active',
+  created_by uuid,
+  used_by uuid,
+  used_at timestamptz,
+  expires_at timestamptz not null default (now() + interval '30 days'),
+  created_at timestamptz not null default now()
+);
+
+-- ---------- favorite_courses (course data stored as one jsonb column) ----------
 create table if not exists favorite_courses (
   id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid(),
   name text not null,
   location text,
-  tees jsonb,
-  holes jsonb,
-  created_by uuid,
-  vetted boolean not null default false,     -- admin-marked shared/community course
+  data jsonb not null,            -- holds tees + holes + meta
+  group_id uuid,
+  vetted boolean not null default false,
   deleted boolean not null default false,
   deleted_by uuid,
   deleted_at timestamptz,
   created_at timestamptz default now()
 );
-alter table favorite_courses add column if not exists vetted boolean not null default false;
-alter table favorite_courses add column if not exists deleted boolean not null default false;
-alter table favorite_courses add column if not exists deleted_by uuid;
-alter table favorite_courses add column if not exists deleted_at timestamptz;
--- Global name-uniqueness (used to dedupe the shared library). KEEP THIS.
-create unique index if not exists favorite_courses_name_unique on favorite_courses (name);
+-- Per-group name uniqueness (live DB uses group-scoped, not global):
+create unique index if not exists favorite_courses_group_name_unique on favorite_courses (group_id, name);
 
--- ---------- group_courses (link table: which groups have adopted which course) ----------
+-- ---------- group_courses (link table) ----------
 create table if not exists group_courses (
   id uuid primary key default gen_random_uuid(),
   group_id uuid not null,
   course_id uuid not null,
-  created_at timestamptz default now()
+  added_by uuid,
+  created_at timestamptz not null default now()
 );
 
 -- ---------- rounds ----------
@@ -105,95 +103,93 @@ create table if not exists rounds (
   course_par int,
   handicap_index numeric,
   course_handicap int,
-  gross_score int,                 -- set for total-only rounds (no hole detail)
   group_id uuid,
-  status text not null default 'final',   -- 'final' | 'in_progress'
   played_at timestamptz default now(),
   created_at timestamptz default now()
 );
-alter table rounds add column if not exists gross_score int;
-alter table rounds add column if not exists group_id uuid;
-alter table rounds add column if not exists status text not null default 'final';
+-- Columns the app expects that were missing from the live DB (added now):
+alter table rounds add column if not exists status text not null default 'final';     -- 'final' | 'in_progress'
+alter table rounds add column if not exists gross_score int;                            -- total-only rounds
 
--- ---------- holes (per-hole detail for a round) ----------
+-- ---------- holes ----------
 create table if not exists holes (
   id uuid primary key default gen_random_uuid(),
   round_id uuid not null,
   hole_number int not null,
-  par int,
+  par int not null,
   stroke_index int,
   strokes int,
   putts int,
-  fairway text,                    -- 'hit' | 'miss' | null
+  fairway text,
   penalties int default 0
 );
 
 -- ---------- games ----------
 create table if not exists games (
   id uuid primary key default gen_random_uuid(),
-  code text,                       -- share/join code
-  name text,
-  course text,
+  code text not null,
+  name text not null,
+  course text not null,
   course_par int,
-  holes_meta jsonb,                -- [{ n, par, si }]
+  holes_meta jsonb not null,
   group_id uuid,
-  game_type text not null default 'stableford',  -- 'stableford' | 'match' | 'fourball'
-  status text not null default 'active',          -- 'active' | 'ended'
-  pairings jsonb default '[]'::jsonb,             -- singles match: [{ a, b }]
-  teams jsonb,                                    -- team match: [{ key, name }]
-  foursomes jsonb,                                -- four-ball: [{ id, name, a:[], b:[] }]
-  created_by uuid,
+  game_type text not null default 'stableford',   -- 'stableford' | 'match' | 'fourball'
+  status text not null default 'active',           -- 'active' | 'ended'
+  pairings jsonb not null default '[]'::jsonb,
+  teams jsonb,
+  foursomes jsonb,
+  created_by uuid not null default auth.uid(),
   created_at timestamptz default now()
 );
-alter table games add column if not exists game_type text not null default 'stableford';
-alter table games add column if not exists status text not null default 'active';
-alter table games add column if not exists pairings jsonb default '[]'::jsonb;
-alter table games add column if not exists teams jsonb;
-alter table games add column if not exists foursomes jsonb;
 
 -- ---------- game_players ----------
 create table if not exists game_players (
   id uuid primary key default gen_random_uuid(),
   game_id uuid not null,
-  user_id uuid,
-  display_name text,
-  email text,
+  user_id uuid not null default auth.uid(),
+  display_name text not null,
   handicap_index numeric,
   rating numeric,
   slope numeric,
   tee_name text,
   course_handicap int,
-  scores jsonb,                    -- strokes per hole
-  putts jsonb,
-  fairways jsonb,
-  team text                        -- team match: 'A' | 'B'
+  scores jsonb not null default '[]'::jsonb,
+  putts jsonb not null default '[]'::jsonb,
+  fairways jsonb not null default '[]'::jsonb,
+  team text,
+  created_at timestamptz default now()
 );
-alter table game_players add column if not exists team text;
 
--- ---------- activity_log (admin audit trail) ----------
+-- ---------- activity_log ----------
 create table if not exists activity_log (
   id uuid primary key default gen_random_uuid(),
   actor_id uuid,
   actor_name text,
-  action text,
+  action text not null,
+  summary text not null,
   group_id uuid,
   target_user_id uuid,
-  summary text,
-  created_at timestamptz default now()
+  created_at timestamptz not null default now()
 );
 
 -- ---------- notifications ----------
 create table if not exists notifications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null,
-  message text,
+  message text not null,
   read boolean not null default false,
+  group_id uuid,
   created_at timestamptz default now()
 );
 
 -- ============================================================================
--- Performance indexes (mirrors birdie-indexes.sql)
+-- Helper functions used by RLS (exist in live DB; export bodies via CLI to
+-- recreate from scratch): is_admin(), is_group_member(gid,uid),
+-- is_group_admin(gid,uid), is_game_member(gid).
+-- RPCs: create_group_invite(...) -> text code; redeem_group_invite(code) -> uuid.
 -- ============================================================================
+
+-- Indexes present in the live DB:
 create index if not exists idx_rounds_user_id      on rounds (user_id);
 create index if not exists idx_rounds_user_played   on rounds (user_id, played_at desc);
 create index if not exists idx_rounds_group_id      on rounds (group_id);
@@ -209,12 +205,3 @@ create index if not exists idx_fav_courses_vetted   on favorite_courses (vetted)
 create index if not exists idx_notifications_user   on notifications (user_id, created_at desc);
 create index if not exists idx_activity_created     on activity_log (created_at desc);
 create index if not exists idx_profiles_last_active on profiles (last_active desc);
-
--- ============================================================================
--- RPCs the app calls (signatures only — see your live DB for the exact bodies)
--- ============================================================================
---   create_group_invite(group_id ...)  -> returns/stores a 6-digit code
---   redeem_group_invite(code text)      -> returns the group_id joined
--- These are NOT redefined here to avoid overwriting your working versions.
--- Export them from Supabase (see SCHEMA.md) and paste the real bodies below
--- when you want this file to fully recreate the database from scratch.
