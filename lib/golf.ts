@@ -355,3 +355,73 @@ export function validateStrokeIndexes(holes: { n: number; si: number | null }[])
   for (let i = 1; i <= n; i++) if (!seen.has(i)) return `Stroke index ${i} is missing — indexes must be 1–${n} with none skipped.`;
   return null;
 }
+
+// ---------------- Four-ball (better net ball) match play ----------------
+// Two pairs play a hole; each team's hole score is the BETTER (lowest) net of its
+// two players. The lower team net wins the hole. Strokes are allocated relative to
+// the lowest course handicap among the four players (that player plays off scratch;
+// the others get the full difference by stroke index).
+
+export type FourballMember = { id: string; gross: (number | null)[]; ch: number | null };
+
+// Net score per player per hole, strokes relative to the lowest CH among the group.
+function fourballNets(holes: MatchHoleMeta[], members: FourballMember[]): Record<string, (number | null)[]> {
+  const low = Math.min(...members.map((m) => m.ch ?? 0));
+  const out: Record<string, (number | null)[]> = {};
+  for (const m of members) {
+    const diff = (m.ch ?? 0) - low;
+    out[m.id] = holes.map((h, i) => {
+      const g = m.gross[i];
+      if (g == null || g <= 0) return null;
+      return g - matchStrokesFor(diff, h.si);
+    });
+  }
+  return out;
+}
+
+// Running lead from pair A's perspective after each hole (positive = A up).
+// A hole counts once BOTH teams have at least one net score on it.
+export function fourballProgress(
+  holes: MatchHoleMeta[],
+  members: FourballMember[],
+  aIds: string[],
+  bIds: string[],
+): (number | null)[] {
+  const nets = fourballNets(holes, members);
+  let lead = 0;
+  return holes.map((_, i) => {
+    const aN = aIds.map((id) => nets[id]?.[i]).filter((n): n is number => n != null);
+    const bN = bIds.map((id) => nets[id]?.[i]).filter((n): n is number => n != null);
+    if (!aN.length || !bN.length) return null;
+    const a = Math.min(...aN), b = Math.min(...bN);
+    if (a < b) lead++;
+    else if (b < a) lead--;
+    return lead;
+  });
+}
+
+// Summary: holes played (both teams), current lead, and a result/status label.
+export function fourballStatus(
+  holes: MatchHoleMeta[],
+  members: FourballMember[],
+  aIds: string[],
+  bIds: string[],
+): { thru: number; lead: number; result: string } {
+  const prog = fourballProgress(holes, members, aIds, bIds);
+  const played = prog.filter((p) => p != null) as number[];
+  const thru = played.length;
+  const lead = played.length ? played[played.length - 1] : 0;
+  const remaining = holes.length - thru;
+  let result = "";
+  if (thru === 0) result = "Not started";
+  else if (Math.abs(lead) > remaining) {
+    // Match decided early: "X & Y".
+    const up = Math.abs(lead);
+    result = remaining === 0 ? (lead === 0 ? "Halved" : `${up} UP`) : `${up} & ${remaining}`;
+  } else if (thru === holes.length) {
+    result = lead === 0 ? "Halved" : `${Math.abs(lead)} UP`;
+  } else {
+    result = lead === 0 ? "All square" : `${Math.abs(lead)} UP`;
+  }
+  return { thru, lead, result };
+}

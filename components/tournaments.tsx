@@ -15,6 +15,8 @@ import {
   matchProgress,
   matchLeadLabel,
   matchAllowance,
+  fourballStatus,
+  type FourballMember,
 } from "@/lib/golf";
 import { loadCoursesForGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
@@ -42,10 +44,11 @@ type Game = {
   course: string;
   course_par: number | null;
   holes_meta: { n: number; par: number; si: number | null }[]; // par + stroke index per hole
-  game_type: "stableford" | "match";
+  game_type: "stableford" | "match" | "fourball";
   pairings: { a: string; b: string }[]; // for match play: user_id vs user_id
   status?: "active" | "ended" | null;
   teams?: { key: string; name: string }[] | null; // two named teams for team match play
+  foursomes?: { id: string; name: string; a: string[]; b: string[] }[] | null; // four-ball: pair A vs pair B
   created_by: string;
   created_at: string;
 };
@@ -313,7 +316,7 @@ function CreateGame({
   const [pickedFav, setPickedFav] = useState<any | null>(null);
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState("");
-  const [gameType, setGameType] = useState<"stableford" | "match">(
+  const [gameType, setGameType] = useState<"stableford" | "match" | "fourball">(
     "stableford",
   );
   const [teamMode, setTeamMode] = useState(false);
@@ -416,7 +419,7 @@ function CreateGame({
           code,
           group_id: activeGroupId,
           name:
-            name.trim() || (gameType === "match" ? "Match Play" : "Tournament"),
+            name.trim() || (gameType === "match" ? "Match Play" : gameType === "fourball" ? "Four-Ball" : "Tournament"),
           course: pickedFav.name,
           course_par: coursePar,
           holes_meta: holesMeta,
@@ -429,6 +432,7 @@ function CreateGame({
                   { key: "B", name: team2.trim() || "Team 2" },
                 ]
               : null,
+          foursomes: gameType === "fourball" ? [] : null,
         })
         .select()
         .single();
@@ -666,23 +670,31 @@ function CreateGame({
 
       <div style={{ marginTop: 14 }}>
         <label style={{ color: C.sage, fontSize: 12 }}>Format</label>
-        <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
           <button
             onClick={() => setGameType("stableford")}
-            style={{ ...btn(gameType === "stableford"), flex: 1, fontSize: 13 }}
+            style={{ ...btn(gameType === "stableford"), flex: 1, minWidth: 120, fontSize: 13 }}
           >
             Stableford tournament
           </button>
           <button
             onClick={() => setGameType("match")}
-            style={{ ...btn(gameType === "match"), flex: 1, fontSize: 13 }}
+            style={{ ...btn(gameType === "match"), flex: 1, minWidth: 120, fontSize: 13 }}
           >
             Singles match play
+          </button>
+          <button
+            onClick={() => { setGameType("fourball"); setTeamMode(false); }}
+            style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 120, fontSize: 13 }}
+          >
+            Four-ball (best net)
           </button>
         </div>
         <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
           {gameType === "stableford"
             ? "Everyone competes on one net-Stableford leaderboard."
+            : gameType === "fourball"
+            ? "2-player teams play better-net-ball match play. Big groups split into foursomes (2 v 2) — set them up after creating. Great for 12–16 players in 3–4 foursomes."
             : "Players are paired 1-on-1. After friends join, you'll set the matchups. Lower handicap plays off scratch; opponent gets the difference."}
         </div>
         {gameType === "match" && (
@@ -775,6 +787,7 @@ function GameRoom({
           ...g,
           pairings: Array.isArray((g as any).pairings) ? (g as any).pairings : [],
           teams: Array.isArray((g as any).teams) ? (g as any).teams : null,
+          foursomes: Array.isArray((g as any).foursomes) ? (g as any).foursomes : null,
           holes_meta: Array.isArray((g as any).holes_meta) ? (g as any).holes_meta : [],
         }
       : g;
@@ -1156,9 +1169,6 @@ function GameRoom({
             {game.code}
           </div>
         </button>
-        <button style={btn(false)} onClick={load}>
-          ⟳ Refresh
-        </button>
       </div>
 
       {/* Sub-tabs: Scorecard (play) vs Setup (organizer/teams/matchups) */}
@@ -1240,21 +1250,30 @@ function GameRoom({
       )}
 
       {roomTab === "play" && (
-      <div style={{ marginTop: 16, background: isEnded ? "#3A3A3A" : game.game_type === "match" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <div style={{ marginTop: 16, background: isEnded ? "#3A3A3A" : game.game_type === "match" ? "#1E3A8A" : game.game_type === "fourball" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>
-          {game.game_type === "match" ? "⛳ Singles Match Play" : "🏆 Stableford Tournament"}
+          {game.game_type === "match" ? "⛳ Singles Match Play" : game.game_type === "fourball" ? "⛳ Four-Ball Match (Best Net)" : "🏆 Stableford Tournament"}
         </span>
         {isEnded ? (
           <span style={{ fontSize: 12, fontWeight: 800, background: C.gold, color: "#1A1A1A", borderRadius: 20, padding: "3px 10px" }}>FINAL · GAME ENDED</span>
         ) : (
           <span style={{ color: C.cream, opacity: 0.8, fontSize: 12 }}>
-            {game.game_type === "match" ? "1-on-1 pairings" : "net Stableford leaderboard"}
+            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? "2 v 2 better-net-ball" : "net Stableford leaderboard"}
           </span>
         )}
       </div>
       )}
 
-      {(roomTab === "play" || roomTab === "setup") && game.game_type === "match" ? (
+      {game.game_type === "fourball" ? (
+        <FourballView
+          game={game}
+          players={players}
+          user={user}
+          isCreator={game.created_by === user.id}
+          mode={roomTab}
+          onChanged={load}
+        />
+      ) : (roomTab === "play" || roomTab === "setup") && game.game_type === "match" ? (
         <MatchView
           game={game}
           players={players}
@@ -1785,6 +1804,170 @@ function MatchView({
                 </button>
               )}
             </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+
+// ---------------- Four-ball (best net ball) view ----------------
+// Setup mode: organizer builds foursomes (2 v 2). Play mode: each foursome shows
+// its running better-net-ball match status; the viewer's own foursome is highlighted.
+function FourballView({
+  game,
+  players,
+  user,
+  isCreator,
+  mode = "play",
+  onChanged,
+}: {
+  game: Game;
+  players: Player[];
+  user: any;
+  isCreator: boolean;
+  mode?: "play" | "setup";
+  onChanged: () => void;
+}) {
+  const foursomes = game.foursomes || [];
+  const playerOf = (uid: string) => players.find((p) => p.user_id === uid) || null;
+  const nameOf = (uid: string) => playerOf(uid)?.display_name || "—";
+  const firstName = (uid: string) => (playerOf(uid)?.display_name || "—").split(" ")[0];
+
+  const saveFoursomes = async (next: typeof foursomes) => {
+    await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
+    onChanged();
+  };
+
+  const addFoursome = () => {
+    const next = [...foursomes, { id: Math.random().toString(36).slice(2, 8), name: `Foursome ${foursomes.length + 1}`, a: [], b: [] }];
+    saveFoursomes(next);
+  };
+  const removeFoursome = (id: string) => {
+    if (!confirm("Remove this foursome?")) return;
+    saveFoursomes(foursomes.filter((f) => f.id !== id));
+  };
+  const renameFoursome = (id: string, name: string) => {
+    saveFoursomes(foursomes.map((f) => (f.id === id ? { ...f, name } : f)));
+  };
+  // Assign a player to a slot (team "a" or "b") in a foursome, removing them from any other slot/foursome first.
+  const assign = (fId: string, team: "a" | "b", uid: string) => {
+    const cleared = foursomes.map((f) => ({ ...f, a: f.a.filter((x) => x !== uid), b: f.b.filter((x) => x !== uid) }));
+    const next = cleared.map((f) => {
+      if (f.id !== fId) return f;
+      const side = f[team];
+      if (side.length >= 2) return f; // pair is full
+      return { ...f, [team]: [...side, uid] };
+    });
+    saveFoursomes(next);
+  };
+  const unassign = (fId: string, team: "a" | "b", uid: string) => {
+    saveFoursomes(foursomes.map((f) => (f.id === fId ? { ...f, [team]: f[team].filter((x) => x !== uid) } : f)));
+  };
+
+  // Players not yet placed in any foursome.
+  const placed = new Set(foursomes.flatMap((f) => [...f.a, ...f.b]));
+  const unplaced = players.filter((p) => !placed.has(p.user_id));
+
+  const members4 = (f: { a: string[]; b: string[] }): FourballMember[] =>
+    [...f.a, ...f.b].map((uid) => {
+      const p = playerOf(uid);
+      return { id: uid, gross: p?.scores || [], ch: p?.course_handicap ?? null };
+    });
+
+  if (mode === "setup") {
+    return (
+      <div style={{ marginTop: 16 }}>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <Eyebrow>FOURSOMES (2 v 2)</Eyebrow>
+          <div style={{ flex: 1 }} />
+          {isCreator && <button style={{ ...btn(true), fontSize: 12 }} onClick={addFoursome}>+ Add foursome</button>}
+        </div>
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
+          Each foursome is a 2-v-2 better-net-ball match. Put 2 players in each pair. Big groups: add a foursome per group of four.
+        </div>
+
+        {foursomes.length === 0 && (
+          <div style={{ background: C.greenLight, borderRadius: 12, padding: 18, marginTop: 12, color: C.sage }}>
+            No foursomes yet. Tap “+ Add foursome”, then assign four players (two per pair).
+          </div>
+        )}
+
+        {foursomes.map((f) => (
+          <div key={f.id} style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 12 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <input value={f.name} onChange={(e) => renameFoursome(f.id, e.target.value)} disabled={!isCreator}
+                style={{ ...inputStyle, flex: 1, fontWeight: 700 }} />
+              {isCreator && <button style={{ ...btn(false), fontSize: 11, color: C.birdie }} onClick={() => removeFoursome(f.id)}>Remove</button>}
+            </div>
+            {(["a", "b"] as const).map((team) => (
+              <div key={team} style={{ marginTop: 10 }}>
+                <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>{team === "a" ? "PAIR 1" : "PAIR 2"}</div>
+                {f[team].map((uid) => (
+                  <div key={uid} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" }}>
+                    <span style={{ flex: 1, color: C.cream, fontSize: 14 }}>{nameOf(uid)}</span>
+                    {isCreator && <button style={{ ...btn(false), fontSize: 11, padding: "3px 8px" }} onClick={() => unassign(f.id, team, uid)}>Remove</button>}
+                  </div>
+                ))}
+                {isCreator && f[team].length < 2 && (
+                  <select defaultValue="" onChange={(e) => { if (e.target.value) { assign(f.id, team, e.target.value); e.target.value = ""; } }}
+                    style={{ ...inputStyle, padding: "6px 8px", fontSize: 12, marginTop: 4 }}>
+                    <option value="">+ Add player…</option>
+                    {unplaced.map((p) => <option key={p.id} value={p.user_id}>{p.display_name}</option>)}
+                  </select>
+                )}
+              </div>
+            ))}
+          </div>
+        ))}
+
+        {unplaced.length > 0 && (
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>
+            Unassigned: {unplaced.map((p) => p.display_name).join(", ")}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Play mode: foursome match cards.
+  return (
+    <div style={{ marginTop: 16 }}>
+      <Eyebrow>FOUR-BALL MATCHES</Eyebrow>
+      {foursomes.length === 0 && (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: 18, marginTop: 12, color: C.sage }}>
+          No foursomes set yet. {isCreator ? "Open Game setup to build them." : "Waiting for the organizer to set up the foursomes."}
+        </div>
+      )}
+      {foursomes.map((f) => {
+        const ms = members4(f);
+        const full = f.a.length && f.b.length;
+        const st = full ? fourballStatus(game.holes_meta, ms, f.a, f.b) : null;
+        const mine = f.a.includes(user.id) || f.b.includes(user.id);
+        const lead = st?.lead ?? 0;
+        const leadText = !st || st.thru === 0 ? "" : lead === 0 ? "All square" : `${firstName(lead > 0 ? f.a[0] : f.b[0])}'s pair ${Math.abs(lead)} UP`;
+        return (
+          <div key={f.id} style={{ background: C.card, borderRadius: 12, padding: 14, marginTop: 12, border: mine ? `1px solid ${C.gold}` : "none" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{f.name}{mine ? " · your match" : ""}</div>
+              <div style={{ flex: 1 }} />
+              <div style={{ color: C.green, fontWeight: 800, fontSize: 14, fontFamily: "Georgia, serif" }}>{st ? st.result : "—"}</div>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
+                <div style={{ color: C.gold, fontSize: 10, fontWeight: 800 }}>PAIR 1</div>
+                <div style={{ color: C.cream, fontSize: 13 }}>{f.a.map(firstName).join(" & ") || "—"}</div>
+              </div>
+              <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
+                <div style={{ color: C.gold, fontSize: 10, fontWeight: 800 }}>PAIR 2</div>
+                <div style={{ color: C.cream, fontSize: 13 }}>{f.b.map(firstName).join(" & ") || "—"}</div>
+              </div>
+            </div>
+            {st && st.thru > 0 && (
+              <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>{leadText} · thru {st.thru}</div>
+            )}
+            {!full && <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Needs players in both pairs.</div>}
           </div>
         );
       })}
