@@ -7,10 +7,13 @@ import {
   girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay, adjustedHoleScore, puttDistribution,
 } from "@/lib/golf";
 import { aiUsesLeft, recordAiUse, AI_DAILY_LIMIT_VALUE } from "@/lib/draft";
+import { createClient } from "@/lib/supabase";
+
+const supabase = createClient();
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
 
-export function RoundDetail({ round, ghinNumber, playerName, priorRounds, onBack, onEdit, onDelete }: {
-  round: Round; ghinNumber?: string | null; playerName?: string; priorRounds?: Round[]; onBack: () => void; onEdit: () => void; onDelete: () => void;
+export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEmail, onBack, onEdit, onDelete }: {
+  round: Round; ghinNumber?: string | null; playerName?: string; priorRounds?: Round[]; userEmail?: string | null; onBack: () => void; onEdit: () => void; onDelete: () => void;
 }) {
   const gross = isGrossOnly(round);
   const [showGhin, setShowGhin] = useState(false);
@@ -51,7 +54,7 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, onBack
       ) : (
         <>
           <RoundStats round={round} />
-          <AiAnalysis round={round} priorRounds={priorRounds || []} />
+          <AiAnalysis round={round} priorRounds={priorRounds || []} userEmail={userEmail} />
           <div style={{ marginTop: 14 }}><ScoreViewCard round={round} /></div>
         </>
       )}
@@ -215,15 +218,20 @@ function roundSummary(r: Round) {
 
 // AI coach: analyzes this round vs. prior rounds. Calls our server route, which
 // keeps the API key secret. Opt-in (button) so it only runs when the user wants it.
-function AiAnalysis({ round, priorRounds }: { round: Round; priorRounds: Round[] }) {
-  const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
-  const [text, setText] = useState("");
+function AiAnalysis({ round, priorRounds, userEmail }: { round: Round; priorRounds: Round[]; userEmail?: string | null }) {
+  // The app owner's account is exempt from the daily cap (for testing).
+  const UNLIMITED_EMAIL = "amitsud@gmail.com";
+  const unlimited = (userEmail || "").trim().toLowerCase() === UNLIMITED_EMAIL;
+  // If this round already has a saved analysis, show it straight away.
+  const saved = (round.ai_analysis || "").trim();
+  const [state, setState] = useState<"idle" | "loading" | "done" | "error">(saved ? "done" : "idle");
+  const [text, setText] = useState(saved);
   const [err, setErr] = useState("");
   const [left, setLeft] = useState<number>(AI_DAILY_LIMIT_VALUE);
   useEffect(() => { setLeft(aiUsesLeft()); }, []);
 
   const run = async () => {
-    if (aiUsesLeft() <= 0) { setErr(`You've used your ${AI_DAILY_LIMIT_VALUE} AI analyses for today. Try again tomorrow.`); setState("error"); return; }
+    if (!unlimited && aiUsesLeft() <= 0) { setErr(`You've used your ${AI_DAILY_LIMIT_VALUE} AI analyses for today. Try again tomorrow.`); setState("error"); return; }
     setState("loading"); setErr("");
     try {
       const history = priorRounds
@@ -237,16 +245,21 @@ function AiAnalysis({ round, priorRounds }: { round: Round; priorRounds: Round[]
       });
       const data = await resp.json();
       if (!resp.ok) { setErr(data.error || "Couldn't analyze this round."); setState("error"); return; }
-      recordAiUse();
-      setLeft(aiUsesLeft());
-      setText(data.analysis || ""); setState("done");
+      if (!unlimited) { recordAiUse(); setLeft(aiUsesLeft()); }
+      const analysis = data.analysis || "";
+      setText(analysis); setState("done");
+      // Persist on the round so it survives navigating away / reopening / other devices.
+      if (analysis && round.id) {
+        supabase.from("rounds").update({ ai_analysis: analysis }).eq("id", round.id).then(() => {});
+        round.ai_analysis = analysis; // keep the in-memory object in sync this session
+      }
     } catch {
       setErr("Couldn't reach the analysis service. Check your connection and try again.");
       setState("error");
     }
   };
 
-  const noneLeft = left <= 0;
+  const noneLeft = !unlimited && left <= 0;
   return (
     <div style={{ marginTop: 16, background: C.greenLight, borderRadius: 14, padding: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -260,7 +273,7 @@ function AiAnalysis({ round, priorRounds }: { round: Round; priorRounds: Round[]
       </div>
       {state === "idle" && !noneLeft && (
         <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
-          Get a quick read on what went well and what to work on — compared to your recent rounds. ({left} left today)
+          Get a quick read on what went well and what to work on — compared to your recent rounds and your handicap level.{unlimited ? " (unlimited)" : ` (${left} left today)`}
         </div>
       )}
       {noneLeft && state !== "done" && (
@@ -277,7 +290,7 @@ function AiAnalysis({ round, priorRounds }: { round: Round; priorRounds: Round[]
       {state === "done" && (
         <>
           <div style={{ color: C.cream, fontSize: 14, marginTop: 10, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{text}</div>
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 10 }}>AI-generated from your round stats · {left} analyses left today</div>
+          <div style={{ color: C.faint, fontSize: 11, marginTop: 10 }}>AI-generated from your round stats{unlimited ? "" : ` · ${left} analyses left today`}</div>
         </>
       )}
     </div>

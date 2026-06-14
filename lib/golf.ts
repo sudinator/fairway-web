@@ -40,6 +40,7 @@ export type Round = {
   course_handicap: number | null;
   played_at: string;
   gross_score?: number | null; // for gross-only historical rounds (no per-hole detail)
+  ai_analysis?: string | null; // saved AI coach summary, persists once generated
   holes: Hole[];
 };
 
