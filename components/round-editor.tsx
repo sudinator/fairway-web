@@ -16,12 +16,12 @@ const supabase = createClient();
 
 export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () => void; onCancel: () => void }) {
   const [holes, setHoles] = useState<Hole[]>(round.holes);
-  // Always-current ref so effects/saves never use a stale snapshot. IMPORTANT:
-  // we sync this in a post-commit effect, NOT inline on every render — assigning
-  // it inline could overwrite a fresher value that setHole just wrote in the same
-  // cycle, which was causing the newest holes to be lost on lock/flush.
+  // Single source of truth = `holes` state. A ref mirrors it ONLY for the
+  // lock/flush handler to read synchronously; it is written in one place (the
+  // save effect below), never hand-managed from setHole, to avoid the two
+  // writers fighting and snapping the ref backwards (which lost newest holes).
   const holesRef = React.useRef<Hole[]>(round.holes);
-  useEffect(() => { holesRef.current = holes; }, [holes]);
+  const touchedRef = React.useRef(false); // has the user entered anything?
 
   // If this round has no per-hole data at all (a gross-only round gaining detail),
   // build a blank hole layout. Guard hard against wiping a resumed draft: only
@@ -150,16 +150,22 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   };
 
   const setHole = (i: number, patch: Partial<Hole>) => {
-    // Compute from the latest holes (ref), update state, and save OUTSIDE the
-    // state updater. Doing side-effects inside setHoles is unsafe — React can
-    // re-invoke the updater, which was pinning the saved draft to an early state
-    // (only hole 1 surviving). This keeps the save tied to the real next value.
-    const next = holesRef.current.map((h, j) => (j === i ? { ...h, ...patch } : h));
-    holesRef.current = next;
-    setHoles(next);
-    saveDraft({ ...roundRef.current, holes: next, id: dbIdRef.current || round.id });
-    scheduleBackgroundSave(next);
+    touchedRef.current = true;
+    // ONLY update state, via the functional updater so it always builds on the
+    // true latest holes. Saving is handled by the effect that watches `holes`,
+    // so there is exactly one writer and no stale-snapshot race.
+    setHoles((prev) => prev.map((h, j) => (j === i ? { ...h, ...patch } : h)));
   };
+
+  // Save whenever holes change (after the state has actually committed). This is
+  // the single, authoritative save path — it always sees the real current holes.
+  useEffect(() => {
+    holesRef.current = holes;
+    if (!touchedRef.current) return; // don't save the initial blank layout
+    saveDraft({ ...roundRef.current, holes, id: dbIdRef.current || round.id });
+    scheduleBackgroundSave(holes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holes]);
 
   // iOS Safari can defer flushing localStorage to disk and lose a just-made write if
   // the page is frozen by a screen lock immediately after. Re-saving in the
