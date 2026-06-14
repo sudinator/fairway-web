@@ -271,7 +271,9 @@ export function Home({ session }: { session: any }) {
           <RoundEditor round={stage.round} onCancel={() => setStage(null)}
             onSaved={async () => { await loadRounds(); setStage(null); setTab("rounds"); }} />
         ) : viewing ? (
-          <RoundDetail round={viewing} ghinNumber={profile?.ghin_number || null} playerName={displayName} onBack={() => setViewing(null)}
+          <RoundDetail round={viewing} ghinNumber={profile?.ghin_number || null} playerName={displayName}
+            priorRounds={rounds.filter((r) => r.id !== viewing.id)}
+            onBack={() => setViewing(null)}
             onEdit={() => { setStage({ round: viewing }); setViewing(null); }}
             onDelete={async () => { await deleteRound(viewing.id); setViewing(null); }} />
         ) : tab === "courses" && activeGroup ? (

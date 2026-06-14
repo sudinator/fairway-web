@@ -4,12 +4,13 @@ import React, { useEffect, useState, useCallback } from "react";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, isGrossOnly, hasHoleDetail,
-  girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay, adjustedHoleScore,
+  girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay, adjustedHoleScore, puttDistribution,
 } from "@/lib/golf";
+import { aiUsesLeft, recordAiUse, AI_DAILY_LIMIT_VALUE } from "@/lib/draft";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
 
-export function RoundDetail({ round, ghinNumber, playerName, onBack, onEdit, onDelete }: {
-  round: Round; ghinNumber?: string | null; playerName?: string; onBack: () => void; onEdit: () => void; onDelete: () => void;
+export function RoundDetail({ round, ghinNumber, playerName, priorRounds, onBack, onEdit, onDelete }: {
+  round: Round; ghinNumber?: string | null; playerName?: string; priorRounds?: Round[]; onBack: () => void; onEdit: () => void; onDelete: () => void;
 }) {
   const gross = isGrossOnly(round);
   const [showGhin, setShowGhin] = useState(false);
@@ -48,7 +49,11 @@ export function RoundDetail({ round, ghinNumber, playerName, onBack, onEdit, onD
           <button style={{ ...btn(true), marginTop: 12 }} onClick={onEdit}>＋ Add hole-by-hole detail</button>
         </div>
       ) : (
-        <div style={{ marginTop: 14 }}><ScoreViewCard round={round} /></div>
+        <>
+          <RoundStats round={round} />
+          <AiAnalysis round={round} priorRounds={priorRounds || []} />
+          <div style={{ marginTop: 14 }}><ScoreViewCard round={round} /></div>
+        </>
       )}
     </div>
   );
@@ -145,6 +150,128 @@ function GhinPanel({ round, ghinNumber, playerName }: { round: Round; ghinNumber
       )}
 
       <button style={{ ...btn(false), marginTop: 14, fontSize: 12 }} onClick={() => copy("all", summary)}>{copied === "all" ? "✓ Copied full summary" : "Copy full summary (for notes/text)"}</button>
+    </div>
+  );
+}
+
+// Per-round stats summary: putt distribution (1-putts, 3+-putts) and scoring
+// breakdown (pars, bogeys, doubles-or-worse), shown above the scorecard.
+function RoundStats({ round }: { round: Round }) {
+  const b = holeBuckets([round]);
+  const pd = puttDistribution([round]);
+  const stat = (label: string, value: string | number, hint?: string) => (
+    <div style={{ flex: "1 1 80px", background: C.greenLight, borderRadius: 10, padding: "10px 12px", minWidth: 80 }}>
+      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800 }}>{value}</div>
+      <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>{label}</div>
+      {hint ? <div style={{ color: C.faint, fontSize: 10, marginTop: 1 }}>{hint}</div> : null}
+    </div>
+  );
+  return (
+    <div style={{ marginTop: 14 }}>
+      <Eyebrow>PUTTING</Eyebrow>
+      <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+        {stat("Total putts", pd.withPutts ? pd.total : "—")}
+        {stat("1-putts", pd.withPutts ? pd.one : "—", pd.withPutts ? `of ${pd.withPutts} holes` : "")}
+        {stat("3+ putts", pd.withPutts ? pd.three : "—", pd.withPutts ? `of ${pd.withPutts} holes` : "")}
+      </div>
+      <div style={{ marginTop: 14 }}><Eyebrow>SCORING</Eyebrow></div>
+      <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+        {stat("Eagles+", b.eagle)}
+        {stat("Birdies", b.birdie)}
+        {stat("Pars", b.par)}
+        {stat("Bogeys", b.bogey)}
+        {stat("Double+", b.double, "dbl bogey or worse")}
+      </div>
+    </div>
+  );
+}
+
+// Compact, numbers-only summary of a round for the AI coach (keeps the payload
+// small and the analysis grounded in real stats).
+function roundSummary(r: Round) {
+  const b = holeBuckets([r]);
+  const pd = puttDistribution([r]);
+  return {
+    date: fmtDate(r.played_at),
+    course: r.course,
+    score: strokesOf(r),
+    toPar: toParStr(diffOf(r)),
+    putts: pd.withPutts ? pd.total : null,
+    onePutts: pd.withPutts ? pd.one : null,
+    threePuttsPlus: pd.withPutts ? pd.three : null,
+    gir: fracPct(girStats([r])),
+    fairways: fracPct(firStats([r])),
+    eagles: b.eagle, birdies: b.birdie, pars: b.par, bogeys: b.bogey, doublesOrWorse: b.double,
+  };
+}
+
+// AI coach: analyzes this round vs. prior rounds. Calls our server route, which
+// keeps the API key secret. Opt-in (button) so it only runs when the user wants it.
+function AiAnalysis({ round, priorRounds }: { round: Round; priorRounds: Round[] }) {
+  const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [text, setText] = useState("");
+  const [err, setErr] = useState("");
+  const [left, setLeft] = useState<number>(AI_DAILY_LIMIT_VALUE);
+  useEffect(() => { setLeft(aiUsesLeft()); }, []);
+
+  const run = async () => {
+    if (aiUsesLeft() <= 0) { setErr(`You've used your ${AI_DAILY_LIMIT_VALUE} AI analyses for today. Try again tomorrow.`); setState("error"); return; }
+    setState("loading"); setErr("");
+    try {
+      const history = priorRounds
+        .filter((r) => hasHoleDetail(r))
+        .slice(0, 10)
+        .map(roundSummary);
+      const resp = await fetch("/api/analyze-round", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ current: roundSummary(round), history }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) { setErr(data.error || "Couldn't analyze this round."); setState("error"); return; }
+      recordAiUse();
+      setLeft(aiUsesLeft());
+      setText(data.analysis || ""); setState("done");
+    } catch {
+      setErr("Couldn't reach the analysis service. Check your connection and try again.");
+      setState("error");
+    }
+  };
+
+  const noneLeft = left <= 0;
+  return (
+    <div style={{ marginTop: 16, background: C.greenLight, borderRadius: 14, padding: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <Eyebrow>AI COACH</Eyebrow>
+        <div style={{ flex: 1 }} />
+        {state !== "loading" && !noneLeft && (
+          <button style={{ ...btn(true), fontSize: 12 }} onClick={run}>
+            {state === "done" ? "↻ Re-analyze" : "✦ Analyze this round"}
+          </button>
+        )}
+      </div>
+      {state === "idle" && !noneLeft && (
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
+          Get a quick read on what went well and what to work on — compared to your recent rounds. ({left} left today)
+        </div>
+      )}
+      {noneLeft && state !== "done" && (
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
+          You've used your {AI_DAILY_LIMIT_VALUE} AI analyses for today. Come back tomorrow for more.
+        </div>
+      )}
+      {state === "loading" && (
+        <div style={{ color: C.gold, fontSize: 13, marginTop: 10 }}>Analyzing your round…</div>
+      )}
+      {state === "error" && (
+        <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{err}</div>
+      )}
+      {state === "done" && (
+        <>
+          <div style={{ color: C.cream, fontSize: 14, marginTop: 10, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{text}</div>
+          <div style={{ color: C.faint, fontSize: 11, marginTop: 10 }}>AI-generated from your round stats · {left} analyses left today</div>
+        </>
+      )}
     </div>
   );
 }

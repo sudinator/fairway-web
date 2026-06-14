@@ -425,3 +425,19 @@ export function fourballStatus(
   }
   return { thru, lead, result };
 }
+
+// Putt distribution for a set of rounds: counts of 1-putts and 3+-putts, plus
+// holes that have a recorded putt value (so percentages are honest).
+export function puttDistribution(rounds: Round[]) {
+  let one = 0, three = 0, withPutts = 0, total = 0;
+  rounds.forEach((r) =>
+    played(r).forEach((h) => {
+      if (h.putts == null) return;
+      withPutts++;
+      total += h.putts;
+      if (h.putts === 1) one++;
+      else if (h.putts >= 3) three++;
+    })
+  );
+  return { one, three, withPutts, total };
+}

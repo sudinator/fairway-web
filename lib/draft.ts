@@ -130,3 +130,33 @@ export function clearGameScores(gameId: string, playerId: string): void {
     window.localStorage.removeItem(gameScoreKey(gameId, playerId));
   } catch {}
 }
+
+// --- Per-user daily AI analysis cap (client-side) ---
+// Limits how many AI analyses a user can run per day, as the first line of cost
+// defense. Stored per device; the server also enforces a global daily cap.
+const AI_KEY = "bnn_ai_uses";
+const AI_DAILY_LIMIT = 2;
+
+export function aiUsesLeft(): number {
+  try {
+    if (typeof window === "undefined") return AI_DAILY_LIMIT;
+    const today = new Date().toISOString().slice(0, 10);
+    const raw = window.localStorage.getItem(AI_KEY);
+    const p = raw ? JSON.parse(raw) : null;
+    if (!p || p.day !== today) return AI_DAILY_LIMIT;
+    return Math.max(0, AI_DAILY_LIMIT - (p.count || 0));
+  } catch { return AI_DAILY_LIMIT; }
+}
+
+export function recordAiUse(): void {
+  try {
+    if (typeof window === "undefined") return;
+    const today = new Date().toISOString().slice(0, 10);
+    const raw = window.localStorage.getItem(AI_KEY);
+    const p = raw ? JSON.parse(raw) : null;
+    const count = p && p.day === today ? (p.count || 0) + 1 : 1;
+    window.localStorage.setItem(AI_KEY, JSON.stringify({ day: today, count }));
+  } catch {}
+}
+
+export const AI_DAILY_LIMIT_VALUE = AI_DAILY_LIMIT;
