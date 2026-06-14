@@ -142,16 +142,23 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
     if (!confirm(`Delete the group "${active.name}"? This permanently removes the group and its membership. Rounds you logged are kept on your account. This cannot be undone.`)) return;
     setBusy(true); setMsg(null);
     try {
-      // Clear the group from anyone whose active group points at it, so they
-      // aren't left pointing at a deleted group.
+      // Clear the group from anyone whose active group points at it.
       await supabase.from("profiles").update({ active_group_id: null }).eq("active_group_id", active.id);
-      // Remove dependent rows first (membership, invites, group-course links),
-      // then the group itself. Rounds keep their group_id as a historical tag.
+      // Remove dependent rows first, then the group. With RLS, a delete you're not
+      // permitted to make returns NO error — it just removes zero rows. So we ask
+      // for the deleted rows back (.select()) and verify the group actually went.
       await supabase.from("group_members").delete().eq("group_id", active.id);
       await supabase.from("group_invites").delete().eq("group_id", active.id);
       await supabase.from("group_courses").delete().eq("group_id", active.id);
-      const { error } = await supabase.from("groups").delete().eq("id", active.id);
+      const { data: deleted, error } = await supabase
+        .from("groups").delete().eq("id", active.id).select("id");
       if (error) throw error;
+      if (!deleted || deleted.length === 0) {
+        // Nothing was removed — almost always a missing delete permission (RLS).
+        setMsg("Couldn't delete this group. Your account may not have permission to delete it (a database policy is required). Nothing was changed.");
+        setBusy(false);
+        return;
+      }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Group admin", action: "group_deleted", summary: `Deleted group "${active.name}"` });
       setMsg("Group deleted.");
       if (onGroupDeleted) await onGroupDeleted();
