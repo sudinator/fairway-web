@@ -74,6 +74,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   const isResumed = !!round.id || draftHasScores(round);
   // Server-side backup: the DB round id once a background save has created it.
   const dbIdRef = React.useRef<string>(round.id || "");
+  const discardedRef = React.useRef(false); // set on discard to block late saves
   const blanksRef = React.useRef(false);
   const saveTimerRef = React.useRef<any>(null);
   // Always-current refs so saves never use a stale snapshot.
@@ -84,6 +85,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   // errors — local storage is the instant guarantee; this is server redundancy
   // so a round survives even if device storage is cleared or you switch devices.
   const backgroundSave = useCallback(async (currentHoles: Hole[]) => {
+    if (discardedRef.current) return; // round was discarded — never re-create it
     try {
       let rid = dbIdRef.current;
       if (!rid) {
@@ -185,6 +187,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   // visibilitychange/pagehide handlers forces the write at the last reliable moment.
   useEffect(() => {
     const flush = () => {
+      if (discardedRef.current) return; // discarded — don't resurrect it
       if (holesRef.current.some((h) => h.strokes != null)) {
         saveDraft({ ...roundRef.current, holes: holesRef.current, id: dbIdRef.current || round.id });
         backgroundSave(holesRef.current); // best-effort server write too
@@ -273,16 +276,31 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
 
   const cancel = async () => {
     if (draftHasScores({ ...round, holes }) && !confirm("Discard this in-progress round? Your entered scores will be cleared.")) return;
+    // Stop any pending/queued background save so it can't re-create the row after we delete.
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    discardedRef.current = true; // block any late flush from re-saving
     clearDraft();
-    // Remove the background in-progress round from the server, if one was created.
-    const rid = dbIdRef.current;
-    if (rid && !round.id) {
-      try {
+    // Delete the server-side in-progress backup. Don't rely on dbIdRef alone — the
+    // debounced background save may have created the row under an id we don't hold,
+    // or not yet at all. Sweep any in_progress round for this user+course so a
+    // refresh can't resurrect it.
+    try {
+      const rid = dbIdRef.current;
+      if (rid) {
         await supabase.from("holes").delete().eq("round_id", rid);
         await supabase.from("rounds").delete().eq("id", rid);
-      } catch {}
-    }
+      }
+      // Belt-and-suspenders: remove any other in-progress row for this round.
+      const { data: u } = await supabase.auth.getUser();
+      if (u.user) {
+        const { data: stray } = await supabase.from("rounds")
+          .select("id").eq("user_id", u.user.id).eq("status", "in_progress").eq("course", round.course);
+        for (const r of stray || []) {
+          await supabase.from("holes").delete().eq("round_id", r.id);
+          await supabase.from("rounds").delete().eq("id", r.id);
+        }
+      }
+    } catch {}
     onCancel();
   };
 
