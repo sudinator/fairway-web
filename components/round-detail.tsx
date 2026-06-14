@@ -159,6 +159,8 @@ function GhinPanel({ round, ghinNumber, playerName }: { round: Round; ghinNumber
 function RoundStats({ round }: { round: Round }) {
   const b = holeBuckets([round]);
   const pd = puttDistribution([round]);
+  const gir = girStats([round]);
+  const fir = firStats([round]);
   const stat = (label: string, value: string | number, hint?: string) => (
     <div style={{ flex: "1 1 80px", background: C.greenLight, borderRadius: 10, padding: "10px 12px", minWidth: 80 }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800 }}>{value}</div>
@@ -168,7 +170,12 @@ function RoundStats({ round }: { round: Round }) {
   );
   return (
     <div style={{ marginTop: 14 }}>
-      <Eyebrow>PUTTING</Eyebrow>
+      <Eyebrow>GREENS & FAIRWAYS</Eyebrow>
+      <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+        {stat("Greens in reg.", gir.total ? `${gir.hit}/${gir.total}` : "—", gir.total ? `${pct(gir)}` : "")}
+        {stat("Fairways hit", fir.total ? `${fir.hit}/${fir.total}` : "—", fir.total ? `${pct(fir)}` : "")}
+      </div>
+      <div style={{ marginTop: 14 }}><Eyebrow>PUTTING</Eyebrow></div>
       <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
         {stat("Total putts", pd.withPutts ? pd.total : "—")}
         {stat("1-putts", pd.withPutts ? pd.one : "—", pd.withPutts ? `of ${pd.withPutts} holes` : "")}

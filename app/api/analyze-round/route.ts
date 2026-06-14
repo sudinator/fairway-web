@@ -58,32 +58,41 @@ Write a short analysis with exactly these three parts, using these labels on the
 Rules: Base everything ONLY on the numbers given. If there are no prior rounds, treat this as a baseline and focus on this round's patterns. Do not invent stats. Keep the whole thing under 130 words. Warm but honest.`;
 
   try {
-    const model = "gemini-2.0-flash";
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 400, temperature: 0.7 },
-      }),
-    });
-    if (!resp.ok) {
-      const detail = (await resp.text()).slice(0, 300);
-      const status = resp.status === 429 ? 429 : 502;
-      return NextResponse.json(
-        { error: status === 429 ? "AI analysis is busy right now - please try again later." : "AI service error.", detail },
-        { status },
-      );
+    // Try current free-tier models in order; if one is unavailable/over-quota
+    // (429/404), fall through to the next before giving up.
+    const models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-8b"];
+    let lastDetail = "";
+    let lastStatus = 502;
+    for (const model of models) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 400, temperature: 0.7 },
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        const text = (data?.candidates?.[0]?.content?.parts || [])
+          .map((p: any) => p.text || "")
+          .join("\n")
+          .trim();
+        if (!text) return NextResponse.json({ error: "No analysis available." }, { status: 502 });
+        dayCount++;
+        return NextResponse.json({ analysis: text });
+      }
+      lastDetail = (await resp.text()).slice(0, 400);
+      lastStatus = resp.status;
+      // Only fall through on model-availability / quota issues; otherwise stop.
+      if (resp.status !== 429 && resp.status !== 404) break;
     }
-    const data = await resp.json();
-    const text = (data?.candidates?.[0]?.content?.parts || [])
-      .map((p: any) => p.text || "")
-      .join("\n")
-      .trim();
-    if (!text) return NextResponse.json({ error: "No analysis available." }, { status: 502 });
-    dayCount++;
-    return NextResponse.json({ analysis: text });
+    // All models failed — surface Google's actual reason so it can be diagnosed.
+    return NextResponse.json(
+      { error: `AI service error (${lastStatus}). ${lastDetail || "No detail returned."}` },
+      { status: lastStatus === 429 ? 429 : 502 },
+    );
   } catch (e: any) {
     return NextResponse.json({ error: "Couldn't reach the AI service.", detail: e?.message }, { status: 502 });
   }
