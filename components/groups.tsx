@@ -212,6 +212,15 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
 
   const updateMember = async (m: Member, patch: Partial<Member>) => {
     if (!active || !isAdmin) return;
+    // Guard: never let a group lose its last admin. Block demoting the only admin
+    // to member, or removing the only admin from the group.
+    const admins = (members || []).filter((x) => x.role === "admin" && x.status === "active");
+    const demotingThisAdmin = patch.role === "member" && m.role === "admin";
+    const removingThisAdmin = patch.status === "removed" && m.role === "admin";
+    if ((demotingThisAdmin || removingThisAdmin) && admins.length <= 1) {
+      setMsg("This is the group's only admin. Make someone else an admin first, so the group always has at least one.");
+      return;
+    }
     setBusy(true); setMsg(null);
     try {
       const { error } = await supabase.from("group_members").update(patch).eq("id", m.id);
