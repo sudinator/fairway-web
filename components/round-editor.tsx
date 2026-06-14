@@ -151,21 +151,19 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
 
   const setHole = (i: number, patch: Partial<Hole>) => {
     touchedRef.current = true;
-    // ONLY update state, via the functional updater so it always builds on the
-    // true latest holes. Saving is handled by the effect that watches `holes`,
-    // so there is exactly one writer and no stale-snapshot race.
-    setHoles((prev) => prev.map((h, j) => (j === i ? { ...h, ...patch } : h)));
+    // Build next from the latest committed holes, then save it SYNCHRONOUSLY,
+    // right here, before returning — so the write lands in storage immediately
+    // and can't be lost to a screen lock a moment later. We read the freshest
+    // holes via the functional updater to avoid stale closures, and persist from
+    // inside it using the exact value we are about to commit.
+    setHoles((prev) => {
+      const next = prev.map((h, j) => (j === i ? { ...h, ...patch } : h));
+      holesRef.current = next;
+      saveDraft({ ...roundRef.current, holes: next, id: dbIdRef.current || round.id });
+      scheduleBackgroundSave(next);
+      return next;
+    });
   };
-
-  // Save whenever holes change (after the state has actually committed). This is
-  // the single, authoritative save path — it always sees the real current holes.
-  useEffect(() => {
-    holesRef.current = holes;
-    if (!touchedRef.current) return; // don't save the initial blank layout
-    saveDraft({ ...roundRef.current, holes, id: dbIdRef.current || round.id });
-    scheduleBackgroundSave(holes);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [holes]);
 
   // iOS Safari can defer flushing localStorage to disk and lose a just-made write if
   // the page is frozen by a screen lock immediately after. Re-saving in the
