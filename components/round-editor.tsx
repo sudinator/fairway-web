@@ -16,15 +16,27 @@ const supabase = createClient();
 
 export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () => void; onCancel: () => void }) {
   const [holes, setHoles] = useState<Hole[]>(round.holes);
+  // Always-current ref so effects/saves never use a stale snapshot.
+  const holesRef = React.useRef<Hole[]>(round.holes);
+  holesRef.current = holes;
 
-  // If this round has no per-hole data (a gross-only round gaining detail), build a hole layout.
+  // If this round has no per-hole data at all (a gross-only round gaining detail),
+  // build a blank hole layout. Guard hard against wiping a resumed draft: only
+  // synthesize when there are genuinely no holes AND none have been loaded into
+  // state. (Resumed drafts have empty round.id, so we must check the live holes,
+  // not just the prop, or this async effect blanks the scores a beat after they load.)
+  const synthesizedRef = React.useRef(false);
   useEffect(() => {
-    if (round.holes.length > 0) return;
+    if (round.holes.length > 0) return;       // round already carries holes
+    if (holesRef.current.length > 0) return;  // holes already in state (resumed/loaded)
+    if (synthesizedRef.current) return;        // only ever do this once
+    synthesizedRef.current = true;
     (async () => {
-      // Try to pull the real par/S.I. from the saved course library.
       let favQuery = supabase.from("favorite_courses").select("data").eq("name", round.course);
       if (round.group_id) favQuery = favQuery.eq("group_id", round.group_id);
       const { data: fav } = await favQuery.maybeSingle();
+      // Re-check after the await — if holes arrived meanwhile, do NOT overwrite them.
+      if (holesRef.current.length > 0) return;
       const courseHoles = (fav?.data?.holes || []) as { n: number; par: number; si: number | null }[];
       const base = courseHoles.length >= 9
         ? courseHoles
@@ -46,6 +58,9 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   const dbIdRef = React.useRef<string>(round.id || "");
   const blanksRef = React.useRef(false);
   const saveTimerRef = React.useRef<any>(null);
+  // Always-current refs so saves never use a stale snapshot.
+  const roundRef = React.useRef<Round>(round);
+  roundRef.current = round;
 
   // Best-effort background save to the database. Never blocks entry and swallows
   // errors — local storage is the instant guarantee; this is server redundancy
@@ -132,22 +147,20 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   };
 
   const setHole = (i: number, patch: Partial<Hole>) => {
-    setHoles((hs) => {
-      const next = hs.map((h, j) => (j === i ? { ...h, ...patch } : h));
-      // Save instantly to local storage — synchronous, so it survives a phone lock
-      // or refresh even if it happens the moment after this tap.
-      saveDraft({ ...round, holes: next, id: dbIdRef.current || round.id });
-      // Background server backup (debounced, non-blocking).
-      scheduleBackgroundSave(next);
-      return next;
-    });
+    // Compute from the latest holes (ref), update state, and save OUTSIDE the
+    // state updater. Doing side-effects inside setHoles is unsafe — React can
+    // re-invoke the updater, which was pinning the saved draft to an early state
+    // (only hole 1 surviving). This keeps the save tied to the real next value.
+    const next = holesRef.current.map((h, j) => (j === i ? { ...h, ...patch } : h));
+    holesRef.current = next;
+    setHoles(next);
+    saveDraft({ ...roundRef.current, holes: next, id: dbIdRef.current || round.id });
+    scheduleBackgroundSave(next);
   };
 
   // iOS Safari can defer flushing localStorage to disk and lose a just-made write if
   // the page is frozen by a screen lock immediately after. Re-saving in the
   // visibilitychange/pagehide handlers forces the write at the last reliable moment.
-  const holesRef = React.useRef(holes);
-  holesRef.current = holes;
   useEffect(() => {
     const flush = () => {
       if (holesRef.current.some((h) => h.strokes != null)) {

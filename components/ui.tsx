@@ -173,7 +173,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
             })()] : []),
             ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: C.dot, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{h.recv > 0 ? "•".repeat(Math.min(h.recv, 3)) : ""}</div>] : []),
             <div key="sc" style={{ textAlign: "center" }}>
-              <NumPicker key={`sc-${hydrated}-${h.strokes ?? "x"}`} value={h.strokes} from={1} to={maxStrokes} onChange={(v) => onSet(i, { strokes: v })} width={48} accent={savingHole === i} />
+              <NumPicker key={`sc-${hydrated}`} value={h.strokes} from={1} to={maxStrokes} onChange={(v) => onSet(i, { strokes: v })} width={48} accent={savingHole === i} />
             </div>,
             ...(showFairway ? [
               <div key="fw" style={{ textAlign: "center" }}>
@@ -187,12 +187,12 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
             ] : []),
             ...(showPutts ? [
               <div key="pu" style={{ textAlign: "center" }}>
-                <NumPicker key={`pu-${hydrated}-${h.putts ?? "x"}`} value={h.putts} from={0} to={maxPutts} onChange={(v) => onSet(i, { putts: v })} width={48} />
+                <NumPicker key={`pu-${hydrated}`} value={h.putts} from={0} to={maxPutts} onChange={(v) => onSet(i, { putts: v })} width={48} />
               </div>,
             ] : []),
             ...(showPenalties ? [
               <div key="pe" style={{ textAlign: "center" }}>
-                <NumPicker key={`pe-${hydrated}-${h.penalties ?? "x"}`} value={h.penalties || null} from={1} to={3} onChange={(v) => onSet(i, { penalties: v ?? 0 })} width={44} />
+                <NumPicker key={`pe-${hydrated}`} value={h.penalties || null} from={1} to={3} onChange={(v) => onSet(i, { penalties: v ?? 0 })} width={44} />
               </div>,
             ] : []),
             <div key="pt" style={{ textAlign: "center", color: ptsColor(pts), fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
