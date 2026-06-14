@@ -161,9 +161,9 @@ function RoundStats({ round }: { round: Round }) {
   const pd = puttDistribution([round]);
   const gir = girStats([round]);
   const fir = firStats([round]);
-  const stat = (label: string, value: string | number, hint?: string) => (
+  const stat = (label: string, value: string | number, hint?: string, size = 22) => (
     <div style={{ flex: "1 1 80px", background: C.greenLight, borderRadius: 10, padding: "10px 12px", minWidth: 80 }}>
-      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800 }}>{value}</div>
+      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: size, fontWeight: 800 }}>{value}</div>
       <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>{label}</div>
       {hint ? <div style={{ color: C.faint, fontSize: 10, marginTop: 1 }}>{hint}</div> : null}
     </div>
@@ -172,8 +172,8 @@ function RoundStats({ round }: { round: Round }) {
     <div style={{ marginTop: 14 }}>
       <Eyebrow>GREENS & FAIRWAYS</Eyebrow>
       <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-        {stat("Greens in reg.", gir.total ? `${gir.hit}/${gir.total}` : "—", gir.total ? `${pct(gir)}` : "")}
-        {stat("Fairways hit", fir.total ? `${fir.hit}/${fir.total}` : "—", fir.total ? `${pct(fir)}` : "")}
+        {stat("Greens in reg.", gir.total ? `${gir.hit}/${gir.total} · ${pct(gir)}` : "—", undefined, 19)}
+        {stat("Fairways hit", fir.total ? `${fir.hit}/${fir.total} · ${pct(fir)}` : "—", undefined, 19)}
       </div>
       <div style={{ marginTop: 14 }}><Eyebrow>PUTTING</Eyebrow></div>
       <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>

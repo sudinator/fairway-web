@@ -60,7 +60,7 @@ Rules: Base everything ONLY on the numbers given. If there are no prior rounds, 
   try {
     // Try current free-tier models in order; if one is unavailable/over-quota
     // (429/404), fall through to the next before giving up.
-    const models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-flash-8b"];
+    const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"];
     let lastDetail = "";
     let lastStatus = 502;
     for (const model of models) {
