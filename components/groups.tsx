@@ -144,21 +144,31 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
     try {
       // Clear the group from anyone whose active group points at it.
       await supabase.from("profiles").update({ active_group_id: null }).eq("active_group_id", active.id);
-      // Remove dependent rows first, then the group. With RLS, a delete you're not
-      // permitted to make returns NO error — it just removes zero rows. So we ask
-      // for the deleted rows back (.select()) and verify the group actually went.
-      await supabase.from("group_members").delete().eq("group_id", active.id);
-      await supabase.from("group_invites").delete().eq("group_id", active.id);
-      await supabase.from("group_courses").delete().eq("group_id", active.id);
+      // Tables whose group_id FK is "no action" (rounds, games, favorites,
+      // notifications) would block the group delete while pointing at it. Null
+      // their group_id first so the rows are preserved but no longer reference the
+      // group. (group_members / group_invites / group_courses cascade automatically.)
+      await supabase.from("rounds").update({ group_id: null }).eq("group_id", active.id);
+      await supabase.from("favorite_courses").update({ group_id: null }).eq("group_id", active.id);
+      await supabase.from("games").update({ group_id: null }).eq("group_id", active.id);
+      await supabase.from("notifications").update({ group_id: null }).eq("group_id", active.id);
+      // IMPORTANT ORDER: delete the GROUP row FIRST, while we are still its admin.
+      // is_group_admin() checks the group_members table, so if we deleted our own
+      // membership first, the group-delete permission check would then fail and
+      // silently remove nothing. Delete the group, verify it went, then clean up
+      // the now-orphaned dependent rows.
       const { data: deleted, error } = await supabase
         .from("groups").delete().eq("id", active.id).select("id");
       if (error) throw error;
       if (!deleted || deleted.length === 0) {
-        // Nothing was removed — almost always a missing delete permission (RLS).
-        setMsg("Couldn't delete this group. Your account may not have permission to delete it (a database policy is required). Nothing was changed.");
+        setMsg("Couldn't delete this group — your account may not have permission (nothing was changed).");
         setBusy(false);
         return;
       }
+      // Group is gone; remove its dependent rows.
+      await supabase.from("group_members").delete().eq("group_id", active.id);
+      await supabase.from("group_invites").delete().eq("group_id", active.id);
+      await supabase.from("group_courses").delete().eq("group_id", active.id);
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Group admin", action: "group_deleted", summary: `Deleted group "${active.name}"` });
       setMsg("Group deleted.");
       if (onGroupDeleted) await onGroupDeleted();
