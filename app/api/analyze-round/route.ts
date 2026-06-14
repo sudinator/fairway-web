@@ -19,6 +19,47 @@ let dayCount = 0;
 const GLOBAL_DAILY_LIMIT = parseInt(process.env.GEMINI_DAILY_LIMIT || "200", 10);
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
+// Hardcoded fallback if the live model list can't be fetched. Ordered newest-first.
+const FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"];
+
+// Cache the discovered model list briefly so we don't list on every request.
+let cachedModels: string[] = [];
+let cachedAt = 0;
+const MODEL_CACHE_MS = 1000 * 60 * 60; // 1 hour
+
+// Future-proofing: ask Google which models THIS key can actually use, and pick
+// suitable lightweight "flash" models (free-tier friendly) that support content
+// generation. Falls back to a known list if discovery fails. An env override
+// (GEMINI_MODEL) always wins if set.
+async function pickModels(key: string): Promise<string[]> {
+  const override = (process.env.GEMINI_MODEL || "").trim();
+  if (override) return [override, ...FALLBACK_MODELS];
+
+  if (cachedModels.length && Date.now() - cachedAt < MODEL_CACHE_MS) {
+    return [...cachedModels, ...FALLBACK_MODELS];
+  }
+  try {
+    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+    if (!resp.ok) return FALLBACK_MODELS;
+    const data = await resp.json();
+    const all: any[] = data?.models || [];
+    const usable = all
+      .filter((m) => (m.supportedGenerationMethods || []).includes("generateContent"))
+      .map((m) => String(m.name || "").replace(/^models\//, ""))
+      .filter((n) => n.includes("flash")); // lightweight, free-tier friendly
+    // Prefer non-experimental, higher version numbers; keep it simple: sort desc.
+    const ranked = usable
+      .filter((n) => !/exp|preview|thinking/i.test(n)) // avoid experimental/preview
+      .sort()
+      .reverse();
+    const chosen = (ranked.length ? ranked : usable).slice(0, 4);
+    if (chosen.length) { cachedModels = chosen; cachedAt = Date.now(); return [...chosen, ...FALLBACK_MODELS]; }
+    return FALLBACK_MODELS;
+  } catch {
+    return FALLBACK_MODELS;
+  }
+}
+
 export async function POST(request: Request) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) {
@@ -42,44 +83,52 @@ export async function POST(request: Request) {
   const { current, history } = body || {};
   if (!current) return NextResponse.json({ error: "No round data provided." }, { status: 400 });
 
-  const prompt = `You are a friendly, encouraging golf coach analyzing an amateur golfer's round. Be specific, positive, and practical. Keep it concise.
+  const prompt = `You are a friendly, encouraging golf coach analyzing an amateur golfer's round. Be specific, positive, practical, and concise.
 
-CURRENT ROUND:
+CURRENT ROUND (includes the golfer's handicap index if known):
 ${JSON.stringify(current)}
 
 PRIOR ROUNDS (most recent first, may be empty):
 ${JSON.stringify(history || [])}
 
-Write a short analysis with exactly these three parts, using these labels on their own:
-"What went well:" - 1-2 specific positives from this round, comparing to prior rounds where possible (fewer 3-putts, better GIR, lower score, etc.).
-"Focus areas:" - 1-2 specific, actionable things to work on, grounded in the stats.
+Write a short analysis with exactly these labels, each on its own line:
+"What went well:" - 1-2 specific positives from this round. Compare to the golfer's own prior rounds where possible (e.g. fewer 3-putts, better GIR, lower score).
+"Vs. your level:" - Compare this round's key stats to what a TYPICAL golfer with this handicap index would normally produce, and say where they're ahead of or behind that benchmark. Use realistic, well-known rules of thumb for amateur golf, e.g.: a ~10 handicap typically hits roughly 6-8 greens in regulation and ~6-8 fairways per round and averages close to 2 putts per green (around 32-34 putts), with very few doubles; a ~20 handicap typically hits ~3-5 GIR, more bogeys and several doubles, and 34-36 putts; scratch-ish players hit 10+ GIR. Scale sensibly to the golfer's actual handicap. If no handicap is given, skip this section.
+"Focus areas:" - 1-2 specific, actionable things to work on, grounded in the stats and the comparison above.
 "Next time:" - one concrete, achievable goal for the next round.
 
-Rules: Base everything ONLY on the numbers given. If there are no prior rounds, treat this as a baseline and focus on this round's patterns. Do not invent stats. Keep the whole thing under 130 words. Warm but honest.`;
+Rules: Base everything ONLY on the numbers given plus standard golf benchmarks for the stated handicap. Do not invent the golfer's own stats. Keep the whole thing under 150 words. Warm but honest.`;
 
   try {
-    // Try current free-tier models in order; if one is unavailable/over-quota
-    // (429/404), fall through to the next before giving up.
-    const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"];
+    const candidates = await pickModels(key);
     let lastDetail = "";
     let lastStatus = 502;
-    for (const model of models) {
+    for (const model of candidates) {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
       const resp = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 400, temperature: 0.7 },
+          generationConfig: { maxOutputTokens: 1200, temperature: 0.7 },
         }),
       });
       if (resp.ok) {
         const data = await resp.json();
-        const text = (data?.candidates?.[0]?.content?.parts || [])
+        const cand = data?.candidates?.[0];
+        const text = (cand?.content?.parts || [])
           .map((p: any) => p.text || "")
           .join("\n")
           .trim();
-        if (!text) return NextResponse.json({ error: "No analysis available." }, { status: 502 });
+        // If the model produced no visible text (e.g. spent the whole budget on
+        // internal reasoning and hit MAX_TOKENS before writing), treat it as a
+        // failure for this model and try the next candidate rather than returning
+        // a blank or half-sentence.
+        if (!text) {
+          lastDetail = `Empty response (finishReason: ${cand?.finishReason || "unknown"}).`;
+          lastStatus = 502;
+          continue;
+        }
         dayCount++;
         return NextResponse.json({ analysis: text });
       }

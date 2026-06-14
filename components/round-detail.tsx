@@ -201,6 +201,7 @@ function roundSummary(r: Round) {
   return {
     date: fmtDate(r.played_at),
     course: r.course,
+    handicapIndex: r.handicap_index ?? null,
     score: strokesOf(r),
     toPar: toParStr(diffOf(r)),
     putts: pd.withPutts ? pd.total : null,
