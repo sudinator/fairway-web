@@ -80,10 +80,11 @@ export async function POST(request: Request) {
 
   let body: any;
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
-  const { current, history } = body || {};
-  if (!current) return NextResponse.json({ error: "No round data provided." }, { status: 400 });
+  const { current, history, mode, aggregate } = body || {};
+  if (mode !== "dashboard" && !current) return NextResponse.json({ error: "No round data provided." }, { status: 400 });
+  if (mode === "dashboard" && !aggregate) return NextResponse.json({ error: "No stats provided." }, { status: 400 });
 
-  const prompt = `You are a friendly, encouraging golf coach analyzing an amateur golfer's round. Be specific, positive, practical, and concise.
+  const roundPrompt = `You are a friendly, encouraging golf coach analyzing an amateur golfer's round. Be specific, positive, practical, and concise.
 
 CURRENT ROUND (includes the golfer's handicap index if known):
 ${JSON.stringify(current)}
@@ -98,6 +99,21 @@ Write a short analysis with exactly these labels, each on its own line:
 "Next time:" - one concrete, achievable goal for the next round.
 
 Rules: Base everything ONLY on the numbers given plus standard golf benchmarks for the stated handicap. Do not invent the golfer's own stats. Keep the whole thing under 150 words. Warm but honest.`;
+
+  const dashboardPrompt = `You are a friendly, expert golf coach reviewing an amateur golfer's CAREER stats accumulated across many rounds. Zoom out and find the big patterns. Be specific, encouraging, and practical.
+
+ACCUMULATED STATS (across all the golfer's logged rounds):
+${JSON.stringify(aggregate)}
+
+Write a coaching summary with exactly these labels, each on its own line:
+"Your game right now:" - 1-2 sentences on the overall picture (handicap level, scoring average, biggest tendencies).
+"Strengths:" - 2-3 specific strengths, grounded in the stats and benchmarked against what a typical golfer at this handicap produces.
+"Biggest opportunities:" - 2-3 specific weaknesses that are costing the most strokes, with WHY (e.g. "3-putts are costing ~X shots a round").
+"What to work on to shoot lower:" - a short prioritized plan (the 1-2 things that would lower scores fastest, and a concrete practice focus for each).
+
+Use realistic amateur-golf benchmarks for the stated handicap (e.g. a ~10 handicap hits ~6-8 GIR and ~32-34 putts; a ~20 handicap hits ~3-5 GIR, more doubles, 34-36 putts; scratch hits 10+ GIR). Base everything ONLY on the numbers given plus these benchmarks; do not invent stats. Keep it under 200 words. Warm, honest, motivating.`;
+
+  const prompt = mode === "dashboard" ? dashboardPrompt : roundPrompt;
 
   try {
     const candidates = await pickModels(key);

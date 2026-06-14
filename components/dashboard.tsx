@@ -12,6 +12,10 @@ import {
 } from "@/lib/golf";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
 import { RoundRow } from "@/components/rounds-list";
+import { createClient } from "@/lib/supabase";
+import { aiUsesLeft, recordAiUse, AI_DAILY_LIMIT_VALUE } from "@/lib/draft";
+
+const supabase = createClient();
 
 function Clk<T extends string>({ k, d, set, children }: { k: T; d: T | null; set: (v: T | null) => void; children: React.ReactNode }) {
   return (
@@ -22,9 +26,10 @@ function Clk<T extends string>({ k, d, set, children }: { k: T; d: T | null; set
   );
 }
 
-export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
+export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userEmail, userId, savedCoach, onCoachSaved }: {
   rounds: Round[]; name: string; onOpen: (r: Round) => void;
   currentIndex: number | null; saveIndex: (i: number | null) => void;
+  userEmail?: string | null; userId?: string; savedCoach?: any; onCoachSaved?: () => void;
 }) {
   const done = rounds.filter((r) => played(r).length > 0 || isGrossOnly(r));
   const sorted = [...done].sort((a, b) => +new Date(a.played_at) - +new Date(b.played_at));
@@ -44,6 +49,22 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
   const avgDifferential = diffs.length ? diffs.reduce((s, d) => s + d, 0) / diffs.length : null;
   const hcp = runningHandicap(done);
   const threePutts = threePuttsPerRound(done);
+
+  // Compact, numbers-only career summary for the AI coach.
+  const coachAggregate = {
+    handicapIndex: hcp.index ?? currentIndex ?? null,
+    roundsLogged: done.length,
+    avgScoreVsPar: avgDiff == null ? null : Math.round(avgDiff * 10) / 10,
+    bestVsPar: best,
+    avgDifferential: avgDifferential == null ? null : Math.round(avgDifferential * 10) / 10,
+    avgPuttsPerHole: avgPutts == null ? null : Math.round(avgPutts * 100) / 100,
+    threePuttsPerRound: threePutts == null ? null : Math.round(threePutts * 10) / 10,
+    girPct: gir.total ? Math.round((100 * gir.hit) / gir.total) : null,
+    fairwayPct: fir.total ? Math.round((100 * fir.hit) / fir.total) : null,
+    avgByPar: byPar,
+    scoringMix: buckets, // eagles/birdies/pars/bogeys/doubles totals
+    penaltiesTotal: pens,
+  };
 
   const trend = sorted.map((r, i) => ({ i: i + 1, name: fmtDate(r.played_at), diff: diffOf(r), pts: estimatedStablefordPts(r), course: r.course, estimated: hasEstimatedStableford(r) }));
   // Dynamic axis domains: fit the data range with a little padding, instead of anchoring at 0.
@@ -128,6 +149,14 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
           )}
         </div>
       </div>
+      <DashboardCoach
+        aggregate={coachAggregate}
+        roundsUsed={done.length}
+        userEmail={userEmail}
+        userId={userId}
+        saved={savedCoach}
+        onSaved={onCoachSaved}
+      />
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <Clk k="rounds" d={detail} set={setDetail}><StatCard label="Rounds" value={done.length} /></Clk>
         <Clk k="avgpar" d={detail} set={setDetail}><StatCard label="Avg vs par" value={avgDiff == null ? "—" : (avgDiff >= 0 ? "+" : "") + avgDiff.toFixed(1)} /></Clk>
@@ -238,6 +267,95 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex }: {
           </div>
         )}
         {[...done].sort((a, b) => +new Date(b.played_at) - +new Date(a.played_at)).slice(0, 5).map((r) => <RoundRow key={r.id} r={r} onOpen={onOpen} />)}
+      </div>
+    </div>
+  );
+}
+
+// Dashboard AI Coach: a zoomed-out coaching summary across ALL the player's
+// stats. Collapsible, date-stamped, shows how many rounds it used, and persists
+// on the user's profile so it's there whenever they return. Uses the same daily
+// quota as the per-round analysis; the owner email is exempt.
+function DashboardCoach({ aggregate, roundsUsed, userEmail, userId, saved, onSaved }: {
+  aggregate: any; roundsUsed: number; userEmail?: string | null; userId?: string; saved?: any; onSaved?: () => void;
+}) {
+  const UNLIMITED_EMAIL = "amitsud@gmail.com";
+  const unlimited = (userEmail || "").trim().toLowerCase() === UNLIMITED_EMAIL;
+  // saved shape: { text, date (ISO), rounds }
+  const initial = saved && saved.text ? saved : null;
+  const [data, setData] = useState<{ text: string; date: string; rounds: number } | null>(initial);
+  const [open, setOpen] = useState(false);
+  const [state, setState] = useState<"idle" | "loading" | "error">("idle");
+  const [err, setErr] = useState("");
+  const [left, setLeft] = useState<number>(AI_DAILY_LIMIT_VALUE);
+  useEffect(() => { setLeft(aiUsesLeft()); }, []);
+
+  const run = async () => {
+    if (roundsUsed < 1) { setErr("Log a round first to get a coaching summary."); setState("error"); setOpen(true); return; }
+    if (!unlimited && aiUsesLeft() <= 0) { setErr(`You've used your ${AI_DAILY_LIMIT_VALUE} AI analyses for today. Try again tomorrow.`); setState("error"); setOpen(true); return; }
+    setState("loading"); setErr(""); setOpen(true);
+    try {
+      const resp = await fetch("/api/analyze-round", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "dashboard", aggregate }),
+      });
+      const d = await resp.json();
+      if (!resp.ok) { setErr(d.error || "Couldn't generate your summary."); setState("error"); return; }
+      if (!unlimited) { recordAiUse(); setLeft(aiUsesLeft()); }
+      const payload = { text: d.analysis || "", date: new Date().toISOString(), rounds: roundsUsed };
+      setData(payload); setState("idle");
+      if (userId) {
+        supabase.from("profiles").update({ dashboard_ai: payload }).eq("id", userId).then(() => { onSaved && onSaved(); });
+      }
+    } catch {
+      setErr("Couldn't reach the analysis service. Check your connection and try again.");
+      setState("error");
+    }
+  };
+
+  const fmt = (iso: string) => { try { return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }); } catch { return iso.slice(0, 10); } };
+
+  return (
+    <div style={{ background: C.greenLight, borderRadius: 14, padding: 14, marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: data ? "pointer" : "default" }}
+        onClick={() => data && setOpen((v) => !v)}>
+        <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 800 }}>✦ AI COACH</div>
+        <div style={{ flex: 1 }} />
+        {data && <span style={{ color: C.sage, fontSize: 16 }}>{open ? "▾" : "▸"}</span>}
+      </div>
+
+      {data && !open && (
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
+          Summary from {fmt(data.date)} · {data.rounds} round{data.rounds === 1 ? "" : "s"} — tap to expand
+        </div>
+      )}
+
+      {!data && state !== "loading" && (
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
+          Get a coaching review across all your rounds — strengths, biggest opportunities, and what to work on to shoot lower.
+          {unlimited ? " (unlimited)" : ` (${left} left today)`}
+        </div>
+      )}
+
+      {open && data && (
+        <>
+          <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>
+            Generated {fmt(data.date)} · based on {data.rounds} round{data.rounds === 1 ? "" : "s"}
+          </div>
+          <div style={{ color: C.cream, fontSize: 14, marginTop: 8, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{data.text}</div>
+        </>
+      )}
+
+      {state === "loading" && <div style={{ color: C.gold, fontSize: 13, marginTop: 10 }}>Reviewing your game…</div>}
+      {state === "error" && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{err}</div>}
+
+      <div style={{ marginTop: 10 }}>
+        {state !== "loading" && (
+          <button style={{ ...btn(true), fontSize: 12 }} onClick={run}>
+            {data ? "↻ Refresh summary" : "✦ Analyze my game"}
+          </button>
+        )}
       </div>
     </div>
   );
