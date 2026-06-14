@@ -55,7 +55,9 @@ export default function JoinGroupPage({ params }: { params: { code: string } }) 
         return;
       }
 
-      const { error: upErr } = await supabase.from("profiles").update({ active_group_id: groupId }).eq("id", data.session.user.id);
+      const { error: upErr } = await supabase.from("profiles")
+        .update({ active_group_id: groupId, deactivated: false })
+        .eq("id", data.session.user.id);
       if (upErr && !cancelled) {
         // The membership was created by the RPC; only setting the active group failed.
         setState("error");
