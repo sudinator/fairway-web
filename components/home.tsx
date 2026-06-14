@@ -91,6 +91,9 @@ export function Home({ session }: { session: any }) {
       .order("created_at", { ascending: true });
 
     let list: AppGroup[] = (data || [])
+      // Drop memberships whose group row no longer exists (e.g. just deleted) —
+      // the join returns a null group for those, and they must not show in the picker.
+      .filter((m: any) => !!m.groups && !!m.groups.id)
       // Hide groups still awaiting admin approval (legacy groups have no status → treated as active).
       .filter((m: any) => (m.groups?.status ?? "active") === "active")
       .map((m: any) => ({
@@ -138,6 +141,15 @@ export function Home({ session }: { session: any }) {
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
   useEffect(() => { if (profile) loadGroups(); }, [loadGroups, profile]);
+
+  // After a group is deleted, clear any pointer to it and reload. loadGroups will
+  // fall back to (or create) the "Main" group when the user has none left.
+  const onGroupDeleted = useCallback(async () => {
+    setActiveGroupId(null);
+    setProfile((p: any) => p ? ({ ...p, active_group_id: null }) : p);
+    await supabase.from("profiles").update({ active_group_id: null }).eq("id", user.id);
+    await loadGroups();
+  }, [loadGroups, user.id]);
 
   const saveIndex = async (idx: number | null) => {
     setProfile((p: any) => ({ ...p, handicap_index: idx }));
@@ -282,7 +294,7 @@ export function Home({ session }: { session: any }) {
         ) : tab === "players" && activeGroup ? (
           <PlayersTab user={user} activeGroupId={activeGroup.id} isGroupAdmin={activeGroup.role === "admin"} onChanged={loadGroups} />
         ) : tab === "groups" ? (
-          <GroupsPanel user={user} groups={groups} activeGroupId={activeGroupId} onGroupsChanged={loadGroups} onActiveGroupChange={chooseGroup} />
+          <GroupsPanel user={user} groups={groups} activeGroupId={activeGroupId} onGroupsChanged={loadGroups} onActiveGroupChange={chooseGroup} onGroupDeleted={onGroupDeleted} />
         ) : tab === "activity" && profile?.is_admin ? (
           <ActivityTab />
         ) : tab === "help" ? (

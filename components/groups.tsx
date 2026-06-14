@@ -37,12 +37,13 @@ export function GroupSelector({ groups, activeGroupId, onChange }: { groups: App
   );
 }
 
-export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onActiveGroupChange }: {
+export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onActiveGroupChange, onGroupDeleted }: {
   user: any;
   groups: AppGroup[];
   activeGroupId: string | null;
   onGroupsChanged: () => Promise<void> | void;
   onActiveGroupChange: (id: string) => void;
+  onGroupDeleted?: () => Promise<void> | void;
 }) {
   const active = groups.find((g) => g.id === activeGroupId) || groups[0] || null;
   const isAdmin = active?.role === "admin";
@@ -153,7 +154,8 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
       if (error) throw error;
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Group admin", action: "group_deleted", summary: `Deleted group "${active.name}"` });
       setMsg("Group deleted.");
-      await onGroupsChanged();
+      if (onGroupDeleted) await onGroupDeleted();
+      else await onGroupsChanged();
     } catch (e: any) {
       setMsg("Couldn't delete group: " + (e.message || "error"));
     } finally { setBusy(false); }
