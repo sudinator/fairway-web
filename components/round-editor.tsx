@@ -288,7 +288,6 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
 
   return (
     <div>
-      <DebugStrip holes={holes} />
       <div style={{ color: C.sage, fontSize: 13, marginBottom: 10 }}>
         {round.course}{round.tee_name ? ` · ${round.tee_name} tees (${round.rating}/${round.slope})` : ""}
         {round.course_handicap != null ? ` · course handicap ${round.course_handicap}` : " · no handicap — Stableford scored gross"}
@@ -338,34 +337,4 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
 }
 
 
-// TEMPORARY DEBUG STRIP — shows what is in the editor's live state vs. what is
-// actually saved in localStorage, refreshed every second and on lock/visibility.
-// Remove once score persistence is confirmed working.
-function DebugStrip({ holes }: { holes: Hole[] }) {
-  const [stored, setStored] = useState<string>("(reading…)");
-  const read = () => {
-    try {
-      const raw = window.localStorage.getItem("bnn_round_draft_v1");
-      if (!raw) { setStored("EMPTY"); return; }
-      const r = JSON.parse(raw)?.round;
-      const arr: any[] = r?.holes || [];
-      const filled = arr.filter((h) => h.strokes != null);
-      setStored(`${filled.length} holes [${filled.map((h) => `${h.hole_number}:${h.strokes}`).join(" ")}]`);
-    } catch (e: any) { setStored("ERR " + (e?.message || "")); }
-  };
-  useEffect(() => {
-    read();
-    const t = setInterval(read, 1000);
-    const onVis = () => read();
-    document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("focus", onVis);
-    return () => { clearInterval(t); document.removeEventListener("visibilitychange", onVis); window.removeEventListener("focus", onVis); };
-  }, []);
-  const liveFilled = holes.filter((h) => h.strokes != null);
-  return (
-    <div style={{ background: "#2A1A1A", border: "1px solid #C0392B", borderRadius: 8, padding: "8px 10px", marginBottom: 10, fontSize: 11, color: "#FFD7D2", fontFamily: "monospace", lineHeight: 1.5 }}>
-      <div><b>DEBUG</b> — live on screen: {liveFilled.length} holes [{liveFilled.map((h) => `${h.hole_number}:${h.strokes}`).join(" ")}]</div>
-      <div>saved in storage: {stored}</div>
-    </div>
-  );
-}
+// TEMPORARY DEBUG STRIP — removed; score persistence confirmed working.

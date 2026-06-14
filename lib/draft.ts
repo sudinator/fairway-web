@@ -84,3 +84,49 @@ export function clearActiveGame(): void {
     window.localStorage.removeItem(GKEY);
   } catch {}
 }
+
+// --- In-progress GAME score backup (per game, per device) ---
+// Game scores normally write straight to the database on each tap, but an
+// immediate screen lock can freeze that network write before it lands. This
+// synchronous localStorage backup captures the latest scores instantly so a
+// hole entered right before a lock isn't lost; on reopen we reconcile it to the DB.
+function gameScoreKey(gameId: string, playerId: string) {
+  return `bnn_game_scores_${gameId}_${playerId}`;
+}
+
+export function saveGameScores(
+  gameId: string,
+  playerId: string,
+  data: { scores: any[]; putts: any[]; fairways: any[] },
+): void {
+  try {
+    if (typeof window === "undefined") return;
+    const scored = (data.scores || []).some((s) => s != null);
+    if (!scored) {
+      // Never overwrite a scored backup with an empty one.
+      const existing = loadGameScores(gameId, playerId);
+      if (existing && (existing.scores || []).some((s) => s != null)) return;
+    }
+    window.localStorage.setItem(gameScoreKey(gameId, playerId), JSON.stringify({ at: Date.now(), ...data }));
+  } catch {}
+}
+
+export function loadGameScores(
+  gameId: string,
+  playerId: string,
+): { scores: any[]; putts: any[]; fairways: any[] } | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem(gameScoreKey(gameId, playerId));
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    return { scores: p.scores || [], putts: p.putts || [], fairways: p.fairways || [] };
+  } catch { return null; }
+}
+
+export function clearGameScores(gameId: string, playerId: string): void {
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem(gameScoreKey(gameId, playerId));
+  } catch {}
+}

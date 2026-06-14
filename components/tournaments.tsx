@@ -20,7 +20,7 @@ import {
 } from "@/lib/golf";
 import { loadCoursesForGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
-import { saveActiveGame, loadActiveGame, clearActiveGame } from "@/lib/draft";
+import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores } from "@/lib/draft";
 import {
   btn,
   inputStyle,
@@ -792,8 +792,34 @@ function GameRoom({
         }
       : g;
     setGame(safeGame as any);
-    setPlayers(ps || []);
-    const mine = (ps || []).find((p: any) => p.user_id === user.id) || null;
+    let mine = (ps || []).find((p: any) => p.user_id === user.id) || null;
+    // Reconcile against the local backup: if a score write was lost to a screen
+    // lock, the device's backup may hold holes the DB row is missing. Merge those
+    // in (local fills holes the DB left blank) and push the result back to the DB.
+    if (mine) {
+      const backup = loadGameScores(gameId, mine.id);
+      if (backup) {
+        const n = (safeGame as any)?.holes_meta?.length || 18;
+        const mergeArr = (dbArr: any[], locArr: any[]) =>
+          Array.from({ length: n }, (_, i) => {
+            const d = dbArr?.[i] ?? null;
+            return d != null ? d : (locArr?.[i] ?? null);
+          });
+        const merged = {
+          scores: mergeArr(mine.scores || [], backup.scores || []),
+          putts: mergeArr(mine.putts || [], backup.putts || []),
+          fairways: mergeArr(mine.fairways || [], backup.fairways || []),
+        };
+        const dbCount = (mine.scores || []).filter((s: any) => s != null).length;
+        const mergedCount = merged.scores.filter((s: any) => s != null).length;
+        if (mergedCount > dbCount) {
+          mine = { ...mine, ...merged };
+          await supabase.from("game_players").update(merged).eq("id", mine.id);
+        }
+        saveGameScores(gameId, mine.id, { scores: mine.scores || [], putts: mine.putts || [], fairways: mine.fairways || [] });
+      }
+    }
+    setPlayers((ps || []).map((p: any) => (mine && p.id === mine.id ? mine : p)));
     setMe(mine);
     if (mine && mine.course_handicap == null && (safeGame as any)?.holes_meta?.length)
       setNeedsSetup(true);
@@ -814,6 +840,35 @@ function GameRoom({
     }, 60000);
     return () => clearInterval(t);
   }, [load, savingHole, game?.status]);
+
+  // Lock-time safety: when the page hides (screen lock / app background), force the
+  // latest scores into the local backup AND re-attempt the DB write, so a hole
+  // entered an instant before locking can't be lost to a frozen network request.
+  const meRef = React.useRef<Player | null>(me);
+  meRef.current = me;
+  const gameIdRef = React.useRef(gameId);
+  gameIdRef.current = gameId;
+  useEffect(() => {
+    const flush = () => {
+      const m = meRef.current;
+      if (!m) return;
+      const data = { scores: m.scores || [], putts: m.putts || [], fairways: m.fairways || [] };
+      if (!data.scores.some((s) => s != null)) return;
+      saveGameScores(gameIdRef.current, m.id, data);              // synchronous, always lands
+      supabase.from("game_players").update(data).eq("id", m.id).then(() => {}); // best-effort
+    };
+    const onVis = () => { if (document.visibilityState === "hidden") flush(); };
+    document.addEventListener("visibilitychange", onVis);
+    document.addEventListener("freeze", flush);
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("blur", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      document.removeEventListener("freeze", flush);
+      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("blur", flush);
+    };
+  }, []);
 
   // Build a player's per-hole Hole[] (with strokes received) for scoring math.
   const playerHoles = (p: Player): Hole[] => {
@@ -879,6 +934,9 @@ function GameRoom({
     const updated = { ...me, scores, putts, fairways };
     setMe(updated);
     setPlayers((ps) => ps.map((p) => (p.id === me.id ? updated : p)));
+    // Synchronous local backup FIRST — survives an immediate lock even if the
+    // network write below gets frozen. Reconciled to the DB on next load.
+    if (game) saveGameScores(game.id, me.id, { scores, putts, fairways });
     setSavingHole(holeIdx);
     lastEditRef.current = Date.now();
     await supabase
