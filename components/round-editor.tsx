@@ -16,9 +16,12 @@ const supabase = createClient();
 
 export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () => void; onCancel: () => void }) {
   const [holes, setHoles] = useState<Hole[]>(round.holes);
-  // Always-current ref so effects/saves never use a stale snapshot.
+  // Always-current ref so effects/saves never use a stale snapshot. IMPORTANT:
+  // we sync this in a post-commit effect, NOT inline on every render — assigning
+  // it inline could overwrite a fresher value that setHole just wrote in the same
+  // cycle, which was causing the newest holes to be lost on lock/flush.
   const holesRef = React.useRef<Hole[]>(round.holes);
-  holesRef.current = holes;
+  useEffect(() => { holesRef.current = holes; }, [holes]);
 
   // If this round has no per-hole data at all (a gross-only round gaining detail),
   // build a blank hole layout. Guard hard against wiping a resumed draft: only
@@ -164,7 +167,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   useEffect(() => {
     const flush = () => {
       if (holesRef.current.some((h) => h.strokes != null)) {
-        saveDraft({ ...round, holes: holesRef.current, id: dbIdRef.current || round.id });
+        saveDraft({ ...roundRef.current, holes: holesRef.current, id: dbIdRef.current || round.id });
         backgroundSave(holesRef.current); // best-effort server write too
       }
     };

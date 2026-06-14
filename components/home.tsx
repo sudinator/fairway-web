@@ -32,6 +32,16 @@ export function Home({ session }: { session: any }) {
   const [groupsLoading, setGroupsLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("dashboard");
   const [stage, setStage] = useState<null | "setup" | { round: Round }>(null);
+  // Tracks the in-progress round draft so we can show a "Resume" banner from any
+  // screen. Re-read from storage whenever navigation happens (see refreshDraft).
+  const [draftRound, setDraftRound] = useState<Round | null>(null);
+  const refreshDraft = useCallback(() => {
+    const d = loadDraft();
+    setDraftRound(d && draftHasScores(d.round) ? d.round : null);
+  }, []);
+  // Keep the resume banner in sync: re-check storage on mount and whenever we
+  // leave the editor (stage changes), so the banner appears/disappears correctly.
+  useEffect(() => { refreshDraft(); }, [refreshDraft, stage, tab]);
   const [viewing, setViewing] = useState<Round | null>(null);
   const [resumeChecked, setResumeChecked] = useState(false);
 
@@ -225,6 +235,27 @@ export function Home({ session }: { session: any }) {
         <NotificationBell user={user} />
         <button style={{ ...btn(true), opacity: activeGroup ? 1 : 0.5 }} disabled={!activeGroup} onClick={() => { setStage("setup"); setViewing(null); }}>＋ New round</button>
       </div>
+
+      {/* Resume an in-progress round from anywhere in the app */}
+      {draftRound && !(stage && typeof stage === "object" && "round" in stage) && (
+        <button
+          onClick={() => { setViewing(null); setTab("dashboard"); setStage({ round: draftRound }); }}
+          style={{
+            display: "flex", alignItems: "center", gap: 12, width: "100%", textAlign: "left",
+            background: C.gold, color: "#16201C", border: "none", cursor: "pointer",
+            borderRadius: 12, padding: "12px 16px", marginTop: 14,
+          }}
+        >
+          <span style={{ fontSize: 20 }}>⛳</span>
+          <span style={{ flex: 1 }}>
+            <span style={{ display: "block", fontWeight: 800, fontSize: 14 }}>Round in progress — tap to resume</span>
+            <span style={{ display: "block", fontSize: 12, opacity: 0.8 }}>
+              {draftRound.course || "Your round"} · {draftRound.holes?.filter((h) => h.strokes != null).length || 0} holes entered
+            </span>
+          </span>
+          <span style={{ fontWeight: 800, fontSize: 13 }}>Resume →</span>
+        </button>
+      )}
 
       {!activeGroup && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 18, color: C.sage }}>
