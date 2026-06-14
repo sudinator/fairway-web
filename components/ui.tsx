@@ -88,6 +88,7 @@ export type EntryHole = {
   strokes: number | null; putts: number | null; fairway: "hit" | "miss" | null;
   penalties?: number | null;
   recv: number; // handicap strokes received on this hole
+  gives?: number; // strokes GIVEN on this hole (match play, lower-handicap player)
 };
 
 // SCORE ENTRY — vertical, one row per hole, fits screen width (no horizontal scroll).
@@ -118,7 +119,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     if (par < 4) return;
     onSet(i, { fairway: cur == null ? "hit" : cur === "hit" ? "miss" : null });
   };
-  const anyStroke = holes.some((h) => h.recv > 0);
+  const anyStroke = holes.some((h) => h.recv > 0 || (h.gives || 0) > 0);
   const hasDots = anyStroke && hasHandicap;
   const headStyle: React.CSSProperties = { color: C.faint, fontSize: 9, letterSpacing: 0.5, fontWeight: 700, textTransform: "uppercase" };
 
@@ -171,7 +172,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
               const col = ov == null || mine == null ? C.faint : ov < mine ? C.birdie : ov > mine ? C.greenMid : C.ink;
               return <div key="op" style={{ textAlign: "center", color: col, fontWeight: 800, fontSize: 15 }}>{ov ?? "·"}</div>;
             })()] : []),
-            ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: C.dot, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{h.recv > 0 ? "•".repeat(Math.min(h.recv, 3)) : ""}</div>] : []),
+            ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: (h.gives || 0) > 0 ? C.sage : C.dot, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{h.recv > 0 ? "•".repeat(Math.min(h.recv, 3)) : ((h.gives || 0) > 0 ? "◦".repeat(Math.min(h.gives || 0, 3)) : "")}</div>] : []),
             <div key="sc" style={{ textAlign: "center" }}>
               <NumPicker key={`sc-${hydrated}`} value={h.strokes} from={1} to={maxStrokes} onChange={(v) => onSet(i, { strokes: v })} width={48} accent={savingHole === i} />
             </div>,
@@ -235,7 +236,11 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   return (
     <>
       {anyStroke && hasHandicap && (
-        <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>• dots show the handicap strokes you receive on that hole.</div>
+        <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>
+          {holes.some((h) => h.recv > 0)
+            ? "• filled dots show the handicap strokes you receive on that hole."
+            : "◦ hollow dots show the holes where you give your opponent a stroke."}
+        </div>
       )}
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 10 }}>
         {block(0, Math.min(9, holes.length), "FRONT NINE")}

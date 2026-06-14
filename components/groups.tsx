@@ -129,6 +129,36 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
     } finally { setBusy(false); }
   };
 
+  const deleteGroup = async () => {
+    if (!active || !isAdmin) return;
+    // Only allow deleting an "empty" group — one where the admin is the only
+    // active member left. Guard on the loaded member list.
+    const activeOthers = (members || []).filter((m) => m.status === "active" && m.user_id !== user.id);
+    if (activeOthers.length > 0) {
+      setMsg(`Can't delete: ${activeOthers.length} other active member${activeOthers.length === 1 ? "" : "s"} still in this group. Remove them first.`);
+      return;
+    }
+    if (!confirm(`Delete the group "${active.name}"? This permanently removes the group and its membership. Rounds you logged are kept on your account. This cannot be undone.`)) return;
+    setBusy(true); setMsg(null);
+    try {
+      // Clear the group from anyone whose active group points at it, so they
+      // aren't left pointing at a deleted group.
+      await supabase.from("profiles").update({ active_group_id: null }).eq("active_group_id", active.id);
+      // Remove dependent rows first (membership, invites, group-course links),
+      // then the group itself. Rounds keep their group_id as a historical tag.
+      await supabase.from("group_members").delete().eq("group_id", active.id);
+      await supabase.from("group_invites").delete().eq("group_id", active.id);
+      await supabase.from("group_courses").delete().eq("group_id", active.id);
+      const { error } = await supabase.from("groups").delete().eq("id", active.id);
+      if (error) throw error;
+      await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Group admin", action: "group_deleted", summary: `Deleted group "${active.name}"` });
+      setMsg("Group deleted.");
+      await onGroupsChanged();
+    } catch (e: any) {
+      setMsg("Couldn't delete group: " + (e.message || "error"));
+    } finally { setBusy(false); }
+  };
+
   const generateInvite = async () => {
     if (!active || !isAdmin) return;
     setBusy(true); setMsg(null); setInviteLink(null); setCopyMsg(null);
@@ -218,6 +248,9 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 24, fontWeight: 800 }}>{active.name}</div>
                 {isAdmin && <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px" }} onClick={() => setRenaming(true)}>Rename</button>}
+                {isAdmin && (members || []).filter((m) => m.status === "active" && m.user_id !== user.id).length === 0 && (
+                  <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", background: "#7A2F28" }} disabled={busy} onClick={deleteGroup}>Delete group</button>
+                )}
               </div>
             )}
           </div>

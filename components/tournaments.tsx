@@ -1456,12 +1456,15 @@ function GameRoom({
               // In match play, dots reflect the RELATIVE allowance (strokes given/received
               // vs. the opponent), not full course handicap. Stroke-play uses full allocation.
               let matchAllow: number | null = null;
+              let oppAllow: number | null = null; // opponent's allowance — used to show holes I GIVE
               if (game.game_type === "match") {
                 const pr = game.pairings.find((p) => p.a === user.id || p.b === user.id);
                 if (pr) {
                   const oppId = pr.a === user.id ? pr.b : pr.a;
                   const oppP = players.find((p) => p.user_id === oppId);
-                  matchAllow = matchAllowance(me.course_handicap, oppP?.course_handicap ?? null).a;
+                  const allowPair = matchAllowance(me.course_handicap, oppP?.course_handicap ?? null);
+                  matchAllow = allowPair.a;
+                  oppAllow = allowPair.b;
                 }
               }
               const alloc = allocateStrokes(
@@ -1479,6 +1482,10 @@ function GameRoom({
                 putts: me.putts?.[i] ?? null,
                 fairway: me.fairways?.[i] ?? null,
                 recv: matchAllow != null ? matchStrokesFor(matchAllow, m.si) : (alloc[m.n] || 0),
+                // If I receive none but my opponent does, show the holes where I give a stroke.
+                gives: game.game_type === "match" && (matchAllow ?? 0) === 0 && oppAllow != null
+                  ? matchStrokesFor(oppAllow, m.si)
+                  : 0,
               }));
             })()}
             hasHandicap={me.course_handicap != null}
