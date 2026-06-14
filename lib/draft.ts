@@ -13,6 +13,15 @@ const KEY = "bnn_round_draft_v1";
 export function saveDraft(round: Round): void {
   try {
     if (typeof window === "undefined") return;
+    // Safety: never overwrite an existing draft that HAS scores with one that has
+    // NONE (e.g. a transient empty state after a remount). Losing entered scores is
+    // far worse than keeping a slightly stale draft.
+    const incomingScored = (round.holes || []).some((h) => h.strokes != null);
+    if (!incomingScored) {
+      const existing = loadDraft();
+      const existingScored = (existing?.round?.holes || []).some((h: any) => h.strokes != null);
+      if (existingScored && existing?.round?.course === round.course) return;
+    }
     window.localStorage.setItem(KEY, JSON.stringify({ savedAt: Date.now(), round }));
   } catch {
     // Storage can be unavailable (private mode, quota). Fail silently — DB save on

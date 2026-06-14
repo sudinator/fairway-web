@@ -8,19 +8,34 @@ import {
   girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay,
 } from "@/lib/golf";
 import { buildCustomCourse, linkCourseToGroup } from "@/lib/courses";
-import { saveDraft, clearDraft, draftHasScores } from "@/lib/draft";
+import { saveDraft, loadDraft, clearDraft, draftHasScores } from "@/lib/draft";
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
 
 const supabase = createClient();
 
 export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () => void; onCancel: () => void }) {
-  const [holes, setHoles] = useState<Hole[]>(round.holes);
-  // Single source of truth = `holes` state. A ref mirrors it ONLY for the
-  // lock/flush handler to read synchronously; it is written in one place (the
-  // save effect below), never hand-managed from setHole, to avoid the two
-  // writers fighting and snapping the ref backwards (which lost newest holes).
-  const holesRef = React.useRef<Hole[]>(round.holes);
+  // Initialize from whichever source has MORE entered scores: the round passed in,
+  // or the draft saved in storage. This makes the editor self-healing — if it gets
+  // remounted (e.g. after a screen lock) with an empty round, it recovers the saved
+  // scores from storage instead of resetting the scorecard to blank.
+  const initialHoles = React.useMemo<Hole[]>(() => {
+    const fromProp = round.holes || [];
+    const propScored = fromProp.filter((h) => h.strokes != null).length;
+    try {
+      const d = loadDraft();
+      const dh = d?.round?.holes || [];
+      const draftScored = dh.filter((h: any) => h.strokes != null).length;
+      // Use the draft only if it matches this course and has at least as many scores.
+      const sameRound = d?.round?.course === round.course;
+      if (sameRound && draftScored > propScored) return dh as Hole[];
+    } catch {}
+    return fromProp;
+  }, []); // mount only
+  const [holes, setHoles] = useState<Hole[]>(initialHoles);
+  // Single source of truth = `holes` state. A ref mirrors it for the lock/flush
+  // handler to read synchronously; written only inside setHole.
+  const holesRef = React.useRef<Hole[]>(initialHoles);
   const touchedRef = React.useRef(false); // has the user entered anything?
 
   // If this round has no per-hole data at all (a gross-only round gaining detail),
