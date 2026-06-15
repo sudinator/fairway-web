@@ -363,17 +363,26 @@ export function validateStrokeIndexes(holes: { n: number; si: number | null }[])
 // the lowest course handicap among the four players (that player plays off scratch;
 // the others get the full difference by stroke index).
 
-export type FourballMember = { id: string; gross: (number | null)[]; ch: number | null };
+export type FourballMember = { id: string; gross: (number | null)[]; ch: number | null; noShow?: boolean };
 
 // Net score per player per hole, strokes relative to the lowest CH among the group.
 function fourballNets(holes: MatchHoleMeta[], members: FourballMember[]): Record<string, (number | null)[]> {
-  const low = Math.min(...members.map((m) => m.ch ?? 0));
+  // The low-handicap reference excludes no-shows so they don't drag the basis.
+  const active = members.filter((m) => !m.noShow);
+  const low = Math.min(...(active.length ? active : members).map((m) => m.ch ?? 0));
   const out: Record<string, (number | null)[]> = {};
   for (const m of members) {
     const diff = (m.ch ?? 0) - low;
     out[m.id] = holes.map((h, i) => {
       const g = m.gross[i];
-      if (g == null || g <= 0) return null;
+      const played = g != null && g > 0;
+      if (m.noShow) {
+        // A flagged player keeps the real net on holes they actually played, and
+        // takes net double bogey (par + 2) on holes they didn't. This handles a
+        // mid-round departure: holes 1–8 count as played, 9–18 become net dbl bogey.
+        return played ? g - matchStrokesFor(diff, h.si) : h.par + 2;
+      }
+      if (!played) return null;
       return g - matchStrokesFor(diff, h.si);
     });
   }

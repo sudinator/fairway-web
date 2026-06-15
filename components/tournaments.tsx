@@ -16,6 +16,7 @@ import {
   matchLeadLabel,
   matchAllowance,
   fourballStatus,
+  fourballProgress,
   type FourballMember,
   computeBetting,
   DEFAULT_BET_SPLIT,
@@ -71,6 +72,7 @@ type Player = {
   putts: (number | null)[]; // putts per hole
   fairways: ("hit" | "miss" | null)[]; // fairway result per hole (par 4/5)
   team?: string | null; // team key ("A"/"B") for team match play
+  no_show?: boolean | null; // organizer-flagged no-show (four-ball: scored net double bogey)
 };
 
 // ---------------- Root tournament tab ----------------
@@ -839,6 +841,15 @@ function GameRoom({
     load();
   }, [load]);
 
+  // Once an ended game and my player row are both loaded, ensure my scorecard is
+  // recorded as a round in my history. Idempotent (skips if already recorded).
+  useEffect(() => {
+    if (game?.status === "ended" && me && me.user_id) {
+      recordMyGameRound();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.status, me?.id]);
+
   // Auto-refresh every minute so players see each other's scores without manual refresh.
   // Pauses while actively entering a score (a save in the last 25s, or one in progress).
   const lastEditRef = React.useRef(0);
@@ -1072,6 +1083,14 @@ function GameRoom({
   };
 
   // Organizer: remove a player from the game (not the organizer).
+  const toggleNoShow = async (p: Player) => {
+    if (!game) return;
+    const next = !p.no_show;
+    if (next && !confirm(`Mark ${p.display_name} as a no-show? In four-ball they'll be scored net double bogey every hole (their ball won't count for the team).`)) return;
+    await supabase.from("game_players").update({ no_show: next }).eq("id", p.id);
+    await load();
+  };
+
   const removePlayer = async (p: Player) => {
     if (!game || p.user_id === game.created_by) return;
     if (
@@ -1109,8 +1128,61 @@ function GameRoom({
     if (!game) return;
     if (!confirm(`End "${game.name}"? Final standings are locked in and players can no longer change scores.`)) return;
     await supabase.from("games").update({ status: "ended" }).eq("id", game.id);
+    await recordMyGameRound();
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_ended", group_id: (game as any).group_id || null, summary: `Ended the game "${game.name}"` });
     await load();
+  };
+
+  // When a game is ended, each player records THEIR OWN scorecard into their rounds
+  // history (so it counts toward their stats/handicap/dashboard), like a solo round.
+  // Done per-user (not by the organizer for everyone) so it respects row-level
+  // security — every player writes only their own round. Tagged with the game id
+  // so it's only ever created once, even if the game is reopened and re-ended, or
+  // the player opens the ended game on multiple devices.
+  const recordMyGameRound = async () => {
+    if (!game || !me || !me.user_id) return;
+    try {
+      const scores: (number | null)[] = me.scores || [];
+      const entered = scores.filter((s) => s != null && s > 0).length;
+      if (entered === 0) return; // didn't play / nothing entered
+
+      // Duplicate guard: already have a round for this game?
+      const { data: existing } = await supabase
+        .from("rounds").select("id").eq("game_id", game.id).eq("user_id", me.user_id).limit(1);
+      if (existing && existing.length) return;
+
+      const gross = scores.reduce((s: number, v) => s + (v && v > 0 ? v : 0), 0);
+      const { data: roundRow, error: rErr } = await supabase.from("rounds").insert({
+        user_id: me.user_id,
+        course: game.course,
+        tee_name: me.tee_name ?? null,
+        rating: me.rating ?? null,
+        slope: me.slope ?? null,
+        course_par: game.course_par ?? null,
+        handicap_index: me.handicap_index ?? null,
+        course_handicap: me.course_handicap ?? null,
+        group_id: (game as any).group_id || null,
+        played_at: (game as any).created_at || new Date().toISOString(),
+        status: "final",
+        gross_score: gross,
+        game_id: game.id,
+      }).select("id").single();
+      if (rErr || !roundRow) return;
+
+      const holeRows = (game.holes_meta || []).map((m, i) => ({
+        round_id: roundRow.id,
+        hole_number: m.n,
+        par: m.par,
+        stroke_index: m.si,
+        strokes: scores[i] ?? null,
+        putts: me.putts?.[i] ?? null,
+        fairway: me.fairways?.[i] ?? null,
+        penalties: null,
+      })).filter((h) => h.strokes != null);
+      if (holeRows.length) await supabase.from("holes").insert(holeRows);
+    } catch {
+      // Non-fatal.
+    }
   };
 
   // Organizer: reopen an ended game if it was ended by mistake.
@@ -1310,6 +1382,7 @@ function GameRoom({
           onOverride={overridePlayerHandicap}
           onAdd={addRegisteredPlayer}
           onRemove={removePlayer}
+          onToggleNoShow={toggleNoShow}
           onRename={renameGame}
           onDelete={deleteGame}
           onEnd={endGame}
@@ -1527,21 +1600,41 @@ function GameRoom({
               return oppP?.display_name?.split(" ")[0] || "Opp";
             })()}
             matchRun={(() => {
-              if (game.game_type !== "match") return undefined;
-              const pr = game.pairings.find((p) => p.a === user.id || p.b === user.id);
-              if (!pr) return undefined;
-              const oppId = pr.a === user.id ? pr.b : pr.a;
-              const oppP = players.find((p) => p.user_id === oppId);
-              if (!oppP) return undefined;
-              // Compute from MY perspective: me = A.
-              const prog = matchProgress(
-                game.holes_meta,
-                me.scores || [],
-                oppP.scores || [],
-                me.course_handicap,
-                oppP.course_handicap,
-              );
-              return prog.map((lead) => matchLeadLabel(lead));
+              if (game.game_type === "match") {
+                const pr = game.pairings.find((p) => p.a === user.id || p.b === user.id);
+                if (!pr) return undefined;
+                const oppId = pr.a === user.id ? pr.b : pr.a;
+                const oppP = players.find((p) => p.user_id === oppId);
+                if (!oppP) return undefined;
+                // Compute from MY perspective: me = A.
+                const prog = matchProgress(
+                  game.holes_meta,
+                  me.scores || [],
+                  oppP.scores || [],
+                  me.course_handicap,
+                  oppP.course_handicap,
+                );
+                return prog.map((lead) => matchLeadLabel(lead));
+              }
+              if (game.game_type === "fourball" && Array.isArray(game.foursomes)) {
+                // Find my foursome and which side I'm on; compute the running team
+                // best-net-ball match position from MY team's perspective.
+                const f = game.foursomes.find(
+                  (x: any) => (x.a || []).includes(user.id) || (x.b || []).includes(user.id),
+                );
+                if (!f || !f.a?.length || !f.b?.length) return undefined;
+                const onA = f.a.includes(user.id);
+                const myIds = onA ? f.a : f.b;
+                const oppIds = onA ? f.b : f.a;
+                const members = [...f.a, ...f.b].map((uid: string) => {
+                  const p = players.find((pp) => pp.user_id === uid);
+                  return { id: uid, gross: p?.scores || [], ch: p?.course_handicap ?? null, noShow: !!p?.no_show };
+                });
+                // myIds as the "A" side so positive lead = my team up.
+                const prog = fourballProgress(game.holes_meta, members, myIds, oppIds);
+                return prog.map((lead) => matchLeadLabel(lead));
+              }
+              return undefined;
             })()}
           />
           <MyStatsLine me={me} holes={playerHoles(me)} />
@@ -1956,7 +2049,7 @@ function FourballView({
   const members4 = (f: { a: string[]; b: string[] }): FourballMember[] =>
     [...f.a, ...f.b].map((uid) => {
       const p = playerOf(uid);
-      return { id: uid, gross: p?.scores || [], ch: p?.course_handicap ?? null };
+      return { id: uid, gross: p?.scores || [], ch: p?.course_handicap ?? null, noShow: !!(p as any)?.no_show };
     });
 
   if (mode === "setup") {
@@ -2068,6 +2161,7 @@ function OrganizerPanel({
   onOverride,
   onAdd,
   onRemove,
+  onToggleNoShow,
   onRename,
   onDelete,
   onEnd,
@@ -2083,6 +2177,7 @@ function OrganizerPanel({
     handicap_index: number | null;
   }) => Promise<void>;
   onRemove: (p: Player) => Promise<void>;
+  onToggleNoShow: (p: Player) => Promise<void>;
   onRename: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
   onEnd: () => Promise<void>;
@@ -2287,6 +2382,25 @@ function OrganizerPanel({
                   </button>
                 </div>
               </div>
+              {game.game_type === "fourball" && (
+                <button
+                  title="Mark no-show (scored net double bogey)"
+                  style={{
+                    background: p.no_show ? C.gold : "none",
+                    border: `1px solid ${p.no_show ? C.gold : C.line}`,
+                    borderRadius: 6,
+                    color: p.no_show ? C.green : C.sage,
+                    fontWeight: 800,
+                    cursor: "pointer",
+                    padding: "6px 10px",
+                    fontSize: 13,
+                    marginRight: 8,
+                  }}
+                  onClick={() => onToggleNoShow(p)}
+                >
+                  {p.no_show ? "No-show ✓" : "No-show"}
+                </button>
+              )}
               {p.user_id !== game.created_by && (
                 <button
                   title="Remove player"
