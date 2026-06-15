@@ -17,6 +17,10 @@ import {
   matchAllowance,
   fourballStatus,
   type FourballMember,
+  computeBetting,
+  DEFAULT_BET_SPLIT,
+  type BetPlayer,
+  type BetSplit,
 } from "@/lib/golf";
 import { loadCoursesForGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
@@ -750,6 +754,7 @@ function GameRoom({
   onBack: () => void;
 }) {
   const [game, setGame] = useState<Game | null>(null);
+  const [groupName, setGroupName] = useState<string>("");
   const [players, setPlayers] = useState<Player[]>([]);
   const [me, setMe] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
@@ -792,6 +797,11 @@ function GameRoom({
         }
       : g;
     setGame(safeGame as any);
+    // Fetch the group's name (used to gate group-specific features like Betting).
+    if ((g as any)?.group_id) {
+      supabase.from("groups").select("name").eq("id", (g as any).group_id).maybeSingle()
+        .then(({ data }) => setGroupName(data?.name || ""));
+    }
     let mine = (ps || []).find((p: any) => p.user_id === user.id) || null;
     // Reconcile against the local backup: if a score write was lost to a screen
     // lock, the device's backup may hold holes the DB row is missing. Merge those
@@ -1435,6 +1445,14 @@ function GameRoom({
               ))}
             </div>
           </div>
+
+          {groupName.trim().toLowerCase() === "tgc" && (
+            <BettingPanel
+              players={players}
+              playerPoints={playerPoints}
+              playerHoles={playerHoles}
+            />
+          )}
         </>
       ) : null}
 
@@ -2376,6 +2394,167 @@ function OrganizerPanel({
             >
               Delete this game
             </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------- Betting (TGC group, Stableford) ----------------
+// Configurable Stableford betting calculator. Bet amount per person, who's in,
+// and the split percentages (default: 3 six-hole segments at 10/75 each, 2nd at
+// 15/75, 1st at 30/75). Computes payouts including ties, all-tied-first, and the
+// clean-sweep double. See computeBetting() in lib/golf.ts for the full rules.
+function BettingPanel({ players, playerPoints, playerHoles }: {
+  players: Player[];
+  playerPoints: (p: Player) => number;
+  playerHoles: (p: Player) => Hole[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [bet, setBet] = useState(75);
+  const [inIds, setInIds] = useState<string[]>(players.map((p) => p.id));
+  const [split, setSplit] = useState<BetSplit>(DEFAULT_BET_SPLIT);
+  const [editSplit, setEditSplit] = useState(false);
+
+  // Keep the bettor list in sync as players join (default: everyone in).
+  useEffect(() => {
+    setInIds((prev) => {
+      const ids = players.map((p) => p.id);
+      const kept = prev.filter((id) => ids.includes(id));
+      const added = ids.filter((id) => !prev.includes(id));
+      // On first mount prev may be the full list already; just union new players.
+      return Array.from(new Set([...kept, ...added]));
+    });
+  }, [players.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggle = (id: string) =>
+    setInIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  const betPlayers: BetPlayer[] = players
+    .filter((p) => inIds.includes(p.id))
+    .map((p) => {
+      const hs = playerHoles(p);
+      const seg: [number, number, number] = [0, 1, 2].map((si) =>
+        hs.slice(si * 6, si * 6 + 6).reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0),
+      ) as [number, number, number];
+      const segPlayed: [boolean, boolean, boolean] = [0, 1, 2].map((si) =>
+        hs.slice(si * 6, si * 6 + 6).filter((h) => h.strokes != null).length === 6,
+      ) as [boolean, boolean, boolean];
+      return { id: p.id, name: p.display_name, total: playerPoints(p), seg, segPlayed };
+    });
+
+  const result = computeBetting(betPlayers, bet, split);
+  const pct = (v: number) => `${Math.round(v * 1000) / 10}%`;
+
+  return (
+    <div style={{ marginTop: 18, background: C.greenLight, borderRadius: 14, padding: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => setOpen((v) => !v)}>
+        <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 800 }}>💰 BETTING (TGC)</div>
+        <div style={{ flex: 1 }} />
+        <span style={{ color: C.sage, fontSize: 16 }}>{open ? "▾" : "▸"}</span>
+      </div>
+
+      {!open && (
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
+          Pot ${(bet * inIds.length).toFixed(0)} · {inIds.length} in at ${bet} — tap to see payouts
+        </div>
+      )}
+
+      {open && (
+        <div style={{ marginTop: 12 }}>
+          {/* Bet amount */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ color: C.sage, fontSize: 13 }}>Bet per person:</span>
+            {[75, 150].map((amt) => (
+              <button key={amt} onClick={() => setBet(amt)} style={{ ...btn(bet === amt), fontSize: 13, padding: "6px 12px" }}>${amt}</button>
+            ))}
+            <input type="number" value={bet} onChange={(e) => setBet(Math.max(0, Number(e.target.value) || 0))}
+              style={{ ...inputStyle, width: 90, padding: "6px 10px", fontSize: 13 }} />
+          </div>
+
+          {/* Who's in */}
+          <div style={{ marginTop: 12 }}>
+            <div style={{ color: C.sage, fontSize: 12, marginBottom: 6 }}>Who's betting ({inIds.length}):</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {players.map((p) => {
+                const on = inIds.includes(p.id);
+                return (
+                  <button key={p.id} onClick={() => toggle(p.id)}
+                    style={{ ...btn(on), fontSize: 12, padding: "6px 10px", opacity: on ? 1 : 0.5 }}>
+                    {on ? "✓ " : ""}{p.display_name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Pot + split */}
+          <div style={{ marginTop: 14, background: C.card, borderRadius: 10, padding: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>Pot: ${result.pot.toFixed(0)}</div>
+              <div style={{ flex: 1 }} />
+              <button onClick={() => setEditSplit((v) => !v)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>
+                {editSplit ? "Done" : "Edit split"}
+              </button>
+            </div>
+            {editSplit ? (
+              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                {([["segPct", "Each six-hole segment (×3)"], ["secondPct", "2nd overall"], ["firstPct", "1st overall"]] as [keyof BetSplit, string][]).map(([k, label]) => (
+                  <div key={k} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ color: C.faint, fontSize: 12, flex: 1 }}>{label}</span>
+                    <input type="number" value={Math.round(split[k] * 1000) / 10}
+                      onChange={(e) => setSplit((s) => ({ ...s, [k]: (Number(e.target.value) || 0) / 100 }))}
+                      style={{ ...inputStyle, width: 70, padding: "5px 8px", fontSize: 12 }} />
+                    <span style={{ color: C.faint, fontSize: 12 }}>%</span>
+                  </div>
+                ))}
+                <div style={{ color: C.faint, fontSize: 11 }}>
+                  3 segments + 2nd + 1st = {pct(split.segPct * 3 + split.secondPct + split.firstPct)} of pot.
+                  {Math.abs(split.segPct * 3 + split.secondPct + split.firstPct - 1) > 0.001 && " ⚠ Should total 100%."}
+                </div>
+                <button onClick={() => setSplit(DEFAULT_BET_SPLIT)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px", alignSelf: "flex-start" }}>Reset to default</button>
+              </div>
+            ) : (
+              <div style={{ color: C.faint, fontSize: 11, marginTop: 4 }}>
+                Each six: {pct(split.segPct)} · 2nd: {pct(split.secondPct)} · 1st: {pct(split.firstPct)}
+              </div>
+            )}
+          </div>
+
+          {/* Result lines */}
+          <div style={{ marginTop: 14 }}>
+            <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>PAYOUTS</div>
+            {result.cleanSweep && (
+              <div style={{ background: "#5A4500", borderRadius: 8, padding: "8px 10px", marginTop: 6, color: C.gold, fontSize: 13, fontWeight: 800 }}>
+                🧹 CLEAN SWEEP — bets doubled!
+              </div>
+            )}
+            <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+              {result.lines.map((l, i) => (
+                <div key={i} style={{ color: C.cream, fontSize: 13, lineHeight: 1.5 }}>{l}</div>
+              ))}
+            </div>
+          </div>
+
+          {/* Net per player */}
+          <div style={{ marginTop: 14 }}>
+            <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>NET RESULT</div>
+            <div style={{ marginTop: 6 }}>
+              {result.perPlayer.slice().sort((a, b) => b.net - a.net).map((p) => (
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, background: C.card, borderRadius: 10, padding: "9px 12px", marginTop: 6 }}>
+                  <div style={{ flex: 1, color: C.ink, fontWeight: 800 }}>{p.name}</div>
+                  <div style={{ color: C.faint, fontSize: 12 }}>won ${p.won.toFixed(2)}</div>
+                  <div style={{ width: 80, textAlign: "right", fontWeight: 800, fontFamily: "Georgia, serif", fontSize: 15, color: p.net >= 0 ? C.green : C.birdie }}>
+                    {p.net >= 0 ? "+" : "−"}${Math.abs(p.net).toFixed(2)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ color: C.faint, fontSize: 11, marginTop: 12 }}>
+            Net = winnings minus your ${bet} ante. Payouts update live as scores come in; segments only pay once all 6 holes are entered.
           </div>
         </div>
       )}

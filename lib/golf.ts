@@ -442,3 +442,116 @@ export function puttDistribution(rounds: Round[]) {
   );
   return { one, three, withPutts, total };
 }
+
+// ---------------- Stableford betting (TGC group) ----------------
+// Pot = bet * number of bettors. Prizes are PERCENTAGES of the pot:
+//   - each of the 3 six-hole segments: segPct (default 10/75)
+//   - overall 2nd place (18-hole): secondPct (default 15/75)
+//   - overall 1st place (18-hole): firstPct (default 30/75)
+// Rules:
+//   - Segment ties split that segment's share equally.
+//   - All players tied for 1st split (first+second) equally; no second paid.
+//   - One outright 1st but multiple tied 2nd: second's share splits equally.
+//   - Clean sweep: one player wins all 3 segments OUTRIGHT and is OUTRIGHT 1st
+//     overall -> bets double; that player takes the entire doubled pot (everyone
+//     else owes double their ante).
+export type BetPlayer = { id: string; name: string; total: number; seg: [number, number, number]; segPlayed: [boolean, boolean, boolean] };
+export type BetSplit = { segPct: number; secondPct: number; firstPct: number };
+export const DEFAULT_BET_SPLIT: BetSplit = { segPct: 10 / 75, secondPct: 15 / 75, firstPct: 30 / 75 };
+
+export type BetResult = {
+  pot: number;
+  perPlayer: { id: string; name: string; won: number; net: number; notes: string[] }[];
+  lines: string[]; // human-readable explanation of each payout
+  cleanSweep: boolean;
+};
+
+export function computeBetting(
+  players: BetPlayer[],
+  bet: number,
+  split: BetSplit = DEFAULT_BET_SPLIT,
+): BetResult {
+  const n = players.length;
+  const basePot = bet * n;
+  const won: Record<string, number> = {};
+  const notes: Record<string, string[]> = {};
+  players.forEach((p) => { won[p.id] = 0; notes[p.id] = []; });
+  const lines: string[] = [];
+
+  if (n < 2) {
+    return { pot: basePot, perPlayer: players.map((p) => ({ id: p.id, name: p.name, won: 0, net: 0, notes: ["Need at least 2 bettors."] })), lines: ["Need at least 2 bettors to calculate a pot."], cleanSweep: false };
+  }
+
+  // Overall standings by 18-hole total.
+  const maxTotal = Math.max(...players.map((p) => p.total));
+  const firsts = players.filter((p) => p.total === maxTotal);
+  const rest = players.filter((p) => p.total < maxTotal);
+  const secondVal = rest.length ? Math.max(...rest.map((p) => p.total)) : null;
+  const seconds = secondVal == null ? [] : rest.filter((p) => p.total === secondVal);
+
+  // Segment winners (only counting fully-played segments). Track outright wins.
+  const segWinnerIds: string[][] = [];
+  for (let si = 0; si < 3; si++) {
+    const eligible = players.filter((p) => p.segPlayed[si]);
+    if (!eligible.length) { segWinnerIds.push([]); continue; }
+    const top = Math.max(...eligible.map((p) => p.seg[si]));
+    segWinnerIds.push(eligible.filter((p) => p.seg[si] === top).map((p) => p.id));
+  }
+
+  // Clean sweep check: one player wins ALL three segments outright AND is the
+  // sole overall leader.
+  const sweepCandidate =
+    firsts.length === 1 &&
+    segWinnerIds.every((w) => w.length === 1 && w[0] === firsts[0].id);
+
+  if (sweepCandidate) {
+    const winner = firsts[0];
+    const doubledPot = basePot * 2;
+    won[winner.id] = doubledPot;
+    notes[winner.id].push("CLEAN SWEEP — won all 3 sixes outright and 1st overall");
+    lines.push(`🧹 CLEAN SWEEP by ${winner.name}: bets double. Pot = $${doubledPot.toFixed(2)} (everyone owes double their $${bet} ante).`);
+    const perPlayer = players.map((p) => ({
+      id: p.id, name: p.name, won: won[p.id],
+      net: p.id === winner.id ? doubledPot - bet * 2 : -(bet * 2),
+      notes: notes[p.id],
+    }));
+    return { pot: doubledPot, perPlayer, lines, cleanSweep: true };
+  }
+
+  // Segment payouts.
+  const segShare = basePot * split.segPct;
+  for (let si = 0; si < 3; si++) {
+    const winners = segWinnerIds[si];
+    if (!winners.length) { lines.push(`Holes ${si * 6 + 1}–${si * 6 + 6}: not all scores in — no payout yet.`); continue; }
+    const each = segShare / winners.length;
+    winners.forEach((id) => { won[id] += each; notes[id].push(`Won holes ${si * 6 + 1}–${si * 6 + 6} (+$${each.toFixed(2)})`); });
+    const names = winners.map((id) => players.find((p) => p.id === id)?.name).join(", ");
+    lines.push(`Holes ${si * 6 + 1}–${si * 6 + 6}: ${names} — $${segShare.toFixed(2)}${winners.length > 1 ? ` split ${winners.length} ways ($${each.toFixed(2)} each)` : ""}.`);
+  }
+
+  // Overall first/second.
+  const firstShare = basePot * split.firstPct;
+  const secondShare = basePot * split.secondPct;
+  if (firsts.length > 1) {
+    // All tied for first split first+second combined; no second paid.
+    const combined = firstShare + secondShare;
+    const each = combined / firsts.length;
+    firsts.forEach((p) => { won[p.id] += each; notes[p.id].push(`Tied 1st — split 1st+2nd (+$${each.toFixed(2)})`); });
+    lines.push(`Overall: ${firsts.map((p) => p.name).join(", ")} tied for 1st — split 1st+2nd ($${combined.toFixed(2)}) = $${each.toFixed(2)} each. No separate 2nd.`);
+  } else {
+    const winner = firsts[0];
+    won[winner.id] += firstShare;
+    notes[winner.id].push(`1st overall (+$${firstShare.toFixed(2)})`);
+    lines.push(`Overall 1st: ${winner.name} — $${firstShare.toFixed(2)}.`);
+    if (seconds.length) {
+      const each = secondShare / seconds.length;
+      seconds.forEach((p) => { won[p.id] += each; notes[p.id].push(`2nd overall (+$${each.toFixed(2)})`); });
+      lines.push(`Overall 2nd: ${seconds.map((p) => p.name).join(", ")} — $${secondShare.toFixed(2)}${seconds.length > 1 ? ` split ${seconds.length} ways ($${each.toFixed(2)} each)` : ""}.`);
+    }
+  }
+
+  const perPlayer = players.map((p) => ({
+    id: p.id, name: p.name, won: won[p.id], net: won[p.id] - bet, notes: notes[p.id],
+  }));
+  return { pot: basePot, perPlayer, lines, cleanSweep: false };
+}
