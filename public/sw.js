@@ -5,15 +5,17 @@
 // network-first with a cache fallback, so users get fresh code when online and a
 // working shell when offline.
 
-const CACHE = "bnn-shell-v2";
+const CACHE = "bnn-shell-v3";
 
 self.addEventListener("install", (event) => {
-  // Activate immediately on first install.
-  self.skipWaiting();
+  // Do NOT skipWaiting here. On a first install there's no active worker to wait
+  // behind, so the worker activates on its own. On an UPDATE, staying in the
+  // "waiting" state is what lets the page detect it and show the "Update
+  // available" prompt — the user's tap (SKIP_WAITING below) is what activates it.
 });
 
-// Allow the page to tell a waiting worker to activate now (used by the
-// "update available" prompt so users get the new version without closing tabs).
+// The page tells a waiting worker to activate now — fired when the user taps
+// "Update". This is the ONLY place we skip waiting, so updates are user-driven.
 self.addEventListener("message", (event) => {
   if (event.data === "SKIP_WAITING") self.skipWaiting();
 });

@@ -19,29 +19,37 @@ export function RegisterSW() {
       try {
         reg = await navigator.serviceWorker.register("/sw.js");
 
-        // If there's already a waiting worker (update downloaded earlier), surface it.
-        if (reg.waiting) setWaiting(reg.waiting);
+        // Surface a worker that's already waiting (update downloaded on a prior visit).
+        if (reg.waiting && navigator.serviceWorker.controller) setWaiting(reg.waiting);
 
-        // Detect a new worker installing, then waiting.
+        // Detect a new worker installing, then reaching "installed" while a
+        // controller already exists (= an update, not a first install).
         reg.addEventListener("updatefound", () => {
           const sw = reg!.installing;
           if (!sw) return;
           sw.addEventListener("statechange", () => {
-            // "installed" + an existing controller means an UPDATE (not first install).
             if (sw.state === "installed" && navigator.serviceWorker.controller) {
               setWaiting(sw);
             }
           });
         });
 
-        // Check for updates periodically and when the app regains focus, so a
-        // long-open installed app still notices new deploys.
+        // Proactively ask the browser to check for a new sw.js right now, so a
+        // freshly-deployed version is noticed on this load rather than later.
+        reg.update().catch(() => {});
+
+        // Check again on foreground return, on bfcache restore, on focus, and hourly.
         const check = () => reg && reg.update().catch(() => {});
         const onVis = () => { if (document.visibilityState === "visible") check(); };
+        const onShow = () => check();
+        const onFocus = () => check();
         document.addEventListener("visibilitychange", onVis);
-        const t = setInterval(check, 60 * 60 * 1000); // hourly
+        window.addEventListener("pageshow", onShow);
+        window.addEventListener("focus", onFocus);
+        const t = setInterval(check, 30 * 60 * 1000); // every 30 min
 
-        // When the controller changes (new SW took over), reload once to get fresh code.
+        // When the controller changes (the new SW took over after the user taps
+        // Update), reload once to load fresh code.
         let reloaded = false;
         navigator.serviceWorker.addEventListener("controllerchange", () => {
           if (reloaded) return;
@@ -49,7 +57,12 @@ export function RegisterSW() {
           window.location.reload();
         });
 
-        return () => { document.removeEventListener("visibilitychange", onVis); clearInterval(t); };
+        return () => {
+          document.removeEventListener("visibilitychange", onVis);
+          window.removeEventListener("pageshow", onShow);
+          window.removeEventListener("focus", onFocus);
+          clearInterval(t);
+        };
       } catch {
         // Non-fatal — app still works as a normal site.
       }
