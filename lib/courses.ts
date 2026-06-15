@@ -127,8 +127,32 @@ export async function loadCoursesForGroup(supabase: any, groupId: string): Promi
   const { data: links } = await supabase.from("group_courses").select("course_id").eq("group_id", groupId);
   const ids = (links || []).map((l: any) => l.course_id).filter(Boolean);
   if (!ids.length) return [];
+
   const { data } = await supabase.from("favorite_courses").select("*").in("id", ids);
-  return (data || []).filter((f: any) => !f.deleted);
+  const rows = (data || []).filter((f: any) => !f.deleted);
+
+  // Group-specific course corrections override the global course record inside
+  // that group only. This lets one group fix tees/pars/stroke indexes immediately
+  // without changing what every other group sees until an app admin approves it.
+  const { data: overrides } = await supabase
+    .from("group_course_overrides")
+    .select("course_id, name, location, data, updated_at")
+    .eq("group_id", groupId)
+    .in("course_id", ids);
+  const byCourse = Object.fromEntries((overrides || []).map((o: any) => [o.course_id, o]));
+
+  return rows.map((f: any) => {
+    const o = byCourse[f.id];
+    if (!o) return f;
+    return {
+      ...f,
+      name: o.name || f.name,
+      location: o.location ?? f.location,
+      data: o.data || f.data,
+      group_override: true,
+      group_override_updated_at: o.updated_at,
+    };
+  });
 }
 
 // Ensure a course (by id) is linked to a group. Safe to call repeatedly.

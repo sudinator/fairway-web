@@ -7,7 +7,7 @@ import {
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, isGrossOnly, hasHoleDetail,
   girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay,
 } from "@/lib/golf";
-import { buildCustomCourse, linkCourseToGroup } from "@/lib/courses";
+import { buildCustomCourse, linkCourseToGroup, loadCoursesForGroup } from "@/lib/courses";
 import { saveDraft, loadDraft, clearDraft, draftHasScores } from "@/lib/draft";
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
@@ -50,9 +50,15 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     if (synthesizedRef.current) return;        // only ever do this once
     synthesizedRef.current = true;
     (async () => {
-      let favQuery = supabase.from("favorite_courses").select("data").eq("name", round.course);
-      if (round.group_id) favQuery = favQuery.eq("group_id", round.group_id);
-      const { data: fav } = await favQuery.maybeSingle();
+      let fav: any = null;
+      if (round.group_id) {
+        const groupCourses = await loadCoursesForGroup(supabase, round.group_id);
+        fav = groupCourses.find((c: any) => c.name === round.course || c.data?.name === round.course) || null;
+      }
+      if (!fav) {
+        const { data } = await supabase.from("favorite_courses").select("data").eq("name", round.course).maybeSingle();
+        fav = data;
+      }
       // Re-check after the await — if holes arrived meanwhile, do NOT overwrite them.
       if (holesRef.current.length > 0) return;
       const courseHoles = (fav?.data?.holes || []) as { n: number; par: number; si: number | null }[];
@@ -180,10 +186,24 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         location: course.location,
         data: course,
       };
-      if (courseId) {
-        const { error } = await supabase.from("favorite_courses").update(row).eq("id", courseId);
-        if (error) throw error;
-        setFavMsg("Course library updated ★ (marked as corrected)");
+      if (courseId && round.group_id) {
+        // Save this correction for the current group immediately, then submit it
+        // for app-admin review before it changes the global course for everyone.
+        const { error: overrideErr } = await supabase.from("group_course_overrides").upsert({
+          group_id: round.group_id,
+          course_id: courseId,
+          name: round.course,
+          location: course.location,
+          data: course,
+          updated_by: null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "group_id,course_id" });
+        if (overrideErr) throw overrideErr;
+        await supabase.from("course_change_requests").insert({
+          course_id: courseId, group_id: round.group_id, submitted_by: null,
+          proposed_name: round.course, proposed_location: course.location, proposed_data: course, status: "pending",
+        });
+        setFavMsg("Course updated for this group ★ (global review pending)");
       } else {
         const { data: created, error } = await supabase.from("favorite_courses")
           .insert({ group_id: round.group_id || null, name: round.course, ...row })

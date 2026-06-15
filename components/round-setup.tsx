@@ -102,9 +102,24 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
         data: picked,
       };
       if (courseId) {
-        const { error } = await supabase.from("favorite_courses").update(row).eq("id", courseId);
-        if (error) throw error;
-        setFavMsg("Updated in course library ★");
+        // Do not overwrite the global course record. Save this version for the
+        // current group and submit it for admin review before other groups see it.
+        const proposed = { ...picked, corrected: true };
+        const { error: overrideErr } = await supabase.from("group_course_overrides").upsert({
+          group_id: activeGroupId,
+          course_id: courseId,
+          name: picked.name,
+          location: picked.location,
+          data: proposed,
+          updated_by: null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "group_id,course_id" });
+        if (overrideErr) throw overrideErr;
+        await supabase.from("course_change_requests").insert({
+          course_id: courseId, group_id: activeGroupId, submitted_by: null,
+          proposed_name: picked.name, proposed_location: picked.location, proposed_data: proposed, status: "pending",
+        });
+        setFavMsg("Saved to this group's course library ★ (global review pending)");
       } else {
         const { data: created, error } = await supabase.from("favorite_courses")
           .insert({ group_id: activeGroupId, ...row })
@@ -127,11 +142,15 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
     if (!picked || !loadedFavId) return;
     setFavSaving(true); setFavMsg(null);
     try {
-      const { error } = await supabase.from("favorite_courses")
-        .update({ name: picked.name, location: picked.location, data: picked })
-        .eq("id", loadedFavId);
+      const proposed = { ...picked, corrected: true };
+      const { error } = await supabase.from("group_course_overrides").upsert({
+        group_id: activeGroupId, course_id: loadedFavId, name: picked.name, location: picked.location, data: proposed, updated_by: null, updated_at: new Date().toISOString(),
+      }, { onConflict: "group_id,course_id" });
       if (error) throw error;
-      setFavMsg("Favorite updated ★");
+      await supabase.from("course_change_requests").insert({
+        course_id: loadedFavId, group_id: activeGroupId, submitted_by: null, proposed_name: picked.name, proposed_location: picked.location, proposed_data: proposed, status: "pending",
+      });
+      setFavMsg("Updated for this group ★ (global review pending)");
       await loadFavorites();
     } catch (e: any) {
       setFavMsg("Couldn't update: " + (e.message || "error"));

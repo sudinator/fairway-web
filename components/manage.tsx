@@ -6,7 +6,7 @@ import { C, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, play
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, NumPicker } from "@/components/ui";
-import { APP_VERSION } from "@/lib/app-version";
+import { APP_VERSION, APP_BUILD_ID } from "@/lib/app-version";
 
 const supabase = createClient();
 
@@ -39,7 +39,8 @@ function normalize(d: any): Course {
 }
 
 // ================= Shared Course Library =================
-type LibCourse = { id: string; name: string; location: string; user_id: string; data: Course; vetted?: boolean };
+type LibCourse = { id: string; name: string; location: string; user_id: string; data: Course; vetted?: boolean; group_override?: boolean; group_override_updated_at?: string | null };
+type CourseEditRequest = { id: string; course_id: string; group_id: string; submitted_by: string | null; proposed_name: string; proposed_location: string | null; proposed_data: Course; status: "pending" | "approved" | "rejected"; created_at: string };
 type CourseTab = "group" | "all";
 
 function courseCardTitle(c: LibCourse) {
@@ -55,6 +56,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   const [search, setSearch] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [pendingEdits, setPendingEdits] = useState<CourseEditRequest[]>([]);
   const [myName, setMyName] = useState<string>("Someone");
 
   const toLibCourse = (f: any): LibCourse => {
@@ -71,6 +73,8 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
         corrected: d?.corrected || f.corrected || false,
       },
       vetted: !!f.vetted,
+      group_override: !!f.group_override,
+      group_override_updated_at: f.group_override_updated_at || null,
     };
   };
 
@@ -91,8 +95,20 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
     setAllCourses(allList);
 
     const { data: prof } = await supabase.from("profiles").select("is_admin, display_name").eq("id", user.id).maybeSingle();
-    setIsAdmin(!!prof?.is_admin);
+    const admin = !!prof?.is_admin;
+    setIsAdmin(admin);
     setMyName(prof?.display_name || user.email || "Someone");
+
+    if (admin) {
+      const { data: edits } = await supabase
+        .from("course_change_requests")
+        .select("id, course_id, group_id, submitted_by, proposed_name, proposed_location, proposed_data, status, created_at")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+      setPendingEdits((edits || []) as CourseEditRequest[]);
+    } else {
+      setPendingEdits([]);
+    }
   }, [user.id, activeGroupId]);
   useEffect(() => { load(); }, [load]);
 
@@ -173,6 +189,46 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
     await load();
   };
 
+  const approveCourseEdit = async (req: CourseEditRequest) => {
+    if (!isAdmin) return;
+    setBusyId(req.id); setMsg(null);
+    try {
+      const proposed = { ...req.proposed_data, name: req.proposed_name, location: req.proposed_location || "", corrected: true };
+      const { error } = await supabase.from("favorite_courses")
+        .update({ name: req.proposed_name, location: req.proposed_location || "", data: proposed, vetted: true })
+        .eq("id", req.course_id);
+      if (error) throw error;
+      await supabase.from("course_change_requests")
+        .update({ status: "approved", reviewed_by: user.id, reviewed_at: new Date().toISOString() })
+        .eq("id", req.id);
+      await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_edit_approved", group_id: req.group_id, summary: `Approved global course edit for "${courseLabel(proposed)}"` });
+      setMsg("Course edit approved globally.");
+      await load();
+    } catch (e: any) {
+      setMsg("Couldn't approve edit: " + (e.message || "error"));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const rejectCourseEdit = async (req: CourseEditRequest) => {
+    if (!isAdmin) return;
+    setBusyId(req.id); setMsg(null);
+    try {
+      const { error } = await supabase.from("course_change_requests")
+        .update({ status: "rejected", reviewed_by: user.id, reviewed_at: new Date().toISOString() })
+        .eq("id", req.id);
+      if (error) throw error;
+      await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_edit_rejected", group_id: req.group_id, summary: `Rejected global course edit for "${req.proposed_name}"` });
+      setMsg("Course edit rejected. The submitting group keeps its group-specific correction.");
+      await load();
+    } catch (e: any) {
+      setMsg("Couldn't reject edit: " + (e.message || "error"));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   if (editing) {
     return <CourseEditor
       user={user}
@@ -200,10 +256,10 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
           <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>
             {courseCardTitle(c)}
             {c.vetted ? <span style={{ color: C.gold, fontSize: 12 }}> · vetted ★</span> : null}
-            {c.data?.corrected ? <span style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}> · ⚑ corrected</span> : null}
+            {c.group_override ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 700 }}> · group edit pending review</span> : c.data?.corrected ? <span style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}> · ⚑ corrected</span> : null}
           </div>
           <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
-            {c.location ? c.location + " · " : ""}{c.data.tees?.length || 0} tee{(c.data.tees?.length || 0) === 1 ? "" : "s"} · tap to view/edit
+            {c.location ? c.location + " · " : ""}{c.data.tees?.length || 0} tee{(c.data.tees?.length || 0) === 1 ? "" : "s"} · tap to view/edit{c.group_override ? " · this group sees a local correction" : ""}
           </div>
         </button>
         {source === "group" ? (
@@ -248,6 +304,27 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
       </div>
 
       {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
+
+      {isAdmin && pendingEdits.length > 0 && (
+        <div style={{ background: C.greenLight, borderRadius: 14, padding: 14, marginTop: 14 }}>
+          <Eyebrow>PENDING GLOBAL COURSE EDITS ({pendingEdits.length})</Eyebrow>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
+            Members can correct a course for their own group immediately. Approve here only when the correction should become the global course record for every group.
+          </div>
+          {pendingEdits.map((r) => (
+            <div key={r.id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
+              <div style={{ color: C.ink, fontWeight: 800 }}>{courseLabel(r.proposed_data || ({ name: r.proposed_name } as any))}</div>
+              <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>
+                Proposed {new Date(r.created_at).toLocaleDateString()} · {r.proposed_location || "No location"} · {(r.proposed_data?.tees?.length || 0)} tee{(r.proposed_data?.tees?.length || 0) === 1 ? "" : "s"}
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                <button style={{ ...btn(true), fontSize: 12, opacity: busyId === r.id ? 0.5 : 1 }} disabled={busyId === r.id} onClick={() => approveCourseEdit(r)}>Approve globally</button>
+                <button style={{ ...btn(false), fontSize: 12, opacity: busyId === r.id ? 0.5 : 1 }} disabled={busyId === r.id} onClick={() => rejectCourseEdit(r)}>Reject global change</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {tab === "group" && (
         <div style={{ marginTop: 16 }}>
@@ -400,19 +477,51 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
     try {
       const name = course.name.trim();
       if (existingId) {
-        // Editing the shared record — affects every group that references it.
-        const { error } = await supabase.from("favorite_courses").update({ name, location: course.location || "", data: course }).eq("id", existingId);
-        if (error) throw error;
+        // Editing an existing global course creates a GROUP-SPECIFIC override immediately
+        // and submits a pending global change request for app-admin review. It does not
+        // overwrite the global record for every group.
+        const proposed = { ...course, name, location: course.location || "", corrected: true };
+        const { error: overrideErr } = await supabase.from("group_course_overrides").upsert({
+          group_id: activeGroupId,
+          course_id: existingId,
+          name,
+          location: course.location || "",
+          data: proposed,
+          updated_by: user.id,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "group_id,course_id" });
+        if (overrideErr) throw overrideErr;
         await linkCourseToGroup(supabase, activeGroupId, existingId, user.id);
+
+        await supabase.from("course_change_requests").insert({
+          course_id: existingId,
+          group_id: activeGroupId,
+          submitted_by: user.id,
+          proposed_name: name,
+          proposed_location: course.location || "",
+          proposed_data: proposed,
+          status: "pending",
+        });
+        await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Someone", action: "course_edit_submitted", group_id: activeGroupId, summary: `Edited course "${name}" for this group and submitted it for global review` });
       } else {
-        // New course: if a canonical record with this name already exists, link it; otherwise create it.
+        // New course: if a canonical record with this name already exists, link it and
+        // store this group's version as an override; otherwise create the global record.
         const { data: existsByName } = await supabase.from("favorite_courses").select("id").eq("name", name).maybeSingle();
         let courseId = existsByName?.id as string | undefined;
         if (courseId) {
-          await supabase.from("favorite_courses").update({ location: course.location || "", data: course }).eq("id", courseId);
+          const proposed = { ...course, name, location: course.location || "", corrected: true };
+          await linkCourseToGroup(supabase, activeGroupId, courseId, user.id);
+          const { error: overrideErr } = await supabase.from("group_course_overrides").upsert({
+            group_id: activeGroupId, course_id: courseId, name, location: course.location || "", data: proposed, updated_by: user.id, updated_at: new Date().toISOString(),
+          }, { onConflict: "group_id,course_id" });
+          if (overrideErr) throw overrideErr;
+          await supabase.from("course_change_requests").insert({
+            course_id: courseId, group_id: activeGroupId, submitted_by: user.id, proposed_name: name, proposed_location: course.location || "", proposed_data: proposed, status: "pending",
+          });
         } else {
+          const createdCourse = { ...course, name, location: course.location || "" };
           const { data: created, error } = await supabase.from("favorite_courses")
-            .insert({ group_id: activeGroupId, name, location: course.location || "", data: course, user_id: user.id })
+            .insert({ group_id: activeGroupId, name, location: course.location || "", data: createdCourse, user_id: user.id })
             .select("id").single();
           if (error || !created) throw error || new Error("Could not create course");
           courseId = created.id;
@@ -426,7 +535,12 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
 
   return (
     <div style={{ maxWidth: 700 }}>
-      <Eyebrow>{existingId ? "EDIT COURSE" : "NEW COURSE"}</Eyebrow>
+      <Eyebrow>{existingId ? "EDIT COURSE FOR THIS GROUP" : "NEW COURSE"}</Eyebrow>
+      {existingId && (
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
+          Changes save immediately for this group and are submitted to an app admin for global approval before other groups see them.
+        </div>
+      )}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
         <div style={{ flex: 2, minWidth: 200 }}>
           <label style={{ color: C.sage, fontSize: 12 }}>Course name</label>
@@ -1324,7 +1438,7 @@ export function HelpPage({ isAdmin }: { isAdmin: boolean }) {
       </Section>
 
       <Section title="Courses">
-        Each group has its own course list. Anyone can add a course (search or type it from a scorecard). Fixing a course's pars or stroke indexes fixes it for everyone using it. Browse <b>★ Community Courses</b> to add vetted courses other groups have shared.
+        Browse <b>All App Courses</b> to see every saved course in Birdie Num Num, then add courses to your group library. Editing a course saves the correction for your group immediately and submits it to an app admin for global approval before other groups see it.
       </Section>
 
       <Section title="Groups">
@@ -1347,7 +1461,10 @@ export function HelpPage({ isAdmin }: { isAdmin: boolean }) {
 // app versions even when the browser does not report a waiting service worker.
 function UpdateChecker() {
   const [status, setStatus] = React.useState<string>("");
-  const check = async () => {
+  const [latest, setLatest] = React.useState<string | null>(null);
+  const [latestBuild, setLatestBuild] = React.useState<string | null>(null);
+
+  const check = async (autoReload = false) => {
     setStatus("Checking…");
     try {
       let waiting: ServiceWorker | null = null;
@@ -1373,13 +1490,16 @@ function UpdateChecker() {
       });
       const server = res.ok ? await res.json() : null;
       const serverVersion = typeof server?.version === "string" ? server.version : null;
+      const serverBuild = typeof server?.buildId === "string" ? server.buildId : null;
+      setLatest(serverVersion);
+      setLatestBuild(serverBuild);
 
       if (waiting) {
         setStatus("New version found — updating…");
         waiting.postMessage("SKIP_WAITING");
       } else if (serverVersion && serverVersion !== APP_VERSION) {
-        setStatus("New version found — reloading…");
-        window.location.reload();
+        setStatus(`New version available: ${serverVersion}.`);
+        if (autoReload) window.location.reload();
       } else if (serverVersion) {
         setStatus("You're on the latest version.");
       } else {
@@ -1389,17 +1509,27 @@ function UpdateChecker() {
       setStatus("Couldn't check right now — try again in a moment.");
     }
   };
+
+  React.useEffect(() => { check(false); }, []);
+
+  const hasNewer = latest && latest !== APP_VERSION;
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 700 }}>App version &amp; updates</div>
       <div style={{ color: C.sage, fontSize: 13, marginTop: 8, lineHeight: 1.55 }}>
-        Installed as an app? Tap below to compare your installed build with the latest deployed build and reload if needed.
+        Installed as an app? This compares your installed build with the latest deployed build and reloads if needed.
       </div>
-      <div style={{ color: C.cream, fontSize: 12, marginTop: 8, fontFamily: "monospace" }}>
-        Current version: {APP_VERSION}
+      <div style={{ color: C.cream, fontSize: 13, marginTop: 10, lineHeight: 1.7 }}>
+        <div><b>Current version:</b> {APP_VERSION}</div>
+        <div><b>Latest version:</b> {latest || "Not checked yet"}</div>
+        {APP_BUILD_ID ? <div style={{ color: C.sage, fontSize: 11 }}>Build: {APP_BUILD_ID.slice(0, 12)}{latestBuild && latestBuild !== APP_BUILD_ID ? ` · latest ${latestBuild.slice(0, 12)}` : ""}</div> : null}
       </div>
-      <button style={{ ...btn(true), marginTop: 12, fontSize: 13 }} onClick={check}>Check for updates</button>
-      {status ? <div style={{ color: C.cream, fontSize: 12, marginTop: 10 }}>{status}</div> : null}
+      {hasNewer ? (
+        <button style={{ ...btn(true), marginTop: 12, fontSize: 13 }} onClick={() => check(true)}>Update to {latest}</button>
+      ) : (
+        <button style={{ ...btn(true), marginTop: 12, fontSize: 13 }} onClick={() => check(false)}>Check for updates</button>
+      )}
+      {status ? <div style={{ color: hasNewer ? C.gold : C.cream, fontSize: 12, marginTop: 10 }}>{status}</div> : null}
     </div>
   );
 }
