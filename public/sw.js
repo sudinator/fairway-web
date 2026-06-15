@@ -5,7 +5,8 @@
 // network-first with a cache fallback, so users get fresh code when online and a
 // working shell when offline.
 
-const CACHE = "bnn-shell-v3";
+const SW_VERSION = "pwa-validation-123";
+const CACHE = `bnn-shell-${SW_VERSION}`;
 
 self.addEventListener("install", (event) => {
   // Do NOT skipWaiting here. On a first install there's no active worker to wait
@@ -38,6 +39,7 @@ function shouldBypass(url) {
     url.hostname.includes("supabase") ||
     url.pathname.startsWith("/api/") ||
     url.pathname.startsWith("/auth/") ||
+    url.pathname === "/app-version.json" ||
     url.hostname.includes("googleapis.com") ||
     url.hostname.includes("google.com") ||
     url.hostname.includes("generativelanguage")

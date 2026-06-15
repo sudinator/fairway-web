@@ -1,83 +1,135 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { APP_VERSION } from "@/lib/app-version";
 
-// Registers the service worker AND handles updates. When a new version is
-// deployed, the browser fetches the new sw.js; this detects the waiting worker
-// and shows a small "Update available" bar. Tapping it activates the new version
-// and reloads — so users get fresh code without manually clearing anything.
+type UpdateReason = "service-worker" | "app-version";
+
+// Registers the service worker AND handles updates.
+//
+// The old implementation only detected service-worker changes. That misses many
+// real app updates because Next.js client bundles can change while sw.js remains
+// textually unchanged. This component now checks both:
+//   1. a waiting service worker
+//   2. /app-version.json, which is generated fresh during every build
 export function RegisterSW() {
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
+  const [versionUpdate, setVersionUpdate] = useState(false);
+
+  const hasUpdate = !!waiting || versionUpdate;
+  const reason: UpdateReason | null = waiting ? "service-worker" : versionUpdate ? "app-version" : null;
+
+  const checkAppVersion = useCallback(async () => {
+    if (typeof window === "undefined") return false;
+    try {
+      const res = await fetch(`/app-version.json?ts=${Date.now()}`, {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      const latest = typeof data?.version === "string" ? data.version : "";
+      if (latest && latest !== APP_VERSION) {
+        setVersionUpdate(true);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!("serviceWorker" in navigator)) return;
 
     let reg: ServiceWorkerRegistration | null = null;
+    let interval: ReturnType<typeof setInterval> | null = null;
+    let started = false;
 
-    const onLoad = async () => {
+    const runChecks = () => {
+      reg?.update().catch(() => {});
+      checkAppVersion();
+    };
+
+    const start = async () => {
+      if (started) return;
+      started = true;
+
       try {
-        reg = await navigator.serviceWorker.register("/sw.js");
+        if ("serviceWorker" in navigator) {
+          reg = await navigator.serviceWorker.register("/sw.js");
 
-        // Surface a worker that's already waiting (update downloaded on a prior visit).
-        if (reg.waiting && navigator.serviceWorker.controller) setWaiting(reg.waiting);
+          if (reg.waiting && navigator.serviceWorker.controller) {
+            setWaiting(reg.waiting);
+          }
 
-        // Detect a new worker installing, then reaching "installed" while a
-        // controller already exists (= an update, not a first install).
-        reg.addEventListener("updatefound", () => {
-          const sw = reg!.installing;
-          if (!sw) return;
-          sw.addEventListener("statechange", () => {
-            if (sw.state === "installed" && navigator.serviceWorker.controller) {
-              setWaiting(sw);
-            }
+          reg.addEventListener("updatefound", () => {
+            const sw = reg?.installing;
+            if (!sw) return;
+            sw.addEventListener("statechange", () => {
+              if (sw.state === "installed" && navigator.serviceWorker.controller) {
+                setWaiting(sw);
+              }
+            });
           });
-        });
-
-        // Proactively ask the browser to check for a new sw.js right now, so a
-        // freshly-deployed version is noticed on this load rather than later.
-        reg.update().catch(() => {});
-
-        // Check again on foreground return, on bfcache restore, on focus, and hourly.
-        const check = () => reg && reg.update().catch(() => {});
-        const onVis = () => { if (document.visibilityState === "visible") check(); };
-        const onShow = () => check();
-        const onFocus = () => check();
-        document.addEventListener("visibilitychange", onVis);
-        window.addEventListener("pageshow", onShow);
-        window.addEventListener("focus", onFocus);
-        const t = setInterval(check, 30 * 60 * 1000); // every 30 min
-
-        // When the controller changes (the new SW took over after the user taps
-        // Update), reload once to load fresh code.
-        let reloaded = false;
-        navigator.serviceWorker.addEventListener("controllerchange", () => {
-          if (reloaded) return;
-          reloaded = true;
-          window.location.reload();
-        });
-
-        return () => {
-          document.removeEventListener("visibilitychange", onVis);
-          window.removeEventListener("pageshow", onShow);
-          window.removeEventListener("focus", onFocus);
-          clearInterval(t);
-        };
+        }
       } catch {
         // Non-fatal — app still works as a normal site.
       }
+
+      runChecks();
+      interval = setInterval(runChecks, 30 * 60 * 1000);
     };
-    window.addEventListener("load", onLoad);
-    return () => window.removeEventListener("load", onLoad);
-  }, []);
+
+    const onVisible = () => { if (document.visibilityState === "visible") runChecks(); };
+    const onPageShow = () => runChecks();
+    const onFocus = () => runChecks();
+
+    let reloaded = false;
+    const onControllerChange = () => {
+      if (reloaded) return;
+      reloaded = true;
+      window.location.reload();
+    };
+
+    window.addEventListener("load", start);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("focus", onFocus);
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
+    }
+
+    if (document.readyState === "complete") start();
+
+    return () => {
+      window.removeEventListener("load", start);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("focus", onFocus);
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+      }
+      if (interval) clearInterval(interval);
+    };
+  }, [checkAppVersion]);
 
   const applyUpdate = () => {
-    if (!waiting) return;
-    waiting.postMessage("SKIP_WAITING"); // triggers controllerchange -> reload
-    setWaiting(null);
+    if (waiting) {
+      waiting.postMessage("SKIP_WAITING");
+      setWaiting(null);
+      return;
+    }
+
+    if (versionUpdate) {
+      const url = new URL(window.location.href);
+      url.searchParams.set("refresh", Date.now().toString());
+      window.location.replace(url.toString());
+    }
   };
 
-  if (!waiting) return null;
+  if (!hasUpdate) return null;
+
   return (
     <div style={{
       position: "fixed", left: 12, right: 12,
@@ -87,6 +139,7 @@ export function RegisterSW() {
     }}>
       <div style={{ flex: 1, color: "#F3EFE2", fontSize: 13, lineHeight: 1.4 }}>
         A new version of Birdie Num Num is available.
+        {reason === "app-version" ? " Refresh to load the latest app." : ""}
       </div>
       <button onClick={applyUpdate} style={{
         background: "#C9A227", color: "#0E3B2E", border: "none", borderRadius: 8,
