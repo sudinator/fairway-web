@@ -38,8 +38,12 @@ export function ScoreMark({ hole }: { hole: Hole }) {
     <span style={{ ...base, border: `1.5px solid ${C.birdie}`, borderRadius: "50%", color: C.birdie, boxShadow: `0 0 0 2.5px ${C.card}, 0 0 0 4px ${C.birdie}` }}>{hole.strokes}</span>
   );
   if (d === -1) return <span style={{ ...base, border: `1.5px solid ${C.birdie}`, borderRadius: "50%", color: C.birdie }}>{hole.strokes}</span>;
-  // Double bogey or worse: double (nested) square. Bogey: single square.
-  if (d >= 2) return (
+  // Double bogey or worse: double (nested) square. Triple bogey or worse (d >= 3)
+  // also gets a translucent blue fill so the worst holes stand out. Bogey: single square.
+  if (d >= 3) return (
+    <span style={{ ...base, border: `1.5px solid ${C.bogey}`, borderRadius: 4, color: C.bogey, background: "rgba(46,90,184,0.22)", boxShadow: `0 0 0 2.5px ${C.card}, 0 0 0 4px ${C.bogey}` }}>{hole.strokes}</span>
+  );
+  if (d === 2) return (
     <span style={{ ...base, border: `1.5px solid ${C.bogey}`, borderRadius: 4, color: C.bogey, boxShadow: `0 0 0 2.5px ${C.card}, 0 0 0 4px ${C.bogey}` }}>{hole.strokes}</span>
   );
   if (d === 1) return <span style={{ ...base, border: `1.5px solid ${C.bogey}`, borderRadius: 4, color: C.bogey }}>{hole.strokes}</span>;
