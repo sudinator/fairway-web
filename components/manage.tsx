@@ -40,11 +40,120 @@ function normalize(d: any): Course {
 
 // ================= Shared Course Library =================
 type LibCourse = { id: string; name: string; location: string; user_id: string; data: Course; vetted?: boolean; group_override?: boolean; group_override_updated_at?: string | null };
-type CourseEditRequest = { id: string; course_id: string; group_id: string; submitted_by: string | null; proposed_name: string; proposed_location: string | null; proposed_data: Course; status: "pending" | "approved" | "rejected"; created_at: string };
+type CourseEditRequest = {
+  id: string;
+  course_id: string;
+  group_id: string;
+  submitted_by: string | null;
+  proposed_name: string;
+  proposed_location: string | null;
+  proposed_data: Course;
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+  current_course?: LibCourse | null;
+  group_name?: string | null;
+  submitter_name?: string | null;
+  submitter_email?: string | null;
+};
 type CourseTab = "group" | "all";
 
 function courseCardTitle(c: LibCourse) {
   return courseLabel(c.data || ({ name: c.name } as any));
+}
+
+function normalizeText(v: any): string {
+  return String(v ?? "").trim();
+}
+
+function sameValue(a: any, b: any): boolean {
+  if (typeof a === "number" || typeof b === "number") {
+    const na = Number(a), nb = Number(b);
+    if (Number.isFinite(na) || Number.isFinite(nb)) return Math.abs((Number.isFinite(na) ? na : 0) - (Number.isFinite(nb) ? nb : 0)) < 0.001;
+  }
+  return normalizeText(a) === normalizeText(b);
+}
+
+function changeLine(label: string, before: any, after: any): string | null {
+  if (sameValue(before, after)) return null;
+  const b = normalizeText(before) || "—";
+  const a = normalizeText(after) || "—";
+  return `${label}: ${b} → ${a}`;
+}
+
+function courseChangeLines(current: Course | null | undefined, proposed: Course | null | undefined): string[] {
+  if (!proposed) return ["No proposed course data was included with this request."];
+  if (!current) return ["New or missing global baseline — review the proposed course details before approval."];
+
+  const lines: string[] = [];
+  const add = (line: string | null) => { if (line) lines.push(line); };
+
+  add(changeLine("Display name", courseLabel(current), courseLabel(proposed)));
+  add(changeLine("Location", current.location, proposed.location));
+  add(changeLine("Facility", current.club, proposed.club));
+  add(changeLine("Layout/course name", current.name, proposed.name));
+
+  const maxTees = Math.max(current.tees?.length || 0, proposed.tees?.length || 0);
+  for (let i = 0; i < maxTees; i++) {
+    const before = current.tees?.[i];
+    const after = proposed.tees?.[i];
+    const label = after?.name || before?.name || `Tee ${i + 1}`;
+    if (!before && after) { lines.push(`Added tee ${label}: rating ${after.rating}, slope ${after.slope}, par ${after.par}`); continue; }
+    if (before && !after) { lines.push(`Removed tee ${label}`); continue; }
+    if (!before || !after) continue;
+    add(changeLine(`${label} tee name`, before.name, after.name));
+    add(changeLine(`${label} rating`, before.rating, after.rating));
+    add(changeLine(`${label} slope`, before.slope, after.slope));
+    add(changeLine(`${label} par`, before.par, after.par));
+  }
+
+  const byCurrentHole = new Map((current.holes || []).map((h) => [h.n, h]));
+  const byProposedHole = new Map((proposed.holes || []).map((h) => [h.n, h]));
+  const holeNums = Array.from(new Set([...Array.from(byCurrentHole.keys()), ...Array.from(byProposedHole.keys())])).sort((a, b) => a - b);
+  for (const n of holeNums) {
+    const before = byCurrentHole.get(n);
+    const after = byProposedHole.get(n);
+    if (!before && after) { lines.push(`Added hole ${n}: par ${after.par}, S.I. ${after.si ?? "—"}`); continue; }
+    if (before && !after) { lines.push(`Removed hole ${n}`); continue; }
+    if (!before || !after) continue;
+    add(changeLine(`Hole ${n} par`, before.par, after.par));
+    add(changeLine(`Hole ${n} stroke index`, before.si ?? "—", after.si ?? "—"));
+  }
+
+  return lines.length ? lines : ["No material field changes detected versus the current global course record."];
+}
+
+function CourseChangeSummary({ req }: { req: CourseEditRequest }) {
+  const current = req.current_course?.data || null;
+  const proposed = req.proposed_data || null;
+  const lines = courseChangeLines(current, proposed);
+  const visible = lines.slice(0, 18);
+  const extra = Math.max(0, lines.length - visible.length);
+
+  return (
+    <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
+        <div style={{ background: C.cream, borderRadius: 10, padding: 10, border: `1px solid ${C.line}` }}>
+          <div style={{ color: C.faint, fontSize: 10, letterSpacing: 1.5, fontWeight: 800 }}>CURRENT GLOBAL</div>
+          <div style={{ color: C.ink, fontWeight: 800, marginTop: 5 }}>{current ? courseLabel(current) : "Unknown course"}</div>
+          <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{current?.location || "No location"}</div>
+          <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{current?.tees?.length || 0} tee{(current?.tees?.length || 0) === 1 ? "" : "s"} · {current?.holes?.length || 0} holes</div>
+        </div>
+        <div style={{ background: C.cream, borderRadius: 10, padding: 10, border: `1px solid ${C.gold}` }}>
+          <div style={{ color: C.gold, fontSize: 10, letterSpacing: 1.5, fontWeight: 800 }}>PROPOSED GLOBAL</div>
+          <div style={{ color: C.ink, fontWeight: 800, marginTop: 5 }}>{proposed ? courseLabel(proposed) : req.proposed_name}</div>
+          <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{proposed?.location || req.proposed_location || "No location"}</div>
+          <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{proposed?.tees?.length || 0} tee{(proposed?.tees?.length || 0) === 1 ? "" : "s"} · {proposed?.holes?.length || 0} holes</div>
+        </div>
+      </div>
+      <div style={{ background: "#FFF8E1", border: `1px solid ${C.gold}`, borderRadius: 10, padding: 10 }}>
+        <div style={{ color: C.green, fontSize: 11, letterSpacing: 1.5, fontWeight: 800, marginBottom: 6 }}>WHAT CHANGED</div>
+        {visible.map((line, i) => (
+          <div key={i} style={{ color: C.ink, fontSize: 12, padding: "3px 0", borderTop: i === 0 ? "none" : `1px solid ${C.line}` }}>{line}</div>
+        ))}
+        {extra > 0 && <div style={{ color: C.faint, fontSize: 12, marginTop: 6 }}>+ {extra} more change{extra === 1 ? "" : "s"}</div>}
+      </div>
+    </div>
+  );
 }
 
 export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroupId: string }) {
@@ -105,7 +214,37 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
         .select("id, course_id, group_id, submitted_by, proposed_name, proposed_location, proposed_data, status, created_at")
         .eq("status", "pending")
         .order("created_at", { ascending: false });
-      setPendingEdits((edits || []) as CourseEditRequest[]);
+      const rows = (edits || []) as CourseEditRequest[];
+      const courseIds = Array.from(new Set(rows.map((r) => r.course_id).filter(Boolean)));
+      const groupIds = Array.from(new Set(rows.map((r) => r.group_id).filter(Boolean)));
+      const userIds = Array.from(new Set(rows.map((r) => r.submitted_by).filter(Boolean))) as string[];
+
+      let coursesById: Record<string, LibCourse> = {};
+      if (courseIds.length) {
+        const { data: courses } = await supabase.from("favorite_courses").select("*").in("id", courseIds);
+        coursesById = Object.fromEntries((courses || []).map((c: any) => [c.id, toLibCourse(c)]));
+      }
+      let groupsById: Record<string, any> = {};
+      if (groupIds.length) {
+        const { data: groupRows } = await supabase.from("groups").select("id, name").in("id", groupIds);
+        groupsById = Object.fromEntries((groupRows || []).map((g: any) => [g.id, g]));
+      }
+      let profilesById: Record<string, any> = {};
+      if (userIds.length) {
+        const { data: profileRows } = await supabase.from("profiles").select("id, display_name, email").in("id", userIds);
+        profilesById = Object.fromEntries((profileRows || []).map((p: any) => [p.id, p]));
+      }
+
+      setPendingEdits(rows.map((r) => {
+        const submitter = r.submitted_by ? profilesById[r.submitted_by] : null;
+        return {
+          ...r,
+          current_course: coursesById[r.course_id] || null,
+          group_name: groupsById[r.group_id]?.name || null,
+          submitter_name: submitter?.display_name || null,
+          submitter_email: submitter?.email || null,
+        };
+      }));
     } else {
       setPendingEdits([]);
     }
@@ -314,9 +453,12 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
           {pendingEdits.map((r) => (
             <div key={r.id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
               <div style={{ color: C.ink, fontWeight: 800 }}>{courseLabel(r.proposed_data || ({ name: r.proposed_name } as any))}</div>
-              <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>
-                Proposed {new Date(r.created_at).toLocaleDateString()} · {r.proposed_location || "No location"} · {(r.proposed_data?.tees?.length || 0)} tee{(r.proposed_data?.tees?.length || 0) === 1 ? "" : "s"}
+              <div style={{ color: C.faint, fontSize: 12, marginTop: 3, lineHeight: 1.5 }}>
+                Submitted {new Date(r.created_at).toLocaleDateString()}
+                {r.group_name ? ` · Group: ${r.group_name}` : ""}
+                {r.submitter_name || r.submitter_email ? ` · By: ${r.submitter_name || r.submitter_email}` : ""}
               </div>
+              <CourseChangeSummary req={r} />
               <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                 <button style={{ ...btn(true), fontSize: 12, opacity: busyId === r.id ? 0.5 : 1 }} disabled={busyId === r.id} onClick={() => approveCourseEdit(r)}>Approve globally</button>
                 <button style={{ ...btn(false), fontSize: 12, opacity: busyId === r.id ? 0.5 : 1 }} disabled={busyId === r.id} onClick={() => rejectCourseEdit(r)}>Reject global change</button>
