@@ -1241,6 +1241,50 @@ export function HelpPage({ isAdmin }: { isAdmin: boolean }) {
           As an app admin you can mark courses as vetted community courses (the ★), adjust any player's handicap, edit scores, and review the <b>Activity</b> tab — an audit trail of major changes across the app.
         </Section>
       )}
+
+      <UpdateChecker />
+    </div>
+  );
+}
+
+// Manual "check for updates" — a reliable escape hatch so getting the newest
+// version never depends solely on automatic detection. Forces the browser to
+// re-fetch the service worker; if a new one is waiting, activates it and reloads.
+function UpdateChecker() {
+  const [status, setStatus] = React.useState<string>("");
+  const check = async () => {
+    setStatus("Checking…");
+    try {
+      if (!("serviceWorker" in navigator)) { setStatus("Updates not supported on this browser."); return; }
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) { setStatus("No app install detected — you're on the web version, which is always current."); return; }
+      await reg.update();
+      // Give the browser a moment to fetch/install any new worker.
+      await new Promise((r) => setTimeout(r, 1200));
+      const waiting = reg.waiting;
+      if (waiting) {
+        setStatus("New version found — updating…");
+        waiting.postMessage("SKIP_WAITING"); // controllerchange handler reloads
+      } else if (reg.installing) {
+        setStatus("Downloading the new version… it'll apply in a moment.");
+        reg.installing.addEventListener("statechange", function onsc() {
+          if (reg.waiting) { reg.waiting.postMessage("SKIP_WAITING"); }
+        });
+      } else {
+        setStatus("You're on the latest version.");
+      }
+    } catch {
+      setStatus("Couldn't check right now — try again in a moment.");
+    }
+  };
+  return (
+    <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>
+      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 700 }}>App version &amp; updates</div>
+      <div style={{ color: C.sage, fontSize: 13, marginTop: 8, lineHeight: 1.55 }}>
+        Installed as an app? Tap below to pull the newest version. (The web version in a browser is always current automatically.)
+      </div>
+      <button style={{ ...btn(true), marginTop: 12, fontSize: 13 }} onClick={check}>Check for updates</button>
+      {status ? <div style={{ color: C.cream, fontSize: 12, marginTop: 10 }}>{status}</div> : null}
     </div>
   );
 }
