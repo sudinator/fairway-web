@@ -50,7 +50,7 @@ type CourseEditRequest = {
   proposed_data: Course;
   reason?: string | null;
   change_summary?: string | null;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "approved" | "group_only" | "rejected_removed" | "rejected";
   created_at: string;
   current_course?: LibCourse | null;
   group_name?: string | null;
@@ -395,8 +395,14 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
       await supabase.from("course_change_requests")
         .update({ status: "approved", reviewed_by: user.id, reviewed_at: new Date().toISOString() })
         .eq("id", req.id);
-      await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_edit_approved", group_id: req.group_id, summary: `Approved global course edit for "${courseLabel(proposed)}"` });
-      setMsg("Course edit approved globally.");
+      // Once the global record matches the proposal, the submitting group's local
+      // override is no longer needed. Removing it prevents duplicate/confusing state.
+      await supabase.from("group_course_overrides")
+        .delete()
+        .eq("group_id", req.group_id)
+        .eq("course_id", req.course_id);
+      await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_edit_approved_global", group_id: req.group_id, summary: `Approved global course edit for "${courseLabel(proposed)}"` });
+      setMsg("Course edit approved globally. The local group override was cleared because the global record now matches it.");
       await load();
     } catch (e: any) {
       setMsg("Couldn't approve edit: " + (e.message || "error"));
@@ -405,19 +411,43 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
     }
   };
 
-  const rejectCourseEdit = async (req: CourseEditRequest) => {
+  const keepCourseEditGroupOnly = async (req: CourseEditRequest) => {
     if (!isAdmin) return;
     setBusyId(req.id); setMsg(null);
     try {
       const { error } = await supabase.from("course_change_requests")
-        .update({ status: "rejected", reviewed_by: user.id, reviewed_at: new Date().toISOString() })
+        .update({ status: "group_only", reviewed_by: user.id, reviewed_at: new Date().toISOString() })
         .eq("id", req.id);
       if (error) throw error;
-      await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_edit_rejected", group_id: req.group_id, summary: `Rejected global course edit for "${req.proposed_name}"` });
-      setMsg("Course edit rejected. The submitting group keeps its group-specific correction.");
+      await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_edit_kept_group_only", group_id: req.group_id, summary: `Kept course edit for "${req.proposed_name}" in the submitting group only` });
+      setMsg("Course edit kept for the submitting group only. The global course record was not changed.");
       await load();
     } catch (e: any) {
-      setMsg("Couldn't reject edit: " + (e.message || "error"));
+      setMsg("Couldn't keep edit group-only: " + (e.message || "error"));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const rejectAndRemoveCourseEdit = async (req: CourseEditRequest) => {
+    if (!isAdmin) return;
+    if (!confirm(`Reject this course edit and remove the local override for ${req.group_name || "the submitting group"}?\n\nThe group will revert to the current global course data.`)) return;
+    setBusyId(req.id); setMsg(null);
+    try {
+      const { error: delErr } = await supabase.from("group_course_overrides")
+        .delete()
+        .eq("group_id", req.group_id)
+        .eq("course_id", req.course_id);
+      if (delErr) throw delErr;
+      const { error } = await supabase.from("course_change_requests")
+        .update({ status: "rejected_removed", reviewed_by: user.id, reviewed_at: new Date().toISOString() })
+        .eq("id", req.id);
+      if (error) throw error;
+      await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_edit_rejected_removed", group_id: req.group_id, summary: `Rejected course edit for "${req.proposed_name}" and removed the group override` });
+      setMsg("Course edit rejected and the submitting group's override was removed.");
+      await load();
+    } catch (e: any) {
+      setMsg("Couldn't reject and remove override: " + (e.message || "error"));
     } finally {
       setBusyId(null);
     }
@@ -503,7 +533,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 14, marginTop: 14 }}>
           <Eyebrow>PENDING GLOBAL COURSE EDITS ({pendingEdits.length})</Eyebrow>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
-            Members can correct a course for their own group immediately. Approve here only when the correction should become the global course record for every group.
+            Members can correct a course for their own group immediately. Choose whether to promote the correction globally, keep it only for that group, or reject it and remove the group override.
           </div>
           {pendingEdits.map((r) => (
             <div key={r.id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
@@ -516,7 +546,8 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
               <CourseChangeSummary req={r} />
               <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                 <button style={{ ...btn(true), fontSize: 12, opacity: busyId === r.id ? 0.5 : 1 }} disabled={busyId === r.id} onClick={() => approveCourseEdit(r)}>Approve globally</button>
-                <button style={{ ...btn(false), fontSize: 12, opacity: busyId === r.id ? 0.5 : 1 }} disabled={busyId === r.id} onClick={() => rejectCourseEdit(r)}>Reject global change</button>
+                <button style={{ ...btn(false), fontSize: 12, opacity: busyId === r.id ? 0.5 : 1 }} disabled={busyId === r.id} onClick={() => keepCourseEditGroupOnly(r)}>Keep changes in group only</button>
+                <button style={{ ...btn(false), background: "#7A2F28", fontSize: 12, opacity: busyId === r.id ? 0.5 : 1 }} disabled={busyId === r.id} onClick={() => rejectAndRemoveCourseEdit(r)}>Reject and remove override</button>
               </div>
             </div>
           ))}

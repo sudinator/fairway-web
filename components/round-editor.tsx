@@ -77,6 +77,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [favMsg, setFavMsg] = useState<string | null>(null);
+  const [courseCorrectionReason, setCourseCorrectionReason] = useState("");
   const isResumed = !!round.id || draftHasScores(round);
   // Server-side backup: the DB round id once a background save has created it.
   const dbIdRef = React.useRef<string>(round.id || "");
@@ -141,6 +142,10 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   // warned it's been improved rather than treating it as a different course.
   const saveCorrectedFavorite = async () => {
     setFavMsg(null);
+    if (!courseCorrectionReason.trim()) {
+      setFavMsg("Please add a reason for this course correction so an admin can review it.");
+      return;
+    }
     const coursePar = holes.reduce((s, h) => s + h.par, 0);
     const newHoles = holes.map((h) => ({ n: h.hole_number, par: h.par, si: h.stroke_index }));
     const siErr = validateStrokeIndexes(newHoles.map((h) => ({ n: h.n, si: h.si })));
@@ -203,7 +208,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         await supabase.from("course_change_requests").insert({
           course_id: courseId, group_id: round.group_id, submitted_by: authUser.user?.id || null,
           proposed_name: round.course, proposed_location: course.location, proposed_data: course,
-          reason: "Course correction saved from Round Editor after entering or correcting hole details.",
+          reason: courseCorrectionReason.trim(),
           change_summary: "Course correction saved from Round Editor. Review proposed course details against the current global course.",
           status: "pending",
         });
@@ -389,6 +394,16 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         }}
       />
       {err && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{err}</div>}
+      <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 14 }}>
+        <label style={{ color: C.sage, fontSize: 12 }}>Reason for course correction <span style={{ color: C.gold }}>(required before saving course changes)</span></label>
+        <textarea
+          style={{ ...inputStyle, marginTop: 4, minHeight: 70, resize: "vertical" }}
+          value={courseCorrectionReason}
+          placeholder="Example: The scorecard shows hole 7 is now a par 5, or the stroke indexes were corrected from the club scorecard."
+          onChange={(e) => setCourseCorrectionReason(e.target.value)}
+        />
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>This reason is sent with the course correction request so app admins know what changed and why.</div>
+      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 16, flexWrap: "wrap" }}>
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 24, fontWeight: 700 }}>
           {anyPlayed ? `${strokesOf(live)} (${toParStr(diffOf(live))}) · ${ptsOf(live)} pts` : "Enter scores above"}

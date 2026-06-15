@@ -33,6 +33,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   const [favorites, setFavorites] = useState<{ id: string; name: string; location: string; data: Course }[]>([]);
   const [favSaving, setFavSaving] = useState(false);
   const [favMsg, setFavMsg] = useState<string | null>(null);
+  const [courseReason, setCourseReason] = useState("");
   // tee override
   const [editingTee, setEditingTee] = useState(false);
   const [loadedFavId, setLoadedFavId] = useState<string | null>(null);
@@ -102,6 +103,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
         data: picked,
       };
       if (courseId) {
+        if (!courseReason.trim()) { setFavMsg("Please add a reason for this course correction so an admin can review it."); setFavSaving(false); return; }
         // Do not overwrite the global course record. Save this version for the
         // current group and submit it for admin review before other groups see it.
         const proposed = { ...picked, corrected: true };
@@ -119,7 +121,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
         await supabase.from("course_change_requests").insert({
           course_id: courseId, group_id: activeGroupId, submitted_by: authUser.user?.id || null,
           proposed_name: picked.name, proposed_location: picked.location, proposed_data: proposed,
-          reason: "Course correction saved from New Round setup.",
+          reason: courseReason.trim(),
           change_summary: "Course correction saved from New Round setup. Review proposed course details against the current global course.",
           status: "pending",
         });
@@ -144,6 +146,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   // Update the favorite that's currently loaded with the latest edits.
   const updateFavorite = async () => {
     if (!picked || !loadedFavId) return;
+    if (!courseReason.trim()) { setFavMsg("Please add a reason for this course correction so an admin can review it."); return; }
     setFavSaving(true); setFavMsg(null);
     try {
       const proposed = { ...picked, corrected: true };
@@ -154,7 +157,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
       const { data: authUser } = await supabase.auth.getUser();
       await supabase.from("course_change_requests").insert({
         course_id: loadedFavId, group_id: activeGroupId, submitted_by: authUser.user?.id || null, proposed_name: picked.name, proposed_location: picked.location, proposed_data: proposed,
-        reason: "Course correction saved from New Round setup.",
+        reason: courseReason.trim(),
         change_summary: "Course correction saved from New Round setup. Review proposed course details against the current global course.",
         status: "pending",
       });
@@ -593,6 +596,19 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
               <div style={{ color: C.sage, fontSize: 12, marginTop: 10 }}>Enter each hole's score on the next screen.</div>
             )}
           </div>
+
+          {picked && (
+            <div style={{ marginTop: 14 }}>
+              <label style={{ color: C.sage, fontSize: 12 }}>Reason for course correction <span style={{ color: C.gold }}>(required when saving changes to an existing course)</span></label>
+              <textarea
+                style={{ ...inputStyle, marginTop: 4, minHeight: 70, resize: "vertical" }}
+                value={courseReason}
+                placeholder="Example: The scorecard shows hole 7 is now a par 5, or the blue tee slope was rerated to 131."
+                onChange={(e) => setCourseReason(e.target.value)}
+              />
+              <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>This is shown to app admins when they review whether the correction should become global.</div>
+            </div>
+          )}
 
           <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
             <button style={btn(false)} onClick={() => { setPicked(null); setFavMsg(null); setLoadedFavId(null); }}>‹ Change course</button>
