@@ -5,11 +5,17 @@
 // network-first with a cache fallback, so users get fresh code when online and a
 // working shell when offline.
 
-const CACHE = "bnn-shell-v1";
+const CACHE = "bnn-shell-v2";
 
 self.addEventListener("install", (event) => {
   // Activate immediately on first install.
   self.skipWaiting();
+});
+
+// Allow the page to tell a waiting worker to activate now (used by the
+// "update available" prompt so users get the new version without closing tabs).
+self.addEventListener("message", (event) => {
+  if (event.data === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {

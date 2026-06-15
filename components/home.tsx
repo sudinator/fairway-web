@@ -16,6 +16,7 @@ import { Dashboard } from "@/components/dashboard";
 import { RoundsList } from "@/components/rounds-list";
 import { GroupsPanel } from "@/components/groups";
 import { InstallHint } from "@/components/install-hint";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 
 import type { AppGroup } from "@/lib/groups";
 
@@ -230,6 +231,7 @@ export function Home({ session }: { session: any }) {
   return (
     <>
       <InstallHint />
+      <PullToRefresh onRefresh={async () => { await Promise.all([loadProfile(), loadGroups(), loadRounds()]); }}>
       <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 96px" }}>
       {/* Line 1: logo + active group (display only — change it in the Groups tab) */}
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
@@ -385,6 +387,7 @@ export function Home({ session }: { session: any }) {
         </>
       )}
       </div>
+      </PullToRefresh>
     </>
   );
 }
