@@ -31,7 +31,7 @@ export const viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, background: "#0E3B2E", fontFamily: "-apple-system, 'Segoe UI', Roboto, sans-serif" }}>
+      <body style={{ margin: 0, background: "#0E3B2E", fontFamily: "-apple-system, 'Segoe UI', Roboto, sans-serif", paddingTop: "env(safe-area-inset-top)" }}>
         <RegisterSW />
         {children}
       </body>
