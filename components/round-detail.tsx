@@ -94,9 +94,9 @@ function GhinPanel({ round, ghinNumber, playerName }: { round: Round; ghinNumber
   ].filter(Boolean).join("\n");
 
   const field = (label: string, value: string, key: string) => (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: `1px solid ${C.greenMid}` }}>
-      <div style={{ color: C.cream, opacity: 0.85, fontSize: 13, width: 120 }}>{label}</div>
-      <div style={{ color: "#FFFFFF", fontSize: 15, fontWeight: 800, flex: 1 }}>{value}</div>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: `1px solid ${C.line}` }}>
+      <div style={{ color: "#5A6B62", fontSize: 13, width: 120 }}>{label}</div>
+      <div style={{ color: "#16201C", fontSize: 15, fontWeight: 800, flex: 1 }}>{value}</div>
       <button style={{ ...btn(false), fontSize: 11, padding: "4px 10px" }} onClick={() => copy(key, value)}>{copied === key ? "✓ Copied" : "Copy"}</button>
     </div>
   );
