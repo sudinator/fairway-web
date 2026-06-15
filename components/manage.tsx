@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { C, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes } from "@/lib/golf";
-import { buildCustomCourse, Course, CourseHole, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
+import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, NumPicker } from "@/components/ui";
 
@@ -54,7 +54,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
     // This group's courses (via the group_courses link table — one shared record per course).
     const linked = await loadCoursesForGroup(supabase, activeGroupId);
     const list = linked
-      .map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", user_id: f.user_id, data: normalize(f.data), vetted: !!f.vetted }));
+      .map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", user_id: f.user_id, data: { ...normalize(f.data), club: f.data?.club || f.facility || "", externalId: f.data?.externalId || f.external_id || null, corrected: f.data?.corrected || f.corrected || false }, vetted: !!f.vetted }));
     list.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
     setCourses(list);
 
@@ -63,7 +63,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
     const { data: vet } = await supabase.from("favorite_courses").select("*").eq("vetted", true).order("name");
     const vlist = (vet || [])
       .filter((f: any) => !f.deleted && !linkedIds.has(f.id))
-      .map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", user_id: f.user_id, data: normalize(f.data), vetted: true }));
+      .map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", user_id: f.user_id, data: { ...normalize(f.data), club: f.data?.club || f.facility || "", externalId: f.data?.externalId || f.external_id || null, corrected: f.data?.corrected || f.corrected || false }, vetted: true }));
     vlist.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
     setCommunity(vlist);
 
@@ -83,7 +83,38 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
     await load();
   };
 
-  // Add a vetted community course to this group BY REFERENCE (one shared record, no copy).
+  // Admin: re-fetch facility name (and refreshed detail) from the golf course API
+  // for every course that has a real canonical id, filling in the "Facility —
+  // Layout" naming for courses saved before facility was captured. Skips courses
+  // whose external_id isn't a real API id (e.g. hand-corrected ones).
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshFacilities = async () => {
+    if (refreshing) return;
+    setRefreshing(true); setMsg(null);
+    const all = [...(courses || [])];
+    let updated = 0, skipped = 0, failed = 0;
+    for (const c of all) {
+      const ext = c.data?.externalId;
+      // Only real numeric API ids can be looked up.
+      if (!ext || !/^\d+$/.test(String(ext))) { skipped++; continue; }
+      try {
+        const res = await fetch(`/api/courses?id=${encodeURIComponent(String(ext))}`);
+        const j = await res.json();
+        const fetched = j.course;
+        if (!fetched || !fetched.club) { failed++; continue; }
+        const newData = { ...c.data, club: fetched.club, externalId: String(ext) };
+        const { error } = await supabase.from("favorite_courses")
+          .update({ facility: fetched.club, data: newData }).eq("id", c.id);
+        if (error) { failed++; continue; }
+        updated++;
+      } catch { failed++; }
+    }
+    setRefreshing(false);
+    setMsg(`Refreshed ${updated} course${updated === 1 ? "" : "s"}${skipped ? ` · ${skipped} skipped (no API id)` : ""}${failed ? ` · ${failed} couldn't be fetched` : ""}.`);
+    await load();
+  };
+
+
   const addToMyGroup = async (c: LibCourse) => {
     setBusyId(c.id); setMsg(null);
     await linkCourseToGroup(supabase, activeGroupId, c.id, user.id);
@@ -122,6 +153,12 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
         {isAdmin ? " As an app admin, tap the ★ to mark a course as a vetted community course available to every group." : ""}
       </div>
 
+      {isAdmin && (
+        <button style={{ ...btn(false), marginTop: 10, fontSize: 12, opacity: refreshing ? 0.6 : 1 }} disabled={refreshing} onClick={refreshFacilities}>
+          {refreshing ? "Refreshing facility names…" : "↻ Refresh facility names from API"}
+        </button>
+      )}
+
       {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
 
       {courses === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
@@ -141,7 +178,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
           )}
           <button onClick={() => setEditing({ id: c.id, data: c.data, user_id: c.user_id })}
             style={{ flex: 1, textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: "13px 16px" }}>
-            <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{c.name}{c.vetted ? <span style={{ color: C.gold, fontSize: 12 }}> · community ★</span> : null}</div>
+            <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{courseLabel(c.data)}{c.vetted ? <span style={{ color: C.gold, fontSize: 12 }}> · community ★</span> : null}{c.data?.corrected ? <span style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}> · ⚑ corrected</span> : null}</div>
             <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
               {c.location ? c.location + " · " : ""}{c.data.tees?.length || 0} tee{(c.data.tees?.length || 0) === 1 ? "" : "s"} · tap to edit
             </div>
@@ -171,7 +208,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
               return (
                 <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, background: C.card, borderRadius: 12, padding: "12px 16px", flexWrap: "wrap" }}>
                   <div style={{ flex: 1, minWidth: 160 }}>
-                    <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{c.name}</div>
+                    <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{courseLabel(c.data)}</div>
                     <div style={{ color: C.faint, fontSize: 12 }}>{c.location ? c.location + " · " : ""}{c.data.tees?.length || 0} tee{(c.data.tees?.length || 0) === 1 ? "" : "s"}</div>
                   </div>
                   {inGroup ? (

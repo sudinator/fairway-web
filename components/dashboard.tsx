@@ -116,6 +116,14 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
 
   return (
     <div>
+      {done.length === 0 && (
+        <div style={{ background: C.greenLight, borderRadius: 14, padding: 20, marginBottom: 12 }}>
+          <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 20 }}>Welcome to Birdie Num Num</div>
+          <div style={{ color: C.sage, fontSize: 13, marginTop: 8, lineHeight: 1.55 }}>
+            Log a round to start tracking your handicap, scoring trends, and stats. Tap <b style={{ color: C.cream }}>＋ New round</b> up top — full hole-by-hole for stats like GIR and putts, or a quick total for a past round. Your numbers below fill in as you play.
+          </div>
+        </div>
+      )}
       <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginBottom: 12, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
         <div>
           <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 700 }}>RUNNING HANDICAP INDEX</div>

@@ -11,11 +11,25 @@ export type CourseTee = { name: string; rating: number; slope: number; par: numb
 export type CourseHole = { n: number; par: number; si: number | null };
 export type Course = {
   id: string;
-  name: string;
+  externalId?: string | null; // golfcourseapi canonical course id — anchors dedup
+  club?: string;              // facility name (e.g., "Neshanic Valley Golf Course")
+  name: string;               // layout/course name (e.g., "Meadow/Lake")
   location: string;
+  corrected?: boolean;        // locally corrected (pars/SI/rating verified by a member)
   tees: CourseTee[];
   holes: CourseHole[];
 };
+
+// Display label: "Facility — Layout" when we have a distinct facility, else just
+// the name. Keeps multi-layout facilities (e.g. Neshanic Valley) unambiguous.
+export function courseLabel(c: { club?: string | null; name: string }): string {
+  const club = (c.club || "").trim();
+  const name = (c.name || "").trim();
+  if (club && name && club.toLowerCase() !== name.toLowerCase() && !name.toLowerCase().includes(club.toLowerCase())) {
+    return `${club} — ${name}`;
+  }
+  return name || club;
+}
 
 // Standard 18-hole par-72 layout with conventional stroke-index allocation.
 function standardHoles(pars: number[]): CourseHole[] {

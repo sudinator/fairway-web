@@ -130,35 +130,67 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   };
 
   // Save the corrected par/stroke-index back as a favorite course for next time.
+  // Corrections PRESERVE the course's canonical identity (external_id) and just
+  // mark it as locally corrected, so it never loses its API id and others can be
+  // warned it's been improved rather than treating it as a different course.
   const saveCorrectedFavorite = async () => {
     setFavMsg(null);
     const coursePar = holes.reduce((s, h) => s + h.par, 0);
-    const course = {
-      id: "corrected",
-      name: round.course,
-      location: round.tee_name || "",
-      tees: [{
-        name: round.tee_name || "Default",
-        rating: round.rating ?? 72, slope: round.slope ?? 113, par: coursePar,
-      }],
-      holes: holes.map((h) => ({ n: h.hole_number, par: h.par, si: h.stroke_index })),
-    };
-    const siErr = validateStrokeIndexes(course.holes.map((h) => ({ n: h.n, si: h.si })));
+    const newHoles = holes.map((h) => ({ n: h.hole_number, par: h.par, si: h.stroke_index }));
+    const siErr = validateStrokeIndexes(newHoles.map((h) => ({ n: h.n, si: h.si })));
     if (siErr) { setFavMsg("Can't save — " + siErr); return; }
     try {
-      const { data: existing } = await supabase.from("favorite_courses").select("id").eq("name", round.course).maybeSingle();
+      // Find the existing record (by name) and keep its canonical id, facility,
+      // location, and tee list — we're only correcting pars/SI (and the tee's
+      // rating/slope for the tee actually played), not redefining the course.
+      const { data: existing } = await supabase
+        .from("favorite_courses").select("id, external_id, facility, location, data").eq("name", round.course).maybeSingle();
+
+      const prevData = (existing?.data as any) || {};
+      const prevExternalId = existing?.external_id || prevData.externalId || prevData.id || null;
+      const keepExternalId = prevExternalId && prevExternalId !== "corrected" ? String(prevExternalId) : null;
+      const prevClub = existing?.facility || prevData.club || "";
+
+      // Merge: keep prior tees, update the played tee's rating/slope/par.
+      const prevTees = Array.isArray(prevData.tees) && prevData.tees.length ? prevData.tees : [];
+      const teeName = round.tee_name || "Default";
+      let tees = prevTees.length ? prevTees.map((t: any) =>
+        t.name === teeName ? { ...t, rating: round.rating ?? t.rating, slope: round.slope ?? t.slope, par: coursePar } : t
+      ) : [{ name: teeName, rating: round.rating ?? 72, slope: round.slope ?? 113, par: coursePar }];
+      if (prevTees.length && !prevTees.some((t: any) => t.name === teeName)) {
+        tees = [...tees, { name: teeName, rating: round.rating ?? 72, slope: round.slope ?? 113, par: coursePar }];
+      }
+
+      const course = {
+        id: keepExternalId || prevData.id || "manual",
+        externalId: keepExternalId,
+        club: prevClub,
+        name: round.course,
+        location: existing?.location || prevData.location || round.tee_name || "",
+        tees,
+        holes: newHoles,
+        corrected: true, // locally improved (pars/SI/rating/slope verified by a member)
+      };
+
       let courseId = existing?.id as string | undefined;
+      const row = {
+        facility: prevClub || null,
+        external_id: keepExternalId,
+        corrected: true,
+        location: course.location,
+        data: course,
+      };
       if (courseId) {
-        const { error } = await supabase.from("favorite_courses").update({ location: round.tee_name || "", data: course }).eq("id", courseId);
+        const { error } = await supabase.from("favorite_courses").update(row).eq("id", courseId);
         if (error) throw error;
-        setFavMsg("Course library updated ★");
+        setFavMsg("Course library updated ★ (marked as corrected)");
       } else {
         const { data: created, error } = await supabase.from("favorite_courses")
-          .insert({ group_id: round.group_id || null, name: round.course, location: round.tee_name || "", data: course })
+          .insert({ group_id: round.group_id || null, name: round.course, ...row })
           .select("id").single();
         if (error || !created) throw error || new Error("save failed");
         courseId = created.id;
-        setFavMsg("Saved to course library ★");
+        setFavMsg("Saved to course library ★ (marked as corrected)");
       }
       if (round.group_id && courseId) await linkCourseToGroup(supabase, round.group_id, courseId, null);
     } catch (e: any) {

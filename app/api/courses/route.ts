@@ -104,6 +104,8 @@ function normalizeCourse(c: any) {
   });
   return {
     id: c.id,
+    externalId: c.id != null ? String(c.id) : null,
+    club: c.club_name || "",
     name: c.course_name || c.club_name,
     location: courseLocation(c),
     tees: allTees,

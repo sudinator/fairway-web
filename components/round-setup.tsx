@@ -7,7 +7,7 @@ import {
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, isGrossOnly, hasHoleDetail,
   girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay,
 } from "@/lib/golf";
-import { buildCustomCourse, Course, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
+import { buildCustomCourse, Course, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
 
@@ -40,7 +40,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   // live search state
   const [searching, setSearching] = useState(false);
   const [loadingId, setLoadingId] = useState<number | null>(null);
-  const [results, setResults] = useState<{ id: number; name: string; location: string }[] | null>(null);
+  const [results, setResults] = useState<{ id: number; club?: string; name: string; location: string }[] | null>(null);
   const [searchErr, setSearchErr] = useState<string | null>(null);
   // custom course fields
   const [cName, setCName] = useState("");
@@ -62,7 +62,12 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
           d.tees = d.tees.map((t: any) => ({ name: t.name, rating: t.rating, slope: t.slope, par: t.par }));
         }
       }
-      return { id: f.id, name: f.name, location: f.location || "", data: d };
+      return {
+        id: f.id,
+        name: f.name,
+        location: f.location || "",
+        data: { ...d, club: d.club || f.facility || "", externalId: d.externalId || f.external_id || null, corrected: d.corrected || f.corrected || false },
+      };
     }));
   };
   useEffect(() => { loadFavorites(); }, [activeGroupId]);
@@ -74,15 +79,35 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
     if (siErr) { setFavMsg("Can't save — " + siErr + " Fix it in the override panel or Courses tab."); return; }
     setFavSaving(true); setFavMsg(null);
     try {
-      const { data: existing } = await supabase.from("favorite_courses").select("id").eq("name", picked.name).maybeSingle();
-      let courseId = existing?.id as string | undefined;
+      // Dedup priority: match the canonical golf-course-API id first (so the same
+      // real course saved by anyone resolves to one row even if names differ);
+      // fall back to exact name match for manually-typed courses with no API id.
+      let existingId: string | undefined;
+      if (picked.externalId) {
+        const { data: byExt } = await supabase
+          .from("favorite_courses").select("id").eq("external_id", picked.externalId).maybeSingle();
+        existingId = byExt?.id;
+      }
+      if (!existingId) {
+        const { data: byName } = await supabase
+          .from("favorite_courses").select("id").eq("name", picked.name).maybeSingle();
+        existingId = byName?.id;
+      }
+      let courseId = existingId;
+      const row = {
+        name: picked.name,
+        facility: picked.club || null,
+        external_id: picked.externalId || null,
+        location: picked.location,
+        data: picked,
+      };
       if (courseId) {
-        const { error } = await supabase.from("favorite_courses").update({ location: picked.location, data: picked }).eq("id", courseId);
+        const { error } = await supabase.from("favorite_courses").update(row).eq("id", courseId);
         if (error) throw error;
         setFavMsg("Updated in course library ★");
       } else {
         const { data: created, error } = await supabase.from("favorite_courses")
-          .insert({ group_id: activeGroupId, name: picked.name, location: picked.location, data: picked })
+          .insert({ group_id: activeGroupId, ...row })
           .select("id").single();
         if (error || !created) throw error || new Error("save failed");
         courseId = created.id;
@@ -223,7 +248,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
       recv: alloc[h.n] || 0,
     }));
     onReady({
-      id: "", group_id: activeGroupId, group_name: activeGroupName, course: picked.name, tee_name: tee.name,
+      id: "", group_id: activeGroupId, group_name: activeGroupName, course: courseLabel(picked), tee_name: tee.name,
       rating: tee.rating, slope: tee.slope, course_par: coursePar,
       handicap_index: idxVal, course_handicap: realCH,
       played_at: playDate,
@@ -242,14 +267,14 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
     const coursePar = picked.holes.reduce((s, h) => s + (h.par || 0), 0);
     const { data: u } = await supabase.auth.getUser();
     const { error } = await supabase.from("rounds").insert({
-      user_id: u.user!.id, group_id: activeGroupId, course: picked.name, tee_name: tee.name,
+      user_id: u.user!.id, group_id: activeGroupId, course: courseLabel(picked), tee_name: tee.name,
       rating: tee.rating, slope: tee.slope, course_par: coursePar,
       handicap_index: idxVal, course_handicap: realCH,
       played_at: playDate, gross_score: g,
     });
     setGrossSaving(false);
     if (error) { setGrossErr("Couldn't save: " + error.message); return; }
-    await logActivity(supabase, { actor_id: u.user!.id, actor_name: u.user?.email || "A player", action: "round_completed", group_id: activeGroupId, summary: `Logged a round at ${picked.name} (${g})` });
+    await logActivity(supabase, { actor_id: u.user!.id, actor_name: u.user?.email || "A player", action: "round_completed", group_id: activeGroupId, summary: `Logged a round at ${courseLabel(picked)} (${g})` });
     onCancel(); // back to home; dashboard reloads
   };
 
@@ -269,7 +294,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
                   <button onClick={() => { setPicked(f.data); setTeeIdx(0); setLoadedFavId(f.id); setEditingTee(false); setFavMsg(null); }}
                     style={{ flex: 1, textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: "12px 14px" }}>
                     <span style={{ color: C.gold, fontWeight: 800 }}>★ </span>
-                    <span style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{f.name}</span>
+                    <span style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{courseLabel(f.data)}</span>
                     {f.location ? <span style={{ color: C.faint, fontSize: 13 }}> · {f.location}</span> : null}
                   </button>
                   <button title="Remove from favorites"
@@ -304,14 +329,31 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
           {results && results.length > 0 && (
             <div style={{ marginTop: 12 }}>
               <Eyebrow>DATABASE RESULTS</Eyebrow>
-              {results.map((c) => (
-                <button key={c.id} onClick={() => pickFromApi(c.id)} disabled={loadingId != null}
-                  style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 14px", opacity: loadingId != null && loadingId !== c.id ? 0.5 : 1 }}>
-                  <span style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{c.name}</span>
-                  {c.location ? <span style={{ color: C.faint, fontSize: 13 }}> · {c.location}</span> : null}
-                  {loadingId === c.id ? <span style={{ color: C.gold, fontSize: 12 }}> · loading…</span> : null}
-                </button>
-              ))}
+              {results.map((c) => {
+                // Already in this group's library? (match canonical id). If so, show
+                // a marker and load the SAVED copy (keeps any pars/SI edits) instead
+                // of re-fetching + re-adding a duplicate.
+                const existing = favorites.find((f) => f.data?.externalId && String(f.data.externalId) === String(c.id));
+                return (
+                  <button key={c.id}
+                    onClick={() => {
+                      if (existing) { setPicked(existing.data); setTeeIdx(0); setLoadedFavId(existing.id); setEditingTee(false); setFavMsg("Loaded from your library ★"); }
+                      else pickFromApi(c.id);
+                    }}
+                    disabled={loadingId != null}
+                    style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.card, border: `1px solid ${existing ? C.gold : C.line}`, borderRadius: 10, padding: "12px 14px", opacity: loadingId != null && loadingId !== c.id ? 0.5 : 1 }}>
+                    <span style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{courseLabel(c)}</span>
+                    {c.location ? <span style={{ color: C.faint, fontSize: 13 }}> · {c.location}</span> : null}
+                    {existing ? <span style={{ color: C.gold, fontSize: 12, fontWeight: 700 }}> · ✓ in your library</span> : null}
+                    {loadingId === c.id ? <span style={{ color: C.gold, fontSize: 12 }}> · loading…</span> : null}
+                    {existing?.data?.corrected ? (
+                      <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
+                        ⚑ Your group already has this course, with member-verified pars/stroke index. Tap to use that version — don't re-add it.
+                      </div>
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -380,7 +422,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
 
       {picked && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 14 }}>
-          <div style={{ color: C.cream, fontWeight: 800, fontSize: 16 }}>{picked.name}</div>
+          <div style={{ color: C.cream, fontWeight: 800, fontSize: 16 }}>{courseLabel(picked)}</div>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{picked.location}</div>
           <div style={{ marginTop: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

@@ -218,46 +218,49 @@ function GameList({
 
   return (
     <div>
-      <div style={{ background: C.greenLight, borderRadius: 14, padding: 18 }}>
-        <Eyebrow>JOIN A GAME</Eyebrow>
-        <div style={{ color: C.sage, fontSize: 13, marginTop: 8 }}>
-          Enter the 6-digit code a friend shared with you.
-        </div>
-        <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-          <input
-            style={{ ...inputStyle, letterSpacing: 3, fontWeight: 700 }}
-            value={code}
-            placeholder="123456"
-            maxLength={6}
-            inputMode="numeric"
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-            onKeyDown={(e) => e.key === "Enter" && join()}
-          />
-          <button
-            style={{
-              ...btn(true),
-              whiteSpace: "nowrap",
-              opacity: code.trim() ? 1 : 0.5,
-            }}
-            disabled={!code.trim() || joining}
-            onClick={join}
-          >
-            {joining ? "Joining…" : "Join"}
-          </button>
-        </div>
-        {joinErr && (
-          <div style={{ color: "#E8A199", fontSize: 13, marginTop: 8 }}>
-            {joinErr}
+      {/* Two clear paths: start a game (you organize) vs join one (someone shared a code). */}
+      <Eyebrow>GAMES</Eyebrow>
+      <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 240px", background: C.greenLight, borderRadius: 14, padding: 18, display: "flex", flexDirection: "column" }}>
+          <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 700 }}>Start a game</div>
+          <div style={{ color: C.sage, fontSize: 13, marginTop: 6, lineHeight: 1.5, flex: 1 }}>
+            Set up a Stableford, singles match, or four-ball. You'll get a 6-digit code to share so others can join.
           </div>
-        )}
+          <button style={{ ...btn(true), marginTop: 12 }} onClick={onCreate}>＋ Start a game</button>
+        </div>
+        <div style={{ flex: "1 1 240px", background: C.greenLight, borderRadius: 14, padding: 18, display: "flex", flexDirection: "column" }}>
+          <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 700 }}>Join with a code</div>
+          <div style={{ color: C.sage, fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>
+            Enter the 6-digit code a friend shared with you.
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+            <input
+              style={{ ...inputStyle, letterSpacing: 3, fontWeight: 700 }}
+              value={code}
+              placeholder="123456"
+              maxLength={6}
+              inputMode="numeric"
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              onKeyDown={(e) => e.key === "Enter" && join()}
+            />
+            <button
+              style={{ ...btn(false), whiteSpace: "nowrap", opacity: code.trim() ? 1 : 0.5 }}
+              disabled={!code.trim() || joining}
+              onClick={join}
+            >
+              {joining ? "Joining…" : "Join"}
+            </button>
+          </div>
+          {joinErr && (
+            <div style={{ color: "#E8A199", fontSize: 13, marginTop: 8 }}>
+              {joinErr}
+            </div>
+          )}
+        </div>
       </div>
 
       <div style={{ display: "flex", alignItems: "center", marginTop: 22 }}>
         <Eyebrow>YOUR GAMES</Eyebrow>
-        <div style={{ flex: 1 }} />
-        <button style={btn(true)} onClick={onCreate}>
-          ＋ Create game
-        </button>
       </div>
 
       {games === null && (
@@ -274,8 +277,7 @@ function GameList({
             textAlign: "center",
           }}
         >
-          No games yet. Create one and share the code, or join with a friend's
-          code above.
+          No games yet. Use <b style={{ color: C.cream }}>Start a game</b> above to create one, or <b style={{ color: C.cream }}>Join with a code</b> if a friend shared one.
         </div>
       )}
       {games?.map((g) => (
