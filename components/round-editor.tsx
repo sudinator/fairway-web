@@ -199,9 +199,13 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
           updated_at: new Date().toISOString(),
         }, { onConflict: "group_id,course_id" });
         if (overrideErr) throw overrideErr;
+        const { data: authUser } = await supabase.auth.getUser();
         await supabase.from("course_change_requests").insert({
-          course_id: courseId, group_id: round.group_id, submitted_by: null,
-          proposed_name: round.course, proposed_location: course.location, proposed_data: course, status: "pending",
+          course_id: courseId, group_id: round.group_id, submitted_by: authUser.user?.id || null,
+          proposed_name: round.course, proposed_location: course.location, proposed_data: course,
+          reason: "Course correction saved from Round Editor after entering or correcting hole details.",
+          change_summary: "Course correction saved from Round Editor. Review proposed course details against the current global course.",
+          status: "pending",
         });
         setFavMsg("Course updated for this group ★ (global review pending)");
       } else {

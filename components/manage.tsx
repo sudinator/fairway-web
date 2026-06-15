@@ -48,6 +48,8 @@ type CourseEditRequest = {
   proposed_name: string;
   proposed_location: string | null;
   proposed_data: Course;
+  reason?: string | null;
+  change_summary?: string | null;
   status: "pending" | "approved" | "rejected";
   created_at: string;
   current_course?: LibCourse | null;
@@ -80,6 +82,35 @@ function changeLine(label: string, before: any, after: any): string | null {
   return `${label}: ${b} → ${a}`;
 }
 
+function holeNumber(h: any, fallback: number): number {
+  const n = Number(h?.n ?? h?.hole_number ?? h?.holeNumber ?? fallback);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function holeStrokeIndex(h: any): number | null {
+  const v = h?.si ?? h?.stroke_index ?? h?.strokeIndex ?? h?.handicap ?? null;
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeHolesForDiff(holes: any[] | undefined | null): { n: number; par: any; si: any }[] {
+  return (holes || []).map((h, i) => ({
+    n: holeNumber(h, i + 1),
+    par: h?.par ?? null,
+    si: holeStrokeIndex(h),
+  }));
+}
+
+function normalizeTeesForDiff(tees: any[] | undefined | null): any[] {
+  return (tees || []).map((t) => ({
+    name: t?.name ?? t?.tee_name ?? t?.teeName ?? "",
+    rating: t?.rating ?? t?.course_rating ?? t?.courseRating ?? null,
+    slope: t?.slope ?? t?.slope_rating ?? t?.slopeRating ?? null,
+    par: t?.par ?? t?.par_total ?? t?.parTotal ?? null,
+  }));
+}
+
 function courseChangeLines(current: Course | null | undefined, proposed: Course | null | undefined): string[] {
   if (!proposed) return ["No proposed course data was included with this request."];
   if (!current) return ["New or missing global baseline — review the proposed course details before approval."];
@@ -89,15 +120,17 @@ function courseChangeLines(current: Course | null | undefined, proposed: Course 
 
   add(changeLine("Display name", courseLabel(current), courseLabel(proposed)));
   add(changeLine("Location", current.location, proposed.location));
-  add(changeLine("Facility", current.club, proposed.club));
+  add(changeLine("Facility", (current as any).club, (proposed as any).club));
   add(changeLine("Layout/course name", current.name, proposed.name));
 
-  const maxTees = Math.max(current.tees?.length || 0, proposed.tees?.length || 0);
+  const currentTees = normalizeTeesForDiff((current as any).tees);
+  const proposedTees = normalizeTeesForDiff((proposed as any).tees);
+  const maxTees = Math.max(currentTees.length, proposedTees.length);
   for (let i = 0; i < maxTees; i++) {
-    const before = current.tees?.[i];
-    const after = proposed.tees?.[i];
+    const before = currentTees[i];
+    const after = proposedTees[i];
     const label = after?.name || before?.name || `Tee ${i + 1}`;
-    if (!before && after) { lines.push(`Added tee ${label}: rating ${after.rating}, slope ${after.slope}, par ${after.par}`); continue; }
+    if (!before && after) { lines.push(`Added tee ${label}: rating ${after.rating ?? "—"}, slope ${after.slope ?? "—"}, par ${after.par ?? "—"}`); continue; }
     if (before && !after) { lines.push(`Removed tee ${label}`); continue; }
     if (!before || !after) continue;
     add(changeLine(`${label} tee name`, before.name, after.name));
@@ -106,31 +139,53 @@ function courseChangeLines(current: Course | null | undefined, proposed: Course 
     add(changeLine(`${label} par`, before.par, after.par));
   }
 
-  const byCurrentHole = new Map((current.holes || []).map((h) => [h.n, h]));
-  const byProposedHole = new Map((proposed.holes || []).map((h) => [h.n, h]));
+  const currentHoles = normalizeHolesForDiff((current as any).holes);
+  const proposedHoles = normalizeHolesForDiff((proposed as any).holes);
+  const byCurrentHole = new Map(currentHoles.map((h) => [h.n, h]));
+  const byProposedHole = new Map(proposedHoles.map((h) => [h.n, h]));
   const holeNums = Array.from(new Set([...Array.from(byCurrentHole.keys()), ...Array.from(byProposedHole.keys())])).sort((a, b) => a - b);
   for (const n of holeNums) {
     const before = byCurrentHole.get(n);
     const after = byProposedHole.get(n);
-    if (!before && after) { lines.push(`Added hole ${n}: par ${after.par}, S.I. ${after.si ?? "—"}`); continue; }
+    if (!before && after) { lines.push(`Added hole ${n}: par ${after.par ?? "—"}, S.I. ${after.si ?? "—"}`); continue; }
     if (before && !after) { lines.push(`Removed hole ${n}`); continue; }
     if (!before || !after) continue;
     add(changeLine(`Hole ${n} par`, before.par, after.par));
     add(changeLine(`Hole ${n} stroke index`, before.si ?? "—", after.si ?? "—"));
   }
 
-  return lines.length ? lines : ["No material field changes detected versus the current global course record."];
+  const fallbackChanged = JSON.stringify(current) !== JSON.stringify(proposed);
+  return lines.length ? lines : [fallbackChanged ? "Underlying course data changed, but no mapped field-level difference was detected. Review the side-by-side course details before approval." : "No material field changes detected versus the current global course record."];
+}
+
+function buildCourseChangeSummary(current: Course | null | undefined, proposed: Course | null | undefined): string {
+  return courseChangeLines(current, proposed).join("\n").slice(0, 4000);
+}
+
+function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return "Unknown time";
+  return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function CourseChangeSummary({ req }: { req: CourseEditRequest }) {
   const current = req.current_course?.data || null;
   const proposed = req.proposed_data || null;
   const lines = courseChangeLines(current, proposed);
-  const visible = lines.slice(0, 18);
+  const visible = lines.slice(0, 30);
   const extra = Math.max(0, lines.length - visible.length);
+  const submitter = req.submitter_name || req.submitter_email || "Unknown user";
 
   return (
     <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
+      <div style={{ background: "#F7F3E8", borderRadius: 10, padding: 10, border: `1px solid ${C.line}` }}>
+        <div style={{ color: C.green, fontSize: 11, letterSpacing: 1.5, fontWeight: 800, marginBottom: 6 }}>SUBMISSION DETAILS</div>
+        <div style={{ color: C.ink, fontSize: 13, lineHeight: 1.6 }}>
+          <div><b>Submitted by:</b> {submitter}</div>
+          <div><b>Group:</b> {req.group_name || "Unknown group"}</div>
+          <div><b>Submitted at:</b> {formatDateTime(req.created_at)}</div>
+          <div><b>Reason:</b> {req.reason?.trim() || "No reason provided."}</div>
+        </div>
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
         <div style={{ background: C.cream, borderRadius: 10, padding: 10, border: `1px solid ${C.line}` }}>
           <div style={{ color: C.faint, fontSize: 10, letterSpacing: 1.5, fontWeight: 800 }}>CURRENT GLOBAL</div>
@@ -211,7 +266,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
     if (admin) {
       const { data: edits } = await supabase
         .from("course_change_requests")
-        .select("id, course_id, group_id, submitted_by, proposed_name, proposed_location, proposed_data, status, created_at")
+        .select("id, course_id, group_id, submitted_by, proposed_name, proposed_location, proposed_data, reason, change_summary, status, created_at")
         .eq("status", "pending")
         .order("created_at", { ascending: false });
       const rows = (edits || []) as CourseEditRequest[];
@@ -454,7 +509,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
             <div key={r.id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
               <div style={{ color: C.ink, fontWeight: 800 }}>{courseLabel(r.proposed_data || ({ name: r.proposed_name } as any))}</div>
               <div style={{ color: C.faint, fontSize: 12, marginTop: 3, lineHeight: 1.5 }}>
-                Submitted {new Date(r.created_at).toLocaleDateString()}
+                Submitted {formatDateTime(r.created_at)}
                 {r.group_name ? ` · Group: ${r.group_name}` : ""}
                 {r.submitter_name || r.submitter_email ? ` · By: ${r.submitter_name || r.submitter_email}` : ""}
               </div>
@@ -594,6 +649,8 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
     return m;
   });
 
+  const [reason, setReason] = useState("");
+
   const setName = (name: string) => setCourse({ ...course, name });
   const setLoc = (location: string) => setCourse({ ...course, location });
   const updateTee = (i: number, patch: any) => setCourse({ ...course, tees: course.tees.map((t, j) => j === i ? { ...t, ...patch } : t) });
@@ -613,6 +670,8 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
 
   const save = async () => {
     if (!course.name.trim()) { setErr("Give the course a name."); return; }
+    const requiresReason = !!existingId;
+    if (requiresReason && !reason.trim()) { setErr("Please explain why this course change is needed so an admin can review it."); return; }
     const siErr = validateStrokeIndexes(course.holes.map((h) => ({ n: h.n, si: h.si })));
     if (siErr) { setErr("Can't save — " + siErr); return; }
     setSaving(true); setErr(null);
@@ -642,6 +701,8 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
           proposed_name: name,
           proposed_location: course.location || "",
           proposed_data: proposed,
+          reason: reason.trim(),
+          change_summary: buildCourseChangeSummary(null, proposed),
           status: "pending",
         });
         await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Someone", action: "course_edit_submitted", group_id: activeGroupId, summary: `Edited course "${name}" for this group and submitted it for global review` });
@@ -658,7 +719,10 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
           }, { onConflict: "group_id,course_id" });
           if (overrideErr) throw overrideErr;
           await supabase.from("course_change_requests").insert({
-            course_id: courseId, group_id: activeGroupId, submitted_by: user.id, proposed_name: name, proposed_location: course.location || "", proposed_data: proposed, status: "pending",
+            course_id: courseId, group_id: activeGroupId, submitted_by: user.id, proposed_name: name, proposed_location: course.location || "", proposed_data: proposed,
+            reason: reason.trim() || "Added a group-specific version of an existing course.",
+            change_summary: buildCourseChangeSummary(null, proposed),
+            status: "pending",
           });
         } else {
           const createdCourse = { ...course, name, location: course.location || "" };
@@ -683,6 +747,19 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
           Changes save immediately for this group and are submitted to an app admin for global approval before other groups see them.
         </div>
       )}
+      {existingId && (
+        <div style={{ marginTop: 12 }}>
+          <label style={{ color: C.sage, fontSize: 12 }}>Reason for change <span style={{ color: C.gold }}>(required)</span></label>
+          <textarea
+            style={{ ...inputStyle, marginTop: 4, minHeight: 74, resize: "vertical" }}
+            value={reason}
+            placeholder="Example: The current scorecard shows hole 7 is now a par 5, and the blue tee slope was rerated to 131."
+            onChange={(e) => setReason(e.target.value)}
+          />
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>This will be shown to app admins when they approve or reject the global course change.</div>
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
         <div style={{ flex: 2, minWidth: 200 }}>
           <label style={{ color: C.sage, fontSize: 12 }}>Course name</label>

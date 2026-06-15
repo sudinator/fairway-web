@@ -115,9 +115,13 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
           updated_at: new Date().toISOString(),
         }, { onConflict: "group_id,course_id" });
         if (overrideErr) throw overrideErr;
+        const { data: authUser } = await supabase.auth.getUser();
         await supabase.from("course_change_requests").insert({
-          course_id: courseId, group_id: activeGroupId, submitted_by: null,
-          proposed_name: picked.name, proposed_location: picked.location, proposed_data: proposed, status: "pending",
+          course_id: courseId, group_id: activeGroupId, submitted_by: authUser.user?.id || null,
+          proposed_name: picked.name, proposed_location: picked.location, proposed_data: proposed,
+          reason: "Course correction saved from New Round setup.",
+          change_summary: "Course correction saved from New Round setup. Review proposed course details against the current global course.",
+          status: "pending",
         });
         setFavMsg("Saved to this group's course library ★ (global review pending)");
       } else {
@@ -147,8 +151,12 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
         group_id: activeGroupId, course_id: loadedFavId, name: picked.name, location: picked.location, data: proposed, updated_by: null, updated_at: new Date().toISOString(),
       }, { onConflict: "group_id,course_id" });
       if (error) throw error;
+      const { data: authUser } = await supabase.auth.getUser();
       await supabase.from("course_change_requests").insert({
-        course_id: loadedFavId, group_id: activeGroupId, submitted_by: null, proposed_name: picked.name, proposed_location: picked.location, proposed_data: proposed, status: "pending",
+        course_id: loadedFavId, group_id: activeGroupId, submitted_by: authUser.user?.id || null, proposed_name: picked.name, proposed_location: picked.location, proposed_data: proposed,
+        reason: "Course correction saved from New Round setup.",
+        change_summary: "Course correction saved from New Round setup. Review proposed course details against the current global course.",
+        status: "pending",
       });
       setFavMsg("Updated for this group ★ (global review pending)");
       await loadFavorites();
