@@ -5,7 +5,7 @@
 // network-first with a cache fallback, so users get fresh code when online and a
 // working shell when offline.
 
-const SW_VERSION = "pwa-validation-123";
+const SW_VERSION = "local-20260615203739";
 const CACHE = `bnn-shell-${SW_VERSION}`;
 
 self.addEventListener("install", (event) => {

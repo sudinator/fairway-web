@@ -40,33 +40,55 @@ function normalize(d: any): Course {
 
 // ================= Shared Course Library =================
 type LibCourse = { id: string; name: string; location: string; user_id: string; data: Course; vetted?: boolean };
+type CourseTab = "group" | "all";
+
+function courseCardTitle(c: LibCourse) {
+  return courseLabel(c.data || ({ name: c.name } as any));
+}
 
 export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroupId: string }) {
-  const [courses, setCourses] = useState<LibCourse[] | null>(null);
-  const [community, setCommunity] = useState<LibCourse[] | null>(null);
+  const [groupCourses, setGroupCourses] = useState<LibCourse[] | null>(null);
+  const [allCourses, setAllCourses] = useState<LibCourse[] | null>(null);
   const [editing, setEditing] = useState<null | "new" | { id: string; data: Course; user_id: string }>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [showCommunity, setShowCommunity] = useState(false);
+  const [tab, setTab] = useState<CourseTab>("group");
+  const [search, setSearch] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [myName, setMyName] = useState<string>("Someone");
 
-  const load = useCallback(async () => {
-    // This group's courses (via the group_courses link table — one shared record per course).
-    const linked = await loadCoursesForGroup(supabase, activeGroupId);
-    const list = linked
-      .map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", user_id: f.user_id, data: { ...normalize(f.data), club: f.data?.club || f.facility || "", externalId: f.data?.externalId || f.external_id || null, corrected: f.data?.corrected || f.corrected || false }, vetted: !!f.vetted }));
-    list.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-    setCourses(list);
+  const toLibCourse = (f: any): LibCourse => {
+    const d = f.data || {};
+    return {
+      id: f.id,
+      name: f.name,
+      location: f.location || "",
+      user_id: f.user_id,
+      data: {
+        ...normalize(d),
+        club: d?.club || f.facility || "",
+        externalId: d?.externalId || f.external_id || null,
+        corrected: d?.corrected || f.corrected || false,
+      },
+      vetted: !!f.vetted,
+    };
+  };
 
-    // Community (vetted) courses NOT already linked to this group — available to add by reference.
-    const linkedIds = new Set(list.map((c: LibCourse) => c.id));
-    const { data: vet } = await supabase.from("favorite_courses").select("*").eq("vetted", true).order("name");
-    const vlist = (vet || [])
-      .filter((f: any) => !f.deleted && !linkedIds.has(f.id))
-      .map((f: any) => ({ id: f.id, name: f.name, location: f.location || "", user_id: f.user_id, data: { ...normalize(f.data), club: f.data?.club || f.facility || "", externalId: f.data?.externalId || f.external_id || null, corrected: f.data?.corrected || f.corrected || false }, vetted: true }));
-    vlist.sort((a: any, b: any) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
-    setCommunity(vlist);
+  const sortCourses = (rows: LibCourse[]) => rows.sort((a, b) =>
+    courseCardTitle(a).localeCompare(courseCardTitle(b), undefined, { sensitivity: "base" })
+  );
+
+  const load = useCallback(async () => {
+    // Your group courses are a subset of the global app library, linked by group_courses.
+    const linked = await loadCoursesForGroup(supabase, activeGroupId);
+    const groupList = sortCourses(linked.map(toLibCourse));
+    setGroupCourses(groupList);
+
+    // Global app library: every non-deleted course saved in Birdie Num Num.
+    // Any user can browse this list and add a course to their current group library.
+    const { data: all } = await supabase.from("favorite_courses").select("*").order("name");
+    const allList = sortCourses((all || []).filter((f: any) => !f.deleted).map(toLibCourse));
+    setAllCourses(allList);
 
     const { data: prof } = await supabase.from("profiles").select("is_admin, display_name").eq("id", user.id).maybeSingle();
     setIsAdmin(!!prof?.is_admin);
@@ -74,12 +96,32 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   }, [user.id, activeGroupId]);
   useEffect(() => { load(); }, [load]);
 
-  // App-admin toggles whether a course is part of the shared community library.
+  const groupCourseIds = new Set((groupCourses || []).map((c) => c.id));
+  const query = search.trim().toLowerCase();
+  const filteredAll = (allCourses || []).filter((c) => {
+    if (!query) return true;
+    return [courseCardTitle(c), c.location, c.data?.club, c.name]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(query);
+  });
+  const filteredGroup = (groupCourses || []).filter((c) => {
+    if (!query) return true;
+    return [courseCardTitle(c), c.location, c.data?.club, c.name]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase()
+      .includes(query);
+  });
+
+  // App-admin marker only. All courses are now visible in the global app library;
+  // the star is a quality flag, not a visibility gate.
   const toggleVetted = async (c: LibCourse) => {
     setBusyId(c.id); setMsg(null);
     const next = !c.vetted;
     await supabase.from("favorite_courses").update({ vetted: next }).eq("id", c.id);
-    await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: next ? "course_vetted" : "course_unvetted", summary: `${next ? "Vetted" : "Un-vetted"} community course "${c.name}"` });
+    await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: next ? "course_vetted" : "course_unvetted", summary: `${next ? "Marked" : "Unmarked"} "${courseCardTitle(c)}" as vetted` });
     setBusyId(null);
     await load();
   };
@@ -92,11 +134,10 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   const refreshFacilities = async () => {
     if (refreshing) return;
     setRefreshing(true); setMsg(null);
-    const all = [...(courses || [])];
+    const all = [...(allCourses || [])];
     let updated = 0, skipped = 0, failed = 0;
     for (const c of all) {
       const ext = c.data?.externalId;
-      // Only real numeric API ids can be looked up.
       if (!ext || !/^\d+$/.test(String(ext))) { skipped++; continue; }
       try {
         const res = await fetch(`/api/courses?id=${encodeURIComponent(String(ext))}`);
@@ -115,16 +156,17 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
     await load();
   };
 
-
   const addToMyGroup = async (c: LibCourse) => {
     setBusyId(c.id); setMsg(null);
     await linkCourseToGroup(supabase, activeGroupId, c.id, user.id);
+    await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_added_to_group", group_id: activeGroupId, summary: `Added course "${courseCardTitle(c)}" to the group library` });
     setBusyId(null);
-    setMsg(`Added "${c.name}" to your group.`);
+    setMsg(`Added "${courseCardTitle(c)}" to your group library.`);
     await load();
+    setTab("group");
   };
 
-  // Remove a course FROM THIS GROUP only (unlink). The shared record and other groups are untouched.
+  // Remove a course FROM THIS GROUP only (unlink). The global record and other groups are untouched.
   const remove = async (id: string, courseName: string) => {
     await supabase.from("group_courses").delete().eq("group_id", activeGroupId).eq("course_id", id);
     await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_removed", group_id: activeGroupId, summary: `Removed course "${courseName}" from a group` });
@@ -138,91 +180,106 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
       initial={editing === "new" ? null : editing.data}
       existingId={editing === "new" ? null : editing.id}
       onCancel={() => setEditing(null)}
-      onSaved={async () => { setEditing(null); await load(); }}
+      onSaved={async () => { setEditing(null); await load(); setTab("group"); }}
     />;
   }
 
+  const CourseRow = ({ c, source }: { c: LibCourse; source: "group" | "all" }) => {
+    const inGroup = groupCourseIds.has(c.id);
+    return (
+      <div key={c.id} style={{ display: "flex", alignItems: "stretch", marginTop: 10, background: C.card, borderRadius: 12, overflow: "hidden" }}>
+        {isAdmin && (
+          <button title={c.vetted ? "Vetted course — tap to unmark" : "Mark as vetted"}
+            onClick={() => toggleVetted(c)} disabled={busyId === c.id}
+            style={{ background: "none", border: "none", borderRight: `1px solid ${C.line}`, color: c.vetted ? C.gold : C.faint, fontSize: 18, cursor: "pointer", padding: "0 14px" }}>
+            {c.vetted ? "★" : "☆"}
+          </button>
+        )}
+        <button onClick={() => setEditing({ id: c.id, data: c.data, user_id: c.user_id })}
+          style={{ flex: 1, textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: "13px 16px" }}>
+          <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>
+            {courseCardTitle(c)}
+            {c.vetted ? <span style={{ color: C.gold, fontSize: 12 }}> · vetted ★</span> : null}
+            {c.data?.corrected ? <span style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}> · ⚑ corrected</span> : null}
+          </div>
+          <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
+            {c.location ? c.location + " · " : ""}{c.data.tees?.length || 0} tee{(c.data.tees?.length || 0) === 1 ? "" : "s"} · tap to view/edit
+          </div>
+        </button>
+        {source === "group" ? (
+          <button title="Remove from group library"
+            onClick={() => { if (confirm(`Remove "${courseCardTitle(c)}" from this group's library?\n\nThe course remains in the global app library and can be added back later.`)) remove(c.id, courseCardTitle(c)); }}
+            style={{ background: "none", border: "none", borderLeft: `1px solid ${C.line}`, color: C.birdie, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>✕</button>
+        ) : inGroup ? (
+          <div style={{ display: "flex", alignItems: "center", borderLeft: `1px solid ${C.line}`, padding: "0 14px", color: C.green, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>In Group ✓</div>
+        ) : (
+          <button style={{ ...btn(true), borderRadius: 0, padding: "0 14px", fontSize: 12, opacity: busyId === c.id ? 0.5 : 1 }} disabled={busyId === c.id} onClick={() => addToMyGroup(c)}>＋ Add to Group</button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <Eyebrow>COURSE LIBRARY</Eyebrow>
         <div style={{ flex: 1 }} />
-        <button style={btn(true)} onClick={() => setEditing("new")}>＋ Add course</button>
+        <button style={btn(true)} onClick={() => setEditing("new")}>＋ Add New Course</button>
       </div>
-      <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
-        Courses in your group's library. Anyone can add, edit, or delete a course (deleting archives it for an admin to restore).
-        {isAdmin ? " As an app admin, tap the ★ to mark a course as a vetted community course available to every group." : ""}
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
+        Browse every course saved in Birdie Num Num, then add the ones your group plays to your group library. Your group library is what appears in New Round and Create Game.
       </div>
 
-      {isAdmin && (
-        <button style={{ ...btn(false), marginTop: 10, fontSize: 12, opacity: refreshing ? 0.6 : 1 }} disabled={refreshing} onClick={refreshFacilities}>
-          {refreshing ? "Refreshing facility names…" : "↻ Refresh facility names from API"}
-        </button>
-      )}
+      <input
+        style={{ ...inputStyle, marginTop: 12 }}
+        value={search}
+        placeholder="Search all courses..."
+        onChange={(e) => setSearch(e.target.value)}
+      />
+
+      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+        <button style={{ ...btn(tab === "group"), fontSize: 13 }} onClick={() => setTab("group")}>My Group Courses ({groupCourses?.length ?? 0})</button>
+        <button style={{ ...btn(tab === "all"), fontSize: 13 }} onClick={() => setTab("all")}>All App Courses ({allCourses?.length ?? 0})</button>
+        {isAdmin && (
+          <button style={{ ...btn(false), fontSize: 12, opacity: refreshing ? 0.6 : 1 }} disabled={refreshing} onClick={refreshFacilities}>
+            {refreshing ? "Refreshing facility names…" : "↻ Refresh facility names"}
+          </button>
+        )}
+      </div>
 
       {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
 
-      {courses === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
-      {courses?.length === 0 && (
-        <div style={{ background: C.greenLight, borderRadius: 14, padding: 24, marginTop: 14, color: C.sage, textAlign: "center" }}>
-          No courses in this group yet. Add one, or browse the community courses below.
+      {tab === "group" && (
+        <div style={{ marginTop: 16 }}>
+          <Eyebrow>YOUR GROUP COURSES</Eyebrow>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
+            These courses are available to everyone in your current group when creating rounds and games.
+          </div>
+          {groupCourses === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
+          {groupCourses !== null && filteredGroup.length === 0 && (
+            <div style={{ background: C.greenLight, borderRadius: 14, padding: 24, marginTop: 14, color: C.sage, textAlign: "center" }}>
+              {search.trim() ? "No group courses match your search." : "No courses in this group yet. Open All App Courses and add the courses your group plays."}
+            </div>
+          )}
+          {filteredGroup.map((c) => <CourseRow key={c.id} c={c} source="group" />)}
         </div>
       )}
-      {courses?.map((c) => (
-        <div key={c.id} style={{ display: "flex", alignItems: "stretch", marginTop: 10, background: C.card, borderRadius: 12, overflow: "hidden" }}>
-          {isAdmin && (
-            <button title={c.vetted ? "Vetted community course — tap to unshare" : "Mark as vetted community course"}
-              onClick={() => toggleVetted(c)} disabled={busyId === c.id}
-              style={{ background: "none", border: "none", borderRight: `1px solid ${C.line}`, color: c.vetted ? C.gold : C.faint, fontSize: 18, cursor: "pointer", padding: "0 14px" }}>
-              {c.vetted ? "★" : "☆"}
-            </button>
-          )}
-          <button onClick={() => setEditing({ id: c.id, data: c.data, user_id: c.user_id })}
-            style={{ flex: 1, textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: "13px 16px" }}>
-            <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{courseLabel(c.data)}{c.vetted ? <span style={{ color: C.gold, fontSize: 12 }}> · community ★</span> : null}{c.data?.corrected ? <span style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}> · ⚑ corrected</span> : null}</div>
-            <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
-              {c.location ? c.location + " · " : ""}{c.data.tees?.length || 0} tee{(c.data.tees?.length || 0) === 1 ? "" : "s"} · tap to edit
-            </div>
-          </button>
-          <button title="Delete course"
-            onClick={() => { if (confirm(`Remove "${c.name}" from this group's library?\n\nThe course itself isn't deleted — other groups keep it, and you can re-add it from Community Courses if it's vetted.`)) remove(c.id, c.name); }}
-            style={{ background: "none", border: "none", borderLeft: `1px solid ${C.line}`, color: C.birdie, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>✕</button>
-        </div>
-      ))}
 
-      {/* Community (vetted) courses anyone can add */}
-      <div style={{ marginTop: 24 }}>
-        <button onClick={() => setShowCommunity((v) => !v)}
-          style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", gap: 8 }}>
-          <Eyebrow>★ COMMUNITY COURSES{community ? ` (${community.length})` : ""}</Eyebrow>
-          <span style={{ color: C.sage, fontSize: 12 }}>{showCommunity ? "hide" : "browse"}</span>
-        </button>
-        <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
-          Vetted courses shared by the whole community. Add any to your group's library with one tap — the whole community benefits as more get vetted.
-        </div>
-        {showCommunity && (
-          <div style={{ marginTop: 10 }}>
-            {community === null && <div style={{ color: C.sage }}>Loading…</div>}
-            {community?.length === 0 && <div style={{ color: C.faint, fontSize: 13 }}>No community courses have been vetted yet.</div>}
-            {community?.map((c) => {
-              const inGroup = (courses || []).some((x) => x.name.toLowerCase() === c.name.toLowerCase());
-              return (
-                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, background: C.card, borderRadius: 12, padding: "12px 16px", flexWrap: "wrap" }}>
-                  <div style={{ flex: 1, minWidth: 160 }}>
-                    <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{courseLabel(c.data)}</div>
-                    <div style={{ color: C.faint, fontSize: 12 }}>{c.location ? c.location + " · " : ""}{c.data.tees?.length || 0} tee{(c.data.tees?.length || 0) === 1 ? "" : "s"}</div>
-                  </div>
-                  {inGroup ? (
-                    <span style={{ color: C.sage, fontSize: 12 }}>in your group ✓</span>
-                  ) : (
-                    <button style={{ ...btn(true), padding: "7px 12px", fontSize: 12, opacity: busyId === c.id ? 0.5 : 1 }} disabled={busyId === c.id} onClick={() => addToMyGroup(c)}>＋ Add to my group</button>
-                  )}
-                </div>
-              );
-            })}
+      {tab === "all" && (
+        <div style={{ marginTop: 16 }}>
+          <Eyebrow>ALL COURSES IN BIRDIE NUM NUM</Eyebrow>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
+            This is the global course library. Add any course to your group with one tap.
           </div>
-        )}
-      </div>
+          {allCourses === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
+          {allCourses !== null && filteredAll.length === 0 && (
+            <div style={{ background: C.greenLight, borderRadius: 14, padding: 24, marginTop: 14, color: C.sage, textAlign: "center" }}>
+              {search.trim() ? "No courses match your search." : "No courses have been added yet. Add the first course from the database or enter one manually."}
+            </div>
+          )}
+          {filteredAll.map((c) => <CourseRow key={c.id} c={c} source="all" />)}
+        </div>
+      )}
     </div>
   );
 }
@@ -1337,6 +1394,9 @@ function UpdateChecker() {
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 700 }}>App version &amp; updates</div>
       <div style={{ color: C.sage, fontSize: 13, marginTop: 8, lineHeight: 1.55 }}>
         Installed as an app? Tap below to compare your installed build with the latest deployed build and reload if needed.
+      </div>
+      <div style={{ color: C.cream, fontSize: 12, marginTop: 8, fontFamily: "monospace" }}>
+        Current version: {APP_VERSION}
       </div>
       <button style={{ ...btn(true), marginTop: 12, fontSize: 13 }} onClick={check}>Check for updates</button>
       {status ? <div style={{ color: C.cream, fontSize: 12, marginTop: 10 }}>{status}</div> : null}
