@@ -168,6 +168,14 @@ export const firStats = (rs: Round[]) => {
   const hs = rs.flatMap(played).filter((h) => h.par >= 4 && (h.fairway === "hit" || h.fairway === "miss"));
   return { hit: hs.filter((h) => h.fairway === "hit").length, total: hs.length };
 };
+// Scrambling: of the holes where the green was MISSED in regulation, how often
+// the player still made par or better. Needs both strokes and putts recorded
+// (putts are what let us know whether the green was hit in regulation).
+export const scrambleStats = (rs: Round[]) => {
+  const hs = rs.flatMap(played).filter((h) => h.strokes != null && h.putts != null);
+  const missed = hs.filter((h) => !isGIR(h)); // missed green in regulation
+  return { hit: missed.filter((h) => (h.strokes as number) <= h.par).length, total: missed.length };
+};
 export const pct = (s: { hit: number; total: number }) =>
   s.total ? Math.round((100 * s.hit) / s.total) + "%" : "—";
 
@@ -209,9 +217,15 @@ export function matchStrokesFor(diff: number, si: number | null): number {
   return Math.floor(diff / 18) + (si <= diff % 18 ? 1 : 0);
 }
 
+// Playing handicap after a match-play allowance (e.g. 85% for four-ball). WHS
+// applies the % to each player's course handicap, then strokes come from the
+// difference. allowancePct defaults to 100 (full handicap) = no change.
+export const applyAllowance = (ch: number | null | undefined, allowancePct: number = 100) =>
+  Math.round(((ch ?? 0) * (allowancePct ?? 100)) / 100);
+
 // Given two players' course handicaps, returns the per-player match allowance.
-export function matchAllowance(chA: number | null, chB: number | null): { a: number; b: number } {
-  const A = chA ?? 0, B = chB ?? 0;
+export function matchAllowance(chA: number | null, chB: number | null, allowancePct: number = 100): { a: number; b: number } {
+  const A = applyAllowance(chA, allowancePct), B = applyAllowance(chB, allowancePct);
   const low = Math.min(A, B);
   return { a: A - low, b: B - low };
 }
@@ -226,9 +240,10 @@ export function matchProgress(
   grossA: (number | null)[],
   grossB: (number | null)[],
   chA: number | null,
-  chB: number | null
+  chB: number | null,
+  allowancePct: number = 100
 ): (number | null)[] {
-  const allow = matchAllowance(chA, chB);
+  const allow = matchAllowance(chA, chB, allowancePct);
   let lead = 0;
   return holes.map((h, i) => {
     const ga = grossA[i], gb = grossB[i];
@@ -253,9 +268,10 @@ export function matchStatus(
   grossA: (number | null)[],
   grossB: (number | null)[],
   chA: number | null,
-  chB: number | null
+  chB: number | null,
+  allowancePct: number = 100
 ): { thru: number; lead: number; aWins: number; bWins: number; halves: number; result: string } {
-  const allow = matchAllowance(chA, chB);
+  const allow = matchAllowance(chA, chB, allowancePct);
   let lead = 0, thru = 0, aWins = 0, bWins = 0, halves = 0;
   holes.forEach((h, i) => {
     const ga = grossA[i], gb = grossB[i];
@@ -393,13 +409,14 @@ export function validateStrokeIndexes(holes: { n: number; si: number | null }[])
 export type FourballMember = { id: string; gross: (number | null)[]; ch: number | null; noShow?: boolean };
 
 // Net score per player per hole, strokes relative to the lowest CH among the group.
-function fourballNets(holes: MatchHoleMeta[], members: FourballMember[]): Record<string, (number | null)[]> {
+function fourballNets(holes: MatchHoleMeta[], members: FourballMember[], allowancePct: number = 100): Record<string, (number | null)[]> {
   // The low-handicap reference excludes no-shows so they don't drag the basis.
+  const adj = (ch: number | null) => applyAllowance(ch, allowancePct);
   const active = members.filter((m) => !m.noShow);
-  const low = Math.min(...(active.length ? active : members).map((m) => m.ch ?? 0));
+  const low = Math.min(...(active.length ? active : members).map((m) => adj(m.ch)));
   const out: Record<string, (number | null)[]> = {};
   for (const m of members) {
-    const diff = (m.ch ?? 0) - low;
+    const diff = adj(m.ch) - low;
     out[m.id] = holes.map((h, i) => {
       const g = m.gross[i];
       const played = g != null && g > 0;
@@ -423,8 +440,9 @@ export function fourballProgress(
   members: FourballMember[],
   aIds: string[],
   bIds: string[],
+  allowancePct: number = 100,
 ): (number | null)[] {
-  const nets = fourballNets(holes, members);
+  const nets = fourballNets(holes, members, allowancePct);
   let lead = 0;
   return holes.map((_, i) => {
     const aN = aIds.map((id) => nets[id]?.[i]).filter((n): n is number => n != null);
@@ -443,8 +461,9 @@ export function fourballStatus(
   members: FourballMember[],
   aIds: string[],
   bIds: string[],
+  allowancePct: number = 100,
 ): { thru: number; lead: number; result: string } {
-  const prog = fourballProgress(holes, members, aIds, bIds);
+  const prog = fourballProgress(holes, members, aIds, bIds, allowancePct);
   const played = prog.filter((p) => p != null) as number[];
   const thru = played.length;
   const lead = played.length ? played[played.length - 1] : 0;
@@ -461,6 +480,60 @@ export function fourballStatus(
     result = lead === 0 ? "All square" : `${Math.abs(lead)} UP`;
   }
   return { thru, lead, result };
+}
+
+// ---------------- Skins (net, with carryovers) ----------------
+export type SkinPlayer = { id: string; name: string; gross: (number | null)[]; ch: number | null };
+export type SkinHole = {
+  hole: number;
+  winnerId: string | null; // null = tied/carried (or not yet fully played)
+  carriedIn: number;        // skins carried into this hole from prior ties
+  value: number;            // skins at stake on this hole (carriedIn + 1)
+  decided: boolean;         // every player has a score on this hole
+  netById: Record<string, number | null>;
+};
+export type SkinResult = {
+  holes: SkinHole[];
+  skinsByPlayer: Record<string, number>; // total skins won
+  carryAtEnd: number;                     // unresolved skins still carrying
+};
+
+// Net skins: on each fully-played hole the lowest UNIQUE net wins 1 skin plus any
+// carried over from immediately preceding tied holes. A tie carries the skins
+// forward. Holes not yet fully played are skipped (no award, no carry) so live
+// scoring stays sensible. Net uses strokes received off each player's course
+// handicap allocated by stroke index (allowance applied by the caller via ch).
+export function computeSkins(holes: MatchHoleMeta[], players: SkinPlayer[], allowancePct: number = 100): SkinResult {
+  const skinsByPlayer: Record<string, number> = {};
+  players.forEach((p) => (skinsByPlayer[p.id] = 0));
+  const out: SkinHole[] = [];
+  let carry = 0;
+  holes.forEach((h, i) => {
+    const netById: Record<string, number | null> = {};
+    let allPlayed = true;
+    for (const p of players) {
+      const g = p.gross[i];
+      if (g == null || g <= 0) { netById[p.id] = null; allPlayed = false; }
+      else netById[p.id] = g - strokesReceived(h.si, applyAllowance(p.ch, allowancePct));
+    }
+    if (!allPlayed || players.length < 2) {
+      out.push({ hole: h.n, winnerId: null, carriedIn: carry, value: carry + 1, decided: false, netById });
+      return; // not yet resolvable; carry unchanged
+    }
+    const nets = players.map((p) => netById[p.id] as number);
+    const min = Math.min(...nets);
+    const winners = players.filter((p) => (netById[p.id] as number) === min);
+    const value = carry + 1;
+    if (winners.length === 1) {
+      skinsByPlayer[winners[0].id] += value;
+      out.push({ hole: h.n, winnerId: winners[0].id, carriedIn: carry, value, decided: true, netById });
+      carry = 0;
+    } else {
+      out.push({ hole: h.n, winnerId: null, carriedIn: carry, value, decided: true, netById });
+      carry = value; // tie carries the whole pot forward
+    }
+  });
+  return { holes: out, skinsByPlayer, carryAtEnd: carry };
 }
 
 // Putt distribution for a set of rounds: counts of 1-putts and 3+-putts, plus
@@ -480,6 +553,10 @@ export function puttDistribution(rounds: Round[]) {
 }
 
 // ---------------- Stableford betting (TGC group) ----------------
+// The betting calculator and (later) the season money ledger are gated to one
+// group by ID, not name — so renaming the group never breaks the gate. If TGC's
+// group id ever changes, update this single constant.
+export const TGC_GROUP_ID = "640fb606-1a78-4a7f-a632-22446bc934c1";
 // Pot = bet * number of bettors. Prizes are PERCENTAGES of the pot:
 //   - each of the 3 six-hole segments: segPct (default 10/75)
 //   - overall 2nd place (18-hole): secondPct (default 15/75)

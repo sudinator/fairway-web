@@ -15,11 +15,15 @@ import {
   matchProgress,
   matchLeadLabel,
   matchAllowance,
+  applyAllowance,
   fourballStatus,
   fourballProgress,
   type FourballMember,
+  computeSkins,
+  type SkinPlayer,
   computeBetting,
   DEFAULT_BET_SPLIT,
+  TGC_GROUP_ID,
   type BetPlayer,
   type BetSplit,
 } from "@/lib/golf";
@@ -49,7 +53,8 @@ type Game = {
   course: string;
   course_par: number | null;
   holes_meta: { n: number; par: number; si: number | null }[]; // par + stroke index per hole
-  game_type: "stableford" | "match" | "fourball";
+  game_type: "stableford" | "match" | "fourball" | "skins";
+  allowance_pct?: number | null; // handicap allowance % applied to net scoring
   pairings: { a: string; b: string }[]; // for match play: user_id vs user_id
   status?: "active" | "ended" | null;
   teams?: { key: string; name: string }[] | null; // two named teams for team match play
@@ -331,9 +336,14 @@ function CreateGame({
   const [pickedFav, setPickedFav] = useState<any | null>(null);
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState("");
-  const [gameType, setGameType] = useState<"stableford" | "match" | "fourball">(
+  const [gameType, setGameType] = useState<"stableford" | "match" | "fourball" | "skins">(
     "stableford",
   );
+  // Handicap allowance % (playing handicap = allowance% of course handicap).
+  // Default 85 for four-ball, 100 otherwise. Resets to the standard when the
+  // format changes; editable any time.
+  const [allowancePct, setAllowancePct] = useState(100);
+  useEffect(() => { setAllowancePct(gameType === "fourball" ? 85 : 100); }, [gameType]);
   const [teamMode, setTeamMode] = useState(false);
   const [team1, setTeam1] = useState("Team 1");
   const [team2, setTeam2] = useState("Team 2");
@@ -423,7 +433,7 @@ function CreateGame({
     setErr(null);
     try {
       const code = makeCode();
-      const typeLabel = gameType === "match" ? "Match Play" : gameType === "fourball" ? "Four-Ball" : "Stableford";
+      const typeLabel = gameType === "match" ? "Match Play" : gameType === "fourball" ? "Four-Ball" : gameType === "skins" ? "Skins" : "Stableford";
       // TZ-safe date label for the auto-generated name (noon avoids offset rollover).
       const dateLabel = new Date(matchDate + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
       const autoName = `${typeLabel} / ${pickedFav.name} / ${dateLabel}`;
@@ -441,6 +451,7 @@ function CreateGame({
           course: pickedFav.name,
           course_par: coursePar,
           played_at: matchDate,
+          allowance_pct: allowancePct,
           holes_meta: holesMeta,
           game_type: gameType,
           pairings: [],
@@ -515,24 +526,25 @@ function CreateGame({
   return (
     <div style={{ maxWidth: 600 }}>
       <Eyebrow>CREATE A GAME</Eyebrow>
-      <div style={{ marginTop: 12 }}>
-        <label style={{ color: C.sage, fontSize: 12 }}>Game name</label>
-        <input
-          style={{ ...inputStyle, marginTop: 6 }}
-          value={name}
-          placeholder="Leave blank to auto-name (e.g. Four-Ball / Pebble Beach / Jun 15, 2026)"
-          onChange={(e) => setName(e.target.value)}
-        />
-      </div>
-
-      <div style={{ marginTop: 14 }}>
-        <label style={{ color: C.sage, fontSize: 12 }}>Match date</label>
-        <input
-          type="date"
-          style={{ ...inputStyle, marginTop: 6 }}
-          value={matchDate}
-          onChange={(e) => setMatchDate(e.target.value || todayLocal())}
-        />
+      <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 190 }}>
+          <label style={{ color: C.sage, fontSize: 12 }}>Game name</label>
+          <input
+            style={{ ...inputStyle, marginTop: 6 }}
+            value={name}
+            placeholder="Leave blank to auto-name"
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+        <div style={{ width: 150 }}>
+          <label style={{ color: C.sage, fontSize: 12 }}>Match date</label>
+          <input
+            type="date"
+            style={{ ...inputStyle, marginTop: 6 }}
+            value={matchDate}
+            onChange={(e) => setMatchDate(e.target.value || todayLocal())}
+          />
+        </div>
       </div>
 
       <div style={{ marginTop: 14 }}>
@@ -718,12 +730,20 @@ function CreateGame({
           >
             Four-ball (best net)
           </button>
+          <button
+            onClick={() => { setGameType("skins"); setTeamMode(false); }}
+            style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 120, fontSize: 13 }}
+          >
+            Skins (net)
+          </button>
         </div>
         <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
           {gameType === "stableford"
             ? "Everyone competes on one net-Stableford leaderboard."
             : gameType === "fourball"
             ? "2-player teams play better-net-ball match play. Big groups split into foursomes (2 v 2) — set them up after creating. Great for 12–16 players in 3–4 foursomes."
+            : gameType === "skins"
+            ? "Lowest net score on a hole wins the skin. A tie carries the skin to the next hole, so the pot builds until someone wins outright."
             : "Players are paired 1-on-1. After friends join, you'll set the matchups. Lower handicap plays off scratch; opponent gets the difference."}
         </div>
         {gameType === "match" && (
@@ -743,6 +763,27 @@ function CreateGame({
             )}
           </div>
         )}
+
+        <div style={{ marginTop: 14 }}>
+          <label style={{ color: C.sage, fontSize: 12 }}>Handicap allowance</label>
+          <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
+            {[100, 90, 85].map((amt) => (
+              <button key={amt} onClick={() => setAllowancePct(amt)} style={{ ...btn(allowancePct === amt), fontSize: 13, padding: "8px 14px" }}>{amt}%</button>
+            ))}
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <input
+                type="number"
+                value={allowancePct}
+                onChange={(e) => setAllowancePct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                style={{ ...inputStyle, width: 64, padding: "8px 10px", fontSize: 13, textAlign: "center" }}
+              />
+              <span style={{ color: C.sage, fontSize: 13 }}>%</span>
+            </div>
+          </div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+            Players play off this percentage of their course handicap. 100% for singles/Stableford/Skins, 85% standard for four-ball. The lower handicap still plays off the difference in match formats.
+          </div>
+        </div>
       </div>
 
       {err && (
@@ -779,7 +820,6 @@ function GameRoom({
   onBack: () => void;
 }) {
   const [game, setGame] = useState<Game | null>(null);
-  const [groupName, setGroupName] = useState<string>("");
   const [players, setPlayers] = useState<Player[]>([]);
   const [me, setMe] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
@@ -822,11 +862,6 @@ function GameRoom({
         }
       : g;
     setGame(safeGame as any);
-    // Fetch the group's name (used to gate group-specific features like Betting).
-    if ((g as any)?.group_id) {
-      supabase.from("groups").select("name").eq("id", (g as any).group_id).maybeSingle()
-        .then(({ data }) => setGroupName(data?.name || ""));
-    }
     let mine = (ps || []).find((p: any) => p.user_id === user.id) || null;
     // Reconcile against the local backup: if a score write was lost to a screen
     // lock, the device's backup may hold holes the DB row is missing. Merge those
@@ -919,7 +954,7 @@ function GameRoom({
     if (!game) return [];
     const alloc = allocateStrokes(
       game.holes_meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })),
-      p.course_handicap,
+      applyAllowance(p.course_handicap, game.allowance_pct ?? 100),
     );
     return game.holes_meta.map((m, i) => ({
       hole_number: m.n,
@@ -1416,13 +1451,13 @@ function GameRoom({
       {roomTab === "play" && (
       <div style={{ marginTop: 16, background: isEnded ? "#3A3A3A" : game.game_type === "match" ? "#1E3A8A" : game.game_type === "fourball" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>
-          {game.game_type === "match" ? "⛳ Singles Match Play" : game.game_type === "fourball" ? "⛳ Four-Ball Match (Best Net)" : "🏆 Stableford Tournament"}
+          {game.game_type === "match" ? "⛳ Singles Match Play" : game.game_type === "fourball" ? "⛳ Four-Ball Match (Best Net)" : game.game_type === "skins" ? "🪙 Skins (Net)" : "🏆 Stableford Tournament"}
         </span>
         {isEnded ? (
           <span style={{ fontSize: 12, fontWeight: 800, background: C.gold, color: "#1A1A1A", borderRadius: 20, padding: "3px 10px" }}>FINAL · GAME ENDED</span>
         ) : (
           <span style={{ color: C.cream, opacity: 0.8, fontSize: 12 }}>
-            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? "2 v 2 better-net-ball" : "net Stableford leaderboard"}
+            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? "2 v 2 better-net-ball" : game.game_type === "skins" ? "net skins · carryovers" : "net Stableford leaderboard"}
           </span>
         )}
       </div>
@@ -1446,6 +1481,8 @@ function GameRoom({
           mode={roomTab}
           onChanged={load}
         />
+      ) : roomTab === "play" && game.game_type === "skins" ? (
+        <SkinsView game={game} players={players} user={user} />
       ) : roomTab === "play" ? (
         <>
           {/* Leaderboard */}
@@ -1542,7 +1579,7 @@ function GameRoom({
             </div>
           </div>
 
-          {groupName.trim().toLowerCase() === "tgc" && (
+          {(game as any)?.group_id === TGC_GROUP_ID && (
             <BettingPanel
               players={players}
               playerPoints={playerPoints}
@@ -1576,7 +1613,7 @@ function GameRoom({
                 if (pr) {
                   const oppId = pr.a === user.id ? pr.b : pr.a;
                   const oppP = players.find((p) => p.user_id === oppId);
-                  const allowPair = matchAllowance(me.course_handicap, oppP?.course_handicap ?? null);
+                  const allowPair = matchAllowance(me.course_handicap, oppP?.course_handicap ?? null, game.allowance_pct ?? 100);
                   matchAllow = allowPair.a;
                   oppAllow = allowPair.b;
                 }
@@ -1586,7 +1623,7 @@ function GameRoom({
                   hole_number: m.n,
                   stroke_index: m.si,
                 })),
-                me.course_handicap,
+                applyAllowance(me.course_handicap, game.allowance_pct ?? 100),
               );
               return game.holes_meta.map((m, i) => ({
                 n: m.n,
@@ -1636,6 +1673,7 @@ function GameRoom({
                   oppP.scores || [],
                   me.course_handicap,
                   oppP.course_handicap,
+                  game.allowance_pct ?? 100,
                 );
                 return prog.map((lead) => matchLeadLabel(lead));
               }
@@ -1654,7 +1692,7 @@ function GameRoom({
                   return { id: uid, gross: p?.scores || [], ch: p?.course_handicap ?? null, noShow: !!p?.no_show };
                 });
                 // myIds as the "A" side so positive lead = my team up.
-                const prog = fourballProgress(game.holes_meta, members, myIds, oppIds);
+                const prog = fourballProgress(game.holes_meta, members, myIds, oppIds, game.allowance_pct ?? 100);
                 return prog.map((lead) => matchLeadLabel(lead));
               }
               return undefined;
@@ -1711,6 +1749,74 @@ function MyStatsLine({ me, holes }: { me: Player; holes: Hole[] }) {
 }
 
 // ---------------- Match play view ----------------
+function SkinsView({ game, players, user }: { game: Game; players: Player[]; user: any }) {
+  const nameById: Record<string, string> = {};
+  players.forEach((p) => (nameById[p.id] = p.display_name));
+  const skinPlayers: SkinPlayer[] = players.map((p) => ({
+    id: p.id, name: p.display_name, gross: p.scores || [], ch: p.course_handicap,
+  }));
+  const result = computeSkins(game.holes_meta, skinPlayers, game.allowance_pct ?? 100);
+
+  const firstUndecided = result.holes.find((h) => !h.decided);
+  const carrying = firstUndecided ? firstUndecided.carriedIn : result.carryAtEnd;
+  const intoHole = firstUndecided ? firstUndecided.hole : null;
+  const totals = [...players].sort((a, b) => (result.skinsByPlayer[b.id] || 0) - (result.skinsByPlayer[a.id] || 0));
+  const ORANGE = "#E8730C";
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      <Eyebrow>{`SKINS · NET${game.allowance_pct != null && game.allowance_pct !== 100 ? ` · ${game.allowance_pct}% ALLOWANCE` : ""}`}</Eyebrow>
+
+      {carrying > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5A3210", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "10px 12px", marginTop: 10 }}>
+          <span style={{ color: ORANGE, fontSize: 18, fontWeight: 800 }}>↑</span>
+          <span style={{ color: "#F2C28A", fontSize: 13 }}>
+            {carrying} skin{carrying > 1 ? "s" : ""} {intoHole ? `carrying into hole ${intoHole}` : "unclaimed (last hole tied)"}
+          </span>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+        {totals.map((p) => {
+          const n = result.skinsByPlayer[p.id] || 0;
+          return (
+            <div key={p.id} style={{ flex: 1, minWidth: 130, background: p.user_id === user.id ? C.cream : C.card, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+              <span style={{ color: C.ink, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_name}{p.user_id === user.id ? " (you)" : ""}</span>
+              <span style={{ color: n > 0 ? C.green : C.faint, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif", marginLeft: 8 }}>{n}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ marginTop: 16 }}>
+        <div style={{ color: C.sage, fontSize: 10, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", padding: "0 4px 6px" }}>Hole by hole</div>
+        {result.holes.map((h) => {
+          const won = h.decided && h.winnerId;
+          const tiedCarry = h.decided && !h.winnerId;
+          return (
+            <div key={h.hole} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 4px", borderBottom: `1px solid ${C.greenLight}` }}>
+              <span style={{ width: 26, color: h.decided ? C.cream : C.sage, fontWeight: 700, fontSize: 13 }}>{h.hole}</span>
+              <span style={{ flex: 1, color: won ? C.cream : C.sage, fontSize: 13 }}>
+                {won ? `${nameById[h.winnerId!] || "—"} · net ${h.netById[h.winnerId!]}` : tiedCarry ? "Tied — carries" : "Not played yet"}
+              </span>
+              {won ? (
+                <span style={{ background: C.greenLight, color: C.gold, fontSize: 12, padding: "3px 9px", borderRadius: 999 }}>{h.value} skin{h.value > 1 ? "s" : ""}</span>
+              ) : tiedCarry ? (
+                <span style={{ background: "#5A3210", color: ORANGE, fontSize: 12, padding: "3px 9px", borderRadius: 999 }}>push →</span>
+              ) : (
+                <span style={{ color: C.faint, fontSize: 12 }}>{h.value} at stake</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ color: C.sage, fontSize: 10, marginTop: 8 }}>
+        Lowest net on a hole wins the skin; ties carry it to the next hole. Enter your scores below.
+      </div>
+    </div>
+  );
+}
+
 function MatchView({
   game,
   players,
@@ -1772,7 +1878,7 @@ function MatchView({
     game.pairings.forEach((pr) => {
       const pa = playerOf(pr.a), pb = playerOf(pr.b);
       if (!pa || !pb) return;
-      const st = matchStatus(game.holes_meta, pa.scores || [], pb.scores || [], pa.course_handicap, pb.course_handicap);
+      const st = matchStatus(game.holes_meta, pa.scores || [], pb.scores || [], pa.course_handicap, pb.course_handicap, game.allowance_pct ?? 100);
       // Determine which team each player is on.
       const ta = pa.team, tb = pb.team;
       if (!ta || !tb || ta === tb) return; // need a cross-team pairing
@@ -1937,8 +2043,9 @@ function MatchView({
           pb.scores || [],
           pa.course_handicap,
           pb.course_handicap,
+          game.allowance_pct ?? 100,
         );
-        const allow = matchAllowance(pa.course_handicap, pb.course_handicap);
+        const allow = matchAllowance(pa.course_handicap, pb.course_handicap, game.allowance_pct ?? 100);
         const leader =
           st.lead > 0 ? pa.display_name : st.lead < 0 ? pb.display_name : null;
         const statusText = st.result
@@ -2142,7 +2249,7 @@ function FourballView({
       {foursomes.map((f) => {
         const ms = members4(f);
         const full = f.a.length && f.b.length;
-        const st = full ? fourballStatus(game.holes_meta, ms, f.a, f.b) : null;
+        const st = full ? fourballStatus(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100) : null;
         const mine = f.a.includes(user.id) || f.b.includes(user.id);
         const lead = st?.lead ?? 0;
         const leadText = !st || st.thru === 0 ? "" : lead === 0 ? "All square" : `${firstName(lead > 0 ? f.a[0] : f.b[0])}'s pair ${Math.abs(lead)} UP`;
