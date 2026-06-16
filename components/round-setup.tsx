@@ -65,7 +65,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
         const teeWithHoles = d.tees.find((t: any) => t.holes && t.holes.length);
         if (teeWithHoles) {
           d.holes = teeWithHoles.holes;
-          d.tees = d.tees.map((t: any) => ({ name: t.name, rating: t.rating, slope: t.slope, par: t.par }));
+          d.tees = d.tees.map((t: any) => ({ name: t.name, rating: t.rating, slope: t.slope, par: t.par, yardages: t.yardages }));
         }
       }
       return {
@@ -300,9 +300,10 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
     if (idxVal != null && idxVal !== index) saveIndex(idxVal);
     const coursePar = picked.holes.reduce((s, h) => s + (h.par || 0), 0);
     const alloc = allocateStrokes(picked.holes.map((h) => ({ hole_number: h.n, stroke_index: h.si })), realCH);
-    const holes: Hole[] = picked.holes.map((h) => ({
+    const holes: Hole[] = picked.holes.map((h, i) => ({
       hole_number: h.n, par: h.par, stroke_index: h.si,
       strokes: null, putts: null, fairway: null, penalties: 0,
+      yardage: tee?.yardages?.[i] ?? null,
       recv: alloc[h.n] || 0,
     }));
     onReady({

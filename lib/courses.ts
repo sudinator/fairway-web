@@ -7,7 +7,7 @@
 
 // Par and stroke index belong to the HOLE (same across all tees).
 // Only rating and slope differ by tee — that's what changes the course handicap.
-export type CourseTee = { name: string; rating: number; slope: number; par: number };
+export type CourseTee = { name: string; rating: number; slope: number; par: number; yardages?: (number | null)[] };
 export type CourseHole = { n: number; par: number; si: number | null };
 export type Course = {
   id: string;

@@ -25,6 +25,7 @@ export type Hole = {
   fairway: "hit" | "miss" | null;
   penalties: number;
   sand?: boolean | null; // greenside bunker on this hole (for sand-save %)
+  yardage?: number | null; // hole distance for the played tee
   recv?: number; // strokes received (computed, not stored)
 };
 

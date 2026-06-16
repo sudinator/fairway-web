@@ -99,6 +99,7 @@ function normalizeCourse(c: any) {
         rating: t.course_rating,
         slope: t.slope_rating,
         par: t.par_total || holes.reduce((s: number, h: any) => s + (h.par || 0), 0),
+        yardages: (t.holes || []).map((h: any) => h.yardage ?? null), // per-hole yardage for THIS tee
       });
     });
   });

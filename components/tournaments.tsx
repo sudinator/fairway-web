@@ -53,7 +53,7 @@ type Game = {
   name: string;
   course: string;
   course_par: number | null;
-  holes_meta: { n: number; par: number; si: number | null }[]; // par + stroke index per hole
+  holes_meta: { n: number; par: number; si: number | null; yards?: number | null }[]; // par + stroke index (+ yardage) per hole
   game_type: "stableford" | "match" | "fourball" | "skins";
   allowance_pct?: number | null; // handicap allowance % applied to net scoring
   pairings: { a: string; b: string }[]; // for match play: user_id vs user_id
@@ -372,6 +372,7 @@ function CreateGame({
                   rating: x.rating,
                   slope: x.slope,
                   par: x.par,
+                  yardages: x.yardages,
                 }));
               }
             }
@@ -438,10 +439,11 @@ function CreateGame({
       // TZ-safe date label for the auto-generated name (noon avoids offset rollover).
       const dateLabel = new Date(matchDate + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
       const autoName = `${typeLabel} / ${pickedFav.name} / ${dateLabel}`;
-      const holesMeta = pickedFav.holes.map((h: any) => ({
+      const holesMeta = pickedFav.holes.map((h: any, i: number) => ({
         n: h.n,
         par: h.par,
         si: h.si,
+        yards: tee?.yardages?.[i] ?? null,
       }));
       const { data: game, error } = await supabase
         .from("games")
@@ -829,6 +831,7 @@ function GameRoom({
     () => loadActiveGame()?.tab || "play",
   );
   useEffect(() => { saveActiveGame(gameId, roomTab); }, [gameId, roomTab]);
+  const [cardView, setCardView] = useState(false); // show the whole-group vertical scorecard
   // Non-organizers only ever see the scorecard.
   useEffect(() => {
     if (roomTab === "setup" && game && game.created_by !== user.id) setRoomTab("play");
@@ -1459,7 +1462,15 @@ function GameRoom({
       </div>
       )}
 
-      {game.game_type === "fourball" ? (
+      {roomTab === "play" && (
+        <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+          <button onClick={() => setCardView(false)} style={{ ...btn(!cardView), flex: 1, fontSize: 13 }}>Results</button>
+          <button onClick={() => setCardView(true)} style={{ ...btn(cardView), flex: 1, fontSize: 13 }}>Group card</button>
+        </div>
+      )}
+      {roomTab === "play" && cardView ? (
+        <GroupScorecard game={game} players={players} user={user} />
+      ) : game.game_type === "fourball" ? (
         <FourballView
           game={game}
           players={players}
@@ -1745,6 +1756,115 @@ function MyStatsLine({ me, holes }: { me: Player; holes: Hole[] }) {
 }
 
 // ---------------- Match play view ----------------
+function GroupScorecard({ game, players, user }: { game: Game; players: Player[]; user: any }) {
+  const allowance = game.allowance_pct ?? 100;
+  const meta = game.holes_meta;
+  const GREEN = "#1B7A4B", BLUE = "#1E5B8A", RED = "#C0392B";
+  // Net-vs-par color: under green, level blue, over red.
+  const netColor = (gross: number | null, recv: number, par: number) => {
+    if (gross == null || gross <= 0) return "#8B8775";
+    const net = gross - recv;
+    return net < par ? GREEN : net === par ? BLUE : RED;
+  };
+  const recvFor = (p: Player, si: number | null) => strokesReceived(si, applyAllowance(p.course_handicap, allowance));
+
+  const teamColor = (i: number) => (i % 2 === 0 ? "#5B8DEF" : "#C9A227");
+  const colTmpl = `58px repeat(${players.length}, minmax(58px, 1fr))`;
+  const cell: React.CSSProperties = { position: "relative", background: "#FBFAF4", borderRadius: 5, height: 42, display: "flex", alignItems: "center", justifyContent: "center" };
+  const agg: React.CSSProperties = { position: "relative", background: C.greenLight, borderRadius: 5, height: 30, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 15, fontWeight: 800 };
+
+  const sums = (p: Player, from: number, to: number) => {
+    let g = 0, pts = 0;
+    for (let i = from; i <= to && i < meta.length; i++) {
+      const gross = p.scores?.[i] ?? null;
+      if (gross != null && gross > 0) {
+        g += gross;
+        pts += stablefordPts(gross, meta[i].par, recvFor(p, meta[i].si)) || 0;
+      }
+    }
+    return { g, pts };
+  };
+
+  const holeRow = (i: number) => {
+    const m = meta[i];
+    return (
+      <React.Fragment key={`h${i}`}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#102E25", borderRadius: 5, padding: "4px 0" }}>
+          <b style={{ color: C.cream, fontSize: 17, fontWeight: 800, lineHeight: 1 }}>{m.n}</b>
+          <span style={{ color: "#8FB0A0", fontSize: 8, lineHeight: 1.25 }}>Par {m.par}</span>
+          <span style={{ color: "#8FB0A0", fontSize: 8, lineHeight: 1.25 }}>{m.yards ? `${m.yards}y · ` : ""}SI {m.si ?? "–"}</span>
+        </div>
+        {players.map((p) => {
+          const gross = p.scores?.[i] ?? null;
+          const recv = recvFor(p, m.si);
+          const pts = stablefordPts(gross, m.par, recv);
+          return (
+            <div key={p.id + i} style={cell}>
+              {recv > 0 && (
+                <div style={{ position: "absolute", top: 3, left: 4, display: "flex", gap: 2 }}>
+                  {Array.from({ length: Math.min(recv, 2) }).map((_, d) => (
+                    <span key={d} style={{ width: 5, height: 5, borderRadius: 99, background: "#E8730C", display: "block" }} />
+                  ))}
+                </div>
+              )}
+              <span style={{ fontSize: 19, fontWeight: 800, color: netColor(gross, recv, m.par) }}>{gross != null && gross > 0 ? gross : "·"}</span>
+              {gross != null && gross > 0 && (
+                <span style={{ position: "absolute", bottom: 2, right: 3, background: C.green, color: "#fff", fontSize: 10, fontWeight: 800, padding: "0 5px", borderRadius: 6 }}>{pts ?? 0}</span>
+              )}
+            </div>
+          );
+        })}
+      </React.Fragment>
+    );
+  };
+
+  const aggRow = (label: string, from: number, to: number) => (
+    <React.Fragment key={label}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "#0A241C", borderRadius: 5, color: "#CFE3D8", fontSize: 10, fontWeight: 800, letterSpacing: 1 }}>{label}</div>
+      {players.map((p) => {
+        const s = sums(p, from, to);
+        return (
+          <div key={p.id + label} style={agg}>
+            <span>{s.g || "–"}</span>
+            <span style={{ position: "absolute", bottom: 2, right: 3, background: C.green, color: "#E4CF86", fontSize: 10, fontWeight: 800, padding: "0 5px", borderRadius: 6 }}>{s.pts}</span>
+          </div>
+        );
+      })}
+    </React.Fragment>
+  );
+
+  const half = meta.length >= 18 ? 9 : Math.ceil(meta.length / 2);
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
+        <span style={{ color: "#7FD0A0", fontSize: 10 }}>● under</span>
+        <span style={{ color: "#6FA8DC", fontSize: 10 }}>● par</span>
+        <span style={{ color: "#E0796B", fontSize: 10 }}>● over (net)</span>
+        <span style={{ color: "#E8730C", fontSize: 10 }}>● gets a stroke · corner = Stableford</span>
+      </div>
+      <div style={{ overflowX: "auto" }}>
+        <div style={{ display: "grid", gridTemplateColumns: colTmpl, gap: 3, minWidth: 300 }}>
+          <div />
+          {players.map((p, i) => (
+            <div key={p.id} style={{ textAlign: "center", padding: "4px 2px", borderBottom: `2px solid ${teamColor(i)}` }}>
+              <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {p.display_name}{p.user_id === user.id ? "" : ""}{(p as any).is_guest ? " ·G" : ""}
+              </div>
+              <div style={{ color: C.sage, fontSize: 9 }}>hcp {p.course_handicap}</div>
+            </div>
+          ))}
+          {meta.slice(0, half).map((_, i) => holeRow(i))}
+          {meta.length > half && meta.slice(half).map((_, i) => holeRow(i + half))}
+          {meta.length >= 18 && aggRow("IN", 9, 17)}
+          {meta.length >= 18 && aggRow("OUT", 0, 8)}
+          {aggRow("TOT", 0, meta.length - 1)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SkinsView({ game, players, user }: { game: Game; players: Player[]; user: any }) {
   const nameById: Record<string, string> = {};
   players.forEach((p) => (nameById[p.id] = p.display_name));
