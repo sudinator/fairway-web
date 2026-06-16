@@ -91,6 +91,7 @@ export type EntryHole = {
   n: number; par: number; si: number | null;
   strokes: number | null; putts: number | null; fairway: "hit" | "miss" | null;
   penalties?: number | null;
+  sand?: boolean | null; // greenside bunker this hole
   recv: number; // handicap strokes received on this hole
   gives?: number; // strokes GIVEN on this hole (match play, lower-handicap player)
 };
@@ -100,7 +101,7 @@ export type EntryHole = {
 export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun }: {
   holes: EntryHole[];
   hasHandicap: boolean;
-  onSet: (i: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | null; penalties?: number | null }) => void;
+  onSet: (i: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | null; penalties?: number | null; sand?: boolean | null }) => void;
   savingHole?: number | null;
   showFairway?: boolean;
   showPutts?: boolean;
@@ -115,6 +116,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   // screen first renders (e.g. resuming a round). Flipping this flag right after
   // mount forces the dropdowns to re-render so they show their saved value.
   const [hydrated, setHydrated] = React.useState(false);
+  const [editPen, setEditPen] = React.useState<number | null>(null); // hole index whose Sand/Pen popup is open
   React.useEffect(() => {
     const r = requestAnimationFrame(() => setHydrated(true));
     return () => cancelAnimationFrame(r);
@@ -137,7 +139,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     const sPts = seg.reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
     const sFwElig = seg.filter((h) => h.par >= 4 && (h.fairway === "hit" || h.fairway === "miss")).length;
     const sFwHit = seg.filter((h) => h.par >= 4 && h.fairway === "hit").length;
-    const cols = `26px 24px 24px${showOpp ? " 40px" : ""}${hasDots ? " 28px" : ""} 1fr${showFairway ? " 30px" : ""}${showPutts ? " 54px" : ""}${showPenalties ? " 48px" : ""} 28px${showRun ? " 44px" : ""}`;
+    const cols = `26px 24px 24px${showOpp ? " 40px" : ""}${hasDots ? " 28px" : ""} 1fr${showFairway ? " 30px" : ""}${showPutts ? " 54px" : ""}${showPenalties ? " 54px" : ""} 28px${showRun ? " 44px" : ""}`;
     const Row = (cells: React.ReactNode[], opts?: { header?: boolean; foot?: boolean }) => (
       <div style={{
         display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4,
@@ -159,7 +161,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           <div key="sc" style={{ ...headStyle, textAlign: "center" }}>Score</div>,
           ...(showFairway ? [<div key="fw" style={{ ...headStyle, textAlign: "center" }}>FW</div>] : []),
           ...(showPutts ? [<div key="pu" style={{ ...headStyle, textAlign: "center" }}>Putt</div>] : []),
-          ...(showPenalties ? [<div key="pe" style={{ ...headStyle, textAlign: "center" }}>Pen</div>] : []),
+          ...(showPenalties ? [<div key="pe" style={{ ...headStyle, textAlign: "center" }}>Sand/Pen</div>] : []),
           <div key="pt" style={{ ...headStyle, textAlign: "center" }}>Pts</div>,
           ...(showRun ? [<div key="ms" style={{ ...headStyle, textAlign: "center", color: C.gold }}>Match</div>] : []),
         ], { header: true })}
@@ -197,11 +199,21 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
                 <NumPicker key={`pu-${hydrated}`} value={h.putts} from={0} to={maxPutts} onChange={(v) => onSet(i, { putts: v })} width={48} />
               </div>,
             ] : []),
-            ...(showPenalties ? [
-              <div key="pe" style={{ textAlign: "center" }}>
-                <NumPicker key={`pe-${hydrated}`} value={h.penalties || null} from={1} to={3} onChange={(v) => onSet(i, { penalties: v ?? 0 })} width={44} />
-              </div>,
-            ] : []),
+            ...(showPenalties ? [(() => {
+              const penN = h.penalties || 0;
+              const sandOn = !!h.sand;
+              const disp = sandOn && penN > 0 ? "*" : sandOn ? "S" : penN > 0 ? String(penN) : "·";
+              const active = sandOn || penN > 0;
+              return (
+                <div key="pe" style={{ textAlign: "center" }}>
+                  <button onClick={() => setEditPen(i)}
+                    style={{ border: `1px solid ${active ? "#C9A227" : C.line}`, borderRadius: 6, width: 44, height: 30, cursor: "pointer",
+                      background: active ? "#EFE2C0" : C.card, color: active ? "#7A5A12" : C.faint, fontWeight: 800, fontSize: disp === "*" ? 18 : 15 }}>
+                    {disp}
+                  </button>
+                </div>
+              );
+            })()] : []),
             <div key="pt" style={{ textAlign: "center", color: ptsColor(pts), fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
             ...(showRun ? [(() => {
               const lbl = matchRun![i] || "";
@@ -268,6 +280,49 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           </div>
         </div>
       )}
+
+      {editPen != null && holes[editPen] && (() => {
+        const h = holes[editPen!];
+        const penN = h.penalties || 0;
+        const sandOn = !!h.sand;
+        const disp = sandOn && penN > 0 ? "*" : sandOn ? "S" : penN > 0 ? String(penN) : "·";
+        return (
+          <div onClick={() => setEditPen(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: 280, maxWidth: "100%", background: C.card, borderRadius: 14, padding: 16 }}>
+              <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>Hole {h.n} · par {h.par}</div>
+              <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>What happened on this hole?</div>
+
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 14 }}>
+                <span style={{ color: C.ink, fontSize: 14 }}>Greenside bunker</span>
+                <button onClick={() => onSet(editPen!, { sand: !sandOn })}
+                  style={{ border: `1px solid ${sandOn ? "#C9A227" : C.line}`, background: sandOn ? "#EFE2C0" : C.card, color: sandOn ? "#7A5A12" : C.faint, borderRadius: 8, padding: "6px 14px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
+                  {sandOn ? "S · on" : "S · off"}
+                </button>
+              </div>
+
+              <div style={{ marginTop: 14 }}>
+                <div style={{ color: C.ink, fontSize: 14, marginBottom: 6 }}>Penalty strokes</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {[0, 1, 2, 3].map((n) => (
+                    <button key={n} onClick={() => onSet(editPen!, { penalties: n })}
+                      style={{ flex: 1, textAlign: "center", border: `1px solid ${penN === n ? C.birdie : C.line}`, background: penN === n ? "#F6DEDB" : C.card, color: penN === n ? C.birdie : C.faint, borderRadius: 8, padding: "8px 0", fontWeight: 800, fontSize: 14, cursor: "pointer" }}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#F1EFE6", borderRadius: 8, padding: "8px 10px", marginTop: 14 }}>
+                <span style={{ color: C.faint, fontSize: 12 }}>Cell shows:</span>
+                <span style={{ color: "#7A5A12", fontWeight: 800, fontSize: 18 }}>{disp}</span>
+                <span style={{ color: C.faint, fontSize: 12 }}>{sandOn && penN > 0 ? "(bunker + penalty)" : sandOn ? "(greenside bunker)" : penN > 0 ? "(penalty strokes)" : ""}</span>
+              </div>
+
+              <button onClick={() => setEditPen(null)} style={{ width: "100%", marginTop: 14, background: C.green, color: C.cream, borderRadius: 8, padding: 10, fontWeight: 800, fontSize: 14, border: "none", cursor: "pointer" }}>Done</button>
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }
@@ -275,7 +330,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
 // READ-ONLY VIEW — vertical scorecard for a completed round. Fits screen width.
 export function ScoreViewCard({ round }: { round: Round }) {
   const hasPutts = round.holes.some((h) => h.putts != null);
-  const hasPens = round.holes.some((h) => (h.penalties || 0) > 0);
+  const hasPens = round.holes.some((h) => (h.penalties || 0) > 0 || !!h.sand);
   const hasDots = round.holes.some((h) => (h.recv || 0) > 0);
   const hasFw = round.holes.some((h) => h.fairway === "hit" || h.fairway === "miss");
 
@@ -315,12 +370,15 @@ export function ScoreViewCard({ round }: { round: Round }) {
           <div key="sc" style={{ ...headStyle, textAlign: "center" }}>Score</div>,
           ...(hasFw ? [<div key="fw" style={{ ...headStyle, textAlign: "center" }}>FW</div>] : []),
           ...(hasPutts ? [<div key="pu" style={{ ...headStyle, textAlign: "center" }}>Putt</div>] : []),
-          ...(hasPens ? [<div key="pe" style={{ ...headStyle, textAlign: "center" }}>Pen</div>] : []),
+          ...(hasPens ? [<div key="pe" style={{ ...headStyle, textAlign: "center" }}>Sand/Pen</div>] : []),
           <div key="pt" style={{ ...headStyle, textAlign: "center" }}>Pts</div>,
         ], { header: true })}
         {seg.map((h, j) => {
           const recv = h.recv || 0;
           const pts = stablefordPts(h.strokes, h.par, h.recv || 0);
+          const penN = h.penalties || 0; const sandOn = !!h.sand;
+          const spDisp = sandOn && penN > 0 ? "*" : sandOn ? "S" : penN > 0 ? String(penN) : "·";
+          const spCol = sandOn ? "#7A5A12" : penN > 0 ? C.birdie : C.faint;
           return Row([
             <div key="h" style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.hole_number}</div>,
             <div key="p" style={{ textAlign: "center", color: C.parBlue, fontWeight: 700, fontSize: 14 }}>{h.par}</div>,
@@ -329,7 +387,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
             <div key="sc" style={{ textAlign: "center" }}><ScoreMark hole={h} /></div>,
             ...(hasFw ? [<div key="fw" style={{ textAlign: "center", fontWeight: 800, fontSize: 13, color: h.fairway === "hit" ? C.greenMid : h.fairway === "miss" ? C.birdie : C.faint }}>{h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "miss" ? "✗" : "·"}</div>] : []),
             ...(hasPutts ? [<div key="pu" style={{ textAlign: "center", color: C.faint, fontSize: 13 }}>{h.putts ?? "·"}</div>] : []),
-            ...(hasPens ? [<div key="pe" style={{ textAlign: "center", color: (h.penalties || 0) > 0 ? C.birdie : C.faint, fontSize: 13 }}>{h.penalties || "·"}</div>] : []),
+            ...(hasPens ? [<div key="pe" style={{ textAlign: "center", color: spCol, fontWeight: spDisp === "*" ? 800 : 400, fontSize: spDisp === "*" ? 16 : 13 }}>{spDisp}</div>] : []),
             <div key="pt" style={{ textAlign: "center", color: ptsColor(pts), fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
           ]);
         })}

@@ -124,7 +124,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
       }
       for (const h of currentHoles) {
         await supabase.from("holes").update({
-          strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties || 0,
+          strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties || 0, sand: h.sand ?? false,
         }).eq("round_id", rid).eq("hole_number", h.hole_number);
       }
     } catch {
@@ -307,7 +307,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         }
         for (const h of holes) {
           await supabase.from("holes").update({
-            strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties || 0,
+            strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties || 0, sand: h.sand ?? false,
           }).eq("round_id", roundId).eq("hole_number", h.hole_number);
         }
         await supabase.from("rounds").update({ course_par: round.course_par, gross_score: null, status: "final" }).eq("id", roundId);
@@ -325,7 +325,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         const rows = holes.map((h) => ({
           round_id: roundId, hole_number: h.hole_number, par: h.par,
           stroke_index: h.stroke_index, strokes: h.strokes, putts: h.putts,
-          fairway: h.fairway, penalties: h.penalties || 0,
+          fairway: h.fairway, penalties: h.penalties || 0, sand: h.sand ?? false,
         }));
         const { error: e2 } = await supabase.from("holes").insert(rows);
         if (e2) throw e2;
@@ -395,7 +395,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
           const alloc = allocateStrokes(holes.map((h) => ({ hole_number: h.hole_number, stroke_index: h.stroke_index })), round.course_handicap);
           return holes.map((h) => ({
             n: h.hole_number, par: h.par, si: h.stroke_index,
-            strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties,
+            strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties, sand: h.sand,
             recv: alloc[h.hole_number] || 0,
           }));
         })()}
@@ -406,6 +406,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
           if (patch.putts !== undefined) p.putts = patch.putts;
           if (patch.fairway !== undefined) p.fairway = patch.fairway;
           if (patch.penalties !== undefined) p.penalties = patch.penalties ?? 0;
+          if (patch.sand !== undefined) p.sand = patch.sand;
           setHole(i, p);
         }}
       />

@@ -24,6 +24,7 @@ export type Hole = {
   putts: number | null;
   fairway: "hit" | "miss" | null;
   penalties: number;
+  sand?: boolean | null; // greenside bunker on this hole (for sand-save %)
   recv?: number; // strokes received (computed, not stored)
 };
 
@@ -175,6 +176,12 @@ export const scrambleStats = (rs: Round[]) => {
   const hs = rs.flatMap(played).filter((h) => h.strokes != null && h.putts != null);
   const missed = hs.filter((h) => !isGIR(h)); // missed green in regulation
   return { hit: missed.filter((h) => (h.strokes as number) <= h.par).length, total: missed.length };
+};
+// Sand saves: of the holes flagged as a greenside bunker (sand), how often the
+// player still made par or better (got up-and-down).
+export const sandSaveStats = (rs: Round[]) => {
+  const hs = rs.flatMap(played).filter((h) => !!h.sand && h.strokes != null);
+  return { hit: hs.filter((h) => (h.strokes as number) <= h.par).length, total: hs.length };
 };
 export const pct = (s: { hit: number; total: number }) =>
   s.total ? Math.round((100 * s.hit) / s.total) + "%" : "—";

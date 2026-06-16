@@ -8,7 +8,7 @@ import {
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, isGrossOnly, hasHoleDetail,
-  girStats, firStats, scrambleStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay, stablefordEstimable,
+  girStats, firStats, scrambleStats, sandSaveStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay, stablefordEstimable,
 } from "@/lib/golf";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
 import { RoundRow } from "@/components/rounds-list";
@@ -38,7 +38,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   const allHoles = done.flatMap(played);
   const withPutts = allHoles.filter((h) => h.putts != null);
   const avgPutts = withPutts.length ? withPutts.reduce((s, h) => s + (h.putts || 0), 0) / withPutts.length : null;
-  const gir = girStats(done), fir = firStats(done), scramble = scrambleStats(done);
+  const gir = girStats(done), fir = firStats(done), scramble = scrambleStats(done), sand = sandSaveStats(done);
   const pens = done.reduce((s, r) => s + pensOf(r), 0);
   const fulls = done.filter((r) => played(r).length >= 14 || isGrossOnly(r));
   const estimablePts = fulls.filter(stablefordEstimable);
@@ -63,6 +63,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
     girPct: gir.total ? Math.round((100 * gir.hit) / gir.total) : null,
     fairwayPct: fir.total ? Math.round((100 * fir.hit) / fir.total) : null,
     scramblingPct: scramble.total ? Math.round((100 * scramble.hit) / scramble.total) : null,
+    sandSavePct: sand.total ? Math.round((100 * sand.hit) / sand.total) : null,
     avgByPar: byPar,
     scoringMix: buckets, // eagles/birdies/pars/bogeys/doubles totals
     penaltiesTotal: pens,
@@ -90,7 +91,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   ].map((d) => ({ ...d, label: `${d.name}: ${d.v} (${distTotal ? Math.round((100 * d.v) / distTotal) : 0}%)` }));
 
   // Per-round value for each stat, for the click-to-expand drill-down.
-  type StatKey = "rounds" | "avgpar" | "best" | "diff" | "par3" | "par4" | "par5" | "pts" | "gir" | "fir" | "scramble" | "putts" | "threeputt" | "pen";
+  type StatKey = "rounds" | "avgpar" | "best" | "diff" | "par3" | "par4" | "par5" | "pts" | "gir" | "fir" | "scramble" | "sandsave" | "putts" | "threeputt" | "pen";
   const [detail, setDetail] = useState<StatKey | null>(null);
   const perRound = (key: StatKey, r: Round): string => {
     const hs = played(r);
@@ -105,6 +106,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
       case "pts": return stablefordDisplay(r);
       case "gir": { const g = girStats([r]); return g.total ? `${g.hit}/${g.total} (${Math.round(100 * g.hit / g.total)}%)` : "— (needs putts)"; }
       case "scramble": { const sc = scrambleStats([r]); return sc.total ? `${sc.hit}/${sc.total} (${Math.round(100 * sc.hit / sc.total)}%)` : "— (needs putts)"; }
+      case "sandsave": { const ss = sandSaveStats([r]); return ss.total ? `${ss.hit}/${ss.total} (${Math.round(100 * ss.hit / ss.total)}%)` : "— (no sand holes)"; }
       case "fir": { const f = firStats([r]); return f.total ? `${f.hit}/${f.total} (${Math.round(100 * f.hit / f.total)}%)` : "—"; }
       case "putts": { const p = hs.filter((h) => h.putts != null); return p.length ? `${puttsOf(r)} (${(puttsOf(r) / p.length).toFixed(2)}/hole)` : "—"; }
       case "threeputt": return `${hs.filter((h) => (h.putts || 0) >= 3).length}`;
@@ -114,7 +116,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   const detailLabels: Record<StatKey, string> = {
     rounds: "Score", avgpar: "vs par", best: "vs par", diff: "Differential",
     par3: "Avg par 3", par4: "Avg par 4", par5: "Avg par 5", pts: "Stableford",
-    gir: "GIR", fir: "Fairways", scramble: "Scrambling", putts: "Putts", threeputt: "3+ putts", pen: "Penalties",
+    gir: "GIR", fir: "Fairways", scramble: "Scrambling", sandsave: "Sand saves", putts: "Putts", threeputt: "3+ putts", pen: "Penalties",
   };
 
   return (
@@ -185,6 +187,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
         <Clk k="gir" d={detail} set={setDetail}><StatCard label="GIR" value={fracPct(gir)} sub={gir.total ? "greens in regulation" : "needs putts"} /></Clk>
         <Clk k="fir" d={detail} set={setDetail}><StatCard label="Fairways hit" value={fracPct(fir)} sub={fir.total ? "excludes par 3s" : "tap FW"} /></Clk>
         <Clk k="scramble" d={detail} set={setDetail}><StatCard label="Scrambling" value={fracPct(scramble)} sub={scramble.total ? "par+ after missing green" : "needs putts"} /></Clk>
+        <Clk k="sandsave" d={detail} set={setDetail}><StatCard label="Sand saves" value={fracPct(sand)} sub={sand.total ? "par+ from greenside bunker" : "tap S in Sand/Pen"} /></Clk>
         <Clk k="putts" d={detail} set={setDetail}><StatCard label="Putts / hole" value={avgPutts == null ? "—" : avgPutts.toFixed(2)} /></Clk>
         <Clk k="threeputt" d={detail} set={setDetail}><StatCard label="3+ putts / round" value={threePutts == null ? "—" : threePutts.toFixed(1)} sub="three-putt holes" /></Clk>
         <Clk k="pen" d={detail} set={setDetail}><StatCard label="Penalties" value={done.length ? (pens / done.length).toFixed(1) : "—"} sub="per round" /></Clk>
