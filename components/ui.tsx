@@ -29,7 +29,7 @@ export function ShortDateInput({ value, onChange, max }: { value: string; onChan
     return `${m}/${d}/${String(y).slice(2)}`;
   };
   return (
-    <div style={{ position: "relative", display: "inline-flex", marginTop: 6 }}>
+    <div style={{ position: "relative", display: "flex", width: "fit-content", marginTop: 6 }}>
       <div style={{ ...inputStyle, width: 116, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <span style={{ color: value ? C.ink : C.faint }}>{fmt(value)}</span>
         <span aria-hidden style={{ color: C.sage, fontSize: 12 }}>▾</span>
@@ -228,8 +228,8 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
               return (
                 <div key="pe" style={{ textAlign: "center" }}>
                   <button onClick={() => setEditPen(i)}
-                    style={{ border: `1px solid ${active ? "#C9A227" : C.line}`, borderRadius: 6, width: 44, height: 30, cursor: "pointer",
-                      background: active ? "#EFE2C0" : C.card, color: active ? "#7A5A12" : C.faint, fontWeight: 800, fontSize: disp === "*" ? 18 : 15 }}>
+                    style={{ border: `1px solid ${active ? C.birdie : C.line}`, borderRadius: 6, width: 44, height: 30, cursor: "pointer",
+                      background: active ? "#F6DEDB" : C.card, color: active ? C.birdie : C.faint, fontWeight: 800, fontSize: disp === "*" ? 18 : 15 }}>
                     {disp}
                   </button>
                 </div>
@@ -335,7 +335,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
 
               <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#F1EFE6", borderRadius: 8, padding: "8px 10px", marginTop: 14 }}>
                 <span style={{ color: C.faint, fontSize: 12 }}>Cell shows:</span>
-                <span style={{ color: "#7A5A12", fontWeight: 800, fontSize: 18 }}>{disp}</span>
+                <span style={{ color: C.birdie, fontWeight: 800, fontSize: 18 }}>{disp}</span>
                 <span style={{ color: C.faint, fontSize: 12 }}>{sandOn && penN > 0 ? "(bunker + penalty)" : sandOn ? "(greenside bunker)" : penN > 0 ? "(penalty strokes)" : ""}</span>
               </div>
 
@@ -399,7 +399,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
           const pts = stablefordPts(h.strokes, h.par, h.recv || 0);
           const penN = h.penalties || 0; const sandOn = !!h.sand;
           const spDisp = sandOn && penN > 0 ? "*" : sandOn ? "S" : penN > 0 ? String(penN) : "·";
-          const spCol = sandOn ? "#7A5A12" : penN > 0 ? C.birdie : C.faint;
+          const spCol = sandOn || penN > 0 ? C.birdie : C.faint;
           return Row([
             <div key="h" style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.hole_number}</div>,
             <div key="p" style={{ textAlign: "center", color: C.parBlue, fontWeight: 700, fontSize: 14 }}>{h.par}</div>,
