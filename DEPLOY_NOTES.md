@@ -1,26 +1,17 @@
-# Deploy notes — v1.0.24 (cumulative — full app, supersedes all prior)
+# Deploy notes — v1.0.25 (cumulative — full app, supersedes all prior)
 
-## Database — run in Supabase SQL editor (idempotent, safe to re-run)
-- NEW: supabase/migrations/0004_holes_sand.sql   (per-hole greenside-bunker flag)
-- If not already run: 0002_games_played_at.sql, 0003_games_allowance_pct.sql
-
-Existing holes default to sand = false, so nothing changes for past rounds.
+## Database
+- No NEW migration in this version.
+- If not already run: 0002 (match date), 0003 (allowance), 0004 (holes.sand).
 
 ## Deploy
 Copy over the repo → commit & push → Vercel auto-deploys.
 
-## New in v1.0.24 — Sand saves
-- The scorecard's penalty column is now "Sand / Pen" (one column). Tapping a
-  hole's cell opens a popup with a Greenside-bunker (S) on/off toggle and the
-  0–3 penalty stepper. The cell displays: * for both, S for bunker only, the
-  number for penalties only, · for neither.
-- New dashboard stat: Sand saves — of holes flagged as a greenside bunker, how
-  often you still made par or better. Tap it for a per-round breakdown. Sits
-  next to GIR / Fairways / Scrambling. Counts par-3 bunkers too.
-- The read-only round scorecard shows the same Sand/Pen column so a bunker-only
-  hole isn't hidden.
-
-## Carried forward (already in prior versions)
-- v1.0.22: Skins format + handicap allowance (all formats).
-- v1.0.23: date-field font fix; correction-reason only on real course edits;
-  fairways in the live per-9 subtotal.
+## Fixes in v1.0.25
+- Finished-round scorecard: the Sand/Pen column was too narrow (30px) and its
+  header collided with "Pts". Widened to 40px and the header now stacks on two
+  lines (Sand / Pen). The live entry card was already fine and is unchanged.
+- Round date & match date now use a compact field showing a short date
+  (e.g. 6/16/26) in a smaller box. The visible text is rendered in the page font
+  (not the browser's native date-control font), so it matches every other input;
+  tapping it still opens the normal date picker.

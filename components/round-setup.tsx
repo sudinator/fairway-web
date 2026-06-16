@@ -9,7 +9,7 @@ import {
 } from "@/lib/golf";
 import { buildCustomCourse, Course, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
-import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark, ShortDateInput } from "@/components/ui";
 import { buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
 
 const supabase = createClient();
@@ -587,8 +587,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
           <div style={{ marginTop: 12, display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end" }}>
             <div>
               <label style={{ color: C.sage, fontSize: 12 }}>Date played</label>
-              <input type="date" max={new Date().toISOString().slice(0, 10)} style={{ ...inputStyle, marginTop: 6, maxWidth: 180, fontFamily: "inherit" }}
-                value={playDate} onChange={(e) => setPlayDate(e.target.value)} />
+              <ShortDateInput value={playDate} onChange={setPlayDate} max={new Date().toISOString().slice(0, 10)} />
             </div>
             <div style={{ color: C.sage, fontSize: 12 }}>
               {playDate === new Date().toISOString().slice(0, 10) ? "Playing today" : "Logging a past round"}

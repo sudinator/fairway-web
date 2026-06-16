@@ -19,6 +19,27 @@ export const Eyebrow = ({ children }: { children: React.ReactNode }) => (
   <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 700 }}>{children}</div>
 );
 
+// Compact date field: shows a short M/D/YY date in the page font (so it matches
+// every other input) with a real native date picker layered transparently on top.
+export function ShortDateInput({ value, onChange, max }: { value: string; onChange: (v: string) => void; max?: string }) {
+  const fmt = (iso: string) => {
+    if (!iso) return "Pick date";
+    const [y, m, d] = iso.split("-").map(Number);
+    if (!y || !m || !d) return iso;
+    return `${m}/${d}/${String(y).slice(2)}`;
+  };
+  return (
+    <div style={{ position: "relative", display: "inline-flex", marginTop: 6 }}>
+      <div style={{ ...inputStyle, width: 116, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <span style={{ color: value ? C.ink : C.faint }}>{fmt(value)}</span>
+        <span aria-hidden style={{ color: C.sage, fontSize: 12 }}>▾</span>
+      </div>
+      <input aria-label="Pick date" type="date" value={value} max={max} onChange={(e) => onChange(e.target.value)}
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, border: "none", padding: 0, margin: 0, cursor: "pointer", background: "transparent" }} />
+    </div>
+  );
+}
+
 export function StatCard({ label, value, sub }: { label: string; value: React.ReactNode; sub?: string }) {
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 16px", flex: 1, minWidth: 118 }}>
@@ -349,7 +370,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
     const Row = (cells: React.ReactNode[], opts?: { header?: boolean; foot?: boolean }) => (
       <div style={{
         display: "grid",
-        gridTemplateColumns: `34px 30px 30px${hasDots ? " 34px" : ""} 1fr${hasFw ? " 30px" : ""}${hasPutts ? " 38px" : ""}${hasPens ? " 30px" : ""} 34px`,
+        gridTemplateColumns: `34px 30px 30px${hasDots ? " 34px" : ""} 1fr${hasFw ? " 30px" : ""}${hasPutts ? " 38px" : ""}${hasPens ? " 40px" : ""} 34px`,
         alignItems: "center", gap: 4,
         padding: opts?.header ? "0 4px 6px" : "6px 4px",
         borderBottom: opts?.header ? `1px solid ${C.line}` : opts?.foot ? "none" : `1px solid ${C.line}`,
@@ -370,7 +391,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
           <div key="sc" style={{ ...headStyle, textAlign: "center" }}>Score</div>,
           ...(hasFw ? [<div key="fw" style={{ ...headStyle, textAlign: "center" }}>FW</div>] : []),
           ...(hasPutts ? [<div key="pu" style={{ ...headStyle, textAlign: "center" }}>Putt</div>] : []),
-          ...(hasPens ? [<div key="pe" style={{ ...headStyle, textAlign: "center" }}>Sand/Pen</div>] : []),
+          ...(hasPens ? [<div key="pe" style={{ ...headStyle, textAlign: "center", lineHeight: 1.05 }}>Sand<br />Pen</div>] : []),
           <div key="pt" style={{ ...headStyle, textAlign: "center" }}>Pts</div>,
         ], { header: true })}
         {seg.map((h, j) => {

@@ -36,6 +36,7 @@ import {
   Eyebrow,
   NumPicker,
   ScoreEntryCard,
+  ShortDateInput,
 } from "@/components/ui";
 
 const supabase = createClient();
@@ -536,14 +537,9 @@ function CreateGame({
             onChange={(e) => setName(e.target.value)}
           />
         </div>
-        <div style={{ width: 150 }}>
+        <div>
           <label style={{ color: C.sage, fontSize: 12 }}>Match date</label>
-          <input
-            type="date"
-            style={{ ...inputStyle, marginTop: 6, fontFamily: "inherit" }}
-            value={matchDate}
-            onChange={(e) => setMatchDate(e.target.value || todayLocal())}
-          />
+          <div><ShortDateInput value={matchDate} onChange={(v) => setMatchDate(v || todayLocal())} max={todayLocal()} /></div>
         </div>
       </div>
 
