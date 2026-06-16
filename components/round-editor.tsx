@@ -373,6 +373,14 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     onCancel();
   };
 
+  // Only ask for a correction reason if the user actually changed course info
+  // (hole pars or stroke indexes) — not when editing scores/putts/fairways.
+  const courseInfoChanged = (() => {
+    const sig = (hs: { par?: number | null; stroke_index?: number | null }[]) =>
+      hs.map((h) => `${h.par ?? ""}:${h.stroke_index ?? ""}`).join("|");
+    return sig(holes) !== sig(initialHoles);
+  })();
+
   return (
     <div>
       <div style={{ color: C.sage, fontSize: 13, marginBottom: 10 }}>
@@ -402,6 +410,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         }}
       />
       {err && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{err}</div>}
+      {courseInfoChanged && (
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 14 }}>
         <label style={{ color: C.sage, fontSize: 12 }}>Reason for course correction <span style={{ color: C.gold }}>(required before saving course changes)</span></label>
         <textarea
@@ -412,6 +421,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         />
         <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>This reason is sent with the course correction request so app admins know what changed and why.</div>
       </div>
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 16, flexWrap: "wrap" }}>
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 24, fontWeight: 700 }}>
           {anyPlayed ? `${strokesOf(live)} (${toParStr(diffOf(live))}) · ${ptsOf(live)} pts` : "Enter scores above"}

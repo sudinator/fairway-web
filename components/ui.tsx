@@ -135,6 +135,8 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     const sPutts = seg.reduce((s, h) => s + (h.putts || 0), 0);
     const sPen = seg.reduce((s, h) => s + (h.penalties || 0), 0);
     const sPts = seg.reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
+    const sFwElig = seg.filter((h) => h.par >= 4 && (h.fairway === "hit" || h.fairway === "miss")).length;
+    const sFwHit = seg.filter((h) => h.par >= 4 && h.fairway === "hit").length;
     const cols = `26px 24px 24px${showOpp ? " 40px" : ""}${hasDots ? " 28px" : ""} 1fr${showFairway ? " 30px" : ""}${showPutts ? " 54px" : ""}${showPenalties ? " 48px" : ""} 28px${showRun ? " 44px" : ""}`;
     const Row = (cells: React.ReactNode[], opts?: { header?: boolean; foot?: boolean }) => (
       <div style={{
@@ -218,7 +220,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           })()] : []),
           ...(hasDots ? [<div key="d" />] : []),
           <div key="sc" style={{ textAlign: "center", color: C.green, fontWeight: 800, fontSize: 15 }}>{sScore || "–"}</div>,
-          ...(showFairway ? [<div key="fw" />] : []),
+          ...(showFairway ? [<div key="fw" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 11 }}>{sFwElig ? `${sFwHit}/${sFwElig}` : "–"}</div>] : []),
           ...(showPutts ? [<div key="pu" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 13 }}>{sPutts || "–"}</div>] : []),
           ...(showPenalties ? [<div key="pe" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 13 }}>{sPen || "–"}</div>] : []),
           <div key="pt" style={{ textAlign: "center", color: C.green, fontWeight: 800, fontSize: 14 }}>{sPts}</div>,

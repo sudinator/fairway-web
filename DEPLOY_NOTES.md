@@ -1,29 +1,20 @@
-# Deploy notes — v1.0.22 (cumulative — full app, supersedes all prior)
+# Deploy notes — v1.0.23 (cumulative — full app, supersedes all prior)
 
-## Database — run BOTH if not already done (Supabase SQL editor)
-1. `supabase/migrations/0002_games_played_at.sql`  (match date — from v1.0.19)
-2. `supabase/migrations/0003_games_allowance_pct.sql`  (handicap allowance — NEW)
-
-Both are idempotent and safe to re-run. Existing games default to 100% allowance
-(no behavior change). Run these before/at the deploy; until 0003 exists, creating
-a game won't save the allowance.
+## Database
+- No NEW migrations in this version.
+- If not already run: 0002 (match date) and 0003 (allowance) from earlier versions.
 
 ## Deploy
-Copy over the repo → commit & push (GitHub Desktop) → Vercel auto-deploys.
+Copy over the repo → commit & push → Vercel auto-deploys.
 
-## New in v1.0.22 (Wave 2)
-- Skins (net) — new game format. Lowest net on a hole wins the skin; ties carry
-  to the next hole. In-game view shows per-player skin totals, a carry banner,
-  per-hole winners, and the live "at stake" count on the next hole. No money in
-  the view by design (skin counts only).
-- Handicap allowance — set in game setup for ALL formats (playing handicap =
-  allowance% of course handicap). Defaults: 85% four-ball, 100% everything else;
-  editable with 100/90/85 presets or a custom %. Applied consistently to net
-  Stableford, singles match, four-ball, and Skins. At 100% nothing changes, so
-  existing/casual play is unaffected.
+## Fixes in v1.0.23
+- Match date field now uses the same font as the other inputs (game setup + New
+  Round).
+- "Reason for course correction" now appears ONLY when course info (hole pars or
+  stroke indexes) is actually changed — not when picking a course or editing
+  hole scores, in both New Round setup and the finished-round editor.
+- The live scorecard's per-9 subtotal now shows Fairways hit (e.g. 2/4) through
+  the holes played so far, alongside score/putts/penalties.
 
-## Carried forward (already in prior versions)
-- Four bug fixes; structured match date + auto-naming; scrambling %; betting
-  gated by TGC group id.
-
-(Nassau was considered and dropped to keep the app focused.)
+(Sand-save tracking is the next build — it adds a per-hole sand input and stat,
+which needs its own DB migration.)

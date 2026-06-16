@@ -24,6 +24,10 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
 }) {
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState<Course | null>(null);
+  // Snapshot of the course as selected/loaded, so we only ask for a correction
+  // reason when the user actually edits course info (rating/slope/par/SI) — not
+  // when merely picking a course or entering hole scores.
+  const [originalPicked, setOriginalPicked] = useState<Course | null>(null);
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState(index != null ? String(index) : "");
   const [showCustom, setShowCustom] = useState(false);
@@ -73,6 +77,11 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
     }));
   };
   useEffect(() => { loadFavorites(); }, [activeGroupId]);
+  // Re-snapshot the original only when a DIFFERENT course is selected/loaded
+  // (keyed on identity), so later inline edits are detectable as changes.
+  useEffect(() => {
+    setOriginalPicked(picked ? JSON.parse(JSON.stringify(picked)) : null);
+  }, [picked?.id, loadedFavId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Save the currently-picked course; if one with the same name exists, update it instead of duplicating.
   const saveFavorite = async () => {
@@ -578,7 +587,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
           <div style={{ marginTop: 12, display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end" }}>
             <div>
               <label style={{ color: C.sage, fontSize: 12 }}>Date played</label>
-              <input type="date" max={new Date().toISOString().slice(0, 10)} style={{ ...inputStyle, marginTop: 6, maxWidth: 180 }}
+              <input type="date" max={new Date().toISOString().slice(0, 10)} style={{ ...inputStyle, marginTop: 6, maxWidth: 180, fontFamily: "inherit" }}
                 value={playDate} onChange={(e) => setPlayDate(e.target.value)} />
             </div>
             <div style={{ color: C.sage, fontSize: 12 }}>
@@ -616,7 +625,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
             )}
           </div>
 
-          {picked && (
+          {picked && originalPicked && hasMaterialCourseChanges(originalPicked, picked) && (
             <div style={{ marginTop: 14 }}>
               <label style={{ color: C.sage, fontSize: 12 }}>Reason for course correction <span style={{ color: C.gold }}>(required when saving changes to an existing course)</span></label>
               <textarea

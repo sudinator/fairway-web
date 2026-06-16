@@ -540,7 +540,7 @@ function CreateGame({
           <label style={{ color: C.sage, fontSize: 12 }}>Match date</label>
           <input
             type="date"
-            style={{ ...inputStyle, marginTop: 6 }}
+            style={{ ...inputStyle, marginTop: 6, fontFamily: "inherit" }}
             value={matchDate}
             onChange={(e) => setMatchDate(e.target.value || todayLocal())}
           />
