@@ -97,7 +97,9 @@ export function courseChangeLines(current: Course | null | undefined, proposed: 
   add(changeLine("Location", (current as any).location, (proposed as any).location));
   add(changeLine("Facility/club", (current as any).club ?? (current as any).facility, (proposed as any).club ?? (proposed as any).facility));
   add(changeLine("External course ID", (current as any).externalId ?? (current as any).external_id, (proposed as any).externalId ?? (proposed as any).external_id));
-  add(changeLine("Corrected flag", (current as any).corrected, (proposed as any).corrected));
+  // Do not treat internal metadata flags such as `corrected` as admin-visible
+  // course changes. They can flip during save/link flows even when the golfer
+  // did not actually change course data.
 
   const currentTees = normalizeTeesForDiff((current as any).tees);
   const proposedTees = normalizeTeesForDiff((proposed as any).tees);
@@ -145,6 +147,14 @@ export function courseChangeLines(current: Course | null | undefined, proposed: 
 
   const fallbackChanged = JSON.stringify(current) !== JSON.stringify(proposed);
   return lines.length ? lines : [fallbackChanged ? "Underlying course data changed, but no mapped field-level difference was detected. Review the side-by-side course details before approval." : "No material field changes detected versus the current global course record."];
+}
+
+export function hasMaterialCourseChanges(current: Course | null | undefined, proposed: Course | null | undefined): boolean {
+  const lines = courseChangeLines(current, proposed);
+  return !lines.some((line) =>
+    line === "No material field changes detected versus the current global course record." ||
+    line === "Underlying course data changed, but no mapped field-level difference was detected. Review the side-by-side course details before approval."
+  );
 }
 
 export function buildCourseChangeSummary(current: Course | null | undefined, proposed: Course | null | undefined): string {

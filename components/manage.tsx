@@ -7,7 +7,7 @@ import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, NumPicker } from "@/components/ui";
 import { APP_VERSION, APP_BUILD_ID } from "@/lib/app-version";
-import { courseChangeLines, buildCourseChangeSummary } from "@/lib/course-diff";
+import { courseChangeLines, buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
 
 const supabase = createClient();
 
@@ -582,6 +582,7 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
   });
 
   const [reason, setReason] = useState("");
+  const initialCourseRef = React.useRef<Course>(JSON.parse(JSON.stringify(course)));
 
   const setName = (name: string) => setCourse({ ...course, name });
   const setLoc = (location: string) => setCourse({ ...course, location });
@@ -602,18 +603,32 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
 
   const save = async () => {
     if (!course.name.trim()) { setErr("Give the course a name."); return; }
-    const requiresReason = !!existingId;
-    if (requiresReason && !reason.trim()) { setErr("Please explain why this course change is needed so an admin can review it."); return; }
+    // A reason is required only when actual course data changed.
+    // Merely opening/viewing an existing course and saving/linking it to the group
+    // should not block the user with a reason requirement.
     const siErr = validateStrokeIndexes(course.holes.map((h) => ({ n: h.n, si: h.si })));
     if (siErr) { setErr("Can't save — " + siErr); return; }
     setSaving(true); setErr(null);
     try {
       const name = course.name.trim();
       if (existingId) {
+        // If the golfer only opened the course detail/editor and did not change
+        // anything, just keep/link the course in this group. Do not require a
+        // reason and do not create a global-review request.
+        const proposedBase = { ...course, name, location: course.location || "" };
+        const hasChanges = hasMaterialCourseChanges(initialCourseRef.current, proposedBase);
+        await linkCourseToGroup(supabase, activeGroupId, existingId, user.id);
+        if (!hasChanges) {
+          await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Someone", action: "course_linked", group_id: activeGroupId, summary: `Saved course "${name}" to this group library with no course-data changes` });
+          onSaved();
+          return;
+        }
+        if (!reason.trim()) { setErr("Please explain why this course change is needed so an admin can review it."); setSaving(false); return; }
+
         // Editing an existing global course creates a GROUP-SPECIFIC override immediately
         // and submits a pending global change request for app-admin review. It does not
         // overwrite the global record for every group.
-        const proposed = { ...course, name, location: course.location || "", corrected: true };
+        const proposed = { ...proposedBase, corrected: true };
         const { error: overrideErr } = await supabase.from("group_course_overrides").upsert({
           group_id: activeGroupId,
           course_id: existingId,
@@ -624,8 +639,8 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
           updated_at: new Date().toISOString(),
         }, { onConflict: "group_id,course_id" });
         if (overrideErr) throw overrideErr;
-        await linkCourseToGroup(supabase, activeGroupId, existingId, user.id);
 
+        const { data: currentRow } = await supabase.from("favorite_courses").select("data").eq("id", existingId).maybeSingle();
         await supabase.from("course_change_requests").insert({
           course_id: existingId,
           group_id: activeGroupId,
@@ -634,7 +649,7 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
           proposed_location: course.location || "",
           proposed_data: proposed,
           reason: reason.trim(),
-          change_summary: buildCourseChangeSummary(null, proposed),
+          change_summary: buildCourseChangeSummary((currentRow?.data as any) || initialCourseRef.current, proposed),
           status: "pending",
         });
         await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Someone", action: "course_edit_submitted", group_id: activeGroupId, summary: `Edited course "${name}" for this group and submitted it for global review` });
@@ -644,18 +659,25 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
         const { data: existsByName } = await supabase.from("favorite_courses").select("id").eq("name", name).maybeSingle();
         let courseId = existsByName?.id as string | undefined;
         if (courseId) {
-          const proposed = { ...course, name, location: course.location || "", corrected: true };
           await linkCourseToGroup(supabase, activeGroupId, courseId, user.id);
-          const { error: overrideErr } = await supabase.from("group_course_overrides").upsert({
-            group_id: activeGroupId, course_id: courseId, name, location: course.location || "", data: proposed, updated_by: user.id, updated_at: new Date().toISOString(),
-          }, { onConflict: "group_id,course_id" });
-          if (overrideErr) throw overrideErr;
-          await supabase.from("course_change_requests").insert({
-            course_id: courseId, group_id: activeGroupId, submitted_by: user.id, proposed_name: name, proposed_location: course.location || "", proposed_data: proposed,
-            reason: reason.trim() || "Added a group-specific version of an existing course.",
-            change_summary: buildCourseChangeSummary(null, proposed),
-            status: "pending",
-          });
+          const { data: currentRow } = await supabase.from("favorite_courses").select("data").eq("id", courseId).maybeSingle();
+          const proposedBase = { ...course, name, location: course.location || "" };
+          const currentData = (currentRow?.data as any) || proposedBase;
+          const hasChanges = hasMaterialCourseChanges(currentData, proposedBase);
+          if (hasChanges) {
+            if (!reason.trim()) { setErr("Please explain why this course change is needed so an admin can review it."); setSaving(false); return; }
+            const proposed = { ...proposedBase, corrected: true };
+            const { error: overrideErr } = await supabase.from("group_course_overrides").upsert({
+              group_id: activeGroupId, course_id: courseId, name, location: course.location || "", data: proposed, updated_by: user.id, updated_at: new Date().toISOString(),
+            }, { onConflict: "group_id,course_id" });
+            if (overrideErr) throw overrideErr;
+            await supabase.from("course_change_requests").insert({
+              course_id: courseId, group_id: activeGroupId, submitted_by: user.id, proposed_name: name, proposed_location: course.location || "", proposed_data: proposed,
+              reason: reason.trim(),
+              change_summary: buildCourseChangeSummary(currentData, proposed),
+              status: "pending",
+            });
+          }
         } else {
           const createdCourse = { ...course, name, location: course.location || "" };
           const { data: created, error } = await supabase.from("favorite_courses")
@@ -780,7 +802,7 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
 
       {existingId && (
         <div style={{ marginTop: 16 }}>
-          <label style={{ color: C.sage, fontSize: 12 }}>Reason for change <span style={{ color: C.gold }}>(required)</span></label>
+          <label style={{ color: C.sage, fontSize: 12 }}>Reason for change <span style={{ color: C.gold }}>(required only if you changed course data)</span></label>
           <textarea
             style={{ ...inputStyle, marginTop: 4, minHeight: 74, resize: "vertical" }}
             value={reason}

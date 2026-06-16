@@ -10,6 +10,7 @@ import {
 import { buildCustomCourse, Course, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
+import { buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
 
 const supabase = createClient();
 
@@ -103,29 +104,38 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
         data: picked,
       };
       if (courseId) {
-        if (!courseReason.trim()) { setFavMsg("Please add a reason for this course correction so an admin can review it."); setFavSaving(false); return; }
-        // Do not overwrite the global course record. Save this version for the
-        // current group and submit it for admin review before other groups see it.
-        const proposed = { ...picked, corrected: true };
-        const { error: overrideErr } = await supabase.from("group_course_overrides").upsert({
-          group_id: activeGroupId,
-          course_id: courseId,
-          name: picked.name,
-          location: picked.location,
-          data: proposed,
-          updated_by: null,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "group_id,course_id" });
-        if (overrideErr) throw overrideErr;
-        const { data: authUser } = await supabase.auth.getUser();
-        await supabase.from("course_change_requests").insert({
-          course_id: courseId, group_id: activeGroupId, submitted_by: authUser.user?.id || null,
-          proposed_name: picked.name, proposed_location: picked.location, proposed_data: proposed,
-          reason: courseReason.trim(),
-          change_summary: "Course correction saved from New Round setup. Review proposed course details against the current global course.",
-          status: "pending",
-        });
-        setFavMsg("Saved to this group's course library ★ (global review pending)");
+        const { data: currentRow } = await supabase.from("favorite_courses").select("data").eq("id", courseId).maybeSingle();
+        const proposedBase = { ...picked };
+        const currentData = (currentRow?.data as any) || proposedBase;
+        const hasChanges = hasMaterialCourseChanges(currentData, proposedBase);
+        await linkCourseToGroup(supabase, activeGroupId, courseId, null);
+        if (hasChanges) {
+          if (!courseReason.trim()) { setFavMsg("Please add a reason for this course correction so an admin can review it."); setFavSaving(false); return; }
+          // Do not overwrite the global course record. Save this version for the
+          // current group and submit it for admin review before other groups see it.
+          const proposed = { ...picked, corrected: true };
+          const { error: overrideErr } = await supabase.from("group_course_overrides").upsert({
+            group_id: activeGroupId,
+            course_id: courseId,
+            name: picked.name,
+            location: picked.location,
+            data: proposed,
+            updated_by: null,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: "group_id,course_id" });
+          if (overrideErr) throw overrideErr;
+          const { data: authUser } = await supabase.auth.getUser();
+          await supabase.from("course_change_requests").insert({
+            course_id: courseId, group_id: activeGroupId, submitted_by: authUser.user?.id || null,
+            proposed_name: picked.name, proposed_location: picked.location, proposed_data: proposed,
+            reason: courseReason.trim(),
+            change_summary: buildCourseChangeSummary(currentData, proposed),
+            status: "pending",
+          });
+          setFavMsg("Saved to this group's course library ★ (global review pending)");
+        } else {
+          setFavMsg("Saved to this group's course library ★");
+        }
       } else {
         const { data: created, error } = await supabase.from("favorite_courses")
           .insert({ group_id: activeGroupId, ...row })
@@ -146,9 +156,18 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   // Update the favorite that's currently loaded with the latest edits.
   const updateFavorite = async () => {
     if (!picked || !loadedFavId) return;
-    if (!courseReason.trim()) { setFavMsg("Please add a reason for this course correction so an admin can review it."); return; }
     setFavSaving(true); setFavMsg(null);
     try {
+      const { data: currentRow } = await supabase.from("favorite_courses").select("data").eq("id", loadedFavId).maybeSingle();
+      const currentData = (currentRow?.data as any) || picked;
+      const hasChanges = hasMaterialCourseChanges(currentData, picked);
+      await linkCourseToGroup(supabase, activeGroupId, loadedFavId, null);
+      if (!hasChanges) {
+        setFavMsg("Saved to this group's course library ★");
+        await loadFavorites();
+        return;
+      }
+      if (!courseReason.trim()) { setFavMsg("Please add a reason for this course correction so an admin can review it."); setFavSaving(false); return; }
       const proposed = { ...picked, corrected: true };
       const { error } = await supabase.from("group_course_overrides").upsert({
         group_id: activeGroupId, course_id: loadedFavId, name: picked.name, location: picked.location, data: proposed, updated_by: null, updated_at: new Date().toISOString(),
@@ -158,7 +177,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
       await supabase.from("course_change_requests").insert({
         course_id: loadedFavId, group_id: activeGroupId, submitted_by: authUser.user?.id || null, proposed_name: picked.name, proposed_location: picked.location, proposed_data: proposed,
         reason: courseReason.trim(),
-        change_summary: "Course correction saved from New Round setup. Review proposed course details against the current global course.",
+        change_summary: buildCourseChangeSummary(currentData, proposed),
         status: "pending",
       });
       setFavMsg("Updated for this group ★ (global review pending)");

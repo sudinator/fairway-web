@@ -11,6 +11,7 @@ import { buildCustomCourse, linkCourseToGroup, loadCoursesForGroup } from "@/lib
 import { saveDraft, loadDraft, clearDraft, draftHasScores } from "@/lib/draft";
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
+import { buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
 
 const supabase = createClient();
 
@@ -142,10 +143,6 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   // warned it's been improved rather than treating it as a different course.
   const saveCorrectedFavorite = async () => {
     setFavMsg(null);
-    if (!courseCorrectionReason.trim()) {
-      setFavMsg("Please add a reason for this course correction so an admin can review it.");
-      return;
-    }
     const coursePar = holes.reduce((s, h) => s + h.par, 0);
     const newHoles = holes.map((h) => ({ n: h.hole_number, par: h.par, si: h.stroke_index }));
     const siErr = validateStrokeIndexes(newHoles.map((h) => ({ n: h.n, si: h.si })));
@@ -192,6 +189,17 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         data: course,
       };
       if (courseId && round.group_id) {
+        const currentData = prevData || course;
+        const hasChanges = hasMaterialCourseChanges(currentData, course);
+        await linkCourseToGroup(supabase, round.group_id, courseId, null);
+        if (!hasChanges) {
+          setFavMsg("Course saved to this group's library ★");
+          return;
+        }
+        if (!courseCorrectionReason.trim()) {
+          setFavMsg("Please add a reason for this course correction so an admin can review it.");
+          return;
+        }
         // Save this correction for the current group immediately, then submit it
         // for app-admin review before it changes the global course for everyone.
         const { error: overrideErr } = await supabase.from("group_course_overrides").upsert({
@@ -209,7 +217,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
           course_id: courseId, group_id: round.group_id, submitted_by: authUser.user?.id || null,
           proposed_name: round.course, proposed_location: course.location, proposed_data: course,
           reason: courseCorrectionReason.trim(),
-          change_summary: "Course correction saved from Round Editor. Review proposed course details against the current global course.",
+          change_summary: buildCourseChangeSummary(currentData, course),
           status: "pending",
         });
         setFavMsg("Course updated for this group ★ (global review pending)");
