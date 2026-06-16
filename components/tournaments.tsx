@@ -56,6 +56,7 @@ type Game = {
   holes_meta: { n: number; par: number; si: number | null; yards?: number | null }[]; // par + stroke index (+ yardage) per hole
   game_type: "stableford" | "match" | "fourball" | "skins";
   allowance_pct?: number | null; // handicap allowance % applied to net scoring
+  marker_user_id?: string | null; // the player currently keeping score for the group
   pairings: { a: string; b: string }[]; // for match play: user_id vs user_id
   status?: "active" | "ended" | null;
   teams?: { key: string; name: string }[] | null; // two named teams for team match play
@@ -832,6 +833,8 @@ function GameRoom({
   );
   useEffect(() => { saveActiveGame(gameId, roomTab); }, [gameId, roomTab]);
   const [cardView, setCardView] = useState(false); // show the whole-group vertical scorecard
+  // When group scoring is switched on, bring everyone to the group card.
+  useEffect(() => { if (game?.marker_user_id) setCardView(true); }, [game?.marker_user_id]);
   // Non-organizers only ever see the scorecard.
   useEffect(() => {
     if (roomTab === "setup" && game && game.created_by !== user.id) setRoomTab("play");
@@ -918,6 +921,24 @@ function GameRoom({
     }, 60000);
     return () => clearInterval(t);
   }, [load, savingHole, game?.status]);
+
+  // Real-time: refresh within ~1s when anyone's scores or the marker change,
+  // so read-only viewers see the marker's entries land live. Guarded by
+  // lastEditRef so it never clobbers an edit this device just made.
+  useEffect(() => {
+    if (!gameId) return;
+    const refresh = () => {
+      if (Date.now() - (lastEditRef.current || 0) < 1500) return;
+      load();
+    };
+    const ch = supabase
+      .channel(`game-${gameId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "game_players", filter: `game_id=eq.${gameId}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "games", filter: `id=eq.${gameId}` }, refresh)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId]);
 
   // Lock-time safety: when the page hides (screen lock / app background), force the
   // latest scores into the local backup AND re-attempt the DB write, so a hole
@@ -1023,6 +1044,44 @@ function GameRoom({
       .eq("id", me.id);
     lastEditRef.current = Date.now();
     setSavingHole(null);
+  };
+
+  // Marker: write one hole for ANY player in the group. Requires marker rights,
+  // enforced server-side by RLS (see migration 0006).
+  const setPlayerHole = async (
+    playerId: string,
+    holeIdx: number,
+    patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | null },
+  ) => {
+    const target = players.find((p) => p.id === playerId);
+    if (!game || !target) return;
+    const n = game.holes_meta.length || 18;
+    const scores = [...(target.scores || Array(n).fill(null))];
+    const putts = [...(target.putts || Array(n).fill(null))];
+    const fairways = [...(target.fairways || Array(n).fill(null))];
+    if ("strokes" in patch) scores[holeIdx] = patch.strokes ?? null;
+    if ("putts" in patch) putts[holeIdx] = patch.putts ?? null;
+    if ("fairway" in patch) fairways[holeIdx] = patch.fairway ?? null;
+    const updated = { ...target, scores, putts, fairways };
+    setPlayers((ps) => ps.map((p) => (p.id === playerId ? updated : p)));
+    if (target.id === me?.id) setMe(updated);
+    lastEditRef.current = Date.now();
+    await supabase.from("game_players").update({ scores, putts, fairways }).eq("id", playerId);
+    lastEditRef.current = Date.now();
+  };
+
+  // Claim / release the group scorecard (the "marker"). Uses a SECURITY DEFINER
+  // RPC so only a group member can claim, and only the marker can release.
+  const takeOverScoring = async () => {
+    if (!game) return;
+    setGame({ ...game, marker_user_id: user.id }); // optimistic
+    setCardView(true);
+    await supabase.rpc("claim_marker", { p_game_id: game.id });
+  };
+  const releaseScoring = async () => {
+    if (!game) return;
+    setGame({ ...game, marker_user_id: null });
+    await supabase.rpc("release_marker", { p_game_id: game.id });
   };
 
   const completeSetup = async () => {
@@ -1468,8 +1527,19 @@ function GameRoom({
           <button onClick={() => setCardView(true)} style={{ ...btn(cardView), flex: 1, fontSize: 13 }}>Group card</button>
         </div>
       )}
+      {roomTab === "play" && !cardView && game.marker_user_id && !isEnded && (
+        <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>
+          Group scoring is on — enter and view scores on the <strong>Group card</strong>.
+        </div>
+      )}
       {roomTab === "play" && cardView ? (
-        <GroupScorecard game={game} players={players} user={user} />
+        <GroupScorecard game={game} players={players} user={user}
+          isMarker={game.marker_user_id === user.id}
+          markerName={game.marker_user_id ? (players.find((p) => p.user_id === game.marker_user_id)?.display_name ?? "Someone") : null}
+          onTakeOver={takeOverScoring}
+          onRelease={releaseScoring}
+          onSetHole={setPlayerHole}
+        />
       ) : game.game_type === "fourball" ? (
         <FourballView
           game={game}
@@ -1596,8 +1666,9 @@ function GameRoom({
         </>
       ) : null}
 
-      {/* My score entry */}
-      {roomTab === "play" && me && (
+      {/* My score entry — hidden while a marker is keeping score for the group
+          (scoring then happens only on the Group card, to avoid conflicts). */}
+      {roomTab === "play" && me && !(game.marker_user_id && !isEnded) && (
         <div style={{ marginTop: 22 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Eyebrow>{isEnded ? "YOUR FINAL SCORES" : "ENTER YOUR SCORES"}</Eyebrow>
@@ -1756,7 +1827,13 @@ function MyStatsLine({ me, holes }: { me: Player; holes: Hole[] }) {
 }
 
 // ---------------- Match play view ----------------
-function GroupScorecard({ game, players, user }: { game: Game; players: Player[]; user: any }) {
+function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver, onRelease, onSetHole }: {
+  game: Game; players: Player[]; user: any;
+  isMarker: boolean; markerName: string | null;
+  onTakeOver: () => void; onRelease: () => void;
+  onSetHole: (playerId: string, holeIdx: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | null }) => void;
+}) {
+  const [edit, setEdit] = useState<{ playerId: string; holeIdx: number } | null>(null);
   const allowance = game.allowance_pct ?? 100;
   const meta = game.holes_meta;
   const GREEN = "#1B7A4B", BLUE = "#1E5B8A", RED = "#C0392B";
@@ -1799,7 +1876,8 @@ function GroupScorecard({ game, players, user }: { game: Game; players: Player[]
           const recv = recvFor(p, m.si);
           const pts = stablefordPts(gross, m.par, recv);
           return (
-            <div key={p.id + i} style={cell}>
+            <div key={p.id + i} style={{ ...cell, cursor: isMarker ? "pointer" : "default", outline: isMarker ? "1px solid #E6E0CC" : "none" }}
+              onClick={isMarker ? () => setEdit({ playerId: p.id, holeIdx: i }) : undefined}>
               {recv > 0 && (
                 <div style={{ position: "absolute", top: 3, left: 4, display: "flex", gap: 2 }}>
                   {Array.from({ length: Math.min(recv, 2) }).map((_, d) => (
@@ -1837,6 +1915,24 @@ function GroupScorecard({ game, players, user }: { game: Game; players: Player[]
 
   return (
     <div style={{ marginTop: 16 }}>
+      {isMarker ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#3F3414", border: `0.5px solid ${C.gold}`, borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
+          <span style={{ color: C.gold, fontSize: 15 }}>✎</span>
+          <span style={{ color: "#E4CF86", fontSize: 12, flex: 1 }}>You're keeping score — tap a cell to edit</span>
+          <button onClick={onRelease} style={{ ...btn(false), fontSize: 11, padding: "5px 10px" }}>Hand off</button>
+        </div>
+      ) : markerName ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#13352A", border: "0.5px solid #2E6B55", borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
+          <span style={{ width: 9, height: 9, borderRadius: 99, background: "#5BD08A", boxShadow: "0 0 0 3px rgba(91,208,138,0.25)" }} />
+          <span style={{ color: "#CFE3D8", fontSize: 12, flex: 1 }}>Live · <strong style={{ color: C.cream }}>{markerName}</strong> is keeping score</span>
+          <button onClick={() => { if (confirm(`Take over scoring from ${markerName}?`)) onTakeOver(); }} style={{ ...btn(false), fontSize: 11, padding: "5px 10px" }}>Take over</button>
+        </div>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#13352A", border: "0.5px solid #2E6B55", borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
+          <span style={{ color: C.sage, fontSize: 12, flex: 1 }}>No one is keeping score for the group yet.</span>
+          <button onClick={onTakeOver} style={{ ...btn(true), fontSize: 11, padding: "5px 10px" }}>Keep score</button>
+        </div>
+      )}
       <div style={{ display: "flex", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
         <span style={{ color: "#7FD0A0", fontSize: 10 }}>● under</span>
         <span style={{ color: "#6FA8DC", fontSize: 10 }}>● par</span>
@@ -1861,6 +1957,55 @@ function GroupScorecard({ game, players, user }: { game: Game; players: Player[]
           {aggRow("TOT", 0, meta.length - 1)}
         </div>
       </div>
+
+      {edit && (() => {
+        const p = players.find((x) => x.id === edit.playerId);
+        const m = meta[edit.holeIdx];
+        if (!p || !m) return null;
+        const gross = p.scores?.[edit.holeIdx] ?? null;
+        const putts = p.putts?.[edit.holeIdx] ?? null;
+        const fw = p.fairways?.[edit.holeIdx] ?? null;
+        const recv = recvFor(p, m.si);
+        const net = gross != null && gross > 0 ? gross - recv : null;
+        const clampG = (v: number) => Math.max(1, Math.min(15, v));
+        return (
+          <div onClick={() => setEdit(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: 290, maxWidth: "100%", background: C.card, borderRadius: 14, padding: 16 }}>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+                <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{p.display_name} · Hole {m.n}</div>
+                {recv > 0 && <div style={{ color: "#E8730C", fontSize: 11, fontWeight: 700 }}>● gets a stroke</div>}
+              </div>
+              <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>Par {m.par}{m.yards ? ` · ${m.yards} yds` : ""} · SI {m.si ?? "–"}</div>
+
+              <div style={{ color: C.ink, fontSize: 13, marginTop: 14, marginBottom: 5 }}>Score (gross)</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <button onClick={() => onSetHole(p.id, edit.holeIdx, { strokes: clampG((gross || m.par) - 1) })} style={{ width: 36, height: 36, borderRadius: 8, border: `0.5px solid ${C.line}`, background: C.card, color: C.ink, fontSize: 20, cursor: "pointer" }}>−</button>
+                <div style={{ flex: 1, textAlign: "center" }}>
+                  <span style={{ fontSize: 26, fontWeight: 800, color: net == null ? C.faint : net < m.par ? "#1B7A4B" : net === m.par ? "#1E5B8A" : "#C0392B" }}>{gross && gross > 0 ? gross : "–"}</span>
+                  {net != null && <span style={{ color: C.faint, fontSize: 12 }}> · net {net}</span>}
+                </div>
+                <button onClick={() => onSetHole(p.id, edit.holeIdx, { strokes: clampG((gross || m.par) + 1) })} style={{ width: 36, height: 36, borderRadius: 8, border: "none", background: C.green, color: "#fff", fontSize: 20, cursor: "pointer" }}>+</button>
+              </div>
+
+              <div style={{ color: C.ink, fontSize: 13, marginTop: 14, marginBottom: 5 }}>Fairway {m.par < 4 ? <span style={{ color: C.faint }}>· n/a on a par 3</span> : ""}</div>
+              <div style={{ display: "flex", gap: 6, opacity: m.par < 4 ? 0.4 : 1, pointerEvents: m.par < 4 ? "none" : "auto" }}>
+                <button onClick={() => onSetHole(p.id, edit.holeIdx, { fairway: fw === "hit" ? null : "hit" })} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: `0.5px solid ${fw === "hit" ? "#1B6E4B" : C.line}`, background: fw === "hit" ? "#E1F0E7" : C.card, color: fw === "hit" ? "#1B6E4B" : C.faint, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Hit</button>
+                <button onClick={() => onSetHole(p.id, edit.holeIdx, { fairway: fw === "miss" ? null : "miss" })} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: `0.5px solid ${fw === "miss" ? C.birdie : C.line}`, background: fw === "miss" ? "#F6DEDB" : C.card, color: fw === "miss" ? C.birdie : C.faint, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>Miss</button>
+              </div>
+
+              <div style={{ color: C.ink, fontSize: 13, marginTop: 14, marginBottom: 5 }}>Putts</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button onClick={() => onSetHole(p.id, edit.holeIdx, { putts: Math.max(0, (putts || 0) - 1) })} style={{ width: 32, height: 32, borderRadius: 8, border: `0.5px solid ${C.line}`, background: C.card, color: C.ink, fontSize: 18, cursor: "pointer" }}>−</button>
+                <span style={{ color: C.ink, fontSize: 18, fontWeight: 700, minWidth: 16, textAlign: "center" }}>{putts ?? "–"}</span>
+                <button onClick={() => onSetHole(p.id, edit.holeIdx, { putts: Math.min(10, (putts || 0) + 1) })} style={{ width: 32, height: 32, borderRadius: 8, border: `0.5px solid ${C.line}`, background: C.card, color: C.ink, fontSize: 18, cursor: "pointer" }}>+</button>
+              </div>
+
+              <button onClick={() => setEdit(null)} style={{ width: "100%", marginTop: 16, background: C.green, color: C.cream, border: "none", borderRadius: 8, padding: 11, fontWeight: 800, fontSize: 14, cursor: "pointer" }}>Done</button>
+              <div style={{ color: C.faint, fontSize: 10, textAlign: "center", marginTop: 8 }}>Only the score is required. Players can add their own stats too.</div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
