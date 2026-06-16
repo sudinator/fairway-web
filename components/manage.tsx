@@ -7,6 +7,7 @@ import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, NumPicker } from "@/components/ui";
 import { APP_VERSION, APP_BUILD_ID } from "@/lib/app-version";
+import { courseChangeLines, buildCourseChangeSummary } from "@/lib/course-diff";
 
 const supabase = createClient();
 
@@ -63,105 +64,6 @@ function courseCardTitle(c: LibCourse) {
   return courseLabel(c.data || ({ name: c.name } as any));
 }
 
-function normalizeText(v: any): string {
-  return String(v ?? "").trim();
-}
-
-function sameValue(a: any, b: any): boolean {
-  if (typeof a === "number" || typeof b === "number") {
-    const na = Number(a), nb = Number(b);
-    if (Number.isFinite(na) || Number.isFinite(nb)) return Math.abs((Number.isFinite(na) ? na : 0) - (Number.isFinite(nb) ? nb : 0)) < 0.001;
-  }
-  return normalizeText(a) === normalizeText(b);
-}
-
-function changeLine(label: string, before: any, after: any): string | null {
-  if (sameValue(before, after)) return null;
-  const b = normalizeText(before) || "—";
-  const a = normalizeText(after) || "—";
-  return `${label}: ${b} → ${a}`;
-}
-
-function holeNumber(h: any, fallback: number): number {
-  const n = Number(h?.n ?? h?.hole_number ?? h?.holeNumber ?? fallback);
-  return Number.isFinite(n) && n > 0 ? n : fallback;
-}
-
-function holeStrokeIndex(h: any): number | null {
-  const v = h?.si ?? h?.stroke_index ?? h?.strokeIndex ?? h?.handicap ?? null;
-  if (v == null || v === "") return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-function normalizeHolesForDiff(holes: any[] | undefined | null): { n: number; par: any; si: any }[] {
-  return (holes || []).map((h, i) => ({
-    n: holeNumber(h, i + 1),
-    par: h?.par ?? null,
-    si: holeStrokeIndex(h),
-  }));
-}
-
-function normalizeTeesForDiff(tees: any[] | undefined | null): any[] {
-  return (tees || []).map((t) => ({
-    name: t?.name ?? t?.tee_name ?? t?.teeName ?? "",
-    rating: t?.rating ?? t?.course_rating ?? t?.courseRating ?? null,
-    slope: t?.slope ?? t?.slope_rating ?? t?.slopeRating ?? null,
-    par: t?.par ?? t?.par_total ?? t?.parTotal ?? null,
-  }));
-}
-
-function courseChangeLines(current: Course | null | undefined, proposed: Course | null | undefined): string[] {
-  if (!proposed) return ["No proposed course data was included with this request."];
-  if (!current) return ["New or missing global baseline — review the proposed course details before approval."];
-
-  const lines: string[] = [];
-  const add = (line: string | null) => { if (line) lines.push(line); };
-
-  add(changeLine("Display name", courseLabel(current), courseLabel(proposed)));
-  add(changeLine("Location", current.location, proposed.location));
-  add(changeLine("Facility", (current as any).club, (proposed as any).club));
-  add(changeLine("Layout/course name", current.name, proposed.name));
-
-  const currentTees = normalizeTeesForDiff((current as any).tees);
-  const proposedTees = normalizeTeesForDiff((proposed as any).tees);
-  const maxTees = Math.max(currentTees.length, proposedTees.length);
-  for (let i = 0; i < maxTees; i++) {
-    const before = currentTees[i];
-    const after = proposedTees[i];
-    const label = after?.name || before?.name || `Tee ${i + 1}`;
-    if (!before && after) { lines.push(`Added tee ${label}: rating ${after.rating ?? "—"}, slope ${after.slope ?? "—"}, par ${after.par ?? "—"}`); continue; }
-    if (before && !after) { lines.push(`Removed tee ${label}`); continue; }
-    if (!before || !after) continue;
-    add(changeLine(`${label} tee name`, before.name, after.name));
-    add(changeLine(`${label} rating`, before.rating, after.rating));
-    add(changeLine(`${label} slope`, before.slope, after.slope));
-    add(changeLine(`${label} par`, before.par, after.par));
-  }
-
-  const currentHoles = normalizeHolesForDiff((current as any).holes);
-  const proposedHoles = normalizeHolesForDiff((proposed as any).holes);
-  const byCurrentHole = new Map(currentHoles.map((h) => [h.n, h]));
-  const byProposedHole = new Map(proposedHoles.map((h) => [h.n, h]));
-  const holeNums = Array.from(new Set([...Array.from(byCurrentHole.keys()), ...Array.from(byProposedHole.keys())])).sort((a, b) => a - b);
-  for (const n of holeNums) {
-    const before = byCurrentHole.get(n);
-    const after = byProposedHole.get(n);
-    if (!before && after) { lines.push(`Added hole ${n}: par ${after.par ?? "—"}, S.I. ${after.si ?? "—"}`); continue; }
-    if (before && !after) { lines.push(`Removed hole ${n}`); continue; }
-    if (!before || !after) continue;
-    add(changeLine(`Hole ${n} par`, before.par, after.par));
-    add(changeLine(`Hole ${n} stroke index`, before.si ?? "—", after.si ?? "—"));
-  }
-
-  const fallbackChanged = JSON.stringify(current) !== JSON.stringify(proposed);
-  return lines.length ? lines : [fallbackChanged ? "Underlying course data changed, but no mapped field-level difference was detected. Review the side-by-side course details before approval." : "No material field changes detected versus the current global course record."];
-}
-
-function buildCourseChangeSummary(current: Course | null | undefined, proposed: Course | null | undefined): string {
-  return courseChangeLines(current, proposed).join("\n").slice(0, 4000);
-}
-
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "Unknown time";
   return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
@@ -171,8 +73,8 @@ function CourseChangeSummary({ req }: { req: CourseEditRequest }) {
   const current = req.current_course?.data || null;
   const proposed = req.proposed_data || null;
   const lines = courseChangeLines(current, proposed);
-  const visible = lines.slice(0, 30);
-  const extra = Math.max(0, lines.length - visible.length);
+  const visible = lines;
+  const extra = 0;
   const submitter = req.submitter_name || req.submitter_email || "Unknown user";
 
   return (
@@ -201,11 +103,10 @@ function CourseChangeSummary({ req }: { req: CourseEditRequest }) {
         </div>
       </div>
       <div style={{ background: "#FFF8E1", border: `1px solid ${C.gold}`, borderRadius: 10, padding: 10 }}>
-        <div style={{ color: C.green, fontSize: 11, letterSpacing: 1.5, fontWeight: 800, marginBottom: 6 }}>WHAT CHANGED</div>
+        <div style={{ color: C.green, fontSize: 11, letterSpacing: 1.5, fontWeight: 800, marginBottom: 6 }}>WHAT CHANGED ({lines.length})</div>
         {visible.map((line, i) => (
           <div key={i} style={{ color: C.ink, fontSize: 12, padding: "3px 0", borderTop: i === 0 ? "none" : `1px solid ${C.line}` }}>{line}</div>
         ))}
-        {extra > 0 && <div style={{ color: C.faint, fontSize: 12, marginTop: 6 }}>+ {extra} more change{extra === 1 ? "" : "s"}</div>}
       </div>
     </div>
   );
@@ -778,19 +679,6 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
           Changes save immediately for this group and are submitted to an app admin for global approval before other groups see them.
         </div>
       )}
-      {existingId && (
-        <div style={{ marginTop: 12 }}>
-          <label style={{ color: C.sage, fontSize: 12 }}>Reason for change <span style={{ color: C.gold }}>(required)</span></label>
-          <textarea
-            style={{ ...inputStyle, marginTop: 4, minHeight: 74, resize: "vertical" }}
-            value={reason}
-            placeholder="Example: The current scorecard shows hole 7 is now a par 5, and the blue tee slope was rerated to 131."
-            onChange={(e) => setReason(e.target.value)}
-          />
-          <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>This will be shown to app admins when they approve or reject the global course change.</div>
-        </div>
-      )}
-
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
         <div style={{ flex: 2, minWidth: 200 }}>
           <label style={{ color: C.sage, fontSize: 12 }}>Course name</label>
@@ -889,6 +777,19 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
       </div>
 
       {err && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{err}</div>}
+
+      {existingId && (
+        <div style={{ marginTop: 16 }}>
+          <label style={{ color: C.sage, fontSize: 12 }}>Reason for change <span style={{ color: C.gold }}>(required)</span></label>
+          <textarea
+            style={{ ...inputStyle, marginTop: 4, minHeight: 74, resize: "vertical" }}
+            value={reason}
+            placeholder="Example: The current scorecard shows hole 7 is now a par 5, and the blue tee slope was rerated to 131."
+            onChange={(e) => setReason(e.target.value)}
+          />
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>This reason is shown to app admins when they review the global course change.</div>
+        </div>
+      )}
       <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
         <button style={btn(false)} onClick={onCancel}>Cancel</button>
         <button style={{ ...btn(true), opacity: saving ? 0.5 : 1 }} disabled={saving} onClick={save}>{saving ? "Saving…" : "Save to library"}</button>
