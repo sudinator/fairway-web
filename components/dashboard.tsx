@@ -8,7 +8,7 @@ import {
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, isGrossOnly, hasHoleDetail,
-  girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay,
+  girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay, stablefordEstimable,
 } from "@/lib/golf";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
 import { RoundRow } from "@/components/rounds-list";
@@ -41,8 +41,9 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   const gir = girStats(done), fir = firStats(done);
   const pens = done.reduce((s, r) => s + pensOf(r), 0);
   const fulls = done.filter((r) => played(r).length >= 14 || isGrossOnly(r));
-  const avgPts = fulls.length ? fulls.reduce((s, r) => s + estimatedStablefordPts(r), 0) / fulls.length : null;
-  const anyEstimatedPts = fulls.some(hasEstimatedStableford);
+  const estimablePts = fulls.filter(stablefordEstimable);
+  const avgPts = estimablePts.length ? estimablePts.reduce((s, r) => s + estimatedStablefordPts(r), 0) / estimablePts.length : null;
+  const anyEstimatedPts = estimablePts.some(hasEstimatedStableford);
   const buckets = holeBuckets(done);
   const byPar = avgByPar(done);
   const diffs = done.map(roundDifferential).filter((d): d is number => d != null);
@@ -66,7 +67,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
     penaltiesTotal: pens,
   };
 
-  const trend = sorted.map((r, i) => ({ i: i + 1, name: fmtDate(r.played_at), diff: diffOf(r), pts: estimatedStablefordPts(r), course: r.course, estimated: hasEstimatedStableford(r) }));
+  const trend = sorted.map((r, i) => ({ i: i + 1, name: fmtDate(r.played_at), diff: diffOf(r), pts: stablefordEstimable(r) ? estimatedStablefordPts(r) : null, course: r.course, estimated: hasEstimatedStableford(r) }));
   // Dynamic axis domains: fit the data range with a little padding, instead of anchoring at 0.
   const niceDomain = (vals: number[], pad: number): [number, number] => {
     if (vals.length === 0) return [0, 1];
@@ -76,7 +77,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
     return [Math.floor(lo), Math.ceil(hi)];
   };
   const diffDomain = niceDomain(trend.map((t) => t.diff), 2);
-  const ptsVals = trend.map((t) => t.pts).filter((v) => v > 0);
+  const ptsVals = trend.map((t) => t.pts).filter((v): v is number => v != null && v > 0);
   const ptsDomain = niceDomain(ptsVals, 2);
   const distTotal = buckets.eagle + buckets.birdie + buckets.par + buckets.bogey + buckets.double;
   const distData = [

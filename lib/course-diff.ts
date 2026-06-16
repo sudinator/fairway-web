@@ -6,9 +6,13 @@ function normalizeText(v: any): string {
 }
 
 function sameValue(a: any, b: any): boolean {
-  const aEmpty = a == null || a === "";
-  const bEmpty = b == null || b === "";
+  // Treat null/undefined/""/whitespace as genuinely empty BEFORE any numeric
+  // coercion — otherwise JS's Number(null)===0 makes a blank→0 change look
+  // unchanged, hiding it from the field-level diff.
+  const aEmpty = normalizeText(a) === "";
+  const bEmpty = normalizeText(b) === "";
   if (aEmpty && bEmpty) return true;
+  if (aEmpty !== bEmpty) return false; // one side blank, the other not → real change
   const na = Number(a), nb = Number(b);
   if ((Number.isFinite(na) && normalizeText(a) !== "") || (Number.isFinite(nb) && normalizeText(b) !== "")) {
     return Number.isFinite(na) && Number.isFinite(nb) && Math.abs(na - nb) < 0.001;

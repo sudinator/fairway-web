@@ -30,10 +30,11 @@ That's it. Everything else is automatic.
 ## Courses
 
 This version does NOT use GHIN (that requires per-user logins that don't work
-for a shared public app). Instead it ships with a handful of famous courses and
-lets anyone add their own course by copying the par/rating/slope off the
-physical scorecard — saved for reuse. Ratings shown for the built-in courses are
-representative; always confirm against the card in your cart.
+for a shared public app). Courses come from a live search of golfcourseapi.com
+(~30,000 courses); anyone can also add their own course by copying the
+par/rating/slope off the physical scorecard — saved for reuse and shareable
+within a group. Always confirm a course's details against the card in your cart;
+members can correct a course's pars/rating/stroke index and save the fix.
 
 ## Running it on your own PC first (optional)
 

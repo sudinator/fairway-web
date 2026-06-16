@@ -46,72 +46,32 @@ function standardHoles(pars: number[]): CourseHole[] {
 
 const P72 = [4, 4, 5, 3, 4, 4, 3, 5, 4, 4, 4, 3, 5, 4, 4, 3, 5, 4];
 
-export const STARTER_COURSES: Course[] = [
-  {
-    id: "bethpage-black",
-    name: "Bethpage State Park — Black Course",
-    location: "Farmingdale, NY",
-    tees: [
-      { name: "Black", rating: 77.5, slope: 148, par: 71 },
-      { name: "Blue", rating: 74.6, slope: 140, par: 71 },
-      { name: "White", rating: 72.7, slope: 134, par: 71 },
-    ],
-    holes: standardHoles([4, 4, 4, 5, 4, 4, 3, 4, 4, 4, 4, 4, 4, 3, 4, 4, 3, 5]),
-  },
-  {
-    id: "pebble-beach",
-    name: "Pebble Beach Golf Links",
-    location: "Pebble Beach, CA",
-    tees: [
-      { name: "Gold", rating: 74.8, slope: 144, par: 72 },
-      { name: "Blue", rating: 72.7, slope: 135, par: 72 },
-      { name: "White", rating: 71.0, slope: 130, par: 72 },
-    ],
-    holes: standardHoles([4, 5, 4, 4, 3, 5, 3, 4, 4, 4, 4, 3, 4, 5, 4, 4, 3, 5]),
-  },
-  {
-    id: "torrey-pines-south",
-    name: "Torrey Pines — South Course",
-    location: "La Jolla, CA",
-    tees: [
-      { name: "Black", rating: 78.0, slope: 144, par: 72 },
-      { name: "Blue", rating: 74.6, slope: 136, par: 72 },
-      { name: "White", rating: 72.1, slope: 129, par: 72 },
-    ],
-    holes: standardHoles(P72),
-  },
-  {
-    id: "st-andrews-old",
-    name: "St Andrews — Old Course",
-    location: "St Andrews, Scotland",
-    tees: [
-      { name: "Championship", rating: 73.1, slope: 132, par: 72 },
-      { name: "Medal", rating: 72.0, slope: 128, par: 72 },
-    ],
-    holes: standardHoles([4, 4, 4, 4, 5, 4, 4, 3, 4, 4, 3, 4, 4, 5, 4, 4, 4, 4]),
-  },
-  {
-    id: "tpc-sawgrass",
-    name: "TPC Sawgrass — THE PLAYERS Stadium",
-    location: "Ponte Vedra Beach, FL",
-    tees: [
-      { name: "Tournament", rating: 76.8, slope: 155, par: 72 },
-      { name: "Blue", rating: 74.0, slope: 142, par: 72 },
-      { name: "White", rating: 71.6, slope: 135, par: 72 },
-    ],
-    holes: standardHoles([4, 5, 3, 4, 4, 4, 4, 3, 5, 4, 5, 4, 3, 4, 4, 3, 3, 4]),
-  },
-];
+// NOTE: The old STARTER_COURSES list (Bethpage/Pebble/Torrey/St Andrews/Sawgrass)
+// was removed. The app never surfaced it — courses come from golfcourseapi search
+// and from buildCustomCourse — and its representative pars/ratings were a source
+// of subtle handicap errors. Do not re-introduce a hardcoded course list.
 
 // Build a generic course when a user types one we don't have.
 export function buildCustomCourse(name: string, location: string, par: number, rating: number, slope: number): Course {
-  // Distribute pars to roughly hit the requested total around a par-72 shape.
+  // Distribute pars to hit the requested total around a par-72 shape. We loop
+  // (rather than a single pass) so low pars (par-3/executive courses) and high
+  // pars are both reachable, bounded by par 3 and par 5 per hole.
   const base = [...P72];
   let total = base.reduce((s, p) => s + p, 0);
-  let i = 0;
-  while (total > par && i < 18) { if (base[i] > 3) { base[i]--; total--; } i++; }
-  i = 0;
-  while (total < par && i < 18) { if (base[i] < 5) { base[i]++; total++; } i++; }
+  let guard = 0;
+  while (total > par && guard < 18 * 5) {
+    let moved = false;
+    for (let i = 0; i < 18 && total > par; i++) { if (base[i] > 3) { base[i]--; total--; moved = true; } }
+    if (!moved) break; // every hole already at par 3 — can't go lower
+    guard++;
+  }
+  guard = 0;
+  while (total < par && guard < 18 * 5) {
+    let moved = false;
+    for (let i = 0; i < 18 && total < par; i++) { if (base[i] < 5) { base[i]++; total++; moved = true; } }
+    if (!moved) break; // every hole already at par 5 — can't go higher
+    guard++;
+  }
   return {
     id: "custom-" + Date.now().toString(36),
     name,

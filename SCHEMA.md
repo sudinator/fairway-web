@@ -13,22 +13,17 @@ pg_indexes) — it reflects the real database, not a guess.
 
 ---
 
-## Known gaps: code expects columns the live DB is missing
-These were found during the schema export. Add them to keep DB ⟷ code in sync:
-
-| Column | Why | Status |
-|---|---|---|
-| `rounds.status` | round auto-save backup (in_progress vs final) | **add it** (`alter table rounds add column if not exists status text not null default 'final';`) |
-| `rounds.gross_score` | total-only rounds | recommended (`alter table rounds add column if not exists gross_score int;`) |
-| `profiles.deactivated` | admin "deactivate player" feature | **add it if you use that feature** (`alter table profiles add column if not exists deactivated boolean not null default false;`) |
-
-Until added, those features silently no-op (the writes go nowhere).
+## Schema status
+Verified against a live `information_schema` export at app v1.0.18. The three
+columns previously flagged as missing (`rounds.status`, `rounds.gross_score`,
+`profiles.deactivated`) **now all exist** in the live DB, so those features no
+longer silently no-op.
 
 ---
 
 ## Tables (verified)
 
-**profiles** (`id` = auth.users.id): `display_name`, `email`, `handicap_index`, `ghin_number`, `phone`, `is_admin`, `active_group_id`, `last_active`, `updated_at`. *(No `deactivated` column in live DB — see gaps above.)*
+**profiles** (`id` = auth.users.id): `display_name`, `email`, `handicap_index`, `ghin_number`, `phone`, `is_admin`, `active_group_id`, `last_active`, `updated_at`, `deactivated` (bool, default false), `dashboard_ai` (jsonb — saved dashboard AI summary).
 
 **groups**: `id`, `name`, `created_by`, `status` (active/pending/declined), `request_note`, `created_at`.
 
@@ -36,17 +31,21 @@ Until added, those features silently no-op (the writes go nowhere).
 
 **group_invites** (powers invite links): `id`, `group_id`, `invite_code`, `role`, `status`, `created_by`, `used_by`, `used_at`, `expires_at` (default now + 30 days), `created_at`.
 
-**favorite_courses** (canonical, community-shared): `id`, `user_id` (default auth.uid()), `name`, `location`, **`data` (jsonb — holds tees + holes + meta, one column)**, `group_id`, `vetted`, `deleted`/`deleted_by`/`deleted_at`, `created_at`. Unique on (`group_id`, `name`) — per-group, not global.
+**favorite_courses** (canonical, community-shared): `id`, `user_id` (default auth.uid()), `name`, `location`, **`data` (jsonb — holds tees + holes + meta, one column)**, `group_id`, `vetted`, `external_id` (text — golfcourseapi id), `facility` (text), `corrected` (bool, default false), `deleted`/`deleted_by`/`deleted_at`, `created_at`. Unique on (`group_id`, `name`) — per-group, not global. *(Note: `external_id`/`facility`/`corrected` exist both as columns and inside `data` — keep them in sync.)*
 
 **group_courses** (link table): `id`, `group_id`, `course_id`, `added_by`, `created_at`. Unique on (`group_id`, `course_id`).
 
-**rounds**: `id`, `user_id`, `course`, `tee_name`, `rating`, `slope`, `course_par`, `handicap_index`, `course_handicap`, `group_id`, `played_at`, `created_at` (+ `status`, `gross_score` once added).
+**group_course_overrides** (per-group course corrections that override the global record inside one group only): `id`, `group_id`, `course_id`, `name`, `location`, `data` (jsonb), `updated_by`, `updated_at`, `created_at`.
+
+**course_change_requests** (admin approval queue for proposed global course edits): `id`, `course_id`, `group_id`, `submitted_by`, `proposed_name`, `proposed_location`, `proposed_data` (jsonb), `status` (default 'pending'), `reviewed_by`, `reviewed_at`, `reason`, `change_summary`, `created_at`.
+
+**rounds**: `id`, `user_id`, `course`, `tee_name`, `rating`, `slope`, `course_par`, `handicap_index`, `course_handicap`, `group_id`, `played_at` (**date**, not null, default current_date), `created_at`, `gross_score` (int), `status` (text, default 'final'), `ai_analysis` (text), `game_id` (uuid — set when recorded from a finished game).
 
 **holes**: `id`, `round_id`, `hole_number`, `par`, `stroke_index`, `strokes`, `putts`, `fairway`, `penalties`.
 
-**games**: `id`, `code`, `name`, `course`, `course_par`, `holes_meta` (jsonb), `group_id`, `game_type` (stableford/match/fourball), `status` (active/ended), `pairings` (jsonb), `teams` (jsonb), `foursomes` (jsonb), `created_by`, `created_at`. Unique on `code`.
+**games**: `id`, `code`, `name`, `course`, `course_par`, `played_at` (**date**, not null, default current_date — the match date), `holes_meta` (jsonb), `group_id`, `game_type` (stableford/match/fourball), `status` (active/ended), `pairings` (jsonb), `teams` (jsonb), `foursomes` (jsonb), `created_by`, `created_at`. Unique on `code`.
 
-**game_players**: `id`, `game_id`, `user_id` (default auth.uid()), `display_name`, `handicap_index`, `rating`, `slope`, `tee_name`, `course_handicap`, `scores`/`putts`/`fairways` (jsonb), `team`, `created_at`. Unique on (`game_id`, `user_id`).
+**game_players**: `id`, `game_id`, `user_id` (default auth.uid()), `display_name`, `handicap_index`, `rating`, `slope`, `tee_name`, `course_handicap`, `scores`/`putts`/`fairways` (jsonb), `team`, `no_show` (bool, default false), `created_at`. Unique on (`game_id`, `user_id`).
 
 **activity_log**: `id`, `actor_id`, `actor_name`, `action`, `summary`, `group_id`, `target_user_id`, `created_at`.
 

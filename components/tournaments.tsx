@@ -320,6 +320,13 @@ function CreateGame({
   onCreated: (id: string) => void;
 }) {
   const [name, setName] = useState("");
+  // Match date — defaults to today (local). Stored structured on the game so we
+  // can later summarize by season/month. YYYY-MM-DD to match a Postgres `date`.
+  const todayLocal = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const [matchDate, setMatchDate] = useState<string>(todayLocal());
   const [favorites, setFavorites] = useState<any[]>([]);
   const [pickedFav, setPickedFav] = useState<any | null>(null);
   const [teeIdx, setTeeIdx] = useState(0);
@@ -416,6 +423,10 @@ function CreateGame({
     setErr(null);
     try {
       const code = makeCode();
+      const typeLabel = gameType === "match" ? "Match Play" : gameType === "fourball" ? "Four-Ball" : "Stableford";
+      // TZ-safe date label for the auto-generated name (noon avoids offset rollover).
+      const dateLabel = new Date(matchDate + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+      const autoName = `${typeLabel} / ${pickedFav.name} / ${dateLabel}`;
       const holesMeta = pickedFav.holes.map((h: any) => ({
         n: h.n,
         par: h.par,
@@ -426,10 +437,10 @@ function CreateGame({
         .insert({
           code,
           group_id: activeGroupId,
-          name:
-            name.trim() || (gameType === "match" ? "Match Play" : gameType === "fourball" ? "Four-Ball" : "Tournament"),
+          name: name.trim() || autoName,
           course: pickedFav.name,
           course_par: coursePar,
+          played_at: matchDate,
           holes_meta: holesMeta,
           game_type: gameType,
           pairings: [],
@@ -509,8 +520,18 @@ function CreateGame({
         <input
           style={{ ...inputStyle, marginTop: 6 }}
           value={name}
-          placeholder="Saturday Skins"
+          placeholder="Leave blank to auto-name (e.g. Four-Ball / Pebble Beach / Jun 15, 2026)"
           onChange={(e) => setName(e.target.value)}
+        />
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <label style={{ color: C.sage, fontSize: 12 }}>Match date</label>
+        <input
+          type="date"
+          style={{ ...inputStyle, marginTop: 6 }}
+          value={matchDate}
+          onChange={(e) => setMatchDate(e.target.value || todayLocal())}
         />
       </div>
 

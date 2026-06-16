@@ -103,6 +103,26 @@ export const ptsOf = (r: Round) =>
 //   A net-par round estimates to 36 points for 18 holes.
 // - Partial hole detail: use actual points for entered holes and assume net par
 //   (2 Stableford points) for unentered holes.
+// How many holes a round represents. Hole-by-hole rounds know it directly; a
+// gross-only round stores no hole rows, so we infer from course par — a 9-hole
+// course tops out around par 40 and an 18-hole course starts around par 54, so
+// 50 cleanly separates them.
+export function roundHoleCount(r: Round): number {
+  const detail = played(r);
+  if (detail.length) return detail.length;
+  if (r.holes?.length) return r.holes.length;
+  if (r.course_par != null && r.course_par <= 50) return 9;
+  return 18;
+}
+
+// We only show an estimated Stableford for rounds that represent a full 18.
+// Hole-by-hole rounds always qualify; a 9-hole gross-only total is too thin to
+// estimate comparably, so callers should show "—" instead of a misleading number.
+export function stablefordEstimable(r: Round): boolean {
+  if (!isGrossOnly(r)) return true;
+  return roundHoleCount(r) >= 18;
+}
+
 export function estimatedStablefordPts(r: Round): number {
   const entered = played(r);
   const actual = ptsOf(r);
@@ -114,11 +134,12 @@ export function estimatedStablefordPts(r: Round): number {
   }
 
   if (isGrossOnly(r) && r.gross_score != null && r.course_par != null) {
-    const holesFactor = totalHoles > 0 ? totalHoles / 18 : 1;
-    const parForRound = r.course_par * holesFactor;
-    const chForRound = (ch ?? 0) * holesFactor;
-    const netToPar = r.gross_score - chForRound - parForRound;
-    return Math.max(0, Math.round(totalHoles * 2 - netToPar));
+    // course_par and course_handicap already correspond to the round's actual
+    // holes, so no scaling is needed — just net the gross to par and compare to
+    // the all-net-par baseline of 2 points per hole.
+    const holes = roundHoleCount(r);
+    const netToPar = r.gross_score - (ch ?? 0) - r.course_par;
+    return Math.max(0, Math.round(holes * 2 - netToPar));
   }
 
   const missing = Math.max(0, totalHoles - entered.length);
@@ -131,6 +152,7 @@ export function hasEstimatedStableford(r: Round): boolean {
 }
 
 export const stablefordDisplay = (r: Round) =>
+  !stablefordEstimable(r) ? "—" :
   hasEstimatedStableford(r) ? `${estimatedStablefordPts(r)} est pts` : `${ptsOf(r)} pts`;
 export const toParStr = (d: number) => (d === 0 ? "E" : d > 0 ? `+${d}` : `${d}`);
 export const fmtDate = (iso: string) =>
@@ -251,6 +273,10 @@ export function matchStatus(
     // Match decided: "X & Y" (up by X with Y to play, before the last counted hole)
     const upBy = Math.abs(lead);
     result = remaining === 0 ? `${upBy} UP` : `${upBy} & ${remaining}`;
+  } else if (remaining === 0 && thru > 0) {
+    // Went the full distance without an early close-out: a level finish is a
+    // halve ("AS"), otherwise the final margin. (Mirrors fourballStatus.)
+    result = lead === 0 ? "AS" : `${Math.abs(lead)} UP`;
   }
   return { thru, lead, aWins, bWins, halves, result };
 }
