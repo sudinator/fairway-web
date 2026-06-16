@@ -68,7 +68,7 @@ type Game = {
 type Player = {
   id: string;
   game_id: string;
-  user_id: string;
+  user_id: string | null; // null for guest players (no account)
   display_name: string;
   handicap_index: number | null;
   rating: number | null;
@@ -80,7 +80,14 @@ type Player = {
   fairways: ("hit" | "miss" | null)[]; // fairway result per hole (par 4/5)
   team?: string | null; // team key ("A"/"B") for team match play
   no_show?: boolean | null; // organizer-flagged no-show (four-ball: scored net double bogey)
+  is_guest?: boolean | null; // a guest player added for this game only
 };
+
+// Stable match identity for a player. Real players key on user_id (so nothing
+// about existing matches changes); guests have no account, so they key on their
+// game_players row id. Used everywhere pairings/foursomes store or look up a
+// player, so guests can be assigned to teams and matches like anyone.
+const pkey = (p: { user_id: string | null; id: string }) => p.user_id ?? p.id;
 
 // ---------------- Root tournament tab ----------------
 export default function Tournaments({
@@ -1690,7 +1697,7 @@ function GameRoom({
                 const pr = game.pairings.find((p) => p.a === user.id || p.b === user.id);
                 if (pr) {
                   const oppId = pr.a === user.id ? pr.b : pr.a;
-                  const oppP = players.find((p) => p.user_id === oppId);
+                  const oppP = players.find((p) => pkey(p) === oppId);
                   const allowPair = matchAllowance(me.course_handicap, oppP?.course_handicap ?? null, game.allowance_pct ?? 100);
                   matchAllow = allowPair.a;
                   oppAllow = allowPair.b;
@@ -1726,7 +1733,7 @@ function GameRoom({
               const pr = game.pairings.find((p) => p.a === user.id || p.b === user.id);
               if (!pr) return undefined;
               const oppId = pr.a === user.id ? pr.b : pr.a;
-              const oppP = players.find((p) => p.user_id === oppId);
+              const oppP = players.find((p) => pkey(p) === oppId);
               return oppP?.scores || undefined;
             })()}
             oppLabel={(() => {
@@ -1734,7 +1741,7 @@ function GameRoom({
               const pr = game.pairings.find((p) => p.a === user.id || p.b === user.id);
               if (!pr) return undefined;
               const oppId = pr.a === user.id ? pr.b : pr.a;
-              const oppP = players.find((p) => p.user_id === oppId);
+              const oppP = players.find((p) => pkey(p) === oppId);
               return oppP?.display_name?.split(" ")[0] || "Opp";
             })()}
             matchRun={(() => {
@@ -1742,7 +1749,7 @@ function GameRoom({
                 const pr = game.pairings.find((p) => p.a === user.id || p.b === user.id);
                 if (!pr) return undefined;
                 const oppId = pr.a === user.id ? pr.b : pr.a;
-                const oppP = players.find((p) => p.user_id === oppId);
+                const oppP = players.find((p) => pkey(p) === oppId);
                 if (!oppP) return undefined;
                 // Compute from MY perspective: me = A.
                 const prog = matchProgress(
@@ -1766,7 +1773,7 @@ function GameRoom({
                 const myIds = onA ? f.a : f.b;
                 const oppIds = onA ? f.b : f.a;
                 const members = [...f.a, ...f.b].map((uid: string) => {
-                  const p = players.find((pp) => pp.user_id === uid);
+                  const p = players.find((pp) => pkey(pp) === uid);
                   return { id: uid, gross: p?.scores || [], ch: p?.course_handicap ?? null, noShow: !!p?.no_show };
                 });
                 // myIds as the "A" side so positive lead = my team up.
@@ -1827,6 +1834,58 @@ function MyStatsLine({ me, holes }: { me: Player; holes: Hole[] }) {
 }
 
 // ---------------- Match play view ----------------
+function GuestManager({ game, players, onChanged }: { game: Game; players: Player[]; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [hcp, setHcp] = useState("");
+  const [busy, setBusy] = useState(false);
+  const guests = players.filter((p) => p.is_guest);
+  const n = game.holes_meta.length || 18;
+
+  const add = async () => {
+    const h = parseInt(hcp, 10);
+    if (!name.trim() || isNaN(h)) return;
+    setBusy(true);
+    await supabase.from("game_players").insert({
+      game_id: game.id, user_id: null, is_guest: true,
+      display_name: name.trim(), course_handicap: h,
+      scores: Array(n).fill(null), putts: Array(n).fill(null), fairways: Array(n).fill(null),
+    });
+    setName(""); setHcp(""); setBusy(false); setOpen(false); onChanged();
+  };
+  const remove = async (id: string) => {
+    if (!confirm("Remove this guest from the game?")) return;
+    await supabase.from("game_players").delete().eq("id", id);
+    onChanged();
+  };
+
+  return (
+    <div style={{ marginTop: 12, borderTop: `0.5px solid ${C.line}`, paddingTop: 12 }}>
+      <div style={{ color: C.sage, fontSize: 12, marginBottom: 6 }}>Guest players <span style={{ color: C.faint }}>(no app account — scored on this game only)</span></div>
+      {guests.length > 0 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+          {guests.map((g) => (
+            <span key={g.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.greenLight, borderRadius: 999, padding: "4px 10px", color: C.cream, fontSize: 13 }}>
+              {g.display_name} <span style={{ color: C.sage, fontSize: 11 }}>hcp {g.course_handicap}</span>
+              <button onClick={() => remove(g.id)} style={{ background: "none", border: "none", color: C.birdie, cursor: "pointer", fontSize: 14, padding: 0 }}>✕</button>
+            </span>
+          ))}
+        </div>
+      )}
+      {open ? (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Guest name" style={{ ...inputStyle, width: "auto", minWidth: 130 }} />
+          <input value={hcp} onChange={(e) => setHcp(e.target.value)} inputMode="numeric" placeholder="Course hcp" style={{ ...inputStyle, width: 100 }} />
+          <button onClick={add} disabled={busy} style={{ ...btn(true), fontSize: 12 }}>{busy ? "Adding…" : "Add"}</button>
+          <button onClick={() => { setOpen(false); setName(""); setHcp(""); }} style={{ ...btn(false), fontSize: 12 }}>Cancel</button>
+        </div>
+      ) : (
+        <button onClick={() => setOpen(true)} style={{ ...btn(false), fontSize: 12 }}>+ Add guest player</button>
+      )}
+    </div>
+  );
+}
+
 function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver, onRelease, onSetHole }: {
   game: Game; players: Player[]; user: any;
   isMarker: boolean; markerName: string | null;
@@ -1945,7 +2004,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
           {players.map((p, i) => (
             <div key={p.id} style={{ textAlign: "center", padding: "4px 2px", borderBottom: `2px solid ${teamColor(i)}` }}>
               <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {p.display_name}{p.user_id === user.id ? "" : ""}{(p as any).is_guest ? " ·G" : ""}
+                {p.display_name}{p.is_guest ? " ·G" : ""}
               </div>
               <div style={{ color: C.sage, fontSize: 9 }}>hcp {p.course_handicap}</div>
             </div>
@@ -2099,11 +2158,11 @@ function MatchView({
   const [busy, setBusy] = useState(false);
 
   const nameOf = (uid: string) =>
-    players.find((p) => p.user_id === uid)?.display_name || "—";
+    players.find((p) => pkey(p) === uid)?.display_name || "—";
   const playerOf = (uid: string) =>
-    players.find((p) => p.user_id === uid) || null;
+    players.find((p) => pkey(p) === uid) || null;
   const paired = new Set(game.pairings.flatMap((pr) => [pr.a, pr.b]));
-  const unpaired = players.filter((p) => !paired.has(p.user_id));
+  const unpaired = players.filter((p) => !paired.has(pkey(p)));
 
   const addPairing = async () => {
     if (!aSel || !bSel || aSel === bSel) return;
@@ -2239,7 +2298,7 @@ function MatchView({
             >
               <option value="">Player A…</option>
               {players.map((p) => (
-                <option key={p.user_id} value={p.user_id}>
+                <option key={pkey(p)} value={pkey(p)}>
                   {p.display_name}
                 </option>
               ))}
@@ -2252,7 +2311,7 @@ function MatchView({
             >
               <option value="">Player B…</option>
               {players.map((p) => (
-                <option key={p.user_id} value={p.user_id}>
+                <option key={pkey(p)} value={pkey(p)}>
                   {p.display_name}
                 </option>
               ))}
@@ -2273,6 +2332,7 @@ function MatchView({
               Not yet paired: {unpaired.map((p) => p.display_name).join(", ")}
             </div>
           )}
+          <GuestManager game={game} players={players} onChanged={onChanged} />
         </div>
       )}
 
@@ -2398,7 +2458,7 @@ function FourballView({
   onChanged: () => void;
 }) {
   const foursomes = game.foursomes || [];
-  const playerOf = (uid: string) => players.find((p) => p.user_id === uid) || null;
+  const playerOf = (uid: string) => players.find((p) => pkey(p) === uid) || null;
   const nameOf = (uid: string) => playerOf(uid)?.display_name || "—";
   const firstName = (uid: string) => (playerOf(uid)?.display_name || "—").split(" ")[0];
 
@@ -2435,7 +2495,7 @@ function FourballView({
 
   // Players not yet placed in any foursome.
   const placed = new Set(foursomes.flatMap((f) => [...f.a, ...f.b]));
-  const unplaced = players.filter((p) => !placed.has(p.user_id));
+  const unplaced = players.filter((p) => !placed.has(pkey(p)));
 
   const members4 = (f: { a: string[]; b: string[] }): FourballMember[] =>
     [...f.a, ...f.b].map((uid) => {
@@ -2481,7 +2541,7 @@ function FourballView({
                   <select defaultValue="" onChange={(e) => { if (e.target.value) { assign(f.id, team, e.target.value); e.target.value = ""; } }}
                     style={{ ...inputStyle, padding: "6px 8px", fontSize: 12, marginTop: 4 }}>
                     <option value="">+ Add player…</option>
-                    {unplaced.map((p) => <option key={p.id} value={p.user_id}>{p.display_name}</option>)}
+                    {unplaced.map((p) => <option key={p.id} value={pkey(p)}>{p.display_name}</option>)}
                   </select>
                 )}
               </div>
@@ -2494,6 +2554,7 @@ function FourballView({
             Unassigned: {unplaced.map((p) => p.display_name).join(", ")}
           </div>
         )}
+        {isCreator && <GuestManager game={game} players={players} onChanged={onChanged} />}
       </div>
     );
   }
