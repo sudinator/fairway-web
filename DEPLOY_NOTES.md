@@ -1,37 +1,37 @@
-# Birdie Num Num — v1.9.0 (onboarding & clarity pass)
+# Birdie Num Num — v1.10.0
 
-Five UX changes from the walkthrough, all additive — no scoring logic changed.
+Round clock, multi-use invite links, four-ball team colours/groups cleanup.
+
+## RUN THESE MIGRATIONS FIRST (in Supabase, in order)
+
+- migrations/0014_round_clock.sql      — two timestamp columns on game_players
+- migrations/0015_multiuse_group_invites.sql — multi-use invite columns + 2 functions
+
+0014 is trivial and safe. 0015 adds a NEW multi-use path and leaves the existing
+one-time invite untouched; I authored it without the original function source, so
+please smoke-test it (below).
 
 ## What's new
 
-1. Setup stepper + progress. The four-tab setup bar is now a stepper that shows
-   status: each step is a dot with a check when complete, the current step is
-   highlighted, and a line underneath tells you what's next. When everything's done it
-   says "you're ready — switch to Scorecard." The first step adapts by format: Stableford
-   reads "share the code so players can join anytime, even across tee times"; match /
-   four-ball / skins read "add everyone before matchups."
+1. Round clock (pace of play). A per-group elapsed timer shows on the play screen.
+   It starts the first time anyone in the group enters a score (no button needed —
+   a Start option could be added later, but this is automatic), and freezes when the
+   group's last hole is scored or the game ends. No pace warnings — just elapsed time,
+   per group (so 8am and 10am groups each run their own clock).
 
-2. On-course "pick a scorer" prompt. On the Group card, a group with no scorer now shows
-   a clear card -- "Who's keeping Group N's card?" with "I'll keep score" (claims the
-   marker) and "We'll each score our own." The cryptic group-tab marker is replaced with
-   "Group N · needs scorer" / "Group N ✓".
+2. Multi-use invite links. In the group admin panel you can now pick "Lasts 24 hours",
+   "7 days", or "One-time (single player)". The timed options create a link the whole
+   group can use until it expires; one-time keeps the old single-player behaviour. The
+   /join/[code] route accepts both.
 
-3. Four-ball team builder is team-aware. When a four-ball is a team game, the foursome
-   builder labels the two sides by team name and only offers that team's players for each
-   side, so a foursome can't accidentally be mixed-team (which would skew the team total).
+3. Four-ball team colours fixed. Team accent colours now follow the team NAME when it's
+   a colour word — name a team "Red" and it shows red, "Blue" shows blue (previously the
+   colour was keyed off team position, so "Red" could appear blue). Custom names fall
+   back to the default palette. Applies to the Teams step and both team scoreboards.
 
-4. Inline guidance on every setup step (folded into the stepper's "what's next" line),
-   e.g. "assign players to teams first" when the matchup pickers are empty, or "build the
-   matchups first" on the Groups step before any exist.
-
-5. Sharing + live status. The share-code button now uses the device share sheet when
-   available (falls back to copy). The score screen shows a green "Live" dot — scores
-   already auto-refresh every 60s and via realtime within ~1s, so ⟳ Refresh is just a
-   manual nudge, not a requirement.
-
-## SQL migrations
-
-NONE.
+4. Four-ball Groups step removed (it was redundant). Each foursome is now automatically
+   its own tee group, so group scoring lines up with the foursomes you build — no extra
+   "Groups" step for four-ball / best-ball skins.
 
 ## Verified locally
 
@@ -39,10 +39,12 @@ NONE.
 - next build: passes (7 routes)
 - Unit tests: 102/102 pass
 
-## Smoke-test suggestions (two devices)
+## Smoke-test (two devices / two accounts)
 
-- Setup: watch the stepper dots tick to ✓ as you set handicaps, teams, matchups, groups,
-  and the banner flip to "ready."
-- On the course: open the Group card on a phone in a group with no scorer, tap "I'll keep
-  score," and confirm the other phone goes read-only.
-- Team four-ball: confirm each foursome side only lists its own team's players.
+- Invite link: as a group admin, generate a 24-hour link; open it from two different
+  accounts and confirm both land in the group, and that an expired/used-up link is
+  refused.
+- Round clock: enter a score in a group and watch the timer start; score the 18th hole
+  (or end the game) and confirm it freezes.
+- Four-ball: name teams "Red"/"Blue" and confirm the colours match; confirm there's no
+  Groups step and each foursome can claim its own scorer on the course.

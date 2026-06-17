@@ -53,6 +53,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
   const [renameText, setRenameText] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [linkKind, setLinkKind] = useState<"24h" | "7d" | "once">("24h");
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -182,18 +183,32 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
     if (!active || !isAdmin) return;
     setBusy(true); setMsg(null); setInviteLink(null); setCopyMsg(null);
     try {
-      const { data, error } = await supabase.rpc("create_group_invite", {
-        group_uuid: active.id,
-        invite_role: "member",
-        valid_days: 30,
-      });
-      if (error) throw error;
-      const code = String(data || "");
+      let code = "";
+      if (linkKind === "once") {
+        const { data, error } = await supabase.rpc("create_group_invite", {
+          group_uuid: active.id,
+          invite_role: "member",
+          valid_days: 30,
+        });
+        if (error) throw error;
+        code = String(data || "");
+      } else {
+        const { data, error } = await supabase.rpc("create_group_invite_multi", {
+          invite_group: active.id,
+          invite_role: "member",
+          hours: linkKind === "7d" ? 168 : 24,
+          uses: null,
+        });
+        if (error) throw error;
+        code = String(data || "");
+      }
       if (!/^\d{6}$/.test(code)) throw new Error("Invite code was not generated correctly.");
       const origin = typeof window !== "undefined" ? window.location.origin : "https://birdienumnum.vercel.app";
       const link = `${origin}/join/${code}`;
       setInviteLink(link);
-      setMsg("Invite link generated. Share it with the player you want to add.");
+      setMsg(linkKind === "once"
+        ? "One-time invite link generated. Send it to a single player."
+        : `Invite link generated — anyone can use it for the next ${linkKind === "7d" ? "7 days" : "24 hours"}.`);
     } catch (e: any) {
       setMsg("Couldn't generate invite link: " + (e.message || "error"));
     } finally { setBusy(false); }
@@ -286,11 +301,17 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
 
           {isAdmin && (
             <div style={{ marginTop: 16 }}>
-              <Eyebrow>INVITE MEMBER</Eyebrow>
+              <Eyebrow>INVITE MEMBERS</Eyebrow>
               <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
-                Generate a one-time invite link. Send it to a player; after Google sign-in they will be added to this group automatically.
+                Generate a link to share. Anyone who opens it is added to this group after Google sign-in. Pick how long it stays valid.
               </div>
-              <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                {([["24h", "Lasts 24 hours"], ["7d", "7 days"], ["once", "One-time (single player)"]] as const).map(([k, lbl]) => (
+                  <button key={k} onClick={() => { setLinkKind(k); setInviteLink(null); }}
+                    style={{ ...btn(linkKind === k), fontSize: 12, padding: "7px 12px" }}>{lbl}</button>
+                ))}
+              </div>
+              <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
                 <button style={{ ...btn(true), opacity: !busy ? 1 : 0.5 }} disabled={busy} onClick={generateInvite}>Generate invite link</button>
                 {inviteLink && <button style={btn(false)} onClick={copyInviteLink}>Copy link</button>}
                 {copyMsg && <span style={{ color: C.gold, fontSize: 12 }}>{copyMsg}</span>}

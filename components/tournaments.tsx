@@ -88,6 +88,8 @@ type Player = {
   tee_group?: number | null; // which tee group (foursome) this player is in (1,2,3…)
   is_marker?: boolean | null; // keeps score for their tee group
   group_locked?: boolean | null; // this player's tee group has been finished/locked
+  clock_start?: string | null; // when this player first entered a score (round clock)
+  clock_end?: string | null; // when this player finished the last hole (round clock)
 };
 
 // Stable match identity for a player. Real players key on user_id (so nothing
@@ -95,6 +97,19 @@ type Player = {
 // game_players row id. Used everywhere pairings/foursomes store or look up a
 // player, so guests can be assigned to teams and matches like anyone.
 const pkey = (p: { user_id: string | null; id: string }) => p.user_id ?? p.id;
+
+// Team accent colour. If the team is *named* after a colour ("Red", "Blue", …) we
+// honour that name so "Red" never shows up blue; otherwise fall back to a stable
+// palette keyed off the team's position (0 / 1).
+const TEAM_COLOR_BY_NAME: Record<string, string> = {
+  red: "#E0695B", blue: "#5AA9E6", green: "#5BD08A", black: "#9AA0A6", white: "#D9D4C7",
+  yellow: "#E8C84A", gold: "#D8B24A", orange: "#E0915B", purple: "#B084E0", pink: "#E08AB8",
+  silver: "#C0C4C8", maroon: "#B05B5B", navy: "#5A7BC0", teal: "#4FB8A8",
+};
+const teamAccent = (name: string | null | undefined, index: number): string => {
+  const k = (name || "").trim().toLowerCase();
+  return TEAM_COLOR_BY_NAME[k] || (index === 0 ? "#5AA9E6" : "#E0915B");
+};
 
 
 function normalizeFavoriteCourse(row: any) {
@@ -1218,7 +1233,11 @@ function GameRoom({
     if ("fairway" in patch) fairways[holeIdx] = patch.fairway ?? null;
     if ("penalties" in patch) penalties[holeIdx] = patch.penalties ?? 0;
     if ("sand" in patch) sand[holeIdx] = patch.sand ?? false;
-    const updated = { ...me, scores, putts, fairways, penalties, sand };
+    const clockPatch: { clock_start?: string; clock_end?: string } = {};
+    const nowIso = new Date().toISOString();
+    if (me.clock_start == null) clockPatch.clock_start = nowIso;
+    if (scores[n - 1] != null && me.clock_end == null) clockPatch.clock_end = nowIso;
+    const updated = { ...me, scores, putts, fairways, penalties, sand, ...clockPatch };
     setMe(updated);
     setPlayers((ps) => ps.map((p) => (p.id === me.id ? updated : p)));
     // Synchronous local backup FIRST — survives an immediate lock even if the
@@ -1228,7 +1247,7 @@ function GameRoom({
     lastEditRef.current = Date.now();
     await supabase
       .from("game_players")
-      .update({ scores, putts, fairways, penalties, sand })
+      .update({ scores, putts, fairways, penalties, sand, ...clockPatch })
       .eq("id", me.id);
     lastEditRef.current = Date.now();
     setSavingHole(null);
@@ -1254,11 +1273,15 @@ function GameRoom({
     if ("fairway" in patch) fairways[holeIdx] = patch.fairway ?? null;
     if ("penalties" in patch) penalties[holeIdx] = patch.penalties ?? 0;
     if ("sand" in patch) sand[holeIdx] = patch.sand ?? false;
-    const updated = { ...target, scores, putts, fairways, penalties, sand };
+    const clockPatch: { clock_start?: string; clock_end?: string } = {};
+    const nowIso = new Date().toISOString();
+    if (target.clock_start == null) clockPatch.clock_start = nowIso;
+    if (scores[n - 1] != null && target.clock_end == null) clockPatch.clock_end = nowIso;
+    const updated = { ...target, scores, putts, fairways, penalties, sand, ...clockPatch };
     setPlayers((ps) => ps.map((p) => (p.id === playerId ? updated : p)));
     if (target.id === me?.id) setMe(updated);
     lastEditRef.current = Date.now();
-    await supabase.from("game_players").update({ scores, putts, fairways, penalties, sand }).eq("id", playerId);
+    await supabase.from("game_players").update({ scores, putts, fairways, penalties, sand, ...clockPatch }).eq("id", playerId);
     lastEditRef.current = Date.now();
   };
 
@@ -1446,6 +1469,11 @@ function GameRoom({
     if (!game) return;
     if (!confirm(`End "${game.name}"? Final standings are locked in and every player's scorecard is posted to their Rounds tab.`)) return;
     await supabase.rpc("finish_game", { p_game: game.id });
+    // Freeze the round clock for anyone still running (started but no end yet).
+    const nowIso = new Date().toISOString();
+    await Promise.all(players
+      .filter((p) => p.clock_start != null && p.clock_end == null)
+      .map((p) => supabase.from("game_players").update({ clock_end: nowIso }).eq("id", p.id)));
     await recordMyGameRound();
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_ended", group_id: (game as any).group_id || null, summary: `Ended the game "${game.name}"` });
     await load();
@@ -1706,11 +1734,12 @@ function GameRoom({
         const teamsArr = Array.isArray(game.teams) ? game.teams : [];
         const usesTeams = teamsArr.length > 0;
         const usesMatchups = game.game_type === "match" || game.game_type === "fourball" || game.game_type === "skins";
+        const usesFoursomes = Array.isArray(game.foursomes);
         const steps: { key: "players" | "teams" | "matchups" | "groups"; label: string }[] = [
           { key: "players", label: "Players" },
           ...(usesTeams ? [{ key: "teams" as const, label: "Teams" }] : []),
           ...(usesMatchups ? [{ key: "matchups" as const, label: "Matchups" }] : []),
-          { key: "groups", label: "Groups" },
+          ...(!usesFoursomes ? [{ key: "groups" as const, label: "Groups" }] : []),
         ];
         const activeStep = steps.some((s) => s.key === setupTab) ? setupTab : "players";
         const panelProps = {
@@ -1750,7 +1779,9 @@ function GameRoom({
             return cWithTeam < total ? "Tap a team on each player. Both teams need players before matchups." : "Teams set — next, build the matchups.";
           if (activeStep === "matchups") {
             if (usesTeams && cWithTeam === 0) return "Assign players to teams first — open the Teams step, then come back.";
-            return "Set who plays whom, then group the matches that tee off together on the next step.";
+            return usesFoursomes
+              ? "Build each foursome — it doubles as its own tee group, so one person can keep that foursome's card on the course."
+              : "Set who plays whom, then group the matches that tee off together on the next step.";
           }
           if (usesMatchups && pairings.length === 0 && foursomes.length === 0)
             return "Build the matchups first, then group the ones that tee off together here.";
@@ -1811,6 +1842,27 @@ function GameRoom({
         )}
       </div>
       )}
+
+      {roomTab === "play" && (() => {
+        const subset = (teeGroupsInUse && myRow?.tee_group != null)
+          ? players.filter((p) => p.tee_group === myRow.tee_group)
+          : players;
+        const starts = subset.map((p) => p.clock_start).filter(Boolean) as string[];
+        if (!starts.length) return null;
+        const startMs = Math.min(...starts.map((s) => new Date(s).getTime()));
+        const ends = subset.map((p) => p.clock_end).filter(Boolean) as string[];
+        const allEnded = subset.length > 0 && ends.length === subset.length;
+        const endMs = allEnded ? Math.max(...ends.map((s) => new Date(s).getTime())) : Date.now();
+        const mins = Math.max(0, Math.round((endMs - startMs) / 60000));
+        const label = teeGroupsInUse && myRow?.tee_group != null ? ` · Group ${myRow.tee_group}` : "";
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
+            <span style={{ fontSize: 15 }}>⏱</span>
+            <span style={{ color: C.cream, fontWeight: 700, fontFamily: "Georgia, serif", fontSize: 17 }}>{Math.floor(mins / 60)}:{String(mins % 60).padStart(2, "0")}</span>
+            <span style={{ color: C.sage, fontSize: 12 }}>{allEnded ? "round time" : "elapsed"}{label}</span>
+          </div>
+        );
+      })()}
 
       {roomTab === "play" && !isEnded && (() => {
         const canFinishGroup = !!myRow?.is_marker && myRow?.tee_group != null && !myRow?.group_locked;
@@ -2740,12 +2792,12 @@ function MatchView({
           <div style={{ color: C.cream, fontSize: 10, letterSpacing: 2, fontWeight: 800, opacity: 0.8 }}>TEAM MATCH · RUNNING SCORE</div>
           <div style={{ display: "flex", alignItems: "center", marginTop: 10 }}>
             <div style={{ flex: 1, textAlign: "center" }}>
-              <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![0].name}</div>
+              <div style={{ color: teamAccent(teams![0].name, 0), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![0].name}</div>
               <div style={{ color: teamStandings.pts.A >= teamStandings.pts.B ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.pts.A)}</div>
             </div>
             <div style={{ color: C.cream, fontSize: 18, opacity: 0.7, padding: "0 8px" }}>–</div>
             <div style={{ flex: 1, textAlign: "center" }}>
-              <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![1].name}</div>
+              <div style={{ color: teamAccent(teams![1].name, 1), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![1].name}</div>
               <div style={{ color: teamStandings.pts.B >= teamStandings.pts.A ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.pts.B)}</div>
             </div>
           </div>
@@ -2965,6 +3017,16 @@ function FourballView({
 
   const saveFoursomes = async (next: typeof foursomes) => {
     await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
+    // Each foursome is also its tee group (1-based), so group scoring/markers line up
+    // with the foursomes and there's no separate "Groups" step for four-ball.
+    const groupOf: Record<string, number> = {};
+    next.forEach((f, i) => { [...f.a, ...f.b].forEach((uid) => { groupOf[uid] = i + 1; }); });
+    await Promise.all(players.map((p) => {
+      const g = groupOf[pkey(p)] ?? null;
+      return (p.tee_group ?? null) !== g
+        ? supabase.from("game_players").update({ tee_group: g }).eq("id", p.id)
+        : Promise.resolve();
+    }));
     onChanged();
   };
 
@@ -3091,12 +3153,12 @@ function FourballView({
         <div style={{ background: C.green, borderRadius: 12, padding: 14, marginTop: 12 }}>
           <div style={{ display: "flex", alignItems: "center" }}>
             <div style={{ flex: 1, textAlign: "center" }}>
-              <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![0].name}</div>
+              <div style={{ color: teamAccent(teams![0].name, 0), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![0].name}</div>
               <div style={{ color: teamStandings.pts.A >= teamStandings.pts.B ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.pts.A)}</div>
             </div>
             <div style={{ color: C.sage, fontWeight: 800 }}>–</div>
             <div style={{ flex: 1, textAlign: "center" }}>
-              <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![1].name}</div>
+              <div style={{ color: teamAccent(teams![1].name, 1), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![1].name}</div>
               <div style={{ color: teamStandings.pts.B >= teamStandings.pts.A ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.pts.B)}</div>
             </div>
           </div>
@@ -3446,12 +3508,10 @@ function OrganizerPanel({
                   <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
                     {teams.map((t, ti) => {
                       const on = p.team === t.key;
-                      const col = ti === 0 ? "#5AA9E6" : "#E08A5B";
-                      const bg = ti === 0 ? "#2C4A66" : "#5A2E22";
-                      const fg = ti === 0 ? "#9FD0F5" : "#F2B894";
+                      const col = teamAccent(t.name, ti);
                       return (
                         <button key={t.key} onClick={() => onSetTeam(p, on ? null : t.key)}
-                          style={{ borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", background: on ? bg : "transparent", border: `1px solid ${on ? col : C.line}`, color: on ? fg : C.sage }}>
+                          style={{ borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", background: on ? "rgba(255,255,255,0.06)" : "transparent", border: `1.5px solid ${on ? col : C.line}`, color: on ? col : C.sage }}>
                           {t.name}
                         </button>
                       );
@@ -3468,7 +3528,7 @@ function OrganizerPanel({
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginTop: 12 }}>
               {teams.map((t, ti) => {
                 const mem = players.filter((p) => p.team === t.key);
-                const accent = ti === 0 ? "#5AA9E6" : "#E08A5B";
+                const accent = teamAccent(t.name, ti);
                 return (
                   <div key={t.key} style={{ background: C.card, borderRadius: 10, padding: 12, border: `1px solid ${accent}` }}>
                     <div style={{ color: accent, fontWeight: 800, fontSize: 13 }}>{t.name}</div>

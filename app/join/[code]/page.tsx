@@ -42,13 +42,20 @@ export default function JoinGroupPage({ params }: { params: { code: string } }) 
       setState("joining");
       setMessage("Joining your group…");
 
-      const { data: groupId, error } = await supabase.rpc("redeem_group_invite", { code });
-      if (error || !groupId) {
+      const multi = await supabase.rpc("redeem_group_invite_multi", { code });
+      let groupId = (multi.data as string | null) ?? null;
+      let redeemErr = multi.error;
+      if (!groupId) {
+        const single = await supabase.rpc("redeem_group_invite", { code });
+        groupId = (single.data as string | null) ?? null;
+        redeemErr = single.error ?? redeemErr;
+      }
+      if (!groupId) {
         if (!cancelled) {
           setState("error");
           setMessage(
-            error
-              ? describeError("redeem this invite", error)
+            redeemErr
+              ? describeError("redeem this invite", redeemErr)
               : "This invite code could not be redeemed — it may be expired or already used. Ask the group admin for a new link.",
           );
         }
