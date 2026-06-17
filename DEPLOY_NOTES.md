@@ -1,3 +1,20 @@
+# v1.5.2 - Mobile setup layout and guest visibility deployment split
+
+## Changed
+- Converted the Organizer / Manage Game roster from a horizontal grid/table to stacked mobile-first player cards.
+- Each player card now keeps handicap, tee, team, tee group, no-show, and remove controls inside the phone viewport.
+- Preserved manual matchups; no auto-pairing added.
+- Kept per-player tee selection and handicap recalculation from v1.4.1/v1.5.0.
+
+## Guest visibility
+- The code package does not include Supabase migrations.
+- Guest visibility requires the Supabase SELECT policy SQL provided separately in the deployment message.
+- Apply that SQL in Supabase before deploying this code if guests are not visible after creation.
+
+## Supabase
+- SQL is provided separately for copy/paste.
+- No supabase folder is included in this zip.
+
 # v1.5.0
 
 ## What Changed

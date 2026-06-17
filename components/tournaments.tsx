@@ -3086,20 +3086,19 @@ function OrganizerPanel({
                   key={p.id}
                   style={{
                     background: C.card,
-                    borderRadius: 10,
-                    padding: "10px 14px",
-                    marginTop: 8,
-                    display: "grid",
-                    gridTemplateColumns: "minmax(160px, 1.5fr) 118px 150px 130px 112px auto",
-                    gap: 10,
-                    alignItems: "center",
+                    borderRadius: 12,
+                    padding: 12,
+                    marginTop: 10,
+                    border: `1px solid ${C.line}`,
                   }}
                 >
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ color: C.ink, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+                      <div style={{ color: C.ink, fontWeight: 800, fontSize: 15, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
                       {p.display_name}
                       {p.user_id === game.created_by ? " (organizer)" : ""}
-                      {p.is_guest ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 700 }}> · guest</span> : null}
+                      </div>
+                      {p.is_guest ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>guest</span> : null}
                     </div>
                     <div style={{ color: C.faint, fontSize: 12 }}>
                       {p.course_handicap != null ? `course handicap ${p.course_handicap}` : "no handicap yet"}
@@ -3107,8 +3106,9 @@ function OrganizerPanel({
                     </div>
                   </div>
 
-                  <div>
-                    <label style={{ color: C.sage, fontSize: 10 }}>Handicap</label>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(132px, 1fr))", gap: 10, marginTop: 12 }}>
+                    <div>
+                      <label style={{ color: C.sage, fontSize: 10 }}>Handicap</label>
                     <div style={{ display: "flex", gap: 5, marginTop: 2 }}>
                       <input
                         inputMode="decimal"
@@ -3179,7 +3179,9 @@ function OrganizerPanel({
                     </select>
                   </div>
 
-                  <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 12 }}>
                     {(game.game_type === "fourball" || game.game_type === "skins") && (
                       <button
                         title="Mark no-show"
