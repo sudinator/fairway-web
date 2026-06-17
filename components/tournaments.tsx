@@ -83,6 +83,8 @@ type Player = {
   team?: string | null; // team key ("A"/"B") for team match play
   no_show?: boolean | null; // organizer-flagged no-show (four-ball: scored net double bogey)
   is_guest?: boolean | null; // a guest player added for this game only
+  tee_group?: number | null; // which tee group (foursome) this player is in (1,2,3…)
+  is_marker?: boolean | null; // keeps score for their tee group
 };
 
 // Stable match identity for a player. Real players key on user_id (so nothing
@@ -850,6 +852,39 @@ function GameRoom({
   const [cardView, setCardView] = useState(false); // show the whole-group vertical scorecard
   // When group scoring is switched on, bring everyone to the group card.
   useEffect(() => { if (game?.marker_user_id && game?.game_type !== "stableford") setCardView(true); }, [game?.marker_user_id, game?.game_type]);
+
+  // ---- Tee groups (foursomes that play together, each with its own marker) ----
+  const myRow = players.find((p) => p.user_id === user.id) || null;
+  const teeGroupsInUse = players.some((p) => p.tee_group != null);
+  const teeGroupList = Array.from(new Set(players.map((p) => p.tee_group).filter((g): g is number => g != null))).sort((a, b) => a - b);
+  const [viewGroup, setViewGroup] = useState<number | null>(null);
+  useEffect(() => {
+    if (!teeGroupsInUse) return;
+    setViewGroup((cur) => (cur != null && teeGroupList.includes(cur)) ? cur : (myRow?.tee_group ?? teeGroupList[0] ?? null));
+  }, [teeGroupsInUse, myRow?.tee_group, teeGroupList.join(",")]);
+  // A marker lands on the group card automatically.
+  useEffect(() => { if (myRow?.is_marker && game?.game_type !== "stableford") setCardView(true); }, [myRow?.is_marker, game?.game_type]);
+  const cardPlayers = teeGroupsInUse ? players.filter((p) => p.tee_group === viewGroup) : players;
+  const iAmViewedMarker = !!myRow?.is_marker && myRow?.tee_group != null && myRow?.tee_group === viewGroup;
+  const cardCanEdit = teeGroupsInUse ? iAmViewedMarker : (game?.marker_user_id === user.id);
+  const viewedMarkerPlayer = teeGroupsInUse
+    ? (players.find((p) => p.tee_group === viewGroup && p.is_marker) || null)
+    : (game?.marker_user_id ? (players.find((p) => p.user_id === game.marker_user_id) || null) : null);
+  const canClaimViewed = !!myRow && !myRow.is_guest && !!myRow.user_id && myRow.tee_group != null && myRow.tee_group === viewGroup;
+  const claimGroupMarker = async () => {
+    if (!game || !myRow) return;
+    setCardView(true);
+    setPlayers((ps) => ps.map((p) => (p.tee_group === myRow.tee_group ? { ...p, is_marker: p.id === myRow.id } : p))); // optimistic
+    lastEditRef.current = Date.now();
+    await supabase.rpc("claim_group_marker", { p_game: game.id });
+    load();
+  };
+  const releaseGroupMarker = async () => {
+    if (!game || !myRow) return;
+    setPlayers((ps) => ps.map((p) => (p.id === myRow.id ? { ...p, is_marker: false } : p))); // optimistic
+    await supabase.rpc("release_group_marker", { p_game: game.id });
+    load();
+  };
   // Non-organizers only ever see the scorecard.
   useEffect(() => {
     if (roomTab === "setup" && game && game.created_by !== user.id) setRoomTab("play");
@@ -1559,14 +1594,36 @@ function GameRoom({
           Group scoring is on — enter and view scores on the <strong>Group card</strong>.
         </div>
       )}
+      {roomTab === "setup" && isOrganizer && game.game_type !== "stableford" && (
+        <TeeGroups game={game} players={players} onChanged={load} />
+      )}
       {roomTab === "play" && cardView && game.game_type !== "stableford" ? (
-        <GroupScorecard game={game} players={players} user={user}
-          isMarker={game.marker_user_id === user.id}
-          markerName={game.marker_user_id ? (players.find((p) => p.user_id === game.marker_user_id)?.display_name ?? "Someone") : null}
-          onTakeOver={takeOverScoring}
-          onRelease={releaseScoring}
-          onSetHole={setPlayerHole}
-        />
+        <>
+          {teeGroupsInUse && teeGroupList.length > 1 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
+              {teeGroupList.map((g) => {
+                const hasMarker = players.some((p) => p.tee_group === g && p.is_marker);
+                return (
+                  <button key={g} onClick={() => setViewGroup(g)} style={{ ...btn(viewGroup === g), fontSize: 12, padding: "5px 12px" }}>
+                    Group {g}{!hasMarker ? " ·!" : ""}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <GroupScorecard game={game} players={cardPlayers} user={user}
+            isMarker={cardCanEdit}
+            markerName={viewedMarkerPlayer?.display_name ?? null}
+            onTakeOver={takeOverScoring}
+            onRelease={releaseScoring}
+            onSetHole={setPlayerHole}
+            teeMode={teeGroupsInUse}
+            groupLabel={viewGroup != null ? `Group ${viewGroup}` : ""}
+            canClaim={canClaimViewed}
+            onClaimGroup={claimGroupMarker}
+            onReleaseGroup={releaseGroupMarker}
+          />
+        </>
       ) : game.game_type === "fourball" ? (
         <FourballView
           game={game}
@@ -1696,7 +1753,7 @@ function GameRoom({
 
       {/* My score entry — hidden while a marker is keeping score for the group
           (scoring then happens only on the Group card, to avoid conflicts). */}
-      {roomTab === "play" && me && !(game.game_type !== "stableford" && game.marker_user_id && !isEnded) && (
+      {roomTab === "play" && me && !(game.game_type !== "stableford" && !isEnded && (game.marker_user_id || teeGroupsInUse)) && (
         <div style={{ marginTop: 22 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Eyebrow>{isEnded ? "YOUR FINAL SCORES" : "ENTER YOUR SCORES"}</Eyebrow>
@@ -1909,11 +1966,65 @@ function GuestManager({ game, players, onChanged }: { game: Game; players: Playe
   );
 }
 
-function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver, onRelease, onSetHole }: {
+function TeeGroups({ game, players, onChanged }: { game: Game; players: Player[]; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const maxGroups = Math.max(2, Math.min(8, Math.ceil(players.length / 2)));
+  const groupNums = Array.from({ length: maxGroups }, (_, i) => i + 1);
+  const used = Array.from(new Set(players.map((p) => p.tee_group).filter((g): g is number => g != null))).sort((a, b) => a - b);
+
+  const setGroup = async (pid: string, n: number | null) => {
+    setBusy(true);
+    await supabase.rpc("set_tee_group", { p_player: pid, p_group: n });
+    setBusy(false);
+    onChanged();
+  };
+
+  return (
+    <div style={{ marginTop: 14, background: C.greenLight, borderRadius: 12, padding: 14 }}>
+      <Eyebrow>TEE GROUPS</Eyebrow>
+      <div style={{ color: C.sage, fontSize: 12, margin: "6px 0 10px" }}>
+        Split players into the groups that tee off together. On the course, anyone in a group can tap “Keep score for this group” on the Group card — no need to assign a marker here.
+      </div>
+      {players.map((p) => (
+        <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: `0.5px solid ${C.line}` }}>
+          <span style={{ flex: 1, color: C.cream, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {p.display_name}{p.is_guest ? " ·G" : ""}{p.is_marker ? <span style={{ color: C.gold, fontSize: 11 }}> ★ marker</span> : null}
+          </span>
+          <select
+            value={p.tee_group ?? ""}
+            onChange={(e) => setGroup(p.id, e.target.value === "" ? null : parseInt(e.target.value, 10))}
+            disabled={busy}
+            style={{ ...inputStyle, width: 96 }}>
+            <option value="">No group</option>
+            {groupNums.map((n) => <option key={n} value={n}>Group {n}</option>)}
+          </select>
+        </div>
+      ))}
+      {used.length > 0 && (
+        <div style={{ marginTop: 10, color: C.sage, fontSize: 11 }}>
+          {used.map((g) => {
+            const mem = players.filter((p) => p.tee_group === g);
+            const marker = mem.find((p) => p.is_marker);
+            return (
+              <div key={g} style={{ marginTop: 4 }}>
+                <strong style={{ color: C.cream }}>Group {g}:</strong> {mem.map((p) => p.display_name).join(", ")}
+                {" · "}{marker ? <span style={{ color: C.gold }}>marker: {marker.display_name}</span> : <span style={{ color: C.sage }}>marker chosen on the course</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup }: {
   game: Game; players: Player[]; user: any;
   isMarker: boolean; markerName: string | null;
   onTakeOver: () => void; onRelease: () => void;
   onSetHole: (playerId: string, holeIdx: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | null; penalties?: number | null; sand?: boolean | null }) => void;
+  teeMode?: boolean; groupLabel?: string; canClaim?: boolean;
+  onClaimGroup?: () => void; onReleaseGroup?: () => void;
 }) {
   const [edit, setEdit] = useState<{ playerId: string; holeIdx: number } | null>(null);
   const allowance = game.allowance_pct ?? 100;
@@ -1997,7 +2108,28 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
 
   return (
     <div style={{ marginTop: 16 }}>
-      {isMarker ? (
+      {teeMode ? (
+        isMarker ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#3F3414", border: `0.5px solid ${C.gold}`, borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
+            <span style={{ color: C.gold, fontSize: 15 }}>✎</span>
+            <span style={{ color: "#E4CF86", fontSize: 12, flex: 1 }}>You're scoring {groupLabel} — tap a cell to edit</span>
+            {onReleaseGroup && <button onClick={onReleaseGroup} style={{ ...btn(false), fontSize: 11, padding: "5px 10px" }}>Hand off</button>}
+          </div>
+        ) : markerName ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#13352A", border: "0.5px solid #2E6B55", borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
+            <span style={{ width: 9, height: 9, borderRadius: 99, background: "#5BD08A", boxShadow: "0 0 0 3px rgba(91,208,138,0.25)" }} />
+            <span style={{ color: "#CFE3D8", fontSize: 12, flex: 1 }}>{groupLabel} · <strong style={{ color: C.cream }}>{markerName}</strong> is keeping score</span>
+            {canClaim && onClaimGroup && <button onClick={() => { if (confirm(`Take over scoring for ${groupLabel} from ${markerName}?`)) onClaimGroup(); }} style={{ ...btn(false), fontSize: 11, padding: "5px 10px" }}>Take over</button>}
+          </div>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#13352A", border: "0.5px solid #2E6B55", borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
+            <span style={{ color: C.sage, fontSize: 12, flex: 1 }}>No one is keeping score for {groupLabel} yet.</span>
+            {canClaim && onClaimGroup
+              ? <button onClick={onClaimGroup} style={{ ...btn(true), fontSize: 11, padding: "5px 10px" }}>Keep score for this group</button>
+              : <span style={{ color: C.faint, fontSize: 11 }}>view only</span>}
+          </div>
+        )
+      ) : isMarker ? (
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#3F3414", border: `0.5px solid ${C.gold}`, borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
           <span style={{ color: C.gold, fontSize: 15 }}>✎</span>
           <span style={{ color: "#E4CF86", fontSize: 12, flex: 1 }}>You're keeping score — tap a cell to edit</span>
@@ -2349,7 +2481,7 @@ function MatchView({
               style={{ ...inputStyle, width: "auto", minWidth: 130 }}
             >
               <option value="">Player A…</option>
-              {players.map((p) => (
+              {unpaired.map((p) => (
                 <option key={pkey(p)} value={pkey(p)}>
                   {p.display_name}
                 </option>
@@ -2362,7 +2494,7 @@ function MatchView({
               style={{ ...inputStyle, width: "auto", minWidth: 130 }}
             >
               <option value="">Player B…</option>
-              {players.map((p) => (
+              {unpaired.filter((p) => pkey(p) !== aSel).map((p) => (
                 <option key={pkey(p)} value={pkey(p)}>
                   {p.display_name}
                 </option>
