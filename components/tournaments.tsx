@@ -2002,9 +2002,13 @@ function GuestManager({ game, players, onChanged }: { game: Game; players: Playe
 
 function TeeGroups({ game, players, onChanged }: { game: Game; players: Player[]; onChanged: () => void }) {
   const [busy, setBusy] = useState(false);
-  const maxGroups = Math.max(2, Math.min(8, Math.ceil(players.length / 2)));
-  const groupNums = Array.from({ length: maxGroups }, (_, i) => i + 1);
   const used = Array.from(new Set(players.map((p) => p.tee_group).filter((g): g is number => g != null))).sort((a, b) => a - b);
+  const usedMax = used.length ? used[used.length - 1] : 0;
+  // Enough group options to cover the field as foursomes, plus one spare so you
+  // can always split off another group. No artificial ceiling; also never hide a
+  // group that's already in use.
+  const maxGroups = Math.max(2, Math.ceil(players.length / 4) + 1, usedMax);
+  const groupNums = Array.from({ length: maxGroups }, (_, i) => i + 1);
 
   const setGroup = async (pid: string, n: number | null) => {
     setBusy(true);
