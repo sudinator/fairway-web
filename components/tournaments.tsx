@@ -2019,21 +2019,27 @@ function TeeGroups({ game, players, onChanged }: { game: Game; players: Player[]
       <div style={{ color: C.sage, fontSize: 12, margin: "6px 0 10px" }}>
         Split players into the groups that tee off together. On the course, anyone in a group can tap “Keep score for this group” on the Group card — no need to assign a marker here.
       </div>
-      {players.map((p) => (
-        <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderTop: `0.5px solid ${C.line}` }}>
-          <span style={{ flex: 1, color: C.cream, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {p.display_name}{p.is_guest ? " ·G" : ""}{p.is_marker ? <span style={{ color: C.gold, fontSize: 11 }}> ★ marker</span> : null}
-          </span>
-          <select
-            value={p.tee_group ?? ""}
-            onChange={(e) => setGroup(p.id, e.target.value === "" ? null : parseInt(e.target.value, 10))}
-            disabled={busy}
-            style={{ ...inputStyle, width: 96 }}>
-            <option value="">No group</option>
-            {groupNums.map((n) => <option key={n} value={n}>Group {n}</option>)}
-          </select>
-        </div>
-      ))}
+      {players.map((p) => {
+        const pill = (active: boolean): React.CSSProperties => ({
+          minWidth: 34, padding: "7px 11px", borderRadius: 8, textAlign: "center",
+          border: `1px solid ${active ? C.gold : C.line}`, background: active ? "#3A3413" : "transparent",
+          color: active ? C.gold : C.sage, fontSize: 13, fontWeight: 700, cursor: busy ? "default" : "pointer",
+        });
+        return (
+          <div key={p.id} style={{ padding: "9px 0", borderTop: `0.5px solid ${C.line}` }}>
+            <div style={{ color: C.cream, fontSize: 14, marginBottom: 7 }}>
+              {p.display_name}{p.is_guest ? " ·G" : ""}{p.is_marker ? <span style={{ color: C.gold, fontSize: 11 }}> ★ marker</span> : null}
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ color: C.faint, fontSize: 11, marginRight: 2 }}>Group:</span>
+              <button onClick={() => !busy && setGroup(p.id, null)} style={{ ...pill(p.tee_group == null), minWidth: 0, padding: "7px 12px" }}>None</button>
+              {groupNums.map((n) => (
+                <button key={n} onClick={() => !busy && setGroup(p.id, n)} style={pill(p.tee_group === n)}>{n}</button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
       {used.length > 0 && (
         <div style={{ marginTop: 10, color: C.sage, fontSize: 11 }}>
           {used.map((g) => {
