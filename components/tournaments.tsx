@@ -949,6 +949,8 @@ function GameRoom({
     () => loadActiveGame()?.tab || "play",
   );
   useEffect(() => { saveActiveGame(gameId, roomTab); }, [gameId, roomTab]);
+  // Which step of the setup flow is showing: players & tees, teams, matchups, groups.
+  const [setupTab, setSetupTab] = useState<"players" | "teams" | "matchups" | "groups">("players");
   const [cardView, setCardView] = useState(false); // show the whole-group vertical scorecard
   // When group scoring is switched on, bring everyone to the group card.
   useEffect(() => { if (game?.marker_user_id) setCardView(true); }, [game?.marker_user_id]);
@@ -1689,24 +1691,47 @@ function GameRoom({
         </div>
       )}
 
-      {roomTab === "setup" && isOrganizer && (
-        <OrganizerPanel
-          game={game}
-          players={players}
-          user={user}
-          onOverride={overridePlayerHandicap}
-          courseTees={courseTees}
-          onSetTee={setPlayerTee}
-          onRemove={removePlayer}
-          onToggleNoShow={toggleNoShow}
-          onSetTeam={setPlayerTeam}
-          onSetTeeGroup={setPlayerTeeGroup}
-          onRename={renameGame}
-          onDelete={deleteGame}
-          onEnd={endGame}
-          onReopen={reopenGame}
-        />
-      )}
+      {roomTab === "setup" && isOrganizer && (() => {
+        const teamsArr = Array.isArray(game.teams) ? game.teams : [];
+        const usesTeams = teamsArr.length > 0;
+        const usesMatchups = game.game_type === "match" || game.game_type === "fourball" || game.game_type === "skins";
+        const steps: { key: "players" | "teams" | "matchups" | "groups"; label: string }[] = [
+          { key: "players", label: "Players & Tees" },
+          ...(usesTeams ? [{ key: "teams" as const, label: "Teams" }] : []),
+          ...(usesMatchups ? [{ key: "matchups" as const, label: "Matchups" }] : []),
+          { key: "groups", label: "Groups" },
+        ];
+        const activeStep = steps.some((s) => s.key === setupTab) ? setupTab : "players";
+        const panelProps = {
+          game, players, user,
+          onOverride: overridePlayerHandicap, courseTees, onSetTee: setPlayerTee,
+          onRemove: removePlayer, onToggleNoShow: toggleNoShow, onSetTeam: setPlayerTeam,
+          onSetTeeGroup: setPlayerTeeGroup, onRename: renameGame, onDelete: deleteGame,
+          onEnd: endGame, onReopen: reopenGame,
+        };
+        return (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ display: "flex", gap: 5, marginBottom: 4 }}>
+              {steps.map((s, i) => (
+                <button key={s.key} onClick={() => setSetupTab(s.key)}
+                  style={{ ...btn(activeStep === s.key), flex: 1, fontSize: 11, padding: "8px 4px" }}>
+                  {i + 1} · {s.label}
+                </button>
+              ))}
+            </div>
+            {activeStep === "players" && <OrganizerPanel section="players" {...panelProps} />}
+            {activeStep === "teams" && <OrganizerPanel section="teams" {...panelProps} />}
+            {activeStep === "groups" && (
+              <GroupsBuilder game={game} players={players} onSetTeeGroup={setPlayerTeeGroup} />
+            )}
+            {activeStep === "matchups" && (
+              <div style={{ color: C.sage, fontSize: 12, marginTop: 12, marginBottom: -4 }}>
+                Set who plays whom. Build the groups that tee off together on the next step.
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {roomTab === "play" && (
       <div style={{ marginTop: 16, background: isEnded ? "#3A3A3A" : game.game_type === "match" ? "#1E3A8A" : game.game_type === "fourball" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -1784,7 +1809,7 @@ function GameRoom({
             onMarkOut={toggleNoShow}
           />
         </>
-      ) : game.game_type === "fourball" ? (
+      ) : game.game_type === "fourball" && (roomTab === "play" || (roomTab === "setup" && setupTab === "matchups")) ? (
         <FourballView
           game={game}
           players={players}
@@ -1793,7 +1818,7 @@ function GameRoom({
           mode={roomTab}
           onChanged={load}
         />
-      ) : (roomTab === "play" || roomTab === "setup") && game.game_type === "match" ? (
+      ) : game.game_type === "match" && (roomTab === "play" || (roomTab === "setup" && setupTab === "matchups")) ? (
         <MatchView
           game={game}
           players={players}
@@ -1802,7 +1827,7 @@ function GameRoom({
           mode={roomTab}
           onChanged={load}
         />
-      ) : (roomTab === "play" || roomTab === "setup") && game.game_type === "skins" ? (
+      ) : game.game_type === "skins" && (roomTab === "play" || (roomTab === "setup" && setupTab === "matchups")) ? (
         <SkinsView game={game} players={players} user={user}
           isCreator={game.created_by === user.id} mode={roomTab} onChanged={load} />
       ) : roomTab === "play" ? (
@@ -2588,6 +2613,9 @@ function MatchView({
   const teams = game.teams || null;
   const isTeam = Array.isArray(teams) && teams.length === 2;
   const teamName = (key: string | null | undefined) => teams?.find((t) => t.key === key)?.name || "—";
+  const teamA = teams && teams[0] ? teams[0] : null;
+  const teamB = teams && teams[1] ? teams[1] : null;
+  const useTeamPick = !!(teamA && teamB);
 
   const assignTeam = async (p: Player, key: string | null) => {
     await supabase.from("game_players").update({ team: key }).eq("id", p.id);
@@ -2684,8 +2712,8 @@ function MatchView({
               onChange={(e) => setASel(e.target.value)}
               style={{ ...inputStyle, width: "auto", minWidth: 130 }}
             >
-              <option value="">Player A…</option>
-              {unpaired.map((p) => (
+              <option value="">{useTeamPick ? `${teamA!.name}…` : "Player A…"}</option>
+              {(useTeamPick ? unpaired.filter((p) => p.team === teamA!.key) : unpaired).map((p) => (
                 <option key={pkey(p)} value={pkey(p)}>
                   {p.display_name}
                 </option>
@@ -2697,8 +2725,8 @@ function MatchView({
               onChange={(e) => setBSel(e.target.value)}
               style={{ ...inputStyle, width: "auto", minWidth: 130 }}
             >
-              <option value="">Player B…</option>
-              {unpaired.filter((p) => pkey(p) !== aSel).map((p) => (
+              <option value="">{useTeamPick ? `${teamB!.name}…` : "Player B…"}</option>
+              {(useTeamPick ? unpaired.filter((p) => p.team === teamB!.key) : unpaired.filter((p) => pkey(p) !== aSel)).map((p) => (
                 <option key={pkey(p)} value={pkey(p)}>
                   {p.display_name}
                 </option>
@@ -2997,6 +3025,95 @@ function FourballView({
 
 // ---------------- Organizer panel (game creator) ----------------
 // Lets the game's creator manage the roster, handicaps, and the game itself.
+// ---------------- Groups builder (who tees off together) ----------------
+// Builds tee groups out of the matchups (matches/foursomes) or, for individual
+// formats like Stableford, straight out of players. Assigning a unit to a group
+// sets tee_group for every player in that unit, which drives group scoring.
+function GroupsBuilder({ game, players, onSetTeeGroup }: {
+  game: Game; players: Player[];
+  onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
+}) {
+  const byKey = (k: string) => players.find((p) => pkey(p) === k) || null;
+  const groupOptions = Array.from({ length: Math.max(2, Math.ceil(players.length / 2) + 1) }, (_, i) => i + 1);
+
+  type Unit = { id: string; label: string; members: Player[] };
+  const pairings = Array.isArray(game.pairings) ? game.pairings : [];
+  const foursomes = Array.isArray(game.foursomes) ? game.foursomes : [];
+  let units: Unit[];
+  if (foursomes.length) {
+    units = foursomes.map((f, i) => ({
+      id: f.id || `f${i}`,
+      label: f.name || `Foursome ${i + 1}`,
+      members: [...f.a, ...f.b].map(byKey).filter((p): p is Player => !!p),
+    }));
+  } else if (pairings.length) {
+    units = pairings.map((pr, i) => {
+      const members = [byKey(pr.a), byKey(pr.b)].filter((p): p is Player => !!p);
+      return { id: `m${i}`, label: members.map((m) => m.display_name).join(" v ") || `Match ${i + 1}`, members };
+    });
+  } else {
+    units = players.map((p) => ({ id: p.id, label: p.display_name, members: [p] }));
+  }
+
+  const unitGroup = (u: Unit): number | null => {
+    const gs = Array.from(new Set(u.members.map((m) => m.tee_group ?? null)));
+    return gs.length === 1 ? gs[0] : null;
+  };
+  const assign = async (u: Unit, g: number | null) => {
+    for (const m of u.members) await onSetTeeGroup(m, g);
+  };
+  const teeGroups = Array.from(new Set(players.map((p) => p.tee_group).filter((g): g is number => g != null))).sort((a, b) => a - b);
+  const firstGroup = teeGroups.length ? Math.min(...teeGroups) : null;
+
+  return (
+    <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>
+      <Eyebrow>GROUPS · WHO TEES OFF TOGETHER</Eyebrow>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
+        {foursomes.length
+          ? "Each foursome is already a group — set the group number to order who tees off first."
+          : pairings.length
+          ? "Put the matches that tee off together in the same group — usually two matches make a foursome."
+          : "Split players into the groups that tee off together (foursomes, 3-balls, or 2-balls). One scorer per group keeps the cards, or players score themselves."}
+      </div>
+
+      {units.map((u) => {
+        const g = unitGroup(u);
+        return (
+          <div key={u.id} style={{ background: C.card, borderRadius: 10, padding: 12, marginTop: 10, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: C.ink, fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis" }}>{u.label}</div>
+              <div style={{ color: C.faint, fontSize: 11 }}>{u.members.length} player{u.members.length === 1 ? "" : "s"}</div>
+            </div>
+            <select value={g ?? ""} onChange={(e) => assign(u, e.target.value ? parseInt(e.target.value, 10) : null)}
+              style={{ ...inputStyle, padding: "6px 8px", minWidth: 110 }}>
+              <option value="">No group</option>
+              {groupOptions.map((n) => <option key={n} value={n}>Group {n}</option>)}
+            </select>
+          </div>
+        );
+      })}
+
+      {teeGroups.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginTop: 14 }}>
+          {teeGroups.map((gn) => {
+            const mem = players.filter((p) => p.tee_group === gn);
+            return (
+              <div key={gn} style={{ background: C.card, borderRadius: 10, padding: 12, border: `1px solid ${C.gold}` }}>
+                <div style={{ color: C.gold, fontWeight: 800, fontSize: 13 }}>Group {gn}{gn === firstGroup ? " · off first" : ""}</div>
+                <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>{mem.length} player{mem.length === 1 ? "" : "s"}</div>
+                <div style={{ marginTop: 8, color: C.ink, fontSize: 13, lineHeight: 1.7 }}>
+                  {mem.map((p) => <div key={p.id}>{p.display_name}</div>)}
+                </div>
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Scorer: chosen on the course</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OrganizerPanel({
   game,
   players,
@@ -3012,6 +3129,7 @@ function OrganizerPanel({
   onDelete,
   onEnd,
   onReopen,
+  section = "players",
 }: {
   game: Game;
   players: Player[];
@@ -3027,6 +3145,7 @@ function OrganizerPanel({
   onDelete: () => Promise<void>;
   onEnd: () => Promise<void>;
   onReopen: () => Promise<void>;
+  section?: "players" | "teams";
 }) {
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -3088,10 +3207,10 @@ function OrganizerPanel({
           {/* Unified player setup */}
           <div style={{ marginTop: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <Eyebrow>PLAYERS · HANDICAPS · TEAMS · TEE GROUPS</Eyebrow>
+              <Eyebrow>{section === "teams" ? "ASSIGN TEAMS" : "PLAYERS · HANDICAPS · TEES"}</Eyebrow>
               <div style={{ flex: 1 }} />
               <span style={{ color: C.sage, fontSize: 11 }}>
-                Set each player once here. Matchups stay manual below.
+                {section === "teams" ? "Tap a team to assign each player." : "Set each player's handicap and tee."}
               </span>
             </div>
             {players.map((p) => {
@@ -3121,6 +3240,8 @@ function OrganizerPanel({
                     </div>
                   </div>
 
+                  {section === "players" ? (
+                  <>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(132px, 1fr))", gap: 10, marginTop: 12 }}>
                     <div>
                       <label style={{ color: C.sage, fontSize: 10 }}>Handicap</label>
@@ -3165,35 +3286,6 @@ function OrganizerPanel({
                       </div>
                     )}
                   </div>
-
-                  <div>
-                    <label style={{ color: C.sage, fontSize: 10 }}>Team</label>
-                    {teams.length ? (
-                      <select
-                        value={p.team || ""}
-                        onChange={(e) => onSetTeam(p, e.target.value || null)}
-                        style={{ ...inputStyle, padding: "6px 8px", marginTop: 2, width: "100%" }}
-                      >
-                        <option value="">No team</option>
-                        {teams.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
-                      </select>
-                    ) : (
-                      <div style={{ color: C.faint, fontSize: 13, marginTop: 8 }}>Not a team game</div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label style={{ color: C.sage, fontSize: 10 }}>Tee group</label>
-                    <select
-                      value={p.tee_group ?? ""}
-                      onChange={(e) => onSetTeeGroup(p, e.target.value ? parseInt(e.target.value, 10) : null)}
-                      style={{ ...inputStyle, padding: "6px 8px", marginTop: 2, width: "100%" }}
-                    >
-                      <option value="">None</option>
-                      {groupOptions.map((g) => <option key={g} value={g}>Group {g}</option>)}
-                    </select>
-                  </div>
-
                   </div>
 
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 12 }}>
@@ -3225,18 +3317,37 @@ function OrganizerPanel({
                       </button>
                     )}
                   </div>
+                  </>
+                  ) : (
+                  <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
+                    {teams.map((t, ti) => {
+                      const on = p.team === t.key;
+                      const col = ti === 0 ? "#5AA9E6" : "#E08A5B";
+                      const bg = ti === 0 ? "#2C4A66" : "#5A2E22";
+                      const fg = ti === 0 ? "#9FD0F5" : "#F2B894";
+                      return (
+                        <button key={t.key} onClick={() => onSetTeam(p, on ? null : t.key)}
+                          style={{ borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", background: on ? bg : "transparent", border: `1px solid ${on ? col : C.line}`, color: on ? fg : C.sage }}>
+                          {t.name}
+                        </button>
+                      );
+                    })}
+                    {p.team ? <span style={{ color: C.faint, fontSize: 11 }}>tap again to clear</span> : <span style={{ color: C.faint, fontSize: 11 }}>no team yet</span>}
+                  </div>
+                  )}
                 </div>
               );
             })}
           </div>
 
-          {teams.length > 0 && (
+          {section === "teams" && teams.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginTop: 12 }}>
-              {teams.map((t) => {
+              {teams.map((t, ti) => {
                 const mem = players.filter((p) => p.team === t.key);
+                const accent = ti === 0 ? "#5AA9E6" : "#E08A5B";
                 return (
-                  <div key={t.key} style={{ background: C.card, borderRadius: 10, padding: 12, border: `1px solid ${C.line}` }}>
-                    <div style={{ color: C.gold, fontWeight: 800, fontSize: 13 }}>{t.name}</div>
+                  <div key={t.key} style={{ background: C.card, borderRadius: 10, padding: 12, border: `1px solid ${accent}` }}>
+                    <div style={{ color: accent, fontWeight: 800, fontSize: 13 }}>{t.name}</div>
                     <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>{mem.length} player{mem.length === 1 ? "" : "s"}</div>
                     <div style={{ marginTop: 8, color: C.ink, fontSize: 13, lineHeight: 1.8 }}>
                       {mem.length ? mem.map((p) => <div key={p.id}>{p.display_name} <span style={{ color: C.faint }}>CH {p.course_handicap ?? "—"}</span></div>) : <span style={{ color: C.faint }}>No players assigned</span>}
@@ -3247,27 +3358,12 @@ function OrganizerPanel({
             </div>
           )}
 
-          {teeGroups.length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginTop: 12 }}>
-              {teeGroups.map((g) => {
-                const mem = players.filter((p) => p.tee_group === g);
-                return (
-                  <div key={g} style={{ background: C.card, borderRadius: 10, padding: 12, border: `1px solid ${C.line}` }}>
-                    <div style={{ color: C.gold, fontWeight: 800, fontSize: 13 }}>Group {g}</div>
-                    <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>{mem.length} player{mem.length === 1 ? "" : "s"}</div>
-                    <div style={{ marginTop: 8, color: C.ink, fontSize: 13, lineHeight: 1.8 }}>
-                      {mem.map((p) => <div key={p.id}>{p.display_name} <span style={{ color: C.faint }}>{teamLabel(p.team)}</span></div>)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {section === "players" && (
           <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>
-            Player roster is set before the game is created. Here you can update handicaps, tees, teams, tee groups, no-shows, and removals.
+            Tees default to the course tee. Set teams and groups on the next steps.
           </div>
-
-          {/* Game settings */}
+          )}
+          {section === "players" && (
           <div
             style={{
               borderTop: `1px solid ${C.greenMid}`,
@@ -3350,6 +3446,7 @@ function OrganizerPanel({
               Delete this game
             </button>
           </div>
+          )}
         </div>
       )}
     </div>
