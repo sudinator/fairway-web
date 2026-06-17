@@ -361,6 +361,7 @@ function CreateGame({
   const [allowancePct, setAllowancePct] = useState(100);
   useEffect(() => { setAllowancePct(gameType === "fourball" ? 85 : 100); }, [gameType]);
   const [teamMode, setTeamMode] = useState(false);
+  const [skinsTeamStyle, setSkinsTeamStyle] = useState<"head_to_head" | "best_ball">("head_to_head");
   const [team1, setTeam1] = useState("Team 1");
   const [team2, setTeam2] = useState("Team 2");
   const [busy, setBusy] = useState(false);
@@ -504,7 +505,7 @@ function CreateGame({
                   { key: "B", name: team2.trim() || "Team 2" },
                 ]
               : null,
-          foursomes: gameType === "fourball" || (gameType === "skins" && teamMode) ? [] : null,
+          foursomes: gameType === "fourball" || (gameType === "skins" && teamMode && skinsTeamStyle === "best_ball") ? [] : null,
         })
         .select()
         .single();
@@ -845,25 +846,33 @@ function CreateGame({
             : gameType === "fourball"
             ? "2-player teams play better-net-ball match play. Big groups split into foursomes (2 v 2) — set them up after creating. Great for 12–16 players in 3–4 foursomes."
             : gameType === "skins"
-            ? "Skins now follows match structure: 1:1 pairings for singles, or team best-ball skins when Team mode is enabled. Halved holes carry the pot forward."
+            ? "Skins follows match-play structure: singles can be 1:1, team 1:1 rolls skins into team totals, or team best-ball can be played in foursomes. Halved holes carry forward."
             : "Players are paired 1-on-1. After friends join, you'll set the matchups. Lower handicap plays off scratch; opponent gets the difference."}
         </div>
         {(gameType === "match" || gameType === "skins") && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
               <input type="checkbox" checked={teamMode} onChange={(e) => setTeamMode(e.target.checked)} />
-              <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>{gameType === "skins" ? "Team skins (best-ball)" : "Team match (e.g. 4 v 4)"}</span>
+              <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>{gameType === "skins" ? "Team skins" : "Team match (e.g. 4 v 4)"}</span>
             </label>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
               {gameType === "skins"
-                ? "Two teams play better-net-ball skins in foursomes. A halved hole carries the pot to the next hole."
+                ? "Two teams. Use 1:1 pairings to roll skins into team totals, or choose best-ball foursomes below. A halved hole carries the pot forward."
                 : "Two teams. Each 1-on-1 pairing is worth a point; the team total is the sum (halved matches = ½ each). You'll assign players to teams after creating."}
             </div>
             {teamMode && (
-              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
-                <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
-              </div>
+              <>
+                {gameType === "skins" && (
+                  <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                    <button onClick={() => setSkinsTeamStyle("head_to_head")} style={{ ...btn(skinsTeamStyle === "head_to_head"), fontSize: 12, padding: "7px 10px" }}>1:1 team skins</button>
+                    <button onClick={() => setSkinsTeamStyle("best_ball")} style={{ ...btn(skinsTeamStyle === "best_ball"), fontSize: 12, padding: "7px 10px" }}>Team best-ball skins</button>
+                  </div>
+                )}
+                <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                  <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
+                  <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
+                </div>
+              </>
             )}
           </div>
         )}
@@ -2398,7 +2407,13 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
                 ))}
               </div>
 
-              <button onClick={() => setEdit(null)} style={{ width: "100%", marginTop: 16, background: C.green, color: C.cream, border: "none", borderRadius: 8, padding: 11, fontWeight: 800, fontSize: 14, cursor: "pointer" }}>Done</button>
+              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                <button
+                  onClick={() => onSetHole(p.id, edit.holeIdx, { strokes: null, putts: null, fairway: null, penalties: 0, sand: false })}
+                  style={{ flex: 1, background: C.greenLight, color: C.cream, border: "none", borderRadius: 8, padding: 11, fontWeight: 800, fontSize: 14, cursor: "pointer" }}
+                >Clear</button>
+                <button onClick={() => setEdit(null)} style={{ flex: 1, background: C.green, color: C.cream, border: "none", borderRadius: 8, padding: 11, fontWeight: 800, fontSize: 14, cursor: "pointer" }}>Done</button>
+              </div>
               <div style={{ color: C.faint, fontSize: 10, textAlign: "center", marginTop: 8 }}>Only the score is required. Players can add their own stats too.</div>
             </div>
           </div>
@@ -2411,8 +2426,10 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
 function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: Game; players: Player[]; user: any; isCreator: boolean; mode: string; onChanged: () => void }) {
   const teams = game.teams || null;
   const isTeamSkins = Array.isArray(teams) && teams.length === 2;
+  const isTeamBestBallSkins = isTeamSkins && Array.isArray(game.foursomes);
   const playerOf = (uid: string) => players.find((p) => pkey(p) === uid) || null;
   const firstName = (uid: string) => (playerOf(uid)?.display_name || "—").split(" ")[0];
+  const teamName = (key: string | null | undefined) => teams?.find((t) => t.key === key)?.name || "—";
   const skinPlayerOf = (uid: string): SkinPlayer | null => {
     const p = playerOf(uid);
     return p ? { id: pkey(p), name: p.display_name, gross: p.scores || [], ch: p.course_handicap, noShow: !!p.no_show } : null;
@@ -2420,7 +2437,7 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
   const ORANGE = "#E8730C";
 
   if (mode === "setup") {
-    if (isTeamSkins) {
+    if (isTeamBestBallSkins) {
       return (
         <div style={{ marginTop: 18 }}>
           <Eyebrow>TEAM SKINS · SETUP</Eyebrow>
@@ -2435,7 +2452,9 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
       <div style={{ marginTop: 18 }}>
         <Eyebrow>1:1 SKINS · SETUP</Eyebrow>
         <div style={{ color: C.sage, fontSize: 12, marginTop: 8, marginBottom: 8 }}>
-          Pair players just like singles match play. Each matchup has its own skin pot; a halved hole carries to the next hole.
+          {isTeamSkins
+            ? "Assign two teams, then pair players 1:1 across teams. Each matchup plays skins; won skins contribute to the player's team total. A halved hole carries to the next hole."
+            : "Pair players just like singles match play. Each matchup has its own skin pot; a halved hole carries to the next hole."}
         </div>
         <MatchView game={game} players={players} user={user} isCreator={isCreator} mode="setup" onChanged={onChanged} />
       </div>
@@ -2444,7 +2463,7 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
 
   const myKey = players.find((p) => p.user_id === user.id)?.user_id ?? user.id;
 
-  if (isTeamSkins) {
+  if (isTeamBestBallSkins) {
     const foursomes = game.foursomes || [];
     const cards = foursomes.map((f) => {
       const members: FourballMember[] = [...f.a, ...f.b].map((uid) => {
@@ -2527,11 +2546,29 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
     }).filter(Boolean) as { idx: number; pr: { a: string; b: string }; pa: SkinPlayer; pb: SkinPlayer; result: ReturnType<typeof computeHeadToHeadSkins> }[];
     const totals: Record<string, number> = {};
     matchCards.forEach(({ result }) => Object.entries(result.skinsBySide).forEach(([id, n]) => { totals[id] = (totals[id] || 0) + n; }));
+    const teamTotals: Record<string, number> = { A: 0, B: 0 };
+    if (isTeamSkins) {
+      players.forEach((p) => {
+        if (p.team === "A" || p.team === "B") teamTotals[p.team] += totals[pkey(p)] || 0;
+      });
+    }
     const carrying = matchCards.reduce((s, c) => s + c.result.carryAtEnd, 0);
 
     return (
       <div style={{ marginTop: 18 }}>
-        <Eyebrow>{`1:1 SKINS · MATCH PLAY${game.allowance_pct != null && game.allowance_pct !== 100 ? ` · ${game.allowance_pct}% ALLOWANCE` : ""}`}</Eyebrow>
+        <Eyebrow>{`${isTeamSkins ? "TEAM " : ""}1:1 SKINS · MATCH PLAY${game.allowance_pct != null && game.allowance_pct !== 100 ? ` · ${game.allowance_pct}% ALLOWANCE` : ""}`}</Eyebrow>
+        {isTeamSkins && (
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+            <div style={{ flex: 1, background: teamTotals.A >= teamTotals.B ? C.cream : C.card, borderRadius: 12, padding: 14, textAlign: "center" }}>
+              <div style={{ color: C.ink, fontWeight: 800 }}>{teams![0].name}</div>
+              <div style={{ color: C.green, fontSize: 32, fontWeight: 900, fontFamily: "Georgia, serif" }}>{teamTotals.A}</div>
+            </div>
+            <div style={{ flex: 1, background: teamTotals.B >= teamTotals.A ? C.cream : C.card, borderRadius: 12, padding: 14, textAlign: "center" }}>
+              <div style={{ color: C.ink, fontWeight: 800 }}>{teams![1].name}</div>
+              <div style={{ color: C.green, fontSize: 32, fontWeight: 900, fontFamily: "Georgia, serif" }}>{teamTotals.B}</div>
+            </div>
+          </div>
+        )}
         {carrying > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5A3210", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "10px 12px", marginTop: 10 }}>
             <span style={{ color: ORANGE, fontSize: 18, fontWeight: 800 }}>↑</span>
@@ -2542,7 +2579,7 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
           {[...players].sort((a, b) => (totals[pkey(b)] || 0) - (totals[pkey(a)] || 0)).map((p) => {
             const n = totals[pkey(p)] || 0;
             return <div key={p.id} style={{ flex: 1, minWidth: 130, background: p.user_id === user.id ? C.cream : C.card, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-              <span style={{ color: C.ink, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_name}{p.user_id === user.id ? " (you)" : ""}</span>
+              <span style={{ color: C.ink, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_name}{p.user_id === user.id ? " (you)" : ""}{isTeamSkins && p.team ? ` · ${teamName(p.team)}` : ""}</span>
               <span style={{ color: n > 0 ? C.green : C.faint, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif", marginLeft: 8 }}>{n}</span>
             </div>;
           })}
@@ -2550,7 +2587,7 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
         {matchCards.map(({ idx, pa, pb, result }) => (
           <div key={idx} style={{ background: C.card, borderRadius: 12, padding: 14, marginTop: 12, border: pa.id === myKey || pb.id === myKey ? `1px solid ${C.gold}` : "none" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{pa.name} <span style={{ color: C.faint, fontWeight: 400 }}>vs</span> {pb.name}</div>
+              <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{pa.name}{isTeamSkins ? ` (${teamName(playerOf(pa.id)?.team)})` : ""} <span style={{ color: C.faint, fontWeight: 400 }}>vs</span> {pb.name}{isTeamSkins ? ` (${teamName(playerOf(pb.id)?.team)})` : ""}</div>
               <div style={{ flex: 1 }} />
               <div style={{ color: C.green, fontWeight: 900, fontFamily: "Georgia, serif" }}>{result.skinsBySide[pa.id] || 0}–{result.skinsBySide[pb.id] || 0}</div>
             </div>
@@ -2935,6 +2972,7 @@ function FourballView({
   const playerOf = (uid: string) => players.find((p) => pkey(p) === uid) || null;
   const nameOf = (uid: string) => playerOf(uid)?.display_name || "—";
   const firstName = (uid: string) => (playerOf(uid)?.display_name || "—").split(" ")[0];
+  const teamName = (key: string | null | undefined) => teams?.find((t) => t.key === key)?.name || "—";
 
   const saveFoursomes = async (next: typeof foursomes) => {
     await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
