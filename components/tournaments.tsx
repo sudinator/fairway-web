@@ -1600,15 +1600,20 @@ function GameRoom({
         <div style={{ flex: 1 }} />
         <button
           onClick={() => {
-            navigator.clipboard
-              ?.writeText(game.code)
-              .then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1500);
-              })
-              .catch(() => {});
+            const shareText = `Join my golf game "${game.name}" on Birdie Num Num — enter code ${game.code}.`;
+            if (typeof navigator !== "undefined" && (navigator as any).share) {
+              (navigator as any).share({ title: "Birdie Num Num", text: shareText }).catch(() => {});
+            } else {
+              navigator.clipboard
+                ?.writeText(game.code)
+                .then(() => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1500);
+                })
+                .catch(() => {});
+            }
           }}
-          title="Tap to copy"
+          title="Share or copy the join code"
           style={{
             background: C.greenLight,
             border: "none",
@@ -1619,7 +1624,7 @@ function GameRoom({
           }}
         >
           <div style={{ color: C.sage, fontSize: 10, letterSpacing: 2 }}>
-            {copied ? "COPIED ✓" : "SHARE CODE · TAP TO COPY"}
+            {copied ? "COPIED ✓" : "SHARE CODE · TAP TO SHARE"}
           </div>
           <div
             style={{
@@ -1702,7 +1707,7 @@ function GameRoom({
         const usesTeams = teamsArr.length > 0;
         const usesMatchups = game.game_type === "match" || game.game_type === "fourball" || game.game_type === "skins";
         const steps: { key: "players" | "teams" | "matchups" | "groups"; label: string }[] = [
-          { key: "players", label: "Players & Tees" },
+          { key: "players", label: "Players" },
           ...(usesTeams ? [{ key: "teams" as const, label: "Teams" }] : []),
           ...(usesMatchups ? [{ key: "matchups" as const, label: "Matchups" }] : []),
           { key: "groups", label: "Groups" },
@@ -1715,25 +1720,78 @@ function GameRoom({
           onSetTeeGroup: setPlayerTeeGroup, onRename: renameGame, onDelete: deleteGame,
           onEnd: endGame, onReopen: reopenGame,
         };
+        // --- per-step completion drives the stepper status + the "what's next" line ---
+        const total = players.length;
+        const pairings = Array.isArray(game.pairings) ? game.pairings : [];
+        const foursomes = Array.isArray(game.foursomes) ? game.foursomes : [];
+        const placedKeys = new Set<string>([
+          ...pairings.flatMap((pr) => [pr.a, pr.b]),
+          ...foursomes.flatMap((f) => [...f.a, ...f.b]),
+        ]);
+        const cWithHcp = players.filter((p) => p.course_handicap != null).length;
+        const cWithTeam = players.filter((p) => p.team).length;
+        const cPlaced = players.filter((p) => placedKeys.has(pkey(p))).length;
+        const cGrouped = players.filter((p) => p.tee_group != null).length;
+        const stepDone = (key: string) =>
+          total > 0 && (
+            key === "players" ? cWithHcp === total
+            : key === "teams" ? cWithTeam === total
+            : key === "matchups" ? cPlaced === total
+            : key === "groups" ? cGrouped === total
+            : false);
+        const allDone = steps.every((s) => stepDone(s.key));
+        const isStableford = game.game_type === "stableford";
+        const hint = (() => {
+          if (activeStep === "players")
+            return isStableford
+              ? "Add players, or share the code so they can join anytime — even across tee times. Stableford rolls everyone into one leaderboard."
+              : "Add everyone here before matchups — players don't have to join themselves (you can still share the code so they self-score).";
+          if (activeStep === "teams")
+            return cWithTeam < total ? "Tap a team on each player. Both teams need players before matchups." : "Teams set — next, build the matchups.";
+          if (activeStep === "matchups") {
+            if (usesTeams && cWithTeam === 0) return "Assign players to teams first — open the Teams step, then come back.";
+            return "Set who plays whom, then group the matches that tee off together on the next step.";
+          }
+          if (usesMatchups && pairings.length === 0 && foursomes.length === 0)
+            return "Build the matchups first, then group the ones that tee off together here.";
+          return isStableford
+            ? "Split players into the groups that tee off together so one person can keep each group's card."
+            : "Group the matches that tee off together — usually two per foursome.";
+        })();
+
         return (
           <div style={{ marginTop: 16 }}>
-            <div style={{ display: "flex", gap: 5, marginBottom: 4 }}>
-              {steps.map((s, i) => (
-                <button key={s.key} onClick={() => setSetupTab(s.key)}
-                  style={{ ...btn(activeStep === s.key), flex: 1, fontSize: 11, padding: "8px 4px" }}>
-                  {i + 1} · {s.label}
-                </button>
-              ))}
+            {/* Stepper: navigation and progress in one control */}
+            <div style={{ display: "flex", alignItems: "center" }}>
+              {steps.map((s, i) => {
+                const done = stepDone(s.key);
+                const active = activeStep === s.key;
+                return (
+                  <div key={s.key} style={{ flex: 1, display: "flex", alignItems: "center" }}>
+                    {i > 0 && <div style={{ flex: "0 0 12px", height: 1, background: "rgba(255,255,255,0.18)" }} />}
+                    <button onClick={() => setSetupTab(s.key)} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "center" }}>
+                      <div style={{
+                        width: active ? 30 : 26, height: active ? 30 : 26, lineHeight: active ? "30px" : "26px",
+                        margin: "0 auto", borderRadius: 999, fontWeight: 800, fontSize: 13,
+                        background: done ? "#5BD08A" : active ? C.gold : "transparent",
+                        color: done ? "#0E241B" : active ? "#23303A" : C.sage,
+                        border: done || active ? "none" : "1px solid rgba(255,255,255,0.25)",
+                        boxShadow: active ? "0 0 0 3px rgba(216,178,74,0.25)" : "none",
+                      }}>{done ? "✓" : i + 1}</div>
+                      <div style={{ color: active ? C.cream : C.sage, fontSize: 10, marginTop: 3, fontWeight: active ? 700 : 400 }}>{s.label}</div>
+                    </button>
+                  </div>
+                );
+              })}
             </div>
+            <div style={{ background: allDone ? C.green : "#16302A", borderRadius: 8, padding: "9px 11px", marginTop: 12, color: allDone ? C.cream : C.gold, fontSize: 12, lineHeight: 1.45 }}>
+              {allDone ? "✓ Everyone's set — switch to Scorecard to start the round." : hint}
+            </div>
+
             {activeStep === "players" && <OrganizerPanel section="players" {...panelProps} />}
             {activeStep === "teams" && <OrganizerPanel section="teams" {...panelProps} />}
             {activeStep === "groups" && (
               <GroupsBuilder game={game} players={players} onSetTeeGroup={setPlayerTeeGroup} />
-            )}
-            {activeStep === "matchups" && (
-              <div style={{ color: C.sage, fontSize: 12, marginTop: 12, marginBottom: -4 }}>
-                Set who plays whom. Build the groups that tee off together on the next step.
-              </div>
             )}
           </div>
         );
@@ -1794,10 +1852,22 @@ function GameRoom({
                 const hasMarker = grpPlayers.some((p) => p.is_marker);
                 return (
                   <button key={g} onClick={() => setViewGroup(g)} style={{ ...btn(viewGroup === g), fontSize: 12, padding: "5px 12px" }}>
-                    Group {g}{locked ? " 🔒" : !hasMarker ? " ·!" : ""}
+                    Group {g}{locked ? " 🔒" : hasMarker ? " ✓" : " · needs scorer"}
                   </button>
                 );
               })}
+            </div>
+          )}
+          {canClaimViewed && !viewedMarkerPlayer && (
+            <div style={{ background: "#16302A", border: `1px solid ${C.gold}`, borderRadius: 12, padding: 14, marginTop: 12 }}>
+              <div style={{ color: C.cream, fontSize: 15, fontWeight: 700, marginBottom: 6 }}>📋 Who's keeping {viewGroup != null ? `Group ${viewGroup}` : "this group"}'s card?</div>
+              <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>
+                One person enters everyone's scores for the group — usually quicker than four phones, and everyone still sees it update live. Or skip it and each player scores their own.
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button onClick={claimGroupMarker} style={{ ...btn(true), flex: 1, minWidth: 130, fontSize: 13 }}>I'll keep score</button>
+                <button onClick={() => setCardView(false)} style={{ ...btn(false), flex: 1, minWidth: 130, fontSize: 13 }}>We'll each score our own</button>
+              </div>
             </div>
           )}
           <GroupScorecard game={game} players={cardPlayers} user={user}
@@ -1949,12 +2019,18 @@ function GameRoom({
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Eyebrow>{isEnded ? "YOUR FINAL SCORES" : "ENTER YOUR SCORES"}</Eyebrow>
             <div style={{ flex: 1 }} />
+            {!isEnded && (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: C.sage, fontSize: 11 }}>
+                <span style={{ width: 7, height: 7, borderRadius: 999, background: "#5BD08A", display: "inline-block" }} />
+                Live
+              </span>
+            )}
             <button style={{ ...btn(false), fontSize: 12, padding: "6px 12px" }} onClick={load}>⟳ Refresh</button>
           </div>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
             {isEnded
               ? "This game has ended — scores are locked in."
-              : "Tap a hole and pick your strokes — it saves and updates the leaderboard. Tap ⟳ Refresh to see others' latest."}
+              : "Tap a hole and pick your strokes — it saves instantly. Others' scores update automatically; ⟳ Refresh forces it."}
           </div>
           <ScoreEntryCard
             holes={(() => {
@@ -2959,7 +3035,9 @@ function FourballView({
           {isCreator && <button style={{ ...btn(true), fontSize: 12 }} onClick={addFoursome}>+ Add foursome</button>}
         </div>
         <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
-          Each foursome is a 2-v-2 better-net-ball match. Put 2 players in each pair. Big groups: add a foursome per group of four.
+          {isTeam
+            ? `Each foursome is ${teams![0].name} vs ${teams![1].name} (2-v-2 better-net-ball). Each side only lists its own team's players, so the team total stays correct.`
+            : "Each foursome is a 2-v-2 better-net-ball match. Put 2 players in each pair. Big groups: add a foursome per group of four."}
         </div>
 
         {foursomes.length === 0 && (
@@ -2977,7 +3055,7 @@ function FourballView({
             </div>
             {(["a", "b"] as const).map((team) => (
               <div key={team} style={{ marginTop: 10 }}>
-                <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>{team === "a" ? "PAIR 1" : "PAIR 2"}</div>
+                <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>{isTeam ? (team === "a" ? teams![0].name : teams![1].name).toUpperCase() : (team === "a" ? "PAIR 1" : "PAIR 2")}</div>
                 {f[team].map((uid) => (
                   <div key={uid} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" }}>
                     <span style={{ flex: 1, color: C.cream, fontSize: 14 }}>{nameOf(uid)}</span>
@@ -2988,7 +3066,7 @@ function FourballView({
                   <select defaultValue="" onChange={(e) => { if (e.target.value) { assign(f.id, team, e.target.value); e.target.value = ""; } }}
                     style={{ ...inputStyle, padding: "6px 8px", fontSize: 12, marginTop: 4 }}>
                     <option value="">+ Add player…</option>
-                    {unplaced.map((p) => <option key={p.id} value={pkey(p)}>{p.display_name}</option>)}
+                    {unplaced.filter((p) => !isTeam || p.team === (team === "a" ? teams![0].key : teams![1].key)).map((p) => <option key={p.id} value={pkey(p)}>{p.display_name}</option>)}
                   </select>
                 )}
               </div>

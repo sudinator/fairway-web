@@ -1,51 +1,48 @@
-# Birdie Num Num — v1.8.0
+# Birdie Num Num — v1.9.0 (onboarding & clarity pass)
 
-Adds the team option to four-ball, so every format except Stableford can be played
-as a two-team (Red vs Blue) competition.
+Five UX changes from the walkthrough, all additive — no scoring logic changed.
 
 ## What's new
 
-1. Four-ball can now be a team game. At creation, four-ball shows the same
-   "Team four-ball (Red vs Blue)" checkbox with two name fields that match and skins
-   already have. (Match and skins were already team-capable; four-ball was the only
-   non-Stableford format that wasn't.)
+1. Setup stepper + progress. The four-tab setup bar is now a stepper that shows
+   status: each step is a dot with a check when complete, the current step is
+   highlighted, and a line underneath tells you what's next. When everything's done it
+   says "you're ready — switch to Scorecard." The first step adapts by format: Stableford
+   reads "share the code so players can join anytime, even across tee times"; match /
+   four-ball / skins read "add everyone before matchups."
 
-2. Ryder-Cup rollup. When four-ball is a team game, each 2-v-2 foursome is worth a
-   point to the winning side's team; a halved foursome is half a point each; the team
-   total is the sum across all foursomes. The play view shows a Red-vs-Blue scoreboard
-   (projected from current foursomes, plus the decided tally), the same scoreboard
-   match play uses.
+2. On-course "pick a scorer" prompt. On the Group card, a group with no scorer now shows
+   a clear card -- "Who's keeping Group N's card?" with "I'll keep score" (claims the
+   marker) and "We'll each score our own." The cryptic group-tab marker is replaced with
+   "Group N · needs scorer" / "Group N ✓".
 
-3. Foursome pairs are labelled by team name in the play cards when teams are on.
+3. Four-ball team builder is team-aware. When a four-ball is a team game, the foursome
+   builder labels the two sides by team name and only offers that team's players for each
+   side, so a foursome can't accidentally be mixed-team (which would skew the team total).
 
-## How to run a team four-ball
+4. Inline guidance on every setup step (folded into the stepper's "what's next" line),
+   e.g. "assign players to teams first" when the matchup pickers are empty, or "build the
+   matchups first" on the Groups step before any exist.
 
-- Create -> Four-ball -> tick "Team four-ball", name the two teams.
-- Setup -> Teams: assign each player to a team.
-- Setup -> Matchups: build each foursome as one team's pair vs the other team's pair.
-  (Keep each pair single-team; the rollup reads the team of each side.)
-- Setup -> Groups: order the foursomes.
-- Play: the Red-vs-Blue scoreboard sits above the foursome cards.
+5. Sharing + live status. The share-code button now uses the device share sheet when
+   available (falls back to copy). The score screen shows a green "Live" dot — scores
+   already auto-refresh every 60s and via realtime within ~1s, so ⟳ Refresh is just a
+   manual nudge, not a requirement.
 
 ## SQL migrations
 
-NONE. Uses the existing teams / foursomes columns.
+NONE.
 
 ## Verified locally
 
 - tsc --noEmit: clean
 - next build: passes (7 routes)
-- Unit tests: 102/102 pass (the underlying foursome result, fourballStatus, is already
-  covered; the rollup is a sum over those results)
+- Unit tests: 102/102 pass
 
-## Smoke-test suggestion
+## Smoke-test suggestions (two devices)
 
-Create a team four-ball with two foursomes (one pair Red, one pair Blue in each),
-enter a few holes, and confirm the Red-vs-Blue total at the top moves as foursomes
-swing, and that a clinched foursome shows in the "decided" tally.
-
-## Note / limitation
-
-The four-ball foursome builder still labels the two sides PAIR 1 / PAIR 2 while you're
-assigning (the team names show on the play cards). If you'd like the builder itself to
-show team names while assigning, that's a quick follow-up.
+- Setup: watch the stepper dots tick to ✓ as you set handicaps, teams, matchups, groups,
+  and the banner flip to "ready."
+- On the course: open the Group card on a phone in a group with no scorer, tap "I'll keep
+  score," and confirm the other phone goes read-only.
+- Team four-ball: confirm each foursome side only lists its own team's players.
