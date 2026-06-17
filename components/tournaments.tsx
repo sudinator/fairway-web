@@ -369,6 +369,30 @@ function CreateGame({
   const [selectedPlayers, setSelectedPlayers] = useState<
     Record<string, boolean>
   >({});
+  const [guestName, setGuestName] = useState("");
+  const [guestHcp, setGuestHcp] = useState("");
+  const [guestPlayers, setGuestPlayers] = useState<
+    { id: string; display_name: string; course_handicap: number }[]
+  >([]);
+
+  const addGuestPlayer = () => {
+    const guestCourseHandicap = parseInt(guestHcp, 10);
+    if (!guestName.trim() || Number.isNaN(guestCourseHandicap)) {
+      setErr("Enter a guest name and course handicap.");
+      return;
+    }
+    setGuestPlayers((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        display_name: guestName.trim(),
+        course_handicap: guestCourseHandicap,
+      },
+    ]);
+    setGuestName("");
+    setGuestHcp("");
+    setErr(null);
+  };
 
   useEffect(() => {
     loadCoursesForGroup(supabase, activeGroupId).then((data) => {
@@ -496,7 +520,7 @@ function CreateGame({
           handicap_index: idxVal,
         });
       }
-      const rows = selectedRoster.map((p) => {
+      const rosterRows = selectedRoster.map((p) => {
         const playerIndex = p.id === user.id ? idxVal : p.handicap_index;
         const playerCourseHandicap =
           playerIndex != null && coursePar != null
@@ -505,6 +529,7 @@ function CreateGame({
         return {
           game_id: game.id,
           user_id: p.id,
+          is_guest: false,
           display_name: p.display_name || "Player",
           handicap_index: playerIndex,
           rating: tee.rating,
@@ -516,11 +541,26 @@ function CreateGame({
           fairways: Array(holesMeta.length).fill(null),
         };
       });
+      const guestRows = guestPlayers.map((p) => ({
+        game_id: game.id,
+        user_id: null,
+        is_guest: true,
+        display_name: p.display_name,
+        handicap_index: null,
+        rating: tee.rating,
+        slope: tee.slope,
+        tee_name: tee.name,
+        course_handicap: p.course_handicap,
+        scores: Array(holesMeta.length).fill(null),
+        putts: Array(holesMeta.length).fill(null),
+        fairways: Array(holesMeta.length).fill(null),
+      }));
+      const rows = [...rosterRows, ...guestRows];
       const { error: e2 } = await supabase.from("game_players").insert(rows);
       if (e2) throw e2;
       await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_created", group_id: activeGroupId, summary: `Created the game "${game.name}" at ${pickedFav.name}` });
       for (const row of rows) {
-        if (row.user_id !== user.id) {
+        if (row.user_id && row.user_id !== user.id) {
           try {
             await supabase
               .from("notifications")
@@ -617,6 +657,49 @@ function CreateGame({
               </label>
             );
           })}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        <label style={{ color: C.sage, fontSize: 12 }}>Guest players</label>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
+          Add guests before creating the game so skins, teams, tee groups, and scoring all start with the correct field.
+        </div>
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: 10, marginTop: 8 }}>
+          {guestPlayers.length > 0 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+              {guestPlayers.map((g) => (
+                <span key={g.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.greenMid, borderRadius: 999, padding: "4px 10px", color: C.cream, fontSize: 13 }}>
+                  {g.display_name} <span style={{ color: C.sage, fontSize: 11 }}>hcp {g.course_handicap}</span>
+                  <button
+                    onClick={() => setGuestPlayers((prev) => prev.filter((p) => p.id !== g.id))}
+                    style={{ background: "none", border: "none", color: C.birdie, cursor: "pointer", fontSize: 14, padding: 0 }}
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <input
+              value={guestName}
+              onChange={(e) => setGuestName(e.target.value)}
+              placeholder="Guest name"
+              style={{ ...inputStyle, width: "auto", minWidth: 150, flex: 1 }}
+            />
+            <input
+              value={guestHcp}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "" || /^-?\d*$/.test(v)) setGuestHcp(v);
+              }}
+              inputMode="numeric"
+              placeholder="Course hcp"
+              style={{ ...inputStyle, width: 110 }}
+            />
+            <button onClick={addGuestPlayer} style={{ ...btn(false), fontSize: 12 }}>+ Add guest</button>
+          </div>
         </div>
       </div>
 
