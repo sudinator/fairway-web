@@ -57,7 +57,7 @@ type Game = {
   game_type: "stableford" | "match" | "fourball" | "skins";
   allowance_pct?: number | null; // handicap allowance % applied to net scoring
   marker_user_id?: string | null; // the player currently keeping score for the group
-  pairings: { a: string; b: string }[]; // for match play: user_id vs user_id
+  pairings: { a: string; b: string }[]; // for match play: pkey(player) vs pkey(player)
   status?: "active" | "ended" | null;
   teams?: { key: string; name: string }[] | null; // two named teams for team match play
   foursomes?: { id: string; name: string; a: string[]; b: string[] }[] | null; // four-ball: pair A vs pair B
@@ -939,6 +939,7 @@ function GameRoom({
 
   // ---- Tee groups (foursomes that play together, each with its own marker) ----
   const myRow = players.find((p) => p.user_id === user.id) || null;
+  const myKey = myRow ? pkey(myRow) : user.id;
   const teeGroupsInUse = players.some((p) => p.tee_group != null);
   const teeGroupList = Array.from(new Set(players.map((p) => p.tee_group).filter((g): g is number => g != null))).sort((a, b) => a - b);
   const [viewGroup, setViewGroup] = useState<number | null>(null);
@@ -1297,7 +1298,7 @@ function GameRoom({
       })
       .eq("id", p.id);
     // Notify the player their game handicap was set by the organizer (if it's not the organizer themselves).
-    if (p.user_id !== user.id) {
+    if (p.user_id && p.user_id !== user.id) {
       try {
         await supabase
           .from("notifications")
@@ -1332,6 +1333,7 @@ function GameRoom({
     await supabase.from("game_players").insert({
       game_id: game.id,
       user_id: prof.id,
+      is_guest: false,
       display_name: prof.display_name || "Player",
       handicap_index: prof.handicap_index ?? null,
       rating,
@@ -1370,8 +1372,20 @@ function GameRoom({
       )
     )
       return;
+    const removedKey = pkey(p);
+    const updates: Partial<Game> = {};
+    const nextPairings = (game.pairings || []).filter((pr) => pr.a !== removedKey && pr.b !== removedKey);
+    if (nextPairings.length !== (game.pairings || []).length) updates.pairings = nextPairings;
+    if (Array.isArray(game.foursomes)) {
+      updates.foursomes = game.foursomes.map((f) => ({
+        ...f,
+        a: (f.a || []).filter((uid) => uid !== removedKey),
+        b: (f.b || []).filter((uid) => uid !== removedKey),
+      }));
+    }
+    if (Object.keys(updates).length) await supabase.from("games").update(updates).eq("id", game.id);
     await supabase.from("game_players").delete().eq("id", p.id);
-    if (p.user_id !== user.id) {
+    if (p.user_id && p.user_id !== user.id) {
       try {
         await supabase
           .from("notifications")
@@ -1892,9 +1906,9 @@ function GameRoom({
               let matchAllow: number | null = null;
               let oppAllow: number | null = null; // opponent's allowance — used to show holes I GIVE
               if (game.game_type === "match") {
-                const pr = game.pairings.find((p) => p.a === user.id || p.b === user.id);
+                const pr = game.pairings.find((p) => p.a === myKey || p.b === myKey);
                 if (pr) {
-                  const oppId = pr.a === user.id ? pr.b : pr.a;
+                  const oppId = pr.a === myKey ? pr.b : pr.a;
                   const oppP = players.find((p) => pkey(p) === oppId);
                   const allowPair = matchAllowance(me.course_handicap, oppP?.course_handicap ?? null, game.allowance_pct ?? 100);
                   matchAllow = allowPair.a;
@@ -1930,25 +1944,25 @@ function GameRoom({
             showPenalties={true}
             opp={(() => {
               if (game.game_type !== "match") return undefined;
-              const pr = game.pairings.find((p) => p.a === user.id || p.b === user.id);
+              const pr = game.pairings.find((p) => p.a === myKey || p.b === myKey);
               if (!pr) return undefined;
-              const oppId = pr.a === user.id ? pr.b : pr.a;
+              const oppId = pr.a === myKey ? pr.b : pr.a;
               const oppP = players.find((p) => pkey(p) === oppId);
               return oppP?.scores || undefined;
             })()}
             oppLabel={(() => {
               if (game.game_type !== "match") return undefined;
-              const pr = game.pairings.find((p) => p.a === user.id || p.b === user.id);
+              const pr = game.pairings.find((p) => p.a === myKey || p.b === myKey);
               if (!pr) return undefined;
-              const oppId = pr.a === user.id ? pr.b : pr.a;
+              const oppId = pr.a === myKey ? pr.b : pr.a;
               const oppP = players.find((p) => pkey(p) === oppId);
               return oppP?.display_name?.split(" ")[0] || "Opp";
             })()}
             matchRun={(() => {
               if (game.game_type === "match") {
-                const pr = game.pairings.find((p) => p.a === user.id || p.b === user.id);
+                const pr = game.pairings.find((p) => p.a === myKey || p.b === myKey);
                 if (!pr) return undefined;
-                const oppId = pr.a === user.id ? pr.b : pr.a;
+                const oppId = pr.a === myKey ? pr.b : pr.a;
                 const oppP = players.find((p) => pkey(p) === oppId);
                 if (!oppP) return undefined;
                 // Compute from MY perspective: me = A.
@@ -1966,10 +1980,10 @@ function GameRoom({
                 // Find my foursome and which side I'm on; compute the running team
                 // best-net-ball match position from MY team's perspective.
                 const f = game.foursomes.find(
-                  (x: any) => (x.a || []).includes(user.id) || (x.b || []).includes(user.id),
+                  (x: any) => (x.a || []).includes(myKey) || (x.b || []).includes(myKey),
                 );
                 if (!f || !f.a?.length || !f.b?.length) return undefined;
-                const onA = f.a.includes(user.id);
+                const onA = f.a.includes(myKey);
                 const myIds = onA ? f.a : f.b;
                 const oppIds = onA ? f.b : f.a;
                 const members = [...f.a, ...f.b].map((uid: string) => {
@@ -2045,16 +2059,32 @@ function GuestManager({ game, players, onChanged }: { game: Game; players: Playe
   const add = async () => {
     const h = parseInt(hcp, 10);
     if (!name.trim() || isNaN(h)) return;
+    const ref = players.find((x) => x.rating != null && x.slope != null);
     setBusy(true);
     await supabase.from("game_players").insert({
       game_id: game.id, user_id: null, is_guest: true,
-      display_name: name.trim(), course_handicap: h,
+      display_name: name.trim(), handicap_index: null,
+      rating: ref?.rating ?? null, slope: ref?.slope ?? null, tee_name: ref?.tee_name ?? null,
+      course_handicap: h,
       scores: Array(n).fill(null), putts: Array(n).fill(null), fairways: Array(n).fill(null),
     });
     setName(""); setHcp(""); setBusy(false); setOpen(false); onChanged();
   };
   const remove = async (id: string) => {
-    if (!confirm("Remove this guest from the game?")) return;
+    const guest = players.find((p) => p.id === id);
+    if (!guest || !confirm("Remove this guest from the game?")) return;
+    const removedKey = pkey(guest);
+    const updates: Partial<Game> = {};
+    const nextPairings = (game.pairings || []).filter((pr) => pr.a !== removedKey && pr.b !== removedKey);
+    if (nextPairings.length !== (game.pairings || []).length) updates.pairings = nextPairings;
+    if (Array.isArray(game.foursomes)) {
+      updates.foursomes = game.foursomes.map((f) => ({
+        ...f,
+        a: (f.a || []).filter((uid) => uid !== removedKey),
+        b: (f.b || []).filter((uid) => uid !== removedKey),
+      }));
+    }
+    if (Object.keys(updates).length) await supabase.from("games").update(updates).eq("id", game.id);
     await supabase.from("game_players").delete().eq("id", id);
     onChanged();
   };
@@ -2696,7 +2726,8 @@ function MatchView({
           : st.lead === 0
             ? "All square"
             : `${leader} ${Math.abs(st.lead)} UP`;
-        const iAmIn = pr.a === user.id || pr.b === user.id;
+        const myKey = players.find((p) => p.user_id === user.id)?.user_id ?? user.id;
+        const iAmIn = pr.a === myKey || pr.b === myKey;
         return (
           <div
             key={idx}
@@ -2894,7 +2925,8 @@ function FourballView({
         const ms = members4(f);
         const full = f.a.length && f.b.length;
         const st = full ? fourballStatus(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100) : null;
-        const mine = f.a.includes(user.id) || f.b.includes(user.id);
+        const myKey = players.find((p) => p.user_id === user.id)?.user_id ?? user.id;
+        const mine = f.a.includes(myKey) || f.b.includes(myKey);
         const lead = st?.lead ?? 0;
         const leadText = !st || st.thru === 0 ? "" : lead === 0 ? "All square" : `${firstName(lead > 0 ? f.a[0] : f.b[0])}'s pair ${Math.abs(lead)} UP`;
         return (

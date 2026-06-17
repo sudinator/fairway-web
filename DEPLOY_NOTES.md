@@ -1,16 +1,22 @@
-# Deploy notes — v1.0.40 (cumulative — full app, supersedes all prior)
+# Deploy notes - v1.1.0 (cumulative - full app, supersedes all prior)
 
-## Database — run supabase/migrations/0013_delete_game.sql
-Adds delete_game(p_game, p_delete_rounds) RPC (organizer-only). If not already
-run: 0002–0012.
+## Release policy
+- Version number is now updated on every codebase change.
+- Release notes are updated alongside each deployable zip.
 
-## Delete-game behavior (rounds)
-- Deleting a game on a LATER day removes the game for everyone but KEEPS each
-  player's posted round in their own Rounds history (this was already the case;
-  delete never cascaded to rounds).
-- Deleting a game the SAME DAY it was created now warns that the scorecards
-  already posted to players' Rounds tabs will ALSO be deleted, and removes those
-  rounds (and their holes) on confirm.
-- Both paths are organizer-only and run via a SECURITY DEFINER RPC. Verified
-  vs PostgreSQL: keep-rounds keeps them, same-day removes rounds+holes, and a
-  non-organizer is rejected.
+## Added
+- Guest players can now be added during game creation, before selecting/finalizing the course and format.
+- Guests are inserted as first-class `game_players` records at create time.
+- Guest players are supported across team match play, four-ball / team best-ball, team assignments, and foursomes.
+
+## Fixed
+- Removing a guest now also cleans up related matchups and foursome assignments.
+- Guest notification handling now skips players without app accounts.
+- Team/game logic now consistently uses stable player keys so guests without `user_id` work correctly.
+
+## Database
+- No new migration is required for v1.1.0 if migrations 0002-0013 have already been run.
+- If deploying to a fresh database, run migrations 0002-0013, including `supabase/migrations/0013_delete_game.sql`.
+
+## Prior v1.0.40 database note
+`0013_delete_game.sql` adds `delete_game(p_game, p_delete_rounds)` RPC for organizer-only deletion.
