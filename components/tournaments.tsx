@@ -502,7 +502,7 @@ function CreateGame({
           game_type: gameType,
           pairings: [],
           teams:
-            (gameType === "match" || gameType === "skins") && teamMode
+            (gameType === "match" || gameType === "skins" || gameType === "fourball") && teamMode
               ? [
                   { key: "A", name: team1.trim() || "Team 1" },
                   { key: "B", name: team2.trim() || "Team 2" },
@@ -831,7 +831,7 @@ function CreateGame({
             Singles match play
           </button>
           <button
-            onClick={() => { setGameType("fourball"); setTeamMode(false); }}
+            onClick={() => setGameType("fourball")}
             style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 120, fontSize: 13 }}
           >
             Four-ball (best net)
@@ -852,15 +852,17 @@ function CreateGame({
             ? "Skins follows match-play structure: singles can be 1:1, team 1:1 rolls skins into team totals, or team best-ball can be played in foursomes. Halved holes carry forward."
             : "Players are paired 1-on-1. After friends join, you'll set the matchups. Lower handicap plays off scratch; opponent gets the difference."}
         </div>
-        {(gameType === "match" || gameType === "skins") && (
+        {(gameType === "match" || gameType === "skins" || gameType === "fourball") && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
               <input type="checkbox" checked={teamMode} onChange={(e) => setTeamMode(e.target.checked)} />
-              <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>{gameType === "skins" ? "Team skins" : "Team match (e.g. 4 v 4)"}</span>
+              <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>{gameType === "skins" ? "Team skins" : gameType === "fourball" ? "Team four-ball (Red vs Blue)" : "Team match (e.g. 4 v 4)"}</span>
             </label>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
               {gameType === "skins"
                 ? "Two teams. Use 1:1 pairings to roll skins into team totals, or choose best-ball foursomes below. A halved hole carries the pot forward."
+                : gameType === "fourball"
+                ? "Two teams. Each 2-v-2 foursome is worth a point; the team total is the sum across foursomes (a halved foursome = ½ each), Ryder-Cup style. You'll assign players to teams after creating."
                 : "Two teams. Each 1-on-1 pairing is worth a point; the team total is the sum (halved matches = ½ each). You'll assign players to teams after creating."}
             </div>
             {teamMode && (
@@ -2926,6 +2928,28 @@ function FourballView({
       return { id: uid, gross: p?.scores || [], ch: p?.course_handicap ?? null, noShow: !!(p as any)?.no_show };
     });
 
+  // Ryder-Cup team rollup: each 2-v-2 foursome is worth a point to the winning
+  // side's team; a halved foursome is ½ each. Sides must be cross-team.
+  const isTeam = Array.isArray(teams) && teams.length === 2;
+  const holesCount = game.holes_meta?.length ?? 18;
+  const teamStandings = (() => {
+    if (!isTeam) return null;
+    const pts: Record<string, number> = { A: 0, B: 0 };
+    const decidedPts: Record<string, number> = { A: 0, B: 0 };
+    foursomes.forEach((f) => {
+      if (!f.a.length || !f.b.length) return;
+      const ta = playerOf(f.a[0])?.team, tb = playerOf(f.b[0])?.team;
+      if (!ta || !tb || ta === tb) return; // need a cross-team foursome
+      const st = fourballStatus(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100);
+      if (st.thru === 0) return;
+      const decided = st.thru === holesCount || Math.abs(st.lead) > holesCount - st.thru;
+      if (st.lead === 0) { pts.A += 0.5; pts.B += 0.5; if (decided) { decidedPts.A += 0.5; decidedPts.B += 0.5; } }
+      else { const w = st.lead > 0 ? ta : tb; pts[w] += 1; if (decided) decidedPts[w] += 1; }
+    });
+    return { pts, decidedPts };
+  })();
+  const fmtPts = (n: number) => (n === Math.floor(n) ? String(n) : `${Math.floor(n)}½`);
+
   if (mode === "setup") {
     return (
       <div style={{ marginTop: 16 }}>
@@ -2985,6 +3009,24 @@ function FourballView({
   return (
     <div style={{ marginTop: 16 }}>
       <Eyebrow>FOUR-BALL MATCHES</Eyebrow>
+      {isTeam && teamStandings && (
+        <div style={{ background: C.green, borderRadius: 12, padding: 14, marginTop: 12 }}>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <div style={{ flex: 1, textAlign: "center" }}>
+              <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![0].name}</div>
+              <div style={{ color: teamStandings.pts.A >= teamStandings.pts.B ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.pts.A)}</div>
+            </div>
+            <div style={{ color: C.sage, fontWeight: 800 }}>–</div>
+            <div style={{ flex: 1, textAlign: "center" }}>
+              <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![1].name}</div>
+              <div style={{ color: teamStandings.pts.B >= teamStandings.pts.A ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.pts.B)}</div>
+            </div>
+          </div>
+          <div style={{ color: C.sage, fontSize: 11, textAlign: "center", marginTop: 6 }}>
+            Projected from current foursomes · {fmtPts(teamStandings.decidedPts.A)}–{fmtPts(teamStandings.decidedPts.B)} decided
+          </div>
+        </div>
+      )}
       {foursomes.length === 0 && (
         <div style={{ background: C.greenLight, borderRadius: 12, padding: 18, marginTop: 12, color: C.sage }}>
           No foursomes set yet. {isCreator ? "Open Game setup to build them." : "Waiting for the organizer to set up the foursomes."}
@@ -3007,11 +3049,11 @@ function FourballView({
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
-                <div style={{ color: C.gold, fontSize: 10, fontWeight: 800 }}>PAIR 1</div>
+                <div style={{ color: C.gold, fontSize: 10, fontWeight: 800 }}>{isTeam ? teamName(playerOf(f.a[0])?.team).toUpperCase() : "PAIR 1"}</div>
                 <div style={{ color: C.cream, fontSize: 13 }}>{f.a.map(firstName).join(" & ") || "—"}</div>
               </div>
               <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
-                <div style={{ color: C.gold, fontSize: 10, fontWeight: 800 }}>PAIR 2</div>
+                <div style={{ color: C.gold, fontSize: 10, fontWeight: 800 }}>{isTeam ? teamName(playerOf(f.b[0])?.team).toUpperCase() : "PAIR 2"}</div>
                 <div style={{ color: C.cream, fontSize: 13 }}>{f.b.map(firstName).join(" & ") || "—"}</div>
               </div>
             </div>
