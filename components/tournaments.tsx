@@ -1386,7 +1386,11 @@ function GameRoom({
   const toggleNoShow = async (p: Player) => {
     if (!game) return;
     const next = !p.no_show;
-    if (next && !confirm(`Mark ${p.display_name} as out? The holes they've already played still count; any holes they didn't play score net double bogey for the team.`)) return;
+    const effect =
+      game.game_type === "fourball" ? "any holes they didn't play score net double bogey for their team"
+      : game.game_type === "match" ? "the match stands on the holes already played"
+      : "their unplayed holes score nothing";
+    if (next && !confirm(`Mark ${p.display_name} as out? The holes they've already played still count; ${effect}.`)) return;
     await supabase.from("game_players").update({ no_show: next }).eq("id", p.id);
     await load();
   };
@@ -2328,9 +2332,9 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
           </div>
         );
       })()}
-      {(game.game_type === "fourball" || game.game_type === "skins") && isMarker && onMarkOut && !groupLocked && (
+      {isMarker && onMarkOut && !groupLocked && (
         <div style={{ marginTop: 14, borderTop: `0.5px solid ${C.line}`, paddingTop: 12 }}>
-          <div style={{ color: C.sage, fontSize: 11, marginBottom: 7 }}>Someone leave early? Tap to mark them out — the holes they didn't play score net double bogey for the team.</div>
+          <div style={{ color: C.sage, fontSize: 11, marginBottom: 7 }}>Someone leave early? Tap to mark them out. The holes they've played still count; {game.game_type === "fourball" ? "the holes they didn't play score net double bogey for their team" : game.game_type === "match" ? "the match stands on the holes already played" : "their unplayed holes score nothing"}.</div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {players.map((p) => (
               <button key={p.id} onClick={() => onMarkOut(p)}
@@ -3289,9 +3293,9 @@ function OrganizerPanel({
                   </div>
 
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 12 }}>
-                    {(game.game_type === "fourball" || game.game_type === "skins") && (
+                    {(
                       <button
-                        title="Mark no-show"
+                        title="Mark out / no-show"
                         style={{
                           background: p.no_show ? C.gold : "none",
                           border: `1px solid ${p.no_show ? C.gold : C.line}`,
