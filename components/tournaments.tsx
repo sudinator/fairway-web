@@ -1385,15 +1385,18 @@ function GameRoom({
   // Organizer: delete the entire game and all its player rows.
   const deleteGame = async () => {
     if (!game) return;
-    if (
-      !confirm(
-        `Delete the game "${game.name}"? This removes it for everyone and can't be undone.`,
-      )
-    )
-      return;
-    await supabase.from("game_players").delete().eq("game_id", game.id);
-    await supabase.from("games").delete().eq("id", game.id);
-    await logActivity(supabase, { actor_id: user.id, actor_name: (user.email || "Someone"), action: "game_deleted", group_id: (game as any).group_id || null, summary: `Deleted the game "${game.name}"` });
+    const created = game.created_at ? new Date(game.created_at) : null;
+    const now = new Date();
+    const sameDay = !!created
+      && created.getFullYear() === now.getFullYear()
+      && created.getMonth() === now.getMonth()
+      && created.getDate() === now.getDate();
+    const msg = sameDay
+      ? `Delete "${game.name}"? It was created today, so any scorecards already posted to players' Rounds tabs will ALSO be deleted. This can't be undone.`
+      : `Delete "${game.name}"? It's removed for everyone, but each player's posted round stays in their own Rounds history. This can't be undone.`;
+    if (!confirm(msg)) return;
+    await supabase.rpc("delete_game", { p_game: game.id, p_delete_rounds: sameDay });
+    await logActivity(supabase, { actor_id: user.id, actor_name: (user.email || "Someone"), action: "game_deleted", group_id: (game as any).group_id || null, summary: `Deleted the game "${game.name}"${sameDay ? " (and its posted rounds)" : ""}` });
     onBack();
   };
 
