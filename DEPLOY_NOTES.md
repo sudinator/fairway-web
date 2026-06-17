@@ -1,23 +1,19 @@
-# Deploy notes — v1.0.31 (cumulative — full app, supersedes all prior)
+# Deploy notes — v1.0.32 (cumulative — full app, supersedes all prior)
 
-## Database — run supabase/migrations/0008_game_players_sand_pen.sql
-Adds penalties + sand jsonb arrays to game_players (for match-play Sand/Pen).
-If not already run: 0002–0007.
+## Database
+No new migration. If not already run: 0002–0008.
 
 ## Changes
-1. Game setup: the selected course now shows a clear ✓ + "SELECTED" highlight
-   (matched by course id), so it's obvious the pick registered.
-2. Group card: tapping an empty cell now defaults that hole to PAR, then +/-
-   adjusts — fast entry for the common case.
-3. Sand / Pen tracking now works in match play (all game formats), matching
-   solo rounds:
-   - The in-game score entry shows the Sand/Pen column.
-   - The marker's tap-to-edit popup gains a Sand (greenside bunker) toggle and a
-     0-3 penalty picker.
-   - Penalties + sand are stored per hole on game_players (migration 0008) and
-     carried into your recorded round, so the dashboard Sand-save % and penalty
-     stats include match-play data. (Yardage is carried into recorded rounds too.)
+1. Stableford is now individual-only: no Group card / marker. The Results vs
+   Group card toggle, the group card, and the auto-switch are all hidden for
+   stableford games, and each player's own score-entry card always shows. (Match,
+   four-ball, and skins keep group scoring.)
+2. Guest players are now easy to find: in a match or four-ball game, the
+   organizer opens the **Setup** tab and sees a "Guest players" section with
+   "+ Add guest player" (name + course handicap) — it no longer hides behind the
+   "Add / edit" matchups toggle.
 
-## Still needs a two-device / live check
-The marker writing another player's sand/penalty relies on the same RLS as
-scores (0006/0007). Verify in your project.
+## Where to add a guest (match / four-ball)
+Open the game → **Setup** tab (organizer only) → "Guest players" →
+"+ Add guest player". The guest then appears in the pairing/foursome dropdowns
+and on the Group card for scoring.

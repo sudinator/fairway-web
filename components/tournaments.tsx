@@ -849,7 +849,7 @@ function GameRoom({
   useEffect(() => { saveActiveGame(gameId, roomTab); }, [gameId, roomTab]);
   const [cardView, setCardView] = useState(false); // show the whole-group vertical scorecard
   // When group scoring is switched on, bring everyone to the group card.
-  useEffect(() => { if (game?.marker_user_id) setCardView(true); }, [game?.marker_user_id]);
+  useEffect(() => { if (game?.marker_user_id && game?.game_type !== "stableford") setCardView(true); }, [game?.marker_user_id, game?.game_type]);
   // Non-organizers only ever see the scorecard.
   useEffect(() => {
     if (roomTab === "setup" && game && game.created_by !== user.id) setRoomTab("play");
@@ -1548,18 +1548,18 @@ function GameRoom({
       </div>
       )}
 
-      {roomTab === "play" && (
+      {roomTab === "play" && game.game_type !== "stableford" && (
         <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
           <button onClick={() => setCardView(false)} style={{ ...btn(!cardView), flex: 1, fontSize: 13 }}>Results</button>
           <button onClick={() => setCardView(true)} style={{ ...btn(cardView), flex: 1, fontSize: 13 }}>Group card</button>
         </div>
       )}
-      {roomTab === "play" && !cardView && game.marker_user_id && !isEnded && (
+      {roomTab === "play" && game.game_type !== "stableford" && !cardView && game.marker_user_id && !isEnded && (
         <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>
           Group scoring is on — enter and view scores on the <strong>Group card</strong>.
         </div>
       )}
-      {roomTab === "play" && cardView ? (
+      {roomTab === "play" && cardView && game.game_type !== "stableford" ? (
         <GroupScorecard game={game} players={players} user={user}
           isMarker={game.marker_user_id === user.id}
           markerName={game.marker_user_id ? (players.find((p) => p.user_id === game.marker_user_id)?.display_name ?? "Someone") : null}
@@ -1695,7 +1695,7 @@ function GameRoom({
 
       {/* My score entry — hidden while a marker is keeping score for the group
           (scoring then happens only on the Group card, to avoid conflicts). */}
-      {roomTab === "play" && me && !(game.marker_user_id && !isEnded) && (
+      {roomTab === "play" && me && !(game.game_type !== "stableford" && game.marker_user_id && !isEnded) && (
         <div style={{ marginTop: 22 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Eyebrow>{isEnded ? "YOUR FINAL SCORES" : "ENTER YOUR SCORES"}</Eyebrow>
@@ -2369,8 +2369,11 @@ function MatchView({
               Not yet paired: {unpaired.map((p) => p.display_name).join(", ")}
             </div>
           )}
-          <GuestManager game={game} players={players} onChanged={onChanged} />
         </div>
+      )}
+
+      {mode === "setup" && isCreator && (
+        <GuestManager game={game} players={players} onChanged={onChanged} />
       )}
 
       {game.pairings.length === 0 && (
