@@ -2969,6 +2969,7 @@ function FourballView({
   onChanged: () => void;
 }) {
   const foursomes = game.foursomes || [];
+  const teams = game.teams || null;
   const playerOf = (uid: string) => players.find((p) => pkey(p) === uid) || null;
   const nameOf = (uid: string) => playerOf(uid)?.display_name || "—";
   const firstName = (uid: string) => (playerOf(uid)?.display_name || "—").split(" ")[0];

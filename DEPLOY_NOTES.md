@@ -1,8 +1,14 @@
-# Deploy notes - v1.3.0 (cumulative - full app, supersedes all prior)
+# Deploy notes - v1.3.1 (cumulative - full app, supersedes all prior)
 
 ## Release policy
 - Version number is updated on every codebase change.
 - Release notes are updated alongside each deployable zip.
+
+## v1.3.1
+
+### Fixed
+- Fixed production build failure in `FourballView` by defining team metadata in the component scope before rendering team names.
+- Preserves v1.3.0 team 1:1 skins behavior and team best-ball skins behavior.
 
 ## v1.3.0
 
