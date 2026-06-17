@@ -29,7 +29,7 @@ import {
   type BetPlayer,
   type BetSplit,
 } from "@/lib/golf";
-import { loadCoursesForGroup } from "@/lib/courses";
+import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores } from "@/lib/draft";
 import {
@@ -95,6 +95,25 @@ type Player = {
 // game_players row id. Used everywhere pairings/foursomes store or look up a
 // player, so guests can be assigned to teams and matches like anyone.
 const pkey = (p: { user_id: string | null; id: string }) => p.user_id ?? p.id;
+
+
+function normalizeFavoriteCourse(row: any) {
+  const d = { ...(row?.data || row || {}) };
+  if ((!d.holes || !d.holes.length) && Array.isArray(d.tees)) {
+    const t = d.tees.find((x: any) => x.holes && x.holes.length);
+    if (t) {
+      d.holes = t.holes;
+      d.tees = d.tees.map((x: any) => ({
+        name: x.name,
+        rating: x.rating,
+        slope: x.slope,
+        par: x.par,
+        yardages: x.yardages,
+      }));
+    }
+  }
+  return d;
+}
 
 // ---------------- Root tournament tab ----------------
 export default function Tournaments({
@@ -401,23 +420,7 @@ function CreateGame({
     loadCoursesForGroup(supabase, activeGroupId).then((data) => {
       if (data)
         setFavorites(
-          data.map((f: any) => {
-            const d = f.data || {};
-            if ((!d.holes || !d.holes.length) && Array.isArray(d.tees)) {
-              const t = d.tees.find((x: any) => x.holes && x.holes.length);
-              if (t) {
-                d.holes = t.holes;
-                d.tees = d.tees.map((x: any) => ({
-                  name: x.name,
-                  rating: x.rating,
-                  slope: x.slope,
-                  par: x.par,
-                  yardages: x.yardages,
-                }));
-              }
-            }
-            return d;
-          }),
+          data.map((f: any) => normalizeFavoriteCourse(f)),
         );
     });
 
@@ -1000,6 +1003,7 @@ function GameRoom({
   }, [roomTab, game, user.id]);
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState("");
+  const [courseTees, setCourseTees] = useState<CourseTee[]>([]);
 
   const load = useCallback(async () => {
     const { data: g } = await supabase
@@ -1059,6 +1063,21 @@ function GameRoom({
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!game?.group_id || !game?.course) {
+      setCourseTees([]);
+      return;
+    }
+    let alive = true;
+    loadCoursesForGroup(supabase, game.group_id).then((rows) => {
+      if (!alive) return;
+      const courses = (rows || []).map((r: any) => normalizeFavoriteCourse(r));
+      const found = courses.find((c: any) => c.name === game.course || courseLabel(c) === game.course);
+      setCourseTees(Array.isArray(found?.tees) ? found.tees : []);
+    });
+    return () => { alive = false; };
+  }, [game?.group_id, game?.course]);
 
   // Once an ended game and my player row are both loaded, ensure my scorecard is
   // recorded as a round in my history. Idempotent (skips if already recorded).
@@ -1324,51 +1343,44 @@ function GameRoom({
     await load();
   };
 
-  // Organizer: add a registered player straight into the game (auto-joined), seeded with their handicap.
-  const addRegisteredPlayer = async (prof: {
-    id: string;
-    display_name: string;
-    handicap_index: number | null;
-  }) => {
-    if (!game) return;
-    if (players.some((p) => p.user_id === prof.id)) return; // already in
-    const ref = players.find((x) => x.rating != null && x.slope != null);
-    const rating = ref?.rating ?? null,
-      slope = ref?.slope ?? null;
-    const ch =
-      prof.handicap_index != null &&
-      rating != null &&
-      slope != null &&
-      game.course_par != null
-        ? courseHandicap(prof.handicap_index, slope, rating, game.course_par)
-        : null;
-    const n = game.holes_meta.length;
-    await supabase.from("game_players").insert({
-      game_id: game.id,
-      user_id: prof.id,
-      is_guest: false,
-      display_name: prof.display_name || "Player",
-      handicap_index: prof.handicap_index ?? null,
-      rating,
-      slope,
-      tee_name: ref?.tee_name ?? null,
-      course_handicap: ch,
-      scores: Array(n).fill(null),
-      putts: Array(n).fill(null),
-      fairways: Array(n).fill(null),
-    });
-    try {
-      await supabase
-        .from("notifications")
-        .insert({
-          user_id: prof.id,
-          message: `You've been added to the game "${game.name}". Open the Games tab to enter your scores (code ${game.code}).`,
-        });
-    } catch {}
+  // Organizer: update a player's team assignment from the unified setup roster.
+  const setPlayerTeam = async (p: Player, team: string | null) => {
+    await supabase.from("game_players").update({ team }).eq("id", p.id);
     await load();
   };
 
-  // Organizer: remove a player from the game (not the organizer).
+  // Organizer: update a player's tee group from the unified setup roster.
+  const setPlayerTeeGroup = async (p: Player, group: number | null) => {
+    await supabase.rpc("set_tee_group", { p_player: p.id, p_group: group });
+    await load();
+  };
+
+  // Organizer: update a player's tee from the unified setup roster. This recalculates
+  // course handicap from that player's handicap index using the selected tee rating/slope.
+  const setPlayerTee = async (p: Player, teeName: string) => {
+    if (!game) return;
+    const tee = courseTees.find((t) => t.name === teeName);
+    if (!tee) return;
+    const ch =
+      p.handicap_index != null &&
+      tee.rating != null &&
+      tee.slope != null &&
+      game.course_par != null
+        ? courseHandicap(p.handicap_index, tee.slope, tee.rating, game.course_par)
+        : null;
+    await supabase
+      .from("game_players")
+      .update({
+        rating: tee.rating,
+        slope: tee.slope,
+        tee_name: tee.name,
+        course_handicap: ch,
+      })
+      .eq("id", p.id);
+    await load();
+  };
+
+  // Organizer: mark/unmark a player as a no-show for formats that support it.
   const toggleNoShow = async (p: Player) => {
     if (!game) return;
     const next = !p.no_show;
@@ -1683,9 +1695,12 @@ function GameRoom({
           players={players}
           user={user}
           onOverride={overridePlayerHandicap}
-          onAdd={addRegisteredPlayer}
+          courseTees={courseTees}
+          onSetTee={setPlayerTee}
           onRemove={removePlayer}
           onToggleNoShow={toggleNoShow}
+          onSetTeam={setPlayerTeam}
+          onSetTeeGroup={setPlayerTeeGroup}
           onRename={renameGame}
           onDelete={deleteGame}
           onEnd={endGame}
@@ -1737,9 +1752,6 @@ function GameRoom({
         <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>
           Group scoring is on — enter and view scores on the <strong>Group card</strong>.
         </div>
-      )}
-      {roomTab === "setup" && isOrganizer && game.game_type !== "stableford" && (
-        <TeeGroups game={game} players={players} onChanged={load} />
       )}
       {roomTab === "play" && cardView && game.game_type !== "stableford" ? (
         <>
@@ -2061,136 +2073,6 @@ function MyStatsLine({ me, holes }: { me: Player; holes: Hole[] }) {
 }
 
 // ---------------- Match play view ----------------
-function GuestManager({ game, players, onChanged }: { game: Game; players: Player[]; onChanged: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [hcp, setHcp] = useState("");
-  const [busy, setBusy] = useState(false);
-  const guests = players.filter((p) => p.is_guest);
-  const n = game.holes_meta.length || 18;
-
-  const add = async () => {
-    const h = parseInt(hcp, 10);
-    if (!name.trim() || isNaN(h)) return;
-    const ref = players.find((x) => x.rating != null && x.slope != null);
-    setBusy(true);
-    await supabase.from("game_players").insert({
-      game_id: game.id, user_id: null, is_guest: true,
-      display_name: name.trim(), handicap_index: null,
-      rating: ref?.rating ?? null, slope: ref?.slope ?? null, tee_name: ref?.tee_name ?? null,
-      course_handicap: h,
-      scores: Array(n).fill(null), putts: Array(n).fill(null), fairways: Array(n).fill(null),
-    });
-    setName(""); setHcp(""); setBusy(false); setOpen(false); onChanged();
-  };
-  const remove = async (id: string) => {
-    const guest = players.find((p) => p.id === id);
-    if (!guest || !confirm("Remove this guest from the game?")) return;
-    const removedKey = pkey(guest);
-    const updates: Partial<Game> = {};
-    const nextPairings = (game.pairings || []).filter((pr) => pr.a !== removedKey && pr.b !== removedKey);
-    if (nextPairings.length !== (game.pairings || []).length) updates.pairings = nextPairings;
-    if (Array.isArray(game.foursomes)) {
-      updates.foursomes = game.foursomes.map((f) => ({
-        ...f,
-        a: (f.a || []).filter((uid) => uid !== removedKey),
-        b: (f.b || []).filter((uid) => uid !== removedKey),
-      }));
-    }
-    if (Object.keys(updates).length) await supabase.from("games").update(updates).eq("id", game.id);
-    await supabase.from("game_players").delete().eq("id", id);
-    onChanged();
-  };
-
-  return (
-    <div style={{ marginTop: 12, borderTop: `0.5px solid ${C.line}`, paddingTop: 12 }}>
-      <div style={{ color: C.sage, fontSize: 12, marginBottom: 6 }}>Guest players <span style={{ color: C.faint }}>(no app account — scored on this game only)</span></div>
-      {guests.length > 0 && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
-          {guests.map((g) => (
-            <span key={g.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.greenLight, borderRadius: 999, padding: "4px 10px", color: C.cream, fontSize: 13 }}>
-              {g.display_name} <span style={{ color: C.sage, fontSize: 11 }}>hcp {g.course_handicap}</span>
-              <button onClick={() => remove(g.id)} style={{ background: "none", border: "none", color: C.birdie, cursor: "pointer", fontSize: 14, padding: 0 }}>✕</button>
-            </span>
-          ))}
-        </div>
-      )}
-      {open ? (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Guest name" style={{ ...inputStyle, width: "auto", minWidth: 130 }} />
-          <input value={hcp} onChange={(e) => setHcp(e.target.value)} inputMode="numeric" placeholder="Course hcp" style={{ ...inputStyle, width: 100 }} />
-          <button onClick={add} disabled={busy} style={{ ...btn(true), fontSize: 12 }}>{busy ? "Adding…" : "Add"}</button>
-          <button onClick={() => { setOpen(false); setName(""); setHcp(""); }} style={{ ...btn(false), fontSize: 12 }}>Cancel</button>
-        </div>
-      ) : (
-        <button onClick={() => setOpen(true)} style={{ ...btn(false), fontSize: 12 }}>+ Add guest player</button>
-      )}
-    </div>
-  );
-}
-
-function TeeGroups({ game, players, onChanged }: { game: Game; players: Player[]; onChanged: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const used = Array.from(new Set(players.map((p) => p.tee_group).filter((g): g is number => g != null))).sort((a, b) => a - b);
-  const usedMax = used.length ? used[used.length - 1] : 0;
-  // Enough group options to cover the field as foursomes, plus one spare so you
-  // can always split off another group. No artificial ceiling; also never hide a
-  // group that's already in use.
-  const maxGroups = Math.max(2, Math.ceil(players.length / 4) + 1, usedMax);
-  const groupNums = Array.from({ length: maxGroups }, (_, i) => i + 1);
-
-  const setGroup = async (pid: string, n: number | null) => {
-    setBusy(true);
-    await supabase.rpc("set_tee_group", { p_player: pid, p_group: n });
-    setBusy(false);
-    onChanged();
-  };
-
-  return (
-    <div style={{ marginTop: 14, background: C.greenLight, borderRadius: 12, padding: 14 }}>
-      <Eyebrow>TEE GROUPS</Eyebrow>
-      <div style={{ color: C.sage, fontSize: 12, margin: "6px 0 10px" }}>
-        Split players into the groups that tee off together. On the course, anyone in a group can tap “Keep score for this group” on the Group card — no need to assign a marker here.
-      </div>
-      {players.map((p) => {
-        const pill = (active: boolean): React.CSSProperties => ({
-          minWidth: 34, padding: "7px 11px", borderRadius: 8, textAlign: "center",
-          border: `1px solid ${active ? C.gold : C.line}`, background: active ? "#3A3413" : "transparent",
-          color: active ? C.gold : C.sage, fontSize: 13, fontWeight: 700, cursor: busy ? "default" : "pointer",
-        });
-        return (
-          <div key={p.id} style={{ padding: "9px 0", borderTop: `0.5px solid ${C.line}` }}>
-            <div style={{ color: C.cream, fontSize: 14, marginBottom: 7 }}>
-              {p.display_name}{p.is_guest ? " ·G" : ""}{p.is_marker ? <span style={{ color: C.gold, fontSize: 11 }}> ★ marker</span> : null}
-            </div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-              <span style={{ color: C.faint, fontSize: 11, marginRight: 2 }}>Group:</span>
-              <button onClick={() => !busy && setGroup(p.id, null)} style={{ ...pill(p.tee_group == null), minWidth: 0, padding: "7px 12px" }}>None</button>
-              {groupNums.map((n) => (
-                <button key={n} onClick={() => !busy && setGroup(p.id, n)} style={pill(p.tee_group === n)}>{n}</button>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-      {used.length > 0 && (
-        <div style={{ marginTop: 10, color: C.sage, fontSize: 11 }}>
-          {used.map((g) => {
-            const mem = players.filter((p) => p.tee_group === g);
-            const marker = mem.find((p) => p.is_marker);
-            return (
-              <div key={g} style={{ marginTop: 4 }}>
-                <strong style={{ color: C.cream }}>Group {g}:</strong> {mem.map((p) => p.display_name).join(", ")}
-                {" · "}{marker ? <span style={{ color: C.gold }}>marker: {marker.display_name}</span> : <span style={{ color: C.sage }}>marker chosen on the course</span>}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup, groupLocked = false }: {
   game: Game; players: Player[]; user: any;
   isMarker: boolean; markerName: string | null;
@@ -2748,23 +2630,7 @@ function MatchView({
         </div>
       )}
 
-      {/* Organizer: assign players to teams */}
-      {mode === "setup" && isTeam && isCreator && (
-        <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginBottom: 16 }}>
-          <Eyebrow>ASSIGN TEAMS</Eyebrow>
-          {players.map((p) => (
-            <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: `1px solid ${C.greenMid}` }}>
-              <div style={{ flex: 1, color: C.cream, fontWeight: 700, fontSize: 14 }}>{p.display_name}</div>
-              {teams!.map((t) => (
-                <button key={t.key} onClick={() => assignTeam(p, t.key)}
-                  style={{ ...btn(p.team === t.key), fontSize: 11, padding: "5px 10px" }}>{t.name}</button>
-              ))}
-            </div>
-          ))}
-          <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Assign each player to a team, then set the 1-on-1 matchups below (pair players from opposite teams).</div>
-        </div>
-      )}
-
+      {/* Team assignments now live in Organizer · Manage Game so each player is configured once. */}
       <div style={{ display: "flex", alignItems: "center" }}>
         <Eyebrow>{mode === "setup" ? "SET MATCHUPS" : "MATCHES"}</Eyebrow>
         <div style={{ flex: 1 }} />
@@ -2842,9 +2708,6 @@ function MatchView({
         </div>
       )}
 
-      {mode === "setup" && isCreator && (
-        <GuestManager game={game} players={players} onChanged={onChanged} />
-      )}
 
       {game.pairings.length === 0 && (
         <div
@@ -3067,7 +2930,6 @@ function FourballView({
             Unassigned: {unplaced.map((p) => p.display_name).join(", ")}
           </div>
         )}
-        {isCreator && <GuestManager game={game} players={players} onChanged={onChanged} />}
       </div>
     );
   }
@@ -3125,9 +2987,12 @@ function OrganizerPanel({
   players,
   user,
   onOverride,
-  onAdd,
+  courseTees,
+  onSetTee,
   onRemove,
   onToggleNoShow,
+  onSetTeam,
+  onSetTeeGroup,
   onRename,
   onDelete,
   onEnd,
@@ -3137,13 +3002,12 @@ function OrganizerPanel({
   players: Player[];
   user: any;
   onOverride: (p: Player, idx: number | null) => Promise<void>;
-  onAdd: (prof: {
-    id: string;
-    display_name: string;
-    handicap_index: number | null;
-  }) => Promise<void>;
+  courseTees: CourseTee[];
+  onSetTee: (p: Player, teeName: string) => Promise<void>;
   onRemove: (p: Player) => Promise<void>;
   onToggleNoShow: (p: Player) => Promise<void>;
+  onSetTeam: (p: Player, team: string | null) => Promise<void>;
+  onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
   onRename: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
   onEnd: () => Promise<void>;
@@ -3152,35 +3016,16 @@ function OrganizerPanel({
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [open, setOpen] = useState(true);
-  const [roster, setRoster] = useState<
-    { id: string; display_name: string; handicap_index: number | null }[]
-  >([]);
-  const [showAdd, setShowAdd] = useState(false);
   const [nameEdit, setNameEdit] = useState(game.name);
 
-  // Load registered players not already in this game.
-  useEffect(() => {
-    if (!showAdd) return;
-    (async () => {
-      const { data } = await supabase
-        .from("group_members")
-        .select("user_id")
-        .eq("group_id", game.group_id)
-        .eq("status", "active");
-      const ids = (data || []).map((r: any) => r.user_id).filter(Boolean);
-      const { data: profs } = ids.length
-        ? await supabase
-            .from("profiles")
-            .select("id, display_name, handicap_index")
-            .in("id", ids)
-        : ({ data: [] as any[] } as any);
-      const inGame = new Set(players.map((p) => p.user_id));
-      setRoster((profs || []).filter((p: any) => !inGame.has(p.id)));
-    })();
-  }, [showAdd, players]);
 
   const withHcp = players.filter((p) => p.course_handicap != null).length;
   const allSet = players.length > 0 && withHcp === players.length;
+
+  const teams = Array.isArray(game.teams) ? game.teams : [];
+  const groupOptions = Array.from({ length: Math.max(1, Math.ceil(players.length / 4) + 1) }, (_, i) => i + 1);
+  const teeGroups = Array.from(new Set(players.map((p) => p.tee_group).filter((g): g is number => g != null))).sort((a, b) => a - b);
+  const teamLabel = (key: string | null | undefined) => teams.find((t) => t.key === key)?.name || "No team";
 
   const save = async (p: Player) => {
     const raw = edits[p.id];
@@ -3225,171 +3070,184 @@ function OrganizerPanel({
 
       {open && (
         <div style={{ marginTop: 10 }}>
-          {/* Add registered players */}
-          <button
-            style={{ ...btn(true), fontSize: 13 }}
-            onClick={() => setShowAdd((v) => !v)}
-          >
-            {showAdd ? "Done adding" : "＋ Add players"}
-          </button>
-          {showAdd && (
-            <div
-              style={{
-                background: C.card,
-                borderRadius: 10,
-                padding: 12,
-                marginTop: 8,
-              }}
-            >
-              <div style={{ color: C.faint, fontSize: 12, marginBottom: 6 }}>
-                Tap a registered player to add them straight into the game.
-                They'll be notified and can open it from their Games tab (or
-                with the code {game.code}).
-              </div>
-              {roster.length === 0 && (
-                <div style={{ color: C.faint, fontSize: 13 }}>
-                  No other registered players to add.
-                </div>
-              )}
-              {roster.map((r) => (
+          {/* Unified player setup */}
+          <div style={{ marginTop: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <Eyebrow>PLAYERS · HANDICAPS · TEAMS · TEE GROUPS</Eyebrow>
+              <div style={{ flex: 1 }} />
+              <span style={{ color: C.sage, fontSize: 11 }}>
+                Set each player once here. Matchups stay manual below.
+              </span>
+            </div>
+            {players.map((p) => {
+              const raw = edits[p.id] ?? (p.handicap_index != null ? String(p.handicap_index) : "");
+              return (
                 <div
-                  key={r.id}
+                  key={p.id}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
+                    background: C.card,
+                    borderRadius: 10,
+                    padding: "10px 14px",
+                    marginTop: 8,
+                    display: "grid",
+                    gridTemplateColumns: "minmax(160px, 1.5fr) 118px 150px 130px 112px auto",
                     gap: 10,
-                    padding: "8px 4px",
-                    borderBottom: `1px solid ${C.line}`,
+                    alignItems: "center",
                   }}
                 >
-                  <div style={{ flex: 1 }}>
-                    <div style={{ color: C.ink, fontWeight: 700 }}>
-                      {r.display_name || "Player"}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ color: C.ink, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {p.display_name}
+                      {p.user_id === game.created_by ? " (organizer)" : ""}
+                      {p.is_guest ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 700 }}> · guest</span> : null}
                     </div>
                     <div style={{ color: C.faint, fontSize: 12 }}>
-                      {r.handicap_index != null
-                        ? `index ${r.handicap_index}`
-                        : "no handicap on file"}
+                      {p.course_handicap != null ? `course handicap ${p.course_handicap}` : "no handicap yet"}
+                      {p.tee_name ? ` · ${p.tee_name}` : ""}
                     </div>
                   </div>
-                  <button
-                    style={{ ...btn(true), padding: "6px 12px", fontSize: 12 }}
-                    onClick={() => onAdd(r)}
-                  >
-                    Add
-                  </button>
+
+                  <div>
+                    <label style={{ color: C.sage, fontSize: 10 }}>Handicap</label>
+                    <div style={{ display: "flex", gap: 5, marginTop: 2 }}>
+                      <input
+                        inputMode="decimal"
+                        value={raw}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (v === "" || /^-?\d*\.?\d*$/.test(v)) setEdits((m) => ({ ...m, [p.id]: v }));
+                        }}
+                        style={{ ...inputStyle, padding: "6px 8px", width: 58, textAlign: "center" }}
+                      />
+                      <button
+                        style={{ ...btn(true), padding: "6px 8px", fontSize: 11, opacity: savingId === p.id ? 0.5 : 1 }}
+                        disabled={savingId === p.id}
+                        onClick={() => save(p)}
+                      >
+                        Set
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ color: C.sage, fontSize: 10 }}>Tee</label>
+                    {courseTees.length ? (
+                      <select
+                        value={p.tee_name || ""}
+                        onChange={(e) => onSetTee(p, e.target.value)}
+                        style={{ ...inputStyle, padding: "6px 8px", marginTop: 2, width: "100%" }}
+                      >
+                        <option value="" disabled>Select tee</option>
+                        {courseTees.map((t) => (
+                          <option key={`${t.name}-${t.rating}-${t.slope}`} value={t.name}>
+                            {t.name} · {t.rating}/{t.slope}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div style={{ color: C.ink, fontWeight: 700, fontSize: 13, marginTop: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {p.tee_name || "—"}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label style={{ color: C.sage, fontSize: 10 }}>Team</label>
+                    {teams.length ? (
+                      <select
+                        value={p.team || ""}
+                        onChange={(e) => onSetTeam(p, e.target.value || null)}
+                        style={{ ...inputStyle, padding: "6px 8px", marginTop: 2, width: "100%" }}
+                      >
+                        <option value="">No team</option>
+                        {teams.map((t) => <option key={t.key} value={t.key}>{t.name}</option>)}
+                      </select>
+                    ) : (
+                      <div style={{ color: C.faint, fontSize: 13, marginTop: 8 }}>Not a team game</div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label style={{ color: C.sage, fontSize: 10 }}>Tee group</label>
+                    <select
+                      value={p.tee_group ?? ""}
+                      onChange={(e) => onSetTeeGroup(p, e.target.value ? parseInt(e.target.value, 10) : null)}
+                      style={{ ...inputStyle, padding: "6px 8px", marginTop: 2, width: "100%" }}
+                    >
+                      <option value="">None</option>
+                      {groupOptions.map((g) => <option key={g} value={g}>Group {g}</option>)}
+                    </select>
+                  </div>
+
+                  <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                    {(game.game_type === "fourball" || game.game_type === "skins") && (
+                      <button
+                        title="Mark no-show"
+                        style={{
+                          background: p.no_show ? C.gold : "none",
+                          border: `1px solid ${p.no_show ? C.gold : C.line}`,
+                          borderRadius: 6,
+                          color: p.no_show ? C.green : C.sage,
+                          fontWeight: 800,
+                          cursor: "pointer",
+                          padding: "6px 8px",
+                          fontSize: 12,
+                        }}
+                        onClick={() => onToggleNoShow(p)}
+                      >
+                        {p.no_show ? "No-show ✓" : "No-show"}
+                      </button>
+                    )}
+                    {p.user_id !== game.created_by && (
+                      <button
+                        title="Remove player"
+                        style={{ background: "none", border: `1px solid ${C.line}`, borderRadius: 6, color: C.birdie, fontWeight: 800, cursor: "pointer", padding: "6px 8px", fontSize: 12 }}
+                        onClick={() => onRemove(p)}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
                 </div>
-              ))}
+              );
+            })}
+          </div>
+
+          {teams.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginTop: 12 }}>
+              {teams.map((t) => {
+                const mem = players.filter((p) => p.team === t.key);
+                return (
+                  <div key={t.key} style={{ background: C.card, borderRadius: 10, padding: 12, border: `1px solid ${C.line}` }}>
+                    <div style={{ color: C.gold, fontWeight: 800, fontSize: 13 }}>{t.name}</div>
+                    <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>{mem.length} player{mem.length === 1 ? "" : "s"}</div>
+                    <div style={{ marginTop: 8, color: C.ink, fontSize: 13, lineHeight: 1.8 }}>
+                      {mem.length ? mem.map((p) => <div key={p.id}>{p.display_name} <span style={{ color: C.faint }}>CH {p.course_handicap ?? "—"}</span></div>) : <span style={{ color: C.faint }}>No players assigned</span>}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
 
-          {/* Current players */}
-          {players.map((p) => (
-            <div
-              key={p.id}
-              style={{
-                background: C.card,
-                borderRadius: 10,
-                padding: "10px 14px",
-                marginTop: 8,
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                flexWrap: "wrap",
-              }}
-            >
-              <div style={{ flex: 1, minWidth: 150 }}>
-                <div style={{ color: C.ink, fontWeight: 700 }}>
-                  {p.display_name}
-                  {p.user_id === game.created_by ? " (organizer)" : ""}
-                </div>
-                <div style={{ color: C.faint, fontSize: 12 }}>
-                  {p.course_handicap != null
-                    ? `course handicap ${p.course_handicap}`
-                    : "no handicap yet"}
-                  {p.rating != null && p.slope != null
-                    ? ` · ${p.rating}/${p.slope}`
-                    : ""}
-                </div>
-              </div>
-              <div>
-                <label style={{ color: C.sage, fontSize: 10 }}>
-                  Handicap index
-                </label>
-                <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
-                  <input
-                    inputMode="decimal"
-                    defaultValue={
-                      p.handicap_index != null ? String(p.handicap_index) : ""
-                    }
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (v === "" || /^\d*\.?\d*$/.test(v))
-                        setEdits((m) => ({ ...m, [p.id]: v }));
-                    }}
-                    style={{
-                      ...inputStyle,
-                      padding: "6px 8px",
-                      width: 80,
-                      textAlign: "center",
-                    }}
-                  />
-                  <button
-                    style={{
-                      ...btn(true),
-                      padding: "6px 12px",
-                      fontSize: 12,
-                      opacity: savingId === p.id ? 0.5 : 1,
-                    }}
-                    disabled={savingId === p.id}
-                    onClick={() => save(p)}
-                  >
-                    Set
-                  </button>
-                </div>
-              </div>
-              {game.game_type === "fourball" && (
-                <button
-                  title="Mark no-show (scored net double bogey)"
-                  style={{
-                    background: p.no_show ? C.gold : "none",
-                    border: `1px solid ${p.no_show ? C.gold : C.line}`,
-                    borderRadius: 6,
-                    color: p.no_show ? C.green : C.sage,
-                    fontWeight: 800,
-                    cursor: "pointer",
-                    padding: "6px 10px",
-                    fontSize: 13,
-                    marginRight: 8,
-                  }}
-                  onClick={() => onToggleNoShow(p)}
-                >
-                  {p.no_show ? "No-show ✓" : "No-show"}
-                </button>
-              )}
-              {p.user_id !== game.created_by && (
-                <button
-                  title="Remove player"
-                  style={{
-                    background: "none",
-                    border: `1px solid ${C.line}`,
-                    borderRadius: 6,
-                    color: C.birdie,
-                    fontWeight: 800,
-                    cursor: "pointer",
-                    padding: "6px 10px",
-                    fontSize: 13,
-                  }}
-                  onClick={() => onRemove(p)}
-                >
-                  Remove
-                </button>
-              )}
+          {teeGroups.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginTop: 12 }}>
+              {teeGroups.map((g) => {
+                const mem = players.filter((p) => p.tee_group === g);
+                return (
+                  <div key={g} style={{ background: C.card, borderRadius: 10, padding: 12, border: `1px solid ${C.line}` }}>
+                    <div style={{ color: C.gold, fontWeight: 800, fontSize: 13 }}>Group {g}</div>
+                    <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>{mem.length} player{mem.length === 1 ? "" : "s"}</div>
+                    <div style={{ marginTop: 8, color: C.ink, fontSize: 13, lineHeight: 1.8 }}>
+                      {mem.map((p) => <div key={p.id}>{p.display_name} <span style={{ color: C.faint }}>{teamLabel(p.team)}</span></div>)}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          ))}
+          )}
           <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>
-            You can add or remove players and set anyone's handicap at any time.
-            Players are notified of changes.
+            Player roster is set before the game is created. Here you can update handicaps, tees, teams, tee groups, no-shows, and removals.
           </div>
 
           {/* Game settings */}
