@@ -1585,8 +1585,9 @@ function GameRoom({
           mode={roomTab}
           onChanged={load}
         />
-      ) : roomTab === "play" && game.game_type === "skins" ? (
-        <SkinsView game={game} players={players} user={user} />
+      ) : (roomTab === "play" || roomTab === "setup") && game.game_type === "skins" ? (
+        <SkinsView game={game} players={players} user={user}
+          isCreator={game.created_by === user.id} mode={roomTab} onChanged={load} />
       ) : roomTab === "play" ? (
         <>
           {/* Leaderboard */}
@@ -2106,7 +2107,21 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
   );
 }
 
-function SkinsView({ game, players, user }: { game: Game; players: Player[]; user: any }) {
+function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: Game; players: Player[]; user: any; isCreator: boolean; mode: string; onChanged: () => void }) {
+  if (mode === "setup") {
+    return (
+      <div style={{ marginTop: 18 }}>
+        <Eyebrow>SKINS · SETUP</Eyebrow>
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
+          Skins is scored as individual net skins — lowest net on a hole wins, ties carry. Add any guests who'll be playing; the marker enters everyone's scores on the Group card.
+        </div>
+        {isCreator
+          ? <GuestManager game={game} players={players} onChanged={onChanged} />
+          : <div style={{ color: C.faint, fontSize: 12, marginTop: 10 }}>Only the organizer can add guests.</div>}
+      </div>
+    );
+  }
+
   const nameById: Record<string, string> = {};
   players.forEach((p) => (nameById[p.id] = p.display_name));
   const skinPlayers: SkinPlayer[] = players.map((p) => ({
