@@ -20,6 +20,8 @@ import {
   fourballProgress,
   type FourballMember,
   computeSkins,
+  computeHeadToHeadSkins,
+  computeTeamBestBallSkins,
   type SkinPlayer,
   computeBetting,
   DEFAULT_BET_SPLIT,
@@ -496,13 +498,13 @@ function CreateGame({
           game_type: gameType,
           pairings: [],
           teams:
-            gameType === "match" && teamMode
+            (gameType === "match" || gameType === "skins") && teamMode
               ? [
                   { key: "A", name: team1.trim() || "Team 1" },
                   { key: "B", name: team2.trim() || "Team 2" },
                 ]
               : null,
-          foursomes: gameType === "fourball" ? [] : null,
+          foursomes: gameType === "fourball" || (gameType === "skins" && teamMode) ? [] : null,
         })
         .select()
         .single();
@@ -831,7 +833,7 @@ function CreateGame({
             Four-ball (best net)
           </button>
           <button
-            onClick={() => { setGameType("skins"); setTeamMode(false); }}
+            onClick={() => setGameType("skins")}
             style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 120, fontSize: 13 }}
           >
             Skins (net)
@@ -843,17 +845,19 @@ function CreateGame({
             : gameType === "fourball"
             ? "2-player teams play better-net-ball match play. Big groups split into foursomes (2 v 2) — set them up after creating. Great for 12–16 players in 3–4 foursomes."
             : gameType === "skins"
-            ? "Lowest net score on a hole wins the skin. A tie carries the skin to the next hole, so the pot builds until someone wins outright."
+            ? "Skins now follows match structure: 1:1 pairings for singles, or team best-ball skins when Team mode is enabled. Halved holes carry the pot forward."
             : "Players are paired 1-on-1. After friends join, you'll set the matchups. Lower handicap plays off scratch; opponent gets the difference."}
         </div>
-        {gameType === "match" && (
+        {(gameType === "match" || gameType === "skins") && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
               <input type="checkbox" checked={teamMode} onChange={(e) => setTeamMode(e.target.checked)} />
-              <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>Team match (e.g. 4 v 4)</span>
+              <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>{gameType === "skins" ? "Team skins (best-ball)" : "Team match (e.g. 4 v 4)"}</span>
             </label>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
-              Two teams. Each 1-on-1 pairing is worth a point; the team total is the sum (halved matches = ½ each). You'll assign players to teams after creating.
+              {gameType === "skins"
+                ? "Two teams play better-net-ball skins in foursomes. A halved hole carries the pot to the next hole."
+                : "Two teams. Each 1-on-1 pairing is worth a point; the team total is the sum (halved matches = ½ each). You'll assign players to teams after creating."}
             </div>
             {teamMode && (
               <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
@@ -2405,86 +2409,203 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
 }
 
 function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: Game; players: Player[]; user: any; isCreator: boolean; mode: string; onChanged: () => void }) {
+  const teams = game.teams || null;
+  const isTeamSkins = Array.isArray(teams) && teams.length === 2;
+  const playerOf = (uid: string) => players.find((p) => pkey(p) === uid) || null;
+  const firstName = (uid: string) => (playerOf(uid)?.display_name || "—").split(" ")[0];
+  const skinPlayerOf = (uid: string): SkinPlayer | null => {
+    const p = playerOf(uid);
+    return p ? { id: pkey(p), name: p.display_name, gross: p.scores || [], ch: p.course_handicap, noShow: !!p.no_show } : null;
+  };
+  const ORANGE = "#E8730C";
+
   if (mode === "setup") {
+    if (isTeamSkins) {
+      return (
+        <div style={{ marginTop: 18 }}>
+          <Eyebrow>TEAM SKINS · SETUP</Eyebrow>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 8, marginBottom: 8 }}>
+            Build team skins as best-ball foursomes. Each side's lowest net ball wins the hole; a halved hole carries the pot forward.
+          </div>
+          <FourballView game={game} players={players} user={user} isCreator={isCreator} mode="setup" onChanged={onChanged} />
+        </div>
+      );
+    }
     return (
       <div style={{ marginTop: 18 }}>
-        <Eyebrow>SKINS · SETUP</Eyebrow>
-        <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
-          Skins is scored as individual net skins — lowest net on a hole wins, ties carry. Add any guests who'll be playing; the marker enters everyone's scores on the Group card.
+        <Eyebrow>1:1 SKINS · SETUP</Eyebrow>
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 8, marginBottom: 8 }}>
+          Pair players just like singles match play. Each matchup has its own skin pot; a halved hole carries to the next hole.
         </div>
-        {isCreator
-          ? <GuestManager game={game} players={players} onChanged={onChanged} />
-          : <div style={{ color: C.faint, fontSize: 12, marginTop: 10 }}>Only the organizer can add guests.</div>}
+        <MatchView game={game} players={players} user={user} isCreator={isCreator} mode="setup" onChanged={onChanged} />
       </div>
     );
   }
 
+  const myKey = players.find((p) => p.user_id === user.id)?.user_id ?? user.id;
+
+  if (isTeamSkins) {
+    const foursomes = game.foursomes || [];
+    const cards = foursomes.map((f) => {
+      const members: FourballMember[] = [...f.a, ...f.b].map((uid) => {
+        const p = playerOf(uid);
+        return { id: uid, gross: p?.scores || [], ch: p?.course_handicap ?? null, noShow: !!p?.no_show };
+      });
+      const result = computeTeamBestBallSkins(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100);
+      return { f, result };
+    });
+    const carrying = cards.reduce((s, c) => s + c.result.carryAtEnd, 0);
+    const totalA = cards.reduce((s, c) => s + (c.result.skinsBySide.a || 0), 0);
+    const totalB = cards.reduce((s, c) => s + (c.result.skinsBySide.b || 0), 0);
+
+    return (
+      <div style={{ marginTop: 18 }}>
+        <Eyebrow>{`TEAM SKINS · BEST BALL${game.allowance_pct != null && game.allowance_pct !== 100 ? ` · ${game.allowance_pct}% ALLOWANCE` : ""}`}</Eyebrow>
+        {carrying > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5A3210", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "10px 12px", marginTop: 10 }}>
+            <span style={{ color: ORANGE, fontSize: 18, fontWeight: 800 }}>↑</span>
+            <span style={{ color: "#F2C28A", fontSize: 13 }}>{carrying} unresolved skin{carrying > 1 ? "s" : ""} carrying across team skins matches</span>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <div style={{ flex: 1, background: totalA >= totalB ? C.cream : C.card, borderRadius: 12, padding: 14, textAlign: "center" }}>
+            <div style={{ color: C.ink, fontWeight: 800 }}>{teams![0].name}</div>
+            <div style={{ color: C.green, fontSize: 32, fontWeight: 900, fontFamily: "Georgia, serif" }}>{totalA}</div>
+          </div>
+          <div style={{ flex: 1, background: totalB >= totalA ? C.cream : C.card, borderRadius: 12, padding: 14, textAlign: "center" }}>
+            <div style={{ color: C.ink, fontWeight: 800 }}>{teams![1].name}</div>
+            <div style={{ color: C.green, fontSize: 32, fontWeight: 900, fontFamily: "Georgia, serif" }}>{totalB}</div>
+          </div>
+        </div>
+
+        {cards.length === 0 && <div style={{ background: C.greenLight, borderRadius: 12, padding: 18, marginTop: 12, color: C.sage }}>No team skins foursomes set yet. Open Game setup to build them.</div>}
+        {cards.map(({ f, result }) => {
+          const mine = f.a.includes(myKey) || f.b.includes(myKey);
+          return (
+            <div key={f.id} style={{ background: C.card, borderRadius: 12, padding: 14, marginTop: 12, border: mine ? `1px solid ${C.gold}` : "none" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{f.name}{mine ? " · your match" : ""}</div>
+                <div style={{ flex: 1 }} />
+                <div style={{ color: C.green, fontWeight: 900, fontFamily: "Georgia, serif" }}>{result.skinsBySide.a || 0}–{result.skinsBySide.b || 0}</div>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
+                  <div style={{ color: C.gold, fontSize: 10, fontWeight: 800 }}>PAIR 1</div>
+                  <div style={{ color: C.cream, fontSize: 13 }}>{f.a.map(firstName).join(" & ") || "—"}</div>
+                </div>
+                <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
+                  <div style={{ color: C.gold, fontSize: 10, fontWeight: 800 }}>PAIR 2</div>
+                  <div style={{ color: C.cream, fontSize: 13 }}>{f.b.map(firstName).join(" & ") || "—"}</div>
+                </div>
+              </div>
+              <div style={{ marginTop: 10 }}>
+                {result.holes.map((h) => {
+                  const tiedCarry = h.decided && !h.winnerId;
+                  const won = h.decided && h.winnerId;
+                  const winnerLabel = h.winnerId === "a" ? "Pair 1" : h.winnerId === "b" ? "Pair 2" : "";
+                  return (
+                    <div key={h.hole} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: `1px solid ${C.line}` }}>
+                      <span style={{ width: 24, color: C.faint, fontWeight: 800, fontSize: 12 }}>{h.hole}</span>
+                      <span style={{ flex: 1, color: C.ink, fontSize: 12 }}>{won ? `${winnerLabel} wins` : tiedCarry ? "Halved — carries" : "Not played yet"}</span>
+                      {won ? <span style={{ background: C.greenLight, color: C.gold, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>{h.value} skin{h.value > 1 ? "s" : ""}</span> : tiedCarry ? <span style={{ background: "#5A3210", color: ORANGE, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>push →</span> : <span style={{ color: C.faint, fontSize: 11 }}>{h.value} at stake</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (game.pairings.length > 0) {
+    const matchCards = game.pairings.map((pr, idx) => {
+      const pa = skinPlayerOf(pr.a), pb = skinPlayerOf(pr.b);
+      if (!pa || !pb) return null;
+      return { idx, pr, pa, pb, result: computeHeadToHeadSkins(game.holes_meta, pa, pb, game.allowance_pct ?? 100) };
+    }).filter(Boolean) as { idx: number; pr: { a: string; b: string }; pa: SkinPlayer; pb: SkinPlayer; result: ReturnType<typeof computeHeadToHeadSkins> }[];
+    const totals: Record<string, number> = {};
+    matchCards.forEach(({ result }) => Object.entries(result.skinsBySide).forEach(([id, n]) => { totals[id] = (totals[id] || 0) + n; }));
+    const carrying = matchCards.reduce((s, c) => s + c.result.carryAtEnd, 0);
+
+    return (
+      <div style={{ marginTop: 18 }}>
+        <Eyebrow>{`1:1 SKINS · MATCH PLAY${game.allowance_pct != null && game.allowance_pct !== 100 ? ` · ${game.allowance_pct}% ALLOWANCE` : ""}`}</Eyebrow>
+        {carrying > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5A3210", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "10px 12px", marginTop: 10 }}>
+            <span style={{ color: ORANGE, fontSize: 18, fontWeight: 800 }}>↑</span>
+            <span style={{ color: "#F2C28A", fontSize: 13 }}>{carrying} unresolved skin{carrying > 1 ? "s" : ""} carrying across 1:1 skins matches</span>
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+          {[...players].sort((a, b) => (totals[pkey(b)] || 0) - (totals[pkey(a)] || 0)).map((p) => {
+            const n = totals[pkey(p)] || 0;
+            return <div key={p.id} style={{ flex: 1, minWidth: 130, background: p.user_id === user.id ? C.cream : C.card, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
+              <span style={{ color: C.ink, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_name}{p.user_id === user.id ? " (you)" : ""}</span>
+              <span style={{ color: n > 0 ? C.green : C.faint, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif", marginLeft: 8 }}>{n}</span>
+            </div>;
+          })}
+        </div>
+        {matchCards.map(({ idx, pa, pb, result }) => (
+          <div key={idx} style={{ background: C.card, borderRadius: 12, padding: 14, marginTop: 12, border: pa.id === myKey || pb.id === myKey ? `1px solid ${C.gold}` : "none" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{pa.name} <span style={{ color: C.faint, fontWeight: 400 }}>vs</span> {pb.name}</div>
+              <div style={{ flex: 1 }} />
+              <div style={{ color: C.green, fontWeight: 900, fontFamily: "Georgia, serif" }}>{result.skinsBySide[pa.id] || 0}–{result.skinsBySide[pb.id] || 0}</div>
+            </div>
+            <div style={{ marginTop: 10 }}>
+              {result.holes.map((h) => {
+                const tiedCarry = h.decided && !h.winnerId;
+                const won = h.decided && h.winnerId;
+                const winnerLabel = h.winnerId === pa.id ? pa.name : h.winnerId === pb.id ? pb.name : "";
+                return (
+                  <div key={h.hole} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: `1px solid ${C.line}` }}>
+                    <span style={{ width: 24, color: C.faint, fontWeight: 800, fontSize: 12 }}>{h.hole}</span>
+                    <span style={{ flex: 1, color: C.ink, fontSize: 12 }}>{won ? `${winnerLabel} wins` : tiedCarry ? "Halved — carries" : "Not played yet"}</span>
+                    {won ? <span style={{ background: C.greenLight, color: C.gold, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>{h.value} skin{h.value > 1 ? "s" : ""}</span> : tiedCarry ? <span style={{ background: "#5A3210", color: ORANGE, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>push →</span> : <span style={{ color: C.faint, fontSize: 11 }}>{h.value} at stake</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Fallback for old skins games that have not yet been configured with pairings.
   const nameById: Record<string, string> = {};
   players.forEach((p) => (nameById[p.id] = p.display_name));
-  const skinPlayers: SkinPlayer[] = players.map((p) => ({
-    id: p.id, name: p.display_name, gross: p.scores || [], ch: p.course_handicap,
-  }));
+  const skinPlayers: SkinPlayer[] = players.map((p) => ({ id: p.id, name: p.display_name, gross: p.scores || [], ch: p.course_handicap }));
   const result = computeSkins(game.holes_meta, skinPlayers, game.allowance_pct ?? 100);
-
   const firstUndecided = result.holes.find((h) => !h.decided);
   const carrying = firstUndecided ? firstUndecided.carriedIn : result.carryAtEnd;
   const intoHole = firstUndecided ? firstUndecided.hole : null;
   const totals = [...players].sort((a, b) => (result.skinsByPlayer[b.id] || 0) - (result.skinsByPlayer[a.id] || 0));
-  const ORANGE = "#E8730C";
 
   return (
     <div style={{ marginTop: 18 }}>
-      <Eyebrow>{`SKINS · NET${game.allowance_pct != null && game.allowance_pct !== 100 ? ` · ${game.allowance_pct}% ALLOWANCE` : ""}`}</Eyebrow>
-
-      {carrying > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5A3210", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "10px 12px", marginTop: 10 }}>
-          <span style={{ color: ORANGE, fontSize: 18, fontWeight: 800 }}>↑</span>
-          <span style={{ color: "#F2C28A", fontSize: 13 }}>
-            {carrying} skin{carrying > 1 ? "s" : ""} {intoHole ? `carrying into hole ${intoHole}` : "unclaimed (last hole tied)"}
-          </span>
-        </div>
-      )}
-
+      <Eyebrow>{`SKINS · INDIVIDUAL FALLBACK${game.allowance_pct != null && game.allowance_pct !== 100 ? ` · ${game.allowance_pct}% ALLOWANCE` : ""}`}</Eyebrow>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Open Game setup to configure 1:1 pairings or team best-ball skins. Until then, this old game is shown as individual skins.</div>
+      {carrying > 0 && <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5A3210", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "10px 12px", marginTop: 10 }}><span style={{ color: ORANGE, fontSize: 18, fontWeight: 800 }}>↑</span><span style={{ color: "#F2C28A", fontSize: 13 }}>{carrying} skin{carrying > 1 ? "s" : ""} {intoHole ? `carrying into hole ${intoHole}` : "unclaimed (last hole tied)"}</span></div>}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
         {totals.map((p) => {
           const n = result.skinsByPlayer[p.id] || 0;
-          return (
-            <div key={p.id} style={{ flex: 1, minWidth: 130, background: p.user_id === user.id ? C.cream : C.card, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-              <span style={{ color: C.ink, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_name}{p.user_id === user.id ? " (you)" : ""}</span>
-              <span style={{ color: n > 0 ? C.green : C.faint, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif", marginLeft: 8 }}>{n}</span>
-            </div>
-          );
+          return <div key={p.id} style={{ flex: 1, minWidth: 130, background: p.user_id === user.id ? C.cream : C.card, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}><span style={{ color: C.ink, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_name}{p.user_id === user.id ? " (you)" : ""}</span><span style={{ color: n > 0 ? C.green : C.faint, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif", marginLeft: 8 }}>{n}</span></div>;
         })}
       </div>
-
       <div style={{ marginTop: 16 }}>
-        <div style={{ color: C.sage, fontSize: 10, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", padding: "0 4px 6px" }}>Hole by hole</div>
         {result.holes.map((h) => {
           const won = h.decided && h.winnerId;
           const tiedCarry = h.decided && !h.winnerId;
-          return (
-            <div key={h.hole} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 4px", borderBottom: `1px solid ${C.greenLight}` }}>
-              <span style={{ width: 26, color: h.decided ? C.cream : C.sage, fontWeight: 700, fontSize: 13 }}>{h.hole}</span>
-              <span style={{ flex: 1, color: won ? C.cream : C.sage, fontSize: 13 }}>
-                {won ? `${nameById[h.winnerId!] || "—"} · net ${h.netById[h.winnerId!]}` : tiedCarry ? "Tied — carries" : "Not played yet"}
-              </span>
-              {won ? (
-                <span style={{ background: C.greenLight, color: C.gold, fontSize: 12, padding: "3px 9px", borderRadius: 999 }}>{h.value} skin{h.value > 1 ? "s" : ""}</span>
-              ) : tiedCarry ? (
-                <span style={{ background: "#5A3210", color: ORANGE, fontSize: 12, padding: "3px 9px", borderRadius: 999 }}>push →</span>
-              ) : (
-                <span style={{ color: C.faint, fontSize: 12 }}>{h.value} at stake</span>
-              )}
-            </div>
-          );
+          return <div key={h.hole} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 4px", borderBottom: `1px solid ${C.greenLight}` }}><span style={{ width: 26, color: h.decided ? C.cream : C.sage, fontWeight: 700, fontSize: 13 }}>{h.hole}</span><span style={{ flex: 1, color: won ? C.cream : C.sage, fontSize: 13 }}>{won ? `${nameById[h.winnerId!] || "—"} · net ${h.netById[h.winnerId!]}` : tiedCarry ? "Tied — carries" : "Not played yet"}</span>{won ? <span style={{ background: C.greenLight, color: C.gold, fontSize: 12, padding: "3px 9px", borderRadius: 999 }}>{h.value} skin{h.value > 1 ? "s" : ""}</span> : tiedCarry ? <span style={{ background: "#5A3210", color: ORANGE, fontSize: 12, padding: "3px 9px", borderRadius: 999 }}>push →</span> : <span style={{ color: C.faint, fontSize: 12 }}>{h.value} at stake</span>}</div>;
         })}
-      </div>
-      <div style={{ color: C.sage, fontSize: 10, marginTop: 8 }}>
-        Lowest net on a hole wins the skin; ties carry it to the next hole. Enter your scores below.
       </div>
     </div>
   );
 }
+
 
 function MatchView({
   game,

@@ -491,26 +491,30 @@ export function fourballStatus(
 }
 
 // ---------------- Skins (net, with carryovers) ----------------
-export type SkinPlayer = { id: string; name: string; gross: (number | null)[]; ch: number | null };
+export type SkinPlayer = { id: string; name: string; gross: (number | null)[]; ch: number | null; noShow?: boolean };
+export type SkinSide = { id: string; name: string; playerIds: string[] };
 export type SkinHole = {
   hole: number;
-  winnerId: string | null; // null = tied/carried (or not yet fully played)
+  winnerId: string | null; // player id for individual skins, side id for match/team skins; null = halved/carried/not ready
   carriedIn: number;        // skins carried into this hole from prior ties
   value: number;            // skins at stake on this hole (carriedIn + 1)
-  decided: boolean;         // every player has a score on this hole
+  decided: boolean;         // every required side has a score on this hole
   netById: Record<string, number | null>;
 };
 export type SkinResult = {
   holes: SkinHole[];
-  skinsByPlayer: Record<string, number>; // total skins won
+  skinsByPlayer: Record<string, number>; // total skins won by player id
   carryAtEnd: number;                     // unresolved skins still carrying
 };
+export type SkinMatchResult = {
+  holes: SkinHole[];
+  skinsBySide: Record<string, number>;    // total skins won by side id
+  carryAtEnd: number;
+};
 
-// Net skins: on each fully-played hole the lowest UNIQUE net wins 1 skin plus any
-// carried over from immediately preceding tied holes. A tie carries the skins
-// forward. Holes not yet fully played are skipped (no award, no carry) so live
-// scoring stays sensible. Net uses strokes received off each player's course
-// handicap allocated by stroke index (allowance applied by the caller via ch).
+// Legacy individual net skins: on each fully-played hole the lowest UNIQUE net wins
+// 1 skin plus any carried over from immediately preceding tied holes. A tie carries
+// the skins forward. Kept as a fallback for old/unconfigured skins games.
 export function computeSkins(holes: MatchHoleMeta[], players: SkinPlayer[], allowancePct: number = 100): SkinResult {
   const skinsByPlayer: Record<string, number> = {};
   players.forEach((p) => (skinsByPlayer[p.id] = 0));
@@ -538,10 +542,96 @@ export function computeSkins(holes: MatchHoleMeta[], players: SkinPlayer[], allo
       carry = 0;
     } else {
       out.push({ hole: h.n, winnerId: null, carriedIn: carry, value, decided: true, netById });
-      carry = value; // tie carries the whole pot forward
+      carry = value;
     }
   });
   return { holes: out, skinsByPlayer, carryAtEnd: carry };
+}
+
+// Match-play skins: exactly two sides compete on each hole. If one side has the
+// lower net score, that side wins the current skin pot. If the hole is halved,
+// the entire pot carries to the next hole.
+export function computeHeadToHeadSkins(
+  holes: MatchHoleMeta[],
+  a: SkinPlayer,
+  b: SkinPlayer,
+  allowancePct: number = 100,
+): SkinMatchResult {
+  const allow = matchAllowance(a.ch, b.ch, allowancePct);
+  const skinsBySide: Record<string, number> = { [a.id]: 0, [b.id]: 0 };
+  const out: SkinHole[] = [];
+  let carry = 0;
+  holes.forEach((h, i) => {
+    const ga = a.gross[i], gb = b.gross[i];
+    const netA = ga != null && ga > 0 ? ga - matchStrokesFor(allow.a, h.si) : null;
+    const netB = gb != null && gb > 0 ? gb - matchStrokesFor(allow.b, h.si) : null;
+    const netById: Record<string, number | null> = { [a.id]: netA, [b.id]: netB };
+    const value = carry + 1;
+    if (netA == null || netB == null) {
+      out.push({ hole: h.n, winnerId: null, carriedIn: carry, value, decided: false, netById });
+      return;
+    }
+    if (netA < netB) {
+      skinsBySide[a.id] += value;
+      out.push({ hole: h.n, winnerId: a.id, carriedIn: carry, value, decided: true, netById });
+      carry = 0;
+    } else if (netB < netA) {
+      skinsBySide[b.id] += value;
+      out.push({ hole: h.n, winnerId: b.id, carriedIn: carry, value, decided: true, netById });
+      carry = 0;
+    } else {
+      out.push({ hole: h.n, winnerId: null, carriedIn: carry, value, decided: true, netById });
+      carry = value;
+    }
+  });
+  return { holes: out, skinsBySide, carryAtEnd: carry };
+}
+
+// Team best-ball skins: each side can have one or more players; the side's hole
+// score is its best/lowest net ball. A lower team net wins the pot; equal best
+// balls halve the hole and carry the pot forward.
+export function computeTeamBestBallSkins(
+  holes: MatchHoleMeta[],
+  members: FourballMember[],
+  aIds: string[],
+  bIds: string[],
+  allowancePct: number = 100,
+): SkinMatchResult {
+  const sides: SkinSide[] = [
+    { id: "a", name: "Pair 1", playerIds: aIds },
+    { id: "b", name: "Pair 2", playerIds: bIds },
+  ];
+  const skinsBySide: Record<string, number> = { a: 0, b: 0 };
+  const nets = fourballNets(holes, members, allowancePct);
+  const out: SkinHole[] = [];
+  let carry = 0;
+  holes.forEach((h, i) => {
+    const netById: Record<string, number | null> = {};
+    members.forEach((m) => (netById[m.id] = nets[m.id]?.[i] ?? null));
+    const value = carry + 1;
+    const sideNets = sides.map((s) => {
+      const vals = s.playerIds.map((id) => nets[id]?.[i]).filter((n): n is number => n != null);
+      return { side: s, net: vals.length ? Math.min(...vals) : null };
+    });
+    if (sideNets.some((s) => s.net == null) || !aIds.length || !bIds.length) {
+      out.push({ hole: h.n, winnerId: null, carriedIn: carry, value, decided: false, netById });
+      return;
+    }
+    const aNet = sideNets[0].net as number, bNet = sideNets[1].net as number;
+    if (aNet < bNet) {
+      skinsBySide.a += value;
+      out.push({ hole: h.n, winnerId: "a", carriedIn: carry, value, decided: true, netById });
+      carry = 0;
+    } else if (bNet < aNet) {
+      skinsBySide.b += value;
+      out.push({ hole: h.n, winnerId: "b", carriedIn: carry, value, decided: true, netById });
+      carry = 0;
+    } else {
+      out.push({ hole: h.n, winnerId: null, carriedIn: carry, value, decided: true, netById });
+      carry = value;
+    }
+  });
+  return { holes: out, skinsBySide, carryAtEnd: carry };
 }
 
 // Putt distribution for a set of rounds: counts of 1-putts and 3+-putts, plus
