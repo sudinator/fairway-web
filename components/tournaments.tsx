@@ -85,6 +85,7 @@ type Player = {
   is_guest?: boolean | null; // a guest player added for this game only
   tee_group?: number | null; // which tee group (foursome) this player is in (1,2,3…)
   is_marker?: boolean | null; // keeps score for their tee group
+  group_locked?: boolean | null; // this player's tee group has been finished/locked
 };
 
 // Stable match identity for a player. Real players key on user_id (so nothing
@@ -864,13 +865,17 @@ function GameRoom({
   }, [teeGroupsInUse, myRow?.tee_group, teeGroupList.join(",")]);
   // A marker lands on the group card automatically.
   useEffect(() => { if (myRow?.is_marker && game?.game_type !== "stableford") setCardView(true); }, [myRow?.is_marker, game?.game_type]);
+  const myGroupHasMarker = teeGroupsInUse && myRow?.tee_group != null && players.some((p) => p.tee_group === myRow!.tee_group && p.is_marker);
   const cardPlayers = teeGroupsInUse ? players.filter((p) => p.tee_group === viewGroup) : players;
+  const gameEnded = game?.status === "ended";
+  const viewedGroupLocked = teeGroupsInUse && cardPlayers.length > 0 && cardPlayers.some((p) => p.group_locked);
+  const myGroupLocked = !!myRow?.group_locked;
   const iAmViewedMarker = !!myRow?.is_marker && myRow?.tee_group != null && myRow?.tee_group === viewGroup;
-  const cardCanEdit = teeGroupsInUse ? iAmViewedMarker : (game?.marker_user_id === user.id);
+  const cardCanEdit = gameEnded ? false : (teeGroupsInUse ? (iAmViewedMarker && !viewedGroupLocked) : (game?.marker_user_id === user.id));
   const viewedMarkerPlayer = teeGroupsInUse
     ? (players.find((p) => p.tee_group === viewGroup && p.is_marker) || null)
     : (game?.marker_user_id ? (players.find((p) => p.user_id === game.marker_user_id) || null) : null);
-  const canClaimViewed = !!myRow && !myRow.is_guest && !!myRow.user_id && myRow.tee_group != null && myRow.tee_group === viewGroup;
+  const canClaimViewed = !gameEnded && !viewedGroupLocked && !!myRow && !myRow.is_guest && !!myRow.user_id && myRow.tee_group != null && myRow.tee_group === viewGroup;
   const claimGroupMarker = async () => {
     if (!game || !myRow) return;
     setCardView(true);
@@ -884,6 +889,13 @@ function GameRoom({
     setPlayers((ps) => ps.map((p) => (p.id === myRow.id ? { ...p, is_marker: false } : p))); // optimistic
     await supabase.rpc("release_group_marker", { p_game: game.id });
     load();
+  };
+  const finishMyGroup = async () => {
+    if (!game || !myRow?.tee_group) return;
+    if (!confirm(`Finish Group ${myRow.tee_group}'s round? Your group's scores lock and post to each player's Rounds tab. The rest of the game keeps going.`)) return;
+    await supabase.rpc("finish_tee_group", { p_game: game.id });
+    await recordMyGameRound();
+    await load();
   };
   // Non-organizers only ever see the scorecard.
   useEffect(() => {
@@ -954,11 +966,11 @@ function GameRoom({
   // Once an ended game and my player row are both loaded, ensure my scorecard is
   // recorded as a round in my history. Idempotent (skips if already recorded).
   useEffect(() => {
-    if (game?.status === "ended" && me && me.user_id) {
+    if ((game?.status === "ended" || myRow?.group_locked) && me && me.user_id) {
       recordMyGameRound();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game?.status, me?.id]);
+  }, [game?.status, me?.id, myRow?.group_locked]);
 
   // Auto-refresh every minute so players see each other's scores without manual refresh.
   // Pauses while actively entering a score (a save in the last 25s, or one in progress).
@@ -1302,8 +1314,8 @@ function GameRoom({
   // Organizer: end the game — freezes scores and shows final results.
   const endGame = async () => {
     if (!game) return;
-    if (!confirm(`End "${game.name}"? Final standings are locked in and players can no longer change scores.`)) return;
-    await supabase.from("games").update({ status: "ended" }).eq("id", game.id);
+    if (!confirm(`End "${game.name}"? Final standings are locked in and every player's scorecard is posted to their Rounds tab.`)) return;
+    await supabase.rpc("finish_game", { p_game: game.id });
     await recordMyGameRound();
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_ended", group_id: (game as any).group_id || null, summary: `Ended the game "${game.name}"` });
     await load();
@@ -1583,6 +1595,25 @@ function GameRoom({
       </div>
       )}
 
+      {roomTab === "play" && !isEnded && (() => {
+        const canFinishGroup = !!myRow?.is_marker && myRow?.tee_group != null && !myRow?.group_locked;
+        if (!canFinishGroup && !isOrganizer) return null;
+        return (
+          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+            {canFinishGroup && (
+              <button onClick={finishMyGroup} style={{ ...btn(true), flex: 1, minWidth: 180, fontSize: 13, padding: "10px 0" }}>
+                🏁 Finish Group {myRow!.tee_group}'s round
+              </button>
+            )}
+            {isOrganizer && (
+              <button onClick={endGame} style={{ ...btn(!canFinishGroup), flex: 1, minWidth: 180, fontSize: 13, padding: "10px 0", background: canFinishGroup ? "#5A1E1E" : undefined, color: canFinishGroup ? "#fff" : undefined }}>
+                🔒 End game for everyone
+              </button>
+            )}
+          </div>
+        );
+      })()}
+
       {roomTab === "play" && game.game_type !== "stableford" && (
         <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
           <button onClick={() => setCardView(false)} style={{ ...btn(!cardView), flex: 1, fontSize: 13 }}>Results</button>
@@ -1602,10 +1633,12 @@ function GameRoom({
           {teeGroupsInUse && teeGroupList.length > 1 && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
               {teeGroupList.map((g) => {
-                const hasMarker = players.some((p) => p.tee_group === g && p.is_marker);
+                const grpPlayers = players.filter((p) => p.tee_group === g);
+                const locked = grpPlayers.some((p) => p.group_locked);
+                const hasMarker = grpPlayers.some((p) => p.is_marker);
                 return (
                   <button key={g} onClick={() => setViewGroup(g)} style={{ ...btn(viewGroup === g), fontSize: 12, padding: "5px 12px" }}>
-                    Group {g}{!hasMarker ? " ·!" : ""}
+                    Group {g}{locked ? " 🔒" : !hasMarker ? " ·!" : ""}
                   </button>
                 );
               })}
@@ -1619,6 +1652,7 @@ function GameRoom({
             onSetHole={setPlayerHole}
             teeMode={teeGroupsInUse}
             groupLabel={viewGroup != null ? `Group ${viewGroup}` : ""}
+            groupLocked={viewedGroupLocked}
             canClaim={canClaimViewed}
             onClaimGroup={claimGroupMarker}
             onReleaseGroup={releaseGroupMarker}
@@ -1753,7 +1787,7 @@ function GameRoom({
 
       {/* My score entry — hidden while a marker is keeping score for the group
           (scoring then happens only on the Group card, to avoid conflicts). */}
-      {roomTab === "play" && me && !(game.game_type !== "stableford" && !isEnded && (game.marker_user_id || teeGroupsInUse)) && (
+      {roomTab === "play" && me && !(game.game_type !== "stableford" && !isEnded && (game.marker_user_id || myGroupHasMarker)) && (
         <div style={{ marginTop: 22 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <Eyebrow>{isEnded ? "YOUR FINAL SCORES" : "ENTER YOUR SCORES"}</Eyebrow>
@@ -2018,13 +2052,13 @@ function TeeGroups({ game, players, onChanged }: { game: Game; players: Player[]
   );
 }
 
-function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup }: {
+function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup, groupLocked = false }: {
   game: Game; players: Player[]; user: any;
   isMarker: boolean; markerName: string | null;
   onTakeOver: () => void; onRelease: () => void;
   onSetHole: (playerId: string, holeIdx: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | null; penalties?: number | null; sand?: boolean | null }) => void;
   teeMode?: boolean; groupLabel?: string; canClaim?: boolean;
-  onClaimGroup?: () => void; onReleaseGroup?: () => void;
+  onClaimGroup?: () => void; onReleaseGroup?: () => void; groupLocked?: boolean;
 }) {
   const [edit, setEdit] = useState<{ playerId: string; holeIdx: number } | null>(null);
   const allowance = game.allowance_pct ?? 100;
@@ -2109,7 +2143,12 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
   return (
     <div style={{ marginTop: 16 }}>
       {teeMode ? (
-        isMarker ? (
+        groupLocked ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#2A2A2A", border: `0.5px solid ${C.gold}`, borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
+            <span style={{ color: C.gold, fontSize: 14 }}>🔒</span>
+            <span style={{ color: "#E4CF86", fontSize: 12, flex: 1 }}>{groupLabel} · final — scores locked and posted to each player's Rounds tab.</span>
+          </div>
+        ) : isMarker ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#3F3414", border: `0.5px solid ${C.gold}`, borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
             <span style={{ color: C.gold, fontSize: 15 }}>✎</span>
             <span style={{ color: "#E4CF86", fontSize: 12, flex: 1 }}>You're scoring {groupLabel} — tap a cell to edit</span>
