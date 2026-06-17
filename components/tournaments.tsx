@@ -78,6 +78,8 @@ type Player = {
   scores: (number | null)[]; // strokes per hole
   putts: (number | null)[]; // putts per hole
   fairways: ("hit" | "miss" | null)[]; // fairway result per hole (par 4/5)
+  penalties?: (number | null)[]; // penalty strokes per hole
+  sand?: (boolean | null)[]; // greenside bunker per hole (for sand-save %)
   team?: string | null; // team key ("A"/"B") for team match play
   no_show?: boolean | null; // organizer-flagged no-show (four-ball: scored net double bogey)
   is_guest?: boolean | null; // a guest player added for this game only
@@ -635,7 +637,9 @@ function CreateGame({
             here.
           </div>
         )}
-        {favorites.map((f, i) => (
+        {favorites.map((f, i) => {
+          const selected = pickedFav?.id != null ? pickedFav.id === f.id : pickedFav?.name === f.name;
+          return (
           <button
             key={i}
             onClick={() => {
@@ -643,26 +647,30 @@ function CreateGame({
               setTeeIdx(0);
             }}
             style={{
-              display: "block",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
               width: "100%",
               textAlign: "left",
               marginTop: 8,
               cursor: "pointer",
-              background: pickedFav?.name === f.name ? C.cream : C.card,
-              border: `1px solid ${pickedFav?.name === f.name ? C.gold : C.line}`,
+              background: selected ? C.cream : C.card,
+              border: `${selected ? 2 : 1}px solid ${selected ? C.gold : C.line}`,
               borderRadius: 10,
               padding: "10px 14px",
             }}
           >
-            <span style={{ color: C.ink, fontWeight: 700 }}>{f.name}</span>
-            {f.location ? (
-              <span style={{ color: C.faint, fontSize: 13 }}>
-                {" "}
-                · {f.location}
-              </span>
-            ) : null}
+            <span style={{ width: 20, height: 20, borderRadius: 999, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: selected ? C.green : "transparent", border: selected ? "none" : `1.5px solid ${C.line}`, color: C.cream, fontSize: 12, fontWeight: 800 }}>{selected ? "✓" : ""}</span>
+            <span style={{ flex: 1 }}>
+              <span style={{ color: C.ink, fontWeight: 700 }}>{f.name}</span>
+              {f.location ? (
+                <span style={{ color: C.faint, fontSize: 13 }}>{" "}· {f.location}</span>
+              ) : null}
+            </span>
+            {selected && <span style={{ color: C.green, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>SELECTED</span>}
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {pickedFav && (
@@ -1027,6 +1035,8 @@ function GameRoom({
       strokes?: number | null;
       putts?: number | null;
       fairway?: "hit" | "miss" | null;
+      penalties?: number | null;
+      sand?: boolean | null;
     },
   ) => {
     if (!me) return;
@@ -1034,10 +1044,14 @@ function GameRoom({
     const scores = [...(me.scores || Array(n).fill(null))];
     const putts = [...(me.putts || Array(n).fill(null))];
     const fairways = [...(me.fairways || Array(n).fill(null))];
+    const penalties = [...(me.penalties || Array(n).fill(null))];
+    const sand = [...(me.sand || Array(n).fill(null))];
     if ("strokes" in patch) scores[holeIdx] = patch.strokes ?? null;
     if ("putts" in patch) putts[holeIdx] = patch.putts ?? null;
     if ("fairway" in patch) fairways[holeIdx] = patch.fairway ?? null;
-    const updated = { ...me, scores, putts, fairways };
+    if ("penalties" in patch) penalties[holeIdx] = patch.penalties ?? 0;
+    if ("sand" in patch) sand[holeIdx] = patch.sand ?? false;
+    const updated = { ...me, scores, putts, fairways, penalties, sand };
     setMe(updated);
     setPlayers((ps) => ps.map((p) => (p.id === me.id ? updated : p)));
     // Synchronous local backup FIRST — survives an immediate lock even if the
@@ -1047,7 +1061,7 @@ function GameRoom({
     lastEditRef.current = Date.now();
     await supabase
       .from("game_players")
-      .update({ scores, putts, fairways })
+      .update({ scores, putts, fairways, penalties, sand })
       .eq("id", me.id);
     lastEditRef.current = Date.now();
     setSavingHole(null);
@@ -1058,7 +1072,7 @@ function GameRoom({
   const setPlayerHole = async (
     playerId: string,
     holeIdx: number,
-    patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | null },
+    patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | null; penalties?: number | null; sand?: boolean | null },
   ) => {
     const target = players.find((p) => p.id === playerId);
     if (!game || !target) return;
@@ -1066,14 +1080,18 @@ function GameRoom({
     const scores = [...(target.scores || Array(n).fill(null))];
     const putts = [...(target.putts || Array(n).fill(null))];
     const fairways = [...(target.fairways || Array(n).fill(null))];
+    const penalties = [...(target.penalties || Array(n).fill(null))];
+    const sand = [...(target.sand || Array(n).fill(null))];
     if ("strokes" in patch) scores[holeIdx] = patch.strokes ?? null;
     if ("putts" in patch) putts[holeIdx] = patch.putts ?? null;
     if ("fairway" in patch) fairways[holeIdx] = patch.fairway ?? null;
-    const updated = { ...target, scores, putts, fairways };
+    if ("penalties" in patch) penalties[holeIdx] = patch.penalties ?? 0;
+    if ("sand" in patch) sand[holeIdx] = patch.sand ?? false;
+    const updated = { ...target, scores, putts, fairways, penalties, sand };
     setPlayers((ps) => ps.map((p) => (p.id === playerId ? updated : p)));
     if (target.id === me?.id) setMe(updated);
     lastEditRef.current = Date.now();
-    await supabase.from("game_players").update({ scores, putts, fairways }).eq("id", playerId);
+    await supabase.from("game_players").update({ scores, putts, fairways, penalties, sand }).eq("id", playerId);
     lastEditRef.current = Date.now();
   };
 
@@ -1300,7 +1318,9 @@ function GameRoom({
         strokes: scores[i] ?? null,
         putts: me.putts?.[i] ?? null,
         fairway: me.fairways?.[i] ?? null,
-        penalties: null,
+        penalties: me.penalties?.[i] ?? null,
+        sand: me.sand?.[i] ?? false,
+        yardage: m.yards ?? null,
       })).filter((h) => h.strokes != null);
       if (holeRows.length) await supabase.from("holes").insert(holeRows);
     } catch {
@@ -1717,6 +1737,8 @@ function GameRoom({
                 strokes: me.scores?.[i] ?? null,
                 putts: me.putts?.[i] ?? null,
                 fairway: me.fairways?.[i] ?? null,
+                penalties: me.penalties?.[i] ?? null,
+                sand: me.sand?.[i] ?? null,
                 recv: matchAllow != null ? matchStrokesFor(matchAllow, m.si) : (alloc[m.n] || 0),
                 // If I receive none but my opponent does, show the holes where I give a stroke.
                 gives: game.game_type === "match" && (matchAllow ?? 0) === 0 && oppAllow != null
@@ -1727,7 +1749,7 @@ function GameRoom({
             hasHandicap={me.course_handicap != null}
             onSet={(i, patch) => { if (!isEnded) setMyHole(i, patch); }}
             savingHole={savingHole}
-            showPenalties={false}
+            showPenalties={true}
             opp={(() => {
               if (game.game_type !== "match") return undefined;
               const pr = game.pairings.find((p) => p.a === user.id || p.b === user.id);
@@ -1890,7 +1912,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
   game: Game; players: Player[]; user: any;
   isMarker: boolean; markerName: string | null;
   onTakeOver: () => void; onRelease: () => void;
-  onSetHole: (playerId: string, holeIdx: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | null }) => void;
+  onSetHole: (playerId: string, holeIdx: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | null; penalties?: number | null; sand?: boolean | null }) => void;
 }) {
   const [edit, setEdit] = useState<{ playerId: string; holeIdx: number } | null>(null);
   const allowance = game.allowance_pct ?? 100;
@@ -1936,7 +1958,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
           const pts = stablefordPts(gross, m.par, recv);
           return (
             <div key={p.id + i} style={{ ...cell, cursor: isMarker ? "pointer" : "default", outline: isMarker ? "1px solid #E6E0CC" : "none" }}
-              onClick={isMarker ? () => setEdit({ playerId: p.id, holeIdx: i }) : undefined}>
+              onClick={isMarker ? () => { if (gross == null || gross <= 0) onSetHole(p.id, i, { strokes: m.par }); setEdit({ playerId: p.id, holeIdx: i }); } : undefined}>
               {recv > 0 && (
                 <div style={{ position: "absolute", top: 3, left: 4, display: "flex", gap: 2 }}>
                   {Array.from({ length: Math.min(recv, 2) }).map((_, d) => (
@@ -2024,6 +2046,8 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
         const gross = p.scores?.[edit.holeIdx] ?? null;
         const putts = p.putts?.[edit.holeIdx] ?? null;
         const fw = p.fairways?.[edit.holeIdx] ?? null;
+        const penN = p.penalties?.[edit.holeIdx] || 0;
+        const sandOn = !!p.sand?.[edit.holeIdx];
         const recv = recvFor(p, m.si);
         const net = gross != null && gross > 0 ? gross - recv : null;
         const clampG = (v: number) => Math.max(1, Math.min(15, v));
@@ -2057,6 +2081,19 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
                 <button onClick={() => onSetHole(p.id, edit.holeIdx, { putts: Math.max(0, (putts || 0) - 1) })} style={{ width: 32, height: 32, borderRadius: 8, border: `0.5px solid ${C.line}`, background: C.card, color: C.ink, fontSize: 18, cursor: "pointer" }}>−</button>
                 <span style={{ color: C.ink, fontSize: 18, fontWeight: 700, minWidth: 16, textAlign: "center" }}>{putts ?? "–"}</span>
                 <button onClick={() => onSetHole(p.id, edit.holeIdx, { putts: Math.min(10, (putts || 0) + 1) })} style={{ width: 32, height: 32, borderRadius: 8, border: `0.5px solid ${C.line}`, background: C.card, color: C.ink, fontSize: 18, cursor: "pointer" }}>+</button>
+              </div>
+
+              <div style={{ color: C.ink, fontSize: 13, marginTop: 14, marginBottom: 5 }}>Sand / Penalty</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                <button onClick={() => onSetHole(p.id, edit.holeIdx, { sand: !sandOn })}
+                  style={{ border: `1px solid ${sandOn ? "#C9A227" : C.line}`, background: sandOn ? "#EFE2C0" : C.card, color: sandOn ? "#7A5A12" : C.faint, borderRadius: 8, padding: "8px 12px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
+                  {sandOn ? "S · bunker" : "S"}
+                </button>
+                <span style={{ color: C.line }}>|</span>
+                {[0, 1, 2, 3].map((nn) => (
+                  <button key={nn} onClick={() => onSetHole(p.id, edit.holeIdx, { penalties: nn })}
+                    style={{ width: 34, padding: "8px 0", textAlign: "center", border: `1px solid ${penN === nn ? C.birdie : C.line}`, background: penN === nn ? "#F6DEDB" : C.card, color: penN === nn ? C.birdie : C.faint, borderRadius: 8, fontWeight: 800, fontSize: 13, cursor: "pointer" }}>{nn}</button>
+                ))}
               </div>
 
               <button onClick={() => setEdit(null)} style={{ width: "100%", marginTop: 16, background: C.green, color: C.cream, border: "none", borderRadius: 8, padding: 11, fontWeight: 800, fontSize: 14, cursor: "pointer" }}>Done</button>
