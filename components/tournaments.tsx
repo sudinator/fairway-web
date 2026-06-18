@@ -620,12 +620,18 @@ function CreateGame({
       </div>
 
       <div style={{ marginTop: 14 }}>
-        <label style={{ color: C.sage, fontSize: 12 }}>
-          Players from this group
-        </label>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <label style={{ color: C.sage, fontSize: 12, flex: 1 }}>
+            Players from this group
+          </label>
+          {(() => {
+            const n = groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length;
+            return <span style={{ color: C.gold, fontSize: 12, fontWeight: 800 }}>{n} player{n === 1 ? "" : "s"} selected</span>;
+          })()}
+        </div>
         <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
           Add players now so they see the game automatically. You can still
-          share the code later if needed.
+          share the code later, and add or remove players after the game starts.
         </div>
         <div
           style={{
@@ -649,10 +655,12 @@ function CreateGame({
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 10,
-                  padding: "8px 4px",
+                  gap: 12,
+                  padding: "14px 12px",
                   cursor: isMe ? "default" : "pointer",
                   borderBottom: `1px solid ${C.greenMid}`,
+                  borderRadius: 8,
+                  background: checked ? "rgba(216,178,74,0.10)" : "transparent",
                 }}
               >
                 <input
@@ -665,8 +673,9 @@ function CreateGame({
                       [p.id]: e.target.checked,
                     }))
                   }
+                  style={{ width: 22, height: 22, flex: "0 0 auto", accentColor: "#D8B24A", cursor: isMe ? "default" : "pointer" }}
                 />
-                <span style={{ flex: 1, color: C.cream, fontWeight: 700 }}>
+                <span style={{ flex: 1, color: C.cream, fontWeight: 700, fontSize: 15 }}>
                   {p.display_name}
                   {isMe ? " (you)" : ""}
                 </span>
@@ -1382,6 +1391,58 @@ function GameRoom({
     await load();
   };
 
+  // --- Add players / guests after the game has started (forgot someone, a walk-up, etc.) ---
+  // Group members in this game's group who aren't in the field yet.
+  const [eligibleMembers, setEligibleMembers] = useState<{ id: string; display_name: string; handicap_index: number | null }[]>([]);
+  useEffect(() => {
+    const gid = game?.group_id;
+    if (!gid) { setEligibleMembers([]); return; }
+    let cancelled = false;
+    (async () => {
+      const { data: mem } = await supabase.from("group_members").select("user_id").eq("group_id", gid).eq("status", "active");
+      const ids = (mem || []).map((r: any) => r.user_id).filter(Boolean);
+      if (!ids.length) { if (!cancelled) setEligibleMembers([]); return; }
+      const { data: profs } = await supabase.from("profiles").select("id, display_name, handicap_index").in("id", ids);
+      const inGame = new Set(players.map((p) => p.user_id).filter(Boolean) as string[]);
+      if (!cancelled) setEligibleMembers((profs || [])
+        .filter((p: any) => !inGame.has(p.id))
+        .map((p: any) => ({ id: p.id, display_name: p.display_name || "Player", handicap_index: p.handicap_index ?? null })));
+    })();
+    return () => { cancelled = true; };
+  }, [game?.group_id, players]);
+
+  // New players inherit the tee already in use (mirrors how a code-join borrows the tee).
+  const refTee = () => {
+    const ref = players.find((p) => p.rating != null && p.slope != null && p.tee_name) || players[0];
+    return { rating: ref?.rating ?? null, slope: ref?.slope ?? null, tee_name: ref?.tee_name ?? null };
+  };
+  const blankCard = () => {
+    const n = game?.holes_meta?.length ?? 18;
+    return { scores: Array(n).fill(null), putts: Array(n).fill(null), fairways: Array(n).fill(null) };
+  };
+  const addGuestToGame = async (name: string, hcp: number) => {
+    if (!game || !name.trim() || Number.isNaN(hcp)) return;
+    const t = refTee();
+    await supabase.from("game_players").insert({
+      game_id: game.id, user_id: null, is_guest: true, display_name: name.trim(),
+      handicap_index: null, rating: t.rating, slope: t.slope, tee_name: t.tee_name,
+      course_handicap: hcp, ...blankCard(),
+    });
+    await load();
+  };
+  const addMemberToGame = async (m: { id: string; display_name: string; handicap_index: number | null }) => {
+    if (!game) return;
+    const t = refTee();
+    const ch = (m.handicap_index != null && t.slope != null && t.rating != null && game.course_par != null)
+      ? courseHandicap(m.handicap_index, t.slope, t.rating, game.course_par) : null;
+    await supabase.from("game_players").insert({
+      game_id: game.id, user_id: m.id, is_guest: false, display_name: m.display_name,
+      handicap_index: m.handicap_index, rating: t.rating, slope: t.slope, tee_name: t.tee_name,
+      course_handicap: ch, ...blankCard(),
+    });
+    await load();
+  };
+
   // Organizer: update a player's tee from the unified setup roster. This recalculates
   // course handicap from that player's handicap index using the selected tee rating/slope.
   const setPlayerTee = async (p: Player, teeName: string) => {
@@ -1748,6 +1809,7 @@ function GameRoom({
           onRemove: removePlayer, onToggleNoShow: toggleNoShow, onSetTeam: setPlayerTeam,
           onSetTeeGroup: setPlayerTeeGroup, onRename: renameGame, onDelete: deleteGame,
           onEnd: endGame, onReopen: reopenGame,
+          eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,
         };
         // --- per-step completion drives the stepper status + the "what's next" line ---
         const total = players.length;
@@ -2726,9 +2788,12 @@ function MatchView({
     players.find((p) => pkey(p) === uid) || null;
   const paired = new Set(game.pairings.flatMap((pr) => [pr.a, pr.b]));
   const unpaired = players.filter((p) => !paired.has(pkey(p)));
+  const inMatchCount = (uid: string) => game.pairings.filter((pr) => pr.a === uid || pr.b === uid).length;
 
   const addPairing = async () => {
     if (!aSel || !bSel || aSel === bSel) return;
+    const dup = game.pairings.some((pr) => (pr.a === aSel && pr.b === bSel) || (pr.a === bSel && pr.b === aSel));
+    if (dup) return; // that exact match already exists
     setBusy(true);
     const pairings = [...game.pairings, { a: aSel, b: bSel }];
     await supabase.from("games").update({ pairings }).eq("id", game.id);
@@ -2847,9 +2912,9 @@ function MatchView({
               style={{ ...inputStyle, width: "auto", minWidth: 130 }}
             >
               <option value="">{useTeamPick ? `${teamA!.name}…` : "Player A…"}</option>
-              {(useTeamPick ? unpaired.filter((p) => p.team === teamA!.key) : unpaired).map((p) => (
+              {(useTeamPick ? players.filter((p) => p.team === teamA!.key) : players).map((p) => (
                 <option key={pkey(p)} value={pkey(p)}>
-                  {p.display_name}
+                  {p.display_name}{inMatchCount(pkey(p)) > 0 ? " · in a match" : ""}
                 </option>
               ))}
             </select>
@@ -2860,9 +2925,9 @@ function MatchView({
               style={{ ...inputStyle, width: "auto", minWidth: 130 }}
             >
               <option value="">{useTeamPick ? `${teamB!.name}…` : "Player B…"}</option>
-              {(useTeamPick ? unpaired.filter((p) => p.team === teamB!.key) : unpaired.filter((p) => pkey(p) !== aSel)).map((p) => (
+              {(useTeamPick ? players.filter((p) => p.team === teamB!.key) : players.filter((p) => pkey(p) !== aSel)).map((p) => (
                 <option key={pkey(p)} value={pkey(p)}>
-                  {p.display_name}
+                  {p.display_name}{inMatchCount(pkey(p)) > 0 ? " · in a match" : ""}
                 </option>
               ))}
             </select>
@@ -2877,11 +2942,12 @@ function MatchView({
               Add
             </button>
           </div>
-          {unpaired.length > 0 && (
-            <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>
-              Not yet paired: {unpaired.map((p) => p.display_name).join(", ")}
-            </div>
-          )}
+          <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>
+            {unpaired.length > 0
+              ? `Not yet paired: ${unpaired.map((p) => p.display_name).join(", ")}`
+              : "Everyone's in a match."}
+            {" "}Odd number? You can pick a player who's already in a match to give them a second opponent, so no one sits out.
+          </div>
         </div>
       )}
 
@@ -3316,6 +3382,9 @@ function OrganizerPanel({
   onEnd,
   onReopen,
   section = "players",
+  eligibleMembers = [],
+  onAddMember,
+  onAddGuest,
 }: {
   game: Game;
   players: Player[];
@@ -3332,11 +3401,17 @@ function OrganizerPanel({
   onEnd: () => Promise<void>;
   onReopen: () => Promise<void>;
   section?: "players" | "teams";
+  eligibleMembers?: { id: string; display_name: string; handicap_index: number | null }[];
+  onAddMember?: (m: { id: string; display_name: string; handicap_index: number | null }) => Promise<void>;
+  onAddGuest?: (name: string, hcp: number) => Promise<void>;
 }) {
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [open, setOpen] = useState(true);
   const [nameEdit, setNameEdit] = useState(game.name);
+  const [addMemberId, setAddMemberId] = useState("");
+  const [addGuestName, setAddGuestName] = useState("");
+  const [addGuestHcp, setAddGuestHcp] = useState("");
 
 
   const withHcp = players.filter((p) => p.course_handicap != null).length;
@@ -3539,6 +3614,43 @@ function OrganizerPanel({
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {section === "players" && (onAddMember || onAddGuest) && (
+            <div style={{ marginTop: 14, borderTop: `1px solid ${C.greenMid}`, paddingTop: 12 }}>
+              <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2, fontWeight: 700 }}>ADD TO THE FIELD</div>
+              {onAddMember && eligibleMembers.length > 0 && (
+                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <select value={addMemberId} onChange={(e) => setAddMemberId(e.target.value)} style={{ ...inputStyle, padding: "8px 10px", flex: 1, minWidth: 160 }}>
+                    <option value="">Add a group member…</option>
+                    {eligibleMembers.map((m) => (
+                      <option key={m.id} value={m.id}>{m.display_name}{m.handicap_index != null ? ` · HCP ${m.handicap_index}` : ""}</option>
+                    ))}
+                  </select>
+                  <button
+                    disabled={!addMemberId}
+                    onClick={async () => {
+                      const m = eligibleMembers.find((x) => x.id === addMemberId);
+                      if (m && onAddMember) { await onAddMember(m); setAddMemberId(""); }
+                    }}
+                    style={{ ...btn(!!addMemberId), fontSize: 13, padding: "8px 14px", opacity: addMemberId ? 1 : 0.5 }}
+                  >Add</button>
+                </div>
+              )}
+              {onAddGuest && (
+                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <input value={addGuestName} onChange={(e) => setAddGuestName(e.target.value)} placeholder="Guest name" style={{ ...inputStyle, padding: "8px 10px", flex: 1, minWidth: 140 }} />
+                  <input value={addGuestHcp} onChange={(e) => { const v = e.target.value; if (v === "" || /^-?\d*$/.test(v)) setAddGuestHcp(v); }} inputMode="numeric" placeholder="Course hcp" style={{ ...inputStyle, padding: "8px 10px", width: 100 }} />
+                  <button
+                    disabled={!addGuestName.trim() || addGuestHcp === ""}
+                    onClick={async () => {
+                      if (onAddGuest) { await onAddGuest(addGuestName, parseInt(addGuestHcp, 10)); setAddGuestName(""); setAddGuestHcp(""); }
+                    }}
+                    style={{ ...btn(false), fontSize: 13, padding: "8px 14px", opacity: addGuestName.trim() && addGuestHcp !== "" ? 1 : 0.5 }}
+                  >+ Add guest</button>
+                </div>
+              )}
             </div>
           )}
 

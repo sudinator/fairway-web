@@ -1,37 +1,25 @@
-# Birdie Num Num — v1.10.0
+# Birdie Num Num — v1.11.0
 
-Round clock, multi-use invite links, four-ball team colours/groups cleanup.
+Add/remove players after kickoff, an easier player picker, and odd-number match play.
 
-## RUN THESE MIGRATIONS FIRST (in Supabase, in order)
-
-- migrations/0014_round_clock.sql      — two timestamp columns on game_players
-- migrations/0015_multiuse_group_invites.sql — multi-use invite columns + 2 functions
-
-0014 is trivial and safe. 0015 adds a NEW multi-use path and leaves the existing
-one-time invite untouched; I authored it without the original function source, so
-please smoke-test it (below).
+## NO migration required (all client-side; uses existing columns/RPCs).
 
 ## What's new
 
-1. Round clock (pace of play). A per-group elapsed timer shows on the play screen.
-   It starts the first time anyone in the group enters a score (no button needed —
-   a Start option could be added later, but this is automatic), and freezes when the
-   group's last hole is scored or the game ends. No pace warnings — just elapsed time,
-   per group (so 8am and 10am groups each run their own clock).
+1. Add players & guests after the game starts. On the setup Players step there's now an
+   "Add to the field" block: pick a group member who isn't in yet, or add a guest by name
+   + course handicap. New players inherit the tee already in use and get a blank card.
+   Removing players was already there. (Forgot someone or a walk-up shows up — no need to
+   recreate the game.)
 
-2. Multi-use invite links. In the group admin panel you can now pick "Lasts 24 hours",
-   "7 days", or "One-time (single player)". The timed options create a link the whole
-   group can use until it expires; one-time keeps the old single-player behaviour. The
-   /join/[code] route accepts both.
+2. Easier player picker at creation. Rows are taller with bigger, easier-to-tap
+   checkboxes and a highlight on the ones you've selected, and a live "N players selected"
+   counter sits next to the heading — much better with 10-12 names.
 
-3. Four-ball team colours fixed. Team accent colours now follow the team NAME when it's
-   a colour word — name a team "Red" and it shows red, "Blue" shows blue (previously the
-   colour was keyed off team position, so "Red" could appear blue). Custom names fall
-   back to the default palette. Applies to the Teams step and both team scoreboards.
-
-4. Four-ball Groups step removed (it was redundant). Each foursome is now automatically
-   its own tee group, so group scoring lines up with the foursomes you build — no extra
-   "Groups" step for four-ball / best-ball skins.
+3. Odd numbers in match play. The pairing pickers now list everyone (not just the
+   not-yet-paired), marking anyone "· in a match." So with an odd field you can give a
+   player a second opponent — their card is scored against both — and nobody sits out.
+   Exact duplicate pairings are blocked.
 
 ## Verified locally
 
@@ -39,12 +27,16 @@ please smoke-test it (below).
 - next build: passes (7 routes)
 - Unit tests: 102/102 pass
 
-## Smoke-test (two devices / two accounts)
+## Note / limitation
 
-- Invite link: as a group admin, generate a 24-hour link; open it from two different
-  accounts and confirm both land in the group, and that an expired/used-up link is
-  refused.
-- Round clock: enter a score in a group and watch the timer start; score the 18th hole
-  (or end the game) and confirm it freezes.
-- Four-ball: name teams "Red"/"Blue" and confirm the colours match; confirm there's no
-  Groups step and each foursome can claim its own scorer on the course.
+For a player who's in two matches at once, each match result is computed correctly and
+independently. The only cosmetic gap: that player's own per-hole stroke dots show the
+strokes vs their FIRST opponent (the match cards and team rollup are all correct). Tell
+me if you want the dots to switch per match and I'll add a selector.
+
+## Smoke-test
+
+- Start a game, then on the Players step add a guest and a group member; confirm they
+  appear with the right tee/handicap and can be scored.
+- Match play with 5 players: pair 1v2 and 3v4, then pair player 5 against player 1
+  (who shows "· in a match"); confirm both of player 1's matches resolve.
