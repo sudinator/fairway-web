@@ -2378,8 +2378,57 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
   };
   const recvFor = (p: Player, si: number | null) => strokesReceived(si, applyAllowance(p.course_handicap, allowance));
 
-  const teamColor = (i: number) => (i % 2 === 0 ? "#5B8DEF" : "#C9A227");
-  const colTmpl = `58px repeat(${players.length}, minmax(58px, 1fr))`;
+  // Column order + colour. Stableford: alphabetical. Team match: each pairing's
+  // two players adjacent, with a divider between matches. Foursome formats: Pair A
+  // then Pair B. Column underline uses the real team colour when teams exist.
+  type Col = { type: "player"; p: Player } | { type: "divider" };
+  const cols: Col[] = (() => {
+    const ps = players;
+    const gt = game.game_type;
+    if (gt === "stableford") {
+      return [...ps].sort((a, b) => a.display_name.localeCompare(b.display_name)).map((p) => ({ type: "player" as const, p }));
+    }
+    if (gt === "match" && Array.isArray(game.pairings) && game.pairings.length) {
+      const byKey = (k: string) => ps.find((p) => pkey(p) === k);
+      const used = new Set<string>();
+      const out: Col[] = [];
+      game.pairings.forEach((pr) => {
+        const pair = [byKey(pr.a), byKey(pr.b)].filter((p): p is Player => !!p);
+        if (!pair.length) return;
+        if (out.length) out.push({ type: "divider" });
+        pair.forEach((p) => { out.push({ type: "player", p }); used.add(p.id); });
+      });
+      const rest = ps.filter((p) => !used.has(p.id)).sort((a, b) => a.display_name.localeCompare(b.display_name));
+      if (rest.length && out.length) out.push({ type: "divider" });
+      rest.forEach((p) => out.push({ type: "player", p }));
+      return out.length ? out : ps.map((p) => ({ type: "player" as const, p }));
+    }
+    if ((gt === "fourball" || gt === "trifecta") && Array.isArray(game.foursomes)) {
+      const f = game.foursomes.find((fr) => [...fr.a, ...fr.b].some((uid) => ps.some((p) => pkey(p) === uid)));
+      if (f) {
+        const aSide = ps.filter((p) => f.a.includes(pkey(p)));
+        const bSide = ps.filter((p) => f.b.includes(pkey(p)));
+        const others = ps.filter((p) => !f.a.includes(pkey(p)) && !f.b.includes(pkey(p)));
+        const out: Col[] = [];
+        aSide.forEach((p) => out.push({ type: "player", p }));
+        if (aSide.length && bSide.length) out.push({ type: "divider" });
+        bSide.forEach((p) => out.push({ type: "player", p }));
+        others.forEach((p) => out.push({ type: "player", p }));
+        return out.length ? out : ps.map((p) => ({ type: "player" as const, p }));
+      }
+    }
+    return ps.map((p) => ({ type: "player" as const, p }));
+  })();
+  const playerOrder = cols.filter((c): c is { type: "player"; p: Player } => c.type === "player").map((c) => c.p);
+  const colorFor = (p: Player): string => {
+    if (Array.isArray(game.teams) && game.teams.length && p.team) {
+      const ti = game.teams.findIndex((t) => t.key === p.team);
+      if (ti >= 0) return teamAccent(game.teams[ti].name, ti);
+    }
+    const idx = playerOrder.findIndex((x) => x.id === p.id);
+    return idx % 2 === 0 ? "#5B8DEF" : "#C9A227";
+  };
+  const colTmpl = `58px ${cols.map((c) => (c.type === "divider" ? "10px" : "minmax(58px, 1fr)")).join(" ")}`;
   const cell: React.CSSProperties = { position: "relative", background: "#FBFAF4", borderRadius: 5, height: 42, display: "flex", alignItems: "center", justifyContent: "center" };
   const agg: React.CSSProperties = { position: "relative", background: C.greenLight, borderRadius: 5, height: 30, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 15, fontWeight: 800 };
 
@@ -2404,7 +2453,9 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
           <span style={{ color: "#8FB0A0", fontSize: 8, lineHeight: 1.25 }}>Par {m.par}</span>
           <span style={{ color: "#8FB0A0", fontSize: 8, lineHeight: 1.25 }}>{m.yards ? `${m.yards}y · ` : ""}SI {m.si ?? "–"}</span>
         </div>
-        {players.map((p) => {
+        {cols.map((c, ci) => {
+          if (c.type === "divider") return <div key={`hd${i}-${ci}`} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ width: 2, height: 30, background: "rgba(216,178,74,0.5)", borderRadius: 2 }} /></div>;
+          const p = c.p;
           const gross = p.scores?.[i] ?? null;
           const recv = recvFor(p, m.si);
           const pts = stablefordPts(gross, m.par, recv);
@@ -2432,7 +2483,9 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
   const aggRow = (label: string, from: number, to: number) => (
     <React.Fragment key={label}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "#0A241C", borderRadius: 5, color: "#CFE3D8", fontSize: 10, fontWeight: 800, letterSpacing: 1 }}>{label}</div>
-      {players.map((p) => {
+      {cols.map((c, ci) => {
+        if (c.type === "divider") return <div key={`ad${label}-${ci}`} />;
+        const p = c.p;
         const s = sums(p, from, to);
         return (
           <div key={p.id + label} style={agg}>
@@ -2501,14 +2554,18 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
       <div style={{ overflowX: "auto" }}>
         <div style={{ display: "grid", gridTemplateColumns: colTmpl, gap: 3, minWidth: 300 }}>
           <div />
-          {players.map((p, i) => (
-            <div key={p.id} style={{ textAlign: "center", padding: "4px 2px", borderBottom: `2px solid ${teamColor(i)}` }}>
-              <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {p.display_name}{p.is_guest ? " ·G" : ""}
+          {cols.map((c, ci) => {
+            if (c.type === "divider") return <div key={`cd${ci}`} />;
+            const p = c.p;
+            return (
+              <div key={p.id} style={{ textAlign: "center", padding: "4px 2px", borderBottom: `2px solid ${colorFor(p)}` }}>
+                <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {p.display_name}{p.is_guest ? " ·G" : ""}
+                </div>
+                <div style={{ color: C.sage, fontSize: 9 }}>hcp {p.course_handicap}</div>
               </div>
-              <div style={{ color: C.sage, fontSize: 9 }}>hcp {p.course_handicap}</div>
-            </div>
-          ))}
+            );
+          })}
           {meta.slice(0, half).map((_, i) => holeRow(i))}
           {meta.length > half && meta.slice(half).map((_, i) => holeRow(i + half))}
           {meta.length >= 18 && aggRow("IN", 9, 17)}
@@ -3733,7 +3790,7 @@ function OrganizerPanel({
                       const col = teamAccent(t.name, ti);
                       return (
                         <button key={t.key} onClick={() => onSetTeam(p, on ? null : t.key)}
-                          style={{ borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", background: on ? "rgba(255,255,255,0.06)" : "transparent", border: `1.5px solid ${on ? col : C.line}`, color: on ? col : C.sage }}>
+                          style={{ borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", background: on ? col : "transparent", border: `1.5px solid ${on ? col : C.line}`, color: on ? "#0E241B" : C.sage }}>
                           {t.name}
                         </button>
                       );
