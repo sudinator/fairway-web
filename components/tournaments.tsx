@@ -1525,6 +1525,27 @@ function GameRoom({
     await load();
   };
 
+  // Organizer: change the handicap allowance on a live game. Views read
+  // allowance_pct live, so standings/strokes recompute on the next load.
+  const setAllowance = async (pct: number) => {
+    if (!game) return;
+    const v = Math.max(0, Math.min(100, Math.round(pct)));
+    await supabase.from("games").update({ allowance_pct: v }).eq("id", game.id);
+    await load();
+  };
+
+  // Organizer: change the format on a live game. Only safe transitions are
+  // offered in the UI (see formatGroup); pairings/foursomes/teams are kept in
+  // place so a switch is reversible. Allowance auto-suggests the new format's
+  // common-practice number but the organizer can override after.
+  const anyScores = players.some((p) => (p.scores || []).some((s) => s != null));
+  const setFormat = async (next: "stableford" | "match" | "fourball" | "skins") => {
+    if (!game || next === game.game_type) return;
+    const suggested = next === "fourball" ? 85 : 100;
+    await supabase.from("games").update({ game_type: next, allowance_pct: suggested }).eq("id", game.id);
+    await load();
+  };
+
   // Organizer: end the game — freezes scores and shows final results.
   const endGame = async () => {
     if (!game) return;
@@ -1810,6 +1831,7 @@ function GameRoom({
           onSetTeeGroup: setPlayerTeeGroup, onRename: renameGame, onDelete: deleteGame,
           onEnd: endGame, onReopen: reopenGame,
           eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,
+          onSetAllowance: setAllowance, onSetFormat: setFormat, anyScores,
         };
         // --- per-step completion drives the stepper status + the "what's next" line ---
         const total = players.length;
@@ -3385,6 +3407,9 @@ function OrganizerPanel({
   eligibleMembers = [],
   onAddMember,
   onAddGuest,
+  onSetAllowance,
+  onSetFormat,
+  anyScores = false,
 }: {
   game: Game;
   players: Player[];
@@ -3404,6 +3429,9 @@ function OrganizerPanel({
   eligibleMembers?: { id: string; display_name: string; handicap_index: number | null }[];
   onAddMember?: (m: { id: string; display_name: string; handicap_index: number | null }) => Promise<void>;
   onAddGuest?: (name: string, hcp: number) => Promise<void>;
+  onSetAllowance?: (pct: number) => Promise<void>;
+  onSetFormat?: (f: "stableford" | "match" | "fourball" | "skins") => Promise<void>;
+  anyScores?: boolean;
 }) {
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -3421,6 +3449,21 @@ function OrganizerPanel({
   const groupOptions = Array.from({ length: Math.max(1, Math.ceil(players.length / 4) + 1) }, (_, i) => i + 1);
   const teeGroups = Array.from(new Set(players.map((p) => p.tee_group).filter((g): g is number => g != null))).sort((a, b) => a - b);
   const teamLabel = (key: string | null | undefined) => teams.find((t) => t.key === key)?.name || "No team";
+
+  // Which formats can this game switch to right now. Once scores exist, only
+  // moves that don't need new matchups are allowed: Stableford/Skins are always
+  // safe (no structure), Match needs pairings already in place, Four-ball needs
+  // foursomes. Before any score, anything is allowed (still setup).
+  const hasPairings = Array.isArray(game.pairings) && game.pairings.length > 0;
+  const hasFoursomes = Array.isArray(game.foursomes) && game.foursomes.length > 0;
+  const canSwitchTo = (target: "stableford" | "match" | "fourball" | "skins") => {
+    if (target === game.game_type) return false;
+    if (!anyScores) return true;
+    if (target === "stableford" || target === "skins") return true;
+    if (target === "match") return hasPairings;
+    if (target === "fourball") return hasFoursomes;
+    return false;
+  };
 
   const save = async (p: Player) => {
     const raw = edits[p.id];
@@ -3572,7 +3615,11 @@ function OrganizerPanel({
                       <button
                         title="Remove player"
                         style={{ background: "none", border: `1px solid ${C.line}`, borderRadius: 6, color: C.birdie, fontWeight: 800, cursor: "pointer", padding: "6px 8px", fontSize: 12 }}
-                        onClick={() => onRemove(p)}
+                        onClick={() => {
+                          const holesPlayed = (p.scores || []).filter((s) => s != null).length;
+                          if (holesPlayed > 0 && !confirm(`${p.display_name} has scores on ${holesPlayed} hole${holesPlayed === 1 ? "" : "s"}. Removing them deletes that scorecard from this game. Remove anyway?\n\nIf they started but had to leave, use "No-show" instead to keep their played holes.`)) return;
+                          onRemove(p);
+                        }}
                       >
                         Remove
                       </button>
@@ -3619,37 +3666,37 @@ function OrganizerPanel({
 
           {section === "players" && (onAddMember || onAddGuest) && (
             <div style={{ marginTop: 14, borderTop: `1px solid ${C.greenMid}`, paddingTop: 12 }}>
-              <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2, fontWeight: 700 }}>ADD TO THE FIELD</div>
               {onAddMember && eligibleMembers.length > 0 && (
-                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <select value={addMemberId} onChange={(e) => setAddMemberId(e.target.value)} style={{ ...inputStyle, padding: "8px 10px", flex: 1, minWidth: 160 }}>
-                    <option value="">Add a group member…</option>
+                <>
+                  <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2, fontWeight: 700 }}>ADD FROM YOUR GROUP</div>
+                  <div style={{ marginTop: 8 }}>
                     {eligibleMembers.map((m) => (
-                      <option key={m.id} value={m.id}>{m.display_name}{m.handicap_index != null ? ` · HCP ${m.handicap_index}` : ""}</option>
+                      <div key={m.id} onClick={() => onAddMember(m)}
+                        style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 8px", cursor: "pointer", borderBottom: `1px solid ${C.greenMid}`, borderRadius: 8 }}>
+                        <span style={{ width: 22, height: 22, borderRadius: 5, border: `1.5px solid ${C.sage}`, flex: "0 0 auto" }} />
+                        <span style={{ flex: 1, color: C.cream, fontWeight: 700, fontSize: 15 }}>{m.display_name}</span>
+                        <span style={{ color: C.sage, fontSize: 12 }}>{m.handicap_index != null ? `HCP ${m.handicap_index}` : "no handicap"}</span>
+                      </div>
                     ))}
-                  </select>
-                  <button
-                    disabled={!addMemberId}
-                    onClick={async () => {
-                      const m = eligibleMembers.find((x) => x.id === addMemberId);
-                      if (m && onAddMember) { await onAddMember(m); setAddMemberId(""); }
-                    }}
-                    style={{ ...btn(!!addMemberId), fontSize: 13, padding: "8px 14px", opacity: addMemberId ? 1 : 0.5 }}
-                  >Add</button>
-                </div>
+                  </div>
+                  <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Tap a name to add them to the field.</div>
+                </>
               )}
               {onAddGuest && (
-                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
-                  <input value={addGuestName} onChange={(e) => setAddGuestName(e.target.value)} placeholder="Guest name" style={{ ...inputStyle, padding: "8px 10px", flex: 1, minWidth: 140 }} />
-                  <input value={addGuestHcp} onChange={(e) => { const v = e.target.value; if (v === "" || /^-?\d*$/.test(v)) setAddGuestHcp(v); }} inputMode="numeric" placeholder="Course hcp" style={{ ...inputStyle, padding: "8px 10px", width: 100 }} />
-                  <button
-                    disabled={!addGuestName.trim() || addGuestHcp === ""}
-                    onClick={async () => {
-                      if (onAddGuest) { await onAddGuest(addGuestName, parseInt(addGuestHcp, 10)); setAddGuestName(""); setAddGuestHcp(""); }
-                    }}
-                    style={{ ...btn(false), fontSize: 13, padding: "8px 14px", opacity: addGuestName.trim() && addGuestHcp !== "" ? 1 : 0.5 }}
-                  >+ Add guest</button>
-                </div>
+                <>
+                  <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2, fontWeight: 700, marginTop: eligibleMembers.length > 0 ? 14 : 0 }}>ADD A GUEST</div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <input value={addGuestName} onChange={(e) => setAddGuestName(e.target.value)} placeholder="Guest name" style={{ ...inputStyle, padding: "8px 10px", flex: 1, minWidth: 140 }} />
+                    <input value={addGuestHcp} onChange={(e) => { const v = e.target.value; if (v === "" || /^-?\d*$/.test(v)) setAddGuestHcp(v); }} inputMode="numeric" placeholder="Course hcp" style={{ ...inputStyle, padding: "8px 10px", width: 100 }} />
+                    <button
+                      disabled={!addGuestName.trim() || addGuestHcp === ""}
+                      onClick={async () => {
+                        if (onAddGuest) { await onAddGuest(addGuestName, parseInt(addGuestHcp, 10)); setAddGuestName(""); setAddGuestHcp(""); }
+                      }}
+                      style={{ ...btn(false), fontSize: 13, padding: "8px 14px", opacity: addGuestName.trim() && addGuestHcp !== "" ? 1 : 0.5 }}
+                    >+ Add guest</button>
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -3709,6 +3756,37 @@ function OrganizerPanel({
                 Rename
               </button>
             </div>
+
+            {game.status !== "ended" && onSetAllowance && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ color: C.sage, fontSize: 12 }}>Handicap allowance</div>
+                <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  {[100, 90, 85].map((amt) => (
+                    <button key={amt} onClick={() => onSetAllowance(amt)} style={{ ...btn((game.allowance_pct ?? 100) === amt), fontSize: 13, padding: "7px 12px" }}>{amt}%</button>
+                  ))}
+                  <span style={{ color: C.sage, fontSize: 12 }}>now {game.allowance_pct ?? 100}%</span>
+                </div>
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>In match formats the lower handicap plays off the difference; standings update live.</div>
+              </div>
+            )}
+
+            {game.status !== "ended" && onSetFormat && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ color: C.sage, fontSize: 12 }}>Format</div>
+                <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                  {([["stableford", "Stableford"], ["match", "Match"], ["fourball", "Four-ball"], ["skins", "Skins"]] as const).map(([key, label]) => {
+                    const isCur = game.game_type === key;
+                    const allowed = isCur || canSwitchTo(key);
+                    return (
+                      <button key={key} disabled={!allowed}
+                        onClick={() => { if (!isCur && allowed && confirm(`Switch to ${label}? Every scorecard is kept and standings recompute. Allowance moves to the ${label} default — adjust it above if you need to.`)) onSetFormat(key); }}
+                        style={{ ...btn(isCur), fontSize: 13, padding: "7px 12px", opacity: allowed ? 1 : 0.4, cursor: allowed ? "pointer" : "not-allowed" }}>{label}</button>
+                    );
+                  })}
+                </div>
+                {anyScores && <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Scores are in — you can switch to Stableford or Skins anytime. Match needs pairings already set, Four-ball needs foursomes.</div>}
+              </div>
+            )}
             {game.status === "ended" ? (
               <button
                 style={{ ...btn(false), marginTop: 10, fontSize: 13 }}

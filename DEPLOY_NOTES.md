@@ -1,42 +1,49 @@
-# Birdie Num Num — v1.11.0
+# Birdie Num Num — v1.12.0
 
-Add/remove players after kickoff, an easier player picker, and odd-number match play.
+Live game-setup editing: change allowance, change format, and manage the roster
+from the Game setup tab after a game has started. NO migration required.
 
-## NO migration required (all client-side; uses existing columns/RPCs).
+This is stages 1-3 of the larger plan we scoped. Trifecta (the new format) and
+the leave-mid-match re-pair flow are the next build — they each need their own
+scoring engine and tests, so they're deliberately not in this drop.
 
 ## What's new
 
-1. Add players & guests after the game starts. On the setup Players step there's now an
-   "Add to the field" block: pick a group member who isn't in yet, or add a guest by name
-   + course handicap. New players inherit the tee already in use and get a blank card.
-   Removing players was already there. (Forgot someone or a walk-up shows up — no need to
-   recreate the game.)
+1. Handicap-allowance editor (Game setup → Players). Change a live game's
+   allowance (100 / 90 / 85) any time. Views read it live, so strokes and
+   standings recompute on the next refresh. This is what reconciles the
+   "85% gives one fewer stroke" question — you can now see and flip it.
 
-2. Easier player picker at creation. Rows are taller with bigger, easier-to-tap
-   checkboxes and a highlight on the ones you've selected, and a live "N players selected"
-   counter sits next to the heading — much better with 10-12 names.
+2. Format change on a live game (Game setup → Players → Format). Guard rails:
+   once any score is entered you can switch to Stableford or Skins anytime
+   (no matchups needed); Match is offered only if pairings already exist and
+   Four-ball only if foursomes exist (so you never lose or fake a matchup).
+   Before any score, all four are open. Pairings/foursomes/teams are kept in
+   place when unused, so switches are reversible. On switch, allowance
+   auto-moves to that format's usual number (four-ball 85%, else 100%) and
+   stays editable. Every scorecard is preserved — format only changes how the
+   same gross scores are scored.
 
-3. Odd numbers in match play. The pairing pickers now list everyone (not just the
-   not-yet-paired), marking anyone "· in a match." So with an odd field you can give a
-   player a second opponent — their card is scored against both — and nobody sits out.
-   Exact duplicate pairings are blocked.
+3. Roster picker on the Players step. The cramped add-dropdown is replaced with
+   a tap-to-add list of your group (under "Add from your group"), plus guest
+   add — reached anytime via the Game setup tab. Removing a player who already
+   has scores now asks for confirmation and points you to No-show instead if
+   they simply left mid-round.
 
 ## Verified locally
-
 - tsc --noEmit: clean
-- next build: passes (7 routes)
+- next build: passes
 - Unit tests: 102/102 pass
 
-## Note / limitation
-
-For a player who's in two matches at once, each match result is computed correctly and
-independently. The only cosmetic gap: that player's own per-hole stroke dots show the
-strokes vs their FIRST opponent (the match cards and team rollup are all correct). Tell
-me if you want the dots to switch per match and I'll add a selector.
-
 ## Smoke-test
+- Mid-round, open Game setup → flip allowance 85 -> 100 and confirm strokes change.
+- In a match game with scores, confirm you can switch to Stableford/Skins but
+  Four-ball is greyed out (no foursomes); in a four-ball, the reverse.
+- Add a group member and a guest from the Players step; try removing a player
+  who has scores and confirm the warning appears.
 
-- Start a game, then on the Players step add a guest and a group member; confirm they
-  appear with the right tee/handicap and can be scored.
-- Match play with 5 players: pair 1v2 and 3v4, then pair player 5 against player 1
-  (who shows "· in a match"); confirm both of player 1's matches resolve.
+## Still to come (next build)
+- Trifecta format (2 singles + team point per hole; Best ball / Shootout toggle;
+  2v1 handling; pending holes under Shootout).
+- Player-leaves-mid-match: re-pair the opponent as a segmented match (resets all
+  square at the switch hole) or play out solo.
