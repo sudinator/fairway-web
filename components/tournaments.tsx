@@ -1233,8 +1233,13 @@ function GameRoom({
     gameMarkerUserId: game?.marker_user_id ?? null,
     players,
   });
+  // Set true for the duration of a score reset so the background flush can't
+  // re-write the old scores (a PWA confirm() can fire visibilitychange/blur,
+  // which would otherwise flush the stale row right back over the reset).
+  const resettingRef = React.useRef(false);
   useEffect(() => {
     const flush = () => {
+      if (resettingRef.current) return;       // a reset is in progress; don't write
       if (markerOwnsMyRowRef.current) return; // marker owns my row; don't write it
       const m = meRef.current;
       if (!m) return;
@@ -1761,7 +1766,12 @@ function GameRoom({
   // and scores recorded, remove those from each player's Rounds tab separately).
   const resetScores = async () => {
     if (!game) return;
-    if (!confirm(`Reset "${game.name}"? This clears every player's scores, putts, fairways, penalties/sand and the round clock, and reopens the game if it was ended. Players, teams, and matchups are kept. Use this to wipe test scores.`)) return;
+    // Suppress the background flush BEFORE confirm() — in a standalone PWA the
+    // confirm dialog can fire visibilitychange/blur, which would otherwise flush
+    // the old scores right back over the reset.
+    resettingRef.current = true;
+    const ok = confirm(`Reset "${game.name}"? This clears every player's scores, putts, fairways, penalties/sand and the round clock, and reopens the game if it was ended. Players, teams, and matchups are kept. Use this to wipe test scores.`);
+    if (!ok) { resettingRef.current = false; return; }
     const n = game.holes_meta?.length ?? 18;
     const blank = {
       scores: Array(n).fill(null),
@@ -1773,13 +1783,21 @@ function GameRoom({
       clock_end: null,
       group_locked: false,
     };
-    await Promise.all(players.map((p) => supabase.from("game_players").update(blank).eq("id", p.id)));
-    // Clear this device's local score backup for my own row, otherwise load()'s
-    // reconcile would merge the old scores back in (and re-write them to the DB).
+    // Optimistically clear local state so meRef goes blank immediately (so even a
+    // stray flush would only ever write blanks) and the UI updates without a wait.
+    setPlayers((ps) => ps.map((p) => ({ ...p, ...blank })));
+    setMe((m) => (m ? { ...m, ...blank } : m));
+    // Clear this device's local score backup for my own row, so load()'s reconcile
+    // has nothing stale to merge back in.
     if (me?.id) clearGameScores(game.id, me.id);
-    if (game.status === "ended") await supabase.from("games").update({ status: "active" }).eq("id", game.id);
-    await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_reset", group_id: (game as any).group_id || null, summary: `Reset scores for "${game.name}"` });
-    await load();
+    try {
+      await Promise.all(players.map((p) => supabase.from("game_players").update(blank).eq("id", p.id)));
+      if (game.status === "ended") await supabase.from("games").update({ status: "active" }).eq("id", game.id);
+      await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_reset", group_id: (game as any).group_id || null, summary: `Reset scores for "${game.name}"` });
+      await load();
+    } finally {
+      resettingRef.current = false;
+    }
   };
 
   // Organizer: delete the entire game and all its player rows.
