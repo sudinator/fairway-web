@@ -944,3 +944,31 @@ export function markerOwnsMyRow(opts: {
   return false;
 }
 
+
+// Reconcile one player's DB row against this device's local backup for that row.
+// The DB value wins where present; the backup fills any hole the DB is missing
+// (a score lost to a screen lock or no signal). This recovers scores, putts,
+// fairways, penalties and sand. `changed` is true when the backup adds at least
+// one scored hole the DB lacked — the signal to push the merged row back to the
+// DB. The backup is never used to remove data, only to fill gaps.
+export function mergeBackupRow(
+  db: { scores?: any[]; putts?: any[]; fairways?: any[]; penalties?: any[]; sand?: any[] },
+  backup: { scores?: any[]; putts?: any[]; fairways?: any[]; penalties?: any[]; sand?: any[] },
+  n: number,
+): { merged: { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] }; changed: boolean } {
+  const mergeArr = (d: any[] | undefined, l: any[] | undefined) =>
+    Array.from({ length: n }, (_, i) => {
+      const dv = d?.[i] ?? null;
+      return dv != null ? dv : (l?.[i] ?? null);
+    });
+  const merged = {
+    scores: mergeArr(db.scores, backup.scores),
+    putts: mergeArr(db.putts, backup.putts),
+    fairways: mergeArr(db.fairways, backup.fairways),
+    penalties: mergeArr(db.penalties, backup.penalties),
+    sand: mergeArr(db.sand, backup.sand),
+  };
+  const dbCount = (db.scores || []).filter((s) => s != null).length;
+  const mergedCount = merged.scores.filter((s) => s != null).length;
+  return { merged, changed: mergedCount > dbCount };
+}

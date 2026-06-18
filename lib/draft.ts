@@ -97,7 +97,7 @@ function gameScoreKey(gameId: string, playerId: string) {
 export function saveGameScores(
   gameId: string,
   playerId: string,
-  data: { scores: any[]; putts: any[]; fairways: any[] },
+  data: { scores: any[]; putts: any[]; fairways: any[]; penalties?: any[]; sand?: any[] },
 ): void {
   try {
     if (typeof window === "undefined") return;
@@ -114,13 +114,13 @@ export function saveGameScores(
 export function loadGameScores(
   gameId: string,
   playerId: string,
-): { scores: any[]; putts: any[]; fairways: any[] } | null {
+): { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] } | null {
   try {
     if (typeof window === "undefined") return null;
     const raw = window.localStorage.getItem(gameScoreKey(gameId, playerId));
     if (!raw) return null;
     const p = JSON.parse(raw);
-    return { scores: p.scores || [], putts: p.putts || [], fairways: p.fairways || [] };
+    return { scores: p.scores || [], putts: p.putts || [], fairways: p.fairways || [], penalties: p.penalties || [], sand: p.sand || [] };
   } catch { return null; }
 }
 
@@ -128,6 +128,22 @@ export function clearGameScores(gameId: string, playerId: string): void {
   try {
     if (typeof window === "undefined") return;
     window.localStorage.removeItem(gameScoreKey(gameId, playerId));
+  } catch {}
+}
+
+// Remove EVERY local score backup for a game on this device (all player rows).
+// Used by the master reset so a pre-game test wipe leaves no backup behind that
+// could resurface — including the rows a marker backed up for other players.
+export function clearAllGameScores(gameId: string): void {
+  try {
+    if (typeof window === "undefined") return;
+    const prefix = `bnn_game_scores_${gameId}_`;
+    const keys: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      if (k && k.startsWith(prefix)) keys.push(k);
+    }
+    keys.forEach((k) => window.localStorage.removeItem(k));
   } catch {}
 }
 

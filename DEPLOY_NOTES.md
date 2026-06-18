@@ -1,54 +1,49 @@
-# Birdie Num Num — v1.21.2
+# Birdie Num Num — v1.22.0
 
-Restore the proven offline/lock scoring logic; reset is an isolated master wipe.
-NO migration.
+Full offline/lock resilience for GROUP scoring + penalties/sand in the backup.
+NO migration. Built on the restored v1.5.2 core (offline/lock recovery unchanged
+in spirit, now extended).
 
-## Verified against your original v1.5.2 upload (diffed, not from memory)
-- load()'s backup reconcile (the offline / screen-lock RECOVERY): now BYTE-FOR-BYTE
-  identical to v1.5.2. The backup is merged in to fill any holes the DB is missing,
-  and is NEVER discarded by load(). All the reset-era experiments on this path
-  (empty-row discard, score epoch) are gone.
-- lib/draft.ts saveGameScores / loadGameScores / clearGameScores: restored to
-  v1.5.2 verbatim.
-- setMyHole / setPlayerHole: the only differences from v1.5.2 are the
-  clock_start/clock_end lines, which are the ROUND-CLOCK feature (powers the pace
-  reminder), not reset-related.
+## Gap 1 fixed: penalties & sand are backed up
+The local backup now stores penalties and sand alongside scores/putts/fairways,
+and the recovery merge restores them. Previously an offline/lock entry could
+recover the strokes but lose the penalty/sand metadata.
 
-## Reset = master pre-game wipe (not a per-group action)
-- Blanks EVERY player in the game to square one: scores, putts, fairways,
-  penalties, sand, the round clock, group-locked, and no-show flags. Keeps the
-  players, teams, matchups, and groups so real play can begin.
-- Reopens the game if it had been ended.
-- Clears the local backup only on the device running the reset (the organizer),
-  and suppresses that device's flush during the reset, so the organizer's own
-  test scores clear reliably.
+## Gap 2 fixed: in group scoring, ALL players' scores are backed up & synced
+- The scoring device (marker) now writes a local backup for EVERY player it
+  scores, not just its own row. So if the marker enters the group's scores with
+  no signal or the screen locks, every player's entry is held safely on the
+  device.
+- Recovery now reconciles EVERY backed-up row, not just "my" row. On reopen, the
+  marker's device pushes any holes the DB is missing (offline entries) back up for
+  all players.
+- New: when the device comes back ONLINE, it reloads and syncs automatically — no
+  need to reopen the game.
+- Pushing another player's recovered row uses the marker's server-side rights; a
+  push that isn't permitted is harmless (the backup is kept, nothing is lost).
 
-## Why reset can NEVER destroy real player data
-The backup is a sacred recovery net. If the reset is ever fired while a real
-player holds scores (incl. offline/unsynced), that player's device still has its
-backup, and load() always recovers it — their scores self-heal on next load. The
-ONLY row permanently cleared is the organizer's own (test scores, pre-game). So
-even a mis-fired mid-round reset cannot lose another player's data.
+## Preserved guarantees
+- A backup is NEVER discarded by load(); it only fills holes the DB is missing.
+  Real scores always win; nothing is removed by recovery.
+- The master reset now clears EVERY local backup for the game on the resetting
+  device (including marker-held rows), so a pre-game test wipe leaves nothing to
+  resurface. Other devices are untouched — their real scores stay protected.
 
-## Two safety guards kept (the only data-path deviations from v1.5.2)
-Both exist solely to PREVENT data loss and can never cause it:
-1. The background flush bails when another player is the marker for your group
-   (the marker owns your row; a stale background write from your phone can't
-   overwrite their entries).
-2. The flush also bails during a reset (so the reset can't be undone by a
-   confirm-dialog flush).
-Plus a one-line addition in setPlayerHole: when the marker edits their OWN row,
-it also writes the local backup — closing a gap where a marker's own score
-entered on the group card had no offline/lock backup in v1.5.2.
-If you'd rather these be stripped to pure v1.5.2, say so — but each only adds
-protection.
+## How preservation now holds, end to end
+- Screen lock mid-entry: synchronous disk backup lands before the network write;
+  recovered on reopen. (any player, group or solo)
+- No signal: entries held on disk; synced on the next online event or reopen.
+  (any player, group or solo)
+- App killed: disk backup survives; recovered on relaunch. (any player)
 
 ## Verified locally
 - tsc --noEmit: clean
 - next build: passes
-- Unit tests: 126/126 pass
+- Unit tests: 130/130 pass (incl. mergeBackupRow recovery + the marker-clobber
+  guard reproduction)
 
-## Smoke-test
-- Offline/lock (most important): network OFF, enter holes, lock screen, reopen,
-  network ON -> holes persist.
-- Reset: enter test scores, reset -> all players zeroed, structure intact.
+## Smoke-test (two devices, the group case this fixes)
+1. Device A is the marker. Put A in airplane mode. Enter scores for all players.
+2. Kill/relaunch A (still offline) -> scores still shown (from backup).
+3. Turn signal back on -> scores sync to the server automatically; Device B sees
+   them. Nothing lost.

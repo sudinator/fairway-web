@@ -33,10 +33,11 @@ import {
   type BetPlayer,
   type BetSplit,
   markerOwnsMyRow,
+  mergeBackupRow,
 } from "@/lib/golf";
 import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
-import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores } from "@/lib/draft";
+import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearAllGameScores } from "@/lib/draft";
 import {
   btn,
   inputStyle,
@@ -1127,34 +1128,30 @@ function GameRoom({
         }
       : g;
     setGame(safeGame as any);
-    let mine = (ps || []).find((p: any) => p.user_id === user.id) || null;
-    // Reconcile against the local backup: if a score write was lost to a screen
-    // lock, the device's backup may hold holes the DB row is missing. Merge those
-    // in (local fills holes the DB left blank) and push the result back to the DB.
-    if (mine) {
-      const backup = loadGameScores(gameId, mine.id);
-      if (backup) {
-        const n = (safeGame as any)?.holes_meta?.length || 18;
-        const mergeArr = (dbArr: any[], locArr: any[]) =>
-          Array.from({ length: n }, (_, i) => {
-            const d = dbArr?.[i] ?? null;
-            return d != null ? d : (locArr?.[i] ?? null);
-          });
-        const merged = {
-          scores: mergeArr(mine.scores || [], backup.scores || []),
-          putts: mergeArr(mine.putts || [], backup.putts || []),
-          fairways: mergeArr(mine.fairways || [], backup.fairways || []),
-        };
-        const dbCount = (mine.scores || []).filter((s: any) => s != null).length;
-        const mergedCount = merged.scores.filter((s: any) => s != null).length;
-        if (mergedCount > dbCount) {
-          mine = { ...mine, ...merged };
-          await supabase.from("game_players").update(merged).eq("id", mine.id);
-        }
-        saveGameScores(gameId, mine.id, { scores: mine.scores || [], putts: mine.putts || [], fairways: mine.fairways || [] });
+    // Reconcile against the local backups. A score lost to a screen lock or no
+    // signal lives in this device's backup; merge it into any hole the DB is
+    // missing and push the result back. We reconcile EVERY row this device has a
+    // backup for — so in group scoring, the marker recovers the OTHER players'
+    // offline-entered scores too, not just their own. A backup only ever fills
+    // gaps; it never removes data. (Pushing another player's row needs marker
+    // rights server-side; a failed push is swallowed and the backup is kept.)
+    const n = (safeGame as any)?.holes_meta?.length || 18;
+    const reconciled: any[] = [];
+    for (const p of (ps || [])) {
+      const backup = loadGameScores(gameId, p.id);
+      if (!backup) { reconciled.push(p); continue; }
+      const { merged, changed } = mergeBackupRow(p, backup, n);
+      let row = p;
+      if (changed) {
+        row = { ...p, ...merged };
+        try { await supabase.from("game_players").update(merged).eq("id", p.id); } catch {}
       }
+      // Keep the backup in lockstep with the reconciled truth.
+      saveGameScores(gameId, p.id, merged);
+      reconciled.push(row);
     }
-    setPlayers((ps || []).map((p: any) => (mine && p.id === mine.id ? mine : p)));
+    let mine = reconciled.find((p: any) => p.user_id === user.id) || null;
+    setPlayers(reconciled);
     setMe(mine);
     if (mine && mine.course_handicap == null && (safeGame as any)?.holes_meta?.length)
       setNeedsSetup(true);
@@ -1265,6 +1262,15 @@ function GameRoom({
     };
   }, []);
 
+  // When the device comes back online, reload — which reconciles every backed-up
+  // row and pushes any holes the DB is missing (offline entries) back up. This
+  // syncs without needing to reopen the game.
+  useEffect(() => {
+    const onOnline = () => { load(); };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [load]);
+
   // Build a player's per-hole Hole[] (with strokes received) for scoring math.
   const playerHoles = (p: Player): Hole[] => {
     if (!game) return [];
@@ -1341,7 +1347,7 @@ function GameRoom({
     setPlayers((ps) => ps.map((p) => (p.id === me.id ? updated : p)));
     // Synchronous local backup FIRST — survives an immediate lock even if the
     // network write below gets frozen. Reconciled to the DB on next load.
-    if (game) saveGameScores(game.id, me.id, { scores, putts, fairways });
+    if (game) saveGameScores(game.id, me.id, { scores, putts, fairways, penalties, sand });
     setSavingHole(holeIdx);
     lastEditRef.current = Date.now();
     await supabase
@@ -1379,9 +1385,11 @@ function GameRoom({
     const updated = { ...target, scores, putts, fairways, penalties, sand, ...clockPatch };
     setPlayers((ps) => ps.map((p) => (p.id === playerId ? updated : p)));
     if (target.id === me?.id) setMe(updated);
-    // If the marker is editing their OWN row, keep the local score backup in sync
-    // (blanks included) so load()'s merge can't resurrect a value they just cleared.
-    if (game && target.id === me?.id) saveGameScores(game.id, target.id, { scores, putts, fairways });
+    // Group scoring: the marker holds everyone's scores, so back up EVERY row this
+    // device writes (not just the marker's own) — with penalties/sand — so an
+    // offline/lock entry for any player is recoverable. Synced back on reopen /
+    // reconnect (see load()).
+    if (game) saveGameScores(game.id, playerId, { scores, putts, fairways, penalties, sand });
     lastEditRef.current = Date.now();
     await supabase.from("game_players").update({ scores, putts, fairways, penalties, sand, ...clockPatch }).eq("id", playerId);
     lastEditRef.current = Date.now();
@@ -1792,10 +1800,11 @@ function GameRoom({
     // stray flush would only ever write blanks) and the UI updates without a wait.
     setPlayers((ps) => ps.map((p) => ({ ...p, ...blank })));
     setMe((m) => (m ? { ...m, ...blank } : m));
-    // Clear this device's local score backup for my own row, so load()'s reconcile
-    // has nothing to merge back in for me. (Only this device's backup — other
-    // devices keep theirs, which protects any real scores they hold.)
-    if (me?.id) clearGameScores(game.id, me.id);
+    // Clear EVERY local score backup for this game on this device — including any
+    // rows a marker backed up for other players — so a pre-game test wipe leaves
+    // nothing to resurface. (Only this device; other devices keep theirs, which
+    // protects any real scores they hold.)
+    clearAllGameScores(game.id);
     try {
       await Promise.all(players.map((p) => supabase.from("game_players").update(blank).eq("id", p.id)));
       if (game.status === "ended") await supabase.from("games").update({ status: "active" }).eq("id", game.id);
