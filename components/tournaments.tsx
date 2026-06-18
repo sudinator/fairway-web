@@ -19,6 +19,7 @@ import {
   fourballStatus,
   fourballProgress,
   computeTrifecta,
+  trifectaSingles,
   type FourballMember,
   computeSkins,
   computeHeadToHeadSkins,
@@ -1988,6 +1989,10 @@ function GameRoom({
         );
       })()}
 
+      {((roomTab === "play") || (roomTab === "setup" && setupTab === "matchups")) && (
+        <StrokesSummary game={game} players={players} collapsible={roomTab === "play"} />
+      )}
+
       {roomTab === "play" && !isEnded && (() => {
         const canFinishGroup = !!myRow?.is_marker && myRow?.tee_group != null && !myRow?.group_locked;
         if (!canFinishGroup && !isOrganizer) return null;
@@ -3453,6 +3458,129 @@ function FourballView({
 
 // ---------------- Organizer panel (game creator) ----------------
 // Lets the game's creator manage the roster, handicaps, and the game itself.
+// ---------------- Strokes summary (who gives/gets, by hole) ----------------
+// Read-only panel for the whole field: for any 1-v-1 element (singles match,
+// the singles inside Trifecta) it shows who plays off scratch and which holes
+// the other player gets a stroke on; for team-only legs (four-ball, the Trifecta
+// team point) it lists each player's course handicap and the strokes they get
+// off the foursome's low. Hole numbers come from the same allocateStrokes the
+// scorecard dots use, so the panel and the card never disagree.
+function StrokesSummary({ game, players, collapsible = false }: { game: Game; players: Player[]; collapsible?: boolean }) {
+  const [open, setOpen] = useState(true);
+  const allowance = game.allowance_pct ?? 100;
+  const meta = game.holes_meta || [];
+  const total = meta.length;
+  const byKey = (k: string) => players.find((p) => pkey(p) === k) || null;
+  const first = (uid: string) => (byKey(uid)?.display_name || "—");
+  const teams = Array.isArray(game.teams) ? game.teams : null;
+  const pairings = Array.isArray(game.pairings) ? game.pairings : [];
+  const foursomes = Array.isArray(game.foursomes) ? game.foursomes : [];
+  const isTrifecta = game.game_type === "trifecta";
+  const teamColOf = (key: string | null | undefined) => {
+    if (!teams || !key) return C.gold;
+    const ti = teams.findIndex((t) => t.key === key);
+    return ti >= 0 ? teamAccent(teams[ti].name, ti) : C.gold;
+  };
+
+  const strokeText = (n: number): string => {
+    if (n <= 0) return "scratch";
+    const alloc = allocateStrokes(meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })), n);
+    const ones = meta.filter((m) => (alloc[m.n] || 0) >= 1).map((m) => m.n);
+    const twos = meta.filter((m) => (alloc[m.n] || 0) >= 2).map((m) => m.n);
+    if (ones.length >= total && twos.length) return `a stroke on every hole, + 2nd on ${twos.join(", ")}`;
+    if (ones.length >= total) return "a stroke on every hole";
+    if (ones.length === 1) return `stroke on ${ones[0]}`;
+    return `strokes on ${ones.join(", ")}`;
+  };
+
+  const needsStructure = ["match", "fourball", "trifecta"].includes(game.game_type) || (game.game_type === "skins" && !!teams);
+  const hasStructure = pairings.length > 0 || foursomes.length > 0;
+  if (!needsStructure && !hasStructure) return null;
+
+  const oneVone = (aId: string, bId: string, key: string) => {
+    const a = byKey(aId), b = byKey(bId);
+    if (!a || !b) return null;
+    const allow = matchAllowance(a.course_handicap, b.course_handicap, allowance);
+    return (
+      <div key={key} style={{ borderTop: "1px solid rgba(255,255,255,0.10)", padding: "10px 0" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ flex: 1, color: C.cream, fontSize: 15, fontWeight: 600 }}>{a.display_name} <span style={{ color: C.sage, fontSize: 12, fontWeight: 400 }}>ch {a.course_handicap ?? "—"}</span></span>
+          <span style={{ color: C.faint, fontSize: 12 }}>vs</span>
+          <span style={{ flex: 1, textAlign: "right", color: C.cream, fontSize: 15, fontWeight: 600 }}><span style={{ color: C.sage, fontSize: 12, fontWeight: 400 }}>ch {b.course_handicap ?? "—"}</span> {b.display_name}</span>
+        </div>
+        <div style={{ color: "#CFE3D8", fontSize: 12, marginTop: 6 }}>
+          {allow.a === 0 && allow.b === 0
+            ? "Even match — no strokes."
+            : allow.a === 0
+              ? <><span style={{ color: C.sage }}>{a.display_name} plays off scratch.</span> {b.display_name} — <span style={{ color: "#E4CF86", fontWeight: 600 }}>{strokeText(allow.b)}</span></>
+              : <><span style={{ color: C.sage }}>{b.display_name} plays off scratch.</span> {a.display_name} — <span style={{ color: "#E4CF86", fontWeight: 600 }}>{strokeText(allow.a)}</span></>}
+        </div>
+      </div>
+    );
+  };
+
+  const teamStrip = (f: { a: string[]; b: string[] }, key: string) => {
+    const members = [...f.a, ...f.b].map(byKey).filter((p): p is Player => !!p);
+    if (members.length < 2) return null;
+    const low = Math.min(...members.map((m) => applyAllowance(m.course_handicap, allowance)));
+    const col = (side: string[], teamKey: string | null) => (
+      <div style={{ flex: 1, borderTop: `2px solid ${teamColOf(teamKey)}`, paddingTop: 8 }}>
+        {teams && teamKey && <div style={{ color: teamColOf(teamKey), fontSize: 11, fontWeight: 600, marginBottom: 6 }}>{teams.find((t) => t.key === teamKey)?.name?.toUpperCase()}</div>}
+        {side.map(byKey).filter((p): p is Player => !!p).map((p) => {
+          const recv = applyAllowance(p.course_handicap, allowance) - low;
+          return (
+            <div key={p.id} style={{ padding: "4px 0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", color: C.cream, fontSize: 14 }}><span>{p.display_name}</span><span style={{ color: C.sage }}>ch {p.course_handicap ?? "—"}</span></div>
+              <div style={{ color: recv > 0 ? "#E4CF86" : C.sage, fontSize: 11, marginTop: 1 }}>{strokeText(recv)}</div>
+            </div>
+          );
+        })}
+      </div>
+    );
+    return (
+      <div key={key} style={{ display: "flex", gap: 12, marginTop: 8 }}>
+        {col(f.a, byKey(f.a[0])?.team ?? null)}
+        {col(f.b, byKey(f.b[0])?.team ?? null)}
+      </div>
+    );
+  };
+
+  const body = (
+    <>
+      {!hasStructure && (
+        <div style={{ color: C.sage, fontSize: 12, padding: "8px 0" }}>Set the matchups to see strokes.</div>
+      )}
+      {pairings.length > 0 && pairings.map((pr, i) => oneVone(pr.a, pr.b, `p${i}`))}
+      {foursomes.length > 0 && foursomes.map((f, i) => {
+        const singles = isTrifecta ? trifectaSingles(f.a, f.b, !!f.swap) : [];
+        return (
+          <div key={f.id || i} style={{ borderTop: "1px solid rgba(255,255,255,0.10)", paddingTop: 10, marginTop: 6 }}>
+            <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 600 }}>{(f.name || `Foursome ${i + 1}`).toUpperCase()}</div>
+            {isTrifecta && singles.length > 0 && (
+              <>
+                <div style={{ color: C.sage, fontSize: 10, letterSpacing: 1, marginTop: 6 }}>TWO SINGLES</div>
+                {singles.map(([aId, bId], si) => oneVone(aId, bId, `${f.id}-s${si}`))}
+                <div style={{ color: C.sage, fontSize: 10, letterSpacing: 1, marginTop: 10 }}>TEAM POINT · {game.team_score_mode === "aggregate" ? "SHOOTOUT" : "BEST BALL"}</div>
+              </>
+            )}
+            {teamStrip(f, `${f.id}-t`)}
+          </div>
+        );
+      })}
+    </>
+  );
+
+  return (
+    <div style={{ background: "#16302A", border: `1px solid ${C.greenMid}`, borderRadius: 12, padding: 14, marginTop: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, cursor: collapsible ? "pointer" : "default" }} onClick={collapsible ? () => setOpen((o) => !o) : undefined}>
+        <span style={{ color: C.gold, fontSize: 11, letterSpacing: 1.5, fontWeight: 700, flex: 1 }}>STROKES{allowance !== 100 ? ` · ${allowance}% ALLOWANCE` : ""}</span>
+        {collapsible && <span style={{ color: C.sage, fontSize: 14 }}>{open ? "▴" : "▾"}</span>}
+      </div>
+      {(open || !collapsible) && body}
+    </div>
+  );
+}
+
 // ---------------- Groups builder (who tees off together) ----------------
 // Builds tee groups out of the matchups (matches/foursomes) or, for individual
 // formats like Stableford, straight out of players. Assigning a unit to a group
