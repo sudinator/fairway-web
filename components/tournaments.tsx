@@ -33,7 +33,6 @@ import {
   type BetPlayer,
   type BetSplit,
   markerOwnsMyRow,
-  mergeScoreArrays,
 } from "@/lib/golf";
 import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
@@ -1136,10 +1135,15 @@ function GameRoom({
       const backup = loadGameScores(gameId, mine.id);
       if (backup) {
         const n = (safeGame as any)?.holes_meta?.length || 18;
+        const mergeArr = (dbArr: any[], locArr: any[]) =>
+          Array.from({ length: n }, (_, i) => {
+            const d = dbArr?.[i] ?? null;
+            return d != null ? d : (locArr?.[i] ?? null);
+          });
         const merged = {
-          scores: mergeScoreArrays(mine.scores || [], backup.scores || [], n),
-          putts: mergeScoreArrays(mine.putts || [], backup.putts || [], n),
-          fairways: mergeScoreArrays(mine.fairways || [], backup.fairways || [], n),
+          scores: mergeArr(mine.scores || [], backup.scores || []),
+          putts: mergeArr(mine.putts || [], backup.putts || []),
+          fairways: mergeArr(mine.fairways || [], backup.fairways || []),
         };
         const dbCount = (mine.scores || []).filter((s: any) => s != null).length;
         const mergedCount = merged.scores.filter((s: any) => s != null).length;
@@ -1782,13 +1786,15 @@ function GameRoom({
       clock_start: null,
       clock_end: null,
       group_locked: false,
+      no_show: false,
     };
     // Optimistically clear local state so meRef goes blank immediately (so even a
     // stray flush would only ever write blanks) and the UI updates without a wait.
     setPlayers((ps) => ps.map((p) => ({ ...p, ...blank })));
     setMe((m) => (m ? { ...m, ...blank } : m));
     // Clear this device's local score backup for my own row, so load()'s reconcile
-    // has nothing stale to merge back in.
+    // has nothing to merge back in for me. (Only this device's backup — other
+    // devices keep theirs, which protects any real scores they hold.)
     if (me?.id) clearGameScores(game.id, me.id);
     try {
       await Promise.all(players.map((p) => supabase.from("game_players").update(blank).eq("id", p.id)));

@@ -944,18 +944,3 @@ export function markerOwnsMyRow(opts: {
   return false;
 }
 
-// Reconcile a DB array against this device's local backup: keep the DB value
-// where present, else fall back to the backup. Recovers holes a frozen network
-// write may have dropped — without resurrecting an intentional clear, because
-// the backup is kept in lockstep with reality on every write (a cleared hole is
-// null in both, so it stays null).
-export function mergeScoreArrays<T>(
-  dbArr: (T | null)[] | null | undefined,
-  locArr: (T | null)[] | null | undefined,
-  n: number,
-): (T | null)[] {
-  return Array.from({ length: n }, (_, i) => {
-    const d = dbArr?.[i] ?? null;
-    return d != null ? d : (locArr?.[i] ?? null);
-  });
-}
