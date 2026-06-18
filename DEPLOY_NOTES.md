@@ -1,25 +1,19 @@
-# Birdie Num Num — v1.15.1
+# Birdie Num Num — v1.15.2
 
-Legibility fix. NO migration, app-only.
+Strokes panel now shows the playing handicap (after allowance). NO migration.
 
-## Fixed
-- The per-foursome scoring summary (Trifecta) had its contest rows drawn with
-  near-white text on the white card — invisible. The rows now use dark text
-  (C.ink) and a light divider (C.line), matching the four-ball and skins cards.
-  This is the same white-box-with-light-text problem that previously hit the
-  GHIN field.
-
-## Consistency check (this release)
-Audited every white (C.card) box in the games UI to confirm dark text:
-- Trifecta per-foursome card: FIXED.
-- Four-ball skins card, skins head-to-head card, four-ball setup card,
-  team scoreboard total cards, and all inputs (GHIN etc. via inputStyle):
-  already correct (C.ink on white). No other offenders found.
-- The v1.15.0 strokes panel renders on a dark surface (#16302A) with light
-  text — already legible.
-
-Rule going forward: a white (C.card) box uses C.ink text and C.line dividers;
-dark surfaces use C.cream/C.sage text.
+## Changed
+- The strokes summary showed each player's raw course handicap ("ch 8") while the
+  strokes were computed off the allowance-adjusted number — so a player could see
+  "ch 5" but get strokes on only 4 holes. Confusing. The panel now shows the
+  PLAYING handicap after the allowance ("ph 7" = 85% of 8), so the number on
+  screen is the basis the strokes actually come from.
+  - 1-v-1 rows: both players' playing handicaps; the difference is the strokes given.
+  - Team strip: each player's playing handicap; strokes are that minus the
+    foursome low (lowest plays off scratch).
+  - Added a one-line note: "ph — playing handicap, after the N% allowance."
+- No change to scoring or the scorecard. (The group scorecard header still shows
+  the course handicap; can align it to playing handicap too if wanted.)
 
 ## Verified locally
 - tsc --noEmit: clean
@@ -27,5 +21,7 @@ dark surfaces use C.cream/C.sage text.
 - Unit tests: 113/113 pass
 
 ## Smoke-test
-- Open a Trifecta game's results and confirm each foursome's contest rows
-  (the two singles + team line) are now readable on the white card.
+- In an 85% game, confirm the strokes panel shows the reduced (playing) handicap
+  and that the stroke count = the difference between the two playing handicaps
+  (1-v-1) or playing handicap minus foursome low (team).
+- In a 100% game, confirm "ph" equals the course handicap.

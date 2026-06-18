@@ -3482,6 +3482,9 @@ function StrokesSummary({ game, players, collapsible = false }: { game: Game; pl
     return ti >= 0 ? teamAccent(teams[ti].name, ti) : C.gold;
   };
 
+  const ph = (ch: number | null | undefined) => applyAllowance(ch, allowance);
+  const phStr = (ch: number | null | undefined) => (ch == null ? "—" : String(ph(ch)));
+
   const strokeText = (n: number): string => {
     if (n <= 0) return "scratch";
     const alloc = allocateStrokes(meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })), n);
@@ -3504,9 +3507,9 @@ function StrokesSummary({ game, players, collapsible = false }: { game: Game; pl
     return (
       <div key={key} style={{ borderTop: "1px solid rgba(255,255,255,0.10)", padding: "10px 0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ flex: 1, color: C.cream, fontSize: 15, fontWeight: 600 }}>{a.display_name} <span style={{ color: C.sage, fontSize: 12, fontWeight: 400 }}>ch {a.course_handicap ?? "—"}</span></span>
+          <span style={{ flex: 1, color: C.cream, fontSize: 15, fontWeight: 600 }}>{a.display_name} <span style={{ color: C.sage, fontSize: 12, fontWeight: 400 }}>ph {phStr(a.course_handicap)}</span></span>
           <span style={{ color: C.faint, fontSize: 12 }}>vs</span>
-          <span style={{ flex: 1, textAlign: "right", color: C.cream, fontSize: 15, fontWeight: 600 }}><span style={{ color: C.sage, fontSize: 12, fontWeight: 400 }}>ch {b.course_handicap ?? "—"}</span> {b.display_name}</span>
+          <span style={{ flex: 1, textAlign: "right", color: C.cream, fontSize: 15, fontWeight: 600 }}><span style={{ color: C.sage, fontSize: 12, fontWeight: 400 }}>ph {phStr(b.course_handicap)}</span> {b.display_name}</span>
         </div>
         <div style={{ color: "#CFE3D8", fontSize: 12, marginTop: 6 }}>
           {allow.a === 0 && allow.b === 0
@@ -3530,7 +3533,7 @@ function StrokesSummary({ game, players, collapsible = false }: { game: Game; pl
           const recv = applyAllowance(p.course_handicap, allowance) - low;
           return (
             <div key={p.id} style={{ padding: "4px 0" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", color: C.cream, fontSize: 14 }}><span>{p.display_name}</span><span style={{ color: C.sage }}>ch {p.course_handicap ?? "—"}</span></div>
+              <div style={{ display: "flex", justifyContent: "space-between", color: C.cream, fontSize: 14 }}><span>{p.display_name}</span><span style={{ color: C.sage }}>ph {phStr(p.course_handicap)}</span></div>
               <div style={{ color: recv > 0 ? "#E4CF86" : C.sage, fontSize: 11, marginTop: 1 }}>{strokeText(recv)}</div>
             </div>
           );
@@ -3567,6 +3570,9 @@ function StrokesSummary({ game, players, collapsible = false }: { game: Game; pl
           </div>
         );
       })}
+      {hasStructure && (
+        <div style={{ color: C.faint, fontSize: 11, marginTop: 10 }}>ph — playing handicap{allowance !== 100 ? `, after the ${allowance}% allowance` : ""}.</div>
+      )}
     </>
   );
 
