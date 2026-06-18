@@ -1,28 +1,56 @@
-# Birdie Num Num — v1.19.1
+# Birdie Num Num — v1.20.0
 
-Patch over v1.19.0. NO migration, app-only.
+Integrity / workflow hardening from the code review. NO migration, app-only.
+(Uses existing tables/columns. One new operation — deleting a round's holes on
+re-post — relies on the player owning their own round under RLS; if a reopened
+round fails to refresh its hole detail, check the holes delete policy.)
 
-## Fix: reset now clears the ORGANIZER's scores too
-In v1.19.0, "Reset scores" cleared everyone except the organizer's own row.
-Cause: load() reconciles your own row against a per-device local score backup
-(a safety net for scores lost to a screen lock). After a reset, the DB row was
-blank but the local backup still held your old scores, so load() merged them
-back in — and even re-wrote them to the DB. (Other players have no local backup
-on your device, so they cleared correctly.)
-Fix: reset now also clears your local score backup for this game before
-reloading, so there's nothing stale to restore.
+## 1. Concurrency / stale-write hardening
+- Background flush (screen lock / app switch) now bails when someone ELSE is the
+  marker for your group. The marker owns your row in that case, so a stale
+  background write from your device can no longer overwrite their latest entry.
+- The local score backup now stays in sync when the marker edits their OWN row
+  (blanks included), so load()'s recovery merge can't resurrect a score the
+  marker just cleared. Closes the same class of bug behind the earlier reset
+  issue, at its other trigger (the marker's clear-hole button).
 
-## Everything else unchanged from v1.19.0
-- Reset scores: organizer button in Game setup; clears scores/putts/fairways/
-  penalties/sand + round clock, reopens if ended, keeps players/teams/matchups.
-- Pace reminder on the round clock: target = 6 + 2 x players min/hole
-  (2-ball 10, 3-ball 12, 4-ball 14), per group; amber nudge when >10 min behind.
+## 2. Reopen now updates the posted round
+Ending a game posts each player's scorecard to their Rounds. If a game is
+reopened, edited, and re-ended, the posted round is now UPDATED in place (gross +
+full hole detail replaced) instead of left frozen — so corrections flow through
+to differentials, par averages, and the dashboard.
+
+## 3. Join uses the organizer's course params
+A player joining by code now copies rating / slope / tee from the ORGANIZER's
+row (always populated, since they set up the game), instead of an arbitrary
+existing player. Falls back to any player with a rating if the organizer row is
+missing. Removes the case where a joiner got nulls and silently received no
+strokes.
+
+## 4. Clearer "who's keeping score" for newcomers
+When a marker is active, a read-only player now sees a short note where their own
+scorecard would be — "[Name] is keeping score… scroll up to the group card to
+follow along live; you can take over from there" — so a first-timer isn't left
+hunting for a card that's intentionally hidden. (The existing claim explainer and
+live banners are unchanged.)
 
 ## Verified locally
 - tsc --noEmit: clean
 - next build: passes
 - Unit tests: 118/118 pass
 
-## Smoke-test
-- Enter dummy scores as the organizer AND another player, hit Reset scores,
-  confirm BOTH rows zero out (not just the others) and stay zero after a refresh.
+## Smoke-test (needs two devices for the marker items)
+- Marker scoring: with a marker active on one phone, background the read-only
+  phone mid-round; confirm the marker's entries are NOT overwritten.
+- Marker clears one of their OWN holes, then pulls to refresh; confirm it stays
+  cleared (doesn't bounce back).
+- Reopen: end a game, reopen it, change a score, re-end; confirm that player's
+  Rounds entry and dashboard reflect the change.
+- Join: create a game, have a second account join by code; confirm they get the
+  organizer's tee rating/slope and receive strokes.
+
+## Note (build refresh)
+The stale-write guard and the recovery merge were extracted into pure, unit-
+tested helpers (markerOwnsMyRow, mergeScoreArrays in lib/golf.ts). The guard now
+ALSO covers the whole-game marker (not just per-tee-group markers). 12 new tests
+reproduce the clobber and prove the guard prevents it; 130 tests pass total.

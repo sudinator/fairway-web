@@ -32,6 +32,8 @@ import {
   TGC_GROUP_ID,
   type BetPlayer,
   type BetSplit,
+  markerOwnsMyRow,
+  mergeScoreArrays,
 } from "@/lib/golf";
 import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
@@ -260,14 +262,25 @@ function GameList({
         .eq("game_id", game.id)
         .eq("user_id", uid);
       if (!existing || !existing.length) {
-        // Borrow course rating/slope/tee from an existing player so handicaps can compute.
-        const { data: others } = await supabase
+        // Borrow course rating/slope/tee from the ORGANIZER's row — they set the
+        // course and tee when creating the game, so their row always has these.
+        // Fall back to any player with a rating if the organizer row is missing.
+        const { data: orgRow } = await supabase
           .from("game_players")
           .select("rating,slope,tee_name")
           .eq("game_id", game.id)
-          .not("rating", "is", null)
+          .eq("user_id", game.created_by)
           .limit(1);
-        const ref = others && others[0] ? others[0] : {};
+        let ref: any = orgRow && orgRow[0] ? orgRow[0] : null;
+        if (!ref || ref.rating == null) {
+          const { data: others } = await supabase
+            .from("game_players")
+            .select("rating,slope,tee_name")
+            .eq("game_id", game.id)
+            .not("rating", "is", null)
+            .limit(1);
+          ref = others && others[0] ? others[0] : (ref || {});
+        }
         const n = game.holes_meta.length;
         const { error: e2 } = await supabase.from("game_players").insert({
           game_id: game.id,
@@ -1123,15 +1136,10 @@ function GameRoom({
       const backup = loadGameScores(gameId, mine.id);
       if (backup) {
         const n = (safeGame as any)?.holes_meta?.length || 18;
-        const mergeArr = (dbArr: any[], locArr: any[]) =>
-          Array.from({ length: n }, (_, i) => {
-            const d = dbArr?.[i] ?? null;
-            return d != null ? d : (locArr?.[i] ?? null);
-          });
         const merged = {
-          scores: mergeArr(mine.scores || [], backup.scores || []),
-          putts: mergeArr(mine.putts || [], backup.putts || []),
-          fairways: mergeArr(mine.fairways || [], backup.fairways || []),
+          scores: mergeScoreArrays(mine.scores || [], backup.scores || [], n),
+          putts: mergeScoreArrays(mine.putts || [], backup.putts || [], n),
+          fairways: mergeScoreArrays(mine.fairways || [], backup.fairways || [], n),
         };
         const dbCount = (mine.scores || []).filter((s: any) => s != null).length;
         const mergedCount = merged.scores.filter((s: any) => s != null).length;
@@ -1213,8 +1221,21 @@ function GameRoom({
   meRef.current = me;
   const gameIdRef = React.useRef(gameId);
   gameIdRef.current = gameId;
+  // True when someone ELSE is the marker for my group — then the marker owns my
+  // row and this device must never write it (a stale background flush would
+  // otherwise clobber the marker's latest entry).
+  const markerOwnsMyRowRef = React.useRef(false);
+  markerOwnsMyRowRef.current = markerOwnsMyRow({
+    teeGroupsInUse,
+    myUserId: user.id,
+    myTeeGroup: myRow?.tee_group ?? null,
+    myIsMarker: myRow?.is_marker ?? false,
+    gameMarkerUserId: game?.marker_user_id ?? null,
+    players,
+  });
   useEffect(() => {
     const flush = () => {
+      if (markerOwnsMyRowRef.current) return; // marker owns my row; don't write it
       const m = meRef.current;
       if (!m) return;
       const data = { scores: m.scores || [], putts: m.putts || [], fairways: m.fairways || [] };
@@ -1349,6 +1370,9 @@ function GameRoom({
     const updated = { ...target, scores, putts, fairways, penalties, sand, ...clockPatch };
     setPlayers((ps) => ps.map((p) => (p.id === playerId ? updated : p)));
     if (target.id === me?.id) setMe(updated);
+    // If the marker is editing their OWN row, keep the local score backup in sync
+    // (blanks included) so load()'s merge can't resurrect a value they just cleared.
+    if (game && target.id === me?.id) saveGameScores(game.id, target.id, { scores, putts, fairways });
     lastEditRef.current = Date.now();
     await supabase.from("game_players").update({ scores, putts, fairways, penalties, sand, ...clockPatch }).eq("id", playerId);
     lastEditRef.current = Date.now();
@@ -1669,13 +1693,8 @@ function GameRoom({
       const entered = scores.filter((s) => s != null && s > 0).length;
       if (entered === 0) return; // didn't play / nothing entered
 
-      // Duplicate guard: already have a round for this game?
-      const { data: existing } = await supabase
-        .from("rounds").select("id").eq("game_id", game.id).eq("user_id", me.user_id).limit(1);
-      if (existing && existing.length) return;
-
       const gross = scores.reduce((s: number, v) => s + (v && v > 0 ? v : 0), 0);
-      const { data: roundRow, error: rErr } = await supabase.from("rounds").insert({
+      const roundFields = {
         user_id: me.user_id,
         course: game.course,
         tee_name: me.tee_name ?? null,
@@ -1686,14 +1705,32 @@ function GameRoom({
         course_handicap: me.course_handicap ?? null,
         group_id: (game as any).group_id || null,
         played_at: (game as any).created_at || new Date().toISOString(),
-        status: "final",
+        status: "final" as const,
         gross_score: gross,
         game_id: game.id,
-      }).select("id").single();
-      if (rErr || !roundRow) return;
+      };
+
+      // If a round was already posted for this game (e.g. the game was ended,
+      // reopened, edited, and re-ended), UPDATE it in place so the corrected
+      // scores flow through to the player's history, differentials, and dashboard
+      // stats — rather than leaving a stale frozen round.
+      const { data: existing } = await supabase
+        .from("rounds").select("id").eq("game_id", game.id).eq("user_id", me.user_id).limit(1);
+
+      let roundId: string | null = existing && existing.length ? existing[0].id : null;
+      if (roundId) {
+        const { error: uErr } = await supabase.from("rounds").update(roundFields).eq("id", roundId);
+        if (uErr) return;
+        // Replace the hole detail so edits, additions, and removals all take.
+        await supabase.from("holes").delete().eq("round_id", roundId);
+      } else {
+        const { data: roundRow, error: rErr } = await supabase.from("rounds").insert(roundFields).select("id").single();
+        if (rErr || !roundRow) return;
+        roundId = roundRow.id;
+      }
 
       const holeRows = (game.holes_meta || []).map((m, i) => ({
-        round_id: roundRow.id,
+        round_id: roundId,
         hole_number: m.n,
         par: m.par,
         stroke_index: m.si,
@@ -2306,6 +2343,23 @@ function GameRoom({
           )}
         </>
       ) : null}
+
+      {/* Read-only players: explain where their entry card went so a newcomer
+          isn't left hunting for it. Shown only when a marker is actively scoring. */}
+      {roomTab === "play" && me && !isEnded && (game.marker_user_id || myGroupHasMarker) && (() => {
+        const mk = (teeGroupsInUse && myRow?.tee_group != null)
+          ? players.find((p) => p.tee_group === myRow.tee_group && p.is_marker)
+          : players.find((p) => p.user_id === game.marker_user_id);
+        const mkName = mk?.display_name || "Someone";
+        return (
+          <div style={{ marginTop: 22, background: "#16302A", border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px" }}>
+            <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>📋 {mkName} is keeping score for your group</div>
+            <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>
+              Your own scorecard is hidden so two phones aren't entering at once — scroll up to the group card to follow along live. You can take over scoring from there if you'd like.
+            </div>
+          </div>
+        );
+      })()}
 
       {/* My score entry — hidden while a marker is keeping score for the group
           (scoring then happens only on the Group card, to avoid conflicts). */}

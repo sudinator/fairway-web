@@ -916,3 +916,46 @@ export function computeBetting(
   }));
   return { pot: basePot, perPlayer, lines, cleanSweep: false };
 }
+
+// ---------------- Multi-device scoring sync helpers ----------------
+// These guard the marker model against stale-write data loss. Pure functions so
+// they can be unit-tested without a live database.
+
+// True when a marker OTHER than this player is responsible for scoring this
+// player's row — so this device must NOT write its own row (the marker owns it,
+// and a stale background flush would clobber the marker's latest entry). Covers
+// both the per-tee-group marker (is_marker on a group peer) and the whole-game
+// marker (marker_user_id).
+export function markerOwnsMyRow(opts: {
+  teeGroupsInUse: boolean;
+  myUserId: string | null | undefined;
+  myTeeGroup: number | null | undefined;
+  myIsMarker: boolean | null | undefined;
+  gameMarkerUserId: string | null | undefined;
+  players: { tee_group?: number | null; is_marker?: boolean | null }[];
+}): boolean {
+  const { teeGroupsInUse, myUserId, myTeeGroup, myIsMarker, gameMarkerUserId, players } = opts;
+  if (myIsMarker) return false;                       // I'm the marker — I own rows
+  if (gameMarkerUserId && gameMarkerUserId === myUserId) return false; // I'm the whole-game marker
+  if (teeGroupsInUse && myTeeGroup != null) {
+    if (players.some((p) => p.tee_group === myTeeGroup && p.is_marker)) return true;
+  }
+  if (gameMarkerUserId && gameMarkerUserId !== myUserId) return true; // someone else marks the whole game
+  return false;
+}
+
+// Reconcile a DB array against this device's local backup: keep the DB value
+// where present, else fall back to the backup. Recovers holes a frozen network
+// write may have dropped — without resurrecting an intentional clear, because
+// the backup is kept in lockstep with reality on every write (a cleared hole is
+// null in both, so it stays null).
+export function mergeScoreArrays<T>(
+  dbArr: (T | null)[] | null | undefined,
+  locArr: (T | null)[] | null | undefined,
+  n: number,
+): (T | null)[] {
+  return Array.from({ length: n }, (_, i) => {
+    const d = dbArr?.[i] ?? null;
+    return d != null ? d : (locArr?.[i] ?? null);
+  });
+}
