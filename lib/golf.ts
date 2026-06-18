@@ -502,6 +502,12 @@ export function fourballStatus(
 
 export type TrifectaMode = "best_ball" | "aggregate";
 
+// Per-hole detail for a contest, so the UI can show "how we got there".
+// aNet/bNet are the contest-relevant nets (single: the two players; team
+// best-ball: each side's counting low net; team aggregate: each side's summed
+// net). r = +1 A won, -1 B won, 0 halve, null pending. aRun/bRun = running points.
+export type ContestHole = { hole: number; aNet: number | null; bNet: number | null; r: number | null; aRun: number; bRun: number };
+
 export type TrifectaContest = {
   kind: "single" | "team";
   aIds: string[];
@@ -510,6 +516,7 @@ export type TrifectaContest = {
   aPts: number;
   bPts: number;
   thru: number;
+  perHole: ContestHole[];
 };
 export type TrifectaResult = {
   contests: TrifectaContest[];
@@ -560,33 +567,68 @@ export function computeTrifecta(
 
   const contests: TrifectaContest[] = [];
 
-  for (const [aId, bId] of singles) {
-    const perHole = holes.map((_, i) => {
-      const a = nets[aId]?.[i], b = nets[bId]?.[i];
-      if (a == null || b == null) return null;
-      return a < b ? 1 : b < a ? -1 : 0;
+  // Build a contest from per-hole (aNet, bNet) pairs, carrying running points.
+  const buildContest = (kind: "single" | "team", aIdsC: string[], bIdsC: string[], pairs: { aNet: number | null; bNet: number | null }[]): TrifectaContest => {
+    let aRun = 0, bRun = 0;
+    const perHole: ContestHole[] = holes.map((h, i) => {
+      const { aNet, bNet } = pairs[i];
+      let r: number | null = null;
+      if (aNet != null && bNet != null) {
+        r = aNet < bNet ? 1 : bNet < aNet ? -1 : 0;
+        if (r > 0) aRun += 1; else if (r < 0) bRun += 1; else { aRun += 0.5; bRun += 0.5; }
+      }
+      return { hole: h.n, aNet, bNet, r, aRun, bRun };
     });
-    contests.push({ kind: "single", aIds: [aId], bIds: [bId], ...tally(perHole) });
+    const results = perHole.map((d) => d.r);
+    return { kind, aIds: aIdsC, bIds: bIdsC, ...tally(results), perHole };
+  };
+
+  for (const [aId, bId] of singles) {
+    const pairs = holes.map((_, i) => ({ aNet: nets[aId]?.[i] ?? null, bNet: nets[bId]?.[i] ?? null }));
+    contests.push(buildContest("single", [aId], [bId], pairs));
   }
 
-  const teamPerHole = holes.map((_, i) => {
+  const teamPairs = holes.map((_, i) => {
     const aN = aIds.map((id) => nets[id]?.[i]).filter((n): n is number => n != null);
     const bN = bIds.map((id) => nets[id]?.[i]).filter((n): n is number => n != null);
     if (teamMode === "aggregate") {
-      if (aN.length < aIds.length || bN.length < bIds.length) return null; // need both nets
-      const a = aN.reduce((s, x) => s + x, 0), b = bN.reduce((s, x) => s + x, 0);
-      return a < b ? 1 : b < a ? -1 : 0;
+      if (aN.length < aIds.length || bN.length < bIds.length) return { aNet: null, bNet: null }; // need both nets
+      return { aNet: aN.reduce((s, x) => s + x, 0), bNet: bN.reduce((s, x) => s + x, 0) };
     }
-    if (!aN.length || !bN.length) return null;
-    const a = Math.min(...aN), b = Math.min(...bN);
-    return a < b ? 1 : b < a ? -1 : 0;
+    if (!aN.length || !bN.length) return { aNet: null, bNet: null };
+    return { aNet: Math.min(...aN), bNet: Math.min(...bN) };
   });
-  contests.push({ kind: "team", aIds, bIds, ...tally(teamPerHole) });
+  contests.push(buildContest("team", aIds, bIds, teamPairs));
 
   const aPts = contests.reduce((s, c) => s + c.aPts, 0);
   const bPts = contests.reduce((s, c) => s + c.bPts, 0);
   const thru = contests.reduce((m, c) => Math.max(m, c.thru), 0);
   return { contests, aPts, bPts, thru };
+}
+
+// Per-hole detail for a plain four-ball best-ball match (each side's low net),
+// so the four-ball foursome line can expand the same way the Trifecta lines do.
+// aRun/bRun here are holes won (running), to match the match-play framing.
+export function fourballHoleDetail(
+  holes: MatchHoleMeta[],
+  members: FourballMember[],
+  aIds: string[],
+  bIds: string[],
+  allowancePct: number = 100,
+): ContestHole[] {
+  const nets = fourballNets(holes, members, allowancePct);
+  let aRun = 0, bRun = 0;
+  return holes.map((h, i) => {
+    const aN = aIds.map((id) => nets[id]?.[i]).filter((n): n is number => n != null);
+    const bN = bIds.map((id) => nets[id]?.[i]).filter((n): n is number => n != null);
+    let aNet: number | null = null, bNet: number | null = null, r: number | null = null;
+    if (aN.length && bN.length) {
+      aNet = Math.min(...aN); bNet = Math.min(...bN);
+      r = aNet < bNet ? 1 : bNet < aNet ? -1 : 0;
+      if (r > 0) aRun += 1; else if (r < 0) bRun += 1; else { aRun += 0.5; bRun += 0.5; }
+    }
+    return { hole: h.n, aNet, bNet, r, aRun, bRun };
+  });
 }
 
 // ---------------- Skins (net, with carryovers) ----------------

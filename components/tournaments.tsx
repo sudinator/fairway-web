@@ -18,6 +18,8 @@ import {
   applyAllowance,
   fourballStatus,
   fourballProgress,
+  fourballHoleDetail,
+  type ContestHole,
   computeTrifecta,
   trifectaSingles,
   type FourballMember,
@@ -3205,6 +3207,39 @@ function FourballView({
   const firstName = (uid: string) => (playerOf(uid)?.display_name || "—").split(" ")[0];
   const teamName = (key: string | null | undefined) => teams?.find((t) => t.key === key)?.name || "—";
 
+  // Which contest line is expanded (one at a time): key is `${foursomeId}-${ci}`.
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  // Hole-by-hole detail panel for an expanded contest line.
+  const HoleDetail = ({ rows, aLabel, bLabel, aColor, bColor }: { rows: ContestHole[]; aLabel: string; bLabel: string; aColor: string; bColor: string }) => {
+    const played = rows.filter((d) => d.r != null);
+    if (!played.length) return <div style={{ background: "#F1EFE6", borderRadius: 8, padding: "8px 10px", margin: "2px 0 6px", color: C.faint, fontSize: 11 }}>No holes scored yet.</div>;
+    return (
+      <div style={{ background: "#F1EFE6", borderRadius: 8, padding: "6px 10px", margin: "2px 0 6px" }}>
+        <div style={{ display: "flex", color: C.faint, fontSize: 10, fontWeight: 800, letterSpacing: 0.5, padding: "3px 0" }}>
+          <span style={{ width: 34 }}>HOLE</span><span style={{ flex: 1 }}>NET</span><span style={{ width: 60, textAlign: "center" }}>WON</span><span style={{ width: 52, textAlign: "right" }}>SCORE</span>
+        </div>
+        {played.map((d) => {
+          const aWon = d.r === 1, bWon = d.r === -1;
+          const wonLabel = aWon ? aLabel : bWon ? bLabel : "halve";
+          const wonColor = aWon ? aColor : bWon ? bColor : C.faint;
+          return (
+            <div key={d.hole} style={{ display: "flex", alignItems: "center", color: C.ink, fontSize: 12, padding: "4px 0", borderTop: "1px solid #E4DFCE" }}>
+              <span style={{ width: 34, color: C.faint }}>{d.hole}</span>
+              <span style={{ flex: 1 }}>
+                <span style={{ color: aWon ? "#1A7A3C" : C.ink, fontWeight: aWon ? 700 : 400 }}>{d.aNet}</span>
+                <span style={{ color: C.faint }}> · </span>
+                <span style={{ color: bWon ? "#1A7A3C" : C.ink, fontWeight: bWon ? 700 : 400 }}>{d.bNet}</span>
+              </span>
+              <span style={{ width: 60, textAlign: "center", color: wonColor, fontWeight: aWon || bWon ? 700 : 400, fontSize: 11 }}>{wonLabel}</span>
+              <span style={{ width: 52, textAlign: "right", color: C.faint }}>{fmtPts(d.aRun)}–{fmtPts(d.bRun)}</span>
+            </div>
+          );
+        })}
+        <div style={{ color: C.faint, fontSize: 10, paddingTop: 5 }}>Net scores. Bold = the lower net that won the hole.</div>
+      </div>
+    );
+  };
+
   const saveFoursomes = async (next: typeof foursomes) => {
     await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
     // Each foursome is also its tee group (1-based), so group scoring/markers line up
@@ -3428,12 +3463,22 @@ function FourballView({
                   const aNames = c.aIds.map(firstName).join(" & ");
                   const bNames = c.bIds.map(firstName).join(" & ");
                   const label = c.kind === "team" ? `Team · ${aNames} v ${bNames}` : `${aNames} v ${bNames}`;
+                  const key = `${f.id}-${ci}`;
+                  const isOpen = openKey === key;
+                  const aColor = isTeam ? teamAccent(teams![0].name, 0) : C.birdie;
+                  const bColor = isTeam ? teamAccent(teams![1].name, 1) : C.bogey;
+                  const aLabel = c.kind === "team" ? (isTeam ? teamName(playerOf(c.aIds[0])?.team) : "Pair 1") : firstName(c.aIds[0]);
+                  const bLabel = c.kind === "team" ? (isTeam ? teamName(playerOf(c.bIds[0])?.team) : "Pair 2") : firstName(c.bIds[0]);
                   return (
-                    <div key={ci} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderTop: `1px solid ${C.line}` }}>
-                      <span style={{ flex: 1, color: C.ink, fontSize: 13 }}>{label}</span>
-                      <span style={{ color: C.faint, fontSize: 11 }}>{c.thru ? `thru ${c.thru}` : "—"}</span>
-                      <span style={{ color: C.gold, fontWeight: 800, fontSize: 13, fontFamily: "Georgia, serif", minWidth: 46, textAlign: "right" }}>{fmtPts(c.aPts)}–{fmtPts(c.bPts)}</span>
-                    </div>
+                    <React.Fragment key={ci}>
+                      <div onClick={() => setOpenKey(isOpen ? null : key)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${C.line}`, cursor: "pointer" }}>
+                        <span style={{ color: C.faint, fontSize: 11, width: 12 }}>{isOpen ? "▾" : "▸"}</span>
+                        <span style={{ flex: 1, color: C.ink, fontSize: 13 }}>{label}</span>
+                        <span style={{ color: C.faint, fontSize: 11 }}>{c.thru ? `thru ${c.thru}` : "—"}</span>
+                        <span style={{ color: C.gold, fontWeight: 800, fontSize: 13, fontFamily: "Georgia, serif", minWidth: 46, textAlign: "right" }}>{fmtPts(c.aPts)}–{fmtPts(c.bPts)}</span>
+                      </div>
+                      {isOpen && <HoleDetail rows={c.perHole} aLabel={aLabel} bLabel={bLabel} aColor={aColor} bColor={bColor} />}
+                    </React.Fragment>
                   );
                 })}
                 {isTeam && (
@@ -3444,9 +3489,21 @@ function FourballView({
                 )}
               </div>
             )}
-            {!isTrifecta && st && st.thru > 0 && (
-              <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>{leadText} · thru {st.thru}</div>
-            )}
+            {!isTrifecta && st && st.thru > 0 && (() => {
+              const key = `${f.id}-fb`;
+              const isOpen = openKey === key;
+              const detail = fourballHoleDetail(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100);
+              return (
+                <div style={{ marginTop: 6 }}>
+                  <div onClick={() => setOpenKey(isOpen ? null : key)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${C.line}`, cursor: "pointer" }}>
+                    <span style={{ color: C.faint, fontSize: 11, width: 12 }}>{isOpen ? "▾" : "▸"}</span>
+                    <span style={{ flex: 1, color: C.ink, fontSize: 12 }}>{leadText}</span>
+                    <span style={{ color: C.faint, fontSize: 11 }}>thru {st.thru}</span>
+                  </div>
+                  {isOpen && <HoleDetail rows={detail} aLabel={firstName(f.a[0]) + "'s"} bLabel={firstName(f.b[0]) + "'s"} aColor={C.birdie} bColor={C.bogey} />}
+                </div>
+              );
+            })()}
             {!full && <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Needs players in both pairs.</div>}
           </div>
         );

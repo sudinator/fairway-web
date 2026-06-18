@@ -1,27 +1,36 @@
-# Birdie Num Num — v1.15.2
+# Birdie Num Num — v1.16.0
 
-Strokes panel now shows the playing handicap (after allowance). NO migration.
+Expandable foursome contest lines. NO migration, app-only.
 
-## Changed
-- The strokes summary showed each player's raw course handicap ("ch 8") while the
-  strokes were computed off the allowance-adjusted number — so a player could see
-  "ch 5" but get strokes on only 4 holes. Confusing. The panel now shows the
-  PLAYING handicap after the allowance ("ph 7" = 85% of 8), so the number on
-  screen is the basis the strokes actually come from.
-  - 1-v-1 rows: both players' playing handicaps; the difference is the strokes given.
-  - Team strip: each player's playing handicap; strokes are that minus the
-    foursome low (lowest plays off scratch).
-  - Added a one-line note: "ph — playing handicap, after the N% allowance."
-- No change to scoring or the scorecard. (The group scorecard header still shows
-  the course handicap; can align it to playing handicap too if wanted.)
+## What's new
+In a four-ball / Trifecta foursome card, each contest line is now tappable and
+expands to a hole-by-hole of how that score got there:
+- Tap a line (e.g. "Amit v Ben · thru 5 · 2–3") to expand; tap again to collapse.
+- Only ONE line is open at a time — opening another closes the previous, so the
+  card never gets unwieldy.
+- The expansion shows, for each played hole: the hole number, the two NET scores
+  (the lower net that won the hole is bolded), who won the hole (player name for
+  singles, team name for the team point), and the running score after that hole.
+- Trifecta: all three lines expand (two singles + the team point). The team line
+  shows each side's counting ball under Best ball, or each side's summed net under
+  Shootout.
+- Plain four-ball: the single match line expands the same way (best-ball net per
+  hole), with running holes-won.
+- Only holes that have been scored appear (matches "thru N").
+
+## Engine
+- TrifectaContest now carries a `perHole` array (hole, aNet, bNet, result, running
+  aPts/bPts). Scoring totals are unchanged — the per-hole detail is the same data
+  the engine already computed internally, now surfaced.
+- New `fourballHoleDetail()` for the plain four-ball line.
 
 ## Verified locally
 - tsc --noEmit: clean
 - next build: passes
-- Unit tests: 113/113 pass
+- Unit tests: 115/115 pass (added 2 for the per-hole detail: nets, result,
+  running tally ending at the totals, and aggregate summing)
 
 ## Smoke-test
-- In an 85% game, confirm the strokes panel shows the reduced (playing) handicap
-  and that the stroke count = the difference between the two playing handicaps
-  (1-v-1) or playing handicap minus foursome low (team).
-- In a 100% game, confirm "ph" equals the course handicap.
+- Trifecta: tap each of the three lines; confirm one-at-a-time open/close and that
+  the hole nets + running score match the scorecard.
+- Four-ball: tap the match line; confirm best-ball nets per hole.
