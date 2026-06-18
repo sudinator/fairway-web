@@ -3429,8 +3429,8 @@ function FourballView({
                   const bNames = c.bIds.map(firstName).join(" & ");
                   const label = c.kind === "team" ? `Team · ${aNames} v ${bNames}` : `${aNames} v ${bNames}`;
                   return (
-                    <div key={ci} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderTop: `1px solid ${C.greenMid}` }}>
-                      <span style={{ flex: 1, color: C.cream, fontSize: 13 }}>{label}</span>
+                    <div key={ci} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderTop: `1px solid ${C.line}` }}>
+                      <span style={{ flex: 1, color: C.ink, fontSize: 13 }}>{label}</span>
                       <span style={{ color: C.faint, fontSize: 11 }}>{c.thru ? `thru ${c.thru}` : "—"}</span>
                       <span style={{ color: C.gold, fontWeight: 800, fontSize: 13, fontFamily: "Georgia, serif", minWidth: 46, textAlign: "right" }}>{fmtPts(c.aPts)}–{fmtPts(c.bPts)}</span>
                     </div>
