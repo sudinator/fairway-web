@@ -1531,6 +1531,31 @@ function GameRoom({
   };
 
   // Organizer: mark/unmark a player as a no-show for formats that support it.
+  // ──────────────────────────────────────────────────────────────────────────
+  // DORMANT / DEFERRED FEATURE — "segmented match re-pair" (NOT built; revisit later)
+  //
+  // Scenario: a player leaves mid-match, stranding their opponent. Today we mark
+  // the leaver "out" (below) — the holes they played still count, and in match
+  // play the match simply stands on those holes. We deliberately do NOT yet
+  // re-pair the stranded opponent against someone still on the course.
+  //
+  // The fuller design we discussed (left dormant on purpose — judged too complex
+  // for the value, as it's a rare edge case):
+  //   • No hard deletion — holes already played are real and stay on the card.
+  //   • The leaver's match closes at the walk-off hole (e.g. B v A settles over
+  //     holes 1–N where N is where A left).
+  //   • The stranded opponent (B) may be re-paired with someone still playing (C);
+  //     that new B v C match starts ALL SQUARE from the next hole (a reset at the
+  //     switch) and is scored only over the remaining holes.
+  //   • C can be in two matches at once (uses the existing multi-match support).
+  //   • Fallback: if no one to re-pair with, B plays out solo — match voided,
+  //     card kept. No blank-card substitution for the player who left.
+  //   • Storage: a "switched at hole N" marker in the pairings JSON — no new
+  //     column expected. Extends this no-show / left-mid-round flow.
+  //
+  // REMINDER (team): revisit this if mid-round departures in competitive matches
+  // become common enough to warrant the complexity. Until then it stays dormant.
+  // ──────────────────────────────────────────────────────────────────────────
   const toggleNoShow = async (p: Player) => {
     if (!game) return;
     const next = !p.no_show;
@@ -1689,6 +1714,31 @@ function GameRoom({
   const reopenGame = async () => {
     if (!game) return;
     await supabase.from("games").update({ status: "active" }).eq("id", game.id);
+    await load();
+  };
+
+  // Organizer: wipe all entered scores and the round clock so the game is fresh
+  // again — useful after entering dummy scores to test the setup. Keeps the
+  // field, teams, and matchups; reopens the game if it had been ended. Does NOT
+  // touch any rounds already posted to players' history (if the game was ended
+  // and scores recorded, remove those from each player's Rounds tab separately).
+  const resetScores = async () => {
+    if (!game) return;
+    if (!confirm(`Reset "${game.name}"? This clears every player's scores, putts, fairways, penalties/sand and the round clock, and reopens the game if it was ended. Players, teams, and matchups are kept. Use this to wipe test scores.`)) return;
+    const n = game.holes_meta?.length ?? 18;
+    const blank = {
+      scores: Array(n).fill(null),
+      putts: Array(n).fill(null),
+      fairways: Array(n).fill(null),
+      penalties: Array(n).fill(null),
+      sand: Array(n).fill(null),
+      clock_start: null,
+      clock_end: null,
+      group_locked: false,
+    };
+    await Promise.all(players.map((p) => supabase.from("game_players").update(blank).eq("id", p.id)));
+    if (game.status === "ended") await supabase.from("games").update({ status: "active" }).eq("id", game.id);
+    await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_reset", group_id: (game as any).group_id || null, summary: `Reset scores for "${game.name}"` });
     await load();
   };
 
@@ -1899,7 +1949,7 @@ function GameRoom({
           onOverride: overridePlayerHandicap, courseTees, onSetTee: setPlayerTee,
           onRemove: removePlayer, onToggleNoShow: toggleNoShow, onSetTeam: setPlayerTeam,
           onSetTeeGroup: setPlayerTeeGroup, onRename: renameGame, onDelete: deleteGame,
-          onEnd: endGame, onReopen: reopenGame,
+          onEnd: endGame, onReopen: reopenGame, onReset: resetScores,
           eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,
           onSetAllowance: setAllowance, onSetFormat: setFormat, onSetTeamScoreMode: setTeamScoreMode, anyScores,
         };
@@ -2009,12 +2059,44 @@ function GameRoom({
         const endMs = allEnded ? Math.max(...ends.map((s) => new Date(s).getTime())) : Date.now();
         const mins = Math.max(0, Math.round((endMs - startMs) / 60000));
         const label = teeGroupsInUse && myRow?.tee_group != null ? ` · Group ${myRow.tee_group}` : "";
+        // Pace: target minutes/hole scales with the group's size (6 + 2*players,
+        // so a 2-ball = 10, 3-ball = 12, 4-ball = 14). "Holes done" is the group's
+        // leading edge — the most holes any player in the group has scored. We nudge
+        // (amber) once the group is more than 10 minutes past the expected time.
+        const groupSize = Math.max(1, subset.length);
+        const targetPerHole = 6 + 2 * groupSize;
+        const holesDone = Math.max(0, ...subset.map((p) => (p.scores || []).filter((s) => s != null && (s as number) > 0).length));
+        const expected = holesDone * targetPerHole;
+        const behind = mins - expected;
+        const showPace = !allEnded && holesDone >= 1;
+        const onPace = behind <= 10;
         return (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
+          <>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
             <span style={{ fontSize: 15 }}>⏱</span>
             <span style={{ color: C.cream, fontWeight: 700, fontFamily: "Georgia, serif", fontSize: 17 }}>{Math.floor(mins / 60)}:{String(mins % 60).padStart(2, "0")}</span>
-            <span style={{ color: C.sage, fontSize: 12 }}>{allEnded ? "round time" : "elapsed"}{label}</span>
+            <span style={{ color: C.sage, fontSize: 12 }}>{allEnded ? "round time" : "elapsed"}{label}{holesDone >= 1 ? ` · thru ${holesDone}` : ""}</span>
+            {showPace && (
+              <>
+                <span style={{ flex: 1 }} />
+                {onPace ? (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(91,208,138,0.15)", color: "#7FD0A0", border: "1px solid rgba(91,208,138,0.4)", borderRadius: 999, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: 99, background: "#5BD08A", display: "block" }} />On pace
+                  </span>
+                ) : (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(216,178,74,0.16)", color: "#E4CF86", border: `1px solid rgba(216,178,74,0.5)`, borderRadius: 999, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>
+                    ⚑ ~{behind} min behind
+                  </span>
+                )}
+              </>
+            )}
           </div>
+          {showPace && !onPace && (
+            <div style={{ color: "#C9A66A", fontSize: 11, marginTop: 6 }}>
+              Keep it moving — you're behind the group's pace (about {targetPerHole} min a hole for {groupSize} player{groupSize === 1 ? "" : "s"}).
+            </div>
+          )}
+          </>
         );
       })()}
 
@@ -3775,6 +3857,7 @@ function OrganizerPanel({
   onDelete,
   onEnd,
   onReopen,
+  onReset,
   section = "players",
   eligibleMembers = [],
   onAddMember,
@@ -3798,6 +3881,7 @@ function OrganizerPanel({
   onDelete: () => Promise<void>;
   onEnd: () => Promise<void>;
   onReopen: () => Promise<void>;
+  onReset: () => Promise<void>;
   section?: "players" | "teams";
   eligibleMembers?: { id: string; display_name: string; handicap_index: number | null }[];
   onAddMember?: (m: { id: string; display_name: string; handicap_index: number | null }) => Promise<void>;
@@ -4194,6 +4278,12 @@ function OrganizerPanel({
                 🏁 End game (lock final results)
               </button>
             )}
+            <button
+              style={{ background: "#3F3414", color: "#E4CF86", border: `0.5px solid ${C.gold}`, borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", marginTop: 10, fontSize: 13, display: "block" }}
+              onClick={onReset}
+            >
+              ↺ Reset scores (clears scores &amp; clock — keeps players, teams, matchups)
+            </button>
             <button
               style={{
                 background: "#5A1E1E",
