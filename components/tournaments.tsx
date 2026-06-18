@@ -18,6 +18,7 @@ import {
   applyAllowance,
   fourballStatus,
   fourballProgress,
+  computeTrifecta,
   type FourballMember,
   computeSkins,
   computeHeadToHeadSkins,
@@ -56,13 +57,14 @@ type Game = {
   course: string;
   course_par: number | null;
   holes_meta: { n: number; par: number; si: number | null; yards?: number | null }[]; // par + stroke index (+ yardage) per hole
-  game_type: "stableford" | "match" | "fourball" | "skins";
+  game_type: "stableford" | "match" | "fourball" | "skins" | "trifecta";
   allowance_pct?: number | null; // handicap allowance % applied to net scoring
   marker_user_id?: string | null; // the player currently keeping score for the group
   pairings: { a: string; b: string }[]; // for match play: pkey(player) vs pkey(player)
   status?: "active" | "ended" | null;
   teams?: { key: string; name: string }[] | null; // two named teams for team match play
-  foursomes?: { id: string; name: string; a: string[]; b: string[] }[] | null; // four-ball: pair A vs pair B
+  foursomes?: { id: string; name: string; a: string[]; b: string[]; swap?: boolean }[] | null; // four-ball / trifecta: pair A vs pair B (swap = cross the singles)
+  team_score_mode?: "best_ball" | "aggregate" | null; // trifecta team leg: low net vs both nets added
   created_by: string;
   created_at: string;
 };
@@ -386,14 +388,15 @@ function CreateGame({
   const [pickedFav, setPickedFav] = useState<any | null>(null);
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState("");
-  const [gameType, setGameType] = useState<"stableford" | "match" | "fourball" | "skins">(
+  const [gameType, setGameType] = useState<"stableford" | "match" | "fourball" | "skins" | "trifecta">(
     "stableford",
   );
   // Handicap allowance % (playing handicap = allowance% of course handicap).
   // Default 85 for four-ball, 100 otherwise. Resets to the standard when the
   // format changes; editable any time.
   const [allowancePct, setAllowancePct] = useState(100);
-  useEffect(() => { setAllowancePct(gameType === "fourball" ? 85 : 100); }, [gameType]);
+  useEffect(() => { setAllowancePct(gameType === "fourball" || gameType === "trifecta" ? 85 : 100); }, [gameType]);
+  const [teamScoreMode, setTeamScoreMode] = useState<"best_ball" | "aggregate">("best_ball");
   const [teamMode, setTeamMode] = useState(false);
   const [skinsTeamStyle, setSkinsTeamStyle] = useState<"head_to_head" | "best_ball">("head_to_head");
   const [team1, setTeam1] = useState("Team 1");
@@ -493,7 +496,7 @@ function CreateGame({
     setErr(null);
     try {
       const code = makeCode();
-      const typeLabel = gameType === "match" ? "Match Play" : gameType === "fourball" ? "Four-Ball" : gameType === "skins" ? "Skins" : "Stableford";
+      const typeLabel = gameType === "match" ? "Match Play" : gameType === "fourball" ? "Four-Ball" : gameType === "skins" ? "Skins" : gameType === "trifecta" ? "Trifecta" : "Stableford";
       // TZ-safe date label for the auto-generated name (noon avoids offset rollover).
       const dateLabel = new Date(matchDate + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
       const autoName = `${typeLabel} / ${pickedFav.name} / ${dateLabel}`;
@@ -517,13 +520,14 @@ function CreateGame({
           game_type: gameType,
           pairings: [],
           teams:
-            (gameType === "match" || gameType === "skins" || gameType === "fourball") && teamMode
+            ((gameType === "match" || gameType === "skins" || gameType === "fourball") && teamMode) || gameType === "trifecta"
               ? [
                   { key: "A", name: team1.trim() || "Team 1" },
                   { key: "B", name: team2.trim() || "Team 2" },
                 ]
               : null,
-          foursomes: gameType === "fourball" || (gameType === "skins" && teamMode && skinsTeamStyle === "best_ball") ? [] : null,
+          foursomes: gameType === "fourball" || gameType === "trifecta" || (gameType === "skins" && teamMode && skinsTeamStyle === "best_ball") ? [] : null,
+          team_score_mode: gameType === "trifecta" ? teamScoreMode : "best_ball",
         })
         .select()
         .single();
@@ -866,6 +870,12 @@ function CreateGame({
           >
             Skins (net)
           </button>
+          <button
+            onClick={() => setGameType("trifecta")}
+            style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 120, fontSize: 13 }}
+          >
+            Trifecta (2 v 2)
+          </button>
         </div>
         <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
           {gameType === "stableford"
@@ -874,8 +884,30 @@ function CreateGame({
             ? "2-player teams play better-net-ball match play. Big groups split into foursomes (2 v 2) — set them up after creating. Great for 12–16 players in 3–4 foursomes."
             : gameType === "skins"
             ? "Skins follows match-play structure: singles can be 1:1, team 1:1 rolls skins into team totals, or team best-ball can be played in foursomes. Halved holes carry forward."
+            : gameType === "trifecta"
+            ? "Each 2-v-2 foursome plays for three points per hole: the two singles (each player vs their opposite number) plus a team point. Three points per hole riding on every group — set up the foursomes after creating."
             : "Players are paired 1-on-1. After friends join, you'll set the matchups. Lower handicap plays off scratch; opponent gets the difference."}
         </div>
+        {gameType === "trifecta" && (
+          <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
+            <div style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>Two teams</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Name the two sides, then build the 2-v-2 foursomes after creating. Each foursome plays for three points a hole.</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
+              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
+            </div>
+            <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>Team point</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+              <button onClick={() => setTeamScoreMode("best_ball")} style={{ ...btn(teamScoreMode === "best_ball"), fontSize: 12, padding: "7px 10px" }}>Best ball</button>
+              <button onClick={() => setTeamScoreMode("aggregate")} style={{ ...btn(teamScoreMode === "aggregate"), fontSize: 12, padding: "7px 10px" }}>Shootout (aggregate)</button>
+            </div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+              {teamScoreMode === "aggregate"
+                ? "Shootout — both partners' net scores count. The team's hole score is the two nets added together, not just the better one, so a blow-up by either player hurts."
+                : "Best ball — the team's hole score is the better net of the two partners."}
+            </div>
+          </div>
+        )}
         {(gameType === "match" || gameType === "skins" || gameType === "fourball") && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
@@ -1473,7 +1505,7 @@ function GameRoom({
     if (!game) return;
     const next = !p.no_show;
     const effect =
-      game.game_type === "fourball" ? "any holes they didn't play score net double bogey for their team"
+      (game.game_type === "fourball" || game.game_type === "trifecta") ? "any holes they didn't play score net double bogey for their team"
       : game.game_type === "match" ? "the match stands on the holes already played"
       : "their unplayed holes score nothing";
     if (next && !confirm(`Mark ${p.display_name} as out? The holes they've already played still count; ${effect}.`)) return;
@@ -1539,10 +1571,18 @@ function GameRoom({
   // place so a switch is reversible. Allowance auto-suggests the new format's
   // common-practice number but the organizer can override after.
   const anyScores = players.some((p) => (p.scores || []).some((s) => s != null));
-  const setFormat = async (next: "stableford" | "match" | "fourball" | "skins") => {
+  const setFormat = async (next: "stableford" | "match" | "fourball" | "skins" | "trifecta") => {
     if (!game || next === game.game_type) return;
-    const suggested = next === "fourball" ? 85 : 100;
-    await supabase.from("games").update({ game_type: next, allowance_pct: suggested }).eq("id", game.id);
+    const suggested = next === "fourball" || next === "trifecta" ? 85 : 100;
+    const patch: Record<string, unknown> = { game_type: next, allowance_pct: suggested };
+    if (next === "trifecta" && !game.team_score_mode) patch.team_score_mode = "best_ball";
+    await supabase.from("games").update(patch).eq("id", game.id);
+    await load();
+  };
+
+  const setTeamScoreMode = async (mode: "best_ball" | "aggregate") => {
+    if (!game) return;
+    await supabase.from("games").update({ team_score_mode: mode }).eq("id", game.id);
     await load();
   };
 
@@ -1815,7 +1855,7 @@ function GameRoom({
       {roomTab === "setup" && isOrganizer && (() => {
         const teamsArr = Array.isArray(game.teams) ? game.teams : [];
         const usesTeams = teamsArr.length > 0;
-        const usesMatchups = game.game_type === "match" || game.game_type === "fourball" || game.game_type === "skins";
+        const usesMatchups = game.game_type === "match" || game.game_type === "fourball" || game.game_type === "skins" || game.game_type === "trifecta";
         const usesFoursomes = Array.isArray(game.foursomes);
         const steps: { key: "players" | "teams" | "matchups" | "groups"; label: string }[] = [
           { key: "players", label: "Players" },
@@ -1831,7 +1871,7 @@ function GameRoom({
           onSetTeeGroup: setPlayerTeeGroup, onRename: renameGame, onDelete: deleteGame,
           onEnd: endGame, onReopen: reopenGame,
           eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,
-          onSetAllowance: setAllowance, onSetFormat: setFormat, anyScores,
+          onSetAllowance: setAllowance, onSetFormat: setFormat, onSetTeamScoreMode: setTeamScoreMode, anyScores,
         };
         // --- per-step completion drives the stepper status + the "what's next" line ---
         const total = players.length;
@@ -1913,15 +1953,15 @@ function GameRoom({
       })()}
 
       {roomTab === "play" && (
-      <div style={{ marginTop: 16, background: isEnded ? "#3A3A3A" : game.game_type === "match" ? "#1E3A8A" : game.game_type === "fourball" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <div style={{ marginTop: 16, background: isEnded ? "#3A3A3A" : game.game_type === "match" ? "#1E3A8A" : game.game_type === "fourball" || game.game_type === "trifecta" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>
-          {game.game_type === "match" ? "⛳ Singles Match Play" : game.game_type === "fourball" ? "⛳ Four-Ball Match (Best Net)" : game.game_type === "skins" ? "🪙 Skins (Net)" : "🏆 Stableford Tournament"}
+          {game.game_type === "match" ? "⛳ Singles Match Play" : game.game_type === "fourball" ? "⛳ Four-Ball Match (Best Net)" : game.game_type === "trifecta" ? (game.team_score_mode === "aggregate" ? "⛳ Trifecta · Shootout" : "⛳ Trifecta") : game.game_type === "skins" ? "🪙 Skins (Net)" : "🏆 Stableford Tournament"}
         </span>
         {isEnded ? (
           <span style={{ fontSize: 12, fontWeight: 800, background: C.gold, color: "#1A1A1A", borderRadius: 20, padding: "3px 10px" }}>FINAL · GAME ENDED</span>
         ) : (
           <span style={{ color: C.cream, opacity: 0.8, fontSize: 12 }}>
-            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? "2 v 2 better-net-ball" : game.game_type === "skins" ? "net skins · carryovers" : "net Stableford leaderboard"}
+            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? "2 v 2 better-net-ball" : game.game_type === "trifecta" ? "2 singles + a team point · 3 pts/hole" : game.game_type === "skins" ? "net skins · carryovers" : "net Stableford leaderboard"}
           </span>
         )}
       </div>
@@ -2021,7 +2061,7 @@ function GameRoom({
             onMarkOut={toggleNoShow}
           />
         </>
-      ) : game.game_type === "fourball" && (roomTab === "play" || (roomTab === "setup" && setupTab === "matchups")) ? (
+      ) : (game.game_type === "fourball" || game.game_type === "trifecta") && (roomTab === "play" || (roomTab === "setup" && setupTab === "matchups")) ? (
         <FourballView
           game={game}
           players={players}
@@ -2245,7 +2285,7 @@ function GameRoom({
                 );
                 return prog.map((lead) => matchLeadLabel(lead));
               }
-              if (game.game_type === "fourball" && Array.isArray(game.foursomes)) {
+              if ((game.game_type === "fourball" || game.game_type === "trifecta") && Array.isArray(game.foursomes)) {
                 // Find my foursome and which side I'm on; compute the running team
                 // best-net-ball match position from MY team's perspective.
                 const f = game.foursomes.find(
@@ -2548,7 +2588,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
       })()}
       {isMarker && onMarkOut && !groupLocked && (
         <div style={{ marginTop: 14, borderTop: `0.5px solid ${C.line}`, paddingTop: 12 }}>
-          <div style={{ color: C.sage, fontSize: 11, marginBottom: 7 }}>Someone leave early? Tap to mark them out. The holes they've played still count; {game.game_type === "fourball" ? "the holes they didn't play score net double bogey for their team" : game.game_type === "match" ? "the match stands on the holes already played" : "their unplayed holes score nothing"}.</div>
+          <div style={{ color: C.sage, fontSize: 11, marginBottom: 7 }}>Someone leave early? Tap to mark them out. The holes they've played still count; {(game.game_type === "fourball" || game.game_type === "trifecta") ? "the holes they didn't play score net double bogey for their team" : game.game_type === "match" ? "the match stands on the holes already played" : "their unplayed holes score nothing"}.</div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {players.map((p) => (
               <button key={p.id} onClick={() => onMarkOut(p)}
@@ -3176,6 +3216,24 @@ function FourballView({
   })();
   const fmtPts = (n: number) => (n === Math.floor(n) ? String(n) : `${Math.floor(n)}½`);
 
+  // Trifecta: each foursome contributes its singles + team points to the team totals.
+  const isTrifecta = game.game_type === "trifecta";
+  const teamScoreMode: "best_ball" | "aggregate" = game.team_score_mode === "aggregate" ? "aggregate" : "best_ball";
+  const trifectaStandings = (() => {
+    if (!isTeam || !isTrifecta) return null;
+    const pts: Record<string, number> = { A: 0, B: 0 };
+    foursomes.forEach((f) => {
+      if (!f.a.length || !f.b.length) return;
+      const ta = playerOf(f.a[0])?.team, tb = playerOf(f.b[0])?.team;
+      if (!ta || !tb || ta === tb) return;
+      const r = computeTrifecta(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap);
+      pts[ta] = (pts[ta] ?? 0) + r.aPts;
+      pts[tb] = (pts[tb] ?? 0) + r.bPts;
+    });
+    return pts;
+  })();
+  const setSwap = (fId: string, swap: boolean) => saveFoursomes(foursomes.map((f) => (f.id === fId ? { ...f, swap } : f)));
+
   if (mode === "setup") {
     return (
       <div style={{ marginTop: 16 }}>
@@ -3221,6 +3279,19 @@ function FourballView({
                 )}
               </div>
             ))}
+            {isTrifecta && f.a.length === 2 && f.b.length === 2 && (
+              <div style={{ marginTop: 10, borderTop: `1px solid ${C.greenMid}`, paddingTop: 8 }}>
+                <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>SINGLES MATCHUPS</div>
+                <div style={{ color: C.cream, fontSize: 13, marginTop: 4 }}>
+                  {!f.swap
+                    ? `${firstName(f.a[0])} v ${firstName(f.b[0])} · ${firstName(f.a[1])} v ${firstName(f.b[1])}`
+                    : `${firstName(f.a[0])} v ${firstName(f.b[1])} · ${firstName(f.a[1])} v ${firstName(f.b[0])}`}
+                </div>
+                {isCreator && (
+                  <button style={{ ...btn(false), fontSize: 12, marginTop: 6 }} onClick={() => setSwap(f.id, !f.swap)}>Swap who plays whom</button>
+                )}
+              </div>
+            )}
           </div>
         ))}
 
@@ -3234,24 +3305,27 @@ function FourballView({
   }
 
   // Play mode: foursome match cards.
+  const standPts = isTrifecta ? trifectaStandings : teamStandings ? teamStandings.pts : null;
   return (
     <div style={{ marginTop: 16 }}>
-      <Eyebrow>FOUR-BALL MATCHES</Eyebrow>
-      {isTeam && teamStandings && (
+      <Eyebrow>{isTrifecta ? (teamScoreMode === "aggregate" ? "TRIFECTA · SHOOTOUT" : "TRIFECTA") : "FOUR-BALL MATCHES"}</Eyebrow>
+      {isTeam && standPts && (
         <div style={{ background: C.green, borderRadius: 12, padding: 14, marginTop: 12 }}>
           <div style={{ display: "flex", alignItems: "center" }}>
             <div style={{ flex: 1, textAlign: "center" }}>
               <div style={{ color: teamAccent(teams![0].name, 0), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![0].name}</div>
-              <div style={{ color: teamStandings.pts.A >= teamStandings.pts.B ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.pts.A)}</div>
+              <div style={{ color: standPts.A >= standPts.B ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(standPts.A)}</div>
             </div>
             <div style={{ color: C.sage, fontWeight: 800 }}>–</div>
             <div style={{ flex: 1, textAlign: "center" }}>
               <div style={{ color: teamAccent(teams![1].name, 1), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![1].name}</div>
-              <div style={{ color: teamStandings.pts.B >= teamStandings.pts.A ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.pts.B)}</div>
+              <div style={{ color: standPts.B >= standPts.A ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(standPts.B)}</div>
             </div>
           </div>
           <div style={{ color: C.sage, fontSize: 11, textAlign: "center", marginTop: 6 }}>
-            Projected from current foursomes · {fmtPts(teamStandings.decidedPts.A)}–{fmtPts(teamStandings.decidedPts.B)} decided
+            {isTrifecta
+              ? `Three points per hole · ${teamScoreMode === "aggregate" ? "team point on aggregate net (both balls)" : "team point on best net ball"}`
+              : `Projected from current foursomes · ${fmtPts(teamStandings!.decidedPts.A)}–${fmtPts(teamStandings!.decidedPts.B)} decided`}
           </div>
         </div>
       )}
@@ -3268,12 +3342,13 @@ function FourballView({
         const mine = f.a.includes(myKey) || f.b.includes(myKey);
         const lead = st?.lead ?? 0;
         const leadText = !st || st.thru === 0 ? "" : lead === 0 ? "All square" : `${firstName(lead > 0 ? f.a[0] : f.b[0])}'s pair ${Math.abs(lead)} UP`;
+        const tri = isTrifecta && full ? computeTrifecta(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap) : null;
         return (
           <div key={f.id} style={{ background: C.card, borderRadius: 12, padding: 14, marginTop: 12, border: mine ? `1px solid ${C.gold}` : "none" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
               <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{f.name}{mine ? " · your match" : ""}</div>
               <div style={{ flex: 1 }} />
-              <div style={{ color: C.green, fontWeight: 800, fontSize: 14, fontFamily: "Georgia, serif" }}>{st ? st.result : "—"}</div>
+              <div style={{ color: C.green, fontWeight: 800, fontSize: 14, fontFamily: "Georgia, serif" }}>{isTrifecta ? (tri ? `${fmtPts(tri.aPts)}–${fmtPts(tri.bPts)}` : "—") : st ? st.result : "—"}</div>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
@@ -3285,7 +3360,29 @@ function FourballView({
                 <div style={{ color: C.cream, fontSize: 13 }}>{f.b.map(firstName).join(" & ") || "—"}</div>
               </div>
             </div>
-            {st && st.thru > 0 && (
+            {tri && (
+              <div style={{ marginTop: 8 }}>
+                {tri.contests.map((c, ci) => {
+                  const aNames = c.aIds.map(firstName).join(" & ");
+                  const bNames = c.bIds.map(firstName).join(" & ");
+                  const label = c.kind === "team" ? `Team · ${aNames} v ${bNames}` : `${aNames} v ${bNames}`;
+                  return (
+                    <div key={ci} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", borderTop: `1px solid ${C.greenMid}` }}>
+                      <span style={{ flex: 1, color: C.cream, fontSize: 13 }}>{label}</span>
+                      <span style={{ color: C.faint, fontSize: 11 }}>{c.thru ? `thru ${c.thru}` : "—"}</span>
+                      <span style={{ color: C.gold, fontWeight: 800, fontSize: 13, fontFamily: "Georgia, serif", minWidth: 46, textAlign: "right" }}>{fmtPts(c.aPts)}–{fmtPts(c.bPts)}</span>
+                    </div>
+                  );
+                })}
+                {isTeam && (
+                  <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>
+                    {teamName(playerOf(f.a[0])?.team)} {fmtPts(tri.aPts)} · {fmtPts(tri.bPts)} {teamName(playerOf(f.b[0])?.team)}
+                    {(f.a.length === 1 || f.b.length === 1) ? " · 2 v 1 — team point on best ball" : ""}
+                  </div>
+                )}
+              </div>
+            )}
+            {!isTrifecta && st && st.thru > 0 && (
               <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>{leadText} · thru {st.thru}</div>
             )}
             {!full && <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Needs players in both pairs.</div>}
@@ -3409,6 +3506,7 @@ function OrganizerPanel({
   onAddGuest,
   onSetAllowance,
   onSetFormat,
+  onSetTeamScoreMode,
   anyScores = false,
 }: {
   game: Game;
@@ -3430,7 +3528,8 @@ function OrganizerPanel({
   onAddMember?: (m: { id: string; display_name: string; handicap_index: number | null }) => Promise<void>;
   onAddGuest?: (name: string, hcp: number) => Promise<void>;
   onSetAllowance?: (pct: number) => Promise<void>;
-  onSetFormat?: (f: "stableford" | "match" | "fourball" | "skins") => Promise<void>;
+  onSetFormat?: (f: "stableford" | "match" | "fourball" | "skins" | "trifecta") => Promise<void>;
+  onSetTeamScoreMode?: (m: "best_ball" | "aggregate") => Promise<void>;
   anyScores?: boolean;
 }) {
   const [edits, setEdits] = useState<Record<string, string>>({});
@@ -3456,12 +3555,13 @@ function OrganizerPanel({
   // foursomes. Before any score, anything is allowed (still setup).
   const hasPairings = Array.isArray(game.pairings) && game.pairings.length > 0;
   const hasFoursomes = Array.isArray(game.foursomes) && game.foursomes.length > 0;
-  const canSwitchTo = (target: "stableford" | "match" | "fourball" | "skins") => {
+  const canSwitchTo = (target: "stableford" | "match" | "fourball" | "skins" | "trifecta") => {
     if (target === game.game_type) return false;
     if (!anyScores) return true;
     if (target === "stableford" || target === "skins") return true;
     if (target === "match") return hasPairings;
     if (target === "fourball") return hasFoursomes;
+    if (target === "trifecta") return hasFoursomes;
     return false;
   };
 
@@ -3774,7 +3874,7 @@ function OrganizerPanel({
               <div style={{ marginTop: 12 }}>
                 <div style={{ color: C.sage, fontSize: 12 }}>Format</div>
                 <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                  {([["stableford", "Stableford"], ["match", "Match"], ["fourball", "Four-ball"], ["skins", "Skins"]] as const).map(([key, label]) => {
+                  {([["stableford", "Stableford"], ["match", "Match"], ["fourball", "Four-ball"], ["skins", "Skins"], ["trifecta", "Trifecta"]] as const).map(([key, label]) => {
                     const isCur = game.game_type === key;
                     const allowed = isCur || canSwitchTo(key);
                     return (
@@ -3785,6 +3885,21 @@ function OrganizerPanel({
                   })}
                 </div>
                 {anyScores && <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Scores are in — you can switch to Stableford or Skins anytime. Match needs pairings already set, Four-ball needs foursomes.</div>}
+              </div>
+            )}
+
+            {game.status !== "ended" && game.game_type === "trifecta" && onSetTeamScoreMode && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ color: C.sage, fontSize: 12 }}>Team point</div>
+                <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                  <button onClick={() => onSetTeamScoreMode("best_ball")} style={{ ...btn((game.team_score_mode ?? "best_ball") === "best_ball"), fontSize: 13, padding: "7px 12px" }}>Best ball</button>
+                  <button onClick={() => onSetTeamScoreMode("aggregate")} style={{ ...btn(game.team_score_mode === "aggregate"), fontSize: 13, padding: "7px 12px" }}>Shootout</button>
+                </div>
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
+                  {game.team_score_mode === "aggregate"
+                    ? "Shootout: both partners' net scores are added for the team point — a blow-up by either player hurts."
+                    : "Best ball: the team point uses the better net of the two partners."}
+                </div>
               </div>
             )}
             {game.status === "ended" ? (

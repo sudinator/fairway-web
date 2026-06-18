@@ -490,6 +490,105 @@ export function fourballStatus(
   return { thru, lead, result };
 }
 
+// ---------------- Trifecta (2-v-2: two singles + a team point, per hole) ----------------
+// Three contests per hole, all net, scored from side A's perspective:
+//   - two singles (each A-side player vs an assigned B-side player)
+//   - one team point: best-ball (low net of the side) or aggregate (both nets added)
+// In a 2-v-1 group the lone player contests a single vs EACH opponent (still two
+// singles), and the team leg always uses best-ball — aggregate would pit one ball
+// against two. Halved holes split a point (½ each). A contest's hole stays pending
+// (null) until the scores it needs are in; under aggregate the team point needs
+// BOTH partners' nets. Points: win = 1, halve = ½.
+
+export type TrifectaMode = "best_ball" | "aggregate";
+
+export type TrifectaContest = {
+  kind: "single" | "team";
+  aIds: string[];
+  bIds: string[];
+  lead: number; // running A-perspective lead in points (aPts - bPts as integers won)
+  aPts: number;
+  bPts: number;
+  thru: number;
+};
+export type TrifectaResult = {
+  contests: TrifectaContest[];
+  aPts: number;
+  bPts: number;
+  thru: number;
+};
+
+// The two singles pairings for an A-vs-B group.
+// 2v2: index pairing, optionally swapped. 2v1 / 1v2: lone player vs each opponent.
+export function trifectaSingles(aIds: string[], bIds: string[], swap = false): [string, string][] {
+  if (aIds.length === 2 && bIds.length === 2) {
+    return swap
+      ? [[aIds[0], bIds[1]], [aIds[1], bIds[0]]]
+      : [[aIds[0], bIds[0]], [aIds[1], bIds[1]]];
+  }
+  if (aIds.length === 1 && bIds.length === 2) return [[aIds[0], bIds[0]], [aIds[0], bIds[1]]];
+  if (aIds.length === 2 && bIds.length === 1) return [[aIds[0], bIds[0]], [aIds[1], bIds[0]]];
+  if (aIds.length === 1 && bIds.length === 1) return [[aIds[0], bIds[0]]];
+  return [];
+}
+
+export function computeTrifecta(
+  holes: MatchHoleMeta[],
+  members: FourballMember[],
+  aIds: string[],
+  bIds: string[],
+  allowancePct: number = 100,
+  mode: TrifectaMode = "best_ball",
+  swap = false,
+): TrifectaResult {
+  const nets = fourballNets(holes, members, allowancePct);
+  const singles = trifectaSingles(aIds, bIds, swap);
+  // A short-handed side forces best-ball on the team leg.
+  const teamMode: TrifectaMode = aIds.length === 1 || bIds.length === 1 ? "best_ball" : mode;
+
+  const tally = (perHole: (number | null)[]): { aPts: number; bPts: number; thru: number; lead: number } => {
+    let aPts = 0, bPts = 0, thru = 0, lead = 0;
+    for (const r of perHole) {
+      if (r == null) continue;
+      thru++;
+      if (r > 0) { aPts += 1; lead++; }
+      else if (r < 0) { bPts += 1; lead--; }
+      else { aPts += 0.5; bPts += 0.5; }
+    }
+    return { aPts, bPts, thru, lead };
+  };
+
+  const contests: TrifectaContest[] = [];
+
+  for (const [aId, bId] of singles) {
+    const perHole = holes.map((_, i) => {
+      const a = nets[aId]?.[i], b = nets[bId]?.[i];
+      if (a == null || b == null) return null;
+      return a < b ? 1 : b < a ? -1 : 0;
+    });
+    contests.push({ kind: "single", aIds: [aId], bIds: [bId], ...tally(perHole) });
+  }
+
+  const teamPerHole = holes.map((_, i) => {
+    const aN = aIds.map((id) => nets[id]?.[i]).filter((n): n is number => n != null);
+    const bN = bIds.map((id) => nets[id]?.[i]).filter((n): n is number => n != null);
+    if (teamMode === "aggregate") {
+      if (aN.length < aIds.length || bN.length < bIds.length) return null; // need both nets
+      const a = aN.reduce((s, x) => s + x, 0), b = bN.reduce((s, x) => s + x, 0);
+      return a < b ? 1 : b < a ? -1 : 0;
+    }
+    if (!aN.length || !bN.length) return null;
+    const a = Math.min(...aN), b = Math.min(...bN);
+    return a < b ? 1 : b < a ? -1 : 0;
+  });
+  contests.push({ kind: "team", aIds, bIds, ...tally(teamPerHole) });
+
+  const aPts = contests.reduce((s, c) => s + c.aPts, 0);
+  const bPts = contests.reduce((s, c) => s + c.bPts, 0);
+  const thru = contests.reduce((m, c) => Math.max(m, c.thru), 0);
+  return { contests, aPts, bPts, thru };
+}
+
 // ---------------- Skins (net, with carryovers) ----------------
 export type SkinPlayer = { id: string; name: string; gross: (number | null)[]; ch: number | null; noShow?: boolean };
 export type SkinSide = { id: string; name: string; playerIds: string[] };
