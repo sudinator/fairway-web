@@ -35,7 +35,7 @@ import {
 } from "@/lib/golf";
 import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
-import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores } from "@/lib/draft";
+import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores } from "@/lib/draft";
 import {
   btn,
   inputStyle,
@@ -1737,6 +1737,9 @@ function GameRoom({
       group_locked: false,
     };
     await Promise.all(players.map((p) => supabase.from("game_players").update(blank).eq("id", p.id)));
+    // Clear this device's local score backup for my own row, otherwise load()'s
+    // reconcile would merge the old scores back in (and re-write them to the DB).
+    if (me?.id) clearGameScores(game.id, me.id);
     if (game.status === "ended") await supabase.from("games").update({ status: "active" }).eq("id", game.id);
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_reset", group_id: (game as any).group_id || null, summary: `Reset scores for "${game.name}"` });
     await load();
