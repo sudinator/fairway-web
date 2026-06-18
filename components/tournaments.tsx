@@ -103,6 +103,20 @@ type Player = {
 // player, so guests can be assigned to teams and matches like anyone.
 const pkey = (p: { user_id: string | null; id: string }) => p.user_id ?? p.id;
 
+// The handicap basis for all stroke math: the UNROUNDED course handicap (WHS
+// applies allowances to the unrounded value and rounds once at the end). Falls
+// back to the stored rounded course handicap when index/tee data is missing
+// (e.g. legacy guests). Display still uses the rounded course_handicap.
+const chBasis = (
+  p: { handicap_index?: number | null; slope?: number | null; rating?: number | null; course_handicap: number | null },
+  coursePar: number | null | undefined,
+): number => {
+  if (p.handicap_index != null && p.slope != null && p.rating != null && coursePar != null) {
+    return p.handicap_index * (p.slope / 113) + (p.rating - coursePar);
+  }
+  return p.course_handicap ?? 0;
+};
+
 // Team accent colour. If the team is *named* after a colour ("Red", "Blue", …) we
 // honour that name so "Red" never shows up blue; otherwise fall back to a stable
 // palette keyed off the team's position (0 / 1).
@@ -391,6 +405,7 @@ function CreateGame({
   const [pickedFav, setPickedFav] = useState<any | null>(null);
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState("");
+  const [profileIdx, setProfileIdx] = useState<number | null>(null);
   const [gameType, setGameType] = useState<"stableford" | "match" | "fourball" | "skins" | "trifecta">(
     "stableford",
   );
@@ -415,13 +430,13 @@ function CreateGame({
   const [guestName, setGuestName] = useState("");
   const [guestHcp, setGuestHcp] = useState("");
   const [guestPlayers, setGuestPlayers] = useState<
-    { id: string; display_name: string; course_handicap: number }[]
+    { id: string; display_name: string; handicap_index: number }[]
   >([]);
 
   const addGuestPlayer = () => {
-    const guestCourseHandicap = parseInt(guestHcp, 10);
-    if (!guestName.trim() || Number.isNaN(guestCourseHandicap)) {
-      setErr("Enter a guest name and course handicap.");
+    const guestIndex = parseFloat(guestHcp);
+    if (!guestName.trim() || Number.isNaN(guestIndex)) {
+      setErr("Enter a guest name and handicap index.");
       return;
     }
     setGuestPlayers((prev) => [
@@ -429,7 +444,7 @@ function CreateGame({
       {
         id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
         display_name: guestName.trim(),
-        course_handicap: guestCourseHandicap,
+        handicap_index: guestIndex,
       },
     ]);
     setGuestName("");
@@ -470,6 +485,11 @@ function CreateGame({
           }),
         );
       setGroupRoster(roster);
+      const mine = roster.find((p) => p.id === user.id);
+      if (mine && mine.handicap_index != null) {
+        setProfileIdx(mine.handicap_index);
+        setIdxStr((cur) => (cur.trim() === "" ? String(mine.handicap_index) : cur));
+      }
       setSelectedPlayers((prev) => {
         const next: Record<string, boolean> = { ...prev };
         roster.forEach((p) => {
@@ -535,6 +555,11 @@ function CreateGame({
         .select()
         .single();
       if (error || !game) throw error || new Error("Could not create game");
+      // Remember the creator's handicap: if they overrode the prefilled value,
+      // save it back to their profile so it persists as the new default.
+      if (idxVal != null && idxVal !== profileIdx) {
+        try { await supabase.from("profiles").update({ handicap_index: idxVal }).eq("id", user.id); } catch {}
+      }
       // Add creator plus any selected group members immediately, so group games do not require join codes.
       const selectedIds = new Set([
         user.id,
@@ -574,11 +599,11 @@ function CreateGame({
         user_id: null,
         is_guest: true,
         display_name: p.display_name,
-        handicap_index: null,
+        handicap_index: p.handicap_index,
         rating: tee.rating,
         slope: tee.slope,
         tee_name: tee.name,
-        course_handicap: p.course_handicap,
+        course_handicap: coursePar != null ? courseHandicap(p.handicap_index, tee.slope, tee.rating, coursePar) : null,
         scores: Array(holesMeta.length).fill(null),
         putts: Array(holesMeta.length).fill(null),
         fairways: Array(holesMeta.length).fill(null),
@@ -700,14 +725,14 @@ function CreateGame({
       <div style={{ marginTop: 14 }}>
         <label style={{ color: C.sage, fontSize: 12 }}>Guest players</label>
         <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
-          Add guests before creating the game so skins, teams, tee groups, and scoring all start with the correct field.
+          Add guests before creating the game so skins, teams, tee groups, and scoring all start with the correct field. Enter the guest's handicap index — it converts to a course handicap for the selected tee.
         </div>
         <div style={{ background: C.greenLight, borderRadius: 12, padding: 10, marginTop: 8 }}>
           {guestPlayers.length > 0 && (
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
               {guestPlayers.map((g) => (
                 <span key={g.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.greenMid, borderRadius: 999, padding: "4px 10px", color: C.cream, fontSize: 13 }}>
-                  {g.display_name} <span style={{ color: C.sage, fontSize: 11 }}>hcp {g.course_handicap}</span>
+                  {g.display_name} <span style={{ color: C.sage, fontSize: 11 }}>idx {g.handicap_index}{tee && coursePar != null ? ` · ch ${courseHandicap(g.handicap_index, tee.slope, tee.rating, coursePar)}` : ""}</span>
                   <button
                     onClick={() => setGuestPlayers((prev) => prev.filter((p) => p.id !== g.id))}
                     style={{ background: "none", border: "none", color: C.birdie, cursor: "pointer", fontSize: 14, padding: 0 }}
@@ -729,11 +754,11 @@ function CreateGame({
               value={guestHcp}
               onChange={(e) => {
                 const v = e.target.value;
-                if (v === "" || /^-?\d*$/.test(v)) setGuestHcp(v);
+                if (v === "" || /^-?\d*\.?\d*$/.test(v)) setGuestHcp(v);
               }}
-              inputMode="numeric"
-              placeholder="Course hcp"
-              style={{ ...inputStyle, width: 110 }}
+              inputMode="decimal"
+              placeholder="Handicap index"
+              style={{ ...inputStyle, width: 130 }}
             />
             <button onClick={addGuestPlayer} style={{ ...btn(false), fontSize: 12 }}>+ Add guest</button>
           </div>
@@ -1215,7 +1240,7 @@ function GameRoom({
     if (!game) return [];
     const alloc = allocateStrokes(
       game.holes_meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })),
-      applyAllowance(p.course_handicap, game.allowance_pct ?? 100),
+      applyAllowance(chBasis(p, game.course_par), game.allowance_pct ?? 100),
     );
     return game.holes_meta.map((m, i) => ({
       hole_number: m.n,
@@ -1455,13 +1480,15 @@ function GameRoom({
     const n = game?.holes_meta?.length ?? 18;
     return { scores: Array(n).fill(null), putts: Array(n).fill(null), fairways: Array(n).fill(null) };
   };
-  const addGuestToGame = async (name: string, hcp: number) => {
-    if (!game || !name.trim() || Number.isNaN(hcp)) return;
+  const addGuestToGame = async (name: string, idx: number) => {
+    if (!game || !name.trim() || Number.isNaN(idx)) return;
     const t = refTee();
+    const ch = (t.slope != null && t.rating != null && game.course_par != null)
+      ? courseHandicap(idx, t.slope, t.rating, game.course_par) : null;
     await supabase.from("game_players").insert({
       game_id: game.id, user_id: null, is_guest: true, display_name: name.trim(),
-      handicap_index: null, rating: t.rating, slope: t.slope, tee_name: t.tee_name,
-      course_handicap: hcp, ...blankCard(),
+      handicap_index: idx, rating: t.rating, slope: t.slope, tee_name: t.tee_name,
+      course_handicap: ch, ...blankCard(),
     });
     await load();
   };
@@ -2226,7 +2253,7 @@ function GameRoom({
                 if (pr) {
                   const oppId = pr.a === myKey ? pr.b : pr.a;
                   const oppP = players.find((p) => pkey(p) === oppId);
-                  const allowPair = matchAllowance(me.course_handicap, oppP?.course_handicap ?? null, game.allowance_pct ?? 100);
+                  const allowPair = matchAllowance(chBasis(me, game.course_par), oppP ? chBasis(oppP, game.course_par) : null, game.allowance_pct ?? 100);
                   matchAllow = allowPair.a;
                   oppAllow = allowPair.b;
                 }
@@ -2236,7 +2263,7 @@ function GameRoom({
                   hole_number: m.n,
                   stroke_index: m.si,
                 })),
-                applyAllowance(me.course_handicap, game.allowance_pct ?? 100),
+                applyAllowance(chBasis(me, game.course_par), game.allowance_pct ?? 100),
               );
               return game.holes_meta.map((m, i) => ({
                 n: m.n,
@@ -2304,7 +2331,7 @@ function GameRoom({
                 const oppIds = onA ? f.b : f.a;
                 const members = [...f.a, ...f.b].map((uid: string) => {
                   const p = players.find((pp) => pkey(pp) === uid);
-                  return { id: uid, gross: p?.scores || [], ch: p?.course_handicap ?? null, noShow: !!p?.no_show };
+                  return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par) : null, noShow: !!p?.no_show };
                 });
                 // myIds as the "A" side so positive lead = my team up.
                 const prog = fourballProgress(game.holes_meta, members, myIds, oppIds, game.allowance_pct ?? 100);
@@ -2383,7 +2410,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
     const net = gross - recv;
     return net < par ? GREEN : net === par ? BLUE : RED;
   };
-  const recvFor = (p: Player, si: number | null) => strokesReceived(si, applyAllowance(p.course_handicap, allowance));
+  const recvFor = (p: Player, si: number | null) => strokesReceived(si, applyAllowance(chBasis(p, game.course_par), allowance));
 
   // Column order + colour. Stableford: alphabetical. Team match: each pairing's
   // two players adjacent, with a divider between matches. Foursome formats: Pair A
@@ -2676,7 +2703,7 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
   const teamName = (key: string | null | undefined) => teams?.find((t) => t.key === key)?.name || "—";
   const skinPlayerOf = (uid: string): SkinPlayer | null => {
     const p = playerOf(uid);
-    return p ? { id: pkey(p), name: p.display_name, gross: p.scores || [], ch: p.course_handicap, noShow: !!p.no_show } : null;
+    return p ? { id: pkey(p), name: p.display_name, gross: p.scores || [], ch: chBasis(p, game.course_par), noShow: !!p.no_show } : null;
   };
   const ORANGE = "#E8730C";
 
@@ -2712,7 +2739,7 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
     const cards = foursomes.map((f) => {
       const members: FourballMember[] = [...f.a, ...f.b].map((uid) => {
         const p = playerOf(uid);
-        return { id: uid, gross: p?.scores || [], ch: p?.course_handicap ?? null, noShow: !!p?.no_show };
+        return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par) : null, noShow: !!p?.no_show };
       });
       const result = computeTeamBestBallSkins(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100);
       return { f, result };
@@ -2858,7 +2885,7 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
   // Fallback for old skins games that have not yet been configured with pairings.
   const nameById: Record<string, string> = {};
   players.forEach((p) => (nameById[p.id] = p.display_name));
-  const skinPlayers: SkinPlayer[] = players.map((p) => ({ id: p.id, name: p.display_name, gross: p.scores || [], ch: p.course_handicap }));
+  const skinPlayers: SkinPlayer[] = players.map((p) => ({ id: p.id, name: p.display_name, gross: p.scores || [], ch: chBasis(p, game.course_par) }));
   const result = computeSkins(game.holes_meta, skinPlayers, game.allowance_pct ?? 100);
   const firstUndecided = result.holes.find((h) => !h.decided);
   const carrying = firstUndecided ? firstUndecided.carriedIn : result.carryAtEnd;
@@ -2955,7 +2982,7 @@ function MatchView({
     game.pairings.forEach((pr) => {
       const pa = playerOf(pr.a), pb = playerOf(pr.b);
       if (!pa || !pb) return;
-      const st = matchStatus(game.holes_meta, pa.scores || [], pb.scores || [], pa.course_handicap, pb.course_handicap, game.allowance_pct ?? 100);
+      const st = matchStatus(game.holes_meta, pa.scores || [], pb.scores || [], chBasis(pa, game.course_par), chBasis(pb, game.course_par), game.allowance_pct ?? 100);
       // Determine which team each player is on.
       const ta = pa.team, tb = pb.team;
       if (!ta || !tb || ta === tb) return; // need a cross-team pairing
@@ -3108,7 +3135,7 @@ function MatchView({
           pb.course_handicap,
           game.allowance_pct ?? 100,
         );
-        const allow = matchAllowance(pa.course_handicap, pb.course_handicap, game.allowance_pct ?? 100);
+        const allow = matchAllowance(chBasis(pa, game.course_par), chBasis(pb, game.course_par), game.allowance_pct ?? 100);
         const leader =
           st.lead > 0 ? pa.display_name : st.lead < 0 ? pb.display_name : null;
         const statusText = st.result
@@ -3288,7 +3315,7 @@ function FourballView({
   const members4 = (f: { a: string[]; b: string[] }): FourballMember[] =>
     [...f.a, ...f.b].map((uid) => {
       const p = playerOf(uid);
-      return { id: uid, gross: p?.scores || [], ch: p?.course_handicap ?? null, noShow: !!(p as any)?.no_show };
+      return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par) : null, noShow: !!(p as any)?.no_show };
     });
 
   // Ryder-Cup team rollup: each 2-v-2 foursome is worth a point to the winning
@@ -3539,8 +3566,8 @@ function StrokesSummary({ game, players, collapsible = false }: { game: Game; pl
     return ti >= 0 ? teamAccent(teams[ti].name, ti) : C.gold;
   };
 
-  const ph = (ch: number | null | undefined) => applyAllowance(ch, allowance);
-  const phStr = (ch: number | null | undefined) => (ch == null ? "—" : String(ph(ch)));
+  const phStr = (pp: Player) => (pp.course_handicap == null && pp.handicap_index == null ? "\u2014" : String(applyAllowance(chBasis(pp, game.course_par), allowance)));
+  // phStr uses the unrounded course handicap (WHS: allowance applied to unrounded, rounded once).
 
   const strokeText = (n: number): string => {
     if (n <= 0) return "scratch";
@@ -3560,13 +3587,13 @@ function StrokesSummary({ game, players, collapsible = false }: { game: Game; pl
   const oneVone = (aId: string, bId: string, key: string) => {
     const a = byKey(aId), b = byKey(bId);
     if (!a || !b) return null;
-    const allow = matchAllowance(a.course_handicap, b.course_handicap, allowance);
+    const allow = matchAllowance(chBasis(a, game.course_par), chBasis(b, game.course_par), allowance);
     return (
       <div key={key} style={{ borderTop: "1px solid rgba(255,255,255,0.10)", padding: "10px 0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ flex: 1, color: C.cream, fontSize: 15, fontWeight: 600 }}>{a.display_name} <span style={{ color: C.sage, fontSize: 12, fontWeight: 400 }}>ph {phStr(a.course_handicap)}</span></span>
+          <span style={{ flex: 1, color: C.cream, fontSize: 15, fontWeight: 600 }}>{a.display_name} <span style={{ color: C.sage, fontSize: 12, fontWeight: 400 }}>ph {phStr(a)}</span></span>
           <span style={{ color: C.faint, fontSize: 12 }}>vs</span>
-          <span style={{ flex: 1, textAlign: "right", color: C.cream, fontSize: 15, fontWeight: 600 }}><span style={{ color: C.sage, fontSize: 12, fontWeight: 400 }}>ph {phStr(b.course_handicap)}</span> {b.display_name}</span>
+          <span style={{ flex: 1, textAlign: "right", color: C.cream, fontSize: 15, fontWeight: 600 }}><span style={{ color: C.sage, fontSize: 12, fontWeight: 400 }}>ph {phStr(b)}</span> {b.display_name}</span>
         </div>
         <div style={{ color: "#CFE3D8", fontSize: 12, marginTop: 6 }}>
           {allow.a === 0 && allow.b === 0
@@ -3582,15 +3609,15 @@ function StrokesSummary({ game, players, collapsible = false }: { game: Game; pl
   const teamStrip = (f: { a: string[]; b: string[] }, key: string) => {
     const members = [...f.a, ...f.b].map(byKey).filter((p): p is Player => !!p);
     if (members.length < 2) return null;
-    const low = Math.min(...members.map((m) => applyAllowance(m.course_handicap, allowance)));
+    const low = Math.min(...members.map((m) => applyAllowance(chBasis(m, game.course_par), allowance)));
     const col = (side: string[], teamKey: string | null) => (
       <div style={{ flex: 1, borderTop: `2px solid ${teamColOf(teamKey)}`, paddingTop: 8 }}>
         {teams && teamKey && <div style={{ color: teamColOf(teamKey), fontSize: 11, fontWeight: 600, marginBottom: 6 }}>{teams.find((t) => t.key === teamKey)?.name?.toUpperCase()}</div>}
         {side.map(byKey).filter((p): p is Player => !!p).map((p) => {
-          const recv = applyAllowance(p.course_handicap, allowance) - low;
+          const recv = applyAllowance(chBasis(p, game.course_par), allowance) - low;
           return (
             <div key={p.id} style={{ padding: "4px 0" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", color: C.cream, fontSize: 14 }}><span>{p.display_name}</span><span style={{ color: C.sage }}>ph {phStr(p.course_handicap)}</span></div>
+              <div style={{ display: "flex", justifyContent: "space-between", color: C.cream, fontSize: 14 }}><span>{p.display_name}</span><span style={{ color: C.sage }}>ph {phStr(p)}</span></div>
               <div style={{ color: recv > 0 ? "#E4CF86" : C.sage, fontSize: 11, marginTop: 1 }}>{strokeText(recv)}</div>
             </div>
           );
@@ -3887,7 +3914,9 @@ function OrganizerPanel({
                       {p.is_guest ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>guest</span> : null}
                     </div>
                     <div style={{ color: C.faint, fontSize: 12 }}>
-                      {p.course_handicap != null ? `course handicap ${p.course_handicap}` : "no handicap yet"}
+                      {p.course_handicap != null
+                        ? `course handicap ${p.course_handicap} · plays ${applyAllowance(chBasis(p, game.course_par), game.allowance_pct ?? 100)}${(game.allowance_pct ?? 100) !== 100 ? ` (${game.allowance_pct}%)` : ""}`
+                        : "no handicap yet"}
                       {p.tee_name ? ` · ${p.tee_name}` : ""}
                     </div>
                   </div>
@@ -4035,11 +4064,11 @@ function OrganizerPanel({
                   <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2, fontWeight: 700, marginTop: eligibleMembers.length > 0 ? 14 : 0 }}>ADD A GUEST</div>
                   <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
                     <input value={addGuestName} onChange={(e) => setAddGuestName(e.target.value)} placeholder="Guest name" style={{ ...inputStyle, padding: "8px 10px", flex: 1, minWidth: 140 }} />
-                    <input value={addGuestHcp} onChange={(e) => { const v = e.target.value; if (v === "" || /^-?\d*$/.test(v)) setAddGuestHcp(v); }} inputMode="numeric" placeholder="Course hcp" style={{ ...inputStyle, padding: "8px 10px", width: 100 }} />
+                    <input value={addGuestHcp} onChange={(e) => { const v = e.target.value; if (v === "" || /^-?\d*\.?\d*$/.test(v)) setAddGuestHcp(v); }} inputMode="decimal" placeholder="Handicap index" style={{ ...inputStyle, padding: "8px 10px", width: 120 }} />
                     <button
                       disabled={!addGuestName.trim() || addGuestHcp === ""}
                       onClick={async () => {
-                        if (onAddGuest) { await onAddGuest(addGuestName, parseInt(addGuestHcp, 10)); setAddGuestName(""); setAddGuestHcp(""); }
+                        if (onAddGuest) { await onAddGuest(addGuestName, parseFloat(addGuestHcp)); setAddGuestName(""); setAddGuestHcp(""); }
                       }}
                       style={{ ...btn(false), fontSize: 13, padding: "8px 14px", opacity: addGuestName.trim() && addGuestHcp !== "" ? 1 : 0.5 }}
                     >+ Add guest</button>

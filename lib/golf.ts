@@ -53,6 +53,15 @@ export function courseHandicap(index: number, slope: number, rating: number, par
   return Math.round(index * (slope / 113) + (rating - par));
 }
 
+// Unrounded course handicap. Since the April 2024 WHS revision, handicap
+// allowances are applied to the UNROUNDED course handicap, with a single round
+// at the end (Appendix C / USGA). Use this as the basis for playing-handicap and
+// stroke math; use courseHandicap() only for display.
+export function courseHandicapExact(index: number, slope: number, rating: number, par: number): number | null {
+  if ([index, slope, rating, par].some((v) => v == null || isNaN(v as number))) return null;
+  return index * (slope / 113) + (rating - par);
+}
+
 export function strokesReceived(si: number | null, ch: number | null): number {
   if (si == null || ch == null) return 0;
   if (ch >= 0) return Math.floor(ch / 18) + (si <= ch % 18 ? 1 : 0);
