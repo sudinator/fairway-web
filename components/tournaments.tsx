@@ -2679,57 +2679,70 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
     return { g, pts };
   };
 
-  const holeRow = (i: number) => {
+  const holeCard = (i: number) => {
     const m = meta[i];
     return (
-      <React.Fragment key={`h${i}`}>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "#102E25", borderRadius: 5, padding: "4px 0" }}>
-          <b style={{ color: C.cream, fontSize: 17, fontWeight: 800, lineHeight: 1 }}>{m.n}</b>
-          <span style={{ color: "#8FB0A0", fontSize: 8, lineHeight: 1.25 }}>Par {m.par}</span>
-          <span style={{ color: "#8FB0A0", fontSize: 8, lineHeight: 1.25 }}>{m.yards ? `${m.yards}y · ` : ""}SI {m.si ?? "–"}</span>
+      <div key={`hc${i}`} style={{ background: "#13352A", border: "1px solid #2E6B55", borderRadius: 10, padding: 8, marginBottom: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+          <span style={{ color: C.cream, fontSize: 18, fontWeight: 800, lineHeight: 1 }}>Hole {m.n}</span>
+          <span style={{ color: "#CFE3D8", fontSize: 13 }}>Par <b style={{ color: C.cream }}>{m.par}</b>{m.yards ? <> · <b style={{ color: C.cream }}>{m.yards}</b> yds</> : null} · SI <b style={{ color: C.cream }}>{m.si ?? "–"}</b></span>
         </div>
-        {cols.map((c, ci) => {
-          if (c.type === "divider") return <div key={`hd${i}-${ci}`} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ width: 2, height: 30, background: "rgba(216,178,74,0.5)", borderRadius: 2 }} /></div>;
-          const p = c.p;
-          const gross = p.scores?.[i] ?? null;
-          const recv = recvFor(p, m.si);
-          const pts = stablefordPts(gross, m.par, recv);
-          return (
-            <div key={p.id + i} style={{ ...cell, cursor: isMarker ? "pointer" : "default", outline: isMarker ? "1px solid #E6E0CC" : "none" }}
-              onClick={isMarker ? () => { if (gross == null || gross <= 0) onSetHole(p.id, i, { strokes: m.par }); setEdit({ playerId: p.id, holeIdx: i }); } : undefined}>
-              {recv > 0 && (
-                <div style={{ position: "absolute", top: 3, left: 4, display: "flex", gap: 2 }}>
-                  {Array.from({ length: Math.min(recv, 2) }).map((_, d) => (
-                    <span key={d} style={{ width: 5, height: 5, borderRadius: 99, background: "#E8730C", display: "block" }} />
-                  ))}
+        <div style={{ display: "flex", gap: 6 }}>
+          {cols.map((c, ci) => {
+            if (c.type === "divider") return <div key={`hd${i}-${ci}`} style={{ width: 2, alignSelf: "stretch", background: "rgba(216,178,74,0.5)", borderRadius: 2, margin: "16px 1px 0" }} />;
+            const p = c.p;
+            const gross = p.scores?.[i] ?? null;
+            const recv = recvFor(p, m.si);
+            const pts = stablefordPts(gross, m.par, recv);
+            return (
+              <div key={p.id + i} style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: colorFor(p), fontSize: 10, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 3 }}>{p.display_name}</div>
+                <div
+                  style={{ position: "relative", background: "#FBFAF4", borderRadius: 7, height: 56, display: "flex", alignItems: "center", justifyContent: "center", cursor: isMarker ? "pointer" : "default", outline: isMarker ? "1px solid #E6E0CC" : "none" }}
+                  onClick={isMarker ? () => { if (gross == null || gross <= 0) onSetHole(p.id, i, { strokes: m.par }); setEdit({ playerId: p.id, holeIdx: i }); } : undefined}>
+                  {recv > 0 && (
+                    <div style={{ position: "absolute", top: 4, left: 5, display: "flex", gap: 2 }}>
+                      {Array.from({ length: Math.min(recv, 2) }).map((_, d) => (
+                        <span key={d} style={{ width: 6, height: 6, borderRadius: 99, background: "#E8730C", display: "block" }} />
+                      ))}
+                    </div>
+                  )}
+                  <span style={{ fontSize: 26, fontWeight: 800, color: netColor(gross, recv, m.par) }}>{gross != null && gross > 0 ? gross : "·"}</span>
+                  {gross != null && gross > 0 && (
+                    <span style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#fff", fontSize: 11, fontWeight: 800, padding: "0 6px", borderRadius: 6 }}>{pts ?? 0}</span>
+                  )}
                 </div>
-              )}
-              <span style={{ fontSize: 19, fontWeight: 800, color: netColor(gross, recv, m.par) }}>{gross != null && gross > 0 ? gross : "·"}</span>
-              {gross != null && gross > 0 && (
-                <span style={{ position: "absolute", bottom: 2, right: 3, background: C.green, color: "#fff", fontSize: 10, fontWeight: 800, padding: "0 5px", borderRadius: 6 }}>{pts ?? 0}</span>
-              )}
-            </div>
-          );
-        })}
-      </React.Fragment>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     );
   };
 
-  const aggRow = (label: string, from: number, to: number) => (
-    <React.Fragment key={label}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", background: "#0A241C", borderRadius: 5, color: "#CFE3D8", fontSize: 10, fontWeight: 800, letterSpacing: 1 }}>{label}</div>
-      {cols.map((c, ci) => {
-        if (c.type === "divider") return <div key={`ad${label}-${ci}`} />;
-        const p = c.p;
-        const s = sums(p, from, to);
-        return (
-          <div key={p.id + label} style={agg}>
-            <span>{s.g || "–"}</span>
-            <span style={{ position: "absolute", bottom: 2, right: 3, background: C.green, color: "#E4CF86", fontSize: 10, fontWeight: 800, padding: "0 5px", borderRadius: 6 }}>{s.pts}</span>
-          </div>
-        );
-      })}
-    </React.Fragment>
+  const totalsCard = () => (
+    <div style={{ background: "#0A241C", border: "1px solid #2E6B55", borderRadius: 10, padding: 8, marginTop: 2 }}>
+      <div style={{ color: "#CFE3D8", fontSize: 11, fontWeight: 800, letterSpacing: 1.5, marginBottom: 8 }}>TOTALS</div>
+      <div style={{ display: "flex", gap: 6 }}>
+        {cols.map((c, ci) => {
+          if (c.type === "divider") return <div key={`td${ci}`} style={{ width: 2, alignSelf: "stretch", background: "rgba(216,178,74,0.5)", borderRadius: 2, margin: "16px 1px 0" }} />;
+          const p = c.p;
+          const tot = sums(p, 0, meta.length - 1);
+          const out = meta.length >= 18 ? sums(p, 0, 8) : null;
+          const inn = meta.length >= 18 ? sums(p, 9, 17) : null;
+          return (
+            <div key={p.id + "tot"} style={{ flex: 1, minWidth: 0, textAlign: "center" }}>
+              <div style={{ color: colorFor(p), fontSize: 10, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 3 }}>{p.display_name}</div>
+              <div style={{ position: "relative", background: C.greenLight, borderRadius: 7, height: 48, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
+                <span style={{ fontSize: 22, fontWeight: 800 }}>{tot.g || "–"}</span>
+                <span style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#E4CF86", fontSize: 10, fontWeight: 800, padding: "0 5px", borderRadius: 6 }}>{tot.pts}</span>
+              </div>
+              {out && inn && <div style={{ color: C.sage, fontSize: 9, marginTop: 3 }}>out {out.g || "–"} · in {inn.g || "–"}</div>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 
   const half = meta.length >= 18 ? 9 : Math.ceil(meta.length / 2);
@@ -2786,31 +2799,25 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
         <span style={{ color: "#E0796B", fontSize: 10 }}>● over (net)</span>
         <span style={{ color: "#E8730C", fontSize: 10 }}>● gets a stroke · corner = Stableford</span>
       </div>
-      <div style={{ overflowX: "auto" }}>
-        <div style={{ display: "grid", gridTemplateColumns: colTmpl, gap: 3, minWidth: 300 }}>
-          <div />
-          {cols.map((c, ci) => {
-            if (c.type === "divider") return <div key={`cd${ci}`} />;
-            const p = c.p;
-            return (
-              <div key={p.id} style={{ textAlign: "center", padding: "4px 2px", borderBottom: `2px solid ${colorFor(p)}` }}>
-                <div style={{ display: "flex", justifyContent: "center", marginBottom: 3 }}>
-                  <Avatar src={p.avatar_url} name={p.display_name} cssSize="min(65px, 90%)" accent={colorFor(p)} />
-                </div>
-                <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {p.display_name}{p.is_guest ? " ·G" : ""}
-                </div>
-                <div style={{ color: C.sage, fontSize: 9 }}>hcp {p.course_handicap}</div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+        {cols.map((c, ci) => {
+          if (c.type === "divider") return <div key={`lg${ci}`} style={{ width: 2, alignSelf: "stretch", background: "rgba(216,178,74,0.5)", borderRadius: 2, margin: "0 1px" }} />;
+          const p = c.p;
+          return (
+            <div key={p.id} style={{ flex: 1, minWidth: 0, textAlign: "center", padding: "4px 2px", borderBottom: `2px solid ${colorFor(p)}` }}>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 3 }}>
+                <Avatar src={p.avatar_url} name={p.display_name} cssSize="min(54px, 90%)" accent={colorFor(p)} />
               </div>
-            );
-          })}
-          {meta.slice(0, half).map((_, i) => holeRow(i))}
-          {meta.length > half && meta.slice(half).map((_, i) => holeRow(i + half))}
-          {meta.length >= 18 && aggRow("IN", 9, 17)}
-          {meta.length >= 18 && aggRow("OUT", 0, 8)}
-          {aggRow("TOT", 0, meta.length - 1)}
-        </div>
+              <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {p.display_name}{p.is_guest ? " ·G" : ""}
+              </div>
+              <div style={{ color: C.sage, fontSize: 9 }}>hcp {p.course_handicap}</div>
+            </div>
+          );
+        })}
       </div>
+      {meta.map((_, i) => holeCard(i))}
+      {totalsCard()}
 
       {edit && (() => {
         const p = players.find((x) => x.id === edit.playerId);
