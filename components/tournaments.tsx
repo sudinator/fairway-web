@@ -38,6 +38,7 @@ import {
 import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearAllGameScores } from "@/lib/draft";
+import { APP_VERSION } from "@/lib/app-version";
 import {
   btn,
   inputStyle,
@@ -1072,6 +1073,7 @@ function GameRoom({
   // Which step of the setup flow is showing: players & tees, teams, matchups, groups.
   const [setupTab, setSetupTab] = useState<"players" | "teams" | "matchups" | "groups">("players");
   const [cardView, setCardView] = useState(false); // show the whole-group vertical scorecard
+  const [disbandDiag, setDisbandDiag] = useState<string>(""); // TEMP debug: what disband did
 
   // ---- Tee groups (foursomes that play together, each with its own marker) ----
   const myRow = players.find((p) => p.user_id === user.id) || null;
@@ -1446,24 +1448,45 @@ function GameRoom({
   // no two devices ever write the same row (the no-dupe-write invariant).
   const everyoneScoresOwn = async () => {
     if (!game) { setCardView(false); return; }
-    if (teeGroupsInUse) {
-      const grpMarker = players.find((p) => p.tee_group === myRow?.tee_group && p.is_marker);
-      if (grpMarker && grpMarker.id !== myRow?.id) {
-        await supabase.rpc("claim_group_marker", { p_game: game.id }); // take over
-        await supabase.rpc("release_group_marker", { p_game: game.id }); // then step down -> nobody
-      } else if (grpMarker && grpMarker.id === myRow?.id) {
-        await supabase.rpc("release_group_marker", { p_game: game.id });
+    let diag = "";
+    try {
+      if (teeGroupsInUse) {
+        const grpMarker = players.find((p) => p.tee_group === myRow?.tee_group && p.is_marker);
+        if (grpMarker && grpMarker.id !== myRow?.id) {
+          const r1 = await supabase.rpc("claim_group_marker", { p_game: game.id });
+          if (r1.error) diag += `claimGrp:${r1.error.message}; `;
+          const r2 = await supabase.rpc("release_group_marker", { p_game: game.id });
+          if (r2.error) diag += `releaseGrp:${r2.error.message}; `;
+        } else if (grpMarker && grpMarker.id === myRow?.id) {
+          const r2 = await supabase.rpc("release_group_marker", { p_game: game.id });
+          if (r2.error) diag += `releaseGrp(self):${r2.error.message}; `;
+        } else {
+          diag += "no grp marker found; ";
+        }
+        setPlayers((ps) => ps.map((p) => (p.tee_group === myRow?.tee_group ? { ...p, is_marker: false } : p))); // optimistic
+      } else if (game.marker_user_id) {
+        if (game.marker_user_id !== user.id) {
+          const rc = await supabase.rpc("claim_marker", { p_game_id: game.id });
+          if (rc.error) diag += `claim:${rc.error.message}; `;
+        }
+        const rr = await supabase.rpc("release_marker", { p_game_id: game.id });
+        if (rr.error) diag += `release:${rr.error.message}; `;
+        setGame({ ...game, marker_user_id: null }); // optimistic
+      } else {
+        diag += "no marker_user_id set; ";
       }
-      setPlayers((ps) => ps.map((p) => (p.tee_group === myRow?.tee_group ? { ...p, is_marker: false } : p))); // optimistic
-    } else if (game.marker_user_id) {
-      if (game.marker_user_id !== user.id) await supabase.rpc("claim_marker", { p_game_id: game.id }); // take over
-      await supabase.rpc("release_marker", { p_game_id: game.id }); // then release -> nobody
-      setGame({ ...game, marker_user_id: null }); // optimistic
-    }
+    } catch (e: any) { diag += `exc:${e?.message || e}; `; }
     setCardView(false);
+    // Verify against the DB so we can SEE whether the marker actually cleared.
+    try {
+      const { data: g2 } = await supabase.from("games").select("marker_user_id").eq("id", game.id).single();
+      const { data: ps2 } = await supabase.from("game_players").select("is_marker").eq("game_id", game.id);
+      const stillGrp = (ps2 || []).some((p: any) => p.is_marker);
+      diag += `after: marker=${(g2 as any)?.marker_user_id ? "SET" : "null"}, anyIsMarker=${stillGrp}`;
+    } catch (e: any) { diag += `verify:${e?.message || e}`; }
+    setDisbandDiag(diag || "released OK");
     load();
   };
-
   const completeSetup = async () => {
     if (!game || !me) return;
     const idxVal = idxStr.trim() === "" ? null : parseFloat(idxStr);
@@ -2258,6 +2281,14 @@ function GameRoom({
         );
       })()}
 
+      {roomTab === "play" && (
+        <div style={{ fontFamily: "monospace", fontSize: 10, color: C.sage, background: "#16302A", border: `1px dashed ${C.line}`, borderRadius: 8, padding: "6px 8px", marginTop: 8, lineHeight: 1.5, wordBreak: "break-word" }}>
+          <div>v{APP_VERSION} · tee={String(teeGroupsInUse)} · cardView={String(cardView)} · ended={String(isEnded)}</div>
+          <div>marker_user_id={game.marker_user_id ? String(game.marker_user_id).slice(0, 8) : "null"} · me={me?.id ? String(me.id).slice(0, 8) : "NULL"} · iAmMarker={String(game.marker_user_id === user.id)}</div>
+          <div>my is_marker={String(!!myRow?.is_marker)} · myGroupHasMarker={String(!!myGroupHasMarker)} · myTeeGroup={String(myRow?.tee_group)}</div>
+          {disbandDiag && <div style={{ color: C.gold }}>disband → {disbandDiag}</div>}
+        </div>
+      )}
       {roomTab === "play" && (
         <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
           <button onClick={() => setCardView(false)} style={{ ...btn(!cardView), flex: 1, fontSize: 13 }}>Results</button>
