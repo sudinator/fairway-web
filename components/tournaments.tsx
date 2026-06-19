@@ -2202,7 +2202,7 @@ function GameRoom({
       })()}
 
       {((roomTab === "play") || (roomTab === "setup" && setupTab === "matchups")) && (
-        <StrokesSummary game={game} players={players} collapsible={roomTab === "play"} />
+        <StrokesSummary game={game} players={players} collapsible={roomTab === "play"} meKey={myRow ? pkey(myRow) : undefined} />
       )}
 
       {roomTab === "play" && !isEnded && (() => {
@@ -3753,8 +3753,9 @@ function FourballView({
 // team point) it lists each player's course handicap and the strokes they get
 // off the foursome's low. Hole numbers come from the same allocateStrokes the
 // scorecard dots use, so the panel and the card never disagree.
-function StrokesSummary({ game, players, collapsible = false }: { game: Game; players: Player[]; collapsible?: boolean }) {
+function StrokesSummary({ game, players, collapsible = false, meKey }: { game: Game; players: Player[]; collapsible?: boolean; meKey?: string }) {
   const [open, setOpen] = useState(true);
+  const [showAll, setShowAll] = useState(false);
   const allowance = game.allowance_pct ?? 100;
   const meta = game.holes_meta || [];
   const total = meta.length;
@@ -3836,28 +3837,106 @@ function StrokesSummary({ game, players, collapsible = false }: { game: Game; pl
     );
   };
 
+  // Default to just the current player's group (their tee group if tee groups are
+  // set, else the single pairing/foursome they're in). A toggle expands to the
+  // whole field, so a 10-foursome game isn't a wall of strokes by default.
+  const meRow = meKey ? players.find((p) => pkey(p) === meKey) || null : null;
+  const myTeeGroup = meRow?.tee_group ?? null;
+  const teeGroupsInUse = players.some((p) => p.tee_group != null);
+  const pairingMine = (pr: { a: string; b: string }) => {
+    if (teeGroupsInUse && myTeeGroup != null) {
+      const a = byKey(pr.a), b = byKey(pr.b);
+      return a?.tee_group === myTeeGroup || b?.tee_group === myTeeGroup;
+    }
+    return !!meKey && (pr.a === meKey || pr.b === meKey);
+  };
+  const foursomeMine = (f: { a: string[]; b: string[] }) => {
+    if (teeGroupsInUse && myTeeGroup != null) {
+      return [...f.a, ...f.b].map(byKey).some((m) => m?.tee_group === myTeeGroup);
+    }
+    return !!meKey && [...f.a, ...f.b].includes(meKey);
+  };
+  const totalUnits = pairings.length + foursomes.length;
+  const myUnits = pairings.filter(pairingMine).length + foursomes.filter(foursomeMine).length;
+  const canFilter = !!meKey && myUnits > 0;
+  const showToggle = canFilter && totalUnits > myUnits;
+
+  // Render one foursome's strokes (label + trifecta singles + team strip).
+  const foursomeBlock = (
+    f: { id?: string; name?: string; a: string[]; b: string[]; swap?: boolean },
+    i: number,
+    opts?: { label?: boolean; dim?: boolean },
+  ) => {
+    const singles = isTrifecta ? trifectaSingles(f.a, f.b, !!f.swap) : [];
+    return (
+      <div key={f.id || i} style={{ borderTop: "1px solid rgba(255,255,255,0.10)", paddingTop: 10, marginTop: 6, opacity: opts?.dim ? 0.62 : 1 }}>
+        {opts?.label !== false && <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 600 }}>{(f.name || `Foursome ${i + 1}`).toUpperCase()}</div>}
+        {isTrifecta && singles.length > 0 && (
+          <>
+            <div style={{ color: C.sage, fontSize: 10, letterSpacing: 1, marginTop: 6 }}>TWO SINGLES</div>
+            {singles.map(([aId, bId], si) => oneVone(aId, bId, `${f.id}-s${si}`))}
+            <div style={{ color: C.sage, fontSize: 10, letterSpacing: 1, marginTop: 10 }}>TEAM POINT · {game.team_score_mode === "aggregate" ? "SHOOTOUT" : "BEST BALL"}</div>
+          </>
+        )}
+        {teamStrip(f, `${f.id}-t`)}
+      </div>
+    );
+  };
+
+  const toggleBtn = showToggle ? (
+    <button
+      onClick={(e) => { e.stopPropagation(); setShowAll((sa) => !sa); }}
+      style={{ background: "none", border: "none", color: C.gold, fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", padding: "4px 2px", flexShrink: 0 }}
+    >
+      {showAll ? "▴ Show my group" : `▾ Show all ${totalUnits} groups`}
+    </button>
+  ) : null;
+
+  const mineFoursomes = foursomes.map((f, i) => ({ f, i })).filter(({ f }) => foursomeMine(f));
+  const minePairings = pairings.map((pr, i) => ({ pr, i })).filter(({ pr }) => pairingMine(pr));
+  const otherFoursomes = foursomes.map((f, i) => ({ f, i })).filter(({ f }) => !foursomeMine(f));
+  const otherPairings = pairings.map((pr, i) => ({ pr, i })).filter(({ pr }) => !pairingMine(pr));
+  // When the player's group is a single foursome, its name rides on the header row.
+  const soleFoursome = canFilter && minePairings.length === 0 && mineFoursomes.length === 1 ? mineFoursomes[0] : null;
+
   const body = (
     <>
       {!hasStructure && (
         <div style={{ color: C.sage, fontSize: 12, padding: "8px 0" }}>Set the matchups to see strokes.</div>
       )}
-      {pairings.length > 0 && pairings.map((pr, i) => oneVone(pr.a, pr.b, `p${i}`))}
-      {foursomes.length > 0 && foursomes.map((f, i) => {
-        const singles = isTrifecta ? trifectaSingles(f.a, f.b, !!f.swap) : [];
-        return (
-          <div key={f.id || i} style={{ borderTop: "1px solid rgba(255,255,255,0.10)", paddingTop: 10, marginTop: 6 }}>
-            <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 600 }}>{(f.name || `Foursome ${i + 1}`).toUpperCase()}</div>
-            {isTrifecta && singles.length > 0 && (
-              <>
-                <div style={{ color: C.sage, fontSize: 10, letterSpacing: 1, marginTop: 6 }}>TWO SINGLES</div>
-                {singles.map(([aId, bId], si) => oneVone(aId, bId, `${f.id}-s${si}`))}
-                <div style={{ color: C.sage, fontSize: 10, letterSpacing: 1, marginTop: 10 }}>TEAM POINT · {game.team_score_mode === "aggregate" ? "SHOOTOUT" : "BEST BALL"}</div>
-              </>
-            )}
-            {teamStrip(f, `${f.id}-t`)}
+
+      {!canFilter && hasStructure && (
+        <>
+          {pairings.map((pr, i) => oneVone(pr.a, pr.b, `p${i}`))}
+          {foursomes.map((f, i) => foursomeBlock(f, i))}
+        </>
+      )}
+
+      {canFilter && (
+        <>
+          {/* YOUR GROUP — always shown; the toggle rides its header row */}
+          <div style={{ boxShadow: `0 0 0 1px ${C.gold} inset`, borderRadius: 8, padding: "8px 8px 6px", marginTop: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <div>
+                <div style={{ color: C.gold, fontSize: 9, fontWeight: 800, letterSpacing: 1 }}>YOUR GROUP</div>
+                {soleFoursome && <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 600, marginTop: 2 }}>{(soleFoursome.f.name || `Foursome ${soleFoursome.i + 1}`).toUpperCase()}</div>}
+              </div>
+              {toggleBtn}
+            </div>
+            {minePairings.map(({ pr, i }) => oneVone(pr.a, pr.b, `p${i}`))}
+            {mineFoursomes.map(({ f, i }) => foursomeBlock(f, i, { label: !soleFoursome }))}
           </div>
-        );
-      })}
+
+          {showAll && (otherPairings.length > 0 || otherFoursomes.length > 0) && (
+            <>
+              <div style={{ color: C.faint, fontSize: 10, letterSpacing: 1.5, fontWeight: 700, marginTop: 14 }}>OTHER GROUPS</div>
+              {otherPairings.map(({ pr, i }) => <div key={`op${i}`} style={{ opacity: 0.62 }}>{oneVone(pr.a, pr.b, `p${i}`)}</div>)}
+              {otherFoursomes.map(({ f, i }) => foursomeBlock(f, i, { dim: true }))}
+            </>
+          )}
+        </>
+      )}
+
       {hasStructure && (
         <div style={{ color: C.faint, fontSize: 11, marginTop: 10 }}>ph — playing handicap{allowance !== 100 ? `, after the ${allowance}% allowance` : ""}.</div>
       )}
