@@ -2148,7 +2148,7 @@ function GameRoom({
       </div>
       )}
 
-      {roomTab === "play" && (() => {
+      {roomTab === "play" && !cardView && (() => {
         const subset = (teeGroupsInUse && myRow?.tee_group != null)
           ? players.filter((p) => p.tee_group === myRow.tee_group)
           : players;
@@ -2795,22 +2795,56 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
         <span style={{ color: "#E0796B", fontSize: 10 }}>● over (net)</span>
         <span style={{ color: "#E8730C", fontSize: 10 }}>● gets a stroke · corner = Stableford</span>
       </div>
-      <div style={{ display: "flex", gap: 6, position: "sticky", top: 0, zIndex: 5, background: C.green, paddingTop: 8, paddingBottom: 10, marginBottom: 4, boxShadow: "0 6px 10px -8px rgba(0,0,0,0.55)" }}>
-        {cols.map((c, ci) => {
-          if (c.type === "divider") return <div key={`lg${ci}`} style={{ width: 2, alignSelf: "stretch", background: "rgba(216,178,74,0.5)", borderRadius: 2, margin: "0 1px" }} />;
-          const p = c.p;
+      <div style={{ position: "sticky", top: "env(safe-area-inset-top)", zIndex: 5, background: C.green, paddingTop: 8, paddingBottom: 10, marginBottom: 4, boxShadow: "0 6px 10px -8px rgba(0,0,0,0.55)" }}>
+        {(() => {
+          const starts = players.map((p) => p.clock_start).filter(Boolean) as string[];
+          if (!starts.length) return null;
+          const startMs = Math.min(...starts.map((s) => new Date(s).getTime()));
+          const ends = players.map((p) => p.clock_end).filter(Boolean) as string[];
+          const allEnded = players.length > 0 && ends.length === players.length;
+          const endMs = allEnded ? Math.max(...ends.map((s) => new Date(s).getTime())) : Date.now();
+          const mins = Math.max(0, Math.round((endMs - startMs) / 60000));
+          const groupSize = Math.max(1, players.length);
+          const targetPerHole = 6 + 2 * groupSize;
+          const holesDone = Math.max(0, ...players.map((p) => (p.scores || []).filter((s) => s != null && (s as number) > 0).length));
+          const behind = mins - holesDone * targetPerHole;
+          const showPace = !allEnded && holesDone >= 1;
+          const onPace = behind <= 10;
           return (
-            <div key={p.id} style={{ flex: 1, minWidth: 0, textAlign: "center", padding: "4px 2px", borderBottom: `2px solid ${colorFor(p)}` }}>
-              <div style={{ display: "flex", justifyContent: "center", marginBottom: 3 }}>
-                <Avatar src={p.avatar_url} name={p.display_name} cssSize="min(54px, 90%)" accent={colorFor(p)} />
-              </div>
-              <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                {p.display_name}{p.is_guest ? " ·G" : ""}
-              </div>
-              <div style={{ color: C.sage, fontSize: 9 }}>hcp {meta.reduce((a, m) => a + recvFor(p, m.si), 0)}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 14 }}>⏱</span>
+              <span style={{ color: C.cream, fontWeight: 700, fontFamily: "Georgia, serif", fontSize: 16 }}>{Math.floor(mins / 60)}:{String(mins % 60).padStart(2, "0")}</span>
+              <span style={{ color: C.sage, fontSize: 11 }}>{allEnded ? "round time" : "elapsed"}{holesDone >= 1 ? ` · thru ${holesDone}` : ""}</span>
+              {showPace && <span style={{ flex: 1 }} />}
+              {showPace && (onPace ? (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(91,208,138,0.15)", color: "#7FD0A0", border: "1px solid rgba(91,208,138,0.4)", borderRadius: 999, padding: "2px 9px", fontSize: 10, fontWeight: 700 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: 99, background: "#5BD08A", display: "block" }} />On pace
+                </span>
+              ) : (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(216,178,74,0.16)", color: "#E4CF86", border: "1px solid rgba(216,178,74,0.5)", borderRadius: 999, padding: "2px 9px", fontSize: 10, fontWeight: 700 }}>
+                  ⚑ ~{behind} min behind
+                </span>
+              ))}
             </div>
           );
-        })}
+        })()}
+        <div style={{ display: "flex", gap: 6 }}>
+          {cols.map((c, ci) => {
+            if (c.type === "divider") return <div key={`lg${ci}`} style={{ width: 2, alignSelf: "stretch", background: "rgba(216,178,74,0.5)", borderRadius: 2, margin: "0 1px" }} />;
+            const p = c.p;
+            return (
+              <div key={p.id} style={{ flex: 1, minWidth: 0, textAlign: "center", padding: "4px 2px", borderBottom: `2px solid ${colorFor(p)}` }}>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 3 }}>
+                  <Avatar src={p.avatar_url} name={p.display_name} cssSize="min(54px, 90%)" accent={colorFor(p)} />
+                </div>
+                <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {p.display_name}{p.is_guest ? " ·G" : ""}
+                </div>
+                <div style={{ color: C.sage, fontSize: 9 }}>hcp {meta.reduce((a, m) => a + recvFor(p, m.si), 0)}</div>
+              </div>
+            );
+          })}
+        </div>
       </div>
       {(() => {
         const nodes: React.ReactNode[] = [];
