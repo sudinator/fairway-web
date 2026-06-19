@@ -2874,13 +2874,22 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
         const picks = Array.from(new Set([m.par - 1, m.par, m.par + 1, m.par + 2].filter((v) => v >= 1 && v <= netDouble)));
         const order = playerOrder;
         const goNext = () => {
+          // Save the player we're leaving (default to par if untouched).
+          const curG = p.scores?.[edit.holeIdx] ?? null;
+          if (curG == null || curG <= 0) onSetHole(p.id, edit.holeIdx, { strokes: m.par });
+          // Move to the next player on THIS hole who still needs a score (wrap around the
+          // row, skip no-shows). When everyone on the hole is scored, the card closes.
+          const needs = (pl: Player) => !pl.no_show && pl.id !== edit.playerId && ((pl.scores?.[edit.holeIdx] ?? null) == null || (pl.scores?.[edit.holeIdx] ?? 0) <= 0);
           const idx = order.findIndex((x) => x.id === edit.playerId);
-          let nextHole = edit.holeIdx; let np = order[idx + 1];
-          if (!np) { nextHole = edit.holeIdx + 1; np = order[0]; }
-          if (nextHole >= meta.length || !np) { setEdit(null); return; }
-          const ng = np.scores?.[nextHole] ?? null;
-          if (ng == null || ng <= 0) onSetHole(np.id, nextHole, { strokes: meta[nextHole].par });
-          setEdit({ playerId: np.id, holeIdx: nextHole });
+          for (let k = 1; k <= order.length; k++) {
+            const cand = order[(idx + k) % order.length];
+            if (needs(cand)) {
+              onSetHole(cand.id, edit.holeIdx, { strokes: m.par });
+              setEdit({ playerId: cand.id, holeIdx: edit.holeIdx });
+              return;
+            }
+          }
+          setEdit(null); // whole row scored — card disappears
         };
         const fwBtns: [("hit" | "left" | "right"), string][] = [["hit", "✓ Hit"], ["left", "◀ Left"], ["right", "Right ▶"]];
         return (
@@ -2919,7 +2928,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
               <div style={{ display: "flex", gap: 6, opacity: m.par < 4 ? 0.4 : 1, pointerEvents: m.par < 4 ? "none" : "auto" }}>
                 {fwBtns.map(([val, label]) => {
                   const on = fw === val; const isHit = val === "hit";
-                  return <button key={val} onClick={() => onSetHole(p.id, edit.holeIdx, { fairway: fw === val ? null : val })} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: `0.5px solid ${on ? (isHit ? "#1B6E4B" : "#C99A2E") : C.line}`, background: on ? (isHit ? "#E1F0E7" : "#F6ECCF") : C.card, color: on ? (isHit ? "#1B6E4B" : "#8A6A12") : C.faint, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{label}</button>;
+                  return <button key={val} onClick={() => onSetHole(p.id, edit.holeIdx, { fairway: fw === val ? null : val })} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: `0.5px solid ${on ? (isHit ? "#156B47" : C.birdie) : C.line}`, background: on ? (isHit ? "#C7E6D1" : "#F2CFCB") : C.card, color: on ? (isHit ? "#0F5436" : C.birdie) : C.faint, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{label}</button>;
                 })}
               </div>
 

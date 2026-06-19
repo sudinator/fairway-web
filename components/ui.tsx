@@ -290,8 +290,8 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
               <div key="fw" style={{ textAlign: "center" }}>
                 <button onClick={() => cycleFw(i, h.fairway, h.par)} disabled={h.par < 4}
                   style={{ border: `1px solid ${C.line}`, borderRadius: 6, width: 28, height: 30, cursor: h.par < 4 ? "default" : "pointer",
-                    background: h.fairway === "hit" ? "#DDF0DF" : (h.fairway === "left" || h.fairway === "right") ? "#F6ECCF" : h.fairway === "miss" ? "#F6DEDB" : C.card,
-                    color: h.fairway === "hit" ? C.greenMid : (h.fairway === "left" || h.fairway === "right") ? "#8A6A12" : h.fairway === "miss" ? C.birdie : C.faint, fontWeight: 800, fontSize: 13 }}>
+                    background: h.fairway === "hit" ? "#C7E6D1" : (h.fairway === "left" || h.fairway === "right" || h.fairway === "miss") ? "#F2CFCB" : C.card,
+                    color: h.fairway === "hit" ? "#0F5436" : (h.fairway === "left" || h.fairway === "right" || h.fairway === "miss") ? C.birdie : C.faint, fontWeight: 800, fontSize: 13 }}>
                   {h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "left" ? "L" : h.fairway === "right" ? "R" : h.fairway === "miss" ? "✗" : "·"}
                 </button>
               </div>,
