@@ -628,13 +628,11 @@ function CreateGame({
       for (const row of rows) {
         if (row.user_id && row.user_id !== user.id) {
           try {
-            await supabase
-              .from("notifications")
-              .insert({
-                user_id: row.user_id,
-                group_id: activeGroupId,
-                message: `You've been added to the game "${game.name}". Open the Games tab to enter your scores (code ${game.code}).`,
-              });
+            await supabase.rpc("create_notification", {
+              p_recipient: row.user_id,
+              p_message: `You've been added to the game "${game.name}". Open the Games tab to enter your scores (code ${game.code}).`,
+              p_group_id: activeGroupId,
+            });
           } catch {}
         }
       }
@@ -1469,12 +1467,10 @@ function GameRoom({
     // Notify the player their game handicap was set by the organizer (if it's not the organizer themselves).
     if (p.user_id && p.user_id !== user.id) {
       try {
-        await supabase
-          .from("notifications")
-          .insert({
-            user_id: p.user_id,
-            message: `Your handicap for "${game.name}" was set to ${idxVal ?? "—"} (course handicap ${ch ?? "—"}) by the organizer.`,
-          });
+        await supabase.rpc("create_notification", {
+          p_recipient: p.user_id,
+          p_message: `Your handicap for "${game.name}" was set to ${idxVal ?? "—"} (course handicap ${ch ?? "—"}) by the organizer.`,
+        });
       } catch {}
     }
     await load();
@@ -1629,17 +1625,17 @@ function GameRoom({
       }));
     }
     if (Object.keys(updates).length) await supabase.from("games").update(updates).eq("id", game.id);
-    await supabase.from("game_players").delete().eq("id", p.id);
+    // Notify BEFORE removing the row, so the organizer<->player relationship the
+    // create_notification check relies on still exists at insert time.
     if (p.user_id && p.user_id !== user.id) {
       try {
-        await supabase
-          .from("notifications")
-          .insert({
-            user_id: p.user_id,
-            message: `You were removed from the game "${game.name}" by the organizer.`,
-          });
+        await supabase.rpc("create_notification", {
+          p_recipient: p.user_id,
+          p_message: `You were removed from the game "${game.name}" by the organizer.`,
+        });
       } catch {}
     }
+    await supabase.from("game_players").delete().eq("id", p.id);
     await load();
   };
 

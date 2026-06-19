@@ -105,7 +105,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
       // Notify every app admin that a request is waiting.
       const { data: admins } = await supabase.from("profiles").select("id").eq("is_admin", true);
       for (const a of admins || []) {
-        try { await supabase.from("notifications").insert({ user_id: a.id, message: `New group request: "${name}" from ${user.email}. Approve or decline it in the admin panel.` }); } catch {}
+        try { await supabase.rpc("create_notification", { p_recipient: a.id, p_message: `New group request: "${name}" from ${user.email}. Approve or decline it in the admin panel.` }); } catch {}
       }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "A member", action: "group_requested", summary: `Requested a new group "${name}"` });
       setNewGroup(""); setNewNote("");

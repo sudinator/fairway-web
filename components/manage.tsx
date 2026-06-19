@@ -13,7 +13,7 @@ const supabase = createClient();
 
 // Create an in-app notification for a user.
 async function notify(userId: string, message: string) {
-  try { await supabase.from("notifications").insert({ user_id: userId, message }); } catch {}
+  try { await supabase.rpc("create_notification", { p_recipient: userId, p_message: message }); } catch {}
 }
 
 // "3h ago" style relative time.
