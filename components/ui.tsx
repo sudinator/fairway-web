@@ -187,10 +187,46 @@ export function NumPicker({ value, from, to, onChange, width = 46, dash = true, 
   );
 }
 
+// FIT-TO-WIDTH — measures its content's natural width and scales it down to fit
+// the available width (never up), so a scorecard never runs off-screen. Wrap any
+// card that could exceed the viewport in this.
+export function FitToWidth({ children }: { children: React.ReactNode }) {
+  const outerRef = React.useRef<HTMLDivElement>(null);
+  const innerRef = React.useRef<HTMLDivElement>(null);
+  const [st, setSt] = React.useState<{ scale: number; width: number | string; height?: number }>({ scale: 1, width: "100%" });
+  React.useLayoutEffect(() => {
+    const measure = () => {
+      const o = outerRef.current, i = innerRef.current;
+      if (!o || !i) return;
+      const pw = i.style.width, pt = i.style.transform;
+      i.style.width = "max-content"; i.style.transform = "none";
+      const natural = i.scrollWidth;
+      const avail = o.clientWidth;
+      i.style.width = pw; i.style.transform = pt;
+      const scale = natural > 0 && natural > avail ? avail / natural : 1;
+      const width: number | string = scale < 1 ? natural : "100%";
+      const height = scale < 1 ? Math.ceil(i.offsetHeight * scale) : undefined;
+      setSt((c) => (c.scale === scale && c.width === width && c.height === height ? c : { scale, width, height }));
+    };
+    measure();
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") { ro = new ResizeObserver(measure); if (outerRef.current) ro.observe(outerRef.current); }
+    window.addEventListener("resize", measure);
+    return () => { if (ro) ro.disconnect(); window.removeEventListener("resize", measure); };
+  }, [children]);
+  return (
+    <div ref={outerRef} style={{ width: "100%", overflow: "hidden", height: st.height }}>
+      <div ref={innerRef} style={{ width: st.width, transformOrigin: "top left", transform: st.scale < 1 ? `scale(${st.scale})` : undefined }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 // ---------------- Shared vertical scorecards ----------------
 // A single per-hole row model used by every entry scorecard (individual & group).
 export type EntryHole = {
-  n: number; par: number; si: number | null;
+  n: number; par: number; si: number | null; yards?: number | null;
   strokes: number | null; putts: number | null; fairway: "hit" | "miss" | "left" | "right" | null;
   penalties?: number | null;
   sand?: boolean | null; // greenside bunker this hole
@@ -200,7 +236,7 @@ export type EntryHole = {
 
 // SCORE ENTRY — vertical, one row per hole, fits screen width (no horizontal scroll).
 // Used by both individual stroke play and group play so the card is identical everywhere.
-export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun }: {
+export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false }: {
   holes: EntryHole[];
   hasHandicap: boolean;
   onSet: (i: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null }) => void;
@@ -211,6 +247,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   opp?: (number | null)[];     // optional opponent gross per hole (match play) — read-only column
   oppLabel?: string;           // short opponent name for the column header
   matchRun?: (string | null)[]; // optional per-hole running match status labels (e.g. "1↑", "AS")
+  matchMode?: boolean;          // when true (1:1 match), render one card per hole instead of the wide grid
 }) {
   const showOpp = Array.isArray(opp);
   const showRun = Array.isArray(matchRun);
@@ -349,6 +386,95 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     );
   };
 
+  // ---- Match-play layout: one compact card per hole (header strip + one field band) ----
+  const mCell = (label: string, node: React.ReactNode) => (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, minWidth: 0, padding: "0 1px" }}>
+      <span style={{ fontSize: 7.5, fontWeight: 800, textTransform: "uppercase", color: C.faint, letterSpacing: 0.2, whiteSpace: "nowrap" }}>{label}</span>
+      {node}
+    </div>
+  );
+  const valBox = (content: React.ReactNode, color: string, size = 16): React.ReactNode => (
+    <div style={{ height: 34, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: size, color }}>{content}</div>
+  );
+  const matchCard = (i: number) => {
+    const h = holes[i];
+    const maxStrokes = hasHandicap ? h.par + 2 + h.recv : h.par * 2;
+    const maxPutts = h.strokes != null && h.strokes > 0 ? Math.min(h.strokes, 6) : 6;
+    const pts = stablefordPts(h.strokes, h.par, h.recv || 0);
+    const penN = h.penalties || 0; const sandOn = !!h.sand;
+    const spDisp = sandOn && penN > 0 ? "*" : sandOn ? "S" : penN > 0 ? String(penN) : "·";
+    const spActive = sandOn || penN > 0;
+    const ov = showOpp ? (opp![i] ?? null) : null;
+    const run = showRun ? (matchRun![i] || "") : "";
+    const runCol = run === "" ? C.faint : run === "AS" ? C.ink : (run.includes("UP") || run.includes("↑")) ? C.greenMid : C.birdie;
+    const yds = h.yards ?? null;
+    return (
+      <div key={h.n} style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 13, overflow: "hidden" }}>
+        <div style={{ background: C.green, color: C.cream, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 12px" }}>
+          <span style={{ fontSize: 16, fontWeight: 800 }}>{h.n}</span>
+          <span style={{ fontSize: 12, color: C.sage, fontWeight: 600, flex: 1, marginLeft: 10 }}>Par <b style={{ color: "#EDE7D4" }}>{h.par}</b>{yds ? <> · <b style={{ color: "#EDE7D4" }}>{yds}</b> yds</> : null} · S.I. <b style={{ color: "#EDE7D4" }}>{h.si ?? "–"}</b></span>
+          <span style={{ fontSize: 11, color: "#EDE7D4", fontWeight: 700, whiteSpace: "nowrap" }}>
+            {h.recv > 0 ? <>you <span style={{ color: C.dot, fontSize: 13, letterSpacing: 1 }}>{"•".repeat(Math.min(h.recv, 3))}</span></> : <span style={{ color: C.sage }}>—</span>}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "flex-end", padding: "5px 4px 6px", gap: 3 }}>
+          {mCell("Score", <NumPicker key={`msc-${hydrated}`} value={h.strokes} from={1} to={maxStrokes} onChange={(v) => onSet(i, { strokes: v })} width={42} accent={savingHole === i} />)}
+          {mCell("FW",
+            <button onClick={() => cycleFw(i, h.fairway, h.par)} disabled={h.par < 4}
+              style={{ height: 34, width: "100%", border: `1px solid ${C.line}`, borderRadius: 7, cursor: h.par < 4 ? "default" : "pointer",
+                background: h.fairway === "hit" ? "#C7E6D1" : (h.fairway === "left" || h.fairway === "right" || h.fairway === "miss") ? "#F2CFCB" : C.card,
+                color: h.fairway === "hit" ? "#0F5436" : (h.fairway === "left" || h.fairway === "right" || h.fairway === "miss") ? C.birdie : C.faint, fontWeight: 800, fontSize: 14 }}>
+              {h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "left" ? "L" : h.fairway === "right" ? "R" : h.fairway === "miss" ? "✗" : "·"}
+            </button>)}
+          {mCell("Putt", <NumPicker key={`mpu-${hydrated}`} value={h.putts} from={0} to={maxPutts} onChange={(v) => onSet(i, { putts: v })} width={42} />)}
+          {mCell("S/Pen",
+            <button onClick={() => setEditPen(i)}
+              style={{ height: 34, width: "100%", border: `1px solid ${spActive ? C.birdie : C.line}`, borderRadius: 7, cursor: "pointer", background: spActive ? "#F6DEDB" : C.card, color: spActive ? C.birdie : C.faint, fontWeight: 800, fontSize: spDisp === "*" ? 18 : 15 }}>
+              {spDisp}
+            </button>)}
+          {mCell("Pts", valBox(pts ?? "·", ptsColor(pts)))}
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 3, background: "#F3EFE2", borderRadius: 8, borderLeft: `1px solid ${C.line}`, marginLeft: 3, paddingLeft: 2 }}>
+            {mCell("Match", valBox(run || "·", runCol, 13))}
+            {mCell("Opp", valBox(ov ?? "·", ov == null ? C.faint : C.ink))}
+            {mCell("Opp str", valBox((h.gives || 0) > 0 ? "•".repeat(Math.min(h.gives || 0, 3)) : "–", C.sage, 13))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+  const matchSummary = (from: number, to: number, label: string) => {
+    const seg = holes.slice(from, to);
+    const sScore = seg.reduce((a, h) => a + (h.strokes || 0), 0);
+    const sPutts = seg.reduce((a, h) => a + (h.putts || 0), 0);
+    const sPts = seg.reduce((a, h) => a + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
+    let run = ""; if (showRun) { for (let k = to - 1; k >= from; k--) { if (matchRun![k]) { run = matchRun![k] as string; break; } } }
+    const runCol = run === "" ? C.sage : run === "AS" ? "#fff" : (run.includes("UP") || run.includes("↑")) ? "#7FE3A6" : "#F0A39A";
+    const item = (k: string, v: React.ReactNode, col = "#fff") => (
+      <div style={{ textAlign: "center" }}><div style={{ fontSize: 8.5, color: C.sage, fontWeight: 700, textTransform: "uppercase" }}>{k}</div><div style={{ fontSize: 16, fontWeight: 800, color: col, marginTop: 1 }}>{v}</div></div>
+    );
+    return (
+      <div key={"sum-" + label} style={{ background: C.green, color: C.cream, borderRadius: 13, padding: "11px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 13, fontWeight: 800 }}>{label}</span>
+        <div style={{ display: "flex", gap: 15 }}>
+          {item("Score", sScore || "–")}
+          {item("Putts", sPutts || "–")}
+          {item("Pts", sPts, C.gold)}
+          {showRun && item("Match", run || "–", runCol)}
+        </div>
+      </div>
+    );
+  };
+  const matchRows: React.ReactNode[] = (() => {
+    const rows: React.ReactNode[] = [];
+    holes.forEach((h, i) => {
+      rows.push(matchCard(i));
+      if (i === 8 && holes.length > 9) rows.push(matchSummary(0, 9, "OUT"));
+    });
+    if (holes.length > 9) { rows.push(matchSummary(9, holes.length, "IN")); rows.push(matchSummary(0, holes.length, "TOTAL")); }
+    else rows.push(matchSummary(0, holes.length, "TOTAL"));
+    return rows;
+  })();
+
   const out = holes.slice(0, 9).reduce((s, h) => s + (h.strokes || 0), 0);
   const inn = holes.slice(9, 18).reduce((s, h) => s + (h.strokes || 0), 0);
   const has18 = holes.length > 9;
@@ -362,11 +488,19 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
             : "◦ hollow dots show the holes where you give your opponent a stroke."}
         </div>
       )}
+      {matchMode ? (
+        <FitToWidth>
+          <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 10 }}>
+            {matchRows}
+          </div>
+        </FitToWidth>
+      ) : (
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 10 }}>
         {block(0, Math.min(9, holes.length), "FRONT NINE")}
         {has18 && block(9, 18, "BACK NINE")}
       </div>
-      {has18 && (out > 0 || inn > 0) && (
+      )}
+      {!matchMode && has18 && (out > 0 || inn > 0) && (
         <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
           <div style={{ background: C.card, borderRadius: 10, padding: "8px 18px", textAlign: "center" }}>
             <div style={{ color: C.sage, fontSize: 10, letterSpacing: 2 }}>OUT</div>
