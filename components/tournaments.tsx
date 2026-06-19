@@ -1072,8 +1072,6 @@ function GameRoom({
   // Which step of the setup flow is showing: players & tees, teams, matchups, groups.
   const [setupTab, setSetupTab] = useState<"players" | "teams" | "matchups" | "groups">("players");
   const [cardView, setCardView] = useState(false); // show the whole-group vertical scorecard
-  // When group scoring is switched on, bring everyone to the group card.
-  useEffect(() => { if (game?.marker_user_id) setCardView(true); }, [game?.marker_user_id]);
 
   // ---- Tee groups (foursomes that play together, each with its own marker) ----
   const myRow = players.find((p) => p.user_id === user.id) || null;
@@ -1085,9 +1083,18 @@ function GameRoom({
     if (!teeGroupsInUse) return;
     setViewGroup((cur) => (cur != null && teeGroupList.includes(cur)) ? cur : (myRow?.tee_group ?? teeGroupList[0] ?? null));
   }, [teeGroupsInUse, myRow?.tee_group, teeGroupList.join(",")]);
-  // A marker lands on the group card automatically.
-  useEffect(() => { if (myRow?.is_marker) setCardView(true); }, [myRow?.is_marker]);
   const myGroupHasMarker = teeGroupsInUse && myRow?.tee_group != null && players.some((p) => p.tee_group === myRow!.tee_group && p.is_marker);
+  // Roll everyone up to the group card when group scoring turns ON, and drop
+  // everyone back to their own scorecard when it turns OFF (disband). Only fires
+  // on the transition, so a steady state never fights a manual tab tap. Together
+  // with the "individual card hidden while a marker exists" gate, this keeps
+  // exactly one writer on any row at a time — no duplicate DB writes.
+  const prevGroupScoring = React.useRef(false);
+  useEffect(() => {
+    const on = !!game?.marker_user_id || !!myGroupHasMarker;
+    if (on !== prevGroupScoring.current) setCardView(on);
+    prevGroupScoring.current = on;
+  }, [game?.marker_user_id, myGroupHasMarker]);
   const cardPlayers = teeGroupsInUse ? players.filter((p) => p.tee_group === viewGroup) : players;
   const gameEnded = game?.status === "ended";
   const viewedGroupLocked = teeGroupsInUse && cardPlayers.length > 0 && cardPlayers.some((p) => p.group_locked);
@@ -1428,6 +1435,33 @@ function GameRoom({
     if (!game) return;
     setGame({ ...game, marker_user_id: null });
     await supabase.rpc("release_marker", { p_game_id: game.id });
+  };
+
+  // "Everyone scores their own" — disband group scoring so every player gets their
+  // own card back. ANY member can do this, not just the current marker: releasing
+  // the marker to "nobody" is holder-only, but anyone may take it over first
+  // (claim_marker / claim_group_marker overwrite the current holder). So when we
+  // don't already hold it, we claim-then-release. A marker exists continuously
+  // until that final release, so individual cards stay hidden the whole time and
+  // no two devices ever write the same row (the no-dupe-write invariant).
+  const everyoneScoresOwn = async () => {
+    if (!game) { setCardView(false); return; }
+    if (teeGroupsInUse) {
+      const grpMarker = players.find((p) => p.tee_group === myRow?.tee_group && p.is_marker);
+      if (grpMarker && grpMarker.id !== myRow?.id) {
+        await supabase.rpc("claim_group_marker", { p_game: game.id }); // take over
+        await supabase.rpc("release_group_marker", { p_game: game.id }); // then step down -> nobody
+      } else if (grpMarker && grpMarker.id === myRow?.id) {
+        await supabase.rpc("release_group_marker", { p_game: game.id });
+      }
+      setPlayers((ps) => ps.map((p) => (p.tee_group === myRow?.tee_group ? { ...p, is_marker: false } : p))); // optimistic
+    } else if (game.marker_user_id) {
+      if (game.marker_user_id !== user.id) await supabase.rpc("claim_marker", { p_game_id: game.id }); // take over
+      await supabase.rpc("release_marker", { p_game_id: game.id }); // then release -> nobody
+      setGame({ ...game, marker_user_id: null }); // optimistic
+    }
+    setCardView(false);
+    load();
   };
 
   const completeSetup = async () => {
@@ -2230,9 +2264,13 @@ function GameRoom({
           <button onClick={() => setCardView(true)} style={{ ...btn(cardView), flex: 1, fontSize: 13 }}>Group card</button>
         </div>
       )}
-      {roomTab === "play" && !cardView && game.marker_user_id && !isEnded && (
-        <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>
-          Group scoring is on — enter and view scores on the <strong>Group card</strong>.
+      {roomTab === "play" && (game.marker_user_id || myGroupHasMarker) && !isEnded && (
+        <div style={{ background: "#16302A", border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
+          <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Group scoring is on</div>
+          <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>
+            One person is keeping the whole group's card{!cardView ? <> — enter scores on the <strong>Group card</strong> tab</> : null}. Anyone can switch the group back to scoring their own cards.
+          </div>
+          <button onClick={everyoneScoresOwn} style={{ ...btn(false), fontSize: 12, padding: "7px 12px", marginTop: 10 }}>Everyone scores their own</button>
         </div>
       )}
       {roomTab === "play" && cardView ? (
@@ -2259,7 +2297,7 @@ function GameRoom({
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button onClick={claimGroupMarker} style={{ ...btn(true), flex: 1, minWidth: 130, fontSize: 13 }}>I'll keep score</button>
-                <button onClick={() => setCardView(false)} style={{ ...btn(false), flex: 1, minWidth: 130, fontSize: 13 }}>We'll each score our own</button>
+                <button onClick={everyoneScoresOwn} style={{ ...btn(false), flex: 1, minWidth: 130, fontSize: 13 }}>We'll each score our own</button>
               </div>
             </div>
           )}
