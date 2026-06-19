@@ -22,7 +22,7 @@ export type Hole = {
   stroke_index: number | null;
   strokes: number | null;
   putts: number | null;
-  fairway: "hit" | "miss" | null;
+  fairway: "hit" | "miss" | "left" | "right" | null;
   penalties: number;
   sand?: boolean | null; // greenside bunker on this hole (for sand-save %)
   yardage?: number | null; // hole distance for the played tee

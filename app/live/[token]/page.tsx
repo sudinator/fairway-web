@@ -15,7 +15,7 @@ type LiveMeta = { n: number; par: number; si: number | null };
 type LivePlayer = {
   id: string; display_name: string; course_handicap: number | null; ch: number;
   team: string | null; tee_group: number | null; no_show: boolean;
-  scores: (number | null)[]; putts: (number | null)[]; fairways: ("hit" | "miss" | null)[];
+  scores: (number | null)[]; putts: (number | null)[]; fairways: ("hit" | "miss" | "left" | "right" | null)[];
   penalties: (number | null)[]; sand: (boolean | null)[];
 };
 type LiveGame = {
@@ -49,7 +49,7 @@ type PStat = {
 function computePlayer(p: LivePlayer, meta: LiveMeta[], allowance: number): PStat {
   const playing = applyAllowance(p.ch, allowance);
   const alloc = allocateStrokes(meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })), playing);
-  let gross = 0, parPlayed = 0, thru = 0, points = 0, net = 0, putts = 0, pen = 0, fwHit = 0, fwTot = 0, girHit = 0, girTot = 0;
+  let gross = 0, parPlayed = 0, thru = 0, points = 0, net = 0, putts = 0, pen = 0, fwHit = 0, fwTot = 0, fwLeft = 0, fwRight = 0, girHit = 0, girTot = 0;
   let puttsT = false, penT = false, fwT = false;
   const perHole = meta.map((m, i) => {
     const s = p.scores?.[i] ?? null; const recv = alloc[m.n] || 0;
@@ -58,13 +58,13 @@ function computePlayer(p: LivePlayer, meta: LiveMeta[], allowance: number): PSta
       gross += s; parPlayed += m.par; thru++; points += pts || 0; net += s - recv;
       const pt = p.putts?.[i]; if (pt != null) { puttsT = true; putts += pt; girTot++; if ((s - pt) <= (m.par - 2)) girHit++; }
       const pe = p.penalties?.[i]; if (pe != null) { pen += pe || 0; if (pe > 0) penT = true; }
-      const fw = p.fairways?.[i]; if (m.par >= 4 && fw != null) { fwT = true; fwTot++; if (fw === "hit") fwHit++; }
+      const fw = p.fairways?.[i]; if (m.par >= 4 && fw != null) { fwT = true; fwTot++; if (fw === "hit") fwHit++; else if (fw === "left") fwLeft++; else if (fw === "right") fwRight++; }
     }
     return { n: m.n, par: m.par, gross: s, recv, pts: (s != null && s > 0) ? pts : null };
   });
   return {
     gross, net, thru, toPar: gross - parPlayed, points, perHole,
-    fairways: fwT ? `${fwHit}/${fwTot}` : null, gir: (puttsT && girTot > 0) ? `${girHit}/${girTot}` : null,
+    fairways: fwT ? `${fwHit}/${fwTot}${fwLeft || fwRight ? ` · ${fwLeft}L ${fwRight}R` : ""}` : null, gir: (puttsT && girTot > 0) ? `${girHit}/${girTot}` : null,
     putts: puttsT ? putts : null, penalties: penT ? pen : null,
   };
 }
