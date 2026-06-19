@@ -2795,7 +2795,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
             return (
               <div key={p.id} style={{ textAlign: "center", padding: "4px 2px", borderBottom: `2px solid ${colorFor(p)}` }}>
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: 3 }}>
-                  <Avatar src={p.avatar_url} name={p.display_name} size={40} accent={colorFor(p)} />
+                  <Avatar src={p.avatar_url} name={p.display_name} cssSize="min(65px, 90%)" accent={colorFor(p)} />
                 </div>
                 <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {p.display_name}{p.is_guest ? " ·G" : ""}

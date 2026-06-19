@@ -7,7 +7,7 @@ import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, NumPicker, Avatar } from "@/components/ui";
 import { resizeToAvatar } from "@/lib/image";
-import { APP_VERSION, APP_BUILD_ID } from "@/lib/app-version";
+import { APP_VERSION, APP_BUILT_AT } from "@/lib/app-version";
 import { courseChangeLines, buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
 
 const supabase = createClient();
@@ -1761,7 +1761,7 @@ function UpdateChecker() {
       <div style={{ color: C.cream, fontSize: 13, marginTop: 10, lineHeight: 1.7 }}>
         <div><b>Current version:</b> {APP_VERSION}</div>
         <div><b>Latest version:</b> {latest || "Not checked yet"}</div>
-        {APP_BUILD_ID ? <div style={{ color: C.sage, fontSize: 11 }}>Build: {APP_BUILD_ID.slice(0, 12)}{latestBuild && latestBuild !== APP_BUILD_ID ? ` · latest ${latestBuild.slice(0, 12)}` : ""}</div> : null}
+        {APP_BUILT_AT ? <div style={{ color: C.sage, fontSize: 11 }}>Built: {new Date(APP_BUILT_AT).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</div> : null}
         <div style={{ color: C.faint, fontSize: 11, marginTop: 12, lineHeight: 1.6 }}>
           Birdie Num Num — created by Amit Sud
           <br />© 2026 Amit Sud. All rights reserved.

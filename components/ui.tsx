@@ -23,15 +23,16 @@ const colorFor = (name: string) => {
   return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
 };
 
-export function Avatar({ src, name, size = 32, accent, enlargeable = true }: {
+export function Avatar({ src, name, size = 32, accent, enlargeable = true, cssSize }: {
   src?: string | null; name: string; size?: number; accent?: string | null; enlargeable?: boolean;
+  cssSize?: string; // responsive width (e.g. "min(65px, 90%)"); overrides fixed `size`
 }) {
   const [open, setOpen] = useState(false);
   const ring = accent || "transparent";
-  const common: React.CSSProperties = {
-    width: size, height: size, borderRadius: "50%", flexShrink: 0,
-    boxShadow: accent ? `0 0 0 2px ${ring}` : "none",
-  };
+  const common: React.CSSProperties = cssSize
+    ? { width: cssSize, aspectRatio: "1 / 1", borderRadius: "50%", flexShrink: 0, boxShadow: accent ? `0 0 0 2px ${ring}` : "none" }
+    : { width: size, height: size, borderRadius: "50%", flexShrink: 0, boxShadow: accent ? `0 0 0 2px ${ring}` : "none" };
+  const initialsFont = cssSize ? 22 : Math.max(10, Math.round(size * 0.4));
 
   // Only real photos are tappable-to-enlarge (no point zooming an initials circle).
   const canEnlarge = !!src && enlargeable;
@@ -73,7 +74,7 @@ export function Avatar({ src, name, size = 32, accent, enlargeable = true }: {
         alignItems: "center",
         justifyContent: "center",
         fontWeight: 700,
-        fontSize: Math.max(10, Math.round(size * 0.4)),
+        fontSize: initialsFont,
         fontFamily: "system-ui, sans-serif",
       }}
       aria-label={name}
