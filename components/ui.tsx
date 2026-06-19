@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   C, Hole, Round, stablefordPts, ptsColor,
 } from "@/lib/golf";
@@ -23,25 +23,47 @@ const colorFor = (name: string) => {
   return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
 };
 
-export function Avatar({ src, name, size = 32, accent }: {
-  src?: string | null; name: string; size?: number; accent?: string | null;
+export function Avatar({ src, name, size = 32, accent, enlargeable = true }: {
+  src?: string | null; name: string; size?: number; accent?: string | null; enlargeable?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
   const ring = accent || "transparent";
   const common: React.CSSProperties = {
     width: size, height: size, borderRadius: "50%", flexShrink: 0,
     boxShadow: accent ? `0 0 0 2px ${ring}` : "none",
   };
-  if (src) {
-    return (
+
+  // Only real photos are tappable-to-enlarge (no point zooming an initials circle).
+  const canEnlarge = !!src && enlargeable;
+
+  const lightbox = open ? (
+    <div
+      onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(8,20,15,0.93)", zIndex: 1000,
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer",
+      }}
+    >
       <img
-        src={src}
+        src={src!}
         alt={name}
-        style={{ ...common, objectFit: "cover", background: C.greenMid }}
         referrerPolicy="no-referrer"
+        style={{ width: "min(80vw, 360px)", height: "min(80vw, 360px)", borderRadius: 24, objectFit: "cover", boxShadow: "0 12px 44px rgba(0,0,0,0.5)" }}
       />
-    );
-  }
-  return (
+      <div style={{ color: C.cream, fontSize: 18, fontWeight: 700, marginTop: 16 }}>{name}</div>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>tap anywhere to close</div>
+    </div>
+  ) : null;
+
+  const node = src ? (
+    <img
+      src={src}
+      alt={name}
+      style={{ ...common, objectFit: "cover", background: C.greenMid, cursor: canEnlarge ? "pointer" : "default" }}
+      referrerPolicy="no-referrer"
+      onClick={canEnlarge ? (e) => { e.stopPropagation(); setOpen(true); } : undefined}
+    />
+  ) : (
     <div
       style={{
         ...common,
@@ -59,6 +81,8 @@ export function Avatar({ src, name, size = 32, accent }: {
       {initialsOf(name)}
     </div>
   );
+
+  return (<>{node}{lightbox}</>);
 }
 
 export const btn = (primary?: boolean): React.CSSProperties => ({

@@ -2327,7 +2327,7 @@ function GameRoom({
                   <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700, width: 30, fontSize: 17 }}>
                     {tied ? "T" : ""}{pos}
                   </div>
-                  <Avatar src={p.avatar_url} name={p.display_name} size={36} />
+                  <Avatar src={p.avatar_url} name={p.display_name} size={48} />
                   <div style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
                     <div style={{ color: C.ink, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {p.display_name}{p.user_id === user.id ? " (you)" : ""}
@@ -2795,7 +2795,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
             return (
               <div key={p.id} style={{ textAlign: "center", padding: "4px 2px", borderBottom: `2px solid ${colorFor(p)}` }}>
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: 3 }}>
-                  <Avatar src={p.avatar_url} name={p.display_name} size={26} accent={colorFor(p)} />
+                  <Avatar src={p.avatar_url} name={p.display_name} size={40} accent={colorFor(p)} />
                 </div>
                 <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {p.display_name}{p.is_guest ? " ·G" : ""}
@@ -4151,7 +4151,9 @@ function OrganizerPanel({
                     border: `1px solid ${C.line}`,
                   }}
                 >
-                  <div style={{ minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <Avatar src={p.avatar_url} name={p.display_name} size={48} />
+                  <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
                       <div style={{ color: C.ink, fontWeight: 800, fontSize: 15, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
                       {p.display_name}
@@ -4165,6 +4167,7 @@ function OrganizerPanel({
                         : "no handicap yet"}
                       {p.tee_name ? ` · ${p.tee_name}` : ""}
                     </div>
+                  </div>
                   </div>
 
                   {section === "players" ? (

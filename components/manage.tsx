@@ -1558,7 +1558,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
         return (
           <div key={row.id} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <Avatar src={row.avatar_url} name={p.display_name || row.email || "?"} size={40} />
+              <Avatar src={row.avatar_url} name={p.display_name || row.email || "?"} size={48} />
               <div style={{ flex: 1, minWidth: 150 }}>
                 <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{p.display_name || row.email}{self ? " (you)" : ""}{row.role === "admin" ? " · admin" : ""}</div>
                 <div style={{ color: C.faint, fontSize: 12 }}>

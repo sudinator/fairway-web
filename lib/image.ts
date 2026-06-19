@@ -2,7 +2,7 @@
 // browser, BEFORE upload — so a 5 MB phone photo becomes a ~15-30 KB square and
 // only that ever reaches storage. Center-crops to a square, scales to `size`px,
 // re-encodes as compressed JPEG.
-export async function resizeToAvatar(file: File, size = 256, quality = 0.82): Promise<Blob> {
+export async function resizeToAvatar(file: File, size = 512, quality = 0.82): Promise<Blob> {
   const dataUrl: string = await new Promise((resolve, reject) => {
     const fr = new FileReader();
     fr.onload = () => resolve(String(fr.result));
