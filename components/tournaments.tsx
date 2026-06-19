@@ -70,6 +70,8 @@ type Game = {
   teams?: { key: string; name: string }[] | null; // two named teams for team match play
   foursomes?: { id: string; name: string; a: string[]; b: string[]; swap?: boolean }[] | null; // four-ball / trifecta: pair A vs pair B (swap = cross the singles)
   team_score_mode?: "best_ball" | "aggregate" | null; // trifecta team leg: low net vs both nets added
+  share_token?: string | null; // public live-scorecard token (organizer-set); null = not shared
+  ended_at?: string | null; // when the game was ended (stamped by trigger); drives the 3-day live window
   created_by: string;
   created_at: string;
 };
@@ -1767,6 +1769,15 @@ function GameRoom({
     await load();
   };
 
+  // Organizer: turn the public live-scorecard link on (mint a token) or off
+  // (revoke it). Goes through an organizer-gated SECURITY DEFINER function so the
+  // games table itself stays private.
+  const setShare = async (on: boolean) => {
+    if (!game) return;
+    const { data, error } = await supabase.rpc("set_game_share", { p_game: game.id, p_on: on });
+    if (!error) setGame({ ...game, share_token: (data as string | null) ?? null });
+  };
+
   // Organizer: wipe all entered scores and the round clock so the game is fresh
   // again — useful after entering dummy scores to test the setup. Keeps the
   // field, teams, and matchups; reopens the game if it had been ended. Does NOT
@@ -2018,7 +2029,7 @@ function GameRoom({
           onOverride: overridePlayerHandicap, courseTees, onSetTee: setPlayerTee,
           onRemove: removePlayer, onToggleNoShow: toggleNoShow, onSetTeam: setPlayerTeam,
           onSetTeeGroup: setPlayerTeeGroup, onRename: renameGame, onDelete: deleteGame,
-          onEnd: endGame, onReopen: reopenGame, onReset: resetScores,
+          onEnd: endGame, onReopen: reopenGame, onReset: resetScores, onShare: setShare,
           eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,
           onSetAllowance: setAllowance, onSetFormat: setFormat, onSetTeamScoreMode: setTeamScoreMode, anyScores,
         };
@@ -3928,6 +3939,44 @@ function GroupsBuilder({ game, players, onSetTeeGroup }: {
   );
 }
 
+// Organizer control to publish / revoke the public live-scorecard link.
+function ShareControl({ game, onShare }: { game: Game; onShare: (on: boolean) => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const shared = !!game.share_token;
+  const link = shared && typeof window !== "undefined" ? `${window.location.origin}/live/${game.share_token}` : "";
+  const toggle = async (on: boolean) => { setBusy(true); try { await onShare(on); } finally { setBusy(false); } };
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
+  };
+  return (
+    <div style={{ marginTop: 10, padding: "12px 14px", background: C.greenLight, borderRadius: 8 }}>
+      <div style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>📡 Live scorecard link</div>
+      <div style={{ color: C.sage, fontSize: 11, marginTop: 4, lineHeight: 1.5 }}>
+        Share a read-only live scorecard with anyone — no login needed. They can follow the action but can&apos;t join or change scores. Stays live for 3 days after the game ends.
+      </div>
+      {!shared ? (
+        <button disabled={busy} onClick={() => toggle(true)}
+          style={{ ...btn(true), marginTop: 10, fontSize: 13, display: "block", opacity: busy ? 0.6 : 1 }}>
+          {busy ? "Creating…" : "Create live link"}
+        </button>
+      ) : (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ display: "flex", gap: 6 }}>
+            <input readOnly value={link} onFocus={(e) => e.currentTarget.select()}
+              style={{ flex: 1, background: C.green, color: C.cream, border: `1px solid ${C.greenMid}`, borderRadius: 6, padding: "8px 10px", fontSize: 12 }} />
+            <button onClick={copy} style={{ ...btn(true), fontSize: 12, padding: "8px 12px" }}>{copied ? "Copied" : "Copy"}</button>
+          </div>
+          <button disabled={busy} onClick={() => toggle(false)}
+            style={{ background: "transparent", color: "#E8A199", border: `0.5px solid #7A3A34`, borderRadius: 8, padding: "7px 12px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 12, display: "block", opacity: busy ? 0.6 : 1 }}>
+            {busy ? "…" : "Stop sharing (revoke link)"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function OrganizerPanel({
   game,
   players,
@@ -3944,6 +3993,7 @@ function OrganizerPanel({
   onEnd,
   onReopen,
   onReset,
+  onShare,
   section = "players",
   eligibleMembers = [],
   onAddMember,
@@ -3968,6 +4018,7 @@ function OrganizerPanel({
   onEnd: () => Promise<void>;
   onReopen: () => Promise<void>;
   onReset: () => Promise<void>;
+  onShare: (on: boolean) => Promise<void>;
   section?: "players" | "teams";
   eligibleMembers?: { id: string; display_name: string; handicap_index: number | null }[];
   onAddMember?: (m: { id: string; display_name: string; handicap_index: number | null }) => Promise<void>;
@@ -4364,6 +4415,7 @@ function OrganizerPanel({
                 🏁 End game (lock final results)
               </button>
             )}
+            <ShareControl game={game} onShare={onShare} />
             <button
               style={{ background: "#3F3414", color: "#E4CF86", border: `0.5px solid ${C.gold}`, borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", marginTop: 10, fontSize: 13, display: "block" }}
               onClick={onReset}
