@@ -1450,21 +1450,12 @@ function GameRoom({
     if (!game) { setCardView(false); return; }
     let diag = "";
     try {
-      if (teeGroupsInUse) {
-        const grpMarker = players.find((p) => p.tee_group === myRow?.tee_group && p.is_marker);
-        if (grpMarker && grpMarker.id !== myRow?.id) {
-          const r1 = await supabase.rpc("claim_group_marker", { p_game: game.id });
-          if (r1.error) diag += `claimGrp:${r1.error.message}; `;
-          const r2 = await supabase.rpc("release_group_marker", { p_game: game.id });
-          if (r2.error) diag += `releaseGrp:${r2.error.message}; `;
-        } else if (grpMarker && grpMarker.id === myRow?.id) {
-          const r2 = await supabase.rpc("release_group_marker", { p_game: game.id });
-          if (r2.error) diag += `releaseGrp(self):${r2.error.message}; `;
-        } else {
-          diag += "no grp marker found; ";
-        }
-        setPlayers((ps) => ps.map((p) => (p.tee_group === myRow?.tee_group ? { ...p, is_marker: false } : p))); // optimistic
-      } else if (game.marker_user_id) {
+      // Clear BOTH marker mechanisms independently — a game can carry a simple
+      // marker (games.marker_user_id) AND tee groups at the same time, so we must
+      // not branch on teeGroupsInUse. Releasing only ever removes a writer, so
+      // clearing both can never create a duplicate-write window.
+      let cleared = false;
+      if (game.marker_user_id) {
         if (game.marker_user_id !== user.id) {
           const rc = await supabase.rpc("claim_marker", { p_game_id: game.id });
           if (rc.error) diag += `claim:${rc.error.message}; `;
@@ -1472,12 +1463,23 @@ function GameRoom({
         const rr = await supabase.rpc("release_marker", { p_game_id: game.id });
         if (rr.error) diag += `release:${rr.error.message}; `;
         setGame({ ...game, marker_user_id: null }); // optimistic
-      } else {
-        diag += "no marker_user_id set; ";
+        cleared = true;
       }
+      const grpMarker = players.find((p) => p.tee_group != null && p.tee_group === myRow?.tee_group && p.is_marker);
+      if (grpMarker) {
+        if (grpMarker.id !== myRow?.id) {
+          const r1 = await supabase.rpc("claim_group_marker", { p_game: game.id });
+          if (r1.error) diag += `claimGrp:${r1.error.message}; `;
+        }
+        const r2 = await supabase.rpc("release_group_marker", { p_game: game.id });
+        if (r2.error) diag += `releaseGrp:${r2.error.message}; `;
+        setPlayers((ps) => ps.map((p) => (p.tee_group === myRow?.tee_group ? { ...p, is_marker: false } : p))); // optimistic
+        cleared = true;
+      }
+      if (!cleared) diag += "nothing to clear; ";
     } catch (e: any) { diag += `exc:${e?.message || e}; `; }
     setCardView(false);
-    // Verify against the DB so we can SEE whether the marker actually cleared.
+    // Verify against the DB so the readout shows whether the marker actually cleared.
     try {
       const { data: g2 } = await supabase.from("games").select("marker_user_id").eq("id", game.id).single();
       const { data: ps2 } = await supabase.from("game_players").select("is_marker").eq("game_id", game.id);
