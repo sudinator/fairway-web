@@ -2720,24 +2720,20 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
     );
   };
 
-  const totalsCard = () => (
-    <div style={{ background: "#0A241C", border: "1px solid #2E6B55", borderRadius: 10, padding: 8, marginTop: 2 }}>
-      <div style={{ color: "#CFE3D8", fontSize: 11, fontWeight: 800, letterSpacing: 1.5, marginBottom: 8 }}>TOTALS</div>
+  const summaryCard = (label: string, from: number, to: number) => (
+    <div key={`sum${label}`} style={{ background: "#0A241C", border: "1px solid #2E6B55", borderRadius: 10, padding: 8, marginTop: 2, marginBottom: 8 }}>
+      <div style={{ color: "#CFE3D8", fontSize: 11, fontWeight: 800, letterSpacing: 1.5, marginBottom: 8 }}>{label}</div>
       <div style={{ display: "flex", gap: 6 }}>
         {cols.map((c, ci) => {
-          if (c.type === "divider") return <div key={`td${ci}`} style={{ width: 2, alignSelf: "stretch", background: "rgba(216,178,74,0.5)", borderRadius: 2, margin: "16px 1px 0" }} />;
+          if (c.type === "divider") return <div key={`sd${label}-${ci}`} style={{ width: 2, alignSelf: "stretch", background: "rgba(216,178,74,0.5)", borderRadius: 2, margin: "0 1px" }} />;
           const p = c.p;
-          const tot = sums(p, 0, meta.length - 1);
-          const out = meta.length >= 18 ? sums(p, 0, 8) : null;
-          const inn = meta.length >= 18 ? sums(p, 9, 17) : null;
+          const s = sums(p, from, to);
           return (
-            <div key={p.id + "tot"} style={{ flex: 1, minWidth: 0, textAlign: "center" }}>
-              <div style={{ color: colorFor(p), fontSize: 10, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 3 }}>{p.display_name}</div>
-              <div style={{ position: "relative", background: C.greenLight, borderRadius: 7, height: 48, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
-                <span style={{ fontSize: 22, fontWeight: 800 }}>{tot.g || "–"}</span>
-                <span style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#E4CF86", fontSize: 10, fontWeight: 800, padding: "0 5px", borderRadius: 6 }}>{tot.pts}</span>
+            <div key={p.id + label} style={{ flex: 1, minWidth: 0, textAlign: "center" }}>
+              <div style={{ position: "relative", background: C.greenLight, borderRadius: 7, height: 44, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
+                <span style={{ fontSize: 20, fontWeight: 800 }}>{s.g || "–"}</span>
+                <span style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#E4CF86", fontSize: 10, fontWeight: 800, padding: "0 5px", borderRadius: 6 }}>{s.pts}</span>
               </div>
-              {out && inn && <div style={{ color: C.sage, fontSize: 9, marginTop: 3 }}>out {out.g || "–"} · in {inn.g || "–"}</div>}
             </div>
           );
         })}
@@ -2799,7 +2795,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
         <span style={{ color: "#E0796B", fontSize: 10 }}>● over (net)</span>
         <span style={{ color: "#E8730C", fontSize: 10 }}>● gets a stroke · corner = Stableford</span>
       </div>
-      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+      <div style={{ display: "flex", gap: 6, position: "sticky", top: 0, zIndex: 5, background: C.green, paddingTop: 8, paddingBottom: 10, marginBottom: 4, boxShadow: "0 6px 10px -8px rgba(0,0,0,0.55)" }}>
         {cols.map((c, ci) => {
           if (c.type === "divider") return <div key={`lg${ci}`} style={{ width: 2, alignSelf: "stretch", background: "rgba(216,178,74,0.5)", borderRadius: 2, margin: "0 1px" }} />;
           const p = c.p;
@@ -2811,13 +2807,21 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
               <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {p.display_name}{p.is_guest ? " ·G" : ""}
               </div>
-              <div style={{ color: C.sage, fontSize: 9 }}>hcp {p.course_handicap}</div>
+              <div style={{ color: C.sage, fontSize: 9 }}>hcp {meta.reduce((a, m) => a + recvFor(p, m.si), 0)}</div>
             </div>
           );
         })}
       </div>
-      {meta.map((_, i) => holeCard(i))}
-      {totalsCard()}
+      {(() => {
+        const nodes: React.ReactNode[] = [];
+        meta.forEach((_, i) => {
+          nodes.push(holeCard(i));
+          if (meta.length >= 18 && i === 8) nodes.push(summaryCard("OUT", 0, 8));
+          if (meta.length >= 18 && i === 17) nodes.push(summaryCard("IN", 9, 17));
+        });
+        nodes.push(summaryCard("TOT", 0, meta.length - 1));
+        return nodes;
+      })()}
 
       {edit && (() => {
         const p = players.find((x) => x.id === edit.playerId);
