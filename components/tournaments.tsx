@@ -3869,8 +3869,10 @@ function StrokesSummary({ game, players, collapsible = false, meKey }: { game: G
   ) => {
     const singles = isTrifecta ? trifectaSingles(f.a, f.b, !!f.swap) : [];
     return (
-      <div key={f.id || i} style={{ borderTop: "1px solid rgba(255,255,255,0.10)", paddingTop: 10, marginTop: 6, opacity: opts?.dim ? 0.62 : 1 }}>
-        {opts?.label !== false && <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 600 }}>{(f.name || `Foursome ${i + 1}`).toUpperCase()}</div>}
+      <div key={f.id || i} style={opts?.dim
+        ? { border: "1px solid rgba(255,255,255,0.30)", borderRadius: 8, padding: 10, marginTop: 10, opacity: 0.62 }
+        : { borderTop: "1px solid rgba(255,255,255,0.10)", paddingTop: 10, marginTop: 6 }}>
+        {opts?.label !== false && <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>{(f.name || `Foursome ${i + 1}`).toUpperCase()}</div>}
         {isTrifecta && singles.length > 0 && (
           <>
             <div style={{ color: C.sage, fontSize: 10, letterSpacing: 1, marginTop: 6 }}>TWO SINGLES</div>
@@ -3919,7 +3921,7 @@ function StrokesSummary({ game, players, collapsible = false, meKey }: { game: G
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <div>
                 <div style={{ color: C.gold, fontSize: 9, fontWeight: 800, letterSpacing: 1 }}>YOUR GROUP</div>
-                {soleFoursome && <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 600, marginTop: 2 }}>{(soleFoursome.f.name || `Foursome ${soleFoursome.i + 1}`).toUpperCase()}</div>}
+                {soleFoursome && <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800, marginTop: 2 }}>{(soleFoursome.f.name || `Foursome ${soleFoursome.i + 1}`).toUpperCase()}</div>}
               </div>
               {toggleBtn}
             </div>

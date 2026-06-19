@@ -957,6 +957,112 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
 }
 
 // ================= Admin panel =================
+// ★ Admin analytics — utilization, feature popularity, health. Reads one JSON
+// payload from the is_admin-gated get_admin_analytics() RPC.
+function AdminAnalytics() {
+  const [a, setA] = useState<any | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.rpc("get_admin_analytics").then(({ data, error }: any) => {
+      if (error) setErr(error.message); else setA(data);
+    });
+  }, []);
+  if (err) return <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Analytics unavailable: {err}</div>;
+  if (!a) return <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Loading analytics…</div>;
+
+  const t = a.totals || {}, ac = a.active || {}, f = a.formats || {}, fe = a.features || {}, h = a.health || {};
+  const series: { day: string; n: number }[] = ac.series || [];
+
+  const tile = (n: React.ReactNode, l: string, d?: string, bg: string = C.greenLight) => (
+    <div style={{ background: bg, borderRadius: 12, padding: "10px 12px", flex: 1, minWidth: 88 }}>
+      <div style={{ color: C.cream, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif" }}>{n}</div>
+      <div style={{ color: C.sage, fontSize: 11 }}>{l}</div>
+      {d ? <div style={{ color: "#5BD08A", fontSize: 10, marginTop: 2 }}>{d}</div> : null}
+    </div>
+  );
+
+  const W = 600, H = 120, pad = 6;
+  const max = Math.max(1, ...series.map((s) => s.n));
+  const step = series.length > 1 ? (W - pad * 2) / (series.length - 1) : 0;
+  const pts = series.map((s, i) => [pad + i * step, H - pad - (s.n / max) * (H - pad * 2)] as [number, number]);
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
+  const area = pts.length ? `${line} L${(W - pad).toFixed(1)} ${H - pad} L${pad} ${H - pad} Z` : "";
+
+  const bar = (label: string, n: number, denom: number, color: string) => (
+    <div key={label}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.cream, marginTop: 8 }}><span>{label}</span><span>{n}</span></div>
+      <div style={{ height: 8, borderRadius: 4, background: C.green, marginTop: 3, overflow: "hidden" }}>
+        <div style={{ height: "100%", borderRadius: 4, width: `${denom > 0 ? Math.round((n / denom) * 100) : 0}%`, background: color }} />
+      </div>
+    </div>
+  );
+
+  const fmtName: Record<string, string> = { stableford: "Stableford", fourball: "Four-ball", match: "Singles match", skins: "Skins", trifecta: "Trifecta" };
+  const fmtColors: Record<string, string> = { stableford: "#5BD08A", fourball: "#5AA9E6", match: "#C9A227", skins: "#E0915B", trifecta: "#B084E0" };
+  const fmtEntries = (Object.entries(f) as [string, number][]).sort((x, y) => y[1] - x[1]);
+  const fmtMax = Math.max(1, ...fmtEntries.map(([, n]) => n));
+  const feat: [string, number][] = [["Avatars set", fe.avatars_set || 0], ["AI summaries", fe.ai_summaries || 0], ["Live links (now)", fe.live_shared || 0], ["Courses added (30d)", fe.courses_added_30d || 0]];
+  const featMax = Math.max(1, ...feat.map(([, n]) => n));
+
+  const hrow = (label: string, val: string, good?: boolean) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "8px 0", borderTop: `1px solid ${C.greenMid}` }}>
+      <span style={{ color: C.cream, fontSize: 13 }}>{label}</span>
+      <span style={{ fontWeight: 800, fontSize: 15, color: good === undefined ? C.cream : good ? "#5BD08A" : "#E0796B" }}>{val}</span>
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {tile(t.users ?? "—", "Total users", t.users_new_30d ? `+${t.users_new_30d} / 30d` : undefined)}
+        {tile(t.active_groups ?? "—", "Active groups")}
+        {tile(t.games ?? "—", "Games", t.games_30d ? `+${t.games_30d} / 30d` : undefined)}
+        {tile(t.rounds ?? "—", "Rounds", t.rounds_30d ? `+${t.rounds_30d} / 30d` : undefined)}
+      </div>
+
+      <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
+        <div style={{ display: "flex", textAlign: "center" }}>
+          <div style={{ flex: 1 }}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.dau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>Today</div></div>
+          <div style={{ flex: 1 }}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.wau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This week</div></div>
+          <div style={{ flex: 1 }}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.mau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This month</div></div>
+        </div>
+        {series.length > 0 && (
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 120, marginTop: 12 }}>
+            <defs><linearGradient id="aaGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={C.gold} stopOpacity="0.35" /><stop offset="1" stopColor={C.gold} stopOpacity="0" /></linearGradient></defs>
+            {area && <path d={area} fill="url(#aaGrad)" />}
+            {line && <path d={line} fill="none" stroke={C.gold} strokeWidth={2.5} strokeLinejoin="round" />}
+          </svg>
+        )}
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.faint }}><span>30 days ago</span><span>today</span></div>
+        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          {tile(ac.avg7 ?? 0, "7-day avg", undefined, C.green)}
+          {tile(ac.avg30 ?? 0, "30-day avg", undefined, C.green)}
+          {tile(`${ac.stickiness_pct ?? 0}%`, "Stickiness", undefined, C.green)}
+        </div>
+        <div style={{ color: C.faint, fontSize: 10, marginTop: 8 }}>Active-user trends build over time from app activity.</div>
+      </div>
+
+      <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
+        <div style={{ color: C.sage, fontSize: 12, fontWeight: 700 }}>Games by format</div>
+        {fmtEntries.length ? fmtEntries.map(([k, n]) => bar(fmtName[k] || k, n, fmtMax, fmtColors[k] || C.sage)) : <div style={{ color: C.faint, fontSize: 12, marginTop: 6 }}>No games yet.</div>}
+        <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 14 }}>Feature usage</div>
+        {feat.map(([k, n]) => bar(k, n, featMax, "#5AA9E6"))}
+      </div>
+
+      <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
+        {hrow("Game completion (ended \u00f7 created)", `${h.completion_pct ?? 0}%`, true)}
+        {hrow("Abandoned setups (never scored)", `${h.abandoned_pct ?? 0}%`, false)}
+        {hrow("Avg holes entered / game", `${h.avg_holes ?? 0}`)}
+        {hrow("New users active within 7 days", `${h.activated_7d_pct ?? 0}%`, true)}
+        {hrow("Signups never joined a group", `${h.never_joined_group_pct ?? 0}%`, false)}
+        {hrow("Retention \u2014 week 1", `${h.retention_w1_pct ?? 0}%`)}
+        {hrow("Retention \u2014 week 4", `${h.retention_w4_pct ?? 0}%`)}
+        <div style={{ color: C.faint, fontSize: 10, marginTop: 8 }}>Retention accrues over the first weeks after launch.</div>
+      </div>
+    </div>
+  );
+}
+
 function AdminPanel({ user }: { user: any }) {
   const [profiles, setProfiles] = useState<any[] | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
@@ -1116,6 +1222,9 @@ function AdminPanel({ user }: { user: any }) {
 
   return (
     <div style={{ marginTop: 24 }}>
+      <Eyebrow>★ ADMIN · ANALYTICS</Eyebrow>
+      <AdminAnalytics />
+      <div style={{ height: 22 }} />
       <Eyebrow>★ ADMIN · ALL PLAYERS</Eyebrow>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
         <div style={{ background: C.greenLight, borderRadius: 12, padding: "10px 14px", flex: 1, minWidth: 110 }}>

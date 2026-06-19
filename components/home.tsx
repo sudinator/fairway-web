@@ -131,6 +131,7 @@ export function Home({ session }: { session: any }) {
     if (data) {
       setProfile(data);
       supabase.from("profiles").update({ last_active: new Date().toISOString(), email: user.email }).eq("id", user.id).then(() => {});
+      supabase.rpc("mark_active").then(() => {}); // record today's activity for analytics
       return;
     }
     // Only trust a real name from the Google account; never fabricate one from the
