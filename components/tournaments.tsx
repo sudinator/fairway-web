@@ -45,6 +45,7 @@ import {
   NumPicker,
   ScoreEntryCard,
   ShortDateInput,
+  Avatar,
 } from "@/components/ui";
 
 const supabase = createClient();
@@ -81,6 +82,7 @@ type Player = {
   game_id: string;
   user_id: string | null; // null for guest players (no account)
   display_name: string;
+  avatar_url?: string | null; // denormalized profile photo (co-players can't read profiles)
   handicap_index: number | null;
   rating: number | null;
   slope: number | null;
@@ -284,10 +286,16 @@ function GameList({
           ref = others && others[0] ? others[0] : (ref || {});
         }
         const n = game.holes_meta.length;
+        let myAvatar: string | null = null;
+        try {
+          const { data: meAv } = await supabase.from("profiles").select("avatar_url").eq("id", uid).single();
+          myAvatar = (meAv as any)?.avatar_url || null;
+        } catch {}
         const { error: e2 } = await supabase.from("game_players").insert({
           game_id: game.id,
           user_id: uid,
           display_name: displayName,
+          avatar_url: myAvatar,
           rating: (ref as any).rating ?? null,
           slope: (ref as any).slope ?? null,
           tee_name: (ref as any).tee_name ?? null,
@@ -588,6 +596,18 @@ function CreateGame({
           handicap_index: idxVal,
         });
       }
+      // Seed each player's avatar from the group-readable copy (game_players can't
+      // read profiles of others, so we denormalize like display_name).
+      const rosterIds = selectedRoster.map((p) => p.id).filter(Boolean);
+      let avatarById: Record<string, string | null> = {};
+      if (rosterIds.length) {
+        const { data: gmAv } = await supabase
+          .from("group_members")
+          .select("user_id, avatar_url")
+          .eq("group_id", activeGroupId)
+          .in("user_id", rosterIds);
+        avatarById = Object.fromEntries((gmAv || []).map((m: any) => [m.user_id, m.avatar_url || null]));
+      }
       const rosterRows = selectedRoster.map((p) => {
         const playerIndex = p.id === user.id ? idxVal : p.handicap_index;
         const playerCourseHandicap =
@@ -599,6 +619,7 @@ function CreateGame({
           user_id: p.id,
           is_guest: false,
           display_name: p.display_name || "Player",
+          avatar_url: avatarById[p.id] ?? null,
           handicap_index: playerIndex,
           rating: tee.rating,
           slope: tee.slope,
@@ -2306,7 +2327,8 @@ function GameRoom({
                   <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700, width: 30, fontSize: 17 }}>
                     {tied ? "T" : ""}{pos}
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <Avatar src={p.avatar_url} name={p.display_name} size={36} />
+                  <div style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
                     <div style={{ color: C.ink, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {p.display_name}{p.user_id === user.id ? " (you)" : ""}
                     </div>
@@ -2772,6 +2794,9 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
             const p = c.p;
             return (
               <div key={p.id} style={{ textAlign: "center", padding: "4px 2px", borderBottom: `2px solid ${colorFor(p)}` }}>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 3 }}>
+                  <Avatar src={p.avatar_url} name={p.display_name} size={26} accent={colorFor(p)} />
+                </div>
                 <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {p.display_name}{p.is_guest ? " ·G" : ""}
                 </div>

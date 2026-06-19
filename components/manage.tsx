@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase";
 import { C, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes } from "@/lib/golf";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
-import { btn, inputStyle, Eyebrow, NumPicker } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, NumPicker, Avatar } from "@/components/ui";
+import { resizeToAvatar } from "@/lib/image";
 import { APP_VERSION, APP_BUILD_ID } from "@/lib/app-version";
 import { courseChangeLines, buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
 
@@ -826,6 +827,8 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
   const [ghin, setGhin] = useState(profile?.ghin_number || "");
   const [phone, setPhone] = useState(profile?.phone || "");
   const [idxStr, setIdxStr] = useState(profile?.handicap_index != null ? String(profile.handicap_index) : "");
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url || null);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -834,7 +837,48 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
     setGhin(profile?.ghin_number || "");
     setPhone(profile?.phone || "");
     setIdxStr(profile?.handicap_index != null ? String(profile.handicap_index) : "");
+    setAvatarUrl(profile?.avatar_url || null);
   }, [profile]);
+
+  const pickPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking the same file later
+    if (!file) return;
+    setPhotoBusy(true); setMsg(null);
+    try {
+      const blob = await resizeToAvatar(file);
+      const path = `${user.id}/avatar.jpg`;
+      const up = await supabase.storage.from("avatars").upload(path, blob, { upsert: true, contentType: "image/jpeg" });
+      if (up.error) throw new Error(up.error.message);
+      const pub = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+      const url = `${pub}?v=${Date.now()}`; // cache-bust so a changed photo shows immediately
+      const { error } = await supabase.rpc("set_my_avatar", { p_url: url });
+      if (error) throw new Error(error.message);
+      setAvatarUrl(url);
+      setMsg("Photo updated ✓");
+      onSaved();
+    } catch (err: any) {
+      setMsg("Couldn't update photo: " + (err?.message || "unknown error"));
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
+  const removePhoto = async () => {
+    setPhotoBusy(true); setMsg(null);
+    try {
+      await supabase.rpc("set_my_avatar", { p_url: null });
+      await supabase.storage.from("avatars").remove([`${user.id}/avatar.jpg`]);
+      setAvatarUrl(null);
+      setMsg("Photo removed ✓");
+      onSaved();
+    } catch (err: any) {
+      setMsg("Couldn't remove photo: " + (err?.message || "unknown error"));
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
+
 
   const save = async () => {
     if (!name.trim()) { setMsg("Please enter your name so others in your group can recognize you."); return; }
@@ -856,6 +900,27 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
     <div style={{ maxWidth: 560 }}>
       <Eyebrow>YOUR PROFILE</Eyebrow>
       <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, paddingBottom: 16, marginBottom: 16, borderBottom: `1px solid ${C.greenMid}` }}>
+          <Avatar src={avatarUrl} name={name || profile?.display_name || "?"} size={64} />
+          <div style={{ flex: 1 }}>
+            <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Profile photo</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 2, lineHeight: 1.5 }}>
+              Helps your group recognize you on the scorecard. Any photo works — it&apos;s resized automatically.
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <label style={{ ...btn(true), fontSize: 12, padding: "7px 12px", cursor: photoBusy ? "default" : "pointer", opacity: photoBusy ? 0.6 : 1 }}>
+                {photoBusy ? "Working…" : avatarUrl ? "Change" : "Add photo"}
+                <input type="file" accept="image/*" disabled={photoBusy} onChange={pickPhoto} style={{ display: "none" }} />
+              </label>
+              {avatarUrl && !photoBusy && (
+                <button onClick={removePhoto}
+                  style={{ background: "transparent", color: "#E8A199", border: `0.5px solid #7A3A34`, borderRadius: 8, padding: "7px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
         <div>
           <label style={{ color: C.sage, fontSize: 12 }}>Display name <span style={{ color: C.gold }}>(required)</span></label>
           <input style={{ ...inputStyle, marginTop: 6 }} value={name} placeholder="e.g. Amit Sharma" onChange={(e) => setName(e.target.value)} />
@@ -1426,7 +1491,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
   const load = useCallback(async () => {
     const { data } = await supabase
       .from("group_members")
-      .select("id, user_id, email, role, status")
+      .select("id, user_id, email, role, status, avatar_url")
       .eq("group_id", activeGroupId)
       .neq("status", "removed")
       .order("role")
@@ -1493,6 +1558,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
         return (
           <div key={row.id} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <Avatar src={row.avatar_url} name={p.display_name || row.email || "?"} size={40} />
               <div style={{ flex: 1, minWidth: 150 }}>
                 <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{p.display_name || row.email}{self ? " (you)" : ""}{row.role === "admin" ? " · admin" : ""}</div>
                 <div style={{ color: C.faint, fontSize: 12 }}>
@@ -1696,6 +1762,10 @@ function UpdateChecker() {
         <div><b>Current version:</b> {APP_VERSION}</div>
         <div><b>Latest version:</b> {latest || "Not checked yet"}</div>
         {APP_BUILD_ID ? <div style={{ color: C.sage, fontSize: 11 }}>Build: {APP_BUILD_ID.slice(0, 12)}{latestBuild && latestBuild !== APP_BUILD_ID ? ` · latest ${latestBuild.slice(0, 12)}` : ""}</div> : null}
+        <div style={{ color: C.faint, fontSize: 11, marginTop: 12, lineHeight: 1.6 }}>
+          Birdie Num Num — created by Amit Sud
+          <br />© 2026 Amit Sud. All rights reserved.
+        </div>
       </div>
       {hasNewer ? (
         <button style={{ ...btn(true), marginTop: 12, fontSize: 13 }} onClick={() => check(true)}>Update to {latest}</button>

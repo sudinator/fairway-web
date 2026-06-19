@@ -5,6 +5,62 @@ import {
   C, Hole, Round, stablefordPts, ptsColor,
 } from "@/lib/golf";
 
+// Player avatar: circular photo when one exists, otherwise a colored circle with
+// the player's initials so the layout is always consistent (never a broken image).
+const initialsOf = (name: string) =>
+  (name || "?")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() || "")
+    .join("") || "?";
+
+// A stable, pleasant color derived from the name when no team accent is supplied.
+const AVATAR_PALETTE = ["#16503D", "#5A7BC0", "#B05B5B", "#4FB8A8", "#C9A227", "#7A5BB0", "#C77B3A"];
+const colorFor = (name: string) => {
+  let h = 0;
+  for (let i = 0; i < (name || "").length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
+};
+
+export function Avatar({ src, name, size = 32, accent }: {
+  src?: string | null; name: string; size?: number; accent?: string | null;
+}) {
+  const ring = accent || "transparent";
+  const common: React.CSSProperties = {
+    width: size, height: size, borderRadius: "50%", flexShrink: 0,
+    boxShadow: accent ? `0 0 0 2px ${ring}` : "none",
+  };
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={name}
+        style={{ ...common, objectFit: "cover", background: C.greenMid }}
+        referrerPolicy="no-referrer"
+      />
+    );
+  }
+  return (
+    <div
+      style={{
+        ...common,
+        background: accent || colorFor(name),
+        color: "#fff",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontWeight: 700,
+        fontSize: Math.max(10, Math.round(size * 0.4)),
+        fontFamily: "system-ui, sans-serif",
+      }}
+      aria-label={name}
+    >
+      {initialsOf(name)}
+    </div>
+  );
+}
+
 export const btn = (primary?: boolean): React.CSSProperties => ({
   background: primary ? C.gold : C.greenLight, color: primary ? C.green : C.cream,
   border: "none", borderRadius: 10, padding: "11px 20px", fontSize: 14, fontWeight: 800, cursor: "pointer",
