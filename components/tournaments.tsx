@@ -1803,6 +1803,9 @@ function GameRoom({
     if (!game) return;
     if (!confirm(`End "${game.name}"? Final standings are locked in and every player's scorecard is posted to their Rounds tab.`)) return;
     await supabase.rpc("finish_game", { p_game: game.id });
+    // Post every player's scorecard to their Rounds history right now (server-side),
+    // so it no longer waits for each player to reopen the ended game on their device.
+    await supabase.rpc("post_game_rounds", { p_game: game.id });
     // Freeze the round clock for anyone still running (started but no end yet).
     const nowIso = new Date().toISOString();
     await Promise.all(players
@@ -2453,8 +2456,8 @@ function GameRoom({
               <div style={{ width: 20 }}>#</div>
               <div style={{ width: 32 }} />
               <div style={{ flex: 1 }}>Player</div>
-              <div style={{ width: 38, textAlign: "center" }}>Gross</div>
               <div style={{ width: 32, textAlign: "center" }}>Thru</div>
+              <div style={{ width: 38, textAlign: "center" }}>Gross</div>
               <div style={{ width: 40, textAlign: "center" }}>O/U</div>
               <div style={{ width: 34, textAlign: "center" }}>Pts</div>
             </div>
@@ -2482,8 +2485,8 @@ function GameRoom({
                       {p.course_handicap != null ? `CH ${p.course_handicap}` : "no hcp"}
                     </div>
                   </div>
-                  <div style={{ width: 38, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru ? playerGross(p) : "–"}</div>
                   <div style={{ width: 32, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru || "–"}</div>
+                  <div style={{ width: 38, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru ? playerGross(p) : "–"}</div>
                   {(() => {
                     if (!thru) return <div style={{ width: 40, textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 16, fontFamily: "Georgia, serif" }}>–</div>;
                     const rel = 2 * thru - pts;
@@ -2638,6 +2641,7 @@ function GameRoom({
             })()}
             hasHandicap={me.course_handicap != null}
             matchMode={game.game_type === "match"}
+            showSixes={(game as any).group_id === TGC_GROUP_ID}
             onSet={(i, patch) => { if (!isEnded) setMyHole(i, patch); }}
             savingHole={savingHole}
             showPenalties={true}

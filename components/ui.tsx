@@ -236,7 +236,7 @@ export type EntryHole = {
 
 // SCORE ENTRY — vertical, one row per hole, fits screen width (no horizontal scroll).
 // Used by both individual stroke play and group play so the card is identical everywhere.
-export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false }: {
+export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false }: {
   holes: EntryHole[];
   hasHandicap: boolean;
   onSet: (i: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null }) => void;
@@ -248,6 +248,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   oppLabel?: string;           // short opponent name for the column header
   matchRun?: (string | null)[]; // optional per-hole running match status labels (e.g. "1↑", "AS")
   matchMode?: boolean;          // when true (1:1 match), render one card per hole instead of the wide grid
+  showSixes?: boolean;          // TGC: show Front/Middle/Last six net-Stableford subtotals at the top
 }) {
   const showOpp = Array.isArray(opp);
   const showRun = Array.isArray(matchRun);
@@ -481,6 +482,28 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
 
   return (
     <>
+      {showSixes && !matchMode && holes.length >= 12 && (() => {
+        const segPts = (from: number, to: number) => holes.slice(from, to).reduce((acc, h) => acc + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
+        const segs = [
+          { lbl: "Front 6", sub: "1\u20136", v: segPts(0, 6) },
+          { lbl: "Middle 6", sub: "7\u201312", v: segPts(6, 12) },
+          { lbl: "Last 6", sub: "13\u201318", v: segPts(12, 18) },
+        ];
+        return (
+          <div style={{ marginTop: 10 }}>
+            <div style={{ color: C.faint, fontSize: 9, letterSpacing: 0.5, fontWeight: 800, textTransform: "uppercase", marginBottom: 6 }}>Sixes \u00b7 net stableford</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {segs.map((sg) => (
+                <div key={sg.lbl} style={{ flex: 1, background: C.greenLight, borderRadius: 12, padding: "9px 6px", textAlign: "center" }}>
+                  <div style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}>{sg.lbl}</div>
+                  <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 20, marginTop: 2 }}>{sg.v}</div>
+                  <div style={{ color: C.faint, fontSize: 10 }}>holes {sg.sub}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
       {anyStroke && hasHandicap && (
         <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>
           {holes.some((h) => h.recv > 0)
