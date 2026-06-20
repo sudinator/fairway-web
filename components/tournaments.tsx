@@ -1884,11 +1884,14 @@ function GameRoom({
       const { error } = await supabase.rpc("reset_game_scores", { p_game: game.id });
       if (error) throw error;
       await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_reset", group_id: (game as any).group_id || null, summary: `Reset scores for "${game.name}"` });
-      await load();
     } catch (e) {
       alert("Couldn't reset the game — make sure you're the organizer. If this keeps happening, the reset_game_scores database function may not be installed yet.");
     } finally {
       resettingRef.current = false;
+      // Re-sync to DB truth whether the reset succeeded OR failed — the UI was
+      // optimistically blanked before the RPC, so on failure this restores the
+      // real (un-wiped) scores rather than leaving a misleading empty card.
+      await load();
     }
   };
 
