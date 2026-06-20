@@ -2267,14 +2267,14 @@ function GameRoom({
       {roomTab === "play" && (
         <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
           <button onClick={() => setCardView(false)} style={{ ...btn(!cardView), flex: 1, fontSize: 13 }}>Results</button>
-          <button onClick={() => setCardView(true)} style={{ ...btn(cardView), flex: 1, fontSize: 13 }}>Group card</button>
+          <button onClick={() => setCardView(true)} style={{ ...btn(cardView), flex: 1, fontSize: 13 }}>Group Card</button>
         </div>
       )}
-      {roomTab === "play" && (game.marker_user_id || myGroupHasMarker) && !isEnded && (
+      {roomTab === "play" && cardView && (game.marker_user_id || myGroupHasMarker) && !isEnded && (
         <div style={{ background: "#16302A", border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
           <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Group scoring is on</div>
           <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>
-            One person is keeping the whole group's card{!cardView ? <> — enter scores on the <strong>Group card</strong> tab</> : null}. Anyone can switch the group back to scoring their own cards.
+            One person is keeping the whole group's card. Anyone can switch the group back to scoring their own cards.
           </div>
           <button onClick={everyoneScoresOwn} style={{ ...btn(false), fontSize: 12, padding: "7px 12px", marginTop: 10 }}>Everyone scores their own</button>
         </div>
