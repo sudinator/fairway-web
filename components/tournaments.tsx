@@ -168,13 +168,31 @@ export default function Tournaments({
   const [view, setView] = useState<"list" | "create" | { gameId: string }>(
     "list",
   );
-  // Resume the game room the user was in (survives lock/refresh) instead of
-  // dropping them back at the games list.
+  // Resume the game room the user was in (survives lock/refresh) — but ONLY if it
+  // belongs to the active group, so switching groups never drops you into (or
+  // shows players from) a game in a different group.
   useEffect(() => {
     const g = loadActiveGame();
-    if (g) setView({ gameId: g.gameId });
+    if (!g) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from("games").select("group_id").eq("id", g.gameId).single();
+      if (cancelled) return;
+      if (data && data.group_id === activeGroupId) setView({ gameId: g.gameId });
+      else clearActiveGame(); // game is in another group (or gone) — show this group's list
+    })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Switching the active group while this tab stays mounted: drop any open game or
+  // create view back to the (group-filtered) list.
+  const prevGroupRef = React.useRef(activeGroupId);
+  useEffect(() => {
+    if (prevGroupRef.current === activeGroupId) return;
+    prevGroupRef.current = activeGroupId;
+    clearActiveGame();
+    setView("list");
+  }, [activeGroupId]);
   const user = session.user;
   const displayName =
     user.user_metadata?.full_name || user.email?.split("@")[0] || "Golfer";
@@ -448,7 +466,7 @@ function CreateGame({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [groupRoster, setGroupRoster] = useState<
-    { id: string; display_name: string; handicap_index: number | null }[]
+    { id: string; display_name: string; avatar_url: string | null; handicap_index: number | null }[]
   >([]);
   const [selectedPlayers, setSelectedPlayers] = useState<
     Record<string, boolean>
@@ -487,22 +505,42 @@ function CreateGame({
     });
 
     (async () => {
-      const { data: members } = await supabase
-        .from("group_members")
-        .select("user_id")
-        .eq("group_id", activeGroupId)
-        .eq("status", "active");
-      const ids = (members || []).map((m: any) => m.user_id).filter(Boolean);
-      const { data: profs } = ids.length
-        ? await supabase
-            .from("profiles")
-            .select("id, display_name, handicap_index")
-            .in("id", ids)
-        : ({ data: [] as any[] } as any);
-      const roster: { id: string; display_name: string; handicap_index: number | null }[] = (profs || [])
+      // Read the roster via a SECURITY DEFINER function so ANY member (not just
+      // admins) can see every member's name, avatar and handicap. RLS otherwise
+      // hides other members' profiles rows from non-admins, collapsing the picker
+      // to just yourself. Fall back to direct reads if the migration isn't applied.
+      let rosterRows: any[] = [];
+      const rpc = await supabase.rpc("group_roster", { p_group: activeGroupId });
+      if (!rpc.error && Array.isArray(rpc.data)) {
+        rosterRows = rpc.data;
+      } else {
+        const { data: members } = await supabase
+          .from("group_members")
+          .select("user_id, avatar_url")
+          .eq("group_id", activeGroupId)
+          .eq("status", "active");
+        const ids = (members || []).map((m: any) => m.user_id).filter(Boolean);
+        const avById: Record<string, string | null> = Object.fromEntries(
+          (members || []).map((m: any) => [m.user_id, m.avatar_url ?? null]),
+        );
+        const { data: profs } = ids.length
+          ? await supabase
+              .from("profiles")
+              .select("id, display_name, handicap_index")
+              .in("id", ids)
+          : ({ data: [] as any[] } as any);
+        rosterRows = (profs || []).map((p: any) => ({
+          id: p.id,
+          display_name: p.display_name,
+          avatar_url: avById[p.id] ?? null,
+          handicap_index: p.handicap_index,
+        }));
+      }
+      const roster: { id: string; display_name: string; avatar_url: string | null; handicap_index: number | null }[] = (rosterRows || [])
         .map((p: any) => ({
           id: p.id,
           display_name: p.display_name || "Player",
+          avatar_url: p.avatar_url ?? null,
           handicap_index: p.handicap_index ?? null,
         }))
         .sort((a: any, b: any) =>
@@ -597,21 +635,12 @@ function CreateGame({
         selectedRoster.unshift({
           id: user.id,
           display_name: displayName,
+          avatar_url: null,
           handicap_index: idxVal,
         });
       }
-      // Seed each player's avatar from the group-readable copy (game_players can't
-      // read profiles of others, so we denormalize like display_name).
-      const rosterIds = selectedRoster.map((p) => p.id).filter(Boolean);
-      let avatarById: Record<string, string | null> = {};
-      if (rosterIds.length) {
-        const { data: gmAv } = await supabase
-          .from("group_members")
-          .select("user_id, avatar_url")
-          .eq("group_id", activeGroupId)
-          .in("user_id", rosterIds);
-        avatarById = Object.fromEntries((gmAv || []).map((m: any) => [m.user_id, m.avatar_url || null]));
-      }
+      // Each selected player already carries avatar_url from the group roster,
+      // so we denormalize it straight onto the game_player row.
       const rosterRows = selectedRoster.map((p) => {
         const playerIndex = p.id === user.id ? idxVal : p.handicap_index;
         const playerCourseHandicap =
@@ -623,7 +652,7 @@ function CreateGame({
           user_id: p.id,
           is_guest: false,
           display_name: p.display_name || "Player",
-          avatar_url: avatarById[p.id] ?? null,
+          avatar_url: (p as any).avatar_url ?? null,
           handicap_index: playerIndex,
           rating: tee.rating,
           slope: tee.slope,
@@ -745,6 +774,7 @@ function CreateGame({
                   }
                   style={{ width: 22, height: 22, flex: "0 0 auto", accentColor: "#D8B24A", cursor: isMe ? "default" : "pointer" }}
                 />
+                <Avatar src={p.avatar_url} name={p.display_name} size={32} />
                 <span style={{ flex: 1, color: C.cream, fontWeight: 700, fontSize: 15 }}>
                   {p.display_name}
                   {isMe ? " (you)" : ""}
