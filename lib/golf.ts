@@ -972,3 +972,21 @@ export function mergeBackupRow(
   const mergedCount = merged.scores.filter((s) => s != null).length;
   return { merged, changed: mergedCount > dbCount };
 }
+
+
+// Team-match clinch math (trifecta/team formats). Given each team's points and
+// the points still up for grabs (unclaimed), determine whether the lead is
+// already unbeatable. A team has WON once its lead strictly exceeds unclaimed;
+// if lead exactly equals unclaimed it can't lose but a tie is still possible.
+export function clinchState(aPts: number, bPts: number, unclaimed: number): {
+  lead: number; leader: "A" | "B" | null; clinched: boolean; canTie: boolean; decided: boolean; needToClinch: number;
+} {
+  const e = 1e-9;
+  const lead = Math.abs(aPts - bPts);
+  const leader: "A" | "B" | null = aPts > bPts + e ? "A" : bPts > aPts + e ? "B" : null;
+  const decided = unclaimed <= e;
+  const clinched = leader != null && lead > unclaimed + e;
+  const canTie = leader != null && !clinched && Math.abs(lead - unclaimed) <= e;
+  const needToClinch = leader != null && !clinched ? Math.floor((unclaimed - lead) / 2) + 1 : 0;
+  return { lead, leader, clinched, canTie, decided, needToClinch };
+}

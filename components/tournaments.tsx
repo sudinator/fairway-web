@@ -21,6 +21,7 @@ import {
   fourballHoleDetail,
   type ContestHole,
   computeTrifecta,
+  clinchState,
   trifectaSingles,
   type FourballMember,
   computeSkins,
@@ -1966,6 +1967,7 @@ function GameRoom({
           <div style={{ color: C.sage, fontSize: 13 }}>{game.course}</div>
         </div>
         <div style={{ flex: 1 }} />
+        {roomTab === "setup" && (
         <button
           onClick={() => {
             const shareText = `Join my golf game "${game.name}" on Birdie Num Num — enter code ${game.code}.`;
@@ -2005,6 +2007,7 @@ function GameRoom({
             {game.code}
           </div>
         </button>
+        )}
       </div>
 
       {/* Sub-tabs: Scorecard (play) vs Setup (organizer/teams/matchups) */}
@@ -3165,6 +3168,10 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
             </div>
           </div>
         )}
+        {isTeamSkins && (() => {
+          const rem = game.holes_meta.length - (teamTotals.A + teamTotals.B);
+          return <div style={{ textAlign: "center", color: C.faint, fontSize: 12, marginTop: 8 }}>{rem > 0 ? `${rem} skin${rem === 1 ? "" : "s"} still in play` : "All skins decided"}</div>;
+        })()}
         {carrying > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5A3210", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "10px 12px", marginTop: 10 }}>
             <span style={{ color: ORANGE, fontSize: 18, fontWeight: 800 }}>↑</span>
@@ -3304,6 +3311,7 @@ function MatchView({
     if (!isTeam) return null;
     const pts: Record<string, number> = { A: 0, B: 0 };
     let decidedPts: Record<string, number> = { A: 0, B: 0 };
+    let valid = 0, dec = 0;
     game.pairings.forEach((pr) => {
       const pa = playerOf(pr.a), pb = playerOf(pr.b);
       if (!pa || !pb) return;
@@ -3311,7 +3319,9 @@ function MatchView({
       // Determine which team each player is on.
       const ta = pa.team, tb = pb.team;
       if (!ta || !tb || ta === tb) return; // need a cross-team pairing
+      valid++;
       const decided = !!st.result;
+      if (decided) dec++;
       const award = (winnerTeam: string, half: boolean) => {
         if (half) { pts.A += 0.5; pts.B += 0.5; if (decided) { decidedPts.A += 0.5; decidedPts.B += 0.5; } }
         else { pts[winnerTeam] += 1; if (decided) decidedPts[winnerTeam] += 1; }
@@ -3323,7 +3333,7 @@ function MatchView({
         award(leadTeam, false);
       }
     });
-    return { pts, decidedPts };
+    return { pts, decidedPts, out: valid - dec };
   })();
 
   const fmtPts = (n: number) => (n === Math.floor(n) ? String(n) : `${Math.floor(n)}½`);
@@ -3347,6 +3357,9 @@ function MatchView({
           <div style={{ color: C.cream, opacity: 0.7, fontSize: 11, textAlign: "center", marginTop: 8 }}>
             Projected from current match states · {fmtPts(teamStandings.decidedPts.A)}–{fmtPts(teamStandings.decidedPts.B)} decided
           </div>
+          {teams && teamStandings && (
+            <TeamClinchLine aPts={teamStandings.decidedPts.A} bPts={teamStandings.decidedPts.B} unclaimed={teamStandings.out} aName={teams[0].name} bName={teams[1].name} metric="matches" />
+          )}
         </div>
       )}
 
@@ -3537,6 +3550,39 @@ function MatchView({
 // ---------------- Four-ball (best net ball) view ----------------
 // Setup mode: organizer builds foursomes (2 v 2). Play mode: each foursome shows
 // its running better-net-ball match status; the viewer's own foursome is highlighted.
+// Shared "team score" tail: shows what's still up for grabs and, for fixed-pool
+// formats, whether a team has mathematically clinched. Rendered INSIDE the
+// existing team-score card (no new box). metric controls the wording only.
+function TeamClinchLine({ aPts, bPts, unclaimed, aName, bName, metric, showBanner = true }: {
+  aPts: number; bPts: number; unclaimed: number; aName: string; bName: string;
+  metric: "points" | "matches" | "skins"; showBanner?: boolean;
+}) {
+  const cs = clinchState(aPts, bPts, unclaimed);
+  const leadName = cs.leader === "A" ? aName : cs.leader === "B" ? bName : null;
+  const hi = Math.max(aPts, bPts), lo = Math.min(aPts, bPts);
+  const f = (n: number) => (n === Math.floor(n) ? String(n) : `${Math.floor(n)}½`);
+  const noun = (n: number) => metric === "matches" ? `match${n === 1 ? "" : "es"}` : metric === "skins" ? `skin${n === 1 ? "" : "s"}` : `point${n === 1 ? "" : "s"}`;
+  const tail = metric === "matches" ? "still out" : metric === "skins" ? "still in play" : "unclaimed";
+  return (
+    <>
+      <div style={{ borderTop: `1px solid ${C.greenMid}`, marginTop: 10, paddingTop: 8, textAlign: "center", color: C.sage, fontSize: 12 }}>
+        {unclaimed > 0 ? <><b style={{ color: C.cream }}>{unclaimed}</b> {noun(unclaimed)} {tail}</> : (metric === "skins" ? "All skins decided" : metric === "matches" ? "All matches in" : "All points played")}
+      </div>
+      {showBanner && (cs.clinched || cs.canTie || cs.decided) && (
+        <div style={{ marginTop: 8, background: cs.canTie ? "#3A3414" : (cs.decided && !cs.leader) ? "#2A2A22" : "#1f7a52", border: `1px solid ${cs.canTie ? C.gold : (cs.decided && !cs.leader) ? C.line : "#3FBF82"}`, borderRadius: 10, padding: "8px 12px", textAlign: "center" }}>
+          <div style={{ color: cs.canTie ? "#E4CF86" : "#CFF5E2", fontWeight: 800, fontSize: 14 }}>
+            {cs.decided ? (cs.leader ? `${leadName} wins, ${f(hi)}–${f(lo)}` : "Match tied") : cs.canTie ? `${leadName} can’t be caught` : `${leadName} has won`}
+          </div>
+          {cs.clinched && !cs.decided && <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>{f(cs.lead)} ahead with {unclaimed} {tail} — unbeatable</div>}
+        </div>
+      )}
+      {showBanner && !cs.clinched && !cs.canTie && !cs.decided && leadName && (
+        <div style={{ color: C.gold, fontSize: 12, fontWeight: 700, textAlign: "center", marginTop: 6 }}>{leadName} wins it with {cs.needToClinch} more {noun(cs.needToClinch)}</div>
+      )}
+    </>
+  );
+}
+
 function FourballView({
   game,
   players,
@@ -3651,17 +3697,20 @@ function FourballView({
     if (!isTeam) return null;
     const pts: Record<string, number> = { A: 0, B: 0 };
     const decidedPts: Record<string, number> = { A: 0, B: 0 };
+    let valid = 0, dec = 0;
     foursomes.forEach((f) => {
       if (!f.a.length || !f.b.length) return;
       const ta = playerOf(f.a[0])?.team, tb = playerOf(f.b[0])?.team;
       if (!ta || !tb || ta === tb) return; // need a cross-team foursome
+      valid++;
       const st = fourballStatus(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100);
       if (st.thru === 0) return;
       const decided = st.thru === holesCount || Math.abs(st.lead) > holesCount - st.thru;
+      if (decided) dec++;
       if (st.lead === 0) { pts.A += 0.5; pts.B += 0.5; if (decided) { decidedPts.A += 0.5; decidedPts.B += 0.5; } }
       else { const w = st.lead > 0 ? ta : tb; pts[w] += 1; if (decided) decidedPts[w] += 1; }
     });
-    return { pts, decidedPts };
+    return { pts, decidedPts, out: valid - dec };
   })();
   const fmtPts = (n: number) => (n === Math.floor(n) ? String(n) : `${Math.floor(n)}½`);
 
@@ -3680,6 +3729,26 @@ function FourballView({
       pts[tb] = (pts[tb] ?? 0) + r.bPts;
     });
     return pts;
+  })();
+  // Points still up for grabs across all trifecta foursomes. A contest's
+  // remaining holes only count while BOTH sides still have a live (non-no-show)
+  // player — a side that can never post can't yield points, so excluding it lets
+  // the lead actually clinch.
+  const trifectaUnclaimed = (() => {
+    if (!isTeam || !isTrifecta) return null;
+    let rem = 0;
+    foursomes.forEach((f) => {
+      if (!f.a.length || !f.b.length) return;
+      const ta = playerOf(f.a[0])?.team, tb = playerOf(f.b[0])?.team;
+      if (!ta || !tb || ta === tb) return;
+      const r = computeTrifecta(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap);
+      r.contests.forEach((c) => {
+        const aLive = c.aIds.some((id) => !playerOf(id)?.no_show);
+        const bLive = c.bIds.some((id) => !playerOf(id)?.no_show);
+        if (aLive && bLive) rem += game.holes_meta.length - c.thru;
+      });
+    });
+    return rem;
   })();
   const setSwap = (fId: string, swap: boolean) => saveFoursomes(foursomes.map((f) => (f.id === fId ? { ...f, swap } : f)));
 
@@ -3776,6 +3845,11 @@ function FourballView({
               ? `Three points per hole · ${teamScoreMode === "aggregate" ? "team point on aggregate net (both balls)" : "team point on best net ball"}`
               : `Projected from current foursomes · ${fmtPts(teamStandings!.decidedPts.A)}–${fmtPts(teamStandings!.decidedPts.B)} decided`}
           </div>
+          {isTeam && standPts && teams && (
+            isTrifecta
+              ? <TeamClinchLine aPts={standPts.A} bPts={standPts.B} unclaimed={trifectaUnclaimed ?? 0} aName={teams[0].name} bName={teams[1].name} metric="points" />
+              : teamStandings ? <TeamClinchLine aPts={teamStandings.decidedPts.A} bPts={teamStandings.decidedPts.B} unclaimed={teamStandings.out} aName={teams[0].name} bName={teams[1].name} metric="matches" /> : null
+          )}
         </div>
       )}
       {foursomes.length === 0 && (

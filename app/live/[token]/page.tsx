@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import {
   C, allocateStrokes, applyAllowance, stablefordPts,
-  matchStatus, fourballStatus, computeTrifecta, computeSkins, toParStr,
+  matchStatus, fourballStatus, computeTrifecta, clinchState, computeSkins, toParStr,
   type FourballMember, type SkinPlayer,
 } from "@/lib/golf";
 
@@ -71,7 +71,7 @@ function computePlayer(p: LivePlayer, meta: LiveMeta[], allowance: number): PSta
 
 function addPts(m: Record<string, number>, k: string | null | undefined, v: number) { if (k) m[k] = (m[k] || 0) + v; }
 
-type TeamRows = { rows: { key: string; name: string; color: string; members: string[]; scoreNum: number; scoreLabel: string }[]; out: number; isSkins: boolean };
+type TeamRows = { rows: { key: string; name: string; color: string; members: string[]; scoreNum: number; scoreLabel: string }[]; out: number; unclaimed: number; isSkins: boolean };
 
 function teamScores(game: LiveGame, players: LivePlayer[], pairings: LiveData["pairings"], foursomes: LiveData["foursomes"], byId: Record<string, LivePlayer>, meta: LiveMeta[], allowance: number): TeamRows | null {
   const teams = (game.teams || []).filter((t) => t && t.key);
@@ -79,6 +79,7 @@ function teamScores(game: LiveGame, players: LivePlayer[], pairings: LiveData["p
   if (teams.length < 2 || !anyTeamed) return null;
   const pts: Record<string, number> = {}; teams.forEach((t) => { pts[t.key] = 0; });
   let out = 0;
+  let unclaimed = 0;
   const teamOf = (id: string | null | undefined) => (id ? byId[id]?.team : null);
   const mkMembers = (ids: (string | null)[]): FourballMember[] =>
     ids.filter(Boolean).map((id) => { const q = byId[id as string]; return { id: id as string, gross: q?.scores || [], ch: q?.ch ?? null, noShow: !!q?.no_show }; });
@@ -103,11 +104,17 @@ function teamScores(game: LiveGame, players: LivePlayer[], pairings: LiveData["p
       const aIds = (f.a || []).filter(Boolean) as string[]; const bIds = (f.b || []).filter(Boolean) as string[];
       const tri = computeTrifecta(meta, mkMembers([...aIds, ...bIds]), aIds, bIds, allowance, game.team_score_mode || "best_ball", !!f.swap);
       addPts(pts, teamOf(aIds[0]), tri.aPts); addPts(pts, teamOf(bIds[0]), tri.bPts);
+      tri.contests.forEach((c) => {
+        const aLive = c.aIds.some((id) => !players.find((p) => p.id === id)?.no_show);
+        const bLive = c.bIds.some((id) => !players.find((p) => p.id === id)?.no_show);
+        if (aLive && bLive) unclaimed += meta.length - c.thru;
+      });
     });
   } else if (game.game_type === "skins") {
     const sp: SkinPlayer[] = players.map((p) => ({ id: p.id, name: p.display_name, gross: p.scores || [], ch: p.ch }));
     const res = computeSkins(meta, sp, allowance);
     players.forEach((p) => { if (p.team) addPts(pts, p.team, res.skinsByPlayer[p.id] || 0); });
+    unclaimed = meta.length - Object.values(res.skinsByPlayer).reduce((a, n) => a + (n as number), 0);
   } else {
     players.forEach((p) => { if (p.team) addPts(pts, p.team, computePlayer(p, meta, allowance).points); });
   }
@@ -117,7 +124,7 @@ function teamScores(game: LiveGame, players: LivePlayer[], pairings: LiveData["p
     members: players.filter((p) => p.team === t.key).map((p) => p.display_name),
     scoreNum: pts[t.key] || 0, scoreLabel: isSkins ? String(pts[t.key] || 0) : fmtHalf(pts[t.key] || 0),
   })).sort((x, y) => y.scoreNum - x.scoreNum);
-  return { rows, out, isSkins };
+  return { rows, out, unclaimed, isSkins };
 }
 
 function summaryText(game: LiveGame, teamRows?: TeamRows["rows"]): string {
@@ -277,7 +284,40 @@ function Scorecard({ data }: { data: LiveData }) {
                 </div>
               </div>
             ))}
-            {!ts.isSkins && ts.out > 0 && <div style={{ textAlign: "center", color: C.faint, fontSize: 12, marginTop: 10 }}>{ts.out} match{ts.out === 1 ? "" : "es"} still out</div>}
+            {(() => {
+              const gt = game.game_type;
+              if ((gt === "trifecta" || gt === "match" || gt === "fourball") && ts.rows.length >= 2) {
+                const top = ts.rows[0], bot = ts.rows[1];
+                const unclaimed = gt === "trifecta" ? ts.unclaimed : ts.out;
+                const cs = clinchState(top.scoreNum, bot.scoreNum, unclaimed);
+                const noun = (n: number) => gt === "trifecta" ? `point${n === 1 ? "" : "s"}` : `match${n === 1 ? "" : "es"}`;
+                const tail = gt === "trifecta" ? "unclaimed" : "still out";
+                return (
+                  <>
+                    <div style={{ borderTop: "1px solid #E8E2CE", marginTop: 12, paddingTop: 10, textAlign: "center", color: C.faint, fontSize: 12 }}>
+                      {unclaimed > 0 ? <><b style={{ color: C.ink }}>{unclaimed}</b> {noun(unclaimed)} {tail}</> : (gt === "trifecta" ? "All points played" : "All matches in")}
+                    </div>
+                    {(cs.clinched || cs.canTie || cs.decided) && (
+                      <div style={{ marginTop: 10, background: cs.canTie ? "#FBF1D2" : cs.decided && !cs.leader ? "#F1EFE6" : "#E2F3E8", border: `1px solid ${cs.canTie ? C.gold : cs.decided && !cs.leader ? C.line : "#5BB98A"}`, borderRadius: 10, padding: "9px 12px", textAlign: "center" }}>
+                        <div style={{ fontWeight: 800, fontSize: 14, color: cs.canTie ? "#7A5A12" : cs.decided && !cs.leader ? C.ink : "#1A7A3C" }}>
+                          {cs.decided ? (cs.leader ? `${top.name} wins, ${fmtHalf(top.scoreNum)}–${fmtHalf(bot.scoreNum)}` : "Match tied") : cs.canTie ? `${top.name} can’t be caught` : `${top.name} has won`}
+                        </div>
+                        {cs.clinched && !cs.decided && <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>{fmtHalf(cs.lead)} ahead with {unclaimed} {tail} — unbeatable</div>}
+                      </div>
+                    )}
+                    {!cs.clinched && !cs.canTie && !cs.decided && (
+                      <div style={{ color: "#8A6D12", fontSize: 12, fontWeight: 700, textAlign: "center", marginTop: 8 }}>{top.name} wins it with {cs.needToClinch} more {noun(cs.needToClinch)}</div>
+                    )}
+                  </>
+                );
+              }
+              if (gt === "skins") {
+                return ts.unclaimed > 0
+                  ? <div style={{ borderTop: "1px solid #E8E2CE", marginTop: 12, paddingTop: 10, textAlign: "center", color: C.faint, fontSize: 12 }}>{ts.unclaimed} skin{ts.unclaimed === 1 ? "" : "s"} still in play</div>
+                  : null;
+              }
+              return (!ts.isSkins && ts.out > 0) ? <div style={{ textAlign: "center", color: C.faint, fontSize: 12, marginTop: 10 }}>{ts.out} match{ts.out === 1 ? "" : "es"} still out</div> : null;
+            })()}
           </div>
         </>
       )}
