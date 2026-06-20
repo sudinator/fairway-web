@@ -23,6 +23,7 @@ type LiveGame = {
   game_type: "stableford" | "match" | "fourball" | "skins" | "trifecta";
   status: "active" | "ended"; allowance_pct: number | null;
   team_score_mode: "best_ball" | "aggregate" | null;
+  trifecta_scoring: "per_hole" | "match" | null;
   teams: { key: string; name: string }[];
   holes_meta: LiveMeta[]; played_at: string | null; ended_at: string | null;
 };
@@ -102,12 +103,12 @@ function teamScores(game: LiveGame, players: LivePlayer[], pairings: LiveData["p
   } else if (game.game_type === "trifecta") {
     foursomes.forEach((f) => {
       const aIds = (f.a || []).filter(Boolean) as string[]; const bIds = (f.b || []).filter(Boolean) as string[];
-      const tri = computeTrifecta(meta, mkMembers([...aIds, ...bIds]), aIds, bIds, allowance, game.team_score_mode || "best_ball", !!f.swap);
+      const tri = computeTrifecta(meta, mkMembers([...aIds, ...bIds]), aIds, bIds, allowance, game.team_score_mode || "best_ball", !!f.swap, game.trifecta_scoring === "match" ? "match" : "per_hole");
       addPts(pts, teamOf(aIds[0]), tri.aPts); addPts(pts, teamOf(bIds[0]), tri.bPts);
       tri.contests.forEach((c) => {
         const aLive = c.aIds.some((id) => !players.find((p) => p.id === id)?.no_show);
         const bLive = c.bIds.some((id) => !players.find((p) => p.id === id)?.no_show);
-        if (aLive && bLive) unclaimed += meta.length - c.thru;
+        if (aLive && bLive) unclaimed += (game.trifecta_scoring === "match") ? (c.settled ? 0 : 1) : (meta.length - c.thru);
       });
     });
   } else if (game.game_type === "skins") {
@@ -289,13 +290,15 @@ function Scorecard({ data }: { data: LiveData }) {
               if ((gt === "trifecta" || gt === "match" || gt === "fourball") && ts.rows.length >= 2) {
                 const top = ts.rows[0], bot = ts.rows[1];
                 const unclaimed = gt === "trifecta" ? ts.unclaimed : ts.out;
+                const triMatch = gt === "trifecta" && game.trifecta_scoring === "match";
                 const cs = clinchState(top.scoreNum, bot.scoreNum, unclaimed);
-                const noun = (n: number) => gt === "trifecta" ? `point${n === 1 ? "" : "s"}` : `match${n === 1 ? "" : "es"}`;
-                const tail = gt === "trifecta" ? "unclaimed" : "still out";
+                const usePoints = gt === "trifecta" && !triMatch;
+                const noun = (n: number) => usePoints ? `point${n === 1 ? "" : "s"}` : `match${n === 1 ? "" : "es"}`;
+                const tail = usePoints ? "unclaimed" : "still out";
                 return (
                   <>
                     <div style={{ borderTop: "1px solid #E8E2CE", marginTop: 12, paddingTop: 10, textAlign: "center", color: C.faint, fontSize: 12 }}>
-                      {unclaimed > 0 ? <><b style={{ color: C.ink }}>{unclaimed}</b> {noun(unclaimed)} {tail}</> : (gt === "trifecta" ? "All points played" : "All matches in")}
+                      {unclaimed > 0 ? <><b style={{ color: C.ink }}>{unclaimed}</b> {noun(unclaimed)} {tail}</> : (usePoints ? "All points played" : "All matches in")}
                     </div>
                     {(cs.clinched || cs.canTie || cs.decided) && (
                       <div style={{ marginTop: 10, background: cs.canTie ? "#FBF1D2" : cs.decided && !cs.leader ? "#F1EFE6" : "#E2F3E8", border: `1px solid ${cs.canTie ? C.gold : cs.decided && !cs.leader ? C.line : "#5BB98A"}`, borderRadius: 10, padding: "9px 12px", textAlign: "center" }}>
@@ -497,7 +500,7 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
     body = <>{foursomes.map((f, i) => {
       const aIds = (f.a || []).filter(Boolean) as string[]; const bIds = (f.b || []).filter(Boolean) as string[];
       if (!aIds.length || !bIds.length) return null;
-      const tri = computeTrifecta(meta, mem([...aIds, ...bIds]), aIds, bIds, allowance, mode, !!f.swap);
+      const tri = computeTrifecta(meta, mem([...aIds, ...bIds]), aIds, bIds, allowance, mode, !!f.swap, game.trifecta_scoring === "match" ? "match" : "per_hole");
       const singles = tri.contests.filter((c) => c.kind === "single");
       const team = tri.contests.find((c) => c.kind === "team");
       return (

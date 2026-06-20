@@ -568,7 +568,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
   const hasPutts = round.holes.some((h) => h.putts != null);
   const hasPens = round.holes.some((h) => (h.penalties || 0) > 0 || !!h.sand);
   const hasDots = round.holes.some((h) => (h.recv || 0) > 0);
-  const hasFw = round.holes.some((h) => h.fairway === "hit" || h.fairway === "miss");
+  const hasFw = round.holes.some((h) => h.fairway != null);
 
   const headStyle: React.CSSProperties = { color: C.faint, fontSize: 9, letterSpacing: 0.5, fontWeight: 700, textTransform: "uppercase" };
 

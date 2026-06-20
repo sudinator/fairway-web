@@ -176,7 +176,10 @@ export const girStats = (rs: Round[]) => {
   return { hit: hs.filter(isGIR).length, total: hs.length };
 };
 export const firStats = (rs: Round[]) => {
-  const hs = rs.flatMap(played).filter((h) => h.par >= 4 && (h.fairway === "hit" || h.fairway === "miss"));
+  // A fairway is "attempted" on any par-4+ where a result was recorded. A miss is
+  // stored as "left"/"right" (or legacy "miss"); only "hit" counts as a hit. The
+  // old denominator excluded left/right, so L/R misses vanished and the % inflated.
+  const hs = rs.flatMap(played).filter((h) => h.par >= 4 && h.fairway != null);
   return { hit: hs.filter((h) => h.fairway === "hit").length, total: hs.length };
 };
 // Scrambling: of the holes where the green was MISSED in regulation, how often
@@ -510,6 +513,7 @@ export function fourballStatus(
 // BOTH partners' nets. Points: win = 1, halve = ½.
 
 export type TrifectaMode = "best_ball" | "aggregate";
+export type TrifectaScoring = "per_hole" | "match"; // per-hole points vs Ryder-Cup 1pt-per-match
 
 // Per-hole detail for a contest, so the UI can show "how we got there".
 // aNet/bNet are the contest-relevant nets (single: the two players; team
@@ -525,6 +529,7 @@ export type TrifectaContest = {
   aPts: number;
   bPts: number;
   thru: number;
+  settled: boolean; // match scoring: contest decided/finished; per-hole: all holes played
   perHole: ContestHole[];
 };
 export type TrifectaResult = {
@@ -556,6 +561,7 @@ export function computeTrifecta(
   allowancePct: number = 100,
   mode: TrifectaMode = "best_ball",
   swap = false,
+  scoring: TrifectaScoring = "per_hole",
 ): TrifectaResult {
   const nets = fourballNets(holes, members, allowancePct);
   const singles = trifectaSingles(aIds, bIds, swap);
@@ -589,7 +595,20 @@ export function computeTrifecta(
       return { hole: h.n, aNet, bNet, r, aRun, bRun };
     });
     const results = perHole.map((d) => d.r);
-    return { kind, aIds: aIdsC, bIds: bIdsC, ...tally(results), perHole };
+    if (scoring === "match") {
+      // Ryder-Cup: the contest is worth ONE point, decided by the match over 18
+      // (½ each if halved). No points until the match is settled.
+      let aH = 0, bH = 0, played = 0;
+      for (const r of results) { if (r == null) continue; played++; if (r > 0) aH++; else if (r < 0) bH++; }
+      const remaining = results.length - played;
+      const lead = aH - bH; // match lead in holes
+      const settled = played > 0 && (Math.abs(lead) > remaining || remaining === 0);
+      let aPts = 0, bPts = 0;
+      if (settled) { if (lead > 0) aPts = 1; else if (lead < 0) bPts = 1; else { aPts = 0.5; bPts = 0.5; } }
+      return { kind, aIds: aIdsC, bIds: bIdsC, aPts, bPts, thru: played, lead, settled, perHole };
+    }
+    const t = tally(results);
+    return { kind, aIds: aIdsC, bIds: bIdsC, ...t, settled: t.thru === holes.length, perHole };
   };
 
   for (const [aId, bId] of singles) {

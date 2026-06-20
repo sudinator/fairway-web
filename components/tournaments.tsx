@@ -72,6 +72,7 @@ type Game = {
   teams?: { key: string; name: string }[] | null; // two named teams for team match play
   foursomes?: { id: string; name: string; a: string[]; b: string[]; swap?: boolean }[] | null; // four-ball / trifecta: pair A vs pair B (swap = cross the singles)
   team_score_mode?: "best_ball" | "aggregate" | null; // trifecta team leg: low net vs both nets added
+  trifecta_scoring?: "per_hole" | "match" | null; // trifecta: per-hole points vs Ryder-Cup 1pt-per-match
   share_token?: string | null; // public live-scorecard token (organizer-set); null = not shared
   ended_at?: string | null; // when the game was ended (stamped by trigger); drives the 3-day live window
   created_by: string;
@@ -439,6 +440,7 @@ function CreateGame({
   const [allowancePct, setAllowancePct] = useState(100);
   useEffect(() => { setAllowancePct(gameType === "fourball" || gameType === "trifecta" ? 85 : 100); }, [gameType]);
   const [teamScoreMode, setTeamScoreMode] = useState<"best_ball" | "aggregate">("best_ball");
+  const [trifectaScoring, setTrifectaScoring] = useState<"per_hole" | "match">("per_hole");
   const [teamMode, setTeamMode] = useState(false);
   const [skinsTeamStyle, setSkinsTeamStyle] = useState<"head_to_head" | "best_ball">("head_to_head");
   const [team1, setTeam1] = useState("Team 1");
@@ -575,6 +577,7 @@ function CreateGame({
               : null,
           foursomes: gameType === "fourball" || gameType === "trifecta" || (gameType === "skins" && teamMode && skinsTeamStyle === "best_ball") ? [] : null,
           team_score_mode: gameType === "trifecta" ? teamScoreMode : "best_ball",
+          trifecta_scoring: gameType === "trifecta" ? trifectaScoring : null,
         })
         .select()
         .single();
@@ -969,6 +972,16 @@ function CreateGame({
                 ? "Shootout — both partners' net scores count. The team's hole score is the two nets added together, not just the better one, so a blow-up by either player hurts."
                 : "Best ball — the team's hole score is the better net of the two partners."}
             </div>
+            <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>Scoring</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+              <button onClick={() => setTrifectaScoring("per_hole")} style={{ ...btn(trifectaScoring === "per_hole"), fontSize: 12, padding: "7px 10px" }}>1 hole = 1 pt</button>
+              <button onClick={() => setTrifectaScoring("match")} style={{ ...btn(trifectaScoring === "match"), fontSize: 12, padding: "7px 10px" }}>1 match = 1 pt (Ryder Cup)</button>
+            </div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+              {trifectaScoring === "match"
+                ? "Ryder Cup — each foursome's 2 singles + 1 team match are worth 1 point each over 18 (½ each if halved). 3 points per foursome."
+                : "Per-hole — every hole of all three matches scores. 3 points on every hole."}
+            </div>
           </div>
         )}
         {(gameType === "match" || gameType === "skins" || gameType === "fourball") && (
@@ -1093,7 +1106,9 @@ function GameRoom({
   const prevGroupScoring = React.useRef(false);
   useEffect(() => {
     const on = !!game?.marker_user_id || !!myGroupHasMarker;
-    if (on !== prevGroupScoring.current) setCardView(on);
+    // Don't auto-snap to the group card once the game is over — an ended game
+    // should open on Results, not the scorecard.
+    if (game?.status !== "ended" && on !== prevGroupScoring.current) setCardView(on);
     prevGroupScoring.current = on;
   }, [game?.marker_user_id, myGroupHasMarker]);
   const cardPlayers = teeGroupsInUse ? players.filter((p) => p.tee_group === viewGroup) : players;
@@ -1728,11 +1743,17 @@ function GameRoom({
   // place so a switch is reversible. Allowance auto-suggests the new format's
   // common-practice number but the organizer can override after.
   const anyScores = players.some((p) => (p.scores || []).some((s) => s != null));
+  const changeTrifectaScoring = async (next: "per_hole" | "match") => {
+    if (!game || game.status === "ended") return;
+    await supabase.from("games").update({ trifecta_scoring: next }).eq("id", game.id);
+    await load();
+  };
   const setFormat = async (next: "stableford" | "match" | "fourball" | "skins" | "trifecta") => {
     if (!game || next === game.game_type) return;
     const suggested = next === "fourball" || next === "trifecta" ? 85 : 100;
     const patch: Record<string, unknown> = { game_type: next, allowance_pct: suggested };
     if (next === "trifecta" && !game.team_score_mode) patch.team_score_mode = "best_ball";
+    if (next === "trifecta" && !game.trifecta_scoring) patch.trifecta_scoring = "per_hole";
     await supabase.from("games").update(patch).eq("id", game.id);
     await load();
   };
@@ -2196,10 +2217,32 @@ function GameRoom({
           <span style={{ fontSize: 12, fontWeight: 800, background: C.gold, color: "#1A1A1A", borderRadius: 20, padding: "3px 10px" }}>FINAL · GAME ENDED</span>
         ) : (
           <span style={{ color: C.cream, opacity: 0.8, fontSize: 12 }}>
-            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? "2 v 2 better-net-ball" : game.game_type === "trifecta" ? "2 singles + a team point · 3 pts/hole" : game.game_type === "skins" ? "net skins · carryovers" : "net Stableford leaderboard"}
+            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? "2 v 2 better-net-ball" : game.game_type === "trifecta" ? (game.trifecta_scoring === "match" ? "2 singles + a team match · 3 pts/foursome" : "2 singles + a team point · 3 pts/hole") : game.game_type === "skins" ? "net skins · carryovers" : "net Stableford leaderboard"}
           </span>
         )}
       </div>
+      )}
+
+      {roomTab === "setup" && isOrganizer && game.game_type === "trifecta" && !isEnded && (
+        <div style={{ marginTop: 12, background: C.greenLight, borderRadius: 12, padding: 14 }}>
+          <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase" }}>Trifecta scoring</div>
+          <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+            {(["per_hole", "match"] as const).map((val) => {
+              const on = (game.trifecta_scoring === "match" ? "match" : "per_hole") === val;
+              return (
+                <button key={val} onClick={() => changeTrifectaScoring(val)} style={{ flex: 1, border: `1px solid ${on ? C.gold : C.greenMid}`, background: on ? C.gold : "transparent", borderRadius: 10, padding: "9px 8px", cursor: "pointer", textAlign: "center" }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: on ? "#1c1606" : C.cream }}>{val === "match" ? "1 match = 1 pt" : "1 hole = 1 pt"}</div>
+                  <div style={{ fontSize: 11, marginTop: 2, color: on ? "#3c3208" : C.sage }}>{val === "match" ? "Ryder Cup · 3 pts/foursome" : "Per-hole · 3 pts/hole"}</div>
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 8, lineHeight: 1.5 }}>
+            {game.trifecta_scoring === "match"
+              ? "Each foursome's 2 singles + 1 team match are worth 1 point each over 18 (½ each if halved)."
+              : "Every hole of all three matches scores — 3 points on every hole."}
+          </div>
+        </div>
       )}
 
       {roomTab === "play" && !cardView && (() => {
@@ -2299,7 +2342,7 @@ function GameRoom({
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
               {teeGroupList.map((g) => {
                 const grpPlayers = players.filter((p) => p.tee_group === g);
-                const locked = grpPlayers.some((p) => p.group_locked);
+                const locked = gameEnded || grpPlayers.some((p) => p.group_locked);
                 const hasMarker = grpPlayers.some((p) => p.is_marker);
                 return (
                   <button key={g} onClick={() => setViewGroup(g)} style={{ ...btn(viewGroup === g), fontSize: 12, padding: "5px 12px" }}>
@@ -2329,7 +2372,7 @@ function GameRoom({
             onSetHole={setPlayerHole}
             teeMode={teeGroupsInUse}
             groupLabel={viewGroup != null ? `Group ${viewGroup}` : ""}
-            groupLocked={viewedGroupLocked}
+            groupLocked={viewedGroupLocked || gameEnded}
             canClaim={canClaimViewed}
             onClaimGroup={claimGroupMarker}
             onReleaseGroup={releaseGroupMarker}
@@ -2580,12 +2623,10 @@ function GameRoom({
                 );
                 return prog.map((lead) => matchLeadLabel(lead));
               }
-              if ((game.game_type === "fourball" || game.game_type === "trifecta") && Array.isArray(game.foursomes)) {
-                // Find my foursome and which side I'm on; compute the running team
-                // best-net-ball match position from MY team's perspective.
-                const f = game.foursomes.find(
-                  (x: any) => (x.a || []).includes(myKey) || (x.b || []).includes(myKey),
-                );
+              if (game.game_type === "fourball" && Array.isArray(game.foursomes)) {
+                // Four-ball has no singles: the player's match IS the team best-ball,
+                // from MY team's perspective.
+                const f = game.foursomes.find((x: any) => (x.a || []).includes(myKey) || (x.b || []).includes(myKey));
                 if (!f || !f.a?.length || !f.b?.length) return undefined;
                 const onA = f.a.includes(myKey);
                 const myIds = onA ? f.a : f.b;
@@ -2594,9 +2635,28 @@ function GameRoom({
                   const p = players.find((pp) => pkey(pp) === uid);
                   return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par) : null, noShow: !!p?.no_show };
                 });
-                // myIds as the "A" side so positive lead = my team up.
                 const prog = fourballProgress(game.holes_meta, members, myIds, oppIds, game.allowance_pct ?? 100);
                 return prog.map((lead) => matchLeadLabel(lead));
+              }
+              if (game.game_type === "trifecta" && Array.isArray(game.foursomes)) {
+                // Trifecta: the card tracks the player's OWN singles match vs their
+                // direct opponent, using the same foursome group-low nets that
+                // computeTrifecta (the Results page) uses — so the running number
+                // matches exactly, instead of showing the team best-ball position.
+                const f = game.foursomes.find((x: any) => (x.a || []).includes(myKey) || (x.b || []).includes(myKey));
+                if (!f || !f.a?.length || !f.b?.length) return undefined;
+                const members = [...f.a, ...f.b].map((uid: string) => {
+                  const p = players.find((pp) => pkey(pp) === uid);
+                  return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par) : null, noShow: !!p?.no_show };
+                });
+                const res = computeTrifecta(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", !!(f as any).swap);
+                const mine = res.contests.find((c) => c.kind === "single" && (c.aIds[0] === myKey || c.bIds[0] === myKey));
+                if (!mine) return undefined;
+                const iAmA = mine.aIds[0] === myKey;
+                return mine.perHole.map((h) => {
+                  if (h.aNet == null || h.bNet == null) return matchLeadLabel(null);
+                  return matchLeadLabel(iAmA ? h.aRun - h.bRun : h.bRun - h.aRun);
+                });
               }
               return undefined;
             })()}
@@ -3731,6 +3791,7 @@ function FourballView({
   // Trifecta: each foursome contributes its singles + team points to the team totals.
   const isTrifecta = game.game_type === "trifecta";
   const teamScoreMode: "best_ball" | "aggregate" = game.team_score_mode === "aggregate" ? "aggregate" : "best_ball";
+  const triScoring: "per_hole" | "match" = game.trifecta_scoring === "match" ? "match" : "per_hole";
   const trifectaStandings = (() => {
     if (!isTeam || !isTrifecta) return null;
     const pts: Record<string, number> = { A: 0, B: 0 };
@@ -3738,7 +3799,7 @@ function FourballView({
       if (!f.a.length || !f.b.length) return;
       const ta = playerOf(f.a[0])?.team, tb = playerOf(f.b[0])?.team;
       if (!ta || !tb || ta === tb) return;
-      const r = computeTrifecta(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap);
+      const r = computeTrifecta(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap, triScoring);
       pts[ta] = (pts[ta] ?? 0) + r.aPts;
       pts[tb] = (pts[tb] ?? 0) + r.bPts;
     });
@@ -3755,11 +3816,12 @@ function FourballView({
       if (!f.a.length || !f.b.length) return;
       const ta = playerOf(f.a[0])?.team, tb = playerOf(f.b[0])?.team;
       if (!ta || !tb || ta === tb) return;
-      const r = computeTrifecta(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap);
+      const r = computeTrifecta(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap, triScoring);
       r.contests.forEach((c) => {
         const aLive = c.aIds.some((id) => !playerOf(id)?.no_show);
         const bLive = c.bIds.some((id) => !playerOf(id)?.no_show);
-        if (aLive && bLive) rem += game.holes_meta.length - c.thru;
+        if (!aLive || !bLive) return;
+        rem += triScoring === "match" ? (c.settled ? 0 : 1) : game.holes_meta.length - c.thru;
       });
     });
     return rem;
@@ -3861,7 +3923,7 @@ function FourballView({
           </div>
           {isTeam && standPts && teams && (
             isTrifecta
-              ? <TeamClinchLine aPts={standPts.A} bPts={standPts.B} unclaimed={trifectaUnclaimed ?? 0} aName={teams[0].name} bName={teams[1].name} metric="points" />
+              ? <TeamClinchLine aPts={standPts.A} bPts={standPts.B} unclaimed={trifectaUnclaimed ?? 0} aName={teams[0].name} bName={teams[1].name} metric={triScoring === "match" ? "matches" : "points"} />
               : teamStandings ? <TeamClinchLine aPts={teamStandings.decidedPts.A} bPts={teamStandings.decidedPts.B} unclaimed={teamStandings.out} aName={teams[0].name} bName={teams[1].name} metric="matches" /> : null
           )}
         </div>
@@ -3879,7 +3941,7 @@ function FourballView({
         const mine = f.a.includes(myKey) || f.b.includes(myKey);
         const lead = st?.lead ?? 0;
         const leadText = !st || st.thru === 0 ? "" : lead === 0 ? "All square" : `${firstName(lead > 0 ? f.a[0] : f.b[0])}'s pair ${Math.abs(lead)} UP`;
-        const tri = isTrifecta && full ? computeTrifecta(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap) : null;
+        const tri = isTrifecta && full ? computeTrifecta(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap, triScoring) : null;
         return (
           <div key={f.id} style={{ background: C.card, borderRadius: 12, padding: 14, marginTop: 12, border: mine ? `1px solid ${C.gold}` : "none" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>

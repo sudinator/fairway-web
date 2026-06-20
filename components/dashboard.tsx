@@ -81,6 +81,29 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   const diffDomain = niceDomain(trend.map((t) => t.diff), 2);
   const ptsVals = trend.map((t) => t.pts).filter((v): v is number => v != null && v > 0);
   const ptsDomain = niceDomain(ptsVals, 2);
+  // ---- Scoring form on differentials (course-adjusted) ----
+  // Only rounds with a valid 18-hole differential (need rating + slope) can be
+  // charted. Bars are coloured vs the player's own average differential; a cream
+  // line shows the trailing 5-round rolling average (≈ handicap direction).
+  const diffSeries = sorted
+    .map((r) => ({ r, d: roundDifferential(r) }))
+    .filter((x): x is { r: Round; d: number } => x.d != null);
+  const diffTrend = diffSeries.map((x, i) => {
+    const w = diffSeries.slice(Math.max(0, i - 4), i + 1);
+    return {
+      i: i + 1,
+      name: fmtDate(x.r.played_at),
+      course: x.r.course,
+      diff: Math.round(x.d * 10) / 10,
+      roll: Math.round((w.reduce((s, y) => s + y.d, 0) / w.length) * 10) / 10,
+    };
+  });
+  const diffFormAvg = diffTrend.length ? diffTrend.reduce((s, t) => s + t.diff, 0) / diffTrend.length : null;
+  const diffFormDomain = niceDomain(diffTrend.map((t) => t.diff), 2);
+  const last5 = diffTrend.slice(-5);
+  const last5Avg = last5.length ? last5.reduce((s, t) => s + t.diff, 0) / last5.length : null;
+  const formDelta = last5Avg != null && diffTrend.length ? diffTrend[0].diff - last5Avg : null; // + = improved (lower now)
+  const unratedTrend = sorted.length - diffTrend.length;
   const distTotal = buckets.eagle + buckets.birdie + buckets.par + buckets.bogey + buckets.double;
   const distData = [
     { name: "Eagle+", v: buckets.eagle, c: "#C77DFF" },
@@ -212,26 +235,40 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
         </div>
       )}
 
-      {trend.length >= 2 && (
+      {diffTrend.length >= 2 && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 16 }}>
-          <Eyebrow>SCORING TREND</Eyebrow>
-          <div style={{ height: 200, marginTop: 10 }}>
+          <Eyebrow>SCORING FORM · DIFFERENTIAL</Eyebrow>
+          {last5Avg != null && (
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 8 }}>
+              <div style={{ fontFamily: "Georgia, serif", fontSize: 28, fontWeight: 800, color: C.cream, lineHeight: 1 }}>{last5Avg.toFixed(1)}</div>
+              <div style={{ color: C.sage, fontSize: 12 }}>last {last5.length}-round avg differential</div>
+              {formDelta != null && Math.abs(formDelta) >= 0.1 && (
+                <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, padding: "4px 10px", borderRadius: 999, background: formDelta > 0 ? "#143a2b" : "#3a1717", color: formDelta > 0 ? "#9be9c0" : "#f3a3a0" }}>
+                  {formDelta > 0 ? "▼" : "▲"} {Math.abs(formDelta).toFixed(1)} vs your start
+                </div>
+              )}
+            </div>
+          )}
+          <div style={{ height: 200, marginTop: 12 }}>
             <ResponsiveContainer>
-              <ComposedChart data={trend} margin={{ top: 5, right: 6, left: -8, bottom: 0 }}>
+              <ComposedChart data={diffTrend} margin={{ top: 5, right: 6, left: -8, bottom: 0 }}>
                 <XAxis dataKey="i" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} />
-                <YAxis yAxisId="left" domain={diffDomain} allowDecimals={false} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
-                <YAxis yAxisId="right" orientation="right" domain={ptsDomain} allowDecimals={false} tick={{ fill: C.gold, fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
+                <YAxis domain={diffFormDomain} allowDecimals={false} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
                 <Tooltip
                   contentStyle={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12 }}
-                  formatter={(v: any, k: any) => [k === "diff" ? toParStr(v) : v, k === "diff" ? "vs par" : "Stableford pts"]}
+                  formatter={(v: any, k: any) => [typeof v === "number" ? v.toFixed(1) : v, k === "diff" ? "Differential" : "5-rd avg"]}
                   labelFormatter={(l: any, p: any) => (p && p[0] ? `${p[0].payload.course} · ${p[0].payload.name}` : l)} />
-                <ReferenceLine yAxisId="left" y={0} stroke={C.cream} strokeDasharray="4 4" />
-                <Line yAxisId="left" type="monotone" dataKey="diff" stroke={C.cream} strokeWidth={2} dot={{ fill: C.cream, r: 3 }} />
-                <Line yAxisId="right" type="monotone" dataKey="pts" stroke={C.gold} strokeWidth={2} strokeDasharray="5 3" dot={{ fill: C.gold, r: 3 }} />
+                {diffFormAvg != null && <ReferenceLine y={Math.round(diffFormAvg * 10) / 10} stroke={C.sage} strokeDasharray="3 4" />}
+                <Bar dataKey="diff" radius={[3, 3, 0, 0]} maxBarSize={26}>
+                  {diffTrend.map((t, i) => <Cell key={i} fill={diffFormAvg != null && t.diff <= diffFormAvg ? "#4ADE80" : "#FB7185"} />)}
+                </Bar>
+                <Line type="monotone" dataKey="roll" stroke={C.cream} strokeWidth={2.5} dot={{ fill: C.cream, r: 3 }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
-          <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Cream (left axis) = strokes vs par (lower better) · Gold (right axis) = Stableford points (higher better)</div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
+            Each bar is one round’s differential (course-adjusted, lower is better). <span style={{ color: "#9be9c0" }}>Green</span> beat your average{diffFormAvg != null ? ` (${diffFormAvg.toFixed(1)})` : ""}, <span style={{ color: "#f3a3a0" }}>red</span> didn’t. The cream line is your 5-round rolling average.{unratedTrend > 0 ? ` ${unratedTrend} round${unratedTrend === 1 ? "" : "s"} not shown (need 18 holes + rating/slope).` : ""}
+          </div>
         </div>
       )}
 
