@@ -1784,6 +1784,10 @@ function GameRoom({
     const patch: Record<string, unknown> = { game_type: next, allowance_pct: suggested };
     if (next === "trifecta" && !game.team_score_mode) patch.team_score_mode = "best_ball";
     if (next === "trifecta" && !game.trifecta_scoring) patch.trifecta_scoring = "per_hole";
+    // NOTE: we deliberately do NOT clear pairings/foursomes/teams when switching
+    // format. A player's setup work is preserved so switching back restores it;
+    // formats that don't use a given structure simply ignore it (see the
+    // game_type guards in StrokesSummary and the setup tab steps).
     await supabase.from("games").update(patch).eq("id", game.id);
     await load();
   };
@@ -1978,9 +1982,15 @@ function GameRoom({
 
   const isOrganizer = game.created_by === user.id;
   const isEnded = game.status === "ended";
-  const leaderboard = [...players].sort(
-    (a, b) => playerPoints(b) - playerPoints(a),
-  );
+  // Rank by over/under (net Stableford vs par pace): most under (lowest 2*thru-pts)
+  // leads, so a hot start can top a longer-but-flatter round. Not-yet-started
+  // players sort to the bottom; ties broken by more points.
+  const ouVal = (p: Player) => (playerThru(p) === 0 ? Infinity : 2 * playerThru(p) - playerPoints(p));
+  const leaderboard = [...players].sort((a, b) => {
+    const d = ouVal(a) - ouVal(b);
+    if (d !== 0) return d;
+    return playerPoints(b) - playerPoints(a);
+  });
 
   // Segment winners (three sixes), by net Stableford.
   const segLabels = ["Holes 1–6", "Holes 7–12", "Holes 13–18"];
@@ -2140,9 +2150,12 @@ function GameRoom({
 
       {roomTab === "setup" && isOrganizer && (() => {
         const teamsArr = Array.isArray(game.teams) ? game.teams : [];
-        const usesTeams = teamsArr.length > 0;
+        // Gate setup steps by the CURRENT format so stale teams/foursomes left over
+        // from a previous format are ignored (not shown) without being deleted —
+        // switching back to that format restores the work.
+        const usesTeams = (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "skins") && teamsArr.length > 0;
         const usesMatchups = game.game_type === "match" || game.game_type === "fourball" || game.game_type === "skins" || game.game_type === "trifecta";
-        const usesFoursomes = Array.isArray(game.foursomes);
+        const usesFoursomes = (game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "skins") && Array.isArray(game.foursomes);
         const steps: { key: "players" | "teams" | "matchups" | "groups"; label: string }[] = [
           { key: "players", label: "Players" },
           ...(usesTeams ? [{ key: "teams" as const, label: "Teams" }] : []),
@@ -2436,46 +2449,53 @@ function GameRoom({
           <div style={{ marginTop: 18 }}>
             <Eyebrow>LEADERBOARD · NET STABLEFORD</Eyebrow>
             {/* Column header */}
-            <div style={{ display: "flex", alignItems: "center", padding: "6px 16px 4px", color: C.sage, fontSize: 10, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase" }}>
-              <div style={{ width: 30 }}>#</div>
+            <div style={{ display: "flex", alignItems: "center", padding: "9px 12px", marginTop: 4, color: C.cream, fontSize: 12, fontWeight: 800, letterSpacing: 0.3, background: C.greenMid, borderRadius: 10 }}>
+              <div style={{ width: 20 }}>#</div>
+              <div style={{ width: 32 }} />
               <div style={{ flex: 1 }}>Player</div>
-              <div style={{ width: 46, textAlign: "center" }}>Gross</div>
-              <div style={{ width: 40, textAlign: "center" }}>Net</div>
-              <div style={{ width: 52, textAlign: "center" }}>Net±Par</div>
-              <div style={{ width: 40, textAlign: "center" }}>Pts</div>
+              <div style={{ width: 38, textAlign: "center" }}>Gross</div>
+              <div style={{ width: 32, textAlign: "center" }}>Thru</div>
+              <div style={{ width: 40, textAlign: "center" }}>O/U</div>
+              <div style={{ width: 34, textAlign: "center" }}>Pts</div>
             </div>
             {leaderboard.map((p) => {
               const pts = playerPoints(p);
-              const pos = leaderboard.findIndex((x) => playerPoints(x) === pts) + 1;
-              const tied = leaderboard.filter((x) => playerPoints(x) === pts).length > 1;
               const thru = playerThru(p);
+              const mineOu = ouVal(p);
+              const pos = leaderboard.filter((x) => ouVal(x) < mineOu).length + 1;
+              const tied = leaderboard.filter((x) => ouVal(x) === mineOu).length > 1;
               return (
                 <div key={p.id} style={{
                   background: p.user_id === user.id ? C.cream : C.card,
                   borderRadius: 12, padding: "10px 16px", marginTop: 8,
                   display: "flex", alignItems: "center",
                 }}>
-                  <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700, width: 30, fontSize: 17 }}>
+                  <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700, width: 20, fontSize: 15 }}>
                     {tied ? "T" : ""}{pos}
                   </div>
-                  <Avatar src={p.avatar_url} name={p.display_name} size={48} />
-                  <div style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
+                  <Avatar src={p.avatar_url} name={p.display_name} size={32} />
+                  <div style={{ flex: 1, minWidth: 0, marginLeft: 8 }}>
                     <div style={{ color: C.ink, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {p.display_name}{p.user_id === user.id ? " (you)" : ""}
                     </div>
                     <div style={{ color: C.faint, fontSize: 11 }}>
-                      thru {thru}{p.course_handicap != null ? ` · CH ${p.course_handicap}` : " · no hcp"}
+                      {p.course_handicap != null ? `CH ${p.course_handicap}` : "no hcp"}
                     </div>
                   </div>
-                  <div style={{ width: 46, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 16 }}>{thru ? playerGross(p) : "–"}</div>
-                  <div style={{ width: 40, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 16 }}>{thru ? playerNet(p) : "–"}</div>
-                  <div style={{ width: 52, textAlign: "center", color: C.ink, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{thru ? relToParStr(p) : "–"}</div>
-                  <div style={{ width: 40, textAlign: "center", color: C.green, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif" }}>{pts}</div>
+                  <div style={{ width: 38, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru ? playerGross(p) : "–"}</div>
+                  <div style={{ width: 32, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru || "–"}</div>
+                  {(() => {
+                    if (!thru) return <div style={{ width: 40, textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 16, fontFamily: "Georgia, serif" }}>–</div>;
+                    const rel = 2 * thru - pts;
+                    const col = rel < 0 ? "#1F8F54" : rel > 0 ? C.birdie : "#6B6857";
+                    return <div style={{ width: 40, textAlign: "center", color: col, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{relToParStr(p)}</div>;
+                  })()}
+                  <div style={{ width: 34, textAlign: "center", color: C.green, fontWeight: 800, fontSize: 19, fontFamily: "Georgia, serif" }}>{pts}</div>
                 </div>
               );
             })}
             <div style={{ color: C.sage, fontSize: 10, marginTop: 8 }}>
-              Gross = total strokes · Net = gross minus handicap strokes · Net±Par = net score vs. par · Pts = net Stableford points.
+              Gross = total strokes · Thru = holes played · O/U = net Stableford vs par pace (under = green) · Pts = net Stableford points. Ranked by O/U.
             </div>
           </div>
 
@@ -2532,6 +2552,8 @@ function GameRoom({
               players={players}
               playerPoints={playerPoints}
               playerHoles={playerHoles}
+              ended={isEnded}
+              game={game}
             />
           )}
         </>
@@ -4086,9 +4108,16 @@ function StrokesSummary({ game, players, collapsible = false, meKey }: { game: G
     return `strokes on ${ones.join(", ")}`;
   };
 
-  const needsStructure = ["match", "fourball", "trifecta"].includes(game.game_type) || (game.game_type === "skins" && !!teams);
   const hasStructure = pairings.length > 0 || foursomes.length > 0;
-  if (!needsStructure && !hasStructure) return null;
+  // Only show the strokes/matchups panel for formats that actually use 1:1
+  // pairings or team foursomes. Stableford never does — and must ignore any stale
+  // pairings left over from a format the game was previously set to.
+  const usesStructure =
+    game.game_type === "match" ||
+    game.game_type === "fourball" ||
+    game.game_type === "trifecta" ||
+    (game.game_type === "skins" && hasStructure);
+  if (!usesStructure) return null;
 
   const oneVone = (aId: string, bId: string, key: string) => {
     const a = byKey(aId), b = byKey(bId);
@@ -4862,10 +4891,12 @@ function OrganizerPanel({
 // and the split percentages (default: 3 six-hole segments at 10/75 each, 2nd at
 // 15/75, 1st at 30/75). Computes payouts including ties, all-tied-first, and the
 // clean-sweep double. See computeBetting() in lib/golf.ts for the full rules.
-function BettingPanel({ players, playerPoints, playerHoles }: {
+function BettingPanel({ players, playerPoints, playerHoles, ended, game }: {
   players: Player[];
   playerPoints: (p: Player) => number;
   playerHoles: (p: Player) => Hole[];
+  ended: boolean;
+  game: Game;
 }) {
   const [open, setOpen] = useState(false);
   const [bet, setBet] = useState(75);
@@ -4903,6 +4934,63 @@ function BettingPanel({ players, playerPoints, playerHoles }: {
   const result = computeBetting(betPlayers, bet, split);
   const pct = (v: number) => `${Math.round(v * 1000) / 10}%`;
 
+  // One-tap shareable recap of the finished round.
+  const [copied, setCopied] = useState(false);
+  const buildSummary = (): string => {
+    const courseName = game?.course || "Round";
+    const dateStr = new Date(game?.ended_at || game?.created_at || Date.now()).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const grossOf = (p: Player) => playerHoles(p).reduce((sum, h) => sum + (h.strokes && h.strokes > 0 ? h.strokes : 0), 0);
+    const rows = players
+      .map((p) => ({ name: p.display_name, total: playerPoints(p), gross: grossOf(p), seg: stablefordBySix(playerHoles(p)) }))
+      .sort((a, b) => b.total - a.total);
+    const segNames = ["Front 6", "Middle 6", "Last 6"];
+    const segLines = [0, 1, 2].map((si) => {
+      const elig = players.filter((p) => playerHoles(p).slice(si * 6, si * 6 + 6).filter((h) => h.strokes != null && h.strokes > 0).length === 6);
+      if (!elig.length) return `${segNames[si]}: \u2014`;
+      const best = Math.max(...elig.map((p) => stablefordBySix(playerHoles(p))[si]));
+      const w = elig.filter((p) => stablefordBySix(playerHoles(p))[si] === best).map((p) => p.display_name);
+      return `${segNames[si]}: ${w.join(" & ")} (${best}${w.length > 1 ? ", tie" : ""})`;
+    });
+    const overall: string[] = [];
+    if (rows.length) {
+      const maxTotal = rows[0].total;
+      const firsts = rows.filter((r) => r.total === maxTotal);
+      if (firsts.length > 1) {
+        overall.push(`\ud83e\udd47 1st (tie): ${firsts.map((r) => r.name).join(" & ")} (${maxTotal})`);
+        overall.push("\u2014 no 2nd \u2014");
+      } else {
+        overall.push(`\ud83e\udd47 1st: ${firsts[0].name} (${maxTotal})`);
+        const rest = rows.filter((r) => r.total < maxTotal);
+        if (rest.length) {
+          const secondVal = rest[0].total;
+          const seconds = rest.filter((r) => r.total === secondVal);
+          overall.push(`\ud83e\udd48 2nd: ${seconds.map((r) => r.name).join(" & ")} (${secondVal})${seconds.length > 1 ? " (tie)" : ""}`);
+        }
+      }
+    }
+    const money = (v: number) => `$${Math.round(v)}`;
+    const netStr = (v: number) => (v > 0 ? `+${money(v)}` : v < 0 ? `-${money(Math.abs(v))}` : "$0");
+    const moneyLines = result.perPlayer.map((pp) => `${pp.name}: won ${money(pp.won)}, net ${netStr(pp.net)}`);
+    return [
+      `\ud83c\udfcc\ufe0f TGC Stableford \u2014 ${courseName} \u00b7 ${dateStr}`,
+      ``,
+      `STANDINGS (net stableford)`,
+      ...rows.map((r, i) => `${i + 1}. ${r.name} \u2014 ${r.total} pts (gross ${r.gross}) \u00b7 F6 ${r.seg[0]} / M6 ${r.seg[1]} / L6 ${r.seg[2]}`),
+      ``,
+      `SIXES`,
+      ...segLines,
+      ``,
+      `OVERALL`,
+      ...overall,
+      ``,
+      `MONEY \u2014 pot ${money(result.pot)}`,
+      ...moneyLines,
+    ].join("\n");
+  };
+  const copySummary = async () => {
+    try { await navigator.clipboard.writeText(buildSummary()); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* clipboard unavailable */ }
+  };
+
   return (
     <div style={{ marginTop: 18, background: C.greenLight, borderRadius: 14, padding: 16 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => setOpen((v) => !v)}>
@@ -4910,6 +4998,12 @@ function BettingPanel({ players, playerPoints, playerHoles }: {
         <div style={{ flex: 1 }} />
         <span style={{ color: C.sage, fontSize: 16 }}>{open ? "▾" : "▸"}</span>
       </div>
+
+      {ended && (
+        <button onClick={copySummary} style={{ ...btn(true), width: "100%", marginTop: 12, fontSize: 14, padding: "11px 0", background: copied ? "#1F8F54" : undefined, color: copied ? "#fff" : undefined }}>
+          {copied ? "\u2713 Copied \u2014 paste into your chat" : "\u29c9 Copy round summary"}
+        </button>
+      )}
 
       {!open && (
         <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
