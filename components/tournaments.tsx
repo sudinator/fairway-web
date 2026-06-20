@@ -38,7 +38,7 @@ import {
 } from "@/lib/golf";
 import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
-import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearAllGameScores } from "@/lib/draft";
+import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores } from "@/lib/draft";
 import {
   btn,
   inputStyle,
@@ -1165,10 +1165,14 @@ function GameRoom({
     // gaps; it never removes data. (Pushing another player's row needs marker
     // rights server-side; a failed push is swallowed and the backup is kept.)
     const n = (safeGame as any)?.holes_meta?.length || 18;
+    const resetAt = (safeGame as any)?.scores_reset_at ? new Date((safeGame as any).scores_reset_at).getTime() : 0;
     const reconciled: any[] = [];
     for (const p of (ps || [])) {
       const backup = loadGameScores(gameId, p.id);
       if (!backup) { reconciled.push(p); continue; }
+      // A backup saved before the organizer's last reset is stale — discard it
+      // so a reset can't be undone by this device's pre-reset memory.
+      if (resetAt && (backup.at ?? 0) < resetAt) { clearGameScores(gameId, p.id); reconciled.push(p); continue; }
       const { merged, changed } = mergeBackupRow(p, backup, n);
       let row = p;
       if (changed) {
@@ -1376,7 +1380,7 @@ function GameRoom({
     setPlayers((ps) => ps.map((p) => (p.id === me.id ? updated : p)));
     // Synchronous local backup FIRST — survives an immediate lock even if the
     // network write below gets frozen. Reconciled to the DB on next load.
-    if (game) saveGameScores(game.id, me.id, { scores, putts, fairways, penalties, sand });
+    if (game) saveGameScores(game.id, me.id, { scores, putts, fairways, penalties, sand }, true);
     setSavingHole(holeIdx);
     lastEditRef.current = Date.now();
     await supabase
@@ -1418,7 +1422,7 @@ function GameRoom({
     // device writes (not just the marker's own) — with penalties/sand — so an
     // offline/lock entry for any player is recoverable. Synced back on reopen /
     // reconnect (see load()).
-    if (game) saveGameScores(game.id, playerId, { scores, putts, fairways, penalties, sand });
+    if (game) saveGameScores(game.id, playerId, { scores, putts, fairways, penalties, sand }, true);
     lastEditRef.current = Date.now();
     await supabase.from("game_players").update({ scores, putts, fairways, penalties, sand, ...clockPatch }).eq("id", playerId);
     lastEditRef.current = Date.now();
@@ -1872,10 +1876,17 @@ function GameRoom({
     // protects any real scores they hold.)
     clearAllGameScores(game.id);
     try {
-      await Promise.all(players.map((p) => supabase.from("game_players").update(blank).eq("id", p.id)));
-      if (game.status === "ended") await supabase.from("games").update({ status: "active" }).eq("id", game.id);
+      // Server-side reset: a SECURITY DEFINER RPC clears EVERY player's scores,
+      // putts, fairways, penalties/sand and round clock in one statement. The old
+      // client loop could only clear rows the organizer had RLS rights to, so
+      // other foursomes kept their scores. The RPC also stamps scores_reset_at so
+      // every other device drops its pre-reset local backups on next load.
+      const { error } = await supabase.rpc("reset_game_scores", { p_game: game.id });
+      if (error) throw error;
       await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_reset", group_id: (game as any).group_id || null, summary: `Reset scores for "${game.name}"` });
       await load();
+    } catch (e) {
+      alert("Couldn't reset the game — make sure you're the organizer. If this keeps happening, the reset_game_scores database function may not be installed yet.");
     } finally {
       resettingRef.current = false;
     }

@@ -98,14 +98,21 @@ export function saveGameScores(
   gameId: string,
   playerId: string,
   data: { scores: any[]; putts: any[]; fairways: any[]; penalties?: any[]; sand?: any[] },
+  force = false,
 ): void {
   try {
     if (typeof window === "undefined") return;
-    const scored = (data.scores || []).some((s) => s != null);
-    if (!scored) {
-      // Never overwrite a scored backup with an empty one.
-      const existing = loadGameScores(gameId, playerId);
-      if (existing && (existing.scores || []).some((s) => s != null)) return;
+    if (!force) {
+      // Passive saves (load/reconcile mirrors) must never overwrite a scored
+      // backup with an empty one — a transient empty state during init could
+      // otherwise wipe offline scores. Deliberate user edits pass force=true so
+      // an intentional deletion (even down to empty) DOES update the backup and
+      // can't be resurrected by the merge on reload.
+      const scored = (data.scores || []).some((s) => s != null);
+      if (!scored) {
+        const existing = loadGameScores(gameId, playerId);
+        if (existing && (existing.scores || []).some((s) => s != null)) return;
+      }
     }
     window.localStorage.setItem(gameScoreKey(gameId, playerId), JSON.stringify({ at: Date.now(), ...data }));
   } catch {}
@@ -114,13 +121,13 @@ export function saveGameScores(
 export function loadGameScores(
   gameId: string,
   playerId: string,
-): { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] } | null {
+): { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[]; at: number } | null {
   try {
     if (typeof window === "undefined") return null;
     const raw = window.localStorage.getItem(gameScoreKey(gameId, playerId));
     if (!raw) return null;
     const p = JSON.parse(raw);
-    return { scores: p.scores || [], putts: p.putts || [], fairways: p.fairways || [], penalties: p.penalties || [], sand: p.sand || [] };
+    return { scores: p.scores || [], putts: p.putts || [], fairways: p.fairways || [], penalties: p.penalties || [], sand: p.sand || [], at: typeof p.at === "number" ? p.at : 0 };
   } catch { return null; }
 }
 
