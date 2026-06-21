@@ -3738,13 +3738,13 @@ function FourballView({
   // Which contest line is expanded (one at a time): key is `${foursomeId}-${ci}`.
   const [openKey, setOpenKey] = useState<string | null>(null);
   // Hole-by-hole detail panel for an expanded contest line.
-  const HoleDetail = ({ rows, aLabel, bLabel, aColor, bColor }: { rows: ContestHole[]; aLabel: string; bLabel: string; aColor: string; bColor: string }) => {
+  const HoleDetail = ({ rows, aLabel, bLabel, aColor, bColor, runningMatch = false }: { rows: ContestHole[]; aLabel: string; bLabel: string; aColor: string; bColor: string; runningMatch?: boolean }) => {
     const played = rows.filter((d) => d.r != null);
     if (!played.length) return <div style={{ background: "#F1EFE6", borderRadius: 8, padding: "8px 10px", margin: "2px 0 6px", color: C.faint, fontSize: 11 }}>No holes scored yet.</div>;
     return (
       <div style={{ background: "#F1EFE6", borderRadius: 8, padding: "6px 10px", margin: "2px 0 6px" }}>
         <div style={{ display: "flex", color: C.faint, fontSize: 10, fontWeight: 800, letterSpacing: 0.5, padding: "3px 0" }}>
-          <span style={{ width: 34 }}>HOLE</span><span style={{ flex: 1 }}>NET</span><span style={{ width: 60, textAlign: "center" }}>WON</span><span style={{ width: 52, textAlign: "right" }}>SCORE</span>
+          <span style={{ width: 34 }}>HOLE</span><span style={{ flex: 1 }}>NET</span><span style={{ width: 60, textAlign: "center" }}>WON</span><span style={{ width: 52, textAlign: "right" }}>{runningMatch ? "MATCH" : "SCORE"}</span>
         </div>
         {played.map((d) => {
           const aWon = d.r === 1, bWon = d.r === -1;
@@ -3759,7 +3759,7 @@ function FourballView({
                 <span style={{ color: bWon ? "#1A7A3C" : C.ink, fontWeight: bWon ? 700 : 400 }}>{d.bNet}</span>
               </span>
               <span style={{ width: 60, textAlign: "center", color: wonColor, fontWeight: aWon || bWon ? 700 : 400, fontSize: 11 }}>{wonLabel}</span>
-              <span style={{ width: 52, textAlign: "right", color: C.faint }}>{fmtPts(d.aRun)}–{fmtPts(d.bRun)}</span>
+              <span style={{ width: 52, textAlign: "right", color: C.faint }}>{runningMatch ? matchLeadLabel(d.aRun - d.bRun) : `${fmtPts(d.aRun)}–${fmtPts(d.bRun)}`}</span>
             </div>
           );
         })}
@@ -3998,12 +3998,17 @@ function FourballView({
         const lead = st?.lead ?? 0;
         const leadText = !st || st.thru === 0 ? "" : lead === 0 ? "All square" : `${firstName(lead > 0 ? f.a[0] : f.b[0])}'s pair ${Math.abs(lead)} UP`;
         const tri = isTrifecta && full ? computeTrifecta(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap, triScoring) : null;
+        // Match scoring (Ryder Cup): show the LIVE provisional match tally (who currently
+        // leads each contest) rather than 0–0 until matches settle.
+        const triTally = tri && triScoring === "match"
+          ? tri.contests.reduce((acc: { a: number; b: number }, c) => { if (c.thru) { if (c.lead > 0) acc.a += 1; else if (c.lead < 0) acc.b += 1; else { acc.a += 0.5; acc.b += 0.5; } } return acc; }, { a: 0, b: 0 })
+          : null;
         return (
           <div key={f.id} style={{ background: C.card, borderRadius: 12, padding: 14, marginTop: 12, border: mine ? `1px solid ${C.gold}` : "none" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
               <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{f.name}{mine ? " · your match" : ""}</div>
               <div style={{ flex: 1 }} />
-              <div style={{ color: C.green, fontWeight: 800, fontSize: 14, fontFamily: "Georgia, serif" }}>{isTrifecta ? (tri ? `${fmtPts(tri.aPts)}–${fmtPts(tri.bPts)}` : "—") : st ? st.result : "—"}</div>
+              <div style={{ color: C.green, fontWeight: 800, fontSize: 14, fontFamily: "Georgia, serif" }}>{isTrifecta ? (tri ? `${fmtPts(triTally ? triTally.a : tri.aPts)}–${fmtPts(triTally ? triTally.b : tri.bPts)}` : "—") : st ? st.result : "—"}</div>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
@@ -4033,15 +4038,15 @@ function FourballView({
                         <span style={{ color: C.faint, fontSize: 11, width: 12 }}>{isOpen ? "▾" : "▸"}</span>
                         <span style={{ flex: 1, color: C.ink, fontSize: 13 }}>{label}</span>
                         <span style={{ color: C.faint, fontSize: 11 }}>{c.thru ? `thru ${c.thru}` : "—"}</span>
-                        <span style={{ color: C.gold, fontWeight: 800, fontSize: 13, fontFamily: "Georgia, serif", minWidth: 46, textAlign: "right" }}>{fmtPts(c.aPts)}–{fmtPts(c.bPts)}</span>
+                        <span style={{ color: C.gold, fontWeight: 800, fontSize: 13, fontFamily: "Georgia, serif", minWidth: 46, textAlign: "right" }}>{triScoring === "match" ? (c.thru ? matchLeadLabel(c.lead) : "—") : `${fmtPts(c.aPts)}–${fmtPts(c.bPts)}`}</span>
                       </div>
-                      {isOpen && <HoleDetail rows={c.perHole} aLabel={aLabel} bLabel={bLabel} aColor={aColor} bColor={bColor} />}
+                      {isOpen && <HoleDetail rows={c.perHole} aLabel={aLabel} bLabel={bLabel} aColor={aColor} bColor={bColor} runningMatch={triScoring === "match"} />}
                     </React.Fragment>
                   );
                 })}
                 {isTeam && (
                   <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>
-                    {teamName(playerOf(f.a[0])?.team)} {fmtPts(tri.aPts)} · {fmtPts(tri.bPts)} {teamName(playerOf(f.b[0])?.team)}
+                    {teamName(playerOf(f.a[0])?.team)} {fmtPts(triTally ? triTally.a : tri.aPts)} · {fmtPts(triTally ? triTally.b : tri.bPts)} {teamName(playerOf(f.b[0])?.team)}
                     {(f.a.length === 1 || f.b.length === 1) ? " · 2 v 1 — team point on best ball" : ""}
                   </div>
                 )}
