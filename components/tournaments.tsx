@@ -619,7 +619,7 @@ function CreateGame({
                 ]
               : null,
           foursomes: gameType === "fourball" || gameType === "trifecta" || (gameType === "skins" && teamMode && skinsTeamStyle === "best_ball") ? [] : null,
-          team_score_mode: gameType === "trifecta" ? teamScoreMode : "best_ball",
+          team_score_mode: gameType === "trifecta" || gameType === "fourball" ? teamScoreMode : "best_ball",
           trifecta_scoring: gameType === "trifecta" ? trifectaScoring : null,
           stroke_basis: gameType === "stroke" ? strokeBasis : null,
         })
@@ -1039,6 +1039,20 @@ function CreateGame({
               {strokeBasis === "gross"
                 ? "Gross — raw strokes, no handicap. Lowest total wins."
                 : "Net — total strokes minus each player's handicap. Lowest net total wins."}
+            </div>
+          </div>
+        )}
+        {gameType === "fourball" && (
+          <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
+            <div style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>Team score</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+              <button onClick={() => setTeamScoreMode("best_ball")} style={{ ...btn(teamScoreMode === "best_ball"), fontSize: 12, padding: "7px 10px" }}>Best ball</button>
+              <button onClick={() => setTeamScoreMode("aggregate")} style={{ ...btn(teamScoreMode === "aggregate"), fontSize: 12, padding: "7px 10px" }}>Shootout (aggregate)</button>
+            </div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+              {teamScoreMode === "aggregate"
+                ? "Shootout — both partners' net scores are added for the team's hole score, so a blow-up by either hurts."
+                : "Best ball — the team's hole score is the better net of the two partners."}
             </div>
           </div>
         )}
@@ -2355,13 +2369,13 @@ function GameRoom({
       {roomTab === "play" && (
       <div style={{ marginTop: 16, background: isEnded ? "#3A3A3A" : game.game_type === "match" ? "#1E3A8A" : game.game_type === "fourball" || game.game_type === "trifecta" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>
-          {game.game_type === "match" ? "⛳ Singles Match Play" : game.game_type === "fourball" ? "⛳ Four-Ball Match (Best Net)" : game.game_type === "trifecta" ? (game.team_score_mode === "aggregate" ? "⛳ Trifecta · Shootout" : "⛳ Trifecta") : game.game_type === "skins" ? "🪙 Skins (Net)" : game.game_type === "stroke" ? (game.stroke_basis === "gross" ? "⛳ Stroke Play (Gross)" : "⛳ Stroke Play (Net)") : "🏆 Stableford Tournament"}
+          {game.game_type === "match" ? "⛳ Singles Match Play" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "⛳ Four-Ball · Shootout" : "⛳ Four-Ball Match (Best Net)") : game.game_type === "trifecta" ? (game.team_score_mode === "aggregate" ? "⛳ Trifecta · Shootout" : "⛳ Trifecta") : game.game_type === "skins" ? "🪙 Skins (Net)" : game.game_type === "stroke" ? (game.stroke_basis === "gross" ? "⛳ Stroke Play (Gross)" : "⛳ Stroke Play (Net)") : "🏆 Stableford Tournament"}
         </span>
         {isEnded ? (
           <span style={{ fontSize: 12, fontWeight: 800, background: C.gold, color: "#1A1A1A", borderRadius: 20, padding: "3px 10px" }}>FINAL · GAME ENDED</span>
         ) : (
           <span style={{ color: C.cream, opacity: 0.8, fontSize: 12 }}>
-            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? "2 v 2 better-net-ball" : game.game_type === "trifecta" ? (game.trifecta_scoring === "match" ? "2 singles + a team match · 3 pts/foursome" : "2 singles + a team point · 3 pts/hole") : game.game_type === "skins" ? "net skins · carryovers" : game.game_type === "stroke" ? "lowest total wins" : "net Stableford leaderboard"}
+            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "2 v 2 · aggregate net (both balls)" : "2 v 2 better-net-ball") : game.game_type === "trifecta" ? (game.trifecta_scoring === "match" ? "2 singles + a team match · 3 pts/foursome" : "2 singles + a team point · 3 pts/hole") : game.game_type === "skins" ? "net skins · carryovers" : game.game_type === "stroke" ? "lowest total wins" : "net Stableford leaderboard"}
           </span>
         )}
       </div>
@@ -2790,7 +2804,7 @@ function GameRoom({
                   const p = players.find((pp) => pkey(pp) === uid);
                   return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par) : null, noShow: !!p?.no_show };
                 });
-                const prog = fourballProgress(game.holes_meta, members, myIds, oppIds, game.allowance_pct ?? 100);
+                const prog = fourballProgress(game.holes_meta, members, myIds, oppIds, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball");
                 return prog.map((lead) => matchLeadLabel(lead));
               }
               if (game.game_type === "trifecta" && Array.isArray(game.foursomes)) {
@@ -3932,7 +3946,7 @@ function FourballView({
       const ta = playerOf(f.a[0])?.team, tb = playerOf(f.b[0])?.team;
       if (!ta || !tb || ta === tb) return; // need a cross-team foursome
       valid++;
-      const st = fourballStatus(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100);
+      const st = fourballStatus(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball");
       if (st.thru === 0) return;
       const decided = st.thru === holesCount || Math.abs(st.lead) > holesCount - st.thru;
       if (decided) dec++;
@@ -4057,7 +4071,7 @@ function FourballView({
   const standPts = isTrifecta ? trifectaStandings : teamStandings ? teamStandings.pts : null;
   return (
     <div style={{ marginTop: 16 }}>
-      <Eyebrow>{isTrifecta ? (teamScoreMode === "aggregate" ? "TRIFECTA · SHOOTOUT" : "TRIFECTA") : "FOUR-BALL MATCHES"}</Eyebrow>
+      <Eyebrow>{isTrifecta ? (teamScoreMode === "aggregate" ? "TRIFECTA · SHOOTOUT" : "TRIFECTA") : (teamScoreMode === "aggregate" ? "FOUR-BALL · SHOOTOUT" : "FOUR-BALL MATCHES")}</Eyebrow>
       {isTeam && standPts && (
         <div style={{ background: C.green, borderRadius: 12, padding: 14, marginTop: 12 }}>
           <div style={{ display: "flex", alignItems: "center" }}>
@@ -4091,7 +4105,7 @@ function FourballView({
       {foursomes.map((f) => {
         const ms = members4(f);
         const full = f.a.length && f.b.length;
-        const st = full ? fourballStatus(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100) : null;
+        const st = full ? fourballStatus(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball") : null;
         const myKey = players.find((p) => p.user_id === user.id)?.user_id ?? user.id;
         const mine = f.a.includes(myKey) || f.b.includes(myKey);
         const lead = st?.lead ?? 0;
@@ -4933,7 +4947,7 @@ function OrganizerPanel({
               </div>
             )}
 
-            {game.status !== "ended" && game.game_type === "trifecta" && onSetTeamScoreMode && (
+            {game.status !== "ended" && (game.game_type === "trifecta" || game.game_type === "fourball") && onSetTeamScoreMode && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ color: C.sage, fontSize: 12 }}>Team point</div>
                 <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>

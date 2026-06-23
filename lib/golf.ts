@@ -461,14 +461,28 @@ export function fourballProgress(
   aIds: string[],
   bIds: string[],
   allowancePct: number = 100,
+  mode: "best_ball" | "aggregate" = "best_ball",
 ): (number | null)[] {
   const nets = fourballNets(holes, members, allowancePct);
+  // Aggregate ("shootout") only applies with two full sides; a short-handed
+  // side falls back to best-ball (one ball can't fairly face two).
+  const useAgg = mode === "aggregate" && aIds.length >= 2 && bIds.length >= 2;
   let lead = 0;
   return holes.map((_, i) => {
-    const aN = aIds.map((id) => nets[id]?.[i]).filter((n): n is number => n != null);
-    const bN = bIds.map((id) => nets[id]?.[i]).filter((n): n is number => n != null);
-    if (!aN.length || !bN.length) return null;
-    const a = Math.min(...aN), b = Math.min(...bN);
+    let a: number, b: number;
+    if (useAgg) {
+      // Both partners' nets must be in before the hole is decided.
+      const aAll = aIds.map((id) => nets[id]?.[i] ?? null);
+      const bAll = bIds.map((id) => nets[id]?.[i] ?? null);
+      if (aAll.some((n) => n == null) || bAll.some((n) => n == null)) return null;
+      a = (aAll as number[]).reduce((acc, n) => acc + n, 0);
+      b = (bAll as number[]).reduce((acc, n) => acc + n, 0);
+    } else {
+      const aN = aIds.map((id) => nets[id]?.[i]).filter((n): n is number => n != null);
+      const bN = bIds.map((id) => nets[id]?.[i]).filter((n): n is number => n != null);
+      if (!aN.length || !bN.length) return null;
+      a = Math.min(...aN); b = Math.min(...bN);
+    }
     if (a < b) lead++;
     else if (b < a) lead--;
     return lead;
@@ -482,8 +496,9 @@ export function fourballStatus(
   aIds: string[],
   bIds: string[],
   allowancePct: number = 100,
+  mode: "best_ball" | "aggregate" = "best_ball",
 ): { thru: number; lead: number; result: string } {
-  const prog = fourballProgress(holes, members, aIds, bIds, allowancePct);
+  const prog = fourballProgress(holes, members, aIds, bIds, allowancePct, mode);
   const played = prog.filter((p) => p != null) as number[];
   const thru = played.length;
   const lead = played.length ? played[played.length - 1] : 0;
