@@ -66,6 +66,7 @@ type Game = {
   holes_meta: { n: number; par: number; si: number | null; yards?: number | null }[]; // par + stroke index (+ yardage) per hole
   game_type: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta";
   stroke_basis?: "gross" | "net" | null; // stroke play: gross or net total
+  skins_mode?: "carryover" | "split" | null; // individual skins: carryover (default) or split
   allowance_pct?: number | null; // handicap allowance % applied to net scoring
   marker_user_id?: string | null; // the player currently keeping score for the group
   pairings: { a: string; b: string }[]; // for match play: pkey(player) vs pkey(player)
@@ -469,6 +470,7 @@ function CreateGame({
   const [matchKind, setMatchKind] = useState<"ind" | "team">("ind");
   const [teamMode, setTeamMode] = useState(false);
   const [skinsTeamStyle, setSkinsTeamStyle] = useState<"head_to_head" | "best_ball">("head_to_head");
+  const [skinsMode, setSkinsMode] = useState<"carryover" | "split">("carryover");
   const [team1, setTeam1] = useState("Team 1");
   const [team2, setTeam2] = useState("Team 2");
   const [busy, setBusy] = useState(false);
@@ -625,6 +627,7 @@ function CreateGame({
           team_score_mode: gameType === "trifecta" || gameType === "fourball" ? teamScoreMode : "best_ball",
           trifecta_scoring: gameType === "trifecta" ? trifectaScoring : null,
           stroke_basis: gameType === "stroke" ? strokeBasis : null,
+          skins_mode: gameType === "skins" && !teamMode ? skinsMode : null,
         })
         .select()
         .single();
@@ -635,6 +638,13 @@ function CreateGame({
         try { await supabase.from("profiles").update({ handicap_index: idxVal }).eq("id", user.id); } catch {}
       }
       // Add creator plus any selected group members immediately, so group games do not require join codes.
+      // Split skins stays simple only in a small field. Beyond 4, steer to teams or 1:1.
+      const skinsFieldCount = groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length;
+      if (gameType === "skins" && !teamMode && skinsMode === "split" && skinsFieldCount > 4) {
+        setErr("Split skins is best for up to 4 players. For a bigger group, use Team skins or 1:1 matchups, or switch Skins to carryover.");
+        setBusy(false);
+        return;
+      }
       const selectedIds = new Set([
         user.id,
         ...Object.keys(selectedPlayers).filter((id) => selectedPlayers[id]),
@@ -1078,6 +1088,29 @@ function CreateGame({
             </div>
           </div>
         )}
+        {gameType === "skins" && !teamMode && (() => {
+          const fieldCount = groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length;
+          const tooMany = skinsMode === "split" && fieldCount > 4;
+          return (
+            <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
+              <div style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>When a hole ties</div>
+              <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                <button onClick={() => setSkinsMode("carryover")} style={{ ...btn(skinsMode === "carryover"), fontSize: 12, padding: "7px 10px" }}>Carry over</button>
+                <button onClick={() => setSkinsMode("split")} style={{ ...btn(skinsMode === "split"), fontSize: 12, padding: "7px 10px" }}>Split</button>
+              </div>
+              <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+                {skinsMode === "split"
+                  ? "Split \u2014 each hole is its own prize and a tie shares it evenly. Stays lively, best for up to 4 players."
+                  : "Carry over \u2014 a tied hole pushes its skin to the next, building the pot. Scales to any field."}
+              </div>
+              {tooMany && (
+                <div style={{ background: "#4a1d16", border: `1px solid ${C.birdie}`, borderRadius: 9, padding: "8px 10px", marginTop: 8, color: "#f0c5bd", fontSize: 11.5, lineHeight: 1.45 }}>
+                  {fieldCount} players is too many for split skins. Use <b>Team skins</b> or <b>1:1 matchups</b>, or switch to <b>Carry over</b>.
+                </div>
+              )}
+            </div>
+          );
+        })()}
         {(gameType === "match" || gameType === "skins" || gameType === "fourball") && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
@@ -3562,7 +3595,9 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
   const nameById: Record<string, string> = {};
   players.forEach((p) => (nameById[p.id] = p.display_name));
   const skinPlayers: SkinPlayer[] = players.map((p) => ({ id: p.id, name: p.display_name, gross: p.scores || [], ch: chBasis(p, game.course_par) }));
-  const result = computeSkins(game.holes_meta, skinPlayers, game.allowance_pct ?? 100);
+  const isSplit = game.skins_mode === "split";
+  const result = computeSkins(game.holes_meta, skinPlayers, game.allowance_pct ?? 100, isSplit ? "split" : "carryover");
+  const fmtSkins = (n: number) => (n % 1 === 0 ? String(n) : n.toFixed(2).replace(/\.?0+$/, ""));
   const firstUndecided = result.holes.find((h) => !h.decided);
   const carrying = firstUndecided ? firstUndecided.carriedIn : result.carryAtEnd;
   const intoHole = firstUndecided ? firstUndecided.hole : null;
@@ -3570,20 +3605,20 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
 
   return (
     <div style={{ marginTop: 18 }}>
-      <Eyebrow>{`SKINS · INDIVIDUAL FALLBACK${game.allowance_pct != null && game.allowance_pct !== 100 ? ` · ${game.allowance_pct}% ALLOWANCE` : ""}`}</Eyebrow>
-      <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Open Game setup to configure 1:1 pairings or team best-ball skins. Until then, this old game is shown as individual skins.</div>
-      {carrying > 0 && <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5A3210", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "10px 12px", marginTop: 10 }}><span style={{ color: ORANGE, fontSize: 18, fontWeight: 800 }}>↑</span><span style={{ color: "#F2C28A", fontSize: 13 }}>{carrying} skin{carrying > 1 ? "s" : ""} {intoHole ? `carrying into hole ${intoHole}` : "unclaimed (last hole tied)"}</span></div>}
+      <Eyebrow>{`SKINS · ${isSplit ? "SPLIT" : "INDIVIDUAL"}${game.allowance_pct != null && game.allowance_pct !== 100 ? ` · ${game.allowance_pct}% ALLOWANCE` : ""}`}</Eyebrow>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>{isSplit ? "Split skins — each hole is its own prize; a tie shares it evenly between the tied players, with no carryovers." : "Open Game setup to configure 1:1 pairings or team best-ball skins. Until then, this old game is shown as individual skins."}</div>
+      {!isSplit && carrying > 0 && <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5A3210", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "10px 12px", marginTop: 10 }}><span style={{ color: ORANGE, fontSize: 18, fontWeight: 800 }}>↑</span><span style={{ color: "#F2C28A", fontSize: 13 }}>{carrying} skin{carrying > 1 ? "s" : ""} {intoHole ? `carrying into hole ${intoHole}` : "unclaimed (last hole tied)"}</span></div>}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
         {totals.map((p) => {
           const n = result.skinsByPlayer[p.id] || 0;
-          return <div key={p.id} style={{ flex: 1, minWidth: 130, background: p.user_id === user.id ? C.cream : C.card, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}><span style={{ color: C.ink, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_name}{p.user_id === user.id ? " (you)" : ""}</span><span style={{ color: n > 0 ? C.green : C.faint, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif", marginLeft: 8 }}>{n}</span></div>;
+          return <div key={p.id} style={{ flex: 1, minWidth: 130, background: p.user_id === user.id ? C.cream : C.card, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}><span style={{ color: C.ink, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_name}{p.user_id === user.id ? " (you)" : ""}</span><span style={{ color: n > 0 ? C.green : C.faint, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif", marginLeft: 8 }}>{fmtSkins(n)}</span></div>;
         })}
       </div>
       <div style={{ marginTop: 16 }}>
         {result.holes.map((h) => {
           const won = h.decided && h.winnerId;
           const tiedCarry = h.decided && !h.winnerId;
-          return <div key={h.hole} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 4px", borderBottom: `1px solid ${C.greenLight}` }}><span style={{ width: 26, color: h.decided ? C.cream : C.sage, fontWeight: 700, fontSize: 13 }}>{h.hole}</span><span style={{ flex: 1, color: won ? C.cream : C.sage, fontSize: 13 }}>{won ? `${nameById[h.winnerId!] || "—"} · net ${h.netById[h.winnerId!]}` : tiedCarry ? "Tied — carries" : "Not played yet"}</span>{won ? <span style={{ background: C.greenLight, color: C.gold, fontSize: 12, padding: "3px 9px", borderRadius: 999 }}>{h.value} skin{h.value > 1 ? "s" : ""}</span> : tiedCarry ? <span style={{ background: "#5A3210", color: ORANGE, fontSize: 12, padding: "3px 9px", borderRadius: 999 }}>push →</span> : <span style={{ color: C.faint, fontSize: 12 }}>{h.value} at stake</span>}</div>;
+          return <div key={h.hole} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 4px", borderBottom: `1px solid ${C.greenLight}` }}><span style={{ width: 26, color: h.decided ? C.cream : C.sage, fontWeight: 700, fontSize: 13 }}>{h.hole}</span><span style={{ flex: 1, color: won ? C.cream : C.sage, fontSize: 13 }}>{won ? `${nameById[h.winnerId!] || "—"} · net ${h.netById[h.winnerId!]}` : tiedCarry ? (isSplit ? `Split · ${(h.splitIds || []).map((id) => nameById[id] || "—").join(", ")}` : "Tied — carries") : "Not played yet"}</span>{won ? <span style={{ background: C.greenLight, color: C.gold, fontSize: 12, padding: "3px 9px", borderRadius: 999 }}>{h.value} skin{h.value > 1 ? "s" : ""}</span> : tiedCarry ? (isSplit ? <span style={{ background: C.greenLight, color: C.sage, fontSize: 12, padding: "3px 9px", borderRadius: 999 }}>split</span> : <span style={{ background: "#5A3210", color: ORANGE, fontSize: 12, padding: "3px 9px", borderRadius: 999 }}>push →</span>) : <span style={{ color: C.faint, fontSize: 12 }}>{h.value} at stake</span>}</div>;
         })}
       </div>
     </div>

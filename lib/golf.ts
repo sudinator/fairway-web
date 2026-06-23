@@ -684,6 +684,7 @@ export type SkinHole = {
   value: number;            // skins at stake on this hole (carriedIn + 1)
   decided: boolean;         // every required side has a score on this hole
   netById: Record<string, number | null>;
+  splitIds?: string[];      // split mode: the tied players who share this hole's skin
 };
 export type SkinResult = {
   holes: SkinHole[];
@@ -699,11 +700,17 @@ export type SkinMatchResult = {
 // Legacy individual net skins: on each fully-played hole the lowest UNIQUE net wins
 // 1 skin plus any carried over from immediately preceding tied holes. A tie carries
 // the skins forward. Kept as a fallback for old/unconfigured skins games.
-export function computeSkins(holes: MatchHoleMeta[], players: SkinPlayer[], allowancePct: number = 100): SkinResult {
+export function computeSkins(
+  holes: MatchHoleMeta[],
+  players: SkinPlayer[],
+  allowancePct: number = 100,
+  mode: "carryover" | "split" = "carryover",
+): SkinResult {
   const skinsByPlayer: Record<string, number> = {};
   players.forEach((p) => (skinsByPlayer[p.id] = 0));
   const out: SkinHole[] = [];
   let carry = 0;
+  const split = mode === "split";
   holes.forEach((h, i) => {
     const netById: Record<string, number | null> = {};
     let allPlayed = true;
@@ -713,12 +720,25 @@ export function computeSkins(holes: MatchHoleMeta[], players: SkinPlayer[], allo
       else netById[p.id] = g - strokesReceived(h.si, applyAllowance(p.ch, allowancePct));
     }
     if (!allPlayed || players.length < 2) {
-      out.push({ hole: h.n, winnerId: null, carriedIn: carry, value: carry + 1, decided: false, netById });
-      return; // not yet resolvable; carry unchanged
+      // In split mode every hole is worth exactly 1 (no pot); carryover builds the pot.
+      out.push({ hole: h.n, winnerId: null, carriedIn: split ? 0 : carry, value: split ? 1 : carry + 1, decided: false, netById });
+      return; // not yet resolvable
     }
     const nets = players.map((p) => netById[p.id] as number);
     const min = Math.min(...nets);
     const winners = players.filter((p) => (netById[p.id] as number) === min);
+    if (split) {
+      // Each hole is its own 1-skin prize; a tie splits it evenly. Nothing carries.
+      if (winners.length === 1) {
+        skinsByPlayer[winners[0].id] += 1;
+        out.push({ hole: h.n, winnerId: winners[0].id, carriedIn: 0, value: 1, decided: true, netById });
+      } else {
+        const share = 1 / winners.length;
+        winners.forEach((w) => (skinsByPlayer[w.id] += share));
+        out.push({ hole: h.n, winnerId: null, carriedIn: 0, value: 1, decided: true, netById, splitIds: winners.map((w) => w.id) });
+      }
+      return;
+    }
     const value = carry + 1;
     if (winners.length === 1) {
       skinsByPlayer[winners[0].id] += value;
@@ -729,7 +749,7 @@ export function computeSkins(holes: MatchHoleMeta[], players: SkinPlayer[], allo
       carry = value;
     }
   });
-  return { holes: out, skinsByPlayer, carryAtEnd: carry };
+  return { holes: out, skinsByPlayer, carryAtEnd: split ? 0 : carry };
 }
 
 // Match-play skins: exactly two sides compete on each hole. If one side has the
