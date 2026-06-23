@@ -2,17 +2,12 @@
 
 Running list of things to build or tighten. Newest ideas near the top of each section.
 
-## Games redesign — AGREED SPEC (v4 mockup)
-Format taxonomy = two families:
-- **Stroke (the field, one-vs-all):** Stableford · Stroke play (NEW) · Skins (carry-over | split).
-- **Match play:** Individual → Singles match · Team → Four-ball | Trifecta.
-Key facts (from the code, do not re-confuse):
-- **Four-ball** = team-only contest, one team score per hole: `team_score_mode` = best_ball | aggregate ("shootout"). Aggregate already exists.
-- **Trifecta** = four-ball team match PLUS the two 1-v-1 singles = three contests (`computeTrifecta`: 2 single + 1 team). Team leg best_ball|aggregate; points `trifecta_scoring` = per_hole | match (Ryder).
-- Genuinely NEW work: **Stroke play** format, **four-ball aggregate exposure** (team_score_mode currently only wired to trifecta), optional **split skins**.
-- **Net-double cap:** entry caps at par+2+recv. Keep for Stableford/match/four-ball/trifecta + WHS posting. For **stroke play, lift the entry ceiling** (count every stroke); handicap posting still caps each hole at net double independently.
-- **Change format** must stay: switch to a simpler format = instant (structure ignored, preserved); switch needing new teams/matchups = a step, and LOCKED once play has started; scoring-only swaps (best-ball↔shootout, per-hole↔per-match) instant even mid-round.
-Build order: (1) stroke play + cap + four-ball aggregate; (2) the guided two-family chooser UI.
+## Games redesign — SHIPPED (v1.44.0 → v1.46.1)
+Done: **Stroke play** (gross/net, lowest-total leaderboard) · **net-double cap lifted at entry** for stroke play AND four-ball/trifecta so real triples+ can be recorded (handicap still caps each hole at net double via `adjustedHoleScore`) · standalone **four-ball best-ball/shootout (aggregate)** scoring · **guided two-family chooser UI** (Stroke vs Match → Individual/Team) · new team/match games **open on Setup** with a "finish setup first" prompt on the Scorecard until handicaps/teams/matchups are done.
+
+Still open from the original spec:
+- **Split skins** — no-carryover variant where tied players share the hole. Only *carryover* exists today; "split" was never built. Useful for big fields where carryovers stall.
+- **Optional hard-gate:** block the Scorecard entirely until setup is complete (today it's a prompt, not a lock).
 
 ## Feature ideas
 
@@ -62,9 +57,13 @@ From the security & structure review. None are emergencies; tackle when convenie
   Supabase auth login, so a removed user can sign back in and get a fresh profile (and,
   with a default group set, auto-join it). Fully retiring an account needs deleting it in
   the Supabase Auth dashboard.
-- **Whole-array score writes:** `setPlayerHole` rewrites a player's entire scores/putts
-  arrays each save; concurrent edits (two devices) can clobber. Per-hole rows would be the
-  structural fix.
+- **Whole-array score writes (NOT a concurrency risk):** `setPlayerHole` rewrites a
+  player's entire scores/putts arrays each save. This is safe because the marker model
+  guarantees a single writer per row: with no marker each player edits only their own row;
+  once a marker is active every other player's entry UI is hidden and `cardCanEdit` grants
+  the card to the marker alone. The only residual is the *same* marker on two devices —
+  by-design "marker is source of truth, last write wins," not a conflict. Per-hole rows are
+  therefore NOT needed.
 - **Silent failures:** several paths `catch {}` (recordMyGameRound, logActivity, background
   save). Resilient, but can mask real data-loss errors — surface them somewhere visible.
 - **Default-group auto-join hits new signups too:** fine for a closed society; a liability

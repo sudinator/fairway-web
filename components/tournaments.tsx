@@ -1172,6 +1172,7 @@ function GameRoom({
   const [me, setMe] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingHole, setSavingHole] = useState<number | null>(null);
+  const [syncState, setSyncState] = useState<"idle" | "saving" | "retry" | "synced" | "error">("idle");
   // join-setup if I'm in the game but haven't set my tee/handicap
   const [needsSetup, setNeedsSetup] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -1463,6 +1464,30 @@ function GameRoom({
   };
 
   // Save one hole's data (strokes / putts / fairway) for me.
+  // Push a score row to the server with visible status + safe retries. The local backup
+  // (saveGameScores) is always written BEFORE this runs, so data is never lost; this just
+  // surfaces sync state and retries. Retries re-read the freshest local backup for the row,
+  // so a slow retry can never revert a hole entered in the meantime.
+  const pushScores = async (rowId: string, firstBody: Record<string, unknown>) => {
+    const freshest = (): Record<string, unknown> => {
+      if (!game) return firstBody;
+      const b = loadGameScores(game.id, rowId);
+      return b ? { scores: b.scores, putts: b.putts, fairways: b.fairways, penalties: b.penalties, sand: b.sand } : firstBody;
+    };
+    for (let n = 0; n < 4; n++) {
+      setSyncState(n === 0 ? "saving" : "retry");
+      const body = n === 0 ? firstBody : freshest();
+      const { error } = await supabase.from("game_players").update(body).eq("id", rowId);
+      if (!error) {
+        setSyncState("synced");
+        window.setTimeout(() => setSyncState((cur) => (cur === "synced" ? "idle" : cur)), 1600);
+        return;
+      }
+      if (n < 3) await new Promise((r) => setTimeout(r, 1500 * (n + 1)));
+    }
+    setSyncState("error"); // saved on this device; reconciles on next open
+  };
+
   const setMyHole = async (
     holeIdx: number,
     patch: {
@@ -1497,10 +1522,7 @@ function GameRoom({
     if (game) saveGameScores(game.id, me.id, { scores, putts, fairways, penalties, sand }, true);
     setSavingHole(holeIdx);
     lastEditRef.current = Date.now();
-    await supabase
-      .from("game_players")
-      .update({ scores, putts, fairways, penalties, sand, ...clockPatch })
-      .eq("id", me.id);
+    await pushScores(me.id, { scores, putts, fairways, penalties, sand, ...clockPatch });
     lastEditRef.current = Date.now();
     setSavingHole(null);
   };
@@ -1538,7 +1560,7 @@ function GameRoom({
     // reconnect (see load()).
     if (game) saveGameScores(game.id, playerId, { scores, putts, fairways, penalties, sand }, true);
     lastEditRef.current = Date.now();
-    await supabase.from("game_players").update({ scores, putts, fairways, penalties, sand, ...clockPatch }).eq("id", playerId);
+    await pushScores(playerId, { scores, putts, fairways, penalties, sand, ...clockPatch });
     lastEditRef.current = Date.now();
   };
 
@@ -2092,29 +2114,28 @@ function GameRoom({
 
   const isOrganizer = game.created_by === user.id;
   const isEnded = game.status === "ended";
-  // Whether the organizer has finished setup (handicaps + any teams/matchups/groups).
-  // Field games (Stableford / Stroke) need no teams or matchups, so they're always ready.
-  const setupComplete = (() => {
-    if (isEnded) return true;
+  // What still needs setting for this game to score cleanly. Informational only —
+  // scoring is never blocked. A missing handicap just means that player plays off scratch (0).
+  const setupMissing: string[] = (() => {
+    if (isEnded) return [];
+    const total = players.length;
+    if (total === 0) return [];
     const gt = game.game_type;
-    if (gt === "stableford" || gt === "stroke") return true;
+    const out: string[] = [];
+    const noHcp = players.filter((p) => p.course_handicap == null).length;
+    if (noHcp > 0) out.push(`${noHcp} player${noHcp > 1 ? "s" : ""} without a handicap — scored off scratch (0) until you set it in the Players tab`);
     const teamsArr = Array.isArray(game.teams) ? game.teams : [];
     const usesTeams = (gt === "match" || gt === "fourball" || gt === "trifecta" || gt === "skins") && teamsArr.length > 0;
     const usesMatchups = gt === "match" || gt === "fourball" || gt === "skins" || gt === "trifecta";
-    const usesFoursomes = (gt === "fourball" || gt === "trifecta" || gt === "skins") && Array.isArray(game.foursomes);
-    const total = players.length;
-    if (total === 0) return false;
-    const pairings = Array.isArray(game.pairings) ? game.pairings : [];
-    const foursomes = Array.isArray(game.foursomes) ? game.foursomes : [];
-    const placedKeys = new Set<string>([
-      ...pairings.flatMap((pr) => [pr.a, pr.b]),
-      ...foursomes.flatMap((f) => [...f.a, ...f.b]),
-    ]);
-    if (players.some((p) => p.course_handicap == null)) return false;
-    if (usesTeams && players.some((p) => !p.team)) return false;
-    if (usesMatchups && players.some((p) => !placedKeys.has(pkey(p)))) return false;
-    if (!usesFoursomes && players.some((p) => p.tee_group == null)) return false;
-    return true;
+    if (usesTeams) { const n = players.filter((p) => !p.team).length; if (n > 0) out.push(`${n} player${n > 1 ? "s" : ""} not assigned to a team`); }
+    if (usesMatchups) {
+      const pairings = Array.isArray(game.pairings) ? game.pairings : [];
+      const foursomes = Array.isArray(game.foursomes) ? game.foursomes : [];
+      const placedKeys = new Set<string>([...pairings.flatMap((pr) => [pr.a, pr.b]), ...foursomes.flatMap((f) => [...f.a, ...f.b])]);
+      const n = players.filter((p) => !placedKeys.has(pkey(p))).length;
+      if (n > 0) out.push(`${n} player${n > 1 ? "s" : ""} not yet in a matchup or foursome`);
+    }
+    return out;
   })();
   // Rank by over/under (net Stableford vs par pace): most under (lowest 2*thru-pts)
   // leads, so a hot start can top a longer-but-flatter round. Not-yet-started
@@ -2262,13 +2283,35 @@ function GameRoom({
         </div>
       )}
 
-      {roomTab === "play" && isOrganizer && !setupComplete && !isEnded && (
-        <div style={{ background: "#16302A", border: `1px solid ${C.gold}`, borderRadius: 14, padding: 16, marginTop: 16 }}>
-          <Eyebrow>FINISH SETUP FIRST</Eyebrow>
-          <div style={{ color: C.cream, fontSize: 13, marginTop: 8, lineHeight: 1.45 }}>
-            This game isn't fully set up yet. Assign teams and matchups and make sure every player has a handicap before the round gets going — otherwise scoring won't be right.
+      {syncState !== "idle" && (
+        <div style={{ position: "fixed", left: 0, right: 0, bottom: 18, display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 60 }}>
+          <div style={{
+            background: syncState === "error" ? "#4a1d16" : syncState === "synced" ? "#13412c" : "#15302a",
+            color: C.cream,
+            border: `1px solid ${syncState === "error" ? C.birdie : syncState === "synced" ? "#1f8f54" : C.line}`,
+            borderRadius: 999, padding: "8px 16px", fontSize: 12.5, fontWeight: 700,
+            boxShadow: "0 8px 22px rgba(0,0,0,.35)",
+          }}>
+            {syncState === "saving" ? "Saving\u2026"
+              : syncState === "retry" ? "Couldn't sync \u2014 trying again\u2026"
+              : syncState === "error" ? "Couldn't sync \u2014 saved on this phone, will retry"
+              : "\u2713 Synced"}
           </div>
-          <button style={{ ...btn(true), marginTop: 12 }} onClick={() => setRoomTab("setup")}>Go to setup</button>
+        </div>
+      )}
+
+      {roomTab === "play" && isOrganizer && setupMissing.length > 0 && !isEnded && (
+        <div style={{ background: "#16302A", border: `1px solid ${C.gold}`, borderRadius: 14, padding: 16, marginTop: 16 }}>
+          <Eyebrow>A FEW THINGS AREN'T SET</Eyebrow>
+          <div style={{ color: C.cream, fontSize: 13, marginTop: 8, lineHeight: 1.5 }}>
+            You can start scoring right away — this is just a heads-up:
+          </div>
+          <ul style={{ color: C.sage, fontSize: 12.5, margin: "8px 0 0", paddingLeft: 18, lineHeight: 1.5 }}>
+            {setupMissing.map((m, i) => (
+              <li key={i}>{m}</li>
+            ))}
+          </ul>
+          <button style={{ ...btn(true), marginTop: 12 }} onClick={() => setRoomTab("setup")}>Open setup</button>
         </div>
       )}
 
