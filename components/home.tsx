@@ -82,12 +82,12 @@ export function Home({ session }: { session: any }) {
     await supabase.from("group_members").update({ user_id: user.id, status: "active" }).eq("email", email).eq("status", "invited");
   }, [user.id, user.email]);
 
-  const loadGroups = useCallback(async () => {
+  const loadGroups = useCallback(async (preferId?: string | null) => {
     setGroupsLoading(true);
     await activateEmailInvites();
     const { data } = await supabase
       .from("group_members")
-      .select("group_id, role, status, groups(id, name, status)")
+      .select("group_id, role, status, is_support, groups(id, name, status)")
       .eq("user_id", user.id)
       .eq("status", "active")
       .order("created_at", { ascending: true });
@@ -97,12 +97,13 @@ export function Home({ session }: { session: any }) {
       // the join returns a null group for those, and they must not show in the picker.
       .filter((m: any) => !!m.groups && !!m.groups.id)
       // Hide groups still awaiting admin approval (legacy groups have no status → treated as active).
-      .filter((m: any) => (m.groups?.status ?? "active") === "active")
+      .filter((m: any) => (m.groups?.status ?? "active") === "active" || m.is_support === true)
       .map((m: any) => ({
         id: m.groups?.id || m.group_id,
         name: m.groups?.name || "Group",
         role: m.role,
         status: m.status,
+        is_support: !!m.is_support,
       })).filter((g: AppGroup) => !!g.id);
 
     if (!list.length) {
@@ -115,7 +116,7 @@ export function Home({ session }: { session: any }) {
     }
 
     setGroups(list);
-    const preferred = profile?.active_group_id || null;
+    const preferred = preferId ?? profile?.active_group_id ?? null;
     const next = (preferred && list.some((g) => g.id === preferred)) ? preferred : list[0]?.id || null;
     setActiveGroupId(next);
     if (next && next !== profile?.active_group_id) {
@@ -201,6 +202,21 @@ export function Home({ session }: { session: any }) {
     await supabase.from("profiles").update({ active_group_id: id }).eq("id", user.id);
   };
 
+  // Master admin: temporarily enter a group as a logged support member and drop
+  // straight into it. Membership-based access carries the session; exiting removes
+  // only the support row (never a real membership).
+  const enterSupportGroup = async (g: { group_id: string; name: string }) => {
+    await supabase.rpc("admin_enter_group", { p_group: g.group_id, p_email: user.email || "" });
+    await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "admin_entered_group", group_id: g.group_id, summary: `Master admin entered group "${g.name}" (support session)` });
+    await loadGroups(g.group_id);
+    setStage(null); setViewing(null); setMoreOpen(false); setTab("dashboard");
+  };
+  const exitSupportGroup = async (g: { group_id: string; name: string }) => {
+    await supabase.rpc("admin_exit_group", { p_group: g.group_id });
+    await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "admin_exited_group", group_id: g.group_id, summary: `Master admin exited group "${g.name}" (support session)` });
+    await loadGroups();
+  };
+
   const inFlow = stage || viewing;
   const [moreOpen, setMoreOpen] = useState(false);
   const activeGroup = groups.find((g) => g.id === activeGroupId) || groups[0] || null;
@@ -281,6 +297,18 @@ export function Home({ session }: { session: any }) {
         </div>
       )}
 
+      {activeGroup?.is_support && (
+        <div style={{ background: C.birdie, borderRadius: 12, padding: "12px 14px", marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ flex: 1, color: C.cream, fontSize: 13 }}>
+            <b>Support mode</b> — you&apos;re inside <b>{activeGroup.name}</b> as a logged admin. Members can see you in the roster while you&apos;re here.
+          </div>
+          <button onClick={() => exitSupportGroup({ group_id: activeGroup.id, name: activeGroup.name })}
+            style={{ background: C.cream, color: C.birdie, border: "none", borderRadius: 8, padding: "7px 14px", fontWeight: 800, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}>
+            Exit
+          </button>
+        </div>
+      )}
+
       <div style={{ marginTop: 20 }}>
         {stage === "setup" && activeGroup ? (
           <RoundSetup index={index} saveIndex={saveIndex} activeGroupId={activeGroup.id} activeGroupName={activeGroup.name} onCancel={() => setStage(null)}
@@ -304,7 +332,7 @@ export function Home({ session }: { session: any }) {
         ) : tab === "activity" && profile?.is_admin ? (
           <ActivityTab />
         ) : tab === "oversight" && profile?.is_admin ? (
-          <AdminGroupsTab user={user} />
+          <AdminGroupsTab user={user} onEnterGroup={enterSupportGroup} onExitGroup={exitSupportGroup} />
         ) : tab === "help" ? (
           <HelpPage isAdmin={!!profile?.is_admin} />
         ) : tab === "profile" ? (

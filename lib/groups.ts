@@ -6,4 +6,5 @@ export type AppGroup = {
   name: string;
   role: GroupRole;
   status: GroupStatus;
+  is_support?: boolean;
 };

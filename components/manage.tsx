@@ -1761,7 +1761,11 @@ export function ActivityTab() {
 }
 
 // ================= Master-admin oversight: all groups =================
-export function AdminGroupsTab({ user }: { user: any }) {
+export function AdminGroupsTab({ user, onEnterGroup, onExitGroup }: {
+  user: any;
+  onEnterGroup?: (g: { group_id: string; name: string }) => Promise<void>;
+  onExitGroup?: (g: { group_id: string; name: string }) => Promise<void>;
+}) {
   const [rows, setRows] = useState<any[] | null>(null);
   const [filter, setFilter] = useState<"active" | "archived" | "all">("active");
   const [busy, setBusy] = useState<string | null>(null);
@@ -1813,6 +1817,15 @@ export function AdminGroupsTab({ user }: { user: any }) {
               <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{g.name}</div>
               {archived && <span style={{ color: C.faint, fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>· archived</span>}
               <div style={{ flex: 1 }} />
+              {g.my_support ? (
+                <button disabled={busy === g.group_id}
+                  onClick={async () => { setBusy(g.group_id); try { await onExitGroup?.({ group_id: g.group_id, name: g.name }); await load(); } finally { setBusy(null); } }}
+                  style={{ ...btn(true), fontSize: 12, padding: "5px 11px" }}>In session · Exit</button>
+              ) : (
+                <button disabled={busy === g.group_id}
+                  onClick={async () => { setBusy(g.group_id); try { await onEnterGroup?.({ group_id: g.group_id, name: g.name }); } finally { setBusy(null); } }}
+                  style={{ ...btn(false), fontSize: 12, padding: "5px 11px", opacity: busy === g.group_id ? 0.5 : 1 }}>Enter</button>
+              )}
               <button disabled={busy === g.group_id} onClick={() => setStatus(g, archived ? "active" : "archived")}
                 style={{ ...btn(false), fontSize: 12, padding: "5px 11px", opacity: busy === g.group_id ? 0.5 : 1 }}>
                 {archived ? "Restore" : "Archive"}
