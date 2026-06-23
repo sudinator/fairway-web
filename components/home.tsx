@@ -8,7 +8,7 @@ import { loadDraft, draftHasScores } from "@/lib/draft";
 import { loadActiveGame } from "@/lib/draft";
 import { btn, Wordmark, inputStyle } from "@/components/ui";
 import Tournaments from "@/components/tournaments";
-import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab, ActivityTab, HelpPage } from "@/components/manage";
+import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab, ActivityTab, AdminGroupsTab, HelpPage } from "@/components/manage";
 import { RoundSetup } from "@/components/round-setup";
 import { RoundEditor } from "@/components/round-editor";
 import { RoundDetail } from "@/components/round-detail";
@@ -22,7 +22,7 @@ import type { AppGroup } from "@/lib/groups";
 
 const supabase = createClient();
 
-type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" | "activity" | "help" | "profile";
+type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" | "activity" | "oversight" | "help" | "profile";
 
 export function Home({ session }: { session: any }) {
   const [rounds, setRounds] = useState<Round[]>([]);
@@ -303,6 +303,8 @@ export function Home({ session }: { session: any }) {
           <GroupsPanel user={user} groups={groups} activeGroupId={activeGroupId} onGroupsChanged={loadGroups} onActiveGroupChange={chooseGroup} onGroupDeleted={onGroupDeleted} />
         ) : tab === "activity" && profile?.is_admin ? (
           <ActivityTab />
+        ) : tab === "oversight" && profile?.is_admin ? (
+          <AdminGroupsTab user={user} />
         ) : tab === "help" ? (
           <HelpPage isAdmin={!!profile?.is_admin} />
         ) : tab === "profile" ? (
@@ -350,7 +352,7 @@ export function Home({ session }: { session: any }) {
                   {item(tab === p.key && !inFlow, p.icon, p.label, () => { setTab(p.key); setStage(null); setViewing(null); setMoreOpen(false); })}
                 </React.Fragment>
               )}
-              {item(moreOpen || (["players","groups","activity","help","profile"].includes(tab) && !inFlow), "⋯", "More", () => setMoreOpen((v) => !v))}
+              {item(moreOpen || (["players","groups","activity","oversight","help","profile"].includes(tab) && !inFlow), "⋯", "More", () => setMoreOpen((v) => !v))}
             </>
           );
         })()}
@@ -371,6 +373,7 @@ export function Home({ session }: { session: any }) {
                 { key: "players", label: "Players", show: true },
                 { key: "groups", label: "Groups", show: showGroupsTab },
                 { key: "activity", label: "Activity ★", show: !!profile?.is_admin },
+                { key: "oversight", label: "Oversight ★", show: !!profile?.is_admin },
                 { key: "help", label: "Help", show: true },
                 { key: "profile", label: profile?.is_admin ? "Profile ★" : "Profile", show: true },
               ];

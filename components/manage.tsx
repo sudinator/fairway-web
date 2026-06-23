@@ -1752,10 +1752,79 @@ export function ActivityTab() {
         <div key={r.id} style={{ background: C.card, borderRadius: 12, padding: "11px 14px", marginTop: 8 }}>
           <div style={{ color: C.ink, fontSize: 14 }}>{r.summary}</div>
           <div style={{ color: C.faint, fontSize: 11, marginTop: 3 }}>
-            {r.actor_name || "Someone"} · {timeAgo(r.created_at)} · {fmtDate(r.created_at)}
+            {r.actor_name || "Someone"} · {fmtDate(r.created_at)} at {new Date(r.created_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} · {timeAgo(r.created_at)}
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ================= Master-admin oversight: all groups =================
+export function AdminGroupsTab({ user }: { user: any }) {
+  const [rows, setRows] = useState<any[] | null>(null);
+  const [filter, setFilter] = useState<"active" | "archived" | "all">("active");
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const load = async () => {
+    const { data } = await supabase.rpc("admin_group_overview");
+    setRows(Array.isArray(data) ? data : []);
+  };
+  useEffect(() => { load(); }, []);
+
+  const shown = (rows || []).filter((r) =>
+    filter === "all" || (filter === "archived" ? r.status === "archived" : r.status !== "archived"));
+
+  const setStatus = async (g: any, next: "active" | "archived") => {
+    const verb = next === "archived" ? "Archive" : "Restore";
+    if (!confirm(`${verb} the group "${g.name}"?${next === "archived" ? " It disappears from members' group pickers — nothing is deleted, and you can restore it." : ""}`)) return;
+    setBusy(g.group_id);
+    try {
+      const { error } = await supabase.rpc("admin_set_group_status", { p_group: g.group_id, p_status: next });
+      if (error) { alert("Couldn't update — " + error.message); return; }
+      await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: next === "archived" ? "group_archived" : "group_restored", group_id: g.group_id, summary: `${next === "archived" ? "Archived" : "Restored"} group "${g.name}"` });
+      await load();
+    } finally { setBusy(null); }
+  };
+
+  return (
+    <div>
+      <Eyebrow>★ OVERSIGHT · ALL GROUPS</Eyebrow>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
+        Every group in Birdie Num Num, most recent activity first. Archiving hides a stale or abusive group from members&apos; pickers — it&apos;s reversible and deletes nothing. Counts are read-only; deeper tools arrive in later phases.
+      </div>
+      <div style={{ display: "flex", gap: 6, marginTop: 12, flexWrap: "wrap" }}>
+        {(["active", "archived", "all"] as const).map((f) => (
+          <button key={f} onClick={() => setFilter(f)}
+            style={{ ...btn(filter === f), fontSize: 12, padding: "6px 12px", textTransform: "capitalize" }}>{f}</button>
+        ))}
+      </div>
+      {rows === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
+      {rows !== null && shown.length === 0 && (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: 20, marginTop: 14, color: C.sage, textAlign: "center" }}>
+          No {filter !== "all" ? filter : ""} groups.
+        </div>
+      )}
+      {shown.map((g) => {
+        const archived = g.status === "archived";
+        return (
+          <div key={g.group_id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 8, opacity: archived ? 0.6 : 1 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{g.name}</div>
+              {archived && <span style={{ color: C.faint, fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>· archived</span>}
+              <div style={{ flex: 1 }} />
+              <button disabled={busy === g.group_id} onClick={() => setStatus(g, archived ? "active" : "archived")}
+                style={{ ...btn(false), fontSize: 12, padding: "5px 11px", opacity: busy === g.group_id ? 0.5 : 1 }}>
+                {archived ? "Restore" : "Archive"}
+              </button>
+            </div>
+            <div style={{ color: C.faint, fontSize: 12, marginTop: 4 }}>Admin: {g.admin_names || "—"}</div>
+            <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
+              {g.member_count} member{g.member_count === 1 ? "" : "s"} · {g.rounds_count} round{g.rounds_count === 1 ? "" : "s"} · {g.games_count} game{g.games_count === 1 ? "" : "s"} · last activity {g.last_activity ? fmtDate(g.last_activity) : "—"}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
