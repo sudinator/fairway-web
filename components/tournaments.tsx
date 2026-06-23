@@ -64,7 +64,8 @@ type Game = {
   course: string;
   course_par: number | null;
   holes_meta: { n: number; par: number; si: number | null; yards?: number | null }[]; // par + stroke index (+ yardage) per hole
-  game_type: "stableford" | "match" | "fourball" | "skins" | "trifecta";
+  game_type: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta";
+  stroke_basis?: "gross" | "net" | null; // stroke play: gross or net total
   allowance_pct?: number | null; // handicap allowance % applied to net scoring
   marker_user_id?: string | null; // the player currently keeping score for the group
   pairings: { a: string; b: string }[]; // for match play: pkey(player) vs pkey(player)
@@ -452,7 +453,7 @@ function CreateGame({
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState("");
   const [profileIdx, setProfileIdx] = useState<number | null>(null);
-  const [gameType, setGameType] = useState<"stableford" | "match" | "fourball" | "skins" | "trifecta">(
+  const [gameType, setGameType] = useState<"stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta">(
     "stableford",
   );
   // Handicap allowance % (playing handicap = allowance% of course handicap).
@@ -462,6 +463,7 @@ function CreateGame({
   useEffect(() => { setAllowancePct(gameType === "fourball" || gameType === "trifecta" ? 85 : 100); }, [gameType]);
   const [teamScoreMode, setTeamScoreMode] = useState<"best_ball" | "aggregate">("best_ball");
   const [trifectaScoring, setTrifectaScoring] = useState<"per_hole" | "match">("per_hole");
+  const [strokeBasis, setStrokeBasis] = useState<"gross" | "net">("net");
   const [teamMode, setTeamMode] = useState(false);
   const [skinsTeamStyle, setSkinsTeamStyle] = useState<"head_to_head" | "best_ball">("head_to_head");
   const [team1, setTeam1] = useState("Team 1");
@@ -586,7 +588,7 @@ function CreateGame({
     setErr(null);
     try {
       const code = makeCode();
-      const typeLabel = gameType === "match" ? "Match Play" : gameType === "fourball" ? "Four-Ball" : gameType === "skins" ? "Skins" : gameType === "trifecta" ? "Trifecta" : "Stableford";
+      const typeLabel = gameType === "match" ? "Match Play" : gameType === "fourball" ? "Four-Ball" : gameType === "skins" ? "Skins" : gameType === "trifecta" ? "Trifecta" : gameType === "stroke" ? "Stroke Play" : "Stableford";
       // TZ-safe date label for the auto-generated name (noon avoids offset rollover).
       const dateLabel = new Date(matchDate + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
       const autoName = `${typeLabel} / ${pickedFav.name} / ${dateLabel}`;
@@ -619,6 +621,7 @@ function CreateGame({
           foursomes: gameType === "fourball" || gameType === "trifecta" || (gameType === "skins" && teamMode && skinsTeamStyle === "best_ball") ? [] : null,
           team_score_mode: gameType === "trifecta" ? teamScoreMode : "best_ball",
           trifecta_scoring: gameType === "trifecta" ? trifectaScoring : null,
+          stroke_basis: gameType === "stroke" ? strokeBasis : null,
         })
         .select()
         .single();
@@ -952,6 +955,12 @@ function CreateGame({
             Stableford tournament
           </button>
           <button
+            onClick={() => setGameType("stroke")}
+            style={{ ...btn(gameType === "stroke"), flex: 1, minWidth: 120, fontSize: 13 }}
+          >
+            Stroke play
+          </button>
+          <button
             onClick={() => setGameType("match")}
             style={{ ...btn(gameType === "match"), flex: 1, minWidth: 120, fontSize: 13 }}
           >
@@ -985,6 +994,8 @@ function CreateGame({
             ? "Skins follows match-play structure: singles can be 1:1, team 1:1 rolls skins into team totals, or team best-ball can be played in foursomes. Halved holes carry forward."
             : gameType === "trifecta"
             ? "Each 2-v-2 foursome plays for three points per hole: the two singles (each player vs their opposite number) plus a team point. Three points per hole riding on every group — set up the foursomes after creating."
+            : gameType === "stroke"
+            ? "Everyone plays their own ball; lowest total wins. Pick gross or net below — every stroke counts, with no Stableford safety net."
             : "Players are paired 1-on-1. After friends join, you'll set the matchups. Lower handicap plays off scratch; opponent gets the difference."}
         </div>
         {gameType === "trifecta" && (
@@ -1014,6 +1025,20 @@ function CreateGame({
               {trifectaScoring === "match"
                 ? "Ryder Cup — each foursome's 2 singles + 1 team match are worth 1 point each over 18 (½ each if halved). 3 points per foursome."
                 : "Per-hole — every hole of all three matches scores. 3 points on every hole."}
+            </div>
+          </div>
+        )}
+        {gameType === "stroke" && (
+          <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
+            <div style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>Scored by</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+              <button onClick={() => setStrokeBasis("net")} style={{ ...btn(strokeBasis === "net"), fontSize: 12, padding: "7px 10px" }}>Net</button>
+              <button onClick={() => setStrokeBasis("gross")} style={{ ...btn(strokeBasis === "gross"), fontSize: 12, padding: "7px 10px" }}>Gross</button>
+            </div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+              {strokeBasis === "gross"
+                ? "Gross — raw strokes, no handicap. Lowest total wins."
+                : "Net — total strokes minus each player's handicap. Lowest net total wins."}
             </div>
           </div>
         )}
@@ -1784,12 +1809,13 @@ function GameRoom({
     await supabase.from("games").update({ trifecta_scoring: next }).eq("id", game.id);
     await load();
   };
-  const setFormat = async (next: "stableford" | "match" | "fourball" | "skins" | "trifecta") => {
+  const setFormat = async (next: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => {
     if (!game || next === game.game_type) return;
     const suggested = next === "fourball" || next === "trifecta" ? 85 : 100;
     const patch: Record<string, unknown> = { game_type: next, allowance_pct: suggested };
     if (next === "trifecta" && !game.team_score_mode) patch.team_score_mode = "best_ball";
     if (next === "trifecta" && !game.trifecta_scoring) patch.trifecta_scoring = "per_hole";
+    if (next === "stroke" && !game.stroke_basis) patch.stroke_basis = "net";
     // NOTE: we deliberately do NOT clear pairings/foursomes/teams when switching
     // format. A player's setup work is preserved so switching back restores it;
     // formats that don't use a given structure simply ignore it (see the
@@ -2032,10 +2058,14 @@ function GameRoom({
   // leads, so a hot start can top a longer-but-flatter round. Not-yet-started
   // players sort to the bottom; ties broken by more points.
   const ouVal = (p: Player) => (playerThru(p) === 0 ? Infinity : 2 * playerThru(p) - playerPoints(p));
+  const isStroke = game.game_type === "stroke";
+  const strokeNet = game.stroke_basis !== "gross"; // default to net
+  const strokeTot = (p: Player) => (strokeNet ? playerNet(p) : playerGross(p));
+  const rankVal = (p: Player) => (isStroke ? (playerThru(p) === 0 ? Infinity : strokeTot(p)) : ouVal(p));
   const leaderboard = [...players].sort((a, b) => {
-    const d = ouVal(a) - ouVal(b);
+    const d = rankVal(a) - rankVal(b);
     if (d !== 0) return d;
-    return playerPoints(b) - playerPoints(a);
+    return isStroke ? 0 : playerPoints(b) - playerPoints(a);
   });
 
   // Segment winners (three sixes), by net Stableford.
@@ -2263,7 +2293,7 @@ function GameRoom({
             : key === "groups" ? cGrouped === total
             : false);
         const allDone = steps.every((s) => stepDone(s.key));
-        const isStableford = game.game_type === "stableford";
+        const isStableford = game.game_type === "stableford" || game.game_type === "stroke";
         const hint = (() => {
           if (activeStep === "players")
             return isStableford
@@ -2325,13 +2355,13 @@ function GameRoom({
       {roomTab === "play" && (
       <div style={{ marginTop: 16, background: isEnded ? "#3A3A3A" : game.game_type === "match" ? "#1E3A8A" : game.game_type === "fourball" || game.game_type === "trifecta" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>
-          {game.game_type === "match" ? "⛳ Singles Match Play" : game.game_type === "fourball" ? "⛳ Four-Ball Match (Best Net)" : game.game_type === "trifecta" ? (game.team_score_mode === "aggregate" ? "⛳ Trifecta · Shootout" : "⛳ Trifecta") : game.game_type === "skins" ? "🪙 Skins (Net)" : "🏆 Stableford Tournament"}
+          {game.game_type === "match" ? "⛳ Singles Match Play" : game.game_type === "fourball" ? "⛳ Four-Ball Match (Best Net)" : game.game_type === "trifecta" ? (game.team_score_mode === "aggregate" ? "⛳ Trifecta · Shootout" : "⛳ Trifecta") : game.game_type === "skins" ? "🪙 Skins (Net)" : game.game_type === "stroke" ? (game.stroke_basis === "gross" ? "⛳ Stroke Play (Gross)" : "⛳ Stroke Play (Net)") : "🏆 Stableford Tournament"}
         </span>
         {isEnded ? (
           <span style={{ fontSize: 12, fontWeight: 800, background: C.gold, color: "#1A1A1A", borderRadius: 20, padding: "3px 10px" }}>FINAL · GAME ENDED</span>
         ) : (
           <span style={{ color: C.cream, opacity: 0.8, fontSize: 12 }}>
-            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? "2 v 2 better-net-ball" : game.game_type === "trifecta" ? (game.trifecta_scoring === "match" ? "2 singles + a team match · 3 pts/foursome" : "2 singles + a team point · 3 pts/hole") : game.game_type === "skins" ? "net skins · carryovers" : "net Stableford leaderboard"}
+            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? "2 v 2 better-net-ball" : game.game_type === "trifecta" ? (game.trifecta_scoring === "match" ? "2 singles + a team match · 3 pts/foursome" : "2 singles + a team point · 3 pts/hole") : game.game_type === "skins" ? "net skins · carryovers" : game.game_type === "stroke" ? "lowest total wins" : "net Stableford leaderboard"}
           </span>
         )}
       </div>
@@ -2527,14 +2557,14 @@ function GameRoom({
               <div style={{ width: 32, textAlign: "center" }}>Thru</div>
               <div style={{ width: 38, textAlign: "center" }}>Gross</div>
               <div style={{ width: 40, textAlign: "center" }}>O/U</div>
-              <div style={{ width: 34, textAlign: "center" }}>Pts</div>
+              <div style={{ width: 34, textAlign: "center" }}>{isStroke ? "Tot" : "Pts"}</div>
             </div>
             {leaderboard.map((p) => {
               const pts = playerPoints(p);
               const thru = playerThru(p);
-              const mineOu = ouVal(p);
-              const pos = leaderboard.filter((x) => ouVal(x) < mineOu).length + 1;
-              const tied = leaderboard.filter((x) => ouVal(x) === mineOu).length > 1;
+              const mineOu = rankVal(p);
+              const pos = leaderboard.filter((x) => rankVal(x) < mineOu).length + 1;
+              const tied = leaderboard.filter((x) => rankVal(x) === mineOu).length > 1;
               return (
                 <div key={p.id} style={{
                   background: p.user_id === user.id ? C.cream : C.card,
@@ -2561,12 +2591,12 @@ function GameRoom({
                     const col = rel < 0 ? "#1F8F54" : rel > 0 ? C.birdie : "#6B6857";
                     return <div style={{ width: 40, textAlign: "center", color: col, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{relToParStr(p)}</div>;
                   })()}
-                  <div style={{ width: 34, textAlign: "center", color: C.green, fontWeight: 800, fontSize: 19, fontFamily: "Georgia, serif" }}>{pts}</div>
+                  <div style={{ width: 34, textAlign: "center", color: C.green, fontWeight: 800, fontSize: 19, fontFamily: "Georgia, serif" }}>{isStroke ? (thru ? strokeTot(p) : "–") : pts}</div>
                 </div>
               );
             })}
             <div style={{ color: C.sage, fontSize: 10, marginTop: 8 }}>
-              Gross = total strokes · Thru = holes played · O/U = net Stableford vs par pace (under = green) · Pts = net Stableford points. Ranked by O/U.
+              {isStroke ? `Gross = total strokes · Thru = holes played · O/U = net vs par · Tot = ${strokeNet ? "net" : "gross"} total. Lowest total wins.` : "Gross = total strokes · Thru = holes played · O/U = net Stableford vs par pace (under = green) · Pts = net Stableford points. Ranked by O/U."}
             </div>
           </div>
 
@@ -2709,6 +2739,7 @@ function GameRoom({
             })()}
             hasHandicap={me.course_handicap != null}
             matchMode={game.game_type === "match"}
+            uncap={game.game_type === "stroke"}
             showSixes={(game as any).group_id === TGC_GROUP_ID}
             onSet={(i, patch) => { if (!isEnded) setMyHole(i, patch); }}
             savingHole={savingHole}
@@ -4537,7 +4568,7 @@ function OrganizerPanel({
   onAddMember?: (m: { id: string; display_name: string; handicap_index: number | null }) => Promise<void>;
   onAddGuest?: (name: string, hcp: number) => Promise<void>;
   onSetAllowance?: (pct: number) => Promise<void>;
-  onSetFormat?: (f: "stableford" | "match" | "fourball" | "skins" | "trifecta") => Promise<void>;
+  onSetFormat?: (f: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => Promise<void>;
   onSetTeamScoreMode?: (m: "best_ball" | "aggregate") => Promise<void>;
   anyScores?: boolean;
 }) {
@@ -4564,10 +4595,10 @@ function OrganizerPanel({
   // foursomes. Before any score, anything is allowed (still setup).
   const hasPairings = Array.isArray(game.pairings) && game.pairings.length > 0;
   const hasFoursomes = Array.isArray(game.foursomes) && game.foursomes.length > 0;
-  const canSwitchTo = (target: "stableford" | "match" | "fourball" | "skins" | "trifecta") => {
+  const canSwitchTo = (target: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => {
     if (target === game.game_type) return false;
     if (!anyScores) return true;
-    if (target === "stableford" || target === "skins") return true;
+    if (target === "stableford" || target === "skins" || target === "stroke") return true;
     if (target === "match") return hasPairings;
     if (target === "fourball") return hasFoursomes;
     if (target === "trifecta") return hasFoursomes;
@@ -4888,7 +4919,7 @@ function OrganizerPanel({
               <div style={{ marginTop: 12 }}>
                 <div style={{ color: C.sage, fontSize: 12 }}>Format</div>
                 <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                  {([["stableford", "Stableford"], ["match", "Match"], ["fourball", "Four-ball"], ["skins", "Skins"], ["trifecta", "Trifecta"]] as const).map(([key, label]) => {
+                  {([["stableford", "Stableford"], ["stroke", "Stroke play"], ["match", "Match"], ["fourball", "Four-ball"], ["skins", "Skins"], ["trifecta", "Trifecta"]] as const).map(([key, label]) => {
                     const isCur = game.game_type === key;
                     const allowed = isCur || canSwitchTo(key);
                     return (

@@ -236,7 +236,7 @@ export type EntryHole = {
 
 // SCORE ENTRY — vertical, one row per hole, fits screen width (no horizontal scroll).
 // Used by both individual stroke play and group play so the card is identical everywhere.
-export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false }: {
+export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false, uncap = false }: {
   holes: EntryHole[];
   hasHandicap: boolean;
   onSet: (i: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null }) => void;
@@ -249,6 +249,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   matchRun?: (string | null)[]; // optional per-hole running match status labels (e.g. "1↑", "AS")
   matchMode?: boolean;          // when true (1:1 match), render one card per hole instead of the wide grid
   showSixes?: boolean;          // TGC: show Front/Middle/Last six net-Stableford subtotals at the top
+  uncap?: boolean;              // stroke play: lift the net-double entry ceiling so every stroke counts
 }) {
   const showOpp = Array.isArray(opp);
   const showRun = Array.isArray(matchRun);
@@ -307,7 +308,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
         ], { header: true })}
         {seg.map((h, j) => {
           const i = from + j;
-          const maxStrokes = hasHandicap ? h.par + 2 + h.recv : h.par * 2;
+          const maxStrokes = uncap ? h.par + 8 : hasHandicap ? h.par + 2 + h.recv : h.par * 2;
           const maxPutts = h.strokes != null && h.strokes > 0 ? Math.min(h.strokes, 6) : 6;
           const pts = stablefordPts(h.strokes, h.par, h.recv || 0);
           return Row([
@@ -399,7 +400,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   );
   const matchCard = (i: number) => {
     const h = holes[i];
-    const maxStrokes = hasHandicap ? h.par + 2 + h.recv : h.par * 2;
+    const maxStrokes = uncap ? h.par + 8 : hasHandicap ? h.par + 2 + h.recv : h.par * 2;
     const maxPutts = h.strokes != null && h.strokes > 0 ? Math.min(h.strokes, 6) : 6;
     const pts = stablefordPts(h.strokes, h.par, h.recv || 0);
     const penN = h.penalties || 0; const sandOn = !!h.sand;
