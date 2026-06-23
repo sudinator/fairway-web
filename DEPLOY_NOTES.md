@@ -31,6 +31,19 @@ App-authored (migrations/): run after the baseline, in order:
 - 0028 admin_support_session      (master-admin: logged enter/exit a group)
 - 0029 admin_delete_group         (master-admin: hard-delete a group, preserves rounds)
 - 0030 default_group              (designate a default group; stranded users land there)
+- 0031 admin_game_repair          (master-admin: force end/reopen/reset/delete/reassign any game)
+- 0032 admin_merge_users_groups   (merge groups; ban; revoke invites; list/wipe/merge users)
+- 0033 lock_privileged_profile_columns  (CRITICAL: block self-grant of is_admin/banned)
+- 0034 enforce_ban_in_access      (fold "not banned" into is_admin/is_group_member/is_group_admin)
+
+### Security floor (run + verify)
+- 0033 is the critical one: without it any user could `update profiles set is_admin=true`
+  on their own row and unlock every admin RPC. Run it first if nothing else.
+- 0034 edits the three core access helpers (is_admin, is_group_member, is_group_admin),
+  which previously lived ONLY in the live DB — they are now captured here. High blast
+  radius: test a suspended account is locked out AND a normal account still works.
+- activity_log RLS is correct (admin-only read; insert gated to actor_id=auth.uid()).
+  Just confirm row-level security is ENABLED on the table (and on profiles).
 
 ### Master-admin oversight set (0027–0030) — notes
 - All functions are SECURITY DEFINER and gated by `is_admin()`; they assume the
