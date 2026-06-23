@@ -106,8 +106,10 @@ export function Home({ session }: { session: any }) {
         is_support: !!m.is_support,
       })).filter((g: AppGroup) => !!g.id);
 
-    if (!list.length) {
-      // Safety net: every user gets one personal "Main" group (active, no approval needed).
+    if (!list.length && !(data && data.length)) {
+      // Safety net: a brand-new user with NO membership rows at all gets one personal
+      // "Main" group. Guarded by the raw row count (not the filtered list) so an
+      // archived-only or transiently-empty result never spawns a duplicate "Main".
       const { data: g } = await supabase.from("groups").insert({ name: "Main", created_by: user.id, status: "active" }).select("id, name").single();
       if (g) {
         await supabase.from("group_members").insert({ group_id: g.id, user_id: user.id, email: (user.email || "").toLowerCase(), role: "admin", status: "active" });
@@ -332,7 +334,7 @@ export function Home({ session }: { session: any }) {
         ) : tab === "activity" && profile?.is_admin ? (
           <ActivityTab />
         ) : tab === "oversight" && profile?.is_admin ? (
-          <AdminGroupsTab user={user} onEnterGroup={enterSupportGroup} onExitGroup={exitSupportGroup} />
+          <AdminGroupsTab user={user} onEnterGroup={enterSupportGroup} onExitGroup={exitSupportGroup} onGroupsChanged={loadGroups} />
         ) : tab === "help" ? (
           <HelpPage isAdmin={!!profile?.is_admin} />
         ) : tab === "profile" ? (

@@ -1761,10 +1761,11 @@ export function ActivityTab() {
 }
 
 // ================= Master-admin oversight: all groups =================
-export function AdminGroupsTab({ user, onEnterGroup, onExitGroup }: {
+export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChanged }: {
   user: any;
   onEnterGroup?: (g: { group_id: string; name: string }) => Promise<void>;
   onExitGroup?: (g: { group_id: string; name: string }) => Promise<void>;
+  onGroupsChanged?: () => Promise<void> | void;
 }) {
   const [rows, setRows] = useState<any[] | null>(null);
   const [filter, setFilter] = useState<"active" | "archived" | "all">("active");
@@ -1788,6 +1789,22 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup }: {
       if (error) { alert("Couldn't update — " + error.message); return; }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: next === "archived" ? "group_archived" : "group_restored", group_id: g.group_id, summary: `${next === "archived" ? "Archived" : "Restored"} group "${g.name}"` });
       await load();
+    } finally { setBusy(null); }
+  };
+
+  const delGroup = async (g: any) => {
+    const hasData = (g.rounds_count || 0) > 0 || (g.games_count || 0) > 0;
+    const msg = hasData
+      ? `Delete "${g.name}"? This removes the group for everyone. Its ${g.games_count} game(s) will be deleted; ${g.rounds_count} posted round(s) stay in players' history but lose the group tag. This can't be undone.`
+      : `Delete "${g.name}"? It has no rounds or games. This removes it for everyone and can't be undone.`;
+    if (!confirm(msg)) return;
+    setBusy(g.group_id);
+    try {
+      const { error } = await supabase.rpc("admin_delete_group", { p_group: g.group_id });
+      if (error) { alert("Couldn't delete — " + error.message); return; }
+      await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "group_deleted", group_id: null, summary: `Deleted group "${g.name}" (admin)` });
+      await load();
+      if (onGroupsChanged) await onGroupsChanged();
     } finally { setBusy(null); }
   };
 
@@ -1834,6 +1851,12 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup }: {
             <div style={{ color: C.faint, fontSize: 12, marginTop: 4 }}>Admin: {g.admin_names || "—"}</div>
             <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
               {g.member_count} member{g.member_count === 1 ? "" : "s"} · {g.rounds_count} round{g.rounds_count === 1 ? "" : "s"} · {g.games_count} game{g.games_count === 1 ? "" : "s"} · last activity {g.last_activity ? fmtDate(g.last_activity) : "—"}
+            </div>
+            <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
+              <button disabled={busy === g.group_id} onClick={() => delGroup(g)}
+                style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                Delete group
+              </button>
             </div>
           </div>
         );
