@@ -330,11 +330,17 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         const { error: e2 } = await supabase.from("holes").insert(rows);
         if (e2) throw e2;
       }
-      try {
-        const { data: u } = await supabase.auth.getUser();
-        const total = holes.reduce((s, h) => s + (h.strokes || 0), 0);
-        await logActivity(supabase, { actor_id: u.user!.id, actor_name: u.user?.email || "A player", action: "round_completed", group_id: round.group_id || null, summary: `Completed a round at ${round.course}${total ? ` (${total})` : ""}` });
-      } catch {}
+      // Don't log "completed a round" for rounds that came from a game: the game
+      // already logs its own create/end activity, and a game posts one round per
+      // player — which otherwise spams the audit trail with a row per golfer every
+      // time someone opens their posted round to add stats and saves.
+      if (!round.game_id) {
+        try {
+          const { data: u } = await supabase.auth.getUser();
+          const total = holes.reduce((s, h) => s + (h.strokes || 0), 0);
+          await logActivity(supabase, { actor_id: u.user!.id, actor_name: u.user?.email || "A player", action: "round_completed", group_id: round.group_id || null, summary: `Completed a round at ${round.course}${total ? ` (${total})` : ""}` });
+        } catch {}
+      }
       clearDraft();
       onSaved();
     } catch (e: any) {
