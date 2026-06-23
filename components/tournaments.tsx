@@ -3144,7 +3144,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
         const recv = recvFor(p, m.si);
         const net = gross != null && gross > 0 ? gross - recv : null;
         const netDouble = m.par + 2 + recv;
-        const clampG = (v: number) => Math.max(1, Math.min(netDouble, v));
+        const clampG = (v: number) => Math.max(1, Math.min(m.par + 8, v)); // entry uncapped beyond net double (aggregate needs the true score); handicap re-caps at posting via adjustedHoleScore
         const sfPts = stablefordPts(gross, m.par, recv);
         const picks = Array.from(new Set([m.par - 1, m.par, m.par + 1, m.par + 2].filter((v) => v >= 1 && v <= netDouble)));
         const order = playerOrder;
@@ -3189,7 +3189,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
                   {net != null && <span style={{ color: C.faint, fontSize: 12 }}> · net {net}</span>}
                   {gross != null && gross > 0 && <span style={{ color: "#0E3B2E", fontSize: 12, fontWeight: 800, background: "#E7EFE9", borderRadius: 6, padding: "1px 7px", marginLeft: 6 }}>{sfPts ?? 0} pts</span>}
                 </div>
-                <button onClick={() => onSetHole(p.id, edit.holeIdx, { strokes: clampG((gross || m.par) + 1) })} style={{ width: 38, height: 38, borderRadius: 8, border: "none", background: gross != null && gross >= netDouble ? "#9BB8AC" : C.green, color: "#fff", fontSize: 20, cursor: "pointer" }}>+</button>
+                <button onClick={() => onSetHole(p.id, edit.holeIdx, { strokes: clampG((gross || m.par) + 1) })} style={{ width: 38, height: 38, borderRadius: 8, border: "none", background: gross != null && gross >= m.par + 8 ? "#9BB8AC" : C.green, color: "#fff", fontSize: 20, cursor: "pointer" }}>+</button>
               </div>
               <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                 {picks.map((v) => {
@@ -3229,7 +3229,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
                 <button onClick={goNext} style={{ flex: 1.3, background: C.gold, color: C.ink, border: "none", borderRadius: 8, padding: "11px 4px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>{"Save & next ▸"}</button>
                 <button onClick={() => setEdit(null)} style={{ flex: 1, background: C.green, color: C.cream, border: "none", borderRadius: 8, padding: "11px 4px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>Done</button>
               </div>
-              <div style={{ color: C.faint, fontSize: 10, textAlign: "center", marginTop: 8 }}>Only the score is required · max is net double bogey ({netDouble})</div>
+              <div style={{ color: C.faint, fontSize: 10, textAlign: "center", marginTop: 8 }}>Only the score is required · enter your real score, every stroke counts. For handicap, each hole is capped at net double bogey ({netDouble}).</div>
             </div>
           </div>
         );
