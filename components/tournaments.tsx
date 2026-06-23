@@ -168,7 +168,7 @@ export default function Tournaments({
   activeGroupId: string;
   isAdmin?: boolean;
 }) {
-  const [view, setView] = useState<"list" | "create" | { gameId: string }>(
+  const [view, setView] = useState<"list" | "create" | { gameId: string; tab?: "play" | "setup" }>(
     "list",
   );
   // Resume the game room the user was in (survives lock/refresh) — but ONLY if it
@@ -207,13 +207,14 @@ export default function Tournaments({
         displayName={displayName}
         activeGroupId={activeGroupId}
         onCancel={() => setView("list")}
-        onCreated={(gameId) => setView({ gameId })}
+        onCreated={(gameId, tab) => setView({ gameId, tab })}
       />
     );
   if (typeof view === "object")
     return (
       <GameRoom
         gameId={view.gameId}
+        initialTab={view.tab}
         user={user}
         displayName={displayName}
         isAdmin={!!isAdmin}
@@ -438,7 +439,7 @@ function CreateGame({
   displayName: string;
   activeGroupId: string;
   onCancel: () => void;
-  onCreated: (id: string) => void;
+  onCreated: (id: string, tab?: "play" | "setup") => void;
 }) {
   const [name, setName] = useState("");
   // Match date — defaults to today (local). Stored structured on the game so we
@@ -700,7 +701,9 @@ function CreateGame({
           } catch {}
         }
       }
-      onCreated(game.id);
+      // Field games (Stableford / Stroke) are ready to play once players are in;
+      // every other format still needs teams / matchups / handicaps, so open Setup.
+      onCreated(game.id, gameType === "stableford" || gameType === "stroke" ? "play" : "setup");
     } catch (e: any) {
       setErr(e.message || "Failed to create game.");
       setBusy(false);
@@ -1151,12 +1154,14 @@ function CreateGame({
 // ---------------- Game room: score entry + leaderboard ----------------
 function GameRoom({
   gameId,
+  initialTab,
   user,
   displayName,
   isAdmin,
   onBack,
 }: {
   gameId: string;
+  initialTab?: "play" | "setup";
   user: any;
   displayName: string;
   isAdmin?: boolean;
@@ -1174,7 +1179,7 @@ function GameRoom({
   // Sub-tab inside the game room: "play" (scorecard, default) vs "setup"
   // (assign teams, matchups, manage game). Restored from the saved active game.
   const [roomTab, setRoomTab] = useState<"play" | "setup">(
-    () => loadActiveGame()?.tab || "play",
+    () => initialTab || loadActiveGame()?.tab || "play",
   );
   useEffect(() => { saveActiveGame(gameId, roomTab); }, [gameId, roomTab]);
   // Which step of the setup flow is showing: players & tees, teams, matchups, groups.
@@ -2087,6 +2092,30 @@ function GameRoom({
 
   const isOrganizer = game.created_by === user.id;
   const isEnded = game.status === "ended";
+  // Whether the organizer has finished setup (handicaps + any teams/matchups/groups).
+  // Field games (Stableford / Stroke) need no teams or matchups, so they're always ready.
+  const setupComplete = (() => {
+    if (isEnded) return true;
+    const gt = game.game_type;
+    if (gt === "stableford" || gt === "stroke") return true;
+    const teamsArr = Array.isArray(game.teams) ? game.teams : [];
+    const usesTeams = (gt === "match" || gt === "fourball" || gt === "trifecta" || gt === "skins") && teamsArr.length > 0;
+    const usesMatchups = gt === "match" || gt === "fourball" || gt === "skins" || gt === "trifecta";
+    const usesFoursomes = (gt === "fourball" || gt === "trifecta" || gt === "skins") && Array.isArray(game.foursomes);
+    const total = players.length;
+    if (total === 0) return false;
+    const pairings = Array.isArray(game.pairings) ? game.pairings : [];
+    const foursomes = Array.isArray(game.foursomes) ? game.foursomes : [];
+    const placedKeys = new Set<string>([
+      ...pairings.flatMap((pr) => [pr.a, pr.b]),
+      ...foursomes.flatMap((f) => [...f.a, ...f.b]),
+    ]);
+    if (players.some((p) => p.course_handicap == null)) return false;
+    if (usesTeams && players.some((p) => !p.team)) return false;
+    if (usesMatchups && players.some((p) => !placedKeys.has(pkey(p)))) return false;
+    if (!usesFoursomes && players.some((p) => p.tee_group == null)) return false;
+    return true;
+  })();
   // Rank by over/under (net Stableford vs par pace): most under (lowest 2*thru-pts)
   // leads, so a hot start can top a longer-but-flatter round. Not-yet-started
   // players sort to the bottom; ties broken by more points.
@@ -2230,6 +2259,16 @@ function GameRoom({
             <button disabled={!reassignTo} onClick={adminReassignOrganizer}
               style={{ background: C.gold, color: C.green, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, padding: "6px 12px", cursor: "pointer", opacity: reassignTo ? 1 : 0.4 }}>Assign</button>
           </div>
+        </div>
+      )}
+
+      {roomTab === "play" && isOrganizer && !setupComplete && !isEnded && (
+        <div style={{ background: "#16302A", border: `1px solid ${C.gold}`, borderRadius: 14, padding: 16, marginTop: 16 }}>
+          <Eyebrow>FINISH SETUP FIRST</Eyebrow>
+          <div style={{ color: C.cream, fontSize: 13, marginTop: 8, lineHeight: 1.45 }}>
+            This game isn't fully set up yet. Assign teams and matchups and make sure every player has a handicap before the round gets going — otherwise scoring won't be right.
+          </div>
+          <button style={{ ...btn(true), marginTop: 12 }} onClick={() => setRoomTab("setup")}>Go to setup</button>
         </div>
       )}
 
