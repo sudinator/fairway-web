@@ -9,6 +9,8 @@ import { btn, inputStyle, Eyebrow, NumPicker, Avatar } from "@/components/ui";
 import { resizeToAvatar } from "@/lib/image";
 import { APP_VERSION, APP_BUILT_AT } from "@/lib/app-version";
 import { courseChangeLines, buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
+import { HelpSearch } from "@/components/help-search";
+import { FeedbackForm, type FeedbackPrefill } from "@/components/feedback";
 
 const supabase = createClient();
 
@@ -2066,7 +2068,13 @@ export function AdminUsersTab({ user }: { user: any }) {
 }
 
 // ================= Help page =================
-export function HelpPage({ isAdmin }: { isAdmin: boolean }) {
+export function HelpPage({ isAdmin, user, displayName, groupId }: { isAdmin: boolean; user: any; displayName: string; groupId: string | null }) {
+  const [fbPrefill, setFbPrefill] = useState<FeedbackPrefill>(null);
+  const fbRef = React.useRef<HTMLDivElement>(null);
+  const sendAsQuestion = (q: string) => {
+    setFbPrefill({ kind: "question", message: q });
+    setTimeout(() => fbRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+  };
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 700 }}>{title}</div>
@@ -2077,6 +2085,12 @@ export function HelpPage({ isAdmin }: { isAdmin: boolean }) {
     <div>
       <Eyebrow>HELP · HOW BIRDIE NUM NUM WORKS</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>A quick guide to the basics. Tap the SCREEN selector at the top to move around.</div>
+
+      <HelpSearch onSendQuestion={sendAsQuestion} />
+
+      <div ref={fbRef}>
+        <FeedbackForm user={user} displayName={displayName} groupId={groupId} prefill={fbPrefill} onConsumePrefill={() => setFbPrefill(null)} />
+      </div>
 
       <Section title="Recording a round">
         Tap <b>＋ New round</b>, pick a course and tee, set the date, then enter your score. You can go <b>hole-by-hole</b> (full stats: GIR, putts, penalties, Stableford) or enter a <b>quick total score</b> for a past round. Quick totals still count toward your handicap and scoring average — you can add hole detail later from the round.

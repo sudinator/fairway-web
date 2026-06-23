@@ -9,6 +9,7 @@ import { loadActiveGame } from "@/lib/draft";
 import { btn, Wordmark, inputStyle } from "@/components/ui";
 import Tournaments from "@/components/tournaments";
 import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab, ActivityTab, AdminGroupsTab, AdminUsersTab, HelpPage } from "@/components/manage";
+import { AdminFeedbackTab } from "@/components/feedback";
 import { RoundSetup } from "@/components/round-setup";
 import { RoundEditor } from "@/components/round-editor";
 import { RoundDetail } from "@/components/round-detail";
@@ -22,7 +23,7 @@ import type { AppGroup } from "@/lib/groups";
 
 const supabase = createClient();
 
-type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" | "activity" | "oversight" | "users" | "help" | "profile";
+type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" | "activity" | "oversight" | "users" | "feedback" | "help" | "profile";
 
 export function Home({ session }: { session: any }) {
   const [rounds, setRounds] = useState<Round[]>([]);
@@ -358,8 +359,10 @@ export function Home({ session }: { session: any }) {
           <AdminGroupsTab user={user} onEnterGroup={enterSupportGroup} onExitGroup={exitSupportGroup} onGroupsChanged={loadGroups} />
         ) : tab === "users" && profile?.is_admin ? (
           <AdminUsersTab user={user} />
+        ) : tab === "feedback" && profile?.is_admin ? (
+          <AdminFeedbackTab />
         ) : tab === "help" ? (
-          <HelpPage isAdmin={!!profile?.is_admin} />
+          <HelpPage isAdmin={!!profile?.is_admin} user={user} displayName={displayName} groupId={activeGroupId} />
         ) : tab === "profile" ? (
           <ProfilePanel profile={profile} user={user} onSaved={loadProfile} />
         ) : tab === "games" && activeGroup ? (
@@ -405,7 +408,7 @@ export function Home({ session }: { session: any }) {
                   {item(tab === p.key && !inFlow, p.icon, p.label, () => { setTab(p.key); setStage(null); setViewing(null); setMoreOpen(false); })}
                 </React.Fragment>
               )}
-              {item(moreOpen || (["players","groups","activity","oversight","users","help","profile"].includes(tab) && !inFlow), "⋯", "More", () => setMoreOpen((v) => !v))}
+              {item(moreOpen || (["players","groups","activity","oversight","users","feedback","help","profile"].includes(tab) && !inFlow), "⋯", "More", () => setMoreOpen((v) => !v))}
             </>
           );
         })()}
@@ -428,6 +431,7 @@ export function Home({ session }: { session: any }) {
                 { key: "activity", label: "Activity ★", show: !!profile?.is_admin },
                 { key: "oversight", label: "Oversight ★", show: !!profile?.is_admin },
                 { key: "users", label: "Users ★", show: !!profile?.is_admin },
+                { key: "feedback", label: "Feedback ★", show: !!profile?.is_admin },
                 { key: "help", label: "Help", show: true },
                 { key: "profile", label: profile?.is_admin ? "Profile ★" : "Profile", show: true },
               ];
