@@ -1770,6 +1770,8 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
   const [rows, setRows] = useState<any[] | null>(null);
   const [filter, setFilter] = useState<"active" | "archived" | "all">("active");
   const [busy, setBusy] = useState<string | null>(null);
+  const [mergeSrc, setMergeSrc] = useState<string | null>(null);
+  const [mergeTo, setMergeTo] = useState("");
 
   const load = async () => {
     const { data } = await supabase.rpc("admin_group_overview");
@@ -1819,6 +1821,31 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
     } finally { setBusy(null); }
   };
 
+  const revokeInvites = async (g: any) => {
+    if (!confirm(`Revoke all outstanding invite links for "${g.name}"? Existing members stay; only unused links stop working.`)) return;
+    setBusy(g.group_id);
+    try {
+      const { error } = await supabase.rpc("admin_revoke_group_invites", { p_group: g.group_id });
+      if (error) { alert("Couldn't revoke — " + error.message); return; }
+      await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "group_invites_revoked", group_id: g.group_id, summary: `Revoked invite links for "${g.name}"` });
+    } finally { setBusy(null); }
+  };
+
+  const doMerge = async (src: any) => {
+    const target = (rows || []).find((r) => r.group_id === mergeTo);
+    if (!target) return;
+    if (!confirm(`Merge "${src.name}" INTO "${target.name}"? All of "${src.name}"'s members, rounds and games move into "${target.name}", then "${src.name}" is deleted. This can't be undone.`)) return;
+    setBusy(src.group_id);
+    try {
+      const { error } = await supabase.rpc("admin_merge_group", { p_source: src.group_id, p_target: mergeTo });
+      if (error) { alert("Couldn't merge — " + error.message); return; }
+      await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "group_merged", group_id: mergeTo, summary: `Merged "${src.name}" into "${target.name}"` });
+      setMergeSrc(null); setMergeTo("");
+      await load();
+      if (onGroupsChanged) await onGroupsChanged();
+    } finally { setBusy(null); }
+  };
+
   return (
     <div>
       <Eyebrow>★ OVERSIGHT · ALL GROUPS</Eyebrow>
@@ -1864,7 +1891,15 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
             <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
               {g.member_count} member{g.member_count === 1 ? "" : "s"} · {g.rounds_count} round{g.rounds_count === 1 ? "" : "s"} · {g.games_count} game{g.games_count === 1 ? "" : "s"} · last activity {g.last_activity ? fmtDate(g.last_activity) : "—"}
             </div>
-            <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+              <button disabled={busy === g.group_id} onClick={() => revokeInvites(g)}
+                style={{ background: "transparent", color: C.faint, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                Revoke invites
+              </button>
+              <button disabled={busy === g.group_id} onClick={() => { setMergeSrc(mergeSrc === g.group_id ? null : g.group_id); setMergeTo(""); }}
+                style={{ background: "transparent", color: C.faint, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                Merge…
+              </button>
               {!g.is_default && (
                 <button disabled={busy === g.group_id} onClick={() => setDefault(g)}
                   style={{ background: "transparent", color: C.faint, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
@@ -1876,6 +1911,153 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
                 Delete group
               </button>
             </div>
+            {mergeSrc === g.group_id && (
+              <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", background: C.greenLight, borderRadius: 8, padding: 8 }}>
+                <span style={{ color: C.sage, fontSize: 12 }}>Merge into:</span>
+                <select value={mergeTo} onChange={(e) => setMergeTo(e.target.value)}
+                  style={{ background: C.card, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
+                  <option value="">Select target…</option>
+                  {(rows || []).filter((r) => r.group_id !== g.group_id).map((r) => (
+                    <option key={r.group_id} value={r.group_id}>{r.name}</option>
+                  ))}
+                </select>
+                <button disabled={!mergeTo || busy === g.group_id} onClick={() => doMerge(g)}
+                  style={{ background: C.gold, color: C.green, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, padding: "5px 12px", cursor: "pointer", opacity: mergeTo ? 1 : 0.4 }}>Merge & delete source</button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ================= Master-admin oversight: all users =================
+export function AdminUsersTab({ user }: { user: any }) {
+  const [rows, setRows] = useState<any[] | null>(null);
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [mergeKeep, setMergeKeep] = useState<string | null>(null);
+  const [mergeRemove, setMergeRemove] = useState("");
+  const [preview, setPreview] = useState<any | null>(null);
+
+  const load = async () => {
+    const { data } = await supabase.rpc("admin_list_users");
+    setRows(Array.isArray(data) ? data : []);
+  };
+  useEffect(() => { load(); }, []);
+
+  const shown = (rows || []).filter((r) => {
+    const s = q.trim().toLowerCase();
+    if (!s) return true;
+    return (r.display_name || "").toLowerCase().includes(s) || (r.email || "").toLowerCase().includes(s);
+  });
+
+  const setBanned = async (u: any, banned: boolean) => {
+    if (!confirm(`${banned ? "Suspend" : "Restore"} ${u.display_name || u.email || "this user"}?${banned ? " They'll be blocked from the app until restored." : ""}`)) return;
+    setBusy(u.id);
+    try {
+      const { error } = await supabase.rpc("admin_set_banned", { p_user: u.id, p_banned: banned });
+      if (error) { alert("Couldn't update — " + error.message); return; }
+      await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: banned ? "user_banned" : "user_unbanned", target_user_id: u.id, summary: `${banned ? "Suspended" : "Restored"} ${u.display_name || u.email || "a user"}` });
+      await load();
+    } finally { setBusy(null); }
+  };
+
+  const wipe = async (u: any) => {
+    if (!confirm(`WIPE all data for ${u.display_name || u.email}? Deletes their rounds, stats, memberships and profile. Group games stay (they hold others' data). This CANNOT be undone.`)) return;
+    if (!confirm(`Final confirm — permanently delete ${u.display_name || u.email}'s data?`)) return;
+    setBusy(u.id);
+    try {
+      const { error } = await supabase.rpc("admin_wipe_user", { p_user: u.id });
+      if (error) { alert("Couldn't wipe — " + error.message); return; }
+      await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "user_wiped", target_user_id: u.id, summary: `Wiped data for ${u.display_name || u.email || "a user"}` });
+      await load();
+    } finally { setBusy(null); }
+  };
+
+  const runPreview = async (keepId: string) => {
+    if (!mergeRemove) return;
+    const { data } = await supabase.rpc("admin_merge_users_preview", { p_keep: keepId, p_remove: mergeRemove });
+    setPreview(Array.isArray(data) ? data[0] : data);
+  };
+
+  const doMergeUsers = async (keep: any) => {
+    const rem = (rows || []).find((r) => r.id === mergeRemove);
+    if (!rem) return;
+    if (!confirm(`Merge ${rem.display_name || rem.email} INTO ${keep.display_name || keep.email}? All of ${rem.display_name || rem.email}'s rounds, games and memberships move to ${keep.display_name || keep.email}, then their duplicate profile is deleted. This can't be undone.`)) return;
+    setBusy(keep.id);
+    try {
+      const { error } = await supabase.rpc("admin_merge_users", { p_keep: keep.id, p_remove: mergeRemove });
+      if (error) { alert("Couldn't merge — " + error.message); return; }
+      await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "users_merged", target_user_id: keep.id, summary: `Merged ${rem.display_name || rem.email} into ${keep.display_name || keep.email}` });
+      setMergeKeep(null); setMergeRemove(""); setPreview(null);
+      await load();
+    } finally { setBusy(null); }
+  };
+
+  return (
+    <div>
+      <Eyebrow>★ OVERSIGHT · ALL USERS</Eyebrow>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
+        Every account. Suspend a bad actor, wipe a user&apos;s data on request, or merge two accounts that are the same person (dedup). Merge and wipe are irreversible.
+      </div>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or email…"
+        style={{ width: "100%", marginTop: 12, background: C.card, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 10, padding: "9px 12px", fontSize: 14 }} />
+      {rows === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
+      {shown.map((u) => {
+        const banned = !!u.banned;
+        const isSelf = u.id === user.id;
+        return (
+          <div key={u.id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 8, opacity: banned ? 0.65 : 1 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{u.display_name || "(no name)"}</div>
+              {u.is_admin && <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>★ admin</span>}
+              {banned && <span style={{ color: C.birdie, fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>· suspended</span>}
+            </div>
+            <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{u.email || "—"}</div>
+            <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
+              {u.group_count} group{u.group_count === 1 ? "" : "s"} · {u.rounds_count} round{u.rounds_count === 1 ? "" : "s"}{u.handicap_index != null ? ` · hcp ${u.handicap_index}` : ""}
+            </div>
+            <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+              <button disabled={busy === u.id} onClick={() => { setMergeKeep(mergeKeep === u.id ? null : u.id); setMergeRemove(""); setPreview(null); }}
+                style={{ background: "transparent", color: C.faint, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}>
+                Merge another into this…
+              </button>
+              <button disabled={busy === u.id || isSelf} onClick={() => setBanned(u, !banned)}
+                style={{ background: "transparent", color: banned ? C.sage : C.birdie, border: `1px solid ${banned ? C.sage : C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.3 : 1 }}>
+                {banned ? "Restore" : "Suspend"}
+              </button>
+              <button disabled={busy === u.id || isSelf} onClick={() => wipe(u)}
+                style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.3 : 1 }}>
+                Wipe data
+              </button>
+            </div>
+            {mergeKeep === u.id && (
+              <div style={{ marginTop: 8, background: C.greenLight, borderRadius: 8, padding: 8 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ color: C.sage, fontSize: 12 }}>Merge a duplicate INTO {u.display_name || u.email}:</span>
+                  <select value={mergeRemove} onChange={(e) => { setMergeRemove(e.target.value); setPreview(null); }}
+                    style={{ background: C.card, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
+                    <option value="">Select duplicate…</option>
+                    {(rows || []).filter((r) => r.id !== u.id).map((r) => (
+                      <option key={r.id} value={r.id}>{r.display_name || r.email}</option>
+                    ))}
+                  </select>
+                  <button disabled={!mergeRemove} onClick={() => runPreview(u.id)}
+                    style={{ background: "transparent", color: C.cream, border: `1px solid ${C.sage}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "5px 10px", cursor: "pointer", opacity: mergeRemove ? 1 : 0.4 }}>Preview</button>
+                </div>
+                {preview && (
+                  <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
+                    Will move: {preview.rounds} rounds · {preview.games_organized} games organized · {preview.game_player_rows} score rows · {preview.memberships} memberships. Then the duplicate profile is deleted.
+                    <div style={{ marginTop: 8 }}>
+                      <button disabled={busy === u.id} onClick={() => doMergeUsers(u)}
+                        style={{ background: C.gold, color: C.green, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, padding: "6px 12px", cursor: "pointer" }}>Confirm merge</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         );
       })}

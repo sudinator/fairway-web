@@ -8,7 +8,7 @@ import { loadDraft, draftHasScores } from "@/lib/draft";
 import { loadActiveGame } from "@/lib/draft";
 import { btn, Wordmark, inputStyle } from "@/components/ui";
 import Tournaments from "@/components/tournaments";
-import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab, ActivityTab, AdminGroupsTab, HelpPage } from "@/components/manage";
+import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab, ActivityTab, AdminGroupsTab, AdminUsersTab, HelpPage } from "@/components/manage";
 import { RoundSetup } from "@/components/round-setup";
 import { RoundEditor } from "@/components/round-editor";
 import { RoundDetail } from "@/components/round-detail";
@@ -22,7 +22,7 @@ import type { AppGroup } from "@/lib/groups";
 
 const supabase = createClient();
 
-type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" | "activity" | "oversight" | "help" | "profile";
+type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" | "activity" | "oversight" | "users" | "help" | "profile";
 
 export function Home({ session }: { session: any }) {
   const [rounds, setRounds] = useState<Round[]>([]);
@@ -238,6 +238,18 @@ export function Home({ session }: { session: any }) {
     return <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 60px", color: C.sage }}>Loading groups…</div>;
   }
 
+  if (profile?.banned) {
+    return (
+      <div style={{ maxWidth: 560, margin: "0 auto", padding: "60px 20px", textAlign: "center" }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>🚫</div>
+        <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 700 }}>Account suspended</div>
+        <div style={{ color: C.sage, fontSize: 14, marginTop: 10, lineHeight: 1.5 }}>
+          Your access to Birdie Num Num has been suspended. If you think this is a mistake, contact the app administrator.
+        </div>
+      </div>
+    );
+  }
+
   if (profile?.deactivated) {
     return (
       <div style={{ maxWidth: 480, margin: "80px auto", padding: 24, textAlign: "center" }}>
@@ -344,6 +356,8 @@ export function Home({ session }: { session: any }) {
           <ActivityTab />
         ) : tab === "oversight" && profile?.is_admin ? (
           <AdminGroupsTab user={user} onEnterGroup={enterSupportGroup} onExitGroup={exitSupportGroup} onGroupsChanged={loadGroups} />
+        ) : tab === "users" && profile?.is_admin ? (
+          <AdminUsersTab user={user} />
         ) : tab === "help" ? (
           <HelpPage isAdmin={!!profile?.is_admin} />
         ) : tab === "profile" ? (
@@ -391,7 +405,7 @@ export function Home({ session }: { session: any }) {
                   {item(tab === p.key && !inFlow, p.icon, p.label, () => { setTab(p.key); setStage(null); setViewing(null); setMoreOpen(false); })}
                 </React.Fragment>
               )}
-              {item(moreOpen || (["players","groups","activity","oversight","help","profile"].includes(tab) && !inFlow), "⋯", "More", () => setMoreOpen((v) => !v))}
+              {item(moreOpen || (["players","groups","activity","oversight","users","help","profile"].includes(tab) && !inFlow), "⋯", "More", () => setMoreOpen((v) => !v))}
             </>
           );
         })()}
@@ -413,6 +427,7 @@ export function Home({ session }: { session: any }) {
                 { key: "groups", label: "Groups", show: showGroupsTab },
                 { key: "activity", label: "Activity ★", show: !!profile?.is_admin },
                 { key: "oversight", label: "Oversight ★", show: !!profile?.is_admin },
+                { key: "users", label: "Users ★", show: !!profile?.is_admin },
                 { key: "help", label: "Help", show: true },
                 { key: "profile", label: profile?.is_admin ? "Profile ★" : "Profile", show: true },
               ];
