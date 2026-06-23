@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
+import { ShareScorecardModal } from "@/components/share-card";
 import {
   C,
   Hole,
@@ -1270,7 +1271,6 @@ function GameRoom({
   };
   const finishMyGroup = async () => {
     if (!game || !myRow?.tee_group) return;
-    if (!confirm(`Finish Group ${myRow.tee_group}'s round? Your group's scores lock and post to each player's Rounds tab. The rest of the game keeps going.`)) return;
     await supabase.rpc("finish_tee_group", { p_game: game.id });
     await recordMyGameRound();
     await load();
@@ -1282,6 +1282,9 @@ function GameRoom({
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState("");
   const [courseTees, setCourseTees] = useState<CourseTee[]>([]);
+  type FinishGap = { name: string; noScores: boolean; missScores: number[]; missPutts: number[]; missFw: number[] };
+  const [finishPrompt, setFinishPrompt] = useState<{ kind: "group" | "game"; teeGroup?: number; gaps: FinishGap[] } | null>(null);
+  const [shareCard, setShareCard] = useState(false);
 
   const load = useCallback(async () => {
     const { data: g } = await supabase
@@ -1928,7 +1931,6 @@ function GameRoom({
   // Organizer: end the game — freezes scores and shows final results.
   const endGame = async () => {
     if (!game) return;
-    if (!confirm(`End "${game.name}"? Final standings are locked in and every player's scorecard is posted to their Rounds tab.`)) return;
     const { error: finErr } = await supabase.rpc("finish_game", { p_game: game.id });
     if (finErr) { alert("Couldn't end the game — " + finErr.message); return; }
     // Post every player's scorecard to their Rounds history right now (server-side),
@@ -1942,6 +1944,35 @@ function GameRoom({
     await recordMyGameRound();
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_ended", group_id: (game as any).group_id || null, summary: `Ended the game "${game.name}"` });
     await load();
+  };
+
+  // Pre-conclusion completeness: list what's missing for the players being locked.
+  const finishListFmt = (a: number[]) => (a.length > 8 ? `${a.length} holes` : a.join(", "));
+  const computeFinishGaps = (scope: Player[]): FinishGap[] => {
+    const meta = game?.holes_meta || [];
+    const out: FinishGap[] = [];
+    for (const pl of scope) {
+      if (pl.no_show) continue;
+      const sc = pl.scores || []; const pu = pl.putts || []; const fw = pl.fairways || [];
+      const cells = meta.map((m, i) => ({ i, par: m.par, n: m.n, s: sc[i] }));
+      const entered = cells.filter((c) => c.s != null && (c.s as number) > 0);
+      if (entered.length === 0) { out.push({ name: pl.display_name, noScores: true, missScores: [], missPutts: [], missFw: [] }); continue; }
+      const missScores = cells.filter((c) => c.s == null || (c.s as number) <= 0).map((c) => c.n);
+      const tracks = pu.some((v) => v != null) || fw.some((v) => v != null);
+      const missPutts = tracks ? entered.filter((c) => pu[c.i] == null).map((c) => c.n) : [];
+      const missFw = tracks ? entered.filter((c) => c.par >= 4 && fw[c.i] == null).map((c) => c.n) : [];
+      if (missScores.length || missPutts.length || missFw.length) out.push({ name: pl.display_name, noScores: false, missScores, missPutts, missFw });
+    }
+    return out;
+  };
+  const requestEndGame = async () => {
+    if (!game) return;
+    setFinishPrompt({ kind: "game", gaps: computeFinishGaps(players) });
+  };
+  const requestFinishGroup = async () => {
+    if (!game || myRow?.tee_group == null) return;
+    const scope = players.filter((pl) => pl.tee_group === myRow.tee_group);
+    setFinishPrompt({ kind: "group", teeGroup: myRow.tee_group ?? undefined, gaps: computeFinishGaps(scope) });
   };
 
   // When a game is ended, each player records THEIR OWN scorecard into their rounds
@@ -2420,7 +2451,7 @@ function GameRoom({
           onOverride: overridePlayerHandicap, courseTees, onSetTee: setPlayerTee,
           onRemove: removePlayer, onToggleNoShow: toggleNoShow, onSetTeam: setPlayerTeam,
           onSetTeeGroup: setPlayerTeeGroup, onRename: renameGame, onDelete: deleteGame,
-          onEnd: endGame, onReopen: reopenGame, onReset: resetScores, onShare: setShare,
+          onEnd: requestEndGame, onReopen: reopenGame, onReset: resetScores, onShare: setShare,
           eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,
           onSetAllowance: setAllowance, onSetFormat: setFormat, onSetTeamScoreMode: setTeamScoreMode, anyScores,
         };
@@ -2597,18 +2628,65 @@ function GameRoom({
         <StrokesSummary game={game} players={players} collapsible={roomTab === "play"} meKey={myRow ? pkey(myRow) : undefined} />
       )}
 
+      {finishPrompt && (() => {
+        const fp = finishPrompt;
+        const lockMsg = fp.kind === "group"
+          ? "Your group's scores lock and post to each player's Rounds tab; the rest of the game keeps going."
+          : "Final standings lock in and every player's scorecard posts to their Rounds tab.";
+        const complete = fp.gaps.length === 0;
+        return (
+          <div onClick={() => setFinishPrompt(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 1000 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: C.card, color: C.ink, borderRadius: 16, padding: 20, maxWidth: 460, width: "100%", maxHeight: "85vh", overflowY: "auto" }}>
+              <div style={{ fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800, color: C.green }}>
+                {fp.kind === "group" ? `Finish Group ${fp.teeGroup}'s round?` : "End the game for everyone?"}
+              </div>
+              {complete ? (
+                <div style={{ color: C.faint, fontSize: 14, marginTop: 10, lineHeight: 1.5 }}>Everything's entered. {lockMsg}</div>
+              ) : (
+                <>
+                  <div style={{ color: C.ink, fontSize: 14, marginTop: 10, lineHeight: 1.5 }}>Some things aren't filled in yet:</div>
+                  <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                    {fp.gaps.map((g) => (
+                      <div key={g.name} style={{ background: "#F4F0E1", borderRadius: 10, padding: "9px 12px", fontSize: 13, lineHeight: 1.45 }}>
+                        <b>{g.name}</b>{" \u2014 "}
+                        {g.noScores ? <span style={{ color: C.birdie }}>no scores entered</span> : (
+                          <span style={{ color: C.faint }}>
+                            {[
+                              g.missScores.length ? `scores on ${finishListFmt(g.missScores)}` : null,
+                              g.missPutts.length ? `putts on ${finishListFmt(g.missPutts)}` : null,
+                              g.missFw.length ? `fairways on ${finishListFmt(g.missFw)}` : null,
+                            ].filter(Boolean).join(" \u00b7 ")}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ color: C.faint, fontSize: 12.5, marginTop: 12, lineHeight: 1.5 }}>{lockMsg} You can finish anyway — missing scores just won't count.</div>
+                </>
+              )}
+              <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "flex-end" }}>
+                <button onClick={() => setFinishPrompt(null)} style={{ ...btn(false), padding: "9px 16px" }}>{complete ? "Cancel" : "Go back"}</button>
+                <button onClick={async () => { const run = fp.kind === "group" ? finishMyGroup : endGame; setFinishPrompt(null); await run(); }} style={{ ...btn(true), padding: "9px 16px", background: "#5A1E1E", color: "#fff" }}>
+                  {complete ? (fp.kind === "group" ? "Finish group" : "End game") : "Finish anyway"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {roomTab === "play" && !isEnded && (() => {
         const canFinishGroup = !!myRow?.is_marker && myRow?.tee_group != null && !myRow?.group_locked;
         if (!canFinishGroup && !isOrganizer) return null;
         return (
           <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
             {canFinishGroup && (
-              <button onClick={finishMyGroup} style={{ ...btn(true), flex: 1, minWidth: 180, fontSize: 13, padding: "10px 0" }}>
+              <button onClick={requestFinishGroup} style={{ ...btn(true), flex: 1, minWidth: 180, fontSize: 13, padding: "10px 0" }}>
                 🏁 Finish Group {myRow!.tee_group}'s round
               </button>
             )}
             {isOrganizer && (
-              <button onClick={endGame} style={{ ...btn(!canFinishGroup), flex: 1, minWidth: 180, fontSize: 13, padding: "10px 0", background: canFinishGroup ? "#5A1E1E" : undefined, color: canFinishGroup ? "#fff" : undefined }}>
+              <button onClick={requestEndGame} style={{ ...btn(!canFinishGroup), flex: 1, minWidth: 180, fontSize: 13, padding: "10px 0", background: canFinishGroup ? "#5A1E1E" : undefined, color: canFinishGroup ? "#fff" : undefined }}>
                 🔒 End game for everyone
               </button>
             )}
@@ -2622,6 +2700,11 @@ function GameRoom({
           <button onClick={() => setCardView(true)} style={{ ...btn(cardView), flex: 1, fontSize: 13 }}>Group Card</button>
         </div>
       )}
+      {roomTab === "play" && me && (me.scores || []).some((s: any) => s != null && s > 0) && (
+        <button onClick={() => setShareCard(true)} style={{ ...btn(false), width: "100%", marginTop: 8, fontSize: 13, padding: "10px 0" }}>📤 Share my scorecard</button>
+      )}
+      {roomTab === "play" && (isOrganizer || isAdmin) && <ScoreHistory gameId={gameId} />}
+      {shareCard && me && <ShareScorecardModal game={game} player={me} onClose={() => setShareCard(false)} />}
       {roomTab === "play" && cardView && (game.marker_user_id || myGroupHasMarker) && !isEnded && (
         <div style={{ background: "#16302A", border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
           <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Group scoring is on</div>
@@ -3396,6 +3479,51 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
               </button>
             ))}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Organizer/admin score-change history for a game (reads migration 0042's audit log).
+function ScoreHistory({ gameId }: { gameId: string }) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const toggle = async () => {
+    const next = !open; setOpen(next);
+    if (next && rows === null) {
+      setLoading(true);
+      const { data } = await supabase.rpc("admin_score_audit", { p_game: gameId });
+      setRows(Array.isArray(data) ? data : []);
+      setLoading(false);
+    }
+  };
+  const fmtVal = (v: number | null) => (v == null ? "—" : String(v));
+  const fmtWhen = (iso: string) => { try { const d = new Date(iso); return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }); } catch { return iso; } };
+  const fieldLabel: Record<string, string> = { score: "score", putts: "putts", penalties: "pen" };
+  return (
+    <div style={{ marginTop: 12 }}>
+      <button onClick={toggle} style={{ ...btn(false), fontSize: 12, padding: "8px 12px", width: "100%" }}>
+        {open ? "▴" : "▾"} Score history
+      </button>
+      {open && (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 8 }}>
+          {loading ? (
+            <div style={{ color: C.sage, fontSize: 13 }}>Loading…</div>
+          ) : !rows || rows.length === 0 ? (
+            <div style={{ color: C.faint, fontSize: 13, lineHeight: 1.5 }}>No changes recorded yet. Edits are logged from when migration 0042 is applied onward.</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflowY: "auto" }}>
+              {rows.map((r) => (
+                <div key={r.id} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12.5, color: C.cream, borderBottom: `1px solid ${C.green}`, paddingBottom: 4 }}>
+                  <span style={{ color: C.gold, fontWeight: 700, minWidth: 64, whiteSpace: "nowrap" }}>H{r.hole_index + 1} {fieldLabel[r.field] || r.field}</span>
+                  <span style={{ flex: 1, minWidth: 0 }}>{r.player_name}: <b>{fmtVal(r.old_value)} → {fmtVal(r.new_value)}</b></span>
+                  <span style={{ color: C.faint, fontSize: 11, whiteSpace: "nowrap" }}>{r.changed_by_name} · {fmtWhen(r.changed_at)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

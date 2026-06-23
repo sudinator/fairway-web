@@ -100,10 +100,13 @@ From the security & structure review. None are emergencies; tackle when convenie
    - If NO stats tracked: don't flag stats, only confirm all scores are in.
    Warn-and-confirm, not a hard block (consistent with "flag not gate"). App code only.
 
-3. **Copy scorecard to chat** - a "Copy" action that builds a plain-text snapshot of
+3. **Copy scorecard to chat** [mockup presented Jun 2026 — enhanced rounds-style scorecard, awaiting go] - a "Copy" action that builds a plain-text snapshot of
    the leaderboard/scorecard (not the live LINK) for pasting into WhatsApp/iMessage/etc.
    Compact, readable text: title + standings + per-player line (and optionally a small
    hole grid). Reuse the GHIN-style text formatting approach. App code only (clipboard).
 
 ## Shipped
+- v1.53.0 — copy/share scorecard: a player can share THEIR OWN card from a game as the vertical Rounds-style ScoreViewCard, exported to PNG via html-to-image for the share sheet (download + Copy-as-text fallbacks). New dependency: html-to-image.
+- v1.52.0 — scoring audit trail: migration 0042 logs every per-hole change (score/putts/penalties) with old—>new, who, and when, via an AFTER UPDATE trigger on game_players (captures all write paths). Organizer/admin can open a collapsible "Score history" panel in the game (admin_score_audit RPC).
+- v1.51.0 — pre-conclusion completeness popup: ending a game / finishing a group now opens a modal listing per-player gaps (unentered scores; and missing putts/fairways for players who track stats, par-3s excluded). Warn-and-confirm, not a hard block; replaces the plain browser confirms on endGame + finishMyGroup.
 - v1.50.2 — error-handling pass: admin/game mutations (setFormat, setTeamScoreMode, endGame, enter/exitSupportGroup) now surface errors and don't optimistically proceed; RoundEditor backgroundSave detects returned .error and shows a calm "saved on device, retrying" indicator instead of swallowing failures.
