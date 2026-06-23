@@ -464,6 +464,8 @@ function CreateGame({
   const [teamScoreMode, setTeamScoreMode] = useState<"best_ball" | "aggregate">("best_ball");
   const [trifectaScoring, setTrifectaScoring] = useState<"per_hole" | "match">("per_hole");
   const [strokeBasis, setStrokeBasis] = useState<"gross" | "net">("net");
+  const [fmtFamily, setFmtFamily] = useState<"stroke" | "match">("stroke");
+  const [matchKind, setMatchKind] = useState<"ind" | "team">("ind");
   const [teamMode, setTeamMode] = useState(false);
   const [skinsTeamStyle, setSkinsTeamStyle] = useState<"head_to_head" | "best_ball">("head_to_head");
   const [team1, setTeam1] = useState("Team 1");
@@ -947,44 +949,61 @@ function CreateGame({
 
       <div style={{ marginTop: 14 }}>
         <label style={{ color: C.sage, fontSize: 12 }}>Format</label>
-        <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+        {/* Two-family guided chooser: pick a family, then a format. */}
+        <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
           <button
-            onClick={() => setGameType("stableford")}
-            style={{ ...btn(gameType === "stableford"), flex: 1, minWidth: 120, fontSize: 13 }}
+            onClick={() => { setFmtFamily("stroke"); if (gameType === "match" || gameType === "fourball" || gameType === "trifecta") setGameType("stableford"); }}
+            style={{ flex: 1, textAlign: "left", background: fmtFamily === "stroke" ? C.green : C.greenLight, border: `1.5px solid ${fmtFamily === "stroke" ? C.gold : "transparent"}`, borderRadius: 12, padding: 11, cursor: "pointer" }}
           >
-            Stableford tournament
+            <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+              <span style={{ width: 34, height: 34, borderRadius: "50%", border: `1.5px solid ${C.gold}`, background: "#fbf6e6", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M7 21V3" stroke="#0E3B2E" strokeWidth="1.6" strokeLinecap="round"/><path d="M7 4l9 2.5L7 9.5z" fill="#B83A2E"/><circle cx="7" cy="21" r="1.6" fill="#C9A227"/></svg>
+              </span>
+              <div>
+                <div style={{ color: C.cream, fontWeight: 700, fontFamily: "Georgia, serif", fontSize: 15 }}>Stroke</div>
+                <div style={{ color: C.sage, fontSize: 11 }}>The whole field</div>
+              </div>
+            </div>
           </button>
           <button
-            onClick={() => setGameType("stroke")}
-            style={{ ...btn(gameType === "stroke"), flex: 1, minWidth: 120, fontSize: 13 }}
+            onClick={() => { setFmtFamily("match"); if (gameType === "stableford" || gameType === "stroke" || gameType === "skins") setGameType(matchKind === "team" ? "fourball" : "match"); }}
+            style={{ flex: 1, textAlign: "left", background: fmtFamily === "match" ? C.green : C.greenLight, border: `1.5px solid ${fmtFamily === "match" ? C.gold : "transparent"}`, borderRadius: 12, padding: 11, cursor: "pointer" }}
           >
-            Stroke play
-          </button>
-          <button
-            onClick={() => setGameType("match")}
-            style={{ ...btn(gameType === "match"), flex: 1, minWidth: 120, fontSize: 13 }}
-          >
-            Singles match play
-          </button>
-          <button
-            onClick={() => setGameType("fourball")}
-            style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 120, fontSize: 13 }}
-          >
-            Four-ball (best net)
-          </button>
-          <button
-            onClick={() => setGameType("skins")}
-            style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 120, fontSize: 13 }}
-          >
-            Skins (net)
-          </button>
-          <button
-            onClick={() => setGameType("trifecta")}
-            style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 120, fontSize: 13 }}
-          >
-            Trifecta (2 v 2)
+            <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+              <span style={{ width: 34, height: 34, borderRadius: "50%", border: `1.5px solid ${C.gold}`, background: "#fbf6e6", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M4 6l7 6-7 6" stroke="#0E3B2E" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/><path d="M20 6l-7 6 7 6" stroke="#B83A2E" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </span>
+              <div>
+                <div style={{ color: C.cream, fontWeight: 700, fontFamily: "Georgia, serif", fontSize: 15 }}>Match play</div>
+                <div style={{ color: C.sage, fontSize: 11 }}>Head to head</div>
+              </div>
+            </div>
           </button>
         </div>
+        {fmtFamily === "stroke" ? (
+          <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+            <button onClick={() => setGameType("stableford")} style={{ ...btn(gameType === "stableford"), flex: 1, minWidth: 100, fontSize: 13 }}>Stableford</button>
+            <button onClick={() => setGameType("stroke")} style={{ ...btn(gameType === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Stroke play</button>
+            <button onClick={() => setGameType("skins")} style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 100, fontSize: 13 }}>Skins</button>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button onClick={() => { setMatchKind("ind"); setGameType("match"); }} style={{ ...btn(matchKind === "ind"), flex: 1, fontSize: 13 }}>Individual</button>
+              <button onClick={() => { setMatchKind("team"); if (gameType !== "fourball" && gameType !== "trifecta") setGameType("fourball"); }} style={{ ...btn(matchKind === "team"), flex: 1, fontSize: 13 }}>Team</button>
+            </div>
+            {matchKind === "ind" ? (
+              <div style={{ marginTop: 8 }}>
+                <button onClick={() => setGameType("match")} style={{ ...btn(gameType === "match"), width: "100%", fontSize: 13 }}>Singles match</button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                <button onClick={() => setGameType("fourball")} style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 110, fontSize: 13 }}>Four-ball</button>
+                <button onClick={() => setGameType("trifecta")} style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 110, fontSize: 13 }}>Trifecta</button>
+              </div>
+            )}
+          </>
+        )}
         <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
           {gameType === "stableford"
             ? "Everyone competes on one net-Stableford leaderboard."
