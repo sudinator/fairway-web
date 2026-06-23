@@ -96,3 +96,54 @@ supabase db dump --schema public > supabase/migrations/0001_baseline.sql
 **Browser (no install):** run read-only queries against `information_schema.columns`,
 `pg_policies`, `information_schema.routines`, `pg_indexes` in the SQL editor and
 compare to this file.
+
+---
+
+## Additions since the v1.0.18 live export (migrations 0014-0041)
+
+The verified section above reflects an old live export. The items below are drawn
+from the committed migration files (not a fresh live re-export), and bring this doc
+current through migration 0041. Treat the migration files as authoritative if they
+ever disagree with this summary.
+
+### New / changed columns
+- **profiles**: `banned` (bool, default false; 0032). A profile is set banned by
+  `admin_set_banned` or born banned via the `banned_emails` trigger (0038).
+- **groups**: `is_default` (bool; 0030) - only one group may be the default
+  (partial unique index). Stranded users land in the default group.
+- **group_members**: `is_support` (bool; 0028) - a temporary master-admin support
+  membership; `support_started_at` (timestamptz; 0039) - when that session began
+  (reaped after 12h by `expire_support_sessions`).
+- **games**: `game_type` now also includes `trifecta` (0016) and `stroke` (0035).
+  Added columns: `marker_user_id` (0006), `share_token` (0018, powers the live link),
+  `ended_at` (finish timestamp), `scores_reset_at` (0023), `team_score_mode`
+  (best_ball/aggregate; trifecta + four-ball), `trifecta_scoring` (per_hole/match;
+  0024), `stroke_basis` (gross/net; 0035), `skins_mode` (carryover/split; 0036),
+  `tee_groups`-related fields per 0009.
+- **game_players**: beyond `scores`/`putts`/`fairways`, also `penalties` and `sand`
+  (jsonb; 0004/0008), `is_marker` + `tee_group` + `group_locked` (0009), `scored_by`
+  (0022), `clock_start`/`clock_end` (0014), `avatar_url` (0019), `is_guest` (0007).
+
+### New tables
+- **banned_emails** (0038): `email` (citext PK), `reason`, `created_at`. Written only
+  by SECURITY DEFINER functions (ban/wipe sync); admin-only read via RLS.
+- **feedback** (0037): `id`, `user_id`, `user_name`, `kind` (bug/wish/question),
+  `message`, `app_version`, `group_id`, `context`, `status` (new/triaged/done),
+  `created_at`. RLS: insert own; select own-or-admin; update/delete admin-only.
+
+### New / notable functions
+- **Live**: `get_live_scorecard(token)` (0018, re-created 0021 + 0041) - public,
+  alias-keyed read; now returns `trifecta_scoring` and `stroke_basis`.
+- **Scoring**: `set_game_scores` / scorecard-ownership RPCs (0022), `reset_game_scores`
+  (0023), `finish_game` + `post_game_rounds` (0011/0026), `validate_game_player_scores`
+  trigger + `_valid_num_array` (0040, optional).
+- **Default group**: `join_default_group(email)` (0030; refuses blocklisted emails per 0038),
+  `admin_set_default_group`.
+- **Master-admin** (all SECURITY DEFINER, gated by `is_admin()`): `admin_group_overview`,
+  `admin_set_group_status`, `admin_delete_group`, `admin_merge_group`, `admin_list_users`,
+  `admin_set_banned`, `admin_wipe_user`, `admin_merge_users(_preview)`,
+  `admin_unblock_email` (0038), `admin_enter_group`/`admin_exit_group` (0028),
+  `expire_support_sessions` (0039), `admin_revoke_group_invites`, game-repair RPCs (0031).
+- **Guards/triggers**: `guard_profile_privileged_cols` (0033, blocks self-grant of
+  is_admin/banned), `guard_new_profile_banned` (0038, born-banned), `is_admin`/
+  `is_group_member`/`is_group_admin` fold in "not banned" (0034).

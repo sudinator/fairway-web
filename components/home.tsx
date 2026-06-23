@@ -218,13 +218,15 @@ export function Home({ session }: { session: any }) {
   // straight into it. Membership-based access carries the session; exiting removes
   // only the support row (never a real membership).
   const enterSupportGroup = async (g: { group_id: string; name: string }) => {
-    await supabase.rpc("admin_enter_group", { p_group: g.group_id, p_email: user.email || "" });
+    const { error } = await supabase.rpc("admin_enter_group", { p_group: g.group_id, p_email: user.email || "" });
+    if (error) { alert("Couldn't enter the group — " + error.message); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "admin_entered_group", group_id: g.group_id, summary: `Master admin entered group "${g.name}" (support session)` });
     await loadGroups(g.group_id);
     setStage(null); setViewing(null); setMoreOpen(false); setTab("dashboard");
   };
   const exitSupportGroup = async (g: { group_id: string; name: string }) => {
-    await supabase.rpc("admin_exit_group", { p_group: g.group_id });
+    const { error } = await supabase.rpc("admin_exit_group", { p_group: g.group_id });
+    if (error) { alert("Couldn't exit the group — " + error.message); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "admin_exited_group", group_id: g.group_id, summary: `Master admin exited group "${g.name}" (support session)` });
     await loadGroups();
   };

@@ -35,6 +35,25 @@ App-authored (migrations/): run after the baseline, in order:
 - 0032 admin_merge_users_groups   (merge groups; ban; revoke invites; list/wipe/merge users)
 - 0033 lock_privileged_profile_columns  (CRITICAL: block self-grant of is_admin/banned)
 - 0034 enforce_ban_in_access      (fold "not banned" into is_admin/is_group_member/is_group_admin)
+- 0035 stroke_basis               (Stroke play: gross vs net total basis)
+- 0036 skins_mode                 (individual Skins: carryover vs split)  [REQUIRED for split skins]
+- 0037 feedback                   (in-app bug/feature/question table + RLS)  [REQUIRED for the Feedback feature]
+- 0038 auth_blocklist             (banned_emails + born-banned profile trigger; ban/wipe sync; default-group refuse; admin_unblock_email)
+- 0039 support_session_expiry     (group_members.support_started_at + expire_support_sessions reaper; admin_enter_group stamps + reaps)
+- 0040 score_validation           (defense-in-depth value check trigger on game_players)  [OPTIONAL - app UI can't produce bad values; guards only the raw API]
+- 0041 live_stroke_trifecta       (live RPC get_live_scorecard now returns trifecta_scoring + stroke_basis)  [REQUIRED for correct live Stroke play / match-scored Trifecta]
+
+### Recent migrations (0035-0041) - notes
+- REQUIRED before the matching feature works: 0036 (split skins), 0037 (feedback),
+  0041 (live Stroke/Trifecta). Code is safe to deploy ahead of them - it falls back
+  to sensible defaults - but the feature is wrong/broken until the migration runs.
+- 0038/0039 are operational hardening (keep banned/wiped users out; auto-clear
+  forgotten support sessions). Run both. 0038 creates the `banned_emails` table and
+  a BEFORE INSERT trigger on `profiles`; 0039 adds a column + reaper and re-creates
+  `admin_enter_group`.
+- 0040 is optional. RLS already scopes WHO can write a row; this trigger only adds a
+  VALUE sanity-check (catches malformed arrays from a hand-crafted API call, not the
+  app UI). Test it against a real score write before relying on it.
 
 ### Security floor (run + verify)
 - 0033 is the critical one: without it any user could `update profiles set is_admin=true`

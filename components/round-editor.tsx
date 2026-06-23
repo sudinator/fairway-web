@@ -77,6 +77,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
 
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [bgSaveFailed, setBgSaveFailed] = useState(false);
   const [favMsg, setFavMsg] = useState<string | null>(null);
   const [courseCorrectionReason, setCourseCorrectionReason] = useState("");
   const isResumed = !!round.id || draftHasScores(round);
@@ -98,7 +99,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
       let rid = dbIdRef.current;
       if (!rid) {
         const { data: u } = await supabase.auth.getUser();
-        const { data: r } = await supabase.from("rounds").insert({
+        const { data: r, error: insErr } = await supabase.from("rounds").insert({
           user_id: u.user!.id,
           course: round.course, tee_name: round.tee_name,
           rating: round.rating, slope: round.slope, course_par: round.course_par,
@@ -106,7 +107,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
           played_at: round.played_at, group_id: round.group_id || null,
           status: "in_progress",
         }).select().single();
-        if (!r) return;
+        if (insErr || !r) { setBgSaveFailed(true); return; }
         rid = r.id;
         dbIdRef.current = rid;
       }
@@ -116,19 +117,24 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         const have = new Set((existing || []).map((x: any) => x.hole_number));
         const missing = currentHoles.filter((h) => !have.has(h.hole_number));
         if (missing.length) {
-          await supabase.from("holes").insert(missing.map((h) => ({
+          const { error: blankErr } = await supabase.from("holes").insert(missing.map((h) => ({
             round_id: rid, hole_number: h.hole_number, par: h.par,
             stroke_index: h.stroke_index, strokes: null, putts: null, fairway: null, penalties: 0,
           })));
+          if (blankErr) { blanksRef.current = false; setBgSaveFailed(true); return; }
         }
       }
+      let failed = false;
       for (const h of currentHoles) {
-        await supabase.from("holes").update({
+        const { error: upErr } = await supabase.from("holes").update({
           strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties || 0, sand: h.sand ?? false,
         }).eq("round_id", rid).eq("hole_number", h.hole_number);
+        if (upErr) failed = true;
       }
+      setBgSaveFailed(failed);
     } catch {
-      // Ignore — local storage already has the data; we'll retry on the next change.
+      // Local storage already holds the data; flag the server backup as pending and retry on the next change.
+      setBgSaveFailed(true);
     }
   }, [round]);
 
@@ -417,6 +423,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         }}
       />
       {err && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{err}</div>}
+      {bgSaveFailed && <div style={{ color: C.gold, fontSize: 12, marginTop: 10, lineHeight: 1.45 }}>Saved on this device. Couldn&apos;t back up to the server yet — it&apos;ll keep retrying as you enter, and &ldquo;Finish round&rdquo; saves everything.</div>}
       {courseInfoChanged && (
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 14 }}>
         <label style={{ color: C.sage, fontSize: 12 }}>Reason for course correction <span style={{ color: C.gold }}>(required before saving course changes)</span></label>

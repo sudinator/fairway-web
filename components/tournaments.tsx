@@ -1913,13 +1913,15 @@ function GameRoom({
     // format. A player's setup work is preserved so switching back restores it;
     // formats that don't use a given structure simply ignore it (see the
     // game_type guards in StrokesSummary and the setup tab steps).
-    await supabase.from("games").update(patch).eq("id", game.id);
+    const { error } = await supabase.from("games").update(patch).eq("id", game.id);
+    if (error) { alert("Couldn't change the format — " + error.message); return; }
     await load();
   };
 
   const setTeamScoreMode = async (mode: "best_ball" | "aggregate") => {
     if (!game) return;
-    await supabase.from("games").update({ team_score_mode: mode }).eq("id", game.id);
+    const { error } = await supabase.from("games").update({ team_score_mode: mode }).eq("id", game.id);
+    if (error) { alert("Couldn't change the team scoring — " + error.message); return; }
     await load();
   };
 
@@ -1927,7 +1929,8 @@ function GameRoom({
   const endGame = async () => {
     if (!game) return;
     if (!confirm(`End "${game.name}"? Final standings are locked in and every player's scorecard is posted to their Rounds tab.`)) return;
-    await supabase.rpc("finish_game", { p_game: game.id });
+    const { error: finErr } = await supabase.rpc("finish_game", { p_game: game.id });
+    if (finErr) { alert("Couldn't end the game — " + finErr.message); return; }
     // Post every player's scorecard to their Rounds history right now (server-side),
     // so it no longer waits for each player to reopen the ended game on their device.
     await supabase.rpc("post_game_rounds", { p_game: game.id });

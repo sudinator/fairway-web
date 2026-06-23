@@ -79,3 +79,31 @@ From the security & structure review. None are emergencies; tackle when convenie
 ## Housekeeping
 - **Marketing one-pager:** `marketing/Birdie-Num-Num-overview.pdf`. Regenerate with
   `python3 marketing/make_onepager.py` and keep it current as features ship.
+
+## Newly requested (June 2026)
+
+1. **Scoring audit trail** - log every score change for dispute resolution + debugging.
+   Capture who / when / from-value / to-value per changed hole. Best done as a DB
+   trigger on game_players (BEFORE/AFTER UPDATE) that diffs old vs new `scores`
+   (and optionally putts/penalties) and inserts one audit row per changed index:
+   {game_id, game_player_id, hole_index, field, old_value, new_value, changed_by =
+   auth.uid(), changed_at}. A trigger captures ALL write paths (direct update, marker,
+   set_game_scores RPC), unlike app-level logging. Pairs naturally with the 0040
+   validation trigger. Add an admin view to read a player's/game's history. New migration.
+
+2. **Pre-conclusion completeness popup** - before a round/game is locked (organizer
+   endGame AND marker "Finish my group"), raise a modal listing what's missing:
+   - Always: holes with no score entered (per player, or for the finishing group).
+   - If stats are being tracked (any putts/fairway recorded): also list missing putts
+     and missing fairways (par-3s excluded from fairways), mirroring the post-round
+     StatsReminder but pre-lock and game-wide.
+   - If NO stats tracked: don't flag stats, only confirm all scores are in.
+   Warn-and-confirm, not a hard block (consistent with "flag not gate"). App code only.
+
+3. **Copy scorecard to chat** - a "Copy" action that builds a plain-text snapshot of
+   the leaderboard/scorecard (not the live LINK) for pasting into WhatsApp/iMessage/etc.
+   Compact, readable text: title + standings + per-player line (and optionally a small
+   hole grid). Reuse the GHIN-style text formatting approach. App code only (clipboard).
+
+## Shipped
+- v1.50.2 — error-handling pass: admin/game mutations (setFormat, setTeamScoreMode, endGame, enter/exitSupportGroup) now surface errors and don't optimistically proceed; RoundEditor backgroundSave detects returned .error and shows a calm "saved on device, retrying" indicator instead of swallowing failures.
