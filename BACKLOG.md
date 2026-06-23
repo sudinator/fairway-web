@@ -6,7 +6,7 @@ Running list of things to build or tighten. Newest ideas near the top of each se
 Done: **Stroke play** (gross/net, lowest-total leaderboard) · **net-double cap lifted at entry** for stroke play AND four-ball/trifecta so real triples+ can be recorded (handicap still caps each hole at net double via `adjustedHoleScore`) · standalone **four-ball best-ball/shootout (aggregate)** scoring · **guided two-family chooser UI** (Stroke vs Match → Individual/Team) · new team/match games **open on Setup** with a "finish setup first" prompt on the Scorecard until handicaps/teams/matchups are done.
 
 Still open from the original spec:
-- **Split skins** — no-carryover variant where tied players share the hole. Only *carryover* exists today; "split" was never built. Useful for big fields where carryovers stall.
+- **Split skins (DONE v1.47.0)** — no-carryover variant where tied players share the hole. Only *carryover* exists today; "split" was never built. Useful for big fields where carryovers stall.
 - **Optional hard-gate:** block the Scorecard entirely until setup is complete (today it's a prompt, not a lock).
 
 ## Feature ideas
@@ -53,7 +53,7 @@ should flag any holes where stats are missing and help them fill the gaps.
 
 ## Known weaknesses / hardening (deferred, not urgent)
 From the security & structure review. None are emergencies; tackle when convenient.
-- **Auth-login disconnect:** wipe/merge/ban remove or flag the *profile* but not the
+- **Auth-login disconnect (DONE v1.50.0 / migration 0038):** wipe/merge/ban remove or flag the *profile* but not the
   Supabase auth login, so a removed user can sign back in and get a fresh profile (and,
   with a default group set, auto-join it). Fully retiring an account needs deleting it in
   the Supabase Auth dashboard.

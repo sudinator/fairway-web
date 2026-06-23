@@ -1776,6 +1776,8 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
   const [mergeTo, setMergeTo] = useState("");
 
   const load = async () => {
+    // Opportunistically clear any forgotten support sessions before showing the overview.
+    await supabase.rpc("expire_support_sessions", { p_max_hours: 12 }).then(() => {}, () => {});
     const { data } = await supabase.rpc("admin_group_overview");
     setRows(Array.isArray(data) ? data : []);
   };

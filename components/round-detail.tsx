@@ -53,11 +53,41 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
         </div>
       ) : (
         <>
+          <StatsReminder round={round} onEdit={onEdit} />
           <RoundStats round={round} />
           <AiAnalysis round={round} priorRounds={priorRounds || []} userEmail={userEmail} />
           <div style={{ marginTop: 14 }}><ScoreViewCard round={round} /></div>
         </>
       )}
+    </div>
+  );
+}
+
+// After a hole-by-hole round, gently flag stats the player started tracking but
+// left blank. Only shows for players who track stats at all (never nags the rest);
+// par 3s are excluded from the fairway check.
+function StatsReminder({ round, onEdit }: { round: Round; onEdit: () => void }) {
+  const holes = played(round);
+  const tracks = holes.some((h) => h.putts != null || h.fairway != null);
+  if (!tracks) return null;
+  const noPutts = holes.filter((h) => h.strokes != null && h.putts == null).map((h) => h.hole_number);
+  const noFw = holes.filter((h) => h.par >= 4 && h.strokes != null && h.fairway == null).map((h) => h.hole_number);
+  if (noPutts.length === 0 && noFw.length === 0) return null;
+  const list = (a: number[]) => (a.length > 8 ? `${a.length} holes` : a.join(", "));
+  return (
+    <div style={{ background: C.greenLight, border: `1px solid ${C.gold}`, borderRadius: 14, padding: "14px 16px", marginTop: 14 }}>
+      <div style={{ color: C.gold, fontWeight: 800, fontSize: 13, letterSpacing: ".04em", textTransform: "uppercase" }}>A few stats are blank</div>
+      <div style={{ color: C.sage, fontSize: 13, marginTop: 8, lineHeight: 1.5 }}>
+        You tracked stats this round but left some holes empty:
+        <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+          {noPutts.length > 0 && <li style={{ marginBottom: 3 }}>Putts on {list(noPutts)}</li>}
+          {noFw.length > 0 && <li>Fairways on {list(noFw)} (par 3s don&apos;t count)</li>}
+        </ul>
+      </div>
+      <div style={{ color: C.faint, fontSize: 12, marginTop: 8, lineHeight: 1.45 }}>
+        If someone else kept the group&apos;s card, your score is here but your own putts and fairways won&apos;t be &mdash; add them on your own round.
+      </div>
+      <button style={{ ...btn(true), marginTop: 12 }} onClick={onEdit}>Add the missing stats</button>
     </div>
   );
 }
