@@ -161,9 +161,11 @@ function normalizeFavoriteCourse(row: any) {
 export default function Tournaments({
   session,
   activeGroupId,
+  isAdmin,
 }: {
   session: any;
   activeGroupId: string;
+  isAdmin?: boolean;
 }) {
   const [view, setView] = useState<"list" | "create" | { gameId: string }>(
     "list",
@@ -213,6 +215,7 @@ export default function Tournaments({
         gameId={view.gameId}
         user={user}
         displayName={displayName}
+        isAdmin={!!isAdmin}
         onBack={() => { clearActiveGame(); setView("list"); }}
       />
     );
@@ -1092,11 +1095,13 @@ function GameRoom({
   gameId,
   user,
   displayName,
+  isAdmin,
   onBack,
 }: {
   gameId: string;
   user: any;
   displayName: string;
+  isAdmin?: boolean;
   onBack: () => void;
 }) {
   const [game, setGame] = useState<Game | null>(null);
@@ -1107,6 +1112,7 @@ function GameRoom({
   // join-setup if I'm in the game but haven't set my tee/handicap
   const [needsSetup, setNeedsSetup] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [reassignTo, setReassignTo] = useState("");
   // Sub-tab inside the game room: "play" (scorecard, default) vs "setup"
   // (assign teams, matchups, manage game). Restored from the saved active game.
   const [roomTab, setRoomTab] = useState<"play" | "setup">(
@@ -1983,6 +1989,43 @@ function GameRoom({
       </div>
     );
 
+  // ---- Master-admin game repair (is_admin only; works on any game) ----
+  const adminLog = async (summary: string) =>
+    logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "admin_game_repair", group_id: (game as any)?.group_id || null, summary });
+  const adminEndGame = async () => {
+    if (!game || !confirm(`Force-end "${game.name}" as admin?`)) return;
+    const { error } = await supabase.rpc("admin_end_game", { p_game: game.id });
+    if (error) { alert("Couldn't end — " + error.message); return; }
+    await adminLog(`Admin force-ended game "${game.name}"`); await load();
+  };
+  const adminReopenGame = async () => {
+    if (!game || !confirm(`Reopen "${game.name}" as admin?`)) return;
+    const { error } = await supabase.rpc("admin_reopen_game", { p_game: game.id });
+    if (error) { alert("Couldn't reopen — " + error.message); return; }
+    await adminLog(`Admin reopened game "${game.name}"`); await load();
+  };
+  const adminResetGame = async () => {
+    if (!game || !confirm(`Reset ALL scores in "${game.name}" as admin? This can't be undone.`)) return;
+    const { error } = await supabase.rpc("admin_reset_game", { p_game: game.id });
+    if (error) { alert("Couldn't reset — " + error.message); return; }
+    await adminLog(`Admin reset scores in game "${game.name}"`); await load();
+  };
+  const adminDeleteGame = async () => {
+    if (!game || !confirm(`Delete "${game.name}" as admin? Rounds already posted to players' history are kept. This can't be undone.`)) return;
+    const { error } = await supabase.rpc("admin_delete_game", { p_game: game.id });
+    if (error) { alert("Couldn't delete — " + error.message); return; }
+    await adminLog(`Admin deleted game "${game.name}"`); onBack();
+  };
+  const adminReassignOrganizer = async () => {
+    if (!game || !reassignTo) return;
+    const who = players.find((p) => p.user_id === reassignTo);
+    if (!confirm(`Make ${who?.display_name || "this player"} the organizer of "${game.name}"?`)) return;
+    const { error } = await supabase.rpc("admin_reassign_organizer", { p_game: game.id, p_user: reassignTo });
+    if (error) { alert("Couldn't reassign — " + error.message); return; }
+    await adminLog(`Admin made ${who?.display_name || "a player"} organizer of "${game.name}"`);
+    setReassignTo(""); await load();
+  };
+
   const isOrganizer = game.created_by === user.id;
   const isEnded = game.status === "ended";
   // Rank by over/under (net Stableford vs par pace): most under (lowest 2*thru-pts)
@@ -2101,6 +2144,31 @@ function GameRoom({
           </button>
         )}
       </div>
+
+      {isAdmin && !isOrganizer && (
+        <div style={{ background: C.greenMid, border: `1px solid ${C.gold}`, borderRadius: 12, padding: 12, marginTop: 12 }}>
+          <div style={{ color: C.gold, fontWeight: 800, fontSize: 13, marginBottom: 8 }}>⚠ Admin repair · you are not the organizer</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {game.status === "ended"
+              ? <button onClick={adminReopenGame} style={{ background: "transparent", color: C.cream, border: `1px solid ${C.sage}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "6px 12px", cursor: "pointer" }}>Reopen</button>
+              : <button onClick={adminEndGame} style={{ background: "transparent", color: C.cream, border: `1px solid ${C.sage}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "6px 12px", cursor: "pointer" }}>Force end</button>}
+            <button onClick={adminResetGame} style={{ background: "transparent", color: C.cream, border: `1px solid ${C.sage}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "6px 12px", cursor: "pointer" }}>Reset scores</button>
+            <button onClick={adminDeleteGame} style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "6px 12px", cursor: "pointer" }}>Delete game</button>
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ color: C.sage, fontSize: 12 }}>Reassign organizer:</span>
+            <select value={reassignTo} onChange={(e) => setReassignTo(e.target.value)}
+              style={{ background: C.card, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
+              <option value="">Select player…</option>
+              {players.filter((p) => p.user_id).map((p) => (
+                <option key={p.user_id} value={p.user_id as string}>{p.display_name}</option>
+              ))}
+            </select>
+            <button disabled={!reassignTo} onClick={adminReassignOrganizer}
+              style={{ background: C.gold, color: C.green, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, padding: "6px 12px", cursor: "pointer", opacity: reassignTo ? 1 : 0.4 }}>Assign</button>
+          </div>
+        </div>
+      )}
 
       {roomTab === "play" && needsSetup && me && (
         <div

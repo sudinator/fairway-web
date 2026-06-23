@@ -349,7 +349,7 @@ export function Home({ session }: { session: any }) {
         ) : tab === "profile" ? (
           <ProfilePanel profile={profile} user={user} onSaved={loadProfile} />
         ) : tab === "games" && activeGroup ? (
-          <Tournaments session={session} activeGroupId={activeGroup.id} />
+          <Tournaments session={session} activeGroupId={activeGroup.id} isAdmin={!!profile?.is_admin} />
         ) : loading ? (
           <div style={{ color: C.sage, textAlign: "center", padding: 40 }}>Loading your rounds…</div>
         ) : tab === "dashboard" ? (
