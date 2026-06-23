@@ -42,11 +42,20 @@ App-authored (migrations/): run after the baseline, in order:
 - 0039 support_session_expiry     (group_members.support_started_at + expire_support_sessions reaper; admin_enter_group stamps + reaps)
 - 0040 score_validation           (defense-in-depth value check trigger on game_players)  [OPTIONAL - app UI can't produce bad values; guards only the raw API]
 - 0041 live_stroke_trifecta       (live RPC get_live_scorecard now returns trifecta_scoring + stroke_basis)  [REQUIRED for correct live Stroke play / match-scored Trifecta]
+- 0042 score_audit                (audit trail for score writes)
+- 0043 round_game_unique          (de-dupe game rounds + UNIQUE index on rounds(game_id,user_id))  [REQUIRED before 0044]
+- 0044 post_game_rounds_fix       (recorded round uses the game's MATCH date; ON CONFLICT-safe upsert)  [REQUIRED; run AFTER 0043]
 
-### Recent migrations (0035-0041) - notes
+### Recent migrations (0035-0044) - notes
 - REQUIRED before the matching feature works: 0036 (split skins), 0037 (feedback),
   0041 (live Stroke/Trifecta). Code is safe to deploy ahead of them - it falls back
   to sensible defaults - but the feature is wrong/broken until the migration runs.
+- 0043 + 0044 are a PAIR for the v1.53.1 bug fixes — run 0043 first (it de-dupes any
+  existing duplicate game rounds, keeping the newest per game+user, then adds the
+  unique index), then 0044 (which relies on that index for its ON CONFLICT upsert).
+  0044 also switches recorded rounds to the game's `played_at` match date instead of
+  `created_at`. 0043 DELETES duplicate rounds (and their holes); it keeps one row per
+  (game,user), so it only removes genuine duplicates. Safe to run once.
 - 0038/0039 are operational hardening (keep banned/wiped users out; auto-clear
   forgotten support sessions). Run both. 0038 creates the `banned_emails` table and
   a BEFORE INSERT trigger on `profiles`; 0039 adds a column + reaper and re-creates

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
-import { C, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes } from "@/lib/golf";
+import { C, Round, Hole, allocateStrokes, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes } from "@/lib/golf";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, NumPicker, Avatar } from "@/components/ui";
@@ -1468,11 +1468,16 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
     const { data: hs } = await supabase.from("holes").select("*").in("round_id", ids.length ? ids : ["none"]);
     const byRound: Record<string, Hole[]> = {};
     (hs || []).forEach((h: any) => { (byRound[h.round_id] ||= []).push(h); });
-    const merged: Round[] = rs.map((r: any) => ({
-      ...r,
-      holes: (byRound[r.id] || []).sort((a, b) => a.hole_number - b.hole_number)
-        .map((h) => ({ ...h, recv: strokesReceived(h.stroke_index, r.course_handicap) })),
-    }));
+    const merged: Round[] = rs.map((r: any) => {
+      const hs = (byRound[r.id] || []).sort((a, b) => a.hole_number - b.hole_number);
+      // Robust rank-based allocation (immune to duplicate/missing stroke indexes),
+      // matching how recv is computed on every other surface.
+      const alloc = allocateStrokes(
+        hs.map((h) => ({ hole_number: h.hole_number, stroke_index: h.stroke_index })),
+        r.course_handicap,
+      );
+      return { ...r, holes: hs.map((h) => ({ ...h, recv: alloc[h.hole_number] || 0 })) };
+    });
     setRounds(merged);
   }, [player.id]);
   useEffect(() => { load(); }, [load]);

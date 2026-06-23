@@ -1428,7 +1428,13 @@ function GameRoom({
       if (markerOwnsMyRowRef.current) return; // marker owns my row; don't write it
       const m = meRef.current;
       if (!m) return;
-      const data = { scores: m.scores || [], putts: m.putts || [], fairways: m.fairways || [] };
+      // Back up ALL five arrays (incl. penalties + sand) — writing a subset here would
+      // overwrite the per-tap backup and erase a penalty/sand entered just before the
+      // lock. Mirrors the body setMyHole/pushScores write.
+      const data = {
+        scores: m.scores || [], putts: m.putts || [], fairways: m.fairways || [],
+        penalties: m.penalties || [], sand: m.sand || [],
+      };
       if (!data.scores.some((s) => s != null)) return;
       saveGameScores(gameIdRef.current, m.id, data);              // synchronous, always lands
       supabase.from("game_players").update(data).eq("id", m.id).then(() => {}); // best-effort
@@ -1505,10 +1511,16 @@ function GameRoom({
   // surfaces sync state and retries. Retries re-read the freshest local backup for the row,
   // so a slow retry can never revert a hole entered in the meantime.
   const pushScores = async (rowId: string, firstBody: Record<string, unknown>) => {
+    // Clock stamps (clock_start/clock_end) ride only on the first body — they aren't
+    // part of the per-hole score backup. Carry them onto every retry so a failed first
+    // attempt followed by a successful retry doesn't silently drop the round clock.
+    const clockFields: Record<string, unknown> = {};
+    if ("clock_start" in firstBody) clockFields.clock_start = (firstBody as any).clock_start;
+    if ("clock_end" in firstBody) clockFields.clock_end = (firstBody as any).clock_end;
     const freshest = (): Record<string, unknown> => {
       if (!game) return firstBody;
       const b = loadGameScores(game.id, rowId);
-      return b ? { scores: b.scores, putts: b.putts, fairways: b.fairways, penalties: b.penalties, sand: b.sand } : firstBody;
+      return b ? { scores: b.scores, putts: b.putts, fairways: b.fairways, penalties: b.penalties, sand: b.sand, ...clockFields } : firstBody;
     };
     for (let n = 0; n < 4; n++) {
       setSyncState(n === 0 ? "saving" : "retry");
@@ -1999,7 +2011,9 @@ function GameRoom({
         handicap_index: me.handicap_index ?? null,
         course_handicap: me.course_handicap ?? null,
         group_id: (game as any).group_id || null,
-        played_at: (game as any).created_at || new Date().toISOString(),
+        // Use the game's match DATE, not its creation timestamp, so the round lands in
+        // history on the day it was played. Fall back to created_at, then today.
+        played_at: (game as any).played_at || (game as any).created_at || new Date().toISOString(),
         status: "final" as const,
         gross_score: gross,
         game_id: game.id,
