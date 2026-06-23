@@ -107,13 +107,22 @@ export function Home({ session }: { session: any }) {
       })).filter((g: AppGroup) => !!g.id);
 
     if (!list.length && !(data && data.length)) {
-      // Safety net: a brand-new user with NO membership rows at all gets one personal
-      // "Main" group. Guarded by the raw row count (not the filtered list) so an
-      // archived-only or transiently-empty result never spawns a duplicate "Main".
-      const { data: g } = await supabase.from("groups").insert({ name: "Main", created_by: user.id, status: "active" }).select("id, name").single();
-      if (g) {
-        await supabase.from("group_members").insert({ group_id: g.id, user_id: user.id, email: (user.email || "").toLowerCase(), role: "admin", status: "active" });
-        list = [{ id: g.id, name: g.name, role: "admin", status: "active" }];
+      // Stranded (or brand-new) — no membership rows at all. First try to land them
+      // in the app's designated default group and bring any homeless rounds along.
+      const { data: gid } = await supabase.rpc("join_default_group", { p_email: user.email || "" });
+      if (gid) {
+        const { data: gg } = await supabase.from("groups").select("id, name").eq("id", gid as string).single();
+        if (gg) list = [{ id: gg.id, name: gg.name, role: "member", status: "active" }];
+      }
+      if (!list.length) {
+        // No default configured — fall back to a personal "Main". Guarded by the raw
+        // row count above so an archived-only or transiently-empty result never spawns
+        // a duplicate "Main".
+        const { data: g } = await supabase.from("groups").insert({ name: "Main", created_by: user.id, status: "active" }).select("id, name").single();
+        if (g) {
+          await supabase.from("group_members").insert({ group_id: g.id, user_id: user.id, email: (user.email || "").toLowerCase(), role: "admin", status: "active" });
+          list = [{ id: g.id, name: g.name, role: "admin", status: "active" }];
+        }
       }
     }
 

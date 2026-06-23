@@ -1808,6 +1808,17 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
     } finally { setBusy(null); }
   };
 
+  const setDefault = async (g: any) => {
+    if (!confirm(`Make "${g.name}" the app's default group? New or stranded users (and their untagged rounds) will land here. This replaces any current default.`)) return;
+    setBusy(g.group_id);
+    try {
+      const { error } = await supabase.rpc("admin_set_default_group", { p_group: g.group_id });
+      if (error) { alert("Couldn't set default — " + error.message); return; }
+      await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "group_set_default", group_id: g.group_id, summary: `Set "${g.name}" as the default group` });
+      await load();
+    } finally { setBusy(null); }
+  };
+
   return (
     <div>
       <Eyebrow>★ OVERSIGHT · ALL GROUPS</Eyebrow>
@@ -1832,6 +1843,7 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
           <div key={g.group_id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 8, opacity: archived ? 0.6 : 1 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
               <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{g.name}</div>
+              {g.is_default && <span style={{ color: C.gold, fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>★ default</span>}
               {archived && <span style={{ color: C.faint, fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>· archived</span>}
               <div style={{ flex: 1 }} />
               {g.my_support ? (
@@ -1852,7 +1864,13 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
             <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
               {g.member_count} member{g.member_count === 1 ? "" : "s"} · {g.rounds_count} round{g.rounds_count === 1 ? "" : "s"} · {g.games_count} game{g.games_count === 1 ? "" : "s"} · last activity {g.last_activity ? fmtDate(g.last_activity) : "—"}
             </div>
-            <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
+            <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              {!g.is_default && (
+                <button disabled={busy === g.group_id} onClick={() => setDefault(g)}
+                  style={{ background: "transparent", color: C.faint, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                  Set as default
+                </button>
+              )}
               <button disabled={busy === g.group_id} onClick={() => delGroup(g)}
                 style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
                 Delete group
