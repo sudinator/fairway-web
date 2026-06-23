@@ -20,10 +20,11 @@ type LivePlayer = {
 };
 type LiveGame = {
   name: string; course: string; course_par: number | null;
-  game_type: "stableford" | "match" | "fourball" | "skins" | "trifecta";
+  game_type: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta";
   status: "active" | "ended"; allowance_pct: number | null;
   team_score_mode: "best_ball" | "aggregate" | null;
   trifecta_scoring: "per_hole" | "match" | null;
+  stroke_basis: "gross" | "net" | null;
   teams: { key: string; name: string }[];
   holes_meta: LiveMeta[]; played_at: string | null; ended_at: string | null;
 };
@@ -141,6 +142,7 @@ function summaryText(game: LiveGame, teamRows?: TeamRows["rows"]): string {
       ? `Four-ball — ${named}. Each foursome (2 v 2) is a match worth a point for the winning team, \u00bd for a halved match — Ryder-Cup style.${allow}`
       : `Four-ball match play — each 2-player side counts its better net ball on every hole; win more holes to win the match.${allow}`;
     case "trifecta": return `Trifecta${named ? ` — ${named}` : ""} — every 2-v-2 foursome plays three points a hole: two singles (each player vs an opponent) plus a team point (${game.team_score_mode === "aggregate" ? "both partners' nets added" : "the side's better net ball"}). Points roll up to the team total.${allow}`;
+    case "stroke": return `Stroke play — lowest ${game.stroke_basis === "gross" ? "gross" : "net"} total over the round wins.${allow}`;
     case "skins": return `Skins — the lowest net score on a hole wins the skin; a tied hole carries the pot forward to the next.${allow}`;
     default: return "";
   }
@@ -226,13 +228,15 @@ function Scorecard({ data }: { data: LiveData }) {
 
   const isStab = game.game_type === "stableford";
   const isSkins = game.game_type === "skins";
+  const isStroke = game.game_type === "stroke";
+  const strokeNet = isStroke && game.stroke_basis !== "gross"; // null/"net" => net
   const skinsByPlayer = useMemo(() => {
     if (!isSkins) return {} as Record<string, number>;
     const sp = players.map((p) => ({ id: p.id, name: p.display_name, gross: p.scores || [], ch: p.ch }));
     return computeSkins(meta, sp, allowance).skinsByPlayer || {};
   }, [isSkins, players, meta, allowance]);
 
-  const metricOf = (p: LivePlayer) => isStab ? stats[p.id].points : isSkins ? (skinsByPlayer[p.id] || 0) : -stats[p.id].toPar;
+  const metricOf = (p: LivePlayer) => isStab ? stats[p.id].points : isSkins ? (skinsByPlayer[p.id] || 0) : isStroke ? -(strokeNet ? stats[p.id].net : stats[p.id].gross) : -stats[p.id].toPar;
   const sortPlayers = (arr: LivePlayer[]) => [...arr].sort((a, b) => {
     const at = stats[a.id].thru, bt = stats[b.id].thru;
     if ((at > 0) !== (bt > 0)) return at > 0 ? -1 : 1;
@@ -241,15 +245,15 @@ function Scorecard({ data }: { data: LiveData }) {
     return a.display_name.localeCompare(b.display_name);
   });
 
-  const fmtLabel: Record<string, string> = { stableford: "Stableford", match: "Singles match play", fourball: "Four-ball match play", skins: "Skins", trifecta: "Trifecta" };
-  const teamFmt: Record<string, string> = { match: "Team match play", fourball: "Four-ball", trifecta: "Trifecta", skins: "Team skins", stableford: "Team Stableford" };
+  const fmtLabel: Record<string, string> = { stableford: "Stableford", stroke: "Stroke play", match: "Singles match play", fourball: "Four-ball match play", skins: "Skins", trifecta: "Trifecta" };
+  const teamFmt: Record<string, string> = { match: "Team match play", fourball: "Four-ball", trifecta: "Trifecta", skins: "Team skins", stableford: "Team Stableford", stroke: "Stroke play" };
   const label = ts ? teamFmt[game.game_type] : fmtLabel[game.game_type];
 
   const groups = ts
     ? ts.rows.map((r) => ({ title: r.name, color: r.color, players: sortPlayers(players.filter((p) => p.team === r.key)) }))
     : [{ title: null as string | null, color: null as string | null, players: sortPlayers(players) }];
 
-  const rightOf = (p: LivePlayer) => isStab ? `${stats[p.id].points} pts` : isSkins ? `${skinsByPlayer[p.id] || 0} skins` : (stats[p.id].thru ? toParStr(stats[p.id].toPar) : "—");
+  const rightOf = (p: LivePlayer) => isStab ? `${stats[p.id].points} pts` : isSkins ? `${skinsByPlayer[p.id] || 0} skins` : isStroke ? (stats[p.id].thru ? String(Math.round(strokeNet ? stats[p.id].net : stats[p.id].gross)) : "—") : (stats[p.id].thru ? toParStr(stats[p.id].toPar) : "—");
 
   return (
     <div>
@@ -338,7 +342,7 @@ function Scorecard({ data }: { data: LiveData }) {
             </div>
           )}
           {g.players.map((p, idx) => (
-            <PlayerRow key={p.id} p={p} pos={idx + 1} stat={stats[p.id]} meta={meta} right={rightOf(p)} status={statusFor(p, game, pairings, foursomes, byId, meta, allowance)} />
+            <PlayerRow key={p.id} p={p} pos={idx + 1} stat={stats[p.id]} meta={meta} right={rightOf(p)} status={statusFor(p, game, pairings, foursomes, byId, meta, allowance)} gameType={game.game_type} strokeNet={strokeNet} />
           ))}
         </div>
       ))}
@@ -346,7 +350,7 @@ function Scorecard({ data }: { data: LiveData }) {
   );
 }
 
-function PlayerRow({ p, pos, stat, meta, right, status }: { p: LivePlayer; pos: number; stat: PStat; meta: LiveMeta[]; right: string; status: string }) {
+function PlayerRow({ p, pos, stat, meta, right, status, gameType, strokeNet }: { p: LivePlayer; pos: number; stat: PStat; meta: LiveMeta[]; right: string; status: string; gameType: string; strokeNet: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <div onClick={() => setOpen((o) => !o)} style={{ background: C.card, borderRadius: 14, color: C.ink, padding: "12px 14px", marginTop: 8, cursor: "pointer" }}>
@@ -359,12 +363,12 @@ function PlayerRow({ p, pos, stat, meta, right, status }: { p: LivePlayer; pos: 
       <div style={{ color: C.faint, fontSize: 11, marginTop: 4, marginLeft: 26 }}>
         {stat.thru ? `thru ${stat.thru} · gross ${stat.gross}` : "not started"}{status ? ` · ${status}` : ""}
       </div>
-      {open && <PlayerDetail stat={stat} meta={meta} />}
+      {open && <PlayerDetail stat={stat} meta={meta} gameType={gameType} strokeNet={strokeNet} />}
     </div>
   );
 }
 
-function PlayerDetail({ stat, meta }: { stat: PStat; meta: LiveMeta[] }) {
+function PlayerDetail({ stat, meta, gameType, strokeNet }: { stat: PStat; meta: LiveMeta[]; gameType: string; strokeNet: boolean }) {
   const lblCell: React.CSSProperties = { textAlign: "left", padding: "3px 6px", fontWeight: 700 };
   const cCell: React.CSSProperties = { textAlign: "center", padding: "3px 4px" };
   const totCell: React.CSSProperties = { textAlign: "center", padding: "3px 6px", fontWeight: 800, color: C.green };
@@ -390,7 +394,9 @@ function PlayerDetail({ stat, meta }: { stat: PStat; meta: LiveMeta[] }) {
                 </td>
               );
             })}<td style={totCell}>{grossSum || "\u00b7"}</td></tr>
+            {gameType !== "stroke" && (
             <tr style={{ background: "#F4F0E1" }}><td style={{ ...lblCell, background: "transparent" }}>Points</td>{hs.map((h) => <td key={h.n} style={{ ...cCell, color: C.green, fontWeight: 700 }}>{h.gross && h.gross > 0 ? (h.pts ?? 0) : "\u00b7"}</td>)}<td style={{ ...cCell, color: C.green, fontWeight: 800 }}>{ptsSum}</td></tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -409,7 +415,9 @@ function PlayerDetail({ stat, meta }: { stat: PStat; meta: LiveMeta[] }) {
       {meta.length > half && grid(half, meta.length, "IN")}
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 13 }}>
         <span style={{ color: C.faint }}>Gross <b style={{ color: C.ink }}>{stat.gross || "\u00b7"}</b>{stat.thru ? <> · Net <b style={{ color: C.ink }}>{Math.round(stat.net)}</b></> : null}</span>
-        <span style={{ color: C.faint }}>Stableford <b style={{ color: C.green }}>{stat.points} pts</b></span>
+        {gameType === "stroke"
+          ? <span style={{ color: C.faint }}>Counts <b style={{ color: C.green }}>{strokeNet ? "net" : "gross"}</b></span>
+          : <span style={{ color: C.faint }}>Stableford <b style={{ color: C.green }}>{stat.points} pts</b></span>}
       </div>
       {chips.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>{chips.map(([k, v]) => <div key={k} style={{ background: "#F2EEDF", borderRadius: 8, padding: "7px 11px", fontSize: 12 }}>{k} <b style={{ color: C.green }}>{v}</b></div>)}</div>}
       <div style={{ color: C.faint, fontSize: 10, marginTop: 10, lineHeight: 1.5 }}><span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#E8730C", verticalAlign: "middle" }} /> gets a stroke (two = two strokes). Score color: under / par / over. Stats shown only if the player tracked them.</div>
