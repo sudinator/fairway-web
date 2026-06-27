@@ -499,11 +499,15 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
               </button>
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
-              {picked.tees.map((t, i) => (
-                <button key={i} onClick={() => setTeeIdx(i)} style={{ ...btn(i === teeIdx), padding: "8px 14px", fontSize: 13 }}>
-                  {t.name} · {t.rating}/{t.slope}
+              {picked.tees.map((t, i) => {
+                const yd = (t.yardages || []).reduce((s: number, v) => s + (v || 0), 0);
+                return (
+                <button key={i} onClick={() => setTeeIdx(i)} style={{ ...btn(i === teeIdx), padding: "8px 12px", fontSize: 13, textAlign: "left", lineHeight: 1.25 }}>
+                  <div style={{ fontWeight: 800 }}>{t.name}</div>
+                  <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{yd > 0 ? `${yd.toLocaleString()} yds · ` : ""}CR {t.rating} / SL {t.slope}</div>
                 </button>
-              ))}
+                );
+              })}
               {editingTee && (
                 <button onClick={addTee} style={{ ...btn(false), padding: "8px 14px", fontSize: 13, border: `1px dashed ${C.gold}` }}>＋ add tee</button>
               )}

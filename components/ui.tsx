@@ -612,28 +612,20 @@ export function ScoreViewCard({ round }: { round: Round }) {
     const sPutts = seg.reduce((s, h) => s + (h.putts || 0), 0);
     const sPen = seg.reduce((s, h) => s + (h.penalties || 0), 0);
     const sPts = seg.reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
+    const sYds = seg.reduce((s, h) => s + (h.yardage || 0), 0);
     const fwElig = seg.filter((h) => h.par >= 4 && h.fairway != null).length;
     const fwHit = seg.filter((h) => h.par >= 4 && h.fairway === "hit").length;
-    const Row = (cells: React.ReactNode[], opts?: { header?: boolean; foot?: boolean }) => (
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: `34px 30px 30px${hasDots ? " 34px" : ""} 1fr${hasFw ? " 30px" : ""}${hasPutts ? " 38px" : ""}${hasPens ? " 40px" : ""} 34px`,
-        alignItems: "center", gap: 4,
-        padding: opts?.header ? "0 4px 6px" : "6px 4px",
-        borderBottom: opts?.header ? `1px solid ${C.line}` : opts?.foot ? "none" : `1px solid ${C.line}`,
-        borderTop: opts?.foot ? `2px solid ${C.greenMid}` : "none",
-        marginTop: opts?.foot ? 4 : 0,
-      }}>
-        {cells}
-      </div>
+    // Two rows per hole (Option B): top line = fixed facts (Hole no., yardage, S.I.);
+    // scoring row beneath. Keeps score cells uncrowded on a phone.
+    const cols = `40px${hasDots ? " 34px" : ""} 1fr${hasFw ? " 34px" : ""}${hasPutts ? " 40px" : ""}${hasPens ? " 44px" : ""} 40px`;
+    const GridRow = (cells: React.ReactNode[], opts?: { header?: boolean }) => (
+      <div style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4, padding: opts?.header ? "0 4px 6px" : "2px 4px 0" }}>{cells}</div>
     );
     return (
       <div style={{ background: C.card, borderRadius: 12, padding: 12, flex: 1, minWidth: 300 }}>
         <div style={{ color: C.green, fontSize: 11, letterSpacing: 2, fontWeight: 800, marginBottom: 8 }}>{label}</div>
-        {Row([
-          <div key="h" style={headStyle}>Hole</div>,
+        {GridRow([
           <div key="p" style={{ ...headStyle, textAlign: "center" }}>Par</div>,
-          <div key="si" style={{ ...headStyle, textAlign: "center" }}>S.I.</div>,
           ...(hasDots ? [<div key="d" style={{ ...headStyle, textAlign: "center" }}>Hcp</div>] : []),
           <div key="sc" style={{ ...headStyle, textAlign: "center" }}>Score</div>,
           ...(hasFw ? [<div key="fw" style={{ ...headStyle, textAlign: "center" }}>FW</div>] : []),
@@ -647,29 +639,39 @@ export function ScoreViewCard({ round }: { round: Round }) {
           const penN = h.penalties || 0; const sandOn = !!h.sand;
           const spDisp = sandOn && penN > 0 ? "*" : sandOn ? "S" : penN > 0 ? String(penN) : "·";
           const spCol = sandOn || penN > 0 ? C.birdie : C.faint;
-          return Row([
-            <div key="h" style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.hole_number}</div>,
-            <div key="p" style={{ textAlign: "center", color: C.parBlue, fontWeight: 700, fontSize: 14 }}>{h.par}</div>,
-            <div key="si" style={{ textAlign: "center", color: C.faint, fontSize: 12 }}>{h.stroke_index ?? "–"}</div>,
-            ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: C.dot, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{recv > 0 ? "•".repeat(Math.min(recv, 3)) : ""}</div>] : []),
-            <div key="sc" style={{ textAlign: "center" }}><ScoreMark hole={h} /></div>,
-            ...(hasFw ? [<div key="fw" style={{ textAlign: "center", fontWeight: 800, fontSize: 13, color: h.fairway === "hit" ? C.greenMid : h.fairway === "miss" ? C.birdie : C.faint }}>{h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "left" ? "L" : h.fairway === "right" ? "R" : h.fairway === "miss" ? "✗" : "·"}</div>] : []),
-            ...(hasPutts ? [<div key="pu" style={{ textAlign: "center", color: C.faint, fontSize: 13 }}>{h.putts ?? "·"}</div>] : []),
-            ...(hasPens ? [<div key="pe" style={{ textAlign: "center", color: spCol, fontWeight: spDisp === "*" ? 800 : 400, fontSize: spDisp === "*" ? 16 : 13 }}>{spDisp}</div>] : []),
-            <div key="pt" style={{ textAlign: "center", color: ptsColor(pts), fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
-          ]);
+          return (
+            <div key={j} style={{ borderBottom: `1px solid ${C.line}`, paddingBottom: 6, marginTop: j === 0 ? 0 : 4 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 4px", flexWrap: "wrap" }}>
+                <span style={{ color: C.ink, fontWeight: 800, fontSize: 14 }}>Hole {h.hole_number}</span>
+                <span style={{ color: C.faint, fontSize: 11, fontWeight: 600 }}>
+                  {h.yardage ? <>· <b style={{ color: C.green }}>{h.yardage}</b> yds </> : null}· S.I. {h.stroke_index ?? "–"}
+                </span>
+              </div>
+              {GridRow([
+                <div key="p" style={{ textAlign: "center", color: C.parBlue, fontWeight: 700, fontSize: 14 }}>{h.par}</div>,
+                ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: C.dot, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{recv > 0 ? "•".repeat(Math.min(recv, 3)) : ""}</div>] : []),
+                <div key="sc" style={{ textAlign: "center" }}><ScoreMark hole={h} /></div>,
+                ...(hasFw ? [<div key="fw" style={{ textAlign: "center", fontWeight: 800, fontSize: 13, color: h.fairway === "hit" ? C.greenMid : h.fairway === "miss" ? C.birdie : C.faint }}>{h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "left" ? "L" : h.fairway === "right" ? "R" : h.fairway === "miss" ? "✗" : "·"}</div>] : []),
+                ...(hasPutts ? [<div key="pu" style={{ textAlign: "center", color: C.faint, fontSize: 13 }}>{h.putts ?? "·"}</div>] : []),
+                ...(hasPens ? [<div key="pe" style={{ textAlign: "center", color: spCol, fontWeight: spDisp === "*" ? 800 : 400, fontSize: spDisp === "*" ? 16 : 13 }}>{spDisp}</div>] : []),
+                <div key="pt" style={{ textAlign: "center", color: ptsColor(pts), fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
+              ])}
+            </div>
+          );
         })}
-        {Row([
-          <div key="h" style={{ color: C.gold, fontWeight: 800, fontSize: 12 }}>{from === 0 ? "OUT" : "IN"}</div>,
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "8px 4px 0" }}>
+          <span style={{ color: C.gold, fontWeight: 800, fontSize: 12 }}>{from === 0 ? "OUT" : "IN"}</span>
+          {sYds > 0 ? <span style={{ color: C.faint, fontSize: 11 }}>· {sYds} yds</span> : null}
+        </div>
+        {GridRow([
           <div key="p" style={{ textAlign: "center", color: C.ink, fontWeight: 800, fontSize: 13 }}>{sPar}</div>,
-          <div key="si" />,
           ...(hasDots ? [<div key="d" />] : []),
           <div key="sc" style={{ textAlign: "center", color: C.ink, fontWeight: 800, fontSize: 15 }}>{sStr || "—"}</div>,
           ...(hasFw ? [<div key="fw" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 11 }}>{fwElig ? `${fwHit}/${fwElig}` : "—"}</div>] : []),
           ...(hasPutts ? [<div key="pu" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 13 }}>{sPutts || "—"}</div>] : []),
           ...(hasPens ? [<div key="pe" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 13 }}>{sPen || "—"}</div>] : []),
           <div key="pt" style={{ textAlign: "center", color: C.green, fontWeight: 800, fontSize: 14 }}>{sPts}</div>,
-        ], { foot: true })}
+        ])}
       </div>
     );
   };

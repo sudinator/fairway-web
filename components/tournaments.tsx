@@ -925,19 +925,19 @@ function CreateGame({
           <div
             style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}
           >
-            {pickedFav.tees.map((t: any, i: number) => (
+            {pickedFav.tees.map((t: any, i: number) => {
+              const yd = (t.yardages || []).reduce((s: number, v: any) => s + (v || 0), 0);
+              return (
               <button
                 key={i}
                 onClick={() => setTeeIdx(i)}
-                style={{
-                  ...btn(i === teeIdx),
-                  padding: "8px 14px",
-                  fontSize: 13,
-                }}
+                style={{ ...btn(i === teeIdx), padding: "8px 12px", fontSize: 13, textAlign: "left", lineHeight: 1.25 }}
               >
-                {t.name} · {t.rating}/{t.slope}
+                <div style={{ fontWeight: 800 }}>{t.name}</div>
+                <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{yd > 0 ? `${yd.toLocaleString()} yds · ` : ""}CR {t.rating} / SL {t.slope}</div>
               </button>
-            ))}
+              );
+            })}
           </div>
           <div style={{ marginTop: 12 }}>
             <label style={{ color: C.sage, fontSize: 12 }}>

@@ -1,8 +1,12 @@
 "use client";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import { C, Hole, Round, stablefordPts, allocateStrokes, applyAllowance, fmtDate } from "@/lib/golf";
 import { ScoreViewCard, btn } from "@/components/ui";
+import { createClient } from "@/lib/supabase";
+import { loadCoursesForGroup, type CourseTee } from "@/lib/courses";
+
+const supabase = createClient();
 
 const FMT_LABEL: Record<string, string> = {
   stableford: "Stableford", stroke: "Stroke play", match: "Singles match play",
@@ -15,6 +19,16 @@ const FMT_LABEL: Record<string, string> = {
 export function ShareScorecardModal({ game, player, onClose }: { game: any; player: any; onClose: () => void }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
+  // Load the course's per-tee yardages so the card shows THIS player's tee.
+  const [courseTees, setCourseTees] = useState<CourseTee[]>([]);
+  useEffect(() => {
+    if (!game?.group_id) return;
+    loadCoursesForGroup(supabase, game.group_id).then((rows: any[]) => {
+      const found = rows.find((r) => r.name === game.course) || rows.find((r) => (r.data?.name) === game.course);
+      const tees = (found?.tees || found?.data?.tees || []) as CourseTee[];
+      setCourseTees(Array.isArray(tees) ? tees : []);
+    }).catch(() => {});
+  }, [game?.group_id, game?.course]);
   const [msg, setMsg] = useState<string | null>(null);
 
   const { round, gross, net, pts, dateStr } = useMemo(() => {
@@ -22,10 +36,12 @@ export function ShareScorecardModal({ game, player, onClose }: { game: any; play
     const ch = player.course_handicap ?? 0;
     const playing = applyAllowance(ch, game.allowance_pct ?? 100);
     const alloc = allocateStrokes(meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })), playing);
+    const myTee = courseTees.find((t) => t.name === player.tee_name);
     const holes: Hole[] = meta.map((m, i) => ({
       hole_number: m.n,
       par: m.par,
       stroke_index: m.si ?? null,
+      yardage: myTee?.yardages?.[i] ?? (m as any).yards ?? null,
       strokes: player.scores?.[i] ?? null,
       putts: player.putts?.[i] ?? null,
       fairway: player.fairways?.[i] ?? null,
@@ -39,7 +55,7 @@ export function ShareScorecardModal({ game, player, onClose }: { game: any; play
     let dateStr = "";
     try { dateStr = game.played_at ? fmtDate(game.played_at) : ""; } catch { dateStr = String(game.played_at || ""); }
     return { round: { holes } as unknown as Round, gross, net, pts, dateStr };
-  }, [game, player]);
+  }, [game, player, courseTees]);
 
   const ended = game.status === "ended";
   const fmt = FMT_LABEL[game.game_type] || "Game";
