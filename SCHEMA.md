@@ -39,7 +39,7 @@ longer silently no-op.
 
 **course_change_requests** (admin approval queue for proposed global course edits): `id`, `course_id`, `group_id`, `submitted_by`, `proposed_name`, `proposed_location`, `proposed_data` (jsonb), `status` (default 'pending'), `reviewed_by`, `reviewed_at`, `reason`, `change_summary`, `created_at`.
 
-**rounds**: `id`, `user_id`, `course`, `tee_name`, `rating`, `slope`, `course_par`, `handicap_index`, `course_handicap`, `group_id`, `played_at` (**date**, not null, default current_date), `created_at`, `gross_score` (int), `status` (text, default 'final'), `ai_analysis` (text), `game_id` (uuid — set when recorded from a finished game). **Unique index** `rounds_game_user_uniq` on (`game_id`, `user_id`) — one history round per game+user; NULL `game_id` (manual rounds) is unconstrained (0043).
+**rounds**: `id`, `user_id`, `course`, `tee_name`, `rating`, `slope`, `course_par`, `handicap_index`, `course_handicap`, `group_id`, `played_at` (**date**, not null, default current_date), `created_at`, `gross_score` (int), `status` (text, default 'final'), `ai_analysis` (text), `game_id` (uuid — set when recorded from a finished game).
 
 **holes**: `id`, `round_id`, `hole_number`, `par`, `stroke_index`, `strokes`, `putts`, `fairway`, `penalties`.
 
@@ -135,9 +135,7 @@ ever disagree with this summary.
 - **Live**: `get_live_scorecard(token)` (0018, re-created 0021 + 0041) - public,
   alias-keyed read; now returns `trifecta_scoring` and `stroke_basis`.
 - **Scoring**: `set_game_scores` / scorecard-ownership RPCs (0022), `reset_game_scores`
-  (0023), `finish_game` + `post_game_rounds` (0011/0026; 0044 makes the recorded round
-  use the game's match date and upserts via ON CONFLICT so concurrent posts can't
-  duplicate or abort), `validate_game_player_scores`
+  (0023), `finish_game` + `post_game_rounds` (0011/0026), `validate_game_player_scores`
   trigger + `_valid_num_array` (0040, optional).
 - **Default group**: `join_default_group(email)` (0030; refuses blocklisted emails per 0038),
   `admin_set_default_group`.

@@ -14,6 +14,13 @@ import { buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course
 
 const supabase = createClient();
 
+// Local calendar date (YYYY-MM-DD) — NOT UTC. Using toISOString() here would roll
+// to tomorrow after ~8pm US-Eastern. Matches todayLocal() in tournaments.tsx.
+function todayLocal() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, onReady, onCancel }: {
   index: number | null;
   saveIndex: (i: number | null) => void;
@@ -31,7 +38,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState(index != null ? String(index) : "");
   const [showCustom, setShowCustom] = useState(false);
-  const [playDate, setPlayDate] = useState(new Date().toISOString().slice(0, 10));
+  const [playDate, setPlayDate] = useState(todayLocal());
   const [grossMode, setGrossMode] = useState(false);
   const [grossStr, setGrossStr] = useState("");
   // favorites
@@ -588,10 +595,10 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
           <div style={{ marginTop: 12, display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end" }}>
             <div>
               <label style={{ color: C.sage, fontSize: 12 }}>Date played</label>
-              <ShortDateInput value={playDate} onChange={setPlayDate} max={new Date().toISOString().slice(0, 10)} />
+              <ShortDateInput value={playDate} onChange={setPlayDate} max={todayLocal()} />
             </div>
             <div style={{ color: C.sage, fontSize: 12 }}>
-              {playDate === new Date().toISOString().slice(0, 10) ? "Playing today" : "Logging a past round"}
+              {playDate === todayLocal() ? "Playing today" : "Logging a past round"}
             </div>
           </div>
           {realCH != null && (

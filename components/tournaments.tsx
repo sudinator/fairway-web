@@ -11,6 +11,7 @@ import {
   allocateStrokes,
   stablefordPts,
   stablefordBySix,
+  netBySix,
   matchStatus,
   matchStrokesFor,
   matchProgress,
@@ -1428,13 +1429,7 @@ function GameRoom({
       if (markerOwnsMyRowRef.current) return; // marker owns my row; don't write it
       const m = meRef.current;
       if (!m) return;
-      // Back up ALL five arrays (incl. penalties + sand) — writing a subset here would
-      // overwrite the per-tap backup and erase a penalty/sand entered just before the
-      // lock. Mirrors the body setMyHole/pushScores write.
-      const data = {
-        scores: m.scores || [], putts: m.putts || [], fairways: m.fairways || [],
-        penalties: m.penalties || [], sand: m.sand || [],
-      };
+      const data = { scores: m.scores || [], putts: m.putts || [], fairways: m.fairways || [] };
       if (!data.scores.some((s) => s != null)) return;
       saveGameScores(gameIdRef.current, m.id, data);              // synchronous, always lands
       supabase.from("game_players").update(data).eq("id", m.id).then(() => {}); // best-effort
@@ -1504,6 +1499,8 @@ function GameRoom({
     const rel = 2 * playerThru(p) - playerPoints(p);
     return rel === 0 ? "E" : rel > 0 ? `+${rel}` : `${rel}`;
   };
+  // Par of the holes played so far (for true stroke over/under par, uncapped).
+  const parThru = (p: Player) => playerHoles(p).reduce((s2, h) => s2 + (h.strokes && h.strokes > 0 ? (h.par || 0) : 0), 0);
 
   // Save one hole's data (strokes / putts / fairway) for me.
   // Push a score row to the server with visible status + safe retries. The local backup
@@ -1511,16 +1508,10 @@ function GameRoom({
   // surfaces sync state and retries. Retries re-read the freshest local backup for the row,
   // so a slow retry can never revert a hole entered in the meantime.
   const pushScores = async (rowId: string, firstBody: Record<string, unknown>) => {
-    // Clock stamps (clock_start/clock_end) ride only on the first body — they aren't
-    // part of the per-hole score backup. Carry them onto every retry so a failed first
-    // attempt followed by a successful retry doesn't silently drop the round clock.
-    const clockFields: Record<string, unknown> = {};
-    if ("clock_start" in firstBody) clockFields.clock_start = (firstBody as any).clock_start;
-    if ("clock_end" in firstBody) clockFields.clock_end = (firstBody as any).clock_end;
     const freshest = (): Record<string, unknown> => {
       if (!game) return firstBody;
       const b = loadGameScores(game.id, rowId);
-      return b ? { scores: b.scores, putts: b.putts, fairways: b.fairways, penalties: b.penalties, sand: b.sand, ...clockFields } : firstBody;
+      return b ? { scores: b.scores, putts: b.putts, fairways: b.fairways, penalties: b.penalties, sand: b.sand } : firstBody;
     };
     for (let n = 0; n < 4; n++) {
       setSyncState(n === 0 ? "saving" : "retry");
@@ -2011,9 +2002,7 @@ function GameRoom({
         handicap_index: me.handicap_index ?? null,
         course_handicap: me.course_handicap ?? null,
         group_id: (game as any).group_id || null,
-        // Use the game's match DATE, not its creation timestamp, so the round lands in
-        // history on the day it was played. Fall back to created_at, then today.
-        played_at: (game as any).played_at || (game as any).created_at || new Date().toISOString(),
+        played_at: (game as any).created_at || new Date().toISOString(),
         status: "final" as const,
         gross_score: gross,
         game_id: game.id,
@@ -2232,27 +2221,22 @@ function GameRoom({
     return isStroke ? 0 : playerPoints(b) - playerPoints(a);
   });
 
-  // Segment winners (three sixes), by net Stableford.
+  // Segment winners (three sixes). Stableford: most points wins. Stroke: lowest net total wins.
   const segLabels = ["Holes 1–6", "Holes 7–12", "Holes 13–18"];
-  const segTotals = players.map((p) => ({
-    p,
-    seg: stablefordBySix(playerHoles(p)),
-  }));
+  const segOf = (p: Player) => (isStroke ? netBySix(playerHoles(p)) : stablefordBySix(playerHoles(p)));
+  const segTotals = players.map((p) => ({ p, seg: segOf(p) }));
   const segWinners = [0, 1, 2].map((si) => {
-    let best = -1,
-      who: string[] = [];
+    let best = isStroke ? Infinity : -1;
+    let who: string[] = [];
     segTotals.forEach(({ p, seg }) => {
-      // only count a segment if the player has entered all 6 holes
-      const played = playerHoles(p)
-        .slice(si * 6, si * 6 + 6)
-        .filter((h) => h.strokes).length;
+      const played = playerHoles(p).slice(si * 6, si * 6 + 6).filter((h) => h.strokes).length;
       if (played < 6) return;
-      if (seg[si] > best) {
-        best = seg[si];
-        who = [p.display_name];
-      } else if (seg[si] === best) who.push(p.display_name);
+      const v = seg[si];
+      if (isStroke ? v < best : v > best) { best = v; who = [p.display_name]; }
+      else if (v === best) who.push(p.display_name);
     });
-    return { label: segLabels[si], best, who };
+    const complete = who.length > 0;
+    return { label: segLabels[si], complete, val: complete ? best : null, who };
   });
 
   return (
@@ -2714,11 +2698,7 @@ function GameRoom({
           <button onClick={() => setCardView(true)} style={{ ...btn(cardView), flex: 1, fontSize: 13 }}>Group Card</button>
         </div>
       )}
-      {roomTab === "play" && me && (me.scores || []).some((s: any) => s != null && s > 0) && (
-        <button onClick={() => setShareCard(true)} style={{ ...btn(false), width: "100%", marginTop: 8, fontSize: 13, padding: "10px 0" }}>📤 Share my scorecard</button>
-      )}
-      {roomTab === "play" && (isOrganizer || isAdmin) && <ScoreHistory gameId={gameId} />}
-      {shareCard && me && <ShareScorecardModal game={game} player={me} onClose={() => setShareCard(false)} />}
+      {roomTab === "setup" && (isOrganizer || isAdmin) && <ScoreHistory gameId={gameId} />}
       {roomTab === "play" && cardView && (game.marker_user_id || myGroupHasMarker) && !isEnded && (
         <div style={{ background: "#16302A", border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
           <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Group scoring is on</div>
@@ -2796,16 +2776,23 @@ function GameRoom({
         <>
           {/* Leaderboard */}
           <div style={{ marginTop: 18 }}>
-            <Eyebrow>LEADERBOARD · NET STABLEFORD</Eyebrow>
+            <Eyebrow>{isStroke ? `STROKE PLAY · ${strokeNet ? "NET" : "GROSS"}` : "LEADERBOARD · NET STABLEFORD"}</Eyebrow>
             {/* Column header */}
             <div style={{ display: "flex", alignItems: "center", padding: "9px 12px", marginTop: 4, color: C.cream, fontSize: 12, fontWeight: 800, letterSpacing: 0.3, background: C.greenMid, borderRadius: 10 }}>
               <div style={{ width: 20 }}>#</div>
               <div style={{ width: 32 }} />
               <div style={{ flex: 1 }}>Player</div>
-              <div style={{ width: 32, textAlign: "center" }}>Thru</div>
-              <div style={{ width: 38, textAlign: "center" }}>Gross</div>
-              <div style={{ width: 40, textAlign: "center" }}>O/U</div>
-              <div style={{ width: 34, textAlign: "center" }}>{isStroke ? "Tot" : "Pts"}</div>
+              {isStroke ? (<>
+                <div style={{ width: 40, textAlign: "center" }}>Thru</div>
+                <div style={{ width: 48, textAlign: "center" }}>Gross</div>
+                <div style={{ width: 48, textAlign: "center" }}>Par</div>
+                <div style={{ width: 50, textAlign: "center" }}>Net</div>
+              </>) : (<>
+                <div style={{ width: 32, textAlign: "center" }}>Thru</div>
+                <div style={{ width: 38, textAlign: "center" }}>Gross</div>
+                <div style={{ width: 40, textAlign: "center" }}>O/U</div>
+                <div style={{ width: 34, textAlign: "center" }}>Pts</div>
+              </>)}
             </div>
             {leaderboard.map((p) => {
               const pts = playerPoints(p);
@@ -2831,26 +2818,38 @@ function GameRoom({
                       {p.course_handicap != null ? `CH ${p.course_handicap}` : "no hcp"}
                     </div>
                   </div>
-                  <div style={{ width: 32, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru || "–"}</div>
-                  <div style={{ width: 38, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru ? playerGross(p) : "–"}</div>
-                  {(() => {
-                    if (!thru) return <div style={{ width: 40, textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 16, fontFamily: "Georgia, serif" }}>–</div>;
-                    const rel = 2 * thru - pts;
-                    const col = rel < 0 ? "#1F8F54" : rel > 0 ? C.birdie : "#6B6857";
-                    return <div style={{ width: 40, textAlign: "center", color: col, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{relToParStr(p)}</div>;
-                  })()}
-                  <div style={{ width: 34, textAlign: "center", color: C.green, fontWeight: 800, fontSize: 19, fontFamily: "Georgia, serif" }}>{isStroke ? (thru ? strokeTot(p) : "–") : pts}</div>
+                  {isStroke ? (() => {
+                    const relV = (strokeNet ? playerNet(p) : playerGross(p)) - parThru(p);
+                    const relS = !thru ? "–" : relV === 0 ? "E" : relV > 0 ? `+${relV}` : `${relV}`;
+                    const relCol = !thru ? C.faint : relV < 0 ? "#1F8F54" : relV > 0 ? C.birdie : "#6B6857";
+                    return (<>
+                      <div style={{ width: 40, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru || "–"}</div>
+                      <div style={{ width: 48, textAlign: "center", color: C.ink, fontWeight: strokeNet ? 700 : 800, fontSize: strokeNet ? 15 : 18, fontFamily: strokeNet ? undefined : "Georgia, serif" }}>{thru ? playerGross(p) : "–"}</div>
+                      <div style={{ width: 48, textAlign: "center", color: relCol, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{relS}</div>
+                      <div style={{ width: 50, textAlign: "center", color: strokeNet ? C.green : C.ink, fontWeight: strokeNet ? 800 : 700, fontSize: strokeNet ? 19 : 15, fontFamily: strokeNet ? "Georgia, serif" : undefined }}>{thru ? playerNet(p) : "–"}</div>
+                    </>);
+                  })() : (<>
+                    <div style={{ width: 32, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru || "–"}</div>
+                    <div style={{ width: 38, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru ? playerGross(p) : "–"}</div>
+                    {(() => {
+                      if (!thru) return <div style={{ width: 40, textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 16, fontFamily: "Georgia, serif" }}>–</div>;
+                      const rel = 2 * thru - pts;
+                      const col = rel < 0 ? "#1F8F54" : rel > 0 ? C.birdie : "#6B6857";
+                      return <div style={{ width: 40, textAlign: "center", color: col, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{relToParStr(p)}</div>;
+                    })()}
+                    <div style={{ width: 34, textAlign: "center", color: C.green, fontWeight: 800, fontSize: 19, fontFamily: "Georgia, serif" }}>{pts}</div>
+                  </>)}
                 </div>
               );
             })}
             <div style={{ color: C.sage, fontSize: 10, marginTop: 8 }}>
-              {isStroke ? `Gross = total strokes · Thru = holes played · O/U = net vs par · Tot = ${strokeNet ? "net" : "gross"} total. Lowest total wins.` : "Gross = total strokes · Thru = holes played · O/U = net Stableford vs par pace (under = green) · Pts = net Stableford points. Ranked by O/U."}
+              {isStroke ? `Thru = holes played · Gross = total strokes · Par = ${strokeNet ? "net" : "gross"} vs par · Net = net total. Lowest ${strokeNet ? "net" : "gross"} wins.` : "Gross = total strokes · Thru = holes played · O/U = net Stableford vs par pace (under = green) · Pts = net Stableford points. Ranked by O/U."}
             </div>
           </div>
 
           {/* Three sixes */}
           <div style={{ marginTop: 18 }}>
-            <Eyebrow>SIX-HOLE SEGMENTS (NET STABLEFORD)</Eyebrow>
+            <Eyebrow>{isStroke ? "SIX-HOLE SEGMENTS (NET SCORE)" : "SIX-HOLE SEGMENTS (NET STABLEFORD)"}</Eyebrow>
             <div
               style={{
                 display: "flex",
@@ -2871,7 +2870,7 @@ function GameRoom({
                   }}
                 >
                   <div style={{ color: C.sage, fontSize: 12 }}>{s.label}</div>
-                  {s.best < 0 ? (
+                  {!s.complete ? (
                     <div style={{ color: C.faint, fontSize: 13, marginTop: 6 }}>
                       Not complete yet
                     </div>
@@ -2887,7 +2886,7 @@ function GameRoom({
                         {s.who.join(", ")}
                       </div>
                       <div style={{ color: C.gold, fontSize: 13 }}>
-                        {s.best} pts {s.who.length > 1 ? "(tie)" : ""}
+                        {isStroke ? `${s.val} net` : `${s.val} pts`} {s.who.length > 1 ? "(tie)" : ""}
                       </div>
                     </>
                   )}
@@ -2989,6 +2988,7 @@ function GameRoom({
             matchMode={game.game_type === "match"}
             uncap={game.game_type === "stroke"}
             showSixes={(game as any).group_id === TGC_GROUP_ID}
+            strokeSixes={game.game_type === "stroke"}
             onSet={(i, patch) => { if (!isEnded) setMyHole(i, patch); }}
             savingHole={savingHole}
             showPenalties={true}
@@ -3082,6 +3082,10 @@ function GameRoom({
           scores.
         </div>
       )}
+      {roomTab === "play" && me && (me.scores || []).some((s: any) => s != null && s > 0) && (
+        <button onClick={() => setShareCard(true)} style={{ ...btn(false), width: "100%", marginTop: 18, fontSize: 13, padding: "10px 0" }}>📤 Share my scorecard</button>
+      )}
+      {shareCard && me && <ShareScorecardModal game={game} player={me} onClose={() => setShareCard(false)} />}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import {
   C, allocateStrokes, applyAllowance, stablefordPts,
-  matchStatus, fourballStatus, computeTrifecta, clinchState, computeSkins, toParStr, fmtDate,
+  matchStatus, fourballStatus, computeTrifecta, clinchState, computeSkins, toParStr,
   type FourballMember, type SkinPlayer,
 } from "@/lib/golf";
 
@@ -263,7 +263,7 @@ function Scorecard({ data }: { data: LiveData }) {
           <span style={{ color: C.gold, fontSize: 11, letterSpacing: 1.5, fontWeight: 700 }}>{(label || game.game_type).toUpperCase()}</span>
         </div>
         <div style={{ fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, color: C.cream, marginTop: 10 }}>{game.name}</div>
-        <div style={{ color: C.sage, fontSize: 13, marginTop: 4 }}>{game.course}{game.played_at ? ` · ${fmtDate(game.played_at)}` : ""}</div>
+        <div style={{ color: C.sage, fontSize: 13, marginTop: 4 }}>{game.course}{game.played_at ? ` · ${game.played_at}` : ""}</div>
       </div>
 
       <SectionTitle>How it works</SectionTitle>

@@ -135,19 +135,24 @@ export function ScoreMark({ hole }: { hole: Hole }) {
   if (!hole.strokes) return <span style={{ color: C.line }}>·</span>;
   const d = hole.strokes - hole.par;
   const base: React.CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, fontWeight: 700, fontSize: 13 };
+  // Double-ring marks use REAL nested borders (not box-shadow) so they survive PNG
+  // export — html-to-image does not rasterize box-shadow. Outer span = outer ring +
+  // gap (shows the card behind it), inner span = inner ring + number. Footprint stays 26x26.
+  const doubleRing = (color: string, shape: "circle" | "square", fill?: string) => {
+    const ri = shape === "circle" ? "50%" : 4;
+    const ro = shape === "circle" ? "50%" : 6;
+    return (
+      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, border: `1.5px solid ${color}`, borderRadius: ro, padding: 1.5, boxSizing: "border-box" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", border: `1.5px solid ${color}`, borderRadius: ri, color, fontWeight: 700, fontSize: 12, background: fill || "transparent" }}>{hole.strokes}</span>
+      </span>
+    );
+  };
   // Birdie or better: circle (eagle gets a double circle).
-  if (d <= -2) return (
-    <span style={{ ...base, border: `1.5px solid ${C.birdie}`, borderRadius: "50%", color: C.birdie, boxShadow: `0 0 0 2.5px ${C.card}, 0 0 0 4px ${C.birdie}` }}>{hole.strokes}</span>
-  );
+  if (d <= -2) return doubleRing(C.birdie, "circle");
   if (d === -1) return <span style={{ ...base, border: `1.5px solid ${C.birdie}`, borderRadius: "50%", color: C.birdie }}>{hole.strokes}</span>;
-  // Double bogey or worse: double (nested) square. Triple bogey or worse (d >= 3)
-  // also gets a translucent blue fill so the worst holes stand out. Bogey: single square.
-  if (d >= 3) return (
-    <span style={{ ...base, border: `1.5px solid ${C.bogey}`, borderRadius: 4, color: C.bogey, background: "rgba(46,90,184,0.22)", boxShadow: `0 0 0 2.5px ${C.card}, 0 0 0 4px ${C.bogey}` }}>{hole.strokes}</span>
-  );
-  if (d === 2) return (
-    <span style={{ ...base, border: `1.5px solid ${C.bogey}`, borderRadius: 4, color: C.bogey, boxShadow: `0 0 0 2.5px ${C.card}, 0 0 0 4px ${C.bogey}` }}>{hole.strokes}</span>
-  );
+  // Double bogey or worse: double square; triple+ (d>=3) adds a translucent blue fill.
+  if (d >= 3) return doubleRing(C.bogey, "square", "rgba(46,90,184,0.22)");
+  if (d === 2) return doubleRing(C.bogey, "square");
   if (d === 1) return <span style={{ ...base, border: `1.5px solid ${C.bogey}`, borderRadius: 4, color: C.bogey }}>{hole.strokes}</span>;
   return <span style={{ ...base, color: C.ink }}>{hole.strokes}</span>;
 }
@@ -236,7 +241,7 @@ export type EntryHole = {
 
 // SCORE ENTRY — vertical, one row per hole, fits screen width (no horizontal scroll).
 // Used by both individual stroke play and group play so the card is identical everywhere.
-export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false, uncap = false }: {
+export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false, strokeSixes = false, uncap = false }: {
   holes: EntryHole[];
   hasHandicap: boolean;
   onSet: (i: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null }) => void;
@@ -249,6 +254,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   matchRun?: (string | null)[]; // optional per-hole running match status labels (e.g. "1↑", "AS")
   matchMode?: boolean;          // when true (1:1 match), render one card per hole instead of the wide grid
   showSixes?: boolean;          // TGC: show Front/Middle/Last six net-Stableford subtotals at the top
+  strokeSixes?: boolean;     // stroke games: show net-score (lowest) subtotals, not Stableford
   uncap?: boolean;              // stroke play: lift the net-double entry ceiling so every stroke counts
 }) {
   const showOpp = Array.isArray(opp);
@@ -484,7 +490,9 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   return (
     <>
       {showSixes && !matchMode && holes.length >= 12 && (() => {
-        const segPts = (from: number, to: number) => holes.slice(from, to).reduce((acc, h) => acc + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
+        const segPts = (from: number, to: number) => strokeSixes
+          ? holes.slice(from, to).reduce((acc, h) => acc + (h.strokes && h.strokes > 0 ? h.strokes - (h.recv || 0) : 0), 0)
+          : holes.slice(from, to).reduce((acc, h) => acc + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
         const segs = [
           { lbl: "Front 6", sub: "1\u20136", v: segPts(0, 6) },
           { lbl: "Middle 6", sub: "7\u201312", v: segPts(6, 12) },
@@ -492,7 +500,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
         ];
         return (
           <div style={{ marginTop: 10 }}>
-            <div style={{ color: C.faint, fontSize: 9, letterSpacing: 0.5, fontWeight: 800, textTransform: "uppercase", marginBottom: 6 }}>Sixes \u00b7 net stableford</div>
+            <div style={{ color: C.faint, fontSize: 9, letterSpacing: 0.5, fontWeight: 800, textTransform: "uppercase", marginBottom: 6 }}>{strokeSixes ? "Sixes · net score" : "Sixes · net stableford"}</div>
             <div style={{ display: "flex", gap: 8 }}>
               {segs.map((sg) => (
                 <div key={sg.lbl} style={{ flex: 1, background: C.greenLight, borderRadius: 12, padding: "9px 6px", textAlign: "center" }}>
