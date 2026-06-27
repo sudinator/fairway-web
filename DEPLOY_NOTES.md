@@ -133,3 +133,10 @@ recover the strokes but lose the penalty/sand metadata.
 - After deploy: open the **Courses** tab as an admin -> the "YARDAGE BACKFILL - ADMIN" panel -> **Preview** (no writes) -> review -> **Apply**.
 - Writes only favorite_courses.data.tees[].yardages (missing cells only). Nothing else is touched.
 - Re-runnable safely (already-filled tees report "nothing to fill").
+
+## v1.54.1 — Yardage editor (admin)
+- No migration, no new env var.
+- Courses tab -> YARDAGE BACKFILL panel -> section 2 "Fix one course": Load courses -> pick a course.
+  - Re-look-up: search golfcourseapi, pick the correct course, "Fill all matching tees" (or map each tee), Save.
+  - Manual: type yardages per tee/hole, Save.
+- Saving writes only favorite_courses.data.tees[].yardages. external_id is NOT changed.
