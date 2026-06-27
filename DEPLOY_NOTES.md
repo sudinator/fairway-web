@@ -127,3 +127,9 @@ recover the strokes but lose the penalty/sand metadata.
 2. Kill/relaunch A (still offline) -> scores still shown (from backup).
 3. Turn signal back on -> scores sync to the server automatically; Device B sees
    them. Nothing lost.
+
+## v1.54.0 — Yardage backfill (admin tool)
+- No migration. No new env var (uses existing GOLF_API_KEY already set for course search).
+- After deploy: open the **Courses** tab as an admin -> the "YARDAGE BACKFILL - ADMIN" panel -> **Preview** (no writes) -> review -> **Apply**.
+- Writes only favorite_courses.data.tees[].yardages (missing cells only). Nothing else is touched.
+- Re-runnable safely (already-filled tees report "nothing to fill").

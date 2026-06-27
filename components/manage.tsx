@@ -6,6 +6,7 @@ import { C, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, play
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, NumPicker, Avatar } from "@/components/ui";
+import { YardageBackfill } from "@/components/yardage-backfill";
 import { resizeToAvatar } from "@/lib/image";
 import { APP_VERSION, APP_BUILT_AT } from "@/lib/app-version";
 import { courseChangeLines, buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
@@ -413,6 +414,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
         Browse every course saved in Birdie Num Num, then add the ones your group plays to your group library. Your group library is what appears in New Round and Create Game.
       </div>
+      {isAdmin && <YardageBackfill />}
 
       <input
         style={{ ...inputStyle, marginTop: 12 }}
