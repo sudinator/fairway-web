@@ -284,25 +284,20 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     const sPutts = seg.reduce((s, h) => s + (h.putts || 0), 0);
     const sPen = seg.reduce((s, h) => s + (h.penalties || 0), 0);
     const sPts = seg.reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
+    const sYds = seg.reduce((s, h) => s + (h.yards || 0), 0);
     const sFwElig = seg.filter((h) => h.par >= 4 && h.fairway != null).length;
     const sFwHit = seg.filter((h) => h.par >= 4 && h.fairway === "hit").length;
-    const cols = `26px 24px 24px${showOpp ? " 40px" : ""}${hasDots ? " 28px" : ""} 1fr${showFairway ? " 30px" : ""}${showPutts ? " 54px" : ""}${showPenalties ? " 54px" : ""} 28px${showRun ? " 44px" : ""}`;
-    const Row = (cells: React.ReactNode[], opts?: { header?: boolean; foot?: boolean }) => (
-      <div style={{
-        display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4,
-        padding: opts?.header ? "0 2px 6px" : "5px 2px",
-        borderBottom: opts?.foot ? "none" : `1px solid ${C.line}`,
-        borderTop: opts?.foot ? `2px solid ${C.greenMid}` : "none",
-        marginTop: opts?.foot ? 4 : 0,
-      }}>{cells}</div>
+    // Option B: Hole no. + yardage (this player's tee) + S.I. on a top line; the
+    // interactive scoring cells get their own full-width row beneath.
+    const cols = `24px${showOpp ? " 40px" : ""}${hasDots ? " 28px" : ""} 1fr${showFairway ? " 30px" : ""}${showPutts ? " 54px" : ""}${showPenalties ? " 54px" : ""} 28px${showRun ? " 44px" : ""}`;
+    const GridRow = (cells: React.ReactNode[], opts?: { header?: boolean }) => (
+      <div style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4, padding: opts?.header ? "0 2px 6px" : "3px 2px 0" }}>{cells}</div>
     );
     return (
       <div style={{ background: C.card, borderRadius: 12, padding: 10, flex: 1, minWidth: 300 }}>
         <div style={{ color: C.green, fontSize: 11, letterSpacing: 2, fontWeight: 800, marginBottom: 8 }}>{label}</div>
-        {Row([
-          <div key="h" style={headStyle}>Hole</div>,
+        {GridRow([
           <div key="p" style={{ ...headStyle, textAlign: "center" }}>Par</div>,
-          <div key="si" style={{ ...headStyle, textAlign: "center" }}>S.I.</div>,
           ...(showOpp ? [<div key="op" style={{ ...headStyle, textAlign: "center", color: C.gold }}>{oppLabel || "Opp"}</div>] : []),
           ...(hasDots ? [<div key="d" style={{ ...headStyle, textAlign: "center" }}>Hcp</div>] : []),
           <div key="sc" style={{ ...headStyle, textAlign: "center" }}>Score</div>,
@@ -317,62 +312,70 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           const maxStrokes = uncap ? h.par + 8 : hasHandicap ? h.par + 2 + h.recv : h.par * 2;
           const maxPutts = h.strokes != null && h.strokes > 0 ? Math.min(h.strokes, 6) : 6;
           const pts = stablefordPts(h.strokes, h.par, h.recv || 0);
-          return Row([
-            <div key="h" style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.n}</div>,
-            <div key="p" style={{ textAlign: "center", color: C.parBlue, fontWeight: 700, fontSize: 14 }}>{h.par}</div>,
-            <div key="si" style={{ textAlign: "center", color: C.faint, fontSize: 12 }}>{h.si ?? "–"}</div>,
-            ...(showOpp ? [(() => {
-              const ov = opp![i] ?? null;
-              const mine = h.strokes;
-              const col = ov == null || mine == null ? C.faint : ov < mine ? C.birdie : ov > mine ? C.greenMid : C.ink;
-              return <div key="op" style={{ textAlign: "center", color: col, fontWeight: 800, fontSize: 15 }}>{ov ?? "·"}</div>;
-            })()] : []),
-            ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: (h.gives || 0) > 0 ? C.sage : C.dot, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{h.recv > 0 ? "•".repeat(Math.min(h.recv, 3)) : ((h.gives || 0) > 0 ? "◦".repeat(Math.min(h.gives || 0, 3)) : "")}</div>] : []),
-            <div key="sc" style={{ textAlign: "center" }}>
-              <NumPicker key={`sc-${hydrated}`} value={h.strokes} from={1} to={maxStrokes} onChange={(v) => onSet(i, { strokes: v })} width={48} accent={savingHole === i} />
-            </div>,
-            ...(showFairway ? [
-              <div key="fw" style={{ textAlign: "center" }}>
-                <button onClick={() => cycleFw(i, h.fairway, h.par)} disabled={h.par < 4}
-                  style={{ border: `1px solid ${C.line}`, borderRadius: 6, width: 28, height: 30, cursor: h.par < 4 ? "default" : "pointer",
-                    background: h.fairway === "hit" ? "#C7E6D1" : (h.fairway === "left" || h.fairway === "right" || h.fairway === "miss") ? "#F2CFCB" : C.card,
-                    color: h.fairway === "hit" ? "#0F5436" : (h.fairway === "left" || h.fairway === "right" || h.fairway === "miss") ? C.birdie : C.faint, fontWeight: 800, fontSize: 13 }}>
-                  {h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "left" ? "L" : h.fairway === "right" ? "R" : h.fairway === "miss" ? "✗" : "·"}
-                </button>
-              </div>,
-            ] : []),
-            ...(showPutts ? [
-              <div key="pu" style={{ textAlign: "center" }}>
-                <NumPicker key={`pu-${hydrated}`} value={h.putts} from={0} to={maxPutts} onChange={(v) => onSet(i, { putts: v })} width={48} />
-              </div>,
-            ] : []),
-            ...(showPenalties ? [(() => {
-              const penN = h.penalties || 0;
-              const sandOn = !!h.sand;
-              const disp = sandOn && penN > 0 ? "*" : sandOn ? "S" : penN > 0 ? String(penN) : "·";
-              const active = sandOn || penN > 0;
-              return (
-                <div key="pe" style={{ textAlign: "center" }}>
-                  <button onClick={() => setEditPen(i)}
-                    style={{ border: `1px solid ${active ? C.birdie : C.line}`, borderRadius: 6, width: 44, height: 30, cursor: "pointer",
-                      background: active ? "#F6DEDB" : C.card, color: active ? C.birdie : C.faint, fontWeight: 800, fontSize: disp === "*" ? 18 : 15 }}>
-                    {disp}
-                  </button>
-                </div>
-              );
-            })()] : []),
-            <div key="pt" style={{ textAlign: "center", color: ptsColor(pts), fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
-            ...(showRun ? [(() => {
-              const lbl = matchRun![i] || "";
-              const col = lbl === "" ? C.faint : lbl === "AS" ? C.ink : lbl.includes("UP") ? C.greenMid : C.birdie;
-              return <div key="ms" style={{ textAlign: "center", color: col, fontWeight: 800, fontSize: 13 }}>{lbl || "·"}</div>;
-            })()] : []),
-          ]);
+          return (
+            <div key={i} style={{ borderBottom: `1px solid ${C.line}`, paddingBottom: 5, marginTop: j === 0 ? 0 : 4 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 2px", flexWrap: "wrap" }}>
+                <span style={{ color: C.ink, fontWeight: 800, fontSize: 14 }}>Hole {h.n}</span>
+                <span style={{ color: C.faint, fontSize: 11, fontWeight: 600 }}>{h.yards ? <>· <b style={{ color: C.green }}>{h.yards}</b> yds </> : null}· S.I. {h.si ?? "–"}</span>
+              </div>
+              {GridRow([
+                <div key="p" style={{ textAlign: "center", color: C.parBlue, fontWeight: 700, fontSize: 14 }}>{h.par}</div>,
+                ...(showOpp ? [(() => {
+                  const ov = opp![i] ?? null;
+                  const mine = h.strokes;
+                  const col = ov == null || mine == null ? C.faint : ov < mine ? C.birdie : ov > mine ? C.greenMid : C.ink;
+                  return <div key="op" style={{ textAlign: "center", color: col, fontWeight: 800, fontSize: 15 }}>{ov ?? "·"}</div>;
+                })()] : []),
+                ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: (h.gives || 0) > 0 ? C.sage : C.dot, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{h.recv > 0 ? "•".repeat(Math.min(h.recv, 3)) : ((h.gives || 0) > 0 ? "◦".repeat(Math.min(h.gives || 0, 3)) : "")}</div>] : []),
+                <div key="sc" style={{ textAlign: "center" }}>
+                  <NumPicker key={`sc-${hydrated}`} value={h.strokes} from={1} to={maxStrokes} onChange={(v) => onSet(i, { strokes: v })} width={48} accent={savingHole === i} />
+                </div>,
+                ...(showFairway ? [
+                  <div key="fw" style={{ textAlign: "center" }}>
+                    <button onClick={() => cycleFw(i, h.fairway, h.par)} disabled={h.par < 4}
+                      style={{ border: `1px solid ${C.line}`, borderRadius: 6, width: 28, height: 30, cursor: h.par < 4 ? "default" : "pointer",
+                        background: h.fairway === "hit" ? "#C7E6D1" : (h.fairway === "left" || h.fairway === "right" || h.fairway === "miss") ? "#F2CFCB" : C.card,
+                        color: h.fairway === "hit" ? "#0F5436" : (h.fairway === "left" || h.fairway === "right" || h.fairway === "miss") ? C.birdie : C.faint, fontWeight: 800, fontSize: 13 }}>
+                      {h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "left" ? "L" : h.fairway === "right" ? "R" : h.fairway === "miss" ? "✗" : "·"}
+                    </button>
+                  </div>,
+                ] : []),
+                ...(showPutts ? [
+                  <div key="pu" style={{ textAlign: "center" }}>
+                    <NumPicker key={`pu-${hydrated}`} value={h.putts} from={0} to={maxPutts} onChange={(v) => onSet(i, { putts: v })} width={48} />
+                  </div>,
+                ] : []),
+                ...(showPenalties ? [(() => {
+                  const penN = h.penalties || 0;
+                  const sandOn = !!h.sand;
+                  const disp = sandOn && penN > 0 ? "*" : sandOn ? "S" : penN > 0 ? String(penN) : "·";
+                  const active = sandOn || penN > 0;
+                  return (
+                    <div key="pe" style={{ textAlign: "center" }}>
+                      <button onClick={() => setEditPen(i)}
+                        style={{ border: `1px solid ${active ? C.birdie : C.line}`, borderRadius: 6, width: 44, height: 30, cursor: "pointer",
+                          background: active ? "#F6DEDB" : C.card, color: active ? C.birdie : C.faint, fontWeight: 800, fontSize: disp === "*" ? 18 : 15 }}>
+                        {disp}
+                      </button>
+                    </div>
+                  );
+                })()] : []),
+                <div key="pt" style={{ textAlign: "center", color: ptsColor(pts), fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
+                ...(showRun ? [(() => {
+                  const lbl = matchRun![i] || "";
+                  const col = lbl === "" ? C.faint : lbl === "AS" ? C.ink : lbl.includes("UP") ? C.greenMid : C.birdie;
+                  return <div key="ms" style={{ textAlign: "center", color: col, fontWeight: 800, fontSize: 13 }}>{lbl || "·"}</div>;
+                })()] : []),
+              ])}
+            </div>
+          );
         })}
-        {Row([
-          <div key="h" style={{ color: C.gold, fontWeight: 800, fontSize: 12 }}>{from === 0 ? "OUT" : "IN"}</div>,
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "6px 2px 0" }}>
+          <span style={{ color: C.gold, fontWeight: 800, fontSize: 12 }}>{from === 0 ? "OUT" : "IN"}</span>
+          {sYds > 0 ? <span style={{ color: C.faint, fontSize: 11 }}>· {sYds} yds</span> : null}
+        </div>
+        {GridRow([
           <div key="p" style={{ textAlign: "center", color: C.ink, fontWeight: 800, fontSize: 13 }}>{sPar}</div>,
-          <div key="si" />,
           ...(showOpp ? [(() => {
             const oSum = opp!.slice(from, to).reduce((s: number, v) => s + (v || 0), 0);
             return <div key="op" style={{ textAlign: "center", color: C.gold, fontWeight: 800, fontSize: 14 }}>{oSum || "–"}</div>;
@@ -389,7 +392,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
             const col = lbl === "" ? C.faint : lbl === "AS" ? C.ink : lbl.includes("UP") ? C.greenMid : C.birdie;
             return <div key="ms" style={{ textAlign: "center", color: col, fontWeight: 800, fontSize: 13 }}>{lbl || "–"}</div>;
           })()] : []),
-        ], { foot: true })}
+        ])}
       </div>
     );
   };

@@ -2037,7 +2037,7 @@ function GameRoom({
         fairway: me.fairways?.[i] ?? null,
         penalties: me.penalties?.[i] ?? null,
         sand: me.sand?.[i] ?? false,
-        yardage: m.yards ?? null,
+        yardage: courseTees.find((t) => t.name === me.tee_name)?.yardages?.[i] ?? m.yards ?? null,
       })).filter((h) => h.strokes != null);
       if (holeRows.length) await supabase.from("holes").insert(holeRows);
     } catch {
@@ -2736,7 +2736,7 @@ function GameRoom({
               </div>
             </div>
           )}
-          <GroupScorecard game={game} players={cardPlayers} user={user}
+          <GroupScorecard game={game} players={cardPlayers} user={user} courseTees={courseTees}
             isMarker={cardCanEdit}
             markerName={viewedMarkerPlayer?.display_name ?? null}
             onTakeOver={takeOverScoring}
@@ -2971,7 +2971,7 @@ function GameRoom({
                 n: m.n,
                 par: m.par,
                 si: m.si,
-                yards: m.yards ?? null,
+                yards: courseTees.find((t) => t.name === me.tee_name)?.yardages?.[i] ?? m.yards ?? null,
                 strokes: me.scores?.[i] ?? null,
                 putts: me.putts?.[i] ?? null,
                 fairway: me.fairways?.[i] ?? null,
@@ -3119,7 +3119,7 @@ function MyStatsLine({ me, holes }: { me: Player; holes: Hole[] }) {
 }
 
 // ---------------- Match play view ----------------
-function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup, groupLocked = false, onMarkOut }: {
+function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup, groupLocked = false, onMarkOut, courseTees = [] }: {
   game: Game; players: Player[]; user: any;
   isMarker: boolean; markerName: string | null;
   onTakeOver: () => void; onRelease: () => void;
@@ -3127,6 +3127,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
   teeMode?: boolean; groupLabel?: string; canClaim?: boolean;
   onClaimGroup?: () => void; onReleaseGroup?: () => void; groupLocked?: boolean;
   onMarkOut?: (p: Player) => void;
+  courseTees?: CourseTee[];
 }) {
   const [edit, setEdit] = useState<{ playerId: string; holeIdx: number } | null>(null);
   const allowance = game.allowance_pct ?? 100;
@@ -3182,6 +3183,14 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
     return ps.map((p) => ({ type: "player" as const, p }));
   })();
   const playerOrder = cols.filter((c): c is { type: "player"; p: Player } => c.type === "player").map((c) => c.p);
+  // Yardage for the hole header: if every shown player is on the same tee, use that
+  // tee's yardages (resolves even for older games whose holes_meta had none);
+  // otherwise fall back to the game's stored yardage.
+  const refTee = playerOrder.length && playerOrder.every((p) => p.tee_name === playerOrder[0].tee_name) ? playerOrder[0].tee_name : null;
+  const ydsAt = (idx: number, fallback: number | null | undefined) => {
+    const t = refTee ? courseTees.find((x) => x.name === refTee) : null;
+    return (t?.yardages?.[idx] ?? fallback ?? null);
+  };
   const colorFor = (p: Player): string => {
     if (Array.isArray(game.teams) && game.teams.length && p.team) {
       const ti = game.teams.findIndex((t) => t.key === p.team);
@@ -3212,7 +3221,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
       <div key={`hc${i}`} style={{ background: "#13352A", border: "1px solid #2E6B55", borderRadius: 10, padding: 8, marginBottom: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
           <span style={{ color: C.cream, fontSize: 18, fontWeight: 800, lineHeight: 1 }}>Hole {m.n}</span>
-          <span style={{ color: "#CFE3D8", fontSize: 13 }}>Par <b style={{ color: C.cream }}>{m.par}</b>{m.yards ? <> · <b style={{ color: C.cream }}>{m.yards}</b> yds</> : null} · SI <b style={{ color: C.cream }}>{m.si ?? "–"}</b></span>
+          <span style={{ color: "#CFE3D8", fontSize: 13 }}>Par <b style={{ color: C.cream }}>{m.par}</b>{(() => { const y = ydsAt(i, m.yards); return y ? <> · <b style={{ color: C.cream }}>{y}</b> yds</> : null; })()} · SI <b style={{ color: C.cream }}>{m.si ?? "–"}</b></span>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           {cols.map((c, ci) => {
@@ -3431,7 +3440,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
                   </div>
                 )}
               </div>
-              <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>Par {m.par}{m.yards ? ` · ${m.yards} yds` : ""} · SI {m.si ?? "–"}</div>
+              <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>Par {m.par}{(() => { const y = ydsAt(edit.holeIdx, m.yards); return y ? ` · ${y} yds` : ""; })()} · SI {m.si ?? "–"}</div>
 
               <div style={{ color: C.ink, fontSize: 13, marginTop: 14, marginBottom: 5 }}>Score (gross)</div>
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
