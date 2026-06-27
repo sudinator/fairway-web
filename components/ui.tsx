@@ -417,7 +417,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           const maxPutts = h.strokes != null && h.strokes > 0 ? Math.min(h.strokes, 6) : 6;
           const pts = stablefordPts(h.strokes, h.par, h.recv || 0);
           return (
-            <div key={i} onClick={() => openEdit(i)} style={{ borderBottom: `1px solid ${C.line}`, paddingBottom: 5, marginTop: j === 0 ? 0 : 4, cursor: "pointer", borderRadius: 8, background: edit === i ? "#EDF3EE" : "transparent" }}>
+            <div key={i} style={{ borderBottom: `1px solid ${C.line}`, paddingBottom: 5, marginTop: j === 0 ? 0 : 4, borderRadius: 8, background: edit === i ? "#EDF3EE" : "transparent" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 2px", flexWrap: "wrap" }}>
                 <span style={{ color: C.ink, fontWeight: 800, fontSize: 14 }}>Hole {h.n}</span>
                 <span style={{ color: C.faint, fontSize: 11, fontWeight: 600 }}>{h.yards ? <>· <b style={{ color: C.green }}>{h.yards}</b> yds </> : null}· S.I. {h.si ?? "–"}</span>
@@ -432,7 +432,9 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
                 })()] : []),
                 ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: (h.gives || 0) > 0 ? C.sage : C.dot, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{h.recv > 0 ? "•".repeat(Math.min(h.recv, 3)) : ((h.gives || 0) > 0 ? "◦".repeat(Math.min(h.gives || 0, 3)) : "")}</div>] : []),
                 <div key="sc" style={{ textAlign: "center" }}>
-                  <ScoreMark hole={h as any} />
+                  <button onClick={(e) => { e.stopPropagation(); openEdit(i); }} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 42, height: 34, padding: "0 6px", border: `1px solid ${h.strokes ? C.line : C.green}`, borderRadius: 8, background: h.strokes ? "#fff" : "#EFF5EE", cursor: "pointer", boxShadow: edit === i ? `0 0 0 2px ${C.green}` : "none" }}>
+                    {h.strokes ? <ScoreMark hole={h as any} /> : <span style={{ color: C.green, fontWeight: 800, fontSize: 18, lineHeight: 1 }}>+</span>}
+                  </button>
                 </div>,
                 ...(showFairway ? [
                   <div key="fw" style={{ textAlign: "center" }}>
@@ -515,7 +517,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     const runCol = run === "" ? C.faint : run === "AS" ? C.ink : (run.includes("UP") || run.includes("↑")) ? C.greenMid : C.birdie;
     const yds = h.yards ?? null;
     return (
-      <div key={h.n} onClick={() => openEdit(i)} style={{ background: C.card, border: `1px solid ${edit === i ? C.gold : C.line}`, borderRadius: 13, overflow: "hidden", cursor: "pointer" }}>
+      <div key={h.n} style={{ background: C.card, border: `1px solid ${edit === i ? C.gold : C.line}`, borderRadius: 13, overflow: "hidden" }}>
         <div style={{ background: C.green, color: C.cream, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 12px" }}>
           <span style={{ fontSize: 16, fontWeight: 800 }}>{h.n}</span>
           <span style={{ fontSize: 12, color: C.sage, fontWeight: 600, flex: 1, marginLeft: 10 }}>Par <b style={{ color: "#EDE7D4" }}>{h.par}</b>{yds ? <> · <b style={{ color: "#EDE7D4" }}>{yds}</b> yds</> : null} · S.I. <b style={{ color: "#EDE7D4" }}>{h.si ?? "–"}</b></span>
@@ -524,7 +526,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "flex-end", padding: "5px 4px 6px", gap: 3 }}>
-          {mCell("Score", <div style={{ height: 34, display: "flex", alignItems: "center", justifyContent: "center" }}><ScoreMark hole={h as any} /></div>)}
+          {mCell("Score", <button onClick={(e) => { e.stopPropagation(); openEdit(i); }} style={{ height: 34, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${h.strokes ? C.line : C.green}`, borderRadius: 8, background: h.strokes ? "#fff" : "#EFF5EE", cursor: "pointer" }}>{h.strokes ? <ScoreMark hole={h as any} /> : <span style={{ color: C.green, fontWeight: 800, fontSize: 18, lineHeight: 1 }}>+</span>}</button>)}
           {mCell("FW", valBox(h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "left" ? "L" : h.fairway === "right" ? "R" : h.fairway === "miss" ? "✗" : "·", h.fairway === "hit" ? "#0F7A45" : (h.fairway === "left" || h.fairway === "right" || h.fairway === "miss") ? C.birdie : C.faint, 14))}
           {mCell("Putt", valBox(h.putts ?? "·", C.faint, 15))}
           {mCell("S/Pen", valBox(spDisp, spActive ? C.birdie : C.faint, spDisp === "*" ? 18 : 15))}
