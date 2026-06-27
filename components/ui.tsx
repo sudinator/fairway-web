@@ -289,7 +289,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     const sFwHit = seg.filter((h) => h.par >= 4 && h.fairway === "hit").length;
     // Option B: Hole no. + yardage (this player's tee) + S.I. on a top line; the
     // interactive scoring cells get their own full-width row beneath.
-    const cols = `24px${showOpp ? " 40px" : ""}${hasDots ? " 28px" : ""} 1fr${showFairway ? " 30px" : ""}${showPutts ? " 54px" : ""}${showPenalties ? " 54px" : ""} 28px${showRun ? " 44px" : ""}`;
+    const cols = `0.8fr${showOpp ? " 0.9fr" : ""}${hasDots ? " 0.7fr" : ""} 1.35fr${showFairway ? " 0.85fr" : ""}${showPutts ? " 1.15fr" : ""}${showPenalties ? " 1fr" : ""} 0.75fr${showRun ? " 0.95fr" : ""}`;
     const GridRow = (cells: React.ReactNode[], opts?: { header?: boolean }) => (
       <div style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4, padding: opts?.header ? "0 2px 6px" : "3px 2px 0" }}>{cells}</div>
     );
@@ -620,7 +620,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
     const fwHit = seg.filter((h) => h.par >= 4 && h.fairway === "hit").length;
     // Two rows per hole (Option B): top line = fixed facts (Hole no., yardage, S.I.);
     // scoring row beneath. Keeps score cells uncrowded on a phone.
-    const cols = `40px${hasDots ? " 34px" : ""} 1fr${hasFw ? " 34px" : ""}${hasPutts ? " 40px" : ""}${hasPens ? " 44px" : ""} 40px`;
+    const cols = `1fr${hasDots ? " 0.8fr" : ""} 1.2fr${hasFw ? " 0.9fr" : ""}${hasPutts ? " 1fr" : ""}${hasPens ? " 1fr" : ""} 1fr`;
     const GridRow = (cells: React.ReactNode[], opts?: { header?: boolean }) => (
       <div style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4, padding: opts?.header ? "0 4px 6px" : "2px 4px 0" }}>{cells}</div>
     );

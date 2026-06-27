@@ -13,12 +13,81 @@ const FMT_LABEL: Record<string, string> = {
   fourball: "Four-ball", skins: "Skins", trifecta: "Trifecta",
 };
 
-// Share the CURRENT user's own scorecard from a game as the same vertical card
-// shown under Rounds. Renders an on-screen preview (so they see exactly what's
-// shared), then exports a PNG to the share sheet, with download + copy-text fallbacks.
-export function ShareScorecardModal({ game, player, onClose }: { game: any; player: any; onClose: () => void }) {
+// Shared presentation + share/copy logic for both the game card and the solo-round
+// card. Renders an on-screen preview (so the player sees exactly what's shared),
+// exports a PNG to the share sheet, with download + copy-text fallbacks.
+function ShareModalInner({ round, statusFinal, fmtLabel, title, subtitle, summaryLine, fileBase, buildText, onClose }: {
+  round: Round; statusFinal: boolean; fmtLabel: string;
+  title: string; subtitle: string; summaryLine: React.ReactNode; fileBase: string;
+  buildText: () => string; onClose: () => void;
+}) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const shareImage = async () => {
+    if (!cardRef.current) return;
+    setBusy(true); setMsg(null);
+    try {
+      const dataUrl = await toPng(cardRef.current, { pixelRatio: 2, backgroundColor: C.green, cacheBust: true });
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], `${(fileBase || "scorecard").replace(/[^a-z0-9]+/gi, "-")}.png`, { type: "image/png" });
+      const navAny = navigator as any;
+      if (navAny.canShare && navAny.canShare({ files: [file] }) && navAny.share) {
+        await navAny.share({ files: [file], title });
+        setMsg(null);
+      } else {
+        const a = document.createElement("a");
+        a.href = dataUrl; a.download = file.name; a.click();
+        setMsg("Image downloaded — attach it in your chat.");
+      }
+    } catch {
+      setMsg("Couldn't make the image here. Try \u201cCopy as text\u201d instead.");
+    }
+    setBusy(false);
+  };
+
+  const copyText = async () => {
+    try { await navigator.clipboard.writeText(buildText()); setMsg("Copied — paste it into your chat."); }
+    catch { setMsg("Couldn't copy automatically on this device."); }
+  };
+
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, zIndex: 1100, overflowY: "auto" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 380, width: "100%", margin: "10px 0 40px" }}>
+        {/* The exportable card */}
+        <div ref={cardRef} style={{ background: C.green, borderRadius: 18, padding: "16px 14px 14px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.4, padding: "3px 9px", borderRadius: 999, background: statusFinal ? "#3F3414" : "#1f7a52", color: statusFinal ? "#E4CF86" : "#CFF5E2" }}>{statusFinal ? "FINAL" : "LIVE"}</span>
+            <span style={{ color: C.gold, fontSize: 11, letterSpacing: 1.4, fontWeight: 700 }}>{fmtLabel}</span>
+          </div>
+          <div style={{ fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, color: C.cream, marginTop: 10 }}>{title}</div>
+          <div style={{ color: C.sage, fontSize: 13, marginTop: 3 }}>{subtitle}</div>
+          <div style={{ color: C.cream, fontSize: 13.5, marginTop: 10, fontWeight: 700 }}>{summaryLine}</div>
+          <div style={{ marginTop: 12 }}>
+            <ScoreViewCard round={round} />
+          </div>
+          <div style={{ textAlign: "center", color: C.sage, fontSize: 11, marginTop: 14, opacity: 0.85 }}>
+            shared from <span style={{ fontFamily: "Georgia, serif", fontWeight: 800, color: C.cream }}>Birdie<span style={{ color: C.gold }}> Num Num</span></span>
+          </div>
+        </div>
+
+        {/* Controls (not part of the exported image) */}
+        <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+          <button onClick={shareImage} disabled={busy} style={{ ...btn(true), flex: 1, minWidth: 130, padding: "10px 0", opacity: busy ? 0.6 : 1 }}>{busy ? "Preparing…" : "📤 Share image"}</button>
+          <button onClick={copyText} style={{ ...btn(false), flex: 1, minWidth: 110, padding: "10px 0" }}>Copy as text</button>
+        </div>
+        {msg && <div style={{ color: C.sage, fontSize: 12.5, marginTop: 10, textAlign: "center" }}>{msg}</div>}
+        <div style={{ textAlign: "center", marginTop: 10 }}>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: C.sage, fontSize: 13, cursor: "pointer" }}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Share the CURRENT user's own scorecard from a GAME.
+export function ShareScorecardModal({ game, player, onClose }: { game: any; player: any; onClose: () => void }) {
   // Load the course's per-tee yardages so the card shows THIS player's tee.
   const [courseTees, setCourseTees] = useState<CourseTee[]>([]);
   useEffect(() => {
@@ -29,7 +98,6 @@ export function ShareScorecardModal({ game, player, onClose }: { game: any; play
       setCourseTees(Array.isArray(tees) ? tees : []);
     }).catch(() => {});
   }, [game?.group_id, game?.course]);
-  const [msg, setMsg] = useState<string | null>(null);
 
   const { round, gross, net, pts, dateStr } = useMemo(() => {
     const meta = (game.holes_meta || []) as { n: number; par: number; si: number | null }[];
@@ -59,7 +127,6 @@ export function ShareScorecardModal({ game, player, onClose }: { game: any; play
 
   const ended = game.status === "ended";
   const fmt = FMT_LABEL[game.game_type] || "Game";
-
   const buildText = () => {
     const lines: string[] = [];
     lines.push(game.name || "Scorecard");
@@ -68,74 +135,55 @@ export function ShareScorecardModal({ game, player, onClose }: { game: any; play
     lines.push("");
     const pad = (v: any, n: number) => String(v).padStart(n);
     lines.push(" H | Par | Score");
-    round.holes.forEach((h) => {
-      lines.push(`${pad(h.hole_number, 2)} | ${pad(h.par, 3)} | ${pad(h.strokes ?? "-", 5)}`);
-    });
-    lines.push("");
-    lines.push("shared from Birdie Num Num");
+    round.holes.forEach((h) => { lines.push(`${pad(h.hole_number, 2)} | ${pad(h.par, 3)} | ${pad(h.strokes ?? "-", 5)}`); });
+    lines.push(""); lines.push("shared from Birdie Num Num");
     return lines.join("\n");
   };
 
-  const shareImage = async () => {
-    if (!cardRef.current) return;
-    setBusy(true); setMsg(null);
-    try {
-      const dataUrl = await toPng(cardRef.current, { pixelRatio: 2, backgroundColor: C.green, cacheBust: true });
-      const blob = await (await fetch(dataUrl)).blob();
-      const file = new File([blob], `${(game.name || "scorecard").replace(/[^a-z0-9]+/gi, "-")}.png`, { type: "image/png" });
-      const navAny = navigator as any;
-      if (navAny.canShare && navAny.canShare({ files: [file] }) && navAny.share) {
-        await navAny.share({ files: [file], title: game.name || "Scorecard" });
-        setMsg(null);
-      } else {
-        const a = document.createElement("a");
-        a.href = dataUrl; a.download = file.name; a.click();
-        setMsg("Image downloaded — attach it in your chat.");
-      }
-    } catch {
-      setMsg("Couldn't make the image here. Try \u201cCopy as text\u201d instead.");
-    }
-    setBusy(false);
-  };
+  return (
+    <ShareModalInner
+      round={round} statusFinal={ended} fmtLabel={fmt.toUpperCase()}
+      title={game.name || "Scorecard"}
+      subtitle={`${game.course || ""}${dateStr ? ` · ${dateStr}` : ""}${game.course_par ? ` · Par ${game.course_par}` : ""}`}
+      summaryLine={<>{player.display_name} <span style={{ color: C.sage, fontWeight: 500 }}>· gross {gross} · net {net} · {pts} pts</span></>}
+      fileBase={game.name || "scorecard"} buildText={buildText} onClose={onClose}
+    />
+  );
+}
 
-  const copyText = async () => {
-    try { await navigator.clipboard.writeText(buildText()); setMsg("Copied — paste it into your chat."); }
-    catch { setMsg("Couldn't copy automatically on this device."); }
+// Share a SOLO round from the round summary. The round already carries its holes
+// (with per-tee yardage and recv), so no course lookup is needed.
+export function ShareRoundModal({ round, playerName, onClose }: { round: any; playerName?: string; onClose: () => void }) {
+  const { gross, net, pts, dateStr } = useMemo(() => {
+    const holes = (round.holes || []) as Hole[];
+    const gross = holes.reduce((s, h) => s + (h.strokes || 0), 0);
+    const net = holes.reduce((s, h) => s + (h.strokes != null ? h.strokes - (h.recv || 0) : 0), 0);
+    const pts = holes.reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
+    let dateStr = "";
+    try { dateStr = round.played_at ? fmtDate(round.played_at) : ""; } catch { dateStr = String(round.played_at || ""); }
+    return { gross, net, pts, dateStr };
+  }, [round]);
+
+  const subtitle = `${round.tee_name ? `${round.tee_name} tees · ` : ""}${dateStr}${round.course_par ? ` · Par ${round.course_par}` : ""}`;
+  const buildText = () => {
+    const lines: string[] = [];
+    lines.push(round.course || "Round");
+    lines.push(subtitle);
+    lines.push(`${playerName ? `${playerName} — ` : ""}gross ${gross} · net ${net} · ${pts} pts`);
+    lines.push("");
+    const pad = (v: any, n: number) => String(v).padStart(n);
+    lines.push(" H | Par | Score");
+    (round.holes || []).forEach((h: Hole) => { lines.push(`${pad(h.hole_number, 2)} | ${pad(h.par, 3)} | ${pad(h.strokes ?? "-", 5)}`); });
+    lines.push(""); lines.push("shared from Birdie Num Num");
+    return lines.join("\n");
   };
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, zIndex: 1100, overflowY: "auto" }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 380, width: "100%", margin: "10px 0 40px" }}>
-
-        {/* The exportable card */}
-        <div ref={cardRef} style={{ background: C.green, borderRadius: 18, padding: "16px 14px 14px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.4, padding: "3px 9px", borderRadius: 999, background: ended ? "#3F3414" : "#1f7a52", color: ended ? "#E4CF86" : "#CFF5E2" }}>{ended ? "FINAL" : "LIVE"}</span>
-            <span style={{ color: C.gold, fontSize: 11, letterSpacing: 1.4, fontWeight: 700 }}>{fmt.toUpperCase()}</span>
-          </div>
-          <div style={{ fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, color: C.cream, marginTop: 10 }}>{game.name}</div>
-          <div style={{ color: C.sage, fontSize: 13, marginTop: 3 }}>{game.course}{dateStr ? ` · ${dateStr}` : ""}{game.course_par ? ` · Par ${game.course_par}` : ""}</div>
-          <div style={{ color: C.cream, fontSize: 13.5, marginTop: 10, fontWeight: 700 }}>
-            {player.display_name} <span style={{ color: C.sage, fontWeight: 500 }}>· gross {gross} · net {net} · {pts} pts</span>
-          </div>
-          <div style={{ marginTop: 12 }}>
-            <ScoreViewCard round={round} />
-          </div>
-          <div style={{ textAlign: "center", color: C.sage, fontSize: 11, marginTop: 14, opacity: 0.85 }}>
-            shared from <span style={{ fontFamily: "Georgia, serif", fontWeight: 800, color: C.cream }}>Birdie<span style={{ color: C.gold }}> Num Num</span></span>
-          </div>
-        </div>
-
-        {/* Controls (not part of the exported image) */}
-        <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-          <button onClick={shareImage} disabled={busy} style={{ ...btn(true), flex: 1, minWidth: 130, padding: "10px 0", opacity: busy ? 0.6 : 1 }}>{busy ? "Preparing…" : "📤 Share image"}</button>
-          <button onClick={copyText} style={{ ...btn(false), flex: 1, minWidth: 110, padding: "10px 0" }}>Copy as text</button>
-        </div>
-        {msg && <div style={{ color: C.sage, fontSize: 12.5, marginTop: 10, textAlign: "center" }}>{msg}</div>}
-        <div style={{ textAlign: "center", marginTop: 10 }}>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: C.sage, fontSize: 13, cursor: "pointer" }}>Close</button>
-        </div>
-      </div>
-    </div>
+    <ShareModalInner
+      round={round as Round} statusFinal={true} fmtLabel="ROUND"
+      title={round.course || "Round"} subtitle={subtitle}
+      summaryLine={<>{playerName ? `${playerName} ` : ""}<span style={{ color: C.sage, fontWeight: 500 }}>{playerName ? "· " : ""}gross {gross} · net {net} · {pts} pts</span></>}
+      fileBase={round.course || "round"} buildText={buildText} onClose={onClose}
+    />
   );
 }

@@ -11,12 +11,14 @@ import { createClient } from "@/lib/supabase";
 
 const supabase = createClient();
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
+import { ShareRoundModal } from "@/components/share-card";
 
 export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEmail, onBack, onEdit, onDelete }: {
   round: Round; ghinNumber?: string | null; playerName?: string; priorRounds?: Round[]; userEmail?: string | null; onBack: () => void; onEdit: () => void; onDelete: () => void;
 }) {
   const gross = isGrossOnly(round);
   const [showGhin, setShowGhin] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -32,6 +34,7 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
         </div>
         <div style={{ flex: 1 }} />
         <button style={btn(true)} onClick={() => setShowGhin((v) => !v)}>{showGhin ? "Hide GHIN" : "Post to GHIN"}</button>
+        {!gross && <button style={btn(false)} onClick={() => setShowShare(true)}>📤 Share</button>}
         <button style={btn(false)} onClick={onEdit}>Edit round</button>
         <button style={{ ...btn(false), background: "#7A2F28" }}
           onClick={() => { if (confirm("Delete this round?")) onDelete(); }}>Delete</button>
@@ -59,6 +62,7 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
           <div style={{ marginTop: 14 }}><ScoreViewCard round={round} /></div>
         </>
       )}
+      {showShare && <ShareRoundModal round={round} playerName={playerName} onClose={() => setShowShare(false)} />}
     </div>
   );
 }

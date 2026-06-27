@@ -66,9 +66,11 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
       const base = courseHoles.length >= 9
         ? courseHoles
         : Array.from({ length: 18 }, (_, i) => ({ n: i + 1, par: 4, si: i + 1 }));
+      const myTee = ((fav?.data?.tees || []) as any[]).find((t) => t.name === round.tee_name);
       const alloc = allocateStrokes(base.map((h) => ({ hole_number: h.n, stroke_index: h.si })), round.course_handicap);
-      setHoles(base.map((h) => ({
+      setHoles(base.map((h, i) => ({
         hole_number: h.n, par: h.par, stroke_index: h.si,
+        yardage: myTee?.yardages?.[i] ?? null,
         strokes: null, putts: null, fairway: null, penalties: 0,
         recv: alloc[h.n] || 0,
       })));
@@ -119,7 +121,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         if (missing.length) {
           const { error: blankErr } = await supabase.from("holes").insert(missing.map((h) => ({
             round_id: rid, hole_number: h.hole_number, par: h.par,
-            stroke_index: h.stroke_index, strokes: null, putts: null, fairway: null, penalties: 0,
+            stroke_index: h.stroke_index, yardage: h.yardage ?? null, strokes: null, putts: null, fairway: null, penalties: 0,
           })));
           if (blankErr) { blanksRef.current = false; setBgSaveFailed(true); return; }
         }
@@ -308,7 +310,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         if (missing.length) {
           await supabase.from("holes").insert(missing.map((h) => ({
             round_id: roundId, hole_number: h.hole_number, par: h.par,
-            stroke_index: h.stroke_index, strokes: null, putts: null, fairway: null, penalties: 0,
+            stroke_index: h.stroke_index, yardage: h.yardage ?? null, strokes: null, putts: null, fairway: null, penalties: 0,
           })));
         }
         for (const h of holes) {
@@ -330,7 +332,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         roundId = r.id;
         const rows = holes.map((h) => ({
           round_id: roundId, hole_number: h.hole_number, par: h.par,
-          stroke_index: h.stroke_index, strokes: h.strokes, putts: h.putts,
+          stroke_index: h.stroke_index, yardage: h.yardage ?? null, strokes: h.strokes, putts: h.putts,
           fairway: h.fairway, penalties: h.penalties || 0, sand: h.sand ?? false,
         }));
         const { error: e2 } = await supabase.from("holes").insert(rows);
@@ -406,7 +408,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         holes={(() => {
           const alloc = allocateStrokes(holes.map((h) => ({ hole_number: h.hole_number, stroke_index: h.stroke_index })), round.course_handicap);
           return holes.map((h) => ({
-            n: h.hole_number, par: h.par, si: h.stroke_index,
+            n: h.hole_number, par: h.par, si: h.stroke_index, yards: h.yardage ?? null,
             strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties, sand: h.sand,
             recv: alloc[h.hole_number] || 0,
           }));
