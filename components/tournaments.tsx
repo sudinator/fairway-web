@@ -47,6 +47,7 @@ import {
   Eyebrow,
   NumPicker,
   ScoreEntryCard,
+  HoleScoreModal,
   ShortDateInput,
   Avatar,
 } from "@/components/ui";
@@ -3403,11 +3404,6 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
         const penN = p.penalties?.[edit.holeIdx] || 0;
         const sandOn = !!p.sand?.[edit.holeIdx];
         const recv = recvFor(p, m.si);
-        const net = gross != null && gross > 0 ? gross - recv : null;
-        const netDouble = m.par + 2 + recv;
-        const clampG = (v: number) => Math.max(1, Math.min(m.par + 8, v)); // entry uncapped beyond net double (aggregate needs the true score); handicap re-caps at posting via adjustedHoleScore
-        const sfPts = stablefordPts(gross, m.par, recv);
-        const picks = Array.from(new Set([m.par - 1, m.par, m.par + 1, m.par + 2].filter((v) => v >= 1 && v <= netDouble)));
         const order = playerOrder;
         const goNext = () => {
           // Save the player we're leaving (default to par if untouched).
@@ -3427,72 +3423,25 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
           }
           setEdit(null); // whole row scored — card disappears
         };
-        const fwBtns: [("hit" | "left" | "right"), string][] = [["hit", "✓ Hit"], ["left", "◀ Left"], ["right", "Right ▶"]];
         return (
-          <div onClick={() => setEdit(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ width: 300, maxWidth: "100%", background: C.card, borderRadius: 14, padding: 16 }}>
-              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-                <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{p.display_name} · Hole {m.n}</div>
-                {recv > 0 && (
-                  <div style={{ color: "#E8730C", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
-                    {Array.from({ length: Math.min(recv, 3) }).map((_, d) => <span key={d} style={{ width: 6, height: 6, borderRadius: 99, background: "#E8730C", display: "inline-block" }} />)}
-                    gets {recv} stroke{recv === 1 ? "" : "s"}
-                  </div>
-                )}
-              </div>
-              <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>Par {m.par}{(() => { const y = ydsAt(edit.holeIdx, m.yards); return y ? ` · ${y} yds` : ""; })()} · SI {m.si ?? "–"}</div>
-
-              <div style={{ color: C.ink, fontSize: 13, marginTop: 14, marginBottom: 5 }}>Score (gross)</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <button onClick={() => onSetHole(p.id, edit.holeIdx, { strokes: clampG((gross || m.par) - 1) })} style={{ width: 38, height: 38, borderRadius: 8, border: `0.5px solid ${C.line}`, background: C.card, color: C.ink, fontSize: 20, cursor: "pointer" }}>−</button>
-                <div style={{ flex: 1, textAlign: "center" }}>
-                  <span style={{ fontSize: 26, fontWeight: 800, color: net == null ? C.faint : net < m.par ? "#1B7A4B" : net === m.par ? "#1E5B8A" : "#C0392B" }}>{gross && gross > 0 ? gross : "–"}</span>
-                  {net != null && <span style={{ color: C.faint, fontSize: 12 }}> · net {net}</span>}
-                  {gross != null && gross > 0 && <span style={{ color: "#0E3B2E", fontSize: 12, fontWeight: 800, background: "#E7EFE9", borderRadius: 6, padding: "1px 7px", marginLeft: 6 }}>{sfPts ?? 0} pts</span>}
-                </div>
-                <button onClick={() => onSetHole(p.id, edit.holeIdx, { strokes: clampG((gross || m.par) + 1) })} style={{ width: 38, height: 38, borderRadius: 8, border: "none", background: gross != null && gross >= m.par + 8 ? "#9BB8AC" : C.green, color: "#fff", fontSize: 20, cursor: "pointer" }}>+</button>
-              </div>
-              <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                {picks.map((v) => {
-                  const on = gross === v;
-                  return <button key={v} onClick={() => onSetHole(p.id, edit.holeIdx, { strokes: v })} style={{ flex: 1, textAlign: "center", padding: "7px 0", borderRadius: 8, border: `0.5px solid ${on ? C.green : C.line}`, background: on ? C.green : "#FBF8EE", color: on ? "#fff" : "#5C5847", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{v}</button>;
-                })}
-                <button onClick={() => onSetHole(p.id, edit.holeIdx, { strokes: netDouble })} style={{ flex: 1, textAlign: "center", padding: "7px 0", borderRadius: 8, border: `0.5px solid ${gross === netDouble ? "#8B6A12" : "#E0CC8A"}`, background: gross === netDouble ? "#EAD79A" : "#F6EFD8", color: "#8B6A12", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>pickup</button>
-              </div>
-
-              <div style={{ color: C.ink, fontSize: 13, marginTop: 14, marginBottom: 5 }}>Fairway {m.par < 4 ? <span style={{ color: C.faint }}>· n/a on a par 3</span> : ""}</div>
-              <div style={{ display: "flex", gap: 6, opacity: m.par < 4 ? 0.4 : 1, pointerEvents: m.par < 4 ? "none" : "auto" }}>
-                {fwBtns.map(([val, label]) => {
-                  const on = fw === val; const isHit = val === "hit";
-                  return <button key={val} onClick={() => onSetHole(p.id, edit.holeIdx, { fairway: fw === val ? null : val })} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: `0.5px solid ${on ? (isHit ? "#156B47" : C.birdie) : C.line}`, background: on ? (isHit ? "#C7E6D1" : "#F2CFCB") : C.card, color: on ? (isHit ? "#0F5436" : C.birdie) : C.faint, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{label}</button>;
-                })}
-              </div>
-
-              <div style={{ color: C.ink, fontSize: 13, marginTop: 14, marginBottom: 5 }}>Putts {putts == null ? <span style={{ color: C.faint, fontWeight: 400 }}>· grey 2 = not recorded, tap to start</span> : ""}</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <button onClick={() => onSetHole(p.id, edit.holeIdx, { putts: putts == null ? 2 : Math.max(0, putts - 1) })} style={{ width: 34, height: 34, borderRadius: 8, border: `0.5px solid ${C.line}`, background: C.card, color: C.ink, fontSize: 18, cursor: "pointer" }}>−</button>
-                <span onClick={() => { if (putts == null) onSetHole(p.id, edit.holeIdx, { putts: 2 }); }} style={{ fontSize: 18, fontWeight: 700, minWidth: 20, textAlign: "center", color: putts == null ? "#C7C2B0" : C.ink, cursor: putts == null ? "pointer" : "default" }}>{putts == null ? 2 : putts}</span>
-                <button onClick={() => onSetHole(p.id, edit.holeIdx, { putts: putts == null ? 2 : Math.min(10, putts + 1) })} style={{ width: 34, height: 34, borderRadius: 8, border: "none", background: C.green, color: "#fff", fontSize: 18, cursor: "pointer" }}>+</button>
-                {putts != null && <span onClick={() => onSetHole(p.id, edit.holeIdx, { putts: null })} style={{ color: "#B0AB98", fontSize: 11, textDecoration: "underline", cursor: "pointer", marginLeft: 4 }}>clear</span>}
-              </div>
-
-              <div style={{ color: C.ink, fontSize: 13, marginTop: 14, marginBottom: 5 }}>Sand / Penalty</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                <button onClick={() => onSetHole(p.id, edit.holeIdx, { sand: !sandOn })} style={{ border: `1px solid ${sandOn ? "#C9A227" : C.line}`, background: sandOn ? "#EFE2C0" : C.card, color: sandOn ? "#7A5A12" : C.faint, borderRadius: 8, padding: "8px 12px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>{sandOn ? "S · bunker" : "S"}</button>
-                <span style={{ color: C.line }}>|</span>
-                {[0, 1, 2, 3].map((nn) => (
-                  <button key={nn} onClick={() => onSetHole(p.id, edit.holeIdx, { penalties: nn })} style={{ width: 34, padding: "8px 0", textAlign: "center", border: `1px solid ${penN === nn ? C.birdie : C.line}`, background: penN === nn ? "#F6DEDB" : C.card, color: penN === nn ? C.birdie : C.faint, borderRadius: 8, fontWeight: 800, fontSize: 13, cursor: "pointer" }}>{nn}</button>
-                ))}
-              </div>
-
-              <div style={{ display: "flex", gap: 6, marginTop: 16 }}>
-                <button onClick={() => onSetHole(p.id, edit.holeIdx, { strokes: null, putts: null, fairway: null, penalties: 0, sand: false })} style={{ flex: 1, background: C.greenLight, color: C.cream, border: "none", borderRadius: 8, padding: "11px 4px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>Clear</button>
-                <button onClick={goNext} style={{ flex: 1.3, background: C.gold, color: C.ink, border: "none", borderRadius: 8, padding: "11px 4px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>{"Save & next ▸"}</button>
-                <button onClick={() => setEdit(null)} style={{ flex: 1, background: C.green, color: C.cream, border: "none", borderRadius: 8, padding: "11px 4px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>Done</button>
-              </div>
-              <div style={{ color: C.faint, fontSize: 10, textAlign: "center", marginTop: 8 }}>Only the score is required · enter your real score, every stroke counts. For handicap, each hole is capped at net double bogey ({netDouble}).</div>
-            </div>
-          </div>
+          <HoleScoreModal
+            title={`${p.display_name} · Hole ${m.n}`}
+            par={m.par}
+            si={m.si ?? null}
+            yardage={ydsAt(edit.holeIdx, m.yards)}
+            strokes={gross}
+            putts={putts}
+            fairway={fw}
+            penalties={penN}
+            sand={sandOn}
+            recv={recv}
+            showFairway
+            showPutts
+            showPenalties
+            onPatch={(patch) => onSetHole(p.id, edit.holeIdx, patch)}
+            onNext={goNext}
+            onClose={() => setEdit(null)}
+          />
         );
       })()}
       {isMarker && onMarkOut && !groupLocked && (
