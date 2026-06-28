@@ -135,7 +135,7 @@ ever disagree with this summary.
 - **Live**: `get_live_scorecard(token)` (0018, re-created 0021 + 0041) - public,
   alias-keyed read; now returns `trifecta_scoring` and `stroke_basis`.
 - **Scoring**: `set_game_scores` / scorecard-ownership RPCs (0022), `reset_game_scores`
-  (0023), `finish_game` + `post_game_rounds` (0011/0026), `validate_game_player_scores`
+  (0023), `finish_game` + `post_game_rounds` (0011/0026), `post_group_rounds` (0045, posts every player in a tee group when the group finishes), `validate_game_player_scores`
   trigger + `_valid_num_array` (0040, optional).
 - **Default group**: `join_default_group(email)` (0030; refuses blocklisted emails per 0038),
   `admin_set_default_group`.

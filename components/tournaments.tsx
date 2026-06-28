@@ -1347,6 +1347,11 @@ function GameRoom({
   const finishMyGroup = async () => {
     if (!game || !myRow?.tee_group) return;
     await supabase.rpc("finish_tee_group", { p_game: game.id });
+    // Post a round for EVERY player in this tee group — in group scoring the keeper
+    // holds everyone's scores, so finishing the group should write all of them, not
+    // just the keeper's. recordMyGameRound() still runs as a guaranteed fallback for
+    // my own round (in case the group RPC isn't deployed yet); both are idempotent.
+    await supabase.rpc("post_group_rounds", { p_game: game.id, p_tee_group: myRow.tee_group });
     await recordMyGameRound();
     await load();
   };
@@ -2004,6 +2009,12 @@ function GameRoom({
     if (error) { alert("Couldn't change the team scoring — " + error.message); return; }
     await load();
   };
+  const updateSkinsMode = async (mode: "carryover" | "split") => {
+    if (!game) return;
+    const { error } = await supabase.from("games").update({ skins_mode: mode }).eq("id", game.id);
+    if (error) { alert("Couldn't change the tie handling — " + error.message); return; }
+    await load();
+  };
 
   // Organizer: end the game — freezes scores and shows final results.
   const endGame = async () => {
@@ -2076,7 +2087,7 @@ function GameRoom({
         handicap_index: me.handicap_index ?? null,
         course_handicap: me.course_handicap ?? null,
         group_id: (game as any).group_id || null,
-        played_at: (game as any).created_at || new Date().toISOString(),
+        played_at: (game as any).played_at || (game as any).created_at || new Date().toISOString(),
         status: "final" as const,
         gross_score: gross,
         game_id: game.id,
@@ -2525,7 +2536,7 @@ function GameRoom({
           onSetTeeGroup: setPlayerTeeGroup, onRename: renameGame, onDelete: deleteGame,
           onEnd: requestEndGame, onReopen: reopenGame, onReset: resetScores, onShare: setShare,
           eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,
-          onSetAllowance: setAllowance, onSetFormat: setFormat, onSetTeamScoreMode: setTeamScoreMode, anyScores,
+          onSetAllowance: setAllowance, onSetFormat: setFormat, onSetTeamScoreMode: setTeamScoreMode, onSetSkinsMode: updateSkinsMode, anyScores,
         };
         // --- per-step completion drives the stepper status + the "what's next" line ---
         const total = players.length;
@@ -4879,6 +4890,7 @@ function OrganizerPanel({
   onSetAllowance,
   onSetFormat,
   onSetTeamScoreMode,
+  onSetSkinsMode,
   anyScores = false,
 }: {
   game: Game;
@@ -4904,6 +4916,7 @@ function OrganizerPanel({
   onSetAllowance?: (pct: number) => Promise<void>;
   onSetFormat?: (f: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => Promise<void>;
   onSetTeamScoreMode?: (m: "best_ball" | "aggregate") => Promise<void>;
+  onSetSkinsMode?: (m: "carryover" | "split") => Promise<void>;
   anyScores?: boolean;
 }) {
   const [edits, setEdits] = useState<Record<string, string>>({});
@@ -5267,17 +5280,31 @@ function OrganizerPanel({
               </div>
             )}
 
-            {game.status !== "ended" && (game.game_type === "trifecta" || game.game_type === "fourball") && onSetTeamScoreMode && (
+            {game.status !== "ended" && (game.game_type === "trifecta" || game.game_type === "fourball" || (game.game_type === "skins" && (game.foursomes?.length ?? 0) > 0)) && onSetTeamScoreMode && (
               <div style={{ marginTop: 12 }}>
-                <div style={{ color: C.sage, fontSize: 12 }}>Team point</div>
+                <div style={{ color: C.sage, fontSize: 12 }}>{game.game_type === "skins" ? "Team score" : "Team point"}</div>
                 <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
                   <button onClick={() => onSetTeamScoreMode("best_ball")} style={{ ...btn((game.team_score_mode ?? "best_ball") === "best_ball"), fontSize: 13, padding: "7px 12px" }}>Best ball</button>
-                  <button onClick={() => onSetTeamScoreMode("aggregate")} style={{ ...btn(game.team_score_mode === "aggregate"), fontSize: 13, padding: "7px 12px" }}>Shootout</button>
+                  <button onClick={() => onSetTeamScoreMode("aggregate")} style={{ ...btn(game.team_score_mode === "aggregate"), fontSize: 13, padding: "7px 12px" }}>{game.game_type === "skins" ? "Aggregate" : "Shootout"}</button>
                 </div>
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
                   {game.team_score_mode === "aggregate"
                     ? "Shootout: both partners' net scores are added for the team point — a blow-up by either player hurts."
                     : "Best ball: the team point uses the better net of the two partners."}
+                </div>
+              </div>
+            )}
+            {game.status !== "ended" && game.game_type === "skins" && onSetSkinsMode && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ color: C.sage, fontSize: 12 }}>When a hole ties</div>
+                <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                  <button onClick={() => onSetSkinsMode("carryover")} style={{ ...btn((game.skins_mode ?? "carryover") === "carryover"), fontSize: 13, padding: "7px 12px" }}>Carry over</button>
+                  <button onClick={() => onSetSkinsMode("split")} style={{ ...btn(game.skins_mode === "split"), fontSize: 13, padding: "7px 12px" }}>Halved</button>
+                </div>
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
+                  {game.skins_mode === "split"
+                    ? "Halved: a tied hole is split — half a skin to each side, no carryover."
+                    : "Carry over: a tied hole pushes its skin to the next, building the pot."}
                 </div>
               </div>
             )}

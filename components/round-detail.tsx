@@ -198,6 +198,46 @@ function RoundStats({ round }: { round: Round }) {
   const pd = puttDistribution([round]);
   const gir = girStats([round]);
   const fir = firStats([round]);
+
+  // Round summary: differential + Out / In / Total for gross, net, and Stableford.
+  const holes = round.holes || [];
+  const alloc = allocateStrokes(holes, round.course_handicap ?? null);
+  const nine = (lo: number, hi: number) => {
+    let g = 0, net = 0, pts = 0, played = false;
+    for (const h of holes) {
+      if (h.hole_number < lo || h.hole_number > hi) continue;
+      const sc = h.strokes;
+      if (sc == null || sc <= 0) continue;
+      played = true;
+      const recv = alloc[h.hole_number] || 0;
+      g += sc;
+      net += sc - recv;
+      pts += stablefordPts(sc, h.par, recv) ?? 0;
+    }
+    return { g, net, pts, played };
+  };
+  const outN = nine(1, 9), inN = nine(10, 18);
+  const totN = { g: outN.g + inN.g, net: outN.net + inN.net, pts: outN.pts + inN.pts, played: outN.played || inN.played };
+  const diff = roundDifferential(round);
+  const parPlayed = holes.filter((h) => h.strokes != null && (h.strokes as number) > 0).reduce((sum, h) => sum + h.par, 0);
+  const vsPar = (g: number) => { const d = g - parPlayed; return d === 0 ? "E" : d > 0 ? `+${d}` : `${d}`; };
+
+  const cellTd: React.CSSProperties = { padding: "8px 6px", textAlign: "center" };
+  const th: React.CSSProperties = { ...cellTd, color: C.sage, fontSize: 10, letterSpacing: 1, fontWeight: 700, borderBottom: "1px solid rgba(169,196,181,.25)" };
+  const sumV = (val: number | string, color: string) => <span style={{ fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 18, color }}>{val}</span>;
+  const cellVal = (played: boolean, val: number) => (played ? val : "—");
+  const sumRow = (label: string, o: number | string, i: number | string, t: number | string, color: string, top?: boolean) => {
+    const tb: React.CSSProperties = top ? { borderTop: "1px solid rgba(169,196,181,.25)" } : {};
+    return (
+      <tr>
+        <td style={{ ...cellTd, textAlign: "left", color: C.sage, fontSize: 12, fontWeight: 700, ...tb }}>{label}</td>
+        <td style={{ ...cellTd, ...tb }}>{sumV(o, color)}</td>
+        <td style={{ ...cellTd, ...tb }}>{sumV(i, color)}</td>
+        <td style={{ ...cellTd, background: "rgba(255,253,246,.06)", ...tb }}>{sumV(t, color)}</td>
+      </tr>
+    );
+  };
+
   const stat = (label: string, value: string | number, hint?: string, size = 22) => (
     <div style={{ flex: "1 1 80px", background: C.greenLight, borderRadius: 10, padding: "10px 12px", minWidth: 80 }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: size, fontWeight: 800 }}>{value}</div>
@@ -207,6 +247,42 @@ function RoundStats({ round }: { round: Round }) {
   );
   return (
     <div style={{ marginTop: 14 }}>
+      {holes.length > 0 && (
+        <>
+          <Eyebrow>ROUND SUMMARY</Eyebrow>
+          <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 8 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontFamily: "Georgia, serif", fontSize: 36, fontWeight: 800, lineHeight: 1, color: C.gold }}>{diff != null ? diff.toFixed(1) : "—"}</div>
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>Differential</div>
+              </div>
+              <div style={{ flex: 1, textAlign: "right" }}>
+                <div style={{ fontFamily: "Georgia, serif", fontSize: 36, fontWeight: 800, lineHeight: 1, color: C.cream }}>{totN.g} <span style={{ fontSize: 18, color: C.sage }}>({vsPar(totN.g)})</span></div>
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>Gross · vs par</div>
+              </div>
+            </div>
+            <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 14 }}>
+              <thead>
+                <tr>
+                  <th style={{ ...th, textAlign: "left" }}>&nbsp;</th>
+                  <th style={th}>Out</th>
+                  <th style={th}>In</th>
+                  <th style={{ ...th, background: "rgba(255,253,246,.06)" }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sumRow("Gross", cellVal(outN.played, outN.g), cellVal(inN.played, inN.g), cellVal(totN.played, totN.g), C.cream)}
+                {sumRow("Net", cellVal(outN.played, outN.net), cellVal(inN.played, inN.net), cellVal(totN.played, totN.net), C.cream)}
+                {sumRow("Stableford", cellVal(outN.played, outN.pts), cellVal(inN.played, inN.pts), cellVal(totN.played, totN.pts), C.gold, true)}
+              </tbody>
+            </table>
+            <div style={{ color: C.faint, fontSize: 11, marginTop: 10, lineHeight: 1.4 }}>
+              Differential uses adjusted gross (net double bogey cap) × 113 / slope{round.rating == null || round.slope == null ? " — needs rating + slope" : ""}. Net and Stableford use your full course handicap{round.course_handicap != null ? ` (${round.course_handicap})` : ""}, allocated by stroke index.
+            </div>
+          </div>
+          <div style={{ marginTop: 14 }} />
+        </>
+      )}
       <Eyebrow>GREENS & FAIRWAYS</Eyebrow>
       <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
         {stat("Greens in reg.", gir.total ? `${gir.hit}/${gir.total} · ${pct(gir)}` : "—", undefined, 19)}
