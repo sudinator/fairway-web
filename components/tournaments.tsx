@@ -3757,7 +3757,9 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
     );
   }
 
-  if (game.pairings.length > 0) {
+  // Only the 1:1 matchup view for TEAM 1:1 skins. Individual skins always uses the
+  // per-player view, even if stray/stashed pairings linger on the row.
+  if (isTeamSkins && game.pairings.length > 0) {
     const matchCards = game.pairings.map((pr, idx) => {
       const pa = skinPlayerOf(pr.a), pb = skinPlayerOf(pr.b);
       if (!pa || !pb) return null;
