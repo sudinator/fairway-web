@@ -3961,7 +3961,7 @@ function MatchView({
 
   // ---- Team match play ----
   const teams = game.teams || null;
-  const isTeam = Array.isArray(teams) && teams.length === 2;
+  const isTeam = shapeOf(game).usesTeams;
   const teamName = (key: string | null | undefined) => teams?.find((t) => t.key === key)?.name || "—";
   const teamA = teams && teams[0] ? teams[0] : null;
   const teamB = teams && teams[1] ? teams[1] : null;
@@ -4357,7 +4357,7 @@ function FourballView({
 
   // Ryder-Cup team rollup: each 2-v-2 foursome is worth a point to the winning
   // side's team; a halved foursome is ½ each. Sides must be cross-team.
-  const isTeam = Array.isArray(teams) && teams.length === 2;
+  const isTeam = shapeOf(game).usesTeams;
   const holesCount = game.holes_meta?.length ?? 18;
   const teamStandings = (() => {
     if (!isTeam) return null;
@@ -5382,8 +5382,7 @@ function OrganizerPanel({
             )}
 
             {game.status !== "ended" && game.game_type === "skins" && onSetSkinsStyle && (() => {
-              const teamsArr = Array.isArray(game.teams) ? game.teams : [];
-              const style = teamsArr.length === 2 ? (Array.isArray(game.foursomes) ? "team_2v2" : "team_11") : "individual";
+              const style = shapeOf(game).skinsStyle ?? "individual";
               return (
                 <div style={{ marginTop: 12 }}>
                   <div style={{ color: C.sage, fontSize: 12 }}>Skins style</div>
@@ -5404,7 +5403,7 @@ function OrganizerPanel({
               );
             })()}
             {game.status !== "ended" && game.game_type === "match" && onSetMatchTeam && (() => {
-              const isTeam = Array.isArray(game.teams) && game.teams.length === 2;
+              const isTeam = shapeOf(game).usesTeams;
               return (
                 <div style={{ marginTop: 12 }}>
                   <div style={{ color: C.sage, fontSize: 12 }}>Players</div>
@@ -5433,7 +5432,7 @@ function OrganizerPanel({
               </div>
             )}
             {game.status !== "ended" && game.game_type === "skins" && onSetSkinsMode && (() => {
-              const indiv = !(Array.isArray(game.teams) && game.teams.length === 2);
+              const indiv = shapeOf(game).skinsStyle === "individual";
               const splitBlocked = indiv && players.filter((p) => !p.no_show).length > 4;
               return (
                 <div style={{ marginTop: 12 }}>
