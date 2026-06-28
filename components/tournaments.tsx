@@ -117,6 +117,46 @@ type Player = {
 // player, so guests can be assigned to teams and matches like anyone.
 const pkey = (p: { user_id: string | null; id: string }) => p.user_id ?? p.id;
 
+// ── Canonical game shape ─────────────────────────────────────────────────────
+// shapeOf is the SINGLE place that decides "what mode is this game". Every other
+// site reads these fields instead of re-inferring from teams/foursomes/pairings
+// presence, so leftover or stashed structure can never change behavior. dotBasis
+// is defined to EQUAL the scoring function's basis — keep these in lockstep:
+//   absolute          → computeSkins / allocateStrokes  (stableford, stroke, individual skins)
+//   relative_pair     → matchAllowance                  (singles & team match; 1:1 team skins / computeHeadToHeadSkins)
+//   relative_foursome → fourballNets                    (four-ball, trifecta; 2v2 best-ball skins / computeTeamBestBallSkins)
+type GameShape = {
+  type: Game["game_type"];
+  skinsStyle: "individual" | "team_11" | "team_2v2" | null;
+  usesTeams: boolean;
+  usesMatchups: boolean;
+  usesFoursomes: boolean;
+  dotBasis: "absolute" | "relative_pair" | "relative_foursome";
+  view: "stableford" | "stroke" | "match" | "fourball" | "trifecta" | "skins_individual" | "skins_team_11" | "skins_team_2v2";
+};
+function shapeOf(game: Pick<Game, "game_type" | "teams" | "foursomes">): GameShape {
+  const gt = game.game_type;
+  const teams2 = Array.isArray(game.teams) && game.teams.length === 2;
+  const hasFour = Array.isArray(game.foursomes);
+  const skinsStyle: GameShape["skinsStyle"] =
+    gt !== "skins" ? null : !teams2 ? "individual" : hasFour ? "team_2v2" : "team_11";
+  const usesFoursomes = gt === "fourball" || gt === "trifecta" || skinsStyle === "team_2v2";
+  const usesTeams =
+    gt === "fourball" || gt === "trifecta" || (gt === "match" && teams2) || (gt === "skins" && skinsStyle !== "individual" && skinsStyle !== null);
+  const usesMatchups =
+    gt === "match" || gt === "fourball" || gt === "trifecta" || (gt === "skins" && skinsStyle !== "individual" && skinsStyle !== null);
+  const dotBasis: GameShape["dotBasis"] =
+    gt === "match"
+      ? "relative_pair"
+      : gt === "fourball" || gt === "trifecta"
+      ? "relative_foursome"
+      : gt === "skins"
+      ? (skinsStyle === "team_2v2" ? "relative_foursome" : skinsStyle === "team_11" ? "relative_pair" : "absolute")
+      : "absolute";
+  const view: GameShape["view"] = gt === "skins" ? (`skins_${skinsStyle}` as GameShape["view"]) : gt;
+  return { type: gt, skinsStyle, usesTeams, usesMatchups, usesFoursomes, dotBasis, view };
+}
+
 // The handicap basis for all stroke math: the UNROUNDED course handicap (WHS
 // applies allowances to the unrounded value and rounds once at the end). Falls
 // back to the stored rounded course handicap when index/tee data is missing
@@ -141,7 +181,7 @@ const chBasis = (
 // round to a handicap record still uses the full playing handicap (handled
 // elsewhere) — that is intentionally different from the live match relativity.
 function dotStrokes(
-  game: Pick<Game, "game_type" | "allowance_pct" | "course_par" | "pairings" | "foursomes">,
+  game: Pick<Game, "game_type" | "allowance_pct" | "course_par" | "pairings" | "foursomes" | "teams">,
   p: Player,
   si: number | null,
   allPlayers: Player[],
@@ -149,7 +189,11 @@ function dotStrokes(
   const allowance = game.allowance_pct ?? 100;
   const mine = applyAllowance(chBasis(p, game.course_par), allowance);
   const key = pkey(p);
-  if (game.game_type === "match") {
+  const basis = shapeOf(game).dotBasis;
+
+  // Relative to the paired opponent (lower of the pair plays scratch):
+  // singles & team match, and 1:1 team skins (matches matchAllowance scoring).
+  if (basis === "relative_pair") {
     const pr = (game.pairings || []).find((x) => x.a === key || x.b === key);
     if (pr) {
       const oppId = pr.a === key ? pr.b : pr.a;
@@ -159,13 +203,11 @@ function dotStrokes(
     }
     return matchStrokesFor(mine, si);
   }
-  // Relative-to-foursome-low (the low handicap plays scratch, everyone else takes
-  // the difference): four-ball, trifecta, AND team best-ball skins — all derive the
-  // side's net from fourballNets, which is relative to the lowest playing handicap
-  // in the foursome. Plain and 1:1 skins are NOT here: they use full playing
-  // handicap (computeSkins), so they fall through to the absolute basis below.
-  const fs = (game.foursomes || []).find((f) => [...f.a, ...f.b].includes(key));
-  if (game.game_type === "fourball" || game.game_type === "trifecta" || (game.game_type === "skins" && !!fs)) {
+
+  // Relative to the foursome's lowest playing handicap (low plays scratch):
+  // four-ball, trifecta, 2v2 best-ball skins (matches fourballNets scoring).
+  if (basis === "relative_foursome") {
+    const fs = (game.foursomes || []).find((f) => [...f.a, ...f.b].includes(key));
     let group = allPlayers;
     if (fs) {
       const ids = new Set([...fs.a, ...fs.b]);
@@ -176,6 +218,8 @@ function dotStrokes(
     const low = Math.min(...ref.map((x) => applyAllowance(chBasis(x, game.course_par), allowance)));
     return matchStrokesFor(Math.max(0, mine - low), si);
   }
+
+  // Full playing handicap: stableford, stroke, individual skins.
   return strokesReceived(si, mine);
 }
 
