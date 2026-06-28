@@ -130,6 +130,49 @@ const chBasis = (
   return p.course_handicap ?? 0;
 };
 
+// Orange stroke dots a player RECEIVES on a hole. This MUST match the basis the
+// game's net scoring uses, so the dots can never disagree with the result:
+//   • match           — relative to the opponent (lower of the pair plays scratch)
+//   • fourball / trifecta — relative to the lowest playing handicap in the foursome
+//     (fourballNets), i.e. the low player plays off scratch
+//   • everything else (stableford, stroke, 1:1 skins) — full playing handicap
+// "Playing handicap" = course handicap with the allowance % applied. Posting a
+// round to a handicap record still uses the full playing handicap (handled
+// elsewhere) — that is intentionally different from the live match relativity.
+function dotStrokes(
+  game: Pick<Game, "game_type" | "allowance_pct" | "course_par" | "pairings" | "foursomes">,
+  p: Player,
+  si: number | null,
+  allPlayers: Player[],
+): number {
+  const allowance = game.allowance_pct ?? 100;
+  const mine = applyAllowance(chBasis(p, game.course_par), allowance);
+  const key = pkey(p);
+  if (game.game_type === "match") {
+    const pr = (game.pairings || []).find((x) => x.a === key || x.b === key);
+    if (pr) {
+      const oppId = pr.a === key ? pr.b : pr.a;
+      const opp = allPlayers.find((x) => pkey(x) === oppId);
+      const { a } = matchAllowance(chBasis(p, game.course_par), opp ? chBasis(opp, game.course_par) : null, allowance);
+      return matchStrokesFor(a, si);
+    }
+    return matchStrokesFor(mine, si);
+  }
+  if (game.game_type === "fourball" || game.game_type === "trifecta") {
+    let group = allPlayers;
+    const fs = (game.foursomes || []).find((f) => [...f.a, ...f.b].includes(key));
+    if (fs) {
+      const ids = new Set([...fs.a, ...fs.b]);
+      group = allPlayers.filter((x) => ids.has(pkey(x)));
+    }
+    const active = group.filter((x) => !x.no_show);
+    const ref = active.length ? active : group;
+    const low = Math.min(...ref.map((x) => applyAllowance(chBasis(x, game.course_par), allowance)));
+    return matchStrokesFor(Math.max(0, mine - low), si);
+  }
+  return strokesReceived(si, mine);
+}
+
 // Team accent colour. If the team is *named* after a colour ("Red", "Blue", …) we
 // honour that name so "Red" never shows up blue; otherwise fall back to a stable
 // palette keyed off the team's position (0 / 1).
@@ -2978,7 +3021,7 @@ function GameRoom({
                 fairway: me.fairways?.[i] ?? null,
                 penalties: me.penalties?.[i] ?? null,
                 sand: me.sand?.[i] ?? null,
-                recv: matchAllow != null ? matchStrokesFor(matchAllow, m.si) : (alloc[m.n] || 0),
+                recv: dotStrokes(game, me, m.si, players),
                 // If I receive none but my opponent does, show the holes where I give a stroke.
                 gives: game.game_type === "match" && (matchAllow ?? 0) === 0 && oppAllow != null
                   ? matchStrokesFor(oppAllow, m.si)
@@ -3140,7 +3183,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
     const net = gross - recv;
     return net < par ? GREEN : net === par ? BLUE : RED;
   };
-  const recvFor = (p: Player, si: number | null) => strokesReceived(si, applyAllowance(chBasis(p, game.course_par), allowance));
+  const recvFor = (p: Player, si: number | null) => dotStrokes(game, p, si, players);
 
   // Column order + colour. Stableford: alphabetical. Team match: each pairing's
   // two players adjacent, with a divider between matches. Foursome formats: Pair A
