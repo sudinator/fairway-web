@@ -1,0 +1,12 @@
+-- 0046_structure_stash.sql
+-- Preserve-and-hide for mid-round structure switches. Skins sub-styles (individual
+-- / 1:1 team / 2v2 best-ball) and match (singles / team) are distinguished by the
+-- PRESENCE of teams/foursomes/pairings, so switching to "individual" must null those
+-- live columns for it to score correctly — which would otherwise throw away the
+-- setup work. This column stashes the last team structure so switching back restores
+-- it intact (player team assignments live on game_players and are never touched, so
+-- they survive too). JSON shape:
+--   { "teams": [...]|null, "foursomes": [...]|null, "pairings": [...] }
+-- Additive, nullable, safe to re-run. Plain game_type switches already preserve
+-- structure (setFormat never clears) — this only backs the skins/match sub-toggles.
+alter table games add column if not exists structure_stash jsonb;

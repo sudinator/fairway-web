@@ -77,6 +77,7 @@ type Game = {
   teams?: { key: string; name: string }[] | null; // two named teams for team match play
   foursomes?: { id: string; name: string; a: string[]; b: string[]; swap?: boolean }[] | null; // four-ball / trifecta: pair A vs pair B (swap = cross the singles)
   team_score_mode?: "best_ball" | "aggregate" | null; // trifecta team leg: low net vs both nets added
+  structure_stash?: { teams?: { key: string; name: string }[] | null; foursomes?: { id: string; name: string; a: string[]; b: string[]; swap?: boolean }[] | null; pairings?: { a: string; b: string }[] | null } | null; // last team structure, kept when a format switch hides it so switching back restores it
   trifecta_scoring?: "per_hole" | "match" | null; // trifecta: per-hole points vs Ryder-Cup 1pt-per-match
   share_token?: string | null; // public live-scorecard token (organizer-set); null = not shared
   ended_at?: string | null; // when the game was ended (stamped by trigger); drives the 3-day live window
@@ -2020,29 +2021,44 @@ function GameRoom({
   // recompute. Team styles leave the side assignment to the Matchups step.
   const setSkinsStyle = async (style: "individual" | "team_11" | "team_2v2") => {
     if (!game) return;
-    const isTeamNow = Array.isArray(game.teams) && game.teams.length === 2;
-    if (anyScores && style === "individual" && isTeamNow) {
-      if (!confirm("Switch to individual skins? The team setup is removed, but every score so far is kept and the skins recompute per player.")) return;
-    }
-    const keepTeams = isTeamNow ? game.teams : [{ key: "A", name: "Team 1" }, { key: "B", name: "Team 2" }];
-    const patch: Record<string, unknown> = {
-      game_type: "skins",
-      teams: style === "individual" ? null : keepTeams,
-      foursomes: style === "team_2v2" ? (Array.isArray(game.foursomes) ? game.foursomes : []) : null,
-      pairings: style === "individual" ? [] : ((game as any).pairings ?? []),
-      team_score_mode: style === "team_2v2" ? (game.team_score_mode ?? "best_ball") : "best_ball",
+    const g = game as any;
+    const liveTeams = Array.isArray(g.teams) && g.teams.length === 2 ? g.teams : null;
+    const liveFour = Array.isArray(g.foursomes) ? g.foursomes : null;
+    const livePair = Array.isArray(g.pairings) ? g.pairings : [];
+    const prev = g.structure_stash || {};
+    // Keep the latest team structure so any later switch can restore it intact.
+    const stash = {
+      teams: liveTeams ?? prev.teams ?? null,
+      foursomes: liveFour ?? prev.foursomes ?? null,
+      pairings: (livePair.length ? livePair : prev.pairings) ?? [],
     };
+    if (anyScores && style === "individual" && !!liveTeams) {
+      if (!confirm("Switch to individual skins? The team setup is hidden but kept — switch back and your matchups return. Every score so far stays.")) return;
+    }
+    const defTeams = [{ key: "A", name: "Team 1" }, { key: "B", name: "Team 2" }];
+    let teams: any = null, foursomes: any = null, pairings: any = [];
+    if (style === "team_11") { teams = stash.teams ?? defTeams; foursomes = null; pairings = stash.pairings ?? []; }
+    else if (style === "team_2v2") { teams = stash.teams ?? defTeams; foursomes = stash.foursomes ?? []; pairings = stash.pairings ?? []; }
+    const patch: Record<string, unknown> = { game_type: "skins", teams, foursomes, pairings, structure_stash: stash };
+    let flippedSplit = false;
+    if (style === "individual" && g.skins_mode === "split" && players.filter((p) => !p.no_show).length > 4) {
+      patch.skins_mode = "carryover"; flippedSplit = true;
+    }
     const { error } = await supabase.from("games").update(patch).eq("id", game.id);
     if (error) { alert("Couldn't change the skins style — " + error.message); return; }
     await load();
+    if (flippedSplit) alert("Halved (split) skins is best for up to 4 players — with a bigger field, individual skins is set to carry over instead.");
   };
   // Singles match <-> team match (e.g. 4 v 4). Only flips the team structure;
   // pairings are assigned in Matchups. Scores untouched.
   const setMatchTeam = async (on: boolean) => {
     if (!game) return;
-    const isTeamNow = Array.isArray(game.teams) && game.teams.length === 2;
-    const teams = on ? (isTeamNow ? game.teams : [{ key: "A", name: "Team 1" }, { key: "B", name: "Team 2" }]) : null;
-    const { error } = await supabase.from("games").update({ teams }).eq("id", game.id);
+    const g = game as any;
+    const liveTeams = Array.isArray(g.teams) && g.teams.length === 2 ? g.teams : null;
+    const prev = g.structure_stash || {};
+    const stash = { ...prev, teams: liveTeams ?? prev.teams ?? null };
+    const teams = on ? (stash.teams ?? [{ key: "A", name: "Team 1" }, { key: "B", name: "Team 2" }]) : null;
+    const { error } = await supabase.from("games").update({ teams, structure_stash: stash }).eq("id", game.id);
     if (error) { alert("Couldn't change the match type — " + error.message); return; }
     await load();
   };
@@ -2312,7 +2328,7 @@ function GameRoom({
     if (noHcp > 0) out.push(`${noHcp} player${noHcp > 1 ? "s" : ""} without a handicap — scored off scratch (0) until you set it in the Players tab`);
     const teamsArr = Array.isArray(game.teams) ? game.teams : [];
     const usesTeams = (gt === "match" || gt === "fourball" || gt === "trifecta" || gt === "skins") && teamsArr.length > 0;
-    const usesMatchups = gt === "match" || gt === "fourball" || gt === "skins" || gt === "trifecta";
+    const usesMatchups = gt === "match" || gt === "fourball" || gt === "trifecta" || (gt === "skins" && teamsArr.length > 0);
     if (usesTeams) { const n = players.filter((p) => !p.team).length; if (n > 0) out.push(`${n} player${n > 1 ? "s" : ""} not assigned to a team`); }
     if (usesMatchups) {
       const pairings = Array.isArray(game.pairings) ? game.pairings : [];
@@ -2551,7 +2567,7 @@ function GameRoom({
         // from a previous format are ignored (not shown) without being deleted —
         // switching back to that format restores the work.
         const usesTeams = (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "skins") && teamsArr.length > 0;
-        const usesMatchups = game.game_type === "match" || game.game_type === "fourball" || game.game_type === "skins" || game.game_type === "trifecta";
+        const usesMatchups = game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" || (game.game_type === "skins" && teamsArr.length > 0);
         const usesFoursomes = (game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "skins") && Array.isArray(game.foursomes);
         const steps: { key: "players" | "teams" | "matchups" | "groups"; label: string }[] = [
           { key: "players", label: "Players" },
@@ -5366,20 +5382,26 @@ function OrganizerPanel({
                 </div>
               </div>
             )}
-            {game.status !== "ended" && game.game_type === "skins" && onSetSkinsMode && (
-              <div style={{ marginTop: 12 }}>
-                <div style={{ color: C.sage, fontSize: 12 }}>When a hole ties</div>
-                <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                  <button onClick={() => onSetSkinsMode("carryover")} style={{ ...btn((game.skins_mode ?? "carryover") === "carryover"), fontSize: 13, padding: "7px 12px" }}>Carry over</button>
-                  <button onClick={() => onSetSkinsMode("split")} style={{ ...btn(game.skins_mode === "split"), fontSize: 13, padding: "7px 12px" }}>Halved</button>
+            {game.status !== "ended" && game.game_type === "skins" && onSetSkinsMode && (() => {
+              const indiv = !(Array.isArray(game.teams) && game.teams.length === 2);
+              const splitBlocked = indiv && players.filter((p) => !p.no_show).length > 4;
+              return (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ color: C.sage, fontSize: 12 }}>When a hole ties</div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                    <button onClick={() => onSetSkinsMode("carryover")} style={{ ...btn((game.skins_mode ?? "carryover") === "carryover"), fontSize: 13, padding: "7px 12px" }}>Carry over</button>
+                    <button onClick={() => { if (splitBlocked) return; onSetSkinsMode("split"); }} style={{ ...btn(game.skins_mode === "split"), fontSize: 13, padding: "7px 12px", opacity: splitBlocked ? 0.4 : 1 }}>Halved</button>
+                  </div>
+                  <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
+                    {splitBlocked
+                      ? "Halved (split) skins is best for up to 4 players — unavailable with a bigger field."
+                      : game.skins_mode === "split"
+                      ? "Halved: a tied hole is split — half a skin to each side, no carryover."
+                      : "Carry over: a tied hole pushes its skin to the next, building the pot."}
+                  </div>
                 </div>
-                <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
-                  {game.skins_mode === "split"
-                    ? "Halved: a tied hole is split — half a skin to each side, no carryover."
-                    : "Carry over: a tied hole pushes its skin to the next, building the pot."}
-                </div>
-              </div>
-            )}
+              );
+            })()}
             {game.status === "ended" ? (
               <button
                 style={{ ...btn(false), marginTop: 10, fontSize: 13 }}

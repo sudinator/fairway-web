@@ -162,3 +162,9 @@ recover the strokes but lose the penalty/sand metadata.
   - Match: a "Players" selector — Individual / Team (4 v 4).
 - All changes write live to the game and standings recompute; no scores are touched.
 - NOTE: this is the setup-tab half. The New-game picker still uses its own controls; converging both onto one shared component (so they can't drift again) is the planned next step.
+
+## v1.60.2 — Preserve-and-hide for structure switches
+- **Migration REQUIRED: `migrations/0046_structure_stash.sql`** — adds games.structure_stash (jsonb). Run before/at deploy.
+- Switching a skins game between Individual / 1:1 Teams / 2v2 Best-ball, and a match between Individual / Team, now STASHES the team structure (teams/foursomes/pairings) instead of discarding it. Switching back restores it intact — matchups reappear filled in. Player team assignments live on game_players and were never touched, so they survive too.
+- Plain game_type switches already preserved structure (setFormat never clears); this brings the skins/match sub-toggles in line.
+- No behavior change for legacy games (stash starts null; first switch populates it).

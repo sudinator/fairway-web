@@ -147,3 +147,5 @@ ever disagree with this summary.
 - **Guards/triggers**: `guard_profile_privileged_cols` (0033, blocks self-grant of
   is_admin/banned), `guard_new_profile_banned` (0038, born-banned), `is_admin`/
   `is_group_member`/`is_group_admin` fold in "not banned" (0034).
+
+- games.structure_stash (jsonb, 0046): last team structure {teams,foursomes,pairings} kept when a mid-round format switch hides it, so switching back restores it. Player team assignments live on game_players.
