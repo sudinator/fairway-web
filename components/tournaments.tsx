@@ -3618,6 +3618,8 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
   }
 
   const myKey = players.find((p) => p.user_id === user.id)?.user_id ?? user.id;
+  // Skins counts can carry a half (split / halved ties) — render "3½", "½", "4".
+  const fmtSkins = (n: number): string => { const whole = Math.floor(n); return n - whole >= 0.5 ? (whole === 0 ? "½" : `${whole}½`) : String(whole); };
 
   if (isTeamBestBallSkins) {
     const foursomes = game.foursomes || [];
@@ -3645,11 +3647,11 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <div style={{ flex: 1, background: totalA >= totalB ? C.cream : C.card, borderRadius: 12, padding: 14, textAlign: "center" }}>
             <div style={{ color: C.ink, fontWeight: 800 }}>{teams![0].name}</div>
-            <div style={{ color: C.green, fontSize: 32, fontWeight: 900, fontFamily: "Georgia, serif" }}>{totalA}</div>
+            <div style={{ color: C.green, fontSize: 32, fontWeight: 900, fontFamily: "Georgia, serif" }}>{fmtSkins(totalA)}</div>
           </div>
           <div style={{ flex: 1, background: totalB >= totalA ? C.cream : C.card, borderRadius: 12, padding: 14, textAlign: "center" }}>
             <div style={{ color: C.ink, fontWeight: 800 }}>{teams![1].name}</div>
-            <div style={{ color: C.green, fontSize: 32, fontWeight: 900, fontFamily: "Georgia, serif" }}>{totalB}</div>
+            <div style={{ color: C.green, fontSize: 32, fontWeight: 900, fontFamily: "Georgia, serif" }}>{fmtSkins(totalB)}</div>
           </div>
         </div>
 
@@ -3664,7 +3666,7 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
               <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                 <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{f.name}{mine ? " · your match" : ""}</div>
                 <div style={{ flex: 1 }} />
-                <div style={{ color: C.green, fontWeight: 900, fontFamily: "Georgia, serif" }}>{result.skinsBySide.a || 0}–{result.skinsBySide.b || 0}</div>
+                <div style={{ color: C.green, fontWeight: 900, fontFamily: "Georgia, serif" }}>{fmtSkins(result.skinsBySide.a || 0)}–{fmtSkins(result.skinsBySide.b || 0)}</div>
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                 <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
@@ -3720,17 +3722,17 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <div style={{ flex: 1, background: teamTotals.A >= teamTotals.B ? C.cream : C.card, borderRadius: 12, padding: 14, textAlign: "center" }}>
               <div style={{ color: C.ink, fontWeight: 800 }}>{teams![0].name}</div>
-              <div style={{ color: C.green, fontSize: 32, fontWeight: 900, fontFamily: "Georgia, serif" }}>{teamTotals.A}</div>
+              <div style={{ color: C.green, fontSize: 32, fontWeight: 900, fontFamily: "Georgia, serif" }}>{fmtSkins(teamTotals.A)}</div>
             </div>
             <div style={{ flex: 1, background: teamTotals.B >= teamTotals.A ? C.cream : C.card, borderRadius: 12, padding: 14, textAlign: "center" }}>
               <div style={{ color: C.ink, fontWeight: 800 }}>{teams![1].name}</div>
-              <div style={{ color: C.green, fontSize: 32, fontWeight: 900, fontFamily: "Georgia, serif" }}>{teamTotals.B}</div>
+              <div style={{ color: C.green, fontSize: 32, fontWeight: 900, fontFamily: "Georgia, serif" }}>{fmtSkins(teamTotals.B)}</div>
             </div>
           </div>
         )}
         {isTeamSkins && (() => {
           const rem = game.holes_meta.length - (teamTotals.A + teamTotals.B);
-          return <div style={{ textAlign: "center", color: C.faint, fontSize: 12, marginTop: 8 }}>{rem > 0 ? `${rem} skin${rem === 1 ? "" : "s"} still in play` : "All skins decided"}</div>;
+          return <div style={{ textAlign: "center", color: C.faint, fontSize: 12, marginTop: 8 }}>{rem > 0 ? `${fmtSkins(rem)} skin${rem === 1 ? "" : "s"} still in play` : "All skins decided"}</div>;
         })()}
         {carrying > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5A3210", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "10px 12px", marginTop: 10 }}>
@@ -3743,7 +3745,7 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
             const n = totals[pkey(p)] || 0;
             return <div key={p.id} style={{ flex: 1, minWidth: 130, background: p.user_id === user.id ? C.cream : C.card, borderRadius: 12, padding: "10px 14px", display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
               <span style={{ color: C.ink, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_name}{p.user_id === user.id ? " (you)" : ""}{isTeamSkins && p.team ? ` · ${teamName(p.team)}` : ""}</span>
-              <span style={{ color: n > 0 ? C.green : C.faint, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif", marginLeft: 8 }}>{n}</span>
+              <span style={{ color: n > 0 ? C.green : C.faint, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif", marginLeft: 8 }}>{fmtSkins(n)}</span>
             </div>;
           })}
         </div>
@@ -3752,7 +3754,7 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
               <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{pa.name}{isTeamSkins ? ` (${teamName(playerOf(pa.id)?.team)})` : ""} <span style={{ color: C.faint, fontWeight: 400 }}>vs</span> {pb.name}{isTeamSkins ? ` (${teamName(playerOf(pb.id)?.team)})` : ""}</div>
               <div style={{ flex: 1 }} />
-              <div style={{ color: C.green, fontWeight: 900, fontFamily: "Georgia, serif" }}>{result.skinsBySide[pa.id] || 0}–{result.skinsBySide[pb.id] || 0}</div>
+              <div style={{ color: C.green, fontWeight: 900, fontFamily: "Georgia, serif" }}>{fmtSkins(result.skinsBySide[pa.id] || 0)}–{fmtSkins(result.skinsBySide[pb.id] || 0)}</div>
             </div>
             <div style={{ marginTop: 10 }}>
               {result.holes.map((h) => {
@@ -3780,7 +3782,6 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
   const skinPlayers: SkinPlayer[] = players.map((p) => ({ id: p.id, name: p.display_name, gross: p.scores || [], ch: chBasis(p, game.course_par) }));
   const isSplit = game.skins_mode === "split";
   const result = computeSkins(game.holes_meta, skinPlayers, game.allowance_pct ?? 100, isSplit ? "split" : "carryover");
-  const fmtSkins = (n: number) => (n % 1 === 0 ? String(n) : n.toFixed(2).replace(/\.?0+$/, ""));
   const firstUndecided = result.holes.find((h) => !h.decided);
   const carrying = firstUndecided ? firstUndecided.carriedIn : result.carryAtEnd;
   const intoHole = firstUndecided ? firstUndecided.hole : null;
