@@ -168,3 +168,7 @@ recover the strokes but lose the penalty/sand metadata.
 - Switching a skins game between Individual / 1:1 Teams / 2v2 Best-ball, and a match between Individual / Team, now STASHES the team structure (teams/foursomes/pairings) instead of discarding it. Switching back restores it intact — matchups reappear filled in. Player team assignments live on game_players and were never touched, so they survive too.
 - Plain game_type switches already preserved structure (setFormat never clears); this brings the skins/match sub-toggles in line.
 - No behavior change for legacy games (stash starts null; first switch populates it).
+
+## v1.62.0 — game-shape module + tests
+- No migration. Pure refactor: shapeOf/dotStrokes/chBasis/pkey moved to lib/game-shape.ts; tournaments.tsx imports them.
+- New: `npm test` runs lib/game-shape.test.ts (no extra deps; uses tsc + node). Run it before shipping format/scoring changes.
