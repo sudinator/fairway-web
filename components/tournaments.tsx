@@ -141,8 +141,11 @@ function shapeOf(game: Pick<Game, "game_type" | "teams" | "foursomes">): GameSha
   const skinsStyle: GameShape["skinsStyle"] =
     gt !== "skins" ? null : !teams2 ? "individual" : hasFour ? "team_2v2" : "team_11";
   const usesFoursomes = gt === "fourball" || gt === "trifecta" || skinsStyle === "team_2v2";
+  // The global Teams step applies only when two named teams actually exist: team match,
+  // team skins, trifecta (always), and the team-mode four-ball variant. Plain four-ball
+  // builds its sides inside each foursome (pair A vs pair B), so it has NO global teams.
   const usesTeams =
-    gt === "fourball" || gt === "trifecta" || (gt === "match" && teams2) || (gt === "skins" && skinsStyle !== "individual" && skinsStyle !== null);
+    teams2 && (gt === "match" || gt === "fourball" || gt === "trifecta" || gt === "skins");
   const usesMatchups =
     gt === "match" || gt === "fourball" || gt === "trifecta" || (gt === "skins" && skinsStyle !== "individual" && skinsStyle !== null);
   const dotBasis: GameShape["dotBasis"] =
@@ -4732,6 +4735,10 @@ function StrokesSummary({ game, players, collapsible = false, meKey }: { game: G
   const myUnits = (shapeOf(game).usesFoursomes ? foursomes.filter(foursomeMine) : pairings.filter(pairingMine)).length;
   const canFilter = !!meKey && myUnits > 0;
   const showToggle = canFilter && totalUnits > myUnits;
+  // The filter works BY TEE GROUP when tee groups are in use, so the "show all"
+  // label counts tee groups (what the user sees as "groups"), not matchups.
+  const teeGroupCount = teeGroupsInUse ? new Set(players.filter((p) => p.tee_group != null).map((p) => p.tee_group)).size : 0;
+  const allGroupsCount = teeGroupCount > 0 ? teeGroupCount : totalUnits;
 
   // Render one foursome's strokes (label + trifecta singles + team strip).
   const foursomeBlock = (
@@ -4762,7 +4769,7 @@ function StrokesSummary({ game, players, collapsible = false, meKey }: { game: G
       onClick={(e) => { e.stopPropagation(); setShowAll((sa) => !sa); }}
       style={{ background: "none", border: "none", color: C.gold, fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", padding: "4px 2px", flexShrink: 0 }}
     >
-      {showAll ? "▴ Show my group" : `▾ Show all ${totalUnits} groups`}
+      {showAll ? "▴ Show my group" : `▾ Show all ${allGroupsCount} groups`}
     </button>
   ) : null;
 
