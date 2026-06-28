@@ -154,3 +154,11 @@ recover the strokes but lose the penalty/sand metadata.
 - post_group_rounds now mirrors the fixed post_game_rounds (0044): stamps the game's MATCH date (games.played_at), and uses ON CONFLICT (game_id, user_id) DO UPDATE so concurrent group finishes can't abort the post with a unique violation.
 - Client fix: recordMyGameRound now stamps the match date (game.played_at) instead of the creation timestamp — restores the v1.53.1 behavior that an earlier working copy had reverted, and keeps the client consistent with both RPCs.
 - Repo hygiene: 0044_post_game_rounds_fix.sql re-added to the repo so bundles carry it. (0043 is still only in your live DB + local repo; paste it anytime and I'll fold it in.)
+
+## v1.60.0 — Change game structure mid-round (setup tab)
+- No migration, no new env var.
+- The Game setup tab (organizer) now exposes the structural choices that were previously only available at New game:
+  - Skins: a "Skins style" selector — Individual / 1:1 Teams / 2v2 Best-ball. Switching is score-preserving; Individual clears teams/foursomes/pairings (with a confirm when scores exist), the team styles hand off to the Teams/Matchups steps to assign sides.
+  - Match: a "Players" selector — Individual / Team (4 v 4).
+- All changes write live to the game and standings recompute; no scores are touched.
+- NOTE: this is the setup-tab half. The New-game picker still uses its own controls; converging both onto one shared component (so they can't drift again) is the planned next step.

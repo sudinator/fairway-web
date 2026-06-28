@@ -2015,6 +2015,37 @@ function GameRoom({
     if (error) { alert("Couldn't change the tie handling — " + error.message); return; }
     await load();
   };
+  // Convert a skins game between individual / 1:1 team / 2v2 best-ball mid-round.
+  // Scores are never touched — only the team structure changes, and the skins
+  // recompute. Team styles leave the side assignment to the Matchups step.
+  const setSkinsStyle = async (style: "individual" | "team_11" | "team_2v2") => {
+    if (!game) return;
+    const isTeamNow = Array.isArray(game.teams) && game.teams.length === 2;
+    if (anyScores && style === "individual" && isTeamNow) {
+      if (!confirm("Switch to individual skins? The team setup is removed, but every score so far is kept and the skins recompute per player.")) return;
+    }
+    const keepTeams = isTeamNow ? game.teams : [{ key: "A", name: "Team 1" }, { key: "B", name: "Team 2" }];
+    const patch: Record<string, unknown> = {
+      game_type: "skins",
+      teams: style === "individual" ? null : keepTeams,
+      foursomes: style === "team_2v2" ? (Array.isArray(game.foursomes) ? game.foursomes : []) : null,
+      pairings: style === "individual" ? [] : ((game as any).pairings ?? []),
+      team_score_mode: style === "team_2v2" ? (game.team_score_mode ?? "best_ball") : "best_ball",
+    };
+    const { error } = await supabase.from("games").update(patch).eq("id", game.id);
+    if (error) { alert("Couldn't change the skins style — " + error.message); return; }
+    await load();
+  };
+  // Singles match <-> team match (e.g. 4 v 4). Only flips the team structure;
+  // pairings are assigned in Matchups. Scores untouched.
+  const setMatchTeam = async (on: boolean) => {
+    if (!game) return;
+    const isTeamNow = Array.isArray(game.teams) && game.teams.length === 2;
+    const teams = on ? (isTeamNow ? game.teams : [{ key: "A", name: "Team 1" }, { key: "B", name: "Team 2" }]) : null;
+    const { error } = await supabase.from("games").update({ teams }).eq("id", game.id);
+    if (error) { alert("Couldn't change the match type — " + error.message); return; }
+    await load();
+  };
 
   // Organizer: end the game — freezes scores and shows final results.
   const endGame = async () => {
@@ -2536,7 +2567,7 @@ function GameRoom({
           onSetTeeGroup: setPlayerTeeGroup, onRename: renameGame, onDelete: deleteGame,
           onEnd: requestEndGame, onReopen: reopenGame, onReset: resetScores, onShare: setShare,
           eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,
-          onSetAllowance: setAllowance, onSetFormat: setFormat, onSetTeamScoreMode: setTeamScoreMode, onSetSkinsMode: updateSkinsMode, anyScores,
+          onSetAllowance: setAllowance, onSetFormat: setFormat, onSetTeamScoreMode: setTeamScoreMode, onSetSkinsMode: updateSkinsMode, onSetSkinsStyle: setSkinsStyle, onSetMatchTeam: setMatchTeam, anyScores,
         };
         // --- per-step completion drives the stepper status + the "what's next" line ---
         const total = players.length;
@@ -4891,6 +4922,8 @@ function OrganizerPanel({
   onSetFormat,
   onSetTeamScoreMode,
   onSetSkinsMode,
+  onSetSkinsStyle,
+  onSetMatchTeam,
   anyScores = false,
 }: {
   game: Game;
@@ -4917,6 +4950,8 @@ function OrganizerPanel({
   onSetFormat?: (f: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => Promise<void>;
   onSetTeamScoreMode?: (m: "best_ball" | "aggregate") => Promise<void>;
   onSetSkinsMode?: (m: "carryover" | "split") => Promise<void>;
+  onSetSkinsStyle?: (s: "individual" | "team_11" | "team_2v2") => Promise<void>;
+  onSetMatchTeam?: (on: boolean) => Promise<void>;
   anyScores?: boolean;
 }) {
   const [edits, setEdits] = useState<Record<string, string>>({});
@@ -5280,6 +5315,43 @@ function OrganizerPanel({
               </div>
             )}
 
+            {game.status !== "ended" && game.game_type === "skins" && onSetSkinsStyle && (() => {
+              const teamsArr = Array.isArray(game.teams) ? game.teams : [];
+              const style = teamsArr.length === 2 ? (Array.isArray(game.foursomes) ? "team_2v2" : "team_11") : "individual";
+              return (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ color: C.sage, fontSize: 12 }}>Skins style</div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                    <button onClick={() => onSetSkinsStyle("individual")} style={{ ...btn(style === "individual"), fontSize: 13, padding: "7px 12px" }}>Individual</button>
+                    <button onClick={() => onSetSkinsStyle("team_11")} style={{ ...btn(style === "team_11"), fontSize: 13, padding: "7px 12px" }}>1:1 Teams</button>
+                    <button onClick={() => onSetSkinsStyle("team_2v2")} style={{ ...btn(style === "team_2v2"), fontSize: 13, padding: "7px 12px" }}>2v2 Best-ball</button>
+                  </div>
+                  <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
+                    {style === "individual"
+                      ? "Individual — everyone for themselves; one skin per hole."
+                      : style === "team_11"
+                      ? "1:1 Teams — pair players across two teams in Matchups; won skins roll into each team's total."
+                      : "2v2 Best-ball — build foursomes in Matchups; each side's better net ball contests the hole."}
+                    {anyScores ? " Scores are kept when you switch." : ""}
+                  </div>
+                </div>
+              );
+            })()}
+            {game.status !== "ended" && game.game_type === "match" && onSetMatchTeam && (() => {
+              const isTeam = Array.isArray(game.teams) && game.teams.length === 2;
+              return (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ color: C.sage, fontSize: 12 }}>Players</div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                    <button onClick={() => onSetMatchTeam(false)} style={{ ...btn(!isTeam), fontSize: 13, padding: "7px 12px" }}>Individual</button>
+                    <button onClick={() => onSetMatchTeam(true)} style={{ ...btn(isTeam), fontSize: 13, padding: "7px 12px" }}>Team (e.g. 4 v 4)</button>
+                  </div>
+                  <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
+                    {isTeam ? "Team match — assign two teams, then pair players 1:1 across them in Matchups." : "Individual — 1:1 pairings, each match stands alone."}
+                  </div>
+                </div>
+              );
+            })()}
             {game.status !== "ended" && (game.game_type === "trifecta" || game.game_type === "fourball" || (game.game_type === "skins" && (game.foursomes?.length ?? 0) > 0)) && onSetTeamScoreMode && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ color: C.sage, fontSize: 12 }}>{game.game_type === "skins" ? "Team score" : "Team point"}</div>
