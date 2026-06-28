@@ -158,9 +158,14 @@ function dotStrokes(
     }
     return matchStrokesFor(mine, si);
   }
-  if (game.game_type === "fourball" || game.game_type === "trifecta") {
+  // Relative-to-foursome-low (the low handicap plays scratch, everyone else takes
+  // the difference): four-ball, trifecta, AND team best-ball skins — all derive the
+  // side's net from fourballNets, which is relative to the lowest playing handicap
+  // in the foursome. Plain and 1:1 skins are NOT here: they use full playing
+  // handicap (computeSkins), so they fall through to the absolute basis below.
+  const fs = (game.foursomes || []).find((f) => [...f.a, ...f.b].includes(key));
+  if (game.game_type === "fourball" || game.game_type === "trifecta" || (game.game_type === "skins" && !!fs)) {
     let group = allPlayers;
-    const fs = (game.foursomes || []).find((f) => [...f.a, ...f.b].includes(key));
     if (fs) {
       const ids = new Set([...fs.a, ...fs.b]);
       group = allPlayers.filter((x) => ids.has(pkey(x)));
