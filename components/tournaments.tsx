@@ -3368,7 +3368,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
     return (t?.yardages?.[idx] ?? fallback ?? null);
   };
   const colorFor = (p: Player): string => {
-    if (Array.isArray(game.teams) && game.teams.length && p.team) {
+    if (shapeOf(game).usesTeams && Array.isArray(game.teams) && game.teams.length && p.team) {
       const ti = game.teams.findIndex((t) => t.key === p.team);
       if (ti >= 0) return teamAccent(game.teams[ti].name, ti);
     }
@@ -3683,8 +3683,9 @@ function ScoreHistory({ gameId }: { gameId: string }) {
 
 function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: Game; players: Player[]; user: any; isCreator: boolean; mode: string; onChanged: () => void }) {
   const teams = game.teams || null;
-  const isTeamSkins = Array.isArray(teams) && teams.length === 2;
-  const isTeamBestBallSkins = isTeamSkins && Array.isArray(game.foursomes);
+  const shape = shapeOf(game);
+  const isTeamSkins = shape.skinsStyle === "team_11" || shape.skinsStyle === "team_2v2";
+  const isTeamBestBallSkins = shape.skinsStyle === "team_2v2";
   const playerOf = (uid: string) => players.find((p) => pkey(p) === uid) || null;
   const firstName = (uid: string) => (playerOf(uid)?.display_name || "—").split(" ")[0];
   const teamName = (key: string | null | undefined) => teams?.find((t) => t.key === key)?.name || "—";
