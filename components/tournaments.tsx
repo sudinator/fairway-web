@@ -2370,9 +2370,7 @@ function GameRoom({
     const out: string[] = [];
     const noHcp = players.filter((p) => p.course_handicap == null).length;
     if (noHcp > 0) out.push(`${noHcp} player${noHcp > 1 ? "s" : ""} without a handicap — scored off scratch (0) until you set it in the Players tab`);
-    const teamsArr = Array.isArray(game.teams) ? game.teams : [];
-    const usesTeams = (gt === "match" || gt === "fourball" || gt === "trifecta" || gt === "skins") && teamsArr.length > 0;
-    const usesMatchups = gt === "match" || gt === "fourball" || gt === "trifecta" || (gt === "skins" && teamsArr.length > 0);
+    const { usesTeams, usesMatchups } = shapeOf(game);
     if (usesTeams) { const n = players.filter((p) => !p.team).length; if (n > 0) out.push(`${n} player${n > 1 ? "s" : ""} not assigned to a team`); }
     if (usesMatchups) {
       const pairings = Array.isArray(game.pairings) ? game.pairings : [];
@@ -2606,13 +2604,10 @@ function GameRoom({
       )}
 
       {roomTab === "setup" && isOrganizer && (() => {
-        const teamsArr = Array.isArray(game.teams) ? game.teams : [];
-        // Gate setup steps by the CURRENT format so stale teams/foursomes left over
-        // from a previous format are ignored (not shown) without being deleted —
-        // switching back to that format restores the work.
-        const usesTeams = (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "skins") && teamsArr.length > 0;
-        const usesMatchups = game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" || (game.game_type === "skins" && teamsArr.length > 0);
-        const usesFoursomes = (game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "skins") && Array.isArray(game.foursomes);
+        // Gate setup steps by the CURRENT format (via shapeOf). Stale teams/foursomes
+        // from a previous format are ignored without being deleted — switching back
+        // restores the work.
+        const { usesTeams, usesMatchups, usesFoursomes } = shapeOf(game);
         const steps: { key: "players" | "teams" | "matchups" | "groups"; label: string }[] = [
           { key: "players", label: "Players" },
           ...(usesTeams ? [{ key: "teams" as const, label: "Teams" }] : []),
@@ -4655,7 +4650,7 @@ function StrokesSummary({ game, players, collapsible = false, meKey }: { game: G
     return `strokes on ${ones.join(", ")}`;
   };
 
-  const hasStructure = pairings.length > 0 || foursomes.length > 0;
+  const hasStructure = shapeOf(game).usesMatchups;
   // Only show the strokes/matchups panel for formats that actually use 1:1
   // pairings or team foursomes. Stableford never does — and must ignore any stale
   // pairings left over from a format the game was previously set to.
@@ -4733,8 +4728,8 @@ function StrokesSummary({ game, players, collapsible = false, meKey }: { game: G
     }
     return !!meKey && [...f.a, ...f.b].includes(meKey);
   };
-  const totalUnits = pairings.length + foursomes.length;
-  const myUnits = pairings.filter(pairingMine).length + foursomes.filter(foursomeMine).length;
+  const totalUnits = shapeOf(game).usesFoursomes ? foursomes.length : pairings.length;
+  const myUnits = (shapeOf(game).usesFoursomes ? foursomes.filter(foursomeMine) : pairings.filter(pairingMine)).length;
   const canFilter = !!meKey && myUnits > 0;
   const showToggle = canFilter && totalUnits > myUnits;
 
@@ -4848,13 +4843,14 @@ function GroupsBuilder({ game, players, onSetTeeGroup }: {
   const pairings = Array.isArray(game.pairings) ? game.pairings : [];
   const foursomes = Array.isArray(game.foursomes) ? game.foursomes : [];
   let units: Unit[];
-  if (foursomes.length) {
+  const sh = shapeOf(game);
+  if (sh.usesFoursomes && foursomes.length) {
     units = foursomes.map((f, i) => ({
       id: f.id || `f${i}`,
       label: f.name || `Foursome ${i + 1}`,
       members: [...f.a, ...f.b].map(byKey).filter((p): p is Player => !!p),
     }));
-  } else if (pairings.length) {
+  } else if (sh.usesMatchups && !sh.usesFoursomes && pairings.length) {
     units = pairings.map((pr, i) => {
       const members = [byKey(pr.a), byKey(pr.b)].filter((p): p is Player => !!p);
       return { id: `m${i}`, label: members.map((m) => m.display_name).join(" v ") || `Match ${i + 1}`, members };
