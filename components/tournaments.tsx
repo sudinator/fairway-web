@@ -670,10 +670,10 @@ function CreateGame({
                 ]
               : null,
           foursomes: gameType === "fourball" || gameType === "trifecta" || (gameType === "skins" && teamMode && skinsTeamStyle === "best_ball") ? [] : null,
-          team_score_mode: gameType === "trifecta" || gameType === "fourball" ? teamScoreMode : "best_ball",
+          team_score_mode: gameType === "trifecta" || gameType === "fourball" || (gameType === "skins" && teamMode && skinsTeamStyle === "best_ball") ? teamScoreMode : "best_ball",
           trifecta_scoring: gameType === "trifecta" ? trifectaScoring : null,
           stroke_basis: gameType === "stroke" ? strokeBasis : null,
-          skins_mode: gameType === "skins" && !teamMode ? skinsMode : null,
+          skins_mode: gameType === "skins" ? skinsMode : null,
         })
         .select()
         .single();
@@ -1059,7 +1059,7 @@ function CreateGame({
               <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                 <button onClick={() => setGameType("fourball")} style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 104, fontSize: 13 }}>Four-ball</button>
                 <button onClick={() => setGameType("trifecta")} style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 104, fontSize: 13 }}>Trifecta</button>
-                <button onClick={() => { setGameType("skins"); setTeamMode(true); setSkinsTeamStyle("best_ball"); }} style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 104, fontSize: 13 }}>Best-ball skins</button>
+                <button onClick={() => { setGameType("skins"); setTeamMode(true); setSkinsTeamStyle("best_ball"); }} style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 104, fontSize: 13 }}>Skins</button>
               </div>
             )}
           </>
@@ -1184,11 +1184,31 @@ function CreateGame({
 
         {gameType === "skins" && fmtFamily === "match" && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
-            <div style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>Two teams \u00b7 best-ball skins</div>
-            <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Each side's better net ball contests the hole; the lower team net wins the pot and a tie carries it forward. Name the sides, then build the 2-v-2 foursomes after creating.</div>
+            <div style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>Two teams · skins</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Each hole is a skin between the two sides. Name the sides, then build the 2-v-2 foursomes after creating.</div>
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
               <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
               <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
+            </div>
+            <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>Team score</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+              <button onClick={() => setTeamScoreMode("best_ball")} style={{ ...btn(teamScoreMode === "best_ball"), fontSize: 12, padding: "7px 10px" }}>Best ball</button>
+              <button onClick={() => setTeamScoreMode("aggregate")} style={{ ...btn(teamScoreMode === "aggregate"), fontSize: 12, padding: "7px 10px" }}>Aggregate</button>
+            </div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+              {teamScoreMode === "aggregate"
+                ? "Aggregate — both partners' net scores are added for the side's hole score."
+                : "Best ball — the side's hole score is the better net of the two partners."}
+            </div>
+            <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>When a hole ties</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+              <button onClick={() => setSkinsMode("carryover")} style={{ ...btn(skinsMode === "carryover"), fontSize: 12, padding: "7px 10px" }}>Carry over</button>
+              <button onClick={() => setSkinsMode("split")} style={{ ...btn(skinsMode === "split"), fontSize: 12, padding: "7px 10px" }}>Halved</button>
+            </div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+              {skinsMode === "split"
+                ? "Halved — a tied hole is split, half a skin to each side, with no carryover."
+                : "Carry over — a tied hole pushes its skin to the next, building the pot."}
             </div>
           </div>
         )}
@@ -3601,7 +3621,7 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
         const p = playerOf(uid);
         return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par) : null, noShow: !!p?.no_show };
       });
-      const result = computeTeamBestBallSkins(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100);
+      const result = computeTeamBestBallSkins(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", game.skins_mode === "split" ? "halved" : "carryover");
       return { f, result };
     });
     const carrying = cards.reduce((s, c) => s + c.result.carryAtEnd, 0);
@@ -3610,7 +3630,7 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
 
     return (
       <div style={{ marginTop: 18 }}>
-        <Eyebrow>{`TEAM SKINS · BEST BALL${game.allowance_pct != null && game.allowance_pct !== 100 ? ` · ${game.allowance_pct}% ALLOWANCE` : ""}`}</Eyebrow>
+        <Eyebrow>{`TEAM SKINS · ${game.team_score_mode === "aggregate" ? "AGGREGATE" : "BEST BALL"}${game.allowance_pct != null && game.allowance_pct !== 100 ? ` · ${game.allowance_pct}% ALLOWANCE` : ""}`}</Eyebrow>
         {carrying > 0 && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5A3210", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "10px 12px", marginTop: 10 }}>
             <span style={{ color: ORANGE, fontSize: 18, fontWeight: 800 }}>↑</span>
@@ -3633,6 +3653,7 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
           const mine = f.a.includes(myKey) || f.b.includes(myKey);
           const aNames = f.a.map(firstName).join(" & ") || "Pair 1";
           const bNames = f.b.map(firstName).join(" & ") || "Pair 2";
+          const halved = game.skins_mode === "split";
           return (
             <div key={f.id} style={{ background: C.card, borderRadius: 12, padding: 14, marginTop: 12, border: mine ? `1px solid ${C.gold}` : "none" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
@@ -3658,8 +3679,8 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
                   return (
                     <div key={h.hole} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: `1px solid ${C.line}` }}>
                       <span style={{ width: 24, color: C.faint, fontWeight: 800, fontSize: 12 }}>{h.hole}</span>
-                      <span style={{ flex: 1, color: C.ink, fontSize: 12 }}>{won ? `${winnerLabel} wins` : tiedCarry ? "Halved — carries" : "Not played yet"}</span>
-                      {won ? <span style={{ background: C.greenLight, color: C.gold, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>{h.value} skin{h.value > 1 ? "s" : ""}</span> : tiedCarry ? <span style={{ background: "#5A3210", color: ORANGE, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>push →</span> : <span style={{ color: C.faint, fontSize: 11 }}>{h.value} at stake</span>}
+                      <span style={{ flex: 1, color: C.ink, fontSize: 12 }}>{won ? `${winnerLabel} wins` : tiedCarry ? (halved ? "Halved · ½ each" : "Halved — carries") : "Not played yet"}</span>
+                      {won ? <span style={{ background: C.greenLight, color: C.gold, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>{h.value} skin{h.value > 1 ? "s" : ""}</span> : tiedCarry ? <span style={{ background: "#5A3210", color: ORANGE, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>{halved ? "½ each" : "push →"}</span> : <span style={{ color: C.faint, fontSize: 11 }}>{h.value} at stake</span>}
                     </div>
                   );
                 })}

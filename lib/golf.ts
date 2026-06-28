@@ -807,6 +807,8 @@ export function computeTeamBestBallSkins(
   aIds: string[],
   bIds: string[],
   allowancePct: number = 100,
+  mode: "best_ball" | "aggregate" = "best_ball",
+  tie: "carryover" | "halved" = "carryover",
 ): SkinMatchResult {
   const sides: SkinSide[] = [
     { id: "a", name: "Pair 1", playerIds: aIds },
@@ -816,19 +818,24 @@ export function computeTeamBestBallSkins(
   const nets = fourballNets(holes, members, allowancePct);
   const out: SkinHole[] = [];
   let carry = 0;
+  // The side's hole score: best ball = lowest net of the side; aggregate = the
+  // sum of every member's net (so the side must have ALL its nets to count).
+  const sideNet = (ids: string[], i: number): number | null => {
+    const vals = ids.map((id) => nets[id]?.[i]).filter((n): n is number => n != null);
+    if (!ids.length) return null;
+    if (mode === "aggregate") return vals.length === ids.length ? vals.reduce((a, b) => a + b, 0) : null;
+    return vals.length ? Math.min(...vals) : null;
+  };
   holes.forEach((h, i) => {
     const netById: Record<string, number | null> = {};
     members.forEach((m) => (netById[m.id] = nets[m.id]?.[i] ?? null));
-    const value = carry + 1;
-    const sideNets = sides.map((s) => {
-      const vals = s.playerIds.map((id) => nets[id]?.[i]).filter((n): n is number => n != null);
-      return { side: s, net: vals.length ? Math.min(...vals) : null };
-    });
-    if (sideNets.some((s) => s.net == null) || !aIds.length || !bIds.length) {
+    // Carry mode builds the pot; halved mode never carries (each hole = 1 skin).
+    const value = tie === "carryover" ? carry + 1 : 1;
+    const aNet = sideNet(aIds, i), bNet = sideNet(bIds, i);
+    if (aNet == null || bNet == null || !aIds.length || !bIds.length) {
       out.push({ hole: h.n, winnerId: null, carriedIn: carry, value, decided: false, netById });
       return;
     }
-    const aNet = sideNets[0].net as number, bNet = sideNets[1].net as number;
     if (aNet < bNet) {
       skinsBySide.a += value;
       out.push({ hole: h.n, winnerId: "a", carriedIn: carry, value, decided: true, netById });
@@ -836,6 +843,12 @@ export function computeTeamBestBallSkins(
     } else if (bNet < aNet) {
       skinsBySide.b += value;
       out.push({ hole: h.n, winnerId: "b", carriedIn: carry, value, decided: true, netById });
+      carry = 0;
+    } else if (tie === "halved") {
+      // Tie is split half a skin to each side; nothing carries.
+      skinsBySide.a += value / 2;
+      skinsBySide.b += value / 2;
+      out.push({ hole: h.n, winnerId: null, carriedIn: carry, value, decided: true, netById });
       carry = 0;
     } else {
       out.push({ hole: h.n, winnerId: null, carriedIn: carry, value, decided: true, netById });
