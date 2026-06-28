@@ -1011,7 +1011,7 @@ function CreateGame({
         {/* Two-family guided chooser: pick a family, then a format. */}
         <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
           <button
-            onClick={() => { setFmtFamily("stroke"); if (gameType === "match" || gameType === "fourball" || gameType === "trifecta") setGameType("stableford"); }}
+            onClick={() => { setFmtFamily("stroke"); if (gameType === "match" || gameType === "fourball" || gameType === "trifecta") setGameType("stableford"); else if (gameType === "skins") { setTeamMode(false); setSkinsTeamStyle("head_to_head"); } }}
             style={{ flex: 1, textAlign: "left", background: fmtFamily === "stroke" ? C.green : C.greenLight, border: `1.5px solid ${fmtFamily === "stroke" ? C.gold : "transparent"}`, borderRadius: 12, padding: 11, cursor: "pointer" }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
@@ -1025,7 +1025,7 @@ function CreateGame({
             </div>
           </button>
           <button
-            onClick={() => { setFmtFamily("match"); if (gameType === "stableford" || gameType === "stroke" || gameType === "skins") setGameType(matchKind === "team" ? "fourball" : "match"); }}
+            onClick={() => { setFmtFamily("match"); const bb = gameType === "skins" && teamMode && skinsTeamStyle === "best_ball"; if (!bb && (gameType === "stableford" || gameType === "stroke" || gameType === "skins")) setGameType(matchKind === "team" ? "fourball" : "match"); }}
             style={{ flex: 1, textAlign: "left", background: fmtFamily === "match" ? C.green : C.greenLight, border: `1.5px solid ${fmtFamily === "match" ? C.gold : "transparent"}`, borderRadius: 12, padding: 11, cursor: "pointer" }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
@@ -1043,7 +1043,7 @@ function CreateGame({
           <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
             <button onClick={() => setGameType("stableford")} style={{ ...btn(gameType === "stableford"), flex: 1, minWidth: 100, fontSize: 13 }}>Stableford</button>
             <button onClick={() => setGameType("stroke")} style={{ ...btn(gameType === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Stroke play</button>
-            <button onClick={() => setGameType("skins")} style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 100, fontSize: 13 }}>Skins</button>
+            <button onClick={() => { setGameType("skins"); setTeamMode(false); setSkinsTeamStyle("head_to_head"); }} style={{ ...btn(gameType === "skins" && fmtFamily === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Skins</button>
           </div>
         ) : (
           <>
@@ -1057,8 +1057,9 @@ function CreateGame({
               </div>
             ) : (
               <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                <button onClick={() => setGameType("fourball")} style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 110, fontSize: 13 }}>Four-ball</button>
-                <button onClick={() => setGameType("trifecta")} style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 110, fontSize: 13 }}>Trifecta</button>
+                <button onClick={() => setGameType("fourball")} style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 104, fontSize: 13 }}>Four-ball</button>
+                <button onClick={() => setGameType("trifecta")} style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 104, fontSize: 13 }}>Trifecta</button>
+                <button onClick={() => { setGameType("skins"); setTeamMode(true); setSkinsTeamStyle("best_ball"); }} style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 104, fontSize: 13 }}>Best-ball skins</button>
               </div>
             )}
           </>
@@ -1134,7 +1135,7 @@ function CreateGame({
             </div>
           </div>
         )}
-        {gameType === "skins" && !teamMode && (() => {
+        {fmtFamily === "stroke" && gameType === "skins" && !teamMode && (() => {
           const fieldCount = groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length;
           const tooMany = skinsMode === "split" && fieldCount > 4;
           return (
@@ -1157,7 +1158,7 @@ function CreateGame({
             </div>
           );
         })()}
-        {(gameType === "match" || gameType === "skins" || gameType === "fourball") && (
+        {((gameType === "match" || gameType === "fourball") || (fmtFamily === "stroke" && gameType === "skins")) && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
               <input type="checkbox" checked={teamMode} onChange={(e) => setTeamMode(e.target.checked)} />
@@ -1165,19 +1166,13 @@ function CreateGame({
             </label>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
               {gameType === "skins"
-                ? "Two teams. Use 1:1 pairings to roll skins into team totals, or choose best-ball foursomes below. A halved hole carries the pot forward."
+                ? "Two teams, 1:1 pairings \u2014 skins roll into each team's total. A halved hole carries the pot forward. (For 2-v-2 better-ball, use Match \u00b7 Team \u00b7 Best-ball skins.)"
                 : gameType === "fourball"
                 ? "Two teams. Each 2-v-2 foursome is worth a point; the team total is the sum across foursomes (a halved foursome = ½ each), Ryder-Cup style. You'll assign players to teams after creating."
                 : "Two teams. Each 1-on-1 pairing is worth a point; the team total is the sum (halved matches = ½ each). You'll assign players to teams after creating."}
             </div>
             {teamMode && (
               <>
-                {gameType === "skins" && (
-                  <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                    <button onClick={() => setSkinsTeamStyle("head_to_head")} style={{ ...btn(skinsTeamStyle === "head_to_head"), fontSize: 12, padding: "7px 10px" }}>1:1 team skins</button>
-                    <button onClick={() => setSkinsTeamStyle("best_ball")} style={{ ...btn(skinsTeamStyle === "best_ball"), fontSize: 12, padding: "7px 10px" }}>Team best-ball skins</button>
-                  </div>
-                )}
                 <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                   <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
                   <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
@@ -1187,6 +1182,16 @@ function CreateGame({
           </div>
         )}
 
+        {gameType === "skins" && fmtFamily === "match" && (
+          <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
+            <div style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>Two teams \u00b7 best-ball skins</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Each side's better net ball contests the hole; the lower team net wins the pot and a tie carries it forward. Name the sides, then build the 2-v-2 foursomes after creating.</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
+              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
+            </div>
+          </div>
+        )}
         <div style={{ marginTop: 14 }}>
           <label style={{ color: C.sage, fontSize: 12 }}>Handicap allowance</label>
           <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
@@ -3626,6 +3631,8 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
         {cards.length === 0 && <div style={{ background: C.greenLight, borderRadius: 12, padding: 18, marginTop: 12, color: C.sage }}>No team skins foursomes set yet. Open Game setup to build them.</div>}
         {cards.map(({ f, result }) => {
           const mine = f.a.includes(myKey) || f.b.includes(myKey);
+          const aNames = f.a.map(firstName).join(" & ") || "Pair 1";
+          const bNames = f.b.map(firstName).join(" & ") || "Pair 2";
           return (
             <div key={f.id} style={{ background: C.card, borderRadius: 12, padding: 14, marginTop: 12, border: mine ? `1px solid ${C.gold}` : "none" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
@@ -3647,7 +3654,7 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
                 {result.holes.map((h) => {
                   const tiedCarry = h.decided && !h.winnerId;
                   const won = h.decided && h.winnerId;
-                  const winnerLabel = h.winnerId === "a" ? "Pair 1" : h.winnerId === "b" ? "Pair 2" : "";
+                  const winnerLabel = h.winnerId === "a" ? aNames : h.winnerId === "b" ? bNames : "";
                   return (
                     <div key={h.hole} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: `1px solid ${C.line}` }}>
                       <span style={{ width: 24, color: C.faint, fontWeight: 800, fontSize: 12 }}>{h.hole}</span>
