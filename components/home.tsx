@@ -84,6 +84,17 @@ export function Home({ session }: { session: any }) {
   }, [user.id, user.email]);
 
   const loadGroups = useCallback(async (preferId?: string | null) => {
+    // Offline: don't sit on "Loading groups…" waiting for a request that can't land.
+    // Hydrate groups + active group from cache immediately.
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      const cache = loadAppBootCache();
+      if (cache?.groups?.length) {
+        setGroups(cache.groups as any);
+        setActiveGroupId(cache.activeGroupId ?? cache.groups[0]?.id ?? null);
+      } else { setGroups([]); setActiveGroupId(null); }
+      setGroupsLoading(false);
+      return;
+    }
     setGroupsLoading(true);
     await activateEmailInvites();
     const { data } = await supabase
@@ -92,18 +103,6 @@ export function Home({ session }: { session: any }) {
       .eq("user_id", user.id)
       .eq("status", "active")
       .order("created_at", { ascending: true });
-
-    // Offline cold launch: hydrate groups + active group from cache so the user
-    // can reach the game room with no signal. Only when the fetch actually failed.
-    if (!data && typeof navigator !== "undefined" && navigator.onLine === false) {
-      const cache = loadAppBootCache();
-      if (cache?.groups?.length) {
-        setGroups(cache.groups as any);
-        setActiveGroupId(cache.activeGroupId ?? cache.groups[0]?.id ?? null);
-        setGroupsLoading(false);
-        return;
-      }
-    }
 
     let list: AppGroup[] = (data || [])
       // Drop memberships whose group row no longer exists (e.g. just deleted) —
@@ -153,6 +152,13 @@ export function Home({ session }: { session: any }) {
 
   // Load (or create) this user's profile: display name, handicap index, GHIN number.
   const loadProfile = useCallback(async () => {
+    // Offline: skip the network entirely so we don't hang on a request that can't
+    // complete — use the cached profile (or a minimal local one) immediately.
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      const cache = loadAppBootCache();
+      setProfile(cache?.profile || { id: user.id, display_name: user.user_metadata?.full_name || null, handicap_index: null, ghin_number: null, is_admin: false });
+      return;
+    }
     const { data } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
     if (data) {
       setProfile(data);
@@ -160,12 +166,6 @@ export function Home({ session }: { session: any }) {
       supabase.from("profiles").update({ last_active: new Date().toISOString(), email: user.email }).eq("id", user.id).then(() => {});
       supabase.rpc("mark_active").then(() => {}); // record today's activity for analytics
       return;
-    }
-    // Offline cold launch: use the cached profile rather than trying to create one
-    // (the insert below would fail with no signal and isn't what we want mid-round).
-    if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      const cache = loadAppBootCache();
-      if (cache?.profile) { setProfile(cache.profile); return; }
     }
     // Only trust a real name from the Google account; never fabricate one from the
     // email local-part, so group-mates don't see "jsmith123" instead of a name.
@@ -193,6 +193,9 @@ export function Home({ session }: { session: any }) {
   };
 
   const loadRounds = useCallback(async () => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setRounds([]); setDbInProgress(null); setLoading(false); return;
+    }
     setLoading(true);
     // Personal views intentionally show this user's rounds across every group.
     const { data: rs } = await supabase

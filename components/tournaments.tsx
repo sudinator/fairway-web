@@ -177,6 +177,12 @@ export default function Tournaments({
     if (!g) return;
     let cancelled = false;
     (async () => {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        // Offline: resume from the snapshot's group without a network round-trip.
+        const snap = loadGameSnapshot(g.gameId);
+        if (snap?.game?.group_id === activeGroupId) setView({ gameId: g.gameId });
+        return;
+      }
       const { data } = await supabase.from("games").select("group_id").eq("id", g.gameId).single();
       if (cancelled) return;
       if (data) {
@@ -1342,6 +1348,35 @@ function GameRoom({
   const [shareCard, setShareCard] = useState(false);
 
   const load = useCallback(async () => {
+    // Boot the room from the local snapshot (merged with this device's per-hole
+    // backups). Used for an offline cold launch, and as a fallback if a live fetch fails.
+    const bootFromSnapshot = (): boolean => {
+      const snap = loadGameSnapshot(gameId);
+      if (!snap?.game) return false;
+      const n0 = snap.game?.holes_meta?.length || 18;
+      const mergedPlayers = (snap.players || []).map((p: any) => {
+        const backup = loadGameScores(gameId, p.id);
+        if (!backup) return p;
+        const { merged } = mergeBackupRow(p, backup, n0);
+        saveGameScores(gameId, p.id, merged);
+        return { ...p, ...merged };
+      });
+      setGame(snap.game as any);
+      setPlayers(mergedPlayers);
+      const mineOff = mergedPlayers.find((p: any) => p.user_id === user.id) || null;
+      setMe(mineOff);
+      if (snap.courseTees) setCourseTees(snap.courseTees as any);
+      if (mineOff && mineOff.course_handicap == null && n0) setNeedsSetup(true);
+      setLoading(false);
+      return true;
+    };
+    // Offline: don't await fetches that will just hang for seconds — boot from the
+    // snapshot straight away.
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      if (bootFromSnapshot()) return;
+      setLoading(false);
+      return;
+    }
     const { data: g } = await supabase
       .from("games")
       .select("*")
@@ -1351,30 +1386,7 @@ function GameRoom({
       .from("game_players")
       .select("*")
       .eq("game_id", gameId);
-    if (!g) {
-      // Offline / fetch failed — boot the whole game room from the local snapshot so
-      // play continues with no signal. Merge in this device's per-hole backups so
-      // anything entered offline (and not yet synced) shows immediately.
-      const snap = loadGameSnapshot(gameId);
-      if (snap?.game) {
-        const n0 = snap.game?.holes_meta?.length || 18;
-        const mergedPlayers = (snap.players || []).map((p: any) => {
-          const backup = loadGameScores(gameId, p.id);
-          if (!backup) return p;
-          const { merged } = mergeBackupRow(p, backup, n0);
-          saveGameScores(gameId, p.id, merged);
-          return { ...p, ...merged };
-        });
-        setGame(snap.game as any);
-        setPlayers(mergedPlayers);
-        const mineOff = mergedPlayers.find((p: any) => p.user_id === user.id) || null;
-        setMe(mineOff);
-        if (snap.courseTees) setCourseTees(snap.courseTees as any);
-        if (mineOff && mineOff.course_handicap == null && n0) setNeedsSetup(true);
-        setLoading(false);
-        return;
-      }
-    }
+    if (!g) { if (bootFromSnapshot()) return; }
     // Defensively normalize: a freshly created or legacy game may have null
     // pairings/teams/holes_meta, which would crash the match views downstream.
     const safeGame = g
@@ -1428,6 +1440,11 @@ function GameRoom({
   useEffect(() => {
     if (!game?.group_id || !game?.course) {
       setCourseTees([]);
+      return;
+    }
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      const snap = loadGameSnapshot(gameId);
+      setCourseTees(snap?.courseTees && snap.courseTees.length ? (snap.courseTees as any) : []);
       return;
     }
     let alive = true;
