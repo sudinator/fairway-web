@@ -41,7 +41,7 @@ import {
 import { pkey, chBasis, shapeOf, dotStrokes } from "@/lib/game-shape";
 import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
-import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot } from "@/lib/draft";
+import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot, saveSyncedWatermark, loadSyncedWatermark, rowPendingHoles } from "@/lib/draft";
 import {
   btn,
   inputStyle,
@@ -1421,8 +1421,9 @@ function GameRoom({
         row = { ...p, ...merged };
         try { await supabase.from("game_players").update(merged).eq("id", p.id); } catch {}
       }
-      // Keep the backup in lockstep with the reconciled truth.
+      // Keep the backup in lockstep with the reconciled truth, and mark it synced.
       saveGameScores(gameId, p.id, merged);
+      saveSyncedWatermark(gameId, p.id, merged as any);
       reconciled.push(row);
     }
     let mine = reconciled.find((p: any) => p.user_id === user.id) || null;
@@ -1511,6 +1512,53 @@ function GameRoom({
   meRef.current = me;
   const gameIdRef = React.useRef(gameId);
   gameIdRef.current = gameId;
+  const playersRef = React.useRef<Player[]>(players);
+  playersRef.current = players;
+  // Pending = holes saved on this phone but not yet confirmed on the server.
+  const [pendingHoles, setPendingHoles] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const recomputePending = React.useCallback(() => {
+    let total = 0;
+    for (const pl of playersRef.current) {
+      const b = loadGameScores(gameIdRef.current, pl.id);
+      if (!b) continue;
+      total += rowPendingHoles(b as any, loadSyncedWatermark(gameIdRef.current, pl.id));
+    }
+    setPendingHoles(total);
+  }, []);
+  // Durable outbox drain: push every row whose local backup differs from its synced
+  // watermark (full last-write-wins per row — safe under the single-writer model),
+  // then mark it synced. Triggered on reconnect, foreground, a slow poll, and manual
+  // Sync now — so recovery never depends on the browser’s online event firing.
+  const drainingRef = React.useRef(false);
+  const drainOutbox = React.useCallback(async (): Promise<number> => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return 0;
+    if (drainingRef.current) return 0;
+    drainingRef.current = true;
+    let pushed = 0;
+    try {
+      for (const pl of playersRef.current) {
+        const b = loadGameScores(gameIdRef.current, pl.id);
+        if (!b) continue;
+        if (rowPendingHoles(b as any, loadSyncedWatermark(gameIdRef.current, pl.id)) === 0) continue;
+        const body = { scores: b.scores, putts: b.putts, fairways: b.fairways, penalties: b.penalties, sand: b.sand };
+        const { error } = await supabase.from("game_players").update(body).eq("id", pl.id);
+        if (!error) { saveSyncedWatermark(gameIdRef.current, pl.id, body); pushed++; }
+      }
+    } finally {
+      drainingRef.current = false;
+      recomputePending();
+    }
+    return pushed;
+  }, [recomputePending]);
+  const syncNow = async () => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      alert("You\u2019re offline. Your scores are saved on this phone and will sync automatically when you\u2019re back in range.");
+      return;
+    }
+    setSyncing(true);
+    try { await drainOutbox(); await load(); } finally { setSyncing(false); }
+  };
   // True when someone ELSE is the marker for my group — then the marker owns my
   // row and this device must never write it (a stale background flush would
   // otherwise clobber the marker's latest entry).
@@ -1555,10 +1603,25 @@ function GameRoom({
   // row and pushes any holes the DB is missing (offline entries) back up. This
   // syncs without needing to reopen the game.
   useEffect(() => {
-    const onOnline = () => { load(); };
+    // Reconnect: push my dirty rows FIRST (authoritative), then reload to pull others'.
+    const onOnline = () => { drainOutbox().then(() => load()); };
+    // Foreground / focus: covers cases where the 'online' event never fires.
+    const onVis = () => { if (document.visibilityState === "visible") drainOutbox(); };
+    const onFocus = () => { drainOutbox(); };
     window.addEventListener("online", onOnline);
-    return () => window.removeEventListener("online", onOnline);
-  }, [load]);
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onFocus);
+    // Slow poll: drainOutbox is a cheap local check when nothing's dirty / offline.
+    const iv = window.setInterval(() => { drainOutbox(); }, 20000);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      document.removeEventListener("visibilitychange", onVis);
+      window.removeEventListener("focus", onFocus);
+      window.clearInterval(iv);
+    };
+  }, [drainOutbox, load]);
+  // Recompute the pending count whenever the players (and thus their scores) change.
+  useEffect(() => { recomputePending(); }, [players, recomputePending]);
 
   // Build a player's per-hole Hole[] (with strokes received) for scoring math.
   const playerHoles = (p: Player): Hole[] => {
@@ -1622,7 +1685,9 @@ function GameRoom({
       const body = n === 0 ? firstBody : freshest();
       const { error } = await supabase.from("game_players").update(body).eq("id", rowId);
       if (!error) {
+        saveSyncedWatermark(gameIdRef.current, rowId, body as any);
         setSyncState("synced");
+        recomputePending();
         window.setTimeout(() => setSyncState((cur) => (cur === "synced" ? "idle" : cur)), 1600);
         return;
       }
@@ -2506,19 +2571,31 @@ function GameRoom({
         </div>
       )}
 
-      {syncState !== "idle" && (
-        <div style={{ position: "fixed", left: 0, right: 0, bottom: 18, display: "flex", justifyContent: "center", pointerEvents: "none", zIndex: 60 }}>
+      {(syncState !== "idle" || pendingHoles > 0) && (
+        <div style={{ position: "fixed", left: 0, right: 0, bottom: 18, display: "flex", justifyContent: "center", zIndex: 60, padding: "0 12px", pointerEvents: "none" }}>
           <div style={{
-            background: syncState === "error" ? "#4a1d16" : syncState === "synced" ? "#13412c" : "#15302a",
+            background: (syncState === "error" || pendingHoles > 0) ? "#3A2A12" : syncState === "synced" ? "#13412c" : "#15302a",
             color: C.cream,
-            border: `1px solid ${syncState === "error" ? C.birdie : syncState === "synced" ? "#1f8f54" : C.line}`,
-            borderRadius: 999, padding: "8px 16px", fontSize: 12.5, fontWeight: 700,
-            boxShadow: "0 8px 22px rgba(0,0,0,.35)",
+            border: `1px solid ${(syncState === "error" || pendingHoles > 0) ? C.gold : syncState === "synced" ? "#1f8f54" : C.line}`,
+            borderRadius: 999, padding: "8px 14px", fontSize: 12.5, fontWeight: 700,
+            boxShadow: "0 8px 22px rgba(0,0,0,.35)", display: "flex", alignItems: "center", gap: 10, maxWidth: "100%", pointerEvents: "auto",
           }}>
-            {syncState === "saving" ? "Saving\u2026"
-              : syncState === "retry" ? "Couldn't sync \u2014 trying again\u2026"
-              : syncState === "error" ? "Couldn't sync \u2014 saved on this phone, will retry"
-              : "\u2713 Synced"}
+            <span>
+              {syncState === "saving" ? "Saving…"
+                : syncState === "retry" ? "Couldn’t sync — trying again…"
+                : pendingHoles > 0
+                  ? (offline
+                      ? `${pendingHoles} ${pendingHoles === 1 ? "hole" : "holes"} saved on this phone · will sync when you reconnect`
+                      : `${pendingHoles} ${pendingHoles === 1 ? "hole" : "holes"} not synced yet`)
+                  : syncState === "error" ? "Couldn’t sync — saved on this phone, will retry"
+                  : "✓ Synced"}
+            </span>
+            {pendingHoles > 0 && !offline && (
+              <button onClick={syncNow} disabled={syncing}
+                style={{ background: C.gold, color: "#3B2A00", border: "none", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer", opacity: syncing ? 0.6 : 1, whiteSpace: "nowrap" }}>
+                {syncing ? "Syncing…" : "Sync now"}
+              </button>
+            )}
           </div>
         </div>
       )}

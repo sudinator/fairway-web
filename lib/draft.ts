@@ -151,6 +151,14 @@ export function clearAllGameScores(gameId: string): void {
       if (k && k.startsWith(prefix)) keys.push(k);
     }
     keys.forEach((k) => window.localStorage.removeItem(k));
+    // Drop watermarks for this game too, so a reset can't leave "already synced" markers.
+    const wmPrefix = `bnn_game_wm_${gameId}_`;
+    const wmKeys: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      if (k && k.startsWith(wmPrefix)) wmKeys.push(k);
+    }
+    wmKeys.forEach((k) => window.localStorage.removeItem(k));
     clearGameSnapshot(gameId);
   } catch {}
 }
@@ -237,4 +245,58 @@ export function loadLastSession(): { user: any } | null {
 // True when the browser reports no connectivity. Best-effort signal only.
 export function isOffline(): boolean {
   try { return typeof navigator !== "undefined" && navigator.onLine === false; } catch { return false; }
+}
+
+// --- Sync watermark + pending detection (offline outbox, Phase 2) ---
+// The watermark is the arrays we've CONFIRMED landed on the server for a row.
+// A row is "pending" when its local backup differs from its watermark. This is
+// derived state (no separate outbox list to drift): dirty = backup !== watermark.
+function wmKey(gameId: string, rowId: string) { return `bnn_game_wm_${gameId}_${rowId}`; }
+export function saveSyncedWatermark(
+  gameId: string,
+  rowId: string,
+  data: { scores: any[]; putts: any[]; fairways: any[]; penalties?: any[]; sand?: any[] },
+): void {
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(wmKey(gameId, rowId), JSON.stringify({
+      scores: data.scores || [], putts: data.putts || [], fairways: data.fairways || [],
+      penalties: data.penalties || [], sand: data.sand || [],
+    }));
+  } catch {}
+}
+export function loadSyncedWatermark(gameId: string, rowId: string): { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] } | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem(wmKey(gameId, rowId));
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    return { scores: p.scores || [], putts: p.putts || [], fairways: p.fairways || [], penalties: p.penalties || [], sand: p.sand || [] };
+  } catch { return null; }
+}
+
+// Count holes whose local backup differs from the watermark (any tracked field).
+// With no watermark yet, every entered hole counts as pending.
+export function rowPendingHoles(
+  backup: { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] } | null,
+  wm: { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] } | null,
+): number {
+  if (!backup) return 0;
+  const w = wm || { scores: [], putts: [], fairways: [], penalties: [], sand: [] };
+  const n = Math.max(
+    backup.scores?.length || 0, backup.putts?.length || 0, backup.fairways?.length || 0,
+    backup.penalties?.length || 0, backup.sand?.length || 0,
+  );
+  let c = 0;
+  for (let i = 0; i < n; i++) {
+    const diff =
+      (backup.scores?.[i] ?? null) !== (w.scores?.[i] ?? null) ||
+      (backup.putts?.[i] ?? null) !== (w.putts?.[i] ?? null) ||
+      (backup.fairways?.[i] ?? null) !== (w.fairways?.[i] ?? null) ||
+      (backup.penalties?.[i] ?? null) !== (w.penalties?.[i] ?? null) ||
+      (backup.sand?.[i] ?? null) !== (w.sand?.[i] ?? null);
+    // Only count a hole as pending if it actually has a score locally.
+    if (diff && (backup.scores?.[i] ?? null) != null) c++;
+  }
+  return c;
 }
