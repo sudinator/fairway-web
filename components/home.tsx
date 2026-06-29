@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase";
 import { C, Round, Hole, allocateStrokes } from "@/lib/golf";
 import { logActivity } from "@/lib/activity";
 import { loadDraft, draftHasScores } from "@/lib/draft";
-import { loadActiveGame } from "@/lib/draft";
+import { loadActiveGame, saveAppBootCache, loadAppBootCache } from "@/lib/draft";
 import { btn, Wordmark, inputStyle } from "@/components/ui";
 import Tournaments from "@/components/tournaments";
 import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab, ActivityTab, AdminGroupsTab, AdminUsersTab, HelpPage } from "@/components/manage";
@@ -93,6 +93,18 @@ export function Home({ session }: { session: any }) {
       .eq("status", "active")
       .order("created_at", { ascending: true });
 
+    // Offline cold launch: hydrate groups + active group from cache so the user
+    // can reach the game room with no signal. Only when the fetch actually failed.
+    if (!data && typeof navigator !== "undefined" && navigator.onLine === false) {
+      const cache = loadAppBootCache();
+      if (cache?.groups?.length) {
+        setGroups(cache.groups as any);
+        setActiveGroupId(cache.activeGroupId ?? cache.groups[0]?.id ?? null);
+        setGroupsLoading(false);
+        return;
+      }
+    }
+
     let list: AppGroup[] = (data || [])
       // Drop memberships whose group row no longer exists (e.g. just deleted) —
       // the join returns a null group for those, and they must not show in the picker.
@@ -131,6 +143,7 @@ export function Home({ session }: { session: any }) {
     const preferred = preferId ?? profile?.active_group_id ?? null;
     const next = (preferred && list.some((g) => g.id === preferred)) ? preferred : list[0]?.id || null;
     setActiveGroupId(next);
+    saveAppBootCache({ groups: list, activeGroupId: next });
     if (next && next !== profile?.active_group_id) {
       supabase.from("profiles").update({ active_group_id: next }).eq("id", user.id).then(() => {});
       setProfile((p: any) => p ? ({ ...p, active_group_id: next }) : p);
@@ -143,9 +156,16 @@ export function Home({ session }: { session: any }) {
     const { data } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
     if (data) {
       setProfile(data);
+      saveAppBootCache({ profile: data });
       supabase.from("profiles").update({ last_active: new Date().toISOString(), email: user.email }).eq("id", user.id).then(() => {});
       supabase.rpc("mark_active").then(() => {}); // record today's activity for analytics
       return;
+    }
+    // Offline cold launch: use the cached profile rather than trying to create one
+    // (the insert below would fail with no signal and isn't what we want mid-round).
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      const cache = loadAppBootCache();
+      if (cache?.profile) { setProfile(cache.profile); return; }
     }
     // Only trust a real name from the Google account; never fabricate one from the
     // email local-part, so group-mates don't see "jsmith123" instead of a name.

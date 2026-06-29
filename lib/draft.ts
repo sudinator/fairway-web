@@ -151,6 +151,7 @@ export function clearAllGameScores(gameId: string): void {
       if (k && k.startsWith(prefix)) keys.push(k);
     }
     keys.forEach((k) => window.localStorage.removeItem(k));
+    clearGameSnapshot(gameId);
   } catch {}
 }
 
@@ -183,3 +184,57 @@ export function recordAiUse(): void {
 }
 
 export const AI_DAILY_LIMIT_VALUE = AI_DAILY_LIMIT;
+
+// --- Active game snapshot (full boot payload for offline cold-launch) ---
+// Captured while ONLINE so the round stays fully usable with no signal: the game
+// row, all player rows, and the course tee yardages. Merged on save so the game
+// room can write {game,players} and the tees effect can add {courseTees} later.
+function gameSnapKey(gameId: string) { return `bnn_game_snap_${gameId}`; }
+export function saveGameSnapshot(gameId: string, partial: { game?: any; players?: any[]; courseTees?: any[] }): void {
+  try {
+    if (typeof window === "undefined") return;
+    const existing = loadGameSnapshot(gameId) || {};
+    window.localStorage.setItem(gameSnapKey(gameId), JSON.stringify({ ...existing, ...partial, at: Date.now() }));
+  } catch {}
+}
+export function loadGameSnapshot(gameId: string): { game?: any; players?: any[]; courseTees?: any[]; at?: number } | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem(gameSnapKey(gameId));
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+export function clearGameSnapshot(gameId: string): void {
+  try { if (typeof window === "undefined") return; window.localStorage.removeItem(gameSnapKey(gameId)); } catch {}
+}
+
+// --- App boot cache (profile + groups + active group) for offline cold-launch ---
+// Lets Home render the right group offline so the user can reach the game room.
+const BOOT_KEY = "bnn_boot_cache_v1";
+export function saveAppBootCache(data: { profile?: any; groups?: any[]; activeGroupId?: string | null }): void {
+  try {
+    if (typeof window === "undefined") return;
+    const existing = loadAppBootCache() || {};
+    window.localStorage.setItem(BOOT_KEY, JSON.stringify({ ...existing, ...data, at: Date.now() }));
+  } catch {}
+}
+export function loadAppBootCache(): { profile?: any; groups?: any[]; activeGroupId?: string | null; at?: number } | null {
+  try { if (typeof window === "undefined") return null; const raw = window.localStorage.getItem(BOOT_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+
+// --- Last session identity (so a cold offline launch renders without a live token) ---
+const SESS_KEY = "bnn_last_session_v1";
+export function saveLastSession(user: any): void {
+  try {
+    if (typeof window === "undefined" || !user) return;
+    window.localStorage.setItem(SESS_KEY, JSON.stringify({ user: { id: user.id, email: user.email, user_metadata: user.user_metadata }, at: Date.now() }));
+  } catch {}
+}
+export function loadLastSession(): { user: any } | null {
+  try { if (typeof window === "undefined") return null; const raw = window.localStorage.getItem(SESS_KEY); const p = raw ? JSON.parse(raw) : null; return p?.user ? { user: p.user } : null; } catch { return null; }
+}
+
+// True when the browser reports no connectivity. Best-effort signal only.
+export function isOffline(): boolean {
+  try { return typeof navigator !== "undefined" && navigator.onLine === false; } catch { return false; }
+}

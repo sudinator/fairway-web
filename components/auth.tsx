@@ -32,7 +32,24 @@ export function Login() {
   );
 }
 
+function OfflineBanner() {
+  const [off, setOff] = useState(false);
+  useEffect(() => {
+    const update = () => setOff(typeof navigator !== "undefined" && navigator.onLine === false);
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => { window.removeEventListener("online", update); window.removeEventListener("offline", update); };
+  }, []);
+  if (!off) return null;
+  return (
+    <div style={{ position: "sticky", top: 0, zIndex: 1000, background: C.gold, color: "#3B2A00", textAlign: "center", fontSize: 12.5, fontWeight: 700, padding: "7px 12px", lineHeight: 1.35 }}>
+      Offline — scores are saved on this phone and will sync when you reconnect.
+    </div>
+  );
+}
+
 export function Shell({ children }: { children: React.ReactNode }) {
-  return <div style={{ minHeight: "100vh", background: C.green }}>{children}</div>;
+  return <div style={{ minHeight: "100vh", background: C.green }}><OfflineBanner />{children}</div>;
 }
 

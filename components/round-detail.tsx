@@ -21,9 +21,10 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
   const [showShare, setShowShare] = useState(false);
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      {/* Top row: Back on the left, Delete pinned far right on the same line */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
         <button style={btn(false)} onClick={onBack}>‹ Back</button>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 700 }}>
             {round.course}{round.tee_name ? ` · ${round.tee_name}` : ""}
           </div>
@@ -32,14 +33,14 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
             {gross ? ` · ${stablefordDisplay(round)} · total score only${round.course_handicap != null ? ` · CH ${round.course_handicap}` : ""}` : ` · ${stablefordDisplay(round)}${round.course_handicap != null ? ` · CH ${round.course_handicap}` : ""} · GIR ${fracPct(girStats([round]))} · FW ${fracPct(firStats([round]))} · ${puttsOf(round)} putts · ${pensOf(round)} pen`}
           </div>
         </div>
-        <div style={{ flex: 1 }} />
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <button style={btn(true)} onClick={() => setShowGhin((v) => !v)}>{showGhin ? "Hide GHIN" : "Post to GHIN"}</button>
-          {!gross && <button style={btn(false)} onClick={() => setShowShare(true)}>📤 Share</button>}
-          <button style={btn(false)} onClick={onEdit}>Edit round</button>
-          <button style={{ ...btn(false), background: "#7A2F28" }}
-            onClick={() => { if (confirm("Delete this round?")) onDelete(); }}>Delete</button>
-        </div>
+        <button style={{ ...btn(false), background: "#7A2F28", flexShrink: 0 }}
+          onClick={() => { if (confirm("Delete this round? This can't be undone.")) onDelete(); }}>Delete</button>
+      </div>
+      {/* Action row: GHIN / Share / Edit, on their own line below */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 12 }}>
+        <button style={btn(true)} onClick={() => setShowGhin((v) => !v)}>{showGhin ? "Hide GHIN" : "Post to GHIN"}</button>
+        {!gross && <button style={btn(false)} onClick={() => setShowShare(true)}>📤 Share</button>}
+        <button style={btn(false)} onClick={onEdit}>Edit round</button>
       </div>
 
 

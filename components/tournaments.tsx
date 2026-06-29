@@ -41,7 +41,7 @@ import {
 import { pkey, chBasis, shapeOf, dotStrokes } from "@/lib/game-shape";
 import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
-import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores } from "@/lib/draft";
+import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot } from "@/lib/draft";
 import {
   btn,
   inputStyle,
@@ -179,8 +179,15 @@ export default function Tournaments({
     (async () => {
       const { data } = await supabase.from("games").select("group_id").eq("id", g.gameId).single();
       if (cancelled) return;
-      if (data && data.group_id === activeGroupId) setView({ gameId: g.gameId });
-      else clearActiveGame(); // game is in another group (or gone) — show this group's list
+      if (data) {
+        if (data.group_id === activeGroupId) setView({ gameId: g.gameId });
+        else clearActiveGame(); // game is in another group (or gone) — show this group's list
+      } else {
+        // Offline / fetch failed: resume from the local snapshot's group instead of
+        // clearing the pointer (a transient offline state must not drop the resume).
+        const snap = loadGameSnapshot(g.gameId);
+        if (snap?.game?.group_id === activeGroupId) setView({ gameId: g.gameId });
+      }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1228,6 +1235,25 @@ function GameRoom({
   const [loading, setLoading] = useState(true);
   const [savingHole, setSavingHole] = useState<number | null>(null);
   const [syncState, setSyncState] = useState<"idle" | "saving" | "retry" | "synced" | "error">("idle");
+  // Connectivity flag. Ownership changes (marker takeover / hand-off / switching to
+  // self-scoring) and finishing are FROZEN while offline: they can't be coordinated
+  // across devices without the server, and allowing them would break the single-
+  // writer-per-row invariant the group model depends on.
+  const [offline, setOffline] = useState(false);
+  useEffect(() => {
+    const upd = () => setOffline(typeof navigator !== "undefined" && navigator.onLine === false);
+    upd();
+    window.addEventListener("online", upd);
+    window.addEventListener("offline", upd);
+    return () => { window.removeEventListener("online", upd); window.removeEventListener("offline", upd); };
+  }, []);
+  const requireOnline = (msg?: string): boolean => {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      alert(msg || "You're offline. This needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.");
+      return false;
+    }
+    return true;
+  };
   // join-setup if I'm in the game but haven't set my tee/handicap
   const [needsSetup, setNeedsSetup] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -1278,6 +1304,7 @@ function GameRoom({
   const canClaimViewed = !gameEnded && !viewedGroupLocked && !!myRow && !myRow.is_guest && !!myRow.user_id && myRow.tee_group != null && myRow.tee_group === viewGroup;
   const claimGroupMarker = async () => {
     if (!game || !myRow) return;
+    if (!requireOnline("You're offline. Changing who keeps score needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.")) return;
     setCardView(true);
     setPlayers((ps) => ps.map((p) => (p.tee_group === myRow.tee_group ? { ...p, is_marker: p.id === myRow.id } : p))); // optimistic
     lastEditRef.current = Date.now();
@@ -1286,12 +1313,14 @@ function GameRoom({
   };
   const releaseGroupMarker = async () => {
     if (!game || !myRow) return;
+    if (!requireOnline("You're offline. Changing who keeps score needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.")) return;
     setPlayers((ps) => ps.map((p) => (p.id === myRow.id ? { ...p, is_marker: false } : p))); // optimistic
     await supabase.rpc("release_group_marker", { p_game: game.id });
     load();
   };
   const finishMyGroup = async () => {
     if (!game || !myRow?.tee_group) return;
+    if (!requireOnline("You're offline. Finishing needs a connection — do it back at the clubhouse. Keep playing; scores are saved on this phone.")) return;
     await supabase.rpc("finish_tee_group", { p_game: game.id });
     // Post a round for EVERY player in this tee group — in group scoring the keeper
     // holds everyone's scores, so finishing the group should write all of them, not
@@ -1322,6 +1351,30 @@ function GameRoom({
       .from("game_players")
       .select("*")
       .eq("game_id", gameId);
+    if (!g) {
+      // Offline / fetch failed — boot the whole game room from the local snapshot so
+      // play continues with no signal. Merge in this device's per-hole backups so
+      // anything entered offline (and not yet synced) shows immediately.
+      const snap = loadGameSnapshot(gameId);
+      if (snap?.game) {
+        const n0 = snap.game?.holes_meta?.length || 18;
+        const mergedPlayers = (snap.players || []).map((p: any) => {
+          const backup = loadGameScores(gameId, p.id);
+          if (!backup) return p;
+          const { merged } = mergeBackupRow(p, backup, n0);
+          saveGameScores(gameId, p.id, merged);
+          return { ...p, ...merged };
+        });
+        setGame(snap.game as any);
+        setPlayers(mergedPlayers);
+        const mineOff = mergedPlayers.find((p: any) => p.user_id === user.id) || null;
+        setMe(mineOff);
+        if (snap.courseTees) setCourseTees(snap.courseTees as any);
+        if (mineOff && mineOff.course_handicap == null && n0) setNeedsSetup(true);
+        setLoading(false);
+        return;
+      }
+    }
     // Defensively normalize: a freshly created or legacy game may have null
     // pairings/teams/holes_meta, which would crash the match views downstream.
     const safeGame = g
@@ -1363,6 +1416,7 @@ function GameRoom({
     let mine = reconciled.find((p: any) => p.user_id === user.id) || null;
     setPlayers(reconciled);
     setMe(mine);
+    if (safeGame) saveGameSnapshot(gameId, { game: safeGame, players: reconciled });
     if (mine && mine.course_handicap == null && (safeGame as any)?.holes_meta?.length)
       setNeedsSetup(true);
     setLoading(false);
@@ -1381,7 +1435,15 @@ function GameRoom({
       if (!alive) return;
       const courses = (rows || []).map((r: any) => normalizeFavoriteCourse(r));
       const found = courses.find((c: any) => c.name === game.course || courseLabel(c) === game.course);
-      setCourseTees(Array.isArray(found?.tees) ? found.tees : []);
+      const tees = Array.isArray(found?.tees) ? found.tees : [];
+      if (tees.length) {
+        setCourseTees(tees);
+        saveGameSnapshot(gameId, { courseTees: tees });
+      } else {
+        // Offline / not found: keep the snapshot's tees rather than blanking yardages.
+        const snap = loadGameSnapshot(gameId);
+        setCourseTees(snap?.courseTees && snap.courseTees.length ? (snap.courseTees as any) : tees);
+      }
     });
     return () => { alive = false; };
   }, [game?.group_id, game?.course]);
@@ -1632,12 +1694,14 @@ function GameRoom({
   // RPC so only a group member can claim, and only the marker can release.
   const takeOverScoring = async () => {
     if (!game) return;
+    if (!requireOnline("You're offline. Changing who keeps score needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.")) return;
     setGame({ ...game, marker_user_id: user.id }); // optimistic
     setCardView(true);
     await supabase.rpc("claim_marker", { p_game_id: game.id });
   };
   const releaseScoring = async () => {
     if (!game) return;
+    if (!requireOnline("You're offline. Changing who keeps score needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.")) return;
     setGame({ ...game, marker_user_id: null });
     await supabase.rpc("release_marker", { p_game_id: game.id });
   };
@@ -1651,6 +1715,7 @@ function GameRoom({
   // no two devices ever write the same row (the no-dupe-write invariant).
   const everyoneScoresOwn = async () => {
     if (!game) { setCardView(false); return; }
+    if (!requireOnline("You're offline. Changing who keeps score needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.")) return;
     // Disband group scoring: clear BOTH marker mechanisms (a game can carry a
     // simple games.marker_user_id AND tee groups), so each player gets their own
     // card back. Any member can do this — releasing to "nobody" is holder-only,
@@ -2011,6 +2076,7 @@ function GameRoom({
   // Organizer: end the game — freezes scores and shows final results.
   const endGame = async () => {
     if (!game) return;
+    if (!requireOnline("You're offline. Finishing needs a connection — do it back at the clubhouse. Keep playing; scores are saved on this phone.")) return;
     const { error: finErr } = await supabase.rpc("finish_game", { p_game: game.id });
     if (finErr) { alert("Couldn't end the game — " + finErr.message); return; }
     // Post every player's scorecard to their Rounds history right now (server-side),
@@ -2777,7 +2843,9 @@ function GameRoom({
           <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>
             One person is keeping the whole group's card. Anyone can switch the group back to scoring their own cards.
           </div>
-          <button onClick={everyoneScoresOwn} style={{ ...btn(false), fontSize: 12, padding: "7px 12px", marginTop: 10 }}>Everyone scores their own</button>
+          {offline
+            ? <div style={{ color: C.gold, fontSize: 11.5, marginTop: 10 }}>Offline — you can switch back to self-scoring once you reconnect.</div>
+            : <button onClick={everyoneScoresOwn} style={{ ...btn(false), fontSize: 12, padding: "7px 12px", marginTop: 10 }}>Everyone scores their own</button>}
         </div>
       )}
       {roomTab === "play" && cardView ? (
@@ -2802,10 +2870,14 @@ function GameRoom({
               <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>
                 One person enters everyone's scores for the group — usually quicker than four phones, and everyone still sees it update live. Or skip it and each player scores their own.
               </div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button onClick={claimGroupMarker} style={{ ...btn(true), flex: 1, minWidth: 130, fontSize: 13 }}>I'll keep score</button>
-                <button onClick={everyoneScoresOwn} style={{ ...btn(false), flex: 1, minWidth: 130, fontSize: 13 }}>We'll each score our own</button>
-              </div>
+              {offline ? (
+                <div style={{ color: C.gold, fontSize: 12 }}>Offline — pick a scorer once you’re back in range. For now, keep entering on whatever card you already have.</div>
+              ) : (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button onClick={claimGroupMarker} style={{ ...btn(true), flex: 1, minWidth: 130, fontSize: 13 }}>I'll keep score</button>
+                  <button onClick={everyoneScoresOwn} style={{ ...btn(false), flex: 1, minWidth: 130, fontSize: 13 }}>We'll each score our own</button>
+                </div>
+              )}
             </div>
           )}
           <GroupScorecard game={game} players={cardPlayers} user={user} courseTees={courseTees}
@@ -2820,6 +2892,7 @@ function GameRoom({
             canClaim={canClaimViewed}
             onClaimGroup={claimGroupMarker}
             onReleaseGroup={releaseGroupMarker}
+            offline={offline}
             onMarkOut={toggleNoShow}
           />
         </>
@@ -3191,7 +3264,7 @@ function MyStatsLine({ me, holes }: { me: Player; holes: Hole[] }) {
 }
 
 // ---------------- Match play view ----------------
-function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup, groupLocked = false, onMarkOut, courseTees = [] }: {
+function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup, groupLocked = false, onMarkOut, courseTees = [], offline = false }: {
   game: Game; players: Player[]; user: any;
   isMarker: boolean; markerName: string | null;
   onTakeOver: () => void; onRelease: () => void;
@@ -3200,6 +3273,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
   onClaimGroup?: () => void; onReleaseGroup?: () => void; groupLocked?: boolean;
   onMarkOut?: (p: Player) => void;
   courseTees?: CourseTee[];
+  offline?: boolean;
 }) {
   const [edit, setEdit] = useState<{ playerId: string; holeIdx: number } | null>(null);
   const allowance = game.allowance_pct ?? 100;
@@ -3353,7 +3427,12 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
 
   return (
     <div style={{ marginTop: 16 }}>
-      {teeMode ? (
+      {offline ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#3A2A12", border: `0.5px solid ${C.gold}`, borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
+          <span style={{ fontSize: 14 }}>📴</span>
+          <span style={{ color: "#E4CF86", fontSize: 12, flex: 1 }}>Offline — you can’t change who’s scoring until you reconnect. The current scorer can keep entering; everything saves on this phone.</span>
+        </div>
+      ) : teeMode ? (
         groupLocked ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#2A2A2A", border: `0.5px solid ${C.gold}`, borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
             <span style={{ color: C.gold, fontSize: 14 }}>🔒</span>
