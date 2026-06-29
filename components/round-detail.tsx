@@ -33,11 +33,13 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
           </div>
         </div>
         <div style={{ flex: 1 }} />
-        <button style={btn(true)} onClick={() => setShowGhin((v) => !v)}>{showGhin ? "Hide GHIN" : "Post to GHIN"}</button>
-        {!gross && <button style={btn(false)} onClick={() => setShowShare(true)}>📤 Share</button>}
-        <button style={btn(false)} onClick={onEdit}>Edit round</button>
-        <button style={{ ...btn(false), background: "#7A2F28" }}
-          onClick={() => { if (confirm("Delete this round?")) onDelete(); }}>Delete</button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <button style={btn(true)} onClick={() => setShowGhin((v) => !v)}>{showGhin ? "Hide GHIN" : "Post to GHIN"}</button>
+          {!gross && <button style={btn(false)} onClick={() => setShowShare(true)}>📤 Share</button>}
+          <button style={btn(false)} onClick={onEdit}>Edit round</button>
+          <button style={{ ...btn(false), background: "#7A2F28" }}
+            onClick={() => { if (confirm("Delete this round?")) onDelete(); }}>Delete</button>
+        </div>
       </div>
 
 

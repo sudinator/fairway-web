@@ -391,9 +391,11 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     const sYds = seg.reduce((s, h) => s + (h.yards || 0), 0);
     const sFwElig = seg.filter((h) => h.par >= 4 && h.fairway != null).length;
     const sFwHit = seg.filter((h) => h.par >= 4 && h.fairway === "hit").length;
+    const sGirTot = seg.filter((h) => h.putts != null).length;
+    const sGirHit = seg.filter((h) => h.putts != null && h.strokes != null && (h.strokes - h.putts) <= (h.par - 2)).length;
     // Option B: Hole no. + yardage (this player's tee) + S.I. on a top line; the
     // interactive scoring cells get their own full-width row beneath.
-    const cols = `0.8fr${showOpp ? " 0.9fr" : ""}${hasDots ? " 0.7fr" : ""} 1.35fr${showFairway ? " 0.85fr" : ""}${showPutts ? " 1.15fr" : ""}${showPenalties ? " 1fr" : ""} 0.75fr${showRun ? " 0.95fr" : ""}`;
+    const cols = `0.8fr${showOpp ? " 0.9fr" : ""}${hasDots ? " 0.7fr" : ""} 1.35fr${showFairway ? " 0.85fr" : ""}${showPutts ? " 0.8fr 1.15fr" : ""}${showPenalties ? " 1fr" : ""} 0.75fr${showRun ? " 0.95fr" : ""}`;
     const GridRow = (cells: React.ReactNode[], opts?: { header?: boolean }) => (
       <div style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4, padding: opts?.header ? "0 2px 6px" : "3px 2px 0" }}>{cells}</div>
     );
@@ -406,6 +408,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           ...(hasDots ? [<div key="d" style={{ ...headStyle, textAlign: "center" }}>Hcp</div>] : []),
           <div key="sc" style={{ ...headStyle, textAlign: "center" }}>Score</div>,
           ...(showFairway ? [<div key="fw" style={{ ...headStyle, textAlign: "center" }}>FW</div>] : []),
+          ...(showPutts ? [<div key="gir" style={{ ...headStyle, textAlign: "center" }}>GIR</div>] : []),
           ...(showPutts ? [<div key="pu" style={{ ...headStyle, textAlign: "center" }}>Putt</div>] : []),
           ...(showPenalties ? [<div key="pe" style={{ ...headStyle, textAlign: "center" }}>Sand/Pen</div>] : []),
           <div key="pt" style={{ ...headStyle, textAlign: "center" }}>Pts</div>,
@@ -441,6 +444,14 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
                     <span style={{ fontWeight: 800, fontSize: 13, color: h.fairway === "hit" ? C.greenMid : (h.fairway === "left" || h.fairway === "right" || h.fairway === "miss") ? C.birdie : C.faint }}>{h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "left" ? "L" : h.fairway === "right" ? "R" : h.fairway === "miss" ? "✗" : "·"}</span>
                   </div>,
                 ] : []),
+                ...(showPutts ? [(() => {
+                  const girHit = h.putts != null && h.strokes != null && (h.strokes - h.putts) <= (h.par - 2);
+                  return (
+                    <div key="gir" style={{ textAlign: "center" }}>
+                      <span style={{ fontWeight: 800, fontSize: 13, color: h.putts == null ? C.faint : girHit ? C.greenMid : C.birdie }}>{h.putts == null ? "·" : girHit ? "✓" : "✗"}</span>
+                    </div>
+                  );
+                })()] : []),
                 ...(showPutts ? [
                   <div key="pu" style={{ textAlign: "center" }}>
                     <span style={{ color: C.faint, fontSize: 13 }}>{h.putts ?? "·"}</span>
@@ -480,6 +491,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           ...(hasDots ? [<div key="d" />] : []),
           <div key="sc" style={{ textAlign: "center", color: C.green, fontWeight: 800, fontSize: 15 }}>{sScore || "–"}</div>,
           ...(showFairway ? [<div key="fw" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 11 }}>{sFwElig ? `${sFwHit}/${sFwElig}` : "–"}</div>] : []),
+          ...(showPutts ? [<div key="gir" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 11 }}>{sGirTot ? `${sGirHit}/${sGirTot}` : "–"}</div>] : []),
           ...(showPutts ? [<div key="pu" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 13 }}>{sPutts || "–"}</div>] : []),
           ...(showPenalties ? [<div key="pe" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 13 }}>{sPen || "–"}</div>] : []),
           <div key="pt" style={{ textAlign: "center", color: C.green, fontWeight: 800, fontSize: 14 }}>{sPts}</div>,
@@ -528,9 +540,9 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
         <div style={{ display: "flex", alignItems: "flex-end", padding: "5px 4px 6px", gap: 3 }}>
           {mCell("Score", h.strokes ? <div style={{ height: 34, display: "flex", alignItems: "center", justifyContent: "center" }}><ScoreMark hole={h as any} /></div> : <div style={{ height: 34, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 34, height: 30, border: `1px solid ${C.green}`, borderRadius: 8, background: "#EFF5EE", color: C.green, fontWeight: 800, fontSize: 18, lineHeight: 1 }}>+</span></div>)}
           {mCell("FW", valBox(h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "left" ? "L" : h.fairway === "right" ? "R" : h.fairway === "miss" ? "✗" : "·", h.fairway === "hit" ? "#0F7A45" : (h.fairway === "left" || h.fairway === "right" || h.fairway === "miss") ? C.birdie : C.faint, 14))}
+          {mCell("GIR", valBox(h.putts == null ? "·" : ((h.strokes != null && (h.strokes - h.putts) <= (h.par - 2)) ? "✓" : "✗"), h.putts == null ? C.faint : ((h.strokes != null && (h.strokes - h.putts) <= (h.par - 2)) ? C.greenMid : C.birdie), 14))}
           {mCell("Putt", valBox(h.putts ?? "·", C.faint, 15))}
           {mCell("S/Pen", valBox(spDisp, spActive ? C.birdie : C.faint, spDisp === "*" ? 18 : 15))}
-          {mCell("Pts", valBox(pts ?? "·", ptsColor(pts)))}
           <div style={{ display: "flex", alignItems: "flex-end", gap: 3, background: "#F3EFE2", borderRadius: 8, borderLeft: `1px solid ${C.line}`, marginLeft: 3, paddingLeft: 2 }}>
             {mCell("Match", valBox(run || "·", runCol, 13))}
             {mCell("Opp", valBox(ov ?? "·", ov == null ? C.faint : C.ink))}
@@ -556,7 +568,6 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
         <div style={{ display: "flex", gap: 15 }}>
           {item("Score", sScore || "–")}
           {item("Putts", sPutts || "–")}
-          {item("Pts", sPts, C.gold)}
           {showRun && item("Match", run || "–", runCol)}
         </div>
       </div>
@@ -603,13 +614,26 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           </div>
         );
       })()}
-      {anyStroke && hasHandicap && (
+      {!matchMode && anyStroke && hasHandicap && (
         <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>
           {holes.some((h) => h.recv > 0)
             ? "• filled dots show the handicap strokes you receive on that hole."
             : "◦ hollow dots show the holes where you give your opponent a stroke."}
         </div>
       )}
+      {matchMode && hasHandicap && (() => {
+        const totRecv = holes.reduce((sum, h) => sum + (h.recv || 0), 0);
+        const totGives = holes.reduce((sum, h) => sum + (h.gives || 0), 0);
+        let body: React.ReactNode;
+        if (totRecv > 0) body = <>You get <b style={{ color: "#fff" }}>{totRecv}</b> <span style={{ color: C.dot, letterSpacing: 1 }}>{"●".repeat(Math.min(totRecv, 6))}</span> · opponent plays scratch</>;
+        else if (totGives > 0) body = <>Opponent gets <b style={{ color: "#fff" }}>{totGives}</b> · you play scratch</>;
+        else body = <>Level match — no strokes given</>;
+        return (
+          <div style={{ background: C.greenLight, borderRadius: 10, padding: "8px 12px", marginTop: 10, color: "#EDE7D4", fontSize: 12.5, fontWeight: 600 }}>
+            <span style={{ color: C.sage, fontWeight: 800, fontSize: 9, letterSpacing: 1, textTransform: "uppercase", marginRight: 8 }}>Match strokes</span>{body}
+          </div>
+        );
+      })()}
       {matchMode ? (
         <FitToWidth>
           <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 10 }}>
@@ -686,9 +710,11 @@ export function ScoreViewCard({ round }: { round: Round }) {
     const sYds = seg.reduce((s, h) => s + (h.yardage || 0), 0);
     const fwElig = seg.filter((h) => h.par >= 4 && h.fairway != null).length;
     const fwHit = seg.filter((h) => h.par >= 4 && h.fairway === "hit").length;
+    const girTot = seg.filter((h) => h.putts != null).length;
+    const girHitN = seg.filter((h) => h.putts != null && h.strokes != null && (h.strokes - h.putts) <= (h.par - 2)).length;
     // Two rows per hole (Option B): top line = fixed facts (Hole no., yardage, S.I.);
     // scoring row beneath. Keeps score cells uncrowded on a phone.
-    const cols = `1fr${hasDots ? " 0.8fr" : ""} 1.2fr${hasFw ? " 0.9fr" : ""}${hasPutts ? " 1fr" : ""}${hasPens ? " 1fr" : ""} 1fr`;
+    const cols = `1fr${hasDots ? " 0.8fr" : ""} 1.2fr${hasFw ? " 0.9fr" : ""}${hasPutts ? " 0.9fr 1fr" : ""}${hasPens ? " 1fr" : ""} 1fr`;
     const GridRow = (cells: React.ReactNode[], opts?: { header?: boolean }) => (
       <div style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4, padding: opts?.header ? "0 4px 6px" : "2px 4px 0" }}>{cells}</div>
     );
@@ -700,6 +726,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
           ...(hasDots ? [<div key="d" style={{ ...headStyle, textAlign: "center" }}>Hcp</div>] : []),
           <div key="sc" style={{ ...headStyle, textAlign: "center" }}>Score</div>,
           ...(hasFw ? [<div key="fw" style={{ ...headStyle, textAlign: "center" }}>FW</div>] : []),
+          ...(hasPutts ? [<div key="gir" style={{ ...headStyle, textAlign: "center" }}>GIR</div>] : []),
           ...(hasPutts ? [<div key="pu" style={{ ...headStyle, textAlign: "center" }}>Putt</div>] : []),
           ...(hasPens ? [<div key="pe" style={{ ...headStyle, textAlign: "center", lineHeight: 1.05 }}>Sand<br />Pen</div>] : []),
           <div key="pt" style={{ ...headStyle, textAlign: "center" }}>Pts</div>,
@@ -723,6 +750,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
                 ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: C.dot, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{recv > 0 ? "•".repeat(Math.min(recv, 3)) : ""}</div>] : []),
                 <div key="sc" style={{ textAlign: "center" }}><ScoreMark hole={h} /></div>,
                 ...(hasFw ? [<div key="fw" style={{ textAlign: "center", fontWeight: 800, fontSize: 13, color: h.fairway === "hit" ? C.greenMid : h.fairway === "miss" ? C.birdie : C.faint }}>{h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "left" ? "L" : h.fairway === "right" ? "R" : h.fairway === "miss" ? "✗" : "·"}</div>] : []),
+                ...(hasPutts ? [(() => { const girHit = h.putts != null && h.strokes != null && (h.strokes - h.putts) <= (h.par - 2); return <div key="gir" style={{ textAlign: "center", fontWeight: 800, fontSize: 13, color: h.putts == null ? C.faint : girHit ? C.greenMid : C.birdie }}>{h.putts == null ? "·" : girHit ? "✓" : "✗"}</div>; })()] : []),
                 ...(hasPutts ? [<div key="pu" style={{ textAlign: "center", color: C.faint, fontSize: 13 }}>{h.putts ?? "·"}</div>] : []),
                 ...(hasPens ? [<div key="pe" style={{ textAlign: "center", color: spCol, fontWeight: spDisp === "*" ? 800 : 400, fontSize: spDisp === "*" ? 16 : 13 }}>{spDisp}</div>] : []),
                 <div key="pt" style={{ textAlign: "center", color: ptsColor(pts), fontWeight: 800, fontSize: 14 }}>{pts ?? "·"}</div>,
@@ -739,6 +767,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
           ...(hasDots ? [<div key="d" />] : []),
           <div key="sc" style={{ textAlign: "center", color: C.ink, fontWeight: 800, fontSize: 15 }}>{sStr || "—"}</div>,
           ...(hasFw ? [<div key="fw" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 11 }}>{fwElig ? `${fwHit}/${fwElig}` : "—"}</div>] : []),
+          ...(hasPutts ? [<div key="gir" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 11 }}>{girTot ? `${girHitN}/${girTot}` : "—"}</div>] : []),
           ...(hasPutts ? [<div key="pu" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 13 }}>{sPutts || "—"}</div>] : []),
           ...(hasPens ? [<div key="pe" style={{ textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 13 }}>{sPen || "—"}</div>] : []),
           <div key="pt" style={{ textAlign: "center", color: C.green, fontWeight: 800, fontSize: 14 }}>{sPts}</div>,

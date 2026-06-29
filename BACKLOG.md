@@ -82,7 +82,7 @@ From the security & structure review. None are emergencies; tackle when convenie
 
 ## Newly requested (June 2026)
 
-1. **Scoring audit trail** - log every score change for dispute resolution + debugging.
+1. **Scoring audit trail** [ALREADY SHIPPED v1.52.0 — migration 0042 AFTER UPDATE trigger + admin_score_audit RPC] - log every score change for dispute resolution + debugging.
    Capture who / when / from-value / to-value per changed hole. Best done as a DB
    trigger on game_players (BEFORE/AFTER UPDATE) that diffs old vs new `scores`
    (and optionally putts/penalties) and inserts one audit row per changed index:
@@ -91,7 +91,7 @@ From the security & structure review. None are emergencies; tackle when convenie
    set_game_scores RPC), unlike app-level logging. Pairs naturally with the 0040
    validation trigger. Add an admin view to read a player's/game's history. New migration.
 
-2. **Pre-conclusion completeness popup** - before a round/game is locked (organizer
+2. **Pre-conclusion completeness popup** [ALREADY SHIPPED v1.51.0 — modal on endGame + finishMyGroup] - before a round/game is locked (organizer
    endGame AND marker "Finish my group"), raise a modal listing what's missing:
    - Always: holes with no score entered (per player, or for the finishing group).
    - If stats are being tracked (any putts/fairway recorded): also list missing putts
@@ -104,6 +104,12 @@ From the security & structure review. None are emergencies; tackle when convenie
    the leaderboard/scorecard (not the live LINK) for pasting into WhatsApp/iMessage/etc.
    Compact, readable text: title + standings + per-player line (and optionally a small
    hole grid). Reuse the GHIN-style text formatting approach. App code only (clipboard).
+
+4. **Round summary action-row layout** [SHIPPED v1.63.0] - in the round-summary
+   (round-detail) view, the **Delete** button wraps onto its own second line. Put it
+   inline on a single row with the other actions — **Post to GHIN**, **Share**, and
+   **Edit round** — so all four sit on one line. CSS/layout only (flex row that wraps
+   gracefully on very narrow screens; keep Delete visually distinct/last). App code only.
 
 ## Shipped
 - v1.62.0 — Design-review #1: extracted shapeOf, dotStrokes, chBasis, pkey out of the 5k-line tournaments.tsx into a pure, importable lib/game-shape.ts (structural input types; imports golf.ts). tournaments.tsx now imports them. Added lib/game-shape.test.ts (full format matrix + adversarial stray-data + malformed + dotBasis<->scoring alignment, 83 assertions) and an `npm test` script that compiles + runs it and exits non-zero on failure. Pure code move — tsc proves equivalence; no behavior change. Also documented (in chat) the four-ball vs trifecta/skins team-setup UI inconsistency as organic growth to unify next via a write-side structureFor(mode).
