@@ -26,6 +26,7 @@ function Clk<T extends string>({ k, d, set, children }: { k: T; d: T | null; set
   );
 }
 
+import { CompareCard } from "@/components/compare-stats";
 export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userEmail, userId, savedCoach, onCoachSaved }: {
   rounds: Round[]; name: string; onOpen: (r: Round) => void;
   currentIndex: number | null; saveIndex: (i: number | null) => void;
@@ -50,6 +51,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   const avgDifferential = diffs.length ? diffs.reduce((s, d) => s + d, 0) / diffs.length : null;
   const hcp = runningHandicap(done);
   const threePutts = threePuttsPerRound(done);
+  const puttsPerRound = avgPutts == null ? null : Math.round(avgPutts * 18 * 10) / 10;
 
   // Compact, numbers-only career summary for the AI coach.
   const coachAggregate = {
@@ -215,6 +217,8 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
         <Clk k="threeputt" d={detail} set={setDetail}><StatCard label="3+ putts / round" value={threePutts == null ? "—" : threePutts.toFixed(1)} sub="three-putt holes" /></Clk>
         <Clk k="pen" d={detail} set={setDetail}><StatCard label="Penalties" value={done.length ? (pens / done.length).toFixed(1) : "—"} sub="per round" /></Clk>
       </div>
+
+      <CompareCard fir={fir} gir={gir} puttsPerRound={puttsPerRound} index={hcp.index ?? currentIndex} />
 
       {detail && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>

@@ -11,6 +11,12 @@ Still open from the original spec:
 
 ## Feature ideas
 
+### Dashboard: handicap trend chart
+Line chart of WHS handicap index over time on the summary dashboard, under the current index number. Buildable from existing data — rounds carry a differential + date, so the index can be recomputed/plotted per round. Mockup (mockup-stats-insights.html) shows the official-index line with each round's differential as faint dots behind it, plus a “v X since Jan” delta. No new data needed; may want to store index snapshots to avoid recomputing 20-round windows each load.
+
+### Dashboard: stats vs peer group (with aspirational target)
+Compare your shot stats (FW%, GIR%, putts/round, penalties/round) against the typical range for your handicap, plus a selectable lower-handicap GOAL band (“Aspire to: 10 / 8 / 5 hcp”). Per-stat one-line takeaway turns it into “what to work on.” Mockup made. YOUR values are real (from recorded rounds); the PEER BANDS need a data-source decision — (a) BNN's own rounds aggregated by handicap band (self-consistent, grows with the society; needs an aggregate query/RPC + enough rounds), or (b) a cited published dataset (Shot Scope/Arccos/etc; needs sourcing + licensing check). Do NOT ship invented benchmark numbers. Lives on the dashboard; tap to expand.
+
 ### In-app "How do I…" help search (no LLM, no tokens)
 A search box in the Help section where players type natural "how do I…" questions and
 get answers in a chat-style exchange (their question, then a step-by-step reply).
@@ -112,6 +118,7 @@ From the security & structure review. None are emergencies; tackle when convenie
    gracefully on very narrow screens; keep Delete visually distinct/last). App code only.
 
 ## Shipped
+- v1.67.0 — Dashboard “How you compare” card: compares your Fairways / GIR / Putts-per-round against the typical range for your handicap, plus a selectable lower-handicap GOAL band (Aspire to: −3 / −6 / scratch). Reads from a new lib/benchmarks.ts (handicap bands 0/5/10/15/20 with avg + lo–hi range, blended from public amateur datasets — Break X Golf ranges, Arccos/Shot Scope averages — sources + caveats documented in-file; bands interpolated for the player’s exact index). Your own values come from your recorded rounds. Each stat shows a one-line takeaway. Penalties omitted (no clean public data). Bootstrap table; to be replaced/augmented with BNN’s own aggregates later.
 - v1.66.2 — Individual share card redesigned to a compact horizontal layout (Option B). ShareRoundModal + ShareScorecardModal now render via a new SoloScoreGrid (front-9/back-9 as columns, yardage folded small under each hole number, Par + Score rows, OUT/IN totals) instead of the tall vertical ScoreViewCard — much shorter in a chat. Score cells use the real ScoreMark notation (birdie ring / eagle double-ring / bogey square / double+ filled / triple+ translucent fill, PNG-safe nested borders). Keeps the gross/net/pts summary + GIR/FW/putts/pen stats line. Card widened to 430px to fit nine columns. ScoreViewCard untouched (still used on-screen).
 - v1.66.1 — Offline Phase 3 hardening: drain-before-finish (finish/end now upload all offline holes and block if any remain unsynced, so recorded rounds are complete) + reset/wipe coherence (reset clears stale watermarks; delete wipes all local game state + active pointer). No migration.
 - v1.66.0 — Copy/Share GROUP scorecard to chat (backlog #3). New ShareGameModal on a game (“Share group card to chat” button under the scorecard): header + leaderboard + a compact horizontal scorecard split into FRONT 9 / BACK 9 grids (players as rows, holes as columns, par row, OUT/IN totals, scores colour-coded red=under / dark=par / blue=over), plus a per-player stats line (gross/net/pts/GIR/FW/putts). Exports one PNG to the share sheet with a Copy-as-text fallback (reuses a shared useCardExport hook). Leaderboard ranks by points for Stableford, else by net. ALSO: the individual share cards (solo round + your game card) now show the GIR/FW/putts/pen stat line, which they were missing. Layout chosen: Option A (two nine-hole cards) for legibility in a chat thumbnail.
