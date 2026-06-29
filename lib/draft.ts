@@ -265,6 +265,14 @@ export function saveSyncedWatermark(
     }));
   } catch {}
 }
+// Drop a single row's synced watermark — used when a reset invalidates a row so a
+// stale "already synced" marker can't suppress re-pushing fresh post-reset scores.
+export function clearSyncedWatermark(gameId: string, rowId: string): void {
+  try {
+    if (typeof window === "undefined") return;
+    window.localStorage.removeItem(wmKey(gameId, rowId));
+  } catch {}
+}
 export function loadSyncedWatermark(gameId: string, rowId: string): { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] } | null {
   try {
     if (typeof window === "undefined") return null;

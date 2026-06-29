@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
-import { ShareScorecardModal } from "@/components/share-card";
+import { ShareScorecardModal, ShareGameModal } from "@/components/share-card";
 import {
   C,
   Hole,
@@ -41,7 +41,7 @@ import {
 import { pkey, chBasis, shapeOf, dotStrokes } from "@/lib/game-shape";
 import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
-import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot, saveSyncedWatermark, loadSyncedWatermark, rowPendingHoles } from "@/lib/draft";
+import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot, saveSyncedWatermark, loadSyncedWatermark, clearSyncedWatermark, rowPendingHoles } from "@/lib/draft";
 import {
   btn,
   inputStyle,
@@ -1327,6 +1327,11 @@ function GameRoom({
   const finishMyGroup = async () => {
     if (!game || !myRow?.tee_group) return;
     if (!requireOnline("You're offline. Finishing needs a connection — do it back at the clubhouse. Keep playing; scores are saved on this phone.")) return;
+    // Push everything entered offline BEFORE recording the round, so the round is
+    // never written from pre-sync server state (which would drop the last holes).
+    await drainOutbox();
+    const left = countPending();
+    if (left > 0) { recomputePending(); alert(left + (left === 1 ? " hole hasn't" : " holes haven't") + " uploaded yet. Tap \"Sync now\", wait until it reaches 0, then finish so the recorded round is complete."); return; }
     await supabase.rpc("finish_tee_group", { p_game: game.id });
     // Post a round for EVERY player in this tee group — in group scoring the keeper
     // holds everyone's scores, so finishing the group should write all of them, not
@@ -1346,6 +1351,7 @@ function GameRoom({
   type FinishGap = { name: string; noScores: boolean; missScores: number[]; missPutts: number[]; missFw: number[] };
   const [finishPrompt, setFinishPrompt] = useState<{ kind: "group" | "game"; teeGroup?: number; gaps: FinishGap[] } | null>(null);
   const [shareCard, setShareCard] = useState(false);
+  const [shareGame, setShareGame] = useState(false);
 
   const load = useCallback(async () => {
     // Boot the room from the local snapshot (merged with this device's per-hole
@@ -1414,7 +1420,7 @@ function GameRoom({
       if (!backup) { reconciled.push(p); continue; }
       // A backup saved before the organizer's last reset is stale — discard it
       // so a reset can't be undone by this device's pre-reset memory.
-      if (resetAt && (backup.at ?? 0) < resetAt) { clearGameScores(gameId, p.id); reconciled.push(p); continue; }
+      if (resetAt && (backup.at ?? 0) < resetAt) { clearGameScores(gameId, p.id); clearSyncedWatermark(gameId, p.id); reconciled.push(p); continue; }
       const { merged, changed } = mergeBackupRow(p, backup, n);
       let row = p;
       if (changed) {
@@ -1517,15 +1523,16 @@ function GameRoom({
   // Pending = holes saved on this phone but not yet confirmed on the server.
   const [pendingHoles, setPendingHoles] = useState(0);
   const [syncing, setSyncing] = useState(false);
-  const recomputePending = React.useCallback(() => {
+  const countPending = React.useCallback(() => {
     let total = 0;
     for (const pl of playersRef.current) {
       const b = loadGameScores(gameIdRef.current, pl.id);
       if (!b) continue;
       total += rowPendingHoles(b as any, loadSyncedWatermark(gameIdRef.current, pl.id));
     }
-    setPendingHoles(total);
+    return total;
   }, []);
+  const recomputePending = React.useCallback(() => { setPendingHoles(countPending()); }, [countPending]);
   // Durable outbox drain: push every row whose local backup differs from its synced
   // watermark (full last-write-wins per row — safe under the single-writer model),
   // then mark it synced. Triggered on reconnect, foreground, a slow poll, and manual
@@ -2159,6 +2166,10 @@ function GameRoom({
   const endGame = async () => {
     if (!game) return;
     if (!requireOnline("You're offline. Finishing needs a connection — do it back at the clubhouse. Keep playing; scores are saved on this phone.")) return;
+    // Drain offline holes before ending, so every player's recorded round is complete.
+    await drainOutbox();
+    const left = countPending();
+    if (left > 0) { recomputePending(); alert(left + (left === 1 ? " hole hasn't" : " holes haven't") + " uploaded yet. Tap \"Sync now\", wait until it reaches 0, then end the game so every recorded round is complete."); return; }
     const { error: finErr } = await supabase.rpc("finish_game", { p_game: game.id });
     if (finErr) { alert("Couldn't end the game — " + finErr.message); return; }
     // Post every player's scorecard to their Rounds history right now (server-side),
@@ -2355,6 +2366,10 @@ function GameRoom({
     if (!confirm(msg)) return;
     await supabase.rpc("delete_game", { p_game: game.id, p_delete_rounds: sameDay });
     await logActivity(supabase, { actor_id: user.id, actor_name: (user.email || "Someone"), action: "game_deleted", group_id: (game as any).group_id || null, summary: `Deleted the game "${game.name}"${sameDay ? " (and its posted rounds)" : ""}` });
+    // Coherent local wipe so a deleted game leaves no snapshot, backups, watermarks,
+    // or active-game pointer that could resurface or boot straight back into it.
+    clearAllGameScores(game.id);
+    clearActiveGame();
     onBack();
   };
 
@@ -3324,7 +3339,11 @@ function GameRoom({
       {roomTab === "play" && me && (me.scores || []).some((s: any) => s != null && s > 0) && (
         <button onClick={() => setShareCard(true)} style={{ ...btn(false), width: "100%", marginTop: 18, fontSize: 13, padding: "10px 0" }}>📤 Share my scorecard</button>
       )}
+      {roomTab === "play" && players.some((p: any) => (p.scores || []).some((s: any) => s != null && s > 0)) && (
+        <button onClick={() => setShareGame(true)} style={{ ...btn(false), width: "100%", marginTop: 10, fontSize: 13, padding: "10px 0" }}>📋 Share group card to chat</button>
+      )}
       {shareCard && me && <ShareScorecardModal game={game} player={me} onClose={() => setShareCard(false)} />}
+      {shareGame && <ShareGameModal game={game} players={players} courseTees={courseTees} onClose={() => setShareGame(false)} />}
     </div>
   );
 }
