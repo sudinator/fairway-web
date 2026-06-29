@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import { C, Hole, Round, stablefordPts, allocateStrokes, applyAllowance, fmtDate, girStats, firStats, fracPct } from "@/lib/golf";
-import { ScoreViewCard, btn } from "@/components/ui";
+import { ScoreMark, btn } from "@/components/ui";
 import { createClient } from "@/lib/supabase";
 import { loadCoursesForGroup, type CourseTee } from "@/lib/courses";
 
@@ -57,7 +57,7 @@ function ShareModalInner({ round, statusFinal, fmtLabel, title, subtitle, summar
 
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, zIndex: 1100, overflowY: "auto" }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 380, width: "100%", margin: "10px 0 40px" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 430, width: "100%", margin: "10px 0 40px" }}>
         {/* The exportable card */}
         <div ref={cardRef} style={{ background: C.green, borderRadius: 18, padding: "16px 14px 14px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -68,8 +68,8 @@ function ShareModalInner({ round, statusFinal, fmtLabel, title, subtitle, summar
           <div style={{ color: C.sage, fontSize: 13, marginTop: 3 }}>{subtitle}</div>
           <div style={{ color: C.cream, fontSize: 13.5, marginTop: 10, fontWeight: 700 }}>{summaryLine}</div>
           {statsLine && <div style={{ color: C.sage, fontSize: 12, marginTop: 4, fontWeight: 600 }}>{statsLine}</div>}
-          <div style={{ marginTop: 12 }}>
-            <ScoreViewCard round={round} />
+          <div style={{ marginTop: 6 }}>
+            <SoloScoreGrid round={round} />
           </div>
           <div style={{ textAlign: "center", color: C.sage, fontSize: 11, marginTop: 14, opacity: 0.85 }}>
             shared from <span style={{ fontFamily: "Georgia, serif", fontWeight: 800, color: C.cream }}>Birdie<span style={{ color: C.gold }}> Num Num</span></span>
@@ -350,5 +350,51 @@ export function ShareGameModal({ game, players, courseTees, onClose }: { game: a
         </div>
       </div>
     </div>
+  );
+}
+
+// Compact horizontal scorecard for a single player (Option B): front/back nine as
+// columns, yardage folded under each hole number, Par + Score rows, real ScoreMark
+// notation (PNG-safe nested borders). Replaces the tall vertical card on share cards.
+function SoloScoreGrid({ round }: { round: Round }) {
+  const holes = (round.holes || []) as Hole[];
+  const n = holes.length || 18;
+  const Nine = ({ from, to, totLbl, label }: { from: number; to: number; totLbl: string; label: string }) => {
+    const slice = holes.slice(from, to);
+    const parSum = slice.reduce((a, h) => a + (h.par || 0), 0);
+    const scSum = slice.reduce((a, h) => a + (h.strokes || 0), 0);
+    return (
+      <div style={{ background: C.card, borderRadius: 12, padding: "8px 8px 10px", marginTop: 8 }}>
+        <div style={{ color: C.greenMid, fontSize: 10, letterSpacing: 1.5, fontWeight: 800, margin: "0 2px 6px" }}>{label}</div>
+        <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}><tbody>
+          <tr style={{ borderBottom: `1px solid ${C.line}` }}>
+            <td style={{ ...sgNm, color: C.faint, fontWeight: 700, fontSize: 10 }}>Hole</td>
+            {slice.map((h) => (
+              <td key={h.hole_number} style={{ ...sgCell, color: C.faint, fontWeight: 700, fontSize: 10 }}>
+                {h.hole_number}
+                {h.yardage != null && <div style={{ fontSize: 8.5, fontWeight: 600, color: C.faint, opacity: 0.85 }}>{h.yardage}</div>}
+              </td>
+            ))}
+            <td style={{ ...sgTot, color: C.greenMid, fontSize: 10 }}>{totLbl}</td>
+          </tr>
+          <tr style={{ borderBottom: `1px solid ${C.line}` }}>
+            <td style={{ ...sgNm, color: C.faint, fontWeight: 700, fontSize: 10 }}>Par</td>
+            {slice.map((h) => <td key={h.hole_number} style={{ ...sgCell, color: C.faint, fontWeight: 700, fontSize: 10 }}>{h.par}</td>)}
+            <td style={{ ...sgTot, color: C.faint, fontSize: 10 }}>{parSum}</td>
+          </tr>
+          <tr>
+            <td style={{ ...sgNm, color: C.ink, fontWeight: 800 }}>Score</td>
+            {slice.map((h) => <td key={h.hole_number} style={{ ...sgCell, padding: "2px 0" }}><ScoreMark hole={h} /></td>)}
+            <td style={{ ...sgTot, color: C.green }}>{scSum || "·"}</td>
+          </tr>
+        </tbody></table>
+      </div>
+    );
+  };
+  return (
+    <>
+      <Nine from={0} to={Math.min(9, n)} totLbl="OUT" label="FRONT 9" />
+      {n > 9 && <Nine from={9} to={n} totLbl="IN" label="BACK 9" />}
+    </>
   );
 }
