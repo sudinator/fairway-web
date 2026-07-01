@@ -149,3 +149,5 @@ ever disagree with this summary.
   `is_group_member`/`is_group_admin` fold in "not banned" (0034).
 
 - games.structure_stash (jsonb, 0046): last team structure {teams,foursomes,pairings} kept when a mid-round format switch hides it, so switching back restores it. Player team assignments live on game_players.
+
+- 0047_live_avatar.sql: get_live_scorecard now returns players[].avatar_url (from game_players.avatar_url) so the public live leaderboard can show photos/initials. No schema/column change.

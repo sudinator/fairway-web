@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
-import { btn, inputStyle, Eyebrow } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, Avatar } from "@/components/ui";
 import type { AppGroup } from "@/lib/groups";
 import { logActivity } from "@/lib/activity";
 
@@ -16,7 +16,7 @@ type Member = {
   email: string;
   role: "admin" | "member";
   status: "active" | "invited" | "removed";
-  profiles?: { display_name?: string | null; handicap_index?: number | null; phone?: string | null; ghin_number?: string | null } | null;
+  profiles?: { display_name?: string | null; handicap_index?: number | null; phone?: string | null; ghin_number?: string | null; avatar_url?: string | null } | null;
 };
 
 export function GroupSelector({ groups, activeGroupId, onChange }: { groups: AppGroup[]; activeGroupId: string | null; onChange: (id: string) => void }) {
@@ -71,7 +71,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
     const ids = rows.map((m) => m.user_id).filter(Boolean) as string[];
     let profilesById: Record<string, any> = {};
     if (ids.length) {
-      const { data: profs } = await supabase.from("profiles").select("id, display_name, handicap_index, phone, ghin_number").in("id", ids);
+      const { data: profs } = await supabase.from("profiles").select("id, display_name, handicap_index, phone, ghin_number, avatar_url").in("id", ids);
       profilesById = Object.fromEntries((profs || []).map((p: any) => [p.id, p]));
     }
     setMembers(rows.map((m) => ({ ...m, profiles: m.user_id ? profilesById[m.user_id] || null : null })) as any);
@@ -336,6 +336,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
               const self = m.user_id === user.id;
               return (
                 <div key={m.id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <Avatar src={m.profiles?.avatar_url} name={name} size={40} />
                   <div style={{ flex: 1, minWidth: 190 }}>
                     <div style={{ color: C.ink, fontWeight: 800 }}>{name}{self ? " (you)" : ""}</div>
                     <div style={{ color: C.faint, fontSize: 12 }}>{m.email} · {m.status}{m.role === "admin" ? " · admin" : ""}</div>

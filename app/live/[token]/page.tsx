@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { Avatar } from "@/components/ui";
 import {
   C, allocateStrokes, applyAllowance, stablefordPts,
   matchStatus, fourballStatus, computeTrifecta, clinchState, computeSkins, toParStr,
@@ -13,7 +14,7 @@ const supabase = createClient();
 
 type LiveMeta = { n: number; par: number; si: number | null };
 type LivePlayer = {
-  id: string; display_name: string; course_handicap: number | null; ch: number;
+  id: string; display_name: string; avatar_url?: string | null; course_handicap: number | null; ch: number;
   team: string | null; tee_group: number | null; no_show: boolean;
   scores: (number | null)[]; putts: (number | null)[]; fairways: ("hit" | "miss" | "left" | "right" | null)[];
   penalties: (number | null)[]; sand: (boolean | null)[];
@@ -356,6 +357,7 @@ function PlayerRow({ p, pos, stat, meta, right, status, gameType, strokeNet }: {
     <div onClick={() => setOpen((o) => !o)} style={{ background: C.card, borderRadius: 14, color: C.ink, padding: "12px 14px", marginTop: 8, cursor: "pointer" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span style={{ width: 16, color: C.faint, fontWeight: 700 }}>{pos}</span>
+        <Avatar src={p.avatar_url} name={p.display_name} size={28} />
         <span style={{ flex: 1, fontWeight: 800, fontSize: 15 }}>{p.display_name}{p.no_show ? " (out)" : ""}</span>
         <span style={{ fontWeight: 800, color: C.green, marginRight: 8 }}>{right}</span>
         <span style={{ color: C.faint }}>{open ? "\u25b4" : "\u25be"}</span>

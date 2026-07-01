@@ -1261,6 +1261,7 @@ function AdminPanel({ user }: { user: any }) {
       {profiles === null && <div style={{ color: C.sage, marginTop: 12 }}>Loading…</div>}
       {profiles?.map((p) => (
         <div key={p.id} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <Avatar src={p.avatar_url} name={p.display_name || p.email || "?"} size={40} />
           <div style={{ flex: 1, minWidth: 180 }}>
             <div style={{ color: C.ink, fontWeight: 700 }}>{p.display_name || "Golfer"}{p.id === user.id ? " (you)" : ""}{p.is_admin ? " ★" : ""}</div>
             <div style={{ color: C.faint, fontSize: 12 }}>
