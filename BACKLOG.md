@@ -118,6 +118,7 @@ From the security & structure review. None are emergencies; tackle when convenie
    gracefully on very narrow screens; keep Delete visually distinct/last). App code only.
 
 ## Shipped
+- v1.70.1 — Moved the tee reminder: removed it from the strokes/matchups box (it was crowding the row and pushing the avatars out of place) and put it under each player's profile in the group scorecard instead (small line beneath avatar/name/hcp). Shows the player's tee, or nothing if none set.
 - v1.70.0 — Team/match “Group results” summary: for match, four-ball, and trifecta, a card shows each player’s score across the three sixes (1–6 / 7–12 / 13–18), both nines, and the full round, with the leader highlighted per segment and a bottom line for the value to beat. Net/Points toggle (low net or most Stableford points); each computed independently (a blow-up hole, floored at 0 in Stableford, can split them). Fills in live; individual net, not team. Shows on the play tab.
 - v1.69.2 — Course library shows total yardage per tee: when a course is opened in the shared library, each tee row now shows its total yards (sum of per-hole yardages) alongside the rating and slope, so you can compare tees at a glance. Shows — when a tee's per-hole yardages aren't populated (use the admin yardage backfill tool to fill them). The player-facing tee pickers already showed yardage.
 - v1.69.1 — Tee reminder in the match/singles strokes panel: each player now shows their tee next to their playing handicap (e.g. “White · ph 7”) in singles matchups and team strips, so everyone can see which tee each player is off. StrokesSummary only.
@@ -173,3 +174,4 @@ From the security & structure review. None are emergencies; tackle when convenie
 - Match-play layout DECISION (Jun 2026): keep per-hole CARD layout, not the grid (tap-target/readability on phone). Grid mockups were exploratory.
 
 ## To do
+- [ ] NEXT VERSION: Surface a visible “no tee set — playing off scratch” warning for any player who lacks a stroke basis (no tee rating/slope AND no stored course_handicap), so the deliberate scratch fallback in chBasis is never SILENT. Show the flag next to the player in the StrokesSummary panel and the new Group results card, and optionally a gentle confirm before finishing (“N player(s) have no tee/handicap and will score off scratch — continue?”). Not a hard block (scoring is intentionally never blocked); just make it obvious.
