@@ -138,6 +138,26 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
       case "pen": return `${pensOf(r)}`;
     }
   };
+  const dirLower = new Set<StatKey>(["rounds", "avgpar", "best", "diff", "par3", "par4", "par5", "putts", "threeputt", "pen"]);
+  const perRoundNum = (key: StatKey, r: Round): number | null => {
+    const hs = played(r);
+    switch (key) {
+      case "rounds": case "avgpar": case "best": return diffOf(r);
+      case "diff": return roundDifferential(r);
+      case "par3": { const a = hs.filter((h) => h.par === 3); return a.length ? a.reduce((s, h) => s + (h.strokes || 0), 0) / a.length : null; }
+      case "par4": { const a = hs.filter((h) => h.par === 4); return a.length ? a.reduce((s, h) => s + (h.strokes || 0), 0) / a.length : null; }
+      case "par5": { const a = hs.filter((h) => h.par === 5); return a.length ? a.reduce((s, h) => s + (h.strokes || 0), 0) / a.length : null; }
+      case "pts": { const v = ptsOf(r); return v == null ? null : v; }
+      case "gir": { const g = girStats([r]); return g.total ? 100 * g.hit / g.total : null; }
+      case "scramble": { const sc = scrambleStats([r]); return sc.total ? 100 * sc.hit / sc.total : null; }
+      case "sandsave": { const ss = sandSaveStats([r]); return ss.total ? 100 * ss.hit / ss.total : null; }
+      case "fir": { const f = firStats([r]); return f.total ? 100 * f.hit / f.total : null; }
+      case "putts": { const pp = hs.filter((h) => h.putts != null); return pp.length ? puttsOf(r) / pp.length : null; }
+      case "threeputt": return hs.filter((h) => (h.putts || 0) >= 3).length;
+      case "pen": return pensOf(r);
+    }
+    return null;
+  };
   const detailLabels: Record<StatKey, string> = {
     rounds: "Score", avgpar: "vs par", best: "vs par", diff: "Differential",
     par3: "Avg par 3", par4: "Avg par 4", par5: "Avg par 5", pts: "Stableford",
@@ -223,19 +243,39 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
       {detail && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>
           <div style={{ display: "flex", alignItems: "center" }}>
-            <Eyebrow>{detailLabels[detail]} · BY ROUND</Eyebrow>
+            <Eyebrow>{detailLabels[detail]} · TREND</Eyebrow>
             <div style={{ flex: 1 }} />
             <button style={{ ...btn(false), fontSize: 12 }} onClick={() => setDetail(null)}>Close ✕</button>
           </div>
-          {sorted.slice().reverse().map((r) => (
-            <div key={r.id} onClick={() => onOpen(r)} style={{ display: "flex", alignItems: "center", padding: "10px 4px", borderBottom: `1px solid ${C.greenMid}`, cursor: "pointer" }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ color: C.cream, fontSize: 14, fontWeight: 600 }}>{r.course}</div>
-                <div style={{ color: C.sage, fontSize: 11 }}>{fmtDate(r.played_at)}</div>
-              </div>
-              <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700, fontSize: 15 }}>{perRound(detail, r)}</div>
-            </div>
-          ))}
+          {(() => {
+            const key = detail as StatKey;
+            const series = sorted.map((r) => ({ r, v: perRoundNum(key, r) })).filter((x) => x.v != null) as { r: Round; v: number }[];
+            if (series.length === 0) return <div style={{ color: C.sage, fontSize: 13, padding: "12px 2px" }}>No rounds with this stat yet — log a few and the trend appears here.</div>;
+            const roll = (i: number, w: number) => { if (i < w - 1) return null; let sum = 0; for (let j = i - w + 1; j <= i; j++) sum += series[j].v; return Math.round((sum / w) * 10) / 10; };
+            const data = series.map((x, i) => ({ i: i + 1, val: Math.round(x.v * 10) / 10, roll5: roll(i, 5), roll10: series.length >= 10 ? roll(i, 10) : null, course: x.r.course, name: fmtDate(x.r.played_at) }));
+            const pctStat = key === "gir" || key === "fir" || key === "scramble" || key === "sandsave";
+            return (
+              <>
+                <div style={{ height: 210, marginTop: 10 }}>
+                  <ResponsiveContainer>
+                    <ComposedChart data={data} margin={{ top: 5, right: 6, left: -8, bottom: 0 }}>
+                      <XAxis dataKey="i" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} />
+                      <YAxis allowDecimals={!pctStat} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={30} domain={["auto", "auto"]} />
+                      <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12 }}
+                        formatter={(v: any, k: any) => [typeof v === "number" ? (pctStat ? Math.round(v) + "%" : v) : v, k === "val" ? detailLabels[key] : k === "roll5" ? "5-rd avg" : "10-rd avg"]}
+                        labelFormatter={(l: any, pl: any) => (pl && pl[0] ? `${pl[0].payload.course} · ${pl[0].payload.name}` : l)} />
+                      <Bar dataKey="val" radius={[3, 3, 0, 0]} maxBarSize={26} fill="#BFD8C9" />
+                      <Line type="monotone" dataKey="roll5" stroke={C.gold} strokeWidth={2.5} dot={false} connectNulls />
+                      {series.length >= 10 && <Line type="monotone" dataKey="roll10" stroke="#4ADE80" strokeWidth={2.5} dot={false} connectNulls />}
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 4, lineHeight: 1.45 }}>
+                  Each bar is one round ({dirLower.has(key) ? "lower is better" : "higher is better"}). <span style={{ color: C.gold }}>Gold</span> is your 5-round rolling average{series.length >= 10 ? <>; <span style={{ color: "#4ADE80" }}>green</span> is the 10-round.</> : series.length >= 5 ? "; the 10-round line joins at 10 rounds." : "; the rolling line needs 5 rounds."}
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 
