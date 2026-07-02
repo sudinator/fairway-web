@@ -724,7 +724,9 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
           <div style={{ flex: 1 }} />
           <button style={{ ...btn(false), fontSize: 12, padding: "6px 12px" }} onClick={addTee}>＋ add tee</button>
         </div>
-        {course.tees.map((t, i) => (
+        {course.tees.map((t, i) => {
+          const yd = (t.yardages || []).reduce((sum: number, v) => sum + (v || 0), 0);
+          return (
           <div key={i} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginTop: 8, background: C.greenLight, borderRadius: 10, padding: 10 }}>
             <div style={{ flex: 2, minWidth: 120 }}>
               <label style={{ color: C.sage, fontSize: 10 }}>Name</label>
@@ -740,11 +742,15 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
               <input style={{ ...inputStyle, marginTop: 2 }} inputMode="numeric" placeholder="130"
                 value={t.slope ?? ""} onChange={(e) => updateTee(i, { slope: e.target.value === "" ? 0 : parseInt(e.target.value, 10) || 0 })} />
             </div>
+            <div style={{ flex: 1, minWidth: 70 }}>
+              <label style={{ color: C.sage, fontSize: 10 }}>Yards</label>
+              <div style={{ color: C.cream, fontSize: 14, fontWeight: 700, marginTop: 6 }} title={yd > 0 ? "Total yardage for this tee" : "Per-hole yardages not set for this tee"}>{yd > 0 ? yd.toLocaleString() : "—"}</div>
+            </div>
             {course.tees.length > 1 && (
               <button onClick={() => removeTee(i)} style={{ background: "none", border: "none", color: C.birdie, cursor: "pointer", fontWeight: 800, padding: "10px 6px" }}>✕</button>
             )}
           </div>
-        ))}
+        ); })}
       </div>
 
       {/* Par + stroke index */}

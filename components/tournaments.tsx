@@ -2873,6 +2873,10 @@ function GameRoom({
         <StrokesSummary game={game} players={players} collapsible={roomTab === "play"} meKey={myRow ? pkey(myRow) : undefined} />
       )}
 
+      {roomTab === "play" && (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta") && (
+        <GroupSegmentSummary game={game} players={players} />
+      )}
+
       {finishPrompt && (() => {
         const fp = finishPrompt;
         const lockMsg = fp.kind === "group"
@@ -4766,9 +4770,9 @@ function StrokesSummary({ game, players, collapsible = false, meKey }: { game: G
     return (
       <div key={key} style={{ borderTop: "1px solid rgba(255,255,255,0.10)", padding: "10px 0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ flex: 1, display: "flex", alignItems: "center", gap: 7, minWidth: 0, color: C.cream, fontSize: 15, fontWeight: 600 }}><Avatar src={a.avatar_url} name={a.display_name} size={24} /><span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.display_name}</span> <span style={{ color: C.sage, fontSize: 12, fontWeight: 400 }}>ph {phStr(a)}</span></span>
+          <span style={{ flex: 1, display: "flex", alignItems: "center", gap: 7, minWidth: 0, color: C.cream, fontSize: 15, fontWeight: 600 }}><Avatar src={a.avatar_url} name={a.display_name} size={24} /><span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.display_name}</span> <span style={{ color: C.sage, fontSize: 12, fontWeight: 400 }}>{a.tee_name ? a.tee_name + " · " : ""}ph {phStr(a)}</span></span>
           <span style={{ color: C.faint, fontSize: 12 }}>vs</span>
-          <span style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 7, minWidth: 0, color: C.cream, fontSize: 15, fontWeight: 600 }}><span style={{ color: C.sage, fontSize: 12, fontWeight: 400 }}>ph {phStr(b)}</span> <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{b.display_name}</span><Avatar src={b.avatar_url} name={b.display_name} size={24} /></span>
+          <span style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 7, minWidth: 0, color: C.cream, fontSize: 15, fontWeight: 600 }}><span style={{ color: C.sage, fontSize: 12, fontWeight: 400 }}>{b.tee_name ? b.tee_name + " · " : ""}ph {phStr(b)}</span> <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{b.display_name}</span><Avatar src={b.avatar_url} name={b.display_name} size={24} /></span>
         </div>
         <div style={{ color: "#CFE3D8", fontSize: 12, marginTop: 6 }}>
           {allow.a === 0 && allow.b === 0
@@ -4792,7 +4796,7 @@ function StrokesSummary({ game, players, collapsible = false, meKey }: { game: G
           const recv = applyAllowance(chBasis(p, game.course_par), allowance) - low;
           return (
             <div key={p.id} style={{ padding: "4px 0" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", color: C.cream, fontSize: 14 }}><span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}><Avatar src={p.avatar_url} name={p.display_name} size={24} /><span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_name}</span></span><span style={{ color: C.sage }}>ph {phStr(p)}</span></div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", color: C.cream, fontSize: 14 }}><span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}><Avatar src={p.avatar_url} name={p.display_name} size={24} /><span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_name}</span></span><span style={{ color: C.sage }}>{p.tee_name ? p.tee_name + " · " : ""}ph {phStr(p)}</span></div>
               <div style={{ color: recv > 0 ? "#E4CF86" : C.sage, fontSize: 11, marginTop: 1 }}>{strokeText(recv)}</div>
             </div>
           );
@@ -5815,6 +5819,107 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game }: {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// Group results for matchup formats: each player's low NET (or Stableford POINTS via
+// the toggle) across the three sixes, both nines, and the full round. Net and points
+// are computed independently and the leader is highlighted per column in whichever
+// metric is shown (they usually agree, but a blow-up hole — floored at 0 in Stableford
+// — can split them).
+function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] }) {
+  const [metric, setMetric] = React.useState<"net" | "pts">("net");
+  const meta = (game.holes_meta || []) as { n: number; par: number; si: number | null }[];
+  const n = meta.length;
+  const ps = players.filter((p) => !p.no_show);
+  const anyScore = ps.some((p) => (p.scores || []).some((x: any) => x != null && x > 0));
+  if (n === 0 || ps.length === 0 || !anyScore) return null;
+
+  type Seg = { k: string; from: number; to: number; cls: "seg" | "nine" | "tot" };
+  const segs: Seg[] = [];
+  if (n >= 6)  segs.push({ k: "1–6",   from: 0,  to: 6,  cls: "seg" });
+  if (n >= 12) segs.push({ k: "7–12",  from: 6,  to: 12, cls: "seg" });
+  if (n >= 18) segs.push({ k: "13–18", from: 12, to: 18, cls: "seg" });
+  segs.push({ k: "F9", from: 0, to: Math.min(9, n), cls: "nine" });
+  if (n > 9) segs.push({ k: "B9", from: 9, to: n, cls: "nine" });
+  segs.push({ k: n === 18 ? "18" : "1–" + n, from: 0, to: n, cls: "tot" });
+
+  const rows = ps.map((p) => {
+    const net: (number | null)[] = [];
+    const pts: (number | null)[] = [];
+    for (const s of segs) {
+      let nSum = 0, pSum = 0, any = false;
+      for (let i = s.from; i < s.to; i++) {
+        const g = p.scores?.[i];
+        if (g == null || g <= 0) continue;
+        any = true;
+        const recv = dotStrokes(game, p, meta[i].si, players);
+        nSum += g - recv;
+        pSum += stablefordPts(g, meta[i].par, recv) || 0;
+      }
+      net.push(any ? nSum : null);
+      pts.push(any ? pSum : null);
+    }
+    return { name: p.display_name, avatar_url: p.avatar_url, net, pts };
+  });
+
+  const winners = segs.map((_, c) => {
+    const vals = rows.map((r) => (metric === "net" ? r.net[c] : r.pts[c])).filter((v): v is number => v != null);
+    if (!vals.length) return { val: null as number | null, idx: new Set<number>() };
+    const best = metric === "net" ? Math.min(...vals) : Math.max(...vals);
+    const idx = new Set<number>();
+    rows.forEach((r, ri) => { const v = metric === "net" ? r.net[c] : r.pts[c]; if (v === best) idx.add(ri); });
+    return { val: best, idx };
+  });
+
+  const hdrBg = (cls: string) => (cls === "seg" ? "#EEF4EF" : cls === "nine" ? "#FBF3DE" : "#E7F0E9");
+  const th: React.CSSProperties = { textAlign: "center", color: C.faint, fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", padding: "6px 3px", borderBottom: `1px solid ${C.line}` };
+  const nmH: React.CSSProperties = { ...th, textAlign: "left", width: 74, borderBottom: `1px solid ${C.line}` };
+  const nmCell: React.CSSProperties = { textAlign: "left", width: 74, color: C.ink, fontWeight: 800, fontSize: 12.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", padding: "6px 3px" };
+  const cell: React.CSSProperties = { textAlign: "center", fontSize: 12.5, padding: "6px 3px", color: "#4b4838", fontWeight: 600 };
+  const chip = (on: boolean): React.CSSProperties => ({ border: `1px solid ${on ? C.gold : "#2c5142"}`, background: on ? C.gold : "#173a2c", color: on ? "#2a2410" : C.cream, borderRadius: 999, padding: "3px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" });
+
+  return (
+    <div style={{ background: C.greenLight, borderRadius: 14, padding: "15px 13px 14px", marginTop: 12 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Group results</div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => setMetric("net")} style={chip(metric === "net")}>Low net</button>
+          <button onClick={() => setMetric("pts")} style={chip(metric === "pts")}>Points</button>
+        </div>
+      </div>
+      <div style={{ color: C.sage, fontSize: 11.5, marginTop: 2 }}>{metric === "net" ? "Lowest net per segment" : "Most Stableford points per segment"}</div>
+
+      <div style={{ background: C.card, borderRadius: 12, padding: "8px 8px 6px", marginTop: 12, overflowX: "auto" }}>
+        <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
+          <thead>
+            <tr>
+              <th style={nmH}></th>
+              {segs.map((s) => <th key={s.k} style={{ ...th, background: hdrBg(s.cls) }}>{s.k}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, ri) => (
+              <tr key={ri} style={{ borderTop: ri === 0 ? "none" : "1px solid #F0EBDA" }}>
+                <td style={nmCell}>{r.name}</td>
+                {segs.map((s, c) => {
+                  const v = metric === "net" ? r.net[c] : r.pts[c];
+                  const win = winners[c].idx.has(ri);
+                  return <td key={s.k} style={{ ...cell, ...(win ? { background: "#F6E7C4", color: C.green, fontWeight: 800, borderRadius: 6 } : {}) }}>{v == null ? "–" : v}</td>;
+                })}
+              </tr>
+            ))}
+            <tr style={{ borderTop: `2px solid ${C.line}` }}>
+              <td style={{ ...nmCell, color: C.greenMid, fontSize: 10, letterSpacing: 0.4, textTransform: "uppercase" }}>{metric === "net" ? "Low net" : "Most pts"}</td>
+              {winners.map((w, c) => <td key={c} style={{ ...cell, color: C.green, fontWeight: 800, fontFamily: "Georgia, serif" }}>{w.val == null ? "–" : w.val}</td>)}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style={{ color: C.sage, fontSize: 10, marginTop: 8, opacity: 0.85, lineHeight: 1.4 }}>
+        Each player’s own net / points. Segments count only holes entered so far, so this fills in live.
+      </div>
     </div>
   );
 }
