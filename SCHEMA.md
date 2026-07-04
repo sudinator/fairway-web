@@ -159,6 +159,7 @@ ever disagree with this summary.
 - expense_shares: id, expense_id (cascade), user_id XOR guest_id, share_cents. Sum of shares == expense amount_cents.
 - expense_payers (migration 0049): id, expense_id (cascade), user_id, paid_cents (int). Multiple payers per expense; balances use these when present, else fall back to expenses.payer_user_id (which holds the primary payer). RLS via parent expense's group.
 - expense_audit (migration 0050): id, expense_id (cascade), action ('created'|'edited'), actor_user_id, snapshot jsonb, created_at. Per-expense edit history; RLS via parent expense's group.
+- group_activity (migration 0051): id, group_id (cascade), actor_user_id, action, summary, meta jsonb, created_at. Immutable group-wide money log (visible to all members; append-only — no update/delete policies). Supersedes expense_audit (0050) for logging; per-expense edit history now reads from this. RLS: select for all active members, insert attributed to self.
 - settlements: id, group_id, from_user_id, to_user_id, amount_cents, method, created_by, created_at. Member-to-member only.
 - profiles: + venmo_handle, paypal_handle, phone (optional, member-entered).
 All money tables are RLS-gated by active group_members; integer cents; no money moves through the app (deep-link hand-off only). Logic lives in lib/money.ts (unit-tested in lib/money.test.ts).

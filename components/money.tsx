@@ -26,7 +26,7 @@ const catLabel = (k: string) => CATS.find((c) => c.k === k)?.label || "Other";
 const ini = (n: string) => n.split(/\s+/).map((w) => w[0] || "").join("").slice(0, 2).toUpperCase();
 
 export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string }; activeGroup: { id: string; name: string; role?: string }; onChanged?: () => void }) {
-  const [screen, setScreen] = useState<"balances" | "add" | "settle">("balances");
+  const [screen, setScreen] = useState<"balances" | "add" | "settle" | "log">("balances");
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<Member[]>([]);
   const [guests, setGuests] = useState<GuestRow[]>([]);
@@ -34,6 +34,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
   const [shares, setShares] = useState<ShareRow[]>([]);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [payers, setPayers] = useState<PayerRow[]>([]);
+  const [activity, setActivity] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<ExpenseRow | null>(null);
   const isAdmin = activeGroup.role === "admin" || activeGroup.role === "owner";
@@ -41,11 +42,21 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: gm } = await supabase.from("group_members").select("user_id, status").eq("group_id", gid).eq("status", "active");
-    const ids = (gm || []).map((m: any) => m.user_id).filter(Boolean);
-    const { data: profs } = ids.length
-      ? await supabase.from("profiles").select("id, display_name, avatar_url, venmo_handle, paypal_handle, phone").in("id", ids)
-      : { data: [] as any[] };
+    // Full group roster via SECURITY DEFINER RPC (profiles RLS otherwise hides other members
+    // from non-admins, collapsing the list to just yourself). Falls back to a direct query if
+    // migration 0052 hasn't been run yet.
+    let profs: any[] = [];
+    const rpc = await supabase.rpc("group_pay_roster", { p_group: gid });
+    if (!rpc.error && rpc.data) {
+      profs = rpc.data as any[];
+    } else {
+      const { data: gm } = await supabase.from("group_members").select("user_id, status").eq("group_id", gid).eq("status", "active");
+      const ids = (gm || []).map((m: any) => m.user_id).filter(Boolean);
+      const { data: p2 } = ids.length
+        ? await supabase.from("profiles").select("id, display_name, avatar_url, venmo_handle, paypal_handle, phone").in("id", ids)
+        : { data: [] as any[] };
+      profs = p2 || [];
+    }
     const { data: gRows } = await supabase.from("group_guests").select("id, name, sponsor_user_id, group_id").eq("group_id", gid);
     const { data: exp } = await supabase.from("expenses").select("*").eq("group_id", gid).order("created_at", { ascending: false });
     const expIds = (exp || []).map((e: any) => e.id);
@@ -56,12 +67,14 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
       ? await supabase.from("expense_payers").select("*").in("expense_id", expIds)
       : { data: [] as any[] };
     const { data: setl } = await supabase.from("settlements").select("*").eq("group_id", gid);
+    const { data: act } = await supabase.from("group_activity").select("*").eq("group_id", gid).order("created_at", { ascending: false }).limit(200);
     setMembers((profs || []).map((p: any) => ({ id: p.id, display_name: p.display_name || "Player", avatar_url: p.avatar_url, venmo_handle: p.venmo_handle, paypal_handle: p.paypal_handle, phone: p.phone })).sort((a, b) => a.display_name.localeCompare(b.display_name, undefined, { sensitivity: "base" })));
     setGuests(((gRows || []) as GuestRow[]).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })));
     setExpenses((exp || []) as ExpenseRow[]);
     setShares((sh || []) as ShareRow[]);
     setSettlements((setl || []) as Settlement[]);
     setPayers((py || []) as PayerRow[]);
+    setActivity((act || []) as any[]);
     setLoading(false);
     onChanged?.();
   }, [gid, onChanged]);
@@ -87,10 +100,15 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [pending]);
 
+  const logActivity = useCallback(async (action: string, summary: string, meta: any = {}) => {
+    await supabase.from("group_activity").insert({ group_id: gid, actor_user_id: user.id, action, summary, meta });
+  }, [gid, user.id]);
+
   async function recordSettlement(from: string, to: string, amt: number, method: string) {
     if (!requireOnline()) return;
     setBusy(true);
     await supabase.from("settlements").insert({ group_id: gid, from_user_id: from, to_user_id: to, amount_cents: amt, method, created_by: user.id });
+    await logActivity("settlement_added", "marked " + fmtUSD(amt) + " paid: " + nameOf(from) + " → " + nameOf(to), { from, to, amount_cents: amt });
     setBusy(false);
     setPending(null); setAskReturn(false);
     await load();
@@ -111,7 +129,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
     <div style={{ maxWidth: 520, margin: "0 auto" }}>
       {/* screen switch */}
       <div style={{ display: "flex", background: "#123528", borderRadius: 999, padding: 3, marginBottom: 12 }}>
-        {([["balances", "Balances"], ["add", "Add expense"], ["settle", "Settle up"]] as const).map(([k, label]) => (
+        {([["balances", "Balances"], ["add", "Add"], ["settle", "Settle"], ["log", "Log"]] as const).map(([k, label]) => (
           <button key={k} onClick={() => { if (k === "add") setEditing(null); setScreen(k); }} style={{
             flex: 1, border: "none", cursor: "pointer", borderRadius: 999, padding: "8px 6px", fontSize: 13, fontWeight: 700,
             background: screen === k ? C.gold : "transparent", color: screen === k ? "#2a2410" : C.sage,
@@ -126,13 +144,13 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
       {screen === "add" && (
         <AddExpense key={editing?.id || "new"} user={user} gid={gid} members={members} guests={guests} busy={busy} setBusy={setBusy}
           requireOnline={requireOnline}
-          editing={editing} editShares={editing ? shares.filter((s) => s.expense_id === editing.id) : []} editPayers={editing ? payers.filter((p) => p.expense_id === editing.id) : []}
+          editing={editing} editShares={editing ? shares.filter((s) => s.expense_id === editing.id) : []} editPayers={editing ? payers.filter((p) => p.expense_id === editing.id) : []} editHistory={editing ? activity.filter((a) => a?.meta?.expense_id === editing.id && (a.action === "expense_created" || a.action === "expense_edited")) : []} onLog={logActivity}
           canDelete={!!editing && (editing.created_by === user.id || isAdmin)}
-          onDelete={async () => { if (!editing) return; setBusy(true); await supabase.from("expenses").delete().eq("id", editing.id); setBusy(false); setEditing(null); await load(); setScreen("balances"); }}
+          onDelete={async () => { if (!editing) return; const d = editing; setBusy(true); await supabase.from("expenses").delete().eq("id", d.id); await logActivity("expense_deleted", "deleted “" + (d.description || catLabel(d.category)) + "” — " + fmtUSD(d.amount_cents), { expense_id: d.id, amount_cents: d.amount_cents }); setBusy(false); setEditing(null); await load(); setScreen("balances"); }}
           onAddGuest={async (name, sponsor) => {
             if (!requireOnline()) return;
             const { data } = await supabase.from("group_guests").insert({ group_id: gid, name, sponsor_user_id: sponsor, created_by: user.id }).select("id, name, sponsor_user_id, group_id").single();
-            if (data) setGuests((g) => [...g, data as GuestRow].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })));
+            if (data) { setGuests((g) => [...g, data as GuestRow].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))); await logActivity("guest_added", "added guest " + name + " (sponsored by " + (members.find((mm) => mm.id === sponsor)?.display_name || "?") + ")", { guest_id: (data as any).id }); }
           }}
           onSaved={async () => { setEditing(null); await load(); setScreen("balances"); }} />
       )}
@@ -140,6 +158,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
         <SettleScreen transfers={transfers} nameOf={nameOf} memberById={memberById} busy={busy} me={user.id} isAdmin={isAdmin}
           onPay={startPay} onMark={(t) => recordSettlement(t.from, t.to, t.amt, "cash")} />
       )}
+      {screen === "log" && <ActivityLog activity={activity} memberById={memberById} />}
 
       {/* expenses list (under balances) */}
       {screen === "balances" && (
@@ -265,12 +284,12 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, onPay,
 // ---------------- Add / Edit expense ----------------
 type Party = { kind: "member" | "guest"; id: string; name: string; avatar_url?: string | null; sponsor?: string };
 
-function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, onAddGuest, onSaved, editing, editShares, editPayers, canDelete, onDelete }: {
+function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, onAddGuest, onSaved, editing, editShares, editPayers, editHistory, onLog, canDelete, onDelete }: {
   user: { id: string }; gid: string; members: Member[]; guests: GuestRow[]; busy: boolean; setBusy: (b: boolean) => void;
   requireOnline: () => boolean;
   onAddGuest: (name: string, sponsor: string) => Promise<void>;
   onSaved: () => Promise<void>;
-  editing?: ExpenseRow | null; editShares?: ShareRow[]; editPayers?: PayerRow[]; canDelete?: boolean; onDelete?: () => Promise<void>;
+  editing?: ExpenseRow | null; editShares?: ShareRow[]; editPayers?: PayerRow[]; editHistory?: any[]; onLog?: (action: string, summary: string, meta?: any) => Promise<void>; canDelete?: boolean; onDelete?: () => Promise<void>;
 }) {
   const skey = (s: ShareRow) => (s.user_id ? "u:" + s.user_id : "g:" + s.guest_id);
   const [desc, setDesc] = useState(editing?.description || "");
@@ -281,8 +300,6 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
   const [multiPayer, setMultiPayer] = useState(initP.length > 1);
   const [payerSet, setPayerSet] = useState<Set<string>>(new Set(initP.length ? initP.map((p) => p.user_id) : [editing?.payer_user_id || user.id]));
   const [payerAmt, setPayerAmt] = useState<Record<string, string>>(Object.fromEntries(initP.map((p) => [p.user_id, (p.paid_cents / 100).toString()])));
-  const [history, setHistory] = useState<any[]>([]);
-  useEffect(() => { if (!editing) return; (async () => { const { data } = await supabase.from("expense_audit").select("*").eq("expense_id", editing.id).order("created_at", { ascending: false }); setHistory(data || []); })(); }, []);
   const [mode, setMode] = useState<"even" | "custom">(editing?.split_type || "even");
   const [checked, setChecked] = useState<Set<string>>(new Set((editShares || []).map(skey)));
   const [custom, setCustom] = useState<Record<string, string>>(Object.fromEntries((editShares || []).map((s) => [skey(s), (s.share_cents / 100).toString()])));
@@ -345,7 +362,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
     await supabase.from("expense_shares").insert(rows);
     await supabase.from("expense_payers").delete().eq("expense_id", expId);
     await supabase.from("expense_payers").insert(paidPayers.map((uid) => ({ expense_id: expId, user_id: uid, paid_cents: multiPayer ? centsOf(payerAmt[uid]) : amtCents })));
-    await supabase.from("expense_audit").insert({ expense_id: expId, action: editing ? "edited" : "created", actor_user_id: user.id, snapshot: { description: desc.trim(), amount_cents: amtCents, category: cat, split_type: mode, payers: paidPayers.length, participants: selected.length } });
+    await onLog?.(editing ? "expense_edited" : "expense_created", (editing ? "edited “" : "added “") + (desc.trim() || catLabel(cat)) + "” — " + fmtUSD(amtCents), { expense_id: expId, amount_cents: amtCents });
     setBusy(false);
     await onSaved();
   }
@@ -447,16 +464,39 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
         <button disabled={busy} onClick={async () => { if (!requireOnline()) return; if (!window.confirm("Delete this expense? Everyone's balances will recompute. Payments already marked settled stay recorded.")) return; setBusy(true); await onDelete?.(); }}
           style={{ ...btn(false), marginTop: 8, color: C.birdie, borderColor: C.birdie }}>Delete expense</button>
       )}
-      {editing && history.length > 0 && (
+      {editing && (editHistory || []).length > 0 && (
         <div style={{ marginTop: 16, borderTop: `1px solid ${C.greenMid}`, paddingTop: 12 }}>
           <Eyebrow>History</Eyebrow>
-          {history.map((h) => (
+          {(editHistory || []).map((h) => (
             <div key={h.id} style={{ color: C.sage, fontSize: 11.5, padding: "3px 0" }}>
-              {h.action === "created" ? "Created" : "Edited"} by {members.find((mm) => mm.id === h.actor_user_id)?.display_name || "Someone"} · {new Date(h.created_at).toLocaleDateString()} · {fmtUSD(h.snapshot?.amount_cents || 0)}
+              {h.action === "expense_created" ? "Created" : "Edited"} by {members.find((mm) => mm.id === h.actor_user_id)?.display_name || "Someone"} · {new Date(h.created_at).toLocaleDateString()} · {fmtUSD(h.meta?.amount_cents || 0)}
             </div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+const ACT_ICON: Record<string, string> = { expense_created: "+", expense_edited: "✎", expense_deleted: "✕", settlement_added: "✓", guest_added: "☺" };
+function ActivityLog({ activity, memberById }: { activity: any[]; memberById: Record<string, Member> }) {
+  return (
+    <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
+      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Activity log</div>
+      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 6 }}>Everything that's happened with the group's money · visible to all, cannot be edited</div>
+      {activity.length === 0 && <div style={{ color: C.sage, fontSize: 13, padding: "8px 2px" }}>Nothing logged yet.</div>}
+      {activity.map((a) => {
+        const who = memberById[a.actor_user_id]?.display_name || "Someone";
+        return (
+          <div key={a.id} style={{ display: "flex", gap: 9, padding: "9px 2px", borderBottom: `1px solid ${C.greenMid}` }}>
+            <span style={{ fontSize: 14, width: 18, textAlign: "center", color: C.gold }}>{ACT_ICON[a.action] || "•"}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: C.cream, fontSize: 13 }}><b>{who}</b> {a.summary}</div>
+              <div style={{ color: C.faint, fontSize: 10.5 }}>{new Date(a.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -203,3 +203,9 @@ Migrations remain: 0045 post_group_rounds, 0046 structure_stash, 0047 live_avata
 
 ## v1.76.0 — Phase 2 (migration 0050)
 **Run migration 0050_expense_audit.sql** (idempotent; after 0049). Adds expense_audit for per-expense edit history + RLS. Category summary needs no migration. Outstanding migrations in order: 0045, 0046, 0047, 0048, 0049, 0050.
+
+## v1.77.0 — Group activity log (migration 0051)
+**Run migration 0051_group_activity.sql** (idempotent; after 0050). Immutable, group-wide money log visible to all members (the 'Log' tab in Money). Logs expense create/edit/delete, settlements, and guest adds. expense_audit (0050) is now unused for logging (per-expense history reads from group_activity); the 0050 table can stay in place harmlessly. Outstanding migrations in order: 0045, 0046, 0047, 0048, 0049, 0050, 0051.
+
+## v1.77.1 — Fix: Money member visibility (migration 0052)
+**Run migration 0052_group_pay_roster.sql** (idempotent; after 0051). profiles RLS was hiding other members from non-admins, so the Money split/payer lists collapsed to just yourself. Adds a SECURITY DEFINER group_pay_roster() returning every active member's id/name/avatar + venmo/paypal/phone (guarded by is_group_member). The app falls back to the old direct query if 0052 isn't run, but the full roster only appears once it is. Run order: 0045..0052.
