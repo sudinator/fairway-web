@@ -5838,13 +5838,16 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
   if (n === 0 || ps.length === 0 || !anyScore) return null;
 
   type Seg = { k: string; from: number; to: number; cls: "seg" | "nine" | "tot" };
-  const segs: Seg[] = [];
-  if (n >= 6)  segs.push({ k: "1–6",   from: 0,  to: 6,  cls: "seg" });
-  if (n >= 12) segs.push({ k: "7–12",  from: 6,  to: 12, cls: "seg" });
-  if (n >= 18) segs.push({ k: "13–18", from: 12, to: 18, cls: "seg" });
-  segs.push({ k: "F9", from: 0, to: Math.min(9, n), cls: "nine" });
-  if (n > 9) segs.push({ k: "B9", from: 9, to: n, cls: "nine" });
-  segs.push({ k: n === 18 ? "18" : "1–" + n, from: 0, to: n, cls: "tot" });
+  const raw: Seg[] = [];
+  for (let start = 0; start < n; start += 6) raw.push({ k: (start + 1) + "–" + Math.min(start + 6, n), from: start, to: Math.min(start + 6, n), cls: "seg" });
+  raw.push({ k: "F9", from: 0, to: Math.min(9, n), cls: "nine" });
+  if (n > 9) raw.push({ k: "B9", from: 9, to: n, cls: "nine" });
+  raw.push({ k: n === 18 ? "18" : "1–" + n, from: 0, to: n, cls: "tot" });
+  // Drop segments whose hole-range duplicates another (e.g. on a 9-hole game F9 == total);
+  // later entries win, so the labelled total/back-nine replaces an identical front-nine/six.
+  const segMap = new Map<string, Seg>();
+  for (const sg of raw) segMap.set(sg.from + "-" + sg.to, sg);
+  const segs: Seg[] = Array.from(segMap.values());
 
   const rows = ps.map((p) => {
     const net: (number | null)[] = [];
@@ -5877,7 +5880,7 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
   const hdrBg = (cls: string) => (cls === "seg" ? "#EEF4EF" : cls === "nine" ? "#FBF3DE" : "#E7F0E9");
   const th: React.CSSProperties = { textAlign: "center", color: C.faint, fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", padding: "6px 3px", borderBottom: `1px solid ${C.line}` };
   const nmH: React.CSSProperties = { ...th, textAlign: "left", width: 74, borderBottom: `1px solid ${C.line}` };
-  const nmCell: React.CSSProperties = { textAlign: "left", width: 74, color: C.ink, fontWeight: 800, fontSize: 12.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", padding: "6px 3px" };
+  const nmCell: React.CSSProperties = { textAlign: "left", width: 96, color: C.ink, fontWeight: 800, fontSize: 12.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", padding: "6px 3px" };
   const cell: React.CSSProperties = { textAlign: "center", fontSize: 12.5, padding: "6px 3px", color: "#4b4838", fontWeight: 600 };
   const chip = (on: boolean): React.CSSProperties => ({ border: `1px solid ${on ? C.gold : "#2c5142"}`, background: on ? C.gold : "#173a2c", color: on ? "#2a2410" : C.cream, borderRadius: 999, padding: "3px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" });
 
@@ -5903,7 +5906,7 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
           <tbody>
             {rows.map((r, ri) => (
               <tr key={ri} style={{ borderTop: ri === 0 ? "none" : "1px solid #F0EBDA" }}>
-                <td style={nmCell}>{r.name}</td>
+                <td style={nmCell}><span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}><Avatar src={r.avatar_url} name={r.name} size={22} /><span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span></span></td>
                 {segs.map((s, c) => {
                   const v = metric === "net" ? r.net[c] : r.pts[c];
                   const win = winners[c].idx.has(ri);

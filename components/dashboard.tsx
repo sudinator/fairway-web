@@ -118,26 +118,6 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   // Per-round value for each stat, for the click-to-expand drill-down.
   type StatKey = "rounds" | "avgpar" | "best" | "diff" | "par3" | "par4" | "par5" | "pts" | "gir" | "fir" | "scramble" | "sandsave" | "putts" | "threeputt" | "pen";
   const [detail, setDetail] = useState<StatKey | null>(null);
-  const perRound = (key: StatKey, r: Round): string => {
-    const hs = played(r);
-    switch (key) {
-      case "rounds": return `${strokesOf(r)} (${toParStr(diffOf(r))})`;
-      case "avgpar": return toParStr(diffOf(r));
-      case "best": return toParStr(diffOf(r));
-      case "diff": { const d = roundDifferential(r); return d == null ? "— (needs 18 + rating/slope)" : d.toFixed(1); }
-      case "par3": { const a = hs.filter((h) => h.par === 3); return a.length ? (a.reduce((s, h) => s + (h.strokes || 0), 0) / a.length).toFixed(2) : "—"; }
-      case "par4": { const a = hs.filter((h) => h.par === 4); return a.length ? (a.reduce((s, h) => s + (h.strokes || 0), 0) / a.length).toFixed(2) : "—"; }
-      case "par5": { const a = hs.filter((h) => h.par === 5); return a.length ? (a.reduce((s, h) => s + (h.strokes || 0), 0) / a.length).toFixed(2) : "—"; }
-      case "pts": return stablefordDisplay(r);
-      case "gir": { const g = girStats([r]); return g.total ? `${g.hit}/${g.total} (${Math.round(100 * g.hit / g.total)}%)` : "— (needs putts)"; }
-      case "scramble": { const sc = scrambleStats([r]); return sc.total ? `${sc.hit}/${sc.total} (${Math.round(100 * sc.hit / sc.total)}%)` : "— (needs putts)"; }
-      case "sandsave": { const ss = sandSaveStats([r]); return ss.total ? `${ss.hit}/${ss.total} (${Math.round(100 * ss.hit / ss.total)}%)` : "— (no sand holes)"; }
-      case "fir": { const f = firStats([r]); return f.total ? `${f.hit}/${f.total} (${Math.round(100 * f.hit / f.total)}%)` : "—"; }
-      case "putts": { const p = hs.filter((h) => h.putts != null); return p.length ? `${puttsOf(r)} (${(puttsOf(r) / p.length).toFixed(2)}/hole)` : "—"; }
-      case "threeputt": return `${hs.filter((h) => (h.putts || 0) >= 3).length}`;
-      case "pen": return `${pensOf(r)}`;
-    }
-  };
   const dirLower = new Set<StatKey>(["rounds", "avgpar", "best", "diff", "par3", "par4", "par5", "putts", "threeputt", "pen"]);
   const perRoundNum = (key: StatKey, r: Round): number | null => {
     const hs = played(r);
@@ -147,7 +127,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
       case "par3": { const a = hs.filter((h) => h.par === 3); return a.length ? a.reduce((s, h) => s + (h.strokes || 0), 0) / a.length : null; }
       case "par4": { const a = hs.filter((h) => h.par === 4); return a.length ? a.reduce((s, h) => s + (h.strokes || 0), 0) / a.length : null; }
       case "par5": { const a = hs.filter((h) => h.par === 5); return a.length ? a.reduce((s, h) => s + (h.strokes || 0), 0) / a.length : null; }
-      case "pts": { const v = ptsOf(r); return v == null ? null : v; }
+      case "pts": return stablefordEstimable(r) ? estimatedStablefordPts(r) : null;
       case "gir": { const g = girStats([r]); return g.total ? 100 * g.hit / g.total : null; }
       case "scramble": { const sc = scrambleStats([r]); return sc.total ? 100 * sc.hit / sc.total : null; }
       case "sandsave": { const ss = sandSaveStats([r]); return ss.total ? 100 * ss.hit / ss.total : null; }

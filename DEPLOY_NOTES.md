@@ -181,3 +181,15 @@ No schema change; deploy is code-only.
 ## v1.69.0 — Avatars everywhere (migration 0047)
 **Run migration 0047_live_avatar.sql** in the Supabase SQL editor before/at deploy. It recreates get_live_scorecard (from 0041) with one added field, 'avatar_url' (from the existing denormalized game_players.avatar_url column — no new columns). Without it the public live page falls back to initials for everyone.
 App changes (no data): profile photos (or initials) now also render on the game leaderboard was already present; added to the skins leaderboards, singles match header, match result cards, team strips, and the public live leaderboard. Native <select> pickers and dense per-hole scorecard columns intentionally left text-only.
+
+
+## Backfill — app-only releases (no migration unless noted)
+These shipped between the migration/structural entries above and were not individually noted here; recorded now to keep DEPLOY_NOTES in sync with BACKLOG.
+- v1.66.0 group share-to-chat card; v1.66.2 horizontal individual share card.
+- v1.67.0 dashboard "How you compare" card; v1.67.1 compare-card readability.
+- v1.68.0 avatars in groups + directory.
+- v1.69.1 tee reminder (later moved); v1.69.2 course-library per-tee yardage.
+- v1.70.0 team/match Group results segment summary; v1.70.1 tee moved under group-scorecard profile.
+- v1.71.0 dashboard click-a-stat TREND chart (bars + rolling averages).
+- v1.71.1 fixes: Stableford trend estimates instead of plotting 0 for gross-only rounds; de-duplicated Group-results columns on <18-hole games; avatars added to Group-results rows; removed dead dashboard perRound helper; this backfill.
+Migrations remain: 0045 post_group_rounds, 0046 structure_stash, 0047 live_avatar (documented above) — run in order in the Supabase SQL editor.
