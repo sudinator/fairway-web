@@ -107,7 +107,8 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
   async function recordSettlement(from: string, to: string, amt: number, method: string) {
     if (!requireOnline()) return;
     setBusy(true);
-    await supabase.from("settlements").insert({ group_id: gid, from_user_id: from, to_user_id: to, amount_cents: amt, method, created_by: user.id });
+    const { error } = await supabase.from("settlements").insert({ group_id: gid, from_user_id: from, to_user_id: to, amount_cents: amt, method, created_by: user.id });
+    if (error) { setBusy(false); alert("Couldn't record the payment — please try again."); return; }
     await logActivity("settlement_added", "marked " + fmtUSD(amt) + " paid: " + nameOf(from) + " → " + nameOf(to), { from, to, amount_cents: amt });
     setBusy(false);
     setPending(null); setAskReturn(false);
@@ -146,11 +147,12 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
           requireOnline={requireOnline}
           editing={editing} editShares={editing ? shares.filter((s) => s.expense_id === editing.id) : []} editPayers={editing ? payers.filter((p) => p.expense_id === editing.id) : []} editHistory={editing ? activity.filter((a) => a?.meta?.expense_id === editing.id && (a.action === "expense_created" || a.action === "expense_edited")) : []} onLog={logActivity}
           canDelete={!!editing && (editing.created_by === user.id || isAdmin)}
-          onDelete={async () => { if (!editing) return; const d = editing; setBusy(true); await supabase.from("expenses").delete().eq("id", d.id); await logActivity("expense_deleted", "deleted “" + (d.description || catLabel(d.category)) + "” — " + fmtUSD(d.amount_cents), { expense_id: d.id, amount_cents: d.amount_cents }); setBusy(false); setEditing(null); await load(); setScreen("balances"); }}
+          onDelete={async () => { if (!editing) return; const d = editing; setBusy(true); const { error } = await supabase.from("expenses").delete().eq("id", d.id); if (error) { setBusy(false); alert("Couldn't delete this expense — please try again."); return; } await logActivity("expense_deleted", "deleted “" + (d.description || catLabel(d.category)) + "” — " + fmtUSD(d.amount_cents), { expense_id: d.id, amount_cents: d.amount_cents }); setBusy(false); setEditing(null); await load(); setScreen("balances"); }}
           onAddGuest={async (name, sponsor) => {
             if (!requireOnline()) return;
-            const { data } = await supabase.from("group_guests").insert({ group_id: gid, name, sponsor_user_id: sponsor, created_by: user.id }).select("id, name, sponsor_user_id, group_id").single();
-            if (data) { setGuests((g) => [...g, data as GuestRow].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))); await logActivity("guest_added", "added guest " + name + " (sponsored by " + (members.find((mm) => mm.id === sponsor)?.display_name || "?") + ")", { guest_id: (data as any).id }); }
+            const { data, error } = await supabase.from("group_guests").insert({ group_id: gid, name, sponsor_user_id: sponsor, created_by: user.id }).select("id, name, sponsor_user_id, group_id").single();
+            if (error || !data) { alert("Couldn't add the guest — please try again."); return; }
+            setGuests((g) => [...g, data as GuestRow].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))); await logActivity("guest_added", "added guest " + name + " (sponsored by " + (members.find((mm) => mm.id === sponsor)?.display_name || "?") + ")", { guest_id: (data as any).id });
           }}
           onSaved={async () => { setEditing(null); await load(); setScreen("balances"); }} />
       )}
@@ -359,9 +361,20 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
       guest_id: p.kind === "guest" ? p.id : null,
       share_cents: shareOf(p),
     }));
-    await supabase.from("expense_shares").insert(rows);
+    const shErr = (await supabase.from("expense_shares").insert(rows)).error;
     await supabase.from("expense_payers").delete().eq("expense_id", expId);
-    await supabase.from("expense_payers").insert(paidPayers.map((uid) => ({ expense_id: expId, user_id: uid, paid_cents: multiPayer ? centsOf(payerAmt[uid]) : amtCents })));
+    const pyErr = (await supabase.from("expense_payers").insert(paidPayers.map((uid) => ({ expense_id: expId, user_id: uid, paid_cents: multiPayer ? centsOf(payerAmt[uid]) : amtCents })))).error;
+    if (shErr || pyErr) {
+      // Never leave a broken expense (payer credited but no shares => wrong balances).
+      // New expense: remove it entirely (shares/payers cascade). Edit: surface so they can re-enter.
+      if (!editing && expId) await supabase.from("expenses").delete().eq("id", expId);
+      setBusy(false);
+      alert(editing
+        ? "The amount saved but the split didn't record — please reopen this expense and re-enter the split."
+        : "Couldn't save the split, so nothing was saved. Check your connection and try again."
+          + (pyErr && !shErr ? " (If this persists, the payers migration 0049 may not be applied yet.)" : ""));
+      return;
+    }
     await onLog?.(editing ? "expense_edited" : "expense_created", (editing ? "edited “" : "added “") + (desc.trim() || catLabel(cat)) + "” — " + fmtUSD(amtCents), { expense_id: expId, amount_cents: amtCents });
     setBusy(false);
     await onSaved();
