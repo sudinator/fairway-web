@@ -137,7 +137,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
           onSaved={async () => { setEditing(null); await load(); setScreen("balances"); }} />
       )}
       {screen === "settle" && (
-        <SettleScreen transfers={transfers} nameOf={nameOf} memberById={memberById} busy={busy}
+        <SettleScreen transfers={transfers} nameOf={nameOf} memberById={memberById} busy={busy} me={user.id} isAdmin={isAdmin}
           onPay={startPay} onMark={(t) => recordSettlement(t.from, t.to, t.amt, "cash")} />
       )}
 
@@ -222,9 +222,9 @@ function BalancesScreen({ members, guests, shares, balances, me, onNudge }: {
 }
 
 // ---------------- Settle up ----------------
-function SettleScreen({ transfers, nameOf, memberById, busy, onPay, onMark }: {
+function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, onPay, onMark }: {
   transfers: { from: string; to: string; amt: number }[]; nameOf: (id: string) => string;
-  memberById: Record<string, Member>; busy: boolean;
+  memberById: Record<string, Member>; busy: boolean; me: string; isAdmin: boolean;
   onPay: (kind: "venmo" | "paypal", t: { from: string; to: string; amt: number }) => void;
   onMark: (t: { from: string; to: string; amt: number }) => void;
 }) {
@@ -241,12 +241,20 @@ function SettleScreen({ transfers, nameOf, memberById, busy, onPay, onMark }: {
               <span style={{ flex: 1, color: C.cream, fontSize: 14 }}><b>{nameOf(t.from)}</b> pays <b>{nameOf(t.to)}</b></span>
               <span style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 17 }}>{fmtUSD(t.amt)}</span>
             </div>
-            <div style={{ display: "flex", gap: 7, marginTop: 9 }}>
-              {to?.venmo_handle && <button disabled={busy} onClick={() => onPay("venmo", t)} style={{ flex: 1, border: "none", borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#3D95CE", color: "#fff" }}>Venmo</button>}
-              {to?.paypal_handle && <button disabled={busy} onClick={() => onPay("paypal", t)} style={{ flex: 1, border: "none", borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#003087", color: "#fff" }}>PayPal</button>}
-              {!to?.venmo_handle && !to?.paypal_handle && <span style={{ flex: 1, color: C.sage, fontSize: 11, alignSelf: "center" }}>no handle on file — pay cash</span>}
-              <button disabled={busy} onClick={() => onMark(t)} style={{ flex: 1, border: `1px solid ${C.line}`, borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: C.cream, color: C.green }}>Mark paid</button>
-            </div>
+            {(() => {
+              const isMine = t.from === me;
+              const canMark = isMine || isAdmin;
+              return (
+                <div style={{ display: "flex", gap: 7, marginTop: 9, alignItems: "center" }}>
+                  {isMine && to?.venmo_handle && <button disabled={busy} onClick={() => onPay("venmo", t)} style={{ flex: 1, border: "none", borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#3D95CE", color: "#fff" }}>Venmo</button>}
+                  {isMine && to?.paypal_handle && <button disabled={busy} onClick={() => onPay("paypal", t)} style={{ flex: 1, border: "none", borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#003087", color: "#fff" }}>PayPal</button>}
+                  {isMine && !to?.venmo_handle && !to?.paypal_handle && <span style={{ flex: 1, color: C.sage, fontSize: 11 }}>no handle on file — pay cash</span>}
+                  {canMark
+                    ? <button disabled={busy} onClick={() => onMark(t)} style={{ flex: 1, border: `1px solid ${C.line}`, borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: C.cream, color: C.green }}>Mark paid{!isMine ? " (admin)" : ""}</button>
+                    : <span style={{ flex: 1, color: C.faint, fontSize: 11.5, textAlign: "right" }}>Only {nameOf(t.from)} can mark this paid</span>}
+                </div>
+              );
+            })()}
           </div>
         );
       })}
@@ -272,12 +280,12 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
   const [payer, setPayer] = useState(initP[0]?.user_id || editing?.payer_user_id || user.id);
   const [multiPayer, setMultiPayer] = useState(initP.length > 1);
   const [payerSet, setPayerSet] = useState<Set<string>>(new Set(initP.length ? initP.map((p) => p.user_id) : [editing?.payer_user_id || user.id]));
-  const [payerAmt, setPayerAmt] = useState<Record<string, number>>(Object.fromEntries(initP.map((p) => [p.user_id, p.paid_cents])));
+  const [payerAmt, setPayerAmt] = useState<Record<string, string>>(Object.fromEntries(initP.map((p) => [p.user_id, (p.paid_cents / 100).toString()])));
   const [history, setHistory] = useState<any[]>([]);
   useEffect(() => { if (!editing) return; (async () => { const { data } = await supabase.from("expense_audit").select("*").eq("expense_id", editing.id).order("created_at", { ascending: false }); setHistory(data || []); })(); }, []);
   const [mode, setMode] = useState<"even" | "custom">(editing?.split_type || "even");
   const [checked, setChecked] = useState<Set<string>>(new Set((editShares || []).map(skey)));
-  const [custom, setCustom] = useState<Record<string, number>>(Object.fromEntries((editShares || []).map((s) => [skey(s), s.share_cents])));
+  const [custom, setCustom] = useState<Record<string, string>>(Object.fromEntries((editShares || []).map((s) => [skey(s), (s.share_cents / 100).toString()])));
   const [showGuest, setShowGuest] = useState(false);
   const [gName, setGName] = useState("");
   const [gSponsor, setGSponsor] = useState(user.id);
@@ -288,26 +296,27 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
   ];
   const keyOf = (p: Party) => (p.kind === "member" ? "u:" : "g:") + p.id;
   const amtCents = Math.round((parseFloat(amount) || 0) * 100);
+  const centsOf = (str?: string) => Math.round((parseFloat(str || "") || 0) * 100);
   const selected = parties.filter((p) => checked.has(keyOf(p)));
 
   const evenMap: Record<string, number> = {};
   if (mode === "even" && selected.length) { const arr = evenShares(amtCents, selected.length); selected.forEach((p, i) => { evenMap[keyOf(p)] = arr[i]; }); }
-  const shareOf = (p: Party) => mode === "even" ? (evenMap[keyOf(p)] || 0) : (custom[keyOf(p)] || 0);
-  const customSum = selected.reduce((s, p) => s + (custom[keyOf(p)] || 0), 0);
-  const customOk = mode === "even" || validateCustomTotal(selected.map((p) => custom[keyOf(p)] || 0), amtCents);
+  const shareOf = (p: Party) => mode === "even" ? (evenMap[keyOf(p)] || 0) : centsOf(custom[keyOf(p)]);
+  const customSum = selected.reduce((s, p) => s + centsOf(custom[keyOf(p)]), 0);
+  const customOk = mode === "even" || validateCustomTotal(selected.map((p) => centsOf(custom[keyOf(p)])), amtCents);
   const paidPayers = multiPayer ? members.filter((mm) => payerSet.has(mm.id)).map((mm) => mm.id) : [payer];
-  const paidSum = multiPayer ? paidPayers.reduce((s, uid) => s + (payerAmt[uid] || 0), 0) : amtCents;
+  const paidSum = multiPayer ? paidPayers.reduce((s, uid) => s + centsOf(payerAmt[uid]), 0) : amtCents;
   const paidOk = !multiPayer || (paidPayers.length > 0 && paidSum === amtCents);
   const canSave = !!desc.trim() && amtCents > 0 && selected.length > 0 && customOk && paidOk && paidPayers.length > 0 && !busy;
   const togglePayer = (uid: string) => { const n = new Set(payerSet); n.has(uid) ? n.delete(uid) : n.add(uid); setPayerSet(n); };
-  const splitPayersEven = () => { const ids = members.filter((mm) => payerSet.has(mm.id)).map((mm) => mm.id); const arr = evenShares(amtCents, ids.length); const nm: Record<string, number> = {}; ids.forEach((uid, i) => { nm[uid] = arr[i]; }); setPayerAmt(nm); };
-  const runningRemain = (order: string[], amts: Record<string, number>, isSel: (k: string) => boolean) => {
+  const splitPayersEven = () => { const ids = members.filter((mm) => payerSet.has(mm.id)).map((mm) => mm.id); const arr = evenShares(amtCents, ids.length); const nm: Record<string, string> = {}; ids.forEach((uid, i) => { nm[uid] = (arr[i] / 100).toString(); }); setPayerAmt(nm); };
+  const runningRemain = (order: string[], amtOf: (k: string) => number, isSel: (k: string) => boolean) => {
     const out: Record<string, number> = {}; let run = 0;
-    order.forEach((k) => { if (isSel(k)) { run += (amts[k] || 0); out[k] = amtCents - run; } });
+    order.forEach((k) => { if (isSel(k)) { run += amtOf(k); out[k] = amtCents - run; } });
     return out;
   };
-  const splitRemainAfter = runningRemain(parties.map(keyOf), custom, (k) => checked.has(k));
-  const payRemainAfter = runningRemain(members.map((mm) => mm.id), payerAmt, (k) => payerSet.has(k));
+  const splitRemainAfter = runningRemain(parties.map(keyOf), (k) => centsOf(custom[k]), (k) => checked.has(k));
+  const payRemainAfter = runningRemain(members.map((mm) => mm.id), (k) => centsOf(payerAmt[k]), (k) => payerSet.has(k));
   const remHint = (v: number | undefined): React.CSSProperties => ({ fontSize: 10.5, whiteSpace: "nowrap", color: v === 0 ? "#7fd6a3" : (v ?? 0) < 0 ? "#ef9d90" : C.sage });
 
   const toggle = (p: Party) => { const k = keyOf(p); const n = new Set(checked); n.has(k) ? n.delete(k) : n.add(k); setChecked(n); };
@@ -335,7 +344,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
     }));
     await supabase.from("expense_shares").insert(rows);
     await supabase.from("expense_payers").delete().eq("expense_id", expId);
-    await supabase.from("expense_payers").insert(paidPayers.map((uid) => ({ expense_id: expId, user_id: uid, paid_cents: multiPayer ? (payerAmt[uid] || 0) : amtCents })));
+    await supabase.from("expense_payers").insert(paidPayers.map((uid) => ({ expense_id: expId, user_id: uid, paid_cents: multiPayer ? centsOf(payerAmt[uid]) : amtCents })));
     await supabase.from("expense_audit").insert({ expense_id: expId, action: editing ? "edited" : "created", actor_user_id: user.id, snapshot: { description: desc.trim(), amount_cents: amtCents, category: cat, split_type: mode, payers: paidPayers.length, participants: selected.length } });
     setBusy(false);
     await onSaved();
@@ -374,7 +383,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
                 <Avatar src={m.avatar_url} name={m.display_name} size={24} />
                 <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 600, minWidth: 0 }}>{m.display_name}</span>
                 {on && <span style={{ display: "flex", alignItems: "center", gap: 4 }} onClick={(e) => e.stopPropagation()}>
-                  <input inputMode="decimal" placeholder="0.00" value={payerAmt[m.id] != null ? (payerAmt[m.id] / 100).toString() : ""} onChange={(e) => { const v = Math.round((parseFloat(e.target.value) || 0) * 100); setPayerAmt((c) => ({ ...c, [m.id]: v })); }} style={{ ...inputStyle, width: 68, textAlign: "right", padding: "6px 8px" }} />
+                  <input inputMode="decimal" placeholder="0.00" value={payerAmt[m.id] ?? ""} onChange={(e) => setPayerAmt((c) => ({ ...c, [m.id]: e.target.value }))} style={{ ...inputStyle, width: 68, textAlign: "right", padding: "6px 8px" }} />
                   <span style={remHint(payRemainAfter[m.id])}>/ {fmtUSD(payRemainAfter[m.id] ?? amtCents)} left</span>
                 </span>}
               </div>
@@ -409,7 +418,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
             {on && (mode === "even"
               ? <span style={{ color: C.cream, fontFamily: "Georgia, serif", fontWeight: 700 }}>{fmtUSD(shareOf(p))}</span>
               : <span style={{ display: "flex", alignItems: "center", gap: 4 }} onClick={(e) => e.stopPropagation()}>
-                  <input inputMode="decimal" placeholder="0.00" value={custom[keyOf(p)] != null ? (custom[keyOf(p)] / 100).toString() : ""} onChange={(e) => { const v = Math.round((parseFloat(e.target.value) || 0) * 100); setCustom((c) => ({ ...c, [keyOf(p)]: v })); }} style={{ ...inputStyle, width: 68, textAlign: "right", padding: "6px 8px" }} />
+                  <input inputMode="decimal" placeholder="0.00" value={custom[keyOf(p)] ?? ""} onChange={(e) => setCustom((c) => ({ ...c, [keyOf(p)]: e.target.value }))} style={{ ...inputStyle, width: 68, textAlign: "right", padding: "6px 8px" }} />
                   <span style={remHint(splitRemainAfter[keyOf(p)])}>/ {fmtUSD(splitRemainAfter[keyOf(p)] ?? amtCents)} left</span>
                 </span>)}
           </div>
