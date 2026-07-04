@@ -1,0 +1,99 @@
+// Unit tests for lib/money.ts — run with `npm test`.
+import {
+  evenShares, validateCustomTotal, computeBalances, simplify, aggregateOwed,
+  payLink, nudgeSms, fmtUSD, guestOwedFor,
+} from "./money";
+import type { Expense, Share, Settlement, Guest, Transfer } from "./money";
+
+let pass = 0, fail = 0; const fails: string[] = [];
+// Canonicalize: sort object keys (leave arrays in order) so {a,b} == {b,a}.
+const canon = (v: any): string => JSON.stringify(v, (_k, val) =>
+  (val && typeof val === "object" && !Array.isArray(val))
+    ? Object.fromEntries(Object.keys(val).sort().map((k) => [k, val[k]]))
+    : val);
+const check = (name: string, got: any, exp: any) => {
+  const a = canon(got), b = canon(exp);
+  if (a === b) pass++; else { fail++; fails.push(`FAIL ${name}\n   got ${a}\n   exp ${b}`); }
+};
+const ok = (name: string, cond: boolean) => check(name, !!cond, true);
+const sum = (o: Record<string, number>) => Object.values(o).reduce((s, v) => s + v, 0);
+
+// --- 2) even split reconciles exactly, incl. odd cents ---
+check("even 1000/3", evenShares(1000, 3), [334, 333, 333]);
+check("even 400/4", evenShares(400, 4), [100, 100, 100, 100]);
+check("even 0/3", evenShares(0, 3), [0, 0, 0]);
+check("even 1001/3 sums", evenShares(1001, 3).reduce((s, v) => s + v, 0), 1001);
+check("even 9999/7 sums", evenShares(9999, 7).reduce((s, v) => s + v, 0), 9999);
+
+// --- 3) custom split must reconcile to total ---
+ok("custom ok", validateCustomTotal([1500, 1500, 1500], 4500));
+ok("custom short", !validateCustomTotal([1500, 1500, 1400], 4500));
+ok("custom over", !validateCustomTotal([1500, 1500, 1600], 4500));
+
+// --- scenario: Amit sponsors guest Sam ---
+const guests: Guest[] = [{ id: "gSam", sponsor_user_id: "amit", name: "Sam" }];
+const expenses: Expense[] = [
+  { id: "e1", payer_user_id: "amit", amount_cents: 36000 }, // tee, even 4
+  { id: "e2", payer_user_id: "ravi", amount_cents: 8000 },  // lunch, even 4
+  { id: "e3", payer_user_id: "dev", amount_cents: 4500 },   // bet: amit, ravi, Sam
+];
+const shares: Share[] = [
+  { expense_id: "e1", user_id: "amit", share_cents: 9000 },
+  { expense_id: "e1", user_id: "dev", share_cents: 9000 },
+  { expense_id: "e1", user_id: "ravi", share_cents: 9000 },
+  { expense_id: "e1", guest_id: "gSam", share_cents: 9000 },
+  { expense_id: "e2", user_id: "amit", share_cents: 2000 },
+  { expense_id: "e2", user_id: "dev", share_cents: 2000 },
+  { expense_id: "e2", user_id: "ravi", share_cents: 2000 },
+  { expense_id: "e2", guest_id: "gSam", share_cents: 2000 },
+  { expense_id: "e3", user_id: "amit", share_cents: 1500 },
+  { expense_id: "e3", user_id: "ravi", share_cents: 1500 },
+  { expense_id: "e3", guest_id: "gSam", share_cents: 1500 },
+];
+const settlements: Settlement[] = [];
+
+// --- 1) balances sum to zero; --- 5) guest resolves to sponsor, absent from map ---
+const bal = computeBalances(expenses, shares, settlements, guests);
+check("balances", bal, { amit: 11000, dev: -6500, ravi: -4500 });
+ok("guest not in balances", !("gSam" in bal));
+check("balances sum zero", sum(bal), 0);
+check("guest owed total", guestOwedFor("gSam", shares), 12500);
+
+// reassign Sam's sponsor to Dev -> guest amounts move
+const guests2: Guest[] = [{ id: "gSam", sponsor_user_id: "dev", name: "Sam" }];
+const bal2 = computeBalances(expenses, shares, settlements, guests2);
+check("reassign moves balance", bal2, { amit: 23500, dev: -19000, ravi: -4500 });
+check("reassign still sums zero", sum(bal2), 0);
+
+// a settlement squares part of it
+const bal3 = computeBalances(expenses, shares, [{ from_user_id: "dev", to_user_id: "amit", amount_cents: 6500 }], guests);
+check("after settlement", bal3, { amit: 4500, dev: 0, ravi: -4500 });
+check("settlement sums zero", sum(bal3), 0);
+
+// --- 4) simplify: fewest transfers, everyone nets to zero, <= n-1 ---
+const tx = simplify(bal);
+const applied: Record<string, number> = { ...bal };
+tx.forEach((t: Transfer) => { applied[t.from] += t.amt; applied[t.to] -= t.amt; });
+check("simplify nets to zero", sum(Object.fromEntries(Object.entries(applied).map(([k, v]) => [k, v]))), 0);
+ok("simplify zeroes everyone", Object.values(applied).every((v) => v === 0));
+const nonzero = Object.values(bal).filter((v) => v !== 0).length;
+ok("simplify <= n-1 transfers", tx.length <= nonzero - 1);
+check("simplify transfers", tx, [{ from: "dev", to: "amit", amt: 6500 }, { from: "ravi", to: "amit", amt: 4500 }]);
+
+// --- aggregate owed across groups (banner) ---
+const g1 = { amit: -6500, dev: 6500 };
+const g2 = { amit: -4500, x: 4500 };
+check("aggregate owed amit", aggregateOwed([g1, g2], "amit"), 11000);
+check("aggregate owed dev (owed, not owing)", aggregateOwed([g1, g2], "dev"), 0);
+
+// --- formatting + links ---
+check("fmt whole", fmtUSD(6500), "$65");
+check("fmt cents", fmtUSD(6550), "$65.50");
+check("fmt neg", fmtUSD(-100), "-$1");
+check("venmo link", payLink("venmo", "amit-sud", 6500, "Golf"), "https://venmo.com/amit-sud?txn=pay&amount=65.00&note=Golf");
+check("paypal link", payLink("paypal", "ravigolf", 4500, "x"), "https://paypal.me/ravigolf/45.00");
+ok("nudge sms has body", nudgeSms("2015550102", "Dev", 6500, "Saturday Golf", "bnn.app/g/x").startsWith("sms:2015550102?&body="));
+
+console.log(`\n=== money.test ===\nPASS ${pass}  FAIL ${fail}`);
+if (fails.length) { console.log("\n" + fails.join("\n\n")); process.exit(1); }
+console.log("All assertions passed.");

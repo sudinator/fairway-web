@@ -151,3 +151,12 @@ ever disagree with this summary.
 - games.structure_stash (jsonb, 0046): last team structure {teams,foursomes,pairings} kept when a mid-round format switch hides it, so switching back restores it. Player team assignments live on game_players.
 
 - 0047_live_avatar.sql: get_live_scorecard now returns players[].avatar_url (from game_players.avatar_url) so the public live leaderboard can show photos/initials. No schema/column change.
+
+
+## Money feature (migration 0048)
+- group_guests: id, group_id, name, sponsor_user_id (member responsible), created_by, created_at. A non-app player; balances resolve to the sponsor.
+- expenses: id, group_id, created_by, payer_user_id (member), description, category (bet|tee|food|other), amount_cents (int), currency ('USD'), split_type (even|custom), created_at, updated_at.
+- expense_shares: id, expense_id (cascade), user_id XOR guest_id, share_cents. Sum of shares == expense amount_cents.
+- settlements: id, group_id, from_user_id, to_user_id, amount_cents, method, created_by, created_at. Member-to-member only.
+- profiles: + venmo_handle, paypal_handle, phone (optional, member-entered).
+All money tables are RLS-gated by active group_members; integer cents; no money moves through the app (deep-link hand-off only). Logic lives in lib/money.ts (unit-tested in lib/money.test.ts).

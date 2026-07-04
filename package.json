@@ -1,13 +1,13 @@
 {
   "name": "fairway-card",
-  "version": "1.71.1",
+  "version": "1.72.0",
   "private": true,
   "scripts": {
     "prebuild": "node scripts/write-version.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "rm -rf .testout && tsc lib/game-shape.test.ts lib/game-shape.ts lib/golf.ts --module commonjs --target es2020 --esModuleInterop --skipLibCheck --outDir .testout --rootDir lib && node .testout/game-shape.test.js"
+    "test": "rm -rf .testout && tsc lib/game-shape.test.ts lib/game-shape.ts lib/golf.ts lib/money.test.ts lib/money.ts --module commonjs --target es2020 --esModuleInterop --skipLibCheck --outDir .testout --rootDir lib && node .testout/game-shape.test.js && node .testout/money.test.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
