@@ -118,6 +118,7 @@ From the security & structure review. None are emergencies; tackle when convenie
    gracefully on very narrow screens; keep Delete visually distinct/last). App code only.
 
 ## Shipped
+- v1.74.2 — Money: members and guests now sort alphabetically (A–Z, case-insensitive) everywhere they appear — payer/sponsor selects, the split checklist, and balances — so they're easy to find. Sort is preserved when a guest is added inline.
 - v1.74.1 — Money refinements: the split section now shows a live “N of M selected” summary (with per-head amount in even mode) while choosing players; and the global “+ New round” button is hidden on the Money tab (not relevant there).
 - v1.74.0 — Money: edit & delete expenses + split-selection improvements. Tap any expense you created (or any expense if you're a group admin) to edit every field or delete it (delete cascades its shares; balances recompute; recorded settlements are untouched — confirmed via a warning). The split checklist now starts with EVERYONE UNSELECTED and has a Select all / Deselect all toggle. Edit reuses the same form (update + share replace); permissions match 0048 RLS (creator or admin).
 - v1.73.1 — Money Phase 1b complete: aggregated owe-banner in the app shell — sums the current member's owed amount across ALL their groups (computed per-group so a credit in one group can't mask a debt in another) and shows a persistent banner until squared, linking to the Money tab. Refreshes after any ledger change. Money feature Phase 1 is now fully shipped.

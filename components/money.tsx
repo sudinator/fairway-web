@@ -51,8 +51,8 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
       ? await supabase.from("expense_shares").select("*").in("expense_id", expIds)
       : { data: [] as any[] };
     const { data: setl } = await supabase.from("settlements").select("*").eq("group_id", gid);
-    setMembers((profs || []).map((p: any) => ({ id: p.id, display_name: p.display_name || "Player", avatar_url: p.avatar_url, venmo_handle: p.venmo_handle, paypal_handle: p.paypal_handle, phone: p.phone })));
-    setGuests((gRows || []) as GuestRow[]);
+    setMembers((profs || []).map((p: any) => ({ id: p.id, display_name: p.display_name || "Player", avatar_url: p.avatar_url, venmo_handle: p.venmo_handle, paypal_handle: p.paypal_handle, phone: p.phone })).sort((a, b) => a.display_name.localeCompare(b.display_name, undefined, { sensitivity: "base" })));
+    setGuests(((gRows || []) as GuestRow[]).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })));
     setExpenses((exp || []) as ExpenseRow[]);
     setShares((sh || []) as ShareRow[]);
     setSettlements((setl || []) as Settlement[]);
@@ -126,7 +126,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
           onAddGuest={async (name, sponsor) => {
             if (!requireOnline()) return;
             const { data } = await supabase.from("group_guests").insert({ group_id: gid, name, sponsor_user_id: sponsor, created_by: user.id }).select("id, name, sponsor_user_id, group_id").single();
-            if (data) setGuests((g) => [...g, data as GuestRow]);
+            if (data) setGuests((g) => [...g, data as GuestRow].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })));
           }}
           onSaved={async () => { setEditing(null); await load(); setScreen("balances"); }} />
       )}
