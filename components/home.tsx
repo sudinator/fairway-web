@@ -275,13 +275,17 @@ export function Home({ session }: { session: any }) {
     const { data: sh } = expIds.length
       ? await supabase.from("expense_shares").select("expense_id, user_id, guest_id, share_cents").in("expense_id", expIds)
       : { data: [] as any[] };
+    const { data: py } = expIds.length
+      ? await supabase.from("expense_payers").select("expense_id, user_id, paid_cents").in("expense_id", expIds)
+      : { data: [] as any[] };
     const g2 = (o: Record<string, any[]>, k: string) => (o[k] || (o[k] = []));
     const expBy: Record<string, any[]> = {}; exps.forEach((e) => g2(expBy, e.group_id).push(e));
     const setlBy: Record<string, any[]> = {}; ((setl || []) as any[]).forEach((x) => g2(setlBy, x.group_id).push(x));
     const ggBy: Record<string, any[]> = {}; ((gg || []) as any[]).forEach((x) => g2(ggBy, x.group_id).push(x));
     const expToGroup: Record<string, string> = {}; exps.forEach((e) => { expToGroup[e.id] = e.group_id; });
     const shBy: Record<string, any[]> = {}; ((sh || []) as any[]).forEach((x) => { const gid = expToGroup[x.expense_id]; if (gid) g2(shBy, gid).push(x); });
-    const perGroup = gids.map((gid) => computeBalances(expBy[gid] || [], shBy[gid] || [], setlBy[gid] || [], ggBy[gid] || []));
+    const pyBy: Record<string, any[]> = {}; ((py || []) as any[]).forEach((x) => { const gid = expToGroup[x.expense_id]; if (gid) g2(pyBy, gid).push(x); });
+    const perGroup = gids.map((gid) => computeBalances(expBy[gid] || [], shBy[gid] || [], setlBy[gid] || [], ggBy[gid] || [], pyBy[gid] || []));
     setOwed({ cents: aggregateOwed(perGroup, user.id), groups: perGroup.filter((b) => (b[user.id] || 0) < 0).length });
   }, [groups, user.id]);
   useEffect(() => { loadOwed(); }, [loadOwed]);

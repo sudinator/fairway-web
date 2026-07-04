@@ -9,6 +9,7 @@ export type Cents = number;
 
 export interface Guest { id: string; sponsor_user_id: string; name?: string }
 export interface Expense { id: string; payer_user_id: string; amount_cents: Cents }
+export interface Payer { expense_id: string; user_id: string; paid_cents: Cents }
 export interface Share { expense_id?: string; user_id?: string | null; guest_id?: string | null; share_cents: Cents }
 export interface Settlement { from_user_id: string; to_user_id: string; amount_cents: Cents }
 export interface Transfer { from: string; to: string; amt: Cents }
@@ -37,15 +38,22 @@ export function resolveMember(
   return null;
 }
 
-/** Net balance per MEMBER (positive = owed money, negative = owes). Sums to zero. */
+/** Net balance per MEMBER (positive = owed money, negative = owes). Sums to zero.
+ *  Payer side: use per-payer rows when present (multiple payers), else the single payer_user_id. */
 export function computeBalances(
-  expenses: Expense[], shares: Share[], settlements: Settlement[], guests: Guest[],
+  expenses: Expense[], shares: Share[], settlements: Settlement[], guests: Guest[], payers: Payer[] = [],
 ): Record<string, Cents> {
   const gById: Record<string, Guest> = {};
   for (const g of guests) gById[g.id] = g;
+  const payersByExp: Record<string, Payer[]> = {};
+  for (const p of payers) (payersByExp[p.expense_id] || (payersByExp[p.expense_id] = [])).push(p);
   const bal: Record<string, Cents> = {};
   const add = (uid: string | null, amt: Cents) => { if (!uid) return; bal[uid] = (bal[uid] || 0) + amt; };
-  for (const e of expenses) add(e.payer_user_id, e.amount_cents);
+  for (const e of expenses) {
+    const ps = payersByExp[e.id];
+    if (ps && ps.length) ps.forEach((p) => add(p.user_id, p.paid_cents));
+    else add(e.payer_user_id, e.amount_cents);
+  }
   for (const s of shares) add(resolveMember(s.user_id, s.guest_id, gById), -s.share_cents);
   for (const st of settlements) { add(st.from_user_id, st.amount_cents); add(st.to_user_id, -st.amount_cents); }
   return bal;

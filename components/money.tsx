@@ -7,7 +7,7 @@ import { Avatar, btn, inputStyle, Eyebrow } from "@/components/ui";
 import {
   computeBalances, simplify, evenShares, validateCustomTotal, guestOwedFor,
   fmtUSD, payLink, nudgeSms,
-  type Expense, type Share, type Settlement, type Guest,
+  type Expense, type Share, type Settlement, type Guest, type Payer,
 } from "@/lib/money";
 
 const supabase = createClient();
@@ -16,6 +16,7 @@ type Member = { id: string; display_name: string; avatar_url?: string | null; ve
 type GuestRow = Guest & { name: string; group_id: string };
 type ExpenseRow = Expense & { group_id: string; created_by: string | null; description: string; category: string; split_type: "even" | "custom"; created_at: string };
 type ShareRow = Share & { id: string };
+type PayerRow = Payer & { id?: string };
 
 const CATS: { k: string; label: string }[] = [
   { k: "tee", label: "Tee time" }, { k: "bet", label: "Bet" },
@@ -32,6 +33,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [shares, setShares] = useState<ShareRow[]>([]);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [payers, setPayers] = useState<PayerRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<ExpenseRow | null>(null);
   const isAdmin = activeGroup.role === "admin" || activeGroup.role === "owner";
@@ -50,12 +52,16 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
     const { data: sh } = expIds.length
       ? await supabase.from("expense_shares").select("*").in("expense_id", expIds)
       : { data: [] as any[] };
+    const { data: py } = expIds.length
+      ? await supabase.from("expense_payers").select("*").in("expense_id", expIds)
+      : { data: [] as any[] };
     const { data: setl } = await supabase.from("settlements").select("*").eq("group_id", gid);
     setMembers((profs || []).map((p: any) => ({ id: p.id, display_name: p.display_name || "Player", avatar_url: p.avatar_url, venmo_handle: p.venmo_handle, paypal_handle: p.paypal_handle, phone: p.phone })).sort((a, b) => a.display_name.localeCompare(b.display_name, undefined, { sensitivity: "base" })));
     setGuests(((gRows || []) as GuestRow[]).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })));
     setExpenses((exp || []) as ExpenseRow[]);
     setShares((sh || []) as ShareRow[]);
     setSettlements((setl || []) as Settlement[]);
+    setPayers((py || []) as PayerRow[]);
     setLoading(false);
     onChanged?.();
   }, [gid, onChanged]);
@@ -63,7 +69,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
 
   const memberById = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m])), [members]);
   const guestById = useMemo(() => Object.fromEntries(guests.map((g) => [g.id, g])), [guests]);
-  const balances = useMemo(() => computeBalances(expenses, shares, settlements, guests), [expenses, shares, settlements, guests]);
+  const balances = useMemo(() => computeBalances(expenses, shares, settlements, guests, payers), [expenses, shares, settlements, guests, payers]);
   const transfers = useMemo(() => simplify(balances), [balances]);
 
   const nameOf = (uid: string) => memberById[uid]?.display_name || "Player";
@@ -120,7 +126,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
       {screen === "add" && (
         <AddExpense key={editing?.id || "new"} user={user} gid={gid} members={members} guests={guests} busy={busy} setBusy={setBusy}
           requireOnline={requireOnline}
-          editing={editing} editShares={editing ? shares.filter((s) => s.expense_id === editing.id) : []}
+          editing={editing} editShares={editing ? shares.filter((s) => s.expense_id === editing.id) : []} editPayers={editing ? payers.filter((p) => p.expense_id === editing.id) : []}
           canDelete={!!editing && (editing.created_by === user.id || isAdmin)}
           onDelete={async () => { if (!editing) return; setBusy(true); await supabase.from("expenses").delete().eq("id", editing.id); setBusy(false); setEditing(null); await load(); setScreen("balances"); }}
           onAddGuest={async (name, sponsor) => {
@@ -142,6 +148,8 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
           {expenses.length === 0 && <div style={{ color: C.sage, fontSize: 13, padding: "8px 2px" }}>No expenses yet. Add one to start the ledger.</div>}
           {expenses.map((e) => {
             const payer = memberById[e.payer_user_id];
+            const prs = payers.filter((p) => p.expense_id === e.id);
+            const paidNames = prs.length ? prs.map((p) => memberById[p.user_id]?.display_name || "?").join(" & ") : (memberById[e.payer_user_id]?.display_name || "?");
             const parts = shares.filter((s) => s.expense_id === e.id);
             const who = parts.length >= members.length + guests.length ? "whole group" : parts.map((s) => s.user_id ? (memberById[s.user_id]?.display_name || "?") : (guestById[s.guest_id || ""]?.name || "guest")).join(", ");
             const canEdit = e.created_by === user.id || isAdmin;
@@ -151,7 +159,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
                 <Avatar src={payer?.avatar_url} name={payer?.display_name || "?"} size={30} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: C.cream, fontSize: 13.5, fontWeight: 600 }}>{e.description || catLabel(e.category)}</div>
-                  <div style={{ color: C.sage, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{catLabel(e.category)} · {payer?.display_name || "?"} paid · {who}</div>
+                  <div style={{ color: C.sage, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{catLabel(e.category)} · {paidNames} paid · {who}</div>
                 </div>
                 <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700 }}>{fmtUSD(e.amount_cents)}</div>
                 {canEdit && <span style={{ color: C.sage, fontSize: 17, marginLeft: 2 }}>&#8250;</span>}
@@ -248,18 +256,22 @@ function SettleScreen({ transfers, nameOf, memberById, busy, onPay, onMark }: {
 // ---------------- Add / Edit expense ----------------
 type Party = { kind: "member" | "guest"; id: string; name: string; avatar_url?: string | null; sponsor?: string };
 
-function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, onAddGuest, onSaved, editing, editShares, canDelete, onDelete }: {
+function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, onAddGuest, onSaved, editing, editShares, editPayers, canDelete, onDelete }: {
   user: { id: string }; gid: string; members: Member[]; guests: GuestRow[]; busy: boolean; setBusy: (b: boolean) => void;
   requireOnline: () => boolean;
   onAddGuest: (name: string, sponsor: string) => Promise<void>;
   onSaved: () => Promise<void>;
-  editing?: ExpenseRow | null; editShares?: ShareRow[]; canDelete?: boolean; onDelete?: () => Promise<void>;
+  editing?: ExpenseRow | null; editShares?: ShareRow[]; editPayers?: PayerRow[]; canDelete?: boolean; onDelete?: () => Promise<void>;
 }) {
   const skey = (s: ShareRow) => (s.user_id ? "u:" + s.user_id : "g:" + s.guest_id);
   const [desc, setDesc] = useState(editing?.description || "");
   const [amount, setAmount] = useState(editing ? (editing.amount_cents / 100).toString() : "");
   const [cat, setCat] = useState(editing?.category || "tee");
-  const [payer, setPayer] = useState(editing?.payer_user_id || user.id);
+  const initP = editPayers || [];
+  const [payer, setPayer] = useState(initP[0]?.user_id || editing?.payer_user_id || user.id);
+  const [multiPayer, setMultiPayer] = useState(initP.length > 1);
+  const [payerSet, setPayerSet] = useState<Set<string>>(new Set(initP.length ? initP.map((p) => p.user_id) : [editing?.payer_user_id || user.id]));
+  const [payerAmt, setPayerAmt] = useState<Record<string, number>>(Object.fromEntries(initP.map((p) => [p.user_id, p.paid_cents])));
   const [mode, setMode] = useState<"even" | "custom">(editing?.split_type || "even");
   const [checked, setChecked] = useState<Set<string>>(new Set((editShares || []).map(skey)));
   const [custom, setCustom] = useState<Record<string, number>>(Object.fromEntries((editShares || []).map((s) => [skey(s), s.share_cents])));
@@ -280,14 +292,20 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
   const shareOf = (p: Party) => mode === "even" ? (evenMap[keyOf(p)] || 0) : (custom[keyOf(p)] || 0);
   const customSum = selected.reduce((s, p) => s + (custom[keyOf(p)] || 0), 0);
   const customOk = mode === "even" || validateCustomTotal(selected.map((p) => custom[keyOf(p)] || 0), amtCents);
-  const canSave = !!desc.trim() && amtCents > 0 && selected.length > 0 && customOk && !busy;
+  const paidPayers = multiPayer ? members.filter((mm) => payerSet.has(mm.id)).map((mm) => mm.id) : [payer];
+  const paidSum = multiPayer ? paidPayers.reduce((s, uid) => s + (payerAmt[uid] || 0), 0) : amtCents;
+  const paidOk = !multiPayer || (paidPayers.length > 0 && paidSum === amtCents);
+  const canSave = !!desc.trim() && amtCents > 0 && selected.length > 0 && customOk && paidOk && paidPayers.length > 0 && !busy;
+  const togglePayer = (uid: string) => { const n = new Set(payerSet); n.has(uid) ? n.delete(uid) : n.add(uid); setPayerSet(n); };
+  const splitPayersEven = () => { const ids = members.filter((mm) => payerSet.has(mm.id)).map((mm) => mm.id); const arr = evenShares(amtCents, ids.length); const nm: Record<string, number> = {}; ids.forEach((uid, i) => { nm[uid] = arr[i]; }); setPayerAmt(nm); };
 
   const toggle = (p: Party) => { const k = keyOf(p); const n = new Set(checked); n.has(k) ? n.delete(k) : n.add(k); setChecked(n); };
 
   async function save() {
     if (!requireOnline() || !canSave) return;
     setBusy(true);
-    const payload = { payer_user_id: payer, description: desc.trim(), category: cat, amount_cents: amtCents, split_type: mode };
+    const primaryPayer = paidPayers[0];
+    const payload = { payer_user_id: primaryPayer, description: desc.trim(), category: cat, amount_cents: amtCents, split_type: mode };
     let expId = editing?.id;
     if (editing) {
       const { error } = await supabase.from("expenses").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", editing.id);
@@ -305,6 +323,8 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
       share_cents: shareOf(p),
     }));
     await supabase.from("expense_shares").insert(rows);
+    await supabase.from("expense_payers").delete().eq("expense_id", expId);
+    await supabase.from("expense_payers").insert(paidPayers.map((uid) => ({ expense_id: expId, user_id: uid, paid_cents: multiPayer ? (payerAmt[uid] || 0) : amtCents })));
     setBusy(false);
     await onSaved();
   }
@@ -316,14 +336,37 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{editing ? "Edit expense" : "Add an expense"}</div>
       <Eyebrow>Description</Eyebrow>
       <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Saturday tee times" style={inputStyle} />
-      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-        <div style={{ flex: 1 }}><Eyebrow>Amount (USD)</Eyebrow><input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="0.00" style={inputStyle} /></div>
-        <div style={{ flex: 1 }}><Eyebrow>Paid by</Eyebrow>
-          <select value={payer} onChange={(e) => setPayer(e.target.value)} style={inputStyle}>
-            {members.map((m) => <option key={m.id} value={m.id}>{m.display_name}</option>)}
-          </select>
-        </div>
+      <Eyebrow>Amount (USD)</Eyebrow>
+      <input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="0.00" style={inputStyle} />
+
+      <div style={{ display: "flex", alignItems: "center", marginTop: 8 }}>
+        <Eyebrow>Paid by</Eyebrow>
+        <span style={{ flex: 1 }} />
+        <button onClick={() => setMultiPayer((v) => !v)} style={linkBtn}>{multiPayer ? "Single payer" : "Multiple payers"}</button>
       </div>
+      {!multiPayer ? (
+        <select value={payer} onChange={(e) => setPayer(e.target.value)} style={inputStyle}>
+          {members.map((m) => <option key={m.id} value={m.id}>{m.display_name}</option>)}
+        </select>
+      ) : (
+        <>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 2 }}>
+            <button onClick={splitPayersEven} disabled={!(amtCents > 0 && payerSet.size > 0)} style={{ ...linkBtn, opacity: amtCents > 0 && payerSet.size > 0 ? 1 : 0.5 }}>Split evenly</button>
+          </div>
+          {members.map((m) => {
+            const on = payerSet.has(m.id);
+            return (
+              <div key={m.id} onClick={() => togglePayer(m.id)} style={{ display: "flex", alignItems: "center", gap: 9, background: on ? "#1c4536" : "#173a2c", border: `1.5px solid ${on ? "#3c6f59" : "transparent"}`, borderRadius: 10, padding: "8px 10px", marginTop: 6, cursor: "pointer" }}>
+                <span style={{ width: 19, height: 19, borderRadius: 5, border: `2px solid ${on ? C.gold : C.sage}`, background: on ? C.gold : "transparent", color: "#2a2410", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 12 }}>{on ? "✓" : ""}</span>
+                <Avatar src={m.avatar_url} name={m.display_name} size={24} />
+                <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 600, minWidth: 0 }}>{m.display_name}</span>
+                {on && <input onClick={(e) => e.stopPropagation()} inputMode="decimal" placeholder="0.00" value={payerAmt[m.id] != null ? (payerAmt[m.id] / 100).toString() : ""} onChange={(e) => { const v = Math.round((parseFloat(e.target.value) || 0) * 100); setPayerAmt((c) => ({ ...c, [m.id]: v })); }} style={{ ...inputStyle, width: 84, textAlign: "right", padding: "6px 8px" }} />}
+              </div>
+            );
+          })}
+          {amtCents > 0 && <Remaining total={amtCents} allocated={paidSum} />}
+        </>
+      )}
 
       <Eyebrow>Category</Eyebrow>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -353,9 +396,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
           </div>
         );
       })}
-      {mode === "custom" && amtCents > 0 && !customOk && (
-        <div style={{ color: "#f0b8ae", fontSize: 11.5, marginTop: 8 }}>Shares add to {fmtUSD(customSum)} — needs to equal {fmtUSD(amtCents)}.</div>
-      )}
+      {mode === "custom" && amtCents > 0 && <Remaining total={amtCents} allocated={customSum} />}
 
       {!showGuest
         ? <button onClick={() => setShowGuest(true)} style={{ ...btn(false), marginTop: 10 }}>+ Add a guest</button>
@@ -381,6 +422,14 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
       )}
     </div>
   );
+}
+
+const linkBtn: React.CSSProperties = { background: "none", border: "none", color: C.gold, fontSize: 12, fontWeight: 700, cursor: "pointer", padding: "2px 0" };
+function Remaining({ total, allocated }: { total: number; allocated: number }) {
+  const rem = total - allocated;
+  const color = rem === 0 ? "#7fd6a3" : rem < 0 ? "#ef9d90" : C.gold;
+  const txt = rem === 0 ? "✓ fully allocated" : rem > 0 ? fmtUSD(rem) + " left to allocate" : fmtUSD(-rem) + " over-allocated";
+  return <div style={{ color, fontSize: 12, marginTop: 8, fontWeight: 700 }}>{txt}</div>;
 }
 
 const chip = (on: boolean): React.CSSProperties => ({

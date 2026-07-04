@@ -3,7 +3,7 @@ import {
   evenShares, validateCustomTotal, computeBalances, simplify, aggregateOwed,
   payLink, nudgeSms, fmtUSD, guestOwedFor,
 } from "./money";
-import type { Expense, Share, Settlement, Guest, Transfer } from "./money";
+import type { Expense, Share, Settlement, Guest, Transfer, Payer } from "./money";
 
 let pass = 0, fail = 0; const fails: string[] = [];
 // Canonicalize: sort object keys (leave arrays in order) so {a,b} == {b,a}.
@@ -69,6 +69,21 @@ check("reassign still sums zero", sum(bal2), 0);
 const bal3 = computeBalances(expenses, shares, [{ from_user_id: "dev", to_user_id: "amit", amount_cents: 6500 }], guests);
 check("after settlement", bal3, { amit: 4500, dev: 0, ravi: -4500 });
 check("settlement sums zero", sum(bal3), 0);
+
+// --- multiple payers: paid side uses per-payer rows, else legacy single payer ---
+const mpExp: Expense[] = [{ id: "m1", payer_user_id: "amit", amount_cents: 30000 }];
+const mpShares: Share[] = [
+  { expense_id: "m1", user_id: "amit", share_cents: 10000 },
+  { expense_id: "m1", user_id: "dev", share_cents: 10000 },
+  { expense_id: "m1", user_id: "ravi", share_cents: 10000 },
+];
+const mpPayers: Payer[] = [
+  { expense_id: "m1", user_id: "amit", paid_cents: 20000 },
+  { expense_id: "m1", user_id: "dev", paid_cents: 10000 },
+];
+check("multi-payer balances", computeBalances(mpExp, mpShares, [], [], mpPayers), { amit: 10000, dev: 0, ravi: -10000 });
+check("multi-payer sums zero", sum(computeBalances(mpExp, mpShares, [], [], mpPayers)), 0);
+check("legacy single payer (no payer rows)", computeBalances(mpExp, mpShares, [], []), { amit: 20000, dev: -10000, ravi: -10000 });
 
 // --- 4) simplify: fewest transfers, everyone nets to zero, <= n-1 ---
 const tx = simplify(bal);
