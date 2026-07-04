@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { C, Round, Hole, allocateStrokes } from "@/lib/golf";
+import { computeBalances, aggregateOwed, fmtUSD } from "@/lib/money";
 import { logActivity } from "@/lib/activity";
 import { loadDraft, draftHasScores } from "@/lib/draft";
 import { loadActiveGame, saveAppBootCache, loadAppBootCache } from "@/lib/draft";
@@ -258,6 +259,32 @@ export function Home({ session }: { session: any }) {
   const inFlow = stage || viewing;
   const [moreOpen, setMoreOpen] = useState(false);
   const activeGroup = groups.find((g) => g.id === activeGroupId) || groups[0] || null;
+
+  // Aggregated owe-banner: how much the current user owes across ALL their groups.
+  const [owed, setOwed] = useState<{ cents: number; groups: number }>({ cents: 0, groups: 0 });
+  const loadOwed = useCallback(async () => {
+    const gids = groups.map((g) => g.id);
+    if (!gids.length) { setOwed({ cents: 0, groups: 0 }); return; }
+    const [{ data: exp }, { data: setl }, { data: gg }] = await Promise.all([
+      supabase.from("expenses").select("id, group_id, payer_user_id, amount_cents").in("group_id", gids),
+      supabase.from("settlements").select("group_id, from_user_id, to_user_id, amount_cents").in("group_id", gids),
+      supabase.from("group_guests").select("id, group_id, sponsor_user_id").in("group_id", gids),
+    ]);
+    const exps = (exp || []) as any[];
+    const expIds = exps.map((e) => e.id);
+    const { data: sh } = expIds.length
+      ? await supabase.from("expense_shares").select("expense_id, user_id, guest_id, share_cents").in("expense_id", expIds)
+      : { data: [] as any[] };
+    const g2 = (o: Record<string, any[]>, k: string) => (o[k] || (o[k] = []));
+    const expBy: Record<string, any[]> = {}; exps.forEach((e) => g2(expBy, e.group_id).push(e));
+    const setlBy: Record<string, any[]> = {}; ((setl || []) as any[]).forEach((x) => g2(setlBy, x.group_id).push(x));
+    const ggBy: Record<string, any[]> = {}; ((gg || []) as any[]).forEach((x) => g2(ggBy, x.group_id).push(x));
+    const expToGroup: Record<string, string> = {}; exps.forEach((e) => { expToGroup[e.id] = e.group_id; });
+    const shBy: Record<string, any[]> = {}; ((sh || []) as any[]).forEach((x) => { const gid = expToGroup[x.expense_id]; if (gid) g2(shBy, gid).push(x); });
+    const perGroup = gids.map((gid) => computeBalances(expBy[gid] || [], shBy[gid] || [], setlBy[gid] || [], ggBy[gid] || []));
+    setOwed({ cents: aggregateOwed(perGroup, user.id), groups: perGroup.filter((b) => (b[user.id] || 0) < 0).length });
+  }, [groups, user.id]);
+  useEffect(() => { loadOwed(); }, [loadOwed]);
   const isAdminOfAnyGroup = groups.some((g) => g.role === "admin");
   const showGroupsTab = isAdminOfAnyGroup || groups.length > 1;
 
@@ -317,7 +344,7 @@ export function Home({ session }: { session: any }) {
           <div style={{ color: C.sage, fontSize: 12 }}>{index != null ? `Handicap ${index}` : "Set your handicap in Profile"}</div>
         </div>
         <NotificationBell user={user} />
-        <button style={{ ...btn(true), opacity: activeGroup ? 1 : 0.5 }} disabled={!activeGroup} onClick={() => { setStage("setup"); setViewing(null); }}>＋ New round</button>
+        {tab !== "money" && <button style={{ ...btn(true), opacity: activeGroup ? 1 : 0.5 }} disabled={!activeGroup} onClick={() => { setStage("setup"); setViewing(null); }}>＋ New round</button>}
       </div>
 
       {/* Resume an in-progress round from anywhere in the app */}
@@ -359,6 +386,15 @@ export function Home({ session }: { session: any }) {
         </div>
       )}
 
+      {owed.cents > 0 && !inFlow && (
+        <button onClick={() => { setTab("money"); setStage(null); setViewing(null); }}
+          style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: "#5a2018", border: "1px solid #7a2e22", borderRadius: 12, padding: "11px 14px", marginTop: 14, cursor: "pointer" }}>
+          <span style={{ fontSize: 18 }}>&#9888;&#65039;</span>
+          <span style={{ flex: 1, color: "#ffd9d2", fontSize: 13 }}>You owe <b style={{ color: "#fff" }}>{fmtUSD(owed.cents)}</b> to settle up{owed.groups > 1 ? ` across ${owed.groups} groups` : ""}</span>
+          <span style={{ background: C.gold, color: "#2a2410", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>Settle up &#8594;</span>
+        </button>
+      )}
+
       <div style={{ marginTop: 20 }}>
         {stage === "setup" && activeGroup ? (
           <RoundSetup index={index} saveIndex={saveIndex} activeGroupId={activeGroup.id} activeGroupName={activeGroup.name} onCancel={() => setStage(null)}
@@ -392,7 +428,7 @@ export function Home({ session }: { session: any }) {
         ) : tab === "profile" ? (
           <ProfilePanel profile={profile} user={user} onSaved={loadProfile} />
         ) : tab === "money" && activeGroup ? (
-          <MoneyTab user={user} activeGroup={activeGroup} />
+          <MoneyTab user={user} activeGroup={activeGroup} onChanged={loadOwed} />
         ) : tab === "games" && activeGroup ? (
           <Tournaments session={session} activeGroupId={activeGroup.id} isAdmin={!!profile?.is_admin} />
         ) : loading ? (

@@ -24,7 +24,7 @@ const CATS: { k: string; label: string }[] = [
 const catLabel = (k: string) => CATS.find((c) => c.k === k)?.label || "Other";
 const ini = (n: string) => n.split(/\s+/).map((w) => w[0] || "").join("").slice(0, 2).toUpperCase();
 
-export function MoneyTab({ user, activeGroup }: { user: { id: string }; activeGroup: { id: string; name: string; role?: string } }) {
+export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string }; activeGroup: { id: string; name: string; role?: string }; onChanged?: () => void }) {
   const [screen, setScreen] = useState<"balances" | "add" | "settle">("balances");
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<Member[]>([]);
@@ -33,6 +33,8 @@ export function MoneyTab({ user, activeGroup }: { user: { id: string }; activeGr
   const [shares, setShares] = useState<ShareRow[]>([]);
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<ExpenseRow | null>(null);
+  const isAdmin = activeGroup.role === "admin" || activeGroup.role === "owner";
   const gid = activeGroup.id;
 
   const load = useCallback(async () => {
@@ -55,7 +57,8 @@ export function MoneyTab({ user, activeGroup }: { user: { id: string }; activeGr
     setShares((sh || []) as ShareRow[]);
     setSettlements((setl || []) as Settlement[]);
     setLoading(false);
-  }, [gid]);
+    onChanged?.();
+  }, [gid, onChanged]);
   useEffect(() => { load(); }, [load]);
 
   const memberById = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m])), [members]);
@@ -103,7 +106,7 @@ export function MoneyTab({ user, activeGroup }: { user: { id: string }; activeGr
       {/* screen switch */}
       <div style={{ display: "flex", background: "#123528", borderRadius: 999, padding: 3, marginBottom: 12 }}>
         {([["balances", "Balances"], ["add", "Add expense"], ["settle", "Settle up"]] as const).map(([k, label]) => (
-          <button key={k} onClick={() => setScreen(k)} style={{
+          <button key={k} onClick={() => { if (k === "add") setEditing(null); setScreen(k); }} style={{
             flex: 1, border: "none", cursor: "pointer", borderRadius: 999, padding: "8px 6px", fontSize: 13, fontWeight: 700,
             background: screen === k ? C.gold : "transparent", color: screen === k ? "#2a2410" : C.sage,
           }}>{label}</button>
@@ -115,14 +118,17 @@ export function MoneyTab({ user, activeGroup }: { user: { id: string }; activeGr
           onNudge={(m, owe) => { const link = "https://birdienumnum.vercel.app"; if (m.phone) window.location.href = nudgeSms(m.phone, m.display_name, owe, activeGroup.name, link); }} />
       )}
       {screen === "add" && (
-        <AddExpense user={user} gid={gid} members={members} guests={guests} busy={busy} setBusy={setBusy}
+        <AddExpense key={editing?.id || "new"} user={user} gid={gid} members={members} guests={guests} busy={busy} setBusy={setBusy}
           requireOnline={requireOnline}
+          editing={editing} editShares={editing ? shares.filter((s) => s.expense_id === editing.id) : []}
+          canDelete={!!editing && (editing.created_by === user.id || isAdmin)}
+          onDelete={async () => { if (!editing) return; setBusy(true); await supabase.from("expenses").delete().eq("id", editing.id); setBusy(false); setEditing(null); await load(); setScreen("balances"); }}
           onAddGuest={async (name, sponsor) => {
             if (!requireOnline()) return;
             const { data } = await supabase.from("group_guests").insert({ group_id: gid, name, sponsor_user_id: sponsor, created_by: user.id }).select("id, name, sponsor_user_id, group_id").single();
             if (data) setGuests((g) => [...g, data as GuestRow]);
           }}
-          onSaved={async () => { await load(); setScreen("balances"); }} />
+          onSaved={async () => { setEditing(null); await load(); setScreen("balances"); }} />
       )}
       {screen === "settle" && (
         <SettleScreen transfers={transfers} nameOf={nameOf} memberById={memberById} busy={busy}
@@ -138,17 +144,21 @@ export function MoneyTab({ user, activeGroup }: { user: { id: string }; activeGr
             const payer = memberById[e.payer_user_id];
             const parts = shares.filter((s) => s.expense_id === e.id);
             const who = parts.length >= members.length + guests.length ? "whole group" : parts.map((s) => s.user_id ? (memberById[s.user_id]?.display_name || "?") : (guestById[s.guest_id || ""]?.name || "guest")).join(", ");
+            const canEdit = e.created_by === user.id || isAdmin;
             return (
-              <div key={e.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 2px", borderBottom: `1px solid ${C.greenMid}` }}>
+              <div key={e.id} onClick={canEdit ? () => { setEditing(e); setScreen("add"); } : undefined}
+                style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 2px", borderBottom: `1px solid ${C.greenMid}`, cursor: canEdit ? "pointer" : "default" }}>
                 <Avatar src={payer?.avatar_url} name={payer?.display_name || "?"} size={30} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: C.cream, fontSize: 13.5, fontWeight: 600 }}>{e.description || catLabel(e.category)}</div>
                   <div style={{ color: C.sage, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{catLabel(e.category)} · {payer?.display_name || "?"} paid · {who}</div>
                 </div>
                 <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700 }}>{fmtUSD(e.amount_cents)}</div>
+                {canEdit && <span style={{ color: C.sage, fontSize: 17, marginLeft: 2 }}>&#8250;</span>}
               </div>
             );
           })}
+          {expenses.length > 0 && <div style={{ color: C.faint, fontSize: 10.5, marginTop: 8 }}>Tap an expense you added to edit or delete it.</div>}
         </div>
       )}
 
@@ -238,19 +248,21 @@ function SettleScreen({ transfers, nameOf, memberById, busy, onPay, onMark }: {
 // ---------------- Add / Edit expense ----------------
 type Party = { kind: "member" | "guest"; id: string; name: string; avatar_url?: string | null; sponsor?: string };
 
-function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, onAddGuest, onSaved }: {
+function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, onAddGuest, onSaved, editing, editShares, canDelete, onDelete }: {
   user: { id: string }; gid: string; members: Member[]; guests: GuestRow[]; busy: boolean; setBusy: (b: boolean) => void;
   requireOnline: () => boolean;
   onAddGuest: (name: string, sponsor: string) => Promise<void>;
   onSaved: () => Promise<void>;
+  editing?: ExpenseRow | null; editShares?: ShareRow[]; canDelete?: boolean; onDelete?: () => Promise<void>;
 }) {
-  const [desc, setDesc] = useState("");
-  const [amount, setAmount] = useState("");
-  const [cat, setCat] = useState("tee");
-  const [payer, setPayer] = useState(user.id);
-  const [mode, setMode] = useState<"even" | "custom">("even");
-  const [checked, setChecked] = useState<Set<string>>(new Set([...members.map((m) => "u:" + m.id), ...guests.map((g) => "g:" + g.id)]));
-  const [custom, setCustom] = useState<Record<string, number>>({});
+  const skey = (s: ShareRow) => (s.user_id ? "u:" + s.user_id : "g:" + s.guest_id);
+  const [desc, setDesc] = useState(editing?.description || "");
+  const [amount, setAmount] = useState(editing ? (editing.amount_cents / 100).toString() : "");
+  const [cat, setCat] = useState(editing?.category || "tee");
+  const [payer, setPayer] = useState(editing?.payer_user_id || user.id);
+  const [mode, setMode] = useState<"even" | "custom">(editing?.split_type || "even");
+  const [checked, setChecked] = useState<Set<string>>(new Set((editShares || []).map(skey)));
+  const [custom, setCustom] = useState<Record<string, number>>(Object.fromEntries((editShares || []).map((s) => [skey(s), s.share_cents])));
   const [showGuest, setShowGuest] = useState(false);
   const [gName, setGName] = useState("");
   const [gSponsor, setGSponsor] = useState(user.id);
@@ -275,12 +287,19 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
   async function save() {
     if (!requireOnline() || !canSave) return;
     setBusy(true);
-    const { data: exp, error } = await supabase.from("expenses").insert({
-      group_id: gid, created_by: user.id, payer_user_id: payer, description: desc.trim(), category: cat, amount_cents: amtCents, split_type: mode,
-    }).select("id").single();
-    if (error || !exp) { setBusy(false); alert("Couldn't save the expense."); return; }
+    const payload = { payer_user_id: payer, description: desc.trim(), category: cat, amount_cents: amtCents, split_type: mode };
+    let expId = editing?.id;
+    if (editing) {
+      const { error } = await supabase.from("expenses").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", editing.id);
+      if (error) { setBusy(false); alert("Couldn't update the expense."); return; }
+      await supabase.from("expense_shares").delete().eq("expense_id", editing.id);
+    } else {
+      const { data: exp, error } = await supabase.from("expenses").insert({ group_id: gid, created_by: user.id, ...payload }).select("id").single();
+      if (error || !exp) { setBusy(false); alert("Couldn't save the expense."); return; }
+      expId = exp.id;
+    }
     const rows = selected.map((p) => ({
-      expense_id: exp.id,
+      expense_id: expId,
       user_id: p.kind === "member" ? p.id : null,
       guest_id: p.kind === "guest" ? p.id : null,
       share_cents: shareOf(p),
@@ -294,7 +313,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
 
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
-      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800, marginBottom: 4 }}>Add an expense</div>
+      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800, marginBottom: 4 }}>{editing ? "Edit expense" : "Add an expense"}</div>
       <Eyebrow>Description</Eyebrow>
       <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Saturday tee times" style={inputStyle} />
       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -311,7 +330,12 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
         {CATS.map((c) => <button key={c.k} onClick={() => setCat(c.k)} style={chip(cat === c.k)}>{c.label}</button>)}
       </div>
 
-      <Eyebrow>Split between</Eyebrow>
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <Eyebrow>Split between</Eyebrow>
+        <span style={{ flex: 1, color: C.sage, fontSize: 11, marginLeft: 8 }}>{selected.length} of {parties.length} selected{mode === "even" && amtCents > 0 && selected.length ? ` · ${fmtUSD(Math.floor(amtCents / selected.length))} each` : ""}</span>
+        {parties.length > 0 && (() => { const allOn = parties.every((p) => checked.has(keyOf(p)));
+          return <button onClick={() => setChecked(allOn ? new Set() : new Set(parties.map(keyOf)))} style={{ background: "none", border: "none", color: C.gold, fontSize: 12, fontWeight: 700, cursor: "pointer", padding: "2px 0" }}>{allOn ? "Deselect all" : "Select all"}</button>; })()}
+      </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
         <button onClick={() => setMode("even")} style={chip(mode === "even")}>Split evenly</button>
         <button onClick={() => setMode("custom")} style={chip(mode === "custom")}>Custom</button>
@@ -350,7 +374,11 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
           </div>
         )}
 
-      <button disabled={!canSave} onClick={save} style={{ ...btn(true), marginTop: 14, opacity: canSave ? 1 : 0.5 }}>Add expense</button>
+      <button disabled={!canSave} onClick={save} style={{ ...btn(true), marginTop: 14, opacity: canSave ? 1 : 0.5 }}>{editing ? "Save changes" : "Add expense"}</button>
+      {editing && canDelete && (
+        <button disabled={busy} onClick={async () => { if (!requireOnline()) return; if (!window.confirm("Delete this expense? Everyone's balances will recompute. Payments already marked settled stay recorded.")) return; setBusy(true); await onDelete?.(); }}
+          style={{ ...btn(false), marginTop: 8, color: C.birdie, borderColor: C.birdie }}>Delete expense</button>
+      )}
     </div>
   );
 }
