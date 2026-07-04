@@ -200,3 +200,6 @@ Migrations remain: 0045 post_group_rounds, 0046 structure_stash, 0047 live_avata
 
 ## v1.75.0 — Multiple payers (migration 0049)
 **Run migration 0049_expense_payers.sql** in the Supabase SQL editor (idempotent; run after 0048). Adds the expense_payers table (who paid, how much) + RLS. Existing single-payer expenses keep working via the payer_user_id fallback. Outstanding migrations in order: 0045, 0046, 0047, 0048, 0049.
+
+## v1.76.0 — Phase 2 (migration 0050)
+**Run migration 0050_expense_audit.sql** (idempotent; after 0049). Adds expense_audit for per-expense edit history + RLS. Category summary needs no migration. Outstanding migrations in order: 0045, 0046, 0047, 0048, 0049, 0050.

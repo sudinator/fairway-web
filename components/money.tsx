@@ -167,6 +167,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
             );
           })}
           {expenses.length > 0 && <div style={{ color: C.faint, fontSize: 10.5, marginTop: 8 }}>Tap an expense you added to edit or delete it.</div>}
+          <CategorySummary expenses={expenses} />
         </div>
       )}
 
@@ -272,6 +273,8 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
   const [multiPayer, setMultiPayer] = useState(initP.length > 1);
   const [payerSet, setPayerSet] = useState<Set<string>>(new Set(initP.length ? initP.map((p) => p.user_id) : [editing?.payer_user_id || user.id]));
   const [payerAmt, setPayerAmt] = useState<Record<string, number>>(Object.fromEntries(initP.map((p) => [p.user_id, p.paid_cents])));
+  const [history, setHistory] = useState<any[]>([]);
+  useEffect(() => { if (!editing) return; (async () => { const { data } = await supabase.from("expense_audit").select("*").eq("expense_id", editing.id).order("created_at", { ascending: false }); setHistory(data || []); })(); }, []);
   const [mode, setMode] = useState<"even" | "custom">(editing?.split_type || "even");
   const [checked, setChecked] = useState<Set<string>>(new Set((editShares || []).map(skey)));
   const [custom, setCustom] = useState<Record<string, number>>(Object.fromEntries((editShares || []).map((s) => [skey(s), s.share_cents])));
@@ -298,6 +301,14 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
   const canSave = !!desc.trim() && amtCents > 0 && selected.length > 0 && customOk && paidOk && paidPayers.length > 0 && !busy;
   const togglePayer = (uid: string) => { const n = new Set(payerSet); n.has(uid) ? n.delete(uid) : n.add(uid); setPayerSet(n); };
   const splitPayersEven = () => { const ids = members.filter((mm) => payerSet.has(mm.id)).map((mm) => mm.id); const arr = evenShares(amtCents, ids.length); const nm: Record<string, number> = {}; ids.forEach((uid, i) => { nm[uid] = arr[i]; }); setPayerAmt(nm); };
+  const runningRemain = (order: string[], amts: Record<string, number>, isSel: (k: string) => boolean) => {
+    const out: Record<string, number> = {}; let run = 0;
+    order.forEach((k) => { if (isSel(k)) { run += (amts[k] || 0); out[k] = amtCents - run; } });
+    return out;
+  };
+  const splitRemainAfter = runningRemain(parties.map(keyOf), custom, (k) => checked.has(k));
+  const payRemainAfter = runningRemain(members.map((mm) => mm.id), payerAmt, (k) => payerSet.has(k));
+  const remHint = (v: number | undefined): React.CSSProperties => ({ fontSize: 10.5, whiteSpace: "nowrap", color: v === 0 ? "#7fd6a3" : (v ?? 0) < 0 ? "#ef9d90" : C.sage });
 
   const toggle = (p: Party) => { const k = keyOf(p); const n = new Set(checked); n.has(k) ? n.delete(k) : n.add(k); setChecked(n); };
 
@@ -325,6 +336,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
     await supabase.from("expense_shares").insert(rows);
     await supabase.from("expense_payers").delete().eq("expense_id", expId);
     await supabase.from("expense_payers").insert(paidPayers.map((uid) => ({ expense_id: expId, user_id: uid, paid_cents: multiPayer ? (payerAmt[uid] || 0) : amtCents })));
+    await supabase.from("expense_audit").insert({ expense_id: expId, action: editing ? "edited" : "created", actor_user_id: user.id, snapshot: { description: desc.trim(), amount_cents: amtCents, category: cat, split_type: mode, payers: paidPayers.length, participants: selected.length } });
     setBusy(false);
     await onSaved();
   }
@@ -350,7 +362,8 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
         </select>
       ) : (
         <>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 2 }}>
+          <div style={{ display: "flex", alignItems: "center" }}>
+            {amtCents > 0 ? <div style={{ flex: 1 }}><Remaining total={amtCents} allocated={paidSum} /></div> : <span style={{ flex: 1 }} />}
             <button onClick={splitPayersEven} disabled={!(amtCents > 0 && payerSet.size > 0)} style={{ ...linkBtn, opacity: amtCents > 0 && payerSet.size > 0 ? 1 : 0.5 }}>Split evenly</button>
           </div>
           {members.map((m) => {
@@ -360,11 +373,13 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
                 <span style={{ width: 19, height: 19, borderRadius: 5, border: `2px solid ${on ? C.gold : C.sage}`, background: on ? C.gold : "transparent", color: "#2a2410", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 12 }}>{on ? "✓" : ""}</span>
                 <Avatar src={m.avatar_url} name={m.display_name} size={24} />
                 <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 600, minWidth: 0 }}>{m.display_name}</span>
-                {on && <input onClick={(e) => e.stopPropagation()} inputMode="decimal" placeholder="0.00" value={payerAmt[m.id] != null ? (payerAmt[m.id] / 100).toString() : ""} onChange={(e) => { const v = Math.round((parseFloat(e.target.value) || 0) * 100); setPayerAmt((c) => ({ ...c, [m.id]: v })); }} style={{ ...inputStyle, width: 84, textAlign: "right", padding: "6px 8px" }} />}
+                {on && <span style={{ display: "flex", alignItems: "center", gap: 4 }} onClick={(e) => e.stopPropagation()}>
+                  <input inputMode="decimal" placeholder="0.00" value={payerAmt[m.id] != null ? (payerAmt[m.id] / 100).toString() : ""} onChange={(e) => { const v = Math.round((parseFloat(e.target.value) || 0) * 100); setPayerAmt((c) => ({ ...c, [m.id]: v })); }} style={{ ...inputStyle, width: 68, textAlign: "right", padding: "6px 8px" }} />
+                  <span style={remHint(payRemainAfter[m.id])}>/ {fmtUSD(payRemainAfter[m.id] ?? amtCents)} left</span>
+                </span>}
               </div>
             );
           })}
-          {amtCents > 0 && <Remaining total={amtCents} allocated={paidSum} />}
         </>
       )}
 
@@ -383,6 +398,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
         <button onClick={() => setMode("even")} style={chip(mode === "even")}>Split evenly</button>
         <button onClick={() => setMode("custom")} style={chip(mode === "custom")}>Custom</button>
       </div>
+      {mode === "custom" && amtCents > 0 && <Remaining total={amtCents} allocated={customSum} />}
       {parties.map((p) => {
         const on = checked.has(keyOf(p));
         return (
@@ -392,11 +408,13 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
             <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 600, minWidth: 0 }}>{p.name}{p.kind === "guest" ? <span style={{ color: C.sage, fontSize: 10.5, fontWeight: 700 }}> · guest of {sponsorName(p.sponsor!)}</span> : ""}</span>
             {on && (mode === "even"
               ? <span style={{ color: C.cream, fontFamily: "Georgia, serif", fontWeight: 700 }}>{fmtUSD(shareOf(p))}</span>
-              : <input onClick={(e) => e.stopPropagation()} inputMode="decimal" placeholder="0.00" value={custom[keyOf(p)] != null ? (custom[keyOf(p)] / 100).toString() : ""} onChange={(e) => { const v = Math.round((parseFloat(e.target.value) || 0) * 100); setCustom((c) => ({ ...c, [keyOf(p)]: v })); }} style={{ ...inputStyle, width: 84, textAlign: "right", padding: "6px 8px" }} />)}
+              : <span style={{ display: "flex", alignItems: "center", gap: 4 }} onClick={(e) => e.stopPropagation()}>
+                  <input inputMode="decimal" placeholder="0.00" value={custom[keyOf(p)] != null ? (custom[keyOf(p)] / 100).toString() : ""} onChange={(e) => { const v = Math.round((parseFloat(e.target.value) || 0) * 100); setCustom((c) => ({ ...c, [keyOf(p)]: v })); }} style={{ ...inputStyle, width: 68, textAlign: "right", padding: "6px 8px" }} />
+                  <span style={remHint(splitRemainAfter[keyOf(p)])}>/ {fmtUSD(splitRemainAfter[keyOf(p)] ?? amtCents)} left</span>
+                </span>)}
           </div>
         );
       })}
-      {mode === "custom" && amtCents > 0 && <Remaining total={amtCents} allocated={customSum} />}
 
       {!showGuest
         ? <button onClick={() => setShowGuest(true)} style={{ ...btn(false), marginTop: 10 }}>+ Add a guest</button>
@@ -420,6 +438,40 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
         <button disabled={busy} onClick={async () => { if (!requireOnline()) return; if (!window.confirm("Delete this expense? Everyone's balances will recompute. Payments already marked settled stay recorded.")) return; setBusy(true); await onDelete?.(); }}
           style={{ ...btn(false), marginTop: 8, color: C.birdie, borderColor: C.birdie }}>Delete expense</button>
       )}
+      {editing && history.length > 0 && (
+        <div style={{ marginTop: 16, borderTop: `1px solid ${C.greenMid}`, paddingTop: 12 }}>
+          <Eyebrow>History</Eyebrow>
+          {history.map((h) => (
+            <div key={h.id} style={{ color: C.sage, fontSize: 11.5, padding: "3px 0" }}>
+              {h.action === "created" ? "Created" : "Edited"} by {members.find((mm) => mm.id === h.actor_user_id)?.display_name || "Someone"} · {new Date(h.created_at).toLocaleDateString()} · {fmtUSD(h.snapshot?.amount_cents || 0)}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CategorySummary({ expenses }: { expenses: ExpenseRow[] }) {
+  const total = expenses.reduce((s, e) => s + e.amount_cents, 0);
+  if (!total) return null;
+  const byCat: Record<string, number> = {};
+  expenses.forEach((e) => { byCat[e.category] = (byCat[e.category] || 0) + e.amount_cents; });
+  const rows = CATS.map((c) => ({ label: c.label, cents: byCat[c.k] || 0 })).filter((r) => r.cents > 0).sort((a, b) => b.cents - a.cents);
+  return (
+    <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px", marginTop: 14 }}>
+      <div style={{ display: "flex", alignItems: "baseline" }}>
+        <div style={{ flex: 1, color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 800 }}>Spend by category</div>
+        <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 800 }}>{fmtUSD(total)}</div>
+      </div>
+      {rows.map((r) => (
+        <div key={r.label} style={{ marginTop: 9 }}>
+          <div style={{ display: "flex", fontSize: 12.5, color: C.cream }}><span style={{ flex: 1 }}>{r.label}</span><span style={{ color: C.sage }}>{fmtUSD(r.cents)} · {Math.round((r.cents / total) * 100)}%</span></div>
+          <div style={{ height: 7, background: "#123528", borderRadius: 4, marginTop: 3, overflow: "hidden" }}>
+            <div style={{ width: `${((r.cents / total) * 100).toFixed(1)}%`, height: "100%", background: C.gold }} />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
