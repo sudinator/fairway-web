@@ -10,6 +10,7 @@ import { btn, Wordmark, inputStyle } from "@/components/ui";
 import Tournaments from "@/components/tournaments";
 import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab, ActivityTab, AdminGroupsTab, AdminUsersTab, HelpPage } from "@/components/manage";
 import { AdminFeedbackTab } from "@/components/feedback";
+import { MoneyTab } from "@/components/money";
 import { RoundSetup } from "@/components/round-setup";
 import { RoundEditor } from "@/components/round-editor";
 import { RoundDetail } from "@/components/round-detail";
@@ -23,7 +24,7 @@ import type { AppGroup } from "@/lib/groups";
 
 const supabase = createClient();
 
-type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" | "activity" | "oversight" | "users" | "feedback" | "help" | "profile";
+type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" | "activity" | "oversight" | "users" | "feedback" | "help" | "profile" | "money";
 
 export function Home({ session }: { session: any }) {
   const [rounds, setRounds] = useState<Round[]>([]);
@@ -390,6 +391,8 @@ export function Home({ session }: { session: any }) {
           <HelpPage isAdmin={!!profile?.is_admin} user={user} displayName={displayName} groupId={activeGroupId} />
         ) : tab === "profile" ? (
           <ProfilePanel profile={profile} user={user} onSaved={loadProfile} />
+        ) : tab === "money" && activeGroup ? (
+          <MoneyTab user={user} activeGroup={activeGroup} />
         ) : tab === "games" && activeGroup ? (
           <Tournaments session={session} activeGroupId={activeGroup.id} isAdmin={!!profile?.is_admin} />
         ) : loading ? (
@@ -433,7 +436,7 @@ export function Home({ session }: { session: any }) {
                   {item(tab === p.key && !inFlow, p.icon, p.label, () => { setTab(p.key); setStage(null); setViewing(null); setMoreOpen(false); })}
                 </React.Fragment>
               )}
-              {item(moreOpen || (["players","groups","activity","oversight","users","feedback","help","profile"].includes(tab) && !inFlow), "⋯", "More", () => setMoreOpen((v) => !v))}
+              {item(moreOpen || (["players","groups","activity","oversight","users","feedback","help","profile","money"].includes(tab) && !inFlow), "⋯", "More", () => setMoreOpen((v) => !v))}
             </>
           );
         })()}
@@ -451,6 +454,7 @@ export function Home({ session }: { session: any }) {
             <div style={{ width: 40, height: 4, background: C.greenMid, borderRadius: 2, margin: "6px auto 12px" }} />
             {(() => {
               const more: { key: Tab; label: string; show: boolean }[] = [
+                { key: "money", label: "Money", show: !!activeGroup },
                 { key: "players", label: "Players", show: true },
                 { key: "groups", label: "Groups", show: showGroupsTab },
                 { key: "activity", label: "Activity ★", show: !!profile?.is_admin },
