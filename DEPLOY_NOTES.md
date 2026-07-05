@@ -212,3 +212,6 @@ Migrations remain: 0045 post_group_rounds, 0046 structure_stash, 0047 live_avata
 
 ## v1.79.0 — Group results: legs & team points
 Run migration **0053_leg_config.sql** in Supabase SQL editor (adds `games.leg_config jsonb`, idempotent). Run order is now 0045 → 0053. No other steps; existing games default to leaderboard-only until an organizer assigns leg points in setup.
+
+## v1.80.0 - Money: simplify toggle
+Run migration **0054_money_simplify.sql** (adds groups.money_simplify boolean default true, idempotent). Run order now 0045 -> 0054. Existing groups default to fewest-payments (current behavior).

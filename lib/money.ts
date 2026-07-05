@@ -88,6 +88,69 @@ export function simplify(balances: Record<string, Cents>): Transfer[] {
 }
 
 /** Total a member owes across all their groups (for the aggregated owe-banner). */
+/** Proportionally allocate `amount` cents across `weights`, summing exactly to `amount`
+ *  (largest-remainder). Falls back to an even split if all weights are zero. */
+function allocateProportional(amount: Cents, weights: Cents[]): Cents[] {
+  const total = weights.reduce((s, w) => s + w, 0);
+  if (total <= 0) return evenShares(amount, weights.length);
+  const raw = weights.map((w) => (amount * w) / total);
+  const out = raw.map((r) => Math.floor(r));
+  let rem = amount - out.reduce((s, v) => s + v, 0);
+  const order = raw.map((r, i) => ({ i, f: r - Math.floor(r) })).sort((a, b) => (b.f - a.f) || (a.i - b.i));
+  for (let k = 0; k < rem; k++) out[order[k % order.length].i] += 1;
+  return out;
+}
+
+/** Who-owes-whom "as entered": each participant owes the expense's payer(s) their share
+ *  (allocated across multiple payers by how much each fronted). Reciprocal pairs are netted,
+ *  and recorded settlements are subtracted. Unlike `simplify`, every transfer maps to a real
+ *  shared expense between those two members. Result sums per member match `computeBalances`. */
+export function pairwiseDebts(
+  expenses: Expense[], shares: Share[], settlements: Settlement[], guests: Guest[], payers: Payer[] = [],
+): Transfer[] {
+  const gById: Record<string, Guest> = {};
+  for (const g of guests) gById[g.id] = g;
+  const payersByExp: Record<string, Payer[]> = {};
+  for (const p of payers) (payersByExp[p.expense_id] || (payersByExp[p.expense_id] = [])).push(p);
+  const sharesByExp: Record<string, Share[]> = {};
+  for (const s of shares) if (s.expense_id) (sharesByExp[s.expense_id] || (sharesByExp[s.expense_id] = [])).push(s);
+
+  const net: Record<string, Record<string, Cents>> = {};
+  const owe = (from: string | null, to: string | null, amt: Cents) => {
+    if (!from || !to || from === to || amt === 0) return;
+    (net[from] || (net[from] = {}));
+    net[from][to] = (net[from][to] || 0) + amt;
+  };
+
+  for (const e of expenses) {
+    const parts = sharesByExp[e.id] || [];
+    const ps = (payersByExp[e.id] && payersByExp[e.id].length)
+      ? payersByExp[e.id]
+      : [{ expense_id: e.id, user_id: e.payer_user_id, paid_cents: e.amount_cents }];
+    const weights = ps.map((p) => p.paid_cents);
+    for (const s of parts) {
+      const debtor = resolveMember(s.user_id ?? null, s.guest_id ?? null, gById);
+      if (!debtor) continue;
+      const alloc = allocateProportional(s.share_cents, weights);
+      ps.forEach((p, idx) => owe(debtor, p.user_id, alloc[idx]));
+    }
+  }
+  for (const st of settlements) owe(st.from_user_id, st.to_user_id, -st.amount_cents);
+
+  const out: Transfer[] = [];
+  const done = new Set<string>();
+  for (const a of Object.keys(net)) for (const b of Object.keys(net[a])) {
+    const key = a < b ? a + "|" + b : b + "|" + a;
+    if (done.has(key)) continue;
+    done.add(key);
+    const diff = (net[a]?.[b] || 0) - (net[b]?.[a] || 0);
+    if (diff > 0) out.push({ from: a, to: b, amt: diff });
+    else if (diff < 0) out.push({ from: b, to: a, amt: -diff });
+  }
+  out.sort((x, y) => (y.amt - x.amt) || (x.from < y.from ? -1 : 1));
+  return out;
+}
+
 export function aggregateOwed(perGroupBalances: Record<string, Cents>[], user_id: string): Cents {
   let owed = 0;
   for (const b of perGroupBalances) { const v = b[user_id] || 0; if (v < 0) owed += -v; }

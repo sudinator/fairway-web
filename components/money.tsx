@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
 import { Avatar, btn, inputStyle, Eyebrow } from "@/components/ui";
 import {
-  computeBalances, simplify, evenShares, validateCustomTotal, guestOwedFor,
+  computeBalances, simplify, pairwiseDebts, evenShares, validateCustomTotal, guestOwedFor,
   fmtUSD, payLink, nudgeSms,
   type Expense, type Share, type Settlement, type Guest, type Payer,
 } from "@/lib/money";
@@ -38,6 +38,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<ExpenseRow | null>(null);
   const [viewing, setViewing] = useState<ExpenseRow | null>(null);
+  const [simplifyMode, setSimplifyMode] = useState(true); // group-wide: true = fewest payments, false = as entered
   const isAdmin = activeGroup.role === "admin" || activeGroup.role === "owner";
   const gid = activeGroup.id;
 
@@ -68,6 +69,8 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
       ? await supabase.from("expense_payers").select("*").in("expense_id", expIds)
       : { data: [] as any[] };
     const { data: setl } = await supabase.from("settlements").select("*").eq("group_id", gid);
+    const { data: grp } = await supabase.from("groups").select("money_simplify").eq("id", gid).single();
+    setSimplifyMode(grp?.money_simplify !== false); // default to simplified when column/absent
     const { data: act } = await supabase.from("group_activity").select("*").eq("group_id", gid).order("created_at", { ascending: false }).limit(200);
     setMembers((profs || []).map((p: any) => ({ id: p.id, display_name: p.display_name || "Player", avatar_url: p.avatar_url, venmo_handle: p.venmo_handle, paypal_handle: p.paypal_handle, phone: p.phone })).sort((a, b) => a.display_name.localeCompare(b.display_name, undefined, { sensitivity: "base" })));
     setGuests(((gRows || []) as GuestRow[]).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })));
@@ -84,7 +87,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
   const memberById = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m])), [members]);
   const guestById = useMemo(() => Object.fromEntries(guests.map((g) => [g.id, g])), [guests]);
   const balances = useMemo(() => computeBalances(expenses, shares, settlements, guests, payers), [expenses, shares, settlements, guests, payers]);
-  const transfers = useMemo(() => simplify(balances), [balances]);
+  const transfers = useMemo(() => (simplifyMode ? simplify(balances) : pairwiseDebts(expenses, shares, settlements, guests, payers)), [simplifyMode, balances, expenses, shares, settlements, guests, payers]);
 
   const nameOf = (uid: string) => memberById[uid]?.display_name || "Player";
   const requireOnline = () => {
@@ -104,6 +107,13 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
   const logActivity = useCallback(async (action: string, summary: string, meta: any = {}) => {
     await supabase.from("group_activity").insert({ group_id: gid, actor_user_id: user.id, action, summary, meta });
   }, [gid, user.id]);
+
+  const setSimplify = async (v: boolean) => {
+    if (!isAdmin || !requireOnline()) return;
+    setSimplifyMode(v);
+    const { error } = await supabase.from("groups").update({ money_simplify: v }).eq("id", gid);
+    if (error) { setSimplifyMode(!v); alert("Couldn't change the setting - please try again."); }
+  };
 
   async function recordSettlement(from: string, to: string, amt: number, method: string) {
     if (!requireOnline()) return;
@@ -159,6 +169,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
       )}
       {screen === "settle" && (
         <SettleScreen transfers={transfers} nameOf={nameOf} memberById={memberById} busy={busy} me={user.id} isAdmin={isAdmin}
+          simplifyOn={simplifyMode} canToggle={isAdmin} onToggle={setSimplify}
           onPay={startPay} onMark={(t) => recordSettlement(t.from, t.to, t.amt, "cash")} />
       )}
       {screen === "log" && <ActivityLog activity={activity} memberById={memberById} onOpenExpense={(id) => { const e = expenses.find((x) => x.id === id); if (e) setViewing(e); }} />}
@@ -251,16 +262,26 @@ function BalancesScreen({ members, guests, shares, balances, me, onNudge }: {
 }
 
 // ---------------- Settle up ----------------
-function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, onPay, onMark }: {
+function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simplifyOn, canToggle, onToggle, onPay, onMark }: {
   transfers: { from: string; to: string; amt: number }[]; nameOf: (id: string) => string;
   memberById: Record<string, Member>; busy: boolean; me: string; isAdmin: boolean;
+  simplifyOn: boolean; canToggle: boolean; onToggle: (v: boolean) => void;
   onPay: (kind: "venmo" | "paypal", t: { from: string; to: string; amt: number }) => void;
   onMark: (t: { from: string; to: string; amt: number }) => void;
 }) {
+  const segBtn = (on: boolean): React.CSSProperties => ({ flex: 1, border: "none", background: on ? C.gold : "transparent", color: on ? "#2a2410" : C.sage, borderRadius: 999, padding: "7px 6px", fontSize: 12, fontWeight: 800, cursor: "pointer" });
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Settle up</div>
-      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 6 }}>Fewest payments to square the group</div>
+      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 8 }}>{simplifyOn ? "Fewest payments to square the group" : "Each payment matches an expense you shared - who owes whom"}</div>
+      {canToggle ? (
+        <div style={{ display: "flex", background: "#123528", borderRadius: 999, padding: 3, marginBottom: 8 }}>
+          <button onClick={() => onToggle(true)} style={segBtn(simplifyOn)}>Fewest payments</button>
+          <button onClick={() => onToggle(false)} style={segBtn(!simplifyOn)}>As entered</button>
+        </div>
+      ) : (
+        <div style={{ color: C.faint, fontSize: 10.5, marginBottom: 8 }}>{simplifyOn ? "Showing fewest payments." : "Showing debts as entered."} Set by a group admin.</div>
+      )}
       {transfers.length === 0 && <div style={{ color: "#7fd6a3", textAlign: "center", fontFamily: "Georgia, serif", fontSize: 17, padding: "22px 0" }}>✓ All square</div>}
       {transfers.map((t, i) => {
         const to = memberById[t.to];

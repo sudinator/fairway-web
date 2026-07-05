@@ -166,3 +166,6 @@ All money tables are RLS-gated by active group_members; integer cents; no money 
 
 ### games.leg_config (jsonb, added v1.79.0 / migration 0053)
 Organizer config for the "Group results: legs & team points" layer on team formats (match / four-ball / trifecta). Shape: `{ scheme: "sixes"|"nines"|"sixesNoTot"|"total", metric: "pts"|"net", points: { <legKey>: number } }`. legKey is the leg label (e.g. "1–6", "Total"). Points in ½ steps; all 0 => leaderboard-only display. Null/absent => defaults (three sixes + total, points, all legs 0).
+
+### groups.money_simplify (boolean, added v1.80.0 / migration 0054)
+Group-wide Money setting. true (default) = Settle screen shows fewest-payments netting (simplify); false = shows debts "as entered" (pairwiseDebts: one payment per real shared expense). Only admins/owners can change it.

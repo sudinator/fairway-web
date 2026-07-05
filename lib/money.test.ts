@@ -1,6 +1,6 @@
 // Unit tests for lib/money.ts — run with `npm test`.
 import {
-  evenShares, validateCustomTotal, computeBalances, simplify, aggregateOwed,
+  evenShares, validateCustomTotal, computeBalances, simplify, pairwiseDebts, aggregateOwed,
   payLink, nudgeSms, fmtUSD, guestOwedFor,
 } from "./money";
 import type { Expense, Share, Settlement, Guest, Transfer, Payer } from "./money";
@@ -108,6 +108,56 @@ check("fmt neg", fmtUSD(-100), "-$1");
 check("venmo link", payLink("venmo", "amit-sud", 6500, "Golf"), "https://venmo.com/amit-sud?txn=pay&amount=65.00&note=Golf");
 check("paypal link", payLink("paypal", "ravigolf", 4500, "x"), "https://paypal.me/ravigolf/45.00");
 ok("nudge sms has body", nudgeSms("2015550102", "Dev", 6500, "Saturday Golf", "bnn.app/g/x").startsWith("sms:2015550102?&body="));
+
+// --- pairwiseDebts (as-entered who-owes-whom) ---
+{
+  const guests: any[] = [];
+  const expenses = [
+    { id: "e1", payer_user_id: "amit", amount_cents: 6000 },
+    { id: "e2", payer_user_id: "ravi", amount_cents: 3000 },
+  ];
+  const shares = [
+    { expense_id: "e1", user_id: "amit", share_cents: 2000 },
+    { expense_id: "e1", user_id: "ravi", share_cents: 2000 },
+    { expense_id: "e1", user_id: "sam", share_cents: 2000 },
+    { expense_id: "e2", user_id: "ravi", share_cents: 1500 },
+    { expense_id: "e2", user_id: "sam", share_cents: 1500 },
+  ];
+  const pw = pairwiseDebts(expenses as any, shares as any, [], guests, []);
+  const key = (t: any) => t.from + ">" + t.to + ":" + t.amt;
+  check("pairwise dinner/drinks", pw.map(key).sort(), ["ravi>amit:2000", "sam>amit:2000", "sam>ravi:1500"].sort());
+
+  // invariant: pairwise nets per member equal computeBalances
+  const bal = computeBalances(expenses as any, shares as any, [], guests, []);
+  const netFrom: Record<string, number> = {};
+  pw.forEach((t: any) => { netFrom[t.to] = (netFrom[t.to] || 0) + t.amt; netFrom[t.from] = (netFrom[t.from] || 0) - t.amt; });
+  check("pairwise invariant vs balances", netFrom, { amit: bal.amit, ravi: bal.ravi, sam: bal.sam });
+
+  // settlement subtracts a real pair
+  const pw2 = pairwiseDebts(expenses as any, shares as any, [{ from_user_id: "ravi", to_user_id: "amit", amount_cents: 2000 }] as any, guests, []);
+  check("pairwise after settle", pw2.map(key).sort(), ["sam>amit:2000", "sam>ravi:1500"].sort());
+}
+// multi-payer proportional allocation + guest->sponsor
+{
+  const guests = [{ id: "g1", sponsor_user_id: "carol" }];
+  const expenses = [{ id: "e1", payer_user_id: "alice", amount_cents: 10000 }];
+  const payers = [
+    { expense_id: "e1", user_id: "alice", paid_cents: 6000 },
+    { expense_id: "e1", user_id: "bob", paid_cents: 4000 },
+  ];
+  const shares = [
+    { expense_id: "e1", user_id: "alice", share_cents: 2500 },
+    { expense_id: "e1", user_id: "bob", share_cents: 2500 },
+    { expense_id: "e1", user_id: "carol", share_cents: 2500 },
+    { expense_id: "e1", guest_id: "g1", share_cents: 2500 },
+  ];
+  const pw = pairwiseDebts(expenses as any, shares as any, [], guests as any, payers as any);
+  const bal = computeBalances(expenses as any, shares as any, [], guests as any, payers as any);
+  const netFrom: Record<string, number> = {};
+  pw.forEach((t: any) => { netFrom[t.to] = (netFrom[t.to] || 0) + t.amt; netFrom[t.from] = (netFrom[t.from] || 0) - t.amt; });
+  // guest folds into carol; every member's pairwise net equals its balance
+  check("multipayer invariant", netFrom, { alice: bal.alice, bob: bal.bob, carol: bal.carol });
+}
 
 console.log(`\n=== money.test ===\nPASS ${pass}  FAIL ${fail}`);
 if (fails.length) { console.log("\n" + fails.join("\n\n")); process.exit(1); }

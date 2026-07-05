@@ -118,6 +118,7 @@ From the security & structure review. None are emergencies; tackle when convenie
    gracefully on very narrow screens; keep Delete visually distinct/last). App code only.
 
 ## Shipped
+- v1.80.0 - Money: group-wide "Fewest payments / As entered" toggle on the Settle screen (admin-controlled, migration 0054). As-entered uses new tested pairwiseDebts() so each payment matches a real shared expense; admin can mark any of them paid. Fewest-payments (simplify) stays the default.
 - v1.79.6 - Group results: points view shows raw Stableford totals again (net view stays over/under par); added a Thru column showing each player's holes played. Leg leader still chosen by pace vs par, so Thru gives the context.
 - v1.79.5 - Group results now dynamic (score-to-par): the grid shows each player's score vs par from their own holes played (E / -1 / +2), and the leg leader is whoever is best per hole, so partial rounds compare fairly (e.g. 5 pts thru 2 beats 8 pts thru 4). Leg points chips reworded: in progress "leading, thru N holes" + "Team B +1/2"; complete "Team A wins 1/2".
 - v1.79.4 - Group results: players now sorted alphabetically in the grid; the Leg points "leading" lines now show the leading team's name (outlined team-colored chip).
