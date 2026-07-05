@@ -163,3 +163,6 @@ ever disagree with this summary.
 - settlements: id, group_id, from_user_id, to_user_id, amount_cents, method, created_by, created_at. Member-to-member only.
 - profiles: + venmo_handle, paypal_handle, phone (optional, member-entered).
 All money tables are RLS-gated by active group_members; integer cents; no money moves through the app (deep-link hand-off only). Logic lives in lib/money.ts (unit-tested in lib/money.test.ts).
+
+### games.leg_config (jsonb, added v1.79.0 / migration 0053)
+Organizer config for the "Group results: legs & team points" layer on team formats (match / four-ball / trifecta). Shape: `{ scheme: "sixes"|"nines"|"sixesNoTot"|"total", metric: "pts"|"net", points: { <legKey>: number } }`. legKey is the leg label (e.g. "1–6", "Total"). Points in ½ steps; all 0 => leaderboard-only display. Null/absent => defaults (three sixes + total, points, all legs 0).

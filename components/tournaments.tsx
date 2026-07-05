@@ -39,6 +39,8 @@ import {
   mergeBackupRow,
 } from "@/lib/golf";
 import { pkey, chBasis, shapeOf, dotStrokes } from "@/lib/game-shape";
+import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
+import type { LegConfig, Leg } from "@/lib/legs";
 import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot, saveSyncedWatermark, loadSyncedWatermark, clearSyncedWatermark, rowPendingHoles } from "@/lib/draft";
@@ -78,6 +80,7 @@ type Game = {
   teams?: { key: string; name: string }[] | null; // two named teams for team match play
   foursomes?: { id: string; name: string; a: string[]; b: string[]; swap?: boolean }[] | null; // four-ball / trifecta: pair A vs pair B (swap = cross the singles)
   team_score_mode?: "best_ball" | "aggregate" | null; // trifecta team leg: low net vs both nets added
+  leg_config?: LegConfig | null; // "Group results: legs & team points" — organizer-set scheme/metric/per-leg points
   structure_stash?: { teams?: { key: string; name: string }[] | null; foursomes?: { id: string; name: string; a: string[]; b: string[]; swap?: boolean }[] | null; pairings?: { a: string; b: string }[] | null } | null; // last team structure, kept when a format switch hides it so switching back restores it
   trifecta_scoring?: "per_hole" | "match" | null; // trifecta: per-hole points vs Ryder-Cup 1pt-per-match
   share_token?: string | null; // public live-scorecard token (organizer-set); null = not shared
@@ -2109,6 +2112,13 @@ function GameRoom({
     if (error) { alert("Couldn't change the team scoring — " + error.message); return; }
     await load();
   };
+
+  const setLegConfig = async (cfg: LegConfig) => {
+    if (!game) return;
+    const { error } = await supabase.from("games").update({ leg_config: cfg }).eq("id", game.id);
+    if (error) { alert("Couldn't save the leg settings — " + error.message); return; }
+    await load();
+  };
   const updateSkinsMode = async (mode: "carryover" | "split") => {
     if (!game) return;
     const { error } = await supabase.from("games").update({ skins_mode: mode }).eq("id", game.id);
@@ -2792,6 +2802,10 @@ function GameRoom({
           </span>
         )}
       </div>
+      )}
+
+      {roomTab === "setup" && isOrganizer && !isEnded && (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta") && (
+        <LegConfigEditor game={game} onSave={setLegConfig} />
       )}
 
       {roomTab === "setup" && isOrganizer && game.game_type === "trifecta" && !isEnded && (
@@ -5829,34 +5843,88 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game }: {
 // are computed independently and the leader is highlighted per column in whichever
 // metric is shown (they usually agree, but a blow-up hole — floored at 0 in Stableford
 // — can split them).
+function LegConfigEditor({ game, onSave }: { game: Game; onSave: (cfg: LegConfig) => void }) {
+  const init: LegConfig = (game.leg_config as LegConfig) || { ...DEFAULT_LEG_CONFIG, points: {} };
+  const [cfg, setCfg] = React.useState<LegConfig>({ scheme: init.scheme || "sixes", metric: init.metric === "net" ? "net" : "pts", points: { ...(init.points || {}) } });
+  const n = (game.holes_meta || []).length || 18;
+  const legs = buildLegs(cfg.scheme, n);
+
+  const push = (next: LegConfig) => { setCfg(next); onSave(next); };
+  const setScheme = (scheme: string) => push({ ...cfg, scheme });
+  const setMet = (metric: "pts" | "net") => push({ ...cfg, metric });
+  const bump = (k: string, d: number) => {
+    const cur = cfg.points[k] != null ? cfg.points[k] : 0;
+    const v = Math.max(0, Math.min(5, Math.round((cur + d) * 2) / 2));
+    push({ ...cfg, points: { ...cfg.points, [k]: v } });
+  };
+
+  const schemes = [
+    { k: "sixes", label: "Three sixes + Total" },
+    { k: "nines", label: "Front 9 / Back 9 / Total" },
+    { k: "sixesNoTot", label: "Three sixes only" },
+    { k: "total", label: "Total only" },
+  ];
+  const chip = (on: boolean): React.CSSProperties => ({ border: `1px solid ${on ? C.gold : C.greenMid}`, background: on ? C.gold : "transparent", color: on ? "#1c1606" : C.cream, borderRadius: 999, padding: "7px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" });
+  const stepBtn: React.CSSProperties = { width: 30, height: 30, borderRadius: 8, border: `1px solid ${C.greenMid}`, background: "transparent", color: C.cream, fontSize: 16, fontWeight: 800, cursor: "pointer" };
+  const lbl: React.CSSProperties = { color: C.sage, fontSize: 10, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", margin: "12px 0 6px" };
+  const fmtName = game.game_type === "trifecta" ? "trifecta" : game.game_type === "fourball" ? "four-ball" : "match";
+
+  return (
+    <div style={{ marginTop: 12, background: C.greenLight, borderRadius: 12, padding: 14 }}>
+      <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase" }}>Group results â legs</div>
+      <div style={{ color: C.sage, fontSize: 11.5, marginTop: 4, lineHeight: 1.5 }}>An extra team game alongside the {fmtName}: pick which legs count and what each is worth. Winning team of each leg takes its points; ties across teams both score, ties within a team score once. Set every leg to 0 to just show a live leaderboard.</div>
+
+      <div style={lbl}>What counts?</div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {schemes.map((sc) => <button key={sc.k} onClick={() => setScheme(sc.k)} style={chip(cfg.scheme === sc.k)}>{sc.label}</button>)}
+      </div>
+
+      <div style={lbl}>Decide each leg by</div>
+      <div style={{ display: "flex", gap: 6 }}>
+        <button onClick={() => setMet("pts")} style={chip(cfg.metric === "pts")}>Stableford points</button>
+        <button onClick={() => setMet("net")} style={chip(cfg.metric === "net")}>Low net</button>
+      </div>
+
+      <div style={lbl}>Points per leg</div>
+      <div style={{ color: C.sage, fontSize: 11, margin: "-2px 0 4px" }}>e.g. Â½ pt per six, 1 pt for the total.</div>
+      {legs.map((lg) => {
+        const v = cfg.points[lg.k] != null ? cfg.points[lg.k] : 0;
+        return (
+          <div key={lg.k} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" }}>
+            <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 700 }}>{lg.k}</span>
+            <button onClick={() => bump(lg.k, -0.5)} style={stepBtn}>â</button>
+            <span style={{ fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800, color: v ? C.gold : C.faint, minWidth: 26, textAlign: "center" }}>{fmtPt(v)}</span>
+            <button onClick={() => bump(lg.k, 0.5)} style={stepBtn}>+</button>
+            <span style={{ color: C.sage, fontSize: 11, width: 16 }}>pt</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] }) {
-  // Default to Stableford points (was "net"): points is the more meaningful at-a-glance
-  // comparison across match / four-ball / trifecta. Toggle to Low net still available.
-  const [metric, setMetric] = React.useState<"net" | "pts">("pts");
+  const cfg: LegConfig = (game.leg_config as LegConfig) || DEFAULT_LEG_CONFIG;
+  const [metric, setMetric] = React.useState<"net" | "pts">(cfg.metric === "net" ? "net" : "pts");
   const meta = (game.holes_meta || []) as { n: number; par: number; si: number | null }[];
   const n = meta.length;
   const ps = players.filter((p) => !p.no_show);
   const anyScore = ps.some((p) => (p.scores || []).some((x: any) => x != null && x > 0));
   if (n === 0 || ps.length === 0 || !anyScore) return null;
 
-  type Seg = { k: string; from: number; to: number; cls: "seg" | "nine" | "tot" };
-  const raw: Seg[] = [];
-  for (let start = 0; start < n; start += 6) raw.push({ k: (start + 1) + "–" + Math.min(start + 6, n), from: start, to: Math.min(start + 6, n), cls: "seg" });
-  raw.push({ k: "F9", from: 0, to: Math.min(9, n), cls: "nine" });
-  if (n > 9) raw.push({ k: "B9", from: 9, to: n, cls: "nine" });
-  raw.push({ k: n === 18 ? "18" : "1–" + n, from: 0, to: n, cls: "tot" });
-  // Drop segments whose hole-range duplicates another (e.g. on a 9-hole game F9 == total);
-  // later entries win, so the labelled total/back-nine replaces an identical front-nine/six.
-  const segMap = new Map<string, Seg>();
-  for (const sg of raw) segMap.set(sg.from + "-" + sg.to, sg);
-  const segs: Seg[] = Array.from(segMap.values());
+  const teams = Array.isArray(game.teams) ? game.teams : [];
+  const hasTeams = teams.length >= 2;
+  const teamKey = (p: Player) => p.team || pkey(p);
+  const teamName = (k: string) => teams.find((t) => t.key === k)?.name || k;
+  const teamColor = (k: string) => (teams[0] && k === teams[0].key ? C.bogey : C.birdie);
+
+  const legs: Leg[] = buildLegs(cfg.scheme, n);
 
   const rows = ps.map((p) => {
-    const net: (number | null)[] = [];
-    const pts: (number | null)[] = [];
-    for (const s of segs) {
+    const net: (number | null)[] = [], pts: (number | null)[] = [];
+    for (const lg of legs) {
       let nSum = 0, pSum = 0, any = false;
-      for (let i = s.from; i < s.to; i++) {
+      for (let i = lg.from; i < lg.to; i++) {
         const g = p.scores?.[i];
         if (g == null || g <= 0) continue;
         any = true;
@@ -5867,24 +5935,28 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
       net.push(any ? nSum : null);
       pts.push(any ? pSum : null);
     }
-    return { name: p.display_name, avatar_url: p.avatar_url, net, pts };
+    return { pid: pkey(p), name: p.display_name, avatar_url: p.avatar_url, team: teamKey(p), net, pts };
   });
 
-  const winners = segs.map((_, c) => {
-    const vals = rows.map((r) => (metric === "net" ? r.net[c] : r.pts[c])).filter((v): v is number => v != null);
-    if (!vals.length) return { val: null as number | null, idx: new Set<number>() };
-    const best = metric === "net" ? Math.min(...vals) : Math.max(...vals);
-    const idx = new Set<number>();
-    rows.forEach((r, ri) => { const v = metric === "net" ? r.net[c] : r.pts[c]; if (v === best) idx.add(ri); });
-    return { val: best, idx };
+  const legInfo = legs.map((lg, c) => {
+    const scores = rows.map((r) => ({ pid: r.pid, team: r.team, val: metric === "net" ? r.net[c] : r.pts[c] }));
+    const res = legResult(scores, metric);
+    return { res, pts: legPoints(cfg, lg), winPids: new Set(res.winnerPids) };
   });
 
-  const hdrBg = (cls: string) => (cls === "seg" ? "#EEF4EF" : cls === "nine" ? "#FBF3DE" : "#E7F0E9");
+  const allZero = legInfo.every((li) => li.pts === 0);
+  const pointsMode = hasTeams && !allZero;
+  const tally = teamTally(legInfo.map((li) => ({ teams: li.res.winnerTeams, points: li.pts })));
+  const tA = teams[0] ? (tally[teams[0].key] || 0) : 0;
+  const tB = teams[1] ? (tally[teams[1].key] || 0) : 0;
+
+  const hdrBg = (lg: Leg) => (lg.tot ? "#E7F0E9" : "#EEF4EF");
   const th: React.CSSProperties = { textAlign: "center", color: C.faint, fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", padding: "6px 3px", borderBottom: `1px solid ${C.line}` };
-  const nmH: React.CSSProperties = { ...th, textAlign: "left", width: 74, borderBottom: `1px solid ${C.line}` };
+  const nmH: React.CSSProperties = { ...th, textAlign: "left", width: 74 };
   const nmCell: React.CSSProperties = { textAlign: "left", width: 96, color: C.ink, fontWeight: 800, fontSize: 12.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", padding: "6px 3px" };
   const cell: React.CSSProperties = { textAlign: "center", fontSize: 12.5, padding: "6px 3px", color: "#4b4838", fontWeight: 600 };
   const chip = (on: boolean): React.CSSProperties => ({ border: `1px solid ${on ? C.gold : "#2c5142"}`, background: on ? C.gold : "#173a2c", color: on ? "#2a2410" : C.cream, borderRadius: 999, padding: "3px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" });
+  const nameOf = (pid: string) => rows.find((r) => r.pid === pid)?.name || "?";
 
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "15px 13px 14px", marginTop: 12 }}>
@@ -5895,37 +5967,75 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
           <button onClick={() => setMetric("pts")} style={chip(metric === "pts")}>Points</button>
         </div>
       </div>
-      <div style={{ color: C.sage, fontSize: 11.5, marginTop: 2 }}>{metric === "net" ? "Lowest net per segment" : "Most Stableford points per segment"}</div>
+      <div style={{ color: C.sage, fontSize: 11.5, marginTop: 2 }}>
+        {(metric === "net" ? "Lowest net" : "Most Stableford points") + " wins each leg"}{pointsMode ? "" : " · leaders only"}
+      </div>
 
       <div style={{ background: C.card, borderRadius: 12, padding: "8px 8px 6px", marginTop: 12, overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
-          <thead>
-            <tr>
-              <th style={nmH}></th>
-              {segs.map((s) => <th key={s.k} style={{ ...th, background: hdrBg(s.cls) }}>{s.k}</th>)}
-            </tr>
-          </thead>
+          <thead><tr>
+            <th style={nmH}></th>
+            {legs.map((lg) => <th key={lg.k} style={{ ...th, background: hdrBg(lg) }}>{lg.k}</th>)}
+          </tr></thead>
           <tbody>
             {rows.map((r, ri) => (
-              <tr key={ri} style={{ borderTop: ri === 0 ? "none" : "1px solid #F0EBDA" }}>
-                <td style={nmCell}><span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}><Avatar src={r.avatar_url} name={r.name} size={22} /><span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span></span></td>
-                {segs.map((s, c) => {
+              <tr key={r.pid} style={{ borderTop: ri === 0 ? "none" : "1px solid #F0EBDA" }}>
+                <td style={nmCell}><span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                  <Avatar src={r.avatar_url} name={r.name} size={22} />
+                  {hasTeams && <span style={{ width: 7, height: 7, borderRadius: 4, background: teamColor(r.team), flex: "none" }} />}
+                  <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+                </span></td>
+                {legs.map((lg, c) => {
                   const v = metric === "net" ? r.net[c] : r.pts[c];
-                  const win = winners[c].idx.has(ri);
-                  return <td key={s.k} style={{ ...cell, ...(win ? { background: "#F6E7C4", color: C.green, fontWeight: 800, borderRadius: 6 } : {}) }}>{v == null ? "–" : v}</td>;
+                  const win = legInfo[c].winPids.has(r.pid);
+                  return <td key={lg.k} style={{ ...cell, ...(win ? { background: "#F6E7C4", color: C.green, fontWeight: 800, borderRadius: 6 } : {}) }}>{v == null ? "–" : v}</td>;
                 })}
               </tr>
             ))}
-            <tr style={{ borderTop: `2px solid ${C.line}` }}>
-              <td style={{ ...nmCell, color: C.greenMid, fontSize: 10, letterSpacing: 0.4, textTransform: "uppercase" }}>{metric === "net" ? "Low net" : "Most pts"}</td>
-              {winners.map((w, c) => <td key={c} style={{ ...cell, color: C.green, fontWeight: 800, fontFamily: "Georgia, serif" }}>{w.val == null ? "–" : w.val}</td>)}
-            </tr>
           </tbody>
         </table>
       </div>
-      <div style={{ color: C.sage, fontSize: 10, marginTop: 8, opacity: 0.85, lineHeight: 1.4 }}>
-        Each player’s own net / points. Segments count only holes entered so far, so this fills in live.
-      </div>
+
+      {pointsMode ? (
+        <>
+          <div style={{ color: C.sage, fontSize: 10.5, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", margin: "14px 0 4px" }}>Leg points</div>
+          {legs.map((lg, c) => {
+            const li = legInfo[c];
+            if (li.pts === 0 || li.res.winnerTeams.length === 0) return null;
+            const names = li.res.winnerPids.map(nameOf).join(" & ");
+            const note = li.res.winnerPids.length === 1 ? (names + " won") : (li.res.winnerTeams.length === 1 ? (names + " tied (same team) — counts once") : (names + " tied across teams — both score"));
+            return (
+              <div key={lg.k} style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: "7px 2px", borderBottom: `1px solid ${C.greenMid}` }}>
+                <div style={{ width: 58, flex: "none", color: C.cream, fontWeight: 800, fontSize: 12.5 }}>{lg.k}</div>
+                <div style={{ flex: 1, color: C.sage, fontSize: 12, lineHeight: 1.4 }}>
+                  {note}
+                  {li.res.winnerTeams.map((tk) => (
+                    <span key={tk} style={{ display: "inline-block", background: teamColor(tk), color: "#fff", borderRadius: 6, padding: "1px 7px", fontSize: 11, fontWeight: 800, marginLeft: 5 }}>{teamName(tk)} +{fmtPt(li.pts)}</span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
+            {teams.slice(0, 2).map((t, i) => (
+              <div key={t.key} style={{ flex: 1, background: "#123528", borderRadius: 12, padding: "12px", textAlign: "center" }}>
+                <div style={{ fontSize: 12, fontWeight: 800, color: teamColor(t.key) }}>{t.name}</div>
+                <div style={{ fontFamily: "Georgia, serif", fontSize: 28, fontWeight: 800, color: C.cream, marginTop: 2 }}>{fmtPt(i === 0 ? tA : tB)}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ textAlign: "center", marginTop: 10, fontFamily: "Georgia, serif", fontWeight: 800, color: tA === tB ? C.gold : C.cream }}>
+            {tA === tB ? ("All square · " + fmtPt(tA) + "–" + fmtPt(tB)) : (teamName(tA > tB ? teams[0].key : teams[1].key) + " leads " + fmtPt(Math.max(tA, tB)) + "–" + fmtPt(Math.min(tA, tB)))}
+          </div>
+          <div style={{ color: C.sage, fontSize: 10, marginTop: 10, opacity: 0.85, lineHeight: 1.4 }}>
+            Ties: opposite teams — both score; same team — the team scores once. Fills in live as holes are entered.
+          </div>
+        </>
+      ) : (
+        <div style={{ color: C.sage, fontSize: 10, marginTop: 8, opacity: 0.85, lineHeight: 1.4 }}>
+          {hasTeams ? "Leaders per leg (highlighted). Assign leg points in setup to play for team points." : "Each player’s own net / points per leg. Fills in live as holes are entered."}
+        </div>
+      )}
     </div>
   );
 }

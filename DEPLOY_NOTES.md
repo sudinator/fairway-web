@@ -209,3 +209,6 @@ Migrations remain: 0045 post_group_rounds, 0046 structure_stash, 0047 live_avata
 
 ## v1.77.1 — Fix: Money member visibility (migration 0052)
 **Run migration 0052_group_pay_roster.sql** (idempotent; after 0051). profiles RLS was hiding other members from non-admins, so the Money split/payer lists collapsed to just yourself. Adds a SECURITY DEFINER group_pay_roster() returning every active member's id/name/avatar + venmo/paypal/phone (guarded by is_group_member). The app falls back to the old direct query if 0052 isn't run, but the full roster only appears once it is. Run order: 0045..0052.
+
+## v1.79.0 — Group results: legs & team points
+Run migration **0053_leg_config.sql** in Supabase SQL editor (adds `games.leg_config jsonb`, idempotent). Run order is now 0045 → 0053. No other steps; existing games default to leaderboard-only until an organizer assigns leg points in setup.
