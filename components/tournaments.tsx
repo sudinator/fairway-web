@@ -5921,31 +5921,36 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
   const legs: Leg[] = buildLegs(cfg.scheme, n);
 
   const rows = ps.map((p) => {
-    const net: (number | null)[] = [], pts: (number | null)[] = [];
-    for (const lg of legs) {
-      let nSum = 0, pSum = 0, any = false;
+    const cells = legs.map((lg) => {
+      let nSum = 0, pSum = 0, parSum = 0, holes = 0;
       for (let i = lg.from; i < lg.to; i++) {
         const g = p.scores?.[i];
         if (g == null || g <= 0) continue;
-        any = true;
+        holes++;
         const recv = dotStrokes(game, p, meta[i].si, players);
         nSum += g - recv;
         pSum += stablefordPts(g, meta[i].par, recv) || 0;
+        parSum += meta[i].par;
       }
-      net.push(any ? nSum : null);
-      pts.push(any ? pSum : null);
-    }
-    return { pid: pkey(p), name: p.display_name, avatar_url: p.avatar_url, team: teamKey(p), net, pts };
+      return { holes, net: nSum, pts: pSum, par: parSum };
+    });
+    return { pid: pkey(p), name: p.display_name, avatar_url: p.avatar_url, team: teamKey(p), cells };
   });
+  // Dynamic: score TO PAR from each player's own holes played, so partial rounds compare fairly.
+  // Stableford: 2 pts = net par per hole, so (2*holes - pts). Net: (net strokes - par). Lower = better.
+  const toParOf = (cl: { holes: number; net: number; pts: number; par: number }, met: "net" | "pts") =>
+    cl.holes === 0 ? null : (met === "pts" ? (2 * cl.holes - cl.pts) : (cl.net - cl.par));
+  const fmtToPar = (v: number) => (v === 0 ? "E" : v < 0 ? String(v) : "+" + v);
 
   const legComplete = (lg: Leg) => {
     for (let i = lg.from; i < lg.to; i++) for (const p of ps) { const g = p.scores?.[i]; if (g == null || g <= 0) return false; }
     return true;
   };
+  const legHolesPlayed = (lg: Leg) => { let h = 0; for (let i = lg.from; i < lg.to; i++) if (ps.some((p) => { const g = p.scores?.[i]; return g != null && g > 0; })) h++; return h; };
   const legInfo = legs.map((lg, c) => {
-    const scores = rows.map((r) => ({ pid: r.pid, team: r.team, val: metric === "net" ? r.net[c] : r.pts[c] }));
-    const res = legResult(scores, metric);
-    return { res, pts: legPoints(cfg, lg), winPids: new Set(res.winnerPids), complete: legComplete(lg) };
+    const scores = rows.map((r) => ({ pid: r.pid, team: r.team, val: toParOf(r.cells[c], metric) }));
+    const res = legResult(scores, "net"); // lower to-par wins (dynamic vs par, fair across holes played)
+    return { res, pts: legPoints(cfg, lg), winPids: new Set(res.winnerPids), complete: legComplete(lg), holes: legHolesPlayed(lg) };
   });
 
   const allZero = legInfo.every((li) => li.pts === 0);
@@ -5962,7 +5967,7 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
   const chip = (on: boolean): React.CSSProperties => ({ border: `1px solid ${on ? C.gold : "#2c5142"}`, background: on ? C.gold : "#173a2c", color: on ? "#2a2410" : C.cream, borderRadius: 999, padding: "3px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" });
   const nameOf = (pid: string) => rows.find((r) => r.pid === pid)?.name || "?";
   const scoringText = () => {
-    const metricPhrase = metric === "net" ? "Lowest net wins each leg" : "Most Stableford points wins each leg";
+    const metricPhrase = (metric === "net" ? "Lowest net to par" : "Best Stableford score to par") + " wins each leg";
     const segLegs = legs.filter((l) => !l.tot && legPoints(cfg, l) > 0);
     const totLeg = legs.find((l) => l.tot && legPoints(cfg, l) > 0);
     if (!segLegs.length && !totLeg) return "Leaderboard only, no team points. " + metricPhrase + ".";
@@ -6004,9 +6009,9 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
                   <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
                 </span></td>
                 {legs.map((lg, c) => {
-                  const v = metric === "net" ? r.net[c] : r.pts[c];
+                  const v = toParOf(r.cells[c], metric);
                   const win = legInfo[c].winPids.has(r.pid);
-                  return <td key={lg.k} style={{ ...cell, ...(win ? { background: "#F6E7C4", color: C.green, fontWeight: 800, borderRadius: 6 } : {}) }}>{v == null ? "-" : v}</td>;
+                  return <td key={lg.k} style={{ ...cell, ...(win ? { background: "#F6E7C4", color: C.green, fontWeight: 800, borderRadius: 6 } : {}) }}>{v == null ? "-" : fmtToPar(v)}</td>;
                 })}
               </tr>
             ))}
@@ -6022,17 +6027,18 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
             if (li.pts === 0 || li.res.winnerTeams.length === 0) return null;
             const names = li.res.winnerPids.map(nameOf).join(" & ");
             const wonNote = li.res.winnerPids.length === 1 ? (names + " won") : (li.res.winnerTeams.length === 1 ? (names + " tied, same team, counts once") : (names + " tied across teams, both score"));
+            const leadNote = names + " leading, thru " + li.holes + " hole" + (li.holes === 1 ? "" : "s");
             return (
               <div key={lg.k} style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: "7px 2px", borderBottom: `1px solid ${C.greenMid}` }}>
                 <div style={{ width: 58, flexShrink: 0, color: C.cream, fontWeight: 800, fontSize: 12.5 }}>{lg.k}</div>
                 <div style={{ flex: 1, color: li.complete ? C.sage : C.faint, fontSize: 12, lineHeight: 1.4 }}>
-                  {li.complete ? wonNote : (names + " leading")}
+                  {li.complete ? wonNote : leadNote}
                   {li.complete
                     ? li.res.winnerTeams.map((tk) => (
-                        <span key={tk} style={{ display: "inline-block", background: teamColor(tk), color: C.ink, borderRadius: 6, padding: "1px 7px", fontSize: 11, fontWeight: 800, marginLeft: 5 }}>{teamName(tk)} +{fmtPt(li.pts)}</span>
+                        <span key={tk} style={{ display: "inline-block", background: teamColor(tk), color: C.ink, borderRadius: 6, padding: "1px 7px", fontSize: 11, fontWeight: 800, marginLeft: 5 }}>{teamName(tk)} wins {fmtPt(li.pts)}</span>
                       ))
                     : li.res.winnerTeams.map((tk) => (
-                        <span key={tk} style={{ display: "inline-block", border: `1px solid ${teamColor(tk)}`, color: teamColor(tk), borderRadius: 6, padding: "1px 7px", fontSize: 11, fontWeight: 800, marginLeft: 5 }}>{teamName(tk)} +{fmtPt(li.pts)} to play</span>
+                        <span key={tk} style={{ display: "inline-block", border: `1px solid ${teamColor(tk)}`, color: teamColor(tk), borderRadius: 6, padding: "1px 7px", fontSize: 11, fontWeight: 800, marginLeft: 5 }}>{teamName(tk)} +{fmtPt(li.pts)}</span>
                       ))}
                 </div>
               </div>
@@ -6055,7 +6061,7 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
         </>
       ) : (
         <div style={{ color: C.sage, fontSize: 10, marginTop: 8, opacity: 0.85, lineHeight: 1.4 }}>
-          {hasTeams ? "Leaders per leg (highlighted). Assign leg points in setup to play for team points." : "Each player's own net / points per leg. Fills in live as holes are entered."}
+          {hasTeams ? "Leaders per leg (highlighted), scored vs par. Assign leg points in setup to play for team points." : "Each player's score vs par per leg. Fills in live as holes are entered."}
         </div>
       )}
     </div>
