@@ -5865,13 +5865,13 @@ function LegConfigEditor({ game, onSave }: { game: Game; onSave: (cfg: LegConfig
     { k: "total", label: "Total only" },
   ];
   const chip = (on: boolean): React.CSSProperties => ({ border: `1px solid ${on ? C.gold : C.greenMid}`, background: on ? C.gold : "transparent", color: on ? "#1c1606" : C.cream, borderRadius: 999, padding: "7px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" });
-  const stepBtn: React.CSSProperties = { width: 30, height: 30, borderRadius: 8, border: `1px solid ${C.greenMid}`, background: "transparent", color: C.cream, fontSize: 16, fontWeight: 800, cursor: "pointer" };
+  const stepBtn: React.CSSProperties = { width: 30, height: 30, borderRadius: 8, border: `1px solid ${C.greenMid}`, background: "transparent", color: C.cream, fontSize: 16, fontWeight: 800, cursor: "pointer", lineHeight: 1 };
   const lbl: React.CSSProperties = { color: C.sage, fontSize: 10, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", margin: "12px 0 6px" };
   const fmtName = game.game_type === "trifecta" ? "trifecta" : game.game_type === "fourball" ? "four-ball" : "match";
 
   return (
     <div style={{ marginTop: 12, background: C.greenLight, borderRadius: 12, padding: 14 }}>
-      <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase" }}>Group results â legs</div>
+      <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase" }}>Group results: legs</div>
       <div style={{ color: C.sage, fontSize: 11.5, marginTop: 4, lineHeight: 1.5 }}>An extra team game alongside the {fmtName}: pick which legs count and what each is worth. Winning team of each leg takes its points; ties across teams both score, ties within a team score once. Set every leg to 0 to just show a live leaderboard.</div>
 
       <div style={lbl}>What counts?</div>
@@ -5886,13 +5886,13 @@ function LegConfigEditor({ game, onSave }: { game: Game; onSave: (cfg: LegConfig
       </div>
 
       <div style={lbl}>Points per leg</div>
-      <div style={{ color: C.sage, fontSize: 11, margin: "-2px 0 4px" }}>e.g. Â½ pt per six, 1 pt for the total.</div>
+      <div style={{ color: C.sage, fontSize: 11, margin: "-2px 0 4px" }}>e.g. half a point per six, 1 point for the total.</div>
       {legs.map((lg) => {
         const v = cfg.points[lg.k] != null ? cfg.points[lg.k] : 0;
         return (
           <div key={lg.k} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" }}>
             <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 700 }}>{lg.k}</span>
-            <button onClick={() => bump(lg.k, -0.5)} style={stepBtn}>â</button>
+            <button onClick={() => bump(lg.k, -0.5)} style={stepBtn}>-</button>
             <span style={{ fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800, color: v ? C.gold : C.faint, minWidth: 26, textAlign: "center" }}>{fmtPt(v)}</span>
             <button onClick={() => bump(lg.k, 0.5)} style={stepBtn}>+</button>
             <span style={{ color: C.sage, fontSize: 11, width: 16 }}>pt</span>
@@ -5938,15 +5938,19 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
     return { pid: pkey(p), name: p.display_name, avatar_url: p.avatar_url, team: teamKey(p), net, pts };
   });
 
+  const legComplete = (lg: Leg) => {
+    for (let i = lg.from; i < lg.to; i++) for (const p of ps) { const g = p.scores?.[i]; if (g == null || g <= 0) return false; }
+    return true;
+  };
   const legInfo = legs.map((lg, c) => {
     const scores = rows.map((r) => ({ pid: r.pid, team: r.team, val: metric === "net" ? r.net[c] : r.pts[c] }));
     const res = legResult(scores, metric);
-    return { res, pts: legPoints(cfg, lg), winPids: new Set(res.winnerPids) };
+    return { res, pts: legPoints(cfg, lg), winPids: new Set(res.winnerPids), complete: legComplete(lg) };
   });
 
   const allZero = legInfo.every((li) => li.pts === 0);
   const pointsMode = hasTeams && !allZero;
-  const tally = teamTally(legInfo.map((li) => ({ teams: li.res.winnerTeams, points: li.pts })));
+  const tally = teamTally(legInfo.filter((li) => li.complete).map((li) => ({ teams: li.res.winnerTeams, points: li.pts })));
   const tA = teams[0] ? (tally[teams[0].key] || 0) : 0;
   const tB = teams[1] ? (tally[teams[1].key] || 0) : 0;
 
@@ -5968,7 +5972,7 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
         </div>
       </div>
       <div style={{ color: C.sage, fontSize: 11.5, marginTop: 2 }}>
-        {(metric === "net" ? "Lowest net" : "Most Stableford points") + " wins each leg"}{pointsMode ? "" : " · leaders only"}
+        {(metric === "net" ? "Lowest net" : "Most Stableford points") + " wins each leg"}{pointsMode ? "" : " (leaders only)"}
       </div>
 
       <div style={{ background: C.card, borderRadius: 12, padding: "8px 8px 6px", marginTop: 12, overflowX: "auto" }}>
@@ -5982,13 +5986,13 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
               <tr key={r.pid} style={{ borderTop: ri === 0 ? "none" : "1px solid #F0EBDA" }}>
                 <td style={nmCell}><span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                   <Avatar src={r.avatar_url} name={r.name} size={22} />
-                  {hasTeams && <span style={{ width: 7, height: 7, borderRadius: 4, background: teamColor(r.team), flex: "none" }} />}
+                  {hasTeams && <span style={{ width: 7, height: 7, borderRadius: 4, background: teamColor(r.team), flexShrink: 0 }} />}
                   <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
                 </span></td>
                 {legs.map((lg, c) => {
                   const v = metric === "net" ? r.net[c] : r.pts[c];
                   const win = legInfo[c].winPids.has(r.pid);
-                  return <td key={lg.k} style={{ ...cell, ...(win ? { background: "#F6E7C4", color: C.green, fontWeight: 800, borderRadius: 6 } : {}) }}>{v == null ? "–" : v}</td>;
+                  return <td key={lg.k} style={{ ...cell, ...(win ? { background: "#F6E7C4", color: C.green, fontWeight: 800, borderRadius: 6 } : {}) }}>{v == null ? "-" : v}</td>;
                 })}
               </tr>
             ))}
@@ -6003,15 +6007,17 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
             const li = legInfo[c];
             if (li.pts === 0 || li.res.winnerTeams.length === 0) return null;
             const names = li.res.winnerPids.map(nameOf).join(" & ");
-            const note = li.res.winnerPids.length === 1 ? (names + " won") : (li.res.winnerTeams.length === 1 ? (names + " tied (same team) — counts once") : (names + " tied across teams — both score"));
+            const wonNote = li.res.winnerPids.length === 1 ? (names + " won") : (li.res.winnerTeams.length === 1 ? (names + " tied, same team, counts once") : (names + " tied across teams, both score"));
             return (
               <div key={lg.k} style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: "7px 2px", borderBottom: `1px solid ${C.greenMid}` }}>
-                <div style={{ width: 58, flex: "none", color: C.cream, fontWeight: 800, fontSize: 12.5 }}>{lg.k}</div>
-                <div style={{ flex: 1, color: C.sage, fontSize: 12, lineHeight: 1.4 }}>
-                  {note}
-                  {li.res.winnerTeams.map((tk) => (
-                    <span key={tk} style={{ display: "inline-block", background: teamColor(tk), color: "#fff", borderRadius: 6, padding: "1px 7px", fontSize: 11, fontWeight: 800, marginLeft: 5 }}>{teamName(tk)} +{fmtPt(li.pts)}</span>
-                  ))}
+                <div style={{ width: 58, flexShrink: 0, color: C.cream, fontWeight: 800, fontSize: 12.5 }}>{lg.k}</div>
+                <div style={{ flex: 1, color: li.complete ? C.sage : C.faint, fontSize: 12, lineHeight: 1.4 }}>
+                  {li.complete ? wonNote : (names + " leading")}
+                  {li.complete
+                    ? li.res.winnerTeams.map((tk) => (
+                        <span key={tk} style={{ display: "inline-block", background: teamColor(tk), color: "#fff", borderRadius: 6, padding: "1px 7px", fontSize: 11, fontWeight: 800, marginLeft: 5 }}>{teamName(tk)} +{fmtPt(li.pts)}</span>
+                      ))
+                    : <span style={{ display: "inline-block", border: `1px solid ${C.greenMid}`, color: C.sage, borderRadius: 6, padding: "1px 7px", fontSize: 11, fontWeight: 800, marginLeft: 5 }}>{fmtPt(li.pts)} pt to play for</span>}
                 </div>
               </div>
             );
@@ -6025,15 +6031,15 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
             ))}
           </div>
           <div style={{ textAlign: "center", marginTop: 10, fontFamily: "Georgia, serif", fontWeight: 800, color: tA === tB ? C.gold : C.cream }}>
-            {tA === tB ? ("All square · " + fmtPt(tA) + "–" + fmtPt(tB)) : (teamName(tA > tB ? teams[0].key : teams[1].key) + " leads " + fmtPt(Math.max(tA, tB)) + "–" + fmtPt(Math.min(tA, tB)))}
+            {tA === tB ? ("All square " + fmtPt(tA) + "-" + fmtPt(tB)) : (teamName(tA > tB ? teams[0].key : teams[1].key) + " leads " + fmtPt(Math.max(tA, tB)) + "-" + fmtPt(Math.min(tA, tB)))}
           </div>
           <div style={{ color: C.sage, fontSize: 10, marginTop: 10, opacity: 0.85, lineHeight: 1.4 }}>
-            Ties: opposite teams — both score; same team — the team scores once. Fills in live as holes are entered.
+            Points are awarded once a leg is complete; the current leader is shown until then. Ties: opposite teams both score, same team scores once.
           </div>
         </>
       ) : (
         <div style={{ color: C.sage, fontSize: 10, marginTop: 8, opacity: 0.85, lineHeight: 1.4 }}>
-          {hasTeams ? "Leaders per leg (highlighted). Assign leg points in setup to play for team points." : "Each player’s own net / points per leg. Fills in live as holes are entered."}
+          {hasTeams ? "Leaders per leg (highlighted). Assign leg points in setup to play for team points." : "Each player's own net / points per leg. Fills in live as holes are entered."}
         </div>
       )}
     </div>
