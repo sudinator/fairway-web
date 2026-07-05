@@ -389,9 +389,9 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
   const [amount, setAmount] = useState(editing ? (editing.amount_cents / 100).toString() : "");
   const [cat, setCat] = useState(editing?.category || "tee");
   const initP = editPayers || [];
-  const [payer, setPayer] = useState(initP[0]?.user_id || editing?.payer_user_id || user.id);
+  const [payer, setPayer] = useState(initP[0]?.user_id || editing?.payer_user_id || ""); // no default payer on a new expense - must be chosen
   const [multiPayer, setMultiPayer] = useState(initP.length > 1);
-  const [payerSet, setPayerSet] = useState<Set<string>>(new Set(initP.length ? initP.map((p) => p.user_id) : [editing?.payer_user_id || user.id]));
+  const [payerSet, setPayerSet] = useState<Set<string>>(new Set(initP.length ? initP.map((p) => p.user_id) : (editing?.payer_user_id ? [editing.payer_user_id] : [])));
   const [payerAmt, setPayerAmt] = useState<Record<string, string>>(Object.fromEntries(initP.map((p) => [p.user_id, (p.paid_cents / 100).toString()])));
   const [mode, setMode] = useState<"even" | "custom">(editing?.split_type || "even");
   const [checked, setChecked] = useState<Set<string>>(new Set((editShares || []).map(skey)));
@@ -414,7 +414,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
   const shareOf = (p: Party) => mode === "even" ? (evenMap[keyOf(p)] || 0) : centsOf(custom[keyOf(p)]);
   const customSum = selected.reduce((s, p) => s + centsOf(custom[keyOf(p)]), 0);
   const customOk = mode === "even" || validateCustomTotal(selected.map((p) => centsOf(custom[keyOf(p)])), amtCents);
-  const paidPayers = multiPayer ? members.filter((mm) => payerSet.has(mm.id)).map((mm) => mm.id) : [payer];
+  const paidPayers = multiPayer ? members.filter((mm) => payerSet.has(mm.id)).map((mm) => mm.id) : (payer ? [payer] : []);
   const paidSum = multiPayer ? paidPayers.reduce((s, uid) => s + centsOf(payerAmt[uid]), 0) : amtCents;
   const paidOk = !multiPayer || (paidPayers.length > 0 && paidSum === amtCents);
   const canSave = !!desc.trim() && amtCents > 0 && selected.length > 0 && customOk && paidOk && paidPayers.length > 0 && !busy;
@@ -488,6 +488,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
       </div>
       {!multiPayer ? (
         <select value={payer} onChange={(e) => setPayer(e.target.value)} style={inputStyle}>
+          <option value="">Select who paid</option>
           {members.map((m) => <option key={m.id} value={m.id}>{m.display_name}</option>)}
         </select>
       ) : (
