@@ -838,6 +838,7 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
   const [phone, setPhone] = useState(profile?.phone || "");
   const [venmo, setVenmo] = useState(profile?.venmo_handle || "");
   const [paypal, setPaypal] = useState(profile?.paypal_handle || "");
+  const [zelle, setZelle] = useState(profile?.zelle_handle || "");
   const [idxStr, setIdxStr] = useState(profile?.handicap_index != null ? String(profile.handicap_index) : "");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url || null);
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -850,6 +851,7 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
     setPhone(profile?.phone || "");
     setVenmo(profile?.venmo_handle || "");
     setPaypal(profile?.paypal_handle || "");
+    setZelle(profile?.zelle_handle || "");
     setIdxStr(profile?.handicap_index != null ? String(profile.handicap_index) : "");
     setAvatarUrl(profile?.avatar_url || null);
   }, [profile]);
@@ -904,6 +906,7 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
       phone: phone.trim() || null,
       venmo_handle: venmo.trim().replace(/^@/, "") || null,
       paypal_handle: paypal.trim().replace(/^@/, "") || null,
+      zelle_handle: zelle.trim() || null,
       handicap_index: idx,
     }).eq("id", user.id);
     setSaving(false);
@@ -955,6 +958,10 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
             <label style={{ color: C.sage, fontSize: 12 }}>PayPal.me handle (optional)</label>
             <input style={{ ...inputStyle, marginTop: 6 }} placeholder="yourhandle" value={paypal} onChange={(e) => setPaypal(e.target.value)} />
           </div>
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <label style={{ color: C.sage, fontSize: 12 }}>Zelle contact (phone or email, optional)</label>
+          <input style={{ ...inputStyle, marginTop: 6 }} placeholder="phone or email you use for Zelle" value={zelle} onChange={(e) => setZelle(e.target.value)} />
         </div>
         <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Used only to pre-fill payments when settling up in Money. Never shared elsewhere.</div>
         <div style={{ marginTop: 14 }}>

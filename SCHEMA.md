@@ -169,3 +169,6 @@ Organizer config for the "Group results: legs & team points" layer on team forma
 
 ### groups.money_simplify (boolean, added v1.80.0 / migration 0054)
 Group-wide Money setting. true (default) = Settle screen shows fewest-payments netting (simplify); false = shows debts "as entered" (pairwiseDebts: one payment per real shared expense). Only admins/owners can change it.
+
+### profiles.zelle_handle (text, added v1.81.0 / migration 0055)
+Optional Zelle contact (phone or email). Zelle has no payment deep link, so Money shows this contact to copy and the payer completes it in their bank app. group_pay_roster returns it alongside venmo/paypal/phone.

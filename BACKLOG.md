@@ -118,6 +118,7 @@ From the security & structure review. None are emergencies; tackle when convenie
    gracefully on very narrow screens; keep Delete visually distinct/last). App code only.
 
 ## Shipped
+- v1.81.0 - Money: Zelle added as a third pay method. Profile has a Zelle contact field (phone/email); Settle screen shows a Zelle button that surfaces the recipient's contact + amount to copy (Zelle has no deep link), then mark settled. Migration 0055.
 - v1.80.0 - Money: group-wide "Fewest payments / As entered" toggle on the Settle screen (admin-controlled, migration 0054). As-entered uses new tested pairwiseDebts() so each payment matches a real shared expense; admin can mark any of them paid. Fewest-payments (simplify) stays the default.
 - v1.79.6 - Group results: points view shows raw Stableford totals again (net view stays over/under par); added a Thru column showing each player's holes played. Leg leader still chosen by pace vs par, so Thru gives the context.
 - v1.79.5 - Group results now dynamic (score-to-par): the grid shows each player's score vs par from their own holes played (E / -1 / +2), and the leg leader is whoever is best per hole, so partial rounds compare fairly (e.g. 5 pts thru 2 beats 8 pts thru 4). Leg points chips reworded: in progress "leading, thru N holes" + "Team B +1/2"; complete "Team A wins 1/2".

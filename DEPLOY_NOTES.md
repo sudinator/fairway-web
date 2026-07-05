@@ -215,3 +215,6 @@ Run migration **0053_leg_config.sql** in Supabase SQL editor (adds `games.leg_co
 
 ## v1.80.0 - Money: simplify toggle
 Run migration **0054_money_simplify.sql** (adds groups.money_simplify boolean default true, idempotent). Run order now 0045 -> 0054. Existing groups default to fewest-payments (current behavior).
+
+## v1.81.0 - Money: Zelle
+Run migration **0055_zelle.sql** (adds profiles.zelle_handle, redefines group_pay_roster to return it; idempotent). Run order now 0045 -> 0055.

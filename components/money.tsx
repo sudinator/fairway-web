@@ -12,7 +12,7 @@ import {
 
 const supabase = createClient();
 
-type Member = { id: string; display_name: string; avatar_url?: string | null; venmo_handle?: string | null; paypal_handle?: string | null; phone?: string | null };
+type Member = { id: string; display_name: string; avatar_url?: string | null; venmo_handle?: string | null; paypal_handle?: string | null; zelle_handle?: string | null; phone?: string | null };
 type GuestRow = Guest & { name: string; group_id: string };
 type ExpenseRow = Expense & { group_id: string; created_by: string | null; description: string; category: string; split_type: "even" | "custom"; created_at: string };
 type ShareRow = Share & { id: string };
@@ -55,7 +55,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
       const { data: gm } = await supabase.from("group_members").select("user_id, status").eq("group_id", gid).eq("status", "active");
       const ids = (gm || []).map((m: any) => m.user_id).filter(Boolean);
       const { data: p2 } = ids.length
-        ? await supabase.from("profiles").select("id, display_name, avatar_url, venmo_handle, paypal_handle, phone").in("id", ids)
+        ? await supabase.from("profiles").select("id, display_name, avatar_url, venmo_handle, paypal_handle, zelle_handle, phone").in("id", ids)
         : { data: [] as any[] };
       profs = p2 || [];
     }
@@ -72,7 +72,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
     const { data: grp } = await supabase.from("groups").select("money_simplify").eq("id", gid).single();
     setSimplifyMode(grp?.money_simplify !== false); // default to simplified when column/absent
     const { data: act } = await supabase.from("group_activity").select("*").eq("group_id", gid).order("created_at", { ascending: false }).limit(200);
-    setMembers((profs || []).map((p: any) => ({ id: p.id, display_name: p.display_name || "Player", avatar_url: p.avatar_url, venmo_handle: p.venmo_handle, paypal_handle: p.paypal_handle, phone: p.phone })).sort((a, b) => a.display_name.localeCompare(b.display_name, undefined, { sensitivity: "base" })));
+    setMembers((profs || []).map((p: any) => ({ id: p.id, display_name: p.display_name || "Player", avatar_url: p.avatar_url, venmo_handle: p.venmo_handle, paypal_handle: p.paypal_handle, zelle_handle: p.zelle_handle, phone: p.phone })).sort((a, b) => a.display_name.localeCompare(b.display_name, undefined, { sensitivity: "base" })));
     setGuests(((gRows || []) as GuestRow[]).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })));
     setExpenses((exp || []) as ExpenseRow[]);
     setShares((sh || []) as ShareRow[]);
@@ -97,6 +97,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
 
   // ---- confirm-on-return after a pay hand-off ----
   const [pending, setPending] = useState<{ from: string; to: string; amt: number } | null>(null);
+  const [zelleInfo, setZelleInfo] = useState<{ from: string; to: string; amt: number; handle: string } | null>(null);
   const [askReturn, setAskReturn] = useState(false);
   useEffect(() => {
     const onVis = () => { if (document.visibilityState === "visible" && pending) setAskReturn(true); };
@@ -126,6 +127,12 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
     await load();
   }
 
+  function startZelle(t: { from: string; to: string; amt: number }) {
+    const payee = memberById[t.to];
+    const handle = payee?.zelle_handle;
+    if (!handle) { alert(nameOf(t.to) + " hasn't added a Zelle contact yet."); return; }
+    setZelleInfo({ from: t.from, to: t.to, amt: t.amt, handle });
+  }
   function startPay(kind: "venmo" | "paypal", t: { from: string; to: string; amt: number }) {
     const payee = memberById[t.to];
     const handle = kind === "venmo" ? payee?.venmo_handle : payee?.paypal_handle;
@@ -170,7 +177,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
       {screen === "settle" && (
         <SettleScreen transfers={transfers} nameOf={nameOf} memberById={memberById} busy={busy} me={user.id} isAdmin={isAdmin}
           simplifyOn={simplifyMode} canToggle={isAdmin} onToggle={setSimplify}
-          onPay={startPay} onMark={(t) => recordSettlement(t.from, t.to, t.amt, "cash")} />
+          onPay={startPay} onZelle={startZelle} onMark={(t) => recordSettlement(t.from, t.to, t.amt, "cash")} />
       )}
       {screen === "log" && <ActivityLog activity={activity} memberById={memberById} onOpenExpense={(id) => { const e = expenses.find((x) => x.id === id); if (e) setViewing(e); }} />}
 
@@ -209,6 +216,25 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
           canEdit={viewing.created_by === user.id || isAdmin}
           onEdit={() => { const v = viewing; setViewing(null); setEditing(v); setScreen("add"); }}
           onClose={() => setViewing(null)} />
+      )}
+
+      {zelleInfo && (
+        <div onClick={() => setZelleInfo(null)} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px 24px", width: "100%", maxWidth: 520 }}>
+            <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>Pay {nameOf(zelleInfo.to)} with Zelle</div>
+            <div style={{ color: C.sage, fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>Zelle happens inside your bank app. Open it, send to the contact below, then mark it settled here.</div>
+            <div style={{ background: "#123528", borderRadius: 12, padding: 14, marginTop: 12 }}>
+              <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>Zelle contact</div>
+              <div style={{ color: C.cream, fontSize: 16, fontWeight: 800, marginTop: 3, wordBreak: "break-all" }}>{zelleInfo.handle}</div>
+              <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, marginTop: 8 }}>{fmtUSD(zelleInfo.amt)}</div>
+              <button onClick={() => { try { navigator.clipboard?.writeText(zelleInfo.handle); } catch {} }} style={{ ...btn(false), marginTop: 10, fontSize: 12.5, padding: "8px 12px" }}>Copy contact</button>
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+              <button disabled={busy} onClick={() => { const z = zelleInfo; setZelleInfo(null); recordSettlement(z.from, z.to, z.amt, "zelle"); }} style={{ ...btn(true), flex: 1, background: "#7fd6a3", color: C.green }}>✓ I&apos;ve paid, mark settled</button>
+              <button onClick={() => setZelleInfo(null)} style={{ ...btn(false), flex: 1 }}>Cancel</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* confirm-on-return sheet */}
@@ -262,11 +288,12 @@ function BalancesScreen({ members, guests, shares, balances, me, onNudge }: {
 }
 
 // ---------------- Settle up ----------------
-function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simplifyOn, canToggle, onToggle, onPay, onMark }: {
+function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simplifyOn, canToggle, onToggle, onPay, onZelle, onMark }: {
   transfers: { from: string; to: string; amt: number }[]; nameOf: (id: string) => string;
   memberById: Record<string, Member>; busy: boolean; me: string; isAdmin: boolean;
   simplifyOn: boolean; canToggle: boolean; onToggle: (v: boolean) => void;
   onPay: (kind: "venmo" | "paypal", t: { from: string; to: string; amt: number }) => void;
+  onZelle: (t: { from: string; to: string; amt: number }) => void;
   onMark: (t: { from: string; to: string; amt: number }) => void;
 }) {
   const segBtn = (on: boolean): React.CSSProperties => ({ flex: 1, border: "none", background: on ? C.gold : "transparent", color: on ? "#2a2410" : C.sage, borderRadius: 999, padding: "7px 6px", fontSize: 12, fontWeight: 800, cursor: "pointer" });
@@ -295,12 +322,13 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
               const isMine = t.from === me;
               const canMark = isMine || isAdmin;
               return (
-                <div style={{ display: "flex", gap: 7, marginTop: 9, alignItems: "center" }}>
-                  {isMine && to?.venmo_handle && <button disabled={busy} onClick={() => onPay("venmo", t)} style={{ flex: 1, border: "none", borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#3D95CE", color: "#fff" }}>Venmo</button>}
-                  {isMine && to?.paypal_handle && <button disabled={busy} onClick={() => onPay("paypal", t)} style={{ flex: 1, border: "none", borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#003087", color: "#fff" }}>PayPal</button>}
-                  {isMine && !to?.venmo_handle && !to?.paypal_handle && <span style={{ flex: 1, color: C.sage, fontSize: 11 }}>no handle on file — pay cash</span>}
+                <div style={{ display: "flex", gap: 7, marginTop: 9, alignItems: "center", flexWrap: "wrap" }}>
+                  {isMine && to?.venmo_handle && <button disabled={busy} onClick={() => onPay("venmo", t)} style={{ flex: "1 1 68px", border: "none", borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#3D95CE", color: "#fff" }}>Venmo</button>}
+                  {isMine && to?.paypal_handle && <button disabled={busy} onClick={() => onPay("paypal", t)} style={{ flex: "1 1 68px", border: "none", borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#003087", color: "#fff" }}>PayPal</button>}
+                  {isMine && to?.zelle_handle && <button disabled={busy} onClick={() => onZelle(t)} style={{ flex: "1 1 68px", border: "none", borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#6D1ED4", color: "#fff" }}>Zelle</button>}
+                  {isMine && !to?.venmo_handle && !to?.paypal_handle && !to?.zelle_handle && <span style={{ flex: 1, color: C.sage, fontSize: 11 }}>no handle on file — pay cash</span>}
                   {canMark
-                    ? <button disabled={busy} onClick={() => onMark(t)} style={{ flex: 1, border: `1px solid ${C.line}`, borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: C.cream, color: C.green }}>Mark paid{!isMine ? " (admin)" : ""}</button>
+                    ? <button disabled={busy} onClick={() => onMark(t)} style={{ flex: "1 1 68px", border: `1px solid ${C.line}`, borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: C.cream, color: C.green }}>Mark paid{!isMine ? " (admin)" : ""}</button>
                     : <span style={{ flex: 1, color: C.faint, fontSize: 11.5, textAlign: "right" }}>Only {nameOf(t.from)} can mark this paid</span>}
                 </div>
               );
