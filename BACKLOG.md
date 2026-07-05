@@ -118,6 +118,7 @@ From the security & structure review. None are emergencies; tackle when convenie
    gracefully on very narrow screens; keep Delete visually distinct/last). App code only.
 
 ## Shipped
+- v1.79.4 - Group results: players now sorted alphabetically in the grid; the Leg points "leading" lines now show the leading team's name (outlined team-colored chip).
 - v1.79.3 - Group results clarity: team colors now match the Trifecta/Four-Ball view (shared teamAccent palette); added an auto-generated scoring description (e.g. "half a pt each 9, 1 pt for the total"); added a "Side game" badge and a note that it's separate from the trifecta result.
 - v1.79.2 - Group results legs: shortened Front 9/Back 9 columns to F9/B9 and widened the player-name column so names are fully visible.
 - v1.79.1 - Group results legs: fixed mangled special characters (encoding), and points are now awarded only once a leg is complete (all its holes entered by everyone) - the current leader is shown until then.

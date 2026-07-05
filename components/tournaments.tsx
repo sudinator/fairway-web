@@ -5908,7 +5908,7 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
   const [metric, setMetric] = React.useState<"net" | "pts">(cfg.metric === "net" ? "net" : "pts");
   const meta = (game.holes_meta || []) as { n: number; par: number; si: number | null }[];
   const n = meta.length;
-  const ps = players.filter((p) => !p.no_show);
+  const ps = players.filter((p) => !p.no_show).slice().sort((a, b) => (a.display_name || "").localeCompare(b.display_name || ""));
   const anyScore = ps.some((p) => (p.scores || []).some((x: any) => x != null && x > 0));
   if (n === 0 || ps.length === 0 || !anyScore) return null;
 
@@ -6031,7 +6031,9 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
                     ? li.res.winnerTeams.map((tk) => (
                         <span key={tk} style={{ display: "inline-block", background: teamColor(tk), color: C.ink, borderRadius: 6, padding: "1px 7px", fontSize: 11, fontWeight: 800, marginLeft: 5 }}>{teamName(tk)} +{fmtPt(li.pts)}</span>
                       ))
-                    : <span style={{ display: "inline-block", border: `1px solid ${C.greenMid}`, color: C.sage, borderRadius: 6, padding: "1px 7px", fontSize: 11, fontWeight: 800, marginLeft: 5 }}>{fmtPt(li.pts)} pt to play for</span>}
+                    : li.res.winnerTeams.map((tk) => (
+                        <span key={tk} style={{ display: "inline-block", border: `1px solid ${teamColor(tk)}`, color: teamColor(tk), borderRadius: 6, padding: "1px 7px", fontSize: 11, fontWeight: 800, marginLeft: 5 }}>{teamName(tk)} +{fmtPt(li.pts)} to play</span>
+                      ))}
                 </div>
               </div>
             );
