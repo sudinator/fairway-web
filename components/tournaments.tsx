@@ -5916,7 +5916,7 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
   const hasTeams = teams.length >= 2;
   const teamKey = (p: Player) => p.team || pkey(p);
   const teamName = (k: string) => teams.find((t) => t.key === k)?.name || k;
-  const teamColor = (k: string) => (teams[0] && k === teams[0].key ? C.bogey : C.birdie);
+  const teamColor = (k: string) => { const i = teams.findIndex((t) => t.key === k); return teamAccent(teams[i]?.name, i < 0 ? 0 : i); };
 
   const legs: Leg[] = buildLegs(cfg.scheme, n);
 
@@ -5961,9 +5961,25 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
   const cell: React.CSSProperties = { textAlign: "center", fontSize: 12.5, padding: "6px 3px", color: "#4b4838", fontWeight: 600 };
   const chip = (on: boolean): React.CSSProperties => ({ border: `1px solid ${on ? C.gold : "#2c5142"}`, background: on ? C.gold : "#173a2c", color: on ? "#2a2410" : C.cream, borderRadius: 999, padding: "3px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" });
   const nameOf = (pid: string) => rows.find((r) => r.pid === pid)?.name || "?";
+  const scoringText = () => {
+    const metricPhrase = metric === "net" ? "Lowest net wins each leg" : "Most Stableford points wins each leg";
+    const segLegs = legs.filter((l) => !l.tot && legPoints(cfg, l) > 0);
+    const totLeg = legs.find((l) => l.tot && legPoints(cfg, l) > 0);
+    if (!segLegs.length && !totLeg) return "Leaderboard only, no team points. " + metricPhrase + ".";
+    const unit = cfg.scheme === "nines" ? "each 9" : "each six";
+    const parts: string[] = [];
+    if (segLegs.length) {
+      const p0 = legPoints(cfg, segLegs[0]);
+      const same = segLegs.every((l) => legPoints(cfg, l) === p0);
+      parts.push(same ? (fmtPt(p0) + " pt " + unit) : segLegs.map((l) => l.k + " " + fmtPt(legPoints(cfg, l))).join(", "));
+    }
+    if (totLeg) parts.push(fmtPt(legPoints(cfg, totLeg)) + " pt for the total");
+    return parts.join(", ") + ". " + metricPhrase + ".";
+  };
 
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "15px 13px 14px", marginTop: 12 }}>
+      <div style={{ display: "inline-block", color: C.green, background: C.gold, borderRadius: 6, padding: "2px 8px", fontSize: 10, fontWeight: 800, letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 8 }}>Side game</div>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Group results</div>
         <div style={{ display: "flex", gap: 6 }}>
@@ -5971,9 +5987,7 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
           <button onClick={() => setMetric("pts")} style={chip(metric === "pts")}>Points</button>
         </div>
       </div>
-      <div style={{ color: C.sage, fontSize: 11.5, marginTop: 2 }}>
-        {(metric === "net" ? "Lowest net" : "Most Stableford points") + " wins each leg"}{pointsMode ? "" : " (leaders only)"}
-      </div>
+      <div style={{ color: C.sage, fontSize: 11.5, marginTop: 2, lineHeight: 1.4 }}>{scoringText()}</div>
 
       <div style={{ background: C.card, borderRadius: 12, padding: "8px 8px 6px", marginTop: 12, overflowX: "auto" }}>
         <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
@@ -6015,7 +6029,7 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
                   {li.complete ? wonNote : (names + " leading")}
                   {li.complete
                     ? li.res.winnerTeams.map((tk) => (
-                        <span key={tk} style={{ display: "inline-block", background: teamColor(tk), color: "#fff", borderRadius: 6, padding: "1px 7px", fontSize: 11, fontWeight: 800, marginLeft: 5 }}>{teamName(tk)} +{fmtPt(li.pts)}</span>
+                        <span key={tk} style={{ display: "inline-block", background: teamColor(tk), color: C.ink, borderRadius: 6, padding: "1px 7px", fontSize: 11, fontWeight: 800, marginLeft: 5 }}>{teamName(tk)} +{fmtPt(li.pts)}</span>
                       ))
                     : <span style={{ display: "inline-block", border: `1px solid ${C.greenMid}`, color: C.sage, borderRadius: 6, padding: "1px 7px", fontSize: 11, fontWeight: 800, marginLeft: 5 }}>{fmtPt(li.pts)} pt to play for</span>}
                 </div>
@@ -6034,7 +6048,7 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
             {tA === tB ? ("All square " + fmtPt(tA) + "-" + fmtPt(tB)) : (teamName(tA > tB ? teams[0].key : teams[1].key) + " leads " + fmtPt(Math.max(tA, tB)) + "-" + fmtPt(Math.min(tA, tB)))}
           </div>
           <div style={{ color: C.sage, fontSize: 10, marginTop: 10, opacity: 0.85, lineHeight: 1.4 }}>
-            Points are awarded once a leg is complete; the current leader is shown until then. Ties: opposite teams both score, same team scores once.
+            Each leg's best individual result scores for their team. Separate from the trifecta - it doesn't change that result. Points are awarded once a leg is complete; the leader is shown until then. Ties: opposite teams both score, same team scores once.
           </div>
         </>
       ) : (
