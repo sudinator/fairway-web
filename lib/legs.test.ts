@@ -16,7 +16,7 @@ const ok = (name: string, cond: boolean) => check(name, !!cond, true);
 // --- buildLegs ---
 check("sixes/18 count", buildLegs("sixes", 18).map((l) => l.k), ["1\u20136", "7\u201312", "13\u201318", "Total"]);
 check("sixesNoTot/18", buildLegs("sixesNoTot", 18).map((l) => l.k), ["1\u20136", "7\u201312", "13\u201318"]);
-check("nines/18", buildLegs("nines", 18).map((l) => l.k), ["Front 9", "Back 9", "Total"]);
+check("nines/18", buildLegs("nines", 18).map((l) => l.k), ["F9", "B9", "Total"]);
 check("total/18", buildLegs("total", 18).map((l) => l.k), ["Total"]);
 // 9-hole game: Front 9 == Total (same range) -> deduped to one leg
 check("nines/9 dedupe", buildLegs("nines", 9).map((l) => l.k), ["Total"]);

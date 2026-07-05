@@ -9,8 +9,8 @@ export interface Leg { k: string; from: number; to: number; tot?: boolean }
 export function buildLegs(scheme: string, n: number): Leg[] {
   const legs: Leg[] = [];
   if (scheme === "nines") {
-    legs.push({ k: "Front 9", from: 0, to: Math.min(9, n) });
-    if (n > 9) legs.push({ k: "Back 9", from: 9, to: n });
+    legs.push({ k: "F9", from: 0, to: Math.min(9, n) });
+    if (n > 9) legs.push({ k: "B9", from: 9, to: n });
     legs.push({ k: "Total", from: 0, to: n, tot: true });
   } else if (scheme === "total") {
     legs.push({ k: "Total", from: 0, to: n, tot: true });

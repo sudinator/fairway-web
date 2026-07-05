@@ -5956,8 +5956,8 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
 
   const hdrBg = (lg: Leg) => (lg.tot ? "#E7F0E9" : "#EEF4EF");
   const th: React.CSSProperties = { textAlign: "center", color: C.faint, fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", padding: "6px 3px", borderBottom: `1px solid ${C.line}` };
-  const nmH: React.CSSProperties = { ...th, textAlign: "left", width: 74 };
-  const nmCell: React.CSSProperties = { textAlign: "left", width: 96, color: C.ink, fontWeight: 800, fontSize: 12.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", padding: "6px 3px" };
+  const nmH: React.CSSProperties = { ...th, textAlign: "left", width: 112 };
+  const nmCell: React.CSSProperties = { textAlign: "left", width: 112, color: C.ink, fontWeight: 800, fontSize: 12.5, padding: "6px 3px" };
   const cell: React.CSSProperties = { textAlign: "center", fontSize: 12.5, padding: "6px 3px", color: "#4b4838", fontWeight: 600 };
   const chip = (on: boolean): React.CSSProperties => ({ border: `1px solid ${on ? C.gold : "#2c5142"}`, background: on ? C.gold : "#173a2c", color: on ? "#2a2410" : C.cream, borderRadius: 999, padding: "3px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" });
   const nameOf = (pid: string) => rows.find((r) => r.pid === pid)?.name || "?";
@@ -5984,10 +5984,10 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
           <tbody>
             {rows.map((r, ri) => (
               <tr key={r.pid} style={{ borderTop: ri === 0 ? "none" : "1px solid #F0EBDA" }}>
-                <td style={nmCell}><span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-                  <Avatar src={r.avatar_url} name={r.name} size={22} />
-                  {hasTeams && <span style={{ width: 7, height: 7, borderRadius: 4, background: teamColor(r.team), flexShrink: 0 }} />}
-                  <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
+                <td style={nmCell}><span style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
+                  <span style={{ flexShrink: 0, display: "flex" }}><Avatar src={r.avatar_url} name={r.name} size={20} /></span>
+                  {hasTeams && <span style={{ width: 6, height: 6, borderRadius: 3, background: teamColor(r.team), flexShrink: 0 }} />}
+                  <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
                 </span></td>
                 {legs.map((lg, c) => {
                   const v = metric === "net" ? r.net[c] : r.pts[c];
