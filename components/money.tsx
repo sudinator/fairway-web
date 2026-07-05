@@ -13,6 +13,7 @@ import {
 const supabase = createClient();
 
 type Member = { id: string; display_name: string; avatar_url?: string | null; venmo_handle?: string | null; paypal_handle?: string | null; zelle_handle?: string | null; phone?: string | null };
+type SettlementRow = Settlement & { id: string; method?: string | null; created_by?: string | null; created_at?: string };
 type GuestRow = Guest & { name: string; group_id: string };
 type ExpenseRow = Expense & { group_id: string; created_by: string | null; description: string; category: string; split_type: "even" | "custom"; created_at: string };
 type ShareRow = Share & { id: string };
@@ -32,7 +33,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
   const [guests, setGuests] = useState<GuestRow[]>([]);
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
   const [shares, setShares] = useState<ShareRow[]>([]);
-  const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [settlements, setSettlements] = useState<SettlementRow[]>([]);
   const [payers, setPayers] = useState<PayerRow[]>([]);
   const [activity, setActivity] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
@@ -76,7 +77,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
     setGuests(((gRows || []) as GuestRow[]).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })));
     setExpenses((exp || []) as ExpenseRow[]);
     setShares((sh || []) as ShareRow[]);
-    setSettlements((setl || []) as Settlement[]);
+    setSettlements((setl || []) as SettlementRow[]);
     setPayers((py || []) as PayerRow[]);
     setActivity((act || []) as any[]);
     setLoading(false);
@@ -125,6 +126,19 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
     setBusy(false);
     setPending(null); setAskReturn(false);
     await load();
+    onChanged?.();
+  }
+
+  async function deleteSettlement(s2: SettlementRow) {
+    if (!requireOnline()) return;
+    if (!window.confirm("Unmark this payment? " + nameOf(s2.from_user_id) + " → " + nameOf(s2.to_user_id) + " " + fmtUSD(s2.amount_cents) + ". Balances will recompute.")) return;
+    setBusy(true);
+    const { error } = await supabase.from("settlements").delete().eq("id", s2.id);
+    if (error) { setBusy(false); alert("Couldn't unmark — " + error.message); return; }
+    await logActivity("settlement_removed", "unmarked " + fmtUSD(s2.amount_cents) + " paid: " + nameOf(s2.from_user_id) + " → " + nameOf(s2.to_user_id), { from: s2.from_user_id, to: s2.to_user_id, amount_cents: s2.amount_cents });
+    setBusy(false);
+    await load();
+    onChanged?.();
   }
 
   function startZelle(t: { from: string; to: string; amt: number }) {
@@ -177,6 +191,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
       {screen === "settle" && (
         <SettleScreen transfers={transfers} nameOf={nameOf} memberById={memberById} busy={busy} me={user.id} isAdmin={isAdmin}
           simplifyOn={simplifyMode} canToggle={isAdmin} onToggle={setSimplify}
+          settlements={settlements} onUnmark={deleteSettlement}
           onPay={startPay} onZelle={startZelle} onMark={(t) => recordSettlement(t.from, t.to, t.amt, "cash")} />
       )}
       {screen === "log" && <ActivityLog activity={activity} memberById={memberById} onOpenExpense={(id) => { const e = expenses.find((x) => x.id === id); if (e) setViewing(e); }} />}
@@ -288,10 +303,11 @@ function BalancesScreen({ members, guests, shares, balances, me, onNudge }: {
 }
 
 // ---------------- Settle up ----------------
-function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simplifyOn, canToggle, onToggle, onPay, onZelle, onMark }: {
+function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simplifyOn, canToggle, onToggle, settlements, onUnmark, onPay, onZelle, onMark }: {
   transfers: { from: string; to: string; amt: number }[]; nameOf: (id: string) => string;
   memberById: Record<string, Member>; busy: boolean; me: string; isAdmin: boolean;
   simplifyOn: boolean; canToggle: boolean; onToggle: (v: boolean) => void;
+  settlements: SettlementRow[]; onUnmark: (s: SettlementRow) => void;
   onPay: (kind: "venmo" | "paypal", t: { from: string; to: string; amt: number }) => void;
   onZelle: (t: { from: string; to: string; amt: number }) => void;
   onMark: (t: { from: string; to: string; amt: number }) => void;
@@ -336,6 +352,24 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
           </div>
         );
       })}
+      {settlements.length > 0 && (
+        <>
+          <div style={{ color: C.sage, fontSize: 10.5, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", margin: "16px 0 4px" }}>Payments recorded</div>
+          {[...settlements].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")).map((s2) => {
+            const canUndo = isAdmin || s2.created_by === me;
+            return (
+              <div key={s2.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 2px", borderBottom: `1px solid ${C.greenMid}` }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: C.cream, fontSize: 13 }}><b>{nameOf(s2.from_user_id)}</b> paid <b>{nameOf(s2.to_user_id)}</b> {fmtUSD(s2.amount_cents)}</div>
+                  <div style={{ color: C.faint, fontSize: 10.5 }}>{s2.method || "cash"}{s2.created_at ? " · " + new Date(s2.created_at).toLocaleDateString() : ""}</div>
+                </div>
+                {canUndo && <button disabled={busy} onClick={() => onUnmark(s2)} style={{ border: `1px solid ${C.line}`, background: "transparent", color: C.sage, borderRadius: 8, padding: "6px 10px", fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>Unmark</button>}
+              </div>
+            );
+          })}
+          <div style={{ color: C.faint, fontSize: 10, marginTop: 6 }}>Unmark reverses a payment and recomputes balances. Admins can unmark any; you can unmark ones you recorded.</div>
+        </>
+      )}
     </div>
   );
 }
