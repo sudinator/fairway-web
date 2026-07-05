@@ -37,6 +37,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
   const [activity, setActivity] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<ExpenseRow | null>(null);
+  const [viewing, setViewing] = useState<ExpenseRow | null>(null);
   const isAdmin = activeGroup.role === "admin" || activeGroup.role === "owner";
   const gid = activeGroup.id;
 
@@ -160,7 +161,7 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
         <SettleScreen transfers={transfers} nameOf={nameOf} memberById={memberById} busy={busy} me={user.id} isAdmin={isAdmin}
           onPay={startPay} onMark={(t) => recordSettlement(t.from, t.to, t.amt, "cash")} />
       )}
-      {screen === "log" && <ActivityLog activity={activity} memberById={memberById} />}
+      {screen === "log" && <ActivityLog activity={activity} memberById={memberById} onOpenExpense={(id) => { const e = expenses.find((x) => x.id === id); if (e) setViewing(e); }} />}
 
       {/* expenses list (under balances) */}
       {screen === "balances" && (
@@ -173,23 +174,30 @@ export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string 
             const paidNames = prs.length ? prs.map((p) => memberById[p.user_id]?.display_name || "?").join(" & ") : (memberById[e.payer_user_id]?.display_name || "?");
             const parts = shares.filter((s) => s.expense_id === e.id);
             const who = parts.length >= members.length + guests.length ? "whole group" : parts.map((s) => s.user_id ? (memberById[s.user_id]?.display_name || "?") : (guestById[s.guest_id || ""]?.name || "guest")).join(", ");
-            const canEdit = e.created_by === user.id || isAdmin;
             return (
-              <div key={e.id} onClick={canEdit ? () => { setEditing(e); setScreen("add"); } : undefined}
-                style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 2px", borderBottom: `1px solid ${C.greenMid}`, cursor: canEdit ? "pointer" : "default" }}>
+              <div key={e.id} onClick={() => setViewing(e)}
+                style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 2px", borderBottom: `1px solid ${C.greenMid}`, cursor: "pointer" }}>
                 <Avatar src={payer?.avatar_url} name={payer?.display_name || "?"} size={30} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: C.cream, fontSize: 13.5, fontWeight: 600 }}>{e.description || catLabel(e.category)}</div>
                   <div style={{ color: C.sage, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{catLabel(e.category)} · {paidNames} paid · {who}</div>
                 </div>
                 <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700 }}>{fmtUSD(e.amount_cents)}</div>
-                {canEdit && <span style={{ color: C.sage, fontSize: 17, marginLeft: 2 }}>&#8250;</span>}
+                <span style={{ color: C.sage, fontSize: 17, marginLeft: 2 }}>&#8250;</span>
               </div>
             );
           })}
-          {expenses.length > 0 && <div style={{ color: C.faint, fontSize: 10.5, marginTop: 8 }}>Tap an expense you added to edit or delete it.</div>}
+          {expenses.length > 0 && <div style={{ color: C.faint, fontSize: 10.5, marginTop: 8 }}>Tap any expense to see full details.</div>}
           <CategorySummary expenses={expenses} />
         </div>
+      )}
+
+      {viewing && (
+        <ExpenseDetail expense={viewing} shares={shares} payers={payers} memberById={memberById} guestById={guestById}
+          history={activity.filter((a) => a?.meta?.expense_id === viewing.id && (a.action === "expense_created" || a.action === "expense_edited"))}
+          canEdit={viewing.created_by === user.id || isAdmin}
+          onEdit={() => { const v = viewing; setViewing(null); setEditing(v); setScreen("add"); }}
+          onClose={() => setViewing(null)} />
       )}
 
       {/* confirm-on-return sheet */}
@@ -491,8 +499,55 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
   );
 }
 
+function ExpenseDetail({ expense, shares, payers, memberById, guestById, history, canEdit, onEdit, onClose }: {
+  expense: ExpenseRow; shares: ShareRow[]; payers: PayerRow[];
+  memberById: Record<string, Member>; guestById: Record<string, GuestRow>;
+  history: any[]; canEdit: boolean; onEdit: () => void; onClose: () => void;
+}) {
+  const prs = payers.filter((p) => p.expense_id === expense.id);
+  const parts = shares.filter((s) => s.expense_id === expense.id);
+  const paidRows = prs.length
+    ? prs.map((p) => ({ name: memberById[p.user_id]?.display_name || "?", cents: p.paid_cents }))
+    : [{ name: memberById[expense.payer_user_id]?.display_name || "?", cents: expense.amount_cents }];
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px 24px", width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          <div style={{ flex: 1, color: C.cream, fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 800 }}>{expense.description || catLabel(expense.category)}</div>
+          <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800 }}>{fmtUSD(expense.amount_cents)}</div>
+        </div>
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{catLabel(expense.category)} · {new Date(expense.created_at).toLocaleDateString()}</div>
+
+        <Eyebrow>Paid by</Eyebrow>
+        {paidRows.map((r, i) => (
+          <div key={i} style={{ display: "flex", color: C.cream, fontSize: 13.5, padding: "3px 0" }}><span style={{ flex: 1 }}>{r.name}</span><span style={{ color: C.gold }}>{fmtUSD(r.cents)}</span></div>
+        ))}
+
+        <Eyebrow>Split · {parts.length} {parts.length === 1 ? "person" : "people"}</Eyebrow>
+        {parts.map((s, i) => {
+          const nm = s.user_id ? (memberById[s.user_id]?.display_name || "?") : ((guestById[s.guest_id || ""]?.name || "guest") + " (guest)");
+          return <div key={s.id || i} style={{ display: "flex", color: C.cream, fontSize: 13.5, padding: "3px 0" }}><span style={{ flex: 1 }}>{nm}</span><span style={{ color: C.sage }}>{fmtUSD(s.share_cents)}</span></div>;
+        })}
+
+        {history.length > 0 && (<>
+          <Eyebrow>History</Eyebrow>
+          {history.map((h) => (
+            <div key={h.id} style={{ color: C.sage, fontSize: 11.5, padding: "2px 0" }}>{h.action === "expense_created" ? "Created" : "Edited"} by {memberById[h.actor_user_id]?.display_name || "Someone"} · {new Date(h.created_at).toLocaleDateString()}</div>
+          ))}
+        </>)}
+
+        <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
+          {canEdit && <button onClick={onEdit} style={{ ...btn(true), flex: 1 }}>Edit</button>}
+          <button onClick={onClose} style={{ ...btn(false), flex: 1 }}>Close</button>
+        </div>
+        {!canEdit && <div style={{ color: C.faint, fontSize: 11, marginTop: 8, textAlign: "center" }}>View only — only the person who entered this or a group admin can edit it.</div>}
+      </div>
+    </div>
+  );
+}
+
 const ACT_ICON: Record<string, string> = { expense_created: "+", expense_edited: "✎", expense_deleted: "✕", settlement_added: "✓", guest_added: "☺" };
-function ActivityLog({ activity, memberById }: { activity: any[]; memberById: Record<string, Member> }) {
+function ActivityLog({ activity, memberById, onOpenExpense }: { activity: any[]; memberById: Record<string, Member>; onOpenExpense?: (expenseId: string) => void }) {
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Activity log</div>
@@ -500,13 +555,16 @@ function ActivityLog({ activity, memberById }: { activity: any[]; memberById: Re
       {activity.length === 0 && <div style={{ color: C.sage, fontSize: 13, padding: "8px 2px" }}>Nothing logged yet.</div>}
       {activity.map((a) => {
         const who = memberById[a.actor_user_id]?.display_name || "Someone";
+        const openable = !!a?.meta?.expense_id && (a.action === "expense_created" || a.action === "expense_edited");
         return (
-          <div key={a.id} style={{ display: "flex", gap: 9, padding: "9px 2px", borderBottom: `1px solid ${C.greenMid}` }}>
+          <div key={a.id} onClick={openable ? () => onOpenExpense?.(a.meta.expense_id) : undefined}
+            style={{ display: "flex", gap: 9, padding: "9px 2px", borderBottom: `1px solid ${C.greenMid}`, cursor: openable ? "pointer" : "default", alignItems: "center" }}>
             <span style={{ fontSize: 14, width: 18, textAlign: "center", color: C.gold }}>{ACT_ICON[a.action] || "•"}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: C.cream, fontSize: 13 }}><b>{who}</b> {a.summary}</div>
               <div style={{ color: C.faint, fontSize: 10.5 }}>{new Date(a.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div>
             </div>
+            {openable && <span style={{ color: C.sage, fontSize: 16 }}>&#8250;</span>}
           </div>
         );
       })}

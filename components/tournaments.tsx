@@ -5830,7 +5830,9 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game }: {
 // metric is shown (they usually agree, but a blow-up hole — floored at 0 in Stableford
 // — can split them).
 function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] }) {
-  const [metric, setMetric] = React.useState<"net" | "pts">("net");
+  // Default to Stableford points (was "net"): points is the more meaningful at-a-glance
+  // comparison across match / four-ball / trifecta. Toggle to Low net still available.
+  const [metric, setMetric] = React.useState<"net" | "pts">("pts");
   const meta = (game.holes_meta || []) as { n: number; par: number; si: number | null }[];
   const n = meta.length;
   const ps = players.filter((p) => !p.no_show);
