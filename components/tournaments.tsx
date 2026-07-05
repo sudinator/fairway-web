@@ -5934,13 +5934,16 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
       }
       return { holes, net: nSum, pts: pSum, par: parSum };
     });
-    return { pid: pkey(p), name: p.display_name, avatar_url: p.avatar_url, team: teamKey(p), cells };
+    let thru = 0; for (let i = 0; i < n; i++) { const g = p.scores?.[i]; if (g != null && g > 0) thru++; }
+    return { pid: pkey(p), name: p.display_name, avatar_url: p.avatar_url, team: teamKey(p), cells, thru };
   });
-  // Dynamic: score TO PAR from each player's own holes played, so partial rounds compare fairly.
-  // Stableford: 2 pts = net par per hole, so (2*holes - pts). Net: (net strokes - par). Lower = better.
+  // Leader is picked dynamically by pace vs par (fair across holes played). Display differs by metric:
+  // points shows the raw Stableford total; net shows over/under par. The Thru column gives the context.
   const toParOf = (cl: { holes: number; net: number; pts: number; par: number }, met: "net" | "pts") =>
     cl.holes === 0 ? null : (met === "pts" ? (2 * cl.holes - cl.pts) : (cl.net - cl.par));
   const fmtToPar = (v: number) => (v === 0 ? "E" : v < 0 ? String(v) : "+" + v);
+  const cellDisplay = (cl: { holes: number; net: number; pts: number; par: number }, met: "net" | "pts") =>
+    cl.holes === 0 ? "-" : (met === "pts" ? String(cl.pts) : fmtToPar(cl.net - cl.par));
 
   const legComplete = (lg: Leg) => {
     for (let i = lg.from; i < lg.to; i++) for (const p of ps) { const g = p.scores?.[i]; if (g == null || g <= 0) return false; }
@@ -5961,13 +5964,14 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
 
   const hdrBg = (lg: Leg) => (lg.tot ? "#E7F0E9" : "#EEF4EF");
   const th: React.CSSProperties = { textAlign: "center", color: C.faint, fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", padding: "6px 3px", borderBottom: `1px solid ${C.line}` };
-  const nmH: React.CSSProperties = { ...th, textAlign: "left", width: 112 };
-  const nmCell: React.CSSProperties = { textAlign: "left", width: 112, color: C.ink, fontWeight: 800, fontSize: 12.5, padding: "6px 3px" };
+  const nmH: React.CSSProperties = { ...th, textAlign: "left", width: 100 };
+  const thruH: React.CSSProperties = { ...th, width: 38 };
+  const nmCell: React.CSSProperties = { textAlign: "left", width: 100, color: C.ink, fontWeight: 800, fontSize: 12.5, padding: "6px 3px" };
   const cell: React.CSSProperties = { textAlign: "center", fontSize: 12.5, padding: "6px 3px", color: "#4b4838", fontWeight: 600 };
   const chip = (on: boolean): React.CSSProperties => ({ border: `1px solid ${on ? C.gold : "#2c5142"}`, background: on ? C.gold : "#173a2c", color: on ? "#2a2410" : C.cream, borderRadius: 999, padding: "3px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" });
   const nameOf = (pid: string) => rows.find((r) => r.pid === pid)?.name || "?";
   const scoringText = () => {
-    const metricPhrase = (metric === "net" ? "Lowest net to par" : "Best Stableford score to par") + " wins each leg";
+    const metricPhrase = (metric === "net" ? "Lowest net to par" : "Most Stableford points") + " wins each leg";
     const segLegs = legs.filter((l) => !l.tot && legPoints(cfg, l) > 0);
     const totLeg = legs.find((l) => l.tot && legPoints(cfg, l) > 0);
     if (!segLegs.length && !totLeg) return "Leaderboard only, no team points. " + metricPhrase + ".";
@@ -5998,6 +6002,7 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
         <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}>
           <thead><tr>
             <th style={nmH}></th>
+            <th style={thruH}>Thru</th>
             {legs.map((lg) => <th key={lg.k} style={{ ...th, background: hdrBg(lg) }}>{lg.k}</th>)}
           </tr></thead>
           <tbody>
@@ -6008,10 +6013,10 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
                   {hasTeams && <span style={{ width: 6, height: 6, borderRadius: 3, background: teamColor(r.team), flexShrink: 0 }} />}
                   <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
                 </span></td>
+                <td style={{ ...cell, color: C.faint, fontWeight: 700 }}>{r.thru}</td>
                 {legs.map((lg, c) => {
-                  const v = toParOf(r.cells[c], metric);
                   const win = legInfo[c].winPids.has(r.pid);
-                  return <td key={lg.k} style={{ ...cell, ...(win ? { background: "#F6E7C4", color: C.green, fontWeight: 800, borderRadius: 6 } : {}) }}>{v == null ? "-" : fmtToPar(v)}</td>;
+                  return <td key={lg.k} style={{ ...cell, ...(win ? { background: "#F6E7C4", color: C.green, fontWeight: 800, borderRadius: 6 } : {}) }}>{cellDisplay(r.cells[c], metric)}</td>;
                 })}
               </tr>
             ))}
@@ -6061,7 +6066,7 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
         </>
       ) : (
         <div style={{ color: C.sage, fontSize: 10, marginTop: 8, opacity: 0.85, lineHeight: 1.4 }}>
-          {hasTeams ? "Leaders per leg (highlighted), scored vs par. Assign leg points in setup to play for team points." : "Each player's score vs par per leg. Fills in live as holes are entered."}
+          {hasTeams ? "Leaders per leg (highlighted); leader is by pace, so Thru matters. Assign leg points in setup to play for team points." : "Each player's Stableford points (or net vs par) per leg. Fills in live as holes are entered."}
         </div>
       )}
     </div>

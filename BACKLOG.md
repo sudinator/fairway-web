@@ -118,6 +118,7 @@ From the security & structure review. None are emergencies; tackle when convenie
    gracefully on very narrow screens; keep Delete visually distinct/last). App code only.
 
 ## Shipped
+- v1.79.6 - Group results: points view shows raw Stableford totals again (net view stays over/under par); added a Thru column showing each player's holes played. Leg leader still chosen by pace vs par, so Thru gives the context.
 - v1.79.5 - Group results now dynamic (score-to-par): the grid shows each player's score vs par from their own holes played (E / -1 / +2), and the leg leader is whoever is best per hole, so partial rounds compare fairly (e.g. 5 pts thru 2 beats 8 pts thru 4). Leg points chips reworded: in progress "leading, thru N holes" + "Team B +1/2"; complete "Team A wins 1/2".
 - v1.79.4 - Group results: players now sorted alphabetically in the grid; the Leg points "leading" lines now show the leading team's name (outlined team-colored chip).
 - v1.79.3 - Group results clarity: team colors now match the Trifecta/Four-Ball view (shared teamAccent palette); added an auto-generated scoring description (e.g. "half a pt each 9, 1 pt for the total"); added a "Side game" badge and a note that it's separate from the trifecta result.
