@@ -89,5 +89,21 @@ const P = (id: string, total: number, seg: [number, number, number]): BetPlayer 
   ok("solo cleanSweep false", r.cleanSweep === false);
 }
 
+// ---- Excluded player (amateur in a pro event): the money game is computed over
+//      bettors ONLY (the caller filters non-bettors out before computeBetting).
+//      The top *scorer* being excluded means the next bettor takes 1st, and the
+//      pot only counts bettors. ----
+{
+  const bet = 30;
+  // "amateur" would be the top scorer (total 40) but is NOT passed in; three pros bet.
+  // Segments split so nobody sweeps: pro1 wins holes 1-6 & 13-18, pro2 wins 7-12.
+  const bettorsOnly = [P("pro1", 36, [14, 10, 12]), P("pro2", 30, [8, 12, 10]), P("pro3", 24, [8, 8, 8])];
+  const r = computeBetting(bettorsOnly, bet, DEFAULT_BET_SPLIT);
+  ok("no clean sweep", r.cleanSweep === false);
+  near("pot excludes non-bettor ante", r.pot, bet * 3);
+  ok("top bettor wins 1st", wonOf(r, "pro1") > wonOf(r, "pro2") && wonOf(r, "pro2") > 0);
+  near("bettor-only bet nets to zero", sumNet(r), 0);
+}
+
 console.log(`golf/computeBetting tests: PASS ${pass}  FAIL ${fail}`);
 if (fail) { console.log(fails.join("\n")); process.exit(1); }

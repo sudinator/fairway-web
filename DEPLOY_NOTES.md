@@ -243,3 +243,10 @@ Run migration **0055_zelle.sql** (adds profiles.zelle_handle, redefines group_pa
 - **Guest carry-forward (corrects v1.90.0):** the P4 handoff now carries the tee time's IN-list guests into Create Game as guest players. Guests with no handicap on file come in flagged "NEEDS HCP" with an inline index field; the organizer can fill it or leave it (they're still created and play off scratch). `GameSeed.guestNames` now populated from `ins[].guest_names`; guest `course_handicap` is null-guarded.
 - **Drop a guest for the waitlist:** on the Signups tab, an organizer sees each IN member's guests as removable chips; removing one frees exactly one spot and the next waitlisted member moves into the field automatically (field/waitlist recomputes by signup order). Logged as `tt_guest_removed`; the host member gets a notification that their guest was removed.
 - Verified locally: `tsc --noEmit` clean, 174 tests pass, `next build` compiles successfully.
+
+## v1.92.0 — Betting: include/exclude a player (amateur-in-a-pro-event)
+- **RUN migration 0059_game_players_bets.sql** (adds `game_players.bets boolean not null default true` + the `set_player_bets` organizer-gated RPC). Run after 0058. Full SQL is printed in chat.
+- New games: **TGC members default IN**, **guests default OUT** (guest rows insert `bets=false`). Existing rows default `true` (past games unchanged).
+- The game's Betting panel "Who's betting" toggles now **persist** to `game_players.bets` (organizer/admin only; buttons disabled for others) via `set_player_bets`. Realtime on `game_players` refreshes the room so the banners stay in sync.
+- Excluded players **still play and appear on the leaderboard** (tagged "no bet", $0). The pot and all payouts are computed over bettors only, so an excluded player who posts the low score simply hands 1st to the next betting player. The clean-sweep watch / achieved banners now **follow the money** (bettors only) via `segWinnersBet`/`segTotalsBet`; the standings still show everyone's scores. The Money post already reflects bettors only.
+- Verified locally: tsc clean, tests pass (incl. new bettor-only cases), build clean.

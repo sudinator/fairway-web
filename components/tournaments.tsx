@@ -110,6 +110,7 @@ type Player = {
   team?: string | null; // team key ("A"/"B") for team match play
   no_show?: boolean | null; // organizer-flagged no-show (four-ball: scored net double bogey)
   is_guest?: boolean | null; // a guest player added for this game only
+  bets?: boolean | null; // in the TGC money game (default true; guests default false)
   tee_group?: number | null; // which tee group (foursome) this player is in (1,2,3…)
   is_marker?: boolean | null; // keeps score for their tee group
   group_locked?: boolean | null; // this player's tee group has been finished/locked
@@ -758,6 +759,7 @@ function CreateGame({
         game_id: game.id,
         user_id: null,
         is_guest: true,
+        bets: false,
         display_name: p.display_name,
         handicap_index: p.handicap_index,
         rating: tee.rating,
@@ -2596,10 +2598,40 @@ function GameRoom({
     return { label: segLabels[si], complete, started, val: started ? best : null, who, thruHole, maxPlayed };
   });
 
+  // Bettor-only segment winners for the money banners (clean-sweep watch/achieved):
+  // non-betting players (e.g. guests) still appear in the standings above, but the
+  // sweep/segment money is decided among bettors only ("follow the money").
+  const segTotalsBet = segTotals.filter(({ p }) => p.bets !== false);
+  const segWinnersBet = [0, 1, 2].map((si) => {
+    let best = isStroke ? Infinity : -1;
+    let who: string[] = [];
+    let started = false;
+    let maxPlayed = 0;
+    let allDone = true;
+    let anyActive = false;
+    segTotalsBet.forEach(({ p, seg }) => {
+      const active = playerHoles(p).some((h) => h.strokes);
+      if (!active) return;
+      anyActive = true;
+      const played = playerHoles(p).slice(si * 6, si * 6 + 6).filter((h) => h.strokes).length;
+      if (played < 6) allDone = false;
+      if (played > 0) started = true;
+      maxPlayed = Math.max(maxPlayed, played);
+      if (played >= 1) {
+        const v = seg[si];
+        if (isStroke ? v < best : v > best) { best = v; who = [p.display_name]; }
+        else if (v === best) who.push(p.display_name);
+      }
+    });
+    const complete = anyActive && allDone && started;
+    const thruHole = si * 6 + maxPlayed;
+    return { label: segLabels[si], complete, started, val: started ? best : null, who, thruHole, maxPlayed };
+  });
+
   // Clean Sweep watch: one player won the first two sixes outright AND is leading the last
   // six alone with fewer than 4 holes left to play (i.e., 3-5 of holes 13-18 done).
   const sweepWatch = (() => {
-    const [s0, s1, s2] = segWinners;
+    const [s0, s1, s2] = segWinnersBet;
     if (!s0.complete || !s1.complete) return null;
     if (s0.who.length !== 1 || s1.who.length !== 1) return null;
     const champ = s0.who[0];
@@ -2613,11 +2645,11 @@ function GameRoom({
   // Clean Sweep achieved: all three sixes are complete and won outright by the same player,
   // and that player is also the sole overall leader (18-hole total).
   const cleanSweepDone = (() => {
-    const [s0, s1, s2] = segWinners;
+    const [s0, s1, s2] = segWinnersBet;
     if (![s0, s1, s2].every((s) => s.complete && s.who.length === 1)) return null;
     const champ = s0.who[0];
     if (s1.who[0] !== champ || s2.who[0] !== champ) return null;
-    const totals = segTotals.map(({ p, seg }) => ({ name: p.display_name, total: seg.reduce((a: number, b: number) => a + b, 0) }));
+    const totals = segTotalsBet.map(({ p, seg }) => ({ name: p.display_name, total: seg.reduce((a: number, b: number) => a + b, 0) }));
     const best = isStroke ? Math.min(...totals.map((t) => t.total)) : Math.max(...totals.map((t) => t.total));
     const leaders = totals.filter((t) => t.total === best);
     if (leaders.length !== 1 || leaders[0].name !== champ) return null;
@@ -3232,6 +3264,7 @@ function GameRoom({
                     </div>
                     <div style={{ color: C.faint, fontSize: 11 }}>
                       {p.course_handicap != null ? `CH ${p.course_handicap}` : "no hcp"}
+                      {p.bets === false ? <span style={{ color: C.gold, fontWeight: 800 }}> · no bet</span> : ""}
                     </div>
                   </div>
                   {isStroke ? (() => {
@@ -5907,7 +5940,7 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
 }) {
   const [open, setOpen] = useState(false);
   const [bet, setBet] = useState(75);
-  const [inIds, setInIds] = useState<string[]>(players.map((p) => p.id));
+  const [inIds, setInIds] = useState<string[]>(() => players.filter((p) => p.bets !== false).map((p) => p.id));
   const [split, setSplit] = useState<BetSplit>(DEFAULT_BET_SPLIT);
   const [editSplit, setEditSplit] = useState(false);
 
@@ -5922,8 +5955,11 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
     });
   }, [players.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toggle = (id: string) =>
+  const toggle = (id: string) => {
+    const on = !inIds.includes(id);
     setInIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    if (canPost) { supabase.rpc("set_player_bets", { p_player: id, p_bets: on }).then(() => {}); } // organizer-gated; realtime refresh keeps banners in sync
+  };
 
   // Betting -> Money posting (TGC phase 1).
   const [memberIds, setMemberIds] = useState<Set<string> | null>(null);
@@ -6118,13 +6154,13 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
 
           {/* Who's in */}
           <div style={{ marginTop: 12 }}>
-            <div style={{ color: C.sage, fontSize: 12, marginBottom: 6 }}>Who's betting ({inIds.length}):</div>
+            <div style={{ color: C.sage, fontSize: 12, marginBottom: 6 }}>Who's betting ({inIds.length}){canPost ? "" : " — organizer sets this"}:</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {players.map((p) => {
                 const on = inIds.includes(p.id);
                 return (
-                  <button key={p.id} onClick={() => toggle(p.id)}
-                    style={{ ...btn(on), fontSize: 12, padding: "6px 10px", opacity: on ? 1 : 0.5 }}>
+                  <button key={p.id} onClick={() => canPost && toggle(p.id)} disabled={!canPost}
+                    style={{ ...btn(on), fontSize: 12, padding: "6px 10px", opacity: on ? 1 : 0.5, cursor: canPost ? "pointer" : "default" }}>
                     {on ? "✓ " : ""}{p.display_name}
                   </button>
                 );
