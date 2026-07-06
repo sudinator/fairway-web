@@ -5843,8 +5843,15 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
     if (!ended || !game.group_id) return;
     let alive = true;
     (async () => {
-      const { data: mem } = await supabase.from("group_members").select("user_id").eq("group_id", game.group_id);
-      if (alive) setMemberIds(new Set((mem || []).map((m: any) => m.user_id).filter(Boolean)));
+      // Member-safe roster (SECURITY DEFINER) first, mirroring the Money tab; fall
+      // back to a direct read only if the RPC returns nothing.
+      const rpc = await supabase.rpc("group_pay_roster", { p_group: game.group_id });
+      let ids: string[] = ((rpc.data as any[]) || []).map((r) => r.id).filter(Boolean);
+      if (!ids.length) {
+        const { data: mem } = await supabase.from("group_members").select("user_id").eq("group_id", game.group_id).eq("status", "active");
+        ids = (mem || []).map((m: any) => m.user_id).filter(Boolean);
+      }
+      if (alive) setMemberIds(new Set(ids));
       const { data: exp } = await supabase
         .from("expenses").select("id, created_at")
         .eq("source_game_id", game.id).eq("source_kind", "tgc_bet").maybeSingle();

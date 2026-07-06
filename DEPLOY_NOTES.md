@@ -219,3 +219,5 @@ Run migration **0054_money_simplify.sql** (adds groups.money_simplify boolean de
 ## v1.81.0 - Money: Zelle
 Run migration **0055_zelle.sql** (adds profiles.zelle_handle, redefines group_pay_roster to return it; idempotent). Run order now 0045 -> 0055.
 - Run migration 0056_expense_source.sql (adds expenses.source_game_id + source_kind + one-bet-per-game index) before the Betting→Money post button is used.
+- Run migration 0057_tee_times.sql (creates tee_times + tee_time_rsvps + RLS) before the Tee Times UI ships.
+- Tee Times UI (v1.86.0) is live in the More menu for the TGC group only. Migration 0057 MUST be run first or the tab will error on load.
