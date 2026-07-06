@@ -2599,7 +2599,7 @@ function GameRoom({
         )}
       </div>
 
-      {roomTab === "play" && sweepWatch && (game.game_type === "stableford" || game.game_type === "stroke") && (
+      {roomTab === "play" && sweepWatch && (game as any)?.group_id === TGC_GROUP_ID && (game.game_type === "stableford" || game.game_type === "stroke") && (
         <CleanSweepBanner name={sweepWatch.name} val={sweepWatch.val} thru={sweepWatch.thru} unit={sweepWatch.unit} />
       )}
 

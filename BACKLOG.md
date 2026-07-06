@@ -118,6 +118,7 @@ From the security & structure review. None are emergencies; tackle when convenie
    gracefully on very narrow screens; keep Delete visually distinct/last). App code only.
 
 ## Shipped
+- v1.83.8 - Clean Sweep Watch banner is now restricted to the TGC group only (added group_id === TGC_GROUP_ID to the render condition). Other groups never see it. Segment-leader display on the six-hole cards is unchanged (general).
 - v1.83.7 - Six-hole segments now show the live LEADER while a segment is in progress (name + points/net + 'thru hole N', with leading/tied tag and a 'Not started' state) instead of 'Not complete yet'. New Clean Sweep Watch banner (gold, black hand-drawn brooms sweeping inward, 2 rows) shows at the top of the game view when one player has won the first two sixes outright and is the sole leader of the last six with < 4 holes to play.
 - v1.83.6 - The home-screen owe banner now opens the Money tab directly on the Settle screen (was landing on Balances). Threaded an initialTab into MoneyTab; a one-shot flag in Home is cleared whenever you leave the money tab, so normal re-entry still opens on Balances. User can still tap Balances/Log to investigate.
 - v1.83.5 - Readability: 10px minimum font floor across the whole app. Bumped all 15 sub-10 sizes (7.5/8.5/9/9.5) up to 10 - match-card stat labels, scorecard column + player-header lines, tee names, YOUR GROUP eyebrow, share-card yardage, roster/setup headers, stats table header, admin index. Rule recorded in README (never use fontSize below 10).
