@@ -206,8 +206,15 @@ export function Home({ session }: { session: any }) {
     }
     setLoading(true);
     // Personal views intentionally show this user's rounds across every group.
-    const { data: rs } = await supabase
+    let { data: rs, error: rErr } = await supabase
       .from("rounds").select("*, groups(name)").eq("user_id", user.id).is("deleted_at", null).order("played_at", { ascending: false });
+    if (rErr) {
+      // The deleted_at column may not exist yet (migration 0058 not run). NEVER blank the
+      // rounds list on a query error — fall back to the unfiltered query so every round
+      // still loads. Data is never deleted; the filter only hides soft-deleted rows.
+      const retry = await supabase.from("rounds").select("*, groups(name)").eq("user_id", user.id).order("played_at", { ascending: false });
+      rs = retry.data;
+    }
     if (!rs) { setRounds([]); setLoading(false); return; }
     const ids = rs.map((r: any) => r.id);
     const { data: hs } = await supabase
@@ -234,13 +241,12 @@ export function Home({ session }: { session: any }) {
 
   const deleteRound = async (id: string) => {
     const r = rounds.find((x) => x.id === id);
-    if ((r as any)?.game_id) {
-      // Game-recorded round: soft-delete so it isn't silently re-posted the next time
-      // the ended game is opened (recordMyGameRound re-inserts a missing round).
-      await supabase.from("rounds").update({ deleted_at: new Date().toISOString() }).eq("id", id);
-    } else {
-      await supabase.from("rounds").delete().eq("id", id);
-    }
+    // Soft-delete every round (not just game-linked ones). A hard DELETE that RLS
+    // doesn't permit silently removes 0 rows; an owner UPDATE is allowed, so setting
+    // deleted_at reliably removes the round from all stats/handicap. It also survives
+    // any re-post (recordMyGameRound finds the hidden row and updates it in place).
+    const { error } = await supabase.from("rounds").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+    if (error) { alert("Couldn't delete that round — " + error.message); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "round_deleted", summary: `Deleted a round${r ? ` at ${r.course}` : ""}` });
     await loadRounds();
   };

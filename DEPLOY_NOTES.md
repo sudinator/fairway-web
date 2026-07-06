@@ -222,3 +222,4 @@ Run migration **0055_zelle.sql** (adds profiles.zelle_handle, redefines group_pa
 - Run migration 0057_tee_times.sql (creates tee_times + tee_time_rsvps + RLS) before the Tee Times UI ships.
 - Tee Times UI (v1.86.0) is live in the More menu for the TGC group only. Migration 0057 MUST be run first or the tab will error on load.
 - Run migration 0058_rounds_soft_delete.sql (adds rounds.deleted_at) so deleting a game round sticks instead of being re-posted.
+- IMPORTANT: run 0058_rounds_soft_delete.sql. Without it the rounds list still loads (v1.87.3 falls back to unfiltered), but soft-deleted rounds won't be hidden until the column exists.
