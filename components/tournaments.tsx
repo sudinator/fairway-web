@@ -38,7 +38,7 @@ import {
   markerOwnsMyRow,
   mergeBackupRow,
 } from "@/lib/golf";
-import { pkey, chBasis, shapeOf, dotStrokes } from "@/lib/game-shape";
+import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
 import type { LegConfig, Leg } from "@/lib/legs";
 import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
@@ -3250,6 +3250,8 @@ function GameRoom({
                 penalties: me.penalties?.[i] ?? null,
                 sand: me.sand?.[i] ?? null,
                 recv: dotStrokes(game, me, m.si, players),
+                // Individual (full playing handicap) strokes — the low-net / Stableford side game.
+                indRecv: fullStrokes(game, me, m.si),
                 // If I receive none but my opponent does, show the holes where I give a stroke.
                 gives: game.game_type === "match" && (matchAllow ?? 0) === 0 && oppAllow != null
                   ? matchStrokesFor(oppAllow, m.si)
@@ -3257,6 +3259,7 @@ function GameRoom({
               }));
             })()}
             hasHandicap={me.course_handicap != null}
+            showIndivDots={shapeOf(game).dotBasis !== "absolute"}
             matchMode={game.game_type === "match"}
             uncap={game.game_type === "stroke"}
             showSixes={(game as any).group_id === TGC_GROUP_ID}
@@ -3417,6 +3420,12 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
     return net < par ? GREEN : net === par ? BLUE : RED;
   };
   const recvFor = (p: Player, si: number | null) => dotStrokes(game, p, si, players);
+  // Individual (full playing handicap) strokes for the low-net / Stableford side game.
+  // Only meaningful when the game uses a relative basis (match/four-ball/trifecta) — on
+  // stableford/stroke the orange dots already ARE the full-handicap strokes, so we don't
+  // draw a duplicate blue set.
+  const relBasis = shapeOf(game).dotBasis !== "absolute";
+  const indRecvFor = (p: Player, si: number | null) => fullStrokes(game, p, si);
 
   // Column order + colour. Stableford: alphabetical. Team match: each pairing's
   // two players adjacent, with a divider between matches. Foursome formats: Pair A
@@ -3506,6 +3515,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
             const p = c.p;
             const gross = p.scores?.[i] ?? null;
             const recv = recvFor(p, m.si);
+            const indRecv = relBasis ? indRecvFor(p, m.si) : 0;
             const pts = stablefordPts(gross, m.par, recv);
             return (
               <div key={p.id + i} style={{ flex: 1, minWidth: 0 }}>
@@ -3517,6 +3527,13 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
                     <div style={{ position: "absolute", top: 4, left: 5, display: "flex", gap: 2 }}>
                       {Array.from({ length: Math.min(recv, 2) }).map((_, d) => (
                         <span key={d} style={{ width: 6, height: 6, borderRadius: 99, background: "#E8730C", display: "block" }} />
+                      ))}
+                    </div>
+                  )}
+                  {indRecv > 0 && (
+                    <div style={{ position: "absolute", bottom: 4, left: 5, display: "flex", gap: 2 }}>
+                      {Array.from({ length: Math.min(indRecv, 2) }).map((_, d) => (
+                        <span key={d} style={{ width: 6, height: 6, borderRadius: 99, background: C.bogey, display: "block" }} />
                       ))}
                     </div>
                   )}
@@ -3611,7 +3628,13 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
         <span style={{ color: "#7FD0A0", fontSize: 10 }}>● under</span>
         <span style={{ color: "#6FA8DC", fontSize: 10 }}>● par</span>
         <span style={{ color: "#E0796B", fontSize: 10 }}>● over (net)</span>
-        <span style={{ color: "#E8730C", fontSize: 10 }}>● gets a stroke · corner = Stableford</span>
+        {relBasis
+          ? <>
+              <span style={{ color: "#E8730C", fontSize: 10 }}>● match stroke</span>
+              <span style={{ color: C.bogey, fontSize: 10 }}>● individual stroke</span>
+              <span style={{ color: C.faint, fontSize: 10 }}>corner = Stableford</span>
+            </>
+          : <span style={{ color: "#E8730C", fontSize: 10 }}>● gets a stroke · corner = Stableford</span>}
       </div>
       <div style={{ position: "sticky", top: "env(safe-area-inset-top)", zIndex: 5, background: C.green, paddingTop: 8, paddingBottom: 10, marginBottom: 4, boxShadow: "0 6px 10px -8px rgba(0,0,0,0.55)" }}>
         {(() => {
@@ -5927,7 +5950,7 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
         const g = p.scores?.[i];
         if (g == null || g <= 0) continue;
         holes++;
-        const recv = dotStrokes(game, p, meta[i].si, players);
+        const recv = fullStrokes(game, p, meta[i].si); // individual side game: full playing handicap, not the match-relative basis
         nSum += g - recv;
         pSum += stablefordPts(g, meta[i].par, recv) || 0;
         parSum += meta[i].par;

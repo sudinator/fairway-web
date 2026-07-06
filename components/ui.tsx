@@ -235,7 +235,8 @@ export type EntryHole = {
   strokes: number | null; putts: number | null; fairway: "hit" | "miss" | "left" | "right" | null;
   penalties?: number | null;
   sand?: boolean | null; // greenside bunker this hole
-  recv: number; // handicap strokes received on this hole
+  recv: number; // handicap strokes received on this hole (relative/match basis for match & trifecta)
+  indRecv?: number; // individual (full playing handicap) strokes — low-net / Stableford side game
   gives?: number; // strokes GIVEN on this hole (match play, lower-handicap player)
 };
 
@@ -343,7 +344,7 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
   );
 }
 
-export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false, strokeSixes = false, uncap = false }: {
+export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false, strokeSixes = false, uncap = false, showIndivDots = false }: {
   holes: EntryHole[];
   hasHandicap: boolean;
   onSet: (i: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null }) => void;
@@ -358,6 +359,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   showSixes?: boolean;          // TGC: show Front/Middle/Last six net-Stableford subtotals at the top
   strokeSixes?: boolean;     // stroke games: show net-score (lowest) subtotals, not Stableford
   uncap?: boolean;              // stroke play: lift the net-double entry ceiling so every stroke counts
+  showIndivDots?: boolean;      // relative games (match/four-ball/trifecta): also show blue individual (full-handicap) dots
 }) {
   const showOpp = Array.isArray(opp);
   const showRun = Array.isArray(matchRun);
@@ -376,7 +378,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     if (par < 4) return;
     onSet(i, { fairway: cur == null ? "hit" : cur === "hit" ? "left" : cur === "left" ? "right" : null });
   };
-  const anyStroke = holes.some((h) => h.recv > 0 || (h.gives || 0) > 0);
+  const anyStroke = holes.some((h) => h.recv > 0 || (h.gives || 0) > 0 || (showIndivDots && (h.indRecv || 0) > 0));
   const hasDots = anyStroke && hasHandicap;
   const headStyle: React.CSSProperties = { color: C.faint, fontSize: 9, letterSpacing: 0.5, fontWeight: 700, textTransform: "uppercase" };
 
@@ -433,7 +435,18 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
                   const col = ov == null || mine == null ? C.faint : ov < mine ? C.birdie : ov > mine ? C.greenMid : C.ink;
                   return <div key="op" style={{ textAlign: "center", color: col, fontWeight: 800, fontSize: 15 }}>{ov ?? "·"}</div>;
                 })()] : []),
-                ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: (h.gives || 0) > 0 ? C.sage : C.dot, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{h.recv > 0 ? "•".repeat(Math.min(h.recv, 3)) : ((h.gives || 0) > 0 ? "◦".repeat(Math.min(h.gives || 0, 3)) : "")}</div>] : []),
+                ...(hasDots ? [(() => {
+                  const relDots = h.recv > 0 ? "\u2022".repeat(Math.min(h.recv, 3)) : ((h.gives || 0) > 0 ? "\u25e6".repeat(Math.min(h.gives || 0, 3)) : "");
+                  const relColor = (h.gives || 0) > 0 ? C.sage : C.dot;
+                  const ind = h.indRecv || 0;
+                  if (showIndivDots && ind > 0) {
+                    return <div key="d" style={{ textAlign: "center", lineHeight: 1.04 }}>
+                      {relDots ? <div style={{ color: relColor, fontWeight: 800, fontSize: 14, letterSpacing: 1 }}>{relDots}</div> : null}
+                      <div style={{ color: C.bogey, fontWeight: 800, fontSize: 14, letterSpacing: 1 }}>{"\u2022".repeat(Math.min(ind, 3))}</div>
+                    </div>;
+                  }
+                  return <div key="d" style={{ textAlign: "center", color: relColor, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{relDots}</div>;
+                })()] : []),
                 <div key="sc" style={{ textAlign: "center" }}>
                   {h.strokes
                     ? <ScoreMark hole={h as any} />
@@ -616,9 +629,11 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
       })()}
       {!matchMode && anyStroke && hasHandicap && (
         <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>
-          {holes.some((h) => h.recv > 0)
-            ? "• filled dots show the handicap strokes you receive on that hole."
-            : "◦ hollow dots show the holes where you give your opponent a stroke."}
+          {showIndivDots
+            ? <><span style={{ color: C.dot }}>&#9679;</span> match strokes (Trifecta) &middot; <span style={{ color: C.bogey }}>&#9679;</span> individual strokes (low-net / Stableford side game)</>
+            : (holes.some((h) => h.recv > 0)
+                ? "\u2022 filled dots show the handicap strokes you receive on that hole."
+                : "\u25e6 hollow dots show the holes where you give your opponent a stroke.")}
         </div>
       )}
       {matchMode && hasHandicap && (() => {

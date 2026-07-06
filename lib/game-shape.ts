@@ -117,3 +117,11 @@ export function dotStrokes(
   // Full playing handicap: stableford, stroke, individual skins.
   return strokesReceived(si, mine);
 }
+
+// Full playing handicap for an INDIVIDUAL competition (e.g. the Group-results low-net /
+// Stableford side game): each player's own strokes vs the course, with NO relative/match
+// subtraction, regardless of the game's format. Mirrors the full-handicap branch of dotStrokes.
+export function fullStrokes(game: DotGame, p: ShapePlayer, si: number | null): number {
+  const allowance = game.allowance_pct ?? 100;
+  return strokesReceived(si, applyAllowance(chBasis(p, game.course_par), allowance));
+}

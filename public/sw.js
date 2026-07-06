@@ -5,7 +5,7 @@
 // network-first with a cache fallback, so users get fresh code when online and a
 // working shell when offline.
 
-const SW_VERSION = "1.82.0-local-20260705195035";
+const SW_VERSION = "1.82.2-local-20260706001637";
 const CACHE = `bnn-shell-${SW_VERSION}`;
 
 self.addEventListener("install", (event) => {

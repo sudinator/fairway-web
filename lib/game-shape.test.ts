@@ -1,7 +1,7 @@
 // Unit tests for lib/game-shape.ts — run with `npm test`.
 // Covers the full format matrix, adversarial stray/leftover structure, malformed
 // inputs, and dotBasis<->scoring alignment against the real golf.ts functions.
-import { shapeOf, dotStrokes } from "./game-shape";
+import { shapeOf, dotStrokes, fullStrokes } from "./game-shape";
 import type { ShapeGame, ShapePlayer, DotGame, GameShape } from "./game-shape";
 import { applyAllowance, matchAllowance, matchStrokesFor, strokesReceived,
          computeSkins, computeHeadToHeadSkins } from "./golf";
@@ -72,6 +72,16 @@ const mk = (id: string, ch: number): ShapePlayer => ({ id, user_id: id, course_h
   const dotA = dotStrokes(g, A, 1, [A, B, C, D]);
   const low = Math.min(applyAllowance(12, 100), applyAllowance(4, 100));
   check("4c 2v2 dot==relative_foursome", dotA, matchStrokesFor(Math.max(0, applyAllowance(12, 100) - low), 1));
+}
+
+{ // fullStrokes: individual side game uses FULL playing handicap, ignoring the match-relative basis
+  const A = mk("A", 14), B = mk("B", 14), C = mk("C", 4), D = mk("D", 4);
+  const fs = [{ id: "f1", name: "F1", a: ["A", "B"], b: ["C", "D"] }];
+  const g = G({ game_type: "trifecta", teams: TA, foursomes: fs });
+  const dotA = dotStrokes(g, A, 12, [A, B, C, D]);   // relative_foursome: 14 - low(4) = 10 -> si12 gets 0
+  const fullA = fullStrokes(g, A, 12);               // full playing handicap: 14 -> si12 gets 1
+  check("fullStrokes == full playing hcp", fullA, strokesReceived(12, applyAllowance(14, 100)));
+  check("fullStrokes ignores relative subtraction (si12: 1 vs 0)", fullA > dotA, true);
 }
 
 console.log(`\n=== game-shape.test ===\nPASS ${pass}  FAIL ${fail}`);
