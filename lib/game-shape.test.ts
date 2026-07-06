@@ -74,14 +74,15 @@ const mk = (id: string, ch: number): ShapePlayer => ({ id, user_id: id, course_h
   check("4c 2v2 dot==relative_foursome", dotA, matchStrokesFor(Math.max(0, applyAllowance(12, 100) - low), 1));
 }
 
-{ // fullStrokes: individual side game uses FULL playing handicap, ignoring the match-relative basis
+{ // fullStrokes: individual side game uses FULL COURSE handicap (100%), ignoring both the
+  // match-relative basis AND the game's allowance %.
   const A = mk("A", 14), B = mk("B", 14), C = mk("C", 4), D = mk("D", 4);
   const fs = [{ id: "f1", name: "F1", a: ["A", "B"], b: ["C", "D"] }];
-  const g = G({ game_type: "trifecta", teams: TA, foursomes: fs });
-  const dotA = dotStrokes(g, A, 12, [A, B, C, D]);   // relative_foursome: 14 - low(4) = 10 -> si12 gets 0
-  const fullA = fullStrokes(g, A, 12);               // full playing handicap: 14 -> si12 gets 1
-  check("fullStrokes == full playing hcp", fullA, strokesReceived(12, applyAllowance(14, 100)));
-  check("fullStrokes ignores relative subtraction (si12: 1 vs 0)", fullA > dotA, true);
+  const g = G({ game_type: "trifecta", teams: TA, foursomes: fs, allowance_pct: 90 });
+  const dotA = dotStrokes(g, A, 12, [A, B, C, D]);   // relative + 90%: round(14*.9)=13, low round(4*.9)=4 -> 9 -> si12 gets 0
+  const fullA = fullStrokes(g, A, 12);               // full course handicap 100%: 14 -> si12 gets 1
+  check("fullStrokes == full COURSE hcp (100%)", fullA, strokesReceived(12, applyAllowance(14, 100)));
+  check("fullStrokes ignores game allowance (si12: 1 vs 0)", fullA > dotA, true);
 }
 
 console.log(`\n=== game-shape.test ===\nPASS ${pass}  FAIL ${fail}`);

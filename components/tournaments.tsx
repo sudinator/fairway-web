@@ -3516,7 +3516,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
             const gross = p.scores?.[i] ?? null;
             const recv = recvFor(p, m.si);
             const indRecv = relBasis ? indRecvFor(p, m.si) : 0;
-            const pts = stablefordPts(gross, m.par, recv);
+            const pts = stablefordPts(gross, m.par, relBasis ? indRecv : recv);
             return (
               <div key={p.id + i} style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: colorFor(p), fontSize: 10, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 3 }}>{p.display_name}</div>
@@ -3533,7 +3533,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
                   {indRecv > 0 && (
                     <div style={{ position: "absolute", bottom: 4, left: 5, display: "flex", gap: 2 }}>
                       {Array.from({ length: Math.min(indRecv, 2) }).map((_, d) => (
-                        <span key={d} style={{ width: 6, height: 6, borderRadius: 99, background: C.bogey, display: "block" }} />
+                        <span key={d} style={{ width: 6, height: 6, borderRadius: 99, background: C.indivDot, display: "block" }} />
                       ))}
                     </div>
                   )}
@@ -3631,7 +3631,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
         {relBasis
           ? <>
               <span style={{ color: "#E8730C", fontSize: 10 }}>● match stroke</span>
-              <span style={{ color: C.bogey, fontSize: 10 }}>● individual stroke</span>
+              <span style={{ color: C.indivDot, fontSize: 10 }}>● individual stroke</span>
               <span style={{ color: C.faint, fontSize: 10 }}>corner = Stableford</span>
             </>
           : <span style={{ color: "#E8730C", fontSize: 10 }}>● gets a stroke · corner = Stableford</span>}
@@ -3681,7 +3681,17 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
                 <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {p.display_name}{p.is_guest ? " ·G" : ""}
                 </div>
-                <div style={{ color: C.sage, fontSize: 9 }}>hcp {meta.reduce((a, m) => a + recvFor(p, m.si), 0)}</div>
+                {(() => {
+                  const matchHcp = meta.reduce((a, m) => a + recvFor(p, m.si), 0);
+                  const courseHcp = meta.reduce((a, m) => a + indRecvFor(p, m.si), 0);
+                  if (!relBasis) return <div style={{ color: C.sage, fontSize: 9 }}>hcp {matchHcp}</div>;
+                  const line = (color: string, label: string, val: number) => (
+                    <div style={{ color: C.sage, fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, whiteSpace: "nowrap" }}>
+                      <span style={{ width: 5, height: 5, borderRadius: 99, background: color, display: "inline-block", flex: "none" }} />{label} {val}
+                    </div>
+                  );
+                  return <>{line("#E8730C", "match hcp", matchHcp)}{line(C.indivDot, "course hcp", courseHcp)}</>;
+                })()}
                 {p.tee_name && <div style={{ color: C.sage, fontSize: 9, opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.tee_name}</div>}
               </div>
             );

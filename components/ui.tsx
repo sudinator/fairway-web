@@ -442,7 +442,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
                   if (showIndivDots && ind > 0) {
                     return <div key="d" style={{ textAlign: "center", lineHeight: 1.04 }}>
                       {relDots ? <div style={{ color: relColor, fontWeight: 800, fontSize: 14, letterSpacing: 1 }}>{relDots}</div> : null}
-                      <div style={{ color: C.bogey, fontWeight: 800, fontSize: 14, letterSpacing: 1 }}>{"\u2022".repeat(Math.min(ind, 3))}</div>
+                      <div style={{ color: C.indivDot, fontWeight: 800, fontSize: 14, letterSpacing: 1 }}>{"\u2022".repeat(Math.min(ind, 3))}</div>
                     </div>;
                   }
                   return <div key="d" style={{ textAlign: "center", color: relColor, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{relDots}</div>;
@@ -630,7 +630,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
       {!matchMode && anyStroke && hasHandicap && (
         <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>
           {showIndivDots
-            ? <><span style={{ color: C.dot }}>&#9679;</span> match strokes (Trifecta) &middot; <span style={{ color: C.bogey }}>&#9679;</span> individual strokes (low-net / Stableford side game)</>
+            ? <><span style={{ color: C.dot }}>&#9679;</span> match strokes (Trifecta) &middot; <span style={{ color: C.indivDot }}>&#9679;</span> individual strokes (low-net / Stableford side game)</>
             : (holes.some((h) => h.recv > 0)
                 ? "\u2022 filled dots show the handicap strokes you receive on that hole."
                 : "\u25e6 hollow dots show the holes where you give your opponent a stroke.")}

@@ -118,10 +118,10 @@ export function dotStrokes(
   return strokesReceived(si, mine);
 }
 
-// Full playing handicap for an INDIVIDUAL competition (e.g. the Group-results low-net /
-// Stableford side game): each player's own strokes vs the course, with NO relative/match
-// subtraction, regardless of the game's format. Mirrors the full-handicap branch of dotStrokes.
+// Full COURSE handicap for an INDIVIDUAL competition (e.g. the Group-results low-net /
+// Stableford side game): each player's own strokes vs the course at 100% (no match
+// allowance, no relative subtraction), regardless of the game's format. This is the
+// "course hcp" / blue-dot basis; the match's own allowance %% lives only in dotStrokes.
 export function fullStrokes(game: DotGame, p: ShapePlayer, si: number | null): number {
-  const allowance = game.allowance_pct ?? 100;
-  return strokesReceived(si, applyAllowance(chBasis(p, game.course_par), allowance));
+  return strokesReceived(si, applyAllowance(chBasis(p, game.course_par), 100));
 }
