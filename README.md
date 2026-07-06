@@ -45,5 +45,6 @@ If you ever want to preview locally before deploying:
 4. `npm run dev`, then open http://localhost:3000
 
 ## UI conventions
+- Six-hole segment breakdown reuses the Group Results grid format (Player / Thru / segment columns / Total) for consistency.
 
 - **Minimum font size: 10px.** Never use a `fontSize` below 10 anywhere in the app (readability floor). Bump to 10 rather than going smaller; if space is tight, shorten the label instead of shrinking the type.

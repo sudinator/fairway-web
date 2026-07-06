@@ -2515,6 +2515,20 @@ function GameRoom({
     return { name: champ, val: s2.val as number, thru: s2.thruHole, unit: isStroke ? "net" : "pts" };
   })();
 
+  // Clean Sweep achieved: all three sixes are complete and won outright by the same player,
+  // and that player is also the sole overall leader (18-hole total).
+  const cleanSweepDone = (() => {
+    const [s0, s1, s2] = segWinners;
+    if (![s0, s1, s2].every((s) => s.complete && s.who.length === 1)) return null;
+    const champ = s0.who[0];
+    if (s1.who[0] !== champ || s2.who[0] !== champ) return null;
+    const totals = segTotals.map(({ p, seg }) => ({ name: p.display_name, total: seg.reduce((a: number, b: number) => a + b, 0) }));
+    const best = isStroke ? Math.min(...totals.map((t) => t.total)) : Math.max(...totals.map((t) => t.total));
+    const leaders = totals.filter((t) => t.total === best);
+    if (leaders.length !== 1 || leaders[0].name !== champ) return null;
+    return { name: champ };
+  })();
+
   return (
     <div>
       <div
@@ -2599,7 +2613,10 @@ function GameRoom({
         )}
       </div>
 
-      {roomTab === "play" && sweepWatch && (game as any)?.group_id === TGC_GROUP_ID && (game.game_type === "stableford" || game.game_type === "stroke") && (
+      {roomTab === "play" && cleanSweepDone && (game as any)?.group_id === TGC_GROUP_ID && (game.game_type === "stableford" || game.game_type === "stroke") && (
+        <SweepAchievedBanner name={cleanSweepDone.name} />
+      )}
+      {roomTab === "play" && !cleanSweepDone && sweepWatch && (game as any)?.group_id === TGC_GROUP_ID && (game.game_type === "stableford" || game.game_type === "stroke") && (
         <CleanSweepBanner name={sweepWatch.name} val={sweepWatch.val} thru={sweepWatch.thru} unit={sweepWatch.unit} />
       )}
 
@@ -3203,6 +3220,19 @@ function GameRoom({
                 </div>
               ))}
             </div>
+            <SegmentBoard
+              isStroke={isStroke}
+              rows={leaderboard.map((p) => {
+                const s = segOf(p);
+                return {
+                  name: p.display_name,
+                  thru: playerThru(p),
+                  segs: s,
+                  total: s.reduce((a: number, b: number) => a + b, 0),
+                  isMe: p.user_id === user.id,
+                };
+              })}
+            />
           </div>
 
           {(game as any)?.group_id === TGC_GROUP_ID && (
@@ -4448,6 +4478,39 @@ function CleanSweepBanner({ name, val, thru, unit }: { name: string; val: number
         </div>
       </div>
       <SweepBroom side="right" />
+    </div>
+  );
+}
+
+// Trophy for the completed clean sweep.
+function SweepTrophy() {
+  return (
+    <svg viewBox="0 0 32 32" width={26} height={26} aria-hidden="true" style={{ flex: "none" }}>
+      <path d="M10 5 h12 v4 a6 6 0 0 1 -12 0 Z" fill="#1a1206" />
+      <path d="M10 6 H6 a3 3 0 0 0 3 4 M22 6 h4 a3 3 0 0 1 -3 4" stroke="#1a1206" strokeWidth="1.6" fill="none" />
+      <rect x="14.7" y="14" width="2.6" height="5" fill="#1a1206" />
+      <rect x="11" y="19" width="10" height="2.6" rx="1" fill="#1a1206" />
+      <rect x="9.5" y="21.4" width="13" height="2.8" rx="1.2" fill="#1a1206" />
+    </svg>
+  );
+}
+
+// Celebration banner shown when a clean sweep is CONFIRMED (game final): richer than
+// the watch banner, with brooms flanking a trophy and a congratulatory message.
+function SweepAchievedBanner({ name, potNote }: { name: string; potNote?: string }) {
+  return (
+    <div style={{ position: "relative", overflow: "hidden", borderRadius: 15, padding: "16px 14px", margin: "12px 0", textAlign: "center", background: "radial-gradient(120% 120% at 50% 0%, #F0CF6A 0%, #D9B23A 45%, #C9A227 100%)", border: "1px solid #EBD37E", boxShadow: "0 10px 26px -10px rgba(0,0,0,0.7)" }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", gap: 8, marginBottom: 4 }}>
+        <SweepBroom side="left" />
+        <SweepTrophy />
+        <SweepBroom side="right" />
+      </div>
+      <div style={{ fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 19, letterSpacing: 0.5, color: "#1c1706", textTransform: "uppercase" }}>Clean Sweep!</div>
+      <div style={{ fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 16, color: "#000", marginTop: 3 }}>{name}</div>
+      <div style={{ fontSize: 12.5, fontWeight: 700, color: "#3A3208", marginTop: 4 }}>Won all three sixes outright — and 1st overall</div>
+      {potNote ? (
+        <div style={{ display: "inline-block", marginTop: 9, background: "#1a1206", color: C.gold, fontWeight: 800, fontSize: 13, padding: "5px 12px", borderRadius: 999 }}>{potNote}</div>
+      ) : null}
     </div>
   );
 }
@@ -5912,7 +5975,9 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game }: {
               </div>
             ) : (
               <div style={{ color: C.faint, fontSize: 11, marginTop: 4 }}>
-                Each six: {pct(split.segPct)} · 2nd: {pct(split.secondPct)} · 1st: {pct(split.firstPct)}
+                {result.pot > 0
+                  ? `Each six: $${Math.round(result.pot * split.segPct)} · 2nd: $${Math.round(result.pot * split.secondPct)} · 1st: $${Math.round(result.pot * split.firstPct)}`
+                  : `Each six: ${pct(split.segPct)} · 2nd: ${pct(split.secondPct)} · 1st: ${pct(split.firstPct)}`}
               </div>
             )}
           </div>
@@ -6018,6 +6083,67 @@ function LegConfigEditor({ game, onSave }: { game: Game; onSave: (cfg: LegConfig
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// Expandable per-player six-hole segment leaderboard, in the Group Results grid
+// format (Name · Thru · 1–6 · 7–12 · 13–18 · Total). Reuses the segment data
+// already computed in the room; collapsed by default.
+function SegmentBoard({
+  rows,
+  isStroke,
+}: {
+  rows: { name: string; thru: number; segs: number[]; total: number; isMe: boolean }[];
+  isStroke: boolean;
+}) {
+  const [open, setOpen] = React.useState(false);
+  if (rows.length < 1) return null;
+  const sorted = rows.slice().sort((a, b) => (isStroke ? a.total - b.total : b.total - a.total));
+  const segLeader = [0, 1, 2].map((i) => {
+    const vals = rows.map((r) => r.segs[i]);
+    if (!vals.length) return null;
+    return isStroke ? Math.min(...vals) : Math.max(...vals);
+  });
+  const cols = ["1\u20136", "7\u201312", "13\u201318"];
+  return (
+    <div style={{ marginTop: 10, background: C.greenLight, borderRadius: 12, overflow: "hidden" }}>
+      <div
+        onClick={() => setOpen((o) => !o)}
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "11px 14px", cursor: "pointer" }}
+      >
+        <span style={{ fontWeight: 800, color: C.cream, fontSize: 13 }}>Full segment breakdown</span>
+        <span style={{ color: C.sage, fontSize: 16, display: "inline-block", transform: open ? "rotate(180deg)" : "none" }}>{"\u25BE"}</span>
+      </div>
+      {open && (
+        <div style={{ padding: "0 10px 10px" }}>
+          <div style={{ display: "flex", alignItems: "center", padding: "6px 6px", color: C.sage, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.4, borderBottom: "1px solid #2c5a48" }}>
+            <div style={{ flex: 1 }}>Player</div>
+            <div style={{ width: 34, textAlign: "center" }}>Thru</div>
+            {cols.map((c, i) => (
+              <div key={i} style={{ width: i === 2 ? 44 : 40, textAlign: "center" }}>{c}</div>
+            ))}
+            <div style={{ width: 42, textAlign: "center" }}>Total</div>
+          </div>
+          {sorted.map((r, idx) => (
+            <div key={idx} style={{ display: "flex", alignItems: "center", padding: "7px 6px", background: r.isMe ? "#123528" : "none", borderRadius: 8 }}>
+              <div style={{ flex: 1, minWidth: 0, color: C.cream, fontWeight: 700, fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {r.name}{r.isMe ? " (you)" : ""}
+              </div>
+              <div style={{ width: 34, textAlign: "center", color: C.sage, fontSize: 12 }}>{r.thru || "\u2013"}</div>
+              {[0, 1, 2].map((i) => {
+                const isLead = segLeader[i] != null && r.segs[i] === segLeader[i];
+                return (
+                  <div key={i} style={{ width: i === 2 ? 44 : 40, textAlign: "center", fontSize: 12, fontWeight: isLead ? 800 : 600, color: isLead ? "#8FE0B0" : C.cream }}>
+                    {r.segs[i]}
+                  </div>
+                );
+              })}
+              <div style={{ width: 42, textAlign: "center", color: C.gold, fontWeight: 800, fontSize: 13 }}>{r.total}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
