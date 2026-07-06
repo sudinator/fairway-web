@@ -26,8 +26,8 @@ const CATS: { k: string; label: string }[] = [
 const catLabel = (k: string) => CATS.find((c) => c.k === k)?.label || "Other";
 const ini = (n: string) => n.split(/\s+/).map((w) => w[0] || "").join("").slice(0, 2).toUpperCase();
 
-export function MoneyTab({ user, activeGroup, onChanged }: { user: { id: string }; activeGroup: { id: string; name: string; role?: string }; onChanged?: () => void }) {
-  const [screen, setScreen] = useState<"balances" | "add" | "settle" | "log">("balances");
+export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: { id: string }; activeGroup: { id: string; name: string; role?: string }; onChanged?: () => void; initialTab?: "balances" | "add" | "settle" | "log" | null }) {
+  const [screen, setScreen] = useState<"balances" | "add" | "settle" | "log">(initialTab ?? "balances");
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<Member[]>([]);
   const [guests, setGuests] = useState<GuestRow[]>([]);

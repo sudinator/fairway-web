@@ -36,6 +36,11 @@ export function Home({ session }: { session: any }) {
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [groupsLoading, setGroupsLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("dashboard");
+  // When the owe banner is tapped we want the Money tab to open straight on "Settle".
+  // The MoneyTab remounts each time you enter it, so this one-shot flag is read on mount;
+  // clear it whenever we're not on the money tab so a normal re-entry lands on Balances.
+  const [moneyInitialTab, setMoneyInitialTab] = useState<"settle" | null>(null);
+  useEffect(() => { if (tab !== "money") setMoneyInitialTab(null); }, [tab]);
   const [stage, setStage] = useState<null | "setup" | { round: Round }>(null);
   // Tracks the in-progress round draft so we can show a "Resume" banner from any
   // screen. Re-read from storage whenever navigation happens (see refreshDraft).
@@ -391,7 +396,7 @@ export function Home({ session }: { session: any }) {
       )}
 
       {owed.cents > 0 && !inFlow && (
-        <button onClick={() => { setTab("money"); setStage(null); setViewing(null); }}
+        <button onClick={() => { setMoneyInitialTab("settle"); setTab("money"); setStage(null); setViewing(null); }}
           style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: "#5a2018", border: "1px solid #7a2e22", borderRadius: 12, padding: "11px 14px", marginTop: 14, cursor: "pointer" }}>
           <span style={{ fontSize: 18 }}>&#9888;&#65039;</span>
           <span style={{ flex: 1, color: "#ffd9d2", fontSize: 13 }}>You owe <b style={{ color: "#fff" }}>{fmtUSD(owed.cents)}</b> to settle up{owed.groups > 1 ? ` across ${owed.groups} groups` : ""}</span>
@@ -432,7 +437,7 @@ export function Home({ session }: { session: any }) {
         ) : tab === "profile" ? (
           <ProfilePanel profile={profile} user={user} onSaved={loadProfile} />
         ) : tab === "money" && activeGroup ? (
-          <MoneyTab user={user} activeGroup={activeGroup} onChanged={loadOwed} />
+          <MoneyTab user={user} activeGroup={activeGroup} onChanged={loadOwed} initialTab={moneyInitialTab} />
         ) : tab === "games" && activeGroup ? (
           <Tournaments session={session} activeGroupId={activeGroup.id} isAdmin={!!profile?.is_admin} />
         ) : loading ? (

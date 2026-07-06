@@ -2474,18 +2474,46 @@ function GameRoom({
   const segOf = (p: Player) => (isStroke ? netBySix(playerHoles(p)) : stablefordBySix(playerHoles(p)));
   const segTotals = players.map((p) => ({ p, seg: segOf(p) }));
   const segWinners = [0, 1, 2].map((si) => {
+    // best/who doubles as the segment WINNER (when everyone's done) or the current LEADER
+    // (while in progress), computed among players who've played >= 1 hole in the segment.
     let best = isStroke ? Infinity : -1;
     let who: string[] = [];
+    let started = false;
+    let maxPlayed = 0;
+    let allDone = true;
+    let anyActive = false;
     segTotals.forEach(({ p, seg }) => {
+      const active = playerHoles(p).some((h) => h.strokes);
+      if (!active) return;
+      anyActive = true;
       const played = playerHoles(p).slice(si * 6, si * 6 + 6).filter((h) => h.strokes).length;
-      if (played < 6) return;
-      const v = seg[si];
-      if (isStroke ? v < best : v > best) { best = v; who = [p.display_name]; }
-      else if (v === best) who.push(p.display_name);
+      if (played < 6) allDone = false;
+      if (played > 0) started = true;
+      maxPlayed = Math.max(maxPlayed, played);
+      if (played >= 1) {
+        const v = seg[si];
+        if (isStroke ? v < best : v > best) { best = v; who = [p.display_name]; }
+        else if (v === best) who.push(p.display_name);
+      }
     });
-    const complete = who.length > 0;
-    return { label: segLabels[si], complete, val: complete ? best : null, who };
+    const complete = anyActive && allDone && started;
+    const thruHole = si * 6 + maxPlayed; // absolute hole reached in this segment
+    return { label: segLabels[si], complete, started, val: started ? best : null, who, thruHole, maxPlayed };
   });
+
+  // Clean Sweep watch: one player won the first two sixes outright AND is leading the last
+  // six alone with fewer than 4 holes left to play (i.e., 3-5 of holes 13-18 done).
+  const sweepWatch = (() => {
+    const [s0, s1, s2] = segWinners;
+    if (!s0.complete || !s1.complete) return null;
+    if (s0.who.length !== 1 || s1.who.length !== 1) return null;
+    const champ = s0.who[0];
+    if (s1.who[0] !== champ) return null;
+    if (!s2.started || s2.complete) return null;
+    if (s2.maxPlayed < 3) return null;                 // fewer than 4 holes remaining
+    if (s2.who.length !== 1 || s2.who[0] !== champ) return null; // leading the last six alone
+    return { name: champ, val: s2.val as number, thru: s2.thruHole, unit: isStroke ? "net" : "pts" };
+  })();
 
   return (
     <div>
@@ -2570,6 +2598,10 @@ function GameRoom({
           </button>
         )}
       </div>
+
+      {roomTab === "play" && sweepWatch && (game.game_type === "stableford" || game.game_type === "stroke") && (
+        <CleanSweepBanner name={sweepWatch.name} val={sweepWatch.val} thru={sweepWatch.thru} unit={sweepWatch.unit} />
+      )}
 
       {isAdmin && !isOrganizer && (
         <div style={{ background: C.greenMid, border: `1px solid ${C.gold}`, borderRadius: 12, padding: 12, marginTop: 12 }}>
@@ -3142,23 +3174,29 @@ function GameRoom({
                   }}
                 >
                   <div style={{ color: C.sage, fontSize: 12 }}>{s.label}</div>
-                  {!s.complete ? (
+                  {!s.started ? (
                     <div style={{ color: C.faint, fontSize: 13, marginTop: 6 }}>
-                      Not complete yet
+                      Not started
                     </div>
-                  ) : (
+                  ) : s.complete ? (
                     <>
-                      <div
-                        style={{
-                          color: C.cream,
-                          fontWeight: 800,
-                          marginTop: 6,
-                        }}
-                      >
+                      <div style={{ color: C.cream, fontWeight: 800, marginTop: 6 }}>
                         {s.who.join(", ")}
                       </div>
                       <div style={{ color: C.gold, fontSize: 13 }}>
                         {isStroke ? `${s.val} net` : `${s.val} pts`} {s.who.length > 1 ? "(tie)" : ""}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ color: C.cream, fontWeight: 800, marginTop: 6 }}>
+                        {s.who.join(" & ")}
+                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", color: C.green, background: C.sage, borderRadius: 5, padding: "1px 6px", verticalAlign: "middle" }}>
+                          {s.who.length > 1 ? "tied" : "leading"}
+                        </span>
+                      </div>
+                      <div style={{ color: C.gold, fontSize: 13 }}>
+                        {isStroke ? `${s.val} net` : `${s.val} pts`} · thru hole {s.thruHole}
                       </div>
                     </>
                   )}
@@ -4380,6 +4418,40 @@ function MatchView({
 // Shared "team score" tail: shows what's still up for grabs and, for fixed-pool
 // formats, whether a team has mathematically clinched. Rendered INSIDE the
 // existing team-score card (no new box). metric controls the wording only.
+// A hand-drawn broom (the emoji can't be recolored). Sweeps inward: left tilts right, right tilts left.
+function SweepBroom({ side }: { side: "left" | "right" }) {
+  return (
+    <svg viewBox="0 0 32 32" width={46} height={46} aria-hidden="true" style={{ flex: "none" }}>
+      <g transform={`rotate(${side === "left" ? -32 : 32} 16 16)`}>
+        <rect x="14.7" y="3" width="2.7" height="13" rx="1.35" fill="#1a1206" />
+        <rect x="10.8" y="14.8" width="10.4" height="3.1" rx="1.5" fill="#1a1206" />
+        <path d="M12.1 18 L19.9 18 L23.6 26.4 Q16 29.2 8.4 26.4 Z" fill="#1a1206" />
+        <g stroke="#E3B93E" strokeWidth="0.9" strokeLinecap="round">
+          <path d="M11.6 25.8 L12.7 18.9" /><path d="M14.4 26.6 L14.8 18.7" />
+          <path d="M17.6 26.6 L17.2 18.7" /><path d="M20.4 25.8 L19.3 18.9" />
+        </g>
+      </g>
+    </svg>
+  );
+}
+
+// Gold "Clean Sweep watch" banner — one player has won the first two sixes and is closing
+// in on the third. Two rows: title, then the live leader line. Big brooms sweep inward.
+function CleanSweepBanner({ name, val, thru, unit }: { name: string; val: number; thru: number; unit: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 12, borderRadius: 13, padding: "10px 14px", margin: "12px 0", background: "linear-gradient(180deg,#D9B23A,#C9A227)", border: "1px solid #E0C043", boxShadow: "0 6px 18px -8px rgba(0,0,0,0.6)" }}>
+      <SweepBroom side="left" />
+      <div style={{ flex: 1, textAlign: "center", minWidth: 0 }}>
+        <div style={{ fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 15, letterSpacing: 0.4, textTransform: "uppercase", color: "#1c1706", whiteSpace: "nowrap" }}>Clean Sweep Watch</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#3A3208", marginTop: 3 }}>
+          <b style={{ color: "#000" }}>{name}</b> is <b style={{ color: "#000" }}>{val} {unit}</b> thru hole {thru}
+        </div>
+      </div>
+      <SweepBroom side="right" />
+    </div>
+  );
+}
+
 function TeamClinchLine({ aPts, bPts, unclaimed, aName, bName, metric, showBanner = true }: {
   aPts: number; bPts: number; unclaimed: number; aName: string; bName: string;
   metric: "points" | "matches" | "skins"; showBanner?: boolean;
