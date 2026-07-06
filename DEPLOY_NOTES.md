@@ -250,3 +250,10 @@ Run migration **0055_zelle.sql** (adds profiles.zelle_handle, redefines group_pa
 - The game's Betting panel "Who's betting" toggles now **persist** to `game_players.bets` (organizer/admin only; buttons disabled for others) via `set_player_bets`. Realtime on `game_players` refreshes the room so the banners stay in sync.
 - Excluded players **still play and appear on the leaderboard** (tagged "no bet", $0). The pot and all payouts are computed over bettors only, so an excluded player who posts the low score simply hands 1st to the next betting player. The clean-sweep watch / achieved banners now **follow the money** (bettors only) via `segWinnersBet`/`segTotalsBet`; the standings still show everyone's scores. The Money post already reflects bettors only.
 - Verified locally: tsc clean, tests pass (incl. new bettor-only cases), build clean.
+
+## v1.93.0 — Betting→Money Phase 2 (re-post corrected winnings)
+- **NO migration.** Uses existing tables/RPCs.
+- When scores change after winnings were posted, the game now detects that the posted bet expense no longer matches the current scores. The Betting panel (organizer) shows **"Scores changed since posting → Review & re-post"** with a per-bettor old→new preview; the play view shows a room-level **"Posted bet winnings are out of date"** banner (visible right after an edit), and the organizer is notified (group_activity `bet_stale` + best-effort push).
+- **Re-post = net-balance model (no payment reversal):** it deletes the old linked bet expense and posts the corrected one. Settlements are group-level, so they're untouched and `computeBalances` reconciles automatically — anyone who overpaid the old amount now shows as **owed back** in Money; the residual settles through the normal Settle flow. Logged as `bet_reposted` with old→new.
+- **Bug fix (from v1.92.0):** the "keep bettor list in sync" effect was re-adding new players unconditionally, which pulled guests (bets=false) back into the bet. It now only auto-includes players whose `bets !== false`, so guests stay out by default.
+- Verified locally: tsc clean, all tests pass, build clean.

@@ -65,7 +65,7 @@ Confirm-only in phase 1. Rare bespoke cases (a player sat out the bet, an inform
 - Migration: `source_game_id`, `source_kind`.
 - "Posted ✓" state + un-post.
 
-**Phase 2 (TGC):**
+**Phase 2 (TGC): DONE (v1.93.0).** Reconciliation uses the net-balance model (delete old linked expense + post corrected; settlements preserved so overpayers show as owed back) rather than manual reversal. Detail:
 - Score-edit detection: recompute nets, compare to posted snapshot.
 - Editor warning when their edit changes winnings.
 - Organizer/admin notification + approve re-post (delete old + post new).

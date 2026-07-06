@@ -1370,6 +1370,25 @@ function GameRoom({
     () => initialTab || loadActiveGame()?.tab || "play",
   );
   useEffect(() => { saveActiveGame(gameId, roomTab); }, [gameId, roomTab]);
+  // Phase 2: the Betting panel signals when posted winnings no longer match the
+  // current scores. Show a room-level banner (visible right after an edit) and
+  // notify the organizer once per session.
+  const [betStale, setBetStale] = useState(false);
+  const betStaleNotified = React.useRef(false);
+  useEffect(() => {
+    if (!betStale || betStaleNotified.current || !game?.group_id) return;
+    betStaleNotified.current = true;
+    const organizerId = game.created_by;
+    const editorName = players.find((p) => p.user_id === user.id)?.display_name || "Someone";
+    (async () => {
+      try {
+        await supabase.from("group_activity").insert({ group_id: game.group_id, actor_user_id: user.id, action: "bet_stale", summary: `a score change means the posted bet winnings for "${game.name || game.course || "the game"}" need re-posting`, meta: { game_id: game.id } });
+      } catch { /* log is best-effort */ }
+      if (organizerId && organizerId !== user.id) {
+        try { await supabase.rpc("create_notification", { p_recipient: organizerId, p_message: `${editorName} changed a score in "${game.name || game.course || "a game"}" — the posted bet winnings need re-posting.`, p_group_id: game.group_id }); } catch { /* best-effort */ }
+      }
+    })();
+  }, [betStale, game, players, user.id]);
   // Which step of the setup flow is showing: players & tees, teams, matchups, groups.
   const [setupTab, setSetupTab] = useState<"players" | "teams" | "matchups" | "groups">("players");
   const [cardView, setCardView] = useState(false); // show the whole-group vertical scorecard
@@ -2801,6 +2820,15 @@ function GameRoom({
         </div>
       )}
 
+      {roomTab === "play" && betStale && (
+        <div style={{ background: "#5a3a10", border: `1px solid ${C.gold}`, borderRadius: 14, padding: 14, marginTop: 16 }}>
+          <div style={{ color: "#f6d98a", fontWeight: 800, fontSize: 14 }}>⚠️ Posted bet winnings are out of date</div>
+          <div style={{ color: C.cream, fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>
+            A score changed since the winnings were posted to Money. {isOrganizer ? "Open the betting section below and tap “Review & re-post” to correct the amounts — recorded payments stay in place." : "The organizer needs to re-post to correct the amounts."}
+          </div>
+        </div>
+      )}
+
       {roomTab === "play" && isOrganizer && setupMissing.length > 0 && !isEnded && (
         <div style={{ background: "#16302A", border: `1px solid ${C.gold}`, borderRadius: 14, padding: 16, marginTop: 16 }}>
           <Eyebrow>A FEW THINGS AREN'T SET</Eyebrow>
@@ -3372,6 +3400,7 @@ function GameRoom({
               game={game}
               user={user}
               canPost={game.created_by === user.id || !!isAdmin}
+              onBetStale={setBetStale}
             />
           )}
         </>
@@ -5929,7 +5958,7 @@ function OrganizerPanel({
 // and the split percentages (default: 3 six-hole segments at 10/75 each, 2nd at
 // 15/75, 1st at 30/75). Computes payouts including ties, all-tied-first, and the
 // clean-sweep double. See computeBetting() in lib/golf.ts for the full rules.
-function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, canPost }: {
+function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, canPost, onBetStale }: {
   players: Player[];
   playerPoints: (p: Player) => number;
   playerHoles: (p: Player) => Hole[];
@@ -5937,6 +5966,7 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
   game: Game;
   user: { id: string };
   canPost: boolean;
+  onBetStale?: (stale: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [bet, setBet] = useState(75);
@@ -5944,13 +5974,13 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
   const [split, setSplit] = useState<BetSplit>(DEFAULT_BET_SPLIT);
   const [editSplit, setEditSplit] = useState(false);
 
-  // Keep the bettor list in sync as players join (default: everyone in).
+  // Keep the bettor list in sync as players join. New players are auto-included
+  // only if they bet (guests default bets=false, so they stay out).
   useEffect(() => {
     setInIds((prev) => {
       const ids = players.map((p) => p.id);
       const kept = prev.filter((id) => ids.includes(id));
-      const added = ids.filter((id) => !prev.includes(id));
-      // On first mount prev may be the full list already; just union new players.
+      const added = ids.filter((id) => !prev.includes(id) && players.find((p) => p.id === id)?.bets !== false);
       return Array.from(new Set([...kept, ...added]));
     });
   }, [players.length]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -5964,7 +5994,9 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
   // Betting -> Money posting (TGC phase 1).
   const [memberIds, setMemberIds] = useState<Set<string> | null>(null);
   const [postedExpense, setPostedExpense] = useState<{ id: string; created_at: string } | null>(null);
+  const [postedNets, setPostedNets] = useState<Record<string, number> | null>(null); // user_id -> cents (+win/-loss) as posted
   const [confirming, setConfirming] = useState(false);
+  const [reposting, setReposting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [postMsg, setPostMsg] = useState<string | null>(null);
 
@@ -5984,7 +6016,17 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
       const { data: exp } = await supabase
         .from("expenses").select("id, created_at")
         .eq("source_game_id", game.id).eq("source_kind", "tgc_bet").maybeSingle();
-      if (alive && exp) setPostedExpense({ id: exp.id, created_at: exp.created_at });
+      if (alive && exp) {
+        setPostedExpense({ id: exp.id, created_at: exp.created_at });
+        const [{ data: pys }, { data: shs }] = await Promise.all([
+          supabase.from("expense_payers").select("user_id, paid_cents").eq("expense_id", exp.id),
+          supabase.from("expense_shares").select("user_id, share_cents").eq("expense_id", exp.id),
+        ]);
+        const nets: Record<string, number> = {};
+        (pys || []).forEach((p: any) => { if (p.user_id) nets[p.user_id] = (nets[p.user_id] || 0) + p.paid_cents; });
+        (shs || []).forEach((s: any) => { if (s.user_id) nets[s.user_id] = (nets[s.user_id] || 0) - s.share_cents; });
+        if (alive) setPostedNets(nets);
+      }
     })();
     return () => { alive = false; };
   }, [ended, game.group_id, game.id]);
@@ -6061,6 +6103,73 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
     setBusy(false);
   }
   const pct = (v: number) => `${Math.round(v * 1000) / 10}%`;
+  const centsNet = (c: number) => `${c >= 0 ? "+" : "\u2212"}$${Math.abs(c / 100).toFixed(0)}`;
+
+  // ---- Phase 2: detect that scores changed after posting, and re-post to correct.
+  // Live nets in cents, same shape as postedNets (user_id -> +win/-loss).
+  const liveNetsCents: Record<string, number> = (() => {
+    const nets: BetNet[] = result.perPlayer.map((pp) => ({ user_id: idToUser[pp.id] as string, name: pp.name, net: pp.net }));
+    const post = betResultToPost(nets);
+    const m: Record<string, number> = {};
+    if (post.ok) {
+      post.payers.forEach((p) => { m[p.user_id] = (m[p.user_id] || 0) + p.paid_cents; });
+      post.shares.forEach((s) => { m[s.user_id] = (m[s.user_id] || 0) - s.share_cents; });
+    }
+    return m;
+  })();
+  const needsUpdate = (() => {
+    if (!postedExpense || !postedNets || Object.keys(liveNetsCents).length === 0) return false;
+    const keys = new Set([...Object.keys(postedNets), ...Object.keys(liveNetsCents)]);
+    for (const k of keys) { if ((postedNets[k] || 0) !== (liveNetsCents[k] || 0)) return true; }
+    return false;
+  })();
+  useEffect(() => { onBetStale?.(needsUpdate); }, [needsUpdate]); // eslint-disable-line react-hooks/exhaustive-deps
+  const nameOfUid = (uid: string) => players.find((p) => p.user_id === uid)?.display_name || "someone";
+  // Per-bettor old -> new change, for the re-post preview.
+  const repostDeltas = (() => {
+    if (!postedNets) return [] as { uid: string; name: string; oldC: number; newC: number }[];
+    const keys = new Set([...Object.keys(postedNets), ...Object.keys(liveNetsCents)]);
+    return Array.from(keys).map((uid) => ({ uid, name: nameOfUid(uid), oldC: postedNets[uid] || 0, newC: liveNetsCents[uid] || 0 }))
+      .filter((r) => r.oldC !== r.newC)
+      .sort((a, b) => b.newC - a.newC);
+  })();
+
+  async function doRepost() {
+    if (!postedExpense) return;
+    setBusy(true); setPostMsg(null);
+    try {
+      const nets: BetNet[] = result.perPlayer.map((pp) => ({ user_id: idToUser[pp.id] as string, name: pp.name, net: pp.net }));
+      const post = betResultToPost(nets);
+      if (!post.ok) { setPostMsg(post.reason || "Couldn't balance the corrected bet."); setBusy(false); return; }
+      const oldSnapshot = postedNets;
+      // Delete the old linked expense (cascades its payers/shares). Settlements are
+      // group-level and untouched, so net balances reconcile automatically — anyone
+      // who overpaid the old amount now shows as "owed back" in the Money tab.
+      const { error: ed } = await supabase.from("expenses").delete().eq("id", postedExpense.id);
+      if (ed) { setPostMsg("Couldn't update — please try again."); setBusy(false); return; }
+      const desc = `TGC bet — ${game.name || game.course || "game"}`;
+      const { data: exp, error: e1 } = await supabase.from("expenses").insert({
+        group_id: game.group_id, created_by: user.id, payer_user_id: post.payers[0].user_id,
+        amount_cents: post.amount_cents, description: desc, category: "bet", split_type: "custom",
+        source_game_id: game.id, source_kind: "tgc_bet",
+      }).select("id, created_at").single();
+      if (e1 || !exp) { setPostedExpense(null); setPostedNets(null); setPostMsg("Removed the old winnings but couldn't re-post — tap Post winnings again."); setBusy(false); return; }
+      const { error: e2 } = await supabase.from("expense_payers").insert(post.payers.map((py) => ({ expense_id: exp.id, user_id: py.user_id, paid_cents: py.paid_cents })));
+      const { error: e3 } = await supabase.from("expense_shares").insert(post.shares.map((sh) => ({ expense_id: exp.id, user_id: sh.user_id, share_cents: sh.share_cents })));
+      if (e2 || e3) { setPostMsg("Re-posted but a split didn't save — please check the Money tab."); }
+      await supabase.from("group_activity").insert({
+        group_id: game.group_id, actor_user_id: user.id, action: "bet_reposted",
+        summary: `re-posted corrected bet winnings — pot $${(post.amount_cents / 100).toFixed(0)}. Recorded payments stay in place; anyone who overpaid now shows as owed back in Money.`,
+        meta: { game_id: game.id, expense_id: exp.id, old_nets: oldSnapshot, new_amount_cents: post.amount_cents },
+      });
+      setPostedExpense({ id: exp.id, created_at: exp.created_at });
+      setPostedNets(liveNetsCents);
+      setConfirming(false);
+      setPostMsg("Winnings corrected in Money.");
+    } catch { setPostMsg("Something went wrong re-posting."); }
+    setBusy(false);
+  }
+
 
   // One-tap shareable recap of the finished round.
   const [copied, setCopied] = useState(false);
@@ -6244,7 +6353,37 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
                 <div>
                   <div style={{ color: C.sage, fontSize: 13, fontWeight: 800 }}>Posted to Money ✓</div>
                   <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>Losers owe winners in the Money tab. Un-posting removes that expense.</div>
-                  <button onClick={doUnpost} disabled={busy} style={{ ...btn(false), fontSize: 12, marginTop: 8 }}>{busy ? "Working…" : "Un-post"}</button>
+                  {needsUpdate ? (
+                    <div style={{ marginTop: 10, background: "#5a3a10", color: "#f6d98a", borderRadius: 10, padding: "10px 12px" }}>
+                      <div style={{ fontWeight: 800, fontSize: 13 }}>⚠️ Scores changed since posting</div>
+                      <div style={{ fontSize: 12, marginTop: 3, lineHeight: 1.4 }}>The posted winnings are out of date. Re-posting corrects the amounts; recorded payments stay in place, so anyone who overpaid shows as owed back in the Money tab.</div>
+                      {!reposting ? (
+                        <button onClick={() => { setReposting(true); setPostMsg(null); }} disabled={busy} style={{ ...btn(true), fontSize: 12, marginTop: 8 }}>Review &amp; re-post</button>
+                      ) : (
+                        <div style={{ background: C.card, borderRadius: 10, padding: 12, marginTop: 8 }}>
+                          <div style={{ color: C.ink, fontWeight: 800, fontSize: 13 }}>Corrected winnings</div>
+                          <div style={{ marginTop: 8 }}>
+                            {repostDeltas.map((r) => (
+                              <div key={r.uid} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12.5 }}>
+                                <span style={{ color: C.ink }}>{r.name}</span>
+                                <span style={{ fontFamily: "Georgia, serif" }}>
+                                  <span style={{ color: C.faint, textDecoration: "line-through" }}>{centsNet(r.oldC)}</span>{"  "}
+                                  <span style={{ fontWeight: 800, color: r.newC >= 0 ? C.green : C.birdie }}>{centsNet(r.newC)}</span>
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                          {postMsg && <div style={{ color: C.birdie, fontSize: 12, marginTop: 6 }}>{postMsg}</div>}
+                          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                            <button onClick={() => { setReposting(false); setPostMsg(null); }} disabled={busy} style={{ ...btn(false), flex: 1, fontSize: 13 }}>Cancel</button>
+                            <button onClick={doRepost} disabled={busy} style={{ ...btn(true), flex: 1, fontSize: 13 }}>{busy ? "Updating…" : "Confirm & re-post"}</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <button onClick={doUnpost} disabled={busy} style={{ ...btn(false), fontSize: 12, marginTop: 8 }}>{busy ? "Working…" : "Un-post"}</button>
+                  )}
                 </div>
               ) : nonMembers.length ? (
                 <div style={{ color: C.birdie, fontSize: 12 }}>
