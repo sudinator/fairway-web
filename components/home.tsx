@@ -207,7 +207,7 @@ export function Home({ session }: { session: any }) {
     setLoading(true);
     // Personal views intentionally show this user's rounds across every group.
     const { data: rs } = await supabase
-      .from("rounds").select("*, groups(name)").eq("user_id", user.id).order("played_at", { ascending: false });
+      .from("rounds").select("*, groups(name)").eq("user_id", user.id).is("deleted_at", null).order("played_at", { ascending: false });
     if (!rs) { setRounds([]); setLoading(false); return; }
     const ids = rs.map((r: any) => r.id);
     const { data: hs } = await supabase
@@ -234,7 +234,13 @@ export function Home({ session }: { session: any }) {
 
   const deleteRound = async (id: string) => {
     const r = rounds.find((x) => x.id === id);
-    await supabase.from("rounds").delete().eq("id", id);
+    if ((r as any)?.game_id) {
+      // Game-recorded round: soft-delete so it isn't silently re-posted the next time
+      // the ended game is opened (recordMyGameRound re-inserts a missing round).
+      await supabase.from("rounds").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+    } else {
+      await supabase.from("rounds").delete().eq("id", id);
+    }
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "round_deleted", summary: `Deleted a round${r ? ` at ${r.course}` : ""}` });
     await loadRounds();
   };

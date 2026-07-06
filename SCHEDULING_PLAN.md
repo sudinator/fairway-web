@@ -34,9 +34,9 @@ RLS mirrors the money tables: any active group member reads; organizer/admin (ro
 Every table carries `group_id`; permissions key on `group_members.role`. Type labels and captain duties are group-configurable with defaults, so nothing TGC-specific lives in the data — the only TGC-specific thing in phase 1 is a UI gate we later remove.
 
 ## Phases
-- **P0 — Schema & RLS** (migration 0057). No UI. ← current.
-- **P1 — Core loop (TGC-gated)**: create/list/view tee times; RSVP (In/Out/Maybe + guests + waitlist); spots; pending nudges (home banner + tab badge).
-- **P2 — Organizer & captain**: sign up/mark out others, waitlist promotion, cancel/edit, signup deadline + late-change warnings + past freeze, captain + duties.
+- **P0 — Schema & RLS** (migration 0057). DONE (v1.85.2).
+- **P1 — Core loop (TGC-gated)**: DONE (v1.86.x).  : create/list/view tee times; RSVP (In/Out/Maybe + guests + waitlist); spots; pending nudges (home banner + tab badge).
+- **P2 — Organizer & captain**: DONE (v1.87.0) — edit a tee time, captain assign + duties, signup-deadline late-change warning, past-tee-time freeze for non-organizers, waitlist promotion. Original: sign up/mark out others, waitlist promotion, cancel/edit, signup deadline + late-change warnings + past freeze, captain + duties.
 - **P3 — Exports & notifications**: WhatsApp tee-time info; posted/deadline/nudge notifications.
 - **P4 — Game handoff**: spawn/link a BNN game from the "In" list with pre-built groups.
 - **P5 — Open to all groups**: remove TGC gate; group settings for type labels + captain duties.

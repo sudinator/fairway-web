@@ -1195,7 +1195,7 @@ function AdminPanel({ user }: { user: any }) {
     const typed = prompt(`PERMANENTLY DELETE ${p.display_name || p.email} and ALL their rounds and scores?\n\nThis cannot be undone. Type DELETE to confirm.`);
     if (typed !== "DELETE") return;
     // Remove their rounds (and holes cascade if FK set), group memberships, then profile.
-    const { data: rs } = await supabase.from("rounds").select("id").eq("user_id", p.id);
+    const { data: rs } = await supabase.from("rounds").select("id").eq("user_id", p.id).is("deleted_at", null);
     const roundIds = (rs || []).map((r: any) => r.id);
     if (roundIds.length) { await supabase.from("holes").delete().in("round_id", roundIds); }
     await supabase.from("rounds").delete().eq("user_id", p.id);
@@ -1495,7 +1495,7 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
   const [msg, setMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const { data: rs } = await supabase.from("rounds").select("*").eq("user_id", player.id).order("played_at", { ascending: false });
+    const { data: rs } = await supabase.from("rounds").select("*").eq("user_id", player.id).is("deleted_at", null).order("played_at", { ascending: false });
     if (!rs) { setRounds([]); return; }
     const ids = rs.map((r: any) => r.id);
     const { data: hs } = await supabase.from("holes").select("*").in("round_id", ids.length ? ids : ["none"]);

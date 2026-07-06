@@ -62,6 +62,9 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
   const [selId, setSelId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<"info" | "signups">("info");
   const [rsvpOpen, setRsvpOpen] = useState(false);
+  const [captainPickerOpen, setCaptainPickerOpen] = useState(false);
+  const [dutiesOpen, setDutiesOpen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -120,11 +123,25 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
     await supabase.from("tee_times").update({ status: "cancelled" }).eq("id", tt.id);
     setBusy(false); setScreen("list"); await load();
   }
+  async function setCaptain(tt: TeeTime, memberId: string | null) {
+    setBusy(true);
+    await supabase.from("tee_times").update({ captain_user_id: memberId }).eq("id", tt.id);
+    setBusy(false); setCaptainPickerOpen(false); await load();
+  }
+  async function promote(tt: TeeTime, memberId: string) {
+    const list = inList(tt.id);
+    const minOrder = Math.min(...list.map((r) => r.signup_order || 0));
+    setBusy(true);
+    await supabase.from("tee_time_rsvps").update({ signup_order: minOrder - 1 }).eq("tee_time_id", tt.id).eq("user_id", memberId);
+    setBusy(false); await load();
+  }
+  const deadlinePassed = (t: TeeTime) => !!t.signup_deadline && new Date(t.signup_deadline) < new Date();
 
   const open = (id: string) => { setSelId(id); setDetailTab("info"); setScreen("detail"); };
+  const openEdit = (id: string) => { setEditId(id); setScreen("create"); };
 
   // ---------------- CREATE ----------------
-  if (screen === "create") return <CreateForm user={user} groupId={activeGroupId} existingSeqs={tees.map((t) => t.seq).filter((n): n is number => n != null)} onCancel={() => setScreen("list")} onCreated={async () => { setScreen("list"); await load(); }} />;
+  if (screen === "create") return <CreateForm user={user} groupId={activeGroupId} editing={editId ? tees.find((t) => t.id === editId) || null : null} existingSeqs={tees.map((t) => t.seq).filter((n): n is number => n != null)} onCancel={() => { setEditId(null); setScreen("list"); }} onCreated={async () => { setEditId(null); setScreen("list"); await load(); }} />;
 
   // ---------------- DETAIL ----------------
   if (screen === "detail" && sel) {
@@ -141,6 +158,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
     let cum = 0;
     const waitSet = new Set<string>();
     if (sel.max_spots != null) ins.forEach((r) => { cum += 1 + (r.guest_names?.length || 0); if (cum > sel.max_spots!) waitSet.add(r.user_id); });
+    const frozen = isPast(sel) && !canManage;
 
     const memberRow = (r: Rsvp, showOrg: boolean, wait?: boolean) => {
       const m = memberOf(r.user_id);
@@ -156,6 +174,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
             </div>
           </div>
           {wait ? <span style={{ fontSize: 10, fontWeight: 800, background: "#fbe9cf", color: "#9a6a12", borderRadius: 20, padding: "3px 9px" }}>Waitlist</span> : null}
+          {wait && canManage ? <button onClick={() => promote(sel, r.user_id)} disabled={busy} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Move up</button> : null}
           {showOrg && canManage ? (
             <button onClick={() => orgSetRsvp(sel, r.user_id, r.choice === "in" ? "out" : "in")} disabled={busy}
               style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>{r.choice === "in" ? "Mark out" : "Mark in"}</button>
@@ -167,7 +186,10 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
     return (
       <div>
         <div style={{ background: `linear-gradient(160deg,#0b2f24,${C.greenLight})`, padding: 16, borderRadius: 14, color: C.cream }}>
-          <button onClick={() => setScreen("list")} style={{ ...btn(false), fontSize: 12, padding: "6px 10px" }}>‹ Back</button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <button onClick={() => setScreen("list")} style={{ ...btn(false), fontSize: 12, padding: "6px 10px" }}>‹ Back</button>
+            {canManage && <button onClick={() => openEdit(sel.id)} style={{ ...btn(false), fontSize: 12, padding: "6px 10px" }}>Edit</button>}
+          </div>
           <div style={{ fontSize: 10, fontWeight: 800, color: C.gold, letterSpacing: 0.4, marginTop: 10 }}>TEE TIME #{sel.seq ?? "—"}</div>
           <div style={{ fontSize: 22, fontWeight: 800, marginTop: 3 }}>{teeName(sel)}</div>
           <div style={{ fontSize: 13, opacity: 0.78, marginTop: 3 }}>
@@ -179,9 +201,9 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
         {sel.status !== "cancelled" && (
           <div style={{ background: C.sage, borderRadius: 12, margin: "10px 0", padding: "11px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ fontSize: 13, color: C.ink }}>
-              {mine ? <>Your response: <b style={{ color: CHOICE[mine.choice].c }}>{CHOICE[mine.choice].label}</b></> : "You haven't responded"}
+              {frozen ? "This tee time has passed" : mine ? <>Your response: <b style={{ color: CHOICE[mine.choice].c }}>{CHOICE[mine.choice].label}</b></> : "You haven't responded"}
             </div>
-            <button onClick={() => setRsvpOpen(true)} style={{ ...btn(true), fontSize: 12, padding: "7px 12px" }}>{mine ? "Change" : "RSVP"}</button>
+            {!frozen && <button onClick={() => setRsvpOpen(true)} style={{ ...btn(true), fontSize: 12, padding: "7px 12px" }}>{mine ? "Change" : "RSVP"}</button>}
           </div>
         )}
 
@@ -192,6 +214,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
         </div>
 
         {detailTab === "info" ? (
+          <>
           <div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>
             {[["Tee time", "#" + (sel.seq ?? "—")], ["Date", fmtFull(sel.play_date)], ["Tee-off", sel.tee_off_times?.join(", ") || "—"], ["Course", sel.course || "—"], ["Type", kindOf(sel.kind).label], ["Spots", sel.max_spots != null ? `${used} / ${sel.max_spots}` : `${used}`], ["Notes", sel.notes || "—"]].map(([l, v], i, arr) => (
               <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "11px 14px", borderBottom: i < arr.length - 1 ? `1px solid ${C.line}` : "none" }}>
@@ -200,6 +223,15 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
               </div>
             ))}
           </div>
+          <div style={{ background: C.card, borderRadius: 14, padding: "11px 14px", marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, color: C.faint }}>Captain</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{sel.captain_user_id ? (memberOf(sel.captain_user_id)?.display_name || "Assigned") : "Not assigned"}</div>
+            </div>
+            {canManage && <button onClick={() => setCaptainPickerOpen(true)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>{sel.captain_user_id ? "Change" : "Assign"}</button>}
+            <button onClick={() => setDutiesOpen(true)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Duties</button>
+          </div>
+          </>
         ) : (
           <div>
             <div style={{ background: C.card, borderRadius: 14, overflow: "hidden", display: "flex", marginBottom: 10 }}>
@@ -233,7 +265,9 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
           <button onClick={() => cancelTeeTime(sel)} disabled={busy} style={{ ...btn(false), width: "100%", marginTop: 14, fontSize: 13, color: C.birdie, borderColor: C.birdie }}>Cancel this tee time</button>
         )}
 
-        {rsvpOpen && <RsvpSheet tt={sel} mine={mine} spotsLeft={spotsLeft} busy={busy} onClose={() => setRsvpOpen(false)} onSubmit={(choice, guests) => submitRsvp(sel, choice, guests)} />}
+        {rsvpOpen && <RsvpSheet tt={sel} mine={mine} spotsLeft={spotsLeft} warn={deadlinePassed(sel) && !canManage} busy={busy} onClose={() => setRsvpOpen(false)} onSubmit={(choice, guests) => submitRsvp(sel, choice, guests)} />}
+        {captainPickerOpen && <CaptainPicker candidates={ins.map((r) => members.find((m) => m.id === r.user_id)).filter(Boolean) as Member[]} current={sel.captain_user_id} busy={busy} onClose={() => setCaptainPickerOpen(false)} onPick={(id) => setCaptain(sel, id)} />}
+        {dutiesOpen && <DutiesModal onClose={() => setDutiesOpen(false)} />}
       </div>
     );
   }
@@ -310,8 +344,8 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
 }
 
 // ---------------- RSVP SHEET ----------------
-function RsvpSheet({ tt, mine, spotsLeft, busy, onClose, onSubmit }: {
-  tt: TeeTime; mine: Rsvp | undefined; spotsLeft: number | null; busy: boolean;
+function RsvpSheet({ tt, mine, spotsLeft, warn, busy, onClose, onSubmit }: {
+  tt: TeeTime; mine: Rsvp | undefined; spotsLeft: number | null; warn?: boolean; busy: boolean;
   onClose: () => void; onSubmit: (choice: "in" | "out" | "maybe", guests: string[]) => void;
 }) {
   const [choice, setChoice] = useState<"in" | "out" | "maybe">(mine?.choice || "in");
@@ -329,6 +363,7 @@ function RsvpSheet({ tt, mine, spotsLeft, busy, onClose, onSubmit }: {
           <div style={{ fontSize: 19, fontWeight: 800, color: C.cream, marginTop: 2 }}>Your response</div>
           {spotsLeft != null && <div style={{ fontSize: 12, fontWeight: 700, color: spotsLeft <= 0 ? "#ff9d7a" : C.sage, marginTop: 3 }}>{spotsLeft > 0 ? `${spotsLeft} of ${tt.max_spots} spots left` : "Full — you'll join the waitlist"}</div>}
         </div>
+        {warn && <div style={{ margin: "4px 16px 8px", background: "#5a3a10", color: "#f6d98a", borderRadius: 10, padding: "9px 12px", fontSize: 12, lineHeight: 1.4 }}>Signup deadline has passed — you can still respond, but a spot isn't guaranteed.</div>}
         {(["in", "maybe", "out"] as const).map((c) => (
           <div key={c} onClick={() => setChoice(c)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 16px", cursor: "pointer", background: choice === c ? CHOICE[c].c + "1A" : "none", borderBottom: `1px solid ${C.greenMid}` }}>
             <div style={{ width: 40, height: 40, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, flex: "none", background: CHOICE[c].c + "2E", color: CHOICE[c].c }}>{CHOICE[c].icon}</div>
@@ -362,18 +397,18 @@ function RsvpSheet({ tt, mine, spotsLeft, busy, onClose, onSubmit }: {
 }
 
 // ---------------- CREATE FORM ----------------
-function CreateForm({ user, groupId, existingSeqs, onCancel, onCreated }: {
-  user: { id: string }; groupId: string; existingSeqs: number[]; onCancel: () => void; onCreated: () => void;
+function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated }: {
+  user: { id: string }; groupId: string; editing?: TeeTime | null; existingSeqs: number[]; onCancel: () => void; onCreated: () => void;
 }) {
   const [courses, setCourses] = useState<string[]>([]);
-  const [kind, setKind] = useState("scheduled");
-  const [title, setTitle] = useState("");
-  const [date, setDate] = useState("");
-  const [times, setTimes] = useState("");
-  const [course, setCourse] = useState("");
-  const [maxSpots, setMaxSpots] = useState("12");
-  const [deadline, setDeadline] = useState("");
-  const [notes, setNotes] = useState("");
+  const [kind, setKind] = useState(editing?.kind || "scheduled");
+  const [title, setTitle] = useState(editing?.title || "");
+  const [date, setDate] = useState(editing?.play_date || "");
+  const [times, setTimes] = useState((editing?.tee_off_times || []).join(", "));
+  const [course, setCourse] = useState(editing?.course || "");
+  const [maxSpots, setMaxSpots] = useState(editing?.max_spots != null ? String(editing.max_spots) : "12");
+  const [deadline, setDeadline] = useState(editing?.signup_deadline ? editing.signup_deadline.slice(0, 10) : "");
+  const [notes, setNotes] = useState(editing?.notes || "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -387,20 +422,26 @@ function CreateForm({ user, groupId, existingSeqs, onCancel, onCreated }: {
 
   // auto-fill deadline 3 days before date
   useEffect(() => {
-    if (!date) return;
+    if (!date || editing) return;
     const d = new Date(date + "T12:00:00"); d.setDate(d.getDate() - 3);
     setDeadline(d.toISOString().split("T")[0]);
-  }, [date]);
+  }, [date, editing]);
 
   // Number convention: 2-digit year + per-year round count, e.g. 2026 round 1 -> 2601
   const yy = Number(String(new Date((date || new Date().toISOString().slice(0, 10)) + "T12:00:00").getFullYear()).slice(-2));
-  const seq = yy * 100 + existingSeqs.filter((n) => Math.floor(n / 100) === yy).length + 1;
+  const seq = editing?.seq != null ? editing.seq : yy * 100 + existingSeqs.filter((n) => Math.floor(n / 100) === yy).length + 1;
 
   async function post() {
     if (!date) { setErr("Pick a play date."); return; }
     const parsedTimes = times.split(",").map((t) => t.trim()).filter(Boolean);
     if (!parsedTimes.length) { setErr("Add at least one tee-off time."); return; }
     setBusy(true); setErr(null);
+    if (editing) {
+      const { error } = await supabase.from("tee_times").update({ kind, title: title.trim() || null, course: course || null, play_date: date, tee_off_times: parsedTimes, signup_deadline: deadline ? new Date(deadline + "T12:00:00").toISOString() : null, max_spots: parseInt(maxSpots) || null, notes: notes.trim() || null, updated_at: new Date().toISOString() }).eq("id", editing.id);
+      setBusy(false);
+      if (error) { setErr("Couldn't save — please try again."); return; }
+      onCreated(); return;
+    }
     const payload = {
       group_id: groupId, created_by: user.id, seq, kind,
       title: title.trim() || null,
@@ -423,7 +464,7 @@ function CreateForm({ user, groupId, existingSeqs, onCancel, onCreated }: {
 
   return (
     <div>
-      <div style={{ fontSize: 20, fontWeight: 800, color: C.cream }}>New Tee Time <span style={{ fontSize: 13, color: C.gold }}>#{seq}</span></div>
+      <div style={{ fontSize: 20, fontWeight: 800, color: C.cream }}>{editing ? "Edit" : "New"} Tee Time <span style={{ fontSize: 13, color: C.gold }}>#{seq}</span></div>
       {label("Type")}
       <select value={kind} onChange={(e) => setKind(e.target.value)} style={{ ...inputStyle, width: "100%" }}>{KINDS.map((k) => <option key={k.k} value={k.k}>{k.label}</option>)}</select>
       {label("Title (optional)")}
@@ -446,8 +487,63 @@ function CreateForm({ user, groupId, existingSeqs, onCancel, onCreated }: {
       {err && <div style={{ color: C.birdie, fontSize: 12, marginTop: 10 }}>{err}</div>}
       <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
         <button onClick={onCancel} disabled={busy} style={{ ...btn(false), flex: 1, fontSize: 13 }}>Cancel</button>
-        <button onClick={post} disabled={busy} style={{ ...btn(true), flex: 1, fontSize: 13 }}>{busy ? "Posting…" : `Post #${seq}`}</button>
+        <button onClick={post} disabled={busy} style={{ ...btn(true), flex: 1, fontSize: 13 }}>{busy ? "Saving…" : editing ? "Save changes" : `Post #${seq}`}</button>
       </div>
     </div>
+  );
+}
+
+// ---------------- CAPTAIN PICKER ----------------
+function CaptainPicker({ candidates, current, busy, onClose, onPick }: {
+  candidates: Member[]; current: string | null; busy: boolean; onClose: () => void; onPick: (id: string | null) => void;
+}) {
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 60 }} />
+      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 70, background: C.green, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: "8px 0 calc(16px + env(safe-area-inset-bottom))", maxWidth: 520, margin: "0 auto" }}>
+        <div style={{ width: 40, height: 4, background: C.greenMid, borderRadius: 2, margin: "6px auto 10px" }} />
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.cream, padding: "0 16px 10px" }}>Assign captain</div>
+        {candidates.length === 0 ? (
+          <div style={{ padding: "0 16px 12px", fontSize: 13, color: C.sage }}>No one is signed up as "In" yet.</div>
+        ) : candidates.map((m) => (
+          <div key={m.id} onClick={() => onPick(m.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", borderBottom: `1px solid ${C.greenMid}` }}>
+            <Avatar src={m.avatar_url || undefined} name={m.display_name} size={34} />
+            <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: C.cream }}>{m.display_name}</div>
+            {current === m.id ? <span style={{ color: C.gold, fontSize: 18, fontWeight: 800 }}>●</span> : null}
+          </div>
+        ))}
+        <div style={{ display: "flex", gap: 10, padding: 16 }}>
+          {current && <button onClick={() => onPick(null)} disabled={busy} style={{ ...btn(false), flex: 1, fontSize: 13, color: C.birdie, borderColor: C.birdie }}>Clear</button>}
+          <button onClick={onClose} disabled={busy} style={{ ...btn(false), flex: 1, fontSize: 13 }}>Close</button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ---------------- CAPTAIN DUTIES ----------------
+const DEFAULT_DUTIES: [string, string][] = [
+  ["Set up groups & handicaps", "Configure the playing groups and confirm each player's course handicap before the round."],
+  ["Confirm the tee sheet", "Check that the names and times on the course's tee sheet match the signups."],
+  ["Cart / walking prefs", "Confirm each player's riding, walking, or push-cart preference."],
+  ["Rally the group", "A few days out, nudge anyone who hasn't confirmed their spot."],
+];
+function DutiesModal({ onClose }: { onClose: () => void }) {
+  return (
+    <>
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 60 }} />
+      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 70, background: C.card, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: "8px 0 calc(16px + env(safe-area-inset-bottom))", maxWidth: 520, margin: "0 auto" }}>
+        <div style={{ width: 40, height: 4, background: C.line, borderRadius: 2, margin: "6px auto 12px" }} />
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.ink, padding: "0 16px 4px" }}>Captain duties</div>
+        <div style={{ fontSize: 12, color: C.faint, padding: "0 16px 8px" }}>Responsibilities for the round captain.</div>
+        {DEFAULT_DUTIES.map(([t, d], i) => (
+          <div key={t} style={{ display: "flex", gap: 12, padding: "12px 16px", borderTop: `1px solid ${C.line}` }}>
+            <div style={{ width: 26, height: 26, borderRadius: "50%", background: C.green, color: C.cream, fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>{i + 1}</div>
+            <div><div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{t}</div><div style={{ fontSize: 12, color: C.faint, marginTop: 2, lineHeight: 1.4 }}>{d}</div></div>
+          </div>
+        ))}
+        <div style={{ padding: 16 }}><button onClick={onClose} style={{ ...btn(true), width: "100%", fontSize: 13 }}>Got it</button></div>
+      </div>
+    </>
   );
 }
