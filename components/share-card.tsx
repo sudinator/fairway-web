@@ -372,7 +372,7 @@ function SoloScoreGrid({ round }: { round: Round }) {
             {slice.map((h) => (
               <td key={h.hole_number} style={{ ...sgCell, color: C.faint, fontWeight: 700, fontSize: 10 }}>
                 {h.hole_number}
-                {h.yardage != null && <div style={{ fontSize: 8.5, fontWeight: 600, color: C.faint, opacity: 0.85 }}>{h.yardage}</div>}
+                {h.yardage != null && <div style={{ fontSize: 10, fontWeight: 600, color: C.faint, opacity: 0.85 }}>{h.yardage}</div>}
               </td>
             ))}
             <td style={{ ...sgTot, color: C.greenMid, fontSize: 10 }}>{totLbl}</td>

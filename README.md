@@ -43,3 +43,7 @@ If you ever want to preview locally before deploying:
 2. `npm install`
 3. Copy `.env.example` to `.env.local` and fill in your two Supabase values
 4. `npm run dev`, then open http://localhost:3000
+
+## UI conventions
+
+- **Minimum font size: 10px.** Never use a `fontSize` below 10 anywhere in the app (readability floor). Bump to 10 rather than going smaller; if space is tight, shorten the label instead of shrinking the type.

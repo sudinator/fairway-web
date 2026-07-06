@@ -383,7 +383,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   // Stableford is scored on the INDIVIDUAL (full course handicap) strokes on relative games
   // (match/four-ball/trifecta), matching the group scorecard; otherwise the game's own recv.
   const sfRecv = (h: EntryHole) => (showIndivDots ? (h.indRecv || 0) : (h.recv || 0));
-  const headStyle: React.CSSProperties = { color: C.faint, fontSize: 9, letterSpacing: 0.5, fontWeight: 700, textTransform: "uppercase" };
+  const headStyle: React.CSSProperties = { color: C.faint, fontSize: 10, letterSpacing: 0.5, fontWeight: 700, textTransform: "uppercase" };
 
   const block = (from: number, to: number, label: string) => {
     const seg = holes.slice(from, to);
@@ -525,7 +525,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   // ---- Match-play layout: one compact card per hole (header strip + one field band) ----
   const mCell = (label: string, node: React.ReactNode) => (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, minWidth: 0, padding: "0 1px" }}>
-      <span style={{ fontSize: 7.5, fontWeight: 800, textTransform: "uppercase", color: C.faint, letterSpacing: 0.2, whiteSpace: "nowrap" }}>{label}</span>
+      <span style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", color: C.faint, letterSpacing: 0.2, whiteSpace: "nowrap" }}>{label}</span>
       {node}
     </div>
   );
@@ -576,7 +576,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     let run = ""; if (showRun) { for (let k = to - 1; k >= from; k--) { if (matchRun![k]) { run = matchRun![k] as string; break; } } }
     const runCol = run === "" ? C.sage : run === "AS" ? "#fff" : (run.includes("UP") || run.includes("↑")) ? "#7FE3A6" : "#F0A39A";
     const item = (k: string, v: React.ReactNode, col = "#fff") => (
-      <div style={{ textAlign: "center" }}><div style={{ fontSize: 8.5, color: C.sage, fontWeight: 700, textTransform: "uppercase" }}>{k}</div><div style={{ fontSize: 16, fontWeight: 800, color: col, marginTop: 1 }}>{v}</div></div>
+      <div style={{ textAlign: "center" }}><div style={{ fontSize: 10, color: C.sage, fontWeight: 700, textTransform: "uppercase" }}>{k}</div><div style={{ fontSize: 16, fontWeight: 800, color: col, marginTop: 1 }}>{v}</div></div>
     );
     return (
       <div key={"sum-" + label} style={{ background: C.green, color: C.cream, borderRadius: 13, padding: "11px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -617,7 +617,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
         ];
         return (
           <div style={{ marginTop: 10 }}>
-            <div style={{ color: C.faint, fontSize: 9, letterSpacing: 0.5, fontWeight: 800, textTransform: "uppercase", marginBottom: 6 }}>{strokeSixes ? "Sixes · net score" : "Sixes · net stableford"}</div>
+            <div style={{ color: C.faint, fontSize: 10, letterSpacing: 0.5, fontWeight: 800, textTransform: "uppercase", marginBottom: 6 }}>{strokeSixes ? "Sixes · net score" : "Sixes · net stableford"}</div>
             <div style={{ display: "flex", gap: 8 }}>
               {segs.map((sg) => (
                 <div key={sg.lbl} style={{ flex: 1, background: C.greenLight, borderRadius: 12, padding: "9px 6px", textAlign: "center" }}>
@@ -648,7 +648,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
         else body = <>Level match — no strokes given</>;
         return (
           <div style={{ background: C.greenLight, borderRadius: 10, padding: "8px 12px", marginTop: 10, color: "#EDE7D4", fontSize: 12.5, fontWeight: 600 }}>
-            <span style={{ color: C.sage, fontWeight: 800, fontSize: 9, letterSpacing: 1, textTransform: "uppercase", marginRight: 8 }}>Match strokes</span>{body}
+            <span style={{ color: C.sage, fontWeight: 800, fontSize: 10, letterSpacing: 1, textTransform: "uppercase", marginRight: 8 }}>Match strokes</span>{body}
           </div>
         );
       })()}
@@ -715,7 +715,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
   const hasDots = round.holes.some((h) => (h.recv || 0) > 0);
   const hasFw = round.holes.some((h) => h.fairway != null);
 
-  const headStyle: React.CSSProperties = { color: C.faint, fontSize: 9, letterSpacing: 0.5, fontWeight: 700, textTransform: "uppercase" };
+  const headStyle: React.CSSProperties = { color: C.faint, fontSize: 10, letterSpacing: 0.5, fontWeight: 700, textTransform: "uppercase" };
 
   const block = (from: number, to: number, label: string) => {
     const seg = round.holes.slice(from, to);

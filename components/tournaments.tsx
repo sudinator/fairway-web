@@ -3698,15 +3698,15 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
                 {(() => {
                   const matchHcp = meta.reduce((a, m) => a + recvFor(p, m.si), 0);
                   const courseHcp = meta.reduce((a, m) => a + indRecvFor(p, m.si), 0);
-                  if (!relBasis) return <div style={{ color: C.sage, fontSize: 9 }}>hcp {matchHcp}</div>;
+                  if (!relBasis) return <div style={{ color: C.sage, fontSize: 10 }}>hcp {matchHcp}</div>;
                   const line = (color: string, label: string, val: number) => (
-                    <div style={{ color: C.sage, fontSize: 9, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, whiteSpace: "nowrap" }}>
+                    <div style={{ color: C.sage, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, whiteSpace: "nowrap" }}>
                       <span style={{ width: 5, height: 5, borderRadius: 99, background: color, display: "inline-block", flex: "none" }} />{label} {val}
                     </div>
                   );
                   return <>{line("#E8730C", "match hcp", matchHcp)}{line(C.indivDot, "course hcp", courseHcp)}</>;
                 })()}
-                {p.tee_name && <div style={{ color: C.sage, fontSize: 9, opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.tee_name}</div>}
+                {p.tee_name && <div style={{ color: C.sage, fontSize: 10, opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.tee_name}</div>}
               </div>
             );
           })}
@@ -4960,7 +4960,7 @@ function StrokesSummary({ game, players, collapsible = false, meKey }: { game: G
           <div style={{ boxShadow: `0 0 0 1px ${C.gold} inset`, borderRadius: 8, padding: "8px 8px 6px", marginTop: 8 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <div>
-                <div style={{ color: C.gold, fontSize: 9, fontWeight: 800, letterSpacing: 1 }}>YOUR GROUP</div>
+                <div style={{ color: C.gold, fontSize: 10, fontWeight: 800, letterSpacing: 1 }}>YOUR GROUP</div>
                 {soleFoursome && <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800, marginTop: 2 }}>{(soleFoursome.f.name || `Foursome ${soleFoursome.i + 1}`).toUpperCase()}</div>}
               </div>
               {toggleBtn}
@@ -6010,7 +6010,7 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
   const tB = teams[1] ? (tally[teams[1].key] || 0) : 0;
 
   const hdrBg = (lg: Leg) => (lg.tot ? "#E7F0E9" : "#EEF4EF");
-  const th: React.CSSProperties = { textAlign: "center", color: C.faint, fontSize: 9.5, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", padding: "6px 3px", borderBottom: `1px solid ${C.line}` };
+  const th: React.CSSProperties = { textAlign: "center", color: C.faint, fontSize: 10, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", padding: "6px 3px", borderBottom: `1px solid ${C.line}` };
   const nmH: React.CSSProperties = { ...th, textAlign: "left", width: 100 };
   const thruH: React.CSSProperties = { ...th, width: 38 };
   const nmCell: React.CSSProperties = { textAlign: "left", width: 100, color: C.ink, fontWeight: 800, fontSize: 12.5, padding: "6px 3px" };

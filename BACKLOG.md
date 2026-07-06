@@ -118,6 +118,7 @@ From the security & structure review. None are emergencies; tackle when convenie
    gracefully on very narrow screens; keep Delete visually distinct/last). App code only.
 
 ## Shipped
+- v1.83.5 - Readability: 10px minimum font floor across the whole app. Bumped all 15 sub-10 sizes (7.5/8.5/9/9.5) up to 10 - match-card stat labels, scorecard column + player-header lines, tee names, YOUR GROUP eyebrow, share-card yardage, roster/setup headers, stats table header, admin index. Rule recorded in README (never use fontSize below 10).
 - v1.83.4 - Group scorecard cells + OUT/IN/TOT subtotals now show TWO net Stableford scores on relative games: orange box (top-right) = match handicap, blue box (bottom-right) = course handicap, matching the orange/blue dots on the left. Non-relative games keep the single green badge. Legend updated.
 - v1.83.3 - Consistency: ALL Stableford on the group + individual scorecards now scores off the individual (full course handicap) strokes on relative games. Fixed the group OUT/IN/TOT subtotals and the individual ScoreEntryCard per-hole points + six/nine subtotals (new sfRecv helper) to match the per-hole badge and the side-game legs. Match/four-ball/trifecta MATCH scoring (relative) and pure Stableford/stroke leaderboards (own allowance) are unchanged. Read-only round card + solo rounds untouched.
 - v1.83.2 - Lighter blue (C.indivDot #5AA9E6) for the individual/course-hcp dots so they read clearly on the dark-green header and cream cells (was C.bogey #2E5AB8, kept for over-par scores).

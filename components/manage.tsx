@@ -773,7 +773,7 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
             return (
               <div style={{ background: C.card, borderRadius: 10, padding: 10, flex: 1, minWidth: 240 }}>
                 <div style={{ color: C.green, fontSize: 11, letterSpacing: 2, fontWeight: 800, marginBottom: 6 }}>{label}</div>
-                <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr", gap: 6, padding: "0 2px 5px", color: C.faint, fontSize: 9, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.line}` }}>
+                <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr", gap: 6, padding: "0 2px 5px", color: C.faint, fontSize: 10, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.line}` }}>
                   <div>HOLE</div><div style={{ textAlign: "center" }}>PAR</div><div style={{ textAlign: "center" }}>S.I.</div>
                 </div>
                 {seg.map((h, jj) => {
