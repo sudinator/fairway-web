@@ -3490,15 +3490,16 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
   const agg: React.CSSProperties = { position: "relative", background: C.greenLight, borderRadius: 5, height: 30, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 15, fontWeight: 800 };
 
   const sums = (p: Player, from: number, to: number) => {
-    let g = 0, pts = 0;
+    let g = 0, mPts = 0, cPts = 0;
     for (let i = from; i <= to && i < meta.length; i++) {
       const gross = p.scores?.[i] ?? null;
       if (gross != null && gross > 0) {
         g += gross;
-        pts += stablefordPts(gross, meta[i].par, relBasis ? indRecvFor(p, meta[i].si) : recvFor(p, meta[i].si)) || 0;
+        mPts += stablefordPts(gross, meta[i].par, recvFor(p, meta[i].si)) || 0;          // match handicap
+        cPts += relBasis ? (stablefordPts(gross, meta[i].par, indRecvFor(p, meta[i].si)) || 0) : 0; // course handicap
       }
     }
-    return { g, pts };
+    return { g, mPts, cPts };
   };
 
   const holeCard = (i: number) => {
@@ -3516,7 +3517,8 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
             const gross = p.scores?.[i] ?? null;
             const recv = recvFor(p, m.si);
             const indRecv = relBasis ? indRecvFor(p, m.si) : 0;
-            const pts = stablefordPts(gross, m.par, relBasis ? indRecv : recv);
+            const oPts = stablefordPts(gross, m.par, recv);                    // orange = match handicap
+            const bPts = relBasis ? stablefordPts(gross, m.par, indRecv) : null; // blue = course handicap
             return (
               <div key={p.id + i} style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: colorFor(p), fontSize: 10, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 3 }}>{p.display_name}</div>
@@ -3538,9 +3540,14 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
                     </div>
                   )}
                   <span style={{ fontSize: 26, fontWeight: 800, color: netColor(gross, recv, m.par) }}>{gross != null && gross > 0 ? gross : "·"}</span>
-                  {gross != null && gross > 0 && (
-                    <span style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#fff", fontSize: 11, fontWeight: 800, padding: "0 6px", borderRadius: 6 }}>{pts ?? 0}</span>
-                  )}
+                  {gross != null && gross > 0 && (relBasis ? (
+                    <>
+                      <span style={{ position: "absolute", top: 3, right: 3, minWidth: 16, height: 16, padding: "0 2px", border: "1.5px solid #E8730C", borderRadius: 5, background: "#FBEEE2", color: "#E8730C", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{oPts ?? 0}</span>
+                      <span style={{ position: "absolute", bottom: 3, right: 3, minWidth: 16, height: 16, padding: "0 2px", border: `1.5px solid ${C.indivDot}`, borderRadius: 5, background: "#EAF3FB", color: "#1E5B8A", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{bPts ?? 0}</span>
+                    </>
+                  ) : (
+                    <span style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#fff", fontSize: 11, fontWeight: 800, padding: "0 6px", borderRadius: 6 }}>{oPts ?? 0}</span>
+                  ))}
                 </div>
               </div>
             );
@@ -3562,7 +3569,14 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
             <div key={p.id + label} style={{ flex: 1, minWidth: 0, textAlign: "center" }}>
               <div style={{ position: "relative", background: C.greenLight, borderRadius: 7, height: 44, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
                 <span style={{ fontSize: 20, fontWeight: 800 }}>{s.g || "–"}</span>
-                <span style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#E4CF86", fontSize: 10, fontWeight: 800, padding: "0 5px", borderRadius: 6 }}>{s.pts}</span>
+                {s.g > 0 && (relBasis ? (
+                  <>
+                    <span style={{ position: "absolute", top: 3, right: 3, minWidth: 15, height: 15, padding: "0 2px", border: "1.5px solid #E8730C", borderRadius: 5, color: "#F0A45E", fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.mPts}</span>
+                    <span style={{ position: "absolute", bottom: 3, right: 3, minWidth: 15, height: 15, padding: "0 2px", border: `1.5px solid ${C.indivDot}`, borderRadius: 5, color: C.indivDot, fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.cPts}</span>
+                  </>
+                ) : (
+                  <span style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#E4CF86", fontSize: 10, fontWeight: 800, padding: "0 5px", borderRadius: 6 }}>{s.mPts}</span>
+                ))}
               </div>
             </div>
           );
@@ -3630,9 +3644,9 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
         <span style={{ color: "#E0796B", fontSize: 10 }}>● over (net)</span>
         {relBasis
           ? <>
-              <span style={{ color: "#E8730C", fontSize: 10 }}>● match stroke</span>
-              <span style={{ color: C.indivDot, fontSize: 10 }}>● individual stroke</span>
-              <span style={{ color: C.faint, fontSize: 10 }}>corner = Stableford</span>
+              <span style={{ color: "#E8730C", fontSize: 10 }}>● ▢ match hcp</span>
+              <span style={{ color: C.indivDot, fontSize: 10 }}>● ▢ course hcp</span>
+              <span style={{ color: C.faint, fontSize: 10 }}>dots = strokes · box = net Stableford</span>
             </>
           : <span style={{ color: "#E8730C", fontSize: 10 }}>● gets a stroke · corner = Stableford</span>}
       </div>
