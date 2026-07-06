@@ -37,7 +37,7 @@ Every table carries `group_id`; permissions key on `group_members.role`. Type la
 - **P0 — Schema & RLS** (migration 0057). DONE (v1.85.2).
 - **P1 — Core loop (TGC-gated)**: DONE (v1.86.x).  : create/list/view tee times; RSVP (In/Out/Maybe + guests + waitlist); spots; pending nudges (home banner + tab badge).
 - **P2 — Organizer & captain**: DONE (v1.87.0) — edit a tee time, captain assign + duties, signup-deadline late-change warning, past-tee-time freeze for non-organizers, waitlist promotion. Original: sign up/mark out others, waitlist promotion, cancel/edit, signup deadline + late-change warnings + past freeze, captain + duties.
-- **P3 — Exports & notifications**: export DONE (v1.88.0); notifications pending. Original:: export DONE (v1.88.0); notifications pending.: WhatsApp tee-time info; posted/deadline/nudge notifications.
+- **P3 — Exports & notifications**: DONE (v1.88.0 export; v1.89.0 reminders + activity log). Deadline reminder ships as a WhatsApp export with a deep link (birdienumnum.vercel.app/?tt=<id>) that opens the RSVP window — chosen over in-app timed reminders because there is no server cron. Activity trail logged to group_activity (tt_ actions) with an Activity sub-tab on the detail. Member-facing comms lean on the WhatsApp posts, so no duplicate in-app "posted" bell was built.
 - **P4 — Game handoff**: spawn/link a BNN game from the "In" list with pre-built groups.
 - **P5 — Open to all groups**: remove TGC gate; group settings for type labels + captain duties.
 

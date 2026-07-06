@@ -96,8 +96,8 @@ export const inputStyle: React.CSSProperties = {
   padding: "10px 13px", fontSize: 16, color: C.ink, width: "100%", boxSizing: "border-box",
 };
 
-export const Eyebrow = ({ children }: { children: React.ReactNode }) => (
-  <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 700 }}>{children}</div>
+export const Eyebrow = ({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) => (
+  <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 700, ...style }}>{children}</div>
 );
 
 // Compact date field: shows a short M/D/YY date in the page font (so it matches

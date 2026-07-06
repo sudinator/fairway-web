@@ -37,6 +37,9 @@ const shortDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("e
 const teeName = (t: { title: string | null; kind: string | null; course: string | null; play_date: string }) =>
   (t.title && t.title.trim()) || [kindOf(t.kind).label, shortCourse(t.course), shortDate(t.play_date)].filter(Boolean).join(" \u00b7 ");
 
+// Section-label spacing for Tee Times (gold eyebrows were flush against the cards).
+const EB: React.CSSProperties = { fontSize: 12, letterSpacing: 1.8, margin: "16px 0 8px" };
+
 function DateBadge({ d }: { d: string }) {
   return (
     <div style={{ width: 46, textAlign: "center", background: C.sage, borderRadius: 10, padding: "6px 0", flex: "none" }}>
@@ -47,11 +50,13 @@ function DateBadge({ d }: { d: string }) {
   );
 }
 
-export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
+export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, initialTeeId, onConsumedDeepLink }: {
   user: { id: string };
   activeGroupId: string;
   activeGroupName: string;
   canManage: boolean;
+  initialTeeId?: string | null;
+  onConsumedDeepLink?: () => void;
 }) {
   const [tees, setTees] = useState<TeeTime[]>([]);
   const [rsvps, setRsvps] = useState<Rsvp[]>([]);
@@ -60,14 +65,17 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
   const [filter, setFilter] = useState<"upcoming" | "past" | "cancelled">("upcoming");
   const [screen, setScreen] = useState<"list" | "detail" | "create">("list");
   const [selId, setSelId] = useState<string | null>(null);
-  const [detailTab, setDetailTab] = useState<"info" | "signups">("info");
+  const [detailTab, setDetailTab] = useState<"info" | "signups" | "activity">("info");
   const [rsvpOpen, setRsvpOpen] = useState(false);
   const [captainPickerOpen, setCaptainPickerOpen] = useState(false);
   const [dutiesOpen, setDutiesOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [courseData, setCourseData] = useState<Record<string, { slope: number; rating: number; par: number }>>({});
+  const [activity, setActivity] = useState<any[]>([]);
   const [copied, setCopied] = useState(false);
+  const [remindCopied, setRemindCopied] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [dlDone, setDlDone] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -92,6 +100,8 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
       if (tee && tee.rating != null && tee.slope != null && par) cmap[row.name] = { slope: Number(tee.slope), rating: Number(tee.rating), par: Number(par) };
     });
     setCourseData(cmap);
+    const { data: act } = await supabase.from("group_activity").select("*").eq("group_id", activeGroupId).like("action", "tt%").order("created_at", { ascending: false }).limit(300);
+    setActivity((act || []) as any[]);
     setLoading(false);
   }, [activeGroupId]);
   useEffect(() => { load(); }, [load]);
@@ -111,6 +121,13 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
   const shown = filter === "upcoming" ? upcoming : filter === "past" ? past : cancelled;
   const sel = tees.find((t) => t.id === selId) || null;
 
+  // Append-only audit trail to group_activity (immutable, member-visible) so a
+  // disputed "but I signed up" has a timestamped record. tt-prefixed actions are
+  // filtered out of the Money log so they don't bleed into it.
+  async function logTee(action: string, summary: string, meta: Record<string, any>) {
+    try { await supabase.from("group_activity").insert({ group_id: activeGroupId, actor_user_id: user.id, action, summary, meta }); } catch { /* logging never blocks the action */ }
+  }
+
   async function submitRsvp(tt: TeeTime, choice: "in" | "out" | "maybe", guestNames: string[]) {
     setBusy(true);
     const existing = myRsvp(tt.id);
@@ -119,6 +136,8 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
       { tee_time_id: tt.id, user_id: user.id, choice, guest_names: choice === "in" ? guestNames : [], signup_order: order, responded_at: new Date().toISOString() },
       { onConflict: "tee_time_id,user_id" },
     );
+    const gtxt = choice === "in" && guestNames.length ? ` (+${guestNames.length} guest${guestNames.length > 1 ? "s" : ""})` : "";
+    await logTee("tt_rsvp", `responded ${CHOICE[choice].label}${gtxt} for tee time #${tt.seq ?? "?"}`, { tee_time_id: tt.id, seq: tt.seq, choice, guests: choice === "in" ? guestNames.length : 0 });
     setBusy(false); setRsvpOpen(false); await load();
   }
   async function orgSetRsvp(tt: TeeTime, memberId: string, choice: "in" | "out" | "maybe") {
@@ -129,16 +148,19 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
       { tee_time_id: tt.id, user_id: memberId, choice, guest_names: existing?.guest_names || [], signup_order: order, responded_at: new Date().toISOString() },
       { onConflict: "tee_time_id,user_id" },
     );
+    await logTee("tt_rsvp_org", `marked ${shortName(memberOf(memberId)?.display_name || "a member")} ${CHOICE[choice].label} for tee time #${tt.seq ?? "?"}`, { tee_time_id: tt.id, seq: tt.seq, choice, target_user_id: memberId });
     setBusy(false); await load();
   }
   async function cancelTeeTime(tt: TeeTime) {
     setBusy(true);
     await supabase.from("tee_times").update({ status: "cancelled" }).eq("id", tt.id);
+    await logTee("tt_cancelled", `cancelled tee time #${tt.seq ?? "?"} (${teeName(tt)})`, { tee_time_id: tt.id, seq: tt.seq });
     setBusy(false); setScreen("list"); await load();
   }
   async function setCaptain(tt: TeeTime, memberId: string | null) {
     setBusy(true);
     await supabase.from("tee_times").update({ captain_user_id: memberId }).eq("id", tt.id);
+    await logTee("tt_captain", memberId ? `assigned ${shortName(memberOf(memberId)?.display_name || "a member")} as captain for tee time #${tt.seq ?? "?"}` : `cleared the captain for tee time #${tt.seq ?? "?"}`, { tee_time_id: tt.id, seq: tt.seq, target_user_id: memberId });
     setBusy(false); setCaptainPickerOpen(false); await load();
   }
   async function promote(tt: TeeTime, memberId: string) {
@@ -146,13 +168,33 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
     const minOrder = Math.min(...list.map((r) => r.signup_order || 0));
     setBusy(true);
     await supabase.from("tee_time_rsvps").update({ signup_order: minOrder - 1 }).eq("tee_time_id", tt.id).eq("user_id", memberId);
+    await logTee("tt_promote", `moved ${shortName(memberOf(memberId)?.display_name || "a member")} up from the waitlist for tee time #${tt.seq ?? "?"}`, { tee_time_id: tt.id, seq: tt.seq, target_user_id: memberId });
     setBusy(false); await load();
   }
   const deadlinePassed = (t: TeeTime) => !!t.signup_deadline && new Date(t.signup_deadline) < new Date();
   const copyExport = async (tt: TeeTime) => { try { await navigator.clipboard.writeText(teeExport(tt, inList(tt.id), memberOf, courseData, activeGroupName)); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* clipboard unavailable */ } };
+  const copyReminder = async (tt: TeeTime) => {
+    const respondedIds = new Set(rsvpsFor(tt.id).map((r) => r.user_id));
+    const notResponded = members.filter((m) => !respondedIds.has(m.id)).length;
+    try { await navigator.clipboard.writeText(teeReminderExport(tt, inList(tt.id), notResponded, activeGroupName)); setRemindCopied(true); setTimeout(() => setRemindCopied(false), 2000); } catch { /* clipboard unavailable */ }
+  };
 
   const open = (id: string) => { setSelId(id); setDetailTab("info"); setScreen("detail"); };
   const openEdit = (id: string) => { setEditId(id); setScreen("create"); };
+
+  // Deep link (from a WhatsApp reminder, e.g. birdienumnum.vercel.app/?tt=<id>):
+  // once tee times have loaded, jump straight to that tee time and open its RSVP
+  // window (unless it's cancelled or already in the past). Fires only once.
+  useEffect(() => {
+    if (loading || dlDone || !initialTeeId) return;
+    const t = tees.find((x) => x.id === initialTeeId);
+    if (t) {
+      setSelId(t.id); setDetailTab("info"); setScreen("detail");
+      if (t.status !== "cancelled" && !isPast(t)) setRsvpOpen(true);
+    }
+    setDlDone(true);
+    onConsumedDeepLink?.();
+  }, [loading, dlDone, initialTeeId, tees]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---------------- CREATE ----------------
   if (screen === "create") return <CreateForm user={user} groupId={activeGroupId} editing={editId ? tees.find((t) => t.id === editId) || null : null} existingSeqs={tees.map((t) => t.seq).filter((n): n is number => n != null)} onCancel={() => { setEditId(null); setScreen("list"); }} onCreated={async () => { setEditId(null); setScreen("list"); await load(); }} />;
@@ -224,8 +266,8 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
         )}
 
         <div style={{ display: "flex", background: C.greenMid, borderRadius: 10, overflow: "hidden", margin: "10px 0" }}>
-          {(["info", "signups"] as const).map((t) => (
-            <button key={t} onClick={() => setDetailTab(t)} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", padding: "11px 0", fontSize: 12, fontWeight: 700, color: detailTab === t ? C.cream : C.sage, borderBottom: detailTab === t ? `2px solid ${C.gold}` : "2px solid transparent" }}>{t === "info" ? "Info" : "Signups"}</button>
+          {(["info", "signups", "activity"] as const).map((t) => (
+            <button key={t} onClick={() => setDetailTab(t)} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", padding: "11px 0", fontSize: 12, fontWeight: 700, color: detailTab === t ? C.cream : C.sage, borderBottom: detailTab === t ? `2px solid ${C.gold}` : "2px solid transparent" }}>{t === "info" ? "Info" : t === "signups" ? "Signups" : "Activity"}</button>
           ))}
         </div>
 
@@ -248,8 +290,11 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
             <button onClick={() => setDutiesOpen(true)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Duties</button>
           </div>
           <button onClick={() => copyExport(sel)} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 13 }}>{copied ? "Copied ✓" : "Copy for WhatsApp"}</button>
+          {canManage && sel.status !== "cancelled" && !isPast(sel) && (
+            <button onClick={() => copyReminder(sel)} style={{ ...btn(false), width: "100%", marginTop: 8, fontSize: 13 }}>{remindCopied ? "Reminder copied ✓" : "Copy reminder for WhatsApp"}</button>
+          )}
           </>
-        ) : (
+        ) : detailTab === "signups" ? (
           <div>
             <div style={{ background: C.card, borderRadius: 14, overflow: "hidden", display: "flex", marginBottom: 10 }}>
               {[["In", ins.reduce((s, r) => s + 1 + (r.guest_names?.length || 0), 0), "#1a7a3a"], ["Maybe", maybes.length, "#C9821F"], ["Out", outs.length, C.birdie], ["Left", spotsLeft ?? "—", C.green]].map(([l, n, col], i) => (
@@ -259,11 +304,11 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
                 </div>
               ))}
             </div>
-            {ins.length > 0 && <><Eyebrow>{`In — ${ins.reduce((s, r) => s + 1 + (r.guest_names?.length || 0), 0)}${sel.max_spots != null ? ` of ${sel.max_spots} spots` : ""}`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{ins.map((r) => memberRow(r, true, waitSet.has(r.user_id)))}</div></>}
-            {maybes.length > 0 && <><Eyebrow>{`Maybe (${maybes.length})`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{maybes.map((r) => memberRow(r, true))}</div></>}
-            {outs.length > 0 && <><Eyebrow>{`Out (${outs.length})`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{outs.map((r) => memberRow(r, true))}</div></>}
+            {ins.length > 0 && <><Eyebrow style={EB}>{`In — ${ins.reduce((s, r) => s + 1 + (r.guest_names?.length || 0), 0)}${sel.max_spots != null ? ` of ${sel.max_spots} spots` : ""}`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{ins.map((r) => memberRow(r, true, waitSet.has(r.user_id)))}</div></>}
+            {maybes.length > 0 && <><Eyebrow style={EB}>{`Maybe (${maybes.length})`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{maybes.map((r) => memberRow(r, true))}</div></>}
+            {outs.length > 0 && <><Eyebrow style={EB}>{`Out (${outs.length})`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{outs.map((r) => memberRow(r, true))}</div></>}
             {canManage && notResponded.length > 0 && (
-              <><Eyebrow>{`Not responded (${notResponded.length})`}</Eyebrow>
+              <><Eyebrow style={EB}>{`Not responded (${notResponded.length})`}</Eyebrow>
                 <div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>
                   {notResponded.map((m) => (
                     <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: `1px solid ${C.line}` }}>
@@ -275,6 +320,27 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
                   ))}
                 </div></>
             )}
+          </div>
+        ) : (
+          <div>
+            {(() => {
+              const rows = activity.filter((a) => a?.meta?.tee_time_id === sel.id);
+              if (rows.length === 0) return <div style={{ background: C.card, borderRadius: 14, padding: 24, textAlign: "center", color: C.faint, fontSize: 13 }}>No activity yet.</div>;
+              return (
+                <div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>
+                  {rows.map((a) => {
+                    const who = shortName(memberOf(a.actor_user_id)?.display_name || "Someone");
+                    const when = new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+                    return (
+                      <div key={a.id} style={{ padding: "10px 14px", borderBottom: `1px solid ${C.line}` }}>
+                        <div style={{ fontSize: 13, color: C.ink }}><b>{who}</b> {a.summary}</div>
+                        <div style={{ fontSize: 11, color: C.faint, marginTop: 2 }}>{when}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -310,7 +376,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
         <>
           {filter === "upcoming" && pending.length > 0 && (
             <>
-              <Eyebrow>{`Needs your response (${pending.length})`}</Eyebrow>
+              <Eyebrow style={EB}>{`Needs your response (${pending.length})`}</Eyebrow>
               <div style={{ background: C.card, borderRadius: 14, overflow: "hidden", border: `1.5px solid ${C.gold}`, marginBottom: 10 }}>
                 {pending.map((t) => (
                   <div key={t.id} onClick={() => open(t.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: "pointer", borderBottom: `1px solid ${C.line}` }}>
@@ -327,7 +393,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
             </>
           )}
 
-          <Eyebrow>{filter === "upcoming" ? "All upcoming" : filter === "past" ? "Past" : "Cancelled"}</Eyebrow>
+          <Eyebrow style={EB}>{filter === "upcoming" ? "All upcoming" : filter === "past" ? "Past" : "Cancelled"}</Eyebrow>
           {shown.length === 0 ? (
             <div style={{ background: C.card, borderRadius: 14, padding: 24, textAlign: "center", color: C.faint, fontSize: 13 }}>Nothing here yet.</div>
           ) : (
@@ -470,9 +536,11 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
       notes: notes.trim() || null,
       status: "upcoming",
     };
-    const { error } = await supabase.from("tee_times").insert(payload);
+    const { data: created, error } = await supabase.from("tee_times").insert(payload).select("id").single();
     setBusy(false);
     if (error) { setErr("Couldn't post — please try again."); return; }
+    const nm = (title.trim() || [kindOf(kind).label, shortCourse(course || null), shortDate(date)].filter(Boolean).join(" \u00b7 "));
+    try { await supabase.from("group_activity").insert({ group_id: groupId, actor_user_id: user.id, action: "tt_posted", summary: `posted tee time #${seq} (${nm})`, meta: { tee_time_id: (created as any)?.id, seq } }); } catch { /* logging never blocks the post */ }
     onCreated();
   }
 
@@ -594,5 +662,24 @@ function teeExport(tt: TeeTime, ins: Rsvp[], memberOf: (id: string) => Member | 
   L.push(`IN — ${used}${tt.max_spots != null ? ` of ${tt.max_spots}` : ""}`);
   field.forEach((r) => L.push(line(r)));
   if (wait.length) { L.push(""); L.push(`WAITLIST (${wait.length})`); wait.forEach((r) => L.push(line(r))); }
+  return L.join("\n");
+}
+
+// Short "please RSVP" nudge for pasting into the group chat. Ends with a deep link
+// that opens the app straight on this tee time's RSVP window (see home.tsx / page.tsx).
+function teeReminderExport(tt: TeeTime, ins: Rsvp[], notResponded: number, groupName: string): string {
+  const used = ins.reduce((sm, r) => sm + 1 + (r.guest_names?.length || 0), 0);
+  const origin = (typeof window !== "undefined" && window.location?.origin) ? window.location.origin : "https://birdienumnum.vercel.app";
+  const link = `${origin}/?tt=${tt.id}`;
+  const spots = tt.max_spots != null ? `${used}/${tt.max_spots} in` : `${used} in`;
+  const L: string[] = [];
+  L.push(`⏰ ${groupName} · Tee Time #${tt.seq ?? "—"} — please RSVP`);
+  L.push(`🏌️ ${teeName(tt)} (${kindOf(tt.kind).label})`);
+  L.push(`📅 ${fmtFull(tt.play_date)}${tt.tee_off_times?.length ? ` · ${tt.tee_off_times.join("/")}` : ""}`);
+  if (tt.course) L.push(`📍 ${tt.course}`);
+  L.push(`✅ ${spots}${notResponded > 0 ? ` · ${notResponded} still to respond` : ""}`);
+  if (tt.signup_deadline) L.push(`⏱ Sign up by ${fmtFull(tt.signup_deadline.slice(0, 10))}`);
+  L.push("");
+  L.push(`👉 Tap to RSVP: ${link}`);
   return L.join("\n");
 }

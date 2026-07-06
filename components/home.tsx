@@ -55,11 +55,19 @@ export function Home({ session }: { session: any }) {
   useEffect(() => { refreshDraft(); }, [refreshDraft, stage, tab]);
   const [viewing, setViewing] = useState<Round | null>(null);
   const [resumeChecked, setResumeChecked] = useState(false);
+  // Deep link from a WhatsApp reminder (birdienumnum.vercel.app/?tt=<id>): page.tsx
+  // stashes the id to localStorage before auth; read + clear it once here.
+  const [deepTeeId, setDeepTeeId] = useState<string | null>(() => {
+    try { const v = typeof window !== "undefined" ? localStorage.getItem("bnn_dl_tt") : null; if (v) localStorage.removeItem("bnn_dl_tt"); return v; } catch { return null; }
+  });
+  useEffect(() => { if (deepTeeId) setTab("teetimes"); }, [deepTeeId]);
 
   // On open, resume an in-progress round straight into the scorecard.
   // Priority: an active game → this device's round draft → the server's in-progress round.
   useEffect(() => {
     if (resumeChecked) return;
+    // A tee-time deep link takes priority over resuming a round/game.
+    if (deepTeeId) { setResumeChecked(true); return; }
     // If the user was in a game room, reopen the Games tab so it can restore the room.
     if (loadActiveGame()) {
       setResumeChecked(true);
@@ -79,7 +87,7 @@ export function Home({ session }: { session: any }) {
     if (dbInProgress && draftHasScores(dbInProgress)) {
       setStage({ round: dbInProgress });
     }
-  }, [resumeChecked, loading, dbInProgress]);
+  }, [resumeChecked, loading, dbInProgress, deepTeeId]);
 
   const user = session.user;
   const displayName = profile?.display_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "Golfer";
@@ -450,7 +458,7 @@ export function Home({ session }: { session: any }) {
         ) : tab === "profile" ? (
           <ProfilePanel profile={profile} user={user} onSaved={loadProfile} />
         ) : tab === "teetimes" && activeGroup ? (
-          <TeeTimes user={user} activeGroupId={activeGroup.id} activeGroupName={activeGroup.name} canManage={activeGroup.role === "admin"} />
+          <TeeTimes user={user} activeGroupId={activeGroup.id} activeGroupName={activeGroup.name} canManage={activeGroup.role === "admin"} initialTeeId={deepTeeId} onConsumedDeepLink={() => setDeepTeeId(null)} />
         ) : tab === "money" && activeGroup ? (
           <MoneyTab user={user} activeGroup={activeGroup} onChanged={loadOwed} initialTab={moneyInitialTab} />
         ) : tab === "games" && activeGroup ? (

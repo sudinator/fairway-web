@@ -11,6 +11,20 @@ const supabase = createClient();
 
 export default function Page() {
   const [session, setSession] = useState<any>(undefined); // undefined = loading
+  // Capture a tee-time deep link (?tt=<id>) before auth resolves and stash it so it
+  // survives a sign-in redirect; home.tsx reads + clears it. Then clean the URL.
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const tt = p.get("tt");
+      if (tt) {
+        localStorage.setItem("bnn_dl_tt", tt);
+        p.delete("tt");
+        const qs = p.toString();
+        window.history.replaceState({}, "", window.location.pathname + (qs ? "?" + qs : "") + window.location.hash);
+      }
+    } catch { /* no-op */ }
+  }, []);
   useEffect(() => {
     let mounted = true;
     supabase.auth.getSession().then(({ data }) => {

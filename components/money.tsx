@@ -72,7 +72,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     const { data: setl } = await supabase.from("settlements").select("*").eq("group_id", gid);
     const { data: grp } = await supabase.from("groups").select("money_simplify").eq("id", gid).single();
     setSimplifyMode(grp?.money_simplify !== false); // default to simplified when column/absent
-    const { data: act } = await supabase.from("group_activity").select("*").eq("group_id", gid).order("created_at", { ascending: false }).limit(200);
+    const { data: act } = await supabase.from("group_activity").select("*").eq("group_id", gid).not("action", "like", "tt%").order("created_at", { ascending: false }).limit(200);
     setMembers((profs || []).map((p: any) => ({ id: p.id, display_name: p.display_name || "Player", avatar_url: p.avatar_url, venmo_handle: p.venmo_handle, paypal_handle: p.paypal_handle, zelle_handle: p.zelle_handle, phone: p.phone })).sort((a, b) => a.display_name.localeCompare(b.display_name, undefined, { sensitivity: "base" })));
     setGuests(((gRows || []) as GuestRow[]).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })));
     setExpenses((exp || []) as ExpenseRow[]);

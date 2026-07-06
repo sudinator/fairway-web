@@ -223,3 +223,10 @@ Run migration **0055_zelle.sql** (adds profiles.zelle_handle, redefines group_pa
 - Tee Times UI (v1.86.0) is live in the More menu for the TGC group only. Migration 0057 MUST be run first or the tab will error on load.
 - Run migration 0058_rounds_soft_delete.sql (adds rounds.deleted_at) so deleting a game round sticks instead of being re-posted.
 - IMPORTANT: run 0058_rounds_soft_delete.sql. Without it the rounds list still loads (v1.87.3 falls back to unfiltered), but soft-deleted rounds won't be hidden until the column exists.
+
+## v1.89.0 — Tee Times P3 (notifications/reminders + activity log)
+- **NO migration.** Reuses the existing `group_activity` table (0051) for the audit trail and adds no schema. Nothing to run in Supabase for this release.
+- Deadline reminder is a **WhatsApp export with a deep link** (organizer taps "Copy reminder for WhatsApp" on the tee-time detail → pastes to the group). The link is `https://birdienumnum.vercel.app/?tt=<tee_time_id>` and opens the app straight on that tee time's RSVP window. Deep-link plumbing added in `app/page.tsx` (stashes `?tt=` to localStorage before auth, cleans the URL) and `components/home.tsx` (reads it once, switches to the Tee Times tab, passes `initialTeeId`).
+- **Activity logging** to `group_activity` with `tt_`-prefixed actions: `tt_posted`, `tt_cancelled`, `tt_rsvp` (self), `tt_rsvp_org` (organizer set on someone's behalf, records target), `tt_promote`, `tt_captain`. Each carries `meta.{tee_time_id, seq, ...}`. New **Activity** sub-tab on the tee-time detail shows that tee time's history (resolves "but I signed up" disputes). `components/money.tsx` now excludes `tt%` actions from the Money log (`.not("action","like","tt%")`) so they don't bleed into it.
+- UI: the shared `Eyebrow` (components/ui.tsx) gained an optional `style` prop (backward-compatible); Tee Times uses it to space the gold section labels (list "All upcoming/Past/Cancelled" and Signups "In/Maybe/Out/Not responded"), which were flush against the cards.
+- Verified locally: `tsc --noEmit` clean, 174 tests pass, `next build` compiles successfully (prerender needs the Supabase env vars, as always).
