@@ -32,6 +32,10 @@ const fmtFull = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("en-
 const dow = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
 const dayN = (d: string) => new Date(d + "T12:00:00").getDate();
 const monN = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+const shortCourse = (c: string | null) => (c ? (c.split(/\s[\u2013-]\s/).pop() || c).trim() : "");
+const shortDate = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+const teeName = (t: { title: string | null; kind: string | null; course: string | null; play_date: string }) =>
+  (t.title && t.title.trim()) || [kindOf(t.kind).label, shortCourse(t.course), shortDate(t.play_date)].filter(Boolean).join(" \u00b7 ");
 
 function DateBadge({ d }: { d: string }) {
   return (
@@ -120,7 +124,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
   const open = (id: string) => { setSelId(id); setDetailTab("info"); setScreen("detail"); };
 
   // ---------------- CREATE ----------------
-  if (screen === "create") return <CreateForm user={user} groupId={activeGroupId} nextSeq={(tees.reduce((m, t) => Math.max(m, t.seq || 0), 0) || 0) + 1} onCancel={() => setScreen("list")} onCreated={async () => { setScreen("list"); await load(); }} />;
+  if (screen === "create") return <CreateForm user={user} groupId={activeGroupId} existingSeqs={tees.map((t) => t.seq).filter((n): n is number => n != null)} onCancel={() => setScreen("list")} onCreated={async () => { setScreen("list"); await load(); }} />;
 
   // ---------------- DETAIL ----------------
   if (screen === "detail" && sel) {
@@ -165,7 +169,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
         <div style={{ background: `linear-gradient(160deg,#0b2f24,${C.greenLight})`, padding: 16, borderRadius: 14, color: C.cream }}>
           <button onClick={() => setScreen("list")} style={{ ...btn(false), fontSize: 12, padding: "6px 10px" }}>‹ Back</button>
           <div style={{ fontSize: 10, fontWeight: 800, color: C.gold, letterSpacing: 0.4, marginTop: 10 }}>TEE TIME #{sel.seq ?? "—"}</div>
-          <div style={{ fontSize: 22, fontWeight: 800, marginTop: 3 }}>{sel.title || "Tee time"}</div>
+          <div style={{ fontSize: 22, fontWeight: 800, marginTop: 3 }}>{teeName(sel)}</div>
           <div style={{ fontSize: 13, opacity: 0.78, marginTop: 3 }}>
             {fmtFull(sel.play_date)}{sel.tee_off_times?.length ? ` · ${sel.tee_off_times.join(", ")}` : ""}{sel.course ? ` · ${sel.course}` : ""}
           </div>
@@ -215,7 +219,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
                   {notResponded.map((m) => (
                     <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: `1px solid ${C.line}` }}>
                       <Avatar src={m.avatar_url || undefined} name={m.display_name} size={34} />
-                      <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: C.ink }}>{m.display_name}</div>
+                      <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, color: C.ink }}>{m.display_name}</div>
                       <button onClick={() => orgSetRsvp(sel, m.id, "in")} disabled={busy} style={{ ...btn(true), fontSize: 11, padding: "5px 9px" }}>In</button>
                       <button onClick={() => orgSetRsvp(sel, m.id, "out")} disabled={busy} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Out</button>
                     </div>
@@ -237,8 +241,8 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
   // ---------------- LIST ----------------
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: 10 }}>
+        <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 22, fontWeight: 800, color: C.cream, letterSpacing: 0.5 }}>Tee Times</div>
           <div style={{ fontSize: 11, color: C.sage, textTransform: "uppercase", letterSpacing: 1 }}>{activeGroupName}</div>
         </div>
@@ -262,7 +266,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
                     <DateBadge d={t.play_date} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 10, fontWeight: 800, color: C.green }}>TEE TIME #{t.seq ?? "—"}</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>{t.title || "Tee time"}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>{teeName(t)}</div>
                       <div style={{ fontSize: 12, color: C.faint }}>{[t.course, t.tee_off_times?.[0]].filter(Boolean).join(" · ")}</div>
                     </div>
                     <button onClick={(e) => { e.stopPropagation(); open(t.id); }} style={{ ...btn(true), fontSize: 12, padding: "7px 12px" }}>RSVP</button>
@@ -287,7 +291,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
                     <DateBadge d={t.play_date} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 10, fontWeight: 800, color: C.green }}>TEE TIME #{t.seq ?? "—"}</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: C.ink, textDecoration: t.status === "cancelled" ? "line-through" : "none" }}>{t.title || "Tee time"}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: C.ink, textDecoration: t.status === "cancelled" ? "line-through" : "none" }}>{teeName(t)}</div>
                       <div style={{ display: "flex", gap: 6, marginTop: 5, flexWrap: "wrap", alignItems: "center" }}>
                         <span style={{ fontSize: 10, fontWeight: 800, borderRadius: 6, padding: "2px 7px", background: k.bg, color: k.fg }}>{k.label}</span>
                         {t.max_spots != null && <span style={{ fontSize: 11, color: C.faint }}>{used} / {t.max_spots} spots{over ? ` · waitlist ${used - t.max_spots}` : ""}</span>}
@@ -358,8 +362,8 @@ function RsvpSheet({ tt, mine, spotsLeft, busy, onClose, onSubmit }: {
 }
 
 // ---------------- CREATE FORM ----------------
-function CreateForm({ user, groupId, nextSeq, onCancel, onCreated }: {
-  user: { id: string }; groupId: string; nextSeq: number; onCancel: () => void; onCreated: () => void;
+function CreateForm({ user, groupId, existingSeqs, onCancel, onCreated }: {
+  user: { id: string }; groupId: string; existingSeqs: number[]; onCancel: () => void; onCreated: () => void;
 }) {
   const [courses, setCourses] = useState<string[]>([]);
   const [kind, setKind] = useState("scheduled");
@@ -388,15 +392,21 @@ function CreateForm({ user, groupId, nextSeq, onCancel, onCreated }: {
     setDeadline(d.toISOString().split("T")[0]);
   }, [date]);
 
+  // Number convention: 2-digit year + per-year round count, e.g. 2026 round 1 -> 2601
+  const yy = Number(String(new Date((date || new Date().toISOString().slice(0, 10)) + "T12:00:00").getFullYear()).slice(-2));
+  const seq = yy * 100 + existingSeqs.filter((n) => Math.floor(n / 100) === yy).length + 1;
+
   async function post() {
     if (!date) { setErr("Pick a play date."); return; }
+    const parsedTimes = times.split(",").map((t) => t.trim()).filter(Boolean);
+    if (!parsedTimes.length) { setErr("Add at least one tee-off time."); return; }
     setBusy(true); setErr(null);
     const payload = {
-      group_id: groupId, created_by: user.id, seq: nextSeq, kind,
+      group_id: groupId, created_by: user.id, seq, kind,
       title: title.trim() || null,
       course: course || null,
       play_date: date,
-      tee_off_times: times.split(",").map((t) => t.trim()).filter(Boolean),
+      tee_off_times: parsedTimes,
       signup_deadline: deadline ? new Date(deadline + "T12:00:00").toISOString() : null,
       max_spots: parseInt(maxSpots) || null,
       notes: notes.trim() || null,
@@ -409,33 +419,34 @@ function CreateForm({ user, groupId, nextSeq, onCancel, onCreated }: {
   }
 
   const label = (t: string) => <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.6, color: C.sage, textTransform: "uppercase", margin: "12px 0 5px" }}>{t}</div>;
+  const dateStyle: React.CSSProperties = { ...inputStyle, width: "100%", maxWidth: "100%", minWidth: 0, WebkitAppearance: "none", appearance: "none" };
 
   return (
     <div>
-      <div style={{ fontSize: 20, fontWeight: 800, color: C.cream }}>New Tee Time <span style={{ fontSize: 13, color: C.gold }}>#{nextSeq}</span></div>
+      <div style={{ fontSize: 20, fontWeight: 800, color: C.cream }}>New Tee Time <span style={{ fontSize: 13, color: C.gold }}>#{seq}</span></div>
       {label("Type")}
       <select value={kind} onChange={(e) => setKind(e.target.value)} style={{ ...inputStyle, width: "100%" }}>{KINDS.map((k) => <option key={k.k} value={k.k}>{k.label}</option>)}</select>
       {label("Title (optional)")}
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Saturday Meadow" style={{ ...inputStyle, width: "100%" }} />
       {label("Play date")}
-      <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ ...inputStyle, width: "100%" }} />
-      {label("Tee-off time(s) — comma separated")}
+      <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={dateStyle} />
+      {label("Tee-off time(s) — required, comma separated")}
       <input value={times} onChange={(e) => setTimes(e.target.value)} placeholder="e.g. 8:10 AM, 8:20 AM" style={{ ...inputStyle, width: "100%" }} />
       {label("Course")}
       <select value={course} onChange={(e) => setCourse(e.target.value)} style={{ ...inputStyle, width: "100%" }}>
         <option value="">— none —</option>
         {courses.map((c) => <option key={c} value={c}>{c}</option>)}
       </select>
-      <div style={{ display: "flex", gap: 12 }}>
-        <div style={{ flex: 1 }}>{label("Max spots")}<input value={maxSpots} onChange={(e) => setMaxSpots(e.target.value)} type="number" style={{ ...inputStyle, width: "100%" }} /></div>
-        <div style={{ flex: 1 }}>{label("Signup deadline")}<input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} style={{ ...inputStyle, width: "100%" }} /></div>
-      </div>
+      {label("Max spots")}
+      <input value={maxSpots} onChange={(e) => setMaxSpots(e.target.value)} type="number" style={{ ...inputStyle, width: "100%" }} />
+      {label("Signup deadline")}
+      <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} style={dateStyle} />
       {label("Notes")}
       <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" style={{ ...inputStyle, width: "100%" }} />
       {err && <div style={{ color: C.birdie, fontSize: 12, marginTop: 10 }}>{err}</div>}
       <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
         <button onClick={onCancel} disabled={busy} style={{ ...btn(false), flex: 1, fontSize: 13 }}>Cancel</button>
-        <button onClick={post} disabled={busy} style={{ ...btn(true), flex: 1, fontSize: 13 }}>{busy ? "Posting…" : `Post #${nextSeq}`}</button>
+        <button onClick={post} disabled={busy} style={{ ...btn(true), flex: 1, fontSize: 13 }}>{busy ? "Posting…" : `Post #${seq}`}</button>
       </div>
     </div>
   );
