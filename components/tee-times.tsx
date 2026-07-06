@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
-import { C } from "@/lib/golf";
+import { C, courseHandicap } from "@/lib/golf";
 import { Avatar, btn, inputStyle, Eyebrow } from "@/components/ui";
 
 const supabase = createClient();
@@ -65,6 +65,8 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
   const [captainPickerOpen, setCaptainPickerOpen] = useState(false);
   const [dutiesOpen, setDutiesOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+  const [courseData, setCourseData] = useState<Record<string, { slope: number; rating: number; par: number }>>({});
+  const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -79,6 +81,17 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
     } else setRsvps([]);
     const rpc = await supabase.rpc("group_roster", { p_group: activeGroupId });
     setMembers(((rpc.data as any[]) || []).map((m) => ({ id: m.id, display_name: m.display_name, avatar_url: m.avatar_url, handicap_index: m.handicap_index })));
+    const { data: fc } = await supabase.from("favorite_courses").select("name, data").eq("group_id", activeGroupId);
+    const cmap: Record<string, { slope: number; rating: number; par: number }> = {};
+    (fc || []).forEach((row: any) => {
+      const d = row?.data || {};
+      let holes = d.holes; const tees = Array.isArray(d.tees) ? d.tees : [];
+      if ((!holes || !holes.length) && tees.length) { const t = tees.find((x: any) => x.holes && x.holes.length); if (t) holes = t.holes; }
+      const tee = tees[0];
+      const par = Array.isArray(holes) ? holes.reduce((sum: number, h: any) => sum + (h.par || 0), 0) : (d.par || null);
+      if (tee && tee.rating != null && tee.slope != null && par) cmap[row.name] = { slope: Number(tee.slope), rating: Number(tee.rating), par: Number(par) };
+    });
+    setCourseData(cmap);
     setLoading(false);
   }, [activeGroupId]);
   useEffect(() => { load(); }, [load]);
@@ -136,6 +149,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
     setBusy(false); await load();
   }
   const deadlinePassed = (t: TeeTime) => !!t.signup_deadline && new Date(t.signup_deadline) < new Date();
+  const copyExport = async (tt: TeeTime) => { try { await navigator.clipboard.writeText(teeExport(tt, inList(tt.id), memberOf, courseData, activeGroupName)); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* clipboard unavailable */ } };
 
   const open = (id: string) => { setSelId(id); setDetailTab("info"); setScreen("detail"); };
   const openEdit = (id: string) => { setEditId(id); setScreen("create"); };
@@ -163,13 +177,15 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
     const memberRow = (r: Rsvp, showOrg: boolean, wait?: boolean) => {
       const m = memberOf(r.user_id);
       const name = m?.display_name || "Member";
+      const cdSel = courseData[sel.course || ""];
+      const chSel = cdSel && m?.handicap_index != null ? courseHandicap(Number(m.handicap_index), cdSel.slope, cdSel.rating, cdSel.par) : null;
       return (
         <div key={r.user_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: `1px solid ${C.line}` }}>
           <Avatar src={m?.avatar_url || undefined} name={name} size={34} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{name}{r.user_id === user.id ? " (you)" : ""}</div>
             <div style={{ fontSize: 11, color: C.faint }}>
-              {m?.handicap_index != null ? `Idx ${m.handicap_index}` : "no idx"}
+              {m?.handicap_index != null ? `Idx ${m.handicap_index}${chSel != null ? ` \u00b7 CH ${chSel}` : ""}` : "no idx"}
               {r.guest_names?.length ? ` · +${r.guest_names.length} guest: ${r.guest_names.join(", ")}` : ""}
             </div>
           </div>
@@ -193,7 +209,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
           <div style={{ fontSize: 10, fontWeight: 800, color: C.gold, letterSpacing: 0.4, marginTop: 10 }}>TEE TIME #{sel.seq ?? "—"}</div>
           <div style={{ fontSize: 22, fontWeight: 800, marginTop: 3 }}>{teeName(sel)}</div>
           <div style={{ fontSize: 13, opacity: 0.78, marginTop: 3 }}>
-            {fmtFull(sel.play_date)}{sel.tee_off_times?.length ? ` · ${sel.tee_off_times.join(", ")}` : ""}{sel.course ? ` · ${sel.course}` : ""}
+            {fmtFull(sel.play_date)}{sel.tee_off_times?.length ? ` · ${sel.tee_off_times.join("/")}` : ""}{sel.course ? ` · ${sel.course}` : ""}
           </div>
           {sel.status === "cancelled" ? <div style={{ marginTop: 8, display: "inline-block", background: "rgba(184,58,46,0.3)", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 800 }}>CANCELLED</div> : null}
         </div>
@@ -216,7 +232,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
         {detailTab === "info" ? (
           <>
           <div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>
-            {[["Tee time", "#" + (sel.seq ?? "—")], ["Date", fmtFull(sel.play_date)], ["Tee-off", sel.tee_off_times?.join(", ") || "—"], ["Course", sel.course || "—"], ["Type", kindOf(sel.kind).label], ["Spots", sel.max_spots != null ? `${used} / ${sel.max_spots}` : `${used}`], ["Notes", sel.notes || "—"]].map(([l, v], i, arr) => (
+            {[["Tee time", "#" + (sel.seq ?? "—")], ["Date", fmtFull(sel.play_date)], ["Tee-off", sel.tee_off_times?.length ? sel.tee_off_times.join("/") : "—"], ["Course", sel.course || "—"], ["Type", kindOf(sel.kind).label], ["Spots", sel.max_spots != null ? `${used} / ${sel.max_spots}` : `${used}`], ["Notes", sel.notes || "—"]].map(([l, v], i, arr) => (
               <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "11px 14px", borderBottom: i < arr.length - 1 ? `1px solid ${C.line}` : "none" }}>
                 <div style={{ fontSize: 12, color: C.faint }}>{l}</div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: C.ink, textAlign: "right", maxWidth: "62%" }}>{v}</div>
@@ -231,6 +247,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
             {canManage && <button onClick={() => setCaptainPickerOpen(true)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>{sel.captain_user_id ? "Change" : "Assign"}</button>}
             <button onClick={() => setDutiesOpen(true)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Duties</button>
           </div>
+          <button onClick={() => copyExport(sel)} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 13 }}>{copied ? "Copied ✓" : "Copy for WhatsApp"}</button>
           </>
         ) : (
           <div>
@@ -301,7 +318,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage }: {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 10, fontWeight: 800, color: C.green }}>TEE TIME #{t.seq ?? "—"}</div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>{teeName(t)}</div>
-                      <div style={{ fontSize: 12, color: C.faint }}>{[t.course, t.tee_off_times?.[0]].filter(Boolean).join(" · ")}</div>
+                      <div style={{ fontSize: 12, color: C.faint }}>{[t.course, (t.tee_off_times || []).join("/")].filter(Boolean).join(" · ")}</div>
                     </div>
                     <button onClick={(e) => { e.stopPropagation(); open(t.id); }} style={{ ...btn(true), fontSize: 12, padding: "7px 12px" }}>RSVP</button>
                   </div>
@@ -546,4 +563,36 @@ function DutiesModal({ onClose }: { onClose: () => void }) {
       </div>
     </>
   );
+}
+
+// ---------------- WHATSAPP EXPORT ----------------
+function shortName(n: string) {
+  const p = (n || "").trim().split(/\s+/);
+  return p.length > 1 ? `${p[0]} ${p[p.length - 1][0]}` : (p[0] || "");
+}
+function teeExport(tt: TeeTime, ins: Rsvp[], memberOf: (id: string) => Member | undefined, courseData: Record<string, { slope: number; rating: number; par: number }>, groupName: string): string {
+  const cd = courseData[tt.course || ""];
+  let cum = 0; const field: Rsvp[] = []; const wait: Rsvp[] = [];
+  ins.forEach((r) => { cum += 1 + (r.guest_names?.length || 0); if (tt.max_spots != null && cum > tt.max_spots) wait.push(r); else field.push(r); });
+  const used = field.reduce((sm, r) => sm + 1 + (r.guest_names?.length || 0), 0);
+  const line = (r: Rsvp) => {
+    const m = memberOf(r.user_id);
+    const idx = m?.handicap_index;
+    const ch = cd && idx != null ? courseHandicap(Number(idx), cd.slope, cd.rating, cd.par) : null;
+    const hcp = idx != null ? `Idx ${idx}${ch != null ? ` · CH ${ch}` : ""}` : (ch != null ? `CH ${ch}` : "—");
+    const g = r.guest_names?.length ? ` +${r.guest_names.length} guest: ${r.guest_names.join(", ")}` : "";
+    return `${shortName(m?.display_name || "Member")} (${hcp})${g}`;
+  };
+  const cap = tt.captain_user_id ? memberOf(tt.captain_user_id)?.display_name : null;
+  const L: string[] = [];
+  L.push(`🏌️ ${groupName} · Tee Time #${tt.seq ?? "—"} — ${teeName(tt)} (${kindOf(tt.kind).label})`);
+  L.push(`📅 ${fmtFull(tt.play_date)}${tt.tee_off_times?.length ? ` · ${tt.tee_off_times.join("/")}` : ""}`);
+  if (tt.course) L.push(`📍 ${tt.course}`);
+  if (cap) L.push(`🧢 Captain: ${shortName(cap)}`);
+  if (tt.signup_deadline) L.push(`⏱ Sign up by ${fmtFull(tt.signup_deadline.slice(0, 10))}`);
+  L.push("");
+  L.push(`IN — ${used}${tt.max_spots != null ? ` of ${tt.max_spots}` : ""}`);
+  field.forEach((r) => L.push(line(r)));
+  if (wait.length) { L.push(""); L.push(`WAITLIST (${wait.length})`); wait.forEach((r) => L.push(line(r))); }
+  return L.join("\n");
 }

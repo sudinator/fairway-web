@@ -5938,6 +5938,7 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
   const buildSummary = (): string => {
     const courseName = game?.course || "Round";
     const dateStr = new Date(game?.ended_at || game?.created_at || Date.now()).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const shortName = (n: string) => { const parts = (n || "").trim().split(/\s+/); return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}` : (parts[0] || ""); };
     const grossOf = (p: Player) => playerHoles(p).reduce((sum, h) => sum + (h.strokes && h.strokes > 0 ? h.strokes : 0), 0);
     const rows = players
       .map((p) => ({ name: p.display_name, total: playerPoints(p), gross: grossOf(p), seg: stablefordBySix(playerHoles(p)) }))
@@ -5947,7 +5948,7 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
       const elig = players.filter((p) => playerHoles(p).slice(si * 6, si * 6 + 6).filter((h) => h.strokes != null && h.strokes > 0).length === 6);
       if (!elig.length) return `${segNames[si]}: \u2014`;
       const best = Math.max(...elig.map((p) => stablefordBySix(playerHoles(p))[si]));
-      const w = elig.filter((p) => stablefordBySix(playerHoles(p))[si] === best).map((p) => p.display_name);
+      const w = elig.filter((p) => stablefordBySix(playerHoles(p))[si] === best).map((p) => shortName(p.display_name));
       return `${segNames[si]}: ${w.join(" & ")} (${best}${w.length > 1 ? ", tie" : ""})`;
     });
     const overall: string[] = [];
@@ -5955,26 +5956,26 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
       const maxTotal = rows[0].total;
       const firsts = rows.filter((r) => r.total === maxTotal);
       if (firsts.length > 1) {
-        overall.push(`\ud83e\udd47 1st (tie): ${firsts.map((r) => r.name).join(" & ")} (${maxTotal})`);
+        overall.push(`\ud83e\udd47 1st (tie): ${firsts.map((r) => shortName(r.name)).join(" & ")} (${maxTotal})`);
         overall.push("\u2014 no 2nd \u2014");
       } else {
-        overall.push(`\ud83e\udd47 1st: ${firsts[0].name} (${maxTotal})`);
+        overall.push(`\ud83e\udd47 1st: ${shortName(firsts[0].name)} (${maxTotal})`);
         const rest = rows.filter((r) => r.total < maxTotal);
         if (rest.length) {
           const secondVal = rest[0].total;
           const seconds = rest.filter((r) => r.total === secondVal);
-          overall.push(`\ud83e\udd48 2nd: ${seconds.map((r) => r.name).join(" & ")} (${secondVal})${seconds.length > 1 ? " (tie)" : ""}`);
+          overall.push(`\ud83e\udd48 2nd: ${seconds.map((r) => shortName(r.name)).join(" & ")} (${secondVal})${seconds.length > 1 ? " (tie)" : ""}`);
         }
       }
     }
     const money = (v: number) => `$${Math.round(v)}`;
     const netStr = (v: number) => (v > 0 ? `+${money(v)}` : v < 0 ? `-${money(Math.abs(v))}` : "$0");
-    const moneyLines = result.perPlayer.map((pp) => `${pp.name}: won ${money(pp.won)}, net ${netStr(pp.net)}`);
+    const moneyLines = result.perPlayer.map((pp) => `${shortName(pp.name)}: won ${money(pp.won)}, net ${netStr(pp.net)}`);
     return [
       `\ud83c\udfcc\ufe0f TGC Stableford \u2014 ${courseName} \u00b7 ${dateStr}`,
       ``,
       `STANDINGS (net stableford)`,
-      ...rows.map((r, i) => `${i + 1}. ${r.name} \u2014 ${r.total} pts (gross ${r.gross}) \u00b7 F6 ${r.seg[0]} / M6 ${r.seg[1]} / L6 ${r.seg[2]}`),
+      ...rows.map((r) => `${shortName(r.name)} - ${r.seg[0]}/${r.seg[1]}/${r.seg[2]} ${r.total} . Gross ${r.gross}`),
       ``,
       `SIXES`,
       ...segLines,
