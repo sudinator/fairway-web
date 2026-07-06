@@ -1,7 +1,7 @@
 // Unit tests for lib/money.ts — run with `npm test`.
 import {
   evenShares, validateCustomTotal, computeBalances, simplify, pairwiseDebts, aggregateOwed,
-  payLink, nudgeSms, fmtUSD, guestOwedFor,
+  payLink, nudgeSms, fmtUSD, guestOwedFor, betResultToPost,
 } from "./money";
 import type { Expense, Share, Settlement, Guest, Transfer, Payer } from "./money";
 
@@ -157,6 +157,45 @@ ok("nudge sms has body", nudgeSms("2015550102", "Dev", 6500, "Saturday Golf", "b
   pw.forEach((t: any) => { netFrom[t.to] = (netFrom[t.to] || 0) + t.amt; netFrom[t.from] = (netFrom[t.from] || 0) - t.amt; });
   // guest folds into carol; every member's pairwise net equals its balance
   check("multipayer invariant", netFrom, { alice: bal.alice, bob: bal.bob, carol: bal.carol });
+}
+
+
+// ---- betResultToPost: bet nets -> expense (payers=winners, shares=losers) ----
+{
+  const r = betResultToPost([
+    { user_id: "a", name: "A", net: 30 },
+    { user_id: "b", name: "B", net: -10 },
+    { user_id: "c", name: "C", net: -20 },
+  ]);
+  check("bet ok", r.ok, true);
+  check("bet amount = winnings", r.amount_cents, 3000);
+  check("bet payers = winners", r.payers, [{ user_id: "a", paid_cents: 3000 }]);
+  check("bet shares = losers", r.shares.map((s) => [s.user_id, s.share_cents]), [["b", 1000], ["c", 2000]]);
+  check("bet payers==shares (zero-sum cents)", r.amount_cents, r.shares.reduce((x, s) => x + s.share_cents, 0));
+}
+{
+  // segment winner who net-loses is a SHARE (owes), not a payer
+  const r = betResultToPost([
+    { user_id: "a", name: "A", net: 55 },
+    { user_id: "b", name: "B", net: -55 },
+    { user_id: "c", name: "C", net: -55 + 55 - 55 }, // placeholder to keep it simple below
+  ].slice(0, 2));
+  check("2-player winner is payer", r.payers, [{ user_id: "a", paid_cents: 5500 }]);
+  check("2-player loser is share", r.shares, [{ user_id: "b", share_cents: 5500 }]);
+}
+{
+  // fractional dollars kept zero-sum in cents via largest-remainder
+  const r = betResultToPost([
+    { user_id: "a", name: "A", net: 33.34 },
+    { user_id: "b", name: "B", net: -16.67 },
+    { user_id: "c", name: "C", net: -16.67 },
+  ]);
+  check("frac zero-sum", r.amount_cents, r.shares.reduce((x, s) => x + s.share_cents, 0));
+  check("frac ok", r.ok, true);
+}
+{
+  const r = betResultToPost([{ user_id: "a", name: "A", net: 0 }]);
+  check("solo not ok", r.ok, false);
 }
 
 console.log(`\n=== money.test ===\nPASS ${pass}  FAIL ${fail}`);

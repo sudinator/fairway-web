@@ -72,7 +72,7 @@ Confirm-only in phase 1. Rare bespoke cases (a player sat out the bet, an inform
 
 **Phase 3:** open to other groups (remove `TGC_GROUP_ID` gate; per-group bet settings).
 
-## Open confirmations before build
+## Resolved decisions
 
-- Category label for posted bets: reuse an existing category with a "TGC bet — …" description, or add a dedicated "Winnings/Bet" category? (Leaning: description prefix + reuse existing category, minimal.)
-- Un-post: allowed anytime by admin/creator, or only before anyone has settled against it? (Leaning: allowed anytime; if partly settled, warn.)
+- **Category:** reuse the existing "Bet" category (`category = "bet"`, already in the Money tab) with description "TGC bet — {game name}". No new category.
+- **Un-post:** allowed anytime by organizer/admin. If settlements have already been recorded against the posted bet, un-posting still deletes the linked expense but first **writes a reversal log to group activity** — a summary of the recorded payments (from → to, amount, method) that now need to be manually reversed, so nothing is silently orphaned.

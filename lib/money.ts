@@ -177,3 +177,57 @@ export function nudgeSms(phone: string, name: string, oweCents: Cents, groupName
   const body = `Hey ${name}, you're at ${fmtUSD(oweCents)} for ${groupName} \u2014 settle up: ${link}`;
   return `sms:${phone}?&body=${encodeURIComponent(body)}`;
 }
+
+// ---------------- Bet → Money posting ----------------
+// Convert a settled bet (per-player net dollars, zero-sum) into a single expense:
+// net winners become payers (credited their winnings), net losers become shares
+// (owing their loss). Dollars are converted to cents and kept exactly zero-sum with
+// largest-remainder rounding, so payers' paid_cents equals losers' share_cents.
+export interface BetNet { user_id: string; name: string; net: number } // net in dollars (+win / -loss)
+export interface BetPost {
+  amount_cents: Cents;
+  payers: { user_id: string; paid_cents: Cents }[]; // net winners
+  shares: { user_id: string; share_cents: Cents }[]; // net losers
+  ok: boolean;
+  reason?: string;
+}
+
+// Round an array of signed dollar amounts (summing ~0) to cents, preserving the exact
+// zero total: round each, then fix the residual on the largest-magnitude entries.
+function roundZeroSumCents(netsDollars: number[]): number[] {
+  const raw = netsDollars.map((d) => d * 100);
+  const cents = raw.map((c) => Math.round(c));
+  let residual = cents.reduce((s, c) => s + c, 0); // should be 0; correct drift
+  if (residual !== 0) {
+    // adjust on entries with the largest fractional loss/gain first
+    const order = raw
+      .map((c, i) => ({ i, frac: c - cents[i] }))
+      .sort((a, b) => (residual > 0 ? a.frac - b.frac : b.frac - a.frac));
+    let k = 0;
+    const step = residual > 0 ? -1 : 1;
+    while (residual !== 0 && order.length) {
+      cents[order[k % order.length].i] += step;
+      residual += step;
+      k++;
+    }
+  }
+  return cents;
+}
+
+export function betResultToPost(nets: BetNet[]): BetPost {
+  if (nets.length < 2) return { amount_cents: 0, payers: [], shares: [], ok: false, reason: "Need at least 2 bettors." };
+  const sum = nets.reduce((s, n) => s + n.net, 0);
+  if (Math.abs(sum) > 0.5) return { amount_cents: 0, payers: [], shares: [], ok: false, reason: "Bet nets don't balance to zero." };
+  const cents = roundZeroSumCents(nets.map((n) => n.net));
+  const payers: { user_id: string; paid_cents: Cents }[] = [];
+  const shares: { user_id: string; share_cents: Cents }[] = [];
+  nets.forEach((n, i) => {
+    const c = cents[i];
+    if (c > 0) payers.push({ user_id: n.user_id, paid_cents: c });
+    else if (c < 0) shares.push({ user_id: n.user_id, share_cents: -c });
+  });
+  const amount_cents = payers.reduce((s, p) => s + p.paid_cents, 0);
+  const shareTotal = shares.reduce((s, p) => s + p.share_cents, 0);
+  const ok = amount_cents === shareTotal;
+  return { amount_cents, payers, shares, ok, reason: ok ? undefined : "Rounding failed to balance." };
+}

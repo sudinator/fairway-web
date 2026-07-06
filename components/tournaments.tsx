@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
+import { betResultToPost } from "@/lib/money";
+import type { BetNet } from "@/lib/money";
 import { ShareScorecardModal, ShareGameModal } from "@/components/share-card";
 import {
   C,
@@ -3242,6 +3244,8 @@ function GameRoom({
               playerHoles={playerHoles}
               ended={isEnded}
               game={game}
+              user={user}
+              canPost={game.created_by === user.id || !!isAdmin}
             />
           )}
         </>
@@ -5799,12 +5803,14 @@ function OrganizerPanel({
 // and the split percentages (default: 3 six-hole segments at 10/75 each, 2nd at
 // 15/75, 1st at 30/75). Computes payouts including ties, all-tied-first, and the
 // clean-sweep double. See computeBetting() in lib/golf.ts for the full rules.
-function BettingPanel({ players, playerPoints, playerHoles, ended, game }: {
+function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, canPost }: {
   players: Player[];
   playerPoints: (p: Player) => number;
   playerHoles: (p: Player) => Hole[];
   ended: boolean;
   game: Game;
+  user: { id: string };
+  canPost: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [bet, setBet] = useState(75);
@@ -5826,6 +5832,27 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game }: {
   const toggle = (id: string) =>
     setInIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
+  // Betting -> Money posting (TGC phase 1).
+  const [memberIds, setMemberIds] = useState<Set<string> | null>(null);
+  const [postedExpense, setPostedExpense] = useState<{ id: string; created_at: string } | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [postMsg, setPostMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!ended || !game.group_id) return;
+    let alive = true;
+    (async () => {
+      const { data: mem } = await supabase.from("group_members").select("user_id").eq("group_id", game.group_id);
+      if (alive) setMemberIds(new Set((mem || []).map((m: any) => m.user_id).filter(Boolean)));
+      const { data: exp } = await supabase
+        .from("expenses").select("id, created_at")
+        .eq("source_game_id", game.id).eq("source_kind", "tgc_bet").maybeSingle();
+      if (alive && exp) setPostedExpense({ id: exp.id, created_at: exp.created_at });
+    })();
+    return () => { alive = false; };
+  }, [ended, game.group_id, game.id]);
+
   const betPlayers: BetPlayer[] = players
     .filter((p) => inIds.includes(p.id))
     .map((p) => {
@@ -5840,6 +5867,63 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game }: {
     });
 
   const result = computeBetting(betPlayers, bet, split);
+
+  const idToUser: Record<string, string | null> = {};
+  players.forEach((p) => { idToUser[p.id] = p.user_id; });
+  const bettorIds = betPlayers.map((b) => b.id);
+  const nonMembers = memberIds
+    ? bettorIds
+        .filter((id) => { const uid = idToUser[id]; return !uid || !memberIds.has(uid); })
+        .map((id) => players.find((p) => p.id === id)?.display_name || "?")
+    : [];
+  const netSum = result.perPlayer.reduce((s, p) => s + p.net, 0);
+  const balanced = Math.abs(netSum) < 0.5;
+
+  async function doPost() {
+    setBusy(true); setPostMsg(null);
+    try {
+      const nets: BetNet[] = result.perPlayer.map((pp) => ({ user_id: idToUser[pp.id] as string, name: pp.name, net: pp.net }));
+      const post = betResultToPost(nets);
+      if (!post.ok) { setPostMsg(post.reason || "Couldn't balance the bet."); setBusy(false); return; }
+      const desc = `TGC bet — ${game.name || game.course || "game"}`;
+      const { data: exp, error: e1 } = await supabase.from("expenses").insert({
+        group_id: game.group_id, created_by: user.id,
+        payer_user_id: post.payers[0].user_id,
+        amount_cents: post.amount_cents, description: desc, category: "bet", split_type: "custom",
+        source_game_id: game.id, source_kind: "tgc_bet",
+      }).select("id, created_at").single();
+      if (e1 || !exp) { setPostMsg("Couldn't post — please try again."); setBusy(false); return; }
+      const { error: e2 } = await supabase.from("expense_payers").insert(post.payers.map((py) => ({ expense_id: exp.id, user_id: py.user_id, paid_cents: py.paid_cents })));
+      const { error: e3 } = await supabase.from("expense_shares").insert(post.shares.map((sh) => ({ expense_id: exp.id, user_id: sh.user_id, share_cents: sh.share_cents })));
+      if (e2 || e3) { await supabase.from("expenses").delete().eq("id", exp.id); setPostMsg("Couldn't post the splits — rolled back."); setBusy(false); return; }
+      await supabase.from("group_activity").insert({ group_id: game.group_id, actor_user_id: user.id, action: "bet_posted", summary: `posted bet winnings — pot $${(post.amount_cents / 100).toFixed(0)}`, meta: { game_id: game.id, expense_id: exp.id, amount_cents: post.amount_cents } });
+      setPostedExpense({ id: exp.id, created_at: exp.created_at }); setConfirming(false);
+      setPostMsg("Posted to Money.");
+    } catch { setPostMsg("Something went wrong posting to Money."); }
+    setBusy(false);
+  }
+
+  async function doUnpost() {
+    if (!postedExpense) return;
+    setBusy(true); setPostMsg(null);
+    try {
+      const uids = bettorIds.map((id) => idToUser[id]).filter(Boolean) as string[];
+      const { data: setl } = await supabase.from("settlements").select("from_user_id, to_user_id, amount_cents, method, created_at").eq("group_id", game.group_id).gte("created_at", postedExpense.created_at);
+      const relevant = (setl || []).filter((s: any) => uids.includes(s.from_user_id) || uids.includes(s.to_user_id));
+      const nameOf = (uid: string) => players.find((p) => p.user_id === uid)?.display_name || "someone";
+      const reversals = relevant.map((s: any) => `${nameOf(s.from_user_id)} → ${nameOf(s.to_user_id)} $${(s.amount_cents / 100).toFixed(0)}${s.method ? ` (${s.method})` : ""}`);
+      await supabase.from("group_activity").insert({
+        group_id: game.group_id, actor_user_id: user.id, action: "bet_unposted",
+        summary: relevant.length ? `un-posted bet — reverse these recorded payments: ${reversals.join("; ")}` : "un-posted bet winnings",
+        meta: { game_id: game.id, expense_id: postedExpense.id, reversals },
+      });
+      const { error } = await supabase.from("expenses").delete().eq("id", postedExpense.id);
+      if (error) { setPostMsg("Couldn't un-post — please try again."); setBusy(false); return; }
+      setPostedExpense(null); setConfirming(false);
+      setPostMsg(relevant.length ? `Un-posted. ${relevant.length} recorded payment(s) logged in group activity for reversal.` : "Un-posted from Money.");
+    } catch { setPostMsg("Something went wrong un-posting."); }
+    setBusy(false);
+  }
   const pct = (v: number) => `${Math.round(v * 1000) / 10}%`;
 
   // One-tap shareable recap of the finished round.
@@ -6016,6 +6100,45 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game }: {
           <div style={{ color: C.faint, fontSize: 11, marginTop: 12 }}>
             Net = winnings minus your ${bet} ante. Payouts update live as scores come in; segments only pay once all 6 holes are entered.
           </div>
+
+          {ended && canPost && result.pot > 0 && (
+            <div style={{ marginTop: 14, borderTop: `1px solid ${C.greenMid}`, paddingTop: 14 }}>
+              {postedExpense ? (
+                <div>
+                  <div style={{ color: C.sage, fontSize: 13, fontWeight: 800 }}>Posted to Money ✓</div>
+                  <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>Losers owe winners in the Money tab. Un-posting removes that expense.</div>
+                  <button onClick={doUnpost} disabled={busy} style={{ ...btn(false), fontSize: 12, marginTop: 8 }}>{busy ? "Working…" : "Un-post"}</button>
+                </div>
+              ) : nonMembers.length ? (
+                <div style={{ color: C.birdie, fontSize: 12 }}>
+                  Can't post to Money — these bettors aren't in the group: {nonMembers.join(", ")}. Add them to the group first.
+                </div>
+              ) : !confirming ? (
+                <button onClick={() => { setConfirming(true); setPostMsg(null); }} style={{ ...btn(true), width: "100%", fontSize: 14, padding: "11px 0" }}>Post winnings to Money</button>
+              ) : (
+                <div style={{ background: C.card, borderRadius: 12, padding: 14 }}>
+                  <div style={{ color: C.ink, fontWeight: 800, fontSize: 14 }}>Confirm bet winnings</div>
+                  <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>Posts one “Bet” expense so losers owe winners in the Money tab.</div>
+                  <div style={{ marginTop: 10 }}>
+                    {result.perPlayer.slice().sort((a, b) => b.net - a.net).map((p) => (
+                      <div key={p.id} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", fontSize: 13 }}>
+                        <span style={{ color: C.ink }}>{p.name}</span>
+                        <span style={{ fontWeight: 800, fontFamily: "Georgia, serif", color: p.net >= 0 ? C.green : C.birdie }}>{p.net >= 0 ? "+" : "−"}${Math.abs(p.net).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {result.cleanSweep && <div style={{ color: C.gold, fontSize: 12, fontWeight: 800, marginTop: 6 }}>{"\uD83E\uDDF9"} Clean sweep — pot doubled.</div>}
+                  <div style={{ fontSize: 12, marginTop: 8, fontWeight: 700, color: balanced ? C.green : C.birdie }}>{balanced ? "Balances to zero ✓" : `Off by $${netSum.toFixed(2)} — not balanced`}</div>
+                  {postMsg && <div style={{ color: C.birdie, fontSize: 12, marginTop: 6 }}>{postMsg}</div>}
+                  <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                    <button onClick={() => { setConfirming(false); setPostMsg(null); }} disabled={busy} style={{ ...btn(false), flex: 1, fontSize: 13 }}>Cancel</button>
+                    <button onClick={doPost} disabled={busy || !balanced} style={{ ...btn(true), flex: 1, fontSize: 13 }}>{busy ? "Posting…" : "Confirm & post"}</button>
+                  </div>
+                </div>
+              )}
+              {postMsg && !confirming && <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>{postMsg}</div>}
+            </div>
+          )}
         </div>
       )}
     </div>

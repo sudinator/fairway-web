@@ -218,3 +218,4 @@ Run migration **0054_money_simplify.sql** (adds groups.money_simplify boolean de
 
 ## v1.81.0 - Money: Zelle
 Run migration **0055_zelle.sql** (adds profiles.zelle_handle, redefines group_pay_roster to return it; idempotent). Run order now 0045 -> 0055.
+- Run migration 0056_expense_source.sql (adds expenses.source_game_id + source_kind + one-bet-per-game index) before the Betting→Money post button is used.
