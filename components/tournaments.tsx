@@ -3495,7 +3495,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
       const gross = p.scores?.[i] ?? null;
       if (gross != null && gross > 0) {
         g += gross;
-        pts += stablefordPts(gross, meta[i].par, recvFor(p, meta[i].si)) || 0;
+        pts += stablefordPts(gross, meta[i].par, relBasis ? indRecvFor(p, meta[i].si) : recvFor(p, meta[i].si)) || 0;
       }
     }
     return { g, pts };

@@ -380,6 +380,9 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   };
   const anyStroke = holes.some((h) => h.recv > 0 || (h.gives || 0) > 0 || (showIndivDots && (h.indRecv || 0) > 0));
   const hasDots = anyStroke && hasHandicap;
+  // Stableford is scored on the INDIVIDUAL (full course handicap) strokes on relative games
+  // (match/four-ball/trifecta), matching the group scorecard; otherwise the game's own recv.
+  const sfRecv = (h: EntryHole) => (showIndivDots ? (h.indRecv || 0) : (h.recv || 0));
   const headStyle: React.CSSProperties = { color: C.faint, fontSize: 9, letterSpacing: 0.5, fontWeight: 700, textTransform: "uppercase" };
 
   const block = (from: number, to: number, label: string) => {
@@ -389,7 +392,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     const sScore = seg.reduce((s, h) => s + (h.strokes || 0), 0);
     const sPutts = seg.reduce((s, h) => s + (h.putts || 0), 0);
     const sPen = seg.reduce((s, h) => s + (h.penalties || 0), 0);
-    const sPts = seg.reduce((s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
+    const sPts = seg.reduce((s, h) => s + (stablefordPts(h.strokes, h.par, sfRecv(h)) || 0), 0);
     const sYds = seg.reduce((s, h) => s + (h.yards || 0), 0);
     const sFwElig = seg.filter((h) => h.par >= 4 && h.fairway != null).length;
     const sFwHit = seg.filter((h) => h.par >= 4 && h.fairway === "hit").length;
@@ -420,7 +423,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           const i = from + j;
           const maxStrokes = uncap ? h.par + 8 : hasHandicap ? h.par + 2 + h.recv : h.par * 2;
           const maxPutts = h.strokes != null && h.strokes > 0 ? Math.min(h.strokes, 6) : 6;
-          const pts = stablefordPts(h.strokes, h.par, h.recv || 0);
+          const pts = stablefordPts(h.strokes, h.par, sfRecv(h));
           return (
             <div key={i} onClick={() => openEdit(i)} style={{ borderBottom: `1px solid ${C.line}`, paddingBottom: 5, marginTop: j === 0 ? 0 : 4, borderRadius: 8, background: edit === i ? "#EDF3EE" : "transparent", cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 2px", flexWrap: "wrap" }}>
@@ -533,7 +536,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     const h = holes[i];
     const maxStrokes = uncap ? h.par + 8 : hasHandicap ? h.par + 2 + h.recv : h.par * 2;
     const maxPutts = h.strokes != null && h.strokes > 0 ? Math.min(h.strokes, 6) : 6;
-    const pts = stablefordPts(h.strokes, h.par, h.recv || 0);
+    const pts = stablefordPts(h.strokes, h.par, sfRecv(h));
     const penN = h.penalties || 0; const sandOn = !!h.sand;
     const spDisp = sandOn && penN > 0 ? "*" : sandOn ? "S" : penN > 0 ? String(penN) : "·";
     const spActive = sandOn || penN > 0;
@@ -569,7 +572,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     const seg = holes.slice(from, to);
     const sScore = seg.reduce((a, h) => a + (h.strokes || 0), 0);
     const sPutts = seg.reduce((a, h) => a + (h.putts || 0), 0);
-    const sPts = seg.reduce((a, h) => a + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
+    const sPts = seg.reduce((a, h) => a + (stablefordPts(h.strokes, h.par, sfRecv(h)) || 0), 0);
     let run = ""; if (showRun) { for (let k = to - 1; k >= from; k--) { if (matchRun![k]) { run = matchRun![k] as string; break; } } }
     const runCol = run === "" ? C.sage : run === "AS" ? "#fff" : (run.includes("UP") || run.includes("↑")) ? "#7FE3A6" : "#F0A39A";
     const item = (k: string, v: React.ReactNode, col = "#fff") => (
@@ -606,7 +609,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
       {showSixes && !matchMode && holes.length >= 12 && (() => {
         const segPts = (from: number, to: number) => strokeSixes
           ? holes.slice(from, to).reduce((acc, h) => acc + (h.strokes && h.strokes > 0 ? h.strokes - (h.recv || 0) : 0), 0)
-          : holes.slice(from, to).reduce((acc, h) => acc + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0), 0);
+          : holes.slice(from, to).reduce((acc, h) => acc + (stablefordPts(h.strokes, h.par, sfRecv(h)) || 0), 0);
         const segs = [
           { lbl: "Front 6", sub: "1\u20136", v: segPts(0, 6) },
           { lbl: "Middle 6", sub: "7\u201312", v: segPts(6, 12) },
