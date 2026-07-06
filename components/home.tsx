@@ -8,7 +8,7 @@ import { logActivity } from "@/lib/activity";
 import { loadDraft, draftHasScores } from "@/lib/draft";
 import { loadActiveGame, saveAppBootCache, loadAppBootCache } from "@/lib/draft";
 import { btn, Wordmark, inputStyle } from "@/components/ui";
-import Tournaments from "@/components/tournaments";
+import Tournaments, { type GameSeed } from "@/components/tournaments";
 import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab, ActivityTab, AdminGroupsTab, AdminUsersTab, HelpPage } from "@/components/manage";
 import { AdminFeedbackTab } from "@/components/feedback";
 import { MoneyTab } from "@/components/money";
@@ -42,6 +42,11 @@ export function Home({ session }: { session: any }) {
   // clear it whenever we're not on the money tab so a normal re-entry lands on Balances.
   const [moneyInitialTab, setMoneyInitialTab] = useState<"settle" | null>(null);
   useEffect(() => { if (tab !== "money") setMoneyInitialTab(null); }, [tab]);
+  // Tee Times → game handoff (P4): a seed prefills Create Game; openGameId opens an
+  // already-linked game. One-shot, cleared when we leave the Games tab (like money).
+  const [gameSeed, setGameSeed] = useState<GameSeed | null>(null);
+  const [openGameId, setOpenGameId] = useState<string | null>(null);
+  useEffect(() => { if (tab !== "games") { setGameSeed(null); setOpenGameId(null); } }, [tab]);
   const [stage, setStage] = useState<null | "setup" | { round: Round }>(null);
   // Tracks the in-progress round draft so we can show a "Resume" banner from any
   // screen. Re-read from storage whenever navigation happens (see refreshDraft).
@@ -458,11 +463,11 @@ export function Home({ session }: { session: any }) {
         ) : tab === "profile" ? (
           <ProfilePanel profile={profile} user={user} onSaved={loadProfile} />
         ) : tab === "teetimes" && activeGroup ? (
-          <TeeTimes user={user} activeGroupId={activeGroup.id} activeGroupName={activeGroup.name} canManage={activeGroup.role === "admin"} initialTeeId={deepTeeId} onConsumedDeepLink={() => setDeepTeeId(null)} />
+          <TeeTimes user={user} activeGroupId={activeGroup.id} activeGroupName={activeGroup.name} canManage={activeGroup.role === "admin"} initialTeeId={deepTeeId} onConsumedDeepLink={() => setDeepTeeId(null)} onSpawnGame={(s) => { setOpenGameId(null); setGameSeed(s); setTab("games"); }} onOpenGame={(gid) => { setGameSeed(null); setOpenGameId(gid); setTab("games"); }} />
         ) : tab === "money" && activeGroup ? (
           <MoneyTab user={user} activeGroup={activeGroup} onChanged={loadOwed} initialTab={moneyInitialTab} />
         ) : tab === "games" && activeGroup ? (
-          <Tournaments session={session} activeGroupId={activeGroup.id} isAdmin={!!profile?.is_admin} />
+          <Tournaments session={session} activeGroupId={activeGroup.id} isAdmin={!!profile?.is_admin} seed={gameSeed} openGameId={openGameId} />
         ) : loading ? (
           <div style={{ color: C.sage, textAlign: "center", padding: 40 }}>Loading your rounds…</div>
         ) : tab === "dashboard" ? (

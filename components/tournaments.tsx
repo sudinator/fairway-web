@@ -166,18 +166,23 @@ export default function Tournaments({
   session,
   activeGroupId,
   isAdmin,
+  seed,
+  openGameId,
 }: {
   session: any;
   activeGroupId: string;
   isAdmin?: boolean;
+  seed?: GameSeed | null;
+  openGameId?: string | null;
 }) {
   const [view, setView] = useState<"list" | "create" | { gameId: string; tab?: "play" | "setup" }>(
-    "list",
+    seed ? "create" : openGameId ? { gameId: openGameId } : "list",
   );
   // Resume the game room the user was in (survives lock/refresh) — but ONLY if it
   // belongs to the active group, so switching groups never drops you into (or
   // shows players from) a game in a different group.
   useEffect(() => {
+    if (seed || openGameId) return; // a tee-time handoff wins over resume
     const g = loadActiveGame();
     if (!g) return;
     let cancelled = false;
@@ -222,6 +227,7 @@ export default function Tournaments({
         user={user}
         displayName={displayName}
         activeGroupId={activeGroupId}
+        seed={seed}
         onCancel={() => setView("list")}
         onCreated={(gameId, tab) => setView({ gameId, tab })}
       />
@@ -444,16 +450,38 @@ function GameList({
 }
 
 // ---------------- Create a game ----------------
+// Seed passed from a Tee Time to prefill Create Game (P4 handoff): course + date
+// + the IN-list members to preselect + the IN-list guests to carry forward (by
+// name; their handicap is entered/confirmed in review). Tee groups are set in setup.
+export type GameSeed = { teeTimeId: string; course: string | null; playDate: string; memberIds: string[]; guestNames: string[] };
+
+// Default tee selection when a course is picked. For TGC: prefer a "member" tee by
+// name; else the tee whose total yardage is closest to 6400; else the first tee.
+function defaultTeeIdx(tees: any[], smart: boolean): number {
+  if (!Array.isArray(tees) || tees.length === 0) return 0;
+  if (!smart) return 0;
+  const mi = tees.findIndex((t) => /member/i.test(t?.name || ""));
+  if (mi >= 0) return mi;
+  let best = -1, bestDiff = Infinity;
+  tees.forEach((t, i) => {
+    const yds = Array.isArray(t?.yardages) ? t.yardages.reduce((s: number, v: any) => s + (Number(v) || 0), 0) : 0;
+    if (yds > 0) { const d = Math.abs(yds - 6400); if (d < bestDiff) { bestDiff = d; best = i; } }
+  });
+  return best >= 0 ? best : 0;
+}
+
 function CreateGame({
   user,
   displayName,
   activeGroupId,
+  seed,
   onCancel,
   onCreated,
 }: {
   user: any;
   displayName: string;
   activeGroupId: string;
+  seed?: GameSeed | null;
   onCancel: () => void;
   onCreated: (id: string, tab?: "play" | "setup") => void;
 }) {
@@ -464,7 +492,7 @@ function CreateGame({
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
-  const [matchDate, setMatchDate] = useState<string>(todayLocal());
+  const [matchDate, setMatchDate] = useState<string>(seed?.playDate || todayLocal());
   const [favorites, setFavorites] = useState<any[]>([]);
   const [pickedFav, setPickedFav] = useState<any | null>(null);
   const [teeIdx, setTeeIdx] = useState(0);
@@ -499,8 +527,10 @@ function CreateGame({
   const [guestName, setGuestName] = useState("");
   const [guestHcp, setGuestHcp] = useState("");
   const [guestPlayers, setGuestPlayers] = useState<
-    { id: string; display_name: string; handicap_index: number }[]
+    { id: string; display_name: string; handicap_index: number | null }[]
   >([]);
+  // Raw text for inline handicap entry on guests that came in without one.
+  const [guestIdxEdits, setGuestIdxEdits] = useState<Record<string, string>>({});
 
   const addGuestPlayer = () => {
     const guestIndex = parseFloat(guestHcp);
@@ -588,6 +618,33 @@ function CreateGame({
       });
     })();
   }, [activeGroupId, user.id]);
+
+  // P4 handoff: once favorites/roster have loaded, prefill the course (with the
+  // default tee) and preselect the tee time's IN-list members. Runs once.
+  useEffect(() => {
+    if (!seed?.course || pickedFav || favorites.length === 0) return;
+    const f = favorites.find((x) => x.name === seed.course);
+    if (f) { setPickedFav(f); setTeeIdx(defaultTeeIdx(f.tees, activeGroupId === TGC_GROUP_ID)); }
+  }, [seed, favorites, pickedFav, activeGroupId]);
+  useEffect(() => {
+    if (!seed || groupRoster.length === 0) return;
+    setSelectedPlayers((prev) => {
+      const next = { ...prev };
+      seed.memberIds.forEach((id) => { if (groupRoster.some((p) => p.id === id)) next[id] = true; });
+      return next;
+    });
+  }, [seed, groupRoster]);
+  // Carry the tee time's guests into the field with a blank handicap for the
+  // organizer to fill in during review (flagged in the guest list). Runs once.
+  const guestsSeeded = React.useRef(false);
+  useEffect(() => {
+    if (!seed?.guestNames?.length || guestsSeeded.current) return;
+    guestsSeeded.current = true;
+    setGuestPlayers((prev) => [
+      ...prev,
+      ...seed.guestNames.map((nm) => ({ id: `seed-${Date.now()}-${Math.random().toString(36).slice(2)}`, display_name: nm, handicap_index: null as number | null })),
+    ]);
+  }, [seed]);
 
   const tee = pickedFav?.tees?.[teeIdx];
   const coursePar = pickedFav
@@ -706,7 +763,7 @@ function CreateGame({
         rating: tee.rating,
         slope: tee.slope,
         tee_name: tee.name,
-        course_handicap: coursePar != null ? courseHandicap(p.handicap_index, tee.slope, tee.rating, coursePar) : null,
+        course_handicap: p.handicap_index != null && coursePar != null ? courseHandicap(p.handicap_index, tee.slope, tee.rating, coursePar) : null,
         scores: Array(holesMeta.length).fill(null),
         putts: Array(holesMeta.length).fill(null),
         fairways: Array(holesMeta.length).fill(null),
@@ -715,6 +772,14 @@ function CreateGame({
       const { error: e2 } = await supabase.from("game_players").insert(rows);
       if (e2) throw e2;
       await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_created", group_id: activeGroupId, summary: `Created the game "${game.name}" at ${pickedFav.name}` });
+      // P4 handoff: link this game back to the originating tee time and record it
+      // in the tee-time activity trail (tt_ actions are kept out of the Money log).
+      if (seed?.teeTimeId) {
+        try {
+          await supabase.from("tee_times").update({ game_id: game.id }).eq("id", seed.teeTimeId);
+          await supabase.from("group_activity").insert({ group_id: activeGroupId, actor_user_id: user.id, action: "tt_game_linked", summary: `created a game from this tee time ("${game.name}")`, meta: { tee_time_id: seed.teeTimeId, game_id: game.id } });
+        } catch { /* linking never blocks game creation */ }
+      }
       for (const row of rows) {
         if (row.user_id && row.user_id !== user.id) {
           try {
@@ -833,18 +898,46 @@ function CreateGame({
         </div>
         <div style={{ background: C.greenLight, borderRadius: 12, padding: 10, marginTop: 8 }}>
           {guestPlayers.length > 0 && (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
-              {guestPlayers.map((g) => (
-                <span key={g.id} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: C.greenMid, borderRadius: 999, padding: "4px 10px", color: C.cream, fontSize: 13 }}>
-                  {g.display_name} <span style={{ color: C.sage, fontSize: 11 }}>idx {g.handicap_index}{tee && coursePar != null ? ` · ch ${courseHandicap(g.handicap_index, tee.slope, tee.rating, coursePar)}` : ""}</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+              {guestPlayers.map((g) => {
+                const hasIdx = g.handicap_index != null && !Number.isNaN(g.handicap_index as number);
+                const ch = hasIdx && tee && coursePar != null ? courseHandicap(g.handicap_index as number, tee.slope, tee.rating, coursePar) : null;
+                return (
+                <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 8, background: C.greenMid, borderRadius: 10, padding: "6px 10px" }}>
+                  <span style={{ color: C.cream, fontSize: 13, flex: 1, minWidth: 0 }}>
+                    {g.display_name}
+                    {hasIdx ? <span style={{ color: C.sage, fontSize: 11 }}> · idx {g.handicap_index}{ch != null ? ` · ch ${ch}` : ""}</span> : null}
+                  </span>
+                  {!hasIdx && (
+                    <>
+                      <span style={{ color: "#f6c66b", fontSize: 10, fontWeight: 800, letterSpacing: 0.4 }}>NEEDS HCP</span>
+                      <input
+                        value={guestIdxEdits[g.id] ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          if (v !== "" && !/^-?\d*\.?\d*$/.test(v)) return;
+                          setGuestIdxEdits((m) => ({ ...m, [g.id]: v }));
+                          const num = v === "" ? null : parseFloat(v);
+                          setGuestPlayers((prev) => prev.map((p) => (p.id === g.id ? { ...p, handicap_index: num == null || Number.isNaN(num) ? null : num } : p)));
+                        }}
+                        inputMode="decimal"
+                        placeholder="Idx"
+                        style={{ ...inputStyle, width: 60, padding: "4px 8px", fontSize: 12 }}
+                      />
+                    </>
+                  )}
                   <button
-                    onClick={() => setGuestPlayers((prev) => prev.filter((p) => p.id !== g.id))}
+                    onClick={() => { setGuestPlayers((prev) => prev.filter((p) => p.id !== g.id)); setGuestIdxEdits((m) => { const n = { ...m }; delete n[g.id]; return n; }); }}
                     style={{ background: "none", border: "none", color: C.birdie, cursor: "pointer", fontSize: 14, padding: 0 }}
                   >
                     ✕
                   </button>
-                </span>
-              ))}
+                </div>
+                );
+              })}
+              {guestPlayers.some((g) => g.handicap_index == null) && (
+                <div style={{ color: "#f6c66b", fontSize: 11, lineHeight: 1.4 }}>Guests without a handicap will be created and play off scratch — add an index above if you have one.</div>
+              )}
             </div>
           )}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
@@ -896,7 +989,7 @@ function CreateGame({
             key={i}
             onClick={() => {
               setPickedFav(f);
-              setTeeIdx(0);
+              setTeeIdx(defaultTeeIdx(f.tees, activeGroupId === TGC_GROUP_ID));
             }}
             style={{
               display: "flex",

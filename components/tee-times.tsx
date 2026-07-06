@@ -11,7 +11,7 @@ type TeeTime = {
   id: string; group_id: string; created_by: string | null; seq: number | null;
   title: string | null; kind: string | null; course: string | null; play_date: string;
   tee_off_times: string[] | null; signup_opens_at: string | null; signup_deadline: string | null;
-  max_spots: number | null; notes: string | null; status: string; captain_user_id: string | null;
+  max_spots: number | null; notes: string | null; status: string; captain_user_id: string | null; game_id: string | null;
 };
 type Rsvp = { id: string; tee_time_id: string; user_id: string; choice: "in" | "out" | "maybe"; guest_names: string[]; signup_order: number | null };
 type Member = { id: string; display_name: string; avatar_url: string | null; handicap_index: number | null };
@@ -50,13 +50,15 @@ function DateBadge({ d }: { d: string }) {
   );
 }
 
-export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, initialTeeId, onConsumedDeepLink }: {
+export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, initialTeeId, onConsumedDeepLink, onSpawnGame, onOpenGame }: {
   user: { id: string };
   activeGroupId: string;
   activeGroupName: string;
   canManage: boolean;
   initialTeeId?: string | null;
   onConsumedDeepLink?: () => void;
+  onSpawnGame?: (seed: { teeTimeId: string; course: string | null; playDate: string; memberIds: string[]; guestNames: string[] }) => void;
+  onOpenGame?: (gameId: string) => void;
 }) {
   const [tees, setTees] = useState<TeeTime[]>([]);
   const [rsvps, setRsvps] = useState<Rsvp[]>([]);
@@ -172,6 +174,24 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
     setBusy(false); await load();
   }
   const deadlinePassed = (t: TeeTime) => !!t.signup_deadline && new Date(t.signup_deadline) < new Date();
+  // Organizer removes a single guest from a member's IN row, freeing exactly one
+  // spot. The field/waitlist split recomputes by signup order on reload, so the
+  // next waitlisted member moves into the field automatically.
+  async function dropGuest(tt: TeeTime, memberId: string, guestIdx: number) {
+    const r = rsvpsFor(tt.id).find((x) => x.user_id === memberId);
+    if (!r || !r.guest_names || guestIdx < 0 || guestIdx >= r.guest_names.length) return;
+    const gname = r.guest_names[guestIdx] || "Guest";
+    const hostName = memberOf(memberId)?.display_name || "a member";
+    if (typeof window !== "undefined" && !window.confirm(`Remove guest "${gname}" from ${hostName}'s signup? This frees a spot for the waitlist.`)) return;
+    const next = r.guest_names.filter((_, i) => i !== guestIdx);
+    setBusy(true);
+    await supabase.from("tee_time_rsvps").update({ guest_names: next }).eq("tee_time_id", tt.id).eq("user_id", memberId);
+    await logTee("tt_guest_removed", `removed ${shortName(hostName)}'s guest "${gname}" from tee time #${tt.seq ?? "?"}`, { tee_time_id: tt.id, seq: tt.seq, target_user_id: memberId, guest_name: gname });
+    if (memberId !== user.id) {
+      try { await supabase.rpc("create_notification", { p_recipient: memberId, p_message: `An organizer removed your guest "${gname}" from tee time #${tt.seq ?? "?"} (${teeName(tt)}) to free a spot.`, p_group_id: activeGroupId }); } catch { /* notification is best-effort */ }
+    }
+    setBusy(false); await load();
+  }
   const copyExport = async (tt: TeeTime) => { try { await navigator.clipboard.writeText(teeExport(tt, inList(tt.id), memberOf, courseData, activeGroupName)); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* clipboard unavailable */ } };
   const copyReminder = async (tt: TeeTime) => {
     const respondedIds = new Set(rsvpsFor(tt.id).map((r) => r.user_id));
@@ -215,6 +235,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
     const waitSet = new Set<string>();
     if (sel.max_spots != null) ins.forEach((r) => { cum += 1 + (r.guest_names?.length || 0); if (cum > sel.max_spots!) waitSet.add(r.user_id); });
     const frozen = isPast(sel) && !canManage;
+    const hasGameBtn = canManage && (!!sel.game_id || (sel.status !== "cancelled" && ins.length > 0));
 
     const memberRow = (r: Rsvp, showOrg: boolean, wait?: boolean) => {
       const m = memberOf(r.user_id);
@@ -228,8 +249,18 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
             <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{name}{r.user_id === user.id ? " (you)" : ""}</div>
             <div style={{ fontSize: 11, color: C.faint }}>
               {m?.handicap_index != null ? `Idx ${m.handicap_index}${chSel != null ? ` \u00b7 CH ${chSel}` : ""}` : "no idx"}
-              {r.guest_names?.length ? ` · +${r.guest_names.length} guest: ${r.guest_names.join(", ")}` : ""}
+              {r.guest_names?.length && !canManage ? ` · +${r.guest_names.length} guest: ${r.guest_names.join(", ")}` : ""}
             </div>
+            {canManage && r.guest_names?.length ? (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 4 }}>
+                {r.guest_names.map((gn, gi) => (
+                  <span key={gi} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#eef3ee", border: `1px solid ${C.line}`, borderRadius: 999, padding: "2px 6px 2px 9px", fontSize: 11, color: C.ink }}>
+                    {gn || "Guest"}
+                    <button onClick={() => dropGuest(sel, r.user_id, gi)} disabled={busy} aria-label={`Remove guest ${gn || ""}`} title="Remove guest (frees a spot)" style={{ background: "none", border: "none", color: C.birdie, cursor: "pointer", fontSize: 12, padding: 0, lineHeight: 1 }}>✕</button>
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
           {wait ? <span style={{ fontSize: 10, fontWeight: 800, background: "#fbe9cf", color: "#9a6a12", borderRadius: 20, padding: "3px 9px" }}>Waitlist</span> : null}
           {wait && canManage ? <button onClick={() => promote(sel, r.user_id)} disabled={busy} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Move up</button> : null}
@@ -289,7 +320,13 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
             {canManage && <button onClick={() => setCaptainPickerOpen(true)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>{sel.captain_user_id ? "Change" : "Assign"}</button>}
             <button onClick={() => setDutiesOpen(true)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Duties</button>
           </div>
-          <button onClick={() => copyExport(sel)} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 13 }}>{copied ? "Copied ✓" : "Copy for WhatsApp"}</button>
+          {canManage && sel.game_id && (
+            <button onClick={() => onOpenGame?.(sel.game_id!)} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 13 }}>Open linked game ›</button>
+          )}
+          {canManage && !sel.game_id && sel.status !== "cancelled" && ins.length > 0 && (
+            <button onClick={() => onSpawnGame?.({ teeTimeId: sel.id, course: sel.course, playDate: sel.play_date, memberIds: ins.map((r) => r.user_id), guestNames: ins.flatMap((r) => r.guest_names || []) })} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 13 }}>Create game from this tee time</button>
+          )}
+          <button onClick={() => copyExport(sel)} style={{ ...btn(!hasGameBtn), width: "100%", marginTop: hasGameBtn ? 8 : 10, fontSize: 13 }}>{copied ? "Copied ✓" : "Copy for WhatsApp"}</button>
           {canManage && sel.status !== "cancelled" && !isPast(sel) && (
             <button onClick={() => copyReminder(sel)} style={{ ...btn(false), width: "100%", marginTop: 8, fontSize: 13 }}>{remindCopied ? "Reminder copied ✓" : "Copy reminder for WhatsApp"}</button>
           )}
@@ -330,7 +367,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
                 <div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>
                   {rows.map((a) => {
                     const who = shortName(memberOf(a.actor_user_id)?.display_name || "Someone");
-                    const when = new Date(a.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+                    const when = new Date(a.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
                     return (
                       <div key={a.id} style={{ padding: "10px 14px", borderBottom: `1px solid ${C.line}` }}>
                         <div style={{ fontSize: 13, color: C.ink }}><b>{who}</b> {a.summary}</div>
