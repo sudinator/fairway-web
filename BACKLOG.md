@@ -118,6 +118,8 @@ From the security & structure review. None are emergencies; tackle when convenie
    gracefully on very narrow screens; keep Delete visually distinct/last). App code only.
 
 ## Shipped
+- v1.101.0 - (a) Group scoring: every player sees their own card in Results; non-marker's gross is view-only (kept by X) with stats editable via the chokepoint (ScoreEntryCard/HoleScoreModal scoreLocked mode). (b) Admin 'Copy sign-up link (new players)' on a tee time mints a group invite code + /join/<code>?tt=<id> so a brand-new player joins the group and lands on the tee time to RSVP; existing members skip the join. No migration.
+- v1.100.1 - Results tab now shows the group scorer their own individual card mid-round (gate fixed from 'any marker exists' to 'someone else owns my row'). No migration.
 - v1.100.0 - Group scoring: a player can keep their OWN putts/fairways/sand/penalties (tap own row in the group card; score greyed/view-only, kept by the marker). Last-write-wins on stats. Server-enforced by save_hole_stats chokepoint (migration 0067). Client writes are now column-scoped (only-changed-columns) so the two writers never clobber. Individual scoring unchanged.
 - v1.99.4 - Six-hole segment card ranks the in-progress leader by under-par pace (points/net relative to holes played), matching the main leaderboard, instead of raw cumulative points; shows the leader's own points·thru. Completed sixes and payouts unchanged. No migration.
 - v1.99.3 - Betting consistency: overall 1st/2nd (and clean sweep) only pay once all 18 are in for every bettor ('no payout yet' until then), matching the sixes; sixes tightened to require all bettors complete that six. Mid-round display only; final posted amounts unchanged. No migration.

@@ -77,6 +77,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
   const [activity, setActivity] = useState<any[]>([]);
   const [copied, setCopied] = useState(false);
   const [remindCopied, setRemindCopied] = useState(false);
+  const [signupCopied, setSignupCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dlDone, setDlDone] = useState(false);
   const [actionErr, setActionErr] = useState<string | null>(null);
@@ -208,6 +209,23 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
     const respondedIds = new Set(rsvpsFor(tt.id).map((r) => r.user_id));
     const notResponded = members.filter((m) => !respondedIds.has(m.id)).length;
     try { await navigator.clipboard.writeText(teeReminderExport(tt, inList(tt.id), notResponded, activeGroupName)); setRemindCopied(true); setTimeout(() => setRemindCopied(false), 2000); } catch { /* clipboard unavailable */ }
+  };
+  // Admin only: mint a multi-use group invite code and build a link that lets a BRAND-NEW
+  // player join the group and land straight on this tee time to RSVP. Members who tap it
+  // are simply taken to the tee time (redeem is a no-op for an existing member).
+  const copySignupLink = async (tt: TeeTime) => {
+    setBusy(true);
+    try {
+      const { data: code, error } = await supabase.rpc("create_group_invite_multi", {
+        invite_group: activeGroupId, invite_role: "member", hours: 336, uses: null,
+      });
+      if (error || !code) { setBusy(false); return; }
+      const origin = (typeof window !== "undefined" && window.location?.origin) ? window.location.origin : "https://birdienumnum.vercel.app";
+      const link = `${origin}/join/${code}?tt=${tt.id}`;
+      await navigator.clipboard.writeText(teeSignupExport(tt, link, activeGroupName));
+      setSignupCopied(true); setTimeout(() => setSignupCopied(false), 2000);
+    } catch { /* clipboard/rpc unavailable */ }
+    setBusy(false);
   };
 
   const open = (id: string) => { setSelId(id); setDetailTab("info"); setScreen("detail"); };
@@ -348,6 +366,9 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
           <button onClick={() => copyExport(sel)} style={{ ...btn(!hasGameBtn), width: "100%", marginTop: hasGameBtn ? 8 : 10, fontSize: 13 }}>{copied ? "Copied ✓" : "Copy for WhatsApp"}</button>
           {canManage && sel.status !== "cancelled" && !isPast(sel) && (
             <button onClick={() => copyReminder(sel)} style={{ ...btn(false), width: "100%", marginTop: 8, fontSize: 13 }}>{remindCopied ? "Reminder copied ✓" : "Copy reminder for WhatsApp"}</button>
+          )}
+          {canManage && sel.status !== "cancelled" && !isPast(sel) && (
+            <button onClick={() => copySignupLink(sel)} disabled={busy} style={{ ...btn(false), width: "100%", marginTop: 8, fontSize: 13, opacity: busy ? 0.6 : 1 }}>{signupCopied ? "Sign-up link copied ✓" : "Copy sign-up link (new players)"}</button>
           )}
           </>
         ) : detailTab === "signups" ? (
@@ -798,5 +819,20 @@ function teeReminderExport(tt: TeeTime, ins: Rsvp[], notResponded: number, group
   if (tt.signup_deadline) L.push(`⏱ Sign up by ${fmtFull(tt.signup_deadline.slice(0, 10))}`);
   L.push("");
   L.push(`👉 Tap to RSVP: ${link}`);
+  return L.join("\n");
+}
+
+// Sign-up link for brand-NEW players (admin only). Carries a multi-use group invite code
+// plus this tee time, so tapping it signs them in, joins the group, and drops them on the
+// tee time to RSVP. Existing members who tap it just land on the tee time (join is a no-op).
+function teeSignupExport(tt: TeeTime, link: string, groupName: string): string {
+  const L: string[] = [];
+  L.push(`🏌️ ${groupName} · Tee Time #${tt.seq ?? "—"} — ${teeName(tt)} (${kindOf(tt.kind).label})`);
+  L.push(`📅 ${fmtFull(tt.play_date)}${tt.tee_off_times?.length ? ` · ${tt.tee_off_times.join("/")}` : ""}`);
+  if (tt.course) L.push(`📍 ${tt.course}`);
+  if (tt.signup_deadline) L.push(`⏱ Sign up by ${fmtFull(tt.signup_deadline.slice(0, 10))}`);
+  L.push("");
+  L.push(`👉 New here? Tap to join ${groupName} and RSVP: ${link}`);
+  L.push(`(Already in the group? Same link takes you straight to RSVP.)`);
   return L.join("\n");
 }

@@ -78,9 +78,13 @@ export default function JoinGroupPage({ params }: { params: { code: string } }) 
         });
       } catch {}
       if (!cancelled) {
+        // If the invite carried a tee-time destination (?tt=<id>), drop them straight
+        // onto it to RSVP now that they're in the group; otherwise open the app home.
+        const tt = (() => { try { return new URLSearchParams(window.location.search).get("tt"); } catch { return null; } })();
+        const dest = tt ? `/?tt=${encodeURIComponent(tt)}` : "/";
         setState("success");
-        setMessage("You joined the group. Opening Birdie Num Num…");
-        setTimeout(() => router.push("/"), 1200);
+        setMessage(tt ? "You're in — opening the tee time to RSVP…" : "You joined the group. Opening Birdie Num Num…");
+        setTimeout(() => router.push(dest), 1200);
       }
     };
     run();
@@ -88,9 +92,11 @@ export default function JoinGroupPage({ params }: { params: { code: string } }) 
   }, [code, router]);
 
   const signIn = async () => {
+    const tt = (() => { try { return new URLSearchParams(window.location.search).get("tt"); } catch { return null; } })();
+    const next = `/join/${code}${tt ? `?tt=${encodeURIComponent(tt)}` : ""}`;
     await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=/join/${code}` },
+      options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
     });
   };
 

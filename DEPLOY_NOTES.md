@@ -447,3 +447,19 @@ begin
    where id = p_player;
 end $$;
 ```
+
+## v1.100.1 — The group scorer sees their own card in Results (no migration)
+- Previously the individual "Enter your scores" card in the Results tab was hidden whenever ANY marker existed — including when the marker was YOU. So the group scorer couldn't see their own card mid-round (only after the game ended).
+- Now it's hidden only when someone ELSE keeps your score (a non-marker mid-game, who uses the group card's per-row stats pop-up instead). The group scorer and self-scorers see their own card in Results as expected. The "someone is keeping score" notice likewise no longer shows to the scorer themselves.
+- Gate changed from "a marker exists" to markerOwnsMyRow (a marker other than me). No schema/logic change beyond the visibility gate; the scorer owns their own row, so editing it here is the same single-writer path as the group card.
+- Verified: tsc clean, tests pass, build clean.
+
+## v1.101.0 — Everyone sees their own card in group scoring + a join-and-RSVP link for new players (no migration)
+### Own card for everyone in group mode
+- In group scoring, the Results tab now shows EVERY player their own individual card — not just the scorer. For a player whose score is kept by someone else, the gross score is view-only (🔒 "kept by X") while putts / fairway / sand / penalties stay editable, saving instantly through the save_hole_stats chokepoint (0067). The group scorer and self-scorers get a fully-editable card as before.
+- Replaces the old "your card is hidden — tap the group card" redirect. (The group card's per-row stats pop-up from v1.100.0 still works too; this just makes the individual card the natural place.) Header reads YOUR CARD (locked) / ENTER YOUR SCORES / YOUR FINAL SCORES appropriately. HoleScoreModal + ScoreEntryCard gained a scoreLocked mode.
+### Join-and-RSVP link for brand-new players
+- Tee-time detail (admins only) gains "Copy sign-up link (new players)". It mints a multi-use group invite code (create_group_invite_multi, 14-day, unlimited uses) and builds `/join/<code>?tt=<teeTimeId>`.
+- A brand-new person who taps it: Continue with Google (creates their account) → the group invite is redeemed (joins the group) → they land straight on the tee time to RSVP. An existing member who taps it skips the join (no-op) and just opens the tee time. The /join page now carries ?tt through the OAuth round-trip and forwards to it on success.
+- Security model unchanged: minting a join link is admin-only (same as the group invite link); the code just also points at a tee time. The regular "Copy for WhatsApp" (members) link is untouched.
+- Verified: tsc clean, tests pass (game-shape/golf/money/legs/grouping/sync-cols), build clean. No migration (reuses existing create_group_invite_multi + redeem RPCs and the save_hole_stats chokepoint from 0067).

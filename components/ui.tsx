@@ -355,7 +355,7 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
   );
 }
 
-export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false, strokeSixes = false, uncap = false, showIndivDots = false }: {
+export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false, strokeSixes = false, uncap = false, showIndivDots = false, scoreLocked = false, lockedByName }: {
   holes: EntryHole[];
   hasHandicap: boolean;
   onSet: (i: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null }) => void;
@@ -371,6 +371,8 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   strokeSixes?: boolean;     // stroke games: show net-score (lowest) subtotals, not Stableford
   uncap?: boolean;              // stroke play: lift the net-double entry ceiling so every stroke counts
   showIndivDots?: boolean;      // relative games (match/four-ball/trifecta): also show blue individual (full-handicap) dots
+  scoreLocked?: boolean;        // group scoring: someone else owns my gross score — view-only, stats still editable
+  lockedByName?: string | null; // who keeps the score, for the "kept by X" note
 }) {
   const showOpp = Array.isArray(opp);
   const showRun = Array.isArray(matchRun);
@@ -379,7 +381,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   // mount forces the dropdowns to re-render so they show their saved value.
   const [hydrated, setHydrated] = React.useState(false);
   const [edit, setEdit] = React.useState<number | null>(null); // hole index whose editor popup is open
-  const openEdit = (i: number) => { const h = holes[i]; if (h && (h.strokes == null || h.strokes <= 0)) onSet(i, { strokes: h.par }); setEdit(i); };
+  const openEdit = (i: number) => { const h = holes[i]; if (!scoreLocked && h && (h.strokes == null || h.strokes <= 0)) onSet(i, { strokes: h.par }); setEdit(i); };
   const nextHole = () => { if (edit == null) return; const ni = edit + 1; if (ni < holes.length) openEdit(ni); else setEdit(null); };
   React.useEffect(() => {
     const r = requestAnimationFrame(() => setHydrated(true));
@@ -709,7 +711,9 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
             showFairway={showFairway}
             showPutts={showPutts}
             showPenalties={showPenalties}
-            onPatch={(patch) => onSet(edit!, patch)}
+            scoreLocked={scoreLocked}
+            lockedByName={lockedByName}
+            onPatch={(patch) => { if (scoreLocked) { const { strokes: _s, ...statsOnly } = patch; onSet(edit!, statsOnly); } else { onSet(edit!, patch); } }}
             onNext={edit! + 1 < holes.length ? nextHole : undefined}
             onClose={() => setEdit(null)}
           />

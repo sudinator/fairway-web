@@ -3608,29 +3608,22 @@ function GameRoom({
         </>
       ) : null}
 
-      {/* Read-only players: explain where their entry card went so a newcomer
-          isn't left hunting for it. Shown only when a marker is actively scoring. */}
-      {roomTab === "play" && me && !isEnded && (game.marker_user_id || myGroupHasMarker) && (() => {
-        const mk = (teeGroupsInUse && myRow?.tee_group != null)
-          ? players.find((p) => p.tee_group === myRow.tee_group && p.is_marker)
-          : players.find((p) => p.user_id === game.marker_user_id);
-        const mkName = mk?.display_name || "Someone";
+      {/* My card. In group scoring EVERYONE sees their own card here; when someone else
+          keeps my gross score it's shown view-only ("kept by X") while my putts / fairways
+          / sand / penalties stay editable (they save through the stats chokepoint). The
+          group scorer and self-scorers get a fully-editable card. */}
+      {roomTab === "play" && me && (() => {
+        const myScoreLocked = !isEnded && markerOwnsMyRowRef.current;
+        const mk = myScoreLocked
+          ? ((teeGroupsInUse && myRow?.tee_group != null)
+              ? players.find((p) => p.tee_group === myRow.tee_group && p.is_marker)
+              : players.find((p) => p.user_id === game.marker_user_id))
+          : null;
+        const mkName = mk?.display_name || "the scorer";
         return (
-          <div style={{ marginTop: 22, background: "#16302A", border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px" }}>
-            <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>📋 {mkName} is keeping score for your group</div>
-            <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>
-              Your score is kept by {mkName} so two phones aren't entering the number at once. Open the group card and tap your own row on any hole to fill in your putts, fairways, sand and penalties — your score stays view-only. You can also take over scoring from there.
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* My score entry — hidden while a marker is keeping score for the group
-          (scoring then happens only on the Group card, to avoid conflicts). */}
-      {roomTab === "play" && me && !(!isEnded && (game.marker_user_id || myGroupHasMarker)) && (
         <div style={{ marginTop: 22 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Eyebrow>{isEnded ? "YOUR FINAL SCORES" : "ENTER YOUR SCORES"}</Eyebrow>
+            <Eyebrow>{isEnded ? "YOUR FINAL SCORES" : myScoreLocked ? "YOUR CARD" : "ENTER YOUR SCORES"}</Eyebrow>
             <div style={{ flex: 1 }} />
             {!isEnded && (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: C.sage, fontSize: 11 }}>
@@ -3643,7 +3636,9 @@ function GameRoom({
           <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
             {isEnded
               ? "This game has ended — scores are locked in."
-              : "Tap a hole and pick your strokes — it saves instantly. Others' scores update automatically; ⟳ Refresh forces it."}
+              : myScoreLocked
+                ? `${mkName} keeps the group's score, so your gross is view-only (🔒). Tap any hole to add your own putts, fairways, sand and penalties — they save instantly.`
+                : "Tap a hole and pick your strokes — it saves instantly. Others' scores update automatically; ⟳ Refresh forces it."}
           </div>
           <ScoreEntryCard
             holes={(() => {
@@ -3693,6 +3688,8 @@ function GameRoom({
             uncap={game.game_type === "stroke"}
             showSixes={(game as any).group_id === TGC_GROUP_ID}
             strokeSixes={game.game_type === "stroke"}
+            scoreLocked={myScoreLocked}
+            lockedByName={mkName}
             onSet={(i, patch) => { if (!isEnded) setMyHole(i, patch); }}
             savingHole={savingHole}
             showPenalties={true}
@@ -3770,7 +3767,8 @@ function GameRoom({
           />
           <MyStatsLine me={me} holes={playerHoles(me)} />
         </div>
-      )}
+        );
+      })()}
       {!me && (
         <div
           style={{
