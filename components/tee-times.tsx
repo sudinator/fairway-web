@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { C, courseHandicap } from "@/lib/golf";
 import { Avatar, btn, inputStyle, Eyebrow } from "@/components/ui";
+import { loadFormDraft, saveFormDraft, clearFormDraft, draftAgeLabel } from "@/lib/form-draft";
 
 const supabase = createClient();
 
@@ -558,12 +559,48 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
     })();
   }, [groupId]);
 
+  const resumingRef = React.useRef(false);
   // auto-fill deadline 3 days before date
   useEffect(() => {
+    if (resumingRef.current) { resumingRef.current = false; return; } // don't clobber a resumed deadline
     if (!date || editing) return;
     const d = new Date(date + "T12:00:00"); d.setDate(d.getDate() - 3);
     setDeadline(d.toISOString().split("T")[0]);
   }, [date, editing]);
+
+  // ---- Resume an interrupted tee-time (device-local draft, new tee times only) ----
+  type TeeDraftData = { kind: string; title: string; date: string; times: string; course: string; maxSpots: string; deadline: string; notes: string };
+  const isNew = !editing;
+  const teeDraftKey = `bnn_teetime_draft:${groupId}`;
+  const teeHasProgress = (d: TeeDraftData) => !!(d.course || d.date || d.title.trim() || d.notes.trim() || d.times.trim());
+  const [teeDraft, setTeeDraft] = useState<{ savedAt: number; data: TeeDraftData } | null>(null);
+  const [teeDraftDismissed, setTeeDraftDismissed] = useState(false);
+  const teeHydratedRef = React.useRef(false);
+
+  useEffect(() => {
+    if (!isNew) { teeHydratedRef.current = true; return; }
+    const d = loadFormDraft<TeeDraftData>(teeDraftKey);
+    if (d && teeHasProgress(d.data)) setTeeDraft(d);
+    else teeHydratedRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const applyTeeDraft = (data: TeeDraftData) => {
+    resumingRef.current = true;
+    setKind(data.kind); setTitle(data.title); setDate(data.date); setTimes(data.times);
+    setCourse(data.course); setMaxSpots(data.maxSpots); setDeadline(data.deadline); setNotes(data.notes);
+    setTeeDraft(null); setTeeDraftDismissed(true); teeHydratedRef.current = true;
+  };
+  const startFreshTee = () => {
+    clearFormDraft(teeDraftKey); setTeeDraft(null); setTeeDraftDismissed(true); teeHydratedRef.current = true;
+  };
+
+  useEffect(() => {
+    if (!isNew || !teeHydratedRef.current) return;
+    const data: TeeDraftData = { kind, title, date, times, course, maxSpots, deadline, notes };
+    if (teeHasProgress(data)) saveFormDraft(teeDraftKey, data);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kind, title, date, times, course, maxSpots, deadline, notes]);
 
   // Display preview only — the database assigns the authoritative number on insert
   // (atomically, collision-safe). This estimate may differ by one in a rare race.
@@ -605,6 +642,7 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
     const assignedSeq = (created as any)?.seq ?? seq; // DB-assigned number is authoritative
     const nm = (title.trim() || [kindOf(kind).label, shortCourse(course || null), shortDate(date)].filter(Boolean).join(" \u00b7 "));
     try { await supabase.from("group_activity").insert({ group_id: groupId, actor_user_id: user.id, action: "tt_posted", summary: `posted tee time #${assignedSeq} (${nm})`, meta: { tee_time_id: (created as any)?.id, seq: assignedSeq } }); } catch { /* logging never blocks the post */ }
+    clearFormDraft(teeDraftKey); // posted — drop the local draft
     onCreated();
   }
 
@@ -614,6 +652,18 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
   return (
     <div>
       <div style={{ fontSize: 20, fontWeight: 800, color: C.cream }}>{editing ? "Edit" : "New"} Tee Time <span style={{ fontSize: 13, color: C.gold }}>#{seq}</span></div>
+      {teeDraft && !teeDraftDismissed && isNew && (
+        <div style={{ marginTop: 12, background: "#14352b", border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 14px" }}>
+          <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Resume your tee time?</div>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 3, lineHeight: 1.45 }}>
+            You left an unfinished tee time {draftAgeLabel(teeDraft.savedAt)}. Pick up where you left off, or start fresh.
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button onClick={() => applyTeeDraft(teeDraft.data)} style={{ ...btn(true), fontSize: 13 }}>Resume</button>
+            <button onClick={startFreshTee} style={{ ...btn(false), fontSize: 13 }}>Start fresh</button>
+          </div>
+        </div>
+      )}
       {label("Type")}
       <select value={kind} onChange={(e) => setKind(e.target.value)} style={{ ...inputStyle, width: "100%" }}>{KINDS.map((k) => <option key={k.k} value={k.k}>{k.label}</option>)}</select>
       {label("Title (optional)")}

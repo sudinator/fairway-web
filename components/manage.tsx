@@ -10,6 +10,7 @@ import { YardageBackfill } from "@/components/yardage-backfill";
 import { resizeToAvatar } from "@/lib/image";
 import { APP_VERSION, APP_BUILT_AT } from "@/lib/app-version";
 import { courseChangeLines, buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
+import { loadFormDraft, saveFormDraft, clearFormDraft, draftAgeLabel } from "@/lib/form-draft";
 import { HelpSearch } from "@/components/help-search";
 import { FeedbackForm, type FeedbackPrefill } from "@/components/feedback";
 
@@ -510,6 +511,36 @@ function CourseEditor({ user, activeGroupId, initial, existingId, onCancel, onSa
   const [results, setResults] = useState<{ id: number; name: string; location: string }[] | null>(null);
   const [loadingId, setLoadingId] = useState<number | null>(null);
 
+  // ---- Resume an interrupted NEW course (device-local draft) ----
+  const isNewCourse = !existingId;
+  const courseDraftKey = `bnn_course_draft:${activeGroupId}`;
+  const [courseDraft, setCourseDraft] = useState<{ savedAt: number; data: Course } | null>(null);
+  const [courseDraftDismissed, setCourseDraftDismissed] = useState(false);
+  const courseHydratedRef = React.useRef(false);
+
+  useEffect(() => {
+    if (!isNewCourse) { courseHydratedRef.current = true; return; }
+    const d = loadFormDraft<Course>(courseDraftKey);
+    if (d && d.data && (d.data.name || "").trim()) setCourseDraft(d);
+    else courseHydratedRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const applyCourseDraft = (data: Course) => {
+    setCourse(data); setMode("form");
+    setCourseDraft(null); setCourseDraftDismissed(true); courseHydratedRef.current = true;
+  };
+  const startFreshCourse = () => {
+    clearFormDraft(courseDraftKey); setCourseDraft(null); setCourseDraftDismissed(true); courseHydratedRef.current = true;
+  };
+
+  // Save the in-progress course once we're editing it (new courses only).
+  useEffect(() => {
+    if (!isNewCourse || !courseHydratedRef.current) return;
+    if (mode === "form" && course && (course.name || "").trim()) saveFormDraft(courseDraftKey, course);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [course, mode]);
+
   const runSearch = async () => {
     if (!q.trim()) return;
     setSearching(true); setErr(null); setResults(null);
@@ -522,6 +553,7 @@ function CourseEditor({ user, activeGroupId, initial, existingId, onCancel, onSa
     finally { setSearching(false); }
   };
   const pick = async (id: number, fallbackLoc?: string) => {
+    if (!courseHydratedRef.current) { courseHydratedRef.current = true; setCourseDraftDismissed(true); } // choosing a course = start fresh
     setLoadingId(id); setErr(null);
     try {
       const res = await fetch(`/api/courses?id=${id}`);
@@ -535,6 +567,7 @@ function CourseEditor({ user, activeGroupId, initial, existingId, onCancel, onSa
     finally { setLoadingId(null); }
   };
   const startManual = () => {
+    if (!courseHydratedRef.current) { courseHydratedRef.current = true; setCourseDraftDismissed(true); }
     setCourse(buildCustomCourse("New course", "", 72, 72, 113));
     setMode("form");
   };
@@ -543,6 +576,18 @@ function CourseEditor({ user, activeGroupId, initial, existingId, onCancel, onSa
     return (
       <div style={{ maxWidth: 600 }}>
         <Eyebrow>ADD A COURSE</Eyebrow>
+        {courseDraft && !courseDraftDismissed && isNewCourse && (
+          <div style={{ marginTop: 12, background: "#faf6ea", border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 14px" }}>
+            <div style={{ color: C.ink, fontSize: 13, fontWeight: 700 }}>Resume your course?</div>
+            <div style={{ color: C.faint, fontSize: 12, marginTop: 3, lineHeight: 1.45 }}>
+              You left {courseDraft.data.name ? `"${courseDraft.data.name}"` : "a course"} unfinished {draftAgeLabel(courseDraft.savedAt)}. Pick up where you left off, or start fresh.
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button onClick={() => applyCourseDraft(courseDraft.data)} style={{ ...btn(true), fontSize: 13 }}>Resume</button>
+              <button onClick={startFreshCourse} style={{ ...btn(false), fontSize: 13 }}>Start fresh</button>
+            </div>
+          </div>
+        )}
         <div style={{ marginTop: 12 }}>
           <label style={{ color: C.sage, fontSize: 12 }}>Search the database (≈30,000 courses)</label>
           <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
@@ -569,7 +614,7 @@ function CourseEditor({ user, activeGroupId, initial, existingId, onCancel, onSa
   }
 
   if (!course) return null;
-  return <CourseForm user={user} activeGroupId={activeGroupId} course={course} setCourse={setCourse} existingId={existingId} saving={saving} setSaving={setSaving} err={err} setErr={setErr} onCancel={onCancel} onSaved={onSaved} />;
+  return <CourseForm user={user} activeGroupId={activeGroupId} course={course} setCourse={setCourse} existingId={existingId} saving={saving} setSaving={setSaving} err={err} setErr={setErr} onCancel={onCancel} onSaved={() => { clearFormDraft(courseDraftKey); onSaved(); }} />;
 }
 
 function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving, setSaving, err, setErr, onCancel, onSaved }: {

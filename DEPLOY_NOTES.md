@@ -313,3 +313,17 @@ Five fixes from a fresh code review:
 - Returning to Create Game shows a **"Resume your setup?"** banner (Resume / Start fresh). Resume restores everything (course re-matched by name once favorites load); Start fresh clears the draft and uses the tee-time defaults. The draft is cleared automatically when the game is created.
 - Keyed by group + originating tee time (bnn_setup_draft:<group>:<teeTime>), so drafts never bleed across tee times or groups. New lib/setup-draft.ts. Note: an explicit Cancel keeps the draft (so you can resume later); use "Start fresh" on the banner to discard.
 - Verified: tsc clean, all tests pass, build clean.
+
+## v1.96.1 — Automated robustness check on every deploy (CI; app unchanged)
+- Added .github/workflows/robustness.yml. On every push/PR (and daily + on-demand) it runs two jobs:
+  1. **Types, tests, build** — `tsc --noEmit`, `npm test` (349 pure-logic tests), `next build`. Catches code/logic/type regressions before deploy.
+  2. **Database schema guard (read-only)** — runs ci/schema-check.sh against the database in the `SUPABASE_DB_URL` repo secret: lists NOT-NULL columns without a default (informational) and HARD-FAILS if any "state" column the app relies on a default for is missing one (ci/assert-defaults.sql). This is the automated version of SMOKE_TEST.sql and directly guards against the `bets` drift class. 100% read-only — safe to point at production. Skips (doesn't fail) until the secret is set.
+- To enable the DB guard: GitHub repo → Settings → Secrets and variables → Actions → New repository secret → name `SUPABASE_DB_URL`, value = the Supabase "Session pooler" connection URI (Supabase → Project Settings → Database → Connection string → URI, Session pooler). Read-only use.
+- App behavior is unchanged from v1.96.0 (this release adds CI + ci/ scripts only; no app code, no migration). We validated the guard against a real Postgres: it passes when defaults exist and fails (naming the column) when one is dropped.
+
+## v1.97.0 — Resume drafts for course creation and tee-time creation (no migration)
+- Factored the draft logic into one shared helper (lib/form-draft.ts: loadFormDraft/saveFormDraft/clearFormDraft/draftAgeLabel). Game setup (lib/setup-draft.ts) now delegates to it; Courses and Tee Times use it directly.
+- **Courses:** starting a NEW course and leaving mid-entry no longer loses your work (name, tees, per-hole par/SI/yardages, ratings). "Add a course" shows a "Resume your course?" banner (Resume / Start fresh); the draft clears on save. Editing an EXISTING course is not drafted (its data is already saved). Picking a searched course or "Enter manually" counts as starting fresh.
+- **Tee Times:** creating a NEW tee time and leaving no longer loses it (type, title, date, tee-off times, course, spots, deadline, notes). "New Tee Time" shows a "Resume your tee time?" banner; draft clears on post. Editing an existing tee time is not drafted. The auto-fill-deadline effect is guarded so a resumed deadline isn't overwritten.
+- Consistent with game setup: Cancel keeps the draft (resume later); use "Start fresh" to discard. Device-local only, keyed per group.
+- Verified: tsc clean, all tests pass, build clean.
