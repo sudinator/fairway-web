@@ -284,3 +284,7 @@ Five fixes from a fresh code review:
 - **Overflow rule:** a sponsor keeps a full foursome (themselves + up to 3 guests). If a member brought 4+ guests, the extra guests are left **unassigned** with a banner naming them, for the organizer to place by hand. A group can never exceed four.
 - **Pre-round only:** the button is disabled once any score is entered or a group is locked (you can't reshuffle a round that's underway).
 - Pure algorithm in `lib/grouping.ts` with 281 unit tests. Verified: tsc clean, all tests pass, build clean.
+
+## v1.94.1 — WhatsApp export gets the tap-to-open link (no migration)
+- The main **"Copy for WhatsApp"** tee-time message now ends with a clickable deep link (`👉 Open in the app to RSVP or view: …/?tt=<id>`), matching the reminder message. Tapping it opens the app straight on that tee time (the link survives the Google sign-in redirect via the existing `?tt=` capture in page.tsx → home.tsx). The reminder message already had this; only the full-field export was missing it.
+- Code-only. Verified: tsc clean, tests pass, build clean.

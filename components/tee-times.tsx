@@ -726,6 +726,9 @@ function teeExport(tt: TeeTime, ins: Rsvp[], memberOf: (id: string) => Member | 
   L.push(`IN — ${used}${tt.max_spots != null ? ` of ${tt.max_spots}` : ""}`);
   field.forEach((r) => L.push(line(r)));
   if (wait.length) { L.push(""); L.push(`WAITLIST (${wait.length})`); wait.forEach((r) => L.push(line(r))); }
+  const origin = (typeof window !== "undefined" && window.location?.origin) ? window.location.origin : "https://birdienumnum.vercel.app";
+  L.push("");
+  L.push(`👉 Open in the app to RSVP or view: ${origin}/?tt=${tt.id}`);
   return L.join("\n");
 }
 
