@@ -414,3 +414,36 @@ alter table public.group_guests
 - Display is unchanged in format: still shows raw points/net · thru the LEADER's own holes (e.g. "Bob · 12 pts · thru hole 4 · leading"), so the over/under is easy to read off.
 - Once every bettor has all six holes in, everyone is on the same par pace, so this collapses to exactly who won the six — no change to completed sixes, and no change to any payout (payouts still settle only when all scores are in, per v1.99.3). Clean-sweep watch now tracks the pace leader of the last six.
 - Verified: tsc clean, tests pass (computeBetting 29 / money 56 / legs 23 / grouping 281), build clean.
+
+## v1.100.0 — Players keep their own stats in group scoring (score stays the scorer's)
+- RUN migration 0067_save_hole_stats.sql (full SQL below). Adds a save_hole_stats(p_player, p_putts, p_fairways, p_penalties, p_sand) SECURITY DEFINER chokepoint: a signed-in player may update ONLY their OWN row's peripheral stats, and it never touches scores/clock. Mirrors the 0022 save_hole_scores ownership pattern. Idempotent; validated on real Postgres (owner writes stats with score intact; a non-owner is rejected).
+- GROUP SCORING ONLY. Individual scoring is unchanged — you enter your own score and stats as before.
+- In a group where someone else keeps score: open the group card and tap your OWN row on any hole. The gross score is greyed out ("kept by <marker>", view-only) and putts / fairway / sand / penalties are editable in the same hole pop-up the marker uses. The marker still owns the number; the scorer MAY also enter stats.
+- Conflict rule: LAST-WRITE-WINS per stat column. The scorer overrides simply by entering a stat (their save becomes the latest). Peripheral stats do not affect the gross/net/Stableford score, so the number is never at risk.
+- Sync safety: every writer now pushes ONLY the columns it changed vs the confirmed-synced watermark (new lib/sync-cols.ts, unit-tested), so the marker's background flush never clobbers a stat it didn't touch and a non-marker's device never writes a score it doesn't own (a hard mask drops `scores`, and stats route through the chokepoint). Watermark advances per written column. No change to the reconcile/merge model.
+- NOTE: multi-device realtime behavior can't be integration-tested in CI — smoke-test on two phones (marker + player) before relying on it: marker enters scores, player taps own row and edits putts, confirm both land and neither clobbers the other; then toggle offline/online and confirm it reconciles.
+- Verified: tsc clean, tests pass (game-shape 85 / computeBetting 29 / money 56 / legs 23 / grouping 281 / sync-cols 6), build clean, migration idempotent on real Postgres.
+
+### 0067_save_hole_stats.sql
+```sql
+create or replace function public.save_hole_stats(
+  p_player    uuid,
+  p_putts     jsonb default null,
+  p_fairways  jsonb default null,
+  p_penalties jsonb default null,
+  p_sand      jsonb default null
+) returns void language plpgsql security definer set search_path = public as $$
+declare uid uuid := auth.uid(); owner uuid;
+begin
+  if uid is null then raise exception 'not signed in'; end if;
+  select user_id into owner from public.game_players where id = p_player;
+  if owner is null then raise exception 'no such player, or that row has no owner to keep its own stats'; end if;
+  if owner <> uid then raise exception 'you can only edit your own stats'; end if;
+  update public.game_players set
+      putts     = coalesce(p_putts,     putts),
+      fairways  = coalesce(p_fairways,  fairways),
+      penalties = coalesce(p_penalties, penalties),
+      sand      = coalesce(p_sand,      sand)
+   where id = p_player;
+end $$;
+```

@@ -118,6 +118,7 @@ From the security & structure review. None are emergencies; tackle when convenie
    gracefully on very narrow screens; keep Delete visually distinct/last). App code only.
 
 ## Shipped
+- v1.100.0 - Group scoring: a player can keep their OWN putts/fairways/sand/penalties (tap own row in the group card; score greyed/view-only, kept by the marker). Last-write-wins on stats. Server-enforced by save_hole_stats chokepoint (migration 0067). Client writes are now column-scoped (only-changed-columns) so the two writers never clobber. Individual scoring unchanged.
 - v1.99.4 - Six-hole segment card ranks the in-progress leader by under-par pace (points/net relative to holes played), matching the main leaderboard, instead of raw cumulative points; shows the leader's own points·thru. Completed sixes and payouts unchanged. No migration.
 - v1.99.3 - Betting consistency: overall 1st/2nd (and clean sweep) only pay once all 18 are in for every bettor ('no payout yet' until then), matching the sixes; sixes tightened to require all bettors complete that six. Mid-round display only; final posted amounts unchanged. No migration.
 - v1.99.2 - Games with <=4 players default all players into one tee group at creation (tee off together); organizer can still split manually. No migration.

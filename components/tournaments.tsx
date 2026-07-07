@@ -54,6 +54,7 @@ import { loadSetupDraft, saveSetupDraft, clearSetupDraft, draftHasProgress, draf
 const GP_STATE_DEFAULTS = { penalties: [] as unknown[], sand: [] as unknown[], is_marker: false, group_locked: false };
 import { logActivity } from "@/lib/activity";
 import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot, saveSyncedWatermark, loadSyncedWatermark, clearSyncedWatermark, rowPendingHoles } from "@/lib/draft";
+import { changedCols, pickCols } from "@/lib/sync-cols";
 import {
   btn,
   inputStyle,
@@ -1771,6 +1772,8 @@ function GameRoom({
   // then mark it synced. Triggered on reconnect, foreground, a slow poll, and manual
   // Sync now — so recovery never depends on the browser’s online event firing.
   const drainingRef = React.useRef(false);
+  // Set after pushRowCols is defined below; lets this memoized drain always use the latest.
+  const pushRowColsRef = React.useRef<(rowId: string, bundle: any, clock?: Record<string, unknown>) => Promise<boolean>>(async () => true);
   const drainOutbox = React.useCallback(async (): Promise<number> => {
     if (typeof navigator !== "undefined" && navigator.onLine === false) return 0;
     if (drainingRef.current) return 0;
@@ -1781,9 +1784,11 @@ function GameRoom({
         const b = loadGameScores(gameIdRef.current, pl.id);
         if (!b) continue;
         if (rowPendingHoles(b as any, loadSyncedWatermark(gameIdRef.current, pl.id)) === 0) continue;
-        const body = { scores: b.scores, putts: b.putts, fairways: b.fairways, penalties: b.penalties, sand: b.sand };
-        const { error } = await supabase.from("game_players").update(body).eq("id", pl.id);
-        if (!error) { saveSyncedWatermark(gameIdRef.current, pl.id, body); pushed++; }
+        const bundle = { scores: b.scores, putts: b.putts, fairways: b.fairways, penalties: b.penalties, sand: b.sand };
+        // Column-scoped + role-aware: marker/self direct-writes changed columns; a
+        // non-marker's own row goes stats-only through the chokepoint. LWW per column.
+        const okd = await pushRowColsRef.current(pl.id, bundle);
+        if (okd) pushed++;
       }
     } finally {
       drainingRef.current = false;
@@ -1811,6 +1816,53 @@ function GameRoom({
     gameMarkerUserId: game?.marker_user_id ?? null,
     players,
   });
+  // True when the gross score for a given row is owned by SOMEONE ELSE (a group/tee-group
+  // marker, or the whole-game marker) — i.e. this device may write that row's peripheral
+  // stats but never its score. Individual scoring returns false (you own your own row).
+  const scoreLockedForRow = React.useCallback((rowId: string): boolean => {
+    const row = playersRef.current.find((p) => p.id === rowId);
+    if (!row) return false;
+    if (teeGroupsInUse && row.tee_group != null) {
+      const mk = playersRef.current.find((p) => p.tee_group === row.tee_group && p.is_marker);
+      return !!mk && mk.user_id !== user.id;
+    }
+    if (game?.marker_user_id) return game.marker_user_id !== user.id;
+    return false;
+  }, [teeGroupsInUse, game?.marker_user_id, user.id]);
+  // Advance the synced watermark for exactly the columns we just pushed (merge, don't
+  // replace) so untouched columns don't later look dirty and get needlessly rewritten.
+  const advanceWatermark = (gid: string, rowId: string, bundle: any, cols: string[]) => {
+    const prev = loadSyncedWatermark(gid, rowId) || { scores: [], putts: [], fairways: [], penalties: [], sand: [] };
+    saveSyncedWatermark(gid, rowId, { ...prev, ...pickCols(bundle, cols as any) } as any);
+  };
+  // Push a row's changes column-scoped + role-aware. Marker/self → direct update of the
+  // changed columns. Non-marker on their own row → stats-only via the save_hole_stats
+  // chokepoint (server refuses to write the score). Returns true if something was written
+  // (or nothing needed writing). LWW per column.
+  const pushRowCols = async (rowId: string, bundle: any, clock?: Record<string, unknown>): Promise<boolean> => {
+    const gid = gameIdRef.current;
+    const locked = scoreLockedForRow(rowId);
+    let cols = changedCols(bundle, loadSyncedWatermark(gid, rowId));
+    if (locked) cols = cols.filter((c) => c !== "scores");
+    if (!cols.length) return true;
+    if (locked) {
+      const { error } = await supabase.rpc("save_hole_stats", {
+        p_player: rowId,
+        p_putts: cols.includes("putts") ? bundle.putts : null,
+        p_fairways: cols.includes("fairways") ? bundle.fairways : null,
+        p_penalties: cols.includes("penalties") ? bundle.penalties : null,
+        p_sand: cols.includes("sand") ? bundle.sand : null,
+      });
+      if (error) return false;
+    } else {
+      const body = { ...pickCols(bundle, cols), ...(clock || {}) };
+      const { error } = await supabase.from("game_players").update(body).eq("id", rowId);
+      if (error) return false;
+    }
+    advanceWatermark(gid, rowId, bundle, cols);
+    return true;
+  };
+  pushRowColsRef.current = pushRowCols;
   // Set true for the duration of a score reset so the background flush can't
   // re-write the old scores (a PWA confirm() can fire visibilitychange/blur,
   // which would otherwise flush the stale row right back over the reset).
@@ -1818,13 +1870,14 @@ function GameRoom({
   useEffect(() => {
     const flush = () => {
       if (resettingRef.current) return;       // a reset is in progress; don't write
-      if (markerOwnsMyRowRef.current) return; // marker owns my row; don't write it
       const m = meRef.current;
       if (!m) return;
-      const data = { scores: m.scores || [], putts: m.putts || [], fairways: m.fairways || [] };
-      if (!data.scores.some((s) => s != null)) return;
-      saveGameScores(gameIdRef.current, m.id, data);              // synchronous, always lands
-      supabase.from("game_players").update(data).eq("id", m.id).then(() => {}); // best-effort
+      const gid = gameIdRef.current;
+      const bundle = { scores: m.scores || [], putts: m.putts || [], fairways: m.fairways || [], penalties: m.penalties || [], sand: m.sand || [] };
+      saveGameScores(gid, m.id, bundle);              // synchronous local backup, always lands
+      // Best-effort network flush of only my changed columns; if a marker owns my score
+      // it goes stats-only through the chokepoint (pushRowCols handles the routing).
+      void pushRowCols(m.id, bundle);
     };
     const onVis = () => { if (document.visibilityState === "hidden") flush(); };
     document.addEventListener("visibilitychange", onVis);
@@ -1915,17 +1968,22 @@ function GameRoom({
   // surfaces sync state and retries. Retries re-read the freshest local backup for the row,
   // so a slow retry can never revert a hole entered in the meantime.
   const pushScores = async (rowId: string, firstBody: Record<string, unknown>) => {
-    const freshest = (): Record<string, unknown> => {
-      if (!game) return firstBody;
-      const b = loadGameScores(game.id, rowId);
-      return b ? { scores: b.scores, putts: b.putts, fairways: b.fairways, penalties: b.penalties, sand: b.sand } : firstBody;
+    const gid = gameIdRef.current;
+    const clock: Record<string, unknown> = {};
+    if ("clock_start" in firstBody) clock.clock_start = (firstBody as any).clock_start;
+    if ("clock_end" in firstBody) clock.clock_end = (firstBody as any).clock_end;
+    const bundleOf = (src: Record<string, unknown>) => ({
+      scores: (src as any).scores, putts: (src as any).putts, fairways: (src as any).fairways,
+      penalties: (src as any).penalties, sand: (src as any).sand,
+    });
+    const freshest = () => {
+      const b = loadGameScores(gid, rowId);
+      return b ? bundleOf(b as any) : bundleOf(firstBody);
     };
     for (let n = 0; n < 4; n++) {
       setSyncState(n === 0 ? "saving" : "retry");
-      const body = n === 0 ? firstBody : freshest();
-      const { error } = await supabase.from("game_players").update(body).eq("id", rowId);
-      if (!error) {
-        saveSyncedWatermark(gameIdRef.current, rowId, body as any);
+      const okd = await pushRowCols(rowId, n === 0 ? bundleOf(firstBody) : freshest(), n === 0 ? clock : undefined);
+      if (okd) {
         setSyncState("synced");
         recomputePending();
         window.setTimeout(() => setSyncState((cur) => (cur === "synced" ? "idle" : cur)), 1600);
@@ -3561,7 +3619,7 @@ function GameRoom({
           <div style={{ marginTop: 22, background: "#16302A", border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px" }}>
             <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>📋 {mkName} is keeping score for your group</div>
             <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>
-              Your own scorecard is hidden so two phones aren't entering at once — scroll up to the group card to follow along live. You can take over scoring from there if you'd like.
+              Your score is kept by {mkName} so two phones aren't entering the number at once. Open the group card and tap your own row on any hole to fill in your putts, fairways, sand and penalties — your score stays view-only. You can also take over scoring from there.
             </div>
           </div>
         );
@@ -3894,8 +3952,8 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
               <div key={p.id + i} style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: colorFor(p), fontSize: 10, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 3 }}>{p.display_name}</div>
                 <div
-                  style={{ position: "relative", background: "#FBFAF4", borderRadius: 7, height: 56, display: "flex", alignItems: "center", justifyContent: "center", cursor: isMarker ? "pointer" : "default", outline: isMarker ? "1px solid #E6E0CC" : "none" }}
-                  onClick={isMarker ? () => { if (gross == null || gross <= 0) onSetHole(p.id, i, { strokes: m.par }); setEdit({ playerId: p.id, holeIdx: i }); } : undefined}>
+                  style={{ position: "relative", background: "#FBFAF4", borderRadius: 7, height: 56, display: "flex", alignItems: "center", justifyContent: "center", cursor: (isMarker || p.user_id === user?.id) ? "pointer" : "default", outline: isMarker ? "1px solid #E6E0CC" : (p.user_id === user?.id ? "1px dashed #C9BF9B" : "none") }}
+                  onClick={(isMarker || p.user_id === user?.id) ? () => { if (isMarker && (gross == null || gross <= 0)) onSetHole(p.id, i, { strokes: m.par }); setEdit({ playerId: p.id, holeIdx: i }); } : undefined}>
                   {recv > 0 && (
                     <div style={{ position: "absolute", top: 4, left: 5, display: "flex", gap: 2 }}>
                       {Array.from({ length: Math.min(recv, 2) }).map((_, d) => (
@@ -4105,6 +4163,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
         const sandOn = !!p.sand?.[edit.holeIdx];
         const recv = recvFor(p, m.si);
         const order = playerOrder;
+        const scoreLocked = !isMarker && !!p.user_id && p.user_id === user?.id; // non-marker editing my own row → stats only
         const goNext = () => {
           // Save the player we're leaving (default to par if untouched).
           const curG = p.scores?.[edit.holeIdx] ?? null;
@@ -4138,8 +4197,10 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
             showFairway
             showPutts
             showPenalties
-            onPatch={(patch) => onSetHole(p.id, edit.holeIdx, patch)}
-            onNext={goNext}
+            scoreLocked={scoreLocked}
+            lockedByName={markerName}
+            onPatch={(patch) => { if (scoreLocked) { const { strokes: _s, ...statsOnly } = patch; onSetHole(p.id, edit.holeIdx, statsOnly); } else { onSetHole(p.id, edit.holeIdx, patch); } }}
+            onNext={scoreLocked ? () => { const ni = edit.holeIdx + 1; if (ni < meta.length) setEdit({ playerId: p.id, holeIdx: ni }); else setEdit(null); } : goNext}
             onClose={() => setEdit(null)}
           />
         );

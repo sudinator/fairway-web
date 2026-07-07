@@ -246,7 +246,7 @@ export type EntryHole = {
 // Reused by the group scorecard, the personal score-entry card, the solo round
 // editor and the match card. Writes each change live via onPatch; the optional
 // onNext advances (next player on the group card, next hole on a personal card).
-export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairway, penalties, sand, recv, showFairway = true, showPutts = true, showPenalties = true, onPatch, onNext, onClose }: {
+export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairway, penalties, sand, recv, showFairway = true, showPutts = true, showPenalties = true, scoreLocked = false, lockedByName, onPatch, onNext, onClose }: {
   title: string;
   par: number;
   si: number | null;
@@ -260,6 +260,8 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
   showFairway?: boolean;
   showPutts?: boolean;
   showPenalties?: boolean;
+  scoreLocked?: boolean;
+  lockedByName?: string | null;
   onPatch: (patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null }) => void;
   onNext?: () => void;
   onClose: () => void;
@@ -284,7 +286,15 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
         </div>
         <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>Par {par}{yardage ? ` · ${yardage} yds` : ""} · SI {si ?? "–"}</div>
 
-        <div style={{ color: C.ink, fontSize: 13, marginTop: 14, marginBottom: 5 }}>Score (gross)</div>
+        <div style={{ color: C.ink, fontSize: 13, marginTop: 14, marginBottom: 5 }}>Score (gross){scoreLocked && <span style={{ color: C.faint }}> · 🔒 kept by {lockedByName || "the scorer"}</span>}</div>
+        {scoreLocked ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#F1EFE8", border: "1px solid #E4DFCF", borderRadius: 10, padding: "10px 12px" }}>
+            <span style={{ fontSize: 26, fontWeight: 800, color: net == null ? C.faint : net < par ? "#1B7A4B" : net === par ? "#1E5B8A" : "#C0392B" }}>{strokes && strokes > 0 ? strokes : "–"}</span>
+            {net != null && <span style={{ color: C.faint, fontSize: 12 }}> · net {net}</span>}
+            {strokes != null && strokes > 0 && <span style={{ color: "#0E3B2E", fontSize: 12, fontWeight: 800, background: "#E7EFE9", borderRadius: 6, padding: "1px 7px" }}>{sfPts ?? 0} pts</span>}
+            <span style={{ marginLeft: "auto", color: C.faint, fontSize: 11 }}>view only</span>
+          </div>
+        ) : (<>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={() => onPatch({ strokes: clampG((strokes || par) - 1) })} style={{ width: 38, height: 38, borderRadius: 8, border: `0.5px solid ${C.line}`, background: C.card, color: C.ink, fontSize: 20, cursor: "pointer" }}>−</button>
           <div style={{ flex: 1, textAlign: "center" }}>
@@ -301,6 +311,7 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
           })}
           <button onClick={() => onPatch({ strokes: netDouble })} style={{ flex: 1, textAlign: "center", padding: "7px 0", borderRadius: 8, border: `0.5px solid ${strokes === netDouble ? "#8B6A12" : "#E0CC8A"}`, background: strokes === netDouble ? "#EAD79A" : "#F6EFD8", color: "#8B6A12", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>pickup</button>
         </div>
+        </>)}
 
         {showFairway && (<>
           <div style={{ color: C.ink, fontSize: 13, marginTop: 14, marginBottom: 5 }}>Fairway {par < 4 ? <span style={{ color: C.faint }}>· n/a on a par 3</span> : ""}</div>

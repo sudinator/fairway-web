@@ -196,3 +196,6 @@ Optional Zelle contact (phone or email). Zelle has no payment deep link, so Mone
 
 ### Migration 0066 — bet-guest source game
 - `group_guests.source_game_id uuid null` → references games(id) on delete set null. Non-null = a throwaway guest auto-created for that game's posted bet (keyed per game; hidden from the add-a-guest picker and Retire list). Null = a deliberate, reusable Money guest.
+
+### Migration 0067 — save_hole_stats chokepoint (group scoring)
+- `save_hole_stats(p_player, p_putts, p_fairways, p_penalties, p_sand)` SECURITY DEFINER. Lets a signed-in player update ONLY their own game_players row's peripheral stats (putts/fairways/penalties/sand); never scores/clock. Enforces `game_players.user_id = auth.uid()`. Powers "players keep their own stats while the marker owns the score." Client sends only changed stat columns (others null → coalesce keeps them); last-write-wins per column.
