@@ -254,6 +254,16 @@ export function Home({ session }: { session: any }) {
 
   const deleteRound = async (id: string) => {
     const r = rounds.find((x) => x.id === id);
+    // A round recorded from a game is just a personal copy — deleting it never
+    // touches the game result, the leaderboard, or any posted/paid winnings
+    // (those live on the game, not the round). Make that explicit so nobody
+    // panics that they've broken the money.
+    if (r?.game_id && typeof window !== "undefined") {
+      const ok = window.confirm(
+        "This round came from a group game. Deleting it only removes it from your own history and handicap — it does NOT change the game result or any winnings already posted to Money. Delete it from your history?",
+      );
+      if (!ok) return;
+    }
     // Soft-delete every round (not just game-linked ones). A hard DELETE that RLS
     // doesn't permit silently removes 0 rows; an owner UPDATE is allowed, so setting
     // deleted_at reliably removes the round from all stats/handicap. It also survives

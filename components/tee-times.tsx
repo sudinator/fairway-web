@@ -146,8 +146,11 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
     setBusy(true);
     const existing = rsvpsFor(tt.id).find((r) => r.user_id === memberId);
     const order = existing?.signup_order ?? rsvpsFor(tt.id).length + 1;
+    // Guests only ride along on an IN response. When marking a member out/maybe,
+    // clear their guests too (matches what a member's own RSVP does) so guests
+    // don't linger on the row or reappear if they're later marked back in.
     await supabase.from("tee_time_rsvps").upsert(
-      { tee_time_id: tt.id, user_id: memberId, choice, guest_names: existing?.guest_names || [], signup_order: order, responded_at: new Date().toISOString() },
+      { tee_time_id: tt.id, user_id: memberId, choice, guest_names: choice === "in" ? (existing?.guest_names || []) : [], signup_order: order, responded_at: new Date().toISOString() },
       { onConflict: "tee_time_id,user_id" },
     );
     await logTee("tt_rsvp_org", `marked ${shortName(memberOf(memberId)?.display_name || "a member")} ${CHOICE[choice].label} for tee time #${tt.seq ?? "?"}`, { tee_time_id: tt.id, seq: tt.seq, choice, target_user_id: memberId });

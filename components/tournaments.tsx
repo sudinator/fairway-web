@@ -1375,6 +1375,15 @@ function GameRoom({
   // notify the organizer once per session.
   const [betStale, setBetStale] = useState(false);
   const betStaleNotified = React.useRef(false);
+  // #7: once the winnings are corrected (no longer stale), allow a fresh notification
+  // for any future staleness episode — while still never spamming within one episode.
+  useEffect(() => { if (!betStale) betStaleNotified.current = false; }, [betStale]);
+  // #5: flip a player's betting flag. Optimistically update local players (drives
+  // BOTH the payout panel and the clean-sweep banners from one source), then persist.
+  const toggleBets = async (playerId: string, on: boolean) => {
+    setPlayers((prev) => prev.map((p) => (p.id === playerId ? { ...p, bets: on } : p)));
+    try { await supabase.rpc("set_player_bets", { p_player: playerId, p_bets: on }); } catch { /* realtime refresh will reconcile if this fails */ }
+  };
   useEffect(() => {
     if (!betStale || betStaleNotified.current || !game?.group_id) return;
     betStaleNotified.current = true;
@@ -3401,6 +3410,7 @@ function GameRoom({
               user={user}
               canPost={game.created_by === user.id || !!isAdmin}
               onBetStale={setBetStale}
+              onToggleBets={toggleBets}
             />
           )}
         </>
@@ -5958,7 +5968,7 @@ function OrganizerPanel({
 // and the split percentages (default: 3 six-hole segments at 10/75 each, 2nd at
 // 15/75, 1st at 30/75). Computes payouts including ties, all-tied-first, and the
 // clean-sweep double. See computeBetting() in lib/golf.ts for the full rules.
-function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, canPost, onBetStale }: {
+function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, canPost, onBetStale, onToggleBets }: {
   players: Player[];
   playerPoints: (p: Player) => number;
   playerHoles: (p: Player) => Hole[];
@@ -5967,28 +5977,21 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
   user: { id: string };
   canPost: boolean;
   onBetStale?: (stale: boolean) => void;
+  onToggleBets?: (playerId: string, on: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [bet, setBet] = useState(75);
-  const [inIds, setInIds] = useState<string[]>(() => players.filter((p) => p.bets !== false).map((p) => p.id));
+  // Who's betting is derived from the persisted `bets` flag — the SAME source the
+  // clean-sweep banners use — so the two can never disagree. Toggling flips the
+  // flag on the player (optimistic in the parent + persisted), which re-renders
+  // both surfaces together.
+  const inIds = players.filter((p) => p.bets !== false).map((p) => p.id);
   const [split, setSplit] = useState<BetSplit>(DEFAULT_BET_SPLIT);
   const [editSplit, setEditSplit] = useState(false);
 
-  // Keep the bettor list in sync as players join. New players are auto-included
-  // only if they bet (guests default bets=false, so they stay out).
-  useEffect(() => {
-    setInIds((prev) => {
-      const ids = players.map((p) => p.id);
-      const kept = prev.filter((id) => ids.includes(id));
-      const added = ids.filter((id) => !prev.includes(id) && players.find((p) => p.id === id)?.bets !== false);
-      return Array.from(new Set([...kept, ...added]));
-    });
-  }, [players.length]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const toggle = (id: string) => {
-    const on = !inIds.includes(id);
-    setInIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-    if (canPost) { supabase.rpc("set_player_bets", { p_player: id, p_bets: on }).then(() => {}); } // organizer-gated; realtime refresh keeps banners in sync
+    if (!canPost) return;
+    onToggleBets?.(id, !inIds.includes(id)); // optimistic update + persist happens in the parent
   };
 
   // Betting -> Money posting (TGC phase 1).
@@ -6156,7 +6159,14 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
       if (e1 || !exp) { setPostedExpense(null); setPostedNets(null); setPostMsg("Removed the old winnings but couldn't re-post — tap Post winnings again."); setBusy(false); return; }
       const { error: e2 } = await supabase.from("expense_payers").insert(post.payers.map((py) => ({ expense_id: exp.id, user_id: py.user_id, paid_cents: py.paid_cents })));
       const { error: e3 } = await supabase.from("expense_shares").insert(post.shares.map((sh) => ({ expense_id: exp.id, user_id: sh.user_id, share_cents: sh.share_cents })));
-      if (e2 || e3) { setPostMsg("Re-posted but a split didn't save — please check the Money tab."); }
+      if (e2 || e3) {
+        // Roll back so we never leave a bet expense with missing/partial splits
+        // (which would compute wrong balances). End up cleanly un-posted instead.
+        await supabase.from("expenses").delete().eq("id", exp.id);
+        setPostedExpense(null); setPostedNets(null);
+        setPostMsg("Couldn't save the corrected splits — the bet is now un-posted. Tap Post winnings to try again.");
+        setBusy(false); return;
+      }
       await supabase.from("group_activity").insert({
         group_id: game.group_id, actor_user_id: user.id, action: "bet_reposted",
         summary: `re-posted corrected bet winnings — pot $${(post.amount_cents / 100).toFixed(0)}. Recorded payments stay in place; anyone who overpaid now shows as owed back in Money.`,
