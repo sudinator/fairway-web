@@ -1,7 +1,7 @@
 // Unit tests for lib/money.ts — run with `npm test`.
 import {
   evenShares, validateCustomTotal, computeBalances, simplify, pairwiseDebts, aggregateOwed,
-  payLink, nudgeSms, fmtUSD, guestOwedFor, betResultToPost,
+  payLink, nudgeSms, fmtUSD, guestOwedFor, guestCoverageBySponsor, betResultToPost,
 } from "./money";
 import type { Expense, Share, Settlement, Guest, Transfer, Payer } from "./money";
 
@@ -196,6 +196,45 @@ ok("nudge sms has body", nudgeSms("2015550102", "Dev", 6500, "Saturday Golf", "b
 {
   const r = betResultToPost([{ user_id: "a", name: "A", net: 0 }]);
   check("solo not ok", r.ok, false);
+}
+
+// --- per-expense guest sponsor (0063) ---
+{
+  // Sam is a guest whose OLD fixed sponsor is amit. New shares carry their own sponsor.
+  const gSam: Guest[] = [{ id: "gSam", sponsor_user_id: "amit", name: "Sam" }];
+  // Two dinners, each $100 paid by ravi, split evenly between ravi and guest Sam ($50 each).
+  const exp: Expense[] = [
+    { id: "e1", payer_user_id: "ravi", amount_cents: 10000 },
+    { id: "e2", payer_user_id: "ravi", amount_cents: 10000 },
+  ];
+  const sh: Share[] = [
+    { expense_id: "e1", user_id: "ravi", share_cents: 5000 },
+    { expense_id: "e1", guest_id: "gSam", sponsor_user_id: "amit", share_cents: 5000 }, // amit covers Sam this time
+    { expense_id: "e2", user_id: "ravi", share_cents: 5000 },
+    { expense_id: "e2", guest_id: "gSam", sponsor_user_id: "dev", share_cents: 5000 },  // dev covers Sam this time
+  ];
+  const bal = computeBalances(exp, sh, [], gSam);
+  // ravi paid 20000, owes own 10000 => +10000; amit owes Sam's first 5000; dev owes Sam's second 5000.
+  check("per-expense sponsor splits a guest across members", bal, { ravi: 10000, amit: -5000, dev: -5000 });
+  check("per-expense sponsor sums zero", sum(bal), 0);
+
+  // Legacy fallback: a guest share with NO per-expense sponsor uses the guest's old sponsor (amit).
+  const legacy: Share[] = [
+    { expense_id: "e1", user_id: "ravi", share_cents: 5000 },
+    { expense_id: "e1", guest_id: "gSam", share_cents: 5000 }, // no sponsor_user_id -> falls back to amit
+  ];
+  const balL = computeBalances([exp[0]], legacy, [], gSam);
+  check("legacy guest share falls back to fixed sponsor", balL, { ravi: 5000, amit: -5000 });
+
+  // Coverage helper: who is covering which guest, and how much.
+  const gById = Object.fromEntries(gSam.map((g) => [g.id, g]));
+  check("guestCoverageBySponsor maps per-expense sponsors", guestCoverageBySponsor(sh, gById), { amit: { gSam: 5000 }, dev: { gSam: 5000 } });
+  check("guestCoverageBySponsor uses fallback when share has none", guestCoverageBySponsor(legacy, gById), { amit: { gSam: 5000 } });
+
+  // A guest with no sponsor anywhere (new-style guest, share missing sponsor) is simply unresolved (dropped).
+  const orphanGuest: Guest[] = [{ id: "gX", sponsor_user_id: null, name: "X" }];
+  const orphanShare: Share[] = [{ expense_id: "e1", guest_id: "gX", share_cents: 5000 }];
+  check("guest with no sponsor at all is unresolved", guestCoverageBySponsor(orphanShare, Object.fromEntries(orphanGuest.map((g) => [g.id, g]))), {});
 }
 
 console.log(`\n=== money.test ===\nPASS ${pass}  FAIL ${fail}`);

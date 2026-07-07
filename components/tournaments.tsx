@@ -543,8 +543,6 @@ function CreateGame({
   const [guestPlayers, setGuestPlayers] = useState<
     { id: string; display_name: string; handicap_index: number | null; guest_of: string }[]
   >([]);
-  // The group's known guests (name + sponsor), so you can re-add without retyping — shared with Money.
-  const [knownGuests, setKnownGuests] = useState<{ id: string; name: string; sponsor_user_id: string | null }[]>([]);
   // Raw text for inline handicap entry on guests that came in without one.
   const [guestIdxEdits, setGuestIdxEdits] = useState<Record<string, string>>({});
 
@@ -642,13 +640,6 @@ function CreateGame({
         });
         return next;
       });
-    })();
-    // The group's known guests (shared with Money), so guests can be re-added
-    // without retyping and always carry a sponsor.
-    (async () => {
-      const { data } = await supabase.from("group_guests")
-        .select("id, name, sponsor_user_id").eq("group_id", activeGroupId);
-      setKnownGuests((data as any[]) || []);
     })();
   }, [activeGroupId, user.id]);
 
@@ -859,17 +850,6 @@ function CreateGame({
       const rows = [...rosterRows, ...guestRows];
       const { error: e2 } = await supabase.from("game_players").insert(rows);
       if (e2) throw e2;
-      // Register any brand-new guests in the group's shared guest list (Money) so
-      // they're offered next time and carry the same sponsor. Best-effort.
-      const known = new Set(knownGuests.map((g) => g.name.trim().toLowerCase()));
-      const fresh = guestPlayers.filter((p) => !known.has(p.display_name.trim().toLowerCase()));
-      if (fresh.length) {
-        try {
-          await supabase.from("group_guests").insert(fresh.map((p) => ({
-            group_id: activeGroupId, name: p.display_name, sponsor_user_id: p.guest_of || user.id, created_by: user.id,
-          })));
-        } catch { /* the game is already saved; a duplicate/known guest is harmless */ }
-      }
       await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_created", group_id: activeGroupId, summary: `Created the game "${game.name}" at ${pickedFav.name}` });
       // P4 handoff: link this game back to the originating tee time and record it
       // in the tee-time activity trail (tt_ actions are kept out of the Money log).
@@ -1054,23 +1034,6 @@ function CreateGame({
             </div>
           )}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-            {knownGuests.length > 0 && (
-              <select
-                value=""
-                onChange={(e) => {
-                  const g = knownGuests.find((x) => x.id === e.target.value);
-                  if (g) { setGuestName(g.name); setGuestSponsor(g.sponsor_user_id || ""); }
-                }}
-                style={{ ...inputStyle, padding: "8px 10px", flex: "1 1 100%", minWidth: 150 }}
-              >
-                <option value="">Add a past guest…</option>
-                {knownGuests.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}{g.sponsor_user_id ? ` — guest of ${groupRoster.find((m) => m.id === g.sponsor_user_id)?.display_name || "member"}` : ""}
-                  </option>
-                ))}
-              </select>
-            )}
             <input
               value={guestName}
               onChange={(e) => setGuestName(e.target.value)}
@@ -2249,8 +2212,8 @@ function GameRoom({
       course_handicap: ch, ...blankCard(),
     });
     if (error) { notifyError("Couldn't add that guest — please try again."); return; }
-    // Keep the group's shared guest list (Money) in sync. Best-effort.
-    try { await supabase.from("group_guests").insert({ group_id: game.group_id, name: name.trim(), sponsor_user_id: sponsor || null, created_by: user.id }); } catch {}
+    // Note: game guests are intentionally NOT written to the persistent group_guests
+    // list — they're temporary to this game. (The Money tab keeps its own guests.)
     await load();
   };
   const addMemberToGame = async (m: { id: string; display_name: string; handicap_index: number | null }) => {
@@ -5701,16 +5664,6 @@ function OrganizerPanel({
   const [addGuestSponsor, setAddGuestSponsor] = useState(""); // sponsor user id; "" -> current user
   // Members already in this game can sponsor a walk-up guest (keeps them together when grouping).
   const gameMembers = players.filter((p) => !p.is_guest && p.user_id).map((p) => ({ id: p.user_id as string, name: p.display_name }));
-  const [panelKnownGuests, setPanelKnownGuests] = useState<{ id: string; name: string; sponsor_user_id: string | null }[]>([]);
-  useEffect(() => {
-    if (!game.group_id) return;
-    let off = false;
-    (async () => {
-      const { data } = await supabase.from("group_guests").select("id, name, sponsor_user_id").eq("group_id", game.group_id);
-      if (!off) setPanelKnownGuests((data as any[]) || []);
-    })();
-    return () => { off = true; };
-  }, [game.group_id]);
 
 
   const withHcp = players.filter((p) => p.course_handicap != null).length;
@@ -5963,15 +5916,6 @@ function OrganizerPanel({
                 <>
                   <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2, fontWeight: 700, marginTop: eligibleMembers.length > 0 ? 14 : 0 }}>ADD A GUEST</div>
                   <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    {panelKnownGuests.length > 0 && (
-                      <select value="" onChange={(e) => { const g = panelKnownGuests.find((x) => x.id === e.target.value); if (g) { setAddGuestName(g.name); setAddGuestSponsor(g.sponsor_user_id || ""); } }}
-                        style={{ ...inputStyle, padding: "8px 10px", flex: "1 1 100%", minWidth: 140 }}>
-                        <option value="">Add a past guest…</option>
-                        {panelKnownGuests.map((g) => (
-                          <option key={g.id} value={g.id}>{g.name}{g.sponsor_user_id ? ` — guest of ${gameMembers.find((m) => m.id === g.sponsor_user_id)?.name || "member"}` : ""}</option>
-                        ))}
-                      </select>
-                    )}
                     <input value={addGuestName} onChange={(e) => setAddGuestName(e.target.value)} placeholder="Guest name" style={{ ...inputStyle, padding: "8px 10px", flex: 1, minWidth: 140 }} />
                     <input value={addGuestHcp} onChange={(e) => { const v = e.target.value; if (v === "" || /^-?\d*\.?\d*$/.test(v)) setAddGuestHcp(v); }} inputMode="decimal" placeholder="Handicap index" style={{ ...inputStyle, padding: "8px 10px", width: 120 }} />
                     {gameMembers.length > 0 && (

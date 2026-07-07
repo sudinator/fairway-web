@@ -327,3 +327,33 @@ Five fixes from a fresh code review:
 - **Tee Times:** creating a NEW tee time and leaving no longer loses it (type, title, date, tee-off times, course, spots, deadline, notes). "New Tee Time" shows a "Resume your tee time?" banner; draft clears on post. Editing an existing tee time is not drafted. The auto-fill-deadline effect is guarded so a resumed deadline isn't overwritten.
 - Consistent with game setup: Cancel keeps the draft (resume later); use "Start fresh" to discard. Device-local only, keyed per group.
 - Verified: tsc clean, all tests pass, build clean.
+
+## v1.97.1 — Game guests are per-game only (no permanent guest list) — no migration
+- Fixed a workflow mismatch: game guests were being written into the persistent group_guests table and surfaced as a "past guests" quick-pick on new game setups. Game guests are temporary to a game, so:
+  - Removed the group_guests writes from both guest-add paths (create-flow and in-game). Game guests now live only as per-game game_players rows.
+  - Removed the "Add a past guest…" quick-pick from the create-game and in-game add-guest screens.
+- Kept the per-game "playing with…" (sponsor) picker, which writes game_players.guest_of — this is what lets the randomizer keep a guest in their host's foursome. It's chosen per game (defaults to whoever's adding), so the same guest can be invited by a different member next time with no permanent tie.
+- Tee-time handoff unchanged: guests assigned via RSVPs still flow into game setup (seed.guests -> guestPlayers, attributed to their sponsoring member).
+- Money's own guest feature (group_guests, for splitting expenses) is untouched — that remains the one place a guest is deliberately persisted, and betting settle-up was already member-only (posts by user_id), so nothing there depended on the game-guest writes.
+- Verified: tsc clean, all tests pass, build clean.
+
+## v1.98.0 — Per-expense guest sponsor + retire-guest (Money)
+- RUN migration 0063_guest_per_expense_sponsor.sql (full SQL below / in the file). Adds expense_shares.sponsor_user_id (nullable), makes group_guests.sponsor_user_id nullable, and adds group_guests.archived (default false) + group_guests.became_member_id (nullable). Idempotent; validated on a real Postgres.
+- The member responsible for a guest is now chosen PER EXPENSE (stored on the share), not fixed on the guest. In Add Expense, each included guest shows a required "Sponsored by" picker that starts blank; Save is blocked until every guest has one. Creating a guest now asks for a NAME ONLY.
+- Settle-up math (lib/money.ts resolveMember) uses the per-expense sponsor, falling back to the guest's old fixed sponsor for any pre-0063 shares — so existing balances do NOT move. Covered by new unit tests (per-expense split, legacy fallback, guestCoverageBySponsor).
+- Balances "incl. <guests>" line now attributes each guest's portion to whoever sponsored it on each expense (a guest can roll to different members).
+- Retire a guest: Balances screen → Guests section → Retire (optionally mark "now a member"). Retiring hides the guest from the add-a-guest picker on new expenses; past expenses are untouched and no balances move. Un-retire restores them. Guest inserts set archived=false explicitly.
+- ci/assert-defaults.sql now also guards group_guests.archived.
+- Verified: tsc clean, tests pass (money 51 / legs 23 / grouping 281), build clean, migration idempotent on real Postgres.
+
+### 0063_guest_per_expense_sponsor.sql
+```sql
+alter table public.expense_shares
+  add column if not exists sponsor_user_id uuid references auth.users(id) on delete set null;
+alter table public.group_guests
+  alter column sponsor_user_id drop not null;
+alter table public.group_guests
+  add column if not exists archived boolean not null default false;
+alter table public.group_guests
+  add column if not exists became_member_id uuid references auth.users(id) on delete set null;
+```

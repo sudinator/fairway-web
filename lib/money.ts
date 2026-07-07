@@ -7,10 +7,10 @@
 
 export type Cents = number;
 
-export interface Guest { id: string; sponsor_user_id: string; name?: string }
+export interface Guest { id: string; sponsor_user_id: string | null; name?: string; archived?: boolean }
 export interface Expense { id: string; payer_user_id: string; amount_cents: Cents }
 export interface Payer { expense_id: string; user_id: string; paid_cents: Cents }
-export interface Share { expense_id?: string; user_id?: string | null; guest_id?: string | null; share_cents: Cents }
+export interface Share { expense_id?: string; user_id?: string | null; guest_id?: string | null; sponsor_user_id?: string | null; share_cents: Cents }
 export interface Settlement { from_user_id: string; to_user_id: string; amount_cents: Cents }
 export interface Transfer { from: string; to: string; amt: Cents }
 
@@ -27,14 +27,20 @@ export function validateCustomTotal(shares: Cents[], total: Cents): boolean {
   return shares.reduce((s, v) => s + v, 0) === total;
 }
 
-/** The member a share belongs to: the member directly, or a guest's sponsor. */
+/** The member a share belongs to: the member directly, or the share's per-expense
+ *  guest sponsor, or (for legacy shares with none) the guest's old fixed sponsor. */
 export function resolveMember(
   user_id: string | null | undefined,
   guest_id: string | null | undefined,
   guestsById: Record<string, Guest>,
+  shareSponsor?: string | null,
 ): string | null {
   if (user_id) return user_id;
-  if (guest_id) { const g = guestsById[guest_id]; return g ? g.sponsor_user_id : null; }
+  if (guest_id) {
+    if (shareSponsor) return shareSponsor;               // per-expense sponsor (new)
+    const g = guestsById[guest_id];                       // fallback for pre-migration shares
+    return g ? (g.sponsor_user_id ?? null) : null;
+  }
   return null;
 }
 
@@ -54,7 +60,7 @@ export function computeBalances(
     if (ps && ps.length) ps.forEach((p) => add(p.user_id, p.paid_cents));
     else add(e.payer_user_id, e.amount_cents);
   }
-  for (const s of shares) add(resolveMember(s.user_id, s.guest_id, gById), -s.share_cents);
+  for (const s of shares) add(resolveMember(s.user_id, s.guest_id, gById, s.sponsor_user_id), -s.share_cents);
   for (const st of settlements) { add(st.from_user_id, st.amount_cents); add(st.to_user_id, -st.amount_cents); }
   return bal;
 }
@@ -62,6 +68,24 @@ export function computeBalances(
 /** How much of a sponsor's balance comes from a given guest's shares (for the "incl. guest" line). */
 export function guestOwedFor(guest_id: string, shares: Share[]): Cents {
   return shares.filter((s) => s.guest_id === guest_id).reduce((s, v) => s + v.share_cents, 0);
+}
+
+/** Which guests each member is currently covering, and how much, using the per-expense
+ *  sponsor (falling back to the guest's old fixed sponsor for legacy shares). Returns
+ *  memberId -> { guestId -> cents }. Powers the Balances "incl. <guests>" line, where a
+ *  single guest can now roll to different members across different expenses. */
+export function guestCoverageBySponsor(
+  shares: Share[], guestsById: Record<string, Guest>,
+): Record<string, Record<string, Cents>> {
+  const out: Record<string, Record<string, Cents>> = {};
+  for (const s of shares) {
+    if (!s.guest_id) continue;
+    const sponsor = s.sponsor_user_id || (guestsById[s.guest_id]?.sponsor_user_id ?? null);
+    if (!sponsor) continue;
+    (out[sponsor] || (out[sponsor] = {}));
+    out[sponsor][s.guest_id] = (out[sponsor][s.guest_id] || 0) + s.share_cents;
+  }
+  return out;
 }
 
 /** Greedy minimum-cash-flow: fewest member-to-member transfers to square everyone. */
@@ -129,7 +153,7 @@ export function pairwiseDebts(
       : [{ expense_id: e.id, user_id: e.payer_user_id, paid_cents: e.amount_cents }];
     const weights = ps.map((p) => p.paid_cents);
     for (const s of parts) {
-      const debtor = resolveMember(s.user_id ?? null, s.guest_id ?? null, gById);
+      const debtor = resolveMember(s.user_id ?? null, s.guest_id ?? null, gById, s.sponsor_user_id ?? null);
       if (!debtor) continue;
       const alloc = allocateProportional(s.share_cents, weights);
       ps.forEach((p, idx) => owe(debtor, p.user_id, alloc[idx]));

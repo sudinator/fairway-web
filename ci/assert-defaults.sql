@@ -17,6 +17,7 @@ begin
       ('games','allowance_pct'), ('games','team_score_mode'), ('games','trifecta_scoring'),
       ('groups','is_default'), ('groups','money_simplify'),
       ('group_members','is_support'),
+      ('group_guests','archived'),
       ('rounds','status'),
       ('holes','sand'),
       ('group_invites','multi'), ('group_invites','use_count')

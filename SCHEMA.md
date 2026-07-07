@@ -181,3 +181,9 @@ Optional Zelle contact (phone or email). Zelle has no payment deep link, so Mone
 
 - game_players.guest_of (migration 0061): uuid, nullable — the sponsoring member's user id for a guest row (null for members / unattributed). Drives 'keep guests with their sponsor' when randomizing tee groups; also shown as 'guest of X'. Populated on all guest-add paths; new guests are also mirrored into group_guests.
 - set_tee_groups(p_game uuid, p_assignments jsonb) (migration 0061): SECURITY DEFINER batch tee-group setter, gated to the game creator OR an active group admin. p_assignments = [{player, group}]; group null = unassigned (overflow guests). Touches only tee_group/is_marker, scoped to p_game. Used by 'Randomize groups' to write all foursomes in one transaction.
+
+### Migration 0063 — per-expense guest sponsor + retire (Money)
+- `expense_shares.sponsor_user_id uuid null` → references auth.users(id) on delete set null. For a guest share, the member covering that guest FOR THIS EXPENSE. Null for member shares and for legacy guest shares (which fall back to the guest's `sponsor_user_id`).
+- `group_guests.sponsor_user_id` → now NULLABLE (was NOT NULL). Retained only as the fallback for pre-0063 guest shares; new guests are created without one.
+- `group_guests.archived boolean not null default false` → retired guests are hidden from the add-a-guest picker on new expenses; history preserved.
+- `group_guests.became_member_id uuid null` → references auth.users(id) on delete set null. Optional "now a member" label shown on retired guests; does not move any balances.

@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
 import { Avatar, btn, inputStyle, Eyebrow } from "@/components/ui";
 import {
-  computeBalances, simplify, pairwiseDebts, evenShares, validateCustomTotal, guestOwedFor,
+  computeBalances, simplify, pairwiseDebts, evenShares, validateCustomTotal, guestCoverageBySponsor,
   fmtUSD, payLink, nudgeSms,
   type Expense, type Share, type Settlement, type Guest, type Payer,
 } from "@/lib/money";
@@ -14,7 +14,7 @@ const supabase = createClient();
 
 type Member = { id: string; display_name: string; avatar_url?: string | null; venmo_handle?: string | null; paypal_handle?: string | null; zelle_handle?: string | null; phone?: string | null };
 type SettlementRow = Settlement & { id: string; method?: string | null; created_by?: string | null; created_at?: string };
-type GuestRow = Guest & { name: string; group_id: string };
+type GuestRow = Guest & { name: string; group_id: string; archived?: boolean; became_member_id?: string | null };
 type ExpenseRow = Expense & { group_id: string; created_by: string | null; description: string; category: string; split_type: "even" | "custom"; created_at: string };
 type ShareRow = Share & { id: string };
 type PayerRow = Payer & { id?: string };
@@ -60,7 +60,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
         : { data: [] as any[] };
       profs = p2 || [];
     }
-    const { data: gRows } = await supabase.from("group_guests").select("id, name, sponsor_user_id, group_id").eq("group_id", gid);
+    const { data: gRows } = await supabase.from("group_guests").select("id, name, sponsor_user_id, group_id, archived, became_member_id").eq("group_id", gid);
     const { data: exp } = await supabase.from("expenses").select("*").eq("group_id", gid).order("created_at", { ascending: false });
     const expIds = (exp || []).map((e: any) => e.id);
     const { data: sh } = expIds.length
@@ -158,6 +158,24 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
 
   if (loading) return <div style={{ color: C.sage, padding: 20, textAlign: "center" }}>Loading…</div>;
 
+  async function retireGuest(guestId: string, becameMemberId: string | null) {
+    if (!requireOnline()) return;
+    setBusy(true);
+    const { error } = await supabase.from("group_guests").update({ archived: true, became_member_id: becameMemberId }).eq("id", guestId);
+    if (error) { setBusy(false); alert("Couldn't retire the guest — please try again."); return; }
+    await logActivity("guest_retired", "retired guest " + (guestById[guestId]?.name || "") + (becameMemberId ? " (now a member: " + nameOf(becameMemberId) + ")" : ""), { guest_id: guestId });
+    setBusy(false); await load();
+  }
+  async function unretireGuest(guestId: string) {
+    if (!requireOnline()) return;
+    setBusy(true);
+    const { error } = await supabase.from("group_guests").update({ archived: false, became_member_id: null }).eq("id", guestId);
+    if (error) { setBusy(false); alert("Couldn't restore the guest — please try again."); return; }
+    await logActivity("guest_restored", "restored guest " + (guestById[guestId]?.name || ""), { guest_id: guestId });
+    setBusy(false); await load();
+  }
+
+
   return (
     <div style={{ maxWidth: 520, margin: "0 auto" }}>
       {/* screen switch */}
@@ -171,8 +189,11 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
       </div>
 
       {screen === "balances" && (
+        <>
         <BalancesScreen members={members} guests={guests} shares={shares} balances={balances} me={user.id} groupName={activeGroup.name}
           onNudge={(m, owe) => { const link = "https://birdienumnum.vercel.app"; if (m.phone) window.location.href = nudgeSms(m.phone, m.display_name, owe, activeGroup.name, link); }} />
+        <GuestManager guests={guests} members={members} busy={busy} onRetire={retireGuest} onUnretire={unretireGuest} />
+        </>
       )}
       {screen === "add" && (
         <AddExpense key={editing?.id || "new"} user={user} gid={gid} members={members} guests={guests} busy={busy} setBusy={setBusy}
@@ -180,11 +201,11 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
           editing={editing} editShares={editing ? shares.filter((s) => s.expense_id === editing.id) : []} editPayers={editing ? payers.filter((p) => p.expense_id === editing.id) : []} editHistory={editing ? activity.filter((a) => a?.meta?.expense_id === editing.id && (a.action === "expense_created" || a.action === "expense_edited")) : []} onLog={logActivity}
           canDelete={!!editing && (editing.created_by === user.id || isAdmin)}
           onDelete={async () => { if (!editing) return; const d = editing; setBusy(true); const { error } = await supabase.from("expenses").delete().eq("id", d.id); if (error) { setBusy(false); alert("Couldn't delete this expense — please try again."); return; } await logActivity("expense_deleted", "deleted “" + (d.description || catLabel(d.category)) + "” — " + fmtUSD(d.amount_cents), { expense_id: d.id, amount_cents: d.amount_cents }); setBusy(false); setEditing(null); await load(); setScreen("balances"); }}
-          onAddGuest={async (name, sponsor) => {
+          onAddGuest={async (name) => {
             if (!requireOnline()) return;
-            const { data, error } = await supabase.from("group_guests").insert({ group_id: gid, name, sponsor_user_id: sponsor, created_by: user.id }).select("id, name, sponsor_user_id, group_id").single();
+            const { data, error } = await supabase.from("group_guests").insert({ group_id: gid, name, archived: false, created_by: user.id }).select("id, name, sponsor_user_id, group_id, archived, became_member_id").single();
             if (error || !data) { alert("Couldn't add the guest — please try again."); return; }
-            setGuests((g) => [...g, data as GuestRow].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))); await logActivity("guest_added", "added guest " + name + " (sponsored by " + (members.find((mm) => mm.id === sponsor)?.display_name || "?") + ")", { guest_id: (data as any).id });
+            setGuests((g) => [...g, data as GuestRow].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))); await logActivity("guest_added", "added guest " + name, { guest_id: (data as any).id });
           }}
           onSaved={async () => { setEditing(null); await load(); setScreen("balances"); }} />
       )}
@@ -270,26 +291,78 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
 }
 
 // ---------------- Balances ----------------
+function GuestManager({ guests, members, busy, onRetire, onUnretire }: {
+  guests: GuestRow[]; members: Member[]; busy: boolean;
+  onRetire: (guestId: string, becameMemberId: string | null) => Promise<void>;
+  onUnretire: (guestId: string) => Promise<void>;
+}) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [became, setBecame] = useState<string>("");
+  if (guests.length === 0) return null;
+  const byName = (a: GuestRow, b: GuestRow) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  const active = guests.filter((g) => !g.archived).sort(byName);
+  const retired = guests.filter((g) => g.archived).sort(byName);
+  const nameOf = (uid: string) => members.find((m) => m.id === uid)?.display_name || "member";
+  return (
+    <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px", marginTop: 12 }}>
+      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 800 }}>Guests</div>
+      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 6 }}>Retire a guest to stop offering them on new expenses. Past expenses stay untouched.</div>
+      {active.length === 0 && <div style={{ color: C.sage, fontSize: 12, padding: "6px 2px" }}>No active guests. Add one from the Add screen.</div>}
+      {active.map((g) => (
+        <div key={g.id} style={{ borderBottom: `1px solid ${C.greenMid}`, padding: "8px 2px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 600, minWidth: 0 }}>{g.name}</span>
+            <button disabled={busy} onClick={() => { setOpenId(openId === g.id ? null : g.id); setBecame(""); }} style={{ background: "#173a2c", color: C.cream, border: `1px solid #37624f`, borderRadius: 8, padding: "5px 10px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>{openId === g.id ? "Cancel" : "Retire"}</button>
+          </div>
+          {openId === g.id && (
+            <div style={{ marginTop: 8, background: "#14352b", borderRadius: 10, padding: 10 }}>
+              <div style={{ color: C.sage, fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>Now a member? (optional)</div>
+              <select value={became} onChange={(e) => setBecame(e.target.value)} style={{ ...inputStyle, padding: "8px 11px", fontSize: 14 }}>
+                <option value="">— not a member —</option>
+                {members.map((m) => <option key={m.id} value={m.id}>{m.display_name}</option>)}
+              </select>
+              <button disabled={busy} onClick={() => { onRetire(g.id, became || null); setOpenId(null); }} style={{ ...btn(true), marginTop: 10, width: "100%" }}>Retire {g.name}</button>
+            </div>
+          )}
+        </div>
+      ))}
+      {retired.length > 0 && (
+        <>
+          <div style={{ color: C.sage, fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", margin: "12px 0 4px" }}>Retired</div>
+          {retired.map((g) => (
+            <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 2px", opacity: 0.85 }}>
+              <span style={{ flex: 1, color: C.sage, fontSize: 13, minWidth: 0 }}>{g.name}{g.became_member_id ? " · now a member: " + nameOf(g.became_member_id) : ""}</span>
+              <button disabled={busy} onClick={() => onUnretire(g.id)} style={{ background: "transparent", color: C.gold, border: "none", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>Un-retire</button>
+            </div>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
 function BalancesScreen({ members, guests, shares, balances, me, onNudge }: {
   members: Member[]; guests: GuestRow[]; shares: ShareRow[]; balances: Record<string, number>; me: string; groupName: string;
   onNudge: (m: Member, owe: number) => void;
 }) {
   const rows = members.map((m) => ({ m, v: balances[m.id] || 0 }));
-  const sponsoredGuests = (uid: string) => guests.filter((g) => g.sponsor_user_id === uid);
+  const gById = Object.fromEntries(guests.map((g) => [g.id, g]));
+  const coverage = guestCoverageBySponsor(shares, gById); // memberId -> { guestId -> cents }, per-expense sponsor
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Balances</div>
       <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 6 }}>Net across all unsettled expenses</div>
       {rows.map(({ m, v }) => {
         const owes = v < 0, owed = v > 0;
-        const gList = sponsoredGuests(m.id);
-        const gTotal = gList.reduce((s, g) => s + guestOwedFor(g.id, shares), 0);
+        const cov = coverage[m.id] || {};
+        const covNames = Object.keys(cov).map((id) => gById[id]?.name).filter(Boolean) as string[];
+        const gTotal = Object.values(cov).reduce((s, c) => s + c, 0);
         return (
           <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 2px", borderBottom: `1px solid ${C.greenMid}` }}>
             <Avatar src={m.avatar_url} name={m.display_name} size={30} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: C.cream, fontSize: 14, fontWeight: 700 }}>{m.display_name}{m.id === me ? " (you)" : ""}</div>
-              {gTotal > 0 && <div style={{ color: C.sage, fontSize: 10.5 }}>incl. {gList.map((g) => g.name).join(", ")}</div>}
+              {gTotal > 0 && <div style={{ color: C.sage, fontSize: 10.5 }}>incl. {covNames.join(", ")}</div>}
             </div>
             <div style={{ color: owed ? "#7fd6a3" : owes ? "#ef9d90" : C.sage, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 15 }}>
               {owed ? "is owed " + fmtUSD(v) : owes ? "owes " + fmtUSD(-v) : "settled"}
@@ -380,7 +453,7 @@ type Party = { kind: "member" | "guest"; id: string; name: string; avatar_url?: 
 function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, onAddGuest, onSaved, editing, editShares, editPayers, editHistory, onLog, canDelete, onDelete }: {
   user: { id: string }; gid: string; members: Member[]; guests: GuestRow[]; busy: boolean; setBusy: (b: boolean) => void;
   requireOnline: () => boolean;
-  onAddGuest: (name: string, sponsor: string) => Promise<void>;
+  onAddGuest: (name: string) => Promise<void>;
   onSaved: () => Promise<void>;
   editing?: ExpenseRow | null; editShares?: ShareRow[]; editPayers?: PayerRow[]; editHistory?: any[]; onLog?: (action: string, summary: string, meta?: any) => Promise<void>; canDelete?: boolean; onDelete?: () => Promise<void>;
 }) {
@@ -398,16 +471,20 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
   const [custom, setCustom] = useState<Record<string, string>>(Object.fromEntries((editShares || []).map((s) => [skey(s), (s.share_cents / 100).toString()])));
   const [showGuest, setShowGuest] = useState(false);
   const [gName, setGName] = useState("");
-  const [gSponsor, setGSponsor] = useState(user.id);
+  // Per-EXPENSE guest sponsor (guestId -> memberId). Chosen on the expense, not on the guest.
+  const [guestSponsors, setGuestSponsors] = useState<Record<string, string>>(
+    Object.fromEntries((editShares || []).filter((s) => s.guest_id).map((s) => [s.guest_id as string, s.sponsor_user_id || ""]))
+  );
 
   const parties: Party[] = [
     ...members.map((m) => ({ kind: "member" as const, id: m.id, name: m.display_name, avatar_url: m.avatar_url })),
-    ...guests.map((g) => ({ kind: "guest" as const, id: g.id, name: g.name, sponsor: g.sponsor_user_id })),
+    ...guests.filter((g) => !g.archived).map((g) => ({ kind: "guest" as const, id: g.id, name: g.name })),
   ];
   const keyOf = (p: Party) => (p.kind === "member" ? "u:" : "g:") + p.id;
   const amtCents = Math.round((parseFloat(amount) || 0) * 100);
   const centsOf = (str?: string) => Math.round((parseFloat(str || "") || 0) * 100);
   const selected = parties.filter((p) => checked.has(keyOf(p)));
+  const guestsMissingSponsor = selected.some((p) => p.kind === "guest" && !guestSponsors[p.id]);
 
   const evenMap: Record<string, number> = {};
   if (mode === "even" && selected.length) { const arr = evenShares(amtCents, selected.length); selected.forEach((p, i) => { evenMap[keyOf(p)] = arr[i]; }); }
@@ -417,7 +494,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
   const paidPayers = multiPayer ? members.filter((mm) => payerSet.has(mm.id)).map((mm) => mm.id) : (payer ? [payer] : []);
   const paidSum = multiPayer ? paidPayers.reduce((s, uid) => s + centsOf(payerAmt[uid]), 0) : amtCents;
   const paidOk = !multiPayer || (paidPayers.length > 0 && paidSum === amtCents);
-  const canSave = !!desc.trim() && amtCents > 0 && selected.length > 0 && customOk && paidOk && paidPayers.length > 0 && !busy;
+  const canSave = !!desc.trim() && amtCents > 0 && selected.length > 0 && customOk && paidOk && paidPayers.length > 0 && !guestsMissingSponsor && !busy;
   const togglePayer = (uid: string) => { const n = new Set(payerSet); n.has(uid) ? n.delete(uid) : n.add(uid); setPayerSet(n); };
   const splitPayersEven = () => { const ids = members.filter((mm) => payerSet.has(mm.id)).map((mm) => mm.id); const arr = evenShares(amtCents, ids.length); const nm: Record<string, string> = {}; ids.forEach((uid, i) => { nm[uid] = (arr[i] / 100).toString(); }); setPayerAmt(nm); };
   const runningRemain = (order: string[], amtOf: (k: string) => number, isSel: (k: string) => boolean) => {
@@ -450,6 +527,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
       expense_id: expId,
       user_id: p.kind === "member" ? p.id : null,
       guest_id: p.kind === "guest" ? p.id : null,
+      sponsor_user_id: p.kind === "guest" ? (guestSponsors[p.id] || null) : null,
       share_cents: shareOf(p),
     }));
     const shErr = (await supabase.from("expense_shares").insert(rows)).error;
@@ -470,8 +548,6 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
     setBusy(false);
     await onSaved();
   }
-
-  const sponsorName = (uid: string) => members.find((m) => m.id === uid)?.display_name || "?";
 
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
@@ -532,17 +608,33 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
       {mode === "custom" && amtCents > 0 && <Remaining total={amtCents} allocated={customSum} />}
       {parties.map((p) => {
         const on = checked.has(keyOf(p));
+        const isGuest = p.kind === "guest";
+        const needSponsor = isGuest && on && !guestSponsors[p.id];
         return (
-          <div key={keyOf(p)} onClick={() => toggle(p)} style={{ display: "flex", alignItems: "center", gap: 9, background: on ? "#1c4536" : "#173a2c", border: `1.5px solid ${on ? "#3c6f59" : "transparent"}`, borderRadius: 10, padding: "8px 10px", marginTop: 6, cursor: "pointer" }}>
+          <div key={keyOf(p)}>
+          <div onClick={() => toggle(p)} style={{ display: "flex", alignItems: "center", gap: 9, background: on ? "#1c4536" : "#173a2c", border: `1.5px solid ${on ? "#3c6f59" : "transparent"}`, borderBottom: isGuest && on ? "none" : undefined, borderRadius: isGuest && on ? "10px 10px 0 0" : 10, padding: "8px 10px", marginTop: 6, cursor: "pointer" }}>
             <span style={{ width: 19, height: 19, borderRadius: 5, border: `2px solid ${on ? C.gold : C.sage}`, background: on ? C.gold : "transparent", color: "#2a2410", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 12 }}>{on ? "✓" : ""}</span>
             <Avatar src={p.avatar_url} name={p.name} size={24} />
-            <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 600, minWidth: 0 }}>{p.name}{p.kind === "guest" ? <span style={{ color: C.sage, fontSize: 10.5, fontWeight: 700 }}> · guest of {sponsorName(p.sponsor!)}</span> : ""}</span>
+            <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 600, minWidth: 0 }}>{p.name}{isGuest ? <span style={{ color: C.sage, fontSize: 10.5, fontWeight: 700 }}> · guest</span> : ""}</span>
             {on && (mode === "even"
               ? <span style={{ color: C.cream, fontFamily: "Georgia, serif", fontWeight: 700 }}>{fmtUSD(shareOf(p))}</span>
               : <span style={{ display: "flex", alignItems: "center", gap: 4 }} onClick={(e) => e.stopPropagation()}>
                   <input inputMode="decimal" placeholder="0.00" value={custom[keyOf(p)] ?? ""} onChange={(e) => setCustom((c) => ({ ...c, [keyOf(p)]: e.target.value }))} style={{ ...inputStyle, width: 68, textAlign: "right", padding: "6px 8px" }} />
                   <span style={remHint(splitRemainAfter[keyOf(p)])}>/ {fmtUSD(splitRemainAfter[keyOf(p)] ?? amtCents)} left</span>
                 </span>)}
+          </div>
+          {isGuest && on && (
+            <div onClick={(e) => e.stopPropagation()} style={{ background: "#14352b", border: `1.5px solid ${needSponsor ? C.birdie : "#3c6f59"}`, borderTop: "none", borderRadius: "0 0 10px 10px", padding: "8px 10px 9px 38px" }}>
+              <div style={{ color: C.sage, fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>
+                Sponsored by {needSponsor ? <span style={{ color: C.birdie }}>· required</span> : <span style={{ color: "#7fbf9c" }}>✓</span>}
+              </div>
+              <select value={guestSponsors[p.id] || ""} onChange={(e) => setGuestSponsors((s) => ({ ...s, [p.id]: e.target.value }))}
+                style={{ ...inputStyle, padding: "8px 11px", fontSize: 14, borderColor: needSponsor ? C.birdie : C.line, color: needSponsor ? C.faint : C.ink }}>
+                <option value="">Select member…</option>
+                {members.map((m) => <option key={m.id} value={m.id}>{m.display_name}</option>)}
+              </select>
+            </div>
+          )}
           </div>
         );
       })}
@@ -553,16 +645,15 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
           <div style={{ background: "#173a2c", borderRadius: 10, padding: 10, marginTop: 10 }}>
             <Eyebrow>Guest name</Eyebrow>
             <input value={gName} onChange={(e) => setGName(e.target.value)} placeholder="e.g. Sam" style={inputStyle} />
-            <Eyebrow>Sponsored by (responsible member)</Eyebrow>
-            <select value={gSponsor} onChange={(e) => setGSponsor(e.target.value)} style={inputStyle}>
-              {members.map((m) => <option key={m.id} value={m.id}>{m.display_name}</option>)}
-            </select>
+            <div style={{ color: C.faint, fontSize: 11, marginTop: 7, lineHeight: 1.45 }}>You'll pick who's covering them on each expense they're part of.</div>
             <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-              <button disabled={!gName.trim()} onClick={async () => { await onAddGuest(gName.trim(), gSponsor); setGName(""); setShowGuest(false); }} style={{ ...btn(true), flex: 1 }}>Add guest</button>
+              <button disabled={!gName.trim()} onClick={async () => { await onAddGuest(gName.trim()); setGName(""); setShowGuest(false); }} style={{ ...btn(true), flex: 1 }}>Add guest</button>
               <button onClick={() => setShowGuest(false)} style={{ ...btn(false), flex: 1 }}>Cancel</button>
             </div>
           </div>
         )}
+
+      {guestsMissingSponsor && <div style={{ color: C.birdie, fontSize: 11.5, fontWeight: 700, marginTop: 8 }}>Choose a sponsor for each guest before saving.</div>}
 
       <button disabled={!canSave} onClick={save} style={{ ...btn(true), marginTop: 14, opacity: canSave ? 1 : 0.5 }}>{editing ? "Save changes" : "Add expense"}</button>
       {editing && canDelete && (
