@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase";
 import { C, Round, Hole, allocateStrokes, TGC_GROUP_ID } from "@/lib/golf";
 import { computeBalances, aggregateOwed, fmtUSD } from "@/lib/money";
 import { logActivity } from "@/lib/activity";
+import { Toaster } from "@/components/toast";
 import { loadDraft, draftHasScores } from "@/lib/draft";
 import { loadActiveGame, saveAppBootCache, loadAppBootCache } from "@/lib/draft";
 import { btn, Wordmark, inputStyle } from "@/components/ui";
@@ -407,6 +408,7 @@ export function Home({ session }: { session: any }) {
   return (
     <>
       <InstallHint />
+      <Toaster />
       <PullToRefresh onRefresh={async () => { await Promise.all([loadProfile(), loadGroups(), loadRounds()]); }}>
       <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 96px" }}>
       {/* Line 1: logo + active group (display only — change it in the Groups tab) */}

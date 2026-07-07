@@ -300,3 +300,10 @@ Five fixes from a fresh code review:
 - OPTIONAL root-cause cleanup (safe, idempotent) to restore the column default so future/manual inserts also behave:
     alter table public.game_players alter column bets set default true;
 - Verified: tsc clean, tests pass, build clean.
+
+## v1.95.0 — Robustness hardening (defensive writes + default repair + error surfacing) — RUN migration 0062
+- **RUN migration 0062_repair_column_defaults.sql** (re-asserts DB defaults on the ~18 columns added via `add column if not exists ... default`, which silently skips the default if the column already existed). Read-only-safe on existing data; idempotent. Full SQL printed in chat. Run after 0061.
+- **Defensive writes (Item 1):** every `game_players` INSERT now sets all NOT-NULL state columns explicitly via a shared `GP_STATE_DEFAULTS` ({penalties:[], sand:[], is_marker:false, group_locked:false}) plus is_guest/bets — so inserts never depend on a DB default again (the `bets` incident could also have hit penalties/sand/is_marker/group_locked, which blankCard() previously omitted). New standing rule: never rely on a DB default for a NOT-NULL column; always set it in the insert.
+- **Error surfacing (Item 4):** added a tiny global toast (components/toast.tsx, mounted once in home). Key user-facing game-setup writes that previously swallowed errors now surface a message on failure: add member, add guest, tee-group assignment, betting toggle, and Randomize. Best-effort logging/notification catches remain intentional.
+- **SMOKE_TEST.sql** added to the repo: run it in the Supabase SQL editor after any migration to catch a missing-default drift before members do (Check 1 is read-only; Check 2 attempts the app's inserts and rolls back). See the walkthrough.
+- Verified: tsc clean, all tests pass, build clean.

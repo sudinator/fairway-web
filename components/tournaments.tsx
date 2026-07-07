@@ -42,9 +42,15 @@ import {
 } from "@/lib/golf";
 import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
 import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
+import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
 import type { LegConfig, Leg } from "@/lib/legs";
 import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
+
+// Every game_players INSERT must set these NOT-NULL columns explicitly rather than
+// leaning on the DB default. A drifted default (0059's `if not exists` skipped it)
+// once caused a NOT-NULL violation on `bets`; these columns carry the same risk.
+const GP_STATE_DEFAULTS = { penalties: [] as unknown[], sand: [] as unknown[], is_marker: false, group_locked: false };
 import { logActivity } from "@/lib/activity";
 import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot, saveSyncedWatermark, loadSyncedWatermark, clearSyncedWatermark, rowPendingHoles } from "@/lib/draft";
 import {
@@ -344,7 +350,9 @@ function GameList({
         const { error: e2 } = await supabase.from("game_players").insert({
           game_id: game.id,
           user_id: uid,
+          is_guest: false,
           bets: true, // member default: in the money game
+          ...GP_STATE_DEFAULTS,
           display_name: displayName,
           avatar_url: myAvatar,
           rating: (ref as any).rating ?? null,
@@ -759,6 +767,7 @@ function CreateGame({
           user_id: p.id,
           is_guest: false,
           bets: true, // members default into the TGC money game (never rely on the DB default)
+          ...GP_STATE_DEFAULTS,
           display_name: p.display_name || "Player",
           avatar_url: (p as any).avatar_url ?? null,
           handicap_index: playerIndex,
@@ -777,6 +786,7 @@ function CreateGame({
         is_guest: true,
         guest_of: p.guest_of || null,
         bets: false,
+        ...GP_STATE_DEFAULTS,
         display_name: p.display_name,
         handicap_index: p.handicap_index,
         rating: tee.rating,
@@ -1438,7 +1448,8 @@ function GameRoom({
   // BOTH the payout panel and the clean-sweep banners from one source), then persist.
   const toggleBets = async (playerId: string, on: boolean) => {
     setPlayers((prev) => prev.map((p) => (p.id === playerId ? { ...p, bets: on } : p)));
-    try { await supabase.rpc("set_player_bets", { p_player: playerId, p_bets: on }); } catch { /* realtime refresh will reconcile if this fails */ }
+    try { const { error } = await supabase.rpc("set_player_bets", { p_player: playerId, p_bets: on }); if (error) throw error; }
+    catch { notifyError("Couldn't update who's betting — it'll re-sync when the game refreshes."); }
   };
   useEffect(() => {
     if (!betStale || betStaleNotified.current || !game?.group_id) return;
@@ -2087,7 +2098,8 @@ function GameRoom({
 
   // Organizer: update a player's tee group from the unified setup roster.
   const setPlayerTeeGroup = async (p: Player, group: number | null) => {
-    await supabase.rpc("set_tee_group", { p_player: p.id, p_group: group });
+    const { error } = await supabase.rpc("set_tee_group", { p_player: p.id, p_group: group });
+    if (error) notifyError("Couldn't update that player's group — please try again.");
     await load();
   };
 
@@ -2118,7 +2130,7 @@ function GameRoom({
       const { error } = await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: payload });
       if (error) throw error;
     } catch {
-      /* a failed batch is reconciled by the reload below (and realtime) — nothing is left half-written */
+      notifyError("Couldn't save the shuffled groups — please try again."); // reload below reconciles from the DB
     } finally {
       setRandomizing(false);
       await load();
@@ -2152,18 +2164,19 @@ function GameRoom({
   };
   const blankCard = () => {
     const n = game?.holes_meta?.length ?? 18;
-    return { scores: Array(n).fill(null), putts: Array(n).fill(null), fairways: Array(n).fill(null) };
+    return { scores: Array(n).fill(null), putts: Array(n).fill(null), fairways: Array(n).fill(null), ...GP_STATE_DEFAULTS };
   };
   const addGuestToGame = async (name: string, idx: number, sponsor: string) => {
     if (!game || !name.trim() || Number.isNaN(idx)) return;
     const t = refTee();
     const ch = (t.slope != null && t.rating != null && game.course_par != null)
       ? courseHandicap(idx, t.slope, t.rating, game.course_par) : null;
-    await supabase.from("game_players").insert({
+    const { error } = await supabase.from("game_players").insert({
       game_id: game.id, user_id: null, is_guest: true, guest_of: sponsor || null, bets: false, display_name: name.trim(),
       handicap_index: idx, rating: t.rating, slope: t.slope, tee_name: t.tee_name,
       course_handicap: ch, ...blankCard(),
     });
+    if (error) { notifyError("Couldn't add that guest — please try again."); return; }
     // Keep the group's shared guest list (Money) in sync. Best-effort.
     try { await supabase.from("group_guests").insert({ group_id: game.group_id, name: name.trim(), sponsor_user_id: sponsor || null, created_by: user.id }); } catch {}
     await load();
@@ -2173,11 +2186,12 @@ function GameRoom({
     const t = refTee();
     const ch = (m.handicap_index != null && t.slope != null && t.rating != null && game.course_par != null)
       ? courseHandicap(m.handicap_index, t.slope, t.rating, game.course_par) : null;
-    await supabase.from("game_players").insert({
+    const { error } = await supabase.from("game_players").insert({
       game_id: game.id, user_id: m.id, is_guest: false, bets: true, display_name: m.display_name,
       handicap_index: m.handicap_index, rating: t.rating, slope: t.slope, tee_name: t.tee_name,
       course_handicap: ch, ...blankCard(),
     });
+    if (error) { notifyError("Couldn't add that player — please try again."); return; }
     await load();
   };
 
