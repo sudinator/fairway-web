@@ -67,6 +67,43 @@ export function Home({ session }: { session: any }) {
   });
   useEffect(() => { if (deepTeeId) setTab("teetimes"); }, [deepTeeId]);
 
+  // A deep link may point at a tee time in a group the user isn't currently viewing.
+  // Resolve that tee time's group and switch to it BEFORE handing the id to TeeTimes,
+  // so the tee time is actually in the loaded list when TeeTimes tries to open it.
+  // deepTeeGroupId: undefined = still resolving; null = unresolvable (unknown id, or
+  // not a member — let TeeTimes try the current group and gracefully no-op); string =
+  // the target group (we switch to it and wait until it's active).
+  const [deepTeeGroupId, setDeepTeeGroupId] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (!deepTeeId) { setDeepTeeGroupId(undefined); return; }
+    if (groupsLoading) return; // wait until we know which groups the user belongs to
+    let cancelled = false;
+    (async () => {
+      let gid: string | null = null;
+      try {
+        const { data } = await supabase.from("tee_times").select("group_id").eq("id", deepTeeId).single();
+        gid = ((data as any)?.group_id as string) || null;
+      } catch { gid = null; }
+      if (cancelled) return;
+      if (gid && groups.some((g) => g.id === gid)) {
+        setDeepTeeGroupId(gid);
+        if (gid !== activeGroupId) {
+          setActiveGroupId(gid);
+          saveAppBootCache({ groups, activeGroupId: gid });
+          supabase.from("profiles").update({ active_group_id: gid }).eq("id", user.id).then(() => {});
+          setProfile((p: any) => (p ? { ...p, active_group_id: gid } : p));
+        }
+      } else {
+        setDeepTeeGroupId(null); // unknown tee time or not a member — don't switch
+      }
+    })();
+    return () => { cancelled = true; };
+    // activeGroupId intentionally omitted: we set it here and don't want to re-run on our own change
+  }, [deepTeeId, groupsLoading, groups]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Only pass the deep link to TeeTimes once its group is the active one (or we've
+  // given up resolving), so TeeTimes can't prematurely "consume" it against the wrong group.
+  const deepReady = !!deepTeeId && deepTeeGroupId !== undefined && (deepTeeGroupId === null || activeGroupId === deepTeeGroupId);
+
   // On open, resume an in-progress round straight into the scorecard.
   // Priority: an active game → this device's round draft → the server's in-progress round.
   useEffect(() => {
@@ -473,7 +510,7 @@ export function Home({ session }: { session: any }) {
         ) : tab === "profile" ? (
           <ProfilePanel profile={profile} user={user} onSaved={loadProfile} />
         ) : tab === "teetimes" && activeGroup ? (
-          <TeeTimes user={user} activeGroupId={activeGroup.id} activeGroupName={activeGroup.name} canManage={activeGroup.role === "admin"} initialTeeId={deepTeeId} onConsumedDeepLink={() => setDeepTeeId(null)} onSpawnGame={(s) => { setOpenGameId(null); setGameSeed(s); setTab("games"); }} onOpenGame={(gid) => { setGameSeed(null); setOpenGameId(gid); setTab("games"); }} />
+          <TeeTimes user={user} activeGroupId={activeGroup.id} activeGroupName={activeGroup.name} canManage={activeGroup.role === "admin"} initialTeeId={deepReady ? deepTeeId : null} onConsumedDeepLink={() => setDeepTeeId(null)} onSpawnGame={(s) => { setOpenGameId(null); setGameSeed(s); setTab("games"); }} onOpenGame={(gid) => { setGameSeed(null); setOpenGameId(gid); setTab("games"); }} />
         ) : tab === "money" && activeGroup ? (
           <MoneyTab user={user} activeGroup={activeGroup} onChanged={loadOwed} initialTab={moneyInitialTab} />
         ) : tab === "games" && activeGroup ? (

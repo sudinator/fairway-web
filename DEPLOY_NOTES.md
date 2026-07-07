@@ -288,3 +288,8 @@ Five fixes from a fresh code review:
 ## v1.94.1 — WhatsApp export gets the tap-to-open link (no migration)
 - The main **"Copy for WhatsApp"** tee-time message now ends with a clickable deep link (`👉 Open in the app to RSVP or view: …/?tt=<id>`), matching the reminder message. Tapping it opens the app straight on that tee time (the link survives the Google sign-in redirect via the existing `?tt=` capture in page.tsx → home.tsx). The reminder message already had this; only the full-field export was missing it.
 - Code-only. Verified: tsc clean, tests pass, build clean.
+
+## v1.94.2 — WhatsApp deep link auto-switches to the tee time's group (no migration)
+- A tee-time deep link (`/?tt=<id>`) now works even when the recipient is viewing a different group. home.tsx resolves the tee time's group_id and switches the active group to it (persisting to profiles.active_group_id + boot cache) BEFORE handing the id to the Tee Times screen — so the tee time is in the loaded list when it opens.
+- Robustness: the id is only passed to Tee Times once the target group is active (a new `deepReady` gate), which fixes the prior race where Tee Times would "consume" the deep link against the wrong group and silently give up. If the tee time is unknown or the user isn't a member (RLS hides it), it falls back gracefully to the current group with no error.
+- Code-only. Verified: tsc clean, tests pass, build clean.
