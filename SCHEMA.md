@@ -176,3 +176,5 @@ Optional Zelle contact (phone or email). Zelle has no payment deep link, so Mone
 - expenses.source_game_id (uuid, nullable, FK games) + expenses.source_kind (text): set to the game id and 'tgc_bet' when an expense was posted from a TGC bet. Unique index expenses_one_bet_per_game enforces one posted bet per game. Normal expenses leave both null. (migration 0056)
 
 - game_players.bets (migration 0059): boolean, default true — whether the player is in the TGC money game. Guests inserted false; members default true. Toggled by organizer via set_player_bets (SECURITY DEFINER, creator/admin only). Excluded players still score; pot/payouts and clean-sweep banners are computed over bettors only.
+
+- tee_times seq (migration 0060): assigned by the assign_tee_seq() BEFORE INSERT trigger (2-digit year * 100 + Nth of year, max()+1 under a per-group advisory lock). Unique index tee_times_group_seq_uidx on (group_id, seq). Client no longer computes seq (display preview only).

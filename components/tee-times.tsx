@@ -78,6 +78,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
   const [remindCopied, setRemindCopied] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dlDone, setDlDone] = useState(false);
+  const [actionErr, setActionErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -131,48 +132,53 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
   }
 
   async function submitRsvp(tt: TeeTime, choice: "in" | "out" | "maybe", guestNames: string[]) {
-    setBusy(true);
+    setBusy(true); setActionErr(null);
     const existing = myRsvp(tt.id);
     const order = existing?.signup_order ?? rsvpsFor(tt.id).length + 1;
-    await supabase.from("tee_time_rsvps").upsert(
+    const { error } = await supabase.from("tee_time_rsvps").upsert(
       { tee_time_id: tt.id, user_id: user.id, choice, guest_names: choice === "in" ? guestNames : [], signup_order: order, responded_at: new Date().toISOString() },
       { onConflict: "tee_time_id,user_id" },
     );
+    if (error) { setBusy(false); if (typeof window !== "undefined") window.alert("Couldn't save your RSVP — please try again."); return; }
     const gtxt = choice === "in" && guestNames.length ? ` (+${guestNames.length} guest${guestNames.length > 1 ? "s" : ""})` : "";
     await logTee("tt_rsvp", `responded ${CHOICE[choice].label}${gtxt} for tee time #${tt.seq ?? "?"}`, { tee_time_id: tt.id, seq: tt.seq, choice, guests: choice === "in" ? guestNames.length : 0 });
     setBusy(false); setRsvpOpen(false); await load();
   }
   async function orgSetRsvp(tt: TeeTime, memberId: string, choice: "in" | "out" | "maybe") {
-    setBusy(true);
+    setBusy(true); setActionErr(null);
     const existing = rsvpsFor(tt.id).find((r) => r.user_id === memberId);
     const order = existing?.signup_order ?? rsvpsFor(tt.id).length + 1;
     // Guests only ride along on an IN response. When marking a member out/maybe,
     // clear their guests too (matches what a member's own RSVP does) so guests
     // don't linger on the row or reappear if they're later marked back in.
-    await supabase.from("tee_time_rsvps").upsert(
+    const { error } = await supabase.from("tee_time_rsvps").upsert(
       { tee_time_id: tt.id, user_id: memberId, choice, guest_names: choice === "in" ? (existing?.guest_names || []) : [], signup_order: order, responded_at: new Date().toISOString() },
       { onConflict: "tee_time_id,user_id" },
     );
+    if (error) { setBusy(false); setActionErr("Couldn't update that RSVP — please try again."); return; }
     await logTee("tt_rsvp_org", `marked ${shortName(memberOf(memberId)?.display_name || "a member")} ${CHOICE[choice].label} for tee time #${tt.seq ?? "?"}`, { tee_time_id: tt.id, seq: tt.seq, choice, target_user_id: memberId });
     setBusy(false); await load();
   }
   async function cancelTeeTime(tt: TeeTime) {
-    setBusy(true);
-    await supabase.from("tee_times").update({ status: "cancelled" }).eq("id", tt.id);
+    setBusy(true); setActionErr(null);
+    const { error } = await supabase.from("tee_times").update({ status: "cancelled" }).eq("id", tt.id);
+    if (error) { setBusy(false); setActionErr("Couldn't cancel this tee time — please try again."); return; }
     await logTee("tt_cancelled", `cancelled tee time #${tt.seq ?? "?"} (${teeName(tt)})`, { tee_time_id: tt.id, seq: tt.seq });
     setBusy(false); setScreen("list"); await load();
   }
   async function setCaptain(tt: TeeTime, memberId: string | null) {
-    setBusy(true);
-    await supabase.from("tee_times").update({ captain_user_id: memberId }).eq("id", tt.id);
+    setBusy(true); setActionErr(null);
+    const { error } = await supabase.from("tee_times").update({ captain_user_id: memberId }).eq("id", tt.id);
+    if (error) { setBusy(false); setActionErr("Couldn't update the captain — please try again."); return; }
     await logTee("tt_captain", memberId ? `assigned ${shortName(memberOf(memberId)?.display_name || "a member")} as captain for tee time #${tt.seq ?? "?"}` : `cleared the captain for tee time #${tt.seq ?? "?"}`, { tee_time_id: tt.id, seq: tt.seq, target_user_id: memberId });
     setBusy(false); setCaptainPickerOpen(false); await load();
   }
   async function promote(tt: TeeTime, memberId: string) {
     const list = inList(tt.id);
     const minOrder = Math.min(...list.map((r) => r.signup_order || 0));
-    setBusy(true);
-    await supabase.from("tee_time_rsvps").update({ signup_order: minOrder - 1 }).eq("tee_time_id", tt.id).eq("user_id", memberId);
+    setBusy(true); setActionErr(null);
+    const { error } = await supabase.from("tee_time_rsvps").update({ signup_order: minOrder - 1 }).eq("tee_time_id", tt.id).eq("user_id", memberId);
+    if (error) { setBusy(false); setActionErr("Couldn't move that member up — please try again."); return; }
     await logTee("tt_promote", `moved ${shortName(memberOf(memberId)?.display_name || "a member")} up from the waitlist for tee time #${tt.seq ?? "?"}`, { tee_time_id: tt.id, seq: tt.seq, target_user_id: memberId });
     setBusy(false); await load();
   }
@@ -187,8 +193,9 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
     const hostName = memberOf(memberId)?.display_name || "a member";
     if (typeof window !== "undefined" && !window.confirm(`Remove guest "${gname}" from ${hostName}'s signup? This frees a spot for the waitlist.`)) return;
     const next = r.guest_names.filter((_, i) => i !== guestIdx);
-    setBusy(true);
-    await supabase.from("tee_time_rsvps").update({ guest_names: next }).eq("tee_time_id", tt.id).eq("user_id", memberId);
+    setBusy(true); setActionErr(null);
+    const { error } = await supabase.from("tee_time_rsvps").update({ guest_names: next }).eq("tee_time_id", tt.id).eq("user_id", memberId);
+    if (error) { setBusy(false); setActionErr("Couldn't remove that guest — please try again."); return; }
     await logTee("tt_guest_removed", `removed ${shortName(hostName)}'s guest "${gname}" from tee time #${tt.seq ?? "?"}`, { tee_time_id: tt.id, seq: tt.seq, target_user_id: memberId, guest_name: gname });
     if (memberId !== user.id) {
       try { await supabase.rpc("create_notification", { p_recipient: memberId, p_message: `An organizer removed your guest "${gname}" from tee time #${tt.seq ?? "?"} (${teeName(tt)}) to free a spot.`, p_group_id: activeGroupId }); } catch { /* notification is best-effort */ }
@@ -233,10 +240,12 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
     const spotsLeft = sel.max_spots != null ? sel.max_spots - used : null;
     const responded = new Set(rsvpsFor(sel.id).map((r) => r.user_id));
     const notResponded = members.filter((m) => !responded.has(m.id));
-    // waitlist: cumulative In spots beyond max
-    let cum = 0;
+    // waitlist: cumulative In spots beyond max, with each waitlisted member's
+    // position (#1, #2, …) by signup order so we can show "Waitlist #N".
+    let cum = 0; let wc = 0;
     const waitSet = new Set<string>();
-    if (sel.max_spots != null) ins.forEach((r) => { cum += 1 + (r.guest_names?.length || 0); if (cum > sel.max_spots!) waitSet.add(r.user_id); });
+    const waitPos = new Map<string, number>();
+    if (sel.max_spots != null) ins.forEach((r) => { cum += 1 + (r.guest_names?.length || 0); if (cum > sel.max_spots!) { wc++; waitSet.add(r.user_id); waitPos.set(r.user_id, wc); } });
     const frozen = isPast(sel) && !canManage;
     const hasGameBtn = canManage && (!!sel.game_id || (sel.status !== "cancelled" && ins.length > 0));
 
@@ -265,7 +274,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
               </div>
             ) : null}
           </div>
-          {wait ? <span style={{ fontSize: 10, fontWeight: 800, background: "#fbe9cf", color: "#9a6a12", borderRadius: 20, padding: "3px 9px" }}>Waitlist</span> : null}
+          {wait ? <span style={{ fontSize: 10, fontWeight: 800, background: "#fbe9cf", color: "#9a6a12", borderRadius: 20, padding: "3px 9px" }}>Waitlist{waitPos.get(r.user_id) ? ` #${waitPos.get(r.user_id)}` : ""}</span> : null}
           {wait && canManage ? <button onClick={() => promote(sel, r.user_id)} disabled={busy} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Move up</button> : null}
           {showOrg && canManage ? (
             <button onClick={() => orgSetRsvp(sel, r.user_id, r.choice === "in" ? "out" : "in")} disabled={busy}
@@ -290,10 +299,16 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
           {sel.status === "cancelled" ? <div style={{ marginTop: 8, display: "inline-block", background: "rgba(184,58,46,0.3)", borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 800 }}>CANCELLED</div> : null}
         </div>
 
+        {actionErr && (
+          <div onClick={() => setActionErr(null)} style={{ background: "rgba(184,58,46,0.18)", border: `1px solid ${C.birdie}`, color: "#ffd9cf", borderRadius: 10, padding: "10px 12px", margin: "10px 0", fontSize: 12.5, cursor: "pointer" }}>
+            {actionErr} <span style={{ opacity: 0.7 }}>(tap to dismiss)</span>
+          </div>
+        )}
+
         {sel.status !== "cancelled" && (
           <div style={{ background: C.sage, borderRadius: 12, margin: "10px 0", padding: "11px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ fontSize: 13, color: C.ink }}>
-              {frozen ? "This tee time has passed" : mine ? <>Your response: <b style={{ color: CHOICE[mine.choice].c }}>{CHOICE[mine.choice].label}</b></> : "You haven't responded"}
+              {frozen ? "This tee time has passed" : mine ? <>Your response: <b style={{ color: CHOICE[mine.choice].c }}>{CHOICE[mine.choice].label}</b>{mine.choice === "in" && sel.max_spots != null ? (waitSet.has(user.id) ? <span style={{ color: "#9a6a12", fontWeight: 700 }}> — Waitlist #{waitPos.get(user.id)}</span> : <span style={{ color: "#1a7a3a", fontWeight: 700 }}> — In the field</span>) : null}</> : "You haven't responded"}
             </div>
             {!frozen && <button onClick={() => setRsvpOpen(true)} style={{ ...btn(true), fontSize: 12, padding: "7px 12px" }}>{mine ? "Change" : "RSVP"}</button>}
           </div>
@@ -484,7 +499,7 @@ function RsvpSheet({ tt, mine, spotsLeft, warn, busy, onClose, onSubmit }: {
         <div style={{ padding: "0 16px 8px" }}>
           <div style={{ fontSize: 10, fontWeight: 800, color: C.gold, letterSpacing: 0.4 }}>TEE TIME #{tt.seq ?? "—"} · {dow(tt.play_date)} {monN(tt.play_date)} {dayN(tt.play_date)}</div>
           <div style={{ fontSize: 19, fontWeight: 800, color: C.cream, marginTop: 2 }}>Your response</div>
-          {spotsLeft != null && <div style={{ fontSize: 12, fontWeight: 700, color: spotsLeft <= 0 ? "#ff9d7a" : C.sage, marginTop: 3 }}>{spotsLeft > 0 ? `${spotsLeft} of ${tt.max_spots} spots left` : "Full — you'll join the waitlist"}</div>}
+          {spotsLeft != null && <div style={{ fontSize: 12, fontWeight: 700, color: spotsLeft <= 0 ? "#ff9d7a" : C.sage, marginTop: 3 }}>{spotsLeft > 0 ? `${spotsLeft} of ${tt.max_spots} spots left` : "The group's full — sign up and you'll join the waitlist, moving into the field automatically if a spot opens. Your RSVP still counts; no further action needed."}</div>}
         </div>
         {warn && <div style={{ margin: "4px 16px 8px", background: "#5a3a10", color: "#f6d98a", borderRadius: 10, padding: "9px 12px", fontSize: 12, lineHeight: 1.4 }}>Signup deadline has passed — you can still respond, but a spot isn't guaranteed.</div>}
         {(["in", "maybe", "out"] as const).map((c) => (
@@ -550,7 +565,8 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
     setDeadline(d.toISOString().split("T")[0]);
   }, [date, editing]);
 
-  // Number convention: 2-digit year + per-year round count, e.g. 2026 round 1 -> 2601
+  // Display preview only — the database assigns the authoritative number on insert
+  // (atomically, collision-safe). This estimate may differ by one in a rare race.
   const yy = Number(String(new Date((date || new Date().toISOString().slice(0, 10)) + "T12:00:00").getFullYear()).slice(-2));
   const seq = editing?.seq != null ? editing.seq : yy * 100 + existingSeqs.filter((n) => Math.floor(n / 100) === yy).length + 1;
 
@@ -558,29 +574,37 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
     if (!date) { setErr("Pick a play date."); return; }
     const parsedTimes = times.split(",").map((t) => t.trim()).filter(Boolean);
     if (!parsedTimes.length) { setErr("Add at least one tee-off time."); return; }
+    const rawCap = maxSpots.trim();
+    let cap = 60; // blank => the 60-player max
+    if (rawCap !== "") {
+      const n = Number(rawCap);
+      if (!Number.isInteger(n) || n < 1 || n > 60) { setErr("Max spots must be a whole number from 1 to 60 (leave blank for the 60-player max)."); return; }
+      cap = n;
+    }
     setBusy(true); setErr(null);
     if (editing) {
-      const { error } = await supabase.from("tee_times").update({ kind, title: title.trim() || null, course: course || null, play_date: date, tee_off_times: parsedTimes, signup_deadline: deadline ? new Date(deadline + "T12:00:00").toISOString() : null, max_spots: parseInt(maxSpots) || null, notes: notes.trim() || null, updated_at: new Date().toISOString() }).eq("id", editing.id);
+      const { error } = await supabase.from("tee_times").update({ kind, title: title.trim() || null, course: course || null, play_date: date, tee_off_times: parsedTimes, signup_deadline: deadline ? new Date(deadline + "T12:00:00").toISOString() : null, max_spots: cap, notes: notes.trim() || null, updated_at: new Date().toISOString() }).eq("id", editing.id);
       setBusy(false);
       if (error) { setErr("Couldn't save — please try again."); return; }
       onCreated(); return;
     }
     const payload = {
-      group_id: groupId, created_by: user.id, seq, kind,
+      group_id: groupId, created_by: user.id, kind,
       title: title.trim() || null,
       course: course || null,
       play_date: date,
       tee_off_times: parsedTimes,
       signup_deadline: deadline ? new Date(deadline + "T12:00:00").toISOString() : null,
-      max_spots: parseInt(maxSpots) || null,
+      max_spots: cap,
       notes: notes.trim() || null,
       status: "upcoming",
     };
-    const { data: created, error } = await supabase.from("tee_times").insert(payload).select("id").single();
+    const { data: created, error } = await supabase.from("tee_times").insert(payload).select("id, seq").single();
     setBusy(false);
     if (error) { setErr("Couldn't post — please try again."); return; }
+    const assignedSeq = (created as any)?.seq ?? seq; // DB-assigned number is authoritative
     const nm = (title.trim() || [kindOf(kind).label, shortCourse(course || null), shortDate(date)].filter(Boolean).join(" \u00b7 "));
-    try { await supabase.from("group_activity").insert({ group_id: groupId, actor_user_id: user.id, action: "tt_posted", summary: `posted tee time #${seq} (${nm})`, meta: { tee_time_id: (created as any)?.id, seq } }); } catch { /* logging never blocks the post */ }
+    try { await supabase.from("group_activity").insert({ group_id: groupId, actor_user_id: user.id, action: "tt_posted", summary: `posted tee time #${assignedSeq} (${nm})`, meta: { tee_time_id: (created as any)?.id, seq: assignedSeq } }); } catch { /* logging never blocks the post */ }
     onCreated();
   }
 
@@ -604,7 +628,7 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
         {courses.map((c) => <option key={c} value={c}>{c}</option>)}
       </select>
       {label("Max spots")}
-      <input value={maxSpots} onChange={(e) => setMaxSpots(e.target.value)} type="number" style={{ ...inputStyle, width: "100%" }} />
+      <input value={maxSpots} onChange={(e) => setMaxSpots(e.target.value)} type="number" min={1} max={60} step={1} placeholder="Blank = 60 (max)" style={{ ...inputStyle, width: "100%" }} />
       {label("Signup deadline")}
       <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} style={dateStyle} />
       {label("Notes")}
