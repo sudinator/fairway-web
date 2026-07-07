@@ -187,3 +187,12 @@ Optional Zelle contact (phone or email). Zelle has no payment deep link, so Mone
 - `group_guests.sponsor_user_id` → now NULLABLE (was NOT NULL). Retained only as the fallback for pre-0063 guest shares; new guests are created without one.
 - `group_guests.archived boolean not null default false` → retired guests are hidden from the add-a-guest picker on new expenses; history preserved.
 - `group_guests.became_member_id uuid null` → references auth.users(id) on delete set null. Optional "now a member" label shown on retired guests; does not move any balances.
+
+### Migration 0065 — guest support on expense_payers (bet winnings)
+- `expense_payers.guest_id uuid null` → references group_guests(id) on delete cascade. For a bet, a guest winner's credit line; resolves to `sponsor_user_id`.
+- `expense_payers.sponsor_user_id uuid null` → references auth.users(id) on delete set null. The member covering that guest for this expense.
+- `expense_payers.user_id` → now NULLABLE (member xor guest). Old member-only unique constraint replaced with a party-based unique index; `expense_payers_one_party` check enforces exactly one party.
+- Betting guests are materialized as `group_guests` rows at post time (dedup by name); they appear in the Money guest list and are retireable.
+
+### Migration 0066 — bet-guest source game
+- `group_guests.source_game_id uuid null` → references games(id) on delete set null. Non-null = a throwaway guest auto-created for that game's posted bet (keyed per game; hidden from the add-a-guest picker and Retire list). Null = a deliberate, reusable Money guest.

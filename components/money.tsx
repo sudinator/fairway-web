@@ -14,7 +14,7 @@ const supabase = createClient();
 
 type Member = { id: string; display_name: string; avatar_url?: string | null; venmo_handle?: string | null; paypal_handle?: string | null; zelle_handle?: string | null; phone?: string | null };
 type SettlementRow = Settlement & { id: string; method?: string | null; created_by?: string | null; created_at?: string };
-type GuestRow = Guest & { name: string; group_id: string; archived?: boolean; became_member_id?: string | null };
+type GuestRow = Guest & { name: string; group_id: string; archived?: boolean; became_member_id?: string | null; source_game_id?: string | null };
 type ExpenseRow = Expense & { group_id: string; created_by: string | null; description: string; category: string; split_type: "even" | "custom"; created_at: string };
 type ShareRow = Share & { id: string };
 type PayerRow = Payer & { id?: string };
@@ -60,7 +60,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
         : { data: [] as any[] };
       profs = p2 || [];
     }
-    const { data: gRows } = await supabase.from("group_guests").select("id, name, sponsor_user_id, group_id, archived, became_member_id").eq("group_id", gid);
+    const { data: gRows } = await supabase.from("group_guests").select("id, name, sponsor_user_id, group_id, archived, became_member_id, source_game_id").eq("group_id", gid);
     const { data: exp } = await supabase.from("expenses").select("*").eq("group_id", gid).order("created_at", { ascending: false });
     const expIds = (exp || []).map((e: any) => e.id);
     const { data: sh } = expIds.length
@@ -190,7 +190,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
 
       {screen === "balances" && (
         <>
-        <BalancesScreen members={members} guests={guests} shares={shares} balances={balances} me={user.id} groupName={activeGroup.name}
+        <BalancesScreen members={members} guests={guests} shares={shares} payers={payers} balances={balances} me={user.id} groupName={activeGroup.name}
           onNudge={(m, owe) => { const link = "https://birdienumnum.vercel.app"; if (m.phone) window.location.href = nudgeSms(m.phone, m.display_name, owe, activeGroup.name, link); }} />
         <GuestManager guests={guests} members={members} busy={busy} onRetire={retireGuest} onUnretire={unretireGuest} />
         </>
@@ -225,7 +225,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
           {expenses.map((e) => {
             const payer = memberById[e.payer_user_id];
             const prs = payers.filter((p) => p.expense_id === e.id);
-            const paidNames = prs.length ? prs.map((p) => memberById[p.user_id]?.display_name || "?").join(" & ") : (memberById[e.payer_user_id]?.display_name || "?");
+            const paidNames = prs.length ? prs.map((p) => p.user_id ? (memberById[p.user_id]?.display_name || "?") : (guestById[p.guest_id || ""]?.name || "guest")).join(" & ") : (memberById[e.payer_user_id]?.display_name || "?");
             const parts = shares.filter((s) => s.expense_id === e.id);
             const who = parts.length >= members.length + guests.length ? "whole group" : parts.map((s) => s.user_id ? (memberById[s.user_id]?.display_name || "?") : (guestById[s.guest_id || ""]?.name || "guest")).join(", ");
             return (
@@ -298,10 +298,11 @@ function GuestManager({ guests, members, busy, onRetire, onUnretire }: {
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [became, setBecame] = useState<string>("");
-  if (guests.length === 0) return null;
   const byName = (a: GuestRow, b: GuestRow) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-  const active = guests.filter((g) => !g.archived).sort(byName);
-  const retired = guests.filter((g) => g.archived).sort(byName);
+  const deliberate = guests.filter((g) => !g.source_game_id); // bet-generated guests are throwaway; not managed here
+  if (deliberate.length === 0) return null;
+  const active = deliberate.filter((g) => !g.archived).sort(byName);
+  const retired = deliberate.filter((g) => g.archived).sort(byName);
   const nameOf = (uid: string) => members.find((m) => m.id === uid)?.display_name || "member";
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px", marginTop: 12 }}>
@@ -341,13 +342,13 @@ function GuestManager({ guests, members, busy, onRetire, onUnretire }: {
   );
 }
 
-function BalancesScreen({ members, guests, shares, balances, me, onNudge }: {
-  members: Member[]; guests: GuestRow[]; shares: ShareRow[]; balances: Record<string, number>; me: string; groupName: string;
+function BalancesScreen({ members, guests, shares, payers, balances, me, onNudge }: {
+  members: Member[]; guests: GuestRow[]; shares: ShareRow[]; payers: PayerRow[]; balances: Record<string, number>; me: string; groupName: string;
   onNudge: (m: Member, owe: number) => void;
 }) {
   const rows = members.map((m) => ({ m, v: balances[m.id] || 0 }));
   const gById = Object.fromEntries(guests.map((g) => [g.id, g]));
-  const coverage = guestCoverageBySponsor(shares, gById); // memberId -> { guestId -> cents }, per-expense sponsor
+  const coverage = guestCoverageBySponsor(shares, gById, payers); // memberId -> { guestId -> net cents }, per-expense sponsor (wins + losses)
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Balances</div>
@@ -356,13 +357,12 @@ function BalancesScreen({ members, guests, shares, balances, me, onNudge }: {
         const owes = v < 0, owed = v > 0;
         const cov = coverage[m.id] || {};
         const covNames = Object.keys(cov).map((id) => gById[id]?.name).filter(Boolean) as string[];
-        const gTotal = Object.values(cov).reduce((s, c) => s + c, 0);
         return (
           <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 2px", borderBottom: `1px solid ${C.greenMid}` }}>
             <Avatar src={m.avatar_url} name={m.display_name} size={30} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: C.cream, fontSize: 14, fontWeight: 700 }}>{m.display_name}{m.id === me ? " (you)" : ""}</div>
-              {gTotal > 0 && <div style={{ color: C.sage, fontSize: 10.5 }}>incl. {covNames.join(", ")}</div>}
+              {covNames.length > 0 && <div style={{ color: C.sage, fontSize: 10.5 }}>incl. {covNames.join(", ")}</div>}
             </div>
             <div style={{ color: owed ? "#7fd6a3" : owes ? "#ef9d90" : C.sage, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 15 }}>
               {owed ? "is owed " + fmtUSD(v) : owes ? "owes " + fmtUSD(-v) : "settled"}
@@ -464,8 +464,8 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
   const initP = editPayers || [];
   const [payer, setPayer] = useState(initP[0]?.user_id || editing?.payer_user_id || ""); // no default payer on a new expense - must be chosen
   const [multiPayer, setMultiPayer] = useState(initP.length > 1);
-  const [payerSet, setPayerSet] = useState<Set<string>>(new Set(initP.length ? initP.map((p) => p.user_id) : (editing?.payer_user_id ? [editing.payer_user_id] : [])));
-  const [payerAmt, setPayerAmt] = useState<Record<string, string>>(Object.fromEntries(initP.map((p) => [p.user_id, (p.paid_cents / 100).toString()])));
+  const [payerSet, setPayerSet] = useState<Set<string>>(new Set(initP.length ? initP.map((p) => p.user_id).filter((x): x is string => !!x) : (editing?.payer_user_id ? [editing.payer_user_id] : [])));
+  const [payerAmt, setPayerAmt] = useState<Record<string, string>>(Object.fromEntries(initP.filter((p) => p.user_id).map((p) => [p.user_id as string, (p.paid_cents / 100).toString()])));
   const [mode, setMode] = useState<"even" | "custom">(editing?.split_type || "even");
   const [checked, setChecked] = useState<Set<string>>(new Set((editShares || []).map(skey)));
   const [custom, setCustom] = useState<Record<string, string>>(Object.fromEntries((editShares || []).map((s) => [skey(s), (s.share_cents / 100).toString()])));
@@ -478,7 +478,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
 
   const parties: Party[] = [
     ...members.map((m) => ({ kind: "member" as const, id: m.id, name: m.display_name, avatar_url: m.avatar_url })),
-    ...guests.filter((g) => !g.archived).map((g) => ({ kind: "guest" as const, id: g.id, name: g.name })),
+    ...guests.filter((g) => !g.archived && !g.source_game_id).map((g) => ({ kind: "guest" as const, id: g.id, name: g.name })),
   ];
   const keyOf = (p: Party) => (p.kind === "member" ? "u:" : "g:") + p.id;
   const amtCents = Math.round((parseFloat(amount) || 0) * 100);
@@ -682,7 +682,7 @@ function ExpenseDetail({ expense, shares, payers, memberById, guestById, history
   const prs = payers.filter((p) => p.expense_id === expense.id);
   const parts = shares.filter((s) => s.expense_id === expense.id);
   const paidRows = prs.length
-    ? prs.map((p) => ({ name: memberById[p.user_id]?.display_name || "?", cents: p.paid_cents }))
+    ? prs.map((p) => ({ name: p.user_id ? (memberById[p.user_id]?.display_name || "?") : (guestById[p.guest_id || ""]?.name || "guest"), cents: p.paid_cents }))
     : [{ name: memberById[expense.payer_user_id]?.display_name || "?", cents: expense.amount_cents }];
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>

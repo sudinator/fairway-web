@@ -169,7 +169,7 @@ ok("nudge sms has body", nudgeSms("2015550102", "Dev", 6500, "Saturday Golf", "b
   ]);
   check("bet ok", r.ok, true);
   check("bet amount = winnings", r.amount_cents, 3000);
-  check("bet payers = winners", r.payers, [{ user_id: "a", paid_cents: 3000 }]);
+  check("bet payers = winners", r.payers, [{ user_id: "a", guest_id: null, sponsor_user_id: null, paid_cents: 3000 }]);
   check("bet shares = losers", r.shares.map((s) => [s.user_id, s.share_cents]), [["b", 1000], ["c", 2000]]);
   check("bet payers==shares (zero-sum cents)", r.amount_cents, r.shares.reduce((x, s) => x + s.share_cents, 0));
 }
@@ -180,8 +180,8 @@ ok("nudge sms has body", nudgeSms("2015550102", "Dev", 6500, "Saturday Golf", "b
     { user_id: "b", name: "B", net: -55 },
     { user_id: "c", name: "C", net: -55 + 55 - 55 }, // placeholder to keep it simple below
   ].slice(0, 2));
-  check("2-player winner is payer", r.payers, [{ user_id: "a", paid_cents: 5500 }]);
-  check("2-player loser is share", r.shares, [{ user_id: "b", share_cents: 5500 }]);
+  check("2-player winner is payer", r.payers, [{ user_id: "a", guest_id: null, sponsor_user_id: null, paid_cents: 5500 }]);
+  check("2-player loser is share", r.shares, [{ user_id: "b", guest_id: null, sponsor_user_id: null, share_cents: 5500 }]);
 }
 {
   // fractional dollars kept zero-sum in cents via largest-remainder
@@ -226,15 +226,43 @@ ok("nudge sms has body", nudgeSms("2015550102", "Dev", 6500, "Saturday Golf", "b
   const balL = computeBalances([exp[0]], legacy, [], gSam);
   check("legacy guest share falls back to fixed sponsor", balL, { ravi: 5000, amit: -5000 });
 
-  // Coverage helper: who is covering which guest, and how much.
+  // Coverage helper: who is covering which guest, and the net effect on the sponsor
+  // (a losing guest's share is negative).
   const gById = Object.fromEntries(gSam.map((g) => [g.id, g]));
-  check("guestCoverageBySponsor maps per-expense sponsors", guestCoverageBySponsor(sh, gById), { amit: { gSam: 5000 }, dev: { gSam: 5000 } });
-  check("guestCoverageBySponsor uses fallback when share has none", guestCoverageBySponsor(legacy, gById), { amit: { gSam: 5000 } });
+  check("guestCoverageBySponsor maps per-expense sponsors (shares negative)", guestCoverageBySponsor(sh, gById), { amit: { gSam: -5000 }, dev: { gSam: -5000 } });
+  check("guestCoverageBySponsor uses fallback when share has none", guestCoverageBySponsor(legacy, gById), { amit: { gSam: -5000 } });
 
   // A guest with no sponsor anywhere (new-style guest, share missing sponsor) is simply unresolved (dropped).
   const orphanGuest: Guest[] = [{ id: "gX", sponsor_user_id: null, name: "X" }];
   const orphanShare: Share[] = [{ expense_id: "e1", guest_id: "gX", share_cents: 5000 }];
   check("guest with no sponsor at all is unresolved", guestCoverageBySponsor(orphanShare, Object.fromEntries(orphanGuest.map((g) => [g.id, g]))), {});
+
+  // --- guest on the WINNING side (payer), 0065 ---
+  // Bet: ravi paid nothing; guest Sam WON $60 credited to sponsor amit; ravi & dev lost $30 each.
+  const betExp: Expense[] = [{ id: "b1", payer_user_id: "amit", amount_cents: 6000 }];
+  const betPayers: Payer[] = [{ expense_id: "b1", guest_id: "gSam", sponsor_user_id: "amit", paid_cents: 6000 }];
+  const betShares: Share[] = [
+    { expense_id: "b1", user_id: "ravi", share_cents: 3000 },
+    { expense_id: "b1", user_id: "dev", share_cents: 3000 },
+  ];
+  const betBal = computeBalances(betExp, betShares, [], gSam, betPayers);
+  // Sam's $60 win credits amit (sponsor); ravi and dev each owe $30.
+  check("winning guest credits sponsor (payer resolves to sponsor)", betBal, { amit: 6000, ravi: -3000, dev: -3000 });
+  check("winning-guest bet sums zero", sum(betBal), 0);
+  check("coverage includes winning guests (payer, positive)", guestCoverageBySponsor(betShares, gById, betPayers), { amit: { gSam: 6000 } });
+
+  // betResultToPost carries guest identity onto the posted payer/share rows.
+  const nets: any[] = [
+    { user_id: "amit", net: 50 },
+    { user_id: null, guest_id: "gSam", sponsor_user_id: "amit", net: 40 }, // guest of amit, wins
+    { user_id: "dev", net: -40 },
+    { user_id: "ravi", net: -30 },
+    { user_id: "p4", net: -20 },
+  ];
+  const bp = betResultToPost(nets as any);
+  ok("betResultToPost balances", bp.ok);
+  const samPayer = bp.payers.find((p: any) => p.guest_id === "gSam");
+  check("guest winner booked as guest payer with sponsor", { g: samPayer?.guest_id, s: samPayer?.sponsor_user_id, c: samPayer?.paid_cents }, { g: "gSam", s: "amit", c: 4000 });
 }
 
 console.log(`\n=== money.test ===\nPASS ${pass}  FAIL ${fail}`);

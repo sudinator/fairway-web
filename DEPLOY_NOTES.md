@@ -357,3 +357,42 @@ alter table public.group_guests
 alter table public.group_guests
   add column if not exists became_member_id uuid references auth.users(id) on delete set null;
 ```
+
+## v1.99.0 — Guests in a posted bet, booked to their sponsor (symmetric win/lose)
+- RUN migration 0065_bet_guest_payers.sql (full SQL below). Extends expense_payers with guest_id + sponsor_user_id, makes user_id nullable, swaps the member-only unique constraint for a party-based unique index, and adds a one-party check — mirroring what 0063 did for expense_shares. Idempotent; validated on real Postgres.
+- Posting a bet that includes a guest no longer blocks. Each guest bettor is booked as their OWN line (win or lose), attributed to the member sponsoring them for that game (game_players.guest_of). Winning guests credit the sponsor (guest payer); losing guests are owed by the sponsor (guest share). Both roll into the sponsor's balance and settle through them.
+- To carry a betting guest onto the ledger, the app finds-or-creates a lightweight Money guest record by name at post time (only because the bet posts to Money — consistent with "persist a guest only when money's involved"). That guest then appears in the Money guest list and can be retired. Re-posting the same bet reuses the record (dedup by name), so no duplicates.
+- Settle-up engine (lib/money.ts): computeBalances + pairwiseDebts now resolve the PAYER side guest->sponsor (previously only shares); betResultToPost carries guest_id + sponsor_user_id onto posted rows; guestCoverageBySponsor also covers payers so the Balances "incl. <guest>" line shows for wins and losses. New unit tests cover winning-guest crediting, betResultToPost guest passthrough, and coverage.
+- Still blocked (by design): a guest with no sponsor assigned, or a real non-member account in the pot — clear message either way.
+- Confirm card + expense detail show the guest's own line ("· guest of X"); Balances shows "incl. <guest>".
+- Verified: tsc clean, tests pass (money 56 / legs 23 / grouping 281), build clean, migration idempotent on real Postgres; end-to-end scenario check (guest of P5, -$25) yields P5 +$95 incl. Sam and settle-up P2->P5 $75, P4->P5 $20, P4->P3 $25.
+
+### 0065_bet_guest_payers.sql
+```sql
+alter table public.expense_payers
+  add column if not exists guest_id uuid references public.group_guests(id) on delete cascade;
+alter table public.expense_payers
+  add column if not exists sponsor_user_id uuid references auth.users(id) on delete set null;
+alter table public.expense_payers
+  alter column user_id drop not null;
+alter table public.expense_payers drop constraint if exists expense_payers_uk;
+create unique index if not exists expense_payers_party_uk
+  on public.expense_payers(expense_id, coalesce(user_id::text, ''), coalesce(guest_id::text, ''));
+alter table public.expense_payers drop constraint if exists expense_payers_one_party;
+alter table public.expense_payers
+  add constraint expense_payers_one_party check ((user_id is not null) <> (guest_id is not null));
+```
+
+## v1.99.1 — Bet-generated guests are per-game throwaways, separated from Money guests
+- RUN migration 0066_bet_guest_source_game.sql (SQL below). Adds group_guests.source_game_id (nullable, references games).
+- A guest auto-created for a posted bet is now tagged with its game (source_game_id) and keyed per game: re-posting the same game reuses the record; the same name in a different game is a separate record (guest + game = sponsor + date context). Two different people named "Sam" in two games are simply two records — correctness is unaffected since the sponsor is always per-transaction.
+- These bet-generated guests are hidden from the deliberate add-a-guest picker (Add Expense) and from the Retire list (Balances → Guests), so they never clutter the reusable Money-guest workflow. They still resolve by name on the expense detail and the "incl. <guest>" balance line.
+- Deliberate Money guests (added in the Money tab) keep source_game_id null and are unchanged.
+- Group-agnostic: all keyed off game.group_id + game.id, so this ports to any group if betting opens beyond TGC.
+- Verified: tsc clean, tests pass (money 56 / legs 23 / grouping 281), build clean, migration idempotent on real Postgres.
+
+### 0066_bet_guest_source_game.sql
+```sql
+alter table public.group_guests
+  add column if not exists source_game_id uuid references public.games(id) on delete set null;
+```

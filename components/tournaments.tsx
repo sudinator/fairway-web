@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { betResultToPost } from "@/lib/money";
-import type { BetNet } from "@/lib/money";
+import type { BetNet, BetPost } from "@/lib/money";
 import { ShareScorecardModal, ShareGameModal } from "@/components/share-card";
 import {
   C,
@@ -6200,12 +6200,12 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
       if (alive && exp) {
         setPostedExpense({ id: exp.id, created_at: exp.created_at });
         const [{ data: pys }, { data: shs }] = await Promise.all([
-          supabase.from("expense_payers").select("user_id, paid_cents").eq("expense_id", exp.id),
-          supabase.from("expense_shares").select("user_id, share_cents").eq("expense_id", exp.id),
+          supabase.from("expense_payers").select("user_id, guest_id, sponsor_user_id, paid_cents").eq("expense_id", exp.id),
+          supabase.from("expense_shares").select("user_id, guest_id, sponsor_user_id, share_cents").eq("expense_id", exp.id),
         ]);
         const nets: Record<string, number> = {};
-        (pys || []).forEach((p: any) => { if (p.user_id) nets[p.user_id] = (nets[p.user_id] || 0) + p.paid_cents; });
-        (shs || []).forEach((s: any) => { if (s.user_id) nets[s.user_id] = (nets[s.user_id] || 0) - s.share_cents; });
+        (pys || []).forEach((p: any) => { const mid = p.user_id || p.sponsor_user_id; if (mid) nets[mid] = (nets[mid] || 0) + p.paid_cents; });
+        (shs || []).forEach((s: any) => { const mid = s.user_id || s.sponsor_user_id; if (mid) nets[mid] = (nets[mid] || 0) - s.share_cents; });
         if (alive) setPostedNets(nets);
       }
     })();
@@ -6228,32 +6228,74 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
   const result = computeBetting(betPlayers, bet, split);
 
   const idToUser: Record<string, string | null> = {};
-  players.forEach((p) => { idToUser[p.id] = p.user_id; });
+  const idToGuestOf: Record<string, string | null> = {};
+  const idToIsGuest: Record<string, boolean> = {};
+  players.forEach((p) => { idToUser[p.id] = p.user_id; idToGuestOf[p.id] = p.guest_of || null; idToIsGuest[p.id] = !!p.is_guest; });
+  // The member responsible for a bettor: the member themselves, or a guest's sponsor.
+  const memberOf = (id: string): string | null => idToUser[id] || idToGuestOf[id] || null;
   const bettorIds = betPlayers.map((b) => b.id);
+  // Can't post if a bettor has no member to attribute to: a real non-member account,
+  // or a guest with no sponsor. A guest sponsored by a member is fine — it folds to them.
   const nonMembers = memberIds
     ? bettorIds
-        .filter((id) => { const uid = idToUser[id]; return !uid || !memberIds.has(uid); })
+        .filter((id) => {
+          const uid = idToUser[id];
+          if (uid) return !memberIds.has(uid);          // a real account, not in the group
+          const sp = idToGuestOf[id];                    // a guest — needs a member sponsor
+          return !(sp && memberIds.has(sp));
+        })
         .map((id) => players.find((p) => p.id === id)?.display_name || "?")
     : [];
   const netSum = result.perPlayer.reduce((s, p) => s + p.net, 0);
   const balanced = Math.abs(netSum) < 0.5;
 
+  // Find-or-create a Money guest record for this GAME (keyed by group + name + game), so
+  // a betting guest can be booked as their own ledger line. Tagged with source_game_id so
+  // it's a per-appearance throwaway (hidden from the deliberate add-a-guest picker / Retire
+  // list) and re-posting the same game reuses it rather than duplicating.
+  async function findOrCreateGuestId(name: string): Promise<string | null> {
+    const { data: existing } = await supabase.from("group_guests").select("id").eq("group_id", game.group_id).eq("name", name).eq("source_game_id", game.id).limit(1);
+    if (existing && existing.length) return (existing[0] as any).id;
+    const { data, error } = await supabase.from("group_guests").insert({ group_id: game.group_id, name, sponsor_user_id: null, archived: false, source_game_id: game.id, created_by: user.id }).select("id").single();
+    return error || !data ? null : (data as any).id;
+  }
+  // Build the nets for posting, materializing a guest record + sponsor for each guest bettor.
+  async function buildPostNets(): Promise<BetNet[] | null> {
+    const out: BetNet[] = [];
+    for (const pp of result.perPlayer) {
+      const uid = idToUser[pp.id];
+      if (uid) { out.push({ user_id: uid, name: pp.name, net: pp.net }); continue; }
+      const sponsor = idToGuestOf[pp.id];
+      if (!sponsor) return null; // guest with no sponsor — blocked upstream, guard anyway
+      const gid = await findOrCreateGuestId(pp.name);
+      if (!gid) return null;
+      out.push({ user_id: null, guest_id: gid, sponsor_user_id: sponsor, name: pp.name, net: pp.net });
+    }
+    return out;
+  }
+  const payerRows = (post: BetPost, expId: string) => post.payers.map((py) => ({ expense_id: expId, user_id: py.user_id, guest_id: py.guest_id, sponsor_user_id: py.sponsor_user_id, paid_cents: py.paid_cents }));
+  const shareRows = (post: BetPost, expId: string) => post.shares.map((sh) => ({ expense_id: expId, user_id: sh.user_id, guest_id: sh.guest_id, sponsor_user_id: sh.sponsor_user_id, share_cents: sh.share_cents }));
+  const primaryPayer = (post: BetPost) => post.payers.map((p) => p.user_id || p.sponsor_user_id).find(Boolean) || null;
+
   async function doPost() {
     setBusy(true); setPostMsg(null);
     try {
-      const nets: BetNet[] = result.perPlayer.map((pp) => ({ user_id: idToUser[pp.id] as string, name: pp.name, net: pp.net }));
+      const nets = await buildPostNets();
+      if (!nets) { setPostMsg("Assign a sponsor for each guest first."); setBusy(false); return; }
       const post = betResultToPost(nets);
       if (!post.ok) { setPostMsg(post.reason || "Couldn't balance the bet."); setBusy(false); return; }
+      const pp = primaryPayer(post);
+      if (!pp) { setPostMsg("Couldn't post — no member to record as payer."); setBusy(false); return; }
       const desc = `TGC bet — ${game.name || game.course || "game"}`;
       const { data: exp, error: e1 } = await supabase.from("expenses").insert({
         group_id: game.group_id, created_by: user.id,
-        payer_user_id: post.payers[0].user_id,
+        payer_user_id: pp,
         amount_cents: post.amount_cents, description: desc, category: "bet", split_type: "custom",
         source_game_id: game.id, source_kind: "tgc_bet",
       }).select("id, created_at").single();
       if (e1 || !exp) { setPostMsg("Couldn't post — please try again."); setBusy(false); return; }
-      const { error: e2 } = await supabase.from("expense_payers").insert(post.payers.map((py) => ({ expense_id: exp.id, user_id: py.user_id, paid_cents: py.paid_cents })));
-      const { error: e3 } = await supabase.from("expense_shares").insert(post.shares.map((sh) => ({ expense_id: exp.id, user_id: sh.user_id, share_cents: sh.share_cents })));
+      const { error: e2 } = await supabase.from("expense_payers").insert(payerRows(post, exp.id));
+      const { error: e3 } = await supabase.from("expense_shares").insert(shareRows(post, exp.id));
       if (e2 || e3) { await supabase.from("expenses").delete().eq("id", exp.id); setPostMsg("Couldn't post the splits — rolled back."); setBusy(false); return; }
       await supabase.from("group_activity").insert({ group_id: game.group_id, actor_user_id: user.id, action: "bet_posted", summary: `posted bet winnings — pot $${(post.amount_cents / 100).toFixed(0)}`, meta: { game_id: game.id, expense_id: exp.id, amount_cents: post.amount_cents } });
       setPostedExpense({ id: exp.id, created_at: exp.created_at }); setConfirming(false);
@@ -6286,15 +6328,23 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
   const pct = (v: number) => `${Math.round(v * 1000) / 10}%`;
   const centsNet = (c: number) => `${c >= 0 ? "+" : "\u2212"}$${Math.abs(c / 100).toFixed(0)}`;
 
+  // Raw per-bettor nets, tagging guests with their sponsor (guest_id filled in only at
+  // post time). Members carry user_id; guests carry sponsor_user_id = their guest_of.
+  const rawNets = (): BetNet[] => result.perPlayer.map((pp) => {
+    const uid = idToUser[pp.id];
+    return uid
+      ? { user_id: uid, name: pp.name, net: pp.net }
+      : { user_id: null, guest_id: null, sponsor_user_id: idToGuestOf[pp.id] || null, name: pp.name, net: pp.net };
+  });
+
   // ---- Phase 2: detect that scores changed after posting, and re-post to correct.
-  // Live nets in cents, same shape as postedNets (user_id -> +win/-loss).
+  // Live nets in cents at MEMBER level (guests fold to their sponsor), same shape as postedNets.
   const liveNetsCents: Record<string, number> = (() => {
-    const nets: BetNet[] = result.perPlayer.map((pp) => ({ user_id: idToUser[pp.id] as string, name: pp.name, net: pp.net }));
-    const post = betResultToPost(nets);
+    const post = betResultToPost(rawNets());
     const m: Record<string, number> = {};
     if (post.ok) {
-      post.payers.forEach((p) => { m[p.user_id] = (m[p.user_id] || 0) + p.paid_cents; });
-      post.shares.forEach((s) => { m[s.user_id] = (m[s.user_id] || 0) - s.share_cents; });
+      post.payers.forEach((p) => { const mid = p.user_id || p.sponsor_user_id; if (mid) m[mid] = (m[mid] || 0) + p.paid_cents; });
+      post.shares.forEach((s) => { const mid = s.user_id || s.sponsor_user_id; if (mid) m[mid] = (m[mid] || 0) - s.share_cents; });
     }
     return m;
   })();
@@ -6319,9 +6369,12 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
     if (!postedExpense) return;
     setBusy(true); setPostMsg(null);
     try {
-      const nets: BetNet[] = result.perPlayer.map((pp) => ({ user_id: idToUser[pp.id] as string, name: pp.name, net: pp.net }));
+      const nets = await buildPostNets();
+      if (!nets) { setPostMsg("Assign a sponsor for each guest first."); setBusy(false); return; }
       const post = betResultToPost(nets);
       if (!post.ok) { setPostMsg(post.reason || "Couldn't balance the corrected bet."); setBusy(false); return; }
+      const pp = primaryPayer(post);
+      if (!pp) { setPostMsg("Couldn't re-post — no member to record as payer."); setBusy(false); return; }
       const oldSnapshot = postedNets;
       // Delete the old linked expense (cascades its payers/shares). Settlements are
       // group-level and untouched, so net balances reconcile automatically — anyone
@@ -6330,13 +6383,13 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
       if (ed) { setPostMsg("Couldn't update — please try again."); setBusy(false); return; }
       const desc = `TGC bet — ${game.name || game.course || "game"}`;
       const { data: exp, error: e1 } = await supabase.from("expenses").insert({
-        group_id: game.group_id, created_by: user.id, payer_user_id: post.payers[0].user_id,
+        group_id: game.group_id, created_by: user.id, payer_user_id: pp,
         amount_cents: post.amount_cents, description: desc, category: "bet", split_type: "custom",
         source_game_id: game.id, source_kind: "tgc_bet",
       }).select("id, created_at").single();
       if (e1 || !exp) { setPostedExpense(null); setPostedNets(null); setPostMsg("Removed the old winnings but couldn't re-post — tap Post winnings again."); setBusy(false); return; }
-      const { error: e2 } = await supabase.from("expense_payers").insert(post.payers.map((py) => ({ expense_id: exp.id, user_id: py.user_id, paid_cents: py.paid_cents })));
-      const { error: e3 } = await supabase.from("expense_shares").insert(post.shares.map((sh) => ({ expense_id: exp.id, user_id: sh.user_id, share_cents: sh.share_cents })));
+      const { error: e2 } = await supabase.from("expense_payers").insert(payerRows(post, exp.id));
+      const { error: e3 } = await supabase.from("expense_shares").insert(shareRows(post, exp.id));
       if (e2 || e3) {
         // Roll back so we never leave a bet expense with missing/partial splits
         // (which would compute wrong balances). End up cleanly un-posted instead.
@@ -6586,7 +6639,7 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
                   <div style={{ marginTop: 10 }}>
                     {result.perPlayer.slice().sort((a, b) => b.net - a.net).map((p) => (
                       <div key={p.id} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", fontSize: 13 }}>
-                        <span style={{ color: C.ink }}>{p.name}</span>
+                        <span style={{ color: C.ink }}>{p.name}{idToIsGuest[p.id] ? <span style={{ color: C.faint, fontSize: 11, fontWeight: 700 }}> · guest of {nameOfUid(idToGuestOf[p.id] || "")}</span> : ""}</span>
                         <span style={{ fontWeight: 800, fontFamily: "Georgia, serif", color: p.net >= 0 ? C.green : C.birdie }}>{p.net >= 0 ? "+" : "−"}${Math.abs(p.net).toFixed(2)}</span>
                       </div>
                     ))}

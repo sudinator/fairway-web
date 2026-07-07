@@ -9,7 +9,7 @@ export type Cents = number;
 
 export interface Guest { id: string; sponsor_user_id: string | null; name?: string; archived?: boolean }
 export interface Expense { id: string; payer_user_id: string; amount_cents: Cents }
-export interface Payer { expense_id: string; user_id: string; paid_cents: Cents }
+export interface Payer { expense_id: string; user_id?: string | null; guest_id?: string | null; sponsor_user_id?: string | null; paid_cents: Cents }
 export interface Share { expense_id?: string; user_id?: string | null; guest_id?: string | null; sponsor_user_id?: string | null; share_cents: Cents }
 export interface Settlement { from_user_id: string; to_user_id: string; amount_cents: Cents }
 export interface Transfer { from: string; to: string; amt: Cents }
@@ -57,7 +57,7 @@ export function computeBalances(
   const add = (uid: string | null, amt: Cents) => { if (!uid) return; bal[uid] = (bal[uid] || 0) + amt; };
   for (const e of expenses) {
     const ps = payersByExp[e.id];
-    if (ps && ps.length) ps.forEach((p) => add(p.user_id, p.paid_cents));
+    if (ps && ps.length) ps.forEach((p) => add(resolveMember(p.user_id, p.guest_id, gById, p.sponsor_user_id), p.paid_cents));
     else add(e.payer_user_id, e.amount_cents);
   }
   for (const s of shares) add(resolveMember(s.user_id, s.guest_id, gById, s.sponsor_user_id), -s.share_cents);
@@ -70,20 +70,27 @@ export function guestOwedFor(guest_id: string, shares: Share[]): Cents {
   return shares.filter((s) => s.guest_id === guest_id).reduce((s, v) => s + v.share_cents, 0);
 }
 
-/** Which guests each member is currently covering, and how much, using the per-expense
- *  sponsor (falling back to the guest's old fixed sponsor for legacy shares). Returns
- *  memberId -> { guestId -> cents }. Powers the Balances "incl. <guests>" line, where a
- *  single guest can now roll to different members across different expenses. */
+/** Which guests each member is currently covering, and their net effect on that member's
+ *  balance (a losing guest's share is negative; a winning guest's credit is positive),
+ *  using the per-expense sponsor (falling back to the guest's old fixed sponsor for legacy
+ *  shares). Returns memberId -> { guestId -> net cents }. Powers the Balances "incl. <guests>"
+ *  line, where a guest can roll to different members across expenses and win or lose. */
 export function guestCoverageBySponsor(
-  shares: Share[], guestsById: Record<string, Guest>,
+  shares: Share[], guestsById: Record<string, Guest>, payers: Payer[] = [],
 ): Record<string, Record<string, Cents>> {
   const out: Record<string, Record<string, Cents>> = {};
+  const bump = (sponsor: string | null, guestId: string, cents: Cents) => {
+    if (!sponsor) return;
+    (out[sponsor] || (out[sponsor] = {}));
+    out[sponsor][guestId] = (out[sponsor][guestId] || 0) + cents;
+  };
   for (const s of shares) {
     if (!s.guest_id) continue;
-    const sponsor = s.sponsor_user_id || (guestsById[s.guest_id]?.sponsor_user_id ?? null);
-    if (!sponsor) continue;
-    (out[sponsor] || (out[sponsor] = {}));
-    out[sponsor][s.guest_id] = (out[sponsor][s.guest_id] || 0) + s.share_cents;
+    bump(s.sponsor_user_id || (guestsById[s.guest_id]?.sponsor_user_id ?? null), s.guest_id, -s.share_cents);
+  }
+  for (const p of payers) {
+    if (!p.guest_id) continue;
+    bump(p.sponsor_user_id || (guestsById[p.guest_id]?.sponsor_user_id ?? null), p.guest_id, p.paid_cents);
   }
   return out;
 }
@@ -156,7 +163,7 @@ export function pairwiseDebts(
       const debtor = resolveMember(s.user_id ?? null, s.guest_id ?? null, gById, s.sponsor_user_id ?? null);
       if (!debtor) continue;
       const alloc = allocateProportional(s.share_cents, weights);
-      ps.forEach((p, idx) => owe(debtor, p.user_id, alloc[idx]));
+      ps.forEach((p, idx) => owe(debtor, resolveMember(p.user_id, p.guest_id, gById, p.sponsor_user_id), alloc[idx]));
     }
   }
   for (const st of settlements) owe(st.from_user_id, st.to_user_id, -st.amount_cents);
@@ -207,11 +214,11 @@ export function nudgeSms(phone: string, name: string, oweCents: Cents, groupName
 // net winners become payers (credited their winnings), net losers become shares
 // (owing their loss). Dollars are converted to cents and kept exactly zero-sum with
 // largest-remainder rounding, so payers' paid_cents equals losers' share_cents.
-export interface BetNet { user_id: string; name: string; net: number } // net in dollars (+win / -loss)
+export interface BetNet { user_id: string | null; guest_id?: string | null; sponsor_user_id?: string | null; name: string; net: number } // net in dollars (+win / -loss)
 export interface BetPost {
   amount_cents: Cents;
-  payers: { user_id: string; paid_cents: Cents }[]; // net winners
-  shares: { user_id: string; share_cents: Cents }[]; // net losers
+  payers: { user_id: string | null; guest_id?: string | null; sponsor_user_id?: string | null; paid_cents: Cents }[]; // net winners
+  shares: { user_id: string | null; guest_id?: string | null; sponsor_user_id?: string | null; share_cents: Cents }[]; // net losers
   ok: boolean;
   reason?: string;
 }
@@ -243,12 +250,12 @@ export function betResultToPost(nets: BetNet[]): BetPost {
   const sum = nets.reduce((s, n) => s + n.net, 0);
   if (Math.abs(sum) > 0.5) return { amount_cents: 0, payers: [], shares: [], ok: false, reason: "Bet nets don't balance to zero." };
   const cents = roundZeroSumCents(nets.map((n) => n.net));
-  const payers: { user_id: string; paid_cents: Cents }[] = [];
-  const shares: { user_id: string; share_cents: Cents }[] = [];
+  const payers: BetPost["payers"] = [];
+  const shares: BetPost["shares"] = [];
   nets.forEach((n, i) => {
     const c = cents[i];
-    if (c > 0) payers.push({ user_id: n.user_id, paid_cents: c });
-    else if (c < 0) shares.push({ user_id: n.user_id, share_cents: -c });
+    if (c > 0) payers.push({ user_id: n.user_id, guest_id: n.guest_id ?? null, sponsor_user_id: n.sponsor_user_id ?? null, paid_cents: c });
+    else if (c < 0) shares.push({ user_id: n.user_id, guest_id: n.guest_id ?? null, sponsor_user_id: n.sponsor_user_id ?? null, share_cents: -c });
   });
   const amount_cents = payers.reduce((s, p) => s + p.paid_cents, 0);
   const shareTotal = shares.reduce((s, p) => s + p.share_cents, 0);
