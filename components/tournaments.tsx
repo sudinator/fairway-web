@@ -344,6 +344,7 @@ function GameList({
         const { error: e2 } = await supabase.from("game_players").insert({
           game_id: game.id,
           user_id: uid,
+          bets: true, // member default: in the money game
           display_name: displayName,
           avatar_url: myAvatar,
           rating: (ref as any).rating ?? null,
@@ -757,6 +758,7 @@ function CreateGame({
           game_id: game.id,
           user_id: p.id,
           is_guest: false,
+          bets: true, // members default into the TGC money game (never rely on the DB default)
           display_name: p.display_name || "Player",
           avatar_url: (p as any).avatar_url ?? null,
           handicap_index: playerIndex,
@@ -2172,7 +2174,7 @@ function GameRoom({
     const ch = (m.handicap_index != null && t.slope != null && t.rating != null && game.course_par != null)
       ? courseHandicap(m.handicap_index, t.slope, t.rating, game.course_par) : null;
     await supabase.from("game_players").insert({
-      game_id: game.id, user_id: m.id, is_guest: false, display_name: m.display_name,
+      game_id: game.id, user_id: m.id, is_guest: false, bets: true, display_name: m.display_name,
       handicap_index: m.handicap_index, rating: t.rating, slope: t.slope, tee_name: t.tee_name,
       course_handicap: ch, ...blankCard(),
     });

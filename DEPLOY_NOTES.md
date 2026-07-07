@@ -293,3 +293,10 @@ Five fixes from a fresh code review:
 - A tee-time deep link (`/?tt=<id>`) now works even when the recipient is viewing a different group. home.tsx resolves the tee time's group_id and switches the active group to it (persisting to profiles.active_group_id + boot cache) BEFORE handing the id to the Tee Times screen — so the tee time is in the loaded list when it opens.
 - Robustness: the id is only passed to Tee Times once the target group is active (a new `deepReady` gate), which fixes the prior race where Tee Times would "consume" the deep link against the wrong group and silently give up. If the tee time is unknown or the user isn't a member (RLS hides it), it falls back gracefully to the current group with no error.
 - Code-only. Verified: tsc clean, tests pass, build clean.
+
+## v1.94.3 — Fix: game_players.bets NOT-NULL violation on game setup (no migration required)
+- Cause: member player rows (create-game roster, self-join, add-member) omitted `bets` and relied on the column's DB default. If the live `game_players.bets` column ended up NOT NULL without a working default (0059's `add column if not exists ... default true` silently skips setting the default when the column already existed from an earlier state), those inserts sent NULL and failed with "null value in column bets ... violates not-null constraint."
+- Fix (code): all four game_players insert paths now set `bets` explicitly — members `true` (in the TGC money game), guests `false` — so inserts never depend on the DB default. No migration needed.
+- OPTIONAL root-cause cleanup (safe, idempotent) to restore the column default so future/manual inserts also behave:
+    alter table public.game_players alter column bets set default true;
+- Verified: tsc clean, tests pass, build clean.
