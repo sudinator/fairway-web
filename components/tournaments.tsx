@@ -848,6 +848,9 @@ function CreateGame({
         fairways: Array(holesMeta.length).fill(null),
       }));
       const rows = [...rosterRows, ...guestRows];
+      // 4 or fewer players tee off together — default everyone to one group (organizer
+      // can still split them manually). Bigger rosters start ungrouped for assignment.
+      if (rows.length <= 4) rows.forEach((r) => { (r as any).tee_group = 1; });
       const { error: e2 } = await supabase.from("game_players").insert(rows);
       if (e2) throw e2;
       await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_created", group_id: activeGroupId, summary: `Created the game "${game.name}" at ${pickedFav.name}` });

@@ -396,3 +396,8 @@ alter table public.expense_payers
 alter table public.group_guests
   add column if not exists source_game_id uuid references public.games(id) on delete set null;
 ```
+
+## v1.99.2 — Default 4-or-fewer-player games to a single tee group (no migration)
+- At game creation, if the roster is 4 players or fewer, everyone is defaulted into Group 1 (they tee off together). The organizer can still split them manually in the Groups step. Bigger rosters continue to start ungrouped for assignment.
+- Applies to all formats (a 2-player match, a 2v2 foursome, etc. all default to one group when the total is <=4).
+- Forward-only (affects newly created games); no schema change.

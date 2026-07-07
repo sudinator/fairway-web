@@ -118,6 +118,7 @@ From the security & structure review. None are emergencies; tackle when convenie
    gracefully on very narrow screens; keep Delete visually distinct/last). App code only.
 
 ## Shipped
+- v1.99.2 - Games with <=4 players default all players into one tee group at creation (tee off together); organizer can still split manually. No migration.
 - v1.99.1 - Bet-generated Money guests tagged with source_game_id (migration 0066), keyed per game (re-post reuses; different game = separate record), and hidden from the add-a-guest picker + Retire list so they don't clutter deliberate Money guests. Group-agnostic. Names still resolve on expense detail + 'incl.' balance line.
 - v1.99.0 - Guests can be in a posted bet: booked as their own line (win or lose), attributed to game_players.guest_of sponsor. Migration 0065 adds guest support to expense_payers (mirrors 0063 for shares); settle-up resolves payer guest->sponsor; bet guest materialized as a Money guest at post time (dedup by name). Still blocks unsponsored guests / non-member accounts. Tests added.
 - v1.98.0 - Money: per-expense guest sponsor (blank+required on each expense; sponsor moved from group_guests to expense_shares.sponsor_user_id, legacy fallback keeps old balances). Guest creation is name-only. Retire-guest (archived + optional became_member_id) hides a guest from new-expense picker without touching history; un-retire restores. Migration 0063. Tests added.
