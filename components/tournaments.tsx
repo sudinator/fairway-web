@@ -2738,67 +2738,55 @@ function GameRoom({
     return isStroke ? 0 : playerPoints(b) - playerPoints(a);
   });
 
-  // Segment winners (three sixes). Stableford: most points wins. Stroke: lowest net total wins.
+  // Segment winners (three sixes). While a six is IN PROGRESS the "leader" is whoever is
+  // most under par for the holes they've actually played (pace) — matching the main
+  // leaderboard — so a shorter-but-deeper card can lead a longer-but-flatter one, and the
+  // lead legitimately flip-flops as holes come in. Once every bettor has all six holes in,
+  // everyone's on the same par pace, so this collapses to simply who won the six.
+  // The card still DISPLAYS raw points/net · thru the leader's holes (over/under is easy to read off that).
   const segLabels = ["Holes 1–6", "Holes 7–12", "Holes 13–18"];
   const segOf = (p: Player) => (isStroke ? netBySix(playerHoles(p)) : stablefordBySix(playerHoles(p)));
   const segTotals = players.map((p) => ({ p, seg: segOf(p) }));
-  const segWinners = [0, 1, 2].map((si) => {
-    // best/who doubles as the segment WINNER (when everyone's done) or the current LEADER
-    // (while in progress), computed among players who've played >= 1 hole in the segment.
-    let best = isStroke ? Infinity : -1;
-    let who: string[] = [];
-    let started = false;
-    let maxPlayed = 0;
-    let allDone = true;
-    let anyActive = false;
-    segTotals.forEach(({ p, seg }) => {
-      const active = playerHoles(p).some((h) => h.strokes);
-      if (!active) return;
-      anyActive = true;
-      const played = playerHoles(p).slice(si * 6, si * 6 + 6).filter((h) => h.strokes).length;
-      if (played < 6) allDone = false;
-      if (played > 0) started = true;
-      maxPlayed = Math.max(maxPlayed, played);
-      if (played >= 1) {
-        const v = seg[si];
-        if (isStroke ? v < best : v > best) { best = v; who = [p.display_name]; }
-        else if (v === best) who.push(p.display_name);
-      }
+  const segLeadersFrom = (rows: { p: Player; seg: [number, number, number] }[]) =>
+    [0, 1, 2].map((si) => {
+      let bestPace = isStroke ? Infinity : -Infinity; // stroke: fewest strokes vs par (lower=better); stableford: most pts vs par-pace (higher=better)
+      let who: string[] = [];
+      let leaderRaw: number | null = null; // the leader's raw points (stableford) / net strokes (stroke), for display
+      let leaderPlayed = 0;               // the leader's holes played in this six, for the "thru" display
+      let started = false, maxPlayed = 0, allDone = true, anyActive = false;
+      rows.forEach(({ p, seg }) => {
+        const hs = playerHoles(p);
+        if (!hs.some((h) => h.strokes)) return;
+        anyActive = true;
+        const segHoles = hs.slice(si * 6, si * 6 + 6);
+        const played = segHoles.filter((h) => h.strokes).length;
+        if (played < 6) allDone = false;
+        if (played > 0) started = true;
+        maxPlayed = Math.max(maxPlayed, played);
+        if (played < 1) return;
+        if (isStroke) {
+          const parPlayed = segHoles.reduce((s, h) => s + (h.strokes && h.strokes > 0 ? (h.par || 0) : 0), 0);
+          const pace = seg[si] - parPlayed; // net strokes relative to par of holes played; lower = more under
+          if (pace < bestPace) { bestPace = pace; who = [p.display_name]; leaderRaw = seg[si]; leaderPlayed = played; }
+          else if (pace === bestPace) { who.push(p.display_name); leaderPlayed = Math.max(leaderPlayed, played); }
+        } else {
+          const pace = seg[si] - 2 * played; // stableford points relative to par pace (2/hole); higher = more under
+          if (pace > bestPace) { bestPace = pace; who = [p.display_name]; leaderRaw = seg[si]; leaderPlayed = played; }
+          else if (pace === bestPace) { who.push(p.display_name); leaderPlayed = Math.max(leaderPlayed, played); }
+        }
+      });
+      const complete = anyActive && allDone && started;
+      const thruHole = si * 6 + maxPlayed;       // deepest player — kept for the clean-sweep "holes remaining" math
+      const leaderThru = si * 6 + leaderPlayed;  // the leader's own progress — what the card shows
+      return { label: segLabels[si], complete, started, val: started ? leaderRaw : null, who, thruHole, leaderThru, maxPlayed };
     });
-    const complete = anyActive && allDone && started;
-    const thruHole = si * 6 + maxPlayed; // absolute hole reached in this segment
-    return { label: segLabels[si], complete, started, val: started ? best : null, who, thruHole, maxPlayed };
-  });
+  const segWinners = segLeadersFrom(segTotals);
 
-  // Bettor-only segment winners for the money banners (clean-sweep watch/achieved):
+  // Bettor-only segment leaders for the money banners (clean-sweep watch/achieved):
   // non-betting players (e.g. guests) still appear in the standings above, but the
   // sweep/segment money is decided among bettors only ("follow the money").
   const segTotalsBet = segTotals.filter(({ p }) => p.bets !== false);
-  const segWinnersBet = [0, 1, 2].map((si) => {
-    let best = isStroke ? Infinity : -1;
-    let who: string[] = [];
-    let started = false;
-    let maxPlayed = 0;
-    let allDone = true;
-    let anyActive = false;
-    segTotalsBet.forEach(({ p, seg }) => {
-      const active = playerHoles(p).some((h) => h.strokes);
-      if (!active) return;
-      anyActive = true;
-      const played = playerHoles(p).slice(si * 6, si * 6 + 6).filter((h) => h.strokes).length;
-      if (played < 6) allDone = false;
-      if (played > 0) started = true;
-      maxPlayed = Math.max(maxPlayed, played);
-      if (played >= 1) {
-        const v = seg[si];
-        if (isStroke ? v < best : v > best) { best = v; who = [p.display_name]; }
-        else if (v === best) who.push(p.display_name);
-      }
-    });
-    const complete = anyActive && allDone && started;
-    const thruHole = si * 6 + maxPlayed;
-    return { label: segLabels[si], complete, started, val: started ? best : null, who, thruHole, maxPlayed };
-  });
+  const segWinnersBet = segLeadersFrom(segTotalsBet);
 
   // Clean Sweep watch: one player won the first two sixes outright AND is leading the last
   // six alone with fewer than 4 holes left to play (i.e., 3-5 of holes 13-18 done).
@@ -2811,7 +2799,7 @@ function GameRoom({
     if (!s2.started || s2.complete) return null;
     if (s2.maxPlayed < 3) return null;                 // fewer than 4 holes remaining
     if (s2.who.length !== 1 || s2.who[0] !== champ) return null; // leading the last six alone
-    return { name: champ, val: s2.val as number, thru: s2.thruHole, unit: isStroke ? "net" : "pts" };
+    return { name: champ, val: s2.val ?? 0, thru: s2.thruHole, unit: isStroke ? "net" : "pts" };
   })();
 
   // Clean Sweep achieved: all three sixes are complete and won outright by the same player,
@@ -3524,7 +3512,7 @@ function GameRoom({
                         </span>
                       </div>
                       <div style={{ color: C.gold, fontSize: 13 }}>
-                        {isStroke ? `${s.val} net` : `${s.val} pts`} · thru hole {s.thruHole}
+                        {isStroke ? `${s.val} net` : `${s.val} pts`} · thru hole {s.leaderThru}
                       </div>
                     </>
                   )}
@@ -6434,7 +6422,10 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
       return `${segNames[si]}: ${w.join(" & ")} (${best}${w.length > 1 ? ", tie" : ""})`;
     });
     const overall: string[] = [];
-    if (rows.length) {
+    const allScoresIn = betPlayers.every((bp) => bp.segPlayed.every(Boolean));
+    if (!allScoresIn) {
+      overall.push("Not all scores in — no payout yet.");
+    } else if (rows.length) {
       const maxTotal = rows[0].total;
       const firsts = rows.filter((r) => r.total === maxTotal);
       if (firsts.length > 1) {

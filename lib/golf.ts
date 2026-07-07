@@ -912,6 +912,10 @@ export function computeBetting(
   const notes: Record<string, string[]> = {};
   players.forEach((p) => { won[p.id] = 0; notes[p.id] = []; });
   const lines: string[] = [];
+  // A payout only settles once every bettor has completed the holes it depends on
+  // (consistent with the sixes: "not all scores in — no payout yet"). Overall 1st/2nd
+  // therefore waits until all 18 are in for all bettors; the leaderboard shows who leads.
+  const allIn = players.every((p) => p.segPlayed.every(Boolean));
 
   if (n < 2) {
     return { pot: basePot, perPlayer: players.map((p) => ({ id: p.id, name: p.name, won: 0, net: 0, notes: ["Need at least 2 bettors."] })), lines: ["Need at least 2 bettors to calculate a pot."], cleanSweep: false };
@@ -924,18 +928,19 @@ export function computeBetting(
   const secondVal = rest.length ? Math.max(...rest.map((p) => p.total)) : null;
   const seconds = secondVal == null ? [] : rest.filter((p) => p.total === secondVal);
 
-  // Segment winners (only counting fully-played segments). Track outright wins.
+  // Segment winners — a six only settles once EVERY bettor has all 6 of its holes in.
   const segWinnerIds: string[][] = [];
   for (let si = 0; si < 3; si++) {
-    const eligible = players.filter((p) => p.segPlayed[si]);
-    if (!eligible.length) { segWinnerIds.push([]); continue; }
-    const top = Math.max(...eligible.map((p) => p.seg[si]));
-    segWinnerIds.push(eligible.filter((p) => p.seg[si] === top).map((p) => p.id));
+    const allPlayed = players.every((p) => p.segPlayed[si]);
+    if (!allPlayed) { segWinnerIds.push([]); continue; }
+    const top = Math.max(...players.map((p) => p.seg[si]));
+    segWinnerIds.push(players.filter((p) => p.seg[si] === top).map((p) => p.id));
   }
 
   // Clean sweep check: one player wins ALL three segments outright AND is the
   // sole overall leader.
   const sweepCandidate =
+    allIn &&
     firsts.length === 1 &&
     segWinnerIds.every((w) => w.length === 1 && w[0] === firsts[0].id);
 
@@ -964,10 +969,12 @@ export function computeBetting(
     lines.push(`Holes ${si * 6 + 1}–${si * 6 + 6}: ${names} — $${segShare.toFixed(2)}${winners.length > 1 ? ` split ${winners.length} ways ($${each.toFixed(2)} each)` : ""}.`);
   }
 
-  // Overall first/second.
+  // Overall first/second — only once all 18 are in for everyone; otherwise no payout yet.
   const firstShare = basePot * split.firstPct;
   const secondShare = basePot * split.secondPct;
-  if (firsts.length > 1) {
+  if (!allIn) {
+    lines.push("Overall 1st/2nd: not all scores in — no payout yet.");
+  } else if (firsts.length > 1) {
     // All tied for first split first+second combined; no second paid.
     const combined = firstShare + secondShare;
     const each = combined / firsts.length;

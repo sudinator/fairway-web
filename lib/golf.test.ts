@@ -105,5 +105,20 @@ const P = (id: string, total: number, seg: [number, number, number]): BetPlayer 
   near("bettor-only bet nets to zero", sumNet(r), 0);
 }
 
+// ---- Mid-round: overall waits for all scores; a completed six still pays. ----
+{
+  const bet = 30;
+  // Front six complete for all; middle/last not fully in for everyone.
+  const mid = [
+    { id: "a", name: "a", total: 22, seg: [12, 6, 4] as [number, number, number], segPlayed: [true, false, false] as [boolean, boolean, boolean] },
+    { id: "b", name: "b", total: 18, seg: [8, 6, 4] as [number, number, number], segPlayed: [true, false, false] as [boolean, boolean, boolean] },
+  ];
+  const r = computeBetting(mid, bet, DEFAULT_BET_SPLIT);
+  ok("mid-round overall not paid", r.lines.some((l) => /Overall.*no payout yet/i.test(l)));
+  ok("front six still pays the leader", wonOf(r, "a") > 0);
+  ok("mid-round: trailing player got no overall money", wonOf(r, "b") === 0);
+  ok("mid-round no clean sweep", r.cleanSweep === false);
+}
+
 console.log(`golf/computeBetting tests: PASS ${pass}  FAIL ${fail}`);
 if (fail) { console.log(fails.join("\n")); process.exit(1); }

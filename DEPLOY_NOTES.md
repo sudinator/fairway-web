@@ -401,3 +401,16 @@ alter table public.group_guests
 - At game creation, if the roster is 4 players or fewer, everyone is defaulted into Group 1 (they tee off together). The organizer can still split them manually in the Groups step. Bigger rosters continue to start ungrouped for assignment.
 - Applies to all formats (a 2-player match, a 2v2 foursome, etc. all default to one group when the total is <=4).
 - Forward-only (affects newly created games); no schema change.
+
+## v1.99.3 — Betting payouts consistent: no payout until scores are in (no migration)
+- Overall 1st/2nd now follows the same rule as the sixes: it stays "not all scores in — no payout yet" until every bettor has completed all 18 holes, instead of showing/assigning money to whoever was leading mid-round. The leaderboard remains the place to see who's currently ahead.
+- Tightened the sixes to match their own wording too: a six settles only once EVERY bettor has all six of its holes in (previously it could settle as soon as one bettor finished the six). Sixes still pay progressively as each is completed.
+- Clean sweep is gated on all 18 being in.
+- No change to any FINAL posted result — posting already requires the game to be ended (all holes in), so settled amounts are identical; this only fixes the mid-round display/assignment. Applies to the payout panel and the WhatsApp/share export.
+- Verified: tsc clean, tests pass (added a mid-round test: overall unpaid, a completed six still pays), build clean.
+
+## v1.99.4 — Six-hole segment leader ranks by under-par pace (no migration)
+- While a six is IN PROGRESS, the "leading"/"tied" player on the six-hole segment card is now whoever is most under par for the holes they've actually played — the same pace metric the main leaderboard uses (2·holes − points for Stableford; net vs par-of-holes-played for stroke). Previously it ranked by raw cumulative points, which disagreed with the leaderboard: a player 15 pts thru 6 (3 under) was shown ahead of one 12 pts thru 4 (4 under). Now the 4-under player leads, and the lead flip-flops correctly as holes come in.
+- Display is unchanged in format: still shows raw points/net · thru the LEADER's own holes (e.g. "Bob · 12 pts · thru hole 4 · leading"), so the over/under is easy to read off.
+- Once every bettor has all six holes in, everyone is on the same par pace, so this collapses to exactly who won the six — no change to completed sixes, and no change to any payout (payouts still settle only when all scores are in, per v1.99.3). Clean-sweep watch now tracks the pace leader of the last six.
+- Verified: tsc clean, tests pass (computeBetting 29 / money 56 / legs 23 / grouping 281), build clean.
