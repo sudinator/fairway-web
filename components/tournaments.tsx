@@ -46,6 +46,7 @@ import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
 import type { LegConfig, Leg } from "@/lib/legs";
 import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
+import { loadSetupDraft, saveSetupDraft, clearSetupDraft, draftHasProgress, draftAgeLabel, type SetupDraft } from "@/lib/setup-draft";
 
 // Every game_players INSERT must set these NOT-NULL columns explicitly rather than
 // leaning on the DB default. A drifted default (0059's `if not exists` skipped it)
@@ -547,6 +548,14 @@ function CreateGame({
   // Raw text for inline handicap entry on guests that came in without one.
   const [guestIdxEdits, setGuestIdxEdits] = useState<Record<string, string>>({});
 
+  // ---- Resume an interrupted setup (device-local draft) ----
+  const teeTimeId = seed?.teeTimeId ?? null;
+  const [draftAvailable, setDraftAvailable] = useState<SetupDraft | null>(null); // an unfinished draft offered on the banner
+  const [draftDismissed, setDraftDismissed] = useState(false);
+  const [pendingFavName, setPendingFavName] = useState<string | null>(null); // restore the course once favorites load
+  const hydratedRef = React.useRef(false); // gates saving until we've decided resume-vs-fresh (don't clobber the draft first)
+  const resumedRef = React.useRef(false);  // when true, skip the tee-time seed prefill (the draft already captured it)
+
   const addGuestPlayer = () => {
     const guestIndex = parseFloat(guestHcp);
     if (!guestName.trim() || Number.isNaN(guestIndex)) {
@@ -646,11 +655,13 @@ function CreateGame({
   // P4 handoff: once favorites/roster have loaded, prefill the course (with the
   // default tee) and preselect the tee time's IN-list members. Runs once.
   useEffect(() => {
+    if (resumedRef.current) return;
     if (!seed?.course || pickedFav || favorites.length === 0) return;
     const f = favorites.find((x) => x.name === seed.course);
     if (f) { setPickedFav(f); setTeeIdx(defaultTeeIdx(f.tees, activeGroupId === TGC_GROUP_ID)); }
   }, [seed, favorites, pickedFav, activeGroupId]);
   useEffect(() => {
+    if (resumedRef.current) return;
     if (!seed || groupRoster.length === 0) return;
     setSelectedPlayers((prev) => {
       const next = { ...prev };
@@ -662,6 +673,7 @@ function CreateGame({
   // organizer to fill in during review (flagged in the guest list). Runs once.
   const guestsSeeded = React.useRef(false);
   useEffect(() => {
+    if (resumedRef.current) return;
     if (!seed?.guests?.length || guestsSeeded.current) return;
     guestsSeeded.current = true;
     setGuestPlayers((prev) => [
@@ -669,6 +681,53 @@ function CreateGame({
       ...seed.guests.map((g) => ({ id: `seed-${Date.now()}-${Math.random().toString(36).slice(2)}`, display_name: g.name, handicap_index: null as number | null, guest_of: g.sponsorUserId })),
     ]);
   }, [seed]);
+
+  // On open, look for an unfinished draft for this group + tee time. If one with
+  // real progress exists, offer to resume it; otherwise allow saving right away.
+  useEffect(() => {
+    const d = loadSetupDraft(activeGroupId, teeTimeId);
+    if (d && draftHasProgress(d, user.id)) setDraftAvailable(d);
+    else hydratedRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const applyDraft = (d: SetupDraft) => {
+    resumedRef.current = true;
+    guestsSeeded.current = true; // don't re-seed tee-time guests over the restored ones
+    setName(d.name); setMatchDate(d.matchDate); setTeeIdx(d.teeIdx); setIdxStr(d.idxStr);
+    setGameType(d.gameType as any); setAllowancePct(d.allowancePct); setTeamScoreMode(d.teamScoreMode as any);
+    setTrifectaScoring(d.trifectaScoring as any); setStrokeBasis(d.strokeBasis as any); setFmtFamily(d.fmtFamily as any);
+    setMatchKind(d.matchKind as any); setTeamMode(d.teamMode); setSkinsTeamStyle(d.skinsTeamStyle as any);
+    setSkinsMode(d.skinsMode as any); setTeam1(d.team1); setTeam2(d.team2);
+    setSelectedPlayers(d.selectedPlayers || {}); setGuestPlayers(d.guestPlayers || []);
+    setPendingFavName(d.favName);
+    setDraftAvailable(null); setDraftDismissed(true); hydratedRef.current = true;
+  };
+  const startFresh = () => {
+    clearSetupDraft(activeGroupId, teeTimeId);
+    setDraftAvailable(null); setDraftDismissed(true); hydratedRef.current = true;
+  };
+
+  // Restore the course once favorites have loaded (kept by name).
+  useEffect(() => {
+    if (!pendingFavName || favorites.length === 0) return;
+    const f = favorites.find((x) => x.name === pendingFavName);
+    if (f) setPickedFav(f);
+    setPendingFavName(null);
+  }, [pendingFavName, favorites]);
+
+  // Save the in-progress setup on every meaningful change (once we've decided
+  // resume-vs-fresh, so we never overwrite an offered draft before the user chooses).
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const snap = {
+      name, matchDate, favName: pickedFav?.name ?? null, teeIdx, idxStr, gameType, allowancePct,
+      teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle,
+      skinsMode, team1, team2, selectedPlayers, guestPlayers,
+    };
+    if (draftHasProgress(snap, user.id)) saveSetupDraft(activeGroupId, teeTimeId, snap);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers]);
 
   const tee = pickedFav?.tees?.[teeIdx];
   const coursePar = pickedFav
@@ -833,6 +892,7 @@ function CreateGame({
       }
       // Field games (Stableford / Stroke) are ready to play once players are in;
       // every other format still needs teams / matchups / handicaps, so open Setup.
+      clearSetupDraft(activeGroupId, teeTimeId); // setup finished — drop the local draft
       onCreated(game.id, gameType === "stableford" || gameType === "stroke" ? "play" : "setup");
     } catch (e: any) {
       setErr(e.message || "Failed to create game.");
@@ -843,6 +903,18 @@ function CreateGame({
   return (
     <div style={{ maxWidth: 600 }}>
       <Eyebrow>CREATE A GAME</Eyebrow>
+      {draftAvailable && !draftDismissed && (
+        <div style={{ marginTop: 12, background: "#faf6ea", border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 14px" }}>
+          <div style={{ color: C.ink, fontSize: 13, fontWeight: 700 }}>Resume your setup?</div>
+          <div style={{ color: C.faint, fontSize: 12, marginTop: 3, lineHeight: 1.45 }}>
+            You left a game setup unfinished {draftAgeLabel(draftAvailable.savedAt)}. Pick up where you left off, or start fresh.
+          </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button onClick={() => applyDraft(draftAvailable)} style={{ ...btn(true), fontSize: 13 }}>Resume</button>
+            <button onClick={startFresh} style={{ ...btn(false), fontSize: 13 }}>Start fresh</button>
+          </div>
+        </div>
+      )}
       <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 190 }}>
           <label style={{ color: C.sage, fontSize: 12 }}>Game name</label>

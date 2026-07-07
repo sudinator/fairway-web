@@ -307,3 +307,9 @@ Five fixes from a fresh code review:
 - **Error surfacing (Item 4):** added a tiny global toast (components/toast.tsx, mounted once in home). Key user-facing game-setup writes that previously swallowed errors now surface a message on failure: add member, add guest, tee-group assignment, betting toggle, and Randomize. Best-effort logging/notification catches remain intentional.
 - **SMOKE_TEST.sql** added to the repo: run it in the Supabase SQL editor after any migration to catch a missing-default drift before members do (Check 1 is read-only; Check 2 attempts the app's inserts and rolls back). See the walkthrough.
 - Verified: tsc clean, all tests pass, build clean.
+
+## v1.96.0 — Resume an interrupted game setup (no migration)
+- Leaving the Create Game screen mid-setup no longer loses your picks. The in-progress setup (name, date, course+tee, format & options, selected members, guests with sponsors, teams) is saved to a device-local draft as you go — no game row is created until you finish, so there's still nothing to clean up.
+- Returning to Create Game shows a **"Resume your setup?"** banner (Resume / Start fresh). Resume restores everything (course re-matched by name once favorites load); Start fresh clears the draft and uses the tee-time defaults. The draft is cleared automatically when the game is created.
+- Keyed by group + originating tee time (bnn_setup_draft:<group>:<teeTime>), so drafts never bleed across tee times or groups. New lib/setup-draft.ts. Note: an explicit Cancel keeps the draft (so you can resume later); use "Start fresh" on the banner to discard.
+- Verified: tsc clean, all tests pass, build clean.
