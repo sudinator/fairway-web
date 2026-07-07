@@ -57,7 +57,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
   canManage: boolean;
   initialTeeId?: string | null;
   onConsumedDeepLink?: () => void;
-  onSpawnGame?: (seed: { teeTimeId: string; course: string | null; playDate: string; memberIds: string[]; guestNames: string[] }) => void;
+  onSpawnGame?: (seed: { teeTimeId: string; course: string | null; playDate: string; memberIds: string[]; guests: { name: string; sponsorUserId: string }[] }) => void;
   onOpenGame?: (gameId: string) => void;
 }) {
   const [tees, setTees] = useState<TeeTime[]>([]);
@@ -342,7 +342,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
             <button onClick={() => onOpenGame?.(sel.game_id!)} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 13 }}>Open linked game ›</button>
           )}
           {canManage && !sel.game_id && sel.status !== "cancelled" && ins.length > 0 && (
-            <button onClick={() => onSpawnGame?.({ teeTimeId: sel.id, course: sel.course, playDate: sel.play_date, memberIds: ins.map((r) => r.user_id), guestNames: ins.flatMap((r) => r.guest_names || []) })} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 13 }}>Create game from this tee time</button>
+            <button onClick={() => onSpawnGame?.({ teeTimeId: sel.id, course: sel.course, playDate: sel.play_date, memberIds: ins.map((r) => r.user_id), guests: ins.flatMap((r) => (r.guest_names || []).map((name) => ({ name, sponsorUserId: r.user_id }))) })} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 13 }}>Create game from this tee time</button>
           )}
           <button onClick={() => copyExport(sel)} style={{ ...btn(!hasGameBtn), width: "100%", marginTop: hasGameBtn ? 8 : 10, fontSize: 13 }}>{copied ? "Copied ✓" : "Copy for WhatsApp"}</button>
           {canManage && sel.status !== "cancelled" && !isPast(sel) && (

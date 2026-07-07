@@ -41,6 +41,7 @@ import {
   mergeBackupRow,
 } from "@/lib/golf";
 import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
+import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
 import type { LegConfig, Leg } from "@/lib/legs";
 import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
@@ -110,6 +111,7 @@ type Player = {
   team?: string | null; // team key ("A"/"B") for team match play
   no_show?: boolean | null; // organizer-flagged no-show (four-ball: scored net double bogey)
   is_guest?: boolean | null; // a guest player added for this game only
+  guest_of?: string | null; // sponsoring member's user id (guests only) — keeps guests with their host when grouping
   bets?: boolean | null; // in the TGC money game (default true; guests default false)
   tee_group?: number | null; // which tee group (foursome) this player is in (1,2,3…)
   is_marker?: boolean | null; // keeps score for their tee group
@@ -454,7 +456,7 @@ function GameList({
 // Seed passed from a Tee Time to prefill Create Game (P4 handoff): course + date
 // + the IN-list members to preselect + the IN-list guests to carry forward (by
 // name; their handicap is entered/confirmed in review). Tee groups are set in setup.
-export type GameSeed = { teeTimeId: string; course: string | null; playDate: string; memberIds: string[]; guestNames: string[] };
+export type GameSeed = { teeTimeId: string; course: string | null; playDate: string; memberIds: string[]; guests: { name: string; sponsorUserId: string }[] };
 
 // Default tee selection when a course is picked. For TGC: prefer a "member" tee by
 // name; else the tee whose total yardage is closest to 6400; else the first tee.
@@ -527,9 +529,12 @@ function CreateGame({
   >({});
   const [guestName, setGuestName] = useState("");
   const [guestHcp, setGuestHcp] = useState("");
+  const [guestSponsor, setGuestSponsor] = useState<string>(""); // sponsor user id; "" resolves to current user
   const [guestPlayers, setGuestPlayers] = useState<
-    { id: string; display_name: string; handicap_index: number | null }[]
+    { id: string; display_name: string; handicap_index: number | null; guest_of: string }[]
   >([]);
+  // The group's known guests (name + sponsor), so you can re-add without retyping — shared with Money.
+  const [knownGuests, setKnownGuests] = useState<{ id: string; name: string; sponsor_user_id: string | null }[]>([]);
   // Raw text for inline handicap entry on guests that came in without one.
   const [guestIdxEdits, setGuestIdxEdits] = useState<Record<string, string>>({});
 
@@ -545,10 +550,12 @@ function CreateGame({
         id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
         display_name: guestName.trim(),
         handicap_index: guestIndex,
+        guest_of: guestSponsor || user.id, // default: the person adding sponsors the guest
       },
     ]);
     setGuestName("");
     setGuestHcp("");
+    setGuestSponsor("");
     setErr(null);
   };
 
@@ -618,6 +625,13 @@ function CreateGame({
         return next;
       });
     })();
+    // The group's known guests (shared with Money), so guests can be re-added
+    // without retyping and always carry a sponsor.
+    (async () => {
+      const { data } = await supabase.from("group_guests")
+        .select("id, name, sponsor_user_id").eq("group_id", activeGroupId);
+      setKnownGuests((data as any[]) || []);
+    })();
   }, [activeGroupId, user.id]);
 
   // P4 handoff: once favorites/roster have loaded, prefill the course (with the
@@ -639,11 +653,11 @@ function CreateGame({
   // organizer to fill in during review (flagged in the guest list). Runs once.
   const guestsSeeded = React.useRef(false);
   useEffect(() => {
-    if (!seed?.guestNames?.length || guestsSeeded.current) return;
+    if (!seed?.guests?.length || guestsSeeded.current) return;
     guestsSeeded.current = true;
     setGuestPlayers((prev) => [
       ...prev,
-      ...seed.guestNames.map((nm) => ({ id: `seed-${Date.now()}-${Math.random().toString(36).slice(2)}`, display_name: nm, handicap_index: null as number | null })),
+      ...seed.guests.map((g) => ({ id: `seed-${Date.now()}-${Math.random().toString(36).slice(2)}`, display_name: g.name, handicap_index: null as number | null, guest_of: g.sponsorUserId })),
     ]);
   }, [seed]);
 
@@ -759,6 +773,7 @@ function CreateGame({
         game_id: game.id,
         user_id: null,
         is_guest: true,
+        guest_of: p.guest_of || null,
         bets: false,
         display_name: p.display_name,
         handicap_index: p.handicap_index,
@@ -773,6 +788,17 @@ function CreateGame({
       const rows = [...rosterRows, ...guestRows];
       const { error: e2 } = await supabase.from("game_players").insert(rows);
       if (e2) throw e2;
+      // Register any brand-new guests in the group's shared guest list (Money) so
+      // they're offered next time and carry the same sponsor. Best-effort.
+      const known = new Set(knownGuests.map((g) => g.name.trim().toLowerCase()));
+      const fresh = guestPlayers.filter((p) => !known.has(p.display_name.trim().toLowerCase()));
+      if (fresh.length) {
+        try {
+          await supabase.from("group_guests").insert(fresh.map((p) => ({
+            group_id: activeGroupId, name: p.display_name, sponsor_user_id: p.guest_of || user.id, created_by: user.id,
+          })));
+        } catch { /* the game is already saved; a duplicate/known guest is harmless */ }
+      }
       await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_created", group_id: activeGroupId, summary: `Created the game "${game.name}" at ${pickedFav.name}` });
       // P4 handoff: link this game back to the originating tee time and record it
       // in the tee-time activity trail (tt_ actions are kept out of the Money log).
@@ -908,6 +934,7 @@ function CreateGame({
                 <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 8, background: C.greenMid, borderRadius: 10, padding: "6px 10px" }}>
                   <span style={{ color: C.cream, fontSize: 13, flex: 1, minWidth: 0 }}>
                     {g.display_name}
+                    <span style={{ color: C.sage, fontSize: 11 }}> · guest of {g.guest_of === user.id ? "me" : (groupRoster.find((m) => m.id === g.guest_of)?.display_name || "member")}</span>
                     {hasIdx ? <span style={{ color: C.sage, fontSize: 11 }}> · idx {g.handicap_index}{ch != null ? ` · ch ${ch}` : ""}</span> : null}
                   </span>
                   {!hasIdx && (
@@ -943,6 +970,23 @@ function CreateGame({
             </div>
           )}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            {knownGuests.length > 0 && (
+              <select
+                value=""
+                onChange={(e) => {
+                  const g = knownGuests.find((x) => x.id === e.target.value);
+                  if (g) { setGuestName(g.name); setGuestSponsor(g.sponsor_user_id || ""); }
+                }}
+                style={{ ...inputStyle, padding: "8px 10px", flex: "1 1 100%", minWidth: 150 }}
+              >
+                <option value="">Add a past guest…</option>
+                {knownGuests.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}{g.sponsor_user_id ? ` — guest of ${groupRoster.find((m) => m.id === g.sponsor_user_id)?.display_name || "member"}` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
             <input
               value={guestName}
               onChange={(e) => setGuestName(e.target.value)}
@@ -959,6 +1003,16 @@ function CreateGame({
               placeholder="Handicap index"
               style={{ ...inputStyle, width: 130 }}
             />
+            <select
+              value={guestSponsor || user.id}
+              onChange={(e) => setGuestSponsor(e.target.value)}
+              title="Which member is this guest playing with? They'll share a group."
+              style={{ ...inputStyle, padding: "8px 10px", minWidth: 150 }}
+            >
+              {groupRoster.map((m) => (
+                <option key={m.id} value={m.id}>Guest of {m.id === user.id ? "me" : m.display_name}</option>
+              ))}
+            </select>
             <button onClick={addGuestPlayer} style={{ ...btn(false), fontSize: 12 }}>+ Add guest</button>
           </div>
         </div>
@@ -2035,6 +2089,40 @@ function GameRoom({
     await load();
   };
 
+  // Organizer: shuffle the field into balanced foursomes, keeping each guest with
+  // the member who sponsored them. Overflow guests (a sponsor with >3 guests) are
+  // left unassigned for manual placement. Pre-round only — see canRandomize below.
+  const [randomizing, setRandomizing] = useState(false);
+  const [groupOverflow, setGroupOverflow] = useState<string[]>([]); // player ids left unassigned by the shuffle
+  const groupsLocked = players.some((p) => p.group_locked);
+  const anyScoresNow = players.some((p) => (p.scores || []).some((s) => s != null));
+  const canRandomize = !gameEnded && !anyScoresNow && !groupsLocked;
+  const randomizeReason = gameEnded ? "The game has ended." : anyScoresNow ? "Scores are already in — groups are set for the round." : groupsLocked ? "A group has started scoring — groups are set for the round." : "";
+  const randomizeGroups = async () => {
+    if (!game || !canRandomize) return;
+    const field: GPlayer[] = players
+      .filter((p) => !p.no_show)
+      .map((p) => ({ id: p.id, userId: p.user_id ?? null, isGuest: !!p.is_guest, guestOf: p.guest_of ?? null }));
+    const { assignments, overflowGuestIds } = randomTeeGroups(field, 4);
+    const byId = new Map(assignments.map((a) => [a.playerId, a.group]));
+    setPlayers((prev) => prev.map((p) => (p.no_show ? p : ({ ...p, tee_group: overflowGuestIds.includes(p.id) ? null : (byId.get(p.id) ?? null) })))); // optimistic
+    setGroupOverflow(overflowGuestIds);
+    setRandomizing(true);
+    try {
+      const payload = [
+        ...assignments.map((a) => ({ player: a.playerId, group: a.group })),
+        ...overflowGuestIds.map((id) => ({ player: id, group: null })),
+      ];
+      const { error } = await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: payload });
+      if (error) throw error;
+    } catch {
+      /* a failed batch is reconciled by the reload below (and realtime) — nothing is left half-written */
+    } finally {
+      setRandomizing(false);
+      await load();
+    }
+  };
+
   // --- Add players / guests after the game has started (forgot someone, a walk-up, etc.) ---
   // Group members in this game's group who aren't in the field yet.
   const [eligibleMembers, setEligibleMembers] = useState<{ id: string; display_name: string; handicap_index: number | null }[]>([]);
@@ -2064,16 +2152,18 @@ function GameRoom({
     const n = game?.holes_meta?.length ?? 18;
     return { scores: Array(n).fill(null), putts: Array(n).fill(null), fairways: Array(n).fill(null) };
   };
-  const addGuestToGame = async (name: string, idx: number) => {
+  const addGuestToGame = async (name: string, idx: number, sponsor: string) => {
     if (!game || !name.trim() || Number.isNaN(idx)) return;
     const t = refTee();
     const ch = (t.slope != null && t.rating != null && game.course_par != null)
       ? courseHandicap(idx, t.slope, t.rating, game.course_par) : null;
     await supabase.from("game_players").insert({
-      game_id: game.id, user_id: null, is_guest: true, display_name: name.trim(),
+      game_id: game.id, user_id: null, is_guest: true, guest_of: sponsor || null, bets: false, display_name: name.trim(),
       handicap_index: idx, rating: t.rating, slope: t.slope, tee_name: t.tee_name,
       course_handicap: ch, ...blankCard(),
     });
+    // Keep the group's shared guest list (Money) in sync. Best-effort.
+    try { await supabase.from("group_guests").insert({ group_id: game.group_id, name: name.trim(), sponsor_user_id: sponsor || null, created_by: user.id }); } catch {}
     await load();
   };
   const addMemberToGame = async (m: { id: string; display_name: string; handicap_index: number | null }) => {
@@ -2996,7 +3086,9 @@ function GameRoom({
             {activeStep === "players" && <OrganizerPanel section="players" {...panelProps} />}
             {activeStep === "teams" && <OrganizerPanel section="teams" {...panelProps} />}
             {activeStep === "groups" && (
-              <GroupsBuilder game={game} players={players} onSetTeeGroup={setPlayerTeeGroup} />
+              <GroupsBuilder game={game} players={players} onSetTeeGroup={setPlayerTeeGroup}
+                onRandomize={randomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason}
+                randomizing={randomizing} overflowIds={groupOverflow} />
             )}
           </div>
         );
@@ -5304,9 +5396,11 @@ function StrokesSummary({ game, players, collapsible = false, meKey }: { game: G
 // Builds tee groups out of the matchups (matches/foursomes) or, for individual
 // formats like Stableford, straight out of players. Assigning a unit to a group
 // sets tee_group for every player in that unit, which drives group scoring.
-function GroupsBuilder({ game, players, onSetTeeGroup }: {
+function GroupsBuilder({ game, players, onSetTeeGroup, onRandomize, canRandomize = false, randomizeReason = "", randomizing = false, overflowIds = [] }: {
   game: Game; players: Player[];
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
+  onRandomize?: () => Promise<void>;
+  canRandomize?: boolean; randomizeReason?: string; randomizing?: boolean; overflowIds?: string[];
 }) {
   const byKey = (k: string) => players.find((p) => pkey(p) === k) || null;
   const groupOptions = Array.from({ length: Math.max(2, Math.ceil(players.length / 2) + 1) }, (_, i) => i + 1);
@@ -5352,6 +5446,27 @@ function GroupsBuilder({ game, players, onSetTeeGroup }: {
           : "Split players into the groups that tee off together (foursomes, 3-balls, or 2-balls). One scorer per group keeps the cards, or players score themselves."}
       </div>
 
+      {onRandomize && !foursomes.length && !pairings.length && (
+        <div style={{ marginTop: 12 }}>
+          <button
+            onClick={() => { if (canRandomize) onRandomize(); }}
+            disabled={!canRandomize || randomizing}
+            style={{ ...btn(true), fontSize: 13, opacity: canRandomize && !randomizing ? 1 : 0.5, cursor: canRandomize && !randomizing ? "pointer" : "not-allowed" }}>
+            {randomizing ? "Shuffling…" : "🎲 Randomize groups"}
+          </button>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>
+            {canRandomize
+              ? "Shuffles everyone into balanced foursomes. Guests stay in their sponsor's group. You can still fine-tune below."
+              : randomizeReason}
+          </div>
+          {overflowIds.length > 0 && (
+            <div style={{ marginTop: 8, background: "#fff6e6", border: `1px solid ${C.gold}`, borderRadius: 8, padding: "9px 11px", color: "#8a5a12", fontSize: 12, lineHeight: 1.45 }}>
+              {overflowIds.length} guest{overflowIds.length === 1 ? "" : "s"} couldn&apos;t be auto-placed (a member brought more than three): {overflowIds.map((id) => players.find((p) => p.id === id)?.display_name || "guest").join(", ")}. Assign {overflowIds.length === 1 ? "them" : "each"} to a group below.
+            </div>
+          )}
+        </div>
+      )}
+
       {units.map((u) => {
         const g = unitGroup(u);
         return (
@@ -5378,7 +5493,10 @@ function GroupsBuilder({ game, players, onSetTeeGroup }: {
                 <div style={{ color: C.gold, fontWeight: 800, fontSize: 13 }}>Group {gn}{gn === firstGroup ? " · off first" : ""}</div>
                 <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>{mem.length} player{mem.length === 1 ? "" : "s"}</div>
                 <div style={{ marginTop: 8, color: C.ink, fontSize: 13, lineHeight: 1.7 }}>
-                  {mem.map((p) => <div key={p.id}>{p.display_name}</div>)}
+                  {mem.map((p) => {
+                    const sponsor = p.is_guest && p.guest_of ? (players.find((m) => m.user_id === p.guest_of)?.display_name || null) : null;
+                    return <div key={p.id}>{p.display_name}{sponsor ? <span style={{ color: C.faint, fontSize: 11 }}> · guest of {sponsor}</span> : null}</div>;
+                  })}
                 </div>
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Scorer: chosen on the course</div>
               </div>
@@ -5476,7 +5594,7 @@ function OrganizerPanel({
   section?: "players" | "teams";
   eligibleMembers?: { id: string; display_name: string; handicap_index: number | null }[];
   onAddMember?: (m: { id: string; display_name: string; handicap_index: number | null }) => Promise<void>;
-  onAddGuest?: (name: string, hcp: number) => Promise<void>;
+  onAddGuest?: (name: string, hcp: number, sponsor: string) => Promise<void>;
   onSetAllowance?: (pct: number) => Promise<void>;
   onSetFormat?: (f: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => Promise<void>;
   onSetTeamScoreMode?: (m: "best_ball" | "aggregate") => Promise<void>;
@@ -5492,6 +5610,19 @@ function OrganizerPanel({
   const [addMemberId, setAddMemberId] = useState("");
   const [addGuestName, setAddGuestName] = useState("");
   const [addGuestHcp, setAddGuestHcp] = useState("");
+  const [addGuestSponsor, setAddGuestSponsor] = useState(""); // sponsor user id; "" -> current user
+  // Members already in this game can sponsor a walk-up guest (keeps them together when grouping).
+  const gameMembers = players.filter((p) => !p.is_guest && p.user_id).map((p) => ({ id: p.user_id as string, name: p.display_name }));
+  const [panelKnownGuests, setPanelKnownGuests] = useState<{ id: string; name: string; sponsor_user_id: string | null }[]>([]);
+  useEffect(() => {
+    if (!game.group_id) return;
+    let off = false;
+    (async () => {
+      const { data } = await supabase.from("group_guests").select("id, name, sponsor_user_id").eq("group_id", game.group_id);
+      if (!off) setPanelKnownGuests((data as any[]) || []);
+    })();
+    return () => { off = true; };
+  }, [game.group_id]);
 
 
   const withHcp = players.filter((p) => p.course_handicap != null).length;
@@ -5744,12 +5875,27 @@ function OrganizerPanel({
                 <>
                   <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2, fontWeight: 700, marginTop: eligibleMembers.length > 0 ? 14 : 0 }}>ADD A GUEST</div>
                   <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    {panelKnownGuests.length > 0 && (
+                      <select value="" onChange={(e) => { const g = panelKnownGuests.find((x) => x.id === e.target.value); if (g) { setAddGuestName(g.name); setAddGuestSponsor(g.sponsor_user_id || ""); } }}
+                        style={{ ...inputStyle, padding: "8px 10px", flex: "1 1 100%", minWidth: 140 }}>
+                        <option value="">Add a past guest…</option>
+                        {panelKnownGuests.map((g) => (
+                          <option key={g.id} value={g.id}>{g.name}{g.sponsor_user_id ? ` — guest of ${gameMembers.find((m) => m.id === g.sponsor_user_id)?.name || "member"}` : ""}</option>
+                        ))}
+                      </select>
+                    )}
                     <input value={addGuestName} onChange={(e) => setAddGuestName(e.target.value)} placeholder="Guest name" style={{ ...inputStyle, padding: "8px 10px", flex: 1, minWidth: 140 }} />
                     <input value={addGuestHcp} onChange={(e) => { const v = e.target.value; if (v === "" || /^-?\d*\.?\d*$/.test(v)) setAddGuestHcp(v); }} inputMode="decimal" placeholder="Handicap index" style={{ ...inputStyle, padding: "8px 10px", width: 120 }} />
+                    {gameMembers.length > 0 && (
+                      <select value={addGuestSponsor || user.id} onChange={(e) => setAddGuestSponsor(e.target.value)}
+                        title="Which member is this guest playing with? They'll share a group." style={{ ...inputStyle, padding: "8px 10px", minWidth: 140 }}>
+                        {gameMembers.map((m) => <option key={m.id} value={m.id}>Guest of {m.id === user.id ? "me" : m.name}</option>)}
+                      </select>
+                    )}
                     <button
                       disabled={!addGuestName.trim() || addGuestHcp === ""}
                       onClick={async () => {
-                        if (onAddGuest) { await onAddGuest(addGuestName, parseFloat(addGuestHcp)); setAddGuestName(""); setAddGuestHcp(""); }
+                        if (onAddGuest) { await onAddGuest(addGuestName, parseFloat(addGuestHcp), addGuestSponsor || user.id); setAddGuestName(""); setAddGuestHcp(""); setAddGuestSponsor(""); }
                       }}
                       style={{ ...btn(false), fontSize: 13, padding: "8px 14px", opacity: addGuestName.trim() && addGuestHcp !== "" ? 1 : 0.5 }}
                     >+ Add guest</button>
