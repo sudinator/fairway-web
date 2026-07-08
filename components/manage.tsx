@@ -1273,6 +1273,15 @@ function AdminPanel({ user }: { user: any }) {
     await load();
   };
 
+  // Flag/unflag any account as a test account (excluded from all analytics, fully functional).
+  const toggleTestPlayer = async (p: any) => {
+    const next = !p.is_test;
+    const { error } = await supabase.rpc("admin_set_test", { p_user: p.id, p_is_test: next });
+    if (error) { alert("Couldn't update test mode — " + error.message); return; }
+    await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: next ? "player_test_on" : "player_test_off", target_user_id: p.id, summary: `${next ? "Marked" : "Unmarked"} ${p.display_name || p.email} as a test account` });
+    await load();
+  };
+
   // Hard delete: erase the player and all their data permanently.
   const deletePlayer = async (p: any) => {
     const typed = prompt(`PERMANENTLY DELETE ${p.display_name || p.email} and ALL their rounds and scores?\n\nThis cannot be undone. Type DELETE to confirm.`);
@@ -1443,6 +1452,17 @@ function AdminPanel({ user }: { user: any }) {
                         <option value="">Select…</option>
                         {allGroups.filter((g) => !myGroupIds.has(g.id)).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                       </select>
+                    </div>
+
+                    <div style={{ borderTop: `1px solid ${C.greenMid}`, marginTop: 12, paddingTop: 10 }}>
+                      <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>ANALYTICS</div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
+                        <div style={{ flex: 1, color: C.cream, fontSize: 12 }}>
+                          Test account {p.is_test ? "· ON" : "· off"}
+                          <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>Hidden from every analytics figure; the app works normally. Use for a second account you test with.</div>
+                        </div>
+                        <button style={{ ...btn(!!p.is_test), padding: "7px 12px", fontSize: 12, whiteSpace: "nowrap" }} onClick={() => toggleTestPlayer(p)}>{p.is_test ? "Turn off" : "Mark as test"}</button>
+                      </div>
                     </div>
 
                     <div style={{ borderTop: `1px solid ${C.greenMid}`, marginTop: 12, paddingTop: 10 }}>

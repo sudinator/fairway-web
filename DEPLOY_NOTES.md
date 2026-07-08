@@ -675,3 +675,8 @@ end;
 $function$;
 grant execute on function public.get_admin_analytics() to authenticated;
 ```
+
+## v1.103.0 — Admin per-user test-account toggle (no migration)
+- The admin Users list now has a per-user "Test account" toggle (expand a user's row -> ANALYTICS section). It calls the existing admin_set_test RPC (from 0068), so an admin can flag ANY account as test, not just their own. A test account is excluded from every analytics figure but works normally.
+- Intended workflow: flag a SECOND account you control (your own second Google login, or a burner) as test, sign in as it on another device/incognito, and use it to see what a regular member sees in response to your admin actions — without polluting analytics. NOTE: this is not impersonation; you must actually sign in as that account. Acting-as-another-member from your own session is a separate, security-sensitive feature not included here.
+- No migration (reuses profiles.is_test + admin_set_test from 0068). Verified: tsc clean, tests pass, build clean.
