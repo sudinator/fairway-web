@@ -199,3 +199,8 @@ Optional Zelle contact (phone or email). Zelle has no payment deep link, so Mone
 
 ### Migration 0067 — save_hole_stats chokepoint (group scoring)
 - `save_hole_stats(p_player, p_putts, p_fairways, p_penalties, p_sand)` SECURITY DEFINER. Lets a signed-in player update ONLY their own game_players row's peripheral stats (putts/fairways/penalties/sand); never scores/clock. Enforces `game_players.user_id = auth.uid()`. Powers "players keep their own stats while the marker owns the score." Client sends only changed stat columns (others null → coalesce keeps them); last-write-wins per column.
+
+### Migration 0068 — analytics v2
+- `daily_active.opens int default 1` — raw app-open counter (mark_active increments on conflict) so analytics can report TOTAL views alongside UNIQUE users.
+- `profiles.is_test boolean default false` — test/QA accounts, fully functional but excluded from every analytics figure. Set via `admin_set_test(p_user, p_is_test)` (is_admin-gated).
+- `get_admin_analytics()` rewritten: rounds counted only when status='final' and deleted_at is null (started tracked separately); abandoned% spans games+rounds; opens total + unique for today/7d/30d; stickiness on unique DAU/MAU; new engagement stats; test users excluded throughout.

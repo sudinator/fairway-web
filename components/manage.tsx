@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
-import { C, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes } from "@/lib/golf";
+import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes } from "@/lib/golf";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, NumPicker, Avatar } from "@/components/ui";
@@ -886,6 +886,7 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
   const [zelle, setZelle] = useState(profile?.zelle_handle || "");
   const [idxStr, setIdxStr] = useState(profile?.handicap_index != null ? String(profile.handicap_index) : "");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url || null);
+  const [isTest, setIsTest] = useState<boolean>(!!profile?.is_test);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -898,6 +899,7 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
     setPaypal(profile?.paypal_handle || "");
     setZelle(profile?.zelle_handle || "");
     setIdxStr(profile?.handicap_index != null ? String(profile.handicap_index) : "");
+    setIsTest(!!profile?.is_test);
     setAvatarUrl(profile?.avatar_url || null);
   }, [profile]);
 
@@ -946,7 +948,7 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
     setSaving(true); setMsg(null);
     const idx = idxStr.trim() === "" ? null : parseFloat(idxStr);
     const { error } = await supabase.from("profiles").update({
-      display_name: name.trim(),
+      display_name: titleCaseName(name.trim()),
       ghin_number: ghin.trim() || null,
       phone: phone.trim() || null,
       venmo_handle: venmo.trim().replace(/^@/, "") || null,
@@ -1026,6 +1028,26 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
         {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
       </div>
 
+      {profile?.is_admin && (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Test account {isTest ? "· ON" : "· off"}</div>
+              <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
+                When on, this account works normally but is excluded from every analytics figure — use it for feature testing so your stats stay clean.
+              </div>
+            </div>
+            <button
+              onClick={async () => {
+                const next = !isTest; setIsTest(next);
+                const { error } = await supabase.rpc("admin_set_test", { p_user: user.id, p_is_test: next });
+                if (error) { setIsTest(!next); setMsg("Couldn't update test mode — " + error.message); }
+              }}
+              style={{ ...btn(isTest), fontSize: 12, padding: "8px 14px", whiteSpace: "nowrap" }}
+            >{isTest ? "Turn off" : "Turn on"}</button>
+          </div>
+        </div>
+      )}
       {profile?.is_admin && <AdminPanel user={user} />}
 
       <div style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${C.greenMid}` }}>
@@ -1049,7 +1071,7 @@ function AdminAnalytics() {
   if (err) return <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Analytics unavailable: {err}</div>;
   if (!a) return <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Loading analytics…</div>;
 
-  const t = a.totals || {}, ac = a.active || {}, f = a.formats || {}, fe = a.features || {}, h = a.health || {};
+  const t = a.totals || {}, ac = a.active || {}, f = a.formats || {}, fe = a.features || {}, h = a.health || {}, en = a.engagement || {};
   const series: { day: string; n: number }[] = ac.series || [];
 
   const tile = (n: React.ReactNode, l: string, d?: string, bg: string = C.greenLight) => (
@@ -1096,14 +1118,14 @@ function AdminAnalytics() {
         {tile(t.users ?? "—", "Total users", t.users_new_30d ? `+${t.users_new_30d} / 30d` : undefined)}
         {tile(t.active_groups ?? "—", "Active groups")}
         {tile(t.games ?? "—", "Games", t.games_30d ? `+${t.games_30d} / 30d` : undefined)}
-        {tile(t.rounds ?? "—", "Rounds", t.rounds_30d ? `+${t.rounds_30d} / 30d` : undefined)}
+        {tile(t.rounds ?? "—", "Rounds done", `${t.rounds_30d ? `+${t.rounds_30d} /30d` : "—"}${t.rounds_started ? ` · ${t.rounds_started} started` : ""}`)}
       </div>
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
         <div style={{ display: "flex", textAlign: "center" }}>
-          <div style={{ flex: 1 }}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.dau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>Today</div></div>
-          <div style={{ flex: 1 }}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.wau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This week</div></div>
-          <div style={{ flex: 1 }}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.mau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This month</div></div>
+          <div style={{ flex: 1 }}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.dau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>Today · unique</div><div style={{ color: C.faint, fontSize: 10, marginTop: 1 }}>{ac.views_today ?? 0} views</div></div>
+          <div style={{ flex: 1 }}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.wau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This week · unique</div><div style={{ color: C.faint, fontSize: 10, marginTop: 1 }}>{ac.views_7d ?? 0} views</div></div>
+          <div style={{ flex: 1 }}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.mau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This month · unique</div><div style={{ color: C.faint, fontSize: 10, marginTop: 1 }}>{ac.views_30d ?? 0} views</div></div>
         </div>
         {series.length > 0 && (
           <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 120, marginTop: 12 }}>
@@ -1116,9 +1138,13 @@ function AdminAnalytics() {
         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
           {tile(ac.avg7 ?? 0, "7-day avg", undefined, C.green)}
           {tile(ac.avg30 ?? 0, "30-day avg", undefined, C.green)}
-          {tile(`${ac.stickiness_pct ?? 0}%`, "Stickiness", undefined, C.green)}
+          {tile(`${ac.stickiness_pct ?? 0}%`, "Stickiness (DAU/MAU)", undefined, C.green)}
         </div>
-        <div style={{ color: C.faint, fontSize: 10, marginTop: 8 }}>Active-user trends build over time from app activity.</div>
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          {tile(t.rounds_per_active_user ?? 0, "Rounds / active user", undefined, C.green)}
+          {tile(ac.churn_30d ?? 0, "Lapsed (30–60d, gone)", undefined, C.green)}
+        </div>
+        <div style={{ color: C.faint, fontSize: 10, marginTop: 8 }}>Unique = distinct users; views = total app opens. Test accounts are excluded from all figures. Trends build over time.</div>
       </div>
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
@@ -1130,13 +1156,25 @@ function AdminAnalytics() {
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
         {hrow("Game completion (ended \u00f7 created)", `${h.completion_pct ?? 0}%`, true)}
-        {hrow("Abandoned setups (never scored)", `${h.abandoned_pct ?? 0}%`, false)}
+        {hrow("Round completion (done \u00f7 started)", `${h.round_completion_pct ?? 0}%`, true)}
+        {hrow("Abandoned games + rounds (never finished)", `${h.abandoned_pct ?? 0}%`, false)}
         {hrow("Avg holes entered / game", `${h.avg_holes ?? 0}`)}
         {hrow("New users active within 7 days", `${h.activated_7d_pct ?? 0}%`, true)}
         {hrow("Signups never joined a group", `${h.never_joined_group_pct ?? 0}%`, false)}
         {hrow("Retention \u2014 week 1", `${h.retention_w1_pct ?? 0}%`)}
         {hrow("Retention \u2014 week 4", `${h.retention_w4_pct ?? 0}%`)}
-        <div style={{ color: C.faint, fontSize: 10, marginTop: 8 }}>Retention accrues over the first weeks after launch.</div>
+        <div style={{ color: C.faint, fontSize: 10, marginTop: 8 }}>Rounds counted only when completed; deleted rounds never count. Retention accrues over the first weeks.</div>
+      </div>
+
+      <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
+        <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginBottom: 2 }}>Engagement (last 30 days)</div>
+        {hrow("Tee times created", `${en.tee_times_30d ?? 0}`)}
+        {hrow("RSVPs recorded", `${en.tee_rsvps_30d ?? 0}`)}
+        {hrow("Bets posted (all-time / 30d)", `${en.bets_posted ?? 0} / ${en.bets_30d ?? 0}`)}
+        {hrow("Money settled (all-time)", `$${Math.round((en.settled_cents ?? 0) / 100).toLocaleString()}`)}
+        {hrow("Invite links created", `${en.invites_created_30d ?? 0}`)}
+        {hrow("Joins via invite (all-time)", `${en.joins_via_invite ?? 0}`)}
+        {hrow("Games using a group scorer", `${en.group_scoring_pct ?? 0}%`, true)}
       </div>
     </div>
   );

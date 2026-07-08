@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
-import { C, Round, Hole, allocateStrokes, TGC_GROUP_ID } from "@/lib/golf";
+import { C, titleCaseName, Round, Hole, allocateStrokes, TGC_GROUP_ID } from "@/lib/golf";
 import { computeBalances, aggregateOwed, fmtUSD } from "@/lib/money";
 import { logActivity } from "@/lib/activity";
 import { Toaster } from "@/components/toast";
@@ -32,6 +32,11 @@ type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" |
 export function Home({ session }: { session: any }) {
   const [rounds, setRounds] = useState<Round[]>([]);
   const [dbInProgress, setDbInProgress] = useState<Round | null>(null);
+  // Weekly "finish your profile" nudge — dismissible; re-appears after 7 days.
+  const [profNudgeHidden, setProfNudgeHidden] = useState<boolean>(() => {
+    try { const v = typeof window !== "undefined" ? localStorage.getItem("bnn_prof_nudge") : null; return v ? (Date.now() - Number(v) < 7 * 86400000) : false; } catch { return false; }
+  });
+  const dismissProfNudge = () => { try { localStorage.setItem("bnn_prof_nudge", String(Date.now())); } catch { /* ignore */ } setProfNudgeHidden(true); };
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   const [groups, setGroups] = useState<AppGroup[]>([]);
@@ -312,6 +317,18 @@ export function Home({ session }: { session: any }) {
     await loadRounds();
   };
 
+  // Finalize an in-progress round exactly as it stands (e.g. only 9 or 15 holes played).
+  // status='final' is what makes a round count in stats; a partial round is legitimate.
+  const markRoundComplete = async (r: Round) => {
+    const gross = (r.holes || []).reduce((s: number, h: any) => s + (h.strokes || 0), 0);
+    const { error } = await supabase.from("rounds")
+      .update({ status: "final", gross_score: gross || null, played_at: (r as any).played_at || new Date().toISOString() })
+      .eq("id", r.id);
+    if (error) { alert("Couldn't mark that round complete — " + error.message); return; }
+    await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "round_completed", summary: `Marked a round complete${r.course ? ` at ${r.course}` : ""}` });
+    await loadRounds();
+  };
+
   const chooseGroup = async (id: string) => {
     setActiveGroupId(id);
     setProfile((p: any) => p ? ({ ...p, active_group_id: id }) : p);
@@ -450,6 +467,37 @@ export function Home({ session }: { session: any }) {
           </span>
           <span style={{ fontWeight: 800, fontSize: 13 }}>Resume →</span>
         </button>
+      )}
+
+      {/* Unfinished-round nudge: a started round only counts once it's completed, so
+          prompt to finish it (partial is fine), mark it complete as-is, or discard it. */}
+      {dbInProgress && !(stage && typeof stage === "object" && "round" in stage) && (
+        <div style={{ background: C.greenLight, border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginTop: 12 }}>
+          <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>⛳ You have an unfinished round</div>
+          <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
+            {dbInProgress.course || "Your round"} · {dbInProgress.holes?.filter((h) => h.strokes != null).length || 0} holes entered. A round only counts in your stats once it's completed — finishing a 9- or 15-hole round is fine.
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+            <button onClick={() => { setViewing(null); setTab("dashboard"); setStage({ round: dbInProgress }); }} style={{ ...btn(true), flex: 1, minWidth: 110, fontSize: 12 }}>Finish scoring</button>
+            <button onClick={() => markRoundComplete(dbInProgress)} style={{ ...btn(false), flex: 1, minWidth: 110, fontSize: 12 }}>Mark complete</button>
+            <button onClick={() => deleteRound(dbInProgress.id)} style={{ ...btn(false), flex: 1, minWidth: 90, fontSize: 12 }}>Delete</button>
+          </div>
+        </div>
+      )}
+
+      {/* Weekly profile-completion nudge — shown in-app when the profile is missing a
+          photo or handicap; links to the Profile tab. Dismiss hides it for a week. */}
+      {activeGroup && !profNudgeHidden && profile && (!profile.avatar_url || profile.handicap_index == null) && (
+        <div style={{ background: "#16302A", border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 14px", marginTop: 12 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+            <div style={{ color: C.cream, fontSize: 13, fontWeight: 700, flex: 1 }}>✨ Finish setting up your profile</div>
+            <button onClick={dismissProfNudge} style={{ background: "none", border: "none", color: C.faint, fontSize: 12, cursor: "pointer" }}>Dismiss</button>
+          </div>
+          <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
+            {[!profile.avatar_url ? "a profile photo" : null, profile.handicap_index == null ? "your handicap index" : null].filter(Boolean).join(" and ")} {(!profile.avatar_url && profile.handicap_index == null) ? "are" : "is"} missing — adding {(!profile.avatar_url && profile.handicap_index == null) ? "them" : "it"} helps your group recognise you and keeps net scoring accurate.
+          </div>
+          <button onClick={() => { setMoreOpen(false); setViewing(null); setStage(null); setTab("profile"); }} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 12 }}>Complete my profile →</button>
+        </div>
       )}
 
       {!activeGroup && (
@@ -615,7 +663,7 @@ function NameGate({ user, onSaved }: { user: any; onSaved: () => void }) {
   const save = async () => {
     if (name.trim().length < 2) { setErr("Please enter your name."); return; }
     setSaving(true); setErr(null);
-    const { error } = await supabase.from("profiles").update({ display_name: name.trim() }).eq("id", user.id);
+    const { error } = await supabase.from("profiles").update({ display_name: titleCaseName(name.trim()) }).eq("id", user.id);
     setSaving(false);
     if (error) { setErr("Couldn't save your name. Please try again."); return; }
     onSaved();

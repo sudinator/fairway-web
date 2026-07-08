@@ -1071,3 +1071,10 @@ export function clinchState(aPts: number, bPts: number, unclaimed: number): {
   const needToClinch = leader != null && !clinched ? Math.floor((unclaimed - lead) / 2) + 1 : 0;
   return { lead, leader, clinched, canTie, decided, needToClinch };
 }
+
+// Capitalize the first letter of each name part (after start, space, hyphen or apostrophe),
+// leaving the rest as typed — so "amit sud" -> "Amit Sud", "o'brien" -> "O'Brien",
+// while preserving intentional caps like "McDonald". Used when saving profile names.
+export function titleCaseName(s: string): string {
+  return (s || "").replace(/(^|[\s'\-])([a-z])/g, (_m, sep, ch) => sep + ch.toUpperCase());
+}
