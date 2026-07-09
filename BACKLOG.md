@@ -118,6 +118,7 @@ From the security & structure review. None are emergencies; tackle when convenie
    gracefully on very narrow screens; keep Delete visually distinct/last). App code only.
 
 ## Shipped
+- v1.108.1 - RLS fix: profiles readable by co-members (shares_active_club helper). Members now see club-mates' names/avatars in Club list, Players, Money, game roster. Migration 0072. Was: self-or-admin only, so members saw emails.
 - v1.108.0 - Member-facing lists show names (email only for no-name pending invites); Club list alphabetised by name. Migration 0071 title-cases existing names to match app's titleCaseName. Admin Users panel keeps email.
 - v1.107.0 - UI rename Group -> Club everywhere user-facing (roles stay members/admins). In-game group concept (tee groups, group scoring/scorecard/scorer) preserved. DB + code internals unchanged. No migration.
 - v1.106.0 - Groups tab now visible to all members (showGroupsTab=true) so any member can request a new group + switch groups. No migration.

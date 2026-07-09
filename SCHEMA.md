@@ -222,3 +222,6 @@ One-time UPDATE of profiles.display_name via a temp function mirroring lib/golf.
 
 ### Naming note
 Product term **Club** = internal **group** everywhere in the DB and code (tables groups/group_members/group_invites/group_guests, columns group_id, functions create_group_invite_multi/is_group_admin/etc., tab key "groups"). The separate in-game **group** (tee groups, group scoring/scorecard/scorer) is a different concept and keeps the word "group" in the UI too.
+
+### Migration 0072 — profiles readable by co-members
+profiles SELECT policy is now `id = auth.uid() OR is_admin() OR shares_active_club(id)`. `shares_active_club(other uuid)` is a SECURITY DEFINER helper: true when the caller and `other` are both active members of the same group/club. Lets members see co-members' names/avatars across the app; email is exposed at the API level to co-members (UI does not show it).
