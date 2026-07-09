@@ -234,3 +234,15 @@ Enables `pg_cron` and schedules `public.send_tee_reminders()` every 15 minutes (
 - (A) Deadline nudge: within 24h of `tee_times.signup_deadline`, to active `group_members` with NO `tee_time_rsvps` row for that tee time. Link `/?tt=<id>&r=deadline`.
 - (B) Morning-of: 06:00–11:59 `America/New_York` on `play_date`, to `tee_time_rsvps` with `choice='in'`. Link `/?tt=<id>&r=day`.
 De-duped per (user, tee time, kind) by matching the exact link marker — no new table. pg_cron runs UTC; windows compare against stored timestamps (signup_deadline is timestamptz; play_date compared in Eastern). tee_reminder default delivery = push (flipped live in the prefs menu, v1.110.0).
+
+### Migration 0075 — tee-time roles (member-created, creator-organized, captain-runs-game)
+RLS changes on tee_times / tee_time_rsvps:
+- `tt_insert`: any **active group member** may create a tee time (was `role in ('admin','owner')`). `created_by` must equal `auth.uid()` (no spoofing).
+- `ttr_insert` / `ttr_update` / `ttr_delete`: the tee time's **creator** joins admins/owners as an organizer who can write anyone's RSVP (members still write only their own). Used for mark-in/out, waitlist promote, guest removal.
+- `tt_update` / `tt_delete` unchanged (creator or admin).
+
+Two SECURITY DEFINER RPCs (grant execute to authenticated):
+- `set_tee_time_captain(p_tee_time_id, p_new_captain)` — authorized for group admin, tee-time creator, or current captain. A non-null new captain must have an `in` RSVP for the round. NULL clears. Grants no other tee_time edit rights.
+- `link_tee_time_game(p_tee_time_id, p_game_id)` — sets `tee_times.game_id`. Caller must have **created** the game (`games.created_by = auth.uid()`), the game and tee time must share a group, and the caller must be the tee time's captain (or its creator/admin).
+
+Product model: any member creates a tee time; the creator organizes it; a captain (admin/creator/current-captain can assign, incl. self if In) sets up the game. Game management stays organizer-based (`games.created_by === user.id`).

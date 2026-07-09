@@ -170,8 +170,8 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
   }
   async function setCaptain(tt: TeeTime, memberId: string | null) {
     setBusy(true); setActionErr(null);
-    const { error } = await supabase.from("tee_times").update({ captain_user_id: memberId }).eq("id", tt.id);
-    if (error) { setBusy(false); setActionErr("Couldn't update the captain — please try again."); return; }
+    const { error } = await supabase.rpc("set_tee_time_captain", { p_tee_time_id: tt.id, p_new_captain: memberId });
+    if (error) { setBusy(false); setActionErr(error.message?.includes("In for this round") ? "That player needs to RSVP \u201cIn\u201d before they can be captain." : error.message?.includes("Not authorized") ? "Only an admin, the tee-time creator, or the current captain can set the captain." : "Couldn't update the captain — please try again."); return; }
     await logTee("tt_captain", memberId ? `assigned ${shortName(memberOf(memberId)?.display_name || "a member")} as captain for tee time #${tt.seq ?? "?"}` : `cleared the captain for tee time #${tt.seq ?? "?"}`, { tee_time_id: tt.id, seq: tt.seq, target_user_id: memberId });
     setBusy(false); setCaptainPickerOpen(false); await load();
   }
@@ -265,8 +265,11 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
     const waitSet = new Set<string>();
     const waitPos = new Map<string, number>();
     if (sel.max_spots != null) ins.forEach((r) => { cum += 1 + (r.guest_names?.length || 0); if (cum > sel.max_spots!) { wc++; waitSet.add(r.user_id); waitPos.set(r.user_id, wc); } });
-    const frozen = isPast(sel) && !canManage;
-    const hasGameBtn = canManage && (!!sel.game_id || (sel.status !== "cancelled" && ins.length > 0));
+    const canOrganizeTee = canManage || sel.created_by === user.id; // admin OR the tee-time creator
+    const isCaptain = sel.captain_user_id === user.id;
+    const frozen = isPast(sel) && !canOrganizeTee;
+    const hasGameBtn = sel.status !== "cancelled" && (!!sel.game_id || (ins.length > 0 && (canOrganizeTee || isCaptain)));
+    const spawnGame = () => onSpawnGame?.({ teeTimeId: sel.id, course: sel.course, playDate: sel.play_date, memberIds: ins.map((r) => r.user_id), guests: ins.flatMap((r) => (r.guest_names || []).map((name) => ({ name, sponsorUserId: r.user_id }))) });
 
     const memberRow = (r: Rsvp, showOrg: boolean, wait?: boolean) => {
       const m = memberOf(r.user_id);
@@ -280,9 +283,9 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
             <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{name}{r.user_id === user.id ? " (you)" : ""}</div>
             <div style={{ fontSize: 11, color: C.faint }}>
               {m?.handicap_index != null ? `Idx ${m.handicap_index}${chSel != null ? ` \u00b7 CH ${chSel}` : ""}` : "no idx"}
-              {r.guest_names?.length && !canManage ? ` · +${r.guest_names.length} guest: ${r.guest_names.join(", ")}` : ""}
+              {r.guest_names?.length && !canOrganizeTee ? ` · +${r.guest_names.length} guest: ${r.guest_names.join(", ")}` : ""}
             </div>
-            {canManage && r.guest_names?.length ? (
+            {canOrganizeTee && r.guest_names?.length ? (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 4 }}>
                 {r.guest_names.map((gn, gi) => (
                   <span key={gi} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#eef3ee", border: `1px solid ${C.line}`, borderRadius: 999, padding: "2px 6px 2px 9px", fontSize: 11, color: C.ink }}>
@@ -294,8 +297,8 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
             ) : null}
           </div>
           {wait ? <span style={{ fontSize: 10, fontWeight: 800, background: "#fbe9cf", color: "#9a6a12", borderRadius: 20, padding: "3px 9px" }}>Waitlist{waitPos.get(r.user_id) ? ` #${waitPos.get(r.user_id)}` : ""}</span> : null}
-          {wait && canManage ? <button onClick={() => promote(sel, r.user_id)} disabled={busy} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Move up</button> : null}
-          {showOrg && canManage ? (
+          {wait && canOrganizeTee ? <button onClick={() => promote(sel, r.user_id)} disabled={busy} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Move up</button> : null}
+          {showOrg && canOrganizeTee ? (
             <button onClick={() => orgSetRsvp(sel, r.user_id, r.choice === "in" ? "out" : "in")} disabled={busy}
               style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>{r.choice === "in" ? "Mark out" : "Mark in"}</button>
           ) : null}
@@ -308,7 +311,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
         <div style={{ background: `linear-gradient(160deg,#0b2f24,${C.greenLight})`, padding: 16, borderRadius: 14, color: C.cream }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <button onClick={() => setScreen("list")} style={{ ...btn(false), fontSize: 12, padding: "6px 10px" }}>‹ Back</button>
-            {canManage && <button onClick={() => openEdit(sel.id)} style={{ ...btn(false), fontSize: 12, padding: "6px 10px" }}>Edit</button>}
+            {canOrganizeTee && <button onClick={() => openEdit(sel.id)} style={{ ...btn(false), fontSize: 12, padding: "6px 10px" }}>Edit</button>}
           </div>
           <div style={{ fontSize: 10, fontWeight: 800, color: C.gold, letterSpacing: 0.4, marginTop: 10 }}>TEE TIME #{sel.seq ?? "—"}</div>
           <div style={{ fontSize: 22, fontWeight: 800, marginTop: 3 }}>{teeName(sel)}</div>
@@ -354,20 +357,38 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
               <div style={{ fontSize: 12, color: C.faint }}>Captain</div>
               <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{sel.captain_user_id ? (memberOf(sel.captain_user_id)?.display_name || "Assigned") : "Not assigned"}</div>
             </div>
-            {canManage && <button onClick={() => setCaptainPickerOpen(true)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>{sel.captain_user_id ? "Change" : "Assign"}</button>}
+            {(canOrganizeTee || isCaptain) && !isPast(sel) && sel.status !== "cancelled" && <button onClick={() => setCaptainPickerOpen(true)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>{sel.captain_user_id ? "Change" : "Assign"}</button>}
             <button onClick={() => setDutiesOpen(true)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Duties</button>
           </div>
-          {canManage && sel.game_id && (
-            <button onClick={() => onOpenGame?.(sel.game_id!)} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 13 }}>Open linked game ›</button>
-          )}
-          {canManage && !sel.game_id && sel.status !== "cancelled" && ins.length > 0 && (
-            <button onClick={() => onSpawnGame?.({ teeTimeId: sel.id, course: sel.course, playDate: sel.play_date, memberIds: ins.map((r) => r.user_id), guests: ins.flatMap((r) => (r.guest_names || []).map((name) => ({ name, sponsorUserId: r.user_id }))) })} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 13 }}>Create game from this tee time</button>
+          {sel.status !== "cancelled" && !isPast(sel) && (
+            sel.game_id ? (
+              (canOrganizeTee || isCaptain) ? <button onClick={() => onOpenGame?.(sel.game_id!)} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 13 }}>Open linked game ›</button> : null
+            ) : ins.length === 0 ? (
+              (canOrganizeTee || isCaptain) ? <div style={{ background: "#14352b", borderRadius: 12, padding: "11px 14px", marginTop: 10, fontSize: 12.5, color: C.sage, lineHeight: 1.45 }}>Once players sign up, the captain can create the game from here.</div> : null
+            ) : !sel.captain_user_id ? (
+              <div style={{ background: "#14352b", borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.cream }}>Assign a captain to create the game</div>
+                <div style={{ fontSize: 12, color: C.sage, marginTop: 3, lineHeight: 1.45 }}>The captain sets up and runs the game for this round. {canOrganizeTee ? "Pick anyone who's In — you can choose yourself." : "An organizer will assign one soon."}</div>
+                {canOrganizeTee ? <button onClick={() => setCaptainPickerOpen(true)} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 13 }}>Assign captain</button> : null}
+                {canOrganizeTee && !ins.some((r) => r.user_id === user.id) ? <div style={{ fontSize: 11, color: C.sage, opacity: 0.75, marginTop: 6 }}>To captain it yourself, RSVP \u201cIn\u201d first.</div> : null}
+              </div>
+            ) : isCaptain ? (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ background: "#14352b", borderRadius: 12, padding: "11px 14px", fontSize: 12.5, color: C.sage, lineHeight: 1.45 }}>You're the captain — set up the game when you're ready.</div>
+                <button onClick={spawnGame} style={{ ...btn(true), width: "100%", marginTop: 8, fontSize: 13 }}>Create game from this tee time</button>
+              </div>
+            ) : (
+              <div style={{ background: "#14352b", borderRadius: 12, padding: "11px 14px", marginTop: 10, fontSize: 12.5, color: C.sage, lineHeight: 1.45 }}>
+                <span><b style={{ color: C.cream }}>{memberOf(sel.captain_user_id)?.display_name || "The captain"}</b> is the captain and will set up the game.</span>
+                {canManage ? <button onClick={spawnGame} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 13 }}>Create game from this tee time (admin)</button> : null}
+              </div>
+            )
           )}
           <button onClick={() => copyExport(sel)} style={{ ...btn(!hasGameBtn), width: "100%", marginTop: hasGameBtn ? 8 : 10, fontSize: 13 }}>{copied ? "Copied ✓" : "Copy for WhatsApp"}</button>
-          {canManage && sel.status !== "cancelled" && !isPast(sel) && (
+          {canOrganizeTee && sel.status !== "cancelled" && !isPast(sel) && (
             <button onClick={() => copyReminder(sel)} style={{ ...btn(false), width: "100%", marginTop: 8, fontSize: 13 }}>{remindCopied ? "Reminder copied ✓" : "Copy reminder for WhatsApp"}</button>
           )}
-          {canManage && sel.status !== "cancelled" && !isPast(sel) && (
+          {canOrganizeTee && sel.status !== "cancelled" && !isPast(sel) && (
             <button onClick={() => copySignupLink(sel)} disabled={busy} style={{ ...btn(false), width: "100%", marginTop: 8, fontSize: 13, opacity: busy ? 0.6 : 1 }}>{signupCopied ? "Sign-up link copied ✓" : "Copy sign-up link (new players)"}</button>
           )}
           </>
@@ -384,7 +405,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
             {ins.length > 0 && <><Eyebrow style={EB}>{`In — ${ins.reduce((s, r) => s + 1 + (r.guest_names?.length || 0), 0)}${sel.max_spots != null ? ` of ${sel.max_spots} spots` : ""}`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{ins.map((r) => memberRow(r, true, waitSet.has(r.user_id)))}</div></>}
             {maybes.length > 0 && <><Eyebrow style={EB}>{`Maybe (${maybes.length})`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{maybes.map((r) => memberRow(r, true))}</div></>}
             {outs.length > 0 && <><Eyebrow style={EB}>{`Out (${outs.length})`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{outs.map((r) => memberRow(r, true))}</div></>}
-            {canManage && notResponded.length > 0 && (
+            {canOrganizeTee && notResponded.length > 0 && (
               <><Eyebrow style={EB}>{`Not responded (${notResponded.length})`}</Eyebrow>
                 <div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>
                   {notResponded.map((m) => (
@@ -421,7 +442,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
           </div>
         )}
 
-        {canManage && sel.status !== "cancelled" && (
+        {canOrganizeTee && sel.status !== "cancelled" && (
           <button onClick={() => cancelTeeTime(sel)} disabled={busy} style={{ ...btn(false), width: "100%", marginTop: 14, fontSize: 13, color: C.birdie, borderColor: C.birdie }}>Cancel this tee time</button>
         )}
 
@@ -440,7 +461,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
           <div style={{ fontSize: 22, fontWeight: 800, color: C.cream, letterSpacing: 0.5 }}>Tee Times</div>
           <div style={{ fontSize: 11, color: C.sage, textTransform: "uppercase", letterSpacing: 1 }}>{activeGroupName}</div>
         </div>
-        {canManage && <button onClick={() => setScreen("create")} style={{ ...btn(true), fontSize: 13, padding: "9px 14px" }}>+ New</button>}
+        <button onClick={() => setScreen("create")} style={{ ...btn(true), fontSize: 13, padding: "9px 14px" }}>+ New</button>
       </div>
 
       <div style={{ display: "flex", gap: 6, margin: "6px 0 4px" }}>
@@ -571,6 +592,7 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
   const [notes, setNotes] = useState(editing?.notes || "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const todayStr = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`; })();
 
   useEffect(() => {
     (async () => {
@@ -586,7 +608,10 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
     if (resumingRef.current) { resumingRef.current = false; return; } // don't clobber a resumed deadline
     if (!date || editing) return;
     const d = new Date(date + "T12:00:00"); d.setDate(d.getDate() - 3);
-    setDeadline(d.toISOString().split("T")[0]);
+    let dd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    if (dd < todayStr) dd = todayStr; // never default into the past (e.g. a round tomorrow)
+    if (dd > date) dd = date;         // never default after the play date
+    setDeadline(dd);
   }, [date, editing]);
 
   // ---- Resume an interrupted tee-time (device-local draft, new tee times only) ----
@@ -630,6 +655,9 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
 
   async function post() {
     if (!date) { setErr("Pick a play date."); return; }
+    if (!editing && date < todayStr) { setErr("Play date can't be in the past."); return; }
+    if (deadline && deadline > date) { setErr("Signup deadline can't be after the play date."); return; }
+    if (!editing && deadline && deadline < todayStr) { setErr("Signup deadline can't be in the past."); return; }
     const parsedTimes = times.split(",").map((t) => t.trim()).filter(Boolean);
     if (!parsedTimes.length) { setErr("Add at least one tee-off time."); return; }
     const rawCap = maxSpots.trim();
@@ -668,6 +696,7 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
   }
 
   const label = (t: string) => <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.6, color: C.sage, textTransform: "uppercase", margin: "12px 0 5px" }}>{t}</div>;
+  const hint = (t: string) => <div style={{ fontSize: 11, color: C.sage, opacity: 0.72, margin: "5px 0 2px", lineHeight: 1.35 }}>{t}</div>;
   const dateStyle: React.CSSProperties = { ...inputStyle, width: "100%", maxWidth: "100%", minWidth: 0, WebkitAppearance: "none", appearance: "none" };
 
   return (
@@ -690,7 +719,8 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
       {label("Title (optional)")}
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Saturday Meadow" style={{ ...inputStyle, width: "100%" }} />
       {label("Play date")}
-      <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={dateStyle} />
+      <input type="date" value={date} min={editing ? undefined : todayStr} onChange={(e) => setDate(e.target.value)} style={dateStyle} />
+      {hint("Tap to choose the round date.")}
       {label("Tee-off time(s) — required, comma separated")}
       <input value={times} onChange={(e) => setTimes(e.target.value)} placeholder="e.g. 8:10 AM, 8:20 AM" style={{ ...inputStyle, width: "100%" }} />
       {label("Course")}
@@ -701,7 +731,8 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
       {label("Max spots")}
       <input value={maxSpots} onChange={(e) => setMaxSpots(e.target.value)} type="number" min={1} max={60} step={1} placeholder="Blank = 60 (max)" style={{ ...inputStyle, width: "100%" }} />
       {label("Signup deadline")}
-      <input type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} style={dateStyle} />
+      <input type="date" value={deadline} min={editing ? undefined : todayStr} max={date || undefined} onChange={(e) => setDeadline(e.target.value)} style={dateStyle} />
+      {hint("Auto-set 3 days before — tap to change. Can't be in the past.")}
       {label("Notes")}
       <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" style={{ ...inputStyle, width: "100%" }} />
       {err && <div style={{ color: C.birdie, fontSize: 12, marginTop: 10 }}>{err}</div>}

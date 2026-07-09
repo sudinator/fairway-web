@@ -859,7 +859,7 @@ function CreateGame({
       // in the tee-time activity trail (tt_ actions are kept out of the Money log).
       if (seed?.teeTimeId) {
         try {
-          await supabase.from("tee_times").update({ game_id: game.id }).eq("id", seed.teeTimeId);
+          await supabase.rpc("link_tee_time_game", { p_tee_time_id: seed.teeTimeId, p_game_id: game.id });
           await supabase.from("group_activity").insert({ group_id: activeGroupId, actor_user_id: user.id, action: "tt_game_linked", summary: `created a game from this tee time ("${game.name}")`, meta: { tee_time_id: seed.teeTimeId, game_id: game.id } });
         } catch { /* linking never blocks game creation */ }
       }
