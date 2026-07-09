@@ -99,6 +99,19 @@ export function RegisterSW() {
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.addEventListener("controllerchange", onControllerChange);
     }
+    // When a push notification is clicked and an existing tab is focused, the SW asks
+    // the page to route to the notification's deep link.
+    const onSwMessage = (e: MessageEvent) => {
+      if (e.data && e.data.kind === "notif-nav" && typeof e.data.link === "string") {
+        try {
+          const url = new URL(e.data.link, window.location.origin);
+          if (url.origin === window.location.origin && url.pathname + url.search !== window.location.pathname + window.location.search) {
+            window.location.assign(url.pathname + url.search);
+          }
+        } catch { /* ignore bad link */ }
+      }
+    };
+    if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", onSwMessage);
 
     if (document.readyState === "complete") start();
 
@@ -109,6 +122,7 @@ export function RegisterSW() {
       window.removeEventListener("focus", onFocus);
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker.removeEventListener("controllerchange", onControllerChange);
+        navigator.serviceWorker.removeEventListener("message", onSwMessage);
       }
       if (interval) clearInterval(interval);
     };

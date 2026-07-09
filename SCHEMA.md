@@ -204,3 +204,9 @@ Optional Zelle contact (phone or email). Zelle has no payment deep link, so Mone
 - `daily_active.opens int default 1` — raw app-open counter (mark_active increments on conflict) so analytics can report TOTAL views alongside UNIQUE users.
 - `profiles.is_test boolean default false` — test/QA accounts, fully functional but excluded from every analytics figure. Set via `admin_set_test(p_user, p_is_test)` (is_admin-gated).
 - `get_admin_analytics()` rewritten: rounds counted only when status='final' and deleted_at is null (started tracked separately); abandoned% spans games+rounds; opens total + unique for today/7d/30d; stickiness on unique DAU/MAU; new engagement stats; test users excluded throughout.
+
+### Migration 0069 — push subscriptions (phase 1)
+- `push_subscriptions(user_id, endpoint unique, p256dh, auth, platform, user_agent, disabled, fail_count, created_at, last_seen)` — one row per device push endpoint; RLS = owner-only (sender uses service role).
+- `profiles.push_prefs jsonb` — per-type push toggles (absent key = on; "_master"=false mutes all).
+- `notifications.type`, `notifications.link` — notification category + deep link for push routing.
+- `create_notification(p_recipient, p_message, p_group_id, p_type, p_link)` — extended (old 2/3-arg calls still resolve via defaults).

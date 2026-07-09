@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
+import { pushGate, isSubscribed, subscribeToPush, unsubscribeFromPush, currentPermission } from "@/lib/push";
 import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes } from "@/lib/golf";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
@@ -876,6 +877,57 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
   );
 }
 
+// ================= Push notifications opt-in =================
+function PushToggle({ user }: { user: any }) {
+  const [gate, setGate] = useState<ReturnType<typeof pushGate> | null>(null);
+  const [on, setOn] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => { setGate(pushGate()); isSubscribed().then(setOn); }, []);
+  if (gate === null) return null;
+
+  const enable = async () => {
+    setBusy(true); setMsg(null);
+    const r = await subscribeToPush(user.id);
+    setBusy(false);
+    if (r.ok) { setOn(true); setMsg("Notifications are on for this device."); return; }
+    if (r.reason === "denied") setMsg(currentPermission() === "denied"
+      ? "Notifications are blocked in your device/browser settings — enable them for Birdie Num Num there, then try again."
+      : "Permission wasn't granted.");
+    else if (r.reason === "unsupported") setMsg("This device can't receive web push. On iPhone, install to the Home Screen from Safari first.");
+    else if (r.reason === "unconfigured") setMsg("Push isn't configured on the server yet.");
+    else setMsg("Couldn't turn on notifications — please try again.");
+  };
+  const disable = async () => { setBusy(true); await unsubscribeFromPush(); setOn(false); setBusy(false); setMsg("Notifications are off for this device."); };
+
+  return (
+    <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
+      <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>🔔 Notifications</div>
+      {gate === "install_ios" ? (
+        <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.55, marginTop: 6 }}>
+          To get notifications on iPhone, install Birdie Num Num to your Home Screen <b>from Safari</b>:
+          open the app in Safari, tap the <b>Share</b> icon (the square with an up-arrow), choose <b>Add to Home Screen</b>, then open BNN from that new icon and come back here to turn notifications on.
+          <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Note: an icon added from Chrome or another browser won't receive notifications — it has to be added from Safari.</div>
+        </div>
+      ) : gate === "unsupported" ? (
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>This browser can't receive push notifications. Try Chrome on Android/desktop, or install to the Home Screen on iPhone via Safari.</div>
+      ) : gate === "unconfigured" ? (
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>Notifications aren't switched on for the app yet — check back soon.</div>
+      ) : (
+        <>
+          <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>
+            Get a phone notification when you're added to a game, when you owe or get paid, and for tee-time updates — even when the app is closed.
+          </div>
+          <button onClick={on ? disable : enable} disabled={busy} style={{ ...btn(!on), marginTop: 10, fontSize: 13, opacity: busy ? 0.6 : 1 }}>
+            {busy ? "…" : on ? "Turn off on this device" : "Turn on notifications"}
+          </button>
+        </>
+      )}
+      {msg && <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>{msg}</div>}
+    </div>
+  );
+}
+
 // ================= Profile panel (+ admin) =================
 export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: any; onSaved: () => void }) {
   const [name, setName] = useState(profile?.display_name || "");
@@ -1028,6 +1080,7 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
         {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
       </div>
 
+      <PushToggle user={user} />
       {profile?.is_admin && (
         <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
