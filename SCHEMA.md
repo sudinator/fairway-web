@@ -216,3 +216,9 @@ Optional Zelle contact (phone or email). Zelle has no payment deep link, so Mone
 - `notify_money_owed()` on expense_shares INSERT → notifies the debtor (skips the payer, guests, zero shares); de-duped to one per user+group per 6h; type money_owed, link /?tab=money.
 - `notify_money_paid()` on settlements INSERT → notifies the payee; type money_paid, link /?tab=money.
 - Sender: app/api/push/route.ts (Supabase webhook → web-push), gated by push_prefs; delivery default map matches the client.
+
+### Migration 0071 — title-case name backfill (data only)
+One-time UPDATE of profiles.display_name via a temp function mirroring lib/golf.ts titleCaseName (uppercases word-initial lowercase letters; no down-casing). Function is dropped at the end. No schema change.
+
+### Naming note
+Product term **Club** = internal **group** everywhere in the DB and code (tables groups/group_members/group_invites/group_guests, columns group_id, functions create_group_invite_multi/is_group_admin/etc., tab key "groups"). The separate in-game **group** (tee groups, group scoring/scorecard/scorer) is a different concept and keeps the word "group" in the UI too.

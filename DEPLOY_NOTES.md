@@ -898,3 +898,44 @@ The top-level community concept is now called a **Club** everywhere users see it
 - Deliberately LEFT the in-game "Group" concept unchanged: tee groups, group scoring, group scorecard, group scorer, "keep score for this group", playing groups, the game-setup Groups tab. Those are a different thing and still read "Group".
 - Database and code internals are UNCHANGED — tables (groups, group_members, group_invites, group_guests), columns (group_id), functions (create_group_invite_multi, is_group_admin, join_default_group), tab keys ("groups"), deep-link ?tab=groups, action enums (group_requested/approved), and props (isGroupAdmin) all still use "group". This keeps the rename zero-risk; users never see those names.
 - NO migration. Verified: tsc clean, tests pass, build clean. Creation is still request-and-approve (v1.106.0 made the Clubs tab visible to everyone so any member can request one).
+
+## v1.108.0 — Show names not emails in member-facing lists + one-time name title-case backfill (RUN migration 0071)
+- Club member list (Clubs tab): now ordered alphabetically by name; the redundant email line under each name is gone. Names show for everyone who has one (which is everyone who's signed in — the app gates all use behind the name screen). Email only appears as the identifier for a PENDING invite (someone added by email who hasn't signed in yet). Remove-confirm now uses the name.
+- Players · Current Club tab: the email on the right is now shown ONLY when a player has no name yet (pending invite); named members without a phone show nothing there instead of their email.
+- Admin Users panel: unchanged — still shows email, since it's your account-management view and abandoned signups may have no name.
+- Migration 0071 (data backfill, full SQL below): title-cases existing profile names to match the app's on-save titleCaseName exactly — capitalises the first letter of each word (after start / space / apostrophe / hyphen) only when lowercase; leaves ALL-CAPS and intentional mid-caps like McDonald/DeVito untouched. Verified char-for-char against the JS function on real Postgres. Safe to re-run.
+- Verified: tsc clean, tests pass, build clean.
+
+### 0071_title_case_names.sql
+```sql
+-- 0071_title_case_names.sql
+-- One-time backfill: title-case existing profile names the same way the app now does
+-- on save (lib/golf.ts titleCaseName). It uppercases the first letter of each word
+-- (start of string, or after a space, apostrophe, or hyphen) ONLY when that letter is
+-- lowercase. It deliberately does NOT lowercase anything, so intentional mid-word caps
+-- (McDonald, DeVito) and ALL-CAPS names are left untouched — exactly matching the app.
+-- Safe to re-run: rows already correct are skipped.
+create or replace function public.bnn_title_case(s text) returns text
+language plpgsql immutable as $fn$
+declare result text := ''; i int; ch text; prev text := '';
+begin
+  if s is null then return null; end if;
+  for i in 1..length(s) loop
+    ch := substr(s, i, 1);
+    if (i = 1 or prev ~ '[\s''\-]') and ch ~ '[a-z]' then
+      result := result || upper(ch);
+    else
+      result := result || ch;
+    end if;
+    prev := ch;
+  end loop;
+  return result;
+end $fn$;
+
+update public.profiles
+set display_name = public.bnn_title_case(display_name)
+where display_name is not null
+  and display_name <> public.bnn_title_case(display_name);
+
+drop function public.bnn_title_case(text);
+```

@@ -1927,9 +1927,9 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
               </div>
               {p.phone ? (
                 <a href={`tel:${p.phone}`} style={{ color: C.green, fontWeight: 700, fontSize: 14, textDecoration: "none", background: C.cream, borderRadius: 8, padding: "8px 12px" }}>{p.phone}</a>
-              ) : (
+              ) : !p.display_name ? (
                 <span style={{ color: C.faint, fontSize: 12 }}>{row.email}</span>
-              )}
+              ) : null}
             </div>
 
             {isGroupAdmin && row.user_id && (

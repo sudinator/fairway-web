@@ -74,7 +74,10 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
       const { data: profs } = await supabase.from("profiles").select("id, display_name, handicap_index, phone, ghin_number, avatar_url").in("id", ids);
       profilesById = Object.fromEntries((profs || []).map((p: any) => [p.id, p]));
     }
-    setMembers(rows.map((m) => ({ ...m, profiles: m.user_id ? profilesById[m.user_id] || null : null })) as any);
+    const mapped = rows.map((m) => ({ ...m, profiles: m.user_id ? profilesById[m.user_id] || null : null }));
+    // Deliberate order: alphabetical by display name (falling back to email for pending invites).
+    mapped.sort((a, b) => (a.profiles?.display_name || a.email || "").toLowerCase().localeCompare((b.profiles?.display_name || b.email || "").toLowerCase()));
+    setMembers(mapped as any);
   }, [active?.id]);
 
   useEffect(() => { loadMembers(); }, [loadMembers]);
@@ -339,12 +342,12 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
                   <Avatar src={m.profiles?.avatar_url} name={name} size={40} />
                   <div style={{ flex: 1, minWidth: 190 }}>
                     <div style={{ color: C.ink, fontWeight: 800 }}>{name}{self ? " (you)" : ""}</div>
-                    <div style={{ color: C.faint, fontSize: 12 }}>{m.email} · {m.status}{m.role === "admin" ? " · admin" : ""}</div>
+                    <div style={{ color: C.faint, fontSize: 12 }}>{m.status}{m.role === "admin" ? " · admin" : ""}</div>
                   </div>
                   {isAdmin && !self && m.status !== "removed" && (
                     <>
                       <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px" }} disabled={busy} onClick={() => updateMember(m, { role: m.role === "admin" ? "member" : "admin" })}>{m.role === "admin" ? "Make member" : "Make admin"}</button>
-                      <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", color: C.birdie }} disabled={busy} onClick={() => { if (confirm(`Remove ${m.email} from ${active.name}?`)) updateMember(m, { status: "removed" }); }}>Remove</button>
+                      <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", color: C.birdie }} disabled={busy} onClick={() => { if (confirm(`Remove ${m.profiles?.display_name || m.email} from ${active.name}?`)) updateMember(m, { status: "removed" }); }}>Remove</button>
                     </>
                   )}
                 </div>
