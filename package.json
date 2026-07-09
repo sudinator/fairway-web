@@ -1,6 +1,6 @@
 {
   "name": "fairway-card",
-  "version": "1.104.0",
+  "version": "1.105.0",
   "private": true,
   "scripts": {
     "prebuild": "node scripts/write-version.mjs",
@@ -16,11 +16,13 @@
     "next": "14.2.35",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "recharts": "^2.12.7"
+    "recharts": "^2.12.7",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^18",
+    "@types/web-push": "^3.6.4",
     "typescript": "^5"
   }
 }

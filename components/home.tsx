@@ -73,6 +73,19 @@ export function Home({ session }: { session: any }) {
   });
   useEffect(() => { if (deepTeeId) setTab("teetimes"); }, [deepTeeId]);
 
+  // Deep link from a notification (/?tab=money|games|teetimes…): open that tab once.
+  useEffect(() => {
+    try {
+      const t = new URLSearchParams(window.location.search).get("tab");
+      const allowed = ["dashboard", "rounds", "games", "courses", "players", "groups", "help", "profile", "money", "teetimes"];
+      if (t && allowed.includes(t)) {
+        setTab(t as Tab);
+        const url = new URL(window.location.href); url.searchParams.delete("tab");
+        window.history.replaceState({}, "", url.pathname + url.search);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   // A deep link may point at a tee time in a group the user isn't currently viewing.
   // Resolve that tee time's group and switch to it BEFORE handing the id to TeeTimes,
   // so the tee time is actually in the loaded list when TeeTimes tries to open it.

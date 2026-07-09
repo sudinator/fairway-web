@@ -210,3 +210,9 @@ Optional Zelle contact (phone or email). Zelle has no payment deep link, so Mone
 - `profiles.push_prefs jsonb` — per-type push toggles (absent key = on; "_master"=false mutes all).
 - `notifications.type`, `notifications.link` — notification category + deep link for push routing.
 - `create_notification(p_recipient, p_message, p_group_id, p_type, p_link)` — extended (old 2/3-arg calls still resolve via defaults).
+
+### Migration 0070 — push event triggers (phase 2)
+- `notify_game_added()` on game_players INSERT → notifies the added user (skips the game creator + guests); type game_added, link /?tab=games.
+- `notify_money_owed()` on expense_shares INSERT → notifies the debtor (skips the payer, guests, zero shares); de-duped to one per user+group per 6h; type money_owed, link /?tab=money.
+- `notify_money_paid()` on settlements INSERT → notifies the payee; type money_paid, link /?tab=money.
+- Sender: app/api/push/route.ts (Supabase webhook → web-push), gated by push_prefs; delivery default map matches the client.

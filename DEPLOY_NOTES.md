@@ -793,3 +793,96 @@ end;
 $function$;
 grant execute on function public.create_notification(uuid, text, uuid, text, text) to authenticated;
 ```
+
+## v1.105.0 — Push notifications, phase 2: sender + webhook + event triggers + prefs (RUN migration 0070)
+Now notifications actually PUSH. A Supabase webhook on `notifications` INSERT calls a Vercel route that pushes to the recipient's devices IF their preference for that type is "push". Three events are wired: added to a game, you owe money, you got paid.
+
+SETUP (one-time, after Phase 1's VAPID vars are already set):
+1. RUN migration 0070 (full SQL below) — event triggers that create the notification rows.
+2. Add TWO more Vercel env vars (Production + Preview; mark sensitive; untick Development for the sensitive ones):
+   - SUPABASE_SERVICE_ROLE_KEY = <Supabase dashboard → Project Settings → API → service_role secret>
+   - PUSH_WEBHOOK_SECRET = <the secret from the chat message>
+   Redeploy after adding.
+3. Create the Supabase Database Webhook (Supabase dashboard → Database → Webhooks → Create):
+   - Table: public.notifications
+   - Events: Insert
+   - Type: HTTP Request; Method: POST
+   - URL: https://birdienumnum.vercel.app/api/push
+   - HTTP Headers: add  x-webhook-secret : <same PUSH_WEBHOOK_SECRET value>
+   Save.
+
+WHAT SHIPPED:
+- app/api/push/route.ts (Node runtime): verifies the x-webhook-secret header, reads the recipient's push_prefs + push_subscriptions via the service role, and web-pushes only if that type resolves to "push". Dead subscriptions (404/410) are deleted; repeated failures disable a subscription. Added web-push dependency.
+- Migration 0070: SECURITY DEFINER triggers create notification rows for game_added (game_players insert; organizer not self-notified; guests skipped), money_owed (expense_shares insert; payer skipped; de-duped to one per user+group per 6h so bet re-posts don't spam), money_paid (settlements insert → payee).
+- Profile → Notifications: a per-type menu (Push / In-app / Off) writing to profiles.push_prefs. Defaults: game_added/money_owed/money_paid = Push; the rest In-app. Types beyond the three wired ones are shown as "· soon".
+- Notification deep links now open the right tab: /?tab=money, /?tab=games (home.tsx handles ?tab=).
+- Delivery resolution (route + client) share the same DEFAULT_DELIVERY map; "in-app only" and "off" simply don't push (the bell still shows the row for non-off types).
+- Verified: tsc clean, tests pass, build clean; 0070 idempotent + logic validated on real Postgres (creator/payer skipped, repost de-duped, payee notified).
+
+TEST (end-to-end, needs the webhook + env vars live): On a device with notifications turned on, have someone add you to a game / post a bet you owe on / settle up with you, and confirm the phone notification arrives and tapping it opens the right tab. In-app-only types show only in the bell. iPhone must be installed via Safari with notifications on.
+
+### 0070_push_events.sql
+```sql
+-- 0070_push_events.sql
+-- Create notification rows for the key events, so the phase-2 webhook can push them.
+-- These run as triggers (SECURITY DEFINER, owner privileges) so they insert regardless
+-- of who performed the action and without the create_notification relationship checks.
+-- The webhook + each user's per-type preference decide whether a row is actually pushed.
+
+-- 1) Added to a game — fires once per player row at game creation / when added later.
+create or replace function public.notify_game_added() returns trigger
+language plpgsql security definer set search_path = public as $fn$
+declare creator uuid; grp uuid;
+begin
+  if new.user_id is null then return new; end if;                -- guests have no account
+  select created_by, group_id into creator, grp from games where id = new.game_id;
+  if creator is not null and new.user_id = creator then return new; end if;  -- don't ping the organizer about themselves
+  insert into notifications (user_id, message, group_id, type, link)
+  values (new.user_id, 'You''ve been added to a new game.', grp, 'game_added', '/?tab=games');
+  return new;
+end $fn$;
+drop trigger if exists trg_notify_game_added on public.game_players;
+create trigger trg_notify_game_added after insert on public.game_players
+  for each row execute function public.notify_game_added();
+
+-- 2) You owe money — fires when an expense share lands against a real user who isn't the
+--    payer. De-duped to at most one per user+group per 6h so bet re-posts don't spam.
+create or replace function public.notify_money_owed() returns trigger
+language plpgsql security definer set search_path = public as $fn$
+declare payer uuid; grp uuid;
+begin
+  if new.user_id is null then return new; end if;               -- guest share
+  if new.share_cents <= 0 then return new; end if;
+  select payer_user_id, group_id into payer, grp from expenses where id = new.expense_id;
+  if payer is not null and new.user_id = payer then return new; end if;   -- the payer isn't owing themselves
+  if exists (
+    select 1 from notifications n
+    where n.user_id = new.user_id and n.type = 'money_owed'
+      and n.group_id is not distinct from grp
+      and n.created_at > now() - interval '6 hours'
+  ) then return new; end if;                                     -- already told them recently
+  insert into notifications (user_id, message, group_id, type, link)
+  values (new.user_id,
+          'New charge: you owe $' || to_char(new.share_cents / 100.0, 'FM999990.00') || '. Tap to open Money.',
+          grp, 'money_owed', '/?tab=money');
+  return new;
+end $fn$;
+drop trigger if exists trg_notify_money_owed on public.expense_shares;
+create trigger trg_notify_money_owed after insert on public.expense_shares
+  for each row execute function public.notify_money_owed();
+
+-- 3) You got paid — fires when a settlement is recorded; notifies the payee.
+create or replace function public.notify_money_paid() returns trigger
+language plpgsql security definer set search_path = public as $fn$
+begin
+  if new.to_user_id is null then return new; end if;
+  insert into notifications (user_id, message, group_id, type, link)
+  values (new.to_user_id,
+          'You''ve been paid $' || to_char(new.amount_cents / 100.0, 'FM999990.00') || '.',
+          new.group_id, 'money_paid', '/?tab=money');
+  return new;
+end $fn$;
+drop trigger if exists trg_notify_money_paid on public.settlements;
+create trigger trg_notify_money_paid after insert on public.settlements
+  for each row execute function public.notify_money_paid();
+```

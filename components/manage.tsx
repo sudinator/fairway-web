@@ -878,12 +878,28 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
 }
 
 // ================= Push notifications opt-in =================
-function PushToggle({ user }: { user: any }) {
+// Per-type notification preferences. Keys + defaults must match the sender route
+// (app/api/push/route.ts DEFAULT_DELIVERY). Only the first three are wired to real
+// events today; the rest are shown so the choice persists as those events get added.
+const NOTIF_TYPES: { key: string; label: string; def: "push" | "inapp" | "off"; live: boolean }[] = [
+  { key: "game_added", label: "You're added to a game", def: "push", live: true },
+  { key: "money_owed", label: "You owe money", def: "push", live: true },
+  { key: "money_paid", label: "You get paid / settled", def: "push", live: true },
+  { key: "tee_reminder", label: "Tee-time reminders", def: "push", live: false },
+  { key: "tee_new", label: "New tee time posted", def: "inapp", live: false },
+  { key: "bet_posted", label: "A bet is posted in your game", def: "inapp", live: false },
+  { key: "game_finished", label: "Game finished / results", def: "inapp", live: false },
+  { key: "group_member", label: "New member joins your group", def: "inapp", live: false },
+];
+
+function PushToggle({ user, profile }: { user: any; profile: any }) {
   const [gate, setGate] = useState<ReturnType<typeof pushGate> | null>(null);
   const [on, setOn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [prefs, setPrefs] = useState<Record<string, string>>((profile?.push_prefs as Record<string, string>) || {});
   useEffect(() => { setGate(pushGate()); isSubscribed().then(setOn); }, []);
+  useEffect(() => { setPrefs((profile?.push_prefs as Record<string, string>) || {}); }, [profile?.push_prefs]);
   if (gate === null) return null;
 
   const enable = async () => {
@@ -899,6 +915,32 @@ function PushToggle({ user }: { user: any }) {
     else setMsg("Couldn't turn on notifications — please try again.");
   };
   const disable = async () => { setBusy(true); await unsubscribeFromPush(); setOn(false); setBusy(false); setMsg("Notifications are off for this device."); };
+
+  const setPref = async (key: string, val: "push" | "inapp" | "off") => {
+    const next = { ...prefs, [key]: val };
+    setPrefs(next);
+    try { await supabase.from("profiles").update({ push_prefs: next }).eq("id", user.id); } catch { /* ignore */ }
+  };
+  const seg = (key: string, def: string) => {
+    const cur = prefs[key] ?? def;
+    const opts: { v: "push" | "inapp" | "off"; l: string }[] = [{ v: "push", l: "Push" }, { v: "inapp", l: "In-app" }, { v: "off", l: "Off" }];
+    return (
+      <div style={{ display: "flex", gap: 4 }}>
+        {opts.map((o) => {
+          const active = cur === o.v;
+          return (
+            <button key={o.v} onClick={() => setPref(key, o.v)}
+              style={{ padding: "4px 9px", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                border: `1px solid ${active ? (o.v === "off" ? "#8B6A62" : C.gold) : C.line}`,
+                background: active ? (o.v === "off" ? "#6B2F28" : C.gold) : "transparent",
+                color: active ? (o.v === "off" ? "#F6DEDB" : "#16201C") : C.sage }}>
+              {o.l}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
@@ -916,7 +958,7 @@ function PushToggle({ user }: { user: any }) {
       ) : (
         <>
           <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>
-            Get a phone notification when you're added to a game, when you owe or get paid, and for tee-time updates — even when the app is closed.
+            Get a phone notification when you're added to a game, when you owe or get paid, and more — even when the app is closed.
           </div>
           <button onClick={on ? disable : enable} disabled={busy} style={{ ...btn(!on), marginTop: 10, fontSize: 13, opacity: busy ? 0.6 : 1 }}>
             {busy ? "…" : on ? "Turn off on this device" : "Turn on notifications"}
@@ -924,6 +966,21 @@ function PushToggle({ user }: { user: any }) {
         </>
       )}
       {msg && <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>{msg}</div>}
+
+      {gate !== "unconfigured" && (
+        <div style={{ marginTop: 14, borderTop: `1px solid ${C.greenMid}`, paddingTop: 10 }}>
+          <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>WHAT TO NOTIFY ME ABOUT</div>
+          <div style={{ color: C.faint, fontSize: 11, marginTop: 3 }}>Push buzzes your phone (needs notifications on for the device); In-app just shows in the bell.</div>
+          {NOTIF_TYPES.map((t) => (
+            <div key={t.key} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 9 }}>
+              <div style={{ flex: 1, color: C.cream, fontSize: 12 }}>
+                {t.label}{!t.live && <span style={{ color: C.faint, fontSize: 10 }}> · soon</span>}
+              </div>
+              {seg(t.key, t.def)}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1080,7 +1137,7 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
         {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
       </div>
 
-      <PushToggle user={user} />
+      <PushToggle user={user} profile={profile} />
       {profile?.is_admin && (
         <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
