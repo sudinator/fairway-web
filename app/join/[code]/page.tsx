@@ -25,7 +25,7 @@ export default function JoinGroupPage({ params }: { params: { code: string } }) 
     const run = async () => {
       if (!/^\d{6}$/.test(code)) {
         setState("error");
-        setMessage("This invite link is not valid. Ask the group admin for a new invite link.");
+        setMessage("This invite link is not valid. Ask the club admin for a new invite link.");
         return;
       }
 
@@ -33,14 +33,14 @@ export default function JoinGroupPage({ params }: { params: { code: string } }) 
       if (!data.session) {
         if (!cancelled) {
           setState("login");
-          setMessage("Sign in with Google to join this group.");
+          setMessage("Sign in with Google to join this club.");
         }
         return;
       }
 
       if (cancelled) return;
       setState("joining");
-      setMessage("Joining your group…");
+      setMessage("Joining your club…");
 
       const multi = await supabase.rpc("redeem_group_invite_multi", { code });
       let groupId = (multi.data as string | null) ?? null;
@@ -56,7 +56,7 @@ export default function JoinGroupPage({ params }: { params: { code: string } }) 
           setMessage(
             redeemErr
               ? describeError("redeem this invite", redeemErr)
-              : "This invite code could not be redeemed — it may be expired or already used. Ask the group admin for a new link.",
+              : "This invite code could not be redeemed — it may be expired or already used. Ask the club admin for a new link.",
           );
         }
         return;
@@ -68,13 +68,13 @@ export default function JoinGroupPage({ params }: { params: { code: string } }) 
       if (upErr && !cancelled) {
         // The membership was created by the RPC; only setting the active group failed.
         setState("error");
-        setMessage(describeError("set this as your active group", upErr) + " You're in the group — open the app and switch to it from the group selector.");
+        setMessage(describeError("set this as your active club", upErr) + " You're in the club — open the app and switch to it from the club selector.");
         return;
       }
       try {
         await supabase.from("activity_log").insert({
           actor_id: data.session.user.id, actor_name: data.session.user.email || "A player",
-          action: "member_added", group_id: groupId, summary: `Joined a group via invite link`,
+          action: "member_added", group_id: groupId, summary: `Joined a club via invite link`,
         });
       } catch {}
       if (!cancelled) {
@@ -83,7 +83,7 @@ export default function JoinGroupPage({ params }: { params: { code: string } }) 
         const tt = (() => { try { return new URLSearchParams(window.location.search).get("tt"); } catch { return null; } })();
         const dest = tt ? `/?tt=${encodeURIComponent(tt)}` : "/";
         setState("success");
-        setMessage(tt ? "You're in — opening the tee time to RSVP…" : "You joined the group. Opening Birdie Num Num…");
+        setMessage(tt ? "You're in — opening the tee time to RSVP…" : "You joined the club. Opening Birdie Num Num…");
         setTimeout(() => router.push(dest), 1200);
       }
     };
@@ -105,7 +105,7 @@ export default function JoinGroupPage({ params }: { params: { code: string } }) 
       <div style={{ maxWidth: 440, margin: "80px auto", padding: 24, textAlign: "center" }}>
         <div style={{ display: "flex", justifyContent: "center" }}><Wordmark width={300} /></div>
         <div style={{ background: C.greenLight, borderRadius: 16, padding: 28, marginTop: 30 }}>
-          <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 800 }}>GROUP INVITE</div>
+          <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 800 }}>CLUB INVITE</div>
           <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 24, fontWeight: 800, marginTop: 10 }}>
             Invite code {code || "------"}
           </div>

@@ -24,7 +24,7 @@ export function GroupSelector({ groups, activeGroupId, onChange }: { groups: App
   const active = groups.find((g) => g.id === activeGroupId) || groups[0];
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, background: C.greenLight, borderRadius: 10, padding: "7px 10px" }}>
-      <span style={{ color: C.sage, fontSize: 11, letterSpacing: 1.5, fontWeight: 800 }}>GROUP</span>
+      <span style={{ color: C.sage, fontSize: 11, letterSpacing: 1.5, fontWeight: 800 }}>CLUB</span>
       {groups.length === 1 ? (
         <span style={{ color: C.cream, fontSize: 13, fontWeight: 800 }}>{active.name}{active.role === "admin" ? " ★" : ""}</span>
       ) : (
@@ -105,9 +105,9 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
       // Notify every app admin that a request is waiting.
       const { data: admins } = await supabase.from("profiles").select("id").eq("is_admin", true);
       for (const a of admins || []) {
-        try { await supabase.rpc("create_notification", { p_recipient: a.id, p_message: `New group request: "${name}" from ${user.email}. Approve or decline it in the admin panel.` }); } catch {}
+        try { await supabase.rpc("create_notification", { p_recipient: a.id, p_message: `New club request: "${name}" from ${user.email}. Approve or decline it in the admin panel.` }); } catch {}
       }
-      await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "A member", action: "group_requested", summary: `Requested a new group "${name}"` });
+      await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "A member", action: "group_requested", summary: `Requested a new club "${name}"` });
       setNewGroup(""); setNewNote("");
       setMsg(`Request submitted for "${name}". An admin will review it — you'll be notified when it's approved.`);
     } catch (e: any) {
@@ -118,16 +118,16 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
   const renameGroup = async () => {
     if (!active || !isAdmin) return;
     const name = renameText.trim();
-    if (!name) { setMsg("Group name cannot be blank."); return; }
+    if (!name) { setMsg("Club name cannot be blank."); return; }
     setBusy(true); setMsg(null);
     try {
       const { error } = await supabase.from("groups").update({ name }).eq("id", active.id);
       if (error) throw error;
       setRenaming(false);
       await onGroupsChanged();
-      setMsg("Group renamed.");
+      setMsg("Club renamed.");
     } catch (e: any) {
-      setMsg("Couldn't rename group: " + (e.message || "error"));
+      setMsg("Couldn't rename club: " + (e.message || "error"));
     } finally { setBusy(false); }
   };
 
@@ -137,10 +137,10 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
     // active member left. Guard on the loaded member list.
     const activeOthers = (members || []).filter((m) => m.status === "active" && m.user_id !== user.id);
     if (activeOthers.length > 0) {
-      setMsg(`Can't delete: ${activeOthers.length} other active member${activeOthers.length === 1 ? "" : "s"} still in this group. Remove them first.`);
+      setMsg(`Can't delete: ${activeOthers.length} other active member${activeOthers.length === 1 ? "" : "s"} still in this club. Remove them first.`);
       return;
     }
-    if (!confirm(`Delete the group "${active.name}"? This permanently removes the group and its membership. Rounds you logged are kept on your account. This cannot be undone.`)) return;
+    if (!confirm(`Delete the club "${active.name}"? This permanently removes the club and its membership. Rounds you logged are kept on your account. This cannot be undone.`)) return;
     setBusy(true); setMsg(null);
     try {
       // Clear the group from anyone whose active group points at it.
@@ -162,7 +162,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
         .from("groups").delete().eq("id", active.id).select("id");
       if (error) throw error;
       if (!deleted || deleted.length === 0) {
-        setMsg("Couldn't delete this group — your account may not have permission (nothing was changed).");
+        setMsg("Couldn't delete this club — your account may not have permission (nothing was changed).");
         setBusy(false);
         return;
       }
@@ -171,11 +171,11 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
       await supabase.from("group_invites").delete().eq("group_id", active.id);
       await supabase.from("group_courses").delete().eq("group_id", active.id);
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Group admin", action: "group_deleted", summary: `Deleted group "${active.name}"` });
-      setMsg("Group deleted.");
+      setMsg("Club deleted.");
       if (onGroupDeleted) await onGroupDeleted();
       else await onGroupsChanged();
     } catch (e: any) {
-      setMsg("Couldn't delete group: " + (e.message || "error"));
+      setMsg("Couldn't delete club: " + (e.message || "error"));
     } finally { setBusy(false); }
   };
 
@@ -233,7 +233,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
     const demotingThisAdmin = patch.role === "member" && m.role === "admin";
     const removingThisAdmin = patch.status === "removed" && m.role === "admin";
     if ((demotingThisAdmin || removingThisAdmin) && admins.length <= 1) {
-      setMsg("This is the group's only admin. Make someone else an admin first, so the group always has at least one.");
+      setMsg("This is the club's only admin. Make someone else an admin first, so the club always has at least one.");
       return;
     }
     setBusy(true); setMsg(null);
@@ -254,18 +254,18 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
 
   return (
     <div>
-      <Eyebrow>GROUPS</Eyebrow>
+      <Eyebrow>CLUBS</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
-        Groups keep games, players, and shared courses limited to the people in that group. Your personal dashboard still includes your own rounds across every group.
+        Clubs keep games, players, and shared courses limited to the people in that club. Your personal dashboard still includes your own rounds across every club.
       </div>
 
       <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 14 }}>
-        <Eyebrow>REQUEST A NEW GROUP</Eyebrow>
+        <Eyebrow>REQUEST A NEW CLUB</Eyebrow>
         <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
-          New groups are approved by an app admin. Fill in the name and a short note on what it's for — you'll be notified when it's approved.
+          New clubs are approved by an app admin. Fill in the name and a short note on what it's for — you'll be notified when it's approved.
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
-          <input style={{ ...inputStyle, maxWidth: 360 }} placeholder="Group name (e.g. Saturday Nassau)" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} />
+          <input style={{ ...inputStyle, maxWidth: 360 }} placeholder="Club name (e.g. Saturday Nassau)" value={newGroup} onChange={(e) => setNewGroup(e.target.value)} />
           <input style={{ ...inputStyle, maxWidth: 360 }} placeholder="What's it for? (optional)" value={newNote} onChange={(e) => setNewNote(e.target.value)} />
           <button style={{ ...btn(true), maxWidth: 200, opacity: newGroup.trim() && !busy ? 1 : 0.5 }} disabled={!newGroup.trim() || busy} onClick={createGroup}>Submit request</button>
         </div>
@@ -274,7 +274,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
       {active && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <Eyebrow>ACTIVE GROUP</Eyebrow>
+            <Eyebrow>ACTIVE CLUB</Eyebrow>
             <select value={active.id} onChange={(e) => onActiveGroupChange(e.target.value)}
               style={{ ...inputStyle, maxWidth: 260, padding: "7px 10px", fontSize: 14 }}>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}{g.role === "admin" ? " ★ admin" : ""}</option>)}
@@ -292,7 +292,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
                 <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 24, fontWeight: 800 }}>{active.name}</div>
                 {isAdmin && <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px" }} onClick={() => setRenaming(true)}>Rename</button>}
                 {isAdmin && (members || []).filter((m) => m.status === "active" && m.user_id !== user.id).length === 0 && (
-                  <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", background: "#7A2F28" }} disabled={busy} onClick={deleteGroup}>Delete group</button>
+                  <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", background: "#7A2F28" }} disabled={busy} onClick={deleteGroup}>Delete club</button>
                 )}
               </div>
             )}
@@ -303,7 +303,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
             <div style={{ marginTop: 16 }}>
               <Eyebrow>INVITE MEMBERS</Eyebrow>
               <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
-                Generate a link to share. Anyone who opens it is added to this group after Google sign-in. Pick how long it stays valid.
+                Generate a link to share. Anyone who opens it is added to this club after Google sign-in. Pick how long it stays valid.
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                 {([["24h", "Lasts 24 hours"], ["7d", "7 days"], ["once", "One-time (single player)"]] as const).map(([k, lbl]) => (

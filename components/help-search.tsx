@@ -22,7 +22,7 @@ const FAQ: Faq[] = [
     q: "How do I add or invite players to a game?",
     keywords: "invite add players join friends roster members code include",
     steps: [
-      "When creating, tick the group members you want to include.",
+      "When creating, tick the club members you want to include.",
       "After creating, share the 6-digit game code (tap it to copy).",
       "Players enter that code on their own Games screen to join.",
     ],
@@ -131,7 +131,7 @@ const FAQ: Faq[] = [
     ],
   },
   {
-    q: "How do I add a guest who isn't in the group?",
+    q: "How do I add a guest who isn't in the club?",
     keywords: "guest non member visitor add outsider friend stranger",
     steps: [
       "When creating the game, add a guest with their name and handicap index.",
@@ -165,10 +165,10 @@ const FAQ: Faq[] = [
     ],
   },
   {
-    q: "How do I switch between my groups?",
-    keywords: "switch change group society multiple active another which",
+    q: "How do I switch between my clubs?",
+    keywords: "switch change club group society multiple active another which",
     steps: [
-      "Use the group selector to pick the active group.",
+      "Use the club selector to pick the active club.",
       "Your dashboard and rounds always cover all of your groups together.",
     ],
   },

@@ -886,3 +886,15 @@ drop trigger if exists trg_notify_money_paid on public.settlements;
 create trigger trg_notify_money_paid after insert on public.settlements
   for each row execute function public.notify_money_paid();
 ```
+
+## v1.106.0 — Every member can reach the Groups (Club) tab (no migration)
+- The Groups tab was hidden for a non-admin member who belonged to a single group, so they had no way to switch groups or reach the "Request a new group" form. It's now visible to everyone (showGroupsTab = true). The request form and the active-group switcher already rendered for all members inside that tab and weren't admin-gated; only the tab's visibility was blocking them. Creation remains request-and-approve for now.
+- No migration. Verified: tsc clean, tests pass, build clean.
+- (Terminology rename Group -> Club is planned as a separate pass pending the final name.)
+
+## v1.107.0 — Rename "Group" -> "Club" across the UI (no migration)
+The top-level community concept is now called a **Club** everywhere users see it. Roles stay **members** and **admins**.
+- Renamed ONLY user-facing text (tab label "Clubs", the Clubs panel, request-a-club, active-club switcher, invites, club course library, admin club requests/oversight, Users list, money ledger copy, join-link page, help/FAQ, activity-log summaries, notification labels). The header selector, empty states, and confirm dialogs now say Club.
+- Deliberately LEFT the in-game "Group" concept unchanged: tee groups, group scoring, group scorecard, group scorer, "keep score for this group", playing groups, the game-setup Groups tab. Those are a different thing and still read "Group".
+- Database and code internals are UNCHANGED — tables (groups, group_members, group_invites, group_guests), columns (group_id), functions (create_group_invite_multi, is_group_admin, join_default_group), tab keys ("groups"), deep-link ?tab=groups, action enums (group_requested/approved), and props (isGroupAdmin) all still use "group". This keeps the rename zero-risk; users never see those names.
+- NO migration. Verified: tsc clean, tests pass, build clean. Creation is still request-and-approve (v1.106.0 made the Clubs tab visible to everyone so any member can request one).

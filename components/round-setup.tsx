@@ -148,9 +148,9 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
             change_summary: buildCourseChangeSummary(currentData, proposed),
             status: "pending",
           });
-          setFavMsg("Saved to this group's course library ★ (global review pending)");
+          setFavMsg("Saved to this club's course library ★ (global review pending)");
         } else {
-          setFavMsg("Saved to this group's course library ★");
+          setFavMsg("Saved to this club's course library ★");
         }
       } else {
         const { data: created, error } = await supabase.from("favorite_courses")
@@ -179,7 +179,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
       const hasChanges = hasMaterialCourseChanges(currentData, picked);
       await linkCourseToGroup(supabase, activeGroupId, loadedFavId, null);
       if (!hasChanges) {
-        setFavMsg("Saved to this group's course library ★");
+        setFavMsg("Saved to this club's course library ★");
         await loadFavorites();
         return;
       }

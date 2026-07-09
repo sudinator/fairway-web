@@ -5948,7 +5948,7 @@ function OrganizerPanel({
             <div style={{ marginTop: 14, borderTop: `1px solid ${C.greenMid}`, paddingTop: 12 }}>
               {onAddMember && eligibleMembers.length > 0 && (
                 <>
-                  <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2, fontWeight: 700 }}>ADD FROM YOUR GROUP</div>
+                  <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2, fontWeight: 700 }}>ADD FROM YOUR CLUB</div>
                   <div style={{ marginTop: 8 }}>
                     {eligibleMembers.map((m) => (
                       <div key={m.id} onClick={() => onAddMember(m)}

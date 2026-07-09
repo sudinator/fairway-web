@@ -89,7 +89,7 @@ function CourseChangeSummary({ req }: { req: CourseEditRequest }) {
         <div style={{ color: C.green, fontSize: 11, letterSpacing: 1.5, fontWeight: 800, marginBottom: 6 }}>SUBMISSION DETAILS</div>
         <div style={{ color: C.ink, fontSize: 13, lineHeight: 1.6 }}>
           <div><b>Submitted by:</b> {submitter}</div>
-          <div><b>Group:</b> {req.group_name || "Unknown group"}</div>
+          <div><b>Club:</b> {req.group_name || "Unknown club"}</div>
           <div><b>Submitted at:</b> {formatDateTime(req.created_at)}</div>
           <div><b>Reason:</b> {req.reason?.trim() || "No reason provided."}</div>
         </div>
@@ -276,9 +276,9 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   const addToMyGroup = async (c: LibCourse) => {
     setBusyId(c.id); setMsg(null);
     await linkCourseToGroup(supabase, activeGroupId, c.id, user.id);
-    await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_added_to_group", group_id: activeGroupId, summary: `Added course "${courseCardTitle(c)}" to the group library` });
+    await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_added_to_group", group_id: activeGroupId, summary: `Added course "${courseCardTitle(c)}" to the club library` });
     setBusyId(null);
-    setMsg(`Added "${courseCardTitle(c)}" to your group library.`);
+    setMsg(`Added "${courseCardTitle(c)}" to your club library.`);
     await load();
     setTab("group");
   };
@@ -286,7 +286,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   // Remove a course FROM THIS GROUP only (unlink). The global record and other groups are untouched.
   const remove = async (id: string, courseName: string) => {
     await supabase.from("group_courses").delete().eq("group_id", activeGroupId).eq("course_id", id);
-    await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_removed", group_id: activeGroupId, summary: `Removed course "${courseName}" from a group` });
+    await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_removed", group_id: activeGroupId, summary: `Removed course "${courseName}" from a club` });
     await load();
   };
 
@@ -309,7 +309,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
         .eq("group_id", req.group_id)
         .eq("course_id", req.course_id);
       await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_edit_approved_global", group_id: req.group_id, summary: `Approved global course edit for "${courseLabel(proposed)}"` });
-      setMsg("Course edit approved globally. The local group override was cleared because the global record now matches it.");
+      setMsg("Course edit approved globally. The local club override was cleared because the global record now matches it.");
       await load();
     } catch (e: any) {
       setMsg("Couldn't approve edit: " + (e.message || "error"));
@@ -327,10 +327,10 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
         .eq("id", req.id);
       if (error) throw error;
       await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_edit_kept_group_only", group_id: req.group_id, summary: `Kept course edit for "${req.proposed_name}" in the submitting group only` });
-      setMsg("Course edit kept for the submitting group only. The global course record was not changed.");
+      setMsg("Course edit kept for the submitting club only. The global course record was not changed.");
       await load();
     } catch (e: any) {
-      setMsg("Couldn't keep edit group-only: " + (e.message || "error"));
+      setMsg("Couldn't keep edit club-only: " + (e.message || "error"));
     } finally {
       setBusyId(null);
     }
@@ -338,7 +338,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
 
   const rejectAndRemoveCourseEdit = async (req: CourseEditRequest) => {
     if (!isAdmin) return;
-    if (!confirm(`Reject this course edit and remove the local override for ${req.group_name || "the submitting group"}?\n\nThe group will revert to the current global course data.`)) return;
+    if (!confirm(`Reject this course edit and remove the local override for ${req.group_name || "the submitting group"}?\n\nThe club will revert to the current global course data.`)) return;
     setBusyId(req.id); setMsg(null);
     try {
       const { error: delErr } = await supabase.from("group_course_overrides")
@@ -350,8 +350,8 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
         .update({ status: "rejected_removed", reviewed_by: user.id, reviewed_at: new Date().toISOString() })
         .eq("id", req.id);
       if (error) throw error;
-      await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_edit_rejected_removed", group_id: req.group_id, summary: `Rejected course edit for "${req.proposed_name}" and removed the group override` });
-      setMsg("Course edit rejected and the submitting group's override was removed.");
+      await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_edit_rejected_removed", group_id: req.group_id, summary: `Rejected course edit for "${req.proposed_name}" and removed the club override` });
+      setMsg("Course edit rejected and the submitting club's override was removed.");
       await load();
     } catch (e: any) {
       setMsg("Couldn't reject and remove override: " + (e.message || "error"));
@@ -387,20 +387,20 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
           <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>
             {courseCardTitle(c)}
             {c.vetted ? <span style={{ color: C.gold, fontSize: 12 }}> · vetted ★</span> : null}
-            {c.group_override ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 700 }}> · group edit pending review</span> : c.data?.corrected ? <span style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}> · ⚑ corrected</span> : null}
+            {c.group_override ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 700 }}> · club edit pending review</span> : c.data?.corrected ? <span style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}> · ⚑ corrected</span> : null}
           </div>
           <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
-            {c.location ? c.location + " · " : ""}{c.data.tees?.length || 0} tee{(c.data.tees?.length || 0) === 1 ? "" : "s"} · tap to view/edit{c.group_override ? " · this group sees a local correction" : ""}
+            {c.location ? c.location + " · " : ""}{c.data.tees?.length || 0} tee{(c.data.tees?.length || 0) === 1 ? "" : "s"} · tap to view/edit{c.group_override ? " · this club sees a local correction" : ""}
           </div>
         </button>
         {source === "group" ? (
-          <button title="Remove from group library"
-            onClick={() => { if (confirm(`Remove "${courseCardTitle(c)}" from this group's library?\n\nThe course remains in the global app library and can be added back later.`)) remove(c.id, courseCardTitle(c)); }}
+          <button title="Remove from club library"
+            onClick={() => { if (confirm(`Remove "${courseCardTitle(c)}" from this club's library?\n\nThe course remains in the global app library and can be added back later.`)) remove(c.id, courseCardTitle(c)); }}
             style={{ background: "none", border: "none", borderLeft: `1px solid ${C.line}`, color: C.birdie, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>✕</button>
         ) : inGroup ? (
-          <div style={{ display: "flex", alignItems: "center", borderLeft: `1px solid ${C.line}`, padding: "0 14px", color: C.green, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>In Group ✓</div>
+          <div style={{ display: "flex", alignItems: "center", borderLeft: `1px solid ${C.line}`, padding: "0 14px", color: C.green, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>In Club ✓</div>
         ) : (
-          <button style={{ ...btn(true), borderRadius: 0, padding: "0 14px", fontSize: 12, opacity: busyId === c.id ? 0.5 : 1 }} disabled={busyId === c.id} onClick={() => addToMyGroup(c)}>＋ Add to Group</button>
+          <button style={{ ...btn(true), borderRadius: 0, padding: "0 14px", fontSize: 12, opacity: busyId === c.id ? 0.5 : 1 }} disabled={busyId === c.id} onClick={() => addToMyGroup(c)}>＋ Add to Club</button>
         )}
       </div>
     );
@@ -414,7 +414,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
         <button style={btn(true)} onClick={() => setEditing("new")}>＋ Add New Course</button>
       </div>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
-        Browse every course saved in Birdie Num Num, then add the ones your group plays to your group library. Your group library is what appears in New Round and Create Game.
+        Browse every course saved in Birdie Num Num, then add the ones your group plays to your club library. Your group library is what appears in New Round and Create Game.
       </div>
       {isAdmin && <YardageBackfill />}
 
@@ -426,7 +426,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
       />
 
       <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-        <button style={{ ...btn(tab === "group"), fontSize: 13 }} onClick={() => setTab("group")}>My Group Courses ({groupCourses?.length ?? 0})</button>
+        <button style={{ ...btn(tab === "group"), fontSize: 13 }} onClick={() => setTab("group")}>My Club Courses ({groupCourses?.length ?? 0})</button>
         <button style={{ ...btn(tab === "all"), fontSize: 13 }} onClick={() => setTab("all")}>All App Courses ({allCourses?.length ?? 0})</button>
         {isAdmin && (
           <button style={{ ...btn(false), fontSize: 12, opacity: refreshing ? 0.6 : 1 }} disabled={refreshing} onClick={refreshFacilities}>
@@ -454,7 +454,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
               <CourseChangeSummary req={r} />
               <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                 <button style={{ ...btn(true), fontSize: 12, opacity: busyId === r.id ? 0.5 : 1 }} disabled={busyId === r.id} onClick={() => approveCourseEdit(r)}>Approve globally</button>
-                <button style={{ ...btn(false), fontSize: 12, opacity: busyId === r.id ? 0.5 : 1 }} disabled={busyId === r.id} onClick={() => keepCourseEditGroupOnly(r)}>Keep changes in group only</button>
+                <button style={{ ...btn(false), fontSize: 12, opacity: busyId === r.id ? 0.5 : 1 }} disabled={busyId === r.id} onClick={() => keepCourseEditGroupOnly(r)}>Keep changes in club only</button>
                 <button style={{ ...btn(false), background: "#7A2F28", fontSize: 12, opacity: busyId === r.id ? 0.5 : 1 }} disabled={busyId === r.id} onClick={() => rejectAndRemoveCourseEdit(r)}>Reject and remove override</button>
               </div>
             </div>
@@ -464,14 +464,14 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
 
       {tab === "group" && (
         <div style={{ marginTop: 16 }}>
-          <Eyebrow>YOUR GROUP COURSES</Eyebrow>
+          <Eyebrow>YOUR CLUB COURSES</Eyebrow>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
             These courses are available to everyone in your current group when creating rounds and games.
           </div>
           {groupCourses === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
           {groupCourses !== null && filteredGroup.length === 0 && (
             <div style={{ background: C.greenLight, borderRadius: 14, padding: 24, marginTop: 14, color: C.sage, textAlign: "center" }}>
-              {search.trim() ? "No group courses match your search." : "No courses in this group yet. Open All App Courses and add the courses your group plays."}
+              {search.trim() ? "No club courses match your search." : "No courses in this club yet. Open All App Courses and add the courses your club plays."}
             </div>
           )}
           {filteredGroup.map((c) => <CourseRow key={c.id} c={c} source="group" />)}
@@ -670,7 +670,7 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
         const hasChanges = hasMaterialCourseChanges(initialCourseRef.current, proposedBase);
         await linkCourseToGroup(supabase, activeGroupId, existingId, user.id);
         if (!hasChanges) {
-          await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Someone", action: "course_linked", group_id: activeGroupId, summary: `Saved course "${name}" to this group library with no course-data changes` });
+          await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Someone", action: "course_linked", group_id: activeGroupId, summary: `Saved course "${name}" to this club library with no course-data changes` });
           onSaved();
           return;
         }
@@ -703,7 +703,7 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
           change_summary: buildCourseChangeSummary((currentRow?.data as any) || initialCourseRef.current, proposed),
           status: "pending",
         });
-        await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Someone", action: "course_edit_submitted", group_id: activeGroupId, summary: `Edited course "${name}" for this group and submitted it for global review` });
+        await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Someone", action: "course_edit_submitted", group_id: activeGroupId, summary: `Edited course "${name}" for this club and submitted it for global review` });
       } else {
         // New course: if a canonical record with this name already exists, link it and
         // store this group's version as an override; otherwise create the global record.
@@ -746,7 +746,7 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
 
   return (
     <div style={{ maxWidth: 700 }}>
-      <Eyebrow>{existingId ? "EDIT COURSE FOR THIS GROUP" : "NEW COURSE"}</Eyebrow>
+      <Eyebrow>{existingId ? "EDIT COURSE FOR THIS CLUB" : "NEW COURSE"}</Eyebrow>
       {existingId && (
         <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
           Changes save immediately for this group and are submitted to an app admin for global approval before other groups see them.
@@ -889,7 +889,7 @@ const NOTIF_TYPES: { key: string; label: string; def: "push" | "inapp" | "off"; 
   { key: "tee_new", label: "New tee time posted", def: "inapp", live: false },
   { key: "bet_posted", label: "A bet is posted in your game", def: "inapp", live: false },
   { key: "game_finished", label: "Game finished / results", def: "inapp", live: false },
-  { key: "group_member", label: "New member joins your group", def: "inapp", live: false },
+  { key: "group_member", label: "New member joins your club", def: "inapp", live: false },
 ];
 
 function PushToggle({ user, profile }: { user: any; profile: any }) {
@@ -1053,7 +1053,7 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
 
 
   const save = async () => {
-    if (!name.trim()) { setMsg("Please enter your name so others in your group can recognize you."); return; }
+    if (!name.trim()) { setMsg("Please enter your name so others in your club can recognize you."); return; }
     setSaving(true); setMsg(null);
     const idx = idxStr.trim() === "" ? null : parseFloat(idxStr);
     const { error } = await supabase.from("profiles").update({
@@ -1226,7 +1226,7 @@ function AdminAnalytics() {
     <div style={{ marginTop: 8 }}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {tile(t.users ?? "—", "Total users", t.users_new_30d ? `+${t.users_new_30d} / 30d` : undefined)}
-        {tile(t.active_groups ?? "—", "Active groups")}
+        {tile(t.active_groups ?? "—", "Active clubs")}
         {tile(t.games ?? "—", "Games", t.games_30d ? `+${t.games_30d} / 30d` : undefined)}
         {tile(t.rounds ?? "—", "Rounds done", `${t.rounds_30d ? `+${t.rounds_30d} /30d` : "—"}${t.rounds_started ? ` · ${t.rounds_started} started` : ""}`)}
       </div>
@@ -1270,7 +1270,7 @@ function AdminAnalytics() {
         {hrow("Abandoned games + rounds (never finished)", `${h.abandoned_pct ?? 0}%`, false)}
         {hrow("Avg holes entered / game", `${h.avg_holes ?? 0}`)}
         {hrow("New users active within 7 days", `${h.activated_7d_pct ?? 0}%`, true)}
-        {hrow("Signups never joined a group", `${h.never_joined_group_pct ?? 0}%`, false)}
+        {hrow("Signups never joined a club", `${h.never_joined_group_pct ?? 0}%`, false)}
         {hrow("Retention \u2014 week 1", `${h.retention_w1_pct ?? 0}%`)}
         {hrow("Retention \u2014 week 4", `${h.retention_w4_pct ?? 0}%`)}
         <div style={{ color: C.faint, fontSize: 10, marginTop: 8 }}>Rounds counted only when completed; deleted rounds never count. Retention accrues over the first weeks.</div>
@@ -1355,7 +1355,7 @@ function AdminPanel({ user }: { user: any }) {
     await supabase.from("group_members").insert({
       group_id: groupId, user_id: p.id, email: (p.email || "").toLowerCase(), role: "member", status: "active",
     });
-    await notify(p.id, `An admin added you to a group.`);
+    await notify(p.id, `An admin added you to a club.`);
     await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "member_added", group_id: groupId, target_user_id: p.id, summary: `Added ${p.display_name || p.email} to a group` });
     await load();
   };
@@ -1370,7 +1370,7 @@ function AdminPanel({ user }: { user: any }) {
 
   // Deactivate: remove from all groups + block access, but keep their data.
   const deactivatePlayer = async (p: any) => {
-    if (!confirm(`Deactivate ${p.display_name || p.email}?\n\nThey'll be removed from all groups and blocked from using the app, but their rounds and history are kept. You can reactivate them later.`)) return;
+    if (!confirm(`Deactivate ${p.display_name || p.email}?\n\nThey'll be removed from all clubs and blocked from using the app, but their rounds and history are kept. You can reactivate them later.`)) return;
     await supabase.from("group_members").update({ status: "removed" }).eq("user_id", p.id);
     await supabase.from("profiles").update({ deactivated: true }).eq("id", p.id);
     await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "player_deactivated", target_user_id: p.id, summary: `Deactivated ${p.display_name || p.email}` });
@@ -1412,16 +1412,16 @@ function AdminPanel({ user }: { user: any }) {
   // Approve a pending group request → it becomes active and appears for its members.
   const approveGroup = async (g: any) => {
     await supabase.from("groups").update({ status: "active" }).eq("id", g.id);
-    if (g.created_by) await notify(g.created_by, `Your group "${g.name}" was approved. It's now active.`);
-    await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "group_approved", group_id: g.id, summary: `Approved the group "${g.name}"` });
+    if (g.created_by) await notify(g.created_by, `Your club "${g.name}" was approved. It's now active.`);
+    await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "group_approved", group_id: g.id, summary: `Approved the club "${g.name}"` });
     await load();
   };
 
   // Decline a request → mark declined (kept for the record) and notify the requester.
   const declineGroup = async (g: any) => {
-    if (!confirm(`Decline the group request "${g.name}"?`)) return;
+    if (!confirm(`Decline the club request "${g.name}"?`)) return;
     await supabase.from("groups").update({ status: "declined" }).eq("id", g.id);
-    if (g.created_by) await notify(g.created_by, `Your group request "${g.name}" was declined.`);
+    if (g.created_by) await notify(g.created_by, `Your club request "${g.name}" was declined.`);
     await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "group_declined", summary: `Declined the group request "${g.name}"` });
     await load();
   };
@@ -1505,15 +1505,15 @@ function AdminPanel({ user }: { user: any }) {
             </div>
             {(() => {
               const mine = memberships.filter((m) => m.user_id === p.id);
-              if (mine.length === 0) return <div style={{ color: C.birdie, fontSize: 12, marginTop: 2 }}>Groups: none</div>;
+              if (mine.length === 0) return <div style={{ color: C.birdie, fontSize: 12, marginTop: 2 }}>Clubs: none</div>;
               return (
                 <div style={{ color: C.green, fontSize: 12, marginTop: 2, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  <span style={{ color: C.faint }}>Groups:</span>
+                  <span style={{ color: C.faint }}>Clubs:</span>
                   {mine.map((m) => {
                     const g = allGroups.find((x) => x.id === m.group_id);
                     return (
                       <span key={m.id} style={{ background: C.greenLight, color: C.cream, borderRadius: 12, padding: "1px 9px", fontSize: 11, fontWeight: 700 }}>
-                        {g?.name || "Group"}{m.role === "admin" ? " ★" : ""}
+                        {g?.name || "Club"}{m.role === "admin" ? " ★" : ""}
                       </span>
                     );
                   })}
@@ -1539,24 +1539,24 @@ function AdminPanel({ user }: { user: any }) {
 
           {manageGroupsFor === p.id && (
             <div style={{ width: "100%", background: C.greenLight, borderRadius: 10, padding: 12, marginTop: 8 }}>
-              <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>GROUPS</div>
+              <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>CLUBS</div>
               {(() => {
                 const mine = memberships.filter((m) => m.user_id === p.id);
                 const myGroupIds = new Set(mine.map((m) => m.group_id));
                 return (
                   <>
-                    {mine.length === 0 && <div style={{ color: C.faint, fontSize: 12, marginTop: 6 }}>Not in any group.</div>}
+                    {mine.length === 0 && <div style={{ color: C.faint, fontSize: 12, marginTop: 6 }}>Not in any club.</div>}
                     {mine.map((m) => {
                       const g = allGroups.find((x) => x.id === m.group_id);
                       return (
                         <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: `1px solid ${C.greenMid}` }}>
-                          <span style={{ flex: 1, color: C.cream, fontSize: 13 }}>{g?.name || "Group"}{m.role === "admin" ? " · admin" : ""}</span>
-                          <button style={{ ...btn(false), padding: "4px 10px", fontSize: 11, color: C.birdie }} onClick={() => removeFromGroup(p, m, g?.name || "this group")}>Remove</button>
+                          <span style={{ flex: 1, color: C.cream, fontSize: 13 }}>{g?.name || "Club"}{m.role === "admin" ? " · admin" : ""}</span>
+                          <button style={{ ...btn(false), padding: "4px 10px", fontSize: 11, color: C.birdie }} onClick={() => removeFromGroup(p, m, g?.name || "this club")}>Remove</button>
                         </div>
                       );
                     })}
                     <div style={{ display: "flex", gap: 6, marginTop: 10, alignItems: "center", flexWrap: "wrap" }}>
-                      <label style={{ color: C.sage, fontSize: 11 }}>Add to group:</label>
+                      <label style={{ color: C.sage, fontSize: 11 }}>Add to club:</label>
                       <select defaultValue="" onChange={(e) => { if (e.target.value) { addToGroup(p, e.target.value); e.target.value = ""; } }}
                         style={{ ...inputStyle, padding: "6px 8px", fontSize: 12, maxWidth: 180 }}>
                         <option value="">Select…</option>
@@ -1607,9 +1607,9 @@ function AdminPanel({ user }: { user: any }) {
       )}
 
       <div style={{ marginTop: 20 }}>
-        <Eyebrow>★ GROUP REQUESTS{pendingGroups.length ? ` (${pendingGroups.length})` : ""}</Eyebrow>
+        <Eyebrow>★ CLUB REQUESTS{pendingGroups.length ? ` (${pendingGroups.length})` : ""}</Eyebrow>
         <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
-          New groups need your approval. Approve to make a group active for its members, or decline the request.
+          New clubs need your approval. Approve to make a club active for its members, or decline the request.
         </div>
         {pendingGroups.length === 0 && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 16, marginTop: 8, color: C.sage }}>No pending requests.</div>
@@ -1892,7 +1892,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
 
   // Group admin: remove a member from THIS group (does not delete their account or other groups).
   const removeFromGroup = async (row: any) => {
-    if (!confirm(`Remove ${row.profiles?.display_name || row.email} from this group?\n\nThis only affects this group — their account and other groups are untouched.`)) return;
+    if (!confirm(`Remove ${row.profiles?.display_name || row.email} from this club?\n\nThis only affects this club — their account and other clubs are untouched.`)) return;
     setBusyId(row.id); setMsg(null);
     await supabase.from("group_members").update({ status: "removed" }).eq("id", row.id);
     if (row.user_id && row.user_id !== user.id) await notify(row.user_id, `You were removed from a group by an admin.`);
@@ -1903,10 +1903,10 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
 
   return (
     <div>
-      <Eyebrow>PLAYERS · CURRENT GROUP</Eyebrow>
+      <Eyebrow>PLAYERS · CURRENT CLUB</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
         Members and invited players in the selected group. Tap a phone number to call or text.
-        {isGroupAdmin ? " As a group admin you can set handicaps, change roles, and remove players from this group." : ""}
+        {isGroupAdmin ? " As a club admin you can set handicaps, change roles, and remove players from this club." : ""}
       </div>
       {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
       {players === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
@@ -2036,7 +2036,7 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
 
   const setStatus = async (g: any, next: "active" | "archived") => {
     const verb = next === "archived" ? "Archive" : "Restore";
-    if (!confirm(`${verb} the group "${g.name}"?${next === "archived" ? " It disappears from members' group pickers — nothing is deleted, and you can restore it." : ""}`)) return;
+    if (!confirm(`${verb} the club "${g.name}"?${next === "archived" ? " It disappears from members' club pickers — nothing is deleted, and you can restore it." : ""}`)) return;
     setBusy(g.group_id);
     try {
       const { error } = await supabase.rpc("admin_set_group_status", { p_group: g.group_id, p_status: next });
@@ -2049,7 +2049,7 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
   const delGroup = async (g: any) => {
     const hasData = (g.rounds_count || 0) > 0 || (g.games_count || 0) > 0;
     const msg = hasData
-      ? `Delete "${g.name}"? This removes the group for everyone. Its ${g.games_count} game(s) will be deleted; ${g.rounds_count} posted round(s) stay in players' history but lose the group tag. This can't be undone.`
+      ? `Delete "${g.name}"? This removes the club for everyone. Its ${g.games_count} game(s) will be deleted; ${g.rounds_count} posted round(s) stay in players' history but lose the club tag. This can't be undone.`
       : `Delete "${g.name}"? It has no rounds or games. This removes it for everyone and can't be undone.`;
     if (!confirm(msg)) return;
     setBusy(g.group_id);
@@ -2063,7 +2063,7 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
   };
 
   const setDefault = async (g: any) => {
-    if (!confirm(`Make "${g.name}" the app's default group? New or stranded users (and their untagged rounds) will land here. This replaces any current default.`)) return;
+    if (!confirm(`Make "${g.name}" the app's default club? New or stranded users (and their untagged rounds) will land here. This replaces any current default.`)) return;
     setBusy(g.group_id);
     try {
       const { error } = await supabase.rpc("admin_set_default_group", { p_group: g.group_id });
@@ -2100,7 +2100,7 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
 
   return (
     <div>
-      <Eyebrow>★ OVERSIGHT · ALL GROUPS</Eyebrow>
+      <Eyebrow>★ OVERSIGHT · ALL CLUBS</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
         Every group in Birdie Num Num, most recent activity first. Archiving hides a stale or abusive group from members&apos; pickers — it&apos;s reversible and deletes nothing. Counts are read-only; deeper tools arrive in later phases.
       </div>
@@ -2217,7 +2217,7 @@ export function AdminUsersTab({ user }: { user: any }) {
   };
 
   const wipe = async (u: any) => {
-    if (!confirm(`WIPE all data for ${u.display_name || u.email}? Deletes their rounds, stats, memberships and profile. Group games stay (they hold others' data). This CANNOT be undone.`)) return;
+    if (!confirm(`WIPE all data for ${u.display_name || u.email}? Deletes their rounds, stats, memberships and profile. Club games stay (they hold others' data). This CANNOT be undone.`)) return;
     if (!confirm(`Final confirm — permanently delete ${u.display_name || u.email}'s data?`)) return;
     setBusy(u.id);
     try {
@@ -2355,11 +2355,11 @@ export function HelpPage({ isAdmin, user, displayName, groupId }: { isAdmin: boo
       </Section>
 
       <Section title="Courses">
-        Browse <b>All App Courses</b> to see every saved course in Birdie Num Num, then add courses to your group library. Editing a course saves the correction for your group immediately and submits it to an app admin for global approval before other groups see it.
+        Browse <b>All App Courses</b> to see every saved course in Birdie Num Num, then add courses to your club library. Editing a course saves the correction for your club immediately and submits it to an app admin for global approval before other clubs see it.
       </Section>
 
-      <Section title="Groups">
-        A group keeps games, players, and courses together for the people you play with. Group admins invite members with a one-time link, set roles, and manage players from the <b>Players</b> tab. Your dashboard and rounds always cover all of your groups together.
+      <Section title="Clubs">
+        A club keeps games, players, and courses together for the people you play with. Club admins invite members with a one-time link, set roles, and manage players from the <b>Players</b> tab. Your dashboard and rounds always cover all of your clubs together.
       </Section>
 
       {isAdmin && (

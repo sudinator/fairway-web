@@ -118,6 +118,8 @@ From the security & structure review. None are emergencies; tackle when convenie
    gracefully on very narrow screens; keep Delete visually distinct/last). App code only.
 
 ## Shipped
+- v1.107.0 - UI rename Group -> Club everywhere user-facing (roles stay members/admins). In-game group concept (tee groups, group scoring/scorecard/scorer) preserved. DB + code internals unchanged. No migration.
+- v1.106.0 - Groups tab now visible to all members (showGroupsTab=true) so any member can request a new group + switch groups. No migration.
 - v1.105.0 - Push notifications phase 2: Vercel sender route (/api/push) + Supabase notifications webhook + event triggers (game_added, money_owed [6h de-dupe], money_paid) + per-type Push/In-app/Off preference menu + ?tab= deep links. Migration 0070. Requires SUPABASE_SERVICE_ROLE_KEY + PUSH_WEBHOOK_SECRET env vars and the DB webhook.
 - v1.104.0 - Push notifications phase 1 (subscription plumbing): push_subscriptions table + RLS, profiles.push_prefs, notifications type/link, create_notification extended; SW push/click/subscriptionchange handlers; Profile opt-in with iOS 'install via Safari' path. Migration 0069. Requires Vercel VAPID env vars. Phase 2 (sender + webhook + event wiring) pending.
 - v1.103.0 - Admin Users list gains a per-user 'Test account' toggle (admin_set_test on any user), so a second test account can be excluded from analytics. No migration.

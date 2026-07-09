@@ -161,7 +161,7 @@ export function Home({ session }: { session: any }) {
   }, [user.id, user.email]);
 
   const loadGroups = useCallback(async (preferId?: string | null) => {
-    // Offline: don't sit on "Loading groups…" waiting for a request that can't land.
+    // Offline: don't sit on "Loading clubs…" waiting for a request that can't land.
     // Hydrate groups + active group from cache immediately.
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
       const cache = loadAppBootCache();
@@ -189,7 +189,7 @@ export function Home({ session }: { session: any }) {
       .filter((m: any) => (m.groups?.status ?? "active") === "active" || m.is_support === true)
       .map((m: any) => ({
         id: m.groups?.id || m.group_id,
-        name: m.groups?.name || "Group",
+        name: m.groups?.name || "Club",
         role: m.role,
         status: m.status,
         is_support: !!m.is_support,
@@ -316,7 +316,7 @@ export function Home({ session }: { session: any }) {
     // panics that they've broken the money.
     if (r?.game_id && typeof window !== "undefined") {
       const ok = window.confirm(
-        "This round came from a group game. Deleting it only removes it from your own history and handicap — it does NOT change the game result or any winnings already posted to Money. Delete it from your history?",
+        "This round came from a Club game. Deleting it only removes it from your own history and handicap — it does NOT change the game result or any winnings already posted to Money. Delete it from your history?",
       );
       if (!ok) return;
     }
@@ -353,14 +353,14 @@ export function Home({ session }: { session: any }) {
   // only the support row (never a real membership).
   const enterSupportGroup = async (g: { group_id: string; name: string }) => {
     const { error } = await supabase.rpc("admin_enter_group", { p_group: g.group_id, p_email: user.email || "" });
-    if (error) { alert("Couldn't enter the group — " + error.message); return; }
-    await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "admin_entered_group", group_id: g.group_id, summary: `Master admin entered group "${g.name}" (support session)` });
+    if (error) { alert("Couldn't enter the Club — " + error.message); return; }
+    await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "admin_entered_group", group_id: g.group_id, summary: `Master admin entered Club "${g.name}" (support session)` });
     await loadGroups(g.group_id);
     setStage(null); setViewing(null); setMoreOpen(false); setTab("dashboard");
   };
   const exitSupportGroup = async (g: { group_id: string; name: string }) => {
     const { error } = await supabase.rpc("admin_exit_group", { p_group: g.group_id });
-    if (error) { alert("Couldn't exit the group — " + error.message); return; }
+    if (error) { alert("Couldn't exit the Club — " + error.message); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "admin_exited_group", group_id: g.group_id, summary: `Master admin exited group "${g.name}" (support session)` });
     await loadGroups();
   };
@@ -398,11 +398,13 @@ export function Home({ session }: { session: any }) {
     setOwed({ cents: aggregateOwed(perGroup, user.id), groups: perGroup.filter((b) => (b[user.id] || 0) < 0).length });
   }, [groups, user.id]);
   useEffect(() => { loadOwed(); }, [loadOwed]);
-  const isAdminOfAnyGroup = groups.some((g) => g.role === "admin");
-  const showGroupsTab = isAdminOfAnyGroup || groups.length > 1;
+  // Everyone can see the Clubs tab — that's where a member requests a new club and
+  // switches between the clubs they belong to. (Creation is still request-and-approve
+  // until we open up free self-serve creation.)
+  const showGroupsTab = true;
 
   if (groupsLoading) {
-    return <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 60px", color: C.sage }}>Loading groups…</div>;
+    return <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 60px", color: C.sage }}>Loading clubs…</div>;
   }
 
   if (profile?.banned) {
@@ -441,7 +443,7 @@ export function Home({ session }: { session: any }) {
       <Toaster />
       <PullToRefresh onRefresh={async () => { await Promise.all([loadProfile(), loadGroups(), loadRounds()]); }}>
       <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 96px" }}>
-      {/* Line 1: logo + active group (display only — change it in the Groups tab) */}
+      {/* Line 1: logo + active club (display only — change it in the Clubs tab) */}
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <Wordmark width={150} />
         {activeGroup && (
@@ -515,7 +517,7 @@ export function Home({ session }: { session: any }) {
 
       {!activeGroup && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 18, color: C.sage }}>
-          You are not in a group yet. Create one from the Groups tab.
+          You are not in a Club yet. Create one from the Clubs tab.
         </div>
       )}
 
@@ -535,7 +537,7 @@ export function Home({ session }: { session: any }) {
         <button onClick={() => { setMoneyInitialTab("settle"); setTab("money"); setStage(null); setViewing(null); }}
           style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: "#5a2018", border: "1px solid #7a2e22", borderRadius: 12, padding: "11px 14px", marginTop: 14, cursor: "pointer" }}>
           <span style={{ fontSize: 18 }}>&#9888;&#65039;</span>
-          <span style={{ flex: 1, color: "#ffd9d2", fontSize: 13 }}>You owe <b style={{ color: "#fff" }}>{fmtUSD(owed.cents)}</b> to settle up{owed.groups > 1 ? ` across ${owed.groups} groups` : ""}</span>
+          <span style={{ flex: 1, color: "#ffd9d2", fontSize: 13 }}>You owe <b style={{ color: "#fff" }}>{fmtUSD(owed.cents)}</b> to settle up{owed.groups > 1 ? ` across ${owed.groups} clubs` : ""}</span>
           <span style={{ background: C.gold, color: "#2a2410", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>Settle up &#8594;</span>
         </button>
       )}
@@ -640,7 +642,7 @@ export function Home({ session }: { session: any }) {
                 { key: "money", label: "Money", show: !!activeGroup },
                 { key: "teetimes", label: "Tee Times", show: !!activeGroup && activeGroupId === TGC_GROUP_ID },
                 { key: "players", label: "Players", show: true },
-                { key: "groups", label: "Groups", show: showGroupsTab },
+                { key: "groups", label: "Clubs", show: showGroupsTab },
                 { key: "activity", label: "Activity ★", show: !!profile?.is_admin },
                 { key: "oversight", label: "Oversight ★", show: !!profile?.is_admin },
                 { key: "users", label: "Users ★", show: !!profile?.is_admin },

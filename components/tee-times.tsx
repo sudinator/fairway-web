@@ -521,7 +521,7 @@ function RsvpSheet({ tt, mine, spotsLeft, warn, busy, onClose, onSubmit }: {
         <div style={{ padding: "0 16px 8px" }}>
           <div style={{ fontSize: 10, fontWeight: 800, color: C.gold, letterSpacing: 0.4 }}>TEE TIME #{tt.seq ?? "—"} · {dow(tt.play_date)} {monN(tt.play_date)} {dayN(tt.play_date)}</div>
           <div style={{ fontSize: 19, fontWeight: 800, color: C.cream, marginTop: 2 }}>Your response</div>
-          {spotsLeft != null && <div style={{ fontSize: 12, fontWeight: 700, color: spotsLeft <= 0 ? "#ff9d7a" : C.sage, marginTop: 3 }}>{spotsLeft > 0 ? `${spotsLeft} of ${tt.max_spots} spots left` : "The group's full — sign up and you'll join the waitlist, moving into the field automatically if a spot opens. Your RSVP still counts; no further action needed."}</div>}
+          {spotsLeft != null && <div style={{ fontSize: 12, fontWeight: 700, color: spotsLeft <= 0 ? "#ff9d7a" : C.sage, marginTop: 3 }}>{spotsLeft > 0 ? `${spotsLeft} of ${tt.max_spots} spots left` : "This tee time's full — sign up and you'll join the waitlist, moving into the field automatically if a spot opens. Your RSVP still counts; no further action needed."}</div>}
         </div>
         {warn && <div style={{ margin: "4px 16px 8px", background: "#5a3a10", color: "#f6d98a", borderRadius: 10, padding: "9px 12px", fontSize: 12, lineHeight: 1.4 }}>Signup deadline has passed — you can still respond, but a spot isn't guaranteed.</div>}
         {(["in", "maybe", "out"] as const).map((c) => (
@@ -833,6 +833,6 @@ function teeSignupExport(tt: TeeTime, link: string, groupName: string): string {
   if (tt.signup_deadline) L.push(`⏱ Sign up by ${fmtFull(tt.signup_deadline.slice(0, 10))}`);
   L.push("");
   L.push(`👉 New here? Tap to join ${groupName} and RSVP: ${link}`);
-  L.push(`(Already in the group? Same link takes you straight to RSVP.)`);
+  L.push(`(Already in the club? Same link takes you straight to RSVP.)`);
   return L.join("\n");
 }

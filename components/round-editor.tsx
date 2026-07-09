@@ -201,7 +201,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         const hasChanges = hasMaterialCourseChanges(currentData, course);
         await linkCourseToGroup(supabase, round.group_id, courseId, null);
         if (!hasChanges) {
-          setFavMsg("Course saved to this group's library ★");
+          setFavMsg("Course saved to this club's library ★");
           return;
         }
         if (!courseCorrectionReason.trim()) {

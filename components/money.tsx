@@ -389,14 +389,14 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Settle up</div>
-      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 8 }}>{simplifyOn ? "Fewest payments to square the group" : "Each payment matches an expense you shared - who owes whom"}</div>
+      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 8 }}>{simplifyOn ? "Fewest payments to square the club" : "Each payment matches an expense you shared - who owes whom"}</div>
       {canToggle ? (
         <div style={{ display: "flex", background: "#123528", borderRadius: 999, padding: 3, marginBottom: 8 }}>
           <button onClick={() => onToggle(true)} style={segBtn(simplifyOn)}>Fewest payments</button>
           <button onClick={() => onToggle(false)} style={segBtn(!simplifyOn)}>As entered</button>
         </div>
       ) : (
-        <div style={{ color: C.faint, fontSize: 10.5, marginBottom: 8 }}>{simplifyOn ? "Showing fewest payments." : "Showing debts as entered."} Set by a group admin.</div>
+        <div style={{ color: C.faint, fontSize: 10.5, marginBottom: 8 }}>{simplifyOn ? "Showing fewest payments." : "Showing debts as entered."} Set by a club admin.</div>
       )}
       {transfers.length === 0 && <div style={{ color: "#7fd6a3", textAlign: "center", fontFamily: "Georgia, serif", fontSize: 17, padding: "22px 0" }}>✓ All square</div>}
       {transfers.map((t, i) => {
@@ -715,7 +715,7 @@ function ExpenseDetail({ expense, shares, payers, memberById, guestById, history
           {canEdit && <button onClick={onEdit} style={{ ...btn(true), flex: 1 }}>Edit</button>}
           <button onClick={onClose} style={{ ...btn(false), flex: 1 }}>Close</button>
         </div>
-        {!canEdit && <div style={{ color: C.faint, fontSize: 11, marginTop: 8, textAlign: "center" }}>View only — only the person who entered this or a group admin can edit it.</div>}
+        {!canEdit && <div style={{ color: C.faint, fontSize: 11, marginTop: 8, textAlign: "center" }}>View only — only the person who entered this or a club admin can edit it.</div>}
       </div>
     </div>
   );
@@ -726,7 +726,7 @@ function ActivityLog({ activity, memberById, onOpenExpense }: { activity: any[];
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Activity log</div>
-      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 6 }}>Everything that's happened with the group's money · visible to all, cannot be edited</div>
+      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 6 }}>Everything that's happened with the club's money · visible to all, cannot be edited</div>
       {activity.length === 0 && <div style={{ color: C.sage, fontSize: 13, padding: "8px 2px" }}>Nothing logged yet.</div>}
       {activity.map((a) => {
         const who = memberById[a.actor_user_id]?.display_name || "Someone";
