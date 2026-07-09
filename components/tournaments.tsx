@@ -6347,7 +6347,7 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
       if (e1 || !exp) { setPostMsg("Couldn't post — please try again."); setBusy(false); return; }
       const { error: e2 } = await supabase.from("expense_payers").insert(payerRows(post, exp.id));
       const { error: e3 } = await supabase.from("expense_shares").insert(shareRows(post, exp.id));
-      if (e2 || e3) { await supabase.from("expenses").delete().eq("id", exp.id); setPostMsg("Couldn't post the splits — rolled back."); setBusy(false); return; }
+      if (e2 || e3) { console.error("[bet post] split insert failed", { payers: e2, shares: e3 }); await supabase.from("expenses").delete().eq("id", exp.id); setPostMsg(("Couldn't post the splits — rolled back. " + ((e2 || e3)?.message || "")).trim()); setBusy(false); return; }
       await supabase.from("group_activity").insert({ group_id: game.group_id, actor_user_id: user.id, action: "bet_posted", summary: `posted bet winnings — pot $${(post.amount_cents / 100).toFixed(0)}`, meta: { game_id: game.id, expense_id: exp.id, amount_cents: post.amount_cents } });
       setPostedExpense({ id: exp.id, created_at: exp.created_at }); setConfirming(false);
       setPostMsg("Posted to Money.");
@@ -6444,9 +6444,10 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
       if (e2 || e3) {
         // Roll back so we never leave a bet expense with missing/partial splits
         // (which would compute wrong balances). End up cleanly un-posted instead.
+        console.error("[bet re-post] split insert failed", { payers: e2, shares: e3 });
         await supabase.from("expenses").delete().eq("id", exp.id);
         setPostedExpense(null); setPostedNets(null);
-        setPostMsg("Couldn't save the corrected splits — the bet is now un-posted. Tap Post winnings to try again.");
+        setPostMsg(("Couldn't save the corrected splits — the bet is now un-posted. Tap Post winnings to try again. " + ((e2 || e3)?.message || "")).trim());
         setBusy(false); return;
       }
       await supabase.from("group_activity").insert({

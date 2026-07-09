@@ -1281,3 +1281,10 @@ end;
 $$;
 grant execute on function public.link_tee_time_game(uuid, uuid) to authenticated;
 ```
+
+### v1.111.1 — bet-post error hardening + migration audit (no migration)
+Code-only. Both bet-post paths surface the real DB error + console.error the error objects.
+New ops tool: `ci/verify_migrations.sql` — run it in the Supabase SQL editor any time to confirm
+which migrations are applied. It lists one sentinel object per migration file and reports
+present=true/false; any `false` row means that migration hasn't been applied to that database.
+(This is the check that would have caught the missing 0063 `expense_shares.sponsor_user_id` column.)
