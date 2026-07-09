@@ -97,6 +97,17 @@ export function stablefordPts(strokes: number | null, par: number, recv: number)
 }
 
 export const played = (r: Round) => r.holes.filter((h) => h.strokes != null && h.strokes > 0);
+// Collapse accidental duplicate hole rows (same hole_number) into one, preferring a row that
+// actually has a score. Safety net so the UI never double-counts if a round somehow holds
+// duplicate hole records (e.g. a concurrent double-post from before migrations 0076/0077).
+export function dedupeHoles<T extends { hole_number: number; strokes?: number | null }>(holes: T[]): T[] {
+  const byNum = new Map<number, T>();
+  for (const h of holes) {
+    const ex = byNum.get(h.hole_number);
+    if (!ex || ((ex.strokes == null || ex.strokes <= 0) && h.strokes != null && h.strokes > 0)) byNum.set(h.hole_number, h);
+  }
+  return Array.from(byNum.values());
+}
 // A "gross-only" round has a recorded total but no per-hole detail.
 export const isGrossOnly = (r: Round) => played(r).length === 0 && r.gross_score != null;
 export const hasHoleDetail = (r: Round) => played(r).length > 0;

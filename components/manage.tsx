@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { pushGate, isSubscribed, subscribeToPush, unsubscribeFromPush, currentPermission } from "@/lib/push";
-import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes } from "@/lib/golf";
+import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles } from "@/lib/golf";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, NumPicker, Avatar } from "@/components/ui";
@@ -1718,7 +1718,7 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
     (hs || []).forEach((h: any) => { (byRound[h.round_id] ||= []).push(h); });
     const merged: Round[] = rs.map((r: any) => ({
       ...r,
-      holes: (byRound[r.id] || []).sort((a, b) => a.hole_number - b.hole_number)
+      holes: dedupeHoles(byRound[r.id] || []).sort((a, b) => a.hole_number - b.hole_number)
         .map((h) => ({ ...h, recv: strokesReceived(h.stroke_index, r.course_handicap) })),
     }));
     setRounds(merged);

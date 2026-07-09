@@ -246,3 +246,12 @@ Two SECURITY DEFINER RPCs (grant execute to authenticated):
 - `link_tee_time_game(p_tee_time_id, p_game_id)` — sets `tee_times.game_id`. Caller must have **created** the game (`games.created_by = auth.uid()`), the game and tee time must share a group, and the caller must be the tee time's captain (or its creator/admin).
 
 Product model: any member creates a tee time; the creator organizes it; a captain (admin/creator/current-captain can assign, incl. self if In) sets up the game. Game management stays organizer-based (`games.created_by === user.id`).
+
+### Migrations 0076 + 0077 — one hole row per (round_id, hole_number)
+- 0076: `create unique index holes_round_hole_uk on public.holes (round_id, hole_number)`.
+  Enforces the intended invariant; without it, concurrent posts could duplicate hole rows.
+- 0077: post_game_rounds / post_group_rounds now insert holes with
+  `on conflict (round_id, hole_number) do update`, so a racing/duplicate post updates the
+  row in place instead of inserting a second copy. Relies on the 0076 index.
+- Client guard: `dedupeHoles()` (lib/golf.ts) collapses duplicate hole rows on load
+  (home.tsx, manage.tsx), preferring the copy that has a score.

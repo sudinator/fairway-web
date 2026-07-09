@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
-import { C, titleCaseName, Round, Hole, allocateStrokes, TGC_GROUP_ID } from "@/lib/golf";
+import { C, titleCaseName, Round, Hole, allocateStrokes, dedupeHoles, TGC_GROUP_ID } from "@/lib/golf";
 import { computeBalances, aggregateOwed, fmtUSD } from "@/lib/money";
 import { logActivity } from "@/lib/activity";
 import { Toaster } from "@/components/toast";
@@ -291,7 +291,7 @@ export function Home({ session }: { session: any }) {
     const byRound: Record<string, Hole[]> = {};
     (hs || []).forEach((h: any) => { (byRound[h.round_id] ||= []).push(h); });
     const merged: Round[] = rs.map((r: any) => {
-      const sorted = (byRound[r.id] || []).sort((a, b) => a.hole_number - b.hole_number);
+      const sorted = dedupeHoles(byRound[r.id] || []).sort((a, b) => a.hole_number - b.hole_number);
       const alloc = allocateStrokes(sorted, r.course_handicap);
       const holes = sorted.map((h) => ({ ...h, recv: alloc[h.hole_number] || 0 }));
       return { ...r, group_name: r.groups?.name || null, holes };

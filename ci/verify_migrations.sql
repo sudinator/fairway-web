@@ -61,7 +61,9 @@ with checks(migration, kind, a, b, human) as (values
   ('0072_profiles_readable_by_comembers.sql','function','shares_active_club','','function shares_active_club()'),
   ('0073_push_events_more.sql','function','notify_tee_new','','function notify_tee_new()'),
   ('0074_tee_reminders.sql','function','send_tee_reminders','','function send_tee_reminders()'),
-  ('0075_tee_time_roles.sql','function','set_tee_time_captain','','function set_tee_time_captain()')
+  ('0075_tee_time_roles.sql','function','set_tee_time_captain','','function set_tee_time_captain()'),
+  ('0076_holes_unique.sql','index','holes_round_hole_uk','','index holes_round_hole_uk'),
+  ('0077_holes_upsert.sql','function','post_game_rounds','','function post_game_rounds()')
 )
 select migration, human as expected_object,
   case kind
