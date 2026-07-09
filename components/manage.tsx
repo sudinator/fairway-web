@@ -885,11 +885,11 @@ const NOTIF_TYPES: { key: string; label: string; def: "push" | "inapp" | "off"; 
   { key: "game_added", label: "You're added to a game", def: "push", live: true },
   { key: "money_owed", label: "You owe money", def: "push", live: true },
   { key: "money_paid", label: "You get paid / settled", def: "push", live: true },
-  { key: "tee_reminder", label: "Tee-time reminders", def: "push", live: false },
-  { key: "tee_new", label: "New tee time posted", def: "inapp", live: false },
-  { key: "bet_posted", label: "A bet is posted in your game", def: "inapp", live: false },
-  { key: "game_finished", label: "Game finished / results", def: "inapp", live: false },
-  { key: "group_member", label: "New member joins your club", def: "inapp", live: false },
+  { key: "tee_reminder", label: "Tee-time reminders", def: "push", live: true },
+  { key: "tee_new", label: "New tee time posted", def: "inapp", live: true },
+  { key: "bet_posted", label: "A bet is posted in your game", def: "inapp", live: true },
+  { key: "game_finished", label: "Game finished / results", def: "inapp", live: true },
+  { key: "group_member", label: "New member joins your club", def: "inapp", live: true },
 ];
 
 function PushToggle({ user, profile }: { user: any; profile: any }) {

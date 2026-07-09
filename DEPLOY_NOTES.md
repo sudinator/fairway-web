@@ -977,3 +977,187 @@ for select using (
   or public.shares_active_club(id)
 );
 ```
+
+## v1.109.0 — Wire four more event notifications (RUN migration 0073)
+Adds SECURITY DEFINER triggers (fan-out, same pattern as 0070) for the four event-driven types that were showing "· soon", and flips them to live in the Profile → Notifications menu. All four default to In-app (they only push if a user opts that type up to Push). tee_reminder stays "· soon" — it's time-based and needs a scheduler (pg_cron), a separate build.
+- tee_new: on tee_times INSERT -> notifies all active club members except the creator; link /?tt=<id>.
+- bet_posted: on expenses INSERT where source_kind='tgc_bet' -> notifies the game's players except the poster; de-duped per user+club per 6h so bet re-posts (delete+reinsert) don't spam; link /?tab=money.
+- game_finished: on games UPDATE when status flips to 'ended' (guarded so it fires once) -> notifies the game's players; link /?tab=games.
+- group_member: on group_members INSERT/UPDATE when a row becomes active (join, or invited->active) -> notifies the OTHER active members ("<Name> joined <Club>."); the club's first member (creator) pings no one; link /?tab=groups.
+- No route change (DEFAULT_DELIVERY already had these types). No client wiring needed — triggers fire regardless of code path.
+- Validated on real Postgres: correct recipients, creator/poster excluded, game-finished fires once, bet re-post deduped, idempotent.
+
+### 0073_push_events_more.sql
+```sql
+-- 0073_push_events_more.sql
+-- Four more event notifications (fan-out via SECURITY DEFINER triggers, like 0070).
+-- Defaults (client + route DEFAULT_DELIVERY) are in-app for all four, so they only
+-- buzz a phone if the user opts that type up to Push.
+
+-- 1) New tee time posted -> notify all active club members except the creator.
+create or replace function public.notify_tee_new() returns trigger
+language plpgsql security definer set search_path = public as $fn$
+begin
+  insert into notifications (user_id, message, group_id, type, link)
+  select gm.user_id, 'New tee time posted — tap to RSVP.', new.group_id, 'tee_new', '/?tt=' || new.id::text
+  from group_members gm
+  where gm.group_id = new.group_id and gm.status = 'active' and gm.user_id is not null
+    and gm.user_id is distinct from new.created_by;
+  return new;
+end $fn$;
+drop trigger if exists trg_notify_tee_new on public.tee_times;
+create trigger trg_notify_tee_new after insert on public.tee_times
+  for each row execute function public.notify_tee_new();
+
+-- 2) A bet was posted -> notify the game's players (not the poster). De-duped per
+--    user+club per 6h so bet re-posts (delete+reinsert) don't spam.
+create or replace function public.notify_bet_posted() returns trigger
+language plpgsql security definer set search_path = public as $fn$
+begin
+  if new.source_kind is distinct from 'tgc_bet' or new.source_game_id is null then return new; end if;
+  insert into notifications (user_id, message, group_id, type, link)
+  select gp.user_id, 'A bet was posted in your game — see the Money tab.', new.group_id, 'bet_posted', '/?tab=money'
+  from game_players gp
+  where gp.game_id = new.source_game_id and gp.user_id is not null
+    and gp.user_id is distinct from new.created_by
+    and not exists (
+      select 1 from notifications n
+      where n.user_id = gp.user_id and n.type = 'bet_posted'
+        and n.group_id is not distinct from new.group_id
+        and n.created_at > now() - interval '6 hours'
+    );
+  return new;
+end $fn$;
+drop trigger if exists trg_notify_bet_posted on public.expenses;
+create trigger trg_notify_bet_posted after insert on public.expenses
+  for each row execute function public.notify_bet_posted();
+
+-- 3) Game finished -> notify the game's players when status flips to 'ended'.
+create or replace function public.notify_game_finished() returns trigger
+language plpgsql security definer set search_path = public as $fn$
+begin
+  if new.status is distinct from 'ended' or old.status is not distinct from 'ended' then return new; end if;
+  insert into notifications (user_id, message, group_id, type, link)
+  select gp.user_id, 'Your game is final — see the results.', new.group_id, 'game_finished', '/?tab=games'
+  from game_players gp
+  where gp.game_id = new.id and gp.user_id is not null;
+  return new;
+end $fn$;
+drop trigger if exists trg_notify_game_finished on public.games;
+create trigger trg_notify_game_finished after update on public.games
+  for each row execute function public.notify_game_finished();
+
+-- 4) New member joins a club -> notify the OTHER active members. Fires when a row
+--    becomes active (insert active, or invited->active), not on the club's first member.
+create or replace function public.notify_group_member() returns trigger
+language plpgsql security definer set search_path = public as $fn$
+declare nm text; cn text;
+begin
+  if new.user_id is null or new.status is distinct from 'active' then return new; end if;
+  if tg_op = 'UPDATE' and old.status is not distinct from 'active' then return new; end if;
+  select coalesce(nullif(display_name, ''), 'A new golfer') into nm from profiles where id = new.user_id;
+  select name into cn from groups where id = new.group_id;
+  insert into notifications (user_id, message, group_id, type, link)
+  select gm.user_id, coalesce(nm, 'A new golfer') || ' joined ' || coalesce(cn, 'your club') || '.', new.group_id, 'group_member', '/?tab=groups'
+  from group_members gm
+  where gm.group_id = new.group_id and gm.status = 'active' and gm.user_id is not null
+    and gm.user_id is distinct from new.user_id;
+  return new;
+end $fn$;
+drop trigger if exists trg_notify_group_member on public.group_members;
+create trigger trg_notify_group_member after insert or update on public.group_members
+  for each row execute function public.notify_group_member();
+```
+
+### Migration 0074 — tee-time reminders (pg_cron)
+Enables pg_cron + schedules send_tee_reminders() every 15 min. Inserts tee_reminder
+notifications only (webhook/push handles delivery). If the SQL editor errors on the
+`create extension` line, enable pg_cron first via Dashboard -> Database -> Extensions,
+then re-run. Verify with: select * from cron.job where jobname='tee-reminders';
+Push still requires the webhook + Vercel env vars to be live to reach phones.
+```sql
+-- 0074_tee_reminders.sql
+-- Time-based tee-time reminders, delivered through the existing
+-- notifications -> Database Webhook -> /api/push pipeline (type 'tee_reminder', def push).
+-- The scheduler only INSERTS notification rows; no pg_net / Edge Function needed.
+--
+-- Two reminders, both de-duplicated per (user, tee time, reminder-kind) via the link marker:
+--   A) Deadline nudge  : 24h before signup_deadline, to ACTIVE club members who have NOT responded.
+--   B) Morning-of      : 06:00-11:59 America/New_York on play_date, to players who chose 'in'.
+--
+-- pg_cron runs in UTC; that is fine because the windows are computed against stored
+-- timestamps (signup_deadline is timestamptz; play_date is compared in America/New_York).
+
+create extension if not exists pg_cron;
+
+create or replace function public.send_tee_reminders()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- A) Deadline nudge: within 24h of the signup deadline, members with no RSVP row yet.
+  insert into notifications (user_id, message, group_id, type, link)
+  select gm.user_id,
+         'RSVP closes soon for the ' || to_char(t.play_date, 'Dy, Mon FMDD')
+           || ' tee time — let your club know if you''re in.',
+         t.group_id,
+         'tee_reminder',
+         '/?tt=' || t.id::text || '&r=deadline'
+  from public.tee_times t
+  join public.group_members gm
+    on gm.group_id = t.group_id
+   and gm.status = 'active'
+   and gm.user_id is not null
+  where t.status = 'upcoming'
+    and t.signup_deadline is not null
+    and now() >= t.signup_deadline - interval '24 hours'
+    and now() <  t.signup_deadline
+    and not exists (
+      select 1 from public.tee_time_rsvps r
+      where r.tee_time_id = t.id and r.user_id = gm.user_id
+    )
+    and not exists (
+      select 1 from public.notifications n
+      where n.user_id = gm.user_id
+        and n.type = 'tee_reminder'
+        and n.link = '/?tt=' || t.id::text || '&r=deadline'
+    );
+
+  -- B) Morning-of: on the play date (06:00-11:59 Eastern), to players who said 'in'.
+  insert into notifications (user_id, message, group_id, type, link)
+  select r.user_id,
+         'Tee time today — ' || to_char(t.play_date, 'Dy, Mon FMDD') || '. See you out there.',
+         t.group_id,
+         'tee_reminder',
+         '/?tt=' || t.id::text || '&r=day'
+  from public.tee_times t
+  join public.tee_time_rsvps r
+    on r.tee_time_id = t.id
+   and r.choice = 'in'
+   and r.user_id is not null
+  where t.status = 'upcoming'
+    and (now() at time zone 'America/New_York')::date = t.play_date
+    and extract(hour from (now() at time zone 'America/New_York')) >= 6
+    and extract(hour from (now() at time zone 'America/New_York')) < 12
+    and not exists (
+      select 1 from public.notifications n
+      where n.user_id = r.user_id
+        and n.type = 'tee_reminder'
+        and n.link = '/?tt=' || t.id::text || '&r=day'
+    );
+end;
+$$;
+
+-- Schedule it every 15 minutes. Idempotent: drop an existing job of the same name first.
+do $$
+begin
+  perform cron.unschedule('tee-reminders');
+exception when others then
+  null;
+end;
+$$;
+
+select cron.schedule('tee-reminders', '*/15 * * * *', $$ select public.send_tee_reminders(); $$);
+```

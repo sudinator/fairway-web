@@ -225,3 +225,12 @@ Product term **Club** = internal **group** everywhere in the DB and code (tables
 
 ### Migration 0072 — profiles readable by co-members
 profiles SELECT policy is now `id = auth.uid() OR is_admin() OR shares_active_club(id)`. `shares_active_club(other uuid)` is a SECURITY DEFINER helper: true when the caller and `other` are both active members of the same group/club. Lets members see co-members' names/avatars across the app; email is exposed at the API level to co-members (UI does not show it).
+
+### Migration 0073 — four more push event triggers
+notify_tee_new (tee_times insert -> active club members except creator), notify_bet_posted (expenses insert source_kind=tgc_bet -> game players except poster, 6h dedup per user+club), notify_game_finished (games update -> players when status->ended, once), notify_group_member (group_members insert/update to active -> other active members). All default in-app.
+
+### Migration 0074 — tee-time reminders (pg_cron)
+Enables `pg_cron` and schedules `public.send_tee_reminders()` every 15 minutes (cron job name `tee-reminders`). The SECURITY DEFINER function inserts `tee_reminder` notifications (which flow through the notifications Database Webhook -> /api/push), so no pg_net / Edge Function is needed:
+- (A) Deadline nudge: within 24h of `tee_times.signup_deadline`, to active `group_members` with NO `tee_time_rsvps` row for that tee time. Link `/?tt=<id>&r=deadline`.
+- (B) Morning-of: 06:00–11:59 `America/New_York` on `play_date`, to `tee_time_rsvps` with `choice='in'`. Link `/?tt=<id>&r=day`.
+De-duped per (user, tee time, kind) by matching the exact link marker — no new table. pg_cron runs UTC; windows compare against stored timestamps (signup_deadline is timestamptz; play_date compared in Eastern). tee_reminder default delivery = push (flipped live in the prefs menu, v1.110.0).

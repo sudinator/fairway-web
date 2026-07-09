@@ -1961,6 +1961,7 @@ function GameRoom({
   };
   // Par of the holes played so far (for true stroke over/under par, uncapped).
   const parThru = (p: Player) => playerHoles(p).reduce((s2, h) => s2 + (h.strokes && h.strokes > 0 ? (h.par || 0) : 0), 0);
+  const leaderName = (full: string) => { const n = (full || "").trim(); if (n.length <= 15) return n; const parts = n.split(/\s+/); if (parts.length > 1) { const c = parts[0] + " " + parts[parts.length - 1][0]; return c.length <= 15 ? c : parts[0].slice(0, 15); } return n.slice(0, 15); };
 
   // Save one hole's data (strokes / putts / fairway) for me.
   // Push a score row to the server with visible status + safe retries. The local backup
@@ -3455,9 +3456,9 @@ function GameRoom({
           <div style={{ marginTop: 18 }}>
             <Eyebrow>{isStroke ? `STROKE PLAY · ${strokeNet ? "NET" : "GROSS"}` : "LEADERBOARD · NET STABLEFORD"}</Eyebrow>
             {/* Column header */}
-            <div style={{ display: "flex", alignItems: "center", padding: "9px 12px", marginTop: 4, color: C.cream, fontSize: 12, fontWeight: 800, letterSpacing: 0.3, background: C.greenMid, borderRadius: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", padding: "9px 16px", marginTop: 4, color: C.cream, fontSize: 12, fontWeight: 800, letterSpacing: 0.3, background: C.greenMid, borderRadius: 10 }}>
               <div style={{ width: 20 }}>#</div>
-              <div style={{ width: 32 }} />
+              <div style={{ width: 40 }} />
               <div style={{ flex: 1 }}>Player</div>
               {isStroke ? (<>
                 <div style={{ width: 40, textAlign: "center" }}>Thru</div>
@@ -3465,10 +3466,10 @@ function GameRoom({
                 <div style={{ width: 48, textAlign: "center" }}>Par</div>
                 <div style={{ width: 50, textAlign: "center" }}>Net</div>
               </>) : (<>
-                <div style={{ width: 32, textAlign: "center" }}>Thru</div>
-                <div style={{ width: 38, textAlign: "center" }}>Gross</div>
-                <div style={{ width: 40, textAlign: "center" }}>O/U</div>
-                <div style={{ width: 34, textAlign: "center" }}>Pts</div>
+                <div style={{ width: 44, textAlign: "center" }}>Thru</div>
+                <div style={{ width: 48, textAlign: "center" }}>Gross</div>
+                <div style={{ width: 44, textAlign: "center" }}>O/U</div>
+                <div style={{ width: 40, textAlign: "center" }}>Pts</div>
               </>)}
             </div>
             {leaderboard.map((p) => {
@@ -3488,8 +3489,8 @@ function GameRoom({
                   </div>
                   <Avatar src={p.avatar_url} name={p.display_name} size={32} />
                   <div style={{ flex: 1, minWidth: 0, marginLeft: 8 }}>
-                    <div style={{ color: C.ink, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {p.display_name}{p.user_id === user.id ? " (you)" : ""}
+                    <div style={{ color: C.ink, fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {leaderName(p.display_name)}{p.user_id === user.id ? " (you)" : ""}
                     </div>
                     <div style={{ color: C.faint, fontSize: 11 }}>
                       {p.course_handicap != null ? `CH ${p.course_handicap}` : "no hcp"}
@@ -3507,15 +3508,15 @@ function GameRoom({
                       <div style={{ width: 50, textAlign: "center", color: strokeNet ? C.green : C.ink, fontWeight: strokeNet ? 800 : 700, fontSize: strokeNet ? 19 : 15, fontFamily: strokeNet ? "Georgia, serif" : undefined }}>{thru ? playerNet(p) : "–"}</div>
                     </>);
                   })() : (<>
-                    <div style={{ width: 32, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru || "–"}</div>
-                    <div style={{ width: 38, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru ? playerGross(p) : "–"}</div>
+                    <div style={{ width: 44, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru || "–"}</div>
+                    <div style={{ width: 48, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru ? playerGross(p) : "–"}</div>
                     {(() => {
-                      if (!thru) return <div style={{ width: 40, textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 16, fontFamily: "Georgia, serif" }}>–</div>;
+                      if (!thru) return <div style={{ width: 44, textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 16, fontFamily: "Georgia, serif" }}>–</div>;
                       const rel = 2 * thru - pts;
                       const col = rel < 0 ? "#1F8F54" : rel > 0 ? C.birdie : "#6B6857";
-                      return <div style={{ width: 40, textAlign: "center", color: col, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{relToParStr(p)}</div>;
+                      return <div style={{ width: 44, textAlign: "center", color: col, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{relToParStr(p)}</div>;
                     })()}
-                    <div style={{ width: 34, textAlign: "center", color: C.green, fontWeight: 800, fontSize: 19, fontFamily: "Georgia, serif" }}>{pts}</div>
+                    <div style={{ width: 40, textAlign: "center", color: C.green, fontWeight: 800, fontSize: 19, fontFamily: "Georgia, serif" }}>{pts}</div>
                   </>)}
                 </div>
               );
