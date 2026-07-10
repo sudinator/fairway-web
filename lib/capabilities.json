@@ -1,0 +1,21 @@
+{
+  "_note": "Single source of truth for the marketing one-pagers AND the in-app Help capabilities list. Add a feature here (one entry) and run `npm run gen:onepagers` to refresh the PDFs; the Help page reads this file directly and updates on its own. CI fails if this file changes without the sheets being regenerated.",
+  "tagline": "Live scoring, real handicaps, and every game your group loves \u2014 in one free app you add to your phone.",
+  "cards": [
+    { "title": "Every format you play", "editions": ["all"], "body": "Stableford, stroke play, singles & four-ball match play, skins and the Ryder-style trifecta \u2014 all scored automatically, hole by hole." },
+    { "title": "Live, shared scoring", "editions": ["all"], "body": "One keeper enters the group and standings update in real time. Share a live link and anyone can follow the round from the clubhouse." },
+    { "title": "Handicaps that keep themselves", "editions": ["all"], "body": "A running WHS-style index \u2014 best 8 of your last 20 \u2014 with automatic course handicap and net scoring. Or simply enter your own." },
+    { "title": "Know your game", "editions": ["all"], "body": "A personal dashboard: index and scoring trends, par-3/4/5 averages, fairways, greens, putts, scrambling and sand saves." },
+    { "title": "Every course, one library", "editions": ["all"], "body": "Search and save any course into one shared library with per-tee yardages and stroke indexes. Spot a wrong number? Suggest a fix \u2014 an admin approves it for everyone." },
+    { "title": "Split costs, settle up", "editions": ["club"], "body": "Track who paid and who owes, split evenly or custom, see every balance at a glance, and send a friendly nudge \u2014 no math at the bar." },
+    { "title": "Settle up, automatically", "editions": ["tgc"], "body": "The Stableford money game, the sixes and side-bets settle themselves and post straight to the Money tab \u2014 the bar tab sorts itself out." },
+    { "title": "Your club, organised", "editions": ["all"], "body": "Invite by code or link, manage players and handicaps, and lean on an admin toolkit with a full score audit trail and oversight." },
+    { "title": "Built for the course", "editions": ["all"], "body": "Installs like an app, works offline, never drops a score on a dead signal \u2014 and phone alerts keep the group in the loop." }
+  ],
+  "tgcExclusives": [
+    { "title": "Tee Times", "body": "Schedule, collect RSVPs, name a captain, send reminders, export to WhatsApp." },
+    { "title": "The money game", "body": "Automatic Stableford bet settlement; winners and losers split, posted to Money." },
+    { "title": "Clean Sweep & the sixes", "body": "Front / Middle / Last six net-Stableford subtotals with live sweep tracking." },
+    { "title": "Member tees by default", "body": "New games default to the member tee, so the field is set up right." }
+  ]
+}

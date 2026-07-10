@@ -3,7 +3,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { pushGate, subscribeToPush, unsubscribeFromPush, currentPermission, syncPushSubscription } from "@/lib/push";
-import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles } from "@/lib/golf";
+import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID } from "@/lib/golf";
+import capabilities from "@/lib/capabilities.json";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, NumPicker, Avatar } from "@/components/ui";
@@ -1188,6 +1189,93 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
 // ================= Admin panel =================
 // ★ Admin analytics — utilization, feature popularity, health. Reads one JSON
 // payload from the is_admin-gated get_admin_analytics() RPC.
+// ★ Golf-cadence engagement — reads the is_admin-gated get_admin_engagement() RPC (migration
+// 0078). Measures the round (real golf activity) on a weekly cycle, not daily app-opens.
+function AdminEngagement() {
+  const [e, setE] = useState<any | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.rpc("get_admin_engagement").then(({ data, error }: any) => {
+      if (error) setErr(error.message); else setE(data);
+    });
+  }, []);
+  if (err) return null; // supplementary; stay quiet if the RPC isn't deployed yet
+  if (!e) return <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Loading engagement…</div>;
+
+  const ws: { week: string; golfers: number; rounds: number }[] = e.weekend_series || [];
+  const nr: { week: string; new: number; returning: number }[] = e.weekly_new_returning || [];
+  const feat = e.feature || { in_game: 0, solo: 0 };
+  const featTot = (feat.in_game || 0) + (feat.solo || 0);
+  const maxG = Math.max(1, ...ws.map((w) => w.golfers));
+  const maxNR = Math.max(1, ...nr.map((w) => (w.new || 0) + (w.returning || 0)));
+
+  const tile = (n: React.ReactNode, l: string, d?: string) => (
+    <div style={{ background: C.greenLight, borderRadius: 12, padding: "10px 12px", flex: 1, minWidth: 92 }}>
+      <div style={{ color: C.cream, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif" }}>{n}</div>
+      <div style={{ color: C.sage, fontSize: 11 }}>{l}</div>
+      {d ? <div style={{ color: C.sage, fontSize: 10, marginTop: 2, opacity: 0.8 }}>{d}</div> : null}
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>Engagement — golf cadence</div>
+      <div style={{ color: C.sage, fontSize: 11, marginTop: 2, marginBottom: 8 }}>Measured on rounds (the real unit of golf) on a weekly cycle — not daily app-opens.</div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {tile(`${e.wau_mau_pct ?? 0}%`, "WAU / MAU", "weekly stickiness")}
+        {tile(e.rounds_per_active_mo ?? 0, "Rounds / golfer", "active, last 28d")}
+        {tile(`${e.weekend_share_pct ?? 0}%`, "Weekend share", "Fri–Sun, 90d")}
+        {tile(e.active_28d ?? 0, "Active golfers", "logged a round, 28d")}
+      </div>
+
+      <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 14, marginBottom: 4 }}>Weekend reach — golfers logging Fri–Sun</div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 92, background: C.greenLight, borderRadius: 12, padding: 10 }}>
+        {ws.length === 0 ? <div style={{ color: C.sage, fontSize: 12 }}>No rounds yet.</div> :
+          ws.map((w, i) => (
+            <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+              <div style={{ color: C.cream, fontSize: 10 }}>{w.golfers}</div>
+              <div title={`${w.golfers} golfers · ${w.rounds} rounds`} style={{ width: "70%", height: `${Math.round((w.golfers / maxG) * 54)}px`, minHeight: 2, background: C.gold, borderRadius: 3 }} />
+              <div style={{ color: C.sage, fontSize: 9, whiteSpace: "nowrap" }}>{w.week}</div>
+            </div>
+          ))}
+      </div>
+
+      <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 14, marginBottom: 4 }}>New vs returning golfers, per week</div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 92, background: C.greenLight, borderRadius: 12, padding: 10 }}>
+        {nr.length === 0 ? <div style={{ color: C.sage, fontSize: 12 }}>No rounds yet.</div> :
+          nr.map((w, i) => {
+            const tot = (w.new || 0) + (w.returning || 0);
+            return (
+              <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                <div style={{ color: C.cream, fontSize: 10 }}>{tot}</div>
+                <div style={{ width: "70%", height: 54, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+                  <div title={`${w.returning} returning`} style={{ height: `${Math.round(((w.returning || 0) / maxNR) * 54)}px`, background: C.sage, borderRadius: "3px 3px 0 0" }} />
+                  <div title={`${w.new} new`} style={{ height: `${Math.round(((w.new || 0) / maxNR) * 54)}px`, background: C.gold }} />
+                </div>
+                <div style={{ color: C.sage, fontSize: 9, whiteSpace: "nowrap" }}>{w.week}</div>
+              </div>
+            );
+          })}
+      </div>
+      <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 10, color: C.sage }}>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, background: C.gold, borderRadius: 2, marginRight: 4 }} />new</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, background: C.sage, borderRadius: 2, marginRight: 4 }} />returning</span>
+      </div>
+
+      <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 14 }}>How rounds are played (90 days)</div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.cream, marginTop: 6 }}><span>In a game</span><span>{feat.in_game || 0}</span></div>
+      <div style={{ height: 8, borderRadius: 4, background: C.green, marginTop: 3, overflow: "hidden" }}>
+        <div style={{ height: "100%", borderRadius: 4, width: `${featTot > 0 ? Math.round(((feat.in_game || 0) / featTot) * 100) : 0}%`, background: C.gold }} />
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.cream, marginTop: 8 }}><span>Solo score entry</span><span>{feat.solo || 0}</span></div>
+      <div style={{ height: 8, borderRadius: 4, background: C.green, marginTop: 3, overflow: "hidden" }}>
+        <div style={{ height: "100%", borderRadius: 4, width: `${featTot > 0 ? Math.round(((feat.solo || 0) / featTot) * 100) : 0}%`, background: C.sage }} />
+      </div>
+    </div>
+  );
+}
+
 function AdminAnalytics() {
   const [a, setA] = useState<any | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -1479,6 +1567,7 @@ function AdminPanel({ user }: { user: any }) {
     <div style={{ marginTop: 24 }}>
       <Eyebrow>★ ADMIN · ANALYTICS</Eyebrow>
       <AdminAnalytics />
+      <AdminEngagement />
       <div style={{ height: 22 }} />
       <Eyebrow>★ ADMIN · ALL PLAYERS</Eyebrow>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
@@ -2353,6 +2442,43 @@ export function HelpPage({ isAdmin, user, displayName, groupId }: { isAdmin: boo
     <div>
       <Eyebrow>HELP · HOW BIRDIE NUM NUM WORKS</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>A quick guide to the basics. Tap the SCREEN selector at the top to move around.</div>
+
+      {(() => {
+        const isTGC = groupId === TGC_GROUP_ID;
+        const edition = isTGC ? "tgc" : "club";
+        const cards = (capabilities.cards as { title: string; body: string; editions: string[] }[])
+          .filter((c) => c.editions.includes("all") || c.editions.includes(edition));
+        const pdf = isTGC ? "/BNN-onepager-tgc.pdf" : "/BNN-onepager-club.pdf";
+        const exclusives = capabilities.tgcExclusives as { title: string; body: string }[];
+        return (
+          <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+              <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 700, flex: 1 }}>What Birdie Num Num can do</div>
+              <a href={pdf} target="_blank" rel="noopener noreferrer" style={{ background: C.gold, color: C.green, fontWeight: 800, fontSize: 12, borderRadius: 8, padding: "7px 12px", textDecoration: "none", whiteSpace: "nowrap" }}>Download one-pager (PDF)</a>
+            </div>
+            <div style={{ color: C.sage, fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>{capabilities.tagline}</div>
+            <div style={{ marginTop: 10, display: "grid", gap: 9 }}>
+              {cards.map((c, i) => (
+                <div key={i}>
+                  <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>{c.title}</div>
+                  <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5 }}>{c.body}</div>
+                </div>
+              ))}
+              {isTGC && (
+                <div style={{ marginTop: 2, borderTop: `1px solid ${C.greenMid}`, paddingTop: 9 }}>
+                  <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>★ EXCLUSIVE TO YOUR CLUB</div>
+                  {exclusives.map((x, i) => (
+                    <div key={i} style={{ marginTop: 7 }}>
+                      <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>{x.title}</div>
+                      <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5 }}>{x.body}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       <HelpSearch onSendQuestion={sendAsQuestion} />
 

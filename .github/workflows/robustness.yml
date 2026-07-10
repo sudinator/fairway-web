@@ -37,3 +37,18 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: bash ci/schema-check.sh
+
+  onepager-sync:
+    name: Marketing one-pagers in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "reportlab==4.4.10"
+      - run: python3 marketing/make_onepagers.py
+      - name: Fail if the capability list changed without regenerating the sheets
+        run: |
+          git diff --exit-code -- marketing/onepager-content.txt \
+            || { echo "::error::Marketing one-pagers are stale. Run 'npm run gen:onepagers' and commit the result."; exit 1; }

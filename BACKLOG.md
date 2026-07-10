@@ -9,113 +9,58 @@ Still open from the original spec:
 - **Split skins (DONE v1.47.0)** — no-carryover variant where tied players share the hole. Only *carryover* exists today; "split" was never built. Useful for big fields where carryovers stall.
 - **Optional hard-gate:** block the Scorecard entirely until setup is complete (today it's a prompt, not a lock).
 
-## Feature ideas
+## Backlog checklist
+Living list. `[x]` = built & verified in code (file noted). `[~]` = partially done.
+`[ ]` = open. Check items off here as they ship.
 
-### Dashboard: handicap trend chart
-Line chart of WHS handicap index over time on the summary dashboard, under the current index number. Buildable from existing data — rounds carry a differential + date, so the index can be recomputed/plotted per round. Mockup (mockup-stats-insights.html) shows the official-index line with each round's differential as faint dots behind it, plus a “v X since Jan” delta. No new data needed; may want to store index snapshots to avoid recomputing 20-round windows each load.
+### Features
+- [x] Admin analytics — golf-cadence engagement (v1.113.0, migration 0078): `get_admin_engagement()` RPC + `AdminEngagement` panel. WAU/MAU on rounds, weekend reach (Fri–Sun golfers/week), weekend-vs-weekday share, rounds per active golfer (28d), new-vs-returning per week, in-game vs solo split. Complements the DAU-framed `get_admin_analytics` (0020) with metrics fit for a weekend-skewed golf app. Measures logged activity (not rounds played-but-unlogged).
+- [ ] Large-field leaderboard (>16 players): default to top-10 + a window around the viewer (pinned self-row + neighbors), a My-group / Overall / Flight filter, compact one-line rows (rank · name · thru · to-par), virtualized full-field view only on demand. Mockups shown; build pending.
+- [ ] Bulk pairings for large groups via desktop sheet: organizer downloads a pre-filled CSV/template, edits on desktop, re-uploads; app validates + previews + matches to members/guests. Phone flow stays for small groups. Under discussion.
+- [ ] **Tee Times for the Livingston Early Morning Golfers Group (LEMG)** — NEW REQUEST (Jul 2026). Extend the Tee Times facility, today gated to TGC only (`home.tsx:643`, `activeGroupId === TGC_GROUP_ID`), to LEMG.
+  - Workflow: one or a few organizers book and post ~5–6 different tee times for up to 20–30 players total; members self sign-up or cancel their spot.
+  - Enable per-group, not by hardcoded ID: replace the single-ID gate with a "tee-times enabled" group flag (or an allow-list) and turn it on for LEMG (needs LEMG's group id, like `TGC_GROUP_ID`).
+  - **24-hour lock (the core new ask):** unused tee times must be released back to the course ≥24h before play, so signups must LOCK at a cutoff. Reuse existing `tee_times.signup_deadline` + `deadlinePassed()` (+ `max_spots`); default the deadline to (tee-off − 24h) on creation and hard-lock RSVP once it passes so the roster is final.
+  - Organizer "unused / under-filled tee times" view before the cutoff, so extras can be cancelled on the platform (status → cancelled) and — a manual step — with the course by phone. The app locks + flags; it does not call the course.
+  - Builds on the tee-time roles model (migration 0075, still pending to run): creator manages signups; captain runs the game.
+  - Open decisions: hard block vs warn at lock; whether to notify organizers at the 24h mark (a `tee_reminder` push already exists, migration 0074); whether members may still cancel (not add) after lock.
+- [x] Marketing one-pagers auto-synced from one source + linked on Help — capability list in `lib/capabilities.json` feeds both PDFs (`npm run gen:onepagers`) and a live “What Birdie Num Num can do” section on the Help page (TGC vs club aware); `public/BNN-onepager-{tgc,club}.pdf` are served + linked; CI job `onepager-sync` fails if the list changes without regenerating (v1.112.0)
+- [x] Dashboard: running handicap index + differential/form trend charts — `components/dashboard.tsx`
+- [x] Dashboard: stats vs peer group + "Aspire to" goal band — `components/compare-stats.tsx`, `lib/benchmarks.ts` (cited Break X Golf percentile tables)
+- [x] In-app "How do I…" help search (no-LLM, offline FAQ) — `components/help-search.tsx`
+- [x] Feedback / wishlist capture + admin review tab — `components/feedback.tsx`
+- [x] Post-round stats completeness reminder (FIR/putts, par-3 aware) — `components/round-detail.tsx` (StatsReminder)
+- [x] Pre-conclusion completeness popup (endGame + finish-group) — `components/tournaments.tsx`
+- [x] Copy scorecard / leaderboard to chat as plain text — `components/share-card.tsx` ("Copy as text")
+- [x] Round-summary action row on one line — shipped v1.63.0
+- [x] Scoring audit trail (who/when/old→new per hole) — migration 0042 + admin view
+- [~] "No tee set — playing off scratch" warning — non-silent in StrokesSummary + setup-missing list (`tournaments.tsx`); optional gentle finish-time confirm NOT built
+- [ ] Real GHIN auto-import — deferred (needs GHIN-login backend; ToS/credential risk). Manual handicap + "Post to GHIN" export exist today.
 
-### Dashboard: stats vs peer group (with aspirational target)
-Compare your shot stats (FW%, GIR%, putts/round, penalties/round) against the typical range for your handicap, plus a selectable lower-handicap GOAL band (“Aspire to: 10 / 8 / 5 hcp”). Per-stat one-line takeaway turns it into “what to work on.” Mockup made. YOUR values are real (from recorded rounds); the PEER BANDS need a data-source decision — (a) BNN's own rounds aggregated by handicap band (self-consistent, grows with the society; needs an aggregate query/RPC + enough rounds), or (b) a cited published dataset (Shot Scope/Arccos/etc; needs sourcing + licensing check). Do NOT ship invented benchmark numbers. Lives on the dashboard; tap to expand.
+### Hardening (deferred, not urgent)
+- [x] Server-side score validation (bounds sanity-check trigger) — migration 0040
+- [x] Auth-login disconnect (removed user can't silently re-join) — v1.50.0 / migration 0038
+- [x] Whole-array score writes — reviewed; non-issue by design (single-writer marker model)
+- [~] Surface silent `catch{}` failures — bet-post now shows the real error (v1.111.1); `recordMyGameRound` / `logActivity` / background save still swallow
+- [x] Shared course-data blast radius — GATED: a member edit applies to their own club only and queues for admin GLOBAL approval (`course_edit_requests`; `manage.tsx` approve/keep/reject). Doubles as the member correction workflow (Courses → All App Courses → edit SI/yardage/par + reason). Residual: takes effect for the submitting club immediately, and no correctness check beyond validateStrokeIndexes (SI 1–18 once). Possible polish: a labelled "Suggest a correction" button for discoverability.
+- [x] Orphaned support sessions — auto-expire after 12h (`expire_support_sessions`, migration 0039); reaped opportunistically on admin enter + oversight-overview load. Nuance: opportunistic, not a hard scheduler.
+- [ ] Default-group auto-join reach (BY DESIGN, monitor) — `join_default_group` (0038) adds any signed-in, non-blocklisted user to the `is_default` club on load and adopts their homeless rounds. Safe while invite-only + `banned_emails` blocklist hold; a liability only if sign-ups ever open to the public.
+- [x] Automated testing — 6 TS suites (~480 assertions: golf math, money/betting, stroke alloc, grouping, legs, sync) + CI `robustness.yml` (tsc/test/build on every push/PR + daily) + read-only schema guard (`ci/schema-check.sh`)
+- [~] Behavioral tests for PL/pgSQL RPCs — existence-checked (`verify_migrations.sql`) but not behavior-tested (no pgTAP); validated ad-hoc in Postgres per change
 
-### In-app "How do I…" help search (no LLM, no tokens)
-A search box in the Help section where players type natural "how do I…" questions and
-get answers in a chat-style exchange (their question, then a step-by-step reply).
-- **No LLM / no tokens:** a curated FAQ knowledge base bundled in the app + client-side
-  search. Keyword + synonym matching, with a lightweight fuzzy-search lib (e.g. Fuse.js)
-  to tolerate typos/phrasing. Deterministic retrieval, runs fully in the browser, works
-  offline, instant, private.
-- Each FAQ entry: the question, keywords/synonyms, and ordered steps that name the in-app
-  location (e.g. "Games → Create → share the 6-digit code"). Could deep-link a button that
-  jumps the player to the right screen.
-- **Coverage caveat:** only answers what's authored; it's smart FAQ search styled as chat,
-  not real conversational understanding. Quality scales with the entry set + synonyms.
-- **Tie-in:** when there's no good match, offer "Didn't find it? Send a question" → routes
-  into the feedback capture below (which also surfaces missing FAQs to add).
-- Optional later: LLM fallback *only* on a miss (hybrid) — burns tokens only when local
-  search fails. Out of scope for the no-token version.
-
-### Feedback: report a bug / request a feature (wishlist)
-Let players report something missing or broken, or suggest a feature, from inside the app.
-- Simple form: type (bug | wish) + message. Auto-attach context (app version, active
-  group, current screen) so bugs are actionable. Optional screenshot.
-- Writes to a Supabase `feedback` table with user id + timestamp + app version.
-- Admin review surface (like Oversight/Users): list submissions, set status
-  (new / triaged / done), optionally reply or notify the requester.
-- No LLM needed.
-
-### Post-round stats completeness reminder
-After a round is **completed**, if the player has been recording stats, the scorecard
-should flag any holes where stats are missing and help them fill the gaps.
-- **Scope:** fairway hit (FIR) and putts only. Ignore sand and penalties.
-- **Trigger:** only when the round is complete AND the player has entered *some* stats
-  (don't nag players who never track stats).
-- **Par-3 handling:** "fairway hit" is N/A on par 3s — exclude par-3 holes from the
-  fairway-missing check (still check putts on par 3s).
-- **UX:** a clear banner/summary listing the holes with missing FIR/putts, plus a direct
-  path to fix them (e.g. "Add my stats" → opens the player's own round in the editor).
-- **Marker note:** explain that their score may have been kept by a *marker*, so the gross
-  is in but their personal fairways/putts may not be — and that they add those themselves
-  on their own round afterward. Make the "where/how" obvious.
-
-## Known weaknesses / hardening (deferred, not urgent)
-From the security & structure review. None are emergencies; tackle when convenient.
-- **Auth-login disconnect (DONE v1.50.0 / migration 0038):** wipe/merge/ban remove or flag the *profile* but not the
-  Supabase auth login, so a removed user can sign back in and get a fresh profile (and,
-  with a default group set, auto-join it). Fully retiring an account needs deleting it in
-  the Supabase Auth dashboard.
-- **Whole-array score writes (NOT a concurrency risk):** `setPlayerHole` rewrites a
-  player's entire scores/putts arrays each save. This is safe because the marker model
-  guarantees a single writer per row: with no marker each player edits only their own row;
-  once a marker is active every other player's entry UI is hidden and `cardCanEdit` grants
-  the card to the marker alone. The only residual is the *same* marker on two devices —
-  by-design "marker is source of truth, last write wins," not a conflict. Per-hole rows are
-  therefore NOT needed.
-- **Silent failures:** several paths `catch {}` (recordMyGameRound, logActivity, background
-  save). Resilient, but can mask real data-loss errors — surface them somewhere visible.
-- **Default-group auto-join hits new signups too:** fine for a closed society; a liability
-  if sign-ups ever open beyond invites.
-- **Shared course-data blast radius:** one wrong rating/slope/SI on a shared course skews
-  handicaps for everyone using it; no guard against a bad edit propagating.
-- **Orphaned support sessions:** rely only on the banner to remind the admin to exit;
-  consider auto-expiry.
-- **No server-side score validation:** clients can write arbitrary values into game_players
-  score arrays.
-- **No automated tests** for the PL/pgSQL admin RPCs.
+### Ops / pending (carried from recent sessions — action items, not code)
+- [ ] Run migration 0075 (tee-time roles)
+- [ ] Run migration 0076 then 0077 (duplicate-hole fix — 0076 FIRST)
+- [ ] Run migration 0073 (recommended — restores bet / tee-new / game-finished / group-member push)
+- [ ] Run migration 0071 (optional — profile-name title-case backfill)
+- [ ] Group push onboarding — v1.111.3 added the iPhone install warning; members still need to install from Safari + enable to actually enroll
 
 ## Housekeeping
-- **Marketing one-pager:** `marketing/Birdie-Num-Num-overview.pdf`. Regenerate with
-  `python3 marketing/make_onepager.py` and keep it current as features ship.
-
-## Newly requested (June 2026)
-
-1. **Scoring audit trail** [ALREADY SHIPPED v1.52.0 — migration 0042 AFTER UPDATE trigger + admin_score_audit RPC] - log every score change for dispute resolution + debugging.
-   Capture who / when / from-value / to-value per changed hole. Best done as a DB
-   trigger on game_players (BEFORE/AFTER UPDATE) that diffs old vs new `scores`
-   (and optionally putts/penalties) and inserts one audit row per changed index:
-   {game_id, game_player_id, hole_index, field, old_value, new_value, changed_by =
-   auth.uid(), changed_at}. A trigger captures ALL write paths (direct update, marker,
-   set_game_scores RPC), unlike app-level logging. Pairs naturally with the 0040
-   validation trigger. Add an admin view to read a player's/game's history. New migration.
-
-2. **Pre-conclusion completeness popup** [ALREADY SHIPPED v1.51.0 — modal on endGame + finishMyGroup] - before a round/game is locked (organizer
-   endGame AND marker "Finish my group"), raise a modal listing what's missing:
-   - Always: holes with no score entered (per player, or for the finishing group).
-   - If stats are being tracked (any putts/fairway recorded): also list missing putts
-     and missing fairways (par-3s excluded from fairways), mirroring the post-round
-     StatsReminder but pre-lock and game-wide.
-   - If NO stats tracked: don't flag stats, only confirm all scores are in.
-   Warn-and-confirm, not a hard block (consistent with "flag not gate"). App code only.
-
-3. **Copy scorecard to chat** [mockup presented Jun 2026 — enhanced rounds-style scorecard, awaiting go] - a "Copy" action that builds a plain-text snapshot of
-   the leaderboard/scorecard (not the live LINK) for pasting into WhatsApp/iMessage/etc.
-   Compact, readable text: title + standings + per-player line (and optionally a small
-   hole grid). Reuse the GHIN-style text formatting approach. App code only (clipboard).
-
-4. **Round summary action-row layout** [SHIPPED v1.63.0] - in the round-summary
-   (round-detail) view, the **Delete** button wraps onto its own second line. Put it
-   inline on a single row with the other actions — **Post to GHIN**, **Share**, and
-   **Edit round** — so all four sit on one line. CSS/layout only (flex row that wraps
-   gracefully on very narrow screens; keep Delete visually distinct/last). App code only.
+- **Marketing one-pagers:** single source `lib/capabilities.json` → `npm run gen:onepagers`
+  (`marketing/make_onepagers.py`) writes `public/BNN-onepager-club.pdf` + `public/BNN-onepager-tgc.pdf`
+  and the `marketing/onepager-content.txt` manifest. The Help page reads capabilities.json live.
+  Add a feature in capabilities.json, run the script, commit. CI `onepager-sync` guards drift.
+  (Old `make_onepager.py` / `Birdie-Num-Num-overview.pdf` superseded.)
 
 ## Shipped
 - v1.111.3 - Push notifications: explicit iPhone install warning + subscription hardening (client-only, no migration). The in-app Notifications section now shows an unmissable red warning in the iPhone-not-installed state stating that phone notifications only work when BNN is installed to the Home Screen from Safari and opened from that icon, with numbered steps and the Chrome caveat. Hardening: new syncPushSubscription() (lib/push.ts) re-saves this device's live browser subscription on app open (app/page.tsx) and on the settings screen — healing an iOS-rotated endpoint that the SW re-subscribes but can't persist, and repairing a row the sender disabled. The settings toggle now reflects true server enrollment (a saved row) instead of just the browser subscription, so it can no longer show a false "on". Root context: push_subscriptions was empty for everyone because iPhone users had been trying from Safari rather than an installed PWA, and nothing re-persisted rotated subs.
@@ -266,5 +211,3 @@ From the security & structure review. None are emergencies; tackle when convenie
 
 - Match-play layout DECISION (Jun 2026): keep per-hole CARD layout, not the grid (tap-target/readability on phone). Grid mockups were exploratory.
 
-## To do
-- [ ] NEXT VERSION: Surface a visible “no tee set — playing off scratch” warning for any player who lacks a stroke basis (no tee rating/slope AND no stored course_handicap), so the deliberate scratch fallback in chBasis is never SILENT. Show the flag next to the player in the StrokesSummary panel and the new Group results card, and optionally a gentle confirm before finishing (“N player(s) have no tee/handicap and will score off scratch — continue?”). Not a hard block (scoring is intentionally never blocked); just make it obvious.

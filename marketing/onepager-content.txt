@@ -1,0 +1,28 @@
+Birdie Num Num one-pager content (auto-generated from lib/capabilities.json)
+
+TAGLINE: Live scoring, real handicaps, and every game your group loves — in one free app you add to your phone.
+
+== CLUB EDITION ==
+- Every format you play: Stableford, stroke play, singles & four-ball match play, skins and the Ryder-style trifecta — all scored automatically, hole by hole.
+- Live, shared scoring: One keeper enters the group and standings update in real time. Share a live link and anyone can follow the round from the clubhouse.
+- Handicaps that keep themselves: A running WHS-style index — best 8 of your last 20 — with automatic course handicap and net scoring. Or simply enter your own.
+- Know your game: A personal dashboard: index and scoring trends, par-3/4/5 averages, fairways, greens, putts, scrambling and sand saves.
+- Every course, one library: Search and save any course into one shared library with per-tee yardages and stroke indexes. Spot a wrong number? Suggest a fix — an admin approves it for everyone.
+- Split costs, settle up: Track who paid and who owes, split evenly or custom, see every balance at a glance, and send a friendly nudge — no math at the bar.
+- Your club, organised: Invite by code or link, manage players and handicaps, and lean on an admin toolkit with a full score audit trail and oversight.
+- Built for the course: Installs like an app, works offline, never drops a score on a dead signal — and phone alerts keep the group in the loop.
+
+== TGC EDITION ==
+- Every format you play: Stableford, stroke play, singles & four-ball match play, skins and the Ryder-style trifecta — all scored automatically, hole by hole.
+- Live, shared scoring: One keeper enters the group and standings update in real time. Share a live link and anyone can follow the round from the clubhouse.
+- Handicaps that keep themselves: A running WHS-style index — best 8 of your last 20 — with automatic course handicap and net scoring. Or simply enter your own.
+- Know your game: A personal dashboard: index and scoring trends, par-3/4/5 averages, fairways, greens, putts, scrambling and sand saves.
+- Every course, one library: Search and save any course into one shared library with per-tee yardages and stroke indexes. Spot a wrong number? Suggest a fix — an admin approves it for everyone.
+- Settle up, automatically: The Stableford money game, the sixes and side-bets settle themselves and post straight to the Money tab — the bar tab sorts itself out.
+- Your club, organised: Invite by code or link, manage players and handicaps, and lean on an admin toolkit with a full score audit trail and oversight.
+- Built for the course: Installs like an app, works offline, never drops a score on a dead signal — and phone alerts keep the group in the loop.
+  TGC EXCLUSIVES:
+   * Tee Times: Schedule, collect RSVPs, name a captain, send reminders, export to WhatsApp.
+   * The money game: Automatic Stableford bet settlement; winners and losers split, posted to Money.
+   * Clean Sweep & the sixes: Front / Middle / Last six net-Stableford subtotals with live sweep tracking.
+   * Member tees by default: New games default to the member tee, so the field is set up right.
