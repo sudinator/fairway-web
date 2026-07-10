@@ -120,3 +120,35 @@ export async function unsubscribeFromPush(): Promise<boolean> {
     return true;
   } catch { return false; }
 }
+
+// Reconcile this device's push enrollment on app open. If permission is already granted and
+// the browser holds a live subscription, (re-)save that subscription to the server — this is
+// what heals an iOS-rotated endpoint (the SW re-subscribes but can't persist it) and repairs a
+// row the sender disabled after transient failures. No permission prompt, no user gesture.
+// Returns whether this device is enrolled (a live browser subscription exists AND was saved),
+// so callers can show an honest on/off state instead of trusting the browser alone.
+export async function syncPushSubscription(userId: string): Promise<boolean> {
+  try {
+    if (!vapidConfigured() || !pushApisPresent()) return false;
+    if (Notification.permission !== "granted") return false;
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return false;
+    const json: any = sub.toJSON();
+    const endpoint = json.endpoint as string;
+    const p256dh = json.keys?.p256dh as string;
+    const auth = json.keys?.auth as string;
+    if (!endpoint || !p256dh || !auth) return false;
+    const { error } = await supabase.from("push_subscriptions").upsert(
+      {
+        user_id: userId, endpoint, p256dh, auth,
+        platform: isIOS() ? "ios" : (typeof navigator !== "undefined" ? (navigator.platform || null) : null),
+        user_agent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 300) : null,
+        disabled: false, fail_count: 0, last_seen: new Date().toISOString(),
+      },
+      { onConflict: "endpoint" },
+    );
+    if (error) return false;
+    return true;
+  } catch { return false; }
+}

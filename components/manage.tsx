@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
-import { pushGate, isSubscribed, subscribeToPush, unsubscribeFromPush, currentPermission } from "@/lib/push";
+import { pushGate, subscribeToPush, unsubscribeFromPush, currentPermission, syncPushSubscription } from "@/lib/push";
 import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles } from "@/lib/golf";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
@@ -898,7 +898,14 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [prefs, setPrefs] = useState<Record<string, string>>((profile?.push_prefs as Record<string, string>) || {});
-  useEffect(() => { setGate(pushGate()); isSubscribed().then(setOn); }, []);
+  useEffect(() => {
+    const g = pushGate(); setGate(g);
+    // Reflect the true server state: on = a live browser subscription that's actually saved.
+    // syncPushSubscription re-saves it (healing a rotated endpoint) and reports enrollment,
+    // so the toggle can't show a false "on" when the server has no row for this device.
+    if (g === "ready" && user?.id) syncPushSubscription(user.id).then(setOn);
+    else setOn(false);
+  }, [user?.id]);
   useEffect(() => { setPrefs((profile?.push_prefs as Record<string, string>) || {}); }, [profile?.push_prefs]);
   if (gate === null) return null;
 
@@ -946,10 +953,21 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
     <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
       <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>🔔 Notifications</div>
       {gate === "install_ios" ? (
-        <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.55, marginTop: 6 }}>
-          To get notifications on iPhone, install Birdie Num Num to your Home Screen <b>from Safari</b>:
-          open the app in Safari, tap the <b>Share</b> icon (the square with an up-arrow), choose <b>Add to Home Screen</b>, then open BNN from that new icon and come back here to turn notifications on.
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Note: an icon added from Chrome or another browser won't receive notifications — it has to be added from Safari.</div>
+        <div style={{ marginTop: 6 }}>
+          <div style={{ background: "#2A1512", border: `1px solid ${C.birdie}`, borderRadius: 10, padding: "10px 11px" }}>
+            <div style={{ color: "#F0997B", fontSize: 12, fontWeight: 800, lineHeight: 1.4 }}>⚠️ iPhone: add to your Home Screen first, or notifications won&apos;t work</div>
+            <div style={{ color: "#E8C9C2", fontSize: 12, lineHeight: 1.5, marginTop: 6 }}>
+              Phone notifications only work when Birdie Num Num is installed to your Home Screen <b>from Safari</b> and opened from that icon. Opened in any browser — including Safari itself — your phone will not receive them.
+            </div>
+          </div>
+          <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.7, marginTop: 10 }}>
+            <div>1. Open Birdie Num Num in <b>Safari</b>.</div>
+            <div>2. Tap the <b>Share</b> icon (the square with an up-arrow).</div>
+            <div>3. Choose <b>Add to Home Screen</b>.</div>
+            <div>4. Open BNN from that new <b>Home-Screen icon</b>.</div>
+            <div>5. Come back here and tap <b>Turn on notifications</b>.</div>
+          </div>
+          <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>An icon added from Chrome or any other browser won&apos;t work — it must be added from Safari.</div>
         </div>
       ) : gate === "unsupported" ? (
         <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>This browser can't receive push notifications. Try Chrome on Android/desktop, or install to the Home Screen on iPhone via Safari.</div>

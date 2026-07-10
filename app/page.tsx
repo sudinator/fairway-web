@@ -6,6 +6,7 @@ import { C } from "@/lib/golf";
 import { Login, Shell } from "@/components/auth";
 import { saveLastSession, loadLastSession } from "@/lib/draft";
 import { Home } from "@/components/home";
+import { syncPushSubscription } from "@/lib/push";
 
 const supabase = createClient();
 
@@ -44,6 +45,15 @@ export default function Page() {
     });
     return () => { mounted = false; sub.subscription.unsubscribe(); };
   }, []);
+
+  // On app open, quietly re-save this device's push subscription if permission is already
+  // granted. Heals an iOS-rotated endpoint (the SW re-subscribes but can't persist it) without
+  // waiting for the user to revisit Settings. Skipped when offline or signed out.
+  useEffect(() => {
+    const uid = session?.user?.id;
+    if (!uid || session?.offline) return;
+    syncPushSubscription(uid).catch(() => {});
+  }, [session?.user?.id, session?.offline]);
 
   if (session === undefined) {
     return <Shell><div style={{ color: C.sage, textAlign: "center", paddingTop: 100 }}>Loading…</div></Shell>;

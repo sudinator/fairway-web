@@ -1512,3 +1512,13 @@ $$;
 
 grant execute on function public.post_group_rounds(uuid, int) to authenticated;
 ```
+
+### v1.111.3 — push: iPhone install warning + subscription hardening (NO migration)
+Client-only; deploy is unzip -> commit -> Vercel, no SQL to run.
+- manage.tsx: install_ios state now shows an explicit red warning + numbered Safari-install
+  steps; toggle on/off reflects real server enrollment via syncPushSubscription (not just the
+  browser subscription), so it can't show a false "on".
+- lib/push.ts: syncPushSubscription(userId) upserts the current browser subscription on open.
+- app/page.tsx: calls syncPushSubscription on app open for a logged-in (online) user.
+Reminder unrelated to this release but still pending from before: run migrations 0075, then
+0076 and 0077 (0076 before 0077), plus optional 0071 and recommended 0073.
