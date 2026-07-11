@@ -1835,3 +1835,11 @@ Debugger updated (reports nav rectBot vs innerH/vvH + AT BOTTOM verdict) and kep
 KNOWN FOLLOW-UP: sub-tab sticky headers (e.g. tournaments) used top:env(safe-area-inset-top) assuming
 window scroll; inside the new container they may sit slightly low — verify/adjust if needed. REMOVE
 nav-debug once Amit confirms the nav stays put.
+
+### v1.122.3 — fix group-scorecard sticky header for the new scroll model (NO migration)
+Client only. Follow-up to v1.122.2. The live game scorecard header (tournaments.tsx) used
+position:sticky; top:env(safe-area-inset-top) to clear the notch when the WINDOW scrolled. Now that
+content scrolls inside the flex-shell container (which already starts below the notch via the body's
+paddingTop), that offset double-counted the safe area and pinned the header a notch-height too low.
+Changed to top:0 so it pins to the scroll-area top (already notch-clear). Only sticky header that used a
+safe-area top offset; the other two (auth banner, install hint) already used top:0.

@@ -4078,7 +4078,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
             </>
           : <span style={{ color: "#E8730C", fontSize: 10 }}>● gets a stroke · corner = Stableford</span>}
       </div>
-      <div style={{ position: "sticky", top: "env(safe-area-inset-top)", zIndex: 5, background: C.green, paddingTop: 8, paddingBottom: 10, marginBottom: 4, boxShadow: "0 6px 10px -8px rgba(0,0,0,0.55)" }}>
+      <div style={{ position: "sticky", top: 0, zIndex: 5, background: C.green, paddingTop: 8, paddingBottom: 10, marginBottom: 4, boxShadow: "0 6px 10px -8px rgba(0,0,0,0.55)" }}>
         {(() => {
           const starts = players.map((p) => p.clock_start).filter(Boolean) as string[];
           if (!starts.length) return null;
