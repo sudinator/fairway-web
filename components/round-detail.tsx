@@ -29,7 +29,7 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
             {round.course}{round.tee_name ? ` · ${round.tee_name}` : ""}
           </div>
           <div style={{ color: C.sage, fontSize: 13 }}>
-            {fmtDate(round.played_at)} · {strokesOf(round)} ({toParStr(diffOf(round))})
+            {fmtDate(round.played_at)} · {strokesOf(round)}{!gross && played(round).length > 0 && played(round).length < 18 ? ` thru ${played(round).length}` : ""} ({toParStr(diffOf(round))})
             {gross ? ` · ${stablefordDisplay(round)} · total score only${round.course_handicap != null ? ` · CH ${round.course_handicap}` : ""}` : ` · ${stablefordDisplay(round)}${round.course_handicap != null ? ` · CH ${round.course_handicap}` : ""} · GIR ${fracPct(girStats([round]))} · FW ${fracPct(firStats([round]))} · ${puttsOf(round)} putts · ${pensOf(round)} pen`}
           </div>
         </div>
@@ -76,11 +76,17 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
               : ms.length <= 4 ? `holes ${ms.join(", ")}`
               : `${info.filled} holes`;
             return (
-              <div style={{ background: C.greenLight, borderRadius: 12, padding: "10px 12px", marginTop: 14, borderLeft: `3px solid ${C.gold}` }}>
-                <div style={{ color: C.cream, fontSize: 12.5, fontWeight: 700 }}>Partial round — counted for your handicap</div>
-                <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
-                  {info.played} holes scored · {where} counted as net par for the handicap differential{d != null ? ` (differential ${d.toFixed(1)})` : ""}. Under WHS a round of 9–17 holes still counts, with unplayed holes filled at net par.
+              <div style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 14, border: `1.5px solid ${C.gold}`, boxShadow: "0 0 0 3px rgba(201,162,39,0.12)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                  <span style={{ fontSize: 14 }}>⛳</span>
+                  <span style={{ color: "#F4E4B0", fontSize: 13, fontWeight: 800, letterSpacing: 0.3 }}>Partial round — counts toward your handicap</span>
                 </div>
+                <div style={{ color: "#CFE3D6", fontSize: 12, lineHeight: 1.55, marginTop: 6 }}>
+                  {info.played} holes scored · {where} counted as <b style={{ color: C.cream }}>net par</b>. Under WHS a 9–17-hole round still counts, with unplayed holes filled at net par.
+                </div>
+                {d != null && (
+                  <div style={{ display: "inline-block", marginTop: 9, background: C.gold, color: C.green, fontWeight: 800, fontSize: 12, borderRadius: 999, padding: "4px 11px" }}>Differential {d.toFixed(1)}</div>
+                )}
               </div>
             );
           })()}

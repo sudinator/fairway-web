@@ -34,6 +34,7 @@ export function RoundRow({ r, onOpen }: { r: Round; onOpen: (r: Round) => void }
       </div>
       <div style={{ textAlign: "right" }}>
         <span style={{ color: C.ink, fontSize: 20, fontWeight: 800, fontFamily: "Georgia, serif" }}>{strokesOf(r)}</span>
+        {!isGrossOnly(r) && played(r).length > 0 && played(r).length < 18 && <span style={{ color: C.faint, fontSize: 11, fontWeight: 700, marginLeft: 5 }}>thru {played(r).length}</span>}
         <span style={{ color: C.green, fontWeight: 700, marginLeft: 8 }}>{toParStr(diffOf(r))}</span>
       </div>
       <div style={{ background: C.cream, borderRadius: 8, padding: "4px 10px", color: C.green, fontWeight: 800, fontSize: 13 }}>{stablefordDisplay(r)}</div>

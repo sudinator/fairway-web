@@ -1646,3 +1646,10 @@ Client only. Deploy is unzip -> commit -> Vercel.
 One-time cleanup of existing orphans (safe — soft-delete, never touches finalized rounds):
   update rounds set deleted_at = now()
   where status = 'in_progress' and deleted_at is null;
+
+### v1.115.1 — partial-round banner prominence + "thru X holes" (NO migration)
+Client only. Refinements to partial-round display.
+- round-detail.tsx: partial-round handicap banner restyled (Option A) — full gold border +
+  gold glow, flag icon, gold "Differential N.N" chip. More prominent than the thin left rule.
+- round-detail.tsx header + rounds-list.tsx row: a partial hole-by-hole round now shows
+  "thru N" next to its score, so a 15-hole total never reads like a full 18.
