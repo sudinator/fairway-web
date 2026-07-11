@@ -1805,3 +1805,16 @@ Client only.
   and any ancestor with a containing-block property, with a Copy button. Nav tagged data-debug-nav.
   IF THE OWNER DOES NOT SEE THE GREEN PANEL, they are on a cached old build. REMOVE THIS COMPONENT +
   its import/render + the data-debug-nav attr once the nav bug is diagnosed.
+
+### v1.122.1 — fix: bottom nav drifts on mobile (visual-viewport pin) (NO migration)
+Client only. ROOT CAUSE (from the owner debug panel): on mobile window.innerHeight (layout viewport,
+e.g. 956) is much larger than visualViewport.height (visible, e.g. 638) with visualViewport.offsetTop>0.
+position:fixed anchors to the LAYOUT viewport, so bottom:0 sits on the taller phantom viewport and the
+bar drifts out of the visible area. ancestorsCB was NONE — this was never a transform/containing-block
+issue (so v1.121.1/.2 couldn't have fixed it). FIX: home.tsx pins the nav to the visual viewport — an
+effect listens to visualViewport resize/scroll (+ window scroll/resize) and sets
+nav.style.transform = translateY(-gap) where gap = innerHeight - (vv.height + vv.offsetTop). gap=0 on
+desktop (viewports match) so it's a no-op there. nav carries a ref. Debug panel updated to self-pin
+(translateY(offsetTop)) so it stays readable, and now reports gap(fix) + Δvis (rectBot vs vv.height) with
+a PINNED/off verdict. NOTE: nav-debug is still shipped (owner-only) to verify the fix — REMOVE once Amit
+confirms PINNED ✓ on his phone.

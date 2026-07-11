@@ -23,9 +23,10 @@ export function NavDebug({ show }: { show: boolean }) {
       } else {
         const r = nav.getBoundingClientRect();
         const cs = getComputedStyle(nav);
-        const dvp = Math.round(window.innerHeight - r.bottom);
-        L.push(`NAV ${cs.position} bottom:${cs.bottom}`);
-        L.push(`  rectTop:${Math.round(r.top)} rectBot:${Math.round(r.bottom)} Δvp:${dvp} ${Math.abs(dvp) <= 3 ? "STUCK ✓" : "MOVING ✗"}`);
+        const gap = Math.max(0, Math.round(window.innerHeight - ((vv?.height ?? window.innerHeight) + (vv?.offsetTop ?? 0))));
+        const dvis = Math.round((vv?.height ?? window.innerHeight) - r.bottom);
+        L.push(`NAV ${cs.position} bottom:${cs.bottom} gap(fix):${gap}`);
+        L.push(`  rectBot:${Math.round(r.bottom)} vvH:${Math.round(vv?.height ?? window.innerHeight)} Δvis:${dvis} ${Math.abs(dvis) <= 4 ? "PINNED ✓" : "off ✗"}`);
         if (cs.transform && cs.transform !== "none") L.push(`  NAV.transform:${cs.transform}`);
         if (cs.marginBottom !== "0px") L.push(`  NAV.marginBottom:${cs.marginBottom}`);
         const bad: string[] = [];
@@ -48,7 +49,10 @@ export function NavDebug({ show }: { show: boolean }) {
         L.push(`ancestorsCB: ${bad.length ? bad.join("  ") : "NONE"}`);
       }
       const self = document.querySelector("[data-debug-self]") as HTMLElement | null;
-      if (self) L.push(`panel rectTop:${Math.round(self.getBoundingClientRect().top)}`);
+      if (self) {
+        self.style.transform = vv && vv.offsetTop ? `translateY(${Math.round(vv.offsetTop)}px)` : "";
+        L.push(`panel rectTop:${Math.round(self.getBoundingClientRect().top)}`);
+      }
       setTxt(L.join("\n"));
     };
     sample();

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 import { C, titleCaseName, Round, Hole, allocateStrokes, dedupeHoles, TGC_GROUP_ID } from "@/lib/golf";
 import { computeBalances, aggregateOwed, fmtUSD } from "@/lib/money";
@@ -154,6 +154,39 @@ export function Home({ session }: { session: any }) {
 
   const user = session.user;
   const displayName = profile?.display_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "Golfer";
+
+  // Pin the bottom nav to the VISUAL viewport. On mobile, position:fixed anchors to the
+  // (taller) layout viewport, so when the URL bar / keyboard shrink the visible area the
+  // bar drifts out of view. Translate it up by the gap so it sits on the real bottom edge.
+  // No-op on desktop where the two viewports match (gap = 0).
+  const navRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    let raf = 0;
+    const fit = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const n = navRef.current;
+        if (!n) return;
+        const gap = Math.max(0, Math.round(window.innerHeight - (vv.height + vv.offsetTop)));
+        n.style.transform = gap ? `translateY(${-gap}px)` : "";
+      });
+    };
+    fit();
+    vv.addEventListener("resize", fit);
+    vv.addEventListener("scroll", fit);
+    window.addEventListener("scroll", fit, { passive: true });
+    window.addEventListener("resize", fit);
+    return () => {
+      cancelAnimationFrame(raf);
+      vv.removeEventListener("resize", fit);
+      vv.removeEventListener("scroll", fit);
+      window.removeEventListener("scroll", fit);
+      window.removeEventListener("resize", fit);
+    };
+  }, []);
+
   const index = profile?.handicap_index ?? null;
 
   const activateEmailInvites = useCallback(async () => {
@@ -618,7 +651,7 @@ export function Home({ session }: { session: any }) {
       </div>
       </PullToRefresh>
       {/* Bottom navigation bar (mobile-first). 4 primary destinations + More. */}
-      <nav data-debug-nav style={{
+      <nav ref={navRef} data-debug-nav style={{
         position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50,
         background: C.green, borderTop: `1px solid ${C.greenMid}`,
         display: "flex", justifyContent: "space-around", alignItems: "stretch",
