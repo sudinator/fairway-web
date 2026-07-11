@@ -1707,3 +1707,16 @@ Client only. Third dashboard-rework piece.
   defaults to the first goalOptions target. Synthesis rendered after the coach. Ball-striking
   stat row gated on `anyHoleDetail`; scores-only golfers see a one-line nudge instead. Synthesis
   and CompareCard self-hide when no stat has data.
+
+### v1.119.0 — dashboard stat-grid regroup + synthesis readability (NO migration)
+Client only. Final dashboard-rework piece.
+- dashboard.tsx: 17 loose stat cards regrouped under section headers — SCORING (Rounds, Avg vs
+  par, Best round, Avg differential, Stableford; always shown, works from scores) with a
+  collapsible "scoring by par 3·4·5"; BALL-STRIKING (Fairways, GIR); SHORT GAME & PUTTING
+  (Scrambling, Putts/hole) with a collapsible "more" (Sand saves, 3+ putts, Penalties). Par-type
+  cards moved out of ball-striking into the SCORING collapse (they're scoring, not ball-striking).
+  Ball-striking + short-game groups gated on anyHoleDetail; scores-only golfers see SCORING only
+  plus the nudge. Collapses via moreScoring / moreShort state. Every card still taps to its trend.
+- Hero: differentials-used list now hidden behind a "how?" toggle (showDiffs) to declutter the top.
+- compare-stats.tsx: ShotSynthesis sub-lines + caption changed from faint grey (low contrast on
+  green, and 9.5px under the 10px floor) to readable sage at 10.5px.

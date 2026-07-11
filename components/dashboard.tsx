@@ -148,6 +148,18 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   // Per-round value for each stat, for the click-to-expand drill-down.
   type StatKey = "rounds" | "avgpar" | "best" | "diff" | "par3" | "par4" | "par5" | "pts" | "gir" | "fir" | "scramble" | "sandsave" | "putts" | "threeputt" | "pen";
   const [detail, setDetail] = useState<StatKey | null>(null);
+  const [moreScoring, setMoreScoring] = useState(false);
+  const [moreShort, setMoreShort] = useState(false);
+  const [showDiffs, setShowDiffs] = useState(false);
+  const sectionHead = (label: string) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "18px 2px 8px" }}>
+      <span style={{ color: C.sage, fontSize: 10, letterSpacing: 2, fontWeight: 700 }}>{label}</span>
+      <span style={{ flex: 1, height: 1, background: C.line }} />
+    </div>
+  );
+  const moreBtn = (label: string, onClick: () => void) => (
+    <button onClick={onClick} style={{ marginTop: 10, width: "100%", background: "transparent", border: `1px dashed ${C.line}`, color: C.sage, borderRadius: 10, padding: "9px 0", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>{label}</button>
+  );
   const dirLower = new Set<StatKey>(["rounds", "avgpar", "best", "diff", "par3", "par4", "par5", "putts", "threeputt", "pen"]);
   const perRoundNum = (key: StatKey, r: Round): number | null => {
     const hs = played(r);
@@ -190,14 +202,16 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
           <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
             {hcp.index == null
               ? `Need at least 3 full 18-hole rounds (with rating & slope). You have ${hcp.total}.`
-              : `Best ${hcp.used} of your last ${Math.min(hcp.total, 20)} differentials · WHS method`}
+              : <>Best {hcp.used} of your last {Math.min(hcp.total, 20)} differentials · WHS{hcp.usedDiffs.length > 0 && (
+                  <span onClick={() => setShowDiffs((v) => !v)} style={{ color: C.gold, cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{showDiffs ? "hide" : "how?"}</span>
+                )}</>}
           </div>
           {idxDelta && Math.abs(idxDelta.delta) >= 0.1 && (
             <div style={{ color: idxDelta.delta < 0 ? "#8FE0B0" : "#FB7185", fontSize: 12, fontWeight: 700, marginTop: 6 }}>
               {idxDelta.delta < 0 ? "▼" : "▲"} {Math.abs(idxDelta.delta).toFixed(1)} since your first index ({idxDelta.first.toFixed(1)})
             </div>
           )}
-          {hcp.index != null && hcp.usedDiffs.length > 0 && (
+          {hcp.index != null && hcp.usedDiffs.length > 0 && showDiffs && (
             <div style={{ color: C.cream, fontSize: 12, marginTop: 6 }}>
               Differential{hcp.usedDiffs.length > 1 ? "s" : ""} used: <b>{hcp.usedDiffs.map((d) => d.toFixed(1)).join(", ")}</b>
               {hcp.adj !== 0 ? ` · adjustment ${hcp.adj > 0 ? "+" : ""}${hcp.adj.toFixed(1)}` : ""}
@@ -251,31 +265,49 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
         onSaved={onCoachSaved}
       />
       <ShotSynthesis fir={fir} gir={gir} puttsPerRound={puttsPerRound} scramble={scramble} index={hcp.index ?? currentIndex} goalHcp={effGoal} setGoalHcp={setGoalHcp} detailRounds={detailRounds} />
+      {sectionHead("SCORING")}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <Clk k="rounds" d={detail} set={setDetail}><StatCard label="Rounds" value={done.length} /></Clk>
         <Clk k="avgpar" d={detail} set={setDetail}><StatCard label="Avg vs par" value={avgDiff == null ? "—" : (avgDiff >= 0 ? "+" : "") + avgDiff.toFixed(1)} /></Clk>
         <Clk k="best" d={detail} set={setDetail}><StatCard label="Best round" value={best == null ? "—" : toParStr(best)} /></Clk>
         <Clk k="diff" d={detail} set={setDetail}><StatCard label="Avg differential" value={avgDifferential == null ? "—" : avgDifferential.toFixed(1)}
           sub={diffs.length ? `${diffs.length} full round${diffs.length === 1 ? "" : "s"} w/ rating·slope` : "needs 18 holes + rating/slope"} /></Clk>
-      </div>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
-        <Clk k="par3" d={detail} set={setDetail}><StatCard label="Avg on par 3s" value={byPar.par3 == null ? "—" : byPar.par3.toFixed(2)} sub={byPar.par3 == null ? "" : (byPar.par3 - 3 >= 0 ? "+" : "") + (byPar.par3 - 3).toFixed(2) + " vs par"} /></Clk>
-        <Clk k="par4" d={detail} set={setDetail}><StatCard label="Avg on par 4s" value={byPar.par4 == null ? "—" : byPar.par4.toFixed(2)} sub={byPar.par4 == null ? "" : (byPar.par4 - 4 >= 0 ? "+" : "") + (byPar.par4 - 4).toFixed(2) + " vs par"} /></Clk>
-        <Clk k="par5" d={detail} set={setDetail}><StatCard label="Avg on par 5s" value={byPar.par5 == null ? "—" : byPar.par5.toFixed(2)} sub={byPar.par5 == null ? "" : (byPar.par5 - 5 >= 0 ? "+" : "") + (byPar.par5 - 5).toFixed(2) + " vs par"} /></Clk>
         <Clk k="pts" d={detail} set={setDetail}><StatCard label="Stableford avg" value={avgPts == null ? "—" : avgPts.toFixed(1)} sub={anyEstimatedPts ? "includes estimates" : "full rounds"} /></Clk>
       </div>
+      {anyHoleDetail && (
+        moreScoring ? (
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+            <Clk k="par3" d={detail} set={setDetail}><StatCard label="Avg on par 3s" value={byPar.par3 == null ? "—" : byPar.par3.toFixed(2)} sub={byPar.par3 == null ? "" : (byPar.par3 - 3 >= 0 ? "+" : "") + (byPar.par3 - 3).toFixed(2) + " vs par"} /></Clk>
+            <Clk k="par4" d={detail} set={setDetail}><StatCard label="Avg on par 4s" value={byPar.par4 == null ? "—" : byPar.par4.toFixed(2)} sub={byPar.par4 == null ? "" : (byPar.par4 - 4 >= 0 ? "+" : "") + (byPar.par4 - 4).toFixed(2) + " vs par"} /></Clk>
+            <Clk k="par5" d={detail} set={setDetail}><StatCard label="Avg on par 5s" value={byPar.par5 == null ? "—" : byPar.par5.toFixed(2)} sub={byPar.par5 == null ? "" : (byPar.par5 - 5 >= 0 ? "+" : "") + (byPar.par5 - 5).toFixed(2) + " vs par"} /></Clk>
+            {moreBtn("– hide scoring by par", () => setMoreScoring(false))}
+          </div>
+        ) : moreBtn("＋ scoring by par (3 · 4 · 5)", () => setMoreScoring(true))
+      )}
+
       {anyHoleDetail ? (
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
-          <Clk k="gir" d={detail} set={setDetail}><StatCard label="GIR" value={fracPct(gir)} sub={gir.total ? "greens in regulation" : "needs putts"} /></Clk>
-          <Clk k="fir" d={detail} set={setDetail}><StatCard label="Fairways hit" value={fracPct(fir)} sub={fir.total ? "excludes par 3s" : "tap FW"} /></Clk>
-          <Clk k="scramble" d={detail} set={setDetail}><StatCard label="Scrambling" value={fracPct(scramble)} sub={scramble.total ? "par+ after missing green" : "needs putts"} /></Clk>
-          <Clk k="sandsave" d={detail} set={setDetail}><StatCard label="Sand saves" value={fracPct(sand)} sub={sand.total ? "par+ from greenside bunker" : "tap S in Sand/Pen"} /></Clk>
-          <Clk k="putts" d={detail} set={setDetail}><StatCard label="Putts / hole" value={avgPutts == null ? "—" : avgPutts.toFixed(2)} /></Clk>
-          <Clk k="threeputt" d={detail} set={setDetail}><StatCard label="3+ putts / round" value={threePutts == null ? "—" : threePutts.toFixed(1)} sub="three-putt holes" /></Clk>
-          <Clk k="pen" d={detail} set={setDetail}><StatCard label="Penalties" value={done.length ? (pens / done.length).toFixed(1) : "—"} sub="per round" /></Clk>
-        </div>
+        <>
+          {sectionHead("BALL-STRIKING")}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <Clk k="fir" d={detail} set={setDetail}><StatCard label="Fairways hit" value={fracPct(fir)} sub={fir.total ? "excludes par 3s" : "tap FW"} /></Clk>
+            <Clk k="gir" d={detail} set={setDetail}><StatCard label="GIR" value={fracPct(gir)} sub={gir.total ? "greens in regulation" : "needs putts"} /></Clk>
+          </div>
+          {sectionHead("SHORT GAME & PUTTING")}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <Clk k="scramble" d={detail} set={setDetail}><StatCard label="Scrambling" value={fracPct(scramble)} sub={scramble.total ? "par+ after missing green" : "needs putts"} /></Clk>
+            <Clk k="putts" d={detail} set={setDetail}><StatCard label="Putts / hole" value={avgPutts == null ? "—" : avgPutts.toFixed(2)} /></Clk>
+          </div>
+          {moreShort ? (
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+              <Clk k="sandsave" d={detail} set={setDetail}><StatCard label="Sand saves" value={fracPct(sand)} sub={sand.total ? "par+ from greenside bunker" : "tap S in Sand/Pen"} /></Clk>
+              <Clk k="threeputt" d={detail} set={setDetail}><StatCard label="3+ putts / round" value={threePutts == null ? "—" : threePutts.toFixed(1)} sub="three-putt holes" /></Clk>
+              <Clk k="pen" d={detail} set={setDetail}><StatCard label="Penalties" value={done.length ? (pens / done.length).toFixed(1) : "—"} sub="per round" /></Clk>
+              {moreBtn("– less", () => setMoreShort(false))}
+            </div>
+          ) : moreBtn("＋ more · sand saves · 3-putts · penalties", () => setMoreShort(true))}
+        </>
       ) : (
-        <div style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 10, color: C.sage, fontSize: 12, lineHeight: 1.5 }}>
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 14, color: C.sage, fontSize: 12, lineHeight: 1.5 }}>
           Track fairways, greens, and putts on a round to unlock shot-by-shot insight — GIR, putting, scrambling, and how you compare to your handicap’s peers. Log a hole-by-hole round to switch it on.
         </div>
       )}

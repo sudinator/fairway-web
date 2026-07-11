@@ -144,13 +144,13 @@ export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHc
                 <div style={{ position: "absolute", left: 0, top: 0, height: 9, width: `${r.score.toFixed(0)}%`, background: vcol, borderRadius: 5 }} />
                 <div style={{ position: "absolute", top: -2, left: "50%", width: 2, height: 13, background: "#fff", opacity: 0.75 }} />
               </div>
-              <div style={{ color: C.faint, fontSize: 10, marginTop: 4 }}>{goalTxt}</div>
+              <div style={{ color: C.sage, fontSize: 10.5, marginTop: 4 }}>{goalTxt}</div>
             </div>
           );
         })}
       </div>
 
-      <div style={{ color: C.faint, fontSize: 9.5, lineHeight: 1.4, marginTop: 12 }}>
+      <div style={{ color: C.sage, fontSize: 10.5, lineHeight: 1.45, marginTop: 12, opacity: 0.9 }}>
         Bars show you vs the typical range for your {Math.round(index)} index (white tick = peer average). Proxies from public amateur data (Arccos · Shot Scope · Break X) — approximate; scrambling needs ~15+ tracked rounds to read reliably.
       </div>
     </div>
