@@ -1793,3 +1793,15 @@ div's padding-bottom:96px still reserves space so content isn't hidden behind th
 NOTE: if the nav still drifts after loading THIS build, the cause is not CSS containing-block — most
 likely the installed PWA is still serving a cached older bundle (needs a hard update), or the trigger
 differs from a pull gesture and needs to be characterised.
+
+### v1.122.0 — chart tooltip restyle + TEMP nav debugger (NO migration)
+Client only.
+- Chart tooltip: replaced the old white `contentStyle` tooltip (background was C.card = #FFFDF6, i.e.
+  near-white, with recharts' default black text) on BOTH dashboard charts with a shared <ChartTip>
+  component — Option B: solid deep-green card, thin gold ring, gold label (course · player/date),
+  cream values, null series filtered out. One component, both charts (scoring-form + stat drill-down).
+- TEMP DIAGNOSTIC (components/nav-debug.tsx): owner-only (amitsud@gmail.com) fixed overlay reporting the
+  loaded build version, live nav computed position/rect + STUCK/MOVING verdict (Δ from viewport bottom),
+  and any ancestor with a containing-block property, with a Copy button. Nav tagged data-debug-nav.
+  IF THE OWNER DOES NOT SEE THE GREEN PANEL, they are on a cached old build. REMOVE THIS COMPONENT +
+  its import/render + the data-debug-nav attr once the nav bug is diagnosed.

@@ -28,6 +28,27 @@ function Clk<T extends string>({ k, d, set, children }: { k: T; d: T | null; set
 
 import { ShotSynthesis } from "@/components/compare-stats";
 import { goalOptions } from "@/lib/benchmarks";
+
+// Shared chart tooltip — solid deep-green card, thin gold ring, gold label (course ·
+// player/date), cream values. `nameMap` maps each series' dataKey to a display label;
+// `fmt` formats each value. Replaces the old white contentStyle tooltip on every chart.
+function ChartTip({ active, payload, nameMap, fmt }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const p0 = payload[0]?.payload || {};
+  const label = p0.course ? `${p0.course}${p0.name ? " · " + p0.name : ""}` : "";
+  const rows = payload.filter((e: any) => e.value != null);
+  return (
+    <div style={{ background: C.green, border: `1px solid ${C.gold}`, borderRadius: 10, padding: "9px 12px", boxShadow: "0 8px 22px -10px rgba(0,0,0,0.7)", minWidth: 132 }}>
+      {label && <div style={{ color: C.gold, fontWeight: 700, fontSize: 11.5, marginBottom: 6 }}>{label}</div>}
+      {rows.map((e: any, i: number) => (
+        <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "baseline" }}>
+          <span style={{ color: C.sage, fontSize: 11 }}>{(nameMap && nameMap[e.dataKey]) || e.name || e.dataKey}</span>
+          <span style={{ color: C.cream, fontWeight: 800, fontSize: 12 }}>{fmt ? fmt(e.value, e.dataKey) : (typeof e.value === "number" ? e.value.toFixed(1) : e.value)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userEmail, userId, savedCoach, onCoachSaved }: {
   rounds: Round[]; name: string; onOpen: (r: Round) => void;
   currentIndex: number | null; saveIndex: (i: number | null) => void;
@@ -275,10 +296,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
               <ComposedChart data={diffTrend} margin={{ top: 5, right: 6, left: -8, bottom: 0 }}>
                 <XAxis dataKey="i" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} />
                 <YAxis domain={diffFormDomain} allowDecimals={false} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
-                <Tooltip
-                  contentStyle={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12 }}
-                  formatter={(v: any, k: any) => [typeof v === "number" ? v.toFixed(1) : v, k === "diff" ? "Differential" : "5-rd avg"]}
-                  labelFormatter={(l: any, p: any) => (p && p[0] ? `${p[0].payload.course} · ${p[0].payload.name}` : l)} />
+                <Tooltip cursor={{ fill: "rgba(255,255,255,0.06)" }} content={<ChartTip nameMap={{ diff: "Differential", roll: "5-rd avg" }} fmt={(v: any) => (typeof v === "number" ? v.toFixed(1) : v)} />} />
                 {diffFormAvg != null && <ReferenceLine y={Math.round(diffFormAvg * 10) / 10} stroke={C.sage} strokeDasharray="3 4" />}
                 <Bar dataKey="diff" radius={[3, 3, 0, 0]} maxBarSize={26}>
                   {diffTrend.map((t, i) => <Cell key={i} fill={diffFormAvg != null && t.diff <= diffFormAvg ? "#4ADE80" : "#FB7185"} />)}
@@ -366,9 +384,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
                     <ComposedChart data={data} margin={{ top: 5, right: 6, left: -8, bottom: 0 }}>
                       <XAxis dataKey="i" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} />
                       <YAxis allowDecimals={!pctStat} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={30} domain={["auto", "auto"]} />
-                      <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12 }}
-                        formatter={(v: any, k: any) => [typeof v === "number" ? (pctStat ? Math.round(v) + "%" : v) : v, k === "val" ? detailLabels[key] : k === "roll5" ? "5-rd avg" : "10-rd avg"]}
-                        labelFormatter={(l: any, pl: any) => (pl && pl[0] ? `${pl[0].payload.course} · ${pl[0].payload.name}` : l)} />
+                      <Tooltip cursor={{ fill: "rgba(255,255,255,0.06)" }} content={<ChartTip nameMap={{ val: detailLabels[key], roll5: "5-rd avg", roll10: "10-rd avg" }} fmt={(v: any) => (typeof v === "number" ? (pctStat ? Math.round(v) + "%" : String(v)) : v)} />} />
                       <Bar dataKey="val" radius={[3, 3, 0, 0]} maxBarSize={26} fill="#BFD8C9" />
                       <Line type="monotone" dataKey="roll5" stroke={C.gold} strokeWidth={2.5} dot={false} connectNulls />
                       {series.length >= 10 && <Line type="monotone" dataKey="roll10" stroke="#4ADE80" strokeWidth={2.5} dot={false} connectNulls />}
