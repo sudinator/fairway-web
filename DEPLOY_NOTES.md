@@ -1843,3 +1843,8 @@ content scrolls inside the flex-shell container (which already starts below the 
 paddingTop), that offset double-counted the safe area and pinned the header a notch-height too low.
 Changed to top:0 so it pins to the scroll-area top (already notch-clear). Only sticky header that used a
 safe-area top offset; the other two (auth banner, install hint) already used top:0.
+
+### v1.122.4 — remove temporary nav debugger (NO migration)
+Client only. Bottom-nav drift confirmed fixed by the flex-shell (v1.122.2) + scorecard header fix
+(v1.122.3). Removed components/nav-debug.tsx and its import/render in home.tsx, and dropped the
+data-debug-nav attribute from the nav. No functional change.

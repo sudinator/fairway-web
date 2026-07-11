@@ -6,7 +6,6 @@ import { C, titleCaseName, Round, Hole, allocateStrokes, dedupeHoles, TGC_GROUP_
 import { computeBalances, aggregateOwed, fmtUSD } from "@/lib/money";
 import { logActivity } from "@/lib/activity";
 import { Toaster } from "@/components/toast";
-import { NavDebug } from "@/components/nav-debug";
 import { loadDraft, draftHasScores } from "@/lib/draft";
 import { loadActiveGame, saveAppBootCache, loadAppBootCache } from "@/lib/draft";
 import { btn, Wordmark, inputStyle } from "@/components/ui";
@@ -628,7 +627,7 @@ export function Home({ session }: { session: any }) {
       </div>
       {/* Bottom navigation bar — a normal flex child pinned at the bottom by layout (NOT
           position:fixed, which drifts in iOS home-screen PWAs). */}
-      <nav data-debug-nav style={{
+      <nav style={{
         flexShrink: 0, zIndex: 50,
         background: C.green, borderTop: `1px solid ${C.greenMid}`,
         display: "flex", justifyContent: "space-around", alignItems: "stretch",
@@ -700,7 +699,6 @@ export function Home({ session }: { session: any }) {
           </div>
         </>
       )}
-      <NavDebug show={(user.email || "").toLowerCase() === "amitsud@gmail.com"} />
     </div>
   );
 }
