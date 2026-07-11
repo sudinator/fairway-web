@@ -1653,3 +1653,11 @@ Client only. Refinements to partial-round display.
   gold glow, flag icon, gold "Differential N.N" chip. More prominent than the thin left rule.
 - round-detail.tsx header + rounds-list.tsx row: a partial hole-by-hole round now shows
   "thru N" next to its score, so a 15-hole total never reads like a full 18.
+
+### v1.115.2 — scorecard "thru N" + banner chip removed (NO migration)
+Client only.
+- ui.tsx ScoreViewCard: the OUT/IN/TOTAL summary now flags a partial round — the TOTAL box
+  shows a "THRU N" sublabel and a "Through N holes — not a full 18" caption, so a 15-hole 73
+  never reads as a full-18 73.
+- round-detail.tsx: removed the gold "Differential N.N" chip from the partial-round banner
+  (the differential already shows in the stats box directly below). Banner keeps its gold border.

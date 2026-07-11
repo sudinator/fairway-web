@@ -812,10 +812,13 @@ export function ScoreViewCard({ round }: { round: Round }) {
   const out = round.holes.slice(0, 9).reduce((s, h) => s + (h.strokes || 0), 0);
   const inn = round.holes.slice(9, 18).reduce((s, h) => s + (h.strokes || 0), 0);
   const has18 = round.holes.length > 9;
-  const summaryBox = (label: string, val: number, primary?: boolean) => (
+  const playedN = round.holes.filter((h) => h.strokes != null && h.strokes > 0).length;
+  const partial = playedN > 0 && playedN < 18;
+  const summaryBox = (label: string, val: number, primary?: boolean, sub?: string) => (
     <div style={{ background: primary ? C.gold : C.card, borderRadius: 10, padding: "8px 20px", textAlign: "center", minWidth: 70 }}>
       <div style={{ color: primary ? "#3B2A00" : C.faint, fontSize: 10, letterSpacing: 2, fontWeight: 700 }}>{label}</div>
       <div style={{ color: primary ? "#3B2A00" : C.ink, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{val || "–"}</div>
+      {sub ? <div style={{ color: primary ? "#3B2A00" : C.faint, fontSize: 9, letterSpacing: 1.5, fontWeight: 800, marginTop: 1 }}>{sub}</div> : null}
     </div>
   );
 
@@ -826,11 +829,14 @@ export function ScoreViewCard({ round }: { round: Round }) {
         {has18 && block(9, 18, "BACK NINE")}
       </div>
       {has18 && (out > 0 || inn > 0) && (
-        <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap", justifyContent: "center" }}>
-          {summaryBox("OUT", out)}
-          {summaryBox("IN", inn)}
-          {summaryBox("TOTAL", out + inn, true)}
-        </div>
+        <>
+          <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap", justifyContent: "center" }}>
+            {summaryBox("OUT", out)}
+            {summaryBox("IN", inn)}
+            {summaryBox("TOTAL", out + inn, true, partial ? `THRU ${playedN}` : undefined)}
+          </div>
+          {partial && <div style={{ textAlign: "center", color: C.gold, fontSize: 11, fontWeight: 700, marginTop: 6 }}>Through {playedN} holes — not a full 18</div>}
+        </>
       )}
     </div>
   );

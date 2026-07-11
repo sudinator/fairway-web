@@ -67,7 +67,6 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
           {(() => {
             const info = partialHandicapInfo(round);
             if (!info) return null;
-            const d = roundDifferential(round);
             const ms = info.missing;
             const contiguous = ms.length > 1 && ms.every((v, i) => i === 0 || v === ms[i - 1] + 1);
             const where = ms.length === 0 ? `${info.filled} holes`
@@ -84,9 +83,6 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
                 <div style={{ color: "#CFE3D6", fontSize: 12, lineHeight: 1.55, marginTop: 6 }}>
                   {info.played} holes scored · {where} counted as <b style={{ color: C.cream }}>net par</b>. Under WHS a 9–17-hole round still counts, with unplayed holes filled at net par.
                 </div>
-                {d != null && (
-                  <div style={{ display: "inline-block", marginTop: 9, background: C.gold, color: C.green, fontWeight: 800, fontSize: 12, borderRadius: 999, padding: "4px 11px" }}>Differential {d.toFixed(1)}</div>
-                )}
               </div>
             );
           })()}
