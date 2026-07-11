@@ -1720,3 +1720,24 @@ Client only. Final dashboard-rework piece.
 - Hero: differentials-used list now hidden behind a "how?" toggle (showDiffs) to declutter the top.
 - compare-stats.tsx: ShotSynthesis sub-lines + caption changed from faint grey (low contrast on
   green, and 9.5px under the 10px floor) to readable sage at 10.5px.
+
+### v1.119.1 — compact Hole Outcomes (NO migration)
+Client only. Replaced the Hole Outcomes donut + 5-row legend with a single horizontal stacked bar
+(one strip = the round's composition), a compact wrapping legend (name · count · %), and a plain
+cumulative takeaway "Par or better: X% · Doubles+: Y%" (clearer than the old double-negative). Same
+categories/colors; ~⅓ the height. recharts PieChart/Pie imports removed (Cell still used elsewhere).
+
+### v1.120.0 — dashboard reorder + How-you-compare restyle + hero layout (NO migration)
+Client only.
+- dashboard.tsx: section order is now Hero → time-window toggle → SCORING FORM chart → AI coach →
+  scoring stat groups → stat drill-down → gaining/losing (synthesis) → how you compare → hole
+  outcomes → recent rounds. (Toggle sits at top so it governs all windowed content incl. the
+  scoring-form chart.)
+- Hero: index number + Use-as-my-handicap button now float to the right; the eyebrow/WHS/delta text
+  wraps around them, so the box is far more compact. "In use" chip shortened.
+- compare-stats.tsx: extracted a shared CatBar row (name + verdict chip + 0–100 band-relative bar
+  with peer tick + sub-line). Both ShotSynthesis and CompareCard now render through it, so "How you
+  compare" matches "Where you're gaining & losing shots" — gold uppercase eyebrow, dark-green card,
+  cream/sage text (dropped the serif title + light cream panels). CompareCard's sub-line is the
+  detailed insight sentence; synthesis's is the goal delta. Removed the old Track/band + light-panel
+  rendering.

@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  ReferenceLine, BarChart, Bar, Cell, ComposedChart, PieChart, Pie, Legend,
+  ReferenceLine, BarChart, Bar, Cell, ComposedChart, Legend,
 } from "recharts";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
@@ -196,45 +196,43 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
           </div>
         </div>
       )}
-      <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginBottom: 12, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-        <div>
-          <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 700 }}>RUNNING HANDICAP INDEX</div>
-          <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
-            {hcp.index == null
-              ? `Need at least 3 full 18-hole rounds (with rating & slope). You have ${hcp.total}.`
-              : <>Best {hcp.used} of your last {Math.min(hcp.total, 20)} differentials · WHS{hcp.usedDiffs.length > 0 && (
-                  <span onClick={() => setShowDiffs((v) => !v)} style={{ color: C.gold, cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{showDiffs ? "hide" : "how?"}</span>
-                )}</>}
-          </div>
-          {idxDelta && Math.abs(idxDelta.delta) >= 0.1 && (
-            <div style={{ color: idxDelta.delta < 0 ? "#8FE0B0" : "#FB7185", fontSize: 12, fontWeight: 700, marginTop: 6 }}>
-              {idxDelta.delta < 0 ? "▼" : "▲"} {Math.abs(idxDelta.delta).toFixed(1)} since your first index ({idxDelta.first.toFixed(1)})
-            </div>
-          )}
-          {hcp.index != null && hcp.usedDiffs.length > 0 && showDiffs && (
-            <div style={{ color: C.cream, fontSize: 12, marginTop: 6 }}>
-              Differential{hcp.usedDiffs.length > 1 ? "s" : ""} used: <b>{hcp.usedDiffs.map((d) => d.toFixed(1)).join(", ")}</b>
-              {hcp.adj !== 0 ? ` · adjustment ${hcp.adj > 0 ? "+" : ""}${hcp.adj.toFixed(1)}` : ""}
-              <span style={{ color: C.sage }}> (of {hcp.allDiffs.map((d) => d.toFixed(1)).join(", ")})</span>
-            </div>
-          )}
-        </div>
-        <div style={{ flex: 1 }} />
-        <div style={{ textAlign: "right" }}>
-          <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 44, fontWeight: 800 }}>
+      <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginBottom: 12 }}>
+        <div style={{ float: "right", textAlign: "right", marginLeft: 16, marginBottom: 6 }}>
+          <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 44, fontWeight: 800, lineHeight: 1 }}>
             {hcp.index == null ? "—" : hcp.index.toFixed(1)}
           </div>
           {hcp.index != null && (
             currentIndex === hcp.index ? (
-              <div style={{ display: "inline-block", marginTop: 5, border: `1px solid ${C.gold}`, color: C.gold, fontSize: 11, fontWeight: 700, borderRadius: 8, padding: "5px 10px" }}>✓ In use as your handicap</div>
+              <div style={{ display: "inline-block", marginTop: 6, border: `1px solid ${C.gold}`, color: C.gold, fontSize: 11, fontWeight: 700, borderRadius: 8, padding: "5px 10px" }}>✓ In use</div>
             ) : (
-              <button style={{ ...btn(true), padding: "6px 12px", fontSize: 12, marginTop: 4 }}
+              <button style={{ ...btn(true), padding: "6px 12px", fontSize: 12, marginTop: 6 }}
                 onClick={() => saveIndex(hcp.index)}>
                 Use as my handicap
               </button>
             )
           )}
         </div>
+        <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 700 }}>RUNNING HANDICAP INDEX</div>
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
+          {hcp.index == null
+            ? `Need at least 3 full 18-hole rounds (with rating & slope). You have ${hcp.total}.`
+            : <>Best {hcp.used} of your last {Math.min(hcp.total, 20)} differentials · WHS{hcp.usedDiffs.length > 0 && (
+                <span onClick={() => setShowDiffs((v) => !v)} style={{ color: C.gold, cursor: "pointer", marginLeft: 6, fontWeight: 700 }}>{showDiffs ? "hide" : "how?"}</span>
+              )}</>}
+        </div>
+        {idxDelta && Math.abs(idxDelta.delta) >= 0.1 && (
+          <div style={{ color: idxDelta.delta < 0 ? "#8FE0B0" : "#FB7185", fontSize: 12, fontWeight: 700, marginTop: 6 }}>
+            {idxDelta.delta < 0 ? "▼" : "▲"} {Math.abs(idxDelta.delta).toFixed(1)} since your first index ({idxDelta.first.toFixed(1)})
+          </div>
+        )}
+        {hcp.index != null && hcp.usedDiffs.length > 0 && showDiffs && (
+          <div style={{ color: C.cream, fontSize: 12, marginTop: 6 }}>
+            Differential{hcp.usedDiffs.length > 1 ? "s" : ""} used: <b>{hcp.usedDiffs.map((d) => d.toFixed(1)).join(", ")}</b>
+            {hcp.adj !== 0 ? ` · adjustment ${hcp.adj > 0 ? "+" : ""}${hcp.adj.toFixed(1)}` : ""}
+            <span style={{ color: C.sage }}> (of {hcp.allDiffs.map((d) => d.toFixed(1)).join(", ")})</span>
+          </div>
+        )}
+        <div style={{ clear: "both" }} />
       </div>
       {allDone.length > 0 && (
         <div style={{ marginBottom: 12 }}>
@@ -256,6 +254,44 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
           </div>
         </div>
       )}
+
+      {diffTrend.length >= 2 && (
+        <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 16 }}>
+          <Eyebrow>SCORING FORM · DIFFERENTIAL</Eyebrow>
+          {last5Avg != null && (
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 8 }}>
+              <div style={{ fontFamily: "Georgia, serif", fontSize: 28, fontWeight: 800, color: C.cream, lineHeight: 1 }}>{last5Avg.toFixed(1)}</div>
+              <div style={{ color: C.sage, fontSize: 12 }}>last {last5.length}-round avg differential</div>
+              {formDelta != null && Math.abs(formDelta) >= 0.1 && (
+                <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, padding: "4px 10px", borderRadius: 999, background: formDelta > 0 ? "#143a2b" : "#3a1717", color: formDelta > 0 ? "#9be9c0" : "#f3a3a0" }}>
+                  {formDelta > 0 ? "▼" : "▲"} {Math.abs(formDelta).toFixed(1)} vs your start
+                </div>
+              )}
+            </div>
+          )}
+          <div style={{ height: 200, marginTop: 12 }}>
+            <ResponsiveContainer>
+              <ComposedChart data={diffTrend} margin={{ top: 5, right: 6, left: -8, bottom: 0 }}>
+                <XAxis dataKey="i" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} />
+                <YAxis domain={diffFormDomain} allowDecimals={false} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
+                <Tooltip
+                  contentStyle={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12 }}
+                  formatter={(v: any, k: any) => [typeof v === "number" ? v.toFixed(1) : v, k === "diff" ? "Differential" : "5-rd avg"]}
+                  labelFormatter={(l: any, p: any) => (p && p[0] ? `${p[0].payload.course} · ${p[0].payload.name}` : l)} />
+                {diffFormAvg != null && <ReferenceLine y={Math.round(diffFormAvg * 10) / 10} stroke={C.sage} strokeDasharray="3 4" />}
+                <Bar dataKey="diff" radius={[3, 3, 0, 0]} maxBarSize={26}>
+                  {diffTrend.map((t, i) => <Cell key={i} fill={diffFormAvg != null && t.diff <= diffFormAvg ? "#4ADE80" : "#FB7185"} />)}
+                </Bar>
+                <Line type="monotone" dataKey="roll" stroke={C.cream} strokeWidth={2.5} dot={{ fill: C.cream, r: 3 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
+            Each bar is one round’s differential (course-adjusted, lower is better). <span style={{ color: "#9be9c0" }}>Green</span> beat your average{diffFormAvg != null ? ` (${diffFormAvg.toFixed(1)})` : ""}, <span style={{ color: "#f3a3a0" }}>red</span> didn’t. The cream line is your 5-round rolling average.{unratedTrend > 0 ? ` ${unratedTrend} round${unratedTrend === 1 ? "" : "s"} not shown (need 18 holes + rating/slope).` : ""}
+          </div>
+        </div>
+      )}
+
       <DashboardCoach
         aggregate={coachAggregate}
         roundsUsed={done.length}
@@ -264,7 +300,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
         saved={savedCoach}
         onSaved={onCoachSaved}
       />
-      <ShotSynthesis fir={fir} gir={gir} puttsPerRound={puttsPerRound} scramble={scramble} index={hcp.index ?? currentIndex} goalHcp={effGoal} setGoalHcp={setGoalHcp} detailRounds={detailRounds} />
+
       {sectionHead("SCORING")}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <Clk k="rounds" d={detail} set={setDetail}><StatCard label="Rounds" value={done.length} /></Clk>
@@ -312,8 +348,6 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
         </div>
       )}
 
-      <CompareCard fir={fir} gir={gir} puttsPerRound={puttsPerRound} scramble={scramble} index={hcp.index ?? currentIndex} goalHcp={effGoal} />
-
       {detail && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>
           <div style={{ display: "flex", alignItems: "center" }}>
@@ -353,78 +387,39 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
         </div>
       )}
 
-      {diffTrend.length >= 2 && (
-        <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 16 }}>
-          <Eyebrow>SCORING FORM · DIFFERENTIAL</Eyebrow>
-          {last5Avg != null && (
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 8 }}>
-              <div style={{ fontFamily: "Georgia, serif", fontSize: 28, fontWeight: 800, color: C.cream, lineHeight: 1 }}>{last5Avg.toFixed(1)}</div>
-              <div style={{ color: C.sage, fontSize: 12 }}>last {last5.length}-round avg differential</div>
-              {formDelta != null && Math.abs(formDelta) >= 0.1 && (
-                <div style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, padding: "4px 10px", borderRadius: 999, background: formDelta > 0 ? "#143a2b" : "#3a1717", color: formDelta > 0 ? "#9be9c0" : "#f3a3a0" }}>
-                  {formDelta > 0 ? "▼" : "▲"} {Math.abs(formDelta).toFixed(1)} vs your start
-                </div>
-              )}
-            </div>
-          )}
-          <div style={{ height: 200, marginTop: 12 }}>
-            <ResponsiveContainer>
-              <ComposedChart data={diffTrend} margin={{ top: 5, right: 6, left: -8, bottom: 0 }}>
-                <XAxis dataKey="i" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} />
-                <YAxis domain={diffFormDomain} allowDecimals={false} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
-                <Tooltip
-                  contentStyle={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12 }}
-                  formatter={(v: any, k: any) => [typeof v === "number" ? v.toFixed(1) : v, k === "diff" ? "Differential" : "5-rd avg"]}
-                  labelFormatter={(l: any, p: any) => (p && p[0] ? `${p[0].payload.course} · ${p[0].payload.name}` : l)} />
-                {diffFormAvg != null && <ReferenceLine y={Math.round(diffFormAvg * 10) / 10} stroke={C.sage} strokeDasharray="3 4" />}
-                <Bar dataKey="diff" radius={[3, 3, 0, 0]} maxBarSize={26}>
-                  {diffTrend.map((t, i) => <Cell key={i} fill={diffFormAvg != null && t.diff <= diffFormAvg ? "#4ADE80" : "#FB7185"} />)}
-                </Bar>
-                <Line type="monotone" dataKey="roll" stroke={C.cream} strokeWidth={2.5} dot={{ fill: C.cream, r: 3 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-          <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
-            Each bar is one round’s differential (course-adjusted, lower is better). <span style={{ color: "#9be9c0" }}>Green</span> beat your average{diffFormAvg != null ? ` (${diffFormAvg.toFixed(1)})` : ""}, <span style={{ color: "#f3a3a0" }}>red</span> didn’t. The cream line is your 5-round rolling average.{unratedTrend > 0 ? ` ${unratedTrend} round${unratedTrend === 1 ? "" : "s"} not shown (need 18 holes + rating/slope).` : ""}
-          </div>
-        </div>
-      )}
+      <ShotSynthesis fir={fir} gir={gir} puttsPerRound={puttsPerRound} scramble={scramble} index={hcp.index ?? currentIndex} goalHcp={effGoal} setGoalHcp={setGoalHcp} detailRounds={detailRounds} />
+
+      <CompareCard fir={fir} gir={gir} puttsPerRound={puttsPerRound} scramble={scramble} index={hcp.index ?? currentIndex} goalHcp={effGoal} />
 
       {allHoles.length > 0 && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 16 }}>
-          <Eyebrow>HOLE OUTCOMES · {allHoles.length} HOLES</Eyebrow>
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 16, marginTop: 10 }}>
-            <div style={{ width: 200, height: 200, position: "relative" }}>
-              <ResponsiveContainer>
-                <PieChart>
-                  <Pie data={distData} dataKey="v" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={88} paddingAngle={2} stroke="none">
-                    {distData.map((d, i) => <Cell key={i} fill={d.c} />)}
-                  </Pie>
-                  <Tooltip contentStyle={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12 }}
-                    formatter={(v: any, n: any) => [`${v} holes (${distTotal ? Math.round(100 * v / distTotal) : 0}%)`, n]} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
-                <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 32, fontWeight: 800, lineHeight: 1 }}>{distTotal}</div>
-                <div style={{ color: C.sage, fontSize: 10, letterSpacing: 1 }}>HOLES</div>
-              </div>
-            </div>
-            <div style={{ flex: 1, minWidth: 180 }}>
-              {distData.map((d, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" }}>
-                  <span style={{ width: 12, height: 12, borderRadius: 3, background: d.c, display: "inline-block" }} />
-                  <span style={{ color: C.cream, fontSize: 13, flex: 1 }}>{d.name}</span>
-                  <span style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>{d.v}</span>
-                  <span style={{ color: C.sage, fontSize: 12, width: 44, textAlign: "right" }}>{distTotal ? Math.round(100 * d.v / distTotal) : 0}%</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <Eyebrow>HOLE OUTCOMES</Eyebrow>
+            <span style={{ color: C.sage, fontSize: 11 }}>{distTotal} holes · {done.length} round{done.length === 1 ? "" : "s"}</span>
+          </div>
+          <div style={{ display: "flex", height: 26, borderRadius: 7, overflow: "hidden", marginTop: 12 }}>
+            {distData.filter((d) => d.v > 0).map((d, i) => {
+              const p = distTotal ? (100 * d.v) / distTotal : 0;
+              return (
+                <div key={i} title={`${d.name}: ${d.v} (${Math.round(p)}%)`}
+                  style={{ width: `${p}%`, background: d.c, display: "flex", alignItems: "center", justifyContent: "center", color: "#0E3B2E", fontSize: 11, fontWeight: 800 }}>
+                  {p >= 8 ? `${Math.round(p)}%` : ""}
                 </div>
-              ))}
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0 0", marginTop: 4, borderTop: `1px solid ${C.greenMid}` }}>
-                <span style={{ width: 12 }} />
-                <span style={{ color: C.gold, fontSize: 13, flex: 1, fontWeight: 700 }}>Total holes</span>
-                <span style={{ color: C.gold, fontWeight: 800, fontSize: 13 }}>{distTotal}</span>
-                <span style={{ width: 44 }} />
-              </div>
-            </div>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "9px 14px", marginTop: 11 }}>
+            {distData.map((d, i) => (
+              <span key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: C.cream }}>
+                <span style={{ width: 11, height: 11, borderRadius: 3, background: d.c, display: "inline-block" }} />
+                {d.name} <b style={{ fontWeight: 800 }}>{d.v}</b> <span style={{ color: C.sage }}>{distTotal ? Math.round(100 * d.v / distTotal) : 0}%</span>
+              </span>
+            ))}
+          </div>
+          <div style={{ color: C.cream, fontSize: 12, marginTop: 12 }}>
+            Par or better: <b style={{ color: "#7FE3A3" }}>{distTotal ? Math.round(100 * (buckets.eagle + buckets.birdie + buckets.par) / distTotal) : 0}%</b>
+            <span style={{ color: C.sage }}> · </span>
+            Doubles+: <b style={{ color: "#FB7185" }}>{distTotal ? Math.round(100 * buckets.double / distTotal) : 0}%</b>
           </div>
         </div>
       )}
