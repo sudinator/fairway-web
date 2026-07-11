@@ -1781,3 +1781,15 @@ release. Switched the pull animation to `margin-top` (visually identical, but cr
 block), so the nav — and every fixed modal/sheet that lives inside PullToRefresh — stays viewport-fixed
 during a pull. Root cause predates the recent dashboard work; the wrapper was added with the June PWA
 pull-to-refresh feature.
+
+### v1.121.2 — belt-and-suspenders: nav moved fully outside PullToRefresh (NO migration)
+Client only. Follow-up to v1.121.1. Investigation confirmed the pull-to-refresh transform was the ONLY
+containing-block property anywhere on an ancestor of the fixed bottom <nav> (no persistent transform/
+filter/contain/backdrop-filter exists in the shell, layout, or globals — there are no CSS files; all
+styling is inline). In addition to switching the pull animation to margin-top (1.121.1), the <nav> and
+the "More" sheet are now spliced OUT of the PullToRefresh subtree in home.tsx (they render as siblings
+after </PullToRefresh>), so nothing inside PullToRefresh can ever re-anchor them again. The content
+div's padding-bottom:96px still reserves space so content isn't hidden behind the fixed nav.
+NOTE: if the nav still drifts after loading THIS build, the cause is not CSS containing-block — most
+likely the installed PWA is still serving a cached older bundle (needs a hard update), or the trigger
+differs from a pull gesture and needs to be characterised.

@@ -614,7 +614,8 @@ export function Home({ session }: { session: any }) {
           <RoundsList rounds={rounds} onOpen={setViewing} />
         )}
       </div>
-
+      </div>
+      </PullToRefresh>
       {/* Bottom navigation bar (mobile-first). 4 primary destinations + More. */}
       <nav style={{
         position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50,
@@ -688,8 +689,6 @@ export function Home({ session }: { session: any }) {
           </div>
         </>
       )}
-      </div>
-      </PullToRefresh>
     </>
   );
 }
