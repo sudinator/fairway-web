@@ -1,10 +1,31 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { C } from "@/lib/golf";
 import { BENCH_DIR, BENCH_LABEL, bandFor, goalOptions, type StatKey, type Band } from "@/lib/benchmarks";
 
 const clampPct = (v: number) => Math.max(0, Math.min(100, v));
 const fmtVal = (key: StatKey, v: number) => (key === "putts" ? (Math.round(v * 10) / 10).toFixed(1) : Math.round(v) + "%");
+
+// Plain-English explainer shown when a category row is tapped: how the number is
+// computed, and what it points you toward practising.
+const CAT_DESC: Record<StatKey, { measured: string; work: string }> = {
+  fir: {
+    measured: "The share of your par-4 and par-5 tee shots that find the fairway. Par-3s don't count, and both left and right misses count as a miss.",
+    work: "If this is low, the tee shot is costing you position. Favour a club you can keep in play over maximum distance, pick a specific aim point, and focus on shrinking the big miss rather than hitting it dead straight.",
+  },
+  gir: {
+    measured: "How often you reach the green with two strokes to spare versus par — e.g. on the green in two on a par 4. It's mostly a read on your approach shot.",
+    work: "If this is low, look at approach distance control — are you consistently short or long? It's also often a knock-on from missing fairways, so check Off the tee first: recovering from the rough drags this down.",
+  },
+  scramble: {
+    measured: "On the holes where you missed the green, how often you still made par or better — 'getting up and down.' It combines the greenside shot (chip, pitch, or bunker) with the putt to save par.",
+    work: "Compare it with Putting. If your putting is fine but this is low, the greenside shots are the issue — work on distance control on chips and pitches, plus bunker technique. If both are low, fix putting first and this rises with it. Sand saves (under More) isolates bunkers specifically.",
+  },
+  putts: {
+    measured: "Your average number of putts per round.",
+    work: "Two levers move this: lag putting (distance control on long putts so you avoid three-putts) and converting the short ones. Check 3-putts per round (under More) — if that's high, the leak is distance control on the first putt, not the short ones.",
+  },
+};
 
 // ---- Shared category-bar language (used by BOTH cards) --------------------
 // Band-relative 0–100 score: 50 = the peer average for your handicap; +/- moves
@@ -21,26 +42,43 @@ function catVerdict(score: number): [string, string] {
 const synGoalLabel = (g: number) => (g === 0 ? "scratch" : `${g} hcp`);
 
 // One row: name + verdict chip, a 0–100 bar (fill = score, coloured by verdict,
-// white tick = peer average at 50), and a sub-line. Shared so the synthesis and
-// How-you-compare are visually identical.
-function CatBar({ name, score, sub }: { name: string; score: number; sub: React.ReactNode }) {
+// white tick = peer average at 50), and a sub-line. Tapping the row expands a
+// plain-English "how it's measured / what to work on" panel.
+function CatBar({ name, score, sub, statKey, open, onToggle }: {
+  name: string; score: number; sub: React.ReactNode;
+  statKey?: StatKey; open?: boolean; onToggle?: () => void;
+}) {
   const [vlabel, vcol] = catVerdict(score);
+  const desc = statKey ? CAT_DESC[statKey] : undefined;
+  const clickable = !!desc && !!onToggle;
   return (
     <div style={{ marginTop: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-        <span style={{ color: C.cream, fontSize: 12.5, fontWeight: 600 }}>{name}</span>
-        <span style={{ color: vcol, fontSize: 10.5, fontWeight: 700 }}>{vlabel}</span>
+      <div onClick={clickable ? onToggle : undefined} style={{ cursor: clickable ? "pointer" : "default" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <span style={{ color: C.cream, fontSize: 12.5, fontWeight: 600 }}>
+            {name}
+            {clickable && <span style={{ color: C.gold, fontSize: 11, marginLeft: 6, fontWeight: 700 }}>{open ? "▲" : "ⓘ"}</span>}
+          </span>
+          <span style={{ color: vcol, fontSize: 10.5, fontWeight: 700 }}>{vlabel}</span>
+        </div>
+        <div style={{ position: "relative", height: 9, background: C.green, borderRadius: 5 }}>
+          <div style={{ position: "absolute", left: 0, top: 0, height: 9, width: `${Math.round(score)}%`, background: vcol, borderRadius: 5 }} />
+          <div style={{ position: "absolute", top: -2, left: "50%", width: 2, height: 13, background: "#fff", opacity: 0.75 }} />
+        </div>
+        <div style={{ color: C.sage, fontSize: 10.5, marginTop: 4, lineHeight: 1.45 }}>{sub}</div>
       </div>
-      <div style={{ position: "relative", height: 9, background: C.green, borderRadius: 5 }}>
-        <div style={{ position: "absolute", left: 0, top: 0, height: 9, width: `${Math.round(score)}%`, background: vcol, borderRadius: 5 }} />
-        <div style={{ position: "absolute", top: -2, left: "50%", width: 2, height: 13, background: "#fff", opacity: 0.75 }} />
-      </div>
-      <div style={{ color: C.sage, fontSize: 10.5, marginTop: 4, lineHeight: 1.45 }}>{sub}</div>
+      {open && desc && (
+        <div style={{ background: C.green, borderRadius: 10, padding: "11px 13px", marginTop: 8 }}>
+          <div style={{ color: C.gold, fontSize: 10, letterSpacing: 1.5, fontWeight: 700 }}>HOW IT'S MEASURED</div>
+          <div style={{ color: C.cream, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>{desc.measured}</div>
+          <div style={{ color: C.gold, fontSize: 10, letterSpacing: 1.5, fontWeight: 700, marginTop: 11 }}>WHAT TO WORK ON</div>
+          <div style={{ color: C.cream, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>{desc.work}</div>
+        </div>
+      )}
     </div>
   );
 }
 
-// Detailed sentence for How-you-compare (references your range + the goal level).
 // ---- Gaining / losing shots (summary + biggest opportunity) ---------------
 export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHcp, setGoalHcp, detailRounds }: {
   fir: { hit: number; total: number };
@@ -52,6 +90,7 @@ export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHc
   setGoalHcp: (h: number | null) => void;
   detailRounds: number;
 }) {
+  const [openCat, setOpenCat] = useState<StatKey | null>(null);
   if (index == null) return null;
   const goals = goalOptions(index);
   const you = bandFor(index);
@@ -101,12 +140,13 @@ export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHc
           : <>Your <b style={{ color: "#F4E4B0" }}>{top.cat.toLowerCase()}</b> has the most room vs your handicap’s peers right now.</>}
       </div>
 
-      <div style={{ marginTop: 4 }}>
+      <div style={{ color: C.gold, fontSize: 10.5, marginTop: 12, opacity: 0.85 }}>Tap a category for how it's measured &amp; what to work on ⓘ</div>
+      <div style={{ marginTop: 2 }}>
         {rows.map((r) => {
           const goalTxt = goalBands
             ? (r.gap > 0.02 ? `you ${fmtVal(r.key, r.value)} → ${synGoalLabel(goalHcp as number)} avg ${fmtVal(r.key, goalBands[r.key].avg)}` : `you ${fmtVal(r.key, r.value)} · already ${synGoalLabel(goalHcp as number)}-level`)
             : `you ${fmtVal(r.key, r.value)} · peer avg ${fmtVal(r.key, you[r.key].avg)}`;
-          return <CatBar key={r.key} name={r.cat} score={r.score} sub={goalTxt} />;
+          return <CatBar key={r.key} name={r.cat} score={r.score} sub={goalTxt} statKey={r.key} open={openCat === r.key} onToggle={() => setOpenCat((o) => (o === r.key ? null : r.key))} />;
         })}
       </div>
 

@@ -84,8 +84,8 @@ export function PullToRefresh({ onRefresh, children }: {
         )}
       </div>
       <div style={{
-        transform: show ? `translateY(${refreshing ? THRESHOLD : pull}px)` : "none",
-        transition: active.current ? "none" : "transform 0.2s ease",
+        marginTop: show ? `${refreshing ? THRESHOLD : pull}px` : 0,
+        transition: active.current ? "none" : "margin-top 0.2s ease",
       }}>
         {children}
       </div>

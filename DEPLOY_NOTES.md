@@ -1762,3 +1762,22 @@ Client only.
   as "Where you're gaining & losing shots". Deleted CompareCard + its insight() helper from
   compare-stats.tsx and the import/usage from dashboard.tsx. The synthesis tile is now the single
   peer/goal card.
+
+### v1.121.0 — tappable category explainers in the synthesis tile (NO migration)
+Client only. compare-stats.tsx: each category row in "Where you're gaining & losing shots" (Off the
+tee / Approach / Short game / Putting) is now tappable — an ⓘ marks it, and tapping expands a
+"How it's measured / What to work on" panel beneath that row (one open at a time). Content lives in a
+CAT_DESC record keyed by StatKey; the Short-game entry explains scrambling in plain English and points
+to comparing with Putting + the Sand-saves stat. Added a one-line "tap a category" hint above the rows.
+CatBar gained statKey/open/onToggle props; ShotSynthesis holds the openCat state (hook placed before
+the null-index early return).
+
+### v1.121.1 — fix: bottom nav detaching during pull-to-refresh (NO migration)
+Client only. pull-to-refresh.tsx: the content wrapper animated the pull with `transform: translateY`.
+A non-none transform makes that wrapper the containing block for `position: fixed` descendants, so
+during a pull (i.e. dragging up at the top of the page) the fixed bottom <nav> in home.tsx re-anchored
+to the bottom of the tall content wrapper and jumped toward the middle of the screen, snapping back on
+release. Switched the pull animation to `margin-top` (visually identical, but creates no containing
+block), so the nav — and every fixed modal/sheet that lives inside PullToRefresh — stays viewport-fixed
+during a pull. Root cause predates the recent dashboard work; the wrapper was added with the June PWA
+pull-to-refresh feature.
