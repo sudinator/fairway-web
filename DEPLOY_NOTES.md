@@ -1618,3 +1618,17 @@ $function$;
 
 grant execute on function public.get_admin_engagement() to authenticated;
 ```
+
+### v1.114.0 — WHS partial-round handicap (net-par fill) — NO migration
+Pure client logic + UI. Deploy is unzip -> commit -> Vercel.
+- lib/golf.ts roundDifferential: rounds of 9–17 played holes now produce a differential.
+  Played holes are capped at net double bogey; each unplayed hole is filled at net par.
+  Net-par fill is derived from course totals (no per-hole data for unplayed holes needed):
+    unplayed par     = course_par - sum(played par)
+    unplayed strokes = course_handicap - sum(strokes received on played holes)
+  Nine-hole floor enforced (fewer than 9 played -> no differential, unchanged for full 18).
+- lib/golf.ts partialHandicapInfo(round): { played, filled, missing[] } | null for the UI.
+- round-detail.tsx: "Partial round — counted for your handicap" banner (shows which holes
+  were net-par-filled + the resulting differential).
+- rounds-list.tsx: compact "· N net par for hcp" note on the row.
+- Regression test (lib/golf.test.ts) pins the real Francis Byrne 15-hole round to differential 12.5.

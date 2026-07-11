@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, isGrossOnly, hasHoleDetail,
-  girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay, adjustedHoleScore, puttDistribution,
+  girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay, adjustedHoleScore, puttDistribution, partialHandicapInfo,
 } from "@/lib/golf";
 import { aiUsesLeft, recordAiUse, AI_DAILY_LIMIT_VALUE } from "@/lib/draft";
 import { createClient } from "@/lib/supabase";
@@ -64,6 +64,26 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
       ) : (
         <>
           <StatsReminder round={round} onEdit={onEdit} />
+          {(() => {
+            const info = partialHandicapInfo(round);
+            if (!info) return null;
+            const d = roundDifferential(round);
+            const ms = info.missing;
+            const contiguous = ms.length > 1 && ms.every((v, i) => i === 0 || v === ms[i - 1] + 1);
+            const where = ms.length === 0 ? `${info.filled} holes`
+              : contiguous ? `holes ${ms[0]}–${ms[ms.length - 1]}`
+              : ms.length === 1 ? `hole ${ms[0]}`
+              : ms.length <= 4 ? `holes ${ms.join(", ")}`
+              : `${info.filled} holes`;
+            return (
+              <div style={{ background: C.greenLight, borderRadius: 12, padding: "10px 12px", marginTop: 14, borderLeft: `3px solid ${C.gold}` }}>
+                <div style={{ color: C.cream, fontSize: 12.5, fontWeight: 700 }}>Partial round — counted for your handicap</div>
+                <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
+                  {info.played} holes scored · {where} counted as net par for the handicap differential{d != null ? ` (differential ${d.toFixed(1)})` : ""}. Under WHS a round of 9–17 holes still counts, with unplayed holes filled at net par.
+                </div>
+              </div>
+            );
+          })()}
           <RoundStats round={round} />
           <AiAnalysis round={round} priorRounds={priorRounds || []} userEmail={userEmail} />
           <div style={{ marginTop: 14 }}><ScoreViewCard round={round} /></div>

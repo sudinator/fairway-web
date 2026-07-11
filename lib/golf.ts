@@ -364,14 +364,43 @@ export function roundDifferential(r: Round): number | null {
     return (113 / r.slope) * ((r.gross_score || 0) - r.rating);
   }
   const holes = played(r);
-  if (holes.length < 18) return null; // differential is an 18-hole figure
+  if (holes.length < 9) return null; // WHS: at least 9 holes played to be acceptable
   let adjusted = 0;
   for (const h of holes) {
     const a = adjustedHoleScore(h);
     if (a == null) return null;
     adjusted += a;
   }
+  // 9-17 holes: fill each unplayed hole with net par (par + strokes received) — the
+  // WHS-permitted method. Derived from course totals so we don't need the missing holes'
+  // own par/stroke-index (which aren't stored): unplayed par = course_par - played par,
+  // and unplayed strokes = course handicap - strokes received on played holes.
+  if (holes.length < 18) {
+    const ch = r.course_handicap ?? courseHandicap(r.handicap_index as number, r.slope, r.rating, r.course_par as number);
+    if (ch == null || r.course_par == null) return null; // can't fill safely -> don't count
+    const playedPar = holes.reduce((s, h) => s + h.par, 0);
+    const playedRecv = holes.reduce((s, h) => s + strokesReceived(h.stroke_index, ch), 0);
+    const unplayedPar = r.course_par - playedPar;
+    const unplayedRecv = ch - playedRecv;
+    if (unplayedPar < 0 || unplayedRecv < 0) return null; // inconsistent data -> don't count
+    adjusted += unplayedPar + unplayedRecv;
+  }
   return (113 / r.slope) * (adjusted - r.rating);
+}
+
+// For a 9-17 hole round that counts toward the handicap, describe the net-par fill for the UI.
+// Returns null for full 18s, gross-only rounds, or rounds too short to count. `missing` lists
+// the unplayed hole numbers (1-18 minus the holes that have a score).
+export function partialHandicapInfo(r: Round): { played: number; filled: number; missing: number[] } | null {
+  if (isGrossOnly(r)) return null;
+  const p = played(r);
+  const n = p.length;
+  if (n < 9 || n >= 18) return null;
+  if (roundDifferential(r) == null) return null; // only when it actually forms a differential
+  const have = new Set(p.map((h) => h.hole_number));
+  const missing: number[] = [];
+  for (let i = 1; i <= 18; i++) if (!have.has(i)) missing.push(i);
+  return { played: n, filled: 18 - n, missing };
 }
 
 // ---------------- Running handicap index (WHS) ----------------

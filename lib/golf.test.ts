@@ -1,6 +1,6 @@
 // Unit tests for computeBetting in lib/golf.ts — run with `npm test`.
-import { computeBetting, DEFAULT_BET_SPLIT } from "./golf";
-import type { BetPlayer } from "./golf";
+import { computeBetting, DEFAULT_BET_SPLIT, roundDifferential, partialHandicapInfo, strokesReceived } from "./golf";
+import type { BetPlayer, Round, Hole } from "./golf";
 
 let pass = 0, fail = 0; const fails: string[] = [];
 const check = (name: string, got: any, exp: any) => {
@@ -118,6 +118,36 @@ const P = (id: string, total: number, seg: [number, number, number]): BetPlayer 
   ok("front six still pays the leader", wonOf(r, "a") > 0);
   ok("mid-round: trailing player got no overall money", wonOf(r, "b") === 0);
   ok("mid-round no clean sweep", r.cleanSweep === false);
+}
+
+// ---- Partial-round (9-17 holes) handicap differential via net-par fill ----
+// Real round: Francis Byrne (Blue 72.9/137, par 70), course handicap 16, 15 holes played.
+{
+  const ch = 16;
+  const rows: [number, number, number, number][] = [ // hole, par, stroke_index, strokes
+    [1,4,5,5],[2,3,11,5],[3,4,7,5],[4,4,13,5],[5,3,17,4],[6,4,1,5],[7,4,15,4],[8,4,9,5],
+    [9,4,3,6],[10,4,10,4],[11,4,8,4],[12,4,2,6],[13,4,6,5],[14,3,18,5],[15,5,16,5],
+  ];
+  const holes: Hole[] = rows.map(([hole_number, par, stroke_index, strokes]) => ({
+    hole_number, par, stroke_index, strokes,
+    recv: strokesReceived(stroke_index, ch), putts: null, fairway: null, penalties: null, sand: null, yardage: null,
+  }) as unknown as Hole);
+  const r = {
+    id: "fb", course: "Francis Byrne Golf Course", played_at: "2026-07-10",
+    rating: 72.9, slope: 137, course_par: 70, course_handicap: 16, handicap_index: 11,
+    gross_score: 73, holes, status: "final",
+  } as unknown as Round;
+  const d = roundDifferential(r)!;
+  ok(`FB 15-hole differential ≈ 12.45 (got ${d.toFixed(4)})`, Math.abs(d - 12.4547) < 0.001);
+  ok(`FB posted differential = 12.5 (got ${Math.round(d * 10) / 10})`, Math.round(d * 10) / 10 === 12.5);
+  const info = partialHandicapInfo(r)!;
+  check("FB partial played", info.played, 15);
+  check("FB partial filled", info.filled, 3);
+  check("FB partial missing holes", info.missing, [16, 17, 18]);
+  // WHS nine-hole floor: an 8-hole round must not count.
+  ok("8-hole round returns no differential", roundDifferential({ ...r, holes: holes.slice(0, 8) } as unknown as Round) === null);
+  // A 9-hole round is acceptable (should produce a number).
+  ok("9-hole round produces a differential", typeof roundDifferential({ ...r, holes: holes.slice(0, 9) } as unknown as Round) === "number");
 }
 
 console.log(`golf/computeBetting tests: PASS ${pass}  FAIL ${fail}`);
