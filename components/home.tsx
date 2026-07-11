@@ -32,6 +32,7 @@ type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" |
 export function Home({ session }: { session: any }) {
   const [rounds, setRounds] = useState<Round[]>([]);
   const [dbInProgress, setDbInProgress] = useState<Round | null>(null);
+  const [inProgressCount, setInProgressCount] = useState(0);
   // Weekly "finish your profile" nudge — dismissible; re-appears after 7 days.
   const [profNudgeHidden, setProfNudgeHidden] = useState<boolean>(() => {
     try { const v = typeof window !== "undefined" ? localStorage.getItem("bnn_prof_nudge") : null; return v ? (Date.now() - Number(v) < 7 * 86400000) : false; } catch { return false; }
@@ -271,7 +272,7 @@ export function Home({ session }: { session: any }) {
 
   const loadRounds = useCallback(async () => {
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
-      setRounds([]); setDbInProgress(null); setLoading(false); return;
+      setRounds([]); setDbInProgress(null); setInProgressCount(0); setLoading(false); return;
     }
     setLoading(true);
     // Personal views intentionally show this user's rounds across every group.
@@ -299,10 +300,12 @@ export function Home({ session }: { session: any }) {
     // Keep in-progress rounds out of the normal list (no clutter); surface the most
     // recent one for resume (covers a cleared-storage or different-device case).
     const finished = merged.filter((r: any) => (r.status ?? "final") !== "in_progress");
-    const inProg = merged.filter((r: any) => (r.status ?? "final") === "in_progress")
-      .sort((a: any, b: any) => +new Date(b.played_at) - +new Date(a.played_at))[0] || null;
+    const inProgAll = merged.filter((r: any) => (r.status ?? "final") === "in_progress")
+      .sort((a: any, b: any) => +new Date(b.played_at) - +new Date(a.played_at));
+    const inProg = inProgAll[0] || null;
     setRounds(finished);
     setDbInProgress(inProg);
+    setInProgressCount(inProgAll.length);
     setLoading(false);
   }, [user.id]);
 
@@ -339,6 +342,20 @@ export function Home({ session }: { session: any }) {
       .eq("id", r.id);
     if (error) { alert("Couldn't mark that round complete — " + error.message); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "round_completed", summary: `Marked a round complete${r.course ? ` at ${r.course}` : ""}` });
+    await loadRounds();
+  };
+
+  // Discard every unfinished (in_progress) round for this user in one action. These never
+  // counted toward stats or handicap (the app ignores in_progress), so this only clears
+  // clutter. Soft-delete (deleted_at) so it's recoverable server-side if ever needed.
+  const discardAllInProgress = async () => {
+    if (typeof window !== "undefined" && !window.confirm(
+      `Discard ${inProgressCount > 1 ? `all ${inProgressCount} unfinished rounds` : "this unfinished round"}? They were never completed, so this doesn't touch your stats or handicap.`
+    )) return;
+    const { error } = await supabase.from("rounds").update({ deleted_at: new Date().toISOString() })
+      .eq("user_id", user.id).eq("status", "in_progress").is("deleted_at", null);
+    if (error) { alert("Couldn't discard — " + error.message); return; }
+    setStage(null);
     await loadRounds();
   };
 
@@ -460,7 +477,14 @@ export function Home({ session }: { session: any }) {
           <div style={{ color: C.sage, fontSize: 12 }}>{index != null ? `Handicap ${index}` : "Set your handicap in Profile"}</div>
         </div>
         <NotificationBell user={user} />
-        {tab !== "money" && <button style={{ ...btn(true), opacity: activeGroup ? 1 : 0.5 }} disabled={!activeGroup} onClick={() => { setStage("setup"); setViewing(null); }}>＋ New round</button>}
+        {tab !== "money" && <button style={{ ...btn(true), opacity: activeGroup ? 1 : 0.5 }} disabled={!activeGroup} onClick={() => {
+          if (dbInProgress) {
+            if (typeof window !== "undefined") window.alert(`You have an unfinished round at ${dbInProgress.course || "a course"}. Finish it, mark it complete, or discard it before starting a new one.`);
+            setStage(null); setViewing(null); setTab("dashboard");
+            return;
+          }
+          setStage("setup"); setViewing(null);
+        }}>＋ New round</button>}
       </div>
 
       {/* Resume an in-progress round from anywhere in the app */}
@@ -488,14 +512,15 @@ export function Home({ session }: { session: any }) {
           prompt to finish it (partial is fine), mark it complete as-is, or discard it. */}
       {dbInProgress && !(stage && typeof stage === "object" && "round" in stage) && (
         <div style={{ background: C.greenLight, border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginTop: 12 }}>
-          <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>⛳ You have an unfinished round</div>
+          <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>⛳ {inProgressCount > 1 ? `You have ${inProgressCount} unfinished rounds` : "You have an unfinished round"}</div>
           <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
-            {dbInProgress.course || "Your round"} · {dbInProgress.holes?.filter((h) => h.strokes != null).length || 0} holes entered. A round only counts in your stats once it's completed — finishing a 9- or 15-hole round is fine.
+            {dbInProgress.course || "Your round"} · {dbInProgress.holes?.filter((h) => h.strokes != null).length || 0} holes entered. A round only counts once it's completed — finishing a 9- or 15-hole round is fine. {inProgressCount > 1 ? "Showing the most recent; discard all to clear the rest. " : ""}You'll need to resolve this before starting a new round.
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
             <button onClick={() => { setViewing(null); setTab("dashboard"); setStage({ round: dbInProgress }); }} style={{ ...btn(true), flex: 1, minWidth: 110, fontSize: 12 }}>Finish scoring</button>
             <button onClick={() => markRoundComplete(dbInProgress)} style={{ ...btn(false), flex: 1, minWidth: 110, fontSize: 12 }}>Mark complete</button>
             <button onClick={() => deleteRound(dbInProgress.id)} style={{ ...btn(false), flex: 1, minWidth: 90, fontSize: 12 }}>Delete</button>
+            {inProgressCount > 1 && <button onClick={discardAllInProgress} style={{ ...btn(false), flex: 1, minWidth: 110, fontSize: 12 }}>Discard all {inProgressCount}</button>}
           </div>
         </div>
       )}

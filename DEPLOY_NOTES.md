@@ -1632,3 +1632,17 @@ Pure client logic + UI. Deploy is unzip -> commit -> Vercel.
   were net-par-filled + the resulting differential).
 - rounds-list.tsx: compact "· N net par for hcp" note on the row.
 - Regression test (lib/golf.test.ts) pins the real Francis Byrne 15-hole round to differential 12.5.
+
+### v1.115.0 — unfinished-round guard + discard-all (NO migration)
+Client only. Deploy is unzip -> commit -> Vercel.
+- home.tsx: ＋ New round is gated — if an in_progress round exists, it routes to the dashboard
+  banner to resolve first (alert explains) instead of creating another round.
+- Tracks the full in_progress list (not just the most recent); banner shows the count and a
+  "Discard all N" button (soft-delete via deleted_at) alongside Finish / Mark complete / Delete.
+- Background: RoundEditor.backgroundSave writes an in_progress row per session (device-loss
+  redundancy); abandoned sessions previously accumulated because only the newest was surfaced.
+  In_progress rounds are already excluded from stats/handicap (home.tsx finished filter).
+
+One-time cleanup of existing orphans (safe — soft-delete, never touches finalized rounds):
+  update rounds set deleted_at = now()
+  where status = 'in_progress' and deleted_at is null;
