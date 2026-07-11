@@ -1741,3 +1741,9 @@ Client only.
   cream/sage text (dropped the serif title + light cream panels). CompareCard's sub-line is the
   detailed insight sentence; synthesis's is the goal delta. Removed the old Track/band + light-panel
   rendering.
+
+### v1.120.1 — section-header expanders (NO migration)
+Client only. dashboard.tsx: the "More/Less" collapse toggles for SCORING (par 3·4·5) and SHORT GAME &
+PUTTING (sand saves · 3-putts · penalties) moved from a full-width dashed row at the bottom of each
+section into a compact "＋ More / − Less" button on the right of the section-header rule — saves a row.
+sectionHead now takes an optional right-side node; moreBtn helper removed, replaced by expandBtn.
