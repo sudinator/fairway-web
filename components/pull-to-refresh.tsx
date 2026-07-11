@@ -6,9 +6,10 @@ import { useEffect, useRef, useState } from "react";
 // standalone mode). Detects a downward drag that STARTS at the top of the page and
 // calls onRefresh (which re-pulls the current screen's data — not a full reload).
 // Renders a small spinner that follows the pull.
-export function PullToRefresh({ onRefresh, children }: {
+export function PullToRefresh({ onRefresh, children, scrollEl }: {
   onRefresh: () => Promise<void> | void;
   children: React.ReactNode;
+  scrollEl?: { current: HTMLElement | null };
 }) {
   const [pull, setPull] = useState(0);     // current pull distance in px
   const [refreshing, setRefreshing] = useState(false);
@@ -19,9 +20,10 @@ export function PullToRefresh({ onRefresh, children }: {
 
   useEffect(() => {
     const onStart = (e: TouchEvent) => {
-      // Only arm if we're at the very top of the page and not already refreshing.
+      // Only arm if we're at the very top of the scroll area and not already refreshing.
       if (refreshing) return;
-      if (window.scrollY > 0) { active.current = false; return; }
+      const top = scrollEl?.current ? scrollEl.current.scrollTop : window.scrollY;
+      if (top > 0) { active.current = false; return; }
       startY.current = e.touches[0].clientY;
       active.current = true;
     };

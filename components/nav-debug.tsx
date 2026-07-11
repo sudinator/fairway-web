@@ -23,10 +23,10 @@ export function NavDebug({ show }: { show: boolean }) {
       } else {
         const r = nav.getBoundingClientRect();
         const cs = getComputedStyle(nav);
-        const gap = Math.max(0, Math.round(window.innerHeight - ((vv?.height ?? window.innerHeight) + (vv?.offsetTop ?? 0))));
-        const dvis = Math.round((vv?.height ?? window.innerHeight) - r.bottom);
-        L.push(`NAV ${cs.position} bottom:${cs.bottom} gap(fix):${gap}`);
-        L.push(`  rectBot:${Math.round(r.bottom)} vvH:${Math.round(vv?.height ?? window.innerHeight)} Δvis:${dvis} ${Math.abs(dvis) <= 4 ? "PINNED ✓" : "off ✗"}`);
+        const dInner = Math.round(window.innerHeight - r.bottom);
+        const dVis = Math.round((vv?.height ?? window.innerHeight) - r.bottom);
+        L.push(`NAV pos:${cs.position} rectTop:${Math.round(r.top)} rectBot:${Math.round(r.bottom)}`);
+        L.push(`  vs innerH Δ:${dInner}  vs vvH Δ:${dVis}  ${Math.abs(dInner) <= 4 || Math.abs(dVis) <= 4 ? "AT BOTTOM ✓" : "OFF ✗"}`);
         if (cs.transform && cs.transform !== "none") L.push(`  NAV.transform:${cs.transform}`);
         if (cs.marginBottom !== "0px") L.push(`  NAV.marginBottom:${cs.marginBottom}`);
         const bad: string[] = [];

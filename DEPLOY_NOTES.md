@@ -1818,3 +1818,20 @@ desktop (viewports match) so it's a no-op there. nav carries a ref. Debug panel 
 (translateY(offsetTop)) so it stays readable, and now reports gap(fix) + Δvis (rectBot vs vv.height) with
 a PINNED/off verdict. NOTE: nav-debug is still shipped (owner-only) to verify the fix — REMOVE once Amit
 confirms PINNED ✓ on his phone.
+
+### v1.122.2 — real fix: bottom nav via flex layout, not position:fixed (NO migration)
+Client only. Owner debug readings proved the drift was NOT a containing-block issue and NOT the visual
+viewport: on the installed iOS PWA, window.innerHeight (956) is the true visible height, visualViewport
+.height (638) is wrong, and content shows BELOW the nav — i.e. position:fixed itself is unreliable in an
+iOS home-screen PWA (drifts during scroll). Reverted the v1.122.1 visualViewport transform. New shell:
+home.tsx return is now a fixed-height flex column (height: calc(100dvh - env(safe-area-inset-top)),
+display:flex, column, overflow:hidden). Content lives in an inner scroll container (scrollRef: flex:1,
+minHeight:0, overflowY:auto, -webkit-overflow-scrolling:touch) wrapping InstallHint + PullToRefresh +
+the page. The <nav> is now a NORMAL flex child (flexShrink:0, NOT position:fixed) so layout pins it to
+the bottom and it physically cannot drift. Content padding-bottom dropped 96px->24px (no fixed nav to
+clear). PullToRefresh now takes scrollEl and checks scrollEl.current.scrollTop instead of window.scrollY.
+Only one scroll-API dependency existed (scrollIntoView in manage.tsx) and it works in any container.
+Debugger updated (reports nav rectBot vs innerH/vvH + AT BOTTOM verdict) and kept for verification.
+KNOWN FOLLOW-UP: sub-tab sticky headers (e.g. tournaments) used top:env(safe-area-inset-top) assuming
+window scroll; inside the new container they may sit slightly low — verify/adjust if needed. REMOVE
+nav-debug once Amit confirms the nav stays put.

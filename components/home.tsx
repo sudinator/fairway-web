@@ -155,37 +155,11 @@ export function Home({ session }: { session: any }) {
   const user = session.user;
   const displayName = profile?.display_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "Golfer";
 
-  // Pin the bottom nav to the VISUAL viewport. On mobile, position:fixed anchors to the
-  // (taller) layout viewport, so when the URL bar / keyboard shrink the visible area the
-  // bar drifts out of view. Translate it up by the gap so it sits on the real bottom edge.
-  // No-op on desktop where the two viewports match (gap = 0).
-  const navRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    let raf = 0;
-    const fit = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const n = navRef.current;
-        if (!n) return;
-        const gap = Math.max(0, Math.round(window.innerHeight - (vv.height + vv.offsetTop)));
-        n.style.transform = gap ? `translateY(${-gap}px)` : "";
-      });
-    };
-    fit();
-    vv.addEventListener("resize", fit);
-    vv.addEventListener("scroll", fit);
-    window.addEventListener("scroll", fit, { passive: true });
-    window.addEventListener("resize", fit);
-    return () => {
-      cancelAnimationFrame(raf);
-      vv.removeEventListener("resize", fit);
-      vv.removeEventListener("scroll", fit);
-      window.removeEventListener("scroll", fit);
-      window.removeEventListener("resize", fit);
-    };
-  }, []);
+  // The app shell is a fixed-height flex column: content scrolls inside scrollRef and
+  // the bottom nav is a normal flex child, NOT position:fixed. On iOS home-screen PWAs
+  // position:fixed drifts during scroll and visualViewport reports the wrong height, so
+  // layout-pinning the nav is the only reliable way to keep it glued to the bottom.
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const index = profile?.handicap_index ?? null;
 
@@ -489,11 +463,12 @@ export function Home({ session }: { session: any }) {
   }
 
   return (
-    <>
-      <InstallHint />
+    <div style={{ height: "calc(100dvh - env(safe-area-inset-top))", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <Toaster />
-      <PullToRefresh onRefresh={async () => { await Promise.all([loadProfile(), loadGroups(), loadRounds()]); }}>
-      <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 96px" }}>
+      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
+      <InstallHint />
+      <PullToRefresh scrollEl={scrollRef} onRefresh={async () => { await Promise.all([loadProfile(), loadGroups(), loadRounds()]); }}>
+      <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 24px" }}>
       {/* Line 1: logo + active club (display only — change it in the Clubs tab) */}
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <Wordmark width={150} />
@@ -650,9 +625,11 @@ export function Home({ session }: { session: any }) {
       </div>
       </div>
       </PullToRefresh>
-      {/* Bottom navigation bar (mobile-first). 4 primary destinations + More. */}
-      <nav ref={navRef} data-debug-nav style={{
-        position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50,
+      </div>
+      {/* Bottom navigation bar — a normal flex child pinned at the bottom by layout (NOT
+          position:fixed, which drifts in iOS home-screen PWAs). */}
+      <nav data-debug-nav style={{
+        flexShrink: 0, zIndex: 50,
         background: C.green, borderTop: `1px solid ${C.greenMid}`,
         display: "flex", justifyContent: "space-around", alignItems: "stretch",
         paddingBottom: "env(safe-area-inset-bottom)",
@@ -724,7 +701,7 @@ export function Home({ session }: { session: any }) {
         </>
       )}
       <NavDebug show={(user.email || "").toLowerCase() === "amitsud@gmail.com"} />
-    </>
+    </div>
   );
 }
 
