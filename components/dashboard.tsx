@@ -26,7 +26,7 @@ function Clk<T extends string>({ k, d, set, children }: { k: T; d: T | null; set
   );
 }
 
-import { CompareCard, ShotSynthesis } from "@/components/compare-stats";
+import { ShotSynthesis } from "@/components/compare-stats";
 import { goalOptions } from "@/lib/benchmarks";
 export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userEmail, userId, savedCoach, onCoachSaved }: {
   rounds: Round[]; name: string; onOpen: (r: Round) => void;
@@ -159,7 +159,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
     </div>
   );
   const expandBtn = (open: boolean, onClick: () => void) => (
-    <button onClick={onClick} style={{ background: "transparent", border: "none", color: C.gold, fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0, whiteSpace: "nowrap", letterSpacing: 0.3 }}>{open ? "− Less" : "＋ More"}</button>
+    <button onClick={onClick} style={{ background: open ? "transparent" : "rgba(201,162,39,0.12)", border: `1px solid ${C.gold}`, color: C.gold, fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "3px 10px", borderRadius: 999, whiteSpace: "nowrap", letterSpacing: 0.3 }}>{open ? "− Less" : "＋ More"}</button>
   );
   const dirLower = new Set<StatKey>(["rounds", "avgpar", "best", "diff", "par3", "par4", "par5", "putts", "threeputt", "pen"]);
   const perRoundNum = (key: StatKey, r: Round): number | null => {
@@ -386,8 +386,6 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
 
       <ShotSynthesis fir={fir} gir={gir} puttsPerRound={puttsPerRound} scramble={scramble} index={hcp.index ?? currentIndex} goalHcp={effGoal} setGoalHcp={setGoalHcp} detailRounds={detailRounds} />
 
-      <CompareCard fir={fir} gir={gir} puttsPerRound={puttsPerRound} scramble={scramble} index={hcp.index ?? currentIndex} goalHcp={effGoal} />
-
       {allHoles.length > 0 && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
@@ -479,7 +477,7 @@ function DashboardCoach({ aggregate, roundsUsed, userEmail, userId, saved, onSav
   const fmt = (iso: string) => { try { return new Date(iso).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }); } catch { return iso.slice(0, 10); } };
 
   return (
-    <div style={{ background: C.greenLight, borderRadius: 14, padding: 14, marginBottom: 12 }}>
+    <div style={{ background: C.greenLight, borderRadius: 14, padding: 14, marginTop: 16, marginBottom: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: data ? "pointer" : "default" }}
         onClick={() => data && setOpen((v) => !v)}>
         <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 800 }}>✦ AI COACH</div>

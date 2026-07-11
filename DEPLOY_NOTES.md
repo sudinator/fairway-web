@@ -1747,3 +1747,18 @@ Client only. dashboard.tsx: the "More/Less" collapse toggles for SCORING (par 3�
 PUTTING (sand saves · 3-putts · penalties) moved from a full-width dashed row at the bottom of each
 section into a compact "＋ More / − Less" button on the right of the section-header rule — saves a row.
 sectionHead now takes an optional right-side node; moreBtn helper removed, replaced by expandBtn.
+
+### v1.120.2 — dashboard fixes + merge duplicate compare tile (NO migration)
+Client only.
+- Fix: AI-coach tile now has marginTop:16 so it no longer sits flush against the Scoring Form tile
+  above it (the coach previously relied on the time-window toggle's bottom margin, which moved away
+  in the reorder).
+- Fix: several strings in compare-stats.tsx were written as literal \uXXXX escapes inside JSX *text*
+  (not string literals), so they rendered as "\u2019" / "\u00b7" / "\u2014" on screen. Replaced all
+  with the real characters (’ · —), so the eyebrow reads "WHERE YOU'RE GAINING & LOSING SHOTS" etc.
+- Expander: the SCORING / SHORT GAME "More/Less" toggle is now a gold-bordered pill (faint gold fill
+  when collapsed) so it's obviously tappable, instead of plain gold text.
+- Merge: removed the "How you compare" (CompareCard) tile entirely — it duplicated the same four bars
+  as "Where you're gaining & losing shots". Deleted CompareCard + its insight() helper from
+  compare-stats.tsx and the import/usage from dashboard.tsx. The synthesis tile is now the single
+  peer/goal card.

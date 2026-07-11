@@ -41,21 +41,6 @@ function CatBar({ name, score, sub }: { name: string; score: number; sub: React.
 }
 
 // Detailed sentence for How-you-compare (references your range + the goal level).
-function insight(key: StatKey, value: number, your: Band, goal: Band | null, goalHcp: number | null) {
-  const dir = BENCH_DIR[key];
-  const beats = dir === 1 ? value > your.hi : value < your.lo;
-  const inRange = value >= your.lo && value <= your.hi;
-  const where = beats ? "Ahead of the typical range for your handicap"
-    : inRange ? "Right in your handicap\u2019s typical range"
-    : "A touch outside your handicap\u2019s range";
-  if (goal == null || goalHcp == null) return where + ".";
-  const needToward = dir === 1 ? goal.avg > value : goal.avg < value;
-  const tail = needToward
-    ? ` \u2014 a ${synGoalLabel(goalHcp)} averages about ${fmtVal(key, goal.avg)}.`
-    : ` \u2014 already around ${goalHcp === 0 ? "scratch" : goalHcp + "-hcp"} level here.`;
-  return where + tail;
-}
-
 // ---- Gaining / losing shots (summary + biggest opportunity) ---------------
 export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHcp, setGoalHcp, detailRounds }: {
   fir: { hit: number; total: number };
@@ -93,7 +78,7 @@ export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHc
 
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12, border: "1px solid #245A47" }}>
-      <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, fontWeight: 700 }}>WHERE YOU\u2019RE GAINING &amp; LOSING SHOTS</div>
+      <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, fontWeight: 700 }}>WHERE YOU’RE GAINING &amp; LOSING SHOTS</div>
 
       {goals.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 11, flexWrap: "wrap" }}>
@@ -112,60 +97,21 @@ export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHc
 
       <div style={{ color: C.cream, fontSize: 12.5, lineHeight: 1.5, marginTop: 11 }}>
         {goalBands && top.gap > 0.02
-          ? <>Biggest opportunity: <b style={{ color: "#F4E4B0" }}>{top.cat.toLowerCase()}</b> \u2014 your {BENCH_LABEL[top.key].toLowerCase()} ({fmtVal(top.key, top.value)}) is furthest from {synGoalLabel(goalHcp as number)} level (~{fmtVal(top.key, goalBands[top.key].avg)}).</>
-          : <>Your <b style={{ color: "#F4E4B0" }}>{top.cat.toLowerCase()}</b> has the most room vs your handicap\u2019s peers right now.</>}
+          ? <>Biggest opportunity: <b style={{ color: "#F4E4B0" }}>{top.cat.toLowerCase()}</b> — your {BENCH_LABEL[top.key].toLowerCase()} ({fmtVal(top.key, top.value)}) is furthest from {synGoalLabel(goalHcp as number)} level (~{fmtVal(top.key, goalBands[top.key].avg)}).</>
+          : <>Your <b style={{ color: "#F4E4B0" }}>{top.cat.toLowerCase()}</b> has the most room vs your handicap’s peers right now.</>}
       </div>
 
       <div style={{ marginTop: 4 }}>
         {rows.map((r) => {
           const goalTxt = goalBands
-            ? (r.gap > 0.02 ? `you ${fmtVal(r.key, r.value)} \u2192 ${synGoalLabel(goalHcp as number)} avg ${fmtVal(r.key, goalBands[r.key].avg)}` : `you ${fmtVal(r.key, r.value)} \u00b7 already ${synGoalLabel(goalHcp as number)}-level`)
-            : `you ${fmtVal(r.key, r.value)} \u00b7 peer avg ${fmtVal(r.key, you[r.key].avg)}`;
+            ? (r.gap > 0.02 ? `you ${fmtVal(r.key, r.value)} → ${synGoalLabel(goalHcp as number)} avg ${fmtVal(r.key, goalBands[r.key].avg)}` : `you ${fmtVal(r.key, r.value)} · already ${synGoalLabel(goalHcp as number)}-level`)
+            : `you ${fmtVal(r.key, r.value)} · peer avg ${fmtVal(r.key, you[r.key].avg)}`;
           return <CatBar key={r.key} name={r.cat} score={r.score} sub={goalTxt} />;
         })}
       </div>
 
       <div style={{ color: C.sage, fontSize: 10.5, lineHeight: 1.45, marginTop: 12, opacity: 0.9 }}>
-        Bars show you vs the typical range for your {Math.round(index)} index (white tick = peer average). Proxies from public amateur data (Arccos \u00b7 Shot Scope \u00b7 Break X) \u2014 approximate; scrambling needs ~15+ tracked rounds to read reliably.
-      </div>
-    </div>
-  );
-}
-
-// ---- How you compare (detail: same bar language + the full sentence) ------
-export function CompareCard({ fir, gir, puttsPerRound, scramble, index, goalHcp }: {
-  fir: { hit: number; total: number };
-  gir: { hit: number; total: number };
-  puttsPerRound: number | null;
-  scramble: { hit: number; total: number };
-  index: number | null;
-  goalHcp: number | null;
-}) {
-  if (index == null) return null;
-  const vals: { key: StatKey; value: number }[] = [];
-  if (fir.total) vals.push({ key: "fir", value: (100 * fir.hit) / fir.total });
-  if (gir.total) vals.push({ key: "gir", value: (100 * gir.hit) / gir.total });
-  if (scramble.total) vals.push({ key: "scramble", value: (100 * scramble.hit) / scramble.total });
-  if (puttsPerRound != null) vals.push({ key: "putts", value: puttsPerRound });
-  if (vals.length === 0) return null;
-
-  const yourBands = bandFor(index);
-  const goalBands = goalHcp != null ? bandFor(goalHcp) : null;
-
-  return (
-    <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12, border: "1px solid #245A47" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <span style={{ color: C.gold, fontSize: 10, letterSpacing: 2, fontWeight: 700 }}>HOW YOU COMPARE</span>
-        <span style={{ color: C.sage, fontSize: 11 }}>you \u00b7 {index} hcp{goalHcp != null ? ` \u00b7 goal ${synGoalLabel(goalHcp)}` : ""}</span>
-      </div>
-
-      {vals.map(({ key, value }) => (
-        <CatBar key={key} name={BENCH_LABEL[key]} score={catScore(key, value, yourBands[key])}
-          sub={insight(key, value, yourBands[key], goalBands ? goalBands[key] : null, goalHcp)} />
-      ))}
-
-      <div style={{ color: C.sage, fontSize: 10.5, marginTop: 12, opacity: 0.9, lineHeight: 1.45 }}>
-        Typical ranges from public amateur datasets (Arccos \u00b7 Shot Scope \u00b7 Break X). Approximate \u2014 they skew to tracked golfers and sources vary.
+        Bars show you vs the typical range for your {Math.round(index)} index (white tick = peer average). Proxies from public amateur data (Arccos · Shot Scope · Break X) — approximate; scrambling needs ~15+ tracked rounds to read reliably.
       </div>
     </div>
   );
