@@ -1661,3 +1661,49 @@ Client only.
   never reads as a full-18 73.
 - round-detail.tsx: removed the gold "Differential N.N" chip from the partial-round banner
   (the differential already shows in the stats box directly below). Banner keeps its gold border.
+
+### v1.116.0 — dashboard time-window toggle (NO migration)
+Client only. First piece of the dashboard rework.
+- dashboard.tsx: new Last 5 / Last 20 / Season / All toggle below the index hero. It windows the
+  round set (`done`) that drives every stat card, average, and chart. `season` = current calendar
+  year; `5`/`20` = most recent N by played_at; default `all` (preserves prior behavior).
+- The WHS index (`hcp`) now computes from the FULL history (`allDone`), never the window — so the
+  toggle can't distort the handicap. Empty state also keys off full history.
+
+### v1.117.0 — index trajectory sparkline in the hero (NO migration)
+Client only. Second piece of the dashboard rework.
+- dashboard.tsx: idxTrail (useMemo on rounds) recomputes the running WHS index after each
+  chronological round (full history); the hero now shows a gold sparkline of that trajectory
+  plus "first → current ▼/▲ delta" and "index over N rounds". Higher on the chart = higher
+  handicap, so improvement trends down (▼ green = index dropped, ▲ red = rose). Shown when
+  there are ≥2 computed index points.
+
+### v1.117.1 — handicap control visibility (NO migration)
+Client only. The "Use as my handicap" button was unchanged by the rework, but its in-use state
+was small grey text where the gold button had been, which read as "the button disappeared."
+- dashboard.tsx: the in-use state is now a visible gold-bordered "✓ In use as your handicap"
+  chip, so the control is clearly present whether or not the computed index is the one in use.
+  (The gold "Use as my handicap" button still appears whenever the computed index differs from
+  your saved handicap — unchanged.)
+
+### v1.117.2 — clearer index-sparkline label (NO migration)
+Client only. The sparkline sub-label "index over N rounds" read like a rolling average; changed
+to "your index after each round". Each point is the running WHS index (best 8 of 20) as of that
+round — not an average of scores. No logic change.
+
+### v1.118.0 — shot-category synthesis + scrambling benchmark + one-line index delta (NO migration)
+Client only. Third dashboard-rework piece.
+- Index hero: the sparkline (v1.117.0) is replaced by a one-line delta ("▼ 2.6 since your first
+  index (16.2)") — the scoring-form differential chart remains the trend view.
+- lib/benchmarks.ts: added a `scramble` band (StatKey/DIR/LABEL/UNIT/DOMAIN + per-hcp bands),
+  sourced from Break X up-and-down rates (0:50.0, 5:37.7, 10:31.6, 15:25.1, 20:21.7). bandFor
+  now returns scramble.
+- compare-stats.tsx: new ShotSynthesis component — off-tee/approach/short-game/putting on a
+  band-relative 0–100 scale (50 = peer avg), verdict from the score (Strength ≥66 / On par /
+  Focus ≤40), biggest-opportunity ranked by gap toward the shared Aspire goal. Scrambling held
+  to a ≥15-round guard (noisy on small samples). CompareCard is now controlled (goalHcp prop,
+  no internal selector) and shows the scramble track too.
+- dashboard.tsx: shared `goalHcp` state lifted here (drives synthesis + CompareCard); effGoal
+  defaults to the first goalOptions target. Synthesis rendered after the coach. Ball-striking
+  stat row gated on `anyHoleDetail`; scores-only golfers see a one-line nudge instead. Synthesis
+  and CompareCard self-hide when no stat has data.

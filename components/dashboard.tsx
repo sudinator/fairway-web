@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   ReferenceLine, BarChart, Bar, Cell, ComposedChart, PieChart, Pie, Legend,
@@ -26,13 +26,21 @@ function Clk<T extends string>({ k, d, set, children }: { k: T; d: T | null; set
   );
 }
 
-import { CompareCard } from "@/components/compare-stats";
+import { CompareCard, ShotSynthesis } from "@/components/compare-stats";
+import { goalOptions } from "@/lib/benchmarks";
 export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userEmail, userId, savedCoach, onCoachSaved }: {
   rounds: Round[]; name: string; onOpen: (r: Round) => void;
   currentIndex: number | null; saveIndex: (i: number | null) => void;
   userEmail?: string | null; userId?: string; savedCoach?: any; onCoachSaved?: () => void;
 }) {
-  const done = rounds.filter((r) => played(r).length > 0 || isGrossOnly(r));
+  const [win, setWin] = useState<"5" | "20" | "season" | "all">("all");
+  const allDone = rounds.filter((r) => played(r).length > 0 || isGrossOnly(r));
+  const nowYear = new Date().getFullYear();
+  const byRecent = [...allDone].sort((a, b) => +new Date(b.played_at) - +new Date(a.played_at));
+  const done = win === "5" ? byRecent.slice(0, 5)
+    : win === "20" ? byRecent.slice(0, 20)
+    : win === "season" ? allDone.filter((r) => new Date(r.played_at).getFullYear() === nowYear)
+    : allDone;
   const sorted = [...done].sort((a, b) => +new Date(a.played_at) - +new Date(b.played_at));
   const avgDiff = done.length ? done.reduce((s, r) => s + diffOf(r), 0) / done.length : null;
   const best = done.length ? Math.min(...done.map(diffOf)) : null;
@@ -49,9 +57,31 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   const byPar = avgByPar(done);
   const diffs = done.map(roundDifferential).filter((d): d is number => d != null);
   const avgDifferential = diffs.length ? diffs.reduce((s, d) => s + d, 0) / diffs.length : null;
-  const hcp = runningHandicap(done);
+  const hcp = runningHandicap(allDone);
+
+  // Index trajectory: the running index recomputed after each round (full history, WHS).
+  const idxTrail = useMemo(() => {
+    const chron = rounds.filter((r) => played(r).length > 0 || isGrossOnly(r))
+      .sort((a, b) => +new Date(a.played_at) - +new Date(b.played_at));
+    const pts: number[] = [];
+    for (let i = 0; i < chron.length; i++) {
+      const rh = runningHandicap(chron.slice(0, i + 1));
+      if (rh.index != null) pts.push(rh.index);
+    }
+    return pts;
+  }, [rounds]);
+  const idxDelta = idxTrail.length >= 2
+    ? { first: idxTrail[0], cur: idxTrail[idxTrail.length - 1], delta: idxTrail[idxTrail.length - 1] - idxTrail[0] }
+    : null;
   const threePutts = threePuttsPerRound(done);
   const puttsPerRound = avgPutts == null ? null : Math.round(avgPutts * 18 * 10) / 10;
+  // Shared aspire goal (drives BOTH the synthesis and the "How you compare" card).
+  const [goalHcp, setGoalHcp] = useState<number | null>(null);
+  const idxForGoal = hcp.index ?? currentIndex;
+  const effGoal = goalHcp ?? (idxForGoal != null ? (goalOptions(idxForGoal)[0] ?? null) : null);
+  // Does the player track hole-by-hole detail at all? Gate the stats-only surfaces if not.
+  const anyHoleDetail = allDone.some(hasHoleDetail);
+  const detailRounds = done.filter(hasHoleDetail).length;
 
   // Compact, numbers-only career summary for the AI coach.
   const coachAggregate = {
@@ -146,7 +176,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
 
   return (
     <div>
-      {done.length === 0 && (
+      {allDone.length === 0 && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 20, marginBottom: 12 }}>
           <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 20 }}>Welcome to Birdie Num Num</div>
           <div style={{ color: C.sage, fontSize: 13, marginTop: 8, lineHeight: 1.55 }}>
@@ -162,6 +192,11 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
               ? `Need at least 3 full 18-hole rounds (with rating & slope). You have ${hcp.total}.`
               : `Best ${hcp.used} of your last ${Math.min(hcp.total, 20)} differentials · WHS method`}
           </div>
+          {idxDelta && Math.abs(idxDelta.delta) >= 0.1 && (
+            <div style={{ color: idxDelta.delta < 0 ? "#8FE0B0" : "#FB7185", fontSize: 12, fontWeight: 700, marginTop: 6 }}>
+              {idxDelta.delta < 0 ? "▼" : "▲"} {Math.abs(idxDelta.delta).toFixed(1)} since your first index ({idxDelta.first.toFixed(1)})
+            </div>
+          )}
           {hcp.index != null && hcp.usedDiffs.length > 0 && (
             <div style={{ color: C.cream, fontSize: 12, marginTop: 6 }}>
               Differential{hcp.usedDiffs.length > 1 ? "s" : ""} used: <b>{hcp.usedDiffs.map((d) => d.toFixed(1)).join(", ")}</b>
@@ -177,7 +212,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
           </div>
           {hcp.index != null && (
             currentIndex === hcp.index ? (
-              <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>✓ in use as your handicap</div>
+              <div style={{ display: "inline-block", marginTop: 5, border: `1px solid ${C.gold}`, color: C.gold, fontSize: 11, fontWeight: 700, borderRadius: 8, padding: "5px 10px" }}>✓ In use as your handicap</div>
             ) : (
               <button style={{ ...btn(true), padding: "6px 12px", fontSize: 12, marginTop: 4 }}
                 onClick={() => saveIndex(hcp.index)}>
@@ -187,6 +222,26 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
           )}
         </div>
       </div>
+      {allDone.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ display: "flex", gap: 5 }}>
+            {(([["5", "Last 5"], ["20", "Last 20"], ["season", "Season"], ["all", "All"]] as [typeof win, string][]).map(([k, label]) => (
+              <button key={k} onClick={() => setWin(k)} style={{
+                flex: 1, textAlign: "center", fontSize: 11, borderRadius: 7, padding: "7px 0", border: "none", cursor: "pointer",
+                background: win === k ? C.gold : C.greenLight, color: win === k ? C.green : C.sage, fontWeight: win === k ? 700 : 400,
+              }}>{label}</button>
+            )))}
+          </div>
+          <div style={{ color: C.faint, fontSize: 10, marginTop: 5, textAlign: "center" }}>
+            {done.length === 0
+              ? (win === "season" ? "No rounds yet this season" : "No rounds in this range")
+              : win === "all" ? `Stats reflect all ${done.length} round${done.length === 1 ? "" : "s"}`
+              : win === "season" ? `Stats reflect this season · ${done.length} round${done.length === 1 ? "" : "s"}`
+              : `Stats reflect your last ${done.length} round${done.length === 1 ? "" : "s"}`}
+            <span style={{ color: C.faint }}> · index always uses WHS best-8-of-20</span>
+          </div>
+        </div>
+      )}
       <DashboardCoach
         aggregate={coachAggregate}
         roundsUsed={done.length}
@@ -195,6 +250,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
         saved={savedCoach}
         onSaved={onCoachSaved}
       />
+      <ShotSynthesis fir={fir} gir={gir} puttsPerRound={puttsPerRound} scramble={scramble} index={hcp.index ?? currentIndex} goalHcp={effGoal} setGoalHcp={setGoalHcp} detailRounds={detailRounds} />
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         <Clk k="rounds" d={detail} set={setDetail}><StatCard label="Rounds" value={done.length} /></Clk>
         <Clk k="avgpar" d={detail} set={setDetail}><StatCard label="Avg vs par" value={avgDiff == null ? "—" : (avgDiff >= 0 ? "+" : "") + avgDiff.toFixed(1)} /></Clk>
@@ -208,17 +264,23 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
         <Clk k="par5" d={detail} set={setDetail}><StatCard label="Avg on par 5s" value={byPar.par5 == null ? "—" : byPar.par5.toFixed(2)} sub={byPar.par5 == null ? "" : (byPar.par5 - 5 >= 0 ? "+" : "") + (byPar.par5 - 5).toFixed(2) + " vs par"} /></Clk>
         <Clk k="pts" d={detail} set={setDetail}><StatCard label="Stableford avg" value={avgPts == null ? "—" : avgPts.toFixed(1)} sub={anyEstimatedPts ? "includes estimates" : "full rounds"} /></Clk>
       </div>
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
-        <Clk k="gir" d={detail} set={setDetail}><StatCard label="GIR" value={fracPct(gir)} sub={gir.total ? "greens in regulation" : "needs putts"} /></Clk>
-        <Clk k="fir" d={detail} set={setDetail}><StatCard label="Fairways hit" value={fracPct(fir)} sub={fir.total ? "excludes par 3s" : "tap FW"} /></Clk>
-        <Clk k="scramble" d={detail} set={setDetail}><StatCard label="Scrambling" value={fracPct(scramble)} sub={scramble.total ? "par+ after missing green" : "needs putts"} /></Clk>
-        <Clk k="sandsave" d={detail} set={setDetail}><StatCard label="Sand saves" value={fracPct(sand)} sub={sand.total ? "par+ from greenside bunker" : "tap S in Sand/Pen"} /></Clk>
-        <Clk k="putts" d={detail} set={setDetail}><StatCard label="Putts / hole" value={avgPutts == null ? "—" : avgPutts.toFixed(2)} /></Clk>
-        <Clk k="threeputt" d={detail} set={setDetail}><StatCard label="3+ putts / round" value={threePutts == null ? "—" : threePutts.toFixed(1)} sub="three-putt holes" /></Clk>
-        <Clk k="pen" d={detail} set={setDetail}><StatCard label="Penalties" value={done.length ? (pens / done.length).toFixed(1) : "—"} sub="per round" /></Clk>
-      </div>
+      {anyHoleDetail ? (
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+          <Clk k="gir" d={detail} set={setDetail}><StatCard label="GIR" value={fracPct(gir)} sub={gir.total ? "greens in regulation" : "needs putts"} /></Clk>
+          <Clk k="fir" d={detail} set={setDetail}><StatCard label="Fairways hit" value={fracPct(fir)} sub={fir.total ? "excludes par 3s" : "tap FW"} /></Clk>
+          <Clk k="scramble" d={detail} set={setDetail}><StatCard label="Scrambling" value={fracPct(scramble)} sub={scramble.total ? "par+ after missing green" : "needs putts"} /></Clk>
+          <Clk k="sandsave" d={detail} set={setDetail}><StatCard label="Sand saves" value={fracPct(sand)} sub={sand.total ? "par+ from greenside bunker" : "tap S in Sand/Pen"} /></Clk>
+          <Clk k="putts" d={detail} set={setDetail}><StatCard label="Putts / hole" value={avgPutts == null ? "—" : avgPutts.toFixed(2)} /></Clk>
+          <Clk k="threeputt" d={detail} set={setDetail}><StatCard label="3+ putts / round" value={threePutts == null ? "—" : threePutts.toFixed(1)} sub="three-putt holes" /></Clk>
+          <Clk k="pen" d={detail} set={setDetail}><StatCard label="Penalties" value={done.length ? (pens / done.length).toFixed(1) : "—"} sub="per round" /></Clk>
+        </div>
+      ) : (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 10, color: C.sage, fontSize: 12, lineHeight: 1.5 }}>
+          Track fairways, greens, and putts on a round to unlock shot-by-shot insight — GIR, putting, scrambling, and how you compare to your handicap’s peers. Log a hole-by-hole round to switch it on.
+        </div>
+      )}
 
-      <CompareCard fir={fir} gir={gir} puttsPerRound={puttsPerRound} index={hcp.index ?? currentIndex} />
+      <CompareCard fir={fir} gir={gir} puttsPerRound={puttsPerRound} scramble={scramble} index={hcp.index ?? currentIndex} goalHcp={effGoal} />
 
       {detail && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>
