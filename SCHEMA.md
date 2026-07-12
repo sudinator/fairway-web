@@ -23,7 +23,7 @@ longer silently no-op.
 
 ## Tables (verified)
 
-**profiles** (`id` = auth.users.id): `display_name`, `email`, `handicap_index`, `ghin_number`, `phone`, `is_admin`, `active_group_id`, `last_active`, `updated_at`, `deactivated` (bool, default false), `dashboard_ai` (jsonb — saved dashboard AI summary).
+**profiles** (`id` = auth.users.id): `display_name`, `email`, `handicap_index`, `ghin_number`, `phone`, `is_admin`, `active_group_id`, `last_active`, `updated_at`, `deactivated` (bool, default false), `dashboard_ai` (jsonb — saved dashboard AI summary), `show_card` (bool, default true — opt-out of the peer-visible player card; 0079).
 
 **groups**: `id`, `name`, `created_by`, `status` (active/pending/declined), `request_note`, `created_at`.
 
@@ -42,6 +42,8 @@ longer silently no-op.
 **rounds**: `id`, `user_id`, `course`, `tee_name`, `rating`, `slope`, `course_par`, `handicap_index`, `course_handicap`, `group_id`, `played_at` (**date**, not null, default current_date), `created_at`, `gross_score` (int), `status` (text, default 'final'), `ai_analysis` (text), `game_id` (uuid — set when recorded from a finished game).
 
 **holes**: `id`, `round_id`, `hole_number`, `par`, `stroke_index`, `strokes`, `putts`, `fairway`, `penalties`.
+
+**member_badges** (0079): one row per (`user_id`, `badge_key`) — PK is the pair. `count` (int, times earned; 1 for once/milestone), `best_value` (numeric — current record for "best" badges), `best_round_id` (uuid → rounds, on delete set null), `first_earned_at`, `last_earned_at`. Badge catalog + the pure per-round evaluator live in `lib/badges.ts` (`BADGES`, `evaluateRound`).
 
 **games**: `id`, `code`, `name`, `course`, `course_par`, `played_at` (**date**, not null, default current_date — the match date), `allowance_pct` (numeric, not null, default 100 — handicap allowance for match/four-ball), `holes_meta` (jsonb), `group_id`, `game_type` (stableford/match/fourball/skins), `status` (active/ended), `pairings` (jsonb), `teams` (jsonb), `foursomes` (jsonb), `created_by`, `created_at`. Unique on `code`.
 
@@ -255,3 +257,13 @@ Product model: any member creates a tee time; the creator organizes it; a captai
   row in place instead of inserting a second copy. Relies on the 0076 index.
 - Client guard: `dedupeHoles()` (lib/golf.ts) collapses duplicate hole rows on load
   (home.tsx, manage.tsx), preferring the copy that has a score.
+
+### Migration 0079 — achievements / badges
+- `member_badges` table (see above) with RLS: `member_badges_own` (for all, `user_id = auth.uid()`)
+  and `member_badges_admin` (select, `is_admin()`).
+- `profiles.show_card` (bool, default true) — per-player opt-out of the public player card.
+- `group_badges(p_group uuid)` — SECURITY DEFINER RPC returning every badge for members of a
+  group the caller belongs to (gated by `is_group_member(p_group, auth.uid())`, honors `show_card`).
+  Mirrors the `group_roster` peer-read pattern. Granted to `authenticated`.
+- Phase 1 (data foundation) only: table + RPC + `lib/badges.ts` evaluator shipped; compute-on-finish,
+  backfill, and the UI surfaces (player card, badge wall, post-round strip) are Phase 2.

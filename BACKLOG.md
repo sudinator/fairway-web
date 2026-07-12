@@ -2,6 +2,24 @@
 
 Running list of things to build or tighten. Newest ideas near the top of each section.
 
+## Achievements / badges
+**Phase 1 — data foundation (SHIPPED v1.123.0):** `member_badges` table + `show_card` opt-out +
+`group_badges` peer-read RPC (migration 0079); `lib/badges.ts` = 33-badge catalog (`BADGES`) +
+pure `evaluateRound` (35 unit tests). Not yet wired into anything.
+
+**Phase 2 — surfaces + wiring (TODO):**
+- [x] Compute-on-finish + backfill unified as `syncBadges` (recompute+diff on rounds change) — v1.124.0.
+- One-time backfill of existing finished rounds (chronological, so 'first'/'best' resolve correctly).
+- **PlayerCard** component (reused self + peer): photo, handicap index + trend, career bests,
+  badge highlight row (hidden scrollbar, a badge half-clipped at the right edge as the scroll cue),
+  recent-form = last-5-differentials rolling average as a smooth line. Coach + weakness panel stay PRIVATE.
+- [x] **AchievementsWall** in the Profile tab (earned vs locked, grouped, counts+records) — v1.124.0. ('See all' link from the card still TODO.)
+- Make Players-tab roster rows tappable -> open that member's PlayerCard (via `group_badges`).
+- Post-round earned strip on round detail; dashboard teaser; `show_card` opt-out toggle in ProfilePanel.
+- Peer trend on the card needs the peer's differentials (rounds RLS is own/admin) — likely a small
+  denormalized card-stats field or a SECURITY DEFINER RPC; decide when building the card.
+
+
 ## Games redesign — SHIPPED (v1.44.0 → v1.46.1)
 Done: **Stroke play** (gross/net, lowest-total leaderboard) · **net-double cap lifted at entry** for stroke play AND four-ball/trifecta so real triples+ can be recorded (handicap still caps each hole at net double via `adjustedHoleScore`) · standalone **four-ball best-ball/shootout (aggregate)** scoring · **guided two-family chooser UI** (Stroke vs Match → Individual/Team) · new team/match games **open on Setup** with a "finish setup first" prompt on the Scorecard until handicaps/teams/matchups are done.
 
