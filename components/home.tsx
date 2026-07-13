@@ -10,8 +10,7 @@ import { loadDraft, draftHasScores } from "@/lib/draft";
 import { loadActiveGame, saveAppBootCache, loadAppBootCache } from "@/lib/draft";
 import { btn, Wordmark, inputStyle } from "@/components/ui";
 import Tournaments, { type GameSeed } from "@/components/tournaments";
-import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab, ActivityTab, AdminGroupsTab, AdminUsersTab, HelpPage } from "@/components/manage";
-import { AdminFeedbackTab } from "@/components/feedback";
+import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab, AdminHome, HelpPage } from "@/components/manage";
 import { MoneyTab } from "@/components/money";
 import { TeeTimes } from "@/components/tee-times";
 import { syncBadges } from "@/lib/badge-sync";
@@ -29,7 +28,7 @@ import type { AppGroup } from "@/lib/groups";
 
 const supabase = createClient();
 
-type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" | "activity" | "oversight" | "users" | "feedback" | "help" | "profile" | "money" | "teetimes";
+type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" | "admin" | "help" | "profile" | "money" | "teetimes";
 
 export function Home({ session }: { session: any }) {
   const [rounds, setRounds] = useState<Round[]>([]);
@@ -82,7 +81,7 @@ export function Home({ session }: { session: any }) {
   useEffect(() => {
     try {
       const t = new URLSearchParams(window.location.search).get("tab");
-      const allowed = ["dashboard", "rounds", "games", "courses", "players", "groups", "help", "profile", "money", "teetimes"];
+      const allowed = ["dashboard", "rounds", "games", "courses", "players", "groups", "admin", "help", "profile", "money", "teetimes"];
       if (t && allowed.includes(t)) {
         setTab(t as Tab);
         const url = new URL(window.location.href); url.searchParams.delete("tab");
@@ -633,14 +632,17 @@ export function Home({ session }: { session: any }) {
           <PlayersTab user={user} activeGroupId={activeGroup.id} isGroupAdmin={activeGroup.role === "admin"} onChanged={loadGroups} />
         ) : tab === "groups" ? (
           <GroupsPanel user={user} groups={groups} activeGroupId={activeGroupId} onGroupsChanged={loadGroups} onActiveGroupChange={chooseGroup} onGroupDeleted={onGroupDeleted} />
-        ) : tab === "activity" && profile?.is_admin ? (
-          <ActivityTab />
-        ) : tab === "oversight" && profile?.is_admin ? (
-          <AdminGroupsTab user={user} onEnterGroup={enterSupportGroup} onExitGroup={exitSupportGroup} onGroupsChanged={loadGroups} />
-        ) : tab === "users" && profile?.is_admin ? (
-          <AdminUsersTab user={user} />
-        ) : tab === "feedback" && profile?.is_admin ? (
-          <AdminFeedbackTab />
+        ) : tab === "admin" && (profile?.is_admin || activeGroup?.role === "admin") ? (
+          <AdminHome
+            user={user}
+            profile={profile}
+            activeGroupName={activeGroup?.name}
+            activeGroupRole={activeGroup?.role}
+            onGoto={(t) => { setTab(t as Tab); setMoreOpen(false); }}
+            onEnterGroup={enterSupportGroup}
+            onExitGroup={exitSupportGroup}
+            onGroupsChanged={loadGroups}
+          />
         ) : tab === "help" ? (
           <HelpPage isAdmin={!!profile?.is_admin} user={user} displayName={displayName} groupId={activeGroupId} />
         ) : tab === "profile" ? (
@@ -696,7 +698,7 @@ export function Home({ session }: { session: any }) {
                   {item(tab === p.key && !inFlow, p.icon, p.label, () => { setTab(p.key); setStage(null); setViewing(null); setMoreOpen(false); })}
                 </React.Fragment>
               )}
-              {item(moreOpen || (["players","groups","activity","oversight","users","feedback","help","profile","money","teetimes"].includes(tab) && !inFlow), "⋯", "More", () => setMoreOpen((v) => !v))}
+              {item(moreOpen || (["players","groups","admin","help","profile","money","teetimes"].includes(tab) && !inFlow), "⋯", "More", () => setMoreOpen((v) => !v))}
             </>
           );
         })()}
@@ -718,12 +720,9 @@ export function Home({ session }: { session: any }) {
                 { key: "teetimes", label: "Tee Times", show: !!activeGroup && activeGroupId === TGC_GROUP_ID },
                 { key: "players", label: "Players", show: true },
                 { key: "groups", label: "Clubs", show: showGroupsTab },
-                { key: "activity", label: "Activity ★", show: !!profile?.is_admin },
-                { key: "oversight", label: "Oversight ★", show: !!profile?.is_admin },
-                { key: "users", label: "Users ★", show: !!profile?.is_admin },
-                { key: "feedback", label: "Feedback ★", show: !!profile?.is_admin },
+                { key: "admin", label: "Admin ★", show: !!profile?.is_admin || activeGroup?.role === "admin" },
                 { key: "help", label: "Help", show: true },
-                { key: "profile", label: profile?.is_admin ? "Profile ★" : "Profile", show: true },
+                { key: "profile", label: "Profile", show: true },
               ];
               return more.filter((m) => m.show).map((m) => (
                 <button key={m.key} onClick={() => { setTab(m.key); setStage(null); setViewing(null); setMoreOpen(false); }}

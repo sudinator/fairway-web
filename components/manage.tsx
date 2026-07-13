@@ -8,6 +8,7 @@ import capabilities from "@/lib/capabilities.json";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { diagEnabled, setDiagEnabled, reproduceBug, setReproduceBug, getDiagLog, clearDiagLog } from "@/lib/debuglog";
+import { AdminFeedbackTab } from "@/components/feedback";
 import { btn, inputStyle, Eyebrow, NumPicker, Avatar } from "@/components/ui";
 import { YardageBackfill } from "@/components/yardage-backfill";
 import { AchievementsWall } from "@/components/achievements";
@@ -1017,7 +1018,6 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
   const [zelle, setZelle] = useState(profile?.zelle_handle || "");
   const [idxStr, setIdxStr] = useState(profile?.handicap_index != null ? String(profile.handicap_index) : "");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(profile?.avatar_url || null);
-  const [isTest, setIsTest] = useState<boolean>(!!profile?.is_test);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -1030,7 +1030,6 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
     setPaypal(profile?.paypal_handle || "");
     setZelle(profile?.zelle_handle || "");
     setIdxStr(profile?.handicap_index != null ? String(profile.handicap_index) : "");
-    setIsTest(!!profile?.is_test);
     setAvatarUrl(profile?.avatar_url || null);
   }, [profile]);
 
@@ -1164,27 +1163,6 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
       <AchievementsWall user={user} rounds={rounds} refreshKey={badgeRefresh} />
 
       <PushToggle user={user} profile={profile} />
-      {profile?.is_admin && (
-        <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Test account {isTest ? "· ON" : "· off"}</div>
-              <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
-                When on, this account works normally but is excluded from every analytics figure — use it for feature testing so your stats stay clean.
-              </div>
-            </div>
-            <button
-              onClick={async () => {
-                const next = !isTest; setIsTest(next);
-                const { error } = await supabase.rpc("admin_set_test", { p_user: user.id, p_is_test: next });
-                if (error) { setIsTest(!next); setMsg("Couldn't update test mode — " + error.message); }
-              }}
-              style={{ ...btn(isTest), fontSize: 12, padding: "8px 14px", whiteSpace: "nowrap" }}
-            >{isTest ? "Turn off" : "Turn on"}</button>
-          </div>
-        </div>
-      )}
-      {profile?.is_admin && <AdminPanel user={user} />}
 
       <div style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${C.greenMid}` }}>
         <button style={{ ...btn(false), fontSize: 13 }} onClick={() => supabase.auth.signOut()}>Sign out</button>
@@ -1514,7 +1492,7 @@ function RoundSaveDiag() {
   );
 }
 
-function AdminPanel({ user }: { user: any }) {
+function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?: boolean }) {
   const [profiles, setProfiles] = useState<any[] | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -1683,12 +1661,16 @@ function AdminPanel({ user }: { user: any }) {
 
   return (
     <div style={{ marginTop: 24 }}>
-      <Eyebrow>★ ADMIN · ANALYTICS</Eyebrow>
-      <AdminAnalytics />
-      <AdminEngagement />
-      <OpsMetrics />
-      <RoundSaveDiag />
-      <div style={{ height: 22 }} />
+      {showAnalytics && (
+        <>
+          <Eyebrow>★ ADMIN · ANALYTICS</Eyebrow>
+          <AdminAnalytics />
+          <AdminEngagement />
+          <OpsMetrics />
+          <RoundSaveDiag />
+          <div style={{ height: 22 }} />
+        </>
+      )}
       <Eyebrow>★ ADMIN · ALL PLAYERS</Eyebrow>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>
         <div style={{ background: C.greenLight, borderRadius: 12, padding: "10px 14px", flex: 1, minWidth: 110 }}>
@@ -2196,6 +2178,135 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
 }
 
 // ================= Admin Activity (audit trail) =================
+// System tools (master admin): test-account toggle + course yardage backfill.
+function SystemTools({ user }: { user: any }) {
+  const [isTest, setIsTest] = useState<boolean | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.from("profiles").select("is_test").eq("id", user.id).maybeSingle().then(({ data }: any) => setIsTest(!!data?.is_test));
+  }, [user.id]);
+  return (
+    <div>
+      <div style={{ background: C.greenLight, borderRadius: 12, padding: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Test account {isTest == null ? "" : isTest ? "· ON" : "· off"}</div>
+            <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
+              When on, this account works normally but is excluded from every analytics figure — use it for feature testing so your stats stay clean.
+            </div>
+          </div>
+          <button
+            onClick={async () => {
+              const next = !isTest; setIsTest(next);
+              const { error } = await supabase.rpc("admin_set_test", { p_user: user.id, p_is_test: next });
+              if (error) { setIsTest(!next); setMsg("Couldn't update test mode — " + error.message); }
+            }}
+            style={{ ...btn(!!isTest), fontSize: 12, padding: "8px 14px", whiteSpace: "nowrap" }}
+          >{isTest ? "Turn off" : "Turn on"}</button>
+        </div>
+        {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
+      </div>
+      <div style={{ marginTop: 14 }}><YardageBackfill /></div>
+    </div>
+  );
+}
+
+// Consolidated admin hub. Two tiers: Club admin (any admin of the active club, scoped to
+// that club) and System / Super admin (master admin only). Reuses every existing panel;
+// club cards jump to the shared tabs, system cards render the panel inline.
+export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onGoto, onEnterGroup, onExitGroup, onGroupsChanged }: {
+  user: any; profile: any; activeGroupName?: string | null; activeGroupRole?: string | null;
+  onGoto: (tab: string) => void;
+  onEnterGroup: (g: any) => Promise<void>; onExitGroup: (g: any) => Promise<void>; onGroupsChanged: () => void;
+}) {
+  const isMaster = !!profile?.is_admin;
+  const isClubAdmin = activeGroupRole === "admin";
+  const [view, setView] = useState<string | null>(null);
+
+  const Card = ({ icon, name, cap, onClick }: { icon: string; name: string; cap: string; onClick: () => void }) => (
+    <button onClick={onClick} style={{ textAlign: "left", background: C.greenLight, border: `1px solid #2c6b54`, borderRadius: 14, padding: "13px 13px 14px", cursor: "pointer", position: "relative" }}>
+      <span style={{ position: "absolute", top: 12, right: 12, color: C.sage, fontSize: 14 }}>›</span>
+      <div style={{ fontSize: 20, lineHeight: 1 }}>{icon}</div>
+      <div style={{ color: C.cream, fontWeight: 800, fontSize: 13.5, marginTop: 8 }}>{name}</div>
+      <div style={{ color: C.sage, fontSize: 10.5, marginTop: 3, lineHeight: 1.35 }}>{cap}</div>
+    </button>
+  );
+  const grid = (children: React.ReactNode) => (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>{children}</div>
+  );
+  const tierHead = (title: string, badge: string, badgeSuper: boolean, desc: string) => (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 20 }}>
+        <span style={{ fontFamily: "Georgia, serif", fontSize: 15, fontWeight: 700, color: C.cream }}>{title}</span>
+        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.04em", padding: "2px 8px", borderRadius: 999, color: badgeSuper ? "#0e3a2c" : C.sage, background: badgeSuper ? C.gold : "#173a2c", border: badgeSuper ? "none" : "1px solid #37624f" }}>{badge}</span>
+      </div>
+      <div style={{ color: C.faint, fontSize: 11, marginTop: 4 }}>{desc}</div>
+    </>
+  );
+
+  if (view) {
+    let title = ""; let panel: React.ReactNode = null;
+    switch (view) {
+      case "analytics": title = "Analytics"; panel = <><AdminAnalytics /><AdminEngagement /></>; break;
+      case "operations": title = "Operations"; panel = <OpsMetrics />; break;
+      case "diagnostics": title = "Diagnostics"; panel = <RoundSaveDiag />; break;
+      case "activity": title = "Activity log"; panel = <ActivityTab />; break;
+      case "oversight": title = "Clubs oversight"; panel = <AdminGroupsTab user={user} onEnterGroup={onEnterGroup} onExitGroup={onExitGroup} onGroupsChanged={onGroupsChanged} />; break;
+      case "users": title = "Users"; panel = <AdminUsersTab user={user} />; break;
+      case "players": title = "Player admin"; panel = <AdminPanel user={user} showAnalytics={false} />; break;
+      case "feedback": title = "Feedback"; panel = <AdminFeedbackTab />; break;
+      case "systools": title = "System tools"; panel = <SystemTools user={user} />; break;
+    }
+    return (
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+          <button onClick={() => setView(null)} style={{ ...btn(false), fontSize: 12, padding: "5px 11px" }}>‹ Admin</button>
+          <div style={{ fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 700, color: C.cream }}>{title}</div>
+        </div>
+        {panel}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 700, color: C.cream }}>Admin</div>
+      <div style={{ color: C.sage, fontSize: 12.5, marginTop: 2 }}>Everything that manages the club or the system, in one place.</div>
+
+      {isClubAdmin && (
+        <>
+          {tierHead("Club admin", (activeGroupName || "This club").toUpperCase(), false, "Scoped to the club you're in. Any admin of this club sees this.")}
+          {grid(<>
+            <Card icon="👥" name="Members" cap="Handicaps, roles, add / remove players" onClick={() => onGoto("players")} />
+            <Card icon="⚙︎" name="Club settings" cap="Name, default club, invite links" onClick={() => onGoto("groups")} />
+          </>)}
+        </>
+      )}
+
+      {isMaster && (
+        <>
+          {tierHead("System", "SUPER ADMIN", true, "Cross-club and system-wide. Master admin only.")}
+          {grid(<>
+            <Card icon="📊" name="Analytics" cap="Usage, engagement & golf cadence" onClick={() => setView("analytics")} />
+            <Card icon="🧭" name="Operations" cap="Nudge funnel, auto-finish, stale rounds" onClick={() => setView("operations")} />
+            <Card icon="📜" name="Activity log" cap="Audit trail across all clubs" onClick={() => setView("activity")} />
+            <Card icon="🏟" name="Clubs oversight" cap="Approve clubs, support sessions" onClick={() => setView("oversight")} />
+            <Card icon="🧑‍🤝‍🧑" name="Users" cap="Global roster, suspend, merge" onClick={() => setView("users")} />
+            <Card icon="🗂" name="Player admin" cap="Handicaps, scores, memberships, courses" onClick={() => setView("players")} />
+            <Card icon="💬" name="Feedback" cap="User-submitted feedback" onClick={() => setView("feedback")} />
+            <Card icon="🩺" name="Diagnostics" cap="Round-save log & reproduce toggle" onClick={() => setView("diagnostics")} />
+            <Card icon="🔧" name="System tools" cap="Test account, yardage backfill" onClick={() => setView("systools")} />
+          </>)}
+        </>
+      )}
+
+      {!isClubAdmin && !isMaster && (
+        <div style={{ color: C.sage, fontSize: 13, marginTop: 20 }}>You don't have admin access to anything here.</div>
+      )}
+    </div>
+  );
+}
+
 export function ActivityTab() {
   const [rows, setRows] = useState<any[] | null>(null);
   const [filter, setFilter] = useState<string>("all");

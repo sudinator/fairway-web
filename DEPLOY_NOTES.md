@@ -2279,3 +2279,21 @@ duplicate-in_progress bug can be REPRODUCED and the fix CONFIRMED on a real phon
 No migration. Procedure: deploy → admin Manage → Round-save diagnostics → Logging ON → Reproduce ON →
 score a few holes locking the phone between each → expect multiple red `insert` lines for one round →
 Reproduce OFF → rescore → expect one insert + green adopt/reuse. Then run the v1.131.1 cleanup SQL.
+
+### v1.133.0 — consolidated Admin tab (no migration)
+All admin surfaces moved out of Profile and the scattered More-menu entries into ONE Admin tab
+with two tiers. Reuses every existing panel unchanged — no logic rewritten, no migration.
+- New `AdminHome` (components/manage.tsx, exported): card index + inline sub-view router.
+  * Tier 1 — Club admin (shown when activeGroup.role==='admin', scoped to that club): Members and
+    Club settings, which JUMP to the existing Players / Clubs tabs (no duplication).
+  * Tier 2 — System / Super admin (profile.is_admin only): Analytics (AdminAnalytics+AdminEngagement),
+    Operations (OpsMetrics), Activity log (ActivityTab), Clubs oversight (AdminGroupsTab), Users
+    (AdminUsersTab), Player admin (AdminPanel with new showAnalytics={false}), Feedback
+    (AdminFeedbackTab), Diagnostics (RoundSaveDiag), System tools (test-account toggle + YardageBackfill).
+- Removed the four ★ More-menu tabs (Activity/Oversight/Users/Feedback) and the admin block + test
+  toggle from ProfilePanel; Profile is now player-only. Nav shows a single 'Admin ★' entry when the
+  user is a club admin OR master admin.
+- `AdminPanel` gained `showAnalytics` (default true) so its analytics header isn't duplicated when
+  rendered as the Player-admin sub-view.
+Note: Users / Player admin / Clubs oversight retain some historical overlap (kept intact to avoid a
+risky governance refactor); can be rationalized later.
