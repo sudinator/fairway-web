@@ -82,7 +82,7 @@ language sql security definer set search_path = public as $$
       and 100.0 * coalesce(rc.completed,0)
           / (coalesce(rc.completed,0) + coalesce(rc.unfinished,0) + coalesce(rc.deleted,0)) < 60),
     (coalesce(rc.completed,0) * 4 + coalesce(gp.games,0) * 2 + coalesce(da.active_days,0) * 1
-      + coalesce(da.opens,0) * 0.1)::numeric
+      + coalesce(da.opens,0) * 0.1)::numeric as score
   from base b
   left join rc on rc.user_id = b.id
   left join gp on gp.user_id = b.id
