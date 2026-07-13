@@ -249,11 +249,29 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
             {idxDelta.delta < 0 ? "▼" : "▲"} {Math.abs(idxDelta.delta).toFixed(1)} since your first index ({idxDelta.first.toFixed(1)})
           </div>
         )}
-        {hcp.index != null && hcp.usedDiffs.length > 0 && showDiffs && (
-          <div style={{ color: C.cream, fontSize: 12, marginTop: 6 }}>
-            Differential{hcp.usedDiffs.length > 1 ? "s" : ""} used: <b>{hcp.usedDiffs.map((d) => d.toFixed(1)).join(", ")}</b>
-            {hcp.adj !== 0 ? ` · adjustment ${hcp.adj > 0 ? "+" : ""}${hcp.adj.toFixed(1)}` : ""}
-            <span style={{ color: C.sage }}> (of {hcp.allDiffs.map((d) => d.toFixed(1)).join(", ")})</span>
+        {hcp.index != null && hcp.recentDetail.length > 0 && showDiffs && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ color: C.faint, fontSize: 10, marginBottom: 4 }}>Newest round first.</div>
+            <div style={{ color: C.cream, fontSize: 12, lineHeight: 1.9 }}>
+              {hcp.recentDetail.map((x, i) => (
+                <span key={i}>
+                  {i > 0 ? <span style={{ color: C.sage }}>, </span> : null}
+                  <span style={{ color: x.used ? C.gold : C.sage, fontWeight: x.used ? 800 : 400 }}>{x.d.toFixed(1)}</span>
+                </span>
+              ))}
+            </div>
+            {(() => {
+              const u = hcp.usedDiffs;
+              if (!u.length) return null;
+              const usedAvg = u.reduce((s, d) => s + d, 0) / u.length;
+              return (
+                <div style={{ color: C.sage, fontSize: 12, marginTop: 7 }}>
+                  {hcp.adj === 0
+                    ? <>The {hcp.used} in gold average <b style={{ color: C.gold }}>{usedAvg.toFixed(1)}</b> — that’s your index.</>
+                    : <>The {hcp.used} in gold average {usedAvg.toFixed(1)} · {hcp.adj > 0 ? "+" : ""}{hcp.adj.toFixed(1)} adjustment → <b style={{ color: C.gold }}>{hcp.index.toFixed(1)}</b>.</>}
+                </div>
+              );
+            })()}
           </div>
         )}
         <div style={{ clear: "both" }} />

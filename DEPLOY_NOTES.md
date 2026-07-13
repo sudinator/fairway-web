@@ -2727,3 +2727,20 @@ Run-check-now, keeper picker + soft-delete on clear). app/api/push/route.ts now 
 'friction' as push and titles it 'Data integrity flag' — admins get one summary push per sweep that
 flags something new. Retired the old 'friction' wording (Power Users badge -> 'restarts'; abandoned
 drill tag shown as 'unfinished') so 'friction' now means only the integrity ledger.
+
+### v1.140.1 — FIX: Friction review is now its own admin card
+Moved AdminFrictionReview out of the Analytics view into its own admin-home Card + view
+(setView 'friction'), with a live open-count badge fed from get_friction_items('open') merged
+into the todos effect. No migration. Client-only.
+
+### v1.140.2 — FIX: removed the Power Users “restarts” badge
+That badge was the old computed heuristic (>=3 abandoned/deleted AND completion <60%) — a live,
+unresolvable verdict on normal behaviour, with no way to clear it. Removed the badge + legend; kept
+the neutral completion_pct column and the 'quiet' churn badge. get_power_users.friction still
+computes but is now unused (no migration). 'Friction' now means only the integrity ledger.
+
+### v1.140.3 — UI: cleaner running-handicap “how?” expansion
+runningHandicap() now returns recentDetail[{d,used}] (newest-first, exact best-N flags). The tile
+expansion drops the duplicated 'used: X (of all Y)' line for a single newest-first list of the last
+20 differentials with the counted ones in gold+bold, a 'Newest round first.' note, and a payoff line
+('The 8 in gold average 12.4 — that’s your index', or with the small-sample adjustment spelled out).

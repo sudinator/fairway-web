@@ -1361,7 +1361,8 @@ function AdminEngagement() {
 }
 
 // ★ Power users — top 25 by composite engagement score, every metric individually sortable,
-// with friction ("kept starting rounds that didn't finish") + churn ("quiet 30d+") signals.
+// with a churn ("quiet 30d+") signal. (The old "restarts" behaviour badge was removed —
+// abandoning/deleting rounds is normal; real data-integrity issues live in Friction review.)
 // Reads the is_admin-gated get_power_users() RPC (migration 0088).
 type PUCol =
   | "score" | "completed_rounds" | "games_played" | "active_days" | "total_opens"
@@ -1425,7 +1426,7 @@ function AdminPowerUsers() {
         </div>
       </div>
       <div style={{ color: C.sage, fontSize: 11, marginTop: 2, marginBottom: 8 }}>
-        Top 25 by composite score — tap a column to sort. <b style={{ color: C.gold }}>restarts</b> = kept starting rounds that didn't finish; <b style={{ color: C.cream }}>quiet</b> = no activity 30d+.
+        Top 25 by composite score — tap a column to sort. <b style={{ color: C.cream }}>quiet</b> = no activity 30d+.
       </div>
 
       {!rows ? <div style={{ color: C.sage, fontSize: 12 }}>Loading…</div> :
@@ -1452,10 +1453,9 @@ function AdminPowerUsers() {
                     <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {r.display_name || "—"}
                     </div>
-                    {(r.friction || r.churned) ? (
+                    {r.churned ? (
                       <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
-                        {r.friction ? <span style={{ fontSize: 10, color: C.green, background: C.gold, borderRadius: 4, padding: "0 5px", fontWeight: 700 }}>restarts</span> : null}
-                        {r.churned ? <span style={{ fontSize: 10, color: C.cream, background: C.greenMid, borderRadius: 4, padding: "0 5px", fontWeight: 700 }}>quiet</span> : null}
+                        <span style={{ fontSize: 10, color: C.cream, background: C.greenMid, borderRadius: 4, padding: "0 5px", fontWeight: 700 }}>quiet</span>
                       </div>
                     ) : null}
                   </td>
@@ -1887,7 +1887,6 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
       {showAnalytics && (
         <>
           <Eyebrow>★ ADMIN · ANALYTICS</Eyebrow>
-          <AdminFrictionReview />
           <AdminAnalytics />
           <AdminExtraStats />
           <AdminDailyReport />
@@ -2776,7 +2775,9 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
   const [todos, setTodos] = useState<any>({});
   useEffect(() => {
     if (!isMaster) return;
-    supabase.rpc("get_admin_todos").then(({ data }: any) => setTodos(data || {}), () => {});
+    supabase.rpc("get_admin_todos").then(({ data }: any) => setTodos((t: any) => ({ ...t, ...(data || {}) })), () => {});
+    supabase.rpc("get_friction_items", { p_status: "open" }).then(
+      ({ data }: any) => setTodos((t: any) => ({ ...t, friction_open: (data || []).length })), () => {});
   }, [isMaster]);
 
   const Card = ({ icon, name, cap, onClick, badge }: { icon: string; name: string; cap: string; onClick: () => void; badge?: number }) => (
@@ -2805,7 +2806,8 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
   if (view) {
     let title = ""; let panel: React.ReactNode = null;
     switch (view) {
-      case "analytics": title = "Analytics"; panel = <><AdminFrictionReview /><AdminAnalytics /><AdminExtraStats /><AdminDailyReport /><AdminEngagement /><AdminPowerUsers /></>; break;
+      case "analytics": title = "Analytics"; panel = <><AdminAnalytics /><AdminExtraStats /><AdminDailyReport /><AdminEngagement /><AdminPowerUsers /></>; break;
+      case "friction": title = "Friction review"; panel = <AdminFrictionReview />; break;
       case "operations": title = "Operations"; panel = <OpsMetrics />; break;
       case "diagnostics": title = "Diagnostics"; panel = <RoundSaveDiag />; break;
       case "activity": title = "Activity log"; panel = <ActivityTab />; break;
@@ -2847,6 +2849,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
           {grid(<>
             <Card icon="📊" name="Analytics" cap="Usage, engagement & golf cadence" onClick={() => setView("analytics")} />
             <Card icon="🧭" name="Operations" cap="Nudge funnel, auto-finish, stale rounds" onClick={() => setView("operations")} badge={todos.stale_ready} />
+            <Card icon="⚠︎" name="Friction review" cap="Data-integrity flags to review & clear" onClick={() => setView("friction")} badge={todos.friction_open} />
             <Card icon="📜" name="Activity log" cap="Audit trail across all clubs" onClick={() => setView("activity")} />
             <Card icon="🏟" name="Clubs oversight" cap="Approve clubs, support sessions" onClick={() => setView("oversight")} badge={todos.pending_clubs} />
             <Card icon="🧑‍🤝‍🧑" name="Users" cap="Global roster, suspend, merge" onClick={() => setView("users")} />
