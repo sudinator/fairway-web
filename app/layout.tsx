@@ -1,4 +1,5 @@
 import { RegisterSW } from "@/components/register-sw";
+import "./globals.css";
 
 export const metadata = {
   title: "Birdie Num Num",
@@ -30,8 +31,8 @@ export const viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" style={{ height: "100%", overflow: "hidden" }}>
-      <body style={{ margin: 0, position: "fixed", inset: 0, overflow: "hidden", overscrollBehavior: "none", background: "#0E3B2E", fontFamily: "-apple-system, 'Segoe UI', Roboto, sans-serif", paddingTop: "env(safe-area-inset-top)" }}>
+    <html lang="en">
+      <body>
         <RegisterSW />
         {children}
       </body>

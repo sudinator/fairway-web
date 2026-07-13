@@ -1,0 +1,32 @@
+/* Global viewport + scroll lock for the installed PWA.
+ *
+ * Why 100lvh (not 100dvh/100vh): with the body pinned via position:fixed to kill the iOS
+ * document rubber-band, iOS resolves the small viewport (svh) for it, which stops ~62px
+ * short of the physical screen bottom and leaves a visible gap below the bottom nav.
+ * 100lvh is the true full-screen height, so the shell reaches the real bottom edge.
+ *
+ * Bounce prevention: position:fixed + overscroll-behavior:none on html/body. Only the
+ * inner scroll container (in home.tsx) scrolls.
+ *
+ * Safe areas: top inset handled by body padding-top (status bar is black-translucent, so
+ * content extends under it); bottom inset (home indicator) handled by the nav's padding. */
+html {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  margin: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 100vh;   /* fallback for older iOS without lvh */
+  height: 100lvh;  /* true full-screen height; avoids the bottom gap */
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: #0E3B2E;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  padding-top: env(safe-area-inset-top);
+}

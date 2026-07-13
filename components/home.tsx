@@ -79,17 +79,25 @@ function ViewportDiag() {
   };
 
   useEffect(() => {
-    setOn(diagEnabled());
-    if (!diagEnabled()) return;
+    let alive = true;
+    let prev = false;
+    const sync = () => {
+      if (!alive) return;
+      const en = diagEnabled();
+      setOn(en);
+      if (en && !prev) requestAnimationFrame(measure); // just turned on → capture
+      prev = en;
+    };
+    sync();
+    const poll = setInterval(sync, 800); // reflect the Admin toggle without a reload
     const run = () => requestAnimationFrame(measure);
-    run();
-    const t = setTimeout(run, 400); // after layout settles
     window.addEventListener("resize", run);
     window.addEventListener("orientationchange", run);
     const vv = (window as any).visualViewport;
     vv?.addEventListener("resize", run);
     return () => {
-      clearTimeout(t);
+      alive = false;
+      clearInterval(poll);
       window.removeEventListener("resize", run);
       window.removeEventListener("orientationchange", run);
       vv?.removeEventListener("resize", run);
@@ -598,7 +606,7 @@ export function Home({ session }: { session: any }) {
   }
 
   return (
-    <div data-diag="shell" style={{ height: "calc(100dvh - env(safe-area-inset-top))", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div data-diag="shell" style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <Toaster />
       <ViewportDiag />
       <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>

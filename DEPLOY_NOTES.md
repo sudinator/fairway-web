@@ -2651,3 +2651,21 @@ guess at dvh/safe-area again, added a ViewportDiag overlay (home.tsx, self-gates
 in Admin -> Diagnostics) that measures innerHeight, docClientH, visualViewport, 100dvh/svh/lvh, both
 safe-area insets, and the real rects of the shell + nav, then reports GAP_below_nav = innerHeight -
 nav.bottom. Copy button dumps JSON. Once we have the numbers the fix is deterministic.
+
+### v1.136.4 — DIAGNOSTIC: viewport panel reacts to the toggle live (no migration)
+ViewportDiag read diagEnabled() once at mount; since it lives on the always-mounted Home shell,
+enabling the toggle mid-session didn't surface it without a full reload. Now polls the flag every 800ms
+so toggling on/off in Admin -> Diagnostics shows/hides the panel within a second. No reload needed.
+
+### v1.136.5 — FIX: bottom-of-screen gap below the nav (no migration)
+Root cause found via the viewport diag + a screenshot: the position:fixed;inset:0 body from 1.136.2
+(added to kill the bounce) made iOS resolve the SMALL viewport (svh = 894 on the test device) for the
+body, which stops 62px short of the real screen (lvh = 956) — that shortfall was the green gap below
+the nav. GAP_below_nav read 0 because it compared against innerHeight/svh (894), not the true screen.
+Fix (app/globals.css, new): html/body locked with overflow:hidden + overscroll-behavior:none; body
+position:fixed sized to height:100lvh (fallback 100vh) so it fills the FULL screen; padding-top keeps
+content below the black-translucent status bar. Shell height switched from calc(100dvh - safeTop) to
+100% so it fills the body content box exactly. Bounce stays fixed; nav now reaches the physical bottom.
+After deploy the diag should show bodyH ~956 and navBottom ~956 (GAP_below_nav will read ~-62 because
+that metric still references svh/innerHeight; the negative just means the nav now extends past svh to
+the real bottom — visually correct).
