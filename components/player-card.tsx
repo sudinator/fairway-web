@@ -11,24 +11,54 @@ const supabase = createClient();
 const TIER_COLOR: Record<string, string> = { common: C.sage, rare: "#7FB8FF", elite: C.gold };
 const TIER_RANK: Record<string, number> = { elite: 0, rare: 1, common: 2 };
 
-type BestItem = { label: string; val: string };
-type BadgeItem = { key: string; icon: string; label: string; tier: string };
-type CardView = { name: string; avatarUrl?: string | null; index: number | null; trend: number | null; roundsPlayed: number; bests: BestItem[]; badges: BadgeItem[]; form: number[] };
+type BadgeItem = { key: string; icon: string; label: string; tier: string; count?: number };
+type CardView = { name: string; avatarUrl?: string | null; index: number | null; trend: number | null; roundsPlayed: number; badges: BadgeItem[]; form: number[] };
 
-function buildBests(bestMap: Record<string, number>): BestItem[] {
-  const b: BestItem[] = [];
-  if (bestMap.best_differential != null) b.push({ label: "best differential", val: bestMap.best_differential.toFixed(1) });
-  if (bestMap.best_vs_par != null) { const v = bestMap.best_vs_par; b.push({ label: "best vs par", val: v === 0 ? "E" : v > 0 ? `+${v}` : `${v}` }); }
-  if (bestMap.best_gir != null) b.push({ label: "best greens", val: `${bestMap.best_gir}` });
-  else if (bestMap.best_fairways != null) b.push({ label: "best fairways", val: `${bestMap.best_fairways}` });
-  return b;
-}
-function buildBadges(rows: { badge_key: string; last_earned_at?: string }[]): BadgeItem[] {
-  return rows
-    .map((e) => ({ e, def: BADGE_BY_KEY[e.badge_key] }))
-    .filter((x) => x.def)
-    .sort((a, b) => (TIER_RANK[a.def.tier] - TIER_RANK[b.def.tier]) || (b.e.last_earned_at || "").localeCompare(a.e.last_earned_at || ""))
-    .map((x) => ({ key: x.e.badge_key, icon: x.def.icon, label: x.def.label, tier: x.def.tier }));
+type EarnedLite = { badge_key: string; count?: number; last_earned_at?: string };
+
+// Curation for the profile / peer card. The full history lives on the Achievements wall; this
+// summary is deliberately selective so each chip means something to another player:
+//  - drop personal single-value records (a peer can't read "best vs par -2")
+//  - drop redundant "first X" badges (subsumed by the count badge or the milestone)
+//  - collapse the gross-score chain to the best cleared, the rounds chain to the highest reached
+//  - bogey-free streaks stay as normal chips but read hardest-first within a tier (bogeyTie)
+//  - everything repeatable carries its ×count; headline scoring counts are pinned
+const CARD_EXCLUDE = new Set(["best_vs_par", "best_differential", "best_gir", "best_fairways", "fewest_putts", "first_birdie", "first_eagle", "first_round"]);
+const BROKE_CHAIN = ["broke_par", "broke_80", "broke_85", "broke_90", "broke_100"]; // best → worst
+const ROUNDS_CHAIN = ["rounds_100", "rounds_50", "rounds_25", "rounds_10", "rounds_5"]; // highest → lowest
+// Bogey-free streaks are ordinary shelf badges now, but within a tier they read hardest-first
+// (a clean nine outranks a 5+ run) rather than by count — otherwise the more frequent, easier
+// streak would jump ahead. Non-family badges score 99 and fall through to the normal count sort.
+const BOGEY_ORDER: Record<string, number> = { bogey_free_round: 0, bogey_free_9: 1, bogey_free_5: 2, bogey_free_3: 3 };
+const bogeyTie = (a: string, b: string) => (BOGEY_ORDER[a] ?? 99) - (BOGEY_ORDER[b] ?? 99);
+const CARD_PIN = new Set(["birdie", "eagle"]); // headline scoring counts — always surfaced
+const CARD_CAP = 8;
+
+function buildBadges(rows: EarnedLite[]): BadgeItem[] {
+  const byKey: Record<string, EarnedLite> = {};
+  rows.forEach((r) => { byKey[r.badge_key] = r; });
+  const brokeBest = BROKE_CHAIN.find((k) => byKey[k] && (byKey[k].count || 0) > 0);
+  const roundsTop = ROUNDS_CHAIN.find((k) => byKey[k]);
+
+  const items = rows
+    .map((r) => ({ r, def: BADGE_BY_KEY[r.badge_key] }))
+    .filter(({ r, def }) =>
+      def &&
+      !CARD_EXCLUDE.has(r.badge_key) &&
+      !(BROKE_CHAIN.includes(r.badge_key) && r.badge_key !== brokeBest) &&
+      !(ROUNDS_CHAIN.includes(r.badge_key) && r.badge_key !== roundsTop))
+    .map(({ r, def }) => ({ key: r.badge_key, def, count: r.count || 0, last: r.last_earned_at || "" }));
+
+  items.sort((a, b) =>
+    (TIER_RANK[a.def.tier] - TIER_RANK[b.def.tier]) || bogeyTie(a.key, b.key) || (b.count - a.count) || b.last.localeCompare(a.last));
+
+  // Cap, but never drop a pinned headline badge that was actually earned.
+  let capped = items.slice(0, CARD_CAP);
+  for (const it of items) {
+    if (CARD_PIN.has(it.key) && !capped.some((c) => c.key === it.key)) capped = capped.slice(0, CARD_CAP - 1).concat(it);
+  }
+  capped.sort((a, b) => (TIER_RANK[a.def.tier] - TIER_RANK[b.def.tier]) || bogeyTie(a.key, b.key) || (b.count - a.count));
+  return capped.map((x) => ({ key: x.key, icon: x.def.icon, label: x.def.label, tier: x.def.tier, count: x.def.kind === "count" ? x.count : undefined }));
 }
 
 // Contextual mini-chart for the rolling-form series: y-scale labels (best/worst
@@ -76,7 +106,7 @@ function FormChart({ data }: { data: number[] }) {
 
 // Presentational — renders any card, self or peer, from normalized view data.
 export function PlayerCardView({ view }: { view: CardView }) {
-  const { name, avatarUrl, index, trend, roundsPlayed, bests, badges, form } = view;
+  const { name, avatarUrl, index, trend, roundsPlayed, badges, form } = view;
   return (
     <div style={{ background: "linear-gradient(180deg,#1d5f47,#153f30)", border: `1px solid ${C.greenMid}`, borderRadius: 16, padding: 16, overflow: "hidden" }}>
       <div style={{ display: "flex", gap: 13, alignItems: "center" }}>
@@ -94,24 +124,18 @@ export function PlayerCardView({ view }: { view: CardView }) {
         </div>
       </div>
 
-      {bests.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${bests.length}, 1fr)`, gap: 8, marginTop: 14 }}>
-          {bests.map((b) => (
-            <div key={b.label} style={{ background: "rgba(0,0,0,.18)", borderRadius: 10, padding: "9px 6px", textAlign: "center" }}>
-              <div style={{ fontSize: 16, fontWeight: 800, color: C.cream }}>{b.val}</div>
-              <div style={{ fontSize: 11, color: C.sage, marginTop: 2 }}>{b.label}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {badges.length > 0 && (
         <div style={{ marginTop: 14 }}>
           <div style={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>Badges</div>
           <div className="bnn-noscroll" style={{ display: "flex", gap: 12, overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}>
             {badges.map((b) => (
               <div key={b.key} style={{ flex: "none", width: 62, textAlign: "center" }}>
-                <div style={{ width: 46, height: 46, margin: "0 auto", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, background: "radial-gradient(circle at 50% 32%, #20624a, #0e3a2c)", border: `2px solid ${TIER_COLOR[b.tier]}`, boxShadow: b.tier !== "common" ? `0 0 12px -4px ${TIER_COLOR[b.tier]}` : "none" }}>{b.icon}</div>
+                <div style={{ position: "relative", width: 46, height: 46, margin: "0 auto" }}>
+                  <div style={{ width: 46, height: 46, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, background: "radial-gradient(circle at 50% 32%, #20624a, #0e3a2c)", border: `2px solid ${TIER_COLOR[b.tier]}`, boxShadow: b.tier !== "common" ? `0 0 12px -4px ${TIER_COLOR[b.tier]}` : "none" }}>{b.icon}</div>
+                  {b.count != null && b.count > 1 && (
+                    <span style={{ position: "absolute", right: -4, top: -4, minWidth: 18, height: 18, padding: "0 4px", borderRadius: 9, background: C.gold, color: "#1c1c15", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #10402f" }}>{"×"}{b.count}</span>
+                  )}
+                </div>
                 <div style={{ fontSize: 11, color: C.sage, marginTop: 5, lineHeight: 1.2 }}>{b.label}</div>
               </div>
             ))}
@@ -160,7 +184,6 @@ export function PlayerCard({ profile, user, rounds = [] }: { profile: any; user:
   }, [user.id, rounds.length]);
 
   const view: CardView = useMemo(() => {
-    const bestMap: Record<string, number> = {}; earned.forEach((e) => { if (e.best_value != null) bestMap[e.badge_key] = Number(e.best_value); });
     const s = computeCardStats(rounds);
     return {
       name: profile?.display_name || "Player",
@@ -168,7 +191,6 @@ export function PlayerCard({ profile, user, rounds = [] }: { profile: any; user:
       index: s.idx ?? (profile?.handicap_index != null ? Number(profile.handicap_index) : null),
       trend: s.idx_trend,
       roundsPlayed: s.rounds,
-      bests: buildBests(bestMap),
       badges: buildBadges(earned),
       form: s.form,
     };
@@ -197,15 +219,14 @@ export function PeerCardModal({ member, groupId, viewerUserId, onClose }: { memb
       if (!alive) return;
       const mine = (badges || []).filter((b: any) => b.user_id === uid);
       const card = (cards || []).find((c: any) => c.user_id === uid) || null;
-      const bestMap: Record<string, number> = {}; mine.forEach((b: any) => { if (b.best_value != null) bestMap[b.badge_key] = Number(b.best_value); });
+      const badgeRows = mine.map((b: any) => ({ badge_key: b.badge_key, count: b.count, last_earned_at: b.last_earned_at }));
       setView({
         name: p.display_name || member.email || "Player",
         avatarUrl: member.avatar_url,
         index: card?.idx != null ? Number(card.idx) : (p.handicap_index != null ? Number(p.handicap_index) : null),
         trend: card?.idx_trend != null ? Number(card.idx_trend) : null,
         roundsPlayed: card?.rounds ?? 0,
-        bests: buildBests(bestMap),
-        badges: buildBadges(mine.map((b: any) => ({ badge_key: b.badge_key, last_earned_at: b.last_earned_at }))),
+        badges: buildBadges(badgeRows),
         form: (card?.form as number[]) || [],
       });
       setLoading(false);

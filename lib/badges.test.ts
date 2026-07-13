@@ -150,7 +150,7 @@ const parRound = () => mkRound(Array(18).fill([4, 4, 2, "hit"]) as HS[]);
   const rA = mkRound(early, { id: "A", played_at: "2026-06-01" });
   const rB = mkRound(late, { id: "B", played_at: "2026-06-15" });
   const state = computeBadgeState([rB, rA]); // pass out of order; fn sorts
-  ok("broke_80 earned once", state["broke_80"]?.count === 1);
+  ok("broke_80 counts both sub-80 rounds", state["broke_80"]?.count === 2);
   ok("broke_80 first date = earlier round", state["broke_80"]?.first_earned_at === "2026-06-01");
   ok("best_vs_par record = 5 (the 77)", Number(state["best_vs_par"]?.best_value) === 5);
   ok("best_vs_par record_round = newer round B", state["best_vs_par"]?.best_round_id === "B");

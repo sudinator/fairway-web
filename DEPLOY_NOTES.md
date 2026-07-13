@@ -2851,3 +2851,58 @@ won't surface anything older than 90 days because it's gone. Run 0095 in the SQL
 ### v1.145.2 — Surface the 90-day retention to users
 Notifications screen now shows a footer line: 'Notifications are kept for 90 days, then removed
 automatically.' so the purge (0095) isn't a surprise. Client-only, no migration.
+
+### v1.146.0 — FEATURE: tappable 'live' notifications — no migration
+Notifications that carry a link (the event types: game_added, game_finished, money_owed/paid,
+bet_posted, tee_new, tee_reminder, group_member — stored by the 0069–0074 triggers as /?tab=… or
+/?tt=<id>) are now tappable in BOTH the bell panel and the Notifications screen, routing in-app with
+no reload. home.navigateFromNotif() parses the link: ?tt=<id> → tee-times deep link, ?tab=<name> →
+that tab. Tapping also marks the item read. A › chevron + pointer cursor mark the clickable ones;
+link-less informational notifications (admin messages, handicap changes) stay tap-to-acknowledge only.
+Passed via new onNavigate prop on NotificationBell + NotificationsScreen.
+
+### v1.147.0 — FEATURE: adaptive dense dashboard charts + standard × on tile popups — no migration
+Both dashboard trend charts (SCORING FORM · DIFFERENTIAL and the tap-a-stat detail drawer) now
+switch presentation by how many rounds are actually in view. Threshold: >30 rounds.
+• ≤30 rounds: unchanged — per-round coloured bars + rolling line(s), round-number x-axis.
+• >30 rounds (dense): new AdaptiveTrend view — raw rounds fade to faint dots, a SINGLE 5-round
+  rolling-average line becomes the hero, gradient-coloured green where it beats your average and
+  red where it doesn't (direction respects lower-is-better vs higher-is-better per stat), a dashed
+  gold average reference line, and a DATE x-axis (preserveStartEnd, thinned) instead of round number.
+  The 10-round line is intentionally dropped in dense view to keep it to one line (recent form).
+Gradient is keyed to the rolling line's own min/max vs avg (objectBoundingBox), so it stays correct
+regardless of y-domain padding, and collapses to a single colour when the line never crosses avg.
+Captions swap to match the active view. AdaptiveTrend is a shared helper in dashboard.tsx.
+Also: tile detail popup close is now a standard corner × icon button (was a 'Close ✕' text button) —
+the pattern to reuse on any future popup.
+
+### v1.148.0 — FEATURE: curated profile/peer card badges + times-earned counts — no migration
+The player card (both your own profile card and the peer card opened from the roster) is now a
+selective summary rather than a dump of every badge. The full history stays on the Achievements wall.
+Card curation (components/player-card.tsx):
+• Personal single-value records removed from the card: best vs par, best differential, best greens,
+  best fairways, fewest putts (the old 'bests' row is gone) — they mean nothing to a peer.
+• Redundant 'first birdie / first eagle / first round' badges dropped (subsumed by counts/milestones).
+• Gross-score chain collapses to the BEST cleared (Broke 85 implies 90/100); rounds chain to the
+  HIGHEST milestone reached. Only the top rung shows.
+• Every repeatable badge shows its ×count (Scramble master ×7, No blow-ups ×4, Birdie ×7, …).
+  Birdie + eagle are pinned so their counts always surface. Shelf capped at 8, ordered elite→rare→common.
+• Bogey-free streaks pulled into their own 'Consistency' funnel (3+ / 5+ / a full nine / whole round)
+  with per-length round counts — shows steadiness at each scale instead of one collapsed badge.
+Badge engine (lib/badges.ts): the broke_100/90/85/80/broke_par badges changed from 'once' to 'count',
+so their stored count is now the NUMBER OF ROUNDS that cleared the threshold (was: first time only).
+syncBadges is diff-based and recomputes from each player's rounds on load, so these counts backfill
+automatically the next time each user's card syncs — no manual migration/backfill needed.
+Peer card now passes group_badges.count through (the RPC already returned it; the client was dropping it).
+
+### v1.148.1 — FIX: count pill moved to top-right — no migration
+The ×count badge on the profile/peer card and the Achievements wall was anchored bottom-right and
+overlapped the badge label directly below it. Moved to top-right (right:-4, top:-4) on both surfaces.
+
+### v1.148.2 — REFINE: bogey-free streaks are normal shelf badges — no migration
+Dropped the separate 'Consistency' block. The four bogey-free streak badges (3+/5+/nine/round) are
+now ordinary chips in the badge shelf, each with its ×count, sorted with everything else by tier so
+Bogey-free round (elite) leads and 3+ (common) sits back. Within a tier they read hardest-first via a
+bogeyTie comparator (nine before 5+) instead of by count. Consequence: as normal badges they compete
+for the 8-chip cap, so 3+ can be pushed off on players with many common badges. buildConsistency and
+the ConsistItem type removed.

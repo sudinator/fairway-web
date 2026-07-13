@@ -204,6 +204,23 @@ export function Home({ session }: { session: any }) {
     } catch { /* ignore */ }
   }, []);
 
+  // In-app navigation when a "live" notification (one carrying a link) is tapped. Parses the
+  // stored link (/?tab=… or /?tt=<id>) and routes without a full reload.
+  const navigateFromNotif = (link?: string | null) => {
+    if (!link) return;
+    try {
+      const q = new URLSearchParams(link.includes("?") ? link.slice(link.indexOf("?") + 1) : "");
+      const tt = q.get("tt");
+      const t = q.get("tab");
+      setStage(null); setViewing(null); setMoreOpen(false); setReturnTab(null);
+      if (tt) { setDeepTeeId(tt); setTab("teetimes"); }
+      else if (t) {
+        const allowed = ["dashboard", "rounds", "games", "courses", "players", "groups", "admin", "help", "profile", "money", "teetimes", "notifications"];
+        if (allowed.includes(t)) setTab(t as Tab);
+      }
+    } catch { /* ignore malformed links */ }
+  };
+
   // A deep link may point at a tee time in a group the user isn't currently viewing.
   // Resolve that tee time's group and switch to it BEFORE handing the id to TeeTimes,
   // so the tee time is actually in the loaded list when TeeTimes tries to open it.
@@ -636,7 +653,7 @@ export function Home({ session }: { session: any }) {
           <div style={{ color: C.cream, fontSize: 15, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayName}</div>
           <div style={{ color: C.sage, fontSize: 12 }}>{index != null ? `Handicap ${index}` : "Set your handicap in Profile"}</div>
         </div>
-        <NotificationBell user={user} onSeeAll={() => { setTab("notifications"); setReturnTab(null); setStage(null); setViewing(null); }} />
+        <NotificationBell user={user} onNavigate={navigateFromNotif} onSeeAll={() => { setTab("notifications"); setReturnTab(null); setStage(null); setViewing(null); }} />
         {tab !== "money" && <button style={{ ...btn(true), opacity: activeGroup ? 1 : 0.5 }} disabled={!activeGroup} onClick={() => {
           if (dbInProgress) {
             if (typeof window !== "undefined") window.alert(`You have an unfinished round at ${dbInProgress.course || "a course"}. Finish it, mark it complete, or discard it before starting a new one.`);
@@ -770,7 +787,7 @@ export function Home({ session }: { session: any }) {
         ) : tab === "help" ? (
           <HelpPage isAdmin={!!profile?.is_admin} user={user} displayName={displayName} groupId={activeGroupId} />
         ) : tab === "notifications" ? (
-          <NotificationsScreen user={user} />
+          <NotificationsScreen user={user} onNavigate={navigateFromNotif} />
         ) : tab === "profile" ? (
           <ProfilePanel profile={profile} user={user} onSaved={loadProfile} badgeRefresh={badgeSync} rounds={rounds} />
         ) : tab === "teetimes" && activeGroup ? (

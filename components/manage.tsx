@@ -2091,7 +2091,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
 }
 
 // ================= Notification bell =================
-export function NotificationBell({ user, onSeeAll }: { user: any; onSeeAll?: () => void }) {
+export function NotificationBell({ user, onSeeAll, onNavigate }: { user: any; onSeeAll?: () => void; onNavigate?: (link?: string | null) => void }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<any[]>([]);
 
@@ -2144,12 +2144,14 @@ export function NotificationBell({ user, onSeeAll }: { user: any; onSeeAll?: () 
             <div style={{ overflowY: "auto", padding: "2px 8px 8px" }}>
               {items.length === 0 && <div style={{ color: C.sage, fontSize: 13, padding: 18, textAlign: "center" }}>Nothing yet.</div>}
               {items.map((n) => (
-                <div key={n.id} onClick={() => { if (!n.read) markOne(n.id); }} style={{ padding: "11px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", display: "flex", gap: 9, cursor: n.read ? "default" : "pointer" }}>
+                <div key={n.id} onClick={() => { if (!n.read) markOne(n.id); if (n.link && onNavigate) { setOpen(false); onNavigate(n.link); } }}
+                  style={{ padding: "11px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", display: "flex", gap: 9, cursor: (n.link || !n.read) ? "pointer" : "default" }}>
                   <span style={{ width: 7, height: 7, borderRadius: 4, background: n.read ? "transparent" : C.gold, marginTop: 5, flexShrink: 0 }} />
-                  <div style={{ minWidth: 0 }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ color: n.read ? "#CFC9B4" : C.cream, fontSize: 13, lineHeight: 1.4, fontWeight: n.read ? 500 : 800 }}>{n.message}</div>
                     <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{fmtNotifTime(n.created_at)}</div>
                   </div>
+                  {n.link ? <span style={{ color: C.sage, fontSize: 18, alignSelf: "center", flexShrink: 0 }}>›</span> : null}
                 </div>
               ))}
               {onSeeAll && (
@@ -2169,7 +2171,7 @@ export { notify };
 // ================= Notifications screen (full history) =================
 // A user's complete notification history, paginated. The bell shows the recent 30 as a quick
 // peek; this is the durable record so nothing sent to a user is ever out of reach.
-export function NotificationsScreen({ user }: { user: any }) {
+export function NotificationsScreen({ user, onNavigate }: { user: any; onNavigate?: (link?: string | null) => void }) {
   const [items, setItems] = useState<any[]>([]);
   const [limit, setLimit] = useState(30);
   const [loading, setLoading] = useState(true);
@@ -2209,13 +2211,14 @@ export function NotificationsScreen({ user }: { user: any }) {
       ) : (
         <>
           {items.map((n) => (
-            <div key={n.id} onClick={() => { if (!n.read) markOne(n.id); }}
-              style={{ background: C.card, borderRadius: 12, padding: "13px 16px", marginTop: 10, display: "flex", gap: 11, cursor: n.read ? "default" : "pointer" }}>
+            <div key={n.id} onClick={() => { if (!n.read) markOne(n.id); if (n.link && onNavigate) onNavigate(n.link); }}
+              style={{ background: C.card, borderRadius: 12, padding: "13px 16px", marginTop: 10, display: "flex", gap: 11, cursor: (n.link || !n.read) ? "pointer" : "default" }}>
               <span style={{ width: 8, height: 8, borderRadius: 4, background: n.read ? "transparent" : C.gold, marginTop: 6, flexShrink: 0 }} />
-              <div style={{ minWidth: 0 }}>
+              <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ color: n.read ? "#6B6857" : C.ink, fontSize: 14, lineHeight: 1.4, fontWeight: n.read ? 500 : 800 }}>{n.message}</div>
                 <div style={{ color: C.faint, fontSize: 11, marginTop: 3 }}>{notifWhen(n.created_at)}</div>
               </div>
+              {n.link ? <span style={{ color: C.faint, fontSize: 20, alignSelf: "center", flexShrink: 0 }}>›</span> : null}
             </div>
           ))}
           {hasMore && (

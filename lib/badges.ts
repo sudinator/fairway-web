@@ -30,11 +30,11 @@ export const BADGES: BadgeDef[] = [
   { key: "first_eagle", label: "First eagle", icon: "✨", tier: "rare", kind: "once", category: "scoring", desc: "Made your first eagle." },
   { key: "par_train", label: "Par train", icon: "🚂", tier: "common", kind: "count", category: "scoring", desc: "Four or more pars in a row." },
   { key: "even_par_nine", label: "Even-par nine", icon: "⚖️", tier: "rare", kind: "count", category: "scoring", desc: "Level par or better over a nine." },
-  { key: "broke_100", label: "Broke 100", icon: "💯", tier: "common", kind: "once", category: "scoring", desc: "Shot under 100 for the first time." },
-  { key: "broke_90", label: "Broke 90", icon: "9️⃣", tier: "common", kind: "once", category: "scoring", desc: "Shot under 90 for the first time." },
-  { key: "broke_85", label: "Broke 85", icon: "🎿", tier: "rare", kind: "once", category: "scoring", desc: "Shot under 85 for the first time." },
-  { key: "broke_80", label: "Broke 80", icon: "8️⃣", tier: "rare", kind: "once", category: "scoring", desc: "Shot under 80 for the first time." },
-  { key: "broke_par", label: "Broke par", icon: "👑", tier: "elite", kind: "once", category: "scoring", desc: "Shot par or better for a round." },
+  { key: "broke_100", label: "Broke 100", icon: "💯", tier: "common", kind: "count", category: "scoring", desc: "Rounds you've shot under 100." },
+  { key: "broke_90", label: "Broke 90", icon: "9️⃣", tier: "common", kind: "count", category: "scoring", desc: "Rounds you've shot under 90." },
+  { key: "broke_85", label: "Broke 85", icon: "🎿", tier: "rare", kind: "count", category: "scoring", desc: "Rounds you've shot under 85." },
+  { key: "broke_80", label: "Broke 80", icon: "8️⃣", tier: "rare", kind: "count", category: "scoring", desc: "Rounds you've shot under 80." },
+  { key: "broke_par", label: "Broke par", icon: "👑", tier: "elite", kind: "count", category: "scoring", desc: "Rounds you've shot at par or better." },
 
   // --- Streaks & consistency ---
   { key: "bogey_free_3", label: "Bogey-free 3+", icon: "✅", tier: "common", kind: "count", category: "streaks", desc: "Three or more holes in a row without a bogey." },
@@ -102,9 +102,11 @@ export function evaluateRound(r: Round, prior: PriorBadges): Award[] {
   if (fullRound && gross != null && par != null) {
     const vsPar = gross - par;
     considerBest("best_vs_par", vsPar, -1);
+    // Count how many rounds clear each gross threshold (not just the first). A round under
+    // 85 also counts toward 90 and 100 — the peer card collapses to the best one earned.
     for (const [key, thr] of [["broke_100", 100], ["broke_90", 90], ["broke_85", 85], ["broke_80", 80]] as const)
-      if (gross < thr && !prior.earned.has(key)) add(key, "once");
-    if (vsPar <= 0 && !prior.earned.has("broke_par")) add("broke_par", "once");
+      if (gross < thr) add(key, "count");
+    if (vsPar <= 0) add("broke_par", "count");
   }
 
   // Everything below needs per-hole detail

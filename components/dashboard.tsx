@@ -50,6 +50,44 @@ function ChartTip({ active, payload, nameMap, fmt }: any) {
     </div>
   );
 }
+// Dense-view trend chart: faint raw dots + a single 5-round rolling line that runs green when
+// you're beating your average and red when you're not (gradient keyed to the rolling line's own
+// range vs `avg`), a dashed average reference, and a date x-axis. Used once a range has enough
+// rounds that per-round bars would be unreadable.
+function AdaptiveTrend({ data, valueKey, rollKey, avg, lowerBetter, domain, pctStat, nameMap, fmt }: {
+  data: any[]; valueKey: string; rollKey: string; avg: number | null; lowerBetter: boolean;
+  domain?: any; pctStat?: boolean; nameMap: Record<string, string>; fmt: (v: any) => any;
+}) {
+  const rolls = data.map((d) => d[rollKey]).filter((v: any): v is number => v != null);
+  const rMax = rolls.length ? Math.max(...rolls) : 1;
+  const rMin = rolls.length ? Math.min(...rolls) : 0;
+  const span = rMax - rMin || 1;
+  const off = Math.max(0, Math.min(1, avg == null ? 0.5 : (rMax - avg) / span));
+  const gid = `rollgrad-${valueKey}-${rollKey}`;
+  const beat = "#9be9c0", miss = "#f3a3a0";
+  // Gradient runs top(0)=rMax … bottom(1)=rMin. lowerBetter: above avg (top) is worse → red.
+  const stops: [number, string][] = lowerBetter
+    ? [[0, miss], [off, miss], [off, beat], [1, beat]]
+    : [[0, beat], [off, beat], [off, miss], [1, miss]];
+  return (
+    <ResponsiveContainer>
+      <ComposedChart data={data} margin={{ top: 5, right: 6, left: -8, bottom: 0 }}>
+        <defs>
+          <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            {stops.map(([o, c], i) => <stop key={i} offset={o} stopColor={c} />)}
+          </linearGradient>
+        </defs>
+        <XAxis dataKey="name" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} interval="preserveStartEnd" minTickGap={28} />
+        <YAxis domain={domain ?? ["auto", "auto"]} allowDecimals={!pctStat} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={30} />
+        <Tooltip cursor={{ stroke: "rgba(255,255,255,0.12)" }} content={<ChartTip nameMap={nameMap} fmt={fmt} />} />
+        {avg != null && <ReferenceLine y={Math.round(avg * 10) / 10} stroke={C.gold} strokeDasharray="5 4" />}
+        <Line type="monotone" dataKey={valueKey} stroke="transparent" isAnimationActive={false} dot={{ r: 2, fill: C.sage, fillOpacity: 0.28, stroke: "none" }} />
+        <Line type="monotone" dataKey={rollKey} stroke={`url(#${gid})`} strokeWidth={3} dot={false} connectNulls isAnimationActive={false} />
+      </ComposedChart>
+    </ResponsiveContainer>
+  );
+}
+
 export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userEmail, userId, savedCoach, onCoachSaved, onViewAchievements }: {
   rounds: Round[]; name: string; onOpen: (r: Round) => void;
   currentIndex: number | null; saveIndex: (i: number | null) => void;
@@ -312,6 +350,10 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
             </div>
           )}
           <div style={{ height: 200, marginTop: 12 }}>
+            {diffTrend.length > 30 ? (
+              <AdaptiveTrend data={diffTrend} valueKey="diff" rollKey="roll" avg={diffFormAvg} lowerBetter domain={diffFormDomain}
+                nameMap={{ diff: "Differential", roll: "5-rd avg" }} fmt={(v: any) => (typeof v === "number" ? v.toFixed(1) : v)} />
+            ) : (
             <ResponsiveContainer>
               <ComposedChart data={diffTrend} margin={{ top: 5, right: 6, left: -8, bottom: 0 }}>
                 <XAxis dataKey="i" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} />
@@ -324,9 +366,14 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
                 <Line type="monotone" dataKey="roll" stroke={C.cream} strokeWidth={2.5} dot={{ fill: C.cream, r: 3 }} />
               </ComposedChart>
             </ResponsiveContainer>
+            )}
           </div>
           <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
-            Each bar is one round’s differential (course-adjusted, lower is better). <span style={{ color: "#9be9c0" }}>Green</span> beat your average{diffFormAvg != null ? ` (${diffFormAvg.toFixed(1)})` : ""}, <span style={{ color: "#f3a3a0" }}>red</span> didn’t. The cream line is your 5-round rolling average.{unratedTrend > 0 ? ` ${unratedTrend} round${unratedTrend === 1 ? "" : "s"} not shown (need 18 holes + rating/slope).` : ""}
+            {diffTrend.length > 30 ? (
+              <>Each dot is one round’s differential (course-adjusted, lower is better); the line is your 5-round rolling average — <span style={{ color: "#9be9c0" }}>green</span> when it’s under your average{diffFormAvg != null ? ` (${diffFormAvg.toFixed(1)})` : ""}, <span style={{ color: "#f3a3a0" }}>red</span> when over.{unratedTrend > 0 ? ` ${unratedTrend} round${unratedTrend === 1 ? "" : "s"} not shown (need 18 holes + rating/slope).` : ""}</>
+            ) : (
+              <>Each bar is one round’s differential (course-adjusted, lower is better). <span style={{ color: "#9be9c0" }}>Green</span> beat your average{diffFormAvg != null ? ` (${diffFormAvg.toFixed(1)})` : ""}, <span style={{ color: "#f3a3a0" }}>red</span> didn’t. The cream line is your 5-round rolling average.{unratedTrend > 0 ? ` ${unratedTrend} round${unratedTrend === 1 ? "" : "s"} not shown (need 18 holes + rating/slope).` : ""}</>
+            )}
           </div>
         </div>
       )}
@@ -390,7 +437,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
           <div style={{ display: "flex", alignItems: "center" }}>
             <Eyebrow>{detailLabels[detail]} · TREND</Eyebrow>
             <div style={{ flex: 1 }} />
-            <button style={{ ...btn(false), fontSize: 12 }} onClick={() => setDetail(null)}>Close ✕</button>
+            <button aria-label="Close" onClick={() => setDetail(null)} style={{ background: C.greenMid, border: "none", color: C.cream, width: 30, height: 30, borderRadius: 15, fontSize: 17, fontWeight: 800, lineHeight: 1, cursor: "pointer", flexShrink: 0 }}>×</button>
           </div>
           {(() => {
             const key = detail as StatKey;
@@ -399,9 +446,16 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
             const roll = (i: number, w: number) => { if (i < w - 1) return null; let sum = 0; for (let j = i - w + 1; j <= i; j++) sum += series[j].v; return Math.round((sum / w) * 10) / 10; };
             const data = series.map((x, i) => ({ i: i + 1, val: Math.round(x.v * 10) / 10, roll5: roll(i, 5), roll10: series.length >= 10 ? roll(i, 10) : null, course: x.r.course, name: fmtDate(x.r.played_at) }));
             const pctStat = key === "gir" || key === "fir" || key === "scramble" || key === "sandsave";
+            const seriesAvg = series.reduce((s, x) => s + x.v, 0) / series.length;
+            const dense = data.length > 30;
             return (
               <>
                 <div style={{ height: 210, marginTop: 10 }}>
+                  {dense ? (
+                    <AdaptiveTrend data={data} valueKey="val" rollKey="roll5" avg={seriesAvg} lowerBetter={dirLower.has(key)} pctStat={pctStat}
+                      nameMap={{ val: detailLabels[key], roll5: "5-rd avg" }}
+                      fmt={(v: any) => (typeof v === "number" ? (pctStat ? Math.round(v) + "%" : String(v)) : v)} />
+                  ) : (
                   <ResponsiveContainer>
                     <ComposedChart data={data} margin={{ top: 5, right: 6, left: -8, bottom: 0 }}>
                       <XAxis dataKey="i" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} />
@@ -412,9 +466,14 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
                       {series.length >= 10 && <Line type="monotone" dataKey="roll10" stroke="#4ADE80" strokeWidth={2.5} dot={false} connectNulls />}
                     </ComposedChart>
                   </ResponsiveContainer>
+                  )}
                 </div>
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 4, lineHeight: 1.45 }}>
-                  Each bar is one round ({dirLower.has(key) ? "lower is better" : "higher is better"}). <span style={{ color: C.gold }}>Gold</span> is your 5-round rolling average{series.length >= 10 ? <>; <span style={{ color: "#4ADE80" }}>green</span> is the 10-round.</> : series.length >= 5 ? "; the 10-round line joins at 10 rounds." : "; the rolling line needs 5 rounds."}
+                  {dense ? (
+                    <>Each dot is one round ({dirLower.has(key) ? "lower is better" : "higher is better"}); the line is your 5-round rolling average — <span style={{ color: "#9be9c0" }}>green</span> when it beats your average ({pctStat ? Math.round(seriesAvg) + "%" : seriesAvg.toFixed(1)}), <span style={{ color: "#f3a3a0" }}>red</span> when it doesn’t.</>
+                  ) : (
+                    <>Each bar is one round ({dirLower.has(key) ? "lower is better" : "higher is better"}). <span style={{ color: C.gold }}>Gold</span> is your 5-round rolling average{series.length >= 10 ? <>; <span style={{ color: "#4ADE80" }}>green</span> is the 10-round.</> : series.length >= 5 ? "; the 10-round line joins at 10 rounds." : "; the rolling line needs 5 rounds."}</>
+                  )}
                 </div>
               </>
             );
