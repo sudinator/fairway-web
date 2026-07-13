@@ -49,7 +49,7 @@ export const BADGES: BadgeDef[] = [
   { key: "best_gir", label: "Best greens", icon: "🟢", tier: "common", kind: "best", dir: 1, category: "ballstriking", desc: "Most greens in regulation in a round." },
   { key: "fewest_putts", label: "Fewest putts", icon: "⛳", tier: "rare", kind: "best", dir: -1, category: "ballstriking", desc: "Fewest total putts in a round." },
   { key: "no_three_putts", label: "No 3-putts", icon: "🚫", tier: "common", kind: "count", category: "ballstriking", desc: "A full round without a three-putt." },
-  { key: "no_penalties", label: "Clean card", icon: "🧼", tier: "common", kind: "count", category: "ballstriking", desc: "A full round with no penalty strokes." },
+  { key: "no_penalties", label: "Penalty-free round", icon: "🧼", tier: "common", kind: "count", category: "ballstriking", desc: "A full round with no penalty strokes." },
   { key: "sand_save", label: "Sand save", icon: "🏖️", tier: "rare", kind: "count", category: "ballstriking", desc: "Up-and-down for par from a greenside bunker." },
   { key: "scramble_master", label: "Scramble master", icon: "🎩", tier: "elite", kind: "count", category: "ballstriking", desc: "Four or more up-and-downs in a round." },
 
@@ -303,7 +303,7 @@ export function badgeEvidence(key: string, r: Round): Evidence {
     }
     case "no_blowups": return { text: "No double bogey or worse all round." };
     case "no_three_putts": return { text: "No three-putts all round." };
-    case "no_penalties": return { text: "No penalty strokes — a clean card." };
+    case "no_penalties": return { text: "No penalty strokes all round." };
     case "eagle": { const h = nums(hs.filter((x) => x.strokes != null && x.strokes - x.par <= -2)); return { text: `Eagle or better on hole${s(h)} ${list(h)}.`, holes: h }; }
     case "birdie_par3": { const h = nums(hs.filter((x) => x.par === 3 && x.strokes != null && x.strokes - x.par === -1)); return { text: `Birdie on par-3 hole${s(h)} ${list(h)}.`, holes: h }; }
     case "first_birdie":

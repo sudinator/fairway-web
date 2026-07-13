@@ -2916,3 +2916,8 @@ low handicappers: playing to your handicap earns the streak. Badges relabelled '
 nine/round' with updated descriptions. Par-train, bounce-back, blow-ups, even-par-nine stay GROSS
 (absolute scoring feats) — only bogey-free changed. Keys unchanged; syncBadges recomputes counts from
 each player's rounds on next load, so counts re-derive on net automatically (no backfill).
+
+### v1.148.4 — REFINE: 'Clean card' → 'Penalty-free round', off the summary card — no migration
+no_penalties relabelled 'Penalty-free round' (Clean card was misleading — read as no-bogeys). Evidence
+text updated. Added to the card's CARD_EXCLUDE so it no longer appears on the profile/peer card; it
+still lives on the full Achievements wall. Key unchanged.

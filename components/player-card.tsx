@@ -23,7 +23,7 @@ type EarnedLite = { badge_key: string; count?: number; last_earned_at?: string }
 //  - collapse the gross-score chain to the best cleared, the rounds chain to the highest reached
 //  - bogey-free streaks stay as normal chips but read hardest-first within a tier (bogeyTie)
 //  - everything repeatable carries its ×count; headline scoring counts are pinned
-const CARD_EXCLUDE = new Set(["best_vs_par", "best_differential", "best_gir", "best_fairways", "fewest_putts", "first_birdie", "first_eagle", "first_round"]);
+const CARD_EXCLUDE = new Set(["best_vs_par", "best_differential", "best_gir", "best_fairways", "fewest_putts", "first_birdie", "first_eagle", "first_round", "no_penalties"]);
 const BROKE_CHAIN = ["broke_par", "broke_80", "broke_85", "broke_90", "broke_100"]; // best → worst
 const ROUNDS_CHAIN = ["rounds_100", "rounds_50", "rounds_25", "rounds_10", "rounds_5"]; // highest → lowest
 // Bogey-free streaks are ordinary shelf badges now, but within a tier they read hardest-first
