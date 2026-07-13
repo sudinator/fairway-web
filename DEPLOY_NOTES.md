@@ -2635,3 +2635,12 @@ language sql security definer set search_path = public as $$
 $$;
 grant execute on function public.get_power_users(int) to authenticated;
 ```
+
+### v1.136.2 — FIX: bottom nav no longer rubber-band swipes (no migration)
+The prior nav fix (100dvh flex shell, no position:fixed) stopped drift but the nav sits OUTSIDE the
+inner scroll container, and nothing locked the document — there was no globals.css and html/body had
+no overflow/overscroll rules. So a swipe landing on the nav was handled by the document, which iOS
+elastic-bounced, revealing the body background below the icons as a phantom empty row. Fix: lock the
+viewport at the document level in app/layout.tsx — html { height:100%; overflow:hidden }, body
+{ position:fixed; inset:0; overflow:hidden; overscroll-behavior:none }. Only the inner container
+scrolls now; pull-to-refresh and the More sheet are unchanged.
