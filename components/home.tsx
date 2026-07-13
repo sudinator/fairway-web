@@ -606,7 +606,7 @@ export function Home({ session }: { session: any }) {
   }
 
   return (
-    <div data-diag="shell" style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div data-diag="shell" className="app-shell">
       <Toaster />
       <ViewportDiag />
       <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>

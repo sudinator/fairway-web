@@ -2669,3 +2669,12 @@ content below the black-translucent status bar. Shell height switched from calc(
 After deploy the diag should show bodyH ~956 and navBottom ~956 (GAP_below_nav will read ~-62 because
 that metric still references svh/innerHeight; the negative just means the nav now extends past svh to
 the real bottom — visually correct).
+
+### v1.136.6 — FIX: nav pushed off-screen by 1.136.5 (no migration)
+1.136.5 sized the shell with height:100%, but a wrapper sits between <body> and the shell without a
+fixed height, so the percentage fell back to auto and the shell grew to its full content height
+(diag: shellH 2913, navBottom 2975) — nav off the bottom of the screen. Also bodyH read 1018 =
+100lvh + padding-top (padding was outside the height). Fix: shell now sized with a viewport unit via
+the .app-shell class (100lvh, fallback 100vh) so it's independent of the parent chain; top safe-area
+padding moved INTO the shell with box-sizing:border-box (no overflow); body padding-top removed.
+Expected diag now: bodyH ~956, shellH ~956, navBottom ~956; GAP_below_nav ~-62 (references svh, fine).

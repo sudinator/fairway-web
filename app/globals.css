@@ -1,15 +1,19 @@
 /* Global viewport + scroll lock for the installed PWA.
  *
- * Why 100lvh (not 100dvh/100vh): with the body pinned via position:fixed to kill the iOS
- * document rubber-band, iOS resolves the small viewport (svh) for it, which stops ~62px
- * short of the physical screen bottom and leaves a visible gap below the bottom nav.
- * 100lvh is the true full-screen height, so the shell reaches the real bottom edge.
+ * The shell is sized with a viewport unit (100lvh), NOT height:100%, because there can be
+ * wrapper elements between <body> and the shell without a fixed height — a percentage height
+ * then falls back to auto and the shell grows to fit its content, pushing the bottom nav off
+ * screen. A viewport unit resolves independently of the parent chain.
  *
- * Bounce prevention: position:fixed + overscroll-behavior:none on html/body. Only the
- * inner scroll container (in home.tsx) scrolls.
+ * 100lvh is the true full-screen height (svh/dvh under position:fixed clamp to the small
+ * viewport and leave a gap at the bottom on iOS). 100vh is the fallback and on iOS also
+ * resolves to the full screen, so either way the shell reaches the real bottom edge.
  *
- * Safe areas: top inset handled by body padding-top (status bar is black-translucent, so
- * content extends under it); bottom inset (home indicator) handled by the nav's padding. */
+ * Top safe area (status bar is black-translucent) is padded INSIDE the shell with border-box
+ * so it doesn't add to the height. Bottom safe area (home indicator) is padded by the nav.
+ *
+ * Bounce prevention: position:fixed body + overscroll-behavior:none. Only the inner scroll
+ * container (home.tsx) scrolls. */
 html {
   height: 100%;
   overflow: hidden;
@@ -22,11 +26,20 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  height: 100vh;   /* fallback for older iOS without lvh */
-  height: 100lvh;  /* true full-screen height; avoids the bottom gap */
+  height: 100vh;   /* fallback (on iOS this is already the full screen) */
+  height: 100lvh;  /* true full-screen height */
   overflow: hidden;
   overscroll-behavior: none;
   background: #0E3B2E;
   font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.app-shell {
+  box-sizing: border-box;
+  height: 100vh;   /* fallback */
+  height: 100lvh;  /* full screen, independent of the parent chain */
   padding-top: env(safe-area-inset-top);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
