@@ -14,8 +14,8 @@ import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab, ActivityTab
 import { AdminFeedbackTab } from "@/components/feedback";
 import { MoneyTab } from "@/components/money";
 import { TeeTimes } from "@/components/tee-times";
-import { AchievementsWall } from "@/components/achievements";
 import { syncBadges } from "@/lib/badge-sync";
+import { syncPlayerCard } from "@/lib/card-sync";
 import { RoundSetup } from "@/components/round-setup";
 import { RoundEditor } from "@/components/round-editor";
 import { RoundDetail } from "@/components/round-detail";
@@ -332,6 +332,7 @@ export function Home({ session }: { session: any }) {
     syncBadges(supabase, user.id, rounds).then((res) => {
       if (alive && (res.changed || res.removed)) setBadgeSync((v) => v + 1);
     }).catch(() => {});
+    syncPlayerCard(supabase, user.id, rounds).catch(() => {});
     return () => { alive = false; };
   }, [rounds, user?.id]);
 
@@ -623,10 +624,7 @@ export function Home({ session }: { session: any }) {
         ) : tab === "help" ? (
           <HelpPage isAdmin={!!profile?.is_admin} user={user} displayName={displayName} groupId={activeGroupId} />
         ) : tab === "profile" ? (
-          <>
-            <ProfilePanel profile={profile} user={user} onSaved={loadProfile} />
-            <AchievementsWall user={user} refreshKey={badgeSync} />
-          </>
+          <ProfilePanel profile={profile} user={user} onSaved={loadProfile} badgeRefresh={badgeSync} rounds={rounds} />
         ) : tab === "teetimes" && activeGroup ? (
           <TeeTimes user={user} activeGroupId={activeGroup.id} activeGroupName={activeGroup.name} canManage={activeGroup.role === "admin"} initialTeeId={deepReady ? deepTeeId : null} onConsumedDeepLink={() => setDeepTeeId(null)} onSpawnGame={(s) => { setOpenGameId(null); setGameSeed(s); setTab("games"); }} onOpenGame={(gid) => { setGameSeed(null); setOpenGameId(gid); setTab("games"); }} />
         ) : tab === "money" && activeGroup ? (

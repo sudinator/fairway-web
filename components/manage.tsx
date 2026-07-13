@@ -9,6 +9,8 @@ import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, NumPicker, Avatar } from "@/components/ui";
 import { YardageBackfill } from "@/components/yardage-backfill";
+import { AchievementsWall } from "@/components/achievements";
+import { PlayerCard, PeerCardModal, CardVisibilityToggle } from "@/components/player-card";
 import { resizeToAvatar } from "@/lib/image";
 import { APP_VERSION, APP_BUILT_AT } from "@/lib/app-version";
 import { courseChangeLines, buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
@@ -1005,7 +1007,7 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
 }
 
 // ================= Profile panel (+ admin) =================
-export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: any; onSaved: () => void }) {
+export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds = [] }: { profile: any; user: any; onSaved: () => void; badgeRefresh?: number; rounds?: Round[] }) {
   const [name, setName] = useState(profile?.display_name || "");
   const [ghin, setGhin] = useState(profile?.ghin_number || "");
   const [phone, setPhone] = useState(profile?.phone || "");
@@ -1092,6 +1094,8 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
 
   return (
     <div style={{ maxWidth: 560 }}>
+      <PlayerCard profile={profile} user={user} rounds={rounds} />
+      <CardVisibilityToggle user={user} initial={profile?.show_card !== false} />
       <Eyebrow>YOUR PROFILE</Eyebrow>
       <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14, paddingBottom: 16, marginBottom: 16, borderBottom: `1px solid ${C.greenMid}` }}>
@@ -1155,6 +1159,8 @@ export function ProfilePanel({ profile, user, onSaved }: { profile: any; user: a
         <button style={{ ...btn(true), marginTop: 18, opacity: saving ? 0.5 : 1 }} disabled={saving} onClick={save}>{saving ? "Saving…" : "Save profile"}</button>
         {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
       </div>
+
+      <AchievementsWall user={user} rounds={rounds} refreshKey={badgeRefresh} />
 
       <PushToggle user={user} profile={profile} />
       {profile?.is_admin && (
@@ -1953,6 +1959,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [cardMember, setCardMember] = useState<any | null>(null);
 
   const load = useCallback(async () => {
     const { data } = await supabase
@@ -2024,14 +2031,21 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
         return (
           <div key={row.id} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <Avatar src={row.avatar_url} name={p.display_name || row.email || "?"} size={48} />
-              <div style={{ flex: 1, minWidth: 150 }}>
-                <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{p.display_name || row.email}{self ? " (you)" : ""}{row.role === "admin" ? " · admin" : ""}</div>
-                <div style={{ color: C.faint, fontSize: 12 }}>
-                  {p.handicap_index != null ? `Handicap ${p.handicap_index}` : row.status === "invited" ? "Invited" : "No handicap set"}
-                  {p.ghin_number ? ` · GHIN ${p.ghin_number}` : ""}
+              <button
+                onClick={() => row.user_id && setCardMember(row)}
+                disabled={!row.user_id}
+                title={row.user_id ? "View player card" : undefined}
+                style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 150, background: "transparent", border: "none", padding: 0, textAlign: "left", cursor: row.user_id ? "pointer" : "default" }}
+              >
+                <Avatar src={row.avatar_url} name={p.display_name || row.email || "?"} size={48} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{p.display_name || row.email}{self ? " (you)" : ""}{row.role === "admin" ? " · admin" : ""}</div>
+                  <div style={{ color: C.faint, fontSize: 12 }}>
+                    {p.handicap_index != null ? `Handicap ${p.handicap_index}` : row.status === "invited" ? "Invited" : "No handicap set"}
+                    {p.ghin_number ? ` · GHIN ${p.ghin_number}` : ""}
+                  </div>
                 </div>
-              </div>
+              </button>
               {p.phone ? (
                 <a href={`tel:${p.phone}`} style={{ color: C.green, fontWeight: 700, fontSize: 14, textDecoration: "none", background: C.cream, borderRadius: 8, padding: "8px 12px" }}>{p.phone}</a>
               ) : !p.display_name ? (
@@ -2062,6 +2076,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
           </div>
         );
       })}
+      {cardMember && <PeerCardModal member={cardMember} groupId={activeGroupId} viewerUserId={user.id} onClose={() => setCardMember(null)} />}
     </div>
   );
 }

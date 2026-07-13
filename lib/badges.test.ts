@@ -1,5 +1,5 @@
 // Unit tests for evaluateRound in lib/badges.ts — run with `npm test`.
-import { evaluateRound, computeBadgeState, PriorBadges } from "./badges";
+import { evaluateRound, computeBadgeState, badgeEvidence, PriorBadges } from "./badges";
 import type { Round, Hole } from "./golf";
 
 let pass = 0, fail = 0; const fails: string[] = [];
@@ -175,6 +175,30 @@ const parRound = () => mkRound(Array(18).fill([4, 4, 2, "hit"]) as HS[]);
   ok("rounds_10 not yet", !state["rounds_10"]);
 }
 
+
+// ---- badgeEvidence: explains how a badge was earned ----
+{
+  // clean back nine (holes 10-18 all par), front mixed
+  const spec: HS[] = [];
+  for (let i = 0; i < 9; i++) spec.push([4, 5, 2, "miss"]);   // front: bogeys
+  for (let i = 0; i < 9; i++) spec.push([4, 4, 2, "hit"]);    // back: pars
+  const r = mkRound(spec, { id: "E1" });
+  const ev = badgeEvidence("bogey_free_9", r);
+  ok("bogey_free_9 identifies back nine", /back nine/i.test(ev.text));
+  ok("bogey_free_9 holes are 10-18", JSON.stringify(ev.holes) === JSON.stringify([10, 11, 12, 13, 14, 15, 16, 17, 18]));
+}
+{
+  const spec: HS[] = [[5, 3, 1, "hit"], ...Array(17).fill([4, 4, 2, "hit"])] as HS[];
+  const ev = badgeEvidence("eagle", mkRound(spec, { id: "E2" }));
+  ok("eagle evidence names the hole", JSON.stringify(ev.holes) === JSON.stringify([1]));
+}
+{
+  const spec: HS[] = [];
+  for (let i = 0; i < 13; i++) spec.push([4, 4, 2, "hit"]);
+  for (let i = 0; i < 5; i++) spec.push([4, 5, 2, "miss"]); // 77, par 72 => +5
+  const ev = badgeEvidence("best_vs_par", mkRound(spec, { id: "E3" }));
+  ok("best_vs_par text shows 77 and +5", /77/.test(ev.text) && /\+5/.test(ev.text));
+}
 
 console.log(`badges: ${pass} passed, ${fail} failed`);
 if (fail) { console.error(fails.join("\n")); process.exit(1); }

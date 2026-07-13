@@ -1918,3 +1918,147 @@ Client only; still requires migration 0079 (above). Wires badges end-to-end:
 - `components/achievements.tsx` `AchievementsWall` renders under the Profile tab (own badges,
   earned vs locked, counts + records). Pre-migration it just shows all-locked (no crash).
 Cumulative: deploying 1.124.0 includes the 1.123.0 foundation.
+
+### v1.125.0 — achievements: tappable evidence + moved under Profile (NO migration)
+Client only. `member_badges.best_round_id` is now the representative round for EVERY badge
+(record round for 'best', latest occurrence for 'count', earning round for once/milestone) —
+no schema change; existing rows backfill this on the next app open via `syncBadges`.
+- `lib/badges.ts` adds `badgeEvidence(key, round)` — recomputes how a badge was earned,
+  including the qualifying hole stretch for streaks (bogey-free, par train, even-par nine, etc.).
+- `AchievementsWall` badges are tappable -> inline panel with the round (course + date), the
+  evidence text, and a per-hole strip for stretch badges.
+- The wall moved INSIDE `ProfilePanel`, directly under the profile card (above notifications and
+  the admin blocks) so it isn't buried at the bottom for admins.
+
+### v1.126.0 — self player card + wall syncs on open (NO migration)
+Client only. Adds `components/player-card.tsx` `PlayerCard` at the top of the Profile tab:
+photo, running index + trend (index now vs before the last 5 rounds), career bests (from
+member_badges), a peek-scroll badge row (hidden scrollbar, a badge clipped at the edge), and a
+last-5-differentials rolling-average form sparkline. All from the player's OWN data — no peer
+read path yet. `AchievementsWall` now runs `syncBadges` on open (rounds passed in) so the earning
+round is always attached before render — fixes the stale first-tap on legacy rows. `ProfilePanel`
+gained a `rounds` prop (threaded from home) feeding both the card and the wall's sync.
+
+### v1.127.0 — peer player card (migration 0080)
+Adds the peer read path. `player_cards` summary + `group_cards` RPC; `lib/card.ts` (`computeCardStats`,
+`rollingForm`) + `lib/card-sync.ts` (`syncPlayerCard`, diff-guarded, runs alongside syncBadges on
+rounds change). `player-card.tsx` refactored to `PlayerCardView` (presentational) + `PlayerCard`
+(self) + `PeerCardModal`. Players-tab roster rows are tappable (avatar+name) -> the peer's card.
+Run 0080:
+```sql
+-- 0080_player_cards.sql
+-- Peer-visible player card: a small per-player summary (running index, its recent
+-- trend, rolling-form series, rounds played) that group-mates can read. Needed
+-- because a peer's rounds themselves are not readable (rounds RLS is own/admin).
+-- Computed client-side at sync time (lib/card-sync). Safe to run multiple times.
+
+create table if not exists public.player_cards (
+  user_id    uuid primary key references auth.users(id) on delete cascade,
+  idx        numeric,                          -- running WHS index (null if < 3 rounds)
+  idx_trend  numeric,                          -- index now minus index before last 5 rounds (neg = improving)
+  form       jsonb not null default '[]'::jsonb, -- last-5 rolling-average differential series
+  rounds     int   not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.player_cards enable row level security;
+
+drop policy if exists player_cards_own on public.player_cards;
+create policy player_cards_own on public.player_cards
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+drop policy if exists player_cards_admin on public.player_cards;
+create policy player_cards_admin on public.player_cards
+  for select using (public.is_admin());
+
+-- Card summaries for everyone in a group the caller belongs to. SECURITY DEFINER +
+-- is_group_member gate (mirrors group_roster / group_badges). Honors show_card.
+drop function if exists public.group_cards(uuid);
+create or replace function public.group_cards(p_group uuid)
+returns table (user_id uuid, idx numeric, idx_trend numeric, form jsonb, rounds int)
+language sql security definer set search_path = public as $$
+  select pc.user_id, pc.idx, pc.idx_trend, pc.form, pc.rounds
+  from public.player_cards pc
+  join public.group_members gm
+    on gm.user_id = pc.user_id and gm.group_id = p_group and gm.status = 'active'
+  join public.profiles pr on pr.id = pc.user_id
+  where public.is_group_member(p_group, auth.uid())
+    and coalesce(pr.show_card, true) = true;
+$$;
+grant execute on function public.group_cards(uuid) to authenticated;
+```
+
+### v1.128.0 — card opt-out + member contact (migration 0081)
+Client + one migration. `CardVisibilityToggle` (writes `profiles.show_card`) under the self-card:
+hides only the performance layer from peers. Peer card gains a `ContactBar` — phone Call/Text when a
+number is on file, plus an always-available PII-free nudge via `send_nudge` (shared-club gate, 6h
+per-pair dedup, in-app notification type `nudge`). Roster taps pass `viewerUserId` so you don't nudge
+yourself. Run 0081:
+```sql
+-- 0081_nudges.sql
+-- Member-to-member "reach out" nudge. create_notification deliberately blocks
+-- regular member->member notifications, so this dedicated SECURITY DEFINER RPC
+-- gates on shared-club membership, dedupes per (sender, recipient) over 6h, and
+-- drops an in-app notification (which the push webhook picks up). No PII shared —
+-- the recipient just sees who reached out. Safe to run multiple times.
+
+create table if not exists public.nudges (
+  id           uuid primary key default gen_random_uuid(),
+  sender_id    uuid not null references auth.users(id) on delete cascade,
+  recipient_id uuid not null references auth.users(id) on delete cascade,
+  group_id     uuid,
+  message      text,
+  created_at   timestamptz not null default now()
+);
+create index if not exists nudges_pair_time on public.nudges (sender_id, recipient_id, created_at desc);
+
+alter table public.nudges enable row level security;
+-- Inserts happen only through send_nudge (SECURITY DEFINER); clients may read their own.
+drop policy if exists nudges_own on public.nudges;
+create policy nudges_own on public.nudges
+  for select using (sender_id = auth.uid() or recipient_id = auth.uid());
+
+-- Returns 'sent' | 'too_soon'. Raises on bad input / not-in-club.
+drop function if exists public.send_nudge(uuid, uuid, text);
+create or replace function public.send_nudge(p_recipient uuid, p_group uuid, p_message text default null)
+returns text
+language plpgsql security definer set search_path = public as $fn$
+declare
+  v_sender uuid := auth.uid();
+  v_name   text;
+  v_clean  text;
+  v_msg    text;
+begin
+  if v_sender is null then raise exception 'not authenticated'; end if;
+  if p_recipient is null or p_group is null then raise exception 'recipient and club are required'; end if;
+  if p_recipient = v_sender then raise exception 'cannot nudge yourself'; end if;
+
+  -- caller must belong to the club; recipient must be an active member of it
+  if not public.is_group_member(p_group, v_sender) then raise exception 'not a member of this club'; end if;
+  if not exists (
+    select 1 from group_members
+    where group_id = p_group and user_id = p_recipient and status = 'active'
+  ) then raise exception 'that player is not in this club'; end if;
+
+  -- at most one nudge per (sender, recipient) per 6h
+  if exists (
+    select 1 from nudges n
+    where n.sender_id = v_sender and n.recipient_id = p_recipient
+      and n.created_at > now() - interval '6 hours'
+  ) then return 'too_soon'; end if;
+
+  select coalesce(display_name, 'A club member') into v_name from profiles where id = v_sender;
+  v_clean := nullif(btrim(coalesce(p_message, '')), '');
+  v_msg := '👋 ' || v_name || ' wants to connect';
+  if v_clean is not null then v_msg := v_msg || ': ' || left(v_clean, 140); end if;
+
+  insert into nudges (sender_id, recipient_id, group_id, message)
+  values (v_sender, p_recipient, p_group, left(coalesce(v_clean, ''), 140));
+
+  insert into notifications (user_id, message, group_id, type, link)
+  values (p_recipient, v_msg, p_group, 'nudge', '/?tab=players');
+
+  return 'sent';
+end $fn$;
+grant execute on function public.send_nudge(uuid, uuid, text) to authenticated;
+```

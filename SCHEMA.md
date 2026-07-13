@@ -45,13 +45,17 @@ longer silently no-op.
 
 **member_badges** (0079): one row per (`user_id`, `badge_key`) — PK is the pair. `count` (int, times earned; 1 for once/milestone), `best_value` (numeric — current record for "best" badges), `best_round_id` (uuid → rounds, on delete set null), `first_earned_at`, `last_earned_at`. Badge catalog + the pure per-round evaluator live in `lib/badges.ts` (`BADGES`, `evaluateRound`).
 
+**player_cards** (0080): one row per `user_id` (PK) — peer-visible card summary. `idx` (running WHS index), `idx_trend` (index now minus index before the last 5 rounds; neg = improving), `form` (jsonb — last-5 rolling-average differential series), `rounds` (int), `updated_at`. Computed client-side (`lib/card.ts` `computeCardStats`) and written by `lib/card-sync.ts`.
+
 **games**: `id`, `code`, `name`, `course`, `course_par`, `played_at` (**date**, not null, default current_date — the match date), `allowance_pct` (numeric, not null, default 100 — handicap allowance for match/four-ball), `holes_meta` (jsonb), `group_id`, `game_type` (stableford/match/fourball/skins), `status` (active/ended), `pairings` (jsonb), `teams` (jsonb), `foursomes` (jsonb), `created_by`, `created_at`. Unique on `code`.
 
 **game_players**: `id`, `game_id`, `user_id` (default auth.uid()), `display_name`, `handicap_index`, `rating`, `slope`, `tee_name`, `course_handicap`, `scores`/`putts`/`fairways` (jsonb), `team`, `no_show` (bool, default false), `created_at`. Unique on (`game_id`, `user_id`).
 
 **activity_log**: `id`, `actor_id`, `actor_name`, `action`, `summary`, `group_id`, `target_user_id`, `created_at`.
 
-**notifications**: `id`, `user_id`, `message`, `read`, `group_id`, `created_at`.
+**notifications**: `id`, `user_id`, `message`, `read`, `group_id`, `created_at` (+ `type`, `link`).
+
+**nudges** (0081): `id`, `sender_id`, `recipient_id`, `group_id`, `message`, `created_at`. Backs member-to-member contact + per-pair 6h dedup. Inserts only via `send_nudge`; RLS read = sender or recipient.
 
 ---
 
@@ -267,3 +271,18 @@ Product model: any member creates a tee time; the creator organizes it; a captai
   Mirrors the `group_roster` peer-read pattern. Granted to `authenticated`.
 - Phase 1 (data foundation) only: table + RPC + `lib/badges.ts` evaluator shipped; compute-on-finish,
   backfill, and the UI surfaces (player card, badge wall, post-round strip) are Phase 2.
+
+### Migration 0080 — peer player card
+- `player_cards` table (see above) with RLS: own all + admin select.
+- `group_cards(p_group uuid)` SECURITY DEFINER RPC — card summaries for members of a group the
+  caller belongs to (gated by `is_group_member`, honors `show_card`). Mirrors `group_badges`.
+- Powers the peer card opened from a tappable roster row (Players tab). The self card computes the
+  same stats live from the player's own rounds; peers read them here since rounds are own/admin-only.
+
+### Migration 0081 — member-to-member nudge
+- `nudges` table (per-pair audit + 6h dedup) with RLS: read own (sender/recipient); inserts via RPC only.
+- `send_nudge(p_recipient, p_group, p_message)` SECURITY DEFINER — gates on shared-club membership,
+  dedupes per (sender,recipient) over 6h, writes an in-app notification (type `nudge`, link `/?tab=players`).
+  Returns 'sent' | 'too_soon'. Exists because `create_notification` blocks regular member->member pings.
+- `profiles.show_card` (0079) now drives a UI toggle: hides only badges/bests/form/trend from peers;
+  name, handicap, and contact remain the always-visible floor.

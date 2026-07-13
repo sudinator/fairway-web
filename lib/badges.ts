@@ -208,11 +208,93 @@ export function computeBadgeState(finished: Round[]): Record<string, BadgeRow> {
       if (!row) row = rows[a.key] = { badge_key: a.key, count: 0, best_value: null, best_round_id: null, first_earned_at: when, last_earned_at: when };
       if (a.kind === "count") row.count += a.value ?? 1;
       else if (row.count < 1) row.count = 1;         // once / milestone / best => held at 1
-      if (a.kind === "best") { row.best_value = a.value ?? null; row.best_round_id = r.id; state.bests[a.key] = a.value as number; }
+      if (a.kind === "best") { row.best_value = a.value ?? null; state.bests[a.key] = a.value as number; }
+      // Representative round: the record round for "best", the most recent
+      // occurrence for "count", the (only) earning round for once/milestone.
+      row.best_round_id = r.id;
       row.last_earned_at = when;
       state.earned.add(a.key);
     }
     state.priorRounds++;
   }
   return rows;
+}
+
+// Human-readable evidence for how a badge was earned in a given round, recomputed
+// from the round's holes. `holes` (when present) is the qualifying stretch to
+// highlight. Pure — the wall/card fetch the round and call this on tap.
+export type Evidence = { text: string; holes?: number[] };
+
+export function badgeEvidence(key: string, r: Round): Evidence {
+  const hs = played(r).slice().sort((a, b) => a.hole_number - b.hole_number);
+  const toPar = (h: Hole) => (h.strokes != null ? h.strokes - h.par : null);
+  const gross = isGrossOnly(r) ? (r.gross_score as number) : hs.reduce((s, h) => s + (h.strokes || 0), 0);
+  const par = r.course_par ?? hs.reduce((s, h) => s + h.par, 0);
+  const front = hs.filter((h) => h.hole_number <= 9);
+  const back = hs.filter((h) => h.hole_number >= 10 && h.hole_number <= 18);
+
+  const longestRun = (pred: (h: Hole) => boolean): number[] => {
+    let bS = -1, bE = -2, cS = -1;
+    for (let i = 0; i < hs.length; i++) {
+      if (hs[i].strokes != null && pred(hs[i])) { if (cS < 0) cS = i; if (i - cS > bE - bS) { bS = cS; bE = i; } }
+      else cS = -1;
+    }
+    return bS >= 0 ? hs.slice(bS, bE + 1).map((h) => h.hole_number) : [];
+  };
+  const nums = (hh: Hole[]) => hh.map((h) => h.hole_number);
+  const list = (a: number[]) => a.join(", ");
+  const s = (a: number[]) => (a.length > 1 ? "s" : "");
+
+  switch (key) {
+    case "bogey_free_round": return { text: "All 18 holes at par or better — no bogeys.", holes: nums(hs) };
+    case "bogey_free_9": {
+      const clean = (x: Hole[]) => x.length >= 9 && x.every((h) => h.strokes != null && h.strokes - h.par <= 0);
+      if (clean(front)) return { text: "Front nine — no bogeys.", holes: nums(front) };
+      if (clean(back)) return { text: "Back nine — no bogeys.", holes: nums(back) };
+      return { text: "A full nine with no bogeys." };
+    }
+    case "bogey_free_5":
+    case "bogey_free_3": {
+      const run = longestRun((h) => (h.strokes as number) - h.par <= 0);
+      return run.length ? { text: `Holes ${run[0]}–${run[run.length - 1]} — ${run.length} in a row without a bogey.`, holes: run } : { text: "A bogey-free stretch." };
+    }
+    case "par_train": {
+      const run = longestRun((h) => (h.strokes as number) - h.par === 0);
+      return run.length ? { text: `Holes ${run[0]}–${run[run.length - 1]} — ${run.length} pars in a row.`, holes: run } : { text: "Four pars in a row." };
+    }
+    case "even_par_nine": {
+      const sum = (x: Hole[]) => x.reduce((a, h) => a + ((h.strokes || 0) - h.par), 0);
+      if (front.length >= 9 && sum(front) <= 0) return { text: `Front nine — ${sum(front) === 0 ? "even par" : "under par"}.`, holes: nums(front) };
+      if (back.length >= 9 && sum(back) <= 0) return { text: `Back nine — ${sum(back) === 0 ? "even par" : "under par"}.`, holes: nums(back) };
+      return { text: "A nine at even par or better." };
+    }
+    case "bounce_back": {
+      const h: number[] = [];
+      for (let i = 1; i < hs.length; i++) { const p = toPar(hs[i - 1]), c = toPar(hs[i]); if (p != null && c != null && p >= 1 && c <= -1) h.push(hs[i].hole_number); }
+      return h.length ? { text: `Birdie right after a bogey — hole${s(h)} ${list(h)}.`, holes: h } : { text: "A birdie right after a bogey." };
+    }
+    case "no_blowups": return { text: "No double bogey or worse all round." };
+    case "no_three_putts": return { text: "No three-putts all round." };
+    case "no_penalties": return { text: "No penalty strokes — a clean card." };
+    case "eagle": { const h = nums(hs.filter((x) => x.strokes != null && x.strokes - x.par <= -2)); return { text: `Eagle or better on hole${s(h)} ${list(h)}.`, holes: h }; }
+    case "birdie_par3": { const h = nums(hs.filter((x) => x.par === 3 && x.strokes != null && x.strokes - x.par === -1)); return { text: `Birdie on par-3 hole${s(h)} ${list(h)}.`, holes: h }; }
+    case "first_birdie":
+    case "birdie": { const h = nums(hs.filter((x) => x.strokes != null && x.strokes - x.par <= -1)); return h.length ? { text: `Birdie on hole${s(h)} ${list(h)}.`, holes: h } : { text: "A birdie." }; }
+    case "best_fairways": { const fh = hs.filter((h) => h.par >= 4 && h.fairway != null); return { text: `${fh.filter((h) => h.fairway === "hit").length} of ${fh.length} fairways hit.` }; }
+    case "best_gir": { const gh = hs.filter((h) => h.strokes != null && h.putts != null); return { text: `${gh.filter((h) => isGIR(h)).length} of ${gh.length} greens in regulation.` }; }
+    case "fewest_putts": { const p = hs.filter((h) => h.putts != null).reduce((a, h) => a + (h.putts || 0), 0); return { text: `${p} putts on the round.` }; }
+    case "best_vs_par": { const v = gross - par; return { text: `Shot ${gross} — ${v === 0 ? "even par" : v > 0 ? `+${v}` : `${v}`}.` }; }
+    case "best_differential": { const d = roundDifferential(r); return { text: d != null ? `${d.toFixed(1)} handicap differential.` : "Your best differential." }; }
+    case "broke_100": case "broke_90": case "broke_85": case "broke_80": return { text: `Shot ${gross}.` };
+    case "broke_par": { const v = gross - par; return { text: `Shot ${gross} — ${v === 0 ? "even par" : v < 0 ? `${v}` : `+${v}`}.` }; }
+    case "sand_save": { const h = nums(hs.filter((x) => x.sand && x.strokes != null && x.putts != null && !isGIR(x) && (x.strokes as number) <= x.par)); return h.length ? { text: `Up-and-down from a bunker — hole${s(h)} ${list(h)}.`, holes: h } : { text: "An up-and-down from a greenside bunker." }; }
+    case "scramble_master": { const h = nums(hs.filter((x) => x.strokes != null && x.putts != null && !isGIR(x) && (x.strokes as number) <= x.par)); return { text: `${h.length} up-and-downs saved par.`, holes: h }; }
+    case "first_round": return { text: "Your very first round logged." };
+    case "rounds_5": return { text: "Five rounds played." };
+    case "rounds_10": return { text: "Ten rounds played." };
+    case "rounds_25": return { text: "Twenty-five rounds played." };
+    case "rounds_50": return { text: "Fifty rounds played." };
+    case "rounds_100": return { text: "One hundred rounds played." };
+    default: return { text: BADGE_BY_KEY[key]?.desc || "" };
+  }
 }
