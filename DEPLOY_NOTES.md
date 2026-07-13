@@ -2062,3 +2062,17 @@ begin
 end $fn$;
 grant execute on function public.send_nudge(uuid, uuid, text) to authenticated;
 ```
+
+### v1.129.0 — dashboard achievements teaser (NO migration)
+Client only. `AchievementsTeaser` (compact strip: recent-badge peek row + earned count) renders on the
+dashboard right after the AI coach. Tapping it switches to the Profile tab and smooth-scrolls to the
+achievements wall (`#achievements-wall`). The wall now leads with a 'Next up' milestone progress bar
+(next rounds-played target from `rounds.length`; hidden once 100+ rounds). Dashboard gained an
+`onViewAchievements` prop wired from home.
+
+### v1.129.1 — player-card formatting fix + contextual form chart (NO migration)
+Client only. (1) Replaced literal \uXXXX escapes with real glyphs in player-card.tsx / achievements.tsx
+(they render verbatim in JSX text). Fixed a pre-existing one in tee-times.tsx:373 too. Added
+`ci/check-jsx-escapes.py` — now run before every package. (2) Reworked the card's recent-form line into
+a contextual `FormChart`: differential y-scale labels (best/worst in window), a gold average baseline,
+a dot per round with the current value called out, and a plain-language verdict (Trending down/up/holding).

@@ -2,12 +2,14 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { C, Round, Hole } from "@/lib/golf";
-import { BADGES, badgeEvidence } from "@/lib/badges";
+import { BADGES, BADGE_BY_KEY, badgeEvidence } from "@/lib/badges";
 import { syncBadges } from "@/lib/badge-sync";
 
 const supabase = createClient();
 
 const TIER_COLOR: Record<string, string> = { common: C.sage, rare: "#7FB8FF", elite: C.gold };
+const TIER_RANK: Record<string, number> = { elite: 0, rare: 1, common: 2 };
+const MILESTONES = [5, 10, 25, 50, 100];
 const CAT_LABEL: Record<string, string> = {
   scoring: "Scoring",
   streaks: "Streaks & consistency",
@@ -36,7 +38,7 @@ function HoleChip({ h }: { h: Hole }) {
   return (
     <div style={{ textAlign: "center", minWidth: 26 }}>
       <div style={{ fontSize: 9, color: C.faint }}>{h.hole_number}</div>
-      <div style={{ fontSize: 13, fontWeight: 800, color: col, lineHeight: 1.1 }}>{h.strokes ?? "\u2013"}</div>
+      <div style={{ fontSize: 13, fontWeight: 800, color: col, lineHeight: 1.1 }}>{h.strokes ?? "–"}</div>
     </div>
   );
 }
@@ -81,12 +83,30 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
   const got = earned ? Object.keys(earned).length : 0;
 
   return (
-    <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 10 }}>
+    <div id="achievements-wall" style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 10 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 3 }}>
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>Achievements</div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: C.gold }}>{earned == null ? "\u2026" : `${got} of ${total}`}</div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: C.gold }}>{earned == null ? "…" : `${got} of ${total}`}</div>
       </div>
       <div style={{ fontSize: 11.5, color: C.sage, marginBottom: 12 }}>Tap a badge to see the round that earned it.</div>
+
+      {(() => {
+        const rp = rounds?.length ?? 0;
+        const next = MILESTONES.find((t) => rp < t);
+        if (!next) return null;
+        const pct = Math.min(100, Math.round((100 * rp) / next));
+        return (
+          <div style={{ background: "#0e3a2c", border: `1px solid ${C.greenMid}`, borderRadius: 12, padding: "11px 13px", marginBottom: 6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 7 }}>
+              <div style={{ color: C.sage, fontSize: 11.5 }}>Next up · <b style={{ color: C.cream, fontWeight: 800 }}>{next} rounds played</b></div>
+              <div style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>{rp} / {next}</div>
+            </div>
+            <div style={{ height: 7, borderRadius: 4, background: "rgba(0,0,0,.28)", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${C.gold}, #E7C860)`, borderRadius: 4 }} />
+            </div>
+          </div>
+        );
+      })()}
 
       {CAT_ORDER.map((cat) => {
         const defs = BADGES.filter((b) => b.category === cat);
@@ -114,9 +134,9 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
                       boxShadow: isOpen ? `0 0 0 3px ${tc}66` : on && b.tier !== "common" ? `0 0 12px -4px ${tc}` : "none",
                       filter: on ? "none" : "grayscale(1)", position: "relative",
                     }}>
-                      <span>{on ? b.icon : "\uD83D\uDD12"}</span>
+                      <span>{on ? b.icon : "🔒"}</span>
                       {showCount && (
-                        <span style={{ position: "absolute", right: -4, bottom: -4, minWidth: 18, height: 18, padding: "0 4px", borderRadius: 9, background: C.gold, color: "#1c1c15", fontSize: 10.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #10402f" }}>{"\u00d7"}{e!.count}</span>
+                        <span style={{ position: "absolute", right: -4, bottom: -4, minWidth: 18, height: 18, padding: "0 4px", borderRadius: 9, background: C.gold, color: "#1c1c15", fontSize: 10.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #10402f" }}>{"×"}{e!.count}</span>
                       )}
                     </div>
                     <div style={{ fontSize: 9.5, color: C.cream, marginTop: 6, lineHeight: 1.2, fontWeight: on ? 700 : 500 }}>{b.label}</div>
@@ -136,7 +156,7 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
                 <div style={{ marginTop: 12, background: "#0e3a2c", border: `1px solid ${C.greenMid}`, borderRadius: 12, padding: "12px 14px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
                     <div style={{ color: C.cream, fontSize: 13.5, fontWeight: 800 }}>{openDefInCat.icon} {openDefInCat.label}</div>
-                    <button onClick={() => setOpen(null)} style={{ background: "transparent", border: "none", color: C.sage, fontSize: 16, cursor: "pointer", lineHeight: 1 }}>{"\u00d7"}</button>
+                    <button onClick={() => setOpen(null)} style={{ background: "transparent", border: "none", color: C.sage, fontSize: 16, cursor: "pointer", lineHeight: 1 }}>{"×"}</button>
                   </div>
                   <div style={{ color: C.sage, fontSize: 11.5, marginTop: 3, lineHeight: 1.5 }}>{openDefInCat.desc}</div>
 
@@ -150,8 +170,8 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
 
                   {rnd && (
                     <div style={{ color: C.gold, fontSize: 11, marginTop: 10, fontWeight: 700 }}>
-                      {repeat ? "Most recently at " : "At "}{rnd.course}{rnd.played_at ? ` \u00b7 ${fmtDate(rnd.played_at)}` : ""}
-                      {repeat ? ` \u00b7 earned ${e.count}\u00d7` : ""}
+                      {repeat ? "Most recently at " : "At "}{rnd.course}{rnd.played_at ? ` · ${fmtDate(rnd.played_at)}` : ""}
+                      {repeat ? ` · earned ${e.count}×` : ""}
                     </div>
                   )}
                   {!rnd && <div style={{ color: C.faint, fontSize: 11, marginTop: 10 }}>Earned {fmtDate(e.first_earned_at)}.</div>}
@@ -162,5 +182,47 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
         );
       })}
     </div>
+  );
+}
+
+// Compact dashboard teaser (Variant B): a peek row of recent badges + an earned
+// count, tapping through to the full wall (which leads with "next up" progress).
+export function AchievementsTeaser({ userId, onViewAll }: { userId: string; onViewAll: () => void }) {
+  const [earned, setEarned] = useState<{ badge_key: string; last_earned_at: string }[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { data } = await supabase.from("member_badges").select("badge_key,last_earned_at").eq("user_id", userId);
+      if (alive) setEarned((data || []) as any);
+    })();
+    return () => { alive = false; };
+  }, [userId]);
+
+  if (!earned || earned.length === 0) return null;
+  const total = BADGES.length;
+  const strip = earned
+    .map((e) => ({ e, def: BADGE_BY_KEY[e.badge_key] }))
+    .filter((x) => x.def)
+    .sort((a, b) => (TIER_RANK[a.def.tier] - TIER_RANK[b.def.tier]) || (b.e.last_earned_at || "").localeCompare(a.e.last_earned_at || ""))
+    .slice(0, 6);
+
+  return (
+    <button onClick={onViewAll} style={{ display: "block", width: "100%", textAlign: "left", background: C.greenLight, border: `1px solid ${C.greenMid}`, borderRadius: 14, padding: 14, marginTop: 16, cursor: "pointer" }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
+        <div style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 800, color: C.cream }}>Achievements</div>
+        <div style={{ color: C.gold, fontSize: 12, fontWeight: 800 }}>View all →</div>
+      </div>
+      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, flex: 1, overflow: "hidden" }}>
+          {strip.map((x, i) => (
+            <div key={x.e.badge_key} style={{ flex: "none", width: 42, height: 42, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 21, background: "radial-gradient(circle at 50% 32%, #20624a, #0e3a2c)", border: `2px solid ${TIER_COLOR[x.def.tier]}`, opacity: i === strip.length - 1 && earned.length > strip.length ? 0.5 : 1 }}>{x.def.icon}</div>
+          ))}
+        </div>
+        <div style={{ textAlign: "right", flex: "none" }}>
+          <div style={{ fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, color: C.cream, lineHeight: 1 }}>{earned.length}</div>
+          <div style={{ color: C.sage, fontSize: 10 }}>of {total}</div>
+        </div>
+      </div>
+    </button>
   );
 }

@@ -31,22 +31,45 @@ function buildBadges(rows: { badge_key: string; last_earned_at?: string }[]): Ba
     .map((x) => ({ key: x.e.badge_key, icon: x.def.icon, label: x.def.label, tier: x.def.tier }));
 }
 
-function Sparkline({ data }: { data: number[] }) {
+// Contextual mini-chart for the rolling-form series: y-scale labels (best/worst
+// differential in the window), a faint average baseline, a dot per round, and the
+// current value called out. Lower differential = lower on screen (down is better).
+function FormChart({ data }: { data: number[] }) {
   if (data.length < 2) return null;
-  const W = 260, H = 54, pad = 6;
+  const W = 300, H = 88, LG = 30, RG = 34, top = 10, bot = H - 20; // left gutter for labels, right for end value
   const min = Math.min(...data), max = Math.max(...data);
   const span = max - min || 1;
-  const x = (i: number) => pad + (i / (data.length - 1)) * (W - 2 * pad);
-  const y = (v: number) => pad + ((v - min) / span) * (H - 2 * pad); // higher diff lower on screen (down = better)
+  const avg = data.reduce((a, b) => a + b, 0) / data.length;
+  const x = (i: number) => LG + (i / (data.length - 1)) * (W - LG - RG);
+  const y = (v: number) => top + ((max - v) / span) * (bot - top); // max at top, min at bottom
   const pts = data.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-  const area = `${x(0)},${H} ${pts} ${x(data.length - 1)},${H}`;
+  const area = `${x(0)},${bot} ${pts} ${x(data.length - 1)},${bot}`;
   const improving = data[data.length - 1] <= data[0];
   const stroke = improving ? "#8FE0B0" : "#FB7185";
+  const last = data[data.length - 1];
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" style={{ display: "block" }}>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block", overflow: "visible" }}>
+      {/* scale gridlines + labels (worst at top, best at bottom) */}
+      {[max, min].map((v, k) => {
+        const yy = y(v);
+        return (
+          <g key={k}>
+            <line x1={LG} y1={yy} x2={W - RG} y2={yy} stroke="#ffffff" strokeOpacity={0.12} strokeWidth={1} strokeDasharray="3 3" />
+            <text x={LG - 5} y={yy + 3} textAnchor="end" fontSize="9" fill="#A9C4B5">{v.toFixed(1)}</text>
+          </g>
+        );
+      })}
+      {/* average baseline */}
+      <line x1={LG} y1={y(avg)} x2={W - RG} y2={y(avg)} stroke="#C9A227" strokeOpacity={0.35} strokeWidth={1} />
+      <text x={W - RG + 3} y={y(avg) + 3} fontSize="8" fill="#C9A227" opacity={0.8}>avg</text>
+      {/* series */}
       <polygon points={area} fill={stroke} opacity={0.12} />
       <polyline points={pts} fill="none" stroke={stroke} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx={x(data.length - 1)} cy={y(data[data.length - 1])} r={3} fill={stroke} />
+      {data.map((v, i) => <circle key={i} cx={x(i)} cy={y(v)} r={i === data.length - 1 ? 3.5 : 2} fill={stroke} />)}
+      {/* current value + x caption */}
+      <text x={x(data.length - 1) + 6} y={y(last) + 3} fontSize="11" fontWeight="800" fill={stroke}>{last.toFixed(1)}</text>
+      <text x={LG} y={H - 4} fontSize="9" fill="#8B8775">{data.length} rounds ago</text>
+      <text x={W - RG} y={H - 4} textAnchor="end" fontSize="9" fill="#8B8775">now</text>
     </svg>
   );
 }
@@ -60,13 +83,13 @@ export function PlayerCardView({ view }: { view: CardView }) {
         <Avatar src={avatarUrl} name={name} size={60} accent={C.gold} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800, color: C.cream, lineHeight: 1.1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{name}</div>
-          <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{roundsPlayed} round{roundsPlayed === 1 ? "" : "s"}{badges.length ? ` \u00b7 ${badges.length} badge${badges.length === 1 ? "" : "s"}` : ""}</div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{roundsPlayed} round{roundsPlayed === 1 ? "" : "s"}{badges.length ? ` · ${badges.length} badge${badges.length === 1 ? "" : "s"}` : ""}</div>
         </div>
         <div style={{ textAlign: "right", flex: "none" }}>
           <div style={{ color: C.gold, fontSize: 9, letterSpacing: 1.5, fontWeight: 800, textTransform: "uppercase" }}>Index</div>
-          <div style={{ fontFamily: "Georgia, serif", fontSize: 28, fontWeight: 800, color: C.cream, lineHeight: 1 }}>{index == null ? "\u2014" : index.toFixed(1)}</div>
+          <div style={{ fontFamily: "Georgia, serif", fontSize: 28, fontWeight: 800, color: C.cream, lineHeight: 1 }}>{index == null ? "—" : index.toFixed(1)}</div>
           {trend != null && Math.abs(trend) >= 0.05 && (
-            <div style={{ fontSize: 11, fontWeight: 800, marginTop: 2, color: trend < 0 ? "#8FE0B0" : "#FB7185" }}>{trend < 0 ? "\u25bc" : "\u25b2"} {Math.abs(trend).toFixed(1)}</div>
+            <div style={{ fontSize: 11, fontWeight: 800, marginTop: 2, color: trend < 0 ? "#8FE0B0" : "#FB7185" }}>{trend < 0 ? "▼" : "▲"} {Math.abs(trend).toFixed(1)}</div>
           )}
         </div>
       </div>
@@ -97,15 +120,27 @@ export function PlayerCardView({ view }: { view: CardView }) {
         </div>
       )}
 
-      {form.length >= 2 && (
-        <div style={{ marginTop: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-            <div style={{ fontSize: 10, letterSpacing: 1.5, fontWeight: 800, textTransform: "uppercase", color: C.gold }}>Recent form</div>
-            <div style={{ fontSize: 9.5, color: C.sage }}>5-round rolling avg \u00b7 lower is better</div>
+      {form.length >= 2 && (() => {
+        const last = form[form.length - 1], first = form[0];
+        const delta = Math.round((last - first) * 10) / 10;
+        const verdict = delta <= -0.1 ? "Trending down" : delta >= 0.1 ? "Trending up" : "Holding steady";
+        const good = delta <= -0.1; // lower differential is better
+        const col = delta <= -0.1 ? "#8FE0B0" : delta >= 0.1 ? "#FB7185" : C.sage;
+        return (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+              <div style={{ fontSize: 10, letterSpacing: 1.5, fontWeight: 800, textTransform: "uppercase", color: C.gold }}>Recent form</div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: col }}>
+                {verdict}{Math.abs(delta) >= 0.1 ? ` ${delta < 0 ? "▼" : "▲"} ${Math.abs(delta).toFixed(1)}` : ""}
+              </div>
+            </div>
+            <div style={{ marginTop: 8 }}><FormChart data={form} /></div>
+            <div style={{ fontSize: 9.5, color: C.sage, marginTop: 6, lineHeight: 1.4 }}>
+              5-round rolling average of your scoring differentials{good ? " — improving" : ""}. Lower is better; the gold line is your average over these rounds.
+            </div>
           </div>
-          <div style={{ marginTop: 6 }}><Sparkline data={form} /></div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -181,9 +216,9 @@ export function PeerCardModal({ member, groupId, viewerUserId, onClose }: { memb
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(6,20,15,.72)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, position: "relative" }}>
-        <button onClick={onClose} aria-label="Close" style={{ position: "absolute", top: -6, right: -6, zIndex: 2, width: 30, height: 30, borderRadius: 15, border: "none", background: C.green, color: C.cream, fontSize: 17, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,.4)" }}>{"\u00d7"}</button>
+        <button onClick={onClose} aria-label="Close" style={{ position: "absolute", top: -6, right: -6, zIndex: 2, width: 30, height: 30, borderRadius: 15, border: "none", background: C.green, color: C.cream, fontSize: 17, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,.4)" }}>{"×"}</button>
         {loading ? (
-          <div style={{ background: C.greenLight, borderRadius: 16, padding: 28, textAlign: "center", color: C.sage }}>Loading\u2026</div>
+          <div style={{ background: C.greenLight, borderRadius: 16, padding: 28, textAlign: "center", color: C.sage }}>Loading…</div>
         ) : view ? (
           <>
             <PlayerCardView view={view} />
@@ -228,7 +263,7 @@ function ContactBar({ recipientId, groupId, name, phone }: { recipientId: string
           </>
         )}
         <button onClick={() => { setOpenMsg((v) => !v); setStatus(null); }} style={{ flex: 1, minWidth: 96, background: C.gold, color: "#1c1c15", fontWeight: 800, fontSize: 13, border: "none", borderRadius: 9, padding: "10px 12px", cursor: "pointer" }}>
-          {status === "sent" ? "Sent \uD83D\uDC4B" : "Say hi"}
+          {status === "sent" ? "Sent 👋" : "Say hi"}
         </button>
       </div>
 
@@ -242,8 +277,8 @@ function ContactBar({ recipientId, groupId, name, phone }: { recipientId: string
             style={{ width: "100%", resize: "none", borderRadius: 8, border: `1px solid ${C.greenMid}`, background: "#0e3a2c", color: C.cream, fontSize: 13, padding: "8px 10px", fontFamily: "inherit" }}
           />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
-            <div style={{ fontSize: 10, color: C.faint }}>{msg.length}/140{status === "too_soon" ? " \u00b7 you already reached out recently" : status === "error" ? " \u00b7 couldn't send" : ""}</div>
-            <button onClick={send} disabled={status === "sending"} style={{ background: C.green, color: C.cream, fontWeight: 800, fontSize: 13, border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", opacity: status === "sending" ? 0.6 : 1 }}>{status === "sending" ? "Sending\u2026" : "Send"}</button>
+            <div style={{ fontSize: 10, color: C.faint }}>{msg.length}/140{status === "too_soon" ? " · you already reached out recently" : status === "error" ? " · couldn't send" : ""}</div>
+            <button onClick={send} disabled={status === "sending"} style={{ background: C.green, color: C.cream, fontWeight: 800, fontSize: 13, border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", opacity: status === "sending" ? 0.6 : 1 }}>{status === "sending" ? "Sending…" : "Send"}</button>
           </div>
         </div>
       )}
@@ -266,7 +301,7 @@ export function CardVisibilityToggle({ user, initial }: { user: any; initial: bo
   return (
     <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10, display: "flex", alignItems: "center", gap: 12 }}>
       <div style={{ flex: 1 }}>
-        <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Show my card to the club {on ? "" : "\u00b7 off"}</div>
+        <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Show my card to the club {on ? "" : "· off"}</div>
         <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
           Your name, handicap, and contact are always visible to club members. This controls whether they also see your badges, career bests, and recent form.
         </div>

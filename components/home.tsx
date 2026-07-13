@@ -635,7 +635,8 @@ export function Home({ session }: { session: any }) {
           <div style={{ color: C.sage, textAlign: "center", padding: 40 }}>Loading your rounds…</div>
         ) : tab === "dashboard" ? (
           <Dashboard rounds={rounds} name={displayName} onOpen={setViewing} currentIndex={index} saveIndex={saveIndex}
-            userEmail={user?.email || null} userId={user.id} savedCoach={profile?.dashboard_ai || null} onCoachSaved={loadProfile} />
+            userEmail={user?.email || null} userId={user.id} savedCoach={profile?.dashboard_ai || null} onCoachSaved={loadProfile}
+            onViewAchievements={() => { setTab("profile"); setTimeout(() => document.getElementById("achievements-wall")?.scrollIntoView({ behavior: "smooth", block: "start" }), 140); }} />
         ) : (
           <RoundsList rounds={rounds} onOpen={setViewing} />
         )}

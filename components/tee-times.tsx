@@ -370,7 +370,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
                 <div style={{ fontSize: 13, fontWeight: 700, color: C.cream }}>Assign a captain to create the game</div>
                 <div style={{ fontSize: 12, color: C.sage, marginTop: 3, lineHeight: 1.45 }}>The captain sets up and runs the game for this round. {canOrganizeTee ? "Pick anyone who's In — you can choose yourself." : "An organizer will assign one soon."}</div>
                 {canOrganizeTee ? <button onClick={() => setCaptainPickerOpen(true)} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 13 }}>Assign captain</button> : null}
-                {canOrganizeTee && !ins.some((r) => r.user_id === user.id) ? <div style={{ fontSize: 11, color: C.sage, opacity: 0.75, marginTop: 6 }}>To captain it yourself, RSVP \u201cIn\u201d first.</div> : null}
+                {canOrganizeTee && !ins.some((r) => r.user_id === user.id) ? <div style={{ fontSize: 11, color: C.sage, opacity: 0.75, marginTop: 6 }}>To captain it yourself, RSVP “In” first.</div> : null}
               </div>
             ) : isCaptain ? (
               <div style={{ marginTop: 10 }}>

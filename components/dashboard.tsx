@@ -27,6 +27,7 @@ function Clk<T extends string>({ k, d, set, children }: { k: T; d: T | null; set
 }
 
 import { ShotSynthesis } from "@/components/compare-stats";
+import { AchievementsTeaser } from "@/components/achievements";
 import { goalOptions } from "@/lib/benchmarks";
 
 // Shared chart tooltip — solid deep-green card, thin gold ring, gold label (course ·
@@ -49,10 +50,11 @@ function ChartTip({ active, payload, nameMap, fmt }: any) {
     </div>
   );
 }
-export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userEmail, userId, savedCoach, onCoachSaved }: {
+export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userEmail, userId, savedCoach, onCoachSaved, onViewAchievements }: {
   rounds: Round[]; name: string; onOpen: (r: Round) => void;
   currentIndex: number | null; saveIndex: (i: number | null) => void;
   userEmail?: string | null; userId?: string; savedCoach?: any; onCoachSaved?: () => void;
+  onViewAchievements?: () => void;
 }) {
   const [win, setWin] = useState<"5" | "20" | "season" | "all">("all");
   const allDone = rounds.filter((r) => played(r).length > 0 || isGrossOnly(r));
@@ -319,6 +321,8 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
         saved={savedCoach}
         onSaved={onCoachSaved}
       />
+
+      {userId && onViewAchievements && <AchievementsTeaser userId={userId} onViewAll={onViewAchievements} />}
 
       {sectionHead("SCORING", anyHoleDetail ? expandBtn(moreScoring, () => setMoreScoring((v) => !v)) : undefined)}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
