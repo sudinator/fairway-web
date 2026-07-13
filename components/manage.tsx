@@ -7,6 +7,7 @@ import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr
 import capabilities from "@/lib/capabilities.json";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
+import { diagEnabled, setDiagEnabled, reproduceBug, setReproduceBug, getDiagLog, clearDiagLog } from "@/lib/debuglog";
 import { btn, inputStyle, Eyebrow, NumPicker, Avatar } from "@/components/ui";
 import { YardageBackfill } from "@/components/yardage-backfill";
 import { AchievementsWall } from "@/components/achievements";
@@ -1402,6 +1403,117 @@ function AdminAnalytics() {
   );
 }
 
+function OpsMetrics() {
+  const [m, setM] = useState<any | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.rpc("get_ops_metrics").then(({ data, error }: any) => {
+      if (error) setErr(error.message); else setM(data);
+    });
+  }, []);
+  if (err) return null; // supplementary; quiet if the RPC isn't deployed yet
+  if (!m || Object.keys(m).length === 0) return null;
+
+  const ctr = (c: number, s: number) => (s ? `${Math.round((100 * c) / s)}% click-through` : "no impressions yet");
+  const tile = (n: React.ReactNode, l: string, d?: string) => (
+    <div style={{ background: C.greenLight, borderRadius: 12, padding: "10px 12px", flex: 1, minWidth: 92 }}>
+      <div style={{ color: C.cream, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif" }}>{n}</div>
+      <div style={{ color: C.sage, fontSize: 11 }}>{l}</div>
+      {d ? <div style={{ color: C.sage, fontSize: 10, marginTop: 2, opacity: 0.8 }}>{d}</div> : null}
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>Operations</div>
+      <div style={{ color: C.sage, fontSize: 11, marginTop: 2, marginBottom: 8 }}>Profile-completion funnel and round hygiene. Nudge counts accumulate from when logging shipped, so they build up over time.</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {tile(m.profiles_incomplete ?? 0, "Profiles incomplete", "missing photo or handicap")}
+        {tile(`${m.nudge_clicked_7d ?? 0}/${m.nudge_shown_7d ?? 0}`, "Nudge clicks · 7d", ctr(m.nudge_clicked_7d ?? 0, m.nudge_shown_7d ?? 0))}
+        {tile(`${m.nudge_clicked_28d ?? 0}/${m.nudge_shown_28d ?? 0}`, "Nudge clicks · 28d", ctr(m.nudge_clicked_28d ?? 0, m.nudge_shown_28d ?? 0))}
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+        {tile(m.stale_ready ?? 0, "Stuck & complete", "auto-finished on next sweep")}
+        {tile(m.stale_partial ?? 0, "Stuck & partial", "left for the player to resolve")}
+        {tile(m.auto_finished_7d ?? 0, "Auto-finished · 7d", "recovered into handicaps")}
+      </div>
+    </div>
+  );
+}
+
+function RoundSaveDiag() {
+  const [on, setOn] = useState(false);
+  const [repro, setRepro] = useState(false);
+  const [log, setLog] = useState<any[]>([]);
+  const [open, setOpen] = useState(false);
+  const refresh = () => setLog(getDiagLog().slice().reverse());
+  useEffect(() => { setOn(diagEnabled()); setRepro(reproduceBug()); refresh(); }, []);
+
+  const toggleOn = () => { const v = !on; setDiagEnabled(v); setOn(v); refresh(); };
+  const toggleRepro = () => { const v = !repro; setReproduceBug(v); setRepro(v); };
+  const copyAll = async () => {
+    const text = getDiagLog().map((e) => `${new Date(e.t).toISOString()} [${e.sid}] ${e.ev}${e.d ? " " + JSON.stringify(e.d) : ""}`).join("\n");
+    try { await navigator.clipboard.writeText(text); alert(`Copied ${getDiagLog().length} events to clipboard.`); }
+    catch { alert("Couldn't access the clipboard — select the text below and copy manually."); }
+  };
+  const clear = () => { if (confirm("Clear the diagnostics log?")) { clearDiagLog(); refresh(); } };
+
+  const insertCount = getDiagLog().filter((e) => e.ev === "ensure" && /insert/.test(e.d?.outcome || "")).length;
+  const evColor = (e: any) => {
+    if (e.ev === "ensure") {
+      const o = e.d?.outcome || "";
+      if (/insert/.test(o)) return "#FB7185";      // new row created — the bug's signature
+      if (o === "adopt" || o === "reuse") return "#8FE0B0"; // reused an existing row — good
+      return C.sage;
+    }
+    if (e.ev === "flush") return "#7FB8FF";
+    if (e.ev === "mount") return C.gold;
+    return C.sage;
+  };
+  const Toggle = ({ v, on: label, off }: { v: boolean; on: string; off: string }) => (
+    <span style={{ display: "inline-block", minWidth: 44, textAlign: "center", padding: "3px 8px", borderRadius: 999, fontSize: 11, fontWeight: 800, color: v ? "#0e3a2c" : C.sage, background: v ? C.gold : "#16302A", border: `1px solid ${v ? C.gold : "#37624f"}` }}>{v ? label : off}</span>
+  );
+
+  return (
+    <div style={{ marginTop: 18, border: `1px solid #37624f`, borderRadius: 12, padding: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700, flex: 1 }}>Round-save diagnostics</div>
+        <button onClick={() => setOpen((o) => !o)} style={{ ...btn(false), fontSize: 11, padding: "5px 10px" }}>{open ? "Hide" : "Show"}</button>
+      </div>
+      {open && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ color: C.sage, fontSize: 11, lineHeight: 1.5, marginBottom: 10 }}>
+            Per-device and off by default. Turn on logging, then to reproduce the bug turn on “reproduce” and score a few holes,
+            locking the phone between each. Red “insert” lines = a new row was created; green “adopt/reuse” = the existing row was
+            reused. One round should show a single insert once reproduce is off.
+          </div>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 10 }}>
+            <button onClick={toggleOn} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, padding: 0 }}>
+              <Toggle v={on} on="ON" off="OFF" /><span style={{ color: C.cream, fontSize: 12 }}>Logging</span>
+            </button>
+            <button onClick={toggleRepro} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 8, padding: 0 }}>
+              <Toggle v={repro} on="ON" off="OFF" /><span style={{ color: repro ? "#FB7185" : C.cream, fontSize: 12 }}>Reproduce bug (disable dedupe)</span>
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+            <button onClick={refresh} style={{ ...btn(false), fontSize: 11, padding: "5px 10px" }}>Refresh</button>
+            <button onClick={copyAll} style={{ ...btn(true), fontSize: 11, padding: "5px 10px" }}>Copy all</button>
+            <button onClick={clear} style={{ ...btn(false), fontSize: 11, padding: "5px 10px" }}>Clear</button>
+          </div>
+          <div style={{ color: C.sage, fontSize: 11, marginBottom: 6 }}>{log.length} events · <span style={{ color: insertCount > 1 ? "#FB7185" : C.sage, fontWeight: 700 }}>{insertCount} insert{insertCount === 1 ? "" : "s"}</span></div>
+          <div style={{ maxHeight: 280, overflowY: "auto", background: "#0e2620", borderRadius: 8, padding: 8, fontFamily: "monospace", fontSize: 10.5, lineHeight: 1.5 }}>
+            {log.length === 0 ? <div style={{ color: C.sage }}>No events yet.</div> : log.map((e, i) => (
+              <div key={i} style={{ color: evColor(e), whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                {new Date(e.t).toLocaleTimeString()} [{e.sid}] {e.ev}{e.d ? " " + JSON.stringify(e.d) : ""}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminPanel({ user }: { user: any }) {
   const [profiles, setProfiles] = useState<any[] | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
@@ -1574,6 +1686,8 @@ function AdminPanel({ user }: { user: any }) {
       <Eyebrow>★ ADMIN · ANALYTICS</Eyebrow>
       <AdminAnalytics />
       <AdminEngagement />
+      <OpsMetrics />
+      <RoundSaveDiag />
       <div style={{ height: 22 }} />
       <Eyebrow>★ ADMIN · ALL PLAYERS</Eyebrow>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 8 }}>

@@ -39,7 +39,7 @@ longer silently no-op.
 
 **course_change_requests** (admin approval queue for proposed global course edits): `id`, `course_id`, `group_id`, `submitted_by`, `proposed_name`, `proposed_location`, `proposed_data` (jsonb), `status` (default 'pending'), `reviewed_by`, `reviewed_at`, `reason`, `change_summary`, `created_at`.
 
-**rounds**: `id`, `user_id`, `course`, `tee_name`, `rating`, `slope`, `course_par`, `handicap_index`, `course_handicap`, `group_id`, `played_at` (**date**, not null, default current_date), `created_at`, `gross_score` (int), `status` (text, default 'final'), `ai_analysis` (text), `game_id` (uuid — set when recorded from a finished game).
+**rounds**: `id`, `user_id`, `course`, `tee_name`, `rating`, `slope`, `course_par`, `handicap_index`, `course_handicap`, `group_id`, `played_at` (**date**, not null, default current_date), `created_at`, `gross_score` (int), `status` (text, default 'final'), `ai_analysis` (text), `game_id` (uuid — set when recorded from a finished game), `finished_by` (text — member uuid or 'system:auto'; 0083), `finished_at` (timestamptz; 0083).
 
 **holes**: `id`, `round_id`, `hole_number`, `par`, `stroke_index`, `strokes`, `putts`, `fairway`, `penalties`.
 
@@ -286,3 +286,12 @@ Product model: any member creates a tee time; the creator organizes it; a captai
   Returns 'sent' | 'too_soon'. Exists because `create_notification` blocks regular member->member pings.
 - `profiles.show_card` (0079) now drives a UI toggle: hides only badges/bests/form/trend from peers;
   name, handicap, and contact remain the always-visible floor.
+
+### Migration 0083 — auto-finish + ops metrics
+- `rounds.finished_by` / `rounds.finished_at` — who/when a round was finalized (manual = member uuid, auto = 'system:auto').
+- `system_jobs(job, last_run)` — throttle registry (SECURITY DEFINER functions only; no client RLS policies).
+- `finish_stale_rounds()` — finalizes stale (24h+), COMPLETE (18+ holes) in-progress rounds; skips partials;
+  self-throttled hourly; attributes 'system:auto'. Called best-effort on app open. Returns count finalized.
+- `get_ops_metrics()` (is_admin) — jsonb: profile-nudge funnel (shown/clicked 7d & 28d), profiles_incomplete,
+  stale_ready / stale_partial, auto_finished_7d.
+- New activity_log actions: `profile_nudge_shown`, `profile_nudge_clicked` (logged client-side; accumulate forward).

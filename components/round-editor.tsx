@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
+import { dbg, newSid, reproduceBug } from "@/lib/debuglog";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, isGrossOnly, hasHoleDetail,
@@ -87,6 +88,15 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   const dbIdRef = React.useRef<string>(round.id || "");
   const discardedRef = React.useRef(false); // set on discard to block late saves
   const blanksRef = React.useRef(false);
+  // Serializes "make sure this round has one DB row": concurrent saves (e.g. the 2-3
+  // screen-lock flush events iOS fires at once) await the SAME insert instead of each
+  // inserting a new in_progress row. Also lets us adopt an existing row after a reload.
+  const ensureIdPromiseRef = React.useRef<Promise<string | null> | null>(null);
+  const sidRef = React.useRef<string>(newSid());
+  React.useEffect(() => {
+    dbg("mount", sidRef.current, { seededId: round.id || "", hasDbId: !!dbIdRef.current });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const saveTimerRef = React.useRef<any>(null);
   // Always-current refs so saves never use a stale snapshot.
   const roundRef = React.useRef<Round>(round);
@@ -95,24 +105,88 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   // Best-effort background save to the database. Never blocks entry and swallows
   // errors — local storage is the instant guarantee; this is server redundancy
   // so a round survives even if device storage is cleared or you switch devices.
-  const backgroundSave = useCallback(async (currentHoles: Hole[]) => {
-    if (discardedRef.current) return; // round was discarded — never re-create it
-    try {
-      let rid = dbIdRef.current;
-      if (!rid) {
+  // Return this round's DB id, creating the row at most once. If we already hold an
+  // id, use it. If a create is already in flight, await that same promise (so racing
+  // saves don't each insert). Otherwise: first ADOPT an existing in-progress row for
+  // this user+course+date (a reload/lock may have lost our in-memory id but the row is
+  // still there), and only insert a brand-new row if none exists. The id is persisted
+  // into the local draft immediately so the next reload resumes THIS row.
+  const ensureRoundId = useCallback(async (): Promise<string | null> => {
+    if (dbIdRef.current) { dbg("ensure", sidRef.current, { outcome: "reuse", rid: dbIdRef.current }); return dbIdRef.current; }
+
+    // LEGACY path — only when the admin has flipped "reproduce bug" on THIS device. Runs
+    // the original blind insert with NO adopt and NO serialization, so the duplicate rows
+    // can be reproduced on purpose while the diagnostics log records every insert.
+    if (reproduceBug()) {
+      try {
         const { data: u } = await supabase.auth.getUser();
+        if (!u?.user) return null;
         const { data: r, error: insErr } = await supabase.from("rounds").insert({
-          user_id: u.user!.id,
+          user_id: u.user.id,
           course: round.course, tee_name: round.tee_name,
           rating: round.rating, slope: round.slope, course_par: round.course_par,
           handicap_index: round.handicap_index, course_handicap: round.course_handicap,
           played_at: round.played_at, group_id: round.group_id || null,
           status: "in_progress",
         }).select().single();
-        if (insErr || !r) { setBgSaveFailed(true); return; }
-        rid = r.id;
+        if (insErr || !r) { dbg("ensure", sidRef.current, { outcome: "legacy_insert_fail" }); return null; }
+        dbIdRef.current = r.id;
+        dbg("ensure", sidRef.current, { outcome: "legacy_insert", rid: r.id });
+        return r.id;
+      } catch { return null; }
+    }
+
+    if (ensureIdPromiseRef.current) { dbg("ensure", sidRef.current, { outcome: "await_inflight" }); return ensureIdPromiseRef.current; }
+    ensureIdPromiseRef.current = (async () => {
+      try {
+        const { data: u } = await supabase.auth.getUser();
+        if (!u?.user) return null;
+        let rid = "";
+        // Adopt only a row from the CURRENT playing session: same user+course, still in
+        // progress, created within the last 12h. The time window prevents adopting an old
+        // abandoned round from a previous day, without depending on played_at matching exactly.
+        const since = new Date(Date.now() - 12 * 3600 * 1000).toISOString();
+        const { data: existing } = await supabase.from("rounds")
+          .select("id")
+          .eq("user_id", u.user.id)
+          .eq("course", round.course)
+          .eq("status", "in_progress")
+          .is("deleted_at", null)
+          .gte("created_at", since)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        if (existing && existing[0]) {
+          rid = existing[0].id;            // adopt the row already on the server
+          dbg("ensure", sidRef.current, { outcome: "adopt", rid });
+        } else {
+          const { data: r, error: insErr } = await supabase.from("rounds").insert({
+            user_id: u.user.id,
+            course: round.course, tee_name: round.tee_name,
+            rating: round.rating, slope: round.slope, course_par: round.course_par,
+            handicap_index: round.handicap_index, course_handicap: round.course_handicap,
+            played_at: round.played_at, group_id: round.group_id || null,
+            status: "in_progress",
+          }).select().single();
+          if (insErr || !r) { dbg("ensure", sidRef.current, { outcome: "insert_fail" }); return null; }
+          rid = r.id;
+          dbg("ensure", sidRef.current, { outcome: "insert", rid });
+        }
         dbIdRef.current = rid;
+        // Persist the id right now so a screen-lock reload resumes this row, not a new one.
+        try { saveDraft({ ...roundRef.current, holes: holesRef.current, id: rid }); } catch { /* ignore */ }
+        return rid;
+      } finally {
+        ensureIdPromiseRef.current = null; // future callers short-circuit on dbIdRef
       }
+    })();
+    return ensureIdPromiseRef.current;
+  }, [round]);
+
+  const backgroundSave = useCallback(async (currentHoles: Hole[]) => {
+    if (discardedRef.current) return; // round was discarded — never re-create it
+    try {
+      const rid = await ensureRoundId();
+      if (!rid || discardedRef.current) { if (!rid) setBgSaveFailed(true); return; }
       if (!blanksRef.current) {
         blanksRef.current = true;
         const { data: existing } = await supabase.from("holes").select("hole_number").eq("round_id", rid);
@@ -138,7 +212,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
       // Local storage already holds the data; flag the server backup as pending and retry on the next change.
       setBgSaveFailed(true);
     }
-  }, [round]);
+  }, [ensureRoundId]);
 
   const scheduleBackgroundSave = (currentHoles: Hole[]) => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -263,14 +337,19 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   // the page is frozen by a screen lock immediately after. Re-saving in the
   // visibilitychange/pagehide handlers forces the write at the last reliable moment.
   useEffect(() => {
-    const flush = () => {
+    const flush = (via: string) => {
       if (discardedRef.current) return; // discarded — don't resurrect it
       if (holesRef.current.some((h) => h.strokes != null)) {
+        dbg("flush", sidRef.current, { via, hasDbId: !!dbIdRef.current });
         saveDraft({ ...roundRef.current, holes: holesRef.current, id: dbIdRef.current || round.id });
         backgroundSave(holesRef.current); // best-effort server write too
       }
     };
-    const onVis = () => { if (document.visibilityState === "hidden") flush(); };
+    const onVis = () => { if (document.visibilityState === "hidden") flush("visibilitychange"); };
+    const onFreeze = () => flush("freeze");
+    const onPageHide = () => flush("pagehide");
+    const onBeforeUnload = () => flush("beforeunload");
+    const onBlur = () => flush("blur");
     // Cover every browser's "page is being hidden / suspended" signal:
     //  - visibilitychange→hidden: all browsers, fires on lock/background/tab-switch
     //  - pagehide: iOS Safari & Chrome (WebKit) on background/navigation
@@ -278,16 +357,16 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     //  - freeze: Android Chrome (Page Lifecycle API) when a backgrounded tab is frozen
     //  - beforeunload: desktop refresh/close
     document.addEventListener("visibilitychange", onVis);
-    document.addEventListener("freeze", flush);
-    window.addEventListener("pagehide", flush);
-    window.addEventListener("beforeunload", flush);
-    window.addEventListener("blur", flush);
+    document.addEventListener("freeze", onFreeze);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    window.addEventListener("blur", onBlur);
     return () => {
       document.removeEventListener("visibilitychange", onVis);
-      document.removeEventListener("freeze", flush);
-      window.removeEventListener("pagehide", flush);
-      window.removeEventListener("beforeunload", flush);
-      window.removeEventListener("blur", flush);
+      document.removeEventListener("freeze", onFreeze);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      window.removeEventListener("blur", onBlur);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round]);

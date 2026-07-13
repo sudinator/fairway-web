@@ -41,6 +41,7 @@ export function Home({ session }: { session: any }) {
     try { const v = typeof window !== "undefined" ? localStorage.getItem("bnn_prof_nudge") : null; return v ? (Date.now() - Number(v) < 7 * 86400000) : false; } catch { return false; }
   });
   const dismissProfNudge = () => { try { localStorage.setItem("bnn_prof_nudge", String(Date.now())); } catch { /* ignore */ } setProfNudgeHidden(true); };
+  const profNudgeLogged = useRef(false);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   const [groups, setGroups] = useState<AppGroup[]>([]);
@@ -321,6 +322,15 @@ export function Home({ session }: { session: any }) {
 
   useEffect(() => { loadRounds(); }, [loadRounds]);
 
+  // Best-effort: auto-finish stale-but-complete in-progress rounds (self-throttled to
+  // once/hour server-side, so calling on each open is fine). Reloads if any were fixed.
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.rpc("finish_stale_rounds").then(({ data }: any) => {
+      if (typeof data === "number" && data > 0) loadRounds();
+    }, () => {});
+  }, [user?.id, loadRounds]);
+
   // Keep achievements in step with finished rounds. This single reconcile covers
   // every finalize path (new round, mark-complete, game-recorded) and doubles as
   // the one-time backfill of history — it's idempotent and a no-op when nothing
@@ -363,7 +373,7 @@ export function Home({ session }: { session: any }) {
   const markRoundComplete = async (r: Round) => {
     const gross = (r.holes || []).reduce((s: number, h: any) => s + (h.strokes || 0), 0);
     const { error } = await supabase.from("rounds")
-      .update({ status: "final", gross_score: gross || null, played_at: (r as any).played_at || new Date().toISOString() })
+      .update({ status: "final", gross_score: gross || null, played_at: (r as any).played_at || new Date().toISOString(), finished_by: user.id, finished_at: new Date().toISOString() })
       .eq("id", r.id);
     if (error) { alert("Couldn't mark that round complete — " + error.message); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "round_completed", summary: `Marked a round complete${r.course ? ` at ${r.course}` : ""}` });
@@ -410,6 +420,16 @@ export function Home({ session }: { session: any }) {
   const inFlow = stage || viewing;
   const [moreOpen, setMoreOpen] = useState(false);
   const activeGroup = groups.find((g) => g.id === activeGroupId) || groups[0] || null;
+
+  // Profile-completion nudge funnel: log one impression per session when the banner is
+  // visible, and a click when the CTA is tapped (see the button below).
+  const showProfNudge = !!(activeGroup && !profNudgeHidden && profile && (!profile.avatar_url || profile.handicap_index == null));
+  useEffect(() => {
+    if (showProfNudge && !profNudgeLogged.current && user?.id) {
+      profNudgeLogged.current = true;
+      logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "profile_nudge_shown", summary: "Profile-completion nudge shown" });
+    }
+  }, [showProfNudge, user?.id, displayName]);
 
   // Aggregated owe-banner: how much the current user owes across ALL their groups.
   const [owed, setOwed] = useState<{ cents: number; groups: number }>({ cents: 0, groups: 0 });
@@ -553,7 +573,7 @@ export function Home({ session }: { session: any }) {
 
       {/* Weekly profile-completion nudge — shown in-app when the profile is missing a
           photo or handicap; links to the Profile tab. Dismiss hides it for a week. */}
-      {activeGroup && !profNudgeHidden && profile && (!profile.avatar_url || profile.handicap_index == null) && (
+      {showProfNudge && (
         <div style={{ background: "#16302A", border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 14px", marginTop: 12 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             <div style={{ color: C.cream, fontSize: 13, fontWeight: 700, flex: 1 }}>✨ Finish setting up your profile</div>
@@ -562,7 +582,7 @@ export function Home({ session }: { session: any }) {
           <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
             {[!profile.avatar_url ? "a profile photo" : null, profile.handicap_index == null ? "your handicap index" : null].filter(Boolean).join(" and ")} {(!profile.avatar_url && profile.handicap_index == null) ? "are" : "is"} missing — adding {(!profile.avatar_url && profile.handicap_index == null) ? "them" : "it"} helps your group recognise you and keeps net scoring accurate.
           </div>
-          <button onClick={() => { setMoreOpen(false); setViewing(null); setStage(null); setTab("profile"); }} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 12 }}>Complete my profile →</button>
+          <button onClick={() => { logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "profile_nudge_clicked", summary: "Tapped the profile-completion nudge" }); setMoreOpen(false); setViewing(null); setStage(null); setTab("profile"); }} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 12 }}>Complete my profile →</button>
         </div>
       )}
 
