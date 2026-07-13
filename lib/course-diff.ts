@@ -61,6 +61,7 @@ function normalizeTeesForDiff(tees: any[] | undefined | null): any[] {
     rating: t?.rating ?? t?.course_rating ?? t?.courseRating ?? null,
     slope: t?.slope ?? t?.slope_rating ?? t?.slopeRating ?? null,
     par: t?.par ?? t?.par_total ?? t?.parTotal ?? null,
+    yardages: Array.isArray(t?.yardages) ? t.yardages.map((v: any) => (v == null || v === "" ? null : Number(v))) : [],
     holes: normalizeHolesForDiff(t?.holes),
   }));
 }
@@ -90,8 +91,23 @@ function compareHoleSets(lines: string[], prefix: string, currentHoles: { n: num
   }
 }
 
-export function courseChangeLines(current: Course | null | undefined, proposed: Course | null | undefined): string[] {
-  if (!proposed) return ["No proposed course data was included with this request."];
+function compareTeeYardages(lines: string[], label: string, before: (number | null)[] | undefined, after: (number | null)[] | undefined) {
+  const bef = before || [];
+  const aft = after || [];
+  const n = Math.max(bef.length, aft.length);
+  const changed: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const b = bef[i] ?? null;
+    const a = aft[i] ?? null;
+    if (!sameValue(b, a)) changed.push(`H${i + 1} ${b ?? "—"}→${a ?? "—"}`);
+  }
+  if (changed.length) {
+    const detail = changed.slice(0, 6).join(", ") + (changed.length > 6 ? `, +${changed.length - 6} more` : "");
+    addUniqueLine(lines, `${label} tee yardages: ${changed.length} hole${changed.length === 1 ? "" : "s"} changed (${detail})`);
+  }
+}
+
+export function courseChangeLines(current: Course | null | undefined, proposed: Course | null | undefined): string[] {  if (!proposed) return ["No proposed course data was included with this request."];
   if (!current) return ["New or missing global baseline — review the proposed course details before approval."];
   const lines: string[] = [];
   const add = (line: string | null) => addUniqueLine(lines, line);
@@ -112,13 +128,17 @@ export function courseChangeLines(current: Course | null | undefined, proposed: 
     const before = currentTees[i];
     const after = proposedTees[i];
     const label = after?.name || before?.name || `Tee ${i + 1}`;
-    if (!before && after) { add(`Added tee ${label}: rating ${after.rating ?? "—"}, slope ${after.slope ?? "—"}, par ${after.par ?? "—"}`); continue; }
+    if (!before && after) {
+      const ydTot = (after.yardages || []).reduce((s: number, v: any) => s + (Number(v) || 0), 0);
+      add(`Added tee ${label}: rating ${after.rating ?? "—"}, slope ${after.slope ?? "—"}, par ${after.par ?? "—"}${ydTot > 0 ? `, ${ydTot} yds` : ""}`); continue;
+    }
     if (before && !after) { add(`Removed tee ${label}`); continue; }
     if (!before || !after) continue;
     add(changeLine(`${label} tee name`, before.name, after.name));
     add(changeLine(`${label} rating`, before.rating, after.rating));
     add(changeLine(`${label} slope`, before.slope, after.slope));
     add(changeLine(`${label} tee par`, before.par, after.par));
+    compareTeeYardages(lines, label, before.yardages, after.yardages);
   }
 
   // Compare tee-specific holes by position first. This catches a common edit flow
@@ -141,9 +161,10 @@ export function courseChangeLines(current: Course | null | undefined, proposed: 
   for (const key of teeKeys) {
     const before = currentByKey.get(key);
     const after = proposedByKey.get(key);
-    if (before && after && (before.holes.length || after.holes.length)) {
+    if (before && after) {
       const label = after.name || before.name || "Tee";
-      compareHoleSets(lines, `${label} tee`, before.holes, after.holes);
+      if (before.holes.length || after.holes.length) compareHoleSets(lines, `${label} tee`, before.holes, after.holes);
+      compareTeeYardages(lines, label, before.yardages, after.yardages);
     }
   }
 

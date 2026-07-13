@@ -2324,3 +2324,21 @@ language sql security definer set search_path = public as $fn$
 $fn$;
 grant execute on function public.get_admin_todos() to authenticated;
 ```
+
+### v1.135.0 — manual per-hole yardage entry in the course editor (no migration)
+Previously the course editor's per-tee 'Yards' was display-only (sum of tees[].yardages, '—' when
+unset); the only manual entry lived in the master-admin Yardage Backfill tool. So a club admin who
+added a tee the API didn't know had no way to enter its yardages.
+Fix: the 'Yards' cell on each tee row is now a button that expands a per-hole yardage grid for that
+tee (writes tees[].yardages). Available to anyone who can edit the course (same permission as
+name/rating/slope) — not admin-gated. Yardages ride along with the existing course save; the Backfill
+tool stays for bulk API pulls.
+
+### v1.135.1 — FIX: yardages are now a first-class course-diff field (no migration)
+v1.135.0 added yardage entry but `lib/course-diff.ts` didn't know about yardages, so a yardage-ONLY
+edit read as 'no material change' — `save()` linked the course and returned, silently dropping the
+entered yardages. Option A applied: `normalizeTeesForDiff` now carries `yardages`, and
+`courseChangeLines` emits a per-tee line (e.g. 'Blue tee yardages: 3 holes changed (H1 —→380, …)').
+Result: yardage edits follow the SAME pattern as par/stroke-index — member edit creates the immediate
+group override + a pending global change request with the yardage diff shown to the approving admin;
+yardage-only edits are detected and persisted. Added-tee lines also show the tee's total yardage.

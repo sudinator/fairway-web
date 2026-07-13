@@ -656,6 +656,14 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
   };
   const removeTee = (i: number) => setCourse({ ...course, tees: course.tees.filter((_, j) => j !== i) });
   const updateHole = (i: number, patch: Partial<CourseHole>) => setCourse({ ...course, holes: course.holes.map((h, j) => j === i ? { ...h, ...patch } : h) });
+  const [yardTee, setYardTee] = useState<number | null>(null); // which tee's per-hole yardages are open
+  const updateTeeYardage = (ti: number, hi: number, val: string) => {
+    const n = course.holes.length;
+    const cur = course.tees[ti].yardages || [];
+    const arr: (number | null)[] = Array.from({ length: n }, (_, k) => cur[k] ?? null);
+    arr[hi] = val.trim() === "" ? null : (parseInt(val, 10) || null);
+    updateTee(ti, { yardages: arr });
+  };
 
   const save = async () => {
     if (!course.name.trim()) { setErr("Give the course a name."); return; }
@@ -778,7 +786,8 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
         {course.tees.map((t, i) => {
           const yd = (t.yardages || []).reduce((sum: number, v) => sum + (v || 0), 0);
           return (
-          <div key={i} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginTop: 8, background: C.greenLight, borderRadius: 10, padding: 10 }}>
+          <React.Fragment key={i}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginTop: 8, background: C.greenLight, borderRadius: 10, padding: 10 }}>
             <div style={{ flex: 2, minWidth: 120 }}>
               <label style={{ color: C.sage, fontSize: 10 }}>Name</label>
               <input style={{ ...inputStyle, marginTop: 2 }} value={t.name} onChange={(e) => updateTee(i, { name: e.target.value })} />
@@ -793,14 +802,34 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
               <input style={{ ...inputStyle, marginTop: 2 }} inputMode="numeric" placeholder="130"
                 value={t.slope ?? ""} onChange={(e) => updateTee(i, { slope: e.target.value === "" ? 0 : parseInt(e.target.value, 10) || 0 })} />
             </div>
-            <div style={{ flex: 1, minWidth: 70 }}>
+            <div style={{ flex: 1, minWidth: 90 }}>
               <label style={{ color: C.sage, fontSize: 10 }}>Yards</label>
-              <div style={{ color: C.cream, fontSize: 14, fontWeight: 700, marginTop: 6 }} title={yd > 0 ? "Total yardage for this tee" : "Per-hole yardages not set for this tee"}>{yd > 0 ? yd.toLocaleString() : "—"}</div>
+              <button type="button" onClick={() => setYardTee(yardTee === i ? null : i)}
+                title={yd > 0 ? "Total yardage for this tee — tap to edit per hole" : "Tap to enter per-hole yardages"}
+                style={{ marginTop: 4, width: "100%", background: "#173a2c", border: `1px solid #37624f`, borderRadius: 8, padding: "6px 8px", color: yd > 0 ? C.cream : C.sage, fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "left" }}>
+                {yd > 0 ? yd.toLocaleString() : "Add"} <span style={{ color: C.sage, fontSize: 11, fontWeight: 600 }}>{yardTee === i ? "· close" : "· edit"}</span>
+              </button>
             </div>
             {course.tees.length > 1 && (
               <button onClick={() => removeTee(i)} style={{ background: "none", border: "none", color: C.birdie, cursor: "pointer", fontWeight: 800, padding: "10px 6px" }}>✕</button>
             )}
           </div>
+          {yardTee === i && (
+            <div style={{ background: C.card, borderRadius: 10, padding: 12, marginTop: 6 }}>
+              <div style={{ color: C.faint, fontSize: 11, marginBottom: 8 }}>Per-hole yardages for <b style={{ color: C.ink }}>{t.name}</b> — leave a hole blank if you don't know it.</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(64px, 1fr))", gap: 6 }}>
+                {course.holes.map((h, hi) => (
+                  <div key={hi} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ color: C.faint, fontSize: 11, fontWeight: 700, width: 20, textAlign: "right" }}>{h.n}</span>
+                    <input inputMode="numeric" value={t.yardages?.[hi] ?? ""} placeholder="—"
+                      onChange={(e) => updateTeeYardage(i, hi, e.target.value)}
+                      style={{ ...inputStyle, padding: "5px 4px", textAlign: "center", fontSize: 13, width: "100%", minWidth: 0 }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          </React.Fragment>
         ); })}
       </div>
 
