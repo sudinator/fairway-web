@@ -2222,10 +2222,17 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
   const isMaster = !!profile?.is_admin;
   const isClubAdmin = activeGroupRole === "admin";
   const [view, setView] = useState<string | null>(null);
+  const [todos, setTodos] = useState<any>({});
+  useEffect(() => {
+    if (!isMaster) return;
+    supabase.rpc("get_admin_todos").then(({ data }: any) => setTodos(data || {}), () => {});
+  }, [isMaster]);
 
-  const Card = ({ icon, name, cap, onClick }: { icon: string; name: string; cap: string; onClick: () => void }) => (
+  const Card = ({ icon, name, cap, onClick, badge }: { icon: string; name: string; cap: string; onClick: () => void; badge?: number }) => (
     <button onClick={onClick} style={{ textAlign: "left", background: C.greenLight, border: `1px solid #2c6b54`, borderRadius: 14, padding: "13px 13px 14px", cursor: "pointer", position: "relative" }}>
-      <span style={{ position: "absolute", top: 12, right: 12, color: C.sage, fontSize: 14 }}>›</span>
+      {badge && badge > 0
+        ? <span style={{ position: "absolute", top: 10, right: 10, minWidth: 20, height: 20, padding: "0 6px", borderRadius: 999, background: C.gold, color: "#0e3a2c", fontSize: 11.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{badge}</span>
+        : <span style={{ position: "absolute", top: 12, right: 12, color: C.sage, fontSize: 14 }}>›</span>}
       <div style={{ fontSize: 20, lineHeight: 1 }}>{icon}</div>
       <div style={{ color: C.cream, fontWeight: 800, fontSize: 13.5, marginTop: 8 }}>{name}</div>
       <div style={{ color: C.sage, fontSize: 10.5, marginTop: 3, lineHeight: 1.35 }}>{cap}</div>
@@ -2288,12 +2295,12 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
           {tierHead("System", "SUPER ADMIN", true, "Cross-club and system-wide. Master admin only.")}
           {grid(<>
             <Card icon="📊" name="Analytics" cap="Usage, engagement & golf cadence" onClick={() => setView("analytics")} />
-            <Card icon="🧭" name="Operations" cap="Nudge funnel, auto-finish, stale rounds" onClick={() => setView("operations")} />
+            <Card icon="🧭" name="Operations" cap="Nudge funnel, auto-finish, stale rounds" onClick={() => setView("operations")} badge={todos.stale_ready} />
             <Card icon="📜" name="Activity log" cap="Audit trail across all clubs" onClick={() => setView("activity")} />
-            <Card icon="🏟" name="Clubs oversight" cap="Approve clubs, support sessions" onClick={() => setView("oversight")} />
+            <Card icon="🏟" name="Clubs oversight" cap="Approve clubs, support sessions" onClick={() => setView("oversight")} badge={todos.pending_clubs} />
             <Card icon="🧑‍🤝‍🧑" name="Users" cap="Global roster, suspend, merge" onClick={() => setView("users")} />
             <Card icon="🗂" name="Player admin" cap="Handicaps, scores, memberships, courses" onClick={() => setView("players")} />
-            <Card icon="💬" name="Feedback" cap="User-submitted feedback" onClick={() => setView("feedback")} />
+            <Card icon="💬" name="Feedback" cap="User-submitted feedback" onClick={() => setView("feedback")} badge={todos.new_feedback} />
             <Card icon="🩺" name="Diagnostics" cap="Round-save log & reproduce toggle" onClick={() => setView("diagnostics")} />
             <Card icon="🔧" name="System tools" cap="Test account, yardage backfill" onClick={() => setView("systools")} />
           </>)}
