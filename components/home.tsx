@@ -362,7 +362,7 @@ export function Home({ session }: { session: any }) {
       setProfile(data);
       saveAppBootCache({ profile: data });
       supabase.from("profiles").update({ last_active: new Date().toISOString(), email: user.email }).eq("id", user.id).then(() => {});
-      supabase.rpc("mark_active").then(() => {}); // record today's activity for analytics
+      supabase.rpc("mark_active", { p_standalone: (typeof window !== "undefined") && ((window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || (window.navigator as any).standalone === true) }).then(() => {}); // record activity + install mode for analytics
       return;
     }
     // Only trust a real name from the Google account; never fabricate one from the

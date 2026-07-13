@@ -241,3 +241,4 @@ Living list. `[x]` = built & verified in code (file noted). `[~]` = partially do
 
 - Match-play layout DECISION (Jun 2026): keep per-hole CARD layout, not the grid (tap-target/readability on phone). Grid mockups were exploratory.
 - [x] Super-admin Power Users analytics (composite ranking, sortable per-metric, friction/churn flags) — v1.136.0 / migration 0088.
+- [~] Analytics name-level drill-down + new stats (STAGE 1 shipped v1.137.0: shared drawer + admin_stat_users engine + drill on all existing stats + install capture). STAGE 2 pending: new summary tiles (notifications on/off, failing subs, per-type mutes, profile sharing, guests, platform split). STAGE 3 pending: Daily report (date-driven active users + rounds).

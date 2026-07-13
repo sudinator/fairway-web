@@ -1201,6 +1201,76 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
 }
 
 // ================= Admin panel =================
+// ★ Shared stat drill-down engine. Any analytics stat calls openStatDrill({stat,title,...});
+// the single StatDrawerHost (mounted once) fetches admin_stat_users(stat,arg,date) and lists
+// the exact users behind that number. Built once, reused by every stat — existing and new.
+type DrillPayload = { stat: string; title: string; cap?: string; arg?: string | null; date?: string | null };
+let _openDrill: ((p: DrillPayload) => void) | null = null;
+function openStatDrill(p: DrillPayload) { _openDrill?.(p); }
+
+function StatDrawerHost() {
+  const [open, setOpen] = useState(false);
+  const [payload, setPayload] = useState<DrillPayload | null>(null);
+  const [rows, setRows] = useState<any[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    _openDrill = (p) => {
+      setPayload(p); setOpen(true); setRows(null); setErr(null);
+      supabase.rpc("admin_stat_users", { p_stat: p.stat, p_arg: p.arg ?? null, p_date: p.date ?? null })
+        .then(({ data, error }: any) => { if (error) setErr(error.message); else setRows(data || []); });
+    };
+    return () => { _openDrill = null; };
+  }, []);
+  const close = () => setOpen(false);
+  const initials = (n: string) =>
+    (n || "?").replace(/[\u201c\u201d"].*/, "").split("\u00b7")[0].trim().split(/\s+/).slice(0, 2)
+      .map((s) => s[0] || "").join("").toUpperCase() || "?";
+  const tagColor = (t: string) => {
+    const bad = ["friction", "off", "stale", "lapsed", "deleted", "muted", "in progress"];
+    const good = ["on", "installed", "new"];
+    if (bad.includes(t)) return { bg: C.birdie, fg: "#fff" };
+    if (good.includes(t)) return { bg: C.gold, fg: C.green };
+    return { bg: C.greenLight, fg: C.sage };
+  };
+  return (
+    <>
+      <div onClick={close} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 80,
+        opacity: open ? 1 : 0, pointerEvents: open ? "auto" : "none", transition: "opacity .2s" }} />
+      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 440, margin: "0 auto", zIndex: 90,
+        background: C.greenMid, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "82vh",
+        display: "flex", flexDirection: "column", transform: open ? "translateY(0)" : "translateY(102%)",
+        transition: "transform .24s cubic-bezier(.2,.7,.2,1)", boxShadow: "0 -10px 40px rgba(0,0,0,.5)",
+        paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}>
+        <div style={{ width: 42, height: 5, borderRadius: 3, background: "rgba(255,255,255,.25)", margin: "9px auto 4px" }} />
+        <div style={{ padding: "6px 16px 12px", borderBottom: `1px solid ${C.greenLight}`, position: "relative" }}>
+          <button onClick={close} style={{ position: "absolute", right: 12, top: 4, background: "none", border: "none", color: C.sage, fontSize: 22, cursor: "pointer", lineHeight: 1 }}>×</button>
+          <div style={{ fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 800, color: C.cream, paddingRight: 28 }}>{payload?.title || ""}</div>
+          {payload?.cap ? <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{payload.cap}</div> : null}
+          {rows ? <div style={{ color: C.faint, fontSize: 11, marginTop: 4 }}>{rows.length} {rows.length === 1 ? "user" : "users"}</div> : null}
+        </div>
+        <div style={{ overflowY: "auto", padding: "6px 10px 22px" }}>
+          {err ? <div style={{ color: C.sage, fontSize: 12, padding: 12 }}>Couldn't load: {err}</div> :
+           !rows ? <div style={{ color: C.sage, fontSize: 12, padding: 12 }}>Loading…</div> :
+           rows.length === 0 ? <div style={{ color: C.sage, fontSize: 12, padding: 12 }}>No users for this metric.</div> :
+           rows.map((u: any, i: number) => {
+             const tc = u.tag ? tagColor(u.tag) : null;
+             return (
+               <div key={i} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 8px", borderTop: i ? "1px solid rgba(255,255,255,.06)" : "none" }}>
+                 <div style={{ width: 34, height: 34, borderRadius: "50%", flex: "0 0 34px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, color: C.green, background: C.sage }}>{initials(u.name)}</div>
+                 <div style={{ minWidth: 0 }}>
+                   <div style={{ fontSize: 14, fontWeight: 600, color: C.cream, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</div>
+                   {u.detail ? <div style={{ fontSize: 11, color: C.sage, marginTop: 1 }}>{u.detail}</div> : null}
+                 </div>
+                 {tc ? <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 800, borderRadius: 6, padding: "2px 7px", background: tc.bg, color: tc.fg, whiteSpace: "nowrap" }}>{u.tag}</span> : null}
+               </div>
+             );
+           })}
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ★ Admin analytics — utilization, feature popularity, health. Reads one JSON
 // payload from the is_admin-gated get_admin_analytics() RPC.
 // ★ Golf-cadence engagement — reads the is_admin-gated get_admin_engagement() RPC (migration
@@ -1424,8 +1494,10 @@ function AdminAnalytics() {
   const t = a.totals || {}, ac = a.active || {}, f = a.formats || {}, fe = a.features || {}, h = a.health || {}, en = a.engagement || {};
   const series: { day: string; n: number }[] = ac.series || [];
 
-  const tile = (n: React.ReactNode, l: string, d?: string, bg: string = C.greenLight) => (
-    <div style={{ background: bg, borderRadius: 12, padding: "10px 12px", flex: 1, minWidth: 88 }}>
+  const tile = (n: React.ReactNode, l: string, d?: string, bg: string = C.greenLight, drill?: { stat: string; cap?: string }) => (
+    <div onClick={drill ? () => openStatDrill({ stat: drill.stat, title: l, cap: drill.cap }) : undefined}
+      style={{ background: bg, borderRadius: 12, padding: "10px 12px", flex: 1, minWidth: 88, position: "relative", cursor: drill ? "pointer" : "default" }}>
+      {drill ? <span style={{ position: "absolute", right: 8, top: 8, color: C.gold, fontSize: 10, fontWeight: 800 }}>who ›</span> : null}
       <div style={{ color: C.cream, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif" }}>{n}</div>
       <div style={{ color: C.sage, fontSize: 11 }}>{l}</div>
       {d ? <div style={{ color: "#5BD08A", fontSize: 10, marginTop: 2 }}>{d}</div> : null}
@@ -1439,9 +1511,9 @@ function AdminAnalytics() {
   const line = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
   const area = pts.length ? `${line} L${(W - pad).toFixed(1)} ${H - pad} L${pad} ${H - pad} Z` : "";
 
-  const bar = (label: string, n: number, denom: number, color: string) => (
-    <div key={label}>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.cream, marginTop: 8 }}><span>{label}</span><span>{n}</span></div>
+  const bar = (label: string, n: number, denom: number, color: string, drillStat?: string) => (
+    <div key={label} onClick={drillStat ? () => openStatDrill({ stat: drillStat, title: label }) : undefined} style={{ cursor: drillStat ? "pointer" : "default" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.cream, marginTop: 8 }}><span>{label}{drillStat ? <span style={{ color: C.gold, fontSize: 10, fontWeight: 800 }}>  who ›</span> : null}</span><span>{n}</span></div>
       <div style={{ height: 8, borderRadius: 4, background: C.green, marginTop: 3, overflow: "hidden" }}>
         <div style={{ height: "100%", borderRadius: 4, width: `${denom > 0 ? Math.round((n / denom) * 100) : 0}%`, background: color }} />
       </div>
@@ -1455,27 +1527,29 @@ function AdminAnalytics() {
   const feat: [string, number][] = [["Avatars set", fe.avatars_set || 0], ["AI summaries", fe.ai_summaries || 0], ["Live links (now)", fe.live_shared || 0], ["Courses added (30d)", fe.courses_added_30d || 0]];
   const featMax = Math.max(1, ...feat.map(([, n]) => n));
 
-  const hrow = (label: string, val: string, good?: boolean) => (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "8px 0", borderTop: `1px solid ${C.greenMid}` }}>
-      <span style={{ color: C.cream, fontSize: 13 }}>{label}</span>
+  const hrow = (label: string, val: string, good?: boolean, drill?: { stat: string; cap?: string }) => (
+    <div onClick={drill ? () => openStatDrill({ stat: drill.stat, title: label, cap: drill.cap }) : undefined}
+      style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "8px 0", borderTop: `1px solid ${C.greenMid}`, cursor: drill ? "pointer" : "default" }}>
+      <span style={{ color: C.cream, fontSize: 13 }}>{label}{drill ? <span style={{ color: C.gold, fontSize: 10, fontWeight: 800 }}>  who ›</span> : null}</span>
       <span style={{ fontWeight: 800, fontSize: 15, color: good === undefined ? C.cream : good ? "#5BD08A" : "#E0796B" }}>{val}</span>
     </div>
   );
 
   return (
     <div style={{ marginTop: 8 }}>
+      <StatDrawerHost />
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {tile(t.users ?? "—", "Total users", t.users_new_30d ? `+${t.users_new_30d} / 30d` : undefined)}
+        {tile(t.users ?? "—", "Total users", t.users_new_30d ? `+${t.users_new_30d} / 30d` : undefined, C.greenLight, { stat: "users_total", cap: "All active (non-test) users" })}
         {tile(t.active_groups ?? "—", "Active clubs")}
         {tile(t.games ?? "—", "Games", t.games_30d ? `+${t.games_30d} / 30d` : undefined)}
-        {tile(t.rounds ?? "—", "Rounds done", `${t.rounds_30d ? `+${t.rounds_30d} /30d` : "—"}${t.rounds_started ? ` · ${t.rounds_started} started` : ""}`)}
+        {tile(t.rounds ?? "—", "Rounds done", `${t.rounds_30d ? `+${t.rounds_30d} /30d` : "—"}${t.rounds_started ? ` · ${t.rounds_started} started` : ""}`, C.greenLight, { stat: "rounds_done", cap: "Players with completed rounds" })}
       </div>
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
         <div style={{ display: "flex", textAlign: "center" }}>
-          <div style={{ flex: 1 }}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.dau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>Today · unique</div><div style={{ color: C.faint, fontSize: 10, marginTop: 1 }}>{ac.views_today ?? 0} views</div></div>
-          <div style={{ flex: 1 }}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.wau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This week · unique</div><div style={{ color: C.faint, fontSize: 10, marginTop: 1 }}>{ac.views_7d ?? 0} views</div></div>
-          <div style={{ flex: 1 }}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.mau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This month · unique</div><div style={{ color: C.faint, fontSize: 10, marginTop: 1 }}>{ac.views_30d ?? 0} views</div></div>
+          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_dau", title: "Active today", cap: "Users who opened BNN today" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.dau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>Today · unique</div><div style={{ color: C.faint, fontSize: 10, marginTop: 1 }}>{ac.views_today ?? 0} views · who ›</div></div>
+          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_wau", title: "Active this week", cap: "Users active in the last 7 days" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.wau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This week · unique</div><div style={{ color: C.faint, fontSize: 10, marginTop: 1 }}>{ac.views_7d ?? 0} views · who ›</div></div>
+          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_mau", title: "Active this month", cap: "Users active in the last 30 days" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.mau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This month · unique</div><div style={{ color: C.faint, fontSize: 10, marginTop: 1 }}>{ac.views_30d ?? 0} views · who ›</div></div>
         </div>
         {series.length > 0 && (
           <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 120, marginTop: 12 }}>
@@ -1492,7 +1566,7 @@ function AdminAnalytics() {
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
           {tile(t.rounds_per_active_user ?? 0, "Rounds / active user", undefined, C.green)}
-          {tile(ac.churn_30d ?? 0, "Lapsed (30–60d, gone)", undefined, C.green)}
+          {tile(ac.churn_30d ?? 0, "Lapsed (30–60d, gone)", undefined, C.green, { stat: "lapsed", cap: "Active 30–60d ago, silent since" })}
         </div>
         <div style={{ color: C.faint, fontSize: 10, marginTop: 8 }}>Unique = distinct users; views = total app opens. Test accounts are excluded from all figures. Trends build over time.</div>
       </div>
@@ -1501,16 +1575,16 @@ function AdminAnalytics() {
         <div style={{ color: C.sage, fontSize: 12, fontWeight: 700 }}>Games by format</div>
         {fmtEntries.length ? fmtEntries.map(([k, n]) => bar(fmtName[k] || k, n, fmtMax, fmtColors[k] || C.sage)) : <div style={{ color: C.faint, fontSize: 12, marginTop: 6 }}>No games yet.</div>}
         <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 14 }}>Feature usage</div>
-        {feat.map(([k, n]) => bar(k, n, featMax, "#5AA9E6"))}
+        {feat.map(([k, n]) => bar(k, n, featMax, "#5AA9E6", k === "Avatars set" ? "avatars_set" : k === "AI summaries" ? "ai_summaries" : undefined))}
       </div>
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
         {hrow("Game completion (ended \u00f7 created)", `${h.completion_pct ?? 0}%`, true)}
-        {hrow("Round completion (done \u00f7 started)", `${h.round_completion_pct ?? 0}%`, true)}
-        {hrow("Abandoned games + rounds (never finished)", `${h.abandoned_pct ?? 0}%`, false)}
+        {hrow("Round completion (done \u00f7 started)", `${h.round_completion_pct ?? 0}%`, true, { stat: "unfinished", cap: "Users with unfinished / abandoned rounds" })}
+        {hrow("Abandoned games + rounds (never finished)", `${h.abandoned_pct ?? 0}%`, false, { stat: "abandoned", cap: "Users with stale unfinished or deleted rounds" })}
         {hrow("Avg holes entered / game", `${h.avg_holes ?? 0}`)}
-        {hrow("New users active within 7 days", `${h.activated_7d_pct ?? 0}%`, true)}
-        {hrow("Signups never joined a club", `${h.never_joined_group_pct ?? 0}%`, false)}
+        {hrow("New users active within 7 days", `${h.activated_7d_pct ?? 0}%`, true, { stat: "users_new_30d", cap: "Recently-joined users" })}
+        {hrow("Signups never joined a club", `${h.never_joined_group_pct ?? 0}%`, false, { stat: "never_joined_group", cap: "Users with no active club membership" })}
         {hrow("Retention \u2014 week 1", `${h.retention_w1_pct ?? 0}%`)}
         {hrow("Retention \u2014 week 4", `${h.retention_w4_pct ?? 0}%`)}
         <div style={{ color: C.faint, fontSize: 10, marginTop: 8 }}>Rounds counted only when completed; deleted rounds never count. Retention accrues over the first weeks.</div>

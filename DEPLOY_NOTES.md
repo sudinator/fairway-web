@@ -2687,3 +2687,16 @@ that tracks Safari's toolbar so the nav stays pinned to the visible bottom inste
 Also added an 8px cushion to the nav's bottom padding so the icon labels are no longer clipped at the
 screen edge. Diag now reports mode (installed/browser), vvOffsetTop, the --app-h var, and
 navBottom_vs_visible (should be ~0 = nav flush to the visible bottom in BOTH contexts).
+
+### v1.137.0 — FEATURE: Analytics name-level drill-down, STAGE 1 (migrations 0089, 0090)
+Additive — nothing removed from the existing Analytics tab. New shared drill engine: every stat is a
+button that opens one reusable bottom-sheet (StatDrawerHost) listing the exact users behind the number,
+fetched from the is_admin-gated admin_stat_users(stat,arg,date) RPC (uniform name/detail/tag rows).
+STAGE 1 wires drill-down onto the existing stats: Total users, Rounds done, DAU/WAU/MAU, Lapsed, Round
+completion, Abandoned, New-users, Never-joined-a-club, and the Avatars/AI feature bars. The engine
+already includes branches for the stage-2/3 stats (installed/browser, notif on/off, failing subs, mutes,
+sharing, guests, daily active/rounds) so those stages are client-only.
+Also: install-vs-browser capture is LIVE (0089) — mark_active(p_standalone) records each user's latest
+open mode into profiles.last_standalone; home.tsx now passes display-mode. Forward-only, no backfill.
+Run 0089 then 0090 (full SQL posted in chat).
+STAGE 2 (next): new summary tiles. STAGE 3: Daily report.
