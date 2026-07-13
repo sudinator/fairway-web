@@ -26,7 +26,7 @@ export function RoundRow({ r, onOpen }: { r: Round; onOpen: (r: Round) => void }
       <div style={{ flex: 1, minWidth: 200 }}>
         <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>
           {r.course}{r.tee_name ? ` · ${r.tee_name}` : ""}
-          {r.game_id ? <span style={{ background: C.greenLight, color: C.gold, fontSize: 10, fontWeight: 800, letterSpacing: 0.5, padding: "2px 7px", borderRadius: 6, marginLeft: 8, verticalAlign: "middle" }}>🏆 GAME</span> : null}
+          {r.game_id ? <span style={{ background: C.greenLight, color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: "2px 7px", borderRadius: 6, marginLeft: 8, verticalAlign: "middle" }}>🏆 GAME</span> : null}
         </div>
         <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
           {r.group_name ? `${r.group_name} · ` : ""}{fmtDate(r.played_at)} · {played(r).length}/{r.holes.length} holes{(() => { const i = partialHandicapInfo(r); return i ? ` · ${i.filled} net par for hcp` : ""; })()} · GIR {pct(girStats([r]))} · FW {pct(firStats([r]))} · {puttsOf(r)} putts{pensOf(r) ? ` · ${pensOf(r)} pen` : ""}

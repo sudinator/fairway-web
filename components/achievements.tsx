@@ -37,7 +37,7 @@ function HoleChip({ h }: { h: Hole }) {
   const col = tp == null ? C.faint : tp < 0 ? C.birdie : tp > 0 ? C.bogey : C.ink;
   return (
     <div style={{ textAlign: "center", minWidth: 26 }}>
-      <div style={{ fontSize: 10, color: C.faint }}>{h.hole_number}</div>
+      <div style={{ fontSize: 11, color: C.faint }}>{h.hole_number}</div>
       <div style={{ fontSize: 13, fontWeight: 800, color: col, lineHeight: 1.1 }}>{h.strokes ?? "–"}</div>
     </div>
   );
@@ -114,7 +114,7 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
         const openDefInCat = defs.find((d) => d.key === open && earned?.[d.key]);
         return (
           <div key={cat} style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 10, letterSpacing: 1.5, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 10 }}>{CAT_LABEL[cat]}</div>
+            <div style={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 10 }}>{CAT_LABEL[cat]}</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))", gap: 12 }}>
               {defs.map((b) => {
                 const e = earned?.[b.key];
@@ -136,11 +136,11 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
                     }}>
                       <span>{on ? b.icon : "🔒"}</span>
                       {showCount && (
-                        <span style={{ position: "absolute", right: -4, bottom: -4, minWidth: 18, height: 18, padding: "0 4px", borderRadius: 9, background: C.gold, color: "#1c1c15", fontSize: 10.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #10402f" }}>{"×"}{e!.count}</span>
+                        <span style={{ position: "absolute", right: -4, bottom: -4, minWidth: 18, height: 18, padding: "0 4px", borderRadius: 9, background: C.gold, color: "#1c1c15", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #10402f" }}>{"×"}{e!.count}</span>
                       )}
                     </div>
-                    <div style={{ fontSize: 10, color: C.cream, marginTop: 6, lineHeight: 1.2, fontWeight: on ? 700 : 500 }}>{b.label}</div>
-                    {best != null && <div style={{ fontSize: 10.5, color: C.gold, fontWeight: 800, marginTop: 1 }}>{best}</div>}
+                    <div style={{ fontSize: 11, color: C.cream, marginTop: 6, lineHeight: 1.2, fontWeight: on ? 700 : 500 }}>{b.label}</div>
+                    {best != null && <div style={{ fontSize: 11, color: C.gold, fontWeight: 800, marginTop: 1 }}>{best}</div>}
                   </button>
                 );
               })}
@@ -220,7 +220,7 @@ export function AchievementsTeaser({ userId, onViewAll }: { userId: string; onVi
         </div>
         <div style={{ textAlign: "right", flex: "none" }}>
           <div style={{ fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, color: C.cream, lineHeight: 1 }}>{earned.length}</div>
-          <div style={{ color: C.sage, fontSize: 10 }}>of {total}</div>
+          <div style={{ color: C.sage, fontSize: 11 }}>of {total}</div>
         </div>
       </div>
     </button>

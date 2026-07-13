@@ -176,7 +176,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   const [showDiffs, setShowDiffs] = useState(false);
   const sectionHead = (label: string, right?: React.ReactNode) => (
     <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "18px 2px 8px" }}>
-      <span style={{ color: C.sage, fontSize: 10, letterSpacing: 2, fontWeight: 700 }}>{label}</span>
+      <span style={{ color: C.sage, fontSize: 11, letterSpacing: 2, fontWeight: 700 }}>{label}</span>
       <span style={{ flex: 1, height: 1, background: C.line }} />
       {right}
     </div>
@@ -251,7 +251,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
         )}
         {hcp.index != null && hcp.recentDetail.length > 0 && showDiffs && (
           <div style={{ marginTop: 8 }}>
-            <div style={{ color: C.faint, fontSize: 10, marginBottom: 4 }}>Newest round first.</div>
+            <div style={{ color: C.faint, fontSize: 11, marginBottom: 4 }}>Newest round first.</div>
             <div style={{ color: C.cream, fontSize: 12, lineHeight: 1.9 }}>
               {hcp.recentDetail.map((x, i) => (
                 <span key={i}>
@@ -286,7 +286,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
               }}>{label}</button>
             )))}
           </div>
-          <div style={{ color: C.faint, fontSize: 10, marginTop: 5, textAlign: "center" }}>
+          <div style={{ color: C.faint, fontSize: 11, marginTop: 5, textAlign: "center" }}>
             {done.length === 0
               ? (win === "season" ? "No rounds yet this season" : "No rounds in this range")
               : win === "all" ? `Stats reflect all ${done.length} round${done.length === 1 ? "" : "s"}`

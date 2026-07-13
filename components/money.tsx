@@ -241,7 +241,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
               </div>
             );
           })}
-          {expenses.length > 0 && <div style={{ color: C.faint, fontSize: 10.5, marginTop: 8 }}>Tap any expense to see full details.</div>}
+          {expenses.length > 0 && <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Tap any expense to see full details.</div>}
           <CategorySummary expenses={expenses} />
         </div>
       )}
@@ -317,7 +317,7 @@ function GuestManager({ guests, members, busy, onRetire, onUnretire }: {
           </div>
           {openId === g.id && (
             <div style={{ marginTop: 8, background: "#14352b", borderRadius: 10, padding: 10 }}>
-              <div style={{ color: C.sage, fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>Now a member? (optional)</div>
+              <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>Now a member? (optional)</div>
               <select value={became} onChange={(e) => setBecame(e.target.value)} style={{ ...inputStyle, padding: "8px 11px", fontSize: 14 }}>
                 <option value="">— not a member —</option>
                 {members.map((m) => <option key={m.id} value={m.id}>{m.display_name}</option>)}
@@ -329,7 +329,7 @@ function GuestManager({ guests, members, busy, onRetire, onUnretire }: {
       ))}
       {retired.length > 0 && (
         <>
-          <div style={{ color: C.sage, fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", margin: "12px 0 4px" }}>Retired</div>
+          <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", margin: "12px 0 4px" }}>Retired</div>
           {retired.map((g) => (
             <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 2px", opacity: 0.85 }}>
               <span style={{ flex: 1, color: C.sage, fontSize: 13, minWidth: 0 }}>{g.name}{g.became_member_id ? " · now a member: " + nameOf(g.became_member_id) : ""}</span>
@@ -362,7 +362,7 @@ function BalancesScreen({ members, guests, shares, payers, balances, me, onNudge
             <Avatar src={m.avatar_url} name={m.display_name} size={30} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: C.cream, fontSize: 14, fontWeight: 700 }}>{m.display_name}{m.id === me ? " (you)" : ""}</div>
-              {covNames.length > 0 && <div style={{ color: C.sage, fontSize: 10.5 }}>incl. {covNames.join(", ")}</div>}
+              {covNames.length > 0 && <div style={{ color: C.sage, fontSize: 11 }}>incl. {covNames.join(", ")}</div>}
             </div>
             <div style={{ color: owed ? "#7fd6a3" : owes ? "#ef9d90" : C.sage, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 15 }}>
               {owed ? "is owed " + fmtUSD(v) : owes ? "owes " + fmtUSD(-v) : "settled"}
@@ -396,7 +396,7 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
           <button onClick={() => onToggle(false)} style={segBtn(!simplifyOn)}>As entered</button>
         </div>
       ) : (
-        <div style={{ color: C.faint, fontSize: 10.5, marginBottom: 8 }}>{simplifyOn ? "Showing fewest payments." : "Showing debts as entered."} Set by a club admin.</div>
+        <div style={{ color: C.faint, fontSize: 11, marginBottom: 8 }}>{simplifyOn ? "Showing fewest payments." : "Showing debts as entered."} Set by a club admin.</div>
       )}
       {transfers.length === 0 && <div style={{ color: "#7fd6a3", textAlign: "center", fontFamily: "Georgia, serif", fontSize: 17, padding: "22px 0" }}>✓ All square</div>}
       {transfers.map((t, i) => {
@@ -427,20 +427,20 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
       })}
       {settlements.length > 0 && (
         <>
-          <div style={{ color: C.sage, fontSize: 10.5, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", margin: "16px 0 4px" }}>Payments recorded</div>
+          <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", margin: "16px 0 4px" }}>Payments recorded</div>
           {[...settlements].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")).map((s2) => {
             const canUndo = isAdmin || s2.created_by === me;
             return (
               <div key={s2.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 2px", borderBottom: `1px solid ${C.greenMid}` }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: C.cream, fontSize: 13 }}><b>{nameOf(s2.from_user_id)}</b> paid <b>{nameOf(s2.to_user_id)}</b> {fmtUSD(s2.amount_cents)}</div>
-                  <div style={{ color: C.faint, fontSize: 10.5 }}>{s2.method || "cash"}{s2.created_at ? " · " + new Date(s2.created_at).toLocaleDateString() : ""}</div>
+                  <div style={{ color: C.faint, fontSize: 11 }}>{s2.method || "cash"}{s2.created_at ? " · " + new Date(s2.created_at).toLocaleDateString() : ""}</div>
                 </div>
                 {canUndo && <button disabled={busy} onClick={() => onUnmark(s2)} style={{ border: `1px solid ${C.line}`, background: "transparent", color: C.sage, borderRadius: 8, padding: "6px 10px", fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>Unmark</button>}
               </div>
             );
           })}
-          <div style={{ color: C.faint, fontSize: 10, marginTop: 6 }}>Unmark reverses a payment and recomputes balances. Admins can unmark any; you can unmark ones you recorded.</div>
+          <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Unmark reverses a payment and recomputes balances. Admins can unmark any; you can unmark ones you recorded.</div>
         </>
       )}
     </div>
@@ -504,7 +504,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
   };
   const splitRemainAfter = runningRemain(parties.map(keyOf), (k) => centsOf(custom[k]), (k) => checked.has(k));
   const payRemainAfter = runningRemain(members.map((mm) => mm.id), (k) => centsOf(payerAmt[k]), (k) => payerSet.has(k));
-  const remHint = (v: number | undefined): React.CSSProperties => ({ fontSize: 10.5, whiteSpace: "nowrap", color: v === 0 ? "#7fd6a3" : (v ?? 0) < 0 ? "#ef9d90" : C.sage });
+  const remHint = (v: number | undefined): React.CSSProperties => ({ fontSize: 11, whiteSpace: "nowrap", color: v === 0 ? "#7fd6a3" : (v ?? 0) < 0 ? "#ef9d90" : C.sage });
 
   const toggle = (p: Party) => { const k = keyOf(p); const n = new Set(checked); n.has(k) ? n.delete(k) : n.add(k); setChecked(n); };
 
@@ -615,7 +615,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
           <div onClick={() => toggle(p)} style={{ display: "flex", alignItems: "center", gap: 9, background: on ? "#1c4536" : "#173a2c", border: `1.5px solid ${on ? "#3c6f59" : "transparent"}`, borderBottom: isGuest && on ? "none" : undefined, borderRadius: isGuest && on ? "10px 10px 0 0" : 10, padding: "8px 10px", marginTop: 6, cursor: "pointer" }}>
             <span style={{ width: 19, height: 19, borderRadius: 5, border: `2px solid ${on ? C.gold : C.sage}`, background: on ? C.gold : "transparent", color: "#2a2410", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 12 }}>{on ? "✓" : ""}</span>
             <Avatar src={p.avatar_url} name={p.name} size={24} />
-            <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 600, minWidth: 0 }}>{p.name}{isGuest ? <span style={{ color: C.sage, fontSize: 10.5, fontWeight: 700 }}> · guest</span> : ""}</span>
+            <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 600, minWidth: 0 }}>{p.name}{isGuest ? <span style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}> · guest</span> : ""}</span>
             {on && (mode === "even"
               ? <span style={{ color: C.cream, fontFamily: "Georgia, serif", fontWeight: 700 }}>{fmtUSD(shareOf(p))}</span>
               : <span style={{ display: "flex", alignItems: "center", gap: 4 }} onClick={(e) => e.stopPropagation()}>
@@ -625,7 +625,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
           </div>
           {isGuest && on && (
             <div onClick={(e) => e.stopPropagation()} style={{ background: "#14352b", border: `1.5px solid ${needSponsor ? C.birdie : "#3c6f59"}`, borderTop: "none", borderRadius: "0 0 10px 10px", padding: "8px 10px 9px 38px" }}>
-              <div style={{ color: C.sage, fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>
+              <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>
                 Sponsored by {needSponsor ? <span style={{ color: C.birdie }}>· required</span> : <span style={{ color: "#7fbf9c" }}>✓</span>}
               </div>
               <select value={guestSponsors[p.id] || ""} onChange={(e) => setGuestSponsors((s) => ({ ...s, [p.id]: e.target.value }))}
@@ -737,7 +737,7 @@ function ActivityLog({ activity, memberById, onOpenExpense }: { activity: any[];
             <span style={{ fontSize: 14, width: 18, textAlign: "center", color: C.gold }}>{ACT_ICON[a.action] || "•"}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: C.cream, fontSize: 13 }}><b>{who}</b> {a.summary}</div>
-              <div style={{ color: C.faint, fontSize: 10.5 }}>{new Date(a.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div>
+              <div style={{ color: C.faint, fontSize: 11 }}>{new Date(a.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div>
             </div>
             {openable && <span style={{ color: C.sage, fontSize: 16 }}>&#8250;</span>}
           </div>

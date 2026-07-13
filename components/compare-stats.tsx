@@ -59,19 +59,19 @@ function CatBar({ name, score, sub, statKey, open, onToggle }: {
             {name}
             {clickable && <span style={{ color: C.gold, fontSize: 11, marginLeft: 6, fontWeight: 700 }}>{open ? "▲" : "ⓘ"}</span>}
           </span>
-          <span style={{ color: vcol, fontSize: 10.5, fontWeight: 700 }}>{vlabel}</span>
+          <span style={{ color: vcol, fontSize: 11, fontWeight: 700 }}>{vlabel}</span>
         </div>
         <div style={{ position: "relative", height: 9, background: C.green, borderRadius: 5 }}>
           <div style={{ position: "absolute", left: 0, top: 0, height: 9, width: `${Math.round(score)}%`, background: vcol, borderRadius: 5 }} />
           <div style={{ position: "absolute", top: -2, left: "50%", width: 2, height: 13, background: "#fff", opacity: 0.75 }} />
         </div>
-        <div style={{ color: C.sage, fontSize: 10.5, marginTop: 4, lineHeight: 1.45 }}>{sub}</div>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 4, lineHeight: 1.45 }}>{sub}</div>
       </div>
       {open && desc && (
         <div style={{ background: C.green, borderRadius: 10, padding: "11px 13px", marginTop: 8 }}>
-          <div style={{ color: C.gold, fontSize: 10, letterSpacing: 1.5, fontWeight: 700 }}>HOW IT'S MEASURED</div>
+          <div style={{ color: C.gold, fontSize: 11, letterSpacing: 1.5, fontWeight: 700 }}>HOW IT'S MEASURED</div>
           <div style={{ color: C.cream, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>{desc.measured}</div>
-          <div style={{ color: C.gold, fontSize: 10, letterSpacing: 1.5, fontWeight: 700, marginTop: 11 }}>WHAT TO WORK ON</div>
+          <div style={{ color: C.gold, fontSize: 11, letterSpacing: 1.5, fontWeight: 700, marginTop: 11 }}>WHAT TO WORK ON</div>
           <div style={{ color: C.cream, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>{desc.work}</div>
         </div>
       )}
@@ -117,7 +117,7 @@ export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHc
 
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12, border: "1px solid #245A47" }}>
-      <div style={{ color: C.gold, fontSize: 10, letterSpacing: 2, fontWeight: 700 }}>WHERE YOU’RE GAINING &amp; LOSING SHOTS</div>
+      <div style={{ color: C.gold, fontSize: 11, letterSpacing: 2, fontWeight: 700 }}>WHERE YOU’RE GAINING &amp; LOSING SHOTS</div>
 
       {goals.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 11, flexWrap: "wrap" }}>
@@ -140,7 +140,7 @@ export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHc
           : <>Your <b style={{ color: "#F4E4B0" }}>{top.cat.toLowerCase()}</b> has the most room vs your handicap’s peers right now.</>}
       </div>
 
-      <div style={{ color: C.gold, fontSize: 10.5, marginTop: 12, opacity: 0.85 }}>Tap a category for how it's measured &amp; what to work on ⓘ</div>
+      <div style={{ color: C.gold, fontSize: 11, marginTop: 12, opacity: 0.85 }}>Tap a category for how it's measured &amp; what to work on ⓘ</div>
       <div style={{ marginTop: 2 }}>
         {rows.map((r) => {
           const goalTxt = goalBands
@@ -150,7 +150,7 @@ export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHc
         })}
       </div>
 
-      <div style={{ color: C.sage, fontSize: 10.5, lineHeight: 1.45, marginTop: 12, opacity: 0.9 }}>
+      <div style={{ color: C.sage, fontSize: 11, lineHeight: 1.45, marginTop: 12, opacity: 0.9 }}>
         Bars show you vs the typical range for your {Math.round(index)} index (white tick = peer average). Proxies from public amateur data (Arccos · Shot Scope · Break X) — approximate; scrambling needs ~15+ tracked rounds to read reliably.
       </div>
     </div>

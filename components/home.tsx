@@ -157,6 +157,10 @@ export function Home({ session }: { session: any }) {
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [groupsLoading, setGroupsLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("dashboard");
+  // When a reused page (Members / Club settings) is opened FROM the admin home, we remember
+  // that origin so the page shows an iOS-style back bar to return there. null = no back bar.
+  const [returnTab, setReturnTab] = useState<Tab | null>(null);
+  const tabTitle = (t: Tab | null) => (t === "admin" ? "Admin" : t === "players" ? "Members" : t === "groups" ? "Club settings" : "");
   // When the owe banner is tapped we want the Money tab to open straight on "Settle".
   // The MoneyTab remounts each time you enter it, so this one-shot flag is read on mount;
   // clear it whenever we're not on the money tab so a normal re-entry lands on Balances.
@@ -724,6 +728,15 @@ export function Home({ session }: { session: any }) {
       )}
 
       <div style={{ marginTop: 20 }}>
+        {returnTab && !stage && !viewing && (tab === "players" || tab === "groups") && (
+          <div style={{ display: "flex", alignItems: "center", position: "relative", padding: "2px 0 12px", marginBottom: 4, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            <button onClick={() => { const t = returnTab; setReturnTab(null); setTab(t); }}
+              style={{ display: "flex", alignItems: "center", gap: 3, background: "none", border: "none", color: C.gold, fontSize: 15, fontWeight: 700, cursor: "pointer", padding: "2px 4px" }}>
+              <span style={{ fontSize: 20, lineHeight: 1, marginTop: -1 }}>‹</span>{tabTitle(returnTab)}
+            </button>
+            <div style={{ position: "absolute", left: 0, right: 0, textAlign: "center", color: C.cream, fontSize: 14, fontWeight: 800, pointerEvents: "none" }}>{tabTitle(tab)}</div>
+          </div>
+        )}
         {stage === "setup" && activeGroup ? (
           <RoundSetup index={index} saveIndex={saveIndex} activeGroupId={activeGroup.id} activeGroupName={activeGroup.name} onCancel={() => setStage(null)}
             onReady={(round) => setStage({ round })} />
@@ -749,7 +762,7 @@ export function Home({ session }: { session: any }) {
             profile={profile}
             activeGroupName={activeGroup?.name}
             activeGroupRole={activeGroup?.role}
-            onGoto={(t) => { setTab(t as Tab); setMoreOpen(false); }}
+            onGoto={(t) => { setReturnTab("admin"); setTab(t as Tab); setMoreOpen(false); }}
             onEnterGroup={enterSupportGroup}
             onExitGroup={exitSupportGroup}
             onGroupsChanged={loadGroups}
@@ -799,14 +812,14 @@ export function Home({ session }: { session: any }) {
               color: active ? C.gold : C.sage,
             }}>
               <span style={{ fontSize: 19, lineHeight: 1 }}>{icon}</span>
-              <span style={{ fontSize: 10, fontWeight: 700 }}>{label}</span>
+              <span style={{ fontSize: 11, fontWeight: 700 }}>{label}</span>
             </button>
           );
           return (
             <>
               {primary.map((p) =>
                 <React.Fragment key={p.key}>
-                  {item(tab === p.key && !inFlow, p.icon, p.label, () => { setTab(p.key); setStage(null); setViewing(null); setMoreOpen(false); })}
+                  {item(tab === p.key && !inFlow, p.icon, p.label, () => { setTab(p.key); setReturnTab(null); setStage(null); setViewing(null); setMoreOpen(false); })}
                 </React.Fragment>
               )}
               {item(moreOpen || (["players","groups","admin","help","profile","money","teetimes"].includes(tab) && !inFlow), "⋯", "More", () => setMoreOpen((v) => !v))}
@@ -836,7 +849,7 @@ export function Home({ session }: { session: any }) {
                 { key: "profile", label: "Profile", show: true },
               ];
               return more.filter((m) => m.show).map((m) => (
-                <button key={m.key} onClick={() => { setTab(m.key); setStage(null); setViewing(null); setMoreOpen(false); }}
+                <button key={m.key} onClick={() => { setTab(m.key); setReturnTab(null); setStage(null); setViewing(null); setMoreOpen(false); }}
                   style={{
                     display: "block", width: "100%", textAlign: "left",
                     background: tab === m.key && !inFlow ? C.green : "none", border: "none", cursor: "pointer",

@@ -198,7 +198,7 @@ export function AdminFeedbackTab() {
           {shown.map((r) => (
             <div key={r.id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <span style={{ background: KIND_COLOR[r.kind] || C.faint, color: "#fff", fontSize: 10, fontWeight: 800, letterSpacing: ".05em", textTransform: "uppercase", padding: "3px 8px", borderRadius: 6 }}>
+                <span style={{ background: KIND_COLOR[r.kind] || C.faint, color: "#fff", fontSize: 11, fontWeight: 800, letterSpacing: ".05em", textTransform: "uppercase", padding: "3px 8px", borderRadius: 6 }}>
                   {KIND_LABEL[r.kind] || r.kind}
                 </span>
                 <span style={{ color: C.ink, fontWeight: 700, fontSize: 13 }}>{r.user_name || "Someone"}</span>

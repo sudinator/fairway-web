@@ -526,6 +526,9 @@ function CreateGame({
   // Handicaps the organizer fills in during a flighted setup for members missing one.
   // Saved to their profile on create (Amit's call), so it becomes their handicap going forward.
   const [hcpOverrides, setHcpOverrides] = useState<Record<string, number>>({});
+  // In-progress text for each missing-handicap field, so a row stays put while typing and
+  // only commits (leaving the "needs" list) when the organizer taps Set.
+  const [flightHcpDraft, setFlightHcpDraft] = useState<Record<string, string>>({});
   useEffect(() => { setAllowancePct(gameType === "fourball" || gameType === "trifecta" ? 85 : 100); }, [gameType]);
   const [teamScoreMode, setTeamScoreMode] = useState<"best_ball" | "aggregate">("best_ball");
   const [trifectaScoring, setTrifectaScoring] = useState<"per_hole" | "match">("per_hole");
@@ -1052,7 +1055,7 @@ function CreateGame({
                   </span>
                   {!hasIdx && (
                     <>
-                      <span style={{ color: "#f6c66b", fontSize: 10, fontWeight: 800, letterSpacing: 0.4 }}>NEEDS HCP</span>
+                      <span style={{ color: "#f6c66b", fontSize: 11, fontWeight: 800, letterSpacing: 0.4 }}>NEEDS HCP</span>
                       <input
                         value={guestIdxEdits[g.id] ?? ""}
                         onChange={(e) => {
@@ -1466,15 +1469,29 @@ function CreateGame({
                   <div style={{ background: "rgba(184,58,46,.12)", border: "1px solid rgba(184,58,46,.4)", borderRadius: 11, padding: "10px 12px", marginBottom: 10 }}>
                     <div style={{ color: C.cream, fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Handicaps needed to flight this event</div>
                     {idxVal == null ? <div style={{ color: C.sage, fontSize: 11, marginBottom: 6 }}>Enter your own index in the field above.</div> : null}
-                    {flightNeedsHcp.map((p) => (
-                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                        <span style={{ flex: 1, fontSize: 13, color: C.cream }}>{p.display_name}</span>
-                        <input type="number" step="0.1" inputMode="decimal" placeholder="index"
-                          onChange={(e) => { const v = parseFloat(e.target.value); setHcpOverrides((m) => { const nx = { ...m }; if (Number.isNaN(v)) { delete nx[p.id]; } else { nx[p.id] = v; } return nx; }); }}
-                          style={{ ...inputStyle, width: 84, padding: "6px 9px", fontSize: 13, textAlign: "center" }} />
-                      </div>
-                    ))}
-                    <div style={{ color: C.sage, fontSize: 10, marginTop: 2 }}>Saved to each player's profile as their handicap going forward.</div>
+                    {flightNeedsHcp.map((p) => {
+                      const draft = flightHcpDraft[p.id] ?? "";
+                      const val = parseFloat(draft);
+                      const valid = !Number.isNaN(val) && val >= 0 && val <= 54;
+                      const setIt = () => {
+                        if (!valid) return;
+                        setHcpOverrides((m) => ({ ...m, [p.id]: val }));
+                        setFlightHcpDraft((d) => { const nx = { ...d }; delete nx[p.id]; return nx; });
+                      };
+                      return (
+                        <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                          <span style={{ flex: 1, fontSize: 13, color: C.cream }}>{p.display_name}</span>
+                          <input type="number" step="0.1" inputMode="decimal" placeholder="index"
+                            value={draft}
+                            onChange={(e) => setFlightHcpDraft((d) => ({ ...d, [p.id]: e.target.value }))}
+                            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setIt(); } }}
+                            style={{ ...inputStyle, width: 72, padding: "6px 9px", fontSize: 13, textAlign: "center" }} />
+                          <button onClick={setIt} disabled={!valid}
+                            style={{ ...btn(valid), fontSize: 12, padding: "6px 12px", opacity: valid ? 1 : 0.4, cursor: valid ? "pointer" : "not-allowed" }}>Set</button>
+                        </div>
+                      );
+                    })}
+                    <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>Saved to each player's profile as their handicap going forward.</div>
                   </div>
                 ) : null}
                 {flightBands.map((b, i) => {
@@ -2916,7 +2933,7 @@ function GameRoom({
         <div style={{ flex: 1, minWidth: 0, marginLeft: 8 }}>
           <div style={{ color: C.ink, fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {leaderName(p.display_name)}{p.user_id === user.id ? " (you)" : ""}
-            {showTag && fkey ? <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 800, borderRadius: 5, padding: "1px 6px", background: flightTagColor(fkey), color: "#06251A" }}>{fkey}</span> : null}
+            {showTag && fkey ? <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, borderRadius: 5, padding: "1px 6px", background: flightTagColor(fkey), color: "#06251A" }}>{fkey}</span> : null}
           </div>
           <div style={{ color: C.faint, fontSize: 11 }}>
             {p.course_handicap != null ? `CH ${p.course_handicap}` : "no hcp"}
@@ -3079,7 +3096,7 @@ function GameRoom({
             cursor: "pointer",
           }}
         >
-          <div style={{ color: C.sage, fontSize: 10, letterSpacing: 2 }}>
+          <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2 }}>
             {copied ? "COPIED ✓" : "SHARE CODE · TAP TO SHARE"}
           </div>
           <div
@@ -3325,7 +3342,7 @@ function GameRoom({
                         border: done || active ? "none" : "1px solid rgba(255,255,255,0.25)",
                         boxShadow: active ? "0 0 0 3px rgba(216,178,74,0.25)" : "none",
                       }}>{done ? "✓" : i + 1}</div>
-                      <div style={{ color: active ? C.cream : C.sage, fontSize: 10, marginTop: 3, fontWeight: active ? 700 : 400 }}>{s.label}</div>
+                      <div style={{ color: active ? C.cream : C.sage, fontSize: 11, marginTop: 3, fontWeight: active ? 700 : 400 }}>{s.label}</div>
                     </button>
                   </div>
                 );
@@ -3668,7 +3685,7 @@ function GameRoom({
             ) : (
               leaderboard.map((p) => renderLeaderRow(p, posWithin(p, leaderboard), tiedWithin(p, leaderboard), hasFlights))
             )}
-            <div style={{ color: C.sage, fontSize: 10, marginTop: 8 }}>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>
               {isStroke ? `Thru = holes played · Gross = total strokes · Par = ${strokeNet ? "net" : "gross"} vs par · Net = net total. Lowest ${strokeNet ? "net" : "gross"} wins.` : "Gross = total strokes · Thru = holes played · O/U = net Stableford vs par pace (under = green) · Pts = net Stableford points. Ranked by O/U."}
             </div>
           </div>
@@ -3713,7 +3730,7 @@ function GameRoom({
                     <>
                       <div style={{ color: C.cream, fontWeight: 800, marginTop: 6 }}>
                         {s.who.join(" & ")}
-                        <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", color: C.green, background: C.sage, borderRadius: 5, padding: "1px 6px", verticalAlign: "middle" }}>
+                        <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", color: C.green, background: C.sage, borderRadius: 5, padding: "1px 6px", verticalAlign: "middle" }}>
                           {s.who.length > 1 ? "tied" : "leading"}
                         </span>
                       </div>
@@ -4096,7 +4113,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
             const bPts = relBasis ? stablefordPts(gross, m.par, indRecv) : null; // blue = course handicap
             return (
               <div key={p.id + i} style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: colorFor(p), fontSize: 10, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 3 }}>{p.display_name}</div>
+                <div style={{ color: colorFor(p), fontSize: 11, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 3 }}>{p.display_name}</div>
                 <div
                   style={{ position: "relative", background: "#FBFAF4", borderRadius: 7, height: 56, display: "flex", alignItems: "center", justifyContent: "center", cursor: (isMarker || p.user_id === user?.id) ? "pointer" : "default", outline: isMarker ? "1px solid #E6E0CC" : (p.user_id === user?.id ? "1px dashed #C9BF9B" : "none") }}
                   onClick={(isMarker || p.user_id === user?.id) ? () => { if (isMarker && (gross == null || gross <= 0)) onSetHole(p.id, i, { strokes: m.par }); setEdit({ playerId: p.id, holeIdx: i }); } : undefined}>
@@ -4146,11 +4163,11 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
                 <span style={{ fontSize: 20, fontWeight: 800 }}>{s.g || "–"}</span>
                 {s.g > 0 && (relBasis ? (
                   <>
-                    <span style={{ position: "absolute", top: 3, right: 3, minWidth: 15, height: 15, padding: "0 2px", border: "1.5px solid #E8730C", borderRadius: 5, color: "#F0A45E", fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.mPts}</span>
-                    <span style={{ position: "absolute", bottom: 3, right: 3, minWidth: 15, height: 15, padding: "0 2px", border: `1.5px solid ${C.indivDot}`, borderRadius: 5, color: C.indivDot, fontSize: 10, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.cPts}</span>
+                    <span style={{ position: "absolute", top: 3, right: 3, minWidth: 15, height: 15, padding: "0 2px", border: "1.5px solid #E8730C", borderRadius: 5, color: "#F0A45E", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.mPts}</span>
+                    <span style={{ position: "absolute", bottom: 3, right: 3, minWidth: 15, height: 15, padding: "0 2px", border: `1.5px solid ${C.indivDot}`, borderRadius: 5, color: C.indivDot, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.cPts}</span>
                   </>
                 ) : (
-                  <span style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#E4CF86", fontSize: 10, fontWeight: 800, padding: "0 5px", borderRadius: 6 }}>{s.mPts}</span>
+                  <span style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#E4CF86", fontSize: 11, fontWeight: 800, padding: "0 5px", borderRadius: 6 }}>{s.mPts}</span>
                 ))}
               </div>
             </div>
@@ -4214,16 +4231,16 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
         </div>
       )}
       <div style={{ display: "flex", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
-        <span style={{ color: "#7FD0A0", fontSize: 10 }}>● under</span>
-        <span style={{ color: "#6FA8DC", fontSize: 10 }}>● par</span>
-        <span style={{ color: "#E0796B", fontSize: 10 }}>● over (net)</span>
+        <span style={{ color: "#7FD0A0", fontSize: 11 }}>● under</span>
+        <span style={{ color: "#6FA8DC", fontSize: 11 }}>● par</span>
+        <span style={{ color: "#E0796B", fontSize: 11 }}>● over (net)</span>
         {relBasis
           ? <>
-              <span style={{ color: "#E8730C", fontSize: 10 }}>● ▢ match hcp</span>
-              <span style={{ color: C.indivDot, fontSize: 10 }}>● ▢ course hcp</span>
-              <span style={{ color: C.faint, fontSize: 10 }}>dots = strokes · box = net Stableford</span>
+              <span style={{ color: "#E8730C", fontSize: 11 }}>● ▢ match hcp</span>
+              <span style={{ color: C.indivDot, fontSize: 11 }}>● ▢ course hcp</span>
+              <span style={{ color: C.faint, fontSize: 11 }}>dots = strokes · box = net Stableford</span>
             </>
-          : <span style={{ color: "#E8730C", fontSize: 10 }}>● gets a stroke · corner = Stableford</span>}
+          : <span style={{ color: "#E8730C", fontSize: 11 }}>● gets a stroke · corner = Stableford</span>}
       </div>
       <div style={{ position: "sticky", top: 0, zIndex: 5, background: C.green, paddingTop: 8, paddingBottom: 10, marginBottom: 4, boxShadow: "0 6px 10px -8px rgba(0,0,0,0.55)" }}>
         {(() => {
@@ -4247,11 +4264,11 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
               <span style={{ color: C.sage, fontSize: 11 }}>{allEnded ? "round time" : "elapsed"}{holesDone >= 1 ? ` · thru ${holesDone}` : ""}</span>
               {showPace && <span style={{ flex: 1 }} />}
               {showPace && (onPace ? (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(91,208,138,0.15)", color: "#7FD0A0", border: "1px solid rgba(91,208,138,0.4)", borderRadius: 999, padding: "2px 9px", fontSize: 10, fontWeight: 700 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(91,208,138,0.15)", color: "#7FD0A0", border: "1px solid rgba(91,208,138,0.4)", borderRadius: 999, padding: "2px 9px", fontSize: 11, fontWeight: 700 }}>
                   <span style={{ width: 6, height: 6, borderRadius: 99, background: "#5BD08A", display: "block" }} />On pace
                 </span>
               ) : (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(216,178,74,0.16)", color: "#E4CF86", border: "1px solid rgba(216,178,74,0.5)", borderRadius: 999, padding: "2px 9px", fontSize: 10, fontWeight: 700 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(216,178,74,0.16)", color: "#E4CF86", border: "1px solid rgba(216,178,74,0.5)", borderRadius: 999, padding: "2px 9px", fontSize: 11, fontWeight: 700 }}>
                   ⚑ ~{behind} min behind
                 </span>
               ))}
@@ -4273,15 +4290,15 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
                 {(() => {
                   const matchHcp = meta.reduce((a, m) => a + recvFor(p, m.si), 0);
                   const courseHcp = meta.reduce((a, m) => a + indRecvFor(p, m.si), 0);
-                  if (!relBasis) return <div style={{ color: C.sage, fontSize: 10 }}>hcp {matchHcp}</div>;
+                  if (!relBasis) return <div style={{ color: C.sage, fontSize: 11 }}>hcp {matchHcp}</div>;
                   const line = (color: string, label: string, val: number) => (
-                    <div style={{ color: C.sage, fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, whiteSpace: "nowrap" }}>
+                    <div style={{ color: C.sage, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, whiteSpace: "nowrap" }}>
                       <span style={{ width: 5, height: 5, borderRadius: 99, background: color, display: "inline-block", flex: "none" }} />{label} {val}
                     </div>
                   );
                   return <>{line("#E8730C", "match hcp", matchHcp)}{line(C.indivDot, "course hcp", courseHcp)}</>;
                 })()}
-                {p.tee_name && <div style={{ color: C.sage, fontSize: 10, opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.tee_name}</div>}
+                {p.tee_name && <div style={{ color: C.sage, fontSize: 11, opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.tee_name}</div>}
               </div>
             );
           })}
@@ -4505,11 +4522,11 @@ function SkinsView({ game, players, user, isCreator, mode, onChanged }: { game: 
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                 <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
-                  <div style={{ color: C.gold, fontSize: 10, fontWeight: 800 }}>PAIR 1</div>
+                  <div style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>PAIR 1</div>
                   <div style={{ color: C.cream, fontSize: 13 }}>{f.a.map(firstName).join(" & ") || "—"}</div>
                 </div>
                 <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
-                  <div style={{ color: C.gold, fontSize: 10, fontWeight: 800 }}>PAIR 2</div>
+                  <div style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>PAIR 2</div>
                   <div style={{ color: C.cream, fontSize: 13 }}>{f.b.map(firstName).join(" & ") || "—"}</div>
                 </div>
               </div>
@@ -4745,7 +4762,7 @@ function MatchView({
     <div style={{ marginTop: 18 }}>
       {mode === "play" && isTeam && teamStandings && (
         <div style={{ background: C.green, borderRadius: 14, padding: 16, marginBottom: 16 }}>
-          <div style={{ color: C.cream, fontSize: 10, letterSpacing: 2, fontWeight: 800, opacity: 0.8 }}>TEAM MATCH · RUNNING SCORE</div>
+          <div style={{ color: C.cream, fontSize: 11, letterSpacing: 2, fontWeight: 800, opacity: 0.8 }}>TEAM MATCH · RUNNING SCORE</div>
           <div style={{ display: "flex", alignItems: "center", marginTop: 10 }}>
             <div style={{ flex: 1, textAlign: "center" }}>
               <div style={{ color: teamAccent(teams![0].name, 0), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![0].name}</div>
@@ -5085,7 +5102,7 @@ function FourballView({
     if (!played.length) return <div style={{ background: "#F1EFE6", borderRadius: 8, padding: "8px 10px", margin: "2px 0 6px", color: C.faint, fontSize: 11 }}>No holes scored yet.</div>;
     return (
       <div style={{ background: "#F1EFE6", borderRadius: 8, padding: "6px 10px", margin: "2px 0 6px" }}>
-        <div style={{ display: "flex", color: C.faint, fontSize: 10, fontWeight: 800, letterSpacing: 0.5, padding: "3px 0" }}>
+        <div style={{ display: "flex", color: C.faint, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: "3px 0" }}>
           <span style={{ width: 34 }}>HOLE</span><span style={{ flex: 1 }}>NET</span><span style={{ width: 60, textAlign: "center" }}>WON</span><span style={{ width: 52, textAlign: "right" }}>{runningMatch ? "MATCH" : "SCORE"}</span>
         </div>
         {played.map((d) => {
@@ -5105,7 +5122,7 @@ function FourballView({
             </div>
           );
         })}
-        <div style={{ color: C.faint, fontSize: 10, paddingTop: 5 }}>Net scores. Bold = the lower net that won the hole.</div>
+        <div style={{ color: C.faint, fontSize: 11, paddingTop: 5 }}>Net scores. Bold = the lower net that won the hole.</div>
       </div>
     );
   };
@@ -5354,11 +5371,11 @@ function FourballView({
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
-                <div style={{ color: C.gold, fontSize: 10, fontWeight: 800 }}>{isTeam ? teamName(playerOf(f.a[0])?.team).toUpperCase() : "PAIR 1"}</div>
+                <div style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>{isTeam ? teamName(playerOf(f.a[0])?.team).toUpperCase() : "PAIR 1"}</div>
                 <div style={{ color: C.cream, fontSize: 13 }}>{f.a.map(firstName).join(" & ") || "—"}</div>
               </div>
               <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
-                <div style={{ color: C.gold, fontSize: 10, fontWeight: 800 }}>{isTeam ? teamName(playerOf(f.b[0])?.team).toUpperCase() : "PAIR 2"}</div>
+                <div style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>{isTeam ? teamName(playerOf(f.b[0])?.team).toUpperCase() : "PAIR 2"}</div>
                 <div style={{ color: C.cream, fontSize: 13 }}>{f.b.map(firstName).join(" & ") || "—"}</div>
               </div>
             </div>
@@ -5560,9 +5577,9 @@ function StrokesSummary({ game, players, collapsible = false, meKey }: { game: G
         {opts?.label !== false && <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>{(f.name || `Foursome ${i + 1}`).toUpperCase()}</div>}
         {isTrifecta && singles.length > 0 && (
           <>
-            <div style={{ color: C.sage, fontSize: 10, letterSpacing: 1, marginTop: 6 }}>TWO SINGLES</div>
+            <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, marginTop: 6 }}>TWO SINGLES</div>
             {singles.map(([aId, bId], si) => oneVone(aId, bId, `${f.id}-s${si}`))}
-            <div style={{ color: C.sage, fontSize: 10, letterSpacing: 1, marginTop: 10 }}>TEAM POINT · {game.team_score_mode === "aggregate" ? "SHOOTOUT" : "BEST BALL"}</div>
+            <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, marginTop: 10 }}>TEAM POINT · {game.team_score_mode === "aggregate" ? "SHOOTOUT" : "BEST BALL"}</div>
           </>
         )}
         {teamStrip(f, `${f.id}-t`)}
@@ -5605,7 +5622,7 @@ function StrokesSummary({ game, players, collapsible = false, meKey }: { game: G
           <div style={{ boxShadow: `0 0 0 1px ${C.gold} inset`, borderRadius: 8, padding: "8px 8px 6px", marginTop: 8 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <div>
-                <div style={{ color: C.gold, fontSize: 10, fontWeight: 800, letterSpacing: 1 }}>YOUR GROUP</div>
+                <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>YOUR GROUP</div>
                 {soleFoursome && <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800, marginTop: 2 }}>{(soleFoursome.f.name || `Foursome ${soleFoursome.i + 1}`).toUpperCase()}</div>}
               </div>
               {toggleBtn}
@@ -5616,7 +5633,7 @@ function StrokesSummary({ game, players, collapsible = false, meKey }: { game: G
 
           {showAll && (otherPairings.length > 0 || otherFoursomes.length > 0) && (
             <>
-              <div style={{ color: C.faint, fontSize: 10, letterSpacing: 1.5, fontWeight: 700, marginTop: 14 }}>OTHER GROUPS</div>
+              <div style={{ color: C.faint, fontSize: 11, letterSpacing: 1.5, fontWeight: 700, marginTop: 14 }}>OTHER GROUPS</div>
               {otherPairings.map(({ pr, i }) => <div key={`op${i}`} style={{ opacity: 0.62 }}>{oneVone(pr.a, pr.b, `p${i}`)}</div>)}
               {otherFoursomes.map(({ f, i }) => foursomeBlock(f, i, { dim: true }))}
             </>
@@ -5976,7 +5993,7 @@ function OrganizerPanel({
                   <>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(132px, 1fr))", gap: 10, marginTop: 12 }}>
                     <div>
-                      <label style={{ color: C.sage, fontSize: 10 }}>Handicap</label>
+                      <label style={{ color: C.sage, fontSize: 11 }}>Handicap</label>
                     <div style={{ display: "flex", gap: 5, marginTop: 2 }}>
                       <input
                         inputMode="decimal"
@@ -5998,7 +6015,7 @@ function OrganizerPanel({
                   </div>
 
                   <div>
-                    <label style={{ color: C.sage, fontSize: 10 }}>Tee</label>
+                    <label style={{ color: C.sage, fontSize: 11 }}>Tee</label>
                     {courseTees.length ? (
                       <select
                         value={p.tee_name || ""}
@@ -6892,7 +6909,7 @@ function LegConfigEditor({ game, onSave }: { game: Game; onSave: (cfg: LegConfig
   ];
   const chip = (on: boolean): React.CSSProperties => ({ border: `1px solid ${on ? C.gold : C.greenMid}`, background: on ? C.gold : "transparent", color: on ? "#1c1606" : C.cream, borderRadius: 999, padding: "7px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" });
   const stepBtn: React.CSSProperties = { width: 30, height: 30, borderRadius: 8, border: `1px solid ${C.greenMid}`, background: "transparent", color: C.cream, fontSize: 16, fontWeight: 800, cursor: "pointer", lineHeight: 1 };
-  const lbl: React.CSSProperties = { color: C.sage, fontSize: 10, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", margin: "12px 0 6px" };
+  const lbl: React.CSSProperties = { color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", margin: "12px 0 6px" };
   const fmtName = game.game_type === "trifecta" ? "trifecta" : game.game_type === "fourball" ? "four-ball" : "match";
 
   return (
@@ -6959,7 +6976,7 @@ function SegmentBoard({
       </div>
       {open && (
         <div style={{ padding: "0 10px 10px" }}>
-          <div style={{ display: "flex", alignItems: "center", padding: "6px 6px", color: C.sage, fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.4, borderBottom: "1px solid #2c5a48" }}>
+          <div style={{ display: "flex", alignItems: "center", padding: "6px 6px", color: C.sage, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.4, borderBottom: "1px solid #2c5a48" }}>
             <div style={{ flex: 1 }}>Player</div>
             <div style={{ width: 34, textAlign: "center" }}>Thru</div>
             {cols.map((c, i) => (
@@ -7050,7 +7067,7 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
   const tB = teams[1] ? (tally[teams[1].key] || 0) : 0;
 
   const hdrBg = (lg: Leg) => (lg.tot ? "#E7F0E9" : "#EEF4EF");
-  const th: React.CSSProperties = { textAlign: "center", color: C.faint, fontSize: 10, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", padding: "6px 3px", borderBottom: `1px solid ${C.line}` };
+  const th: React.CSSProperties = { textAlign: "center", color: C.faint, fontSize: 11, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", padding: "6px 3px", borderBottom: `1px solid ${C.line}` };
   const nmH: React.CSSProperties = { ...th, textAlign: "left", width: 100 };
   const thruH: React.CSSProperties = { ...th, width: 38 };
   const nmCell: React.CSSProperties = { textAlign: "left", width: 100, color: C.ink, fontWeight: 800, fontSize: 12.5, padding: "6px 3px" };
@@ -7075,7 +7092,7 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
 
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "15px 13px 14px", marginTop: 12 }}>
-      <div style={{ display: "inline-block", color: C.green, background: C.gold, borderRadius: 6, padding: "2px 8px", fontSize: 10, fontWeight: 800, letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 8 }}>Side game</div>
+      <div style={{ display: "inline-block", color: C.green, background: C.gold, borderRadius: 6, padding: "2px 8px", fontSize: 11, fontWeight: 800, letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 8 }}>Side game</div>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Group results</div>
         <div style={{ display: "flex", gap: 6 }}>
@@ -7113,7 +7130,7 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
 
       {pointsMode ? (
         <>
-          <div style={{ color: C.sage, fontSize: 10.5, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", margin: "14px 0 4px" }}>Leg points</div>
+          <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", margin: "14px 0 4px" }}>Leg points</div>
           {legs.map((lg, c) => {
             const li = legInfo[c];
             if (li.pts === 0 || li.res.winnerTeams.length === 0) return null;
@@ -7147,12 +7164,12 @@ function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] 
           <div style={{ textAlign: "center", marginTop: 10, fontFamily: "Georgia, serif", fontWeight: 800, color: tA === tB ? C.gold : C.cream }}>
             {tA === tB ? ("All square " + fmtPt(tA) + "-" + fmtPt(tB)) : (teamName(tA > tB ? teams[0].key : teams[1].key) + " leads " + fmtPt(Math.max(tA, tB)) + "-" + fmtPt(Math.min(tA, tB)))}
           </div>
-          <div style={{ color: C.sage, fontSize: 10, marginTop: 10, opacity: 0.85, lineHeight: 1.4 }}>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 10, opacity: 0.85, lineHeight: 1.4 }}>
             Each leg's best individual result scores for their team. Separate from the trifecta - it doesn't change that result. Points are awarded once a leg is complete; the leader is shown until then. Ties: opposite teams both score, same team scores once.
           </div>
         </>
       ) : (
-        <div style={{ color: C.sage, fontSize: 10, marginTop: 8, opacity: 0.85, lineHeight: 1.4 }}>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 8, opacity: 0.85, lineHeight: 1.4 }}>
           {hasTeams ? "Leaders per leg (highlighted); leader is by pace, so Thru matters. Assign leg points in setup to play for team points." : "Each player's Stableford points (or net vs par) per leg. Fills in live as holes are entered."}
         </div>
       )}

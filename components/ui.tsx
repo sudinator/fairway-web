@@ -32,7 +32,7 @@ export function Avatar({ src, name, size = 32, accent, enlargeable = true, cssSi
   const common: React.CSSProperties = cssSize
     ? { width: cssSize, aspectRatio: "1 / 1", borderRadius: "50%", flexShrink: 0, boxShadow: accent ? `0 0 0 2px ${ring}` : "none" }
     : { width: size, height: size, borderRadius: "50%", flexShrink: 0, boxShadow: accent ? `0 0 0 2px ${ring}` : "none" };
-  const initialsFont = cssSize ? 22 : Math.max(10, Math.round(size * 0.4));
+  const initialsFont = cssSize ? 22 : Math.max(11, Math.round(size * 0.4));
 
   // Only real photos are tappable-to-enlarge (no point zooming an initials circle).
   const canEnlarge = !!src && enlargeable;
@@ -349,7 +349,7 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
           {onNext && <button onClick={onNext} style={{ flex: 1.3, background: C.gold, color: C.ink, border: "none", borderRadius: 8, padding: "11px 4px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>Save &amp; next ▸</button>}
           <button onClick={onClose} style={{ flex: 1, background: C.green, color: C.cream, border: "none", borderRadius: 8, padding: "11px 4px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>Done</button>
         </div>
-        <div style={{ color: C.faint, fontSize: 10, textAlign: "center", marginTop: 8 }}>Only the score is required · every stroke counts. For handicap, each hole caps at net double bogey ({netDouble}).</div>
+        <div style={{ color: C.faint, fontSize: 11, textAlign: "center", marginTop: 8 }}>Only the score is required · every stroke counts. For handicap, each hole caps at net double bogey ({netDouble}).</div>
       </div>
     </div>
   );
@@ -396,7 +396,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   // Stableford is scored on the INDIVIDUAL (full course handicap) strokes on relative games
   // (match/four-ball/trifecta), matching the group scorecard; otherwise the game's own recv.
   const sfRecv = (h: EntryHole) => (showIndivDots ? (h.indRecv || 0) : (h.recv || 0));
-  const headStyle: React.CSSProperties = { color: C.faint, fontSize: 10, letterSpacing: 0.5, fontWeight: 700, textTransform: "uppercase" };
+  const headStyle: React.CSSProperties = { color: C.faint, fontSize: 11, letterSpacing: 0.5, fontWeight: 700, textTransform: "uppercase" };
 
   const block = (from: number, to: number, label: string) => {
     const seg = holes.slice(from, to);
@@ -538,7 +538,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   // ---- Match-play layout: one compact card per hole (header strip + one field band) ----
   const mCell = (label: string, node: React.ReactNode) => (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, minWidth: 0, padding: "0 1px" }}>
-      <span style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", color: C.faint, letterSpacing: 0.2, whiteSpace: "nowrap" }}>{label}</span>
+      <span style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", color: C.faint, letterSpacing: 0.2, whiteSpace: "nowrap" }}>{label}</span>
       {node}
     </div>
   );
@@ -589,7 +589,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     let run = ""; if (showRun) { for (let k = to - 1; k >= from; k--) { if (matchRun![k]) { run = matchRun![k] as string; break; } } }
     const runCol = run === "" ? C.sage : run === "AS" ? "#fff" : (run.includes("UP") || run.includes("↑")) ? "#7FE3A6" : "#F0A39A";
     const item = (k: string, v: React.ReactNode, col = "#fff") => (
-      <div style={{ textAlign: "center" }}><div style={{ fontSize: 10, color: C.sage, fontWeight: 700, textTransform: "uppercase" }}>{k}</div><div style={{ fontSize: 16, fontWeight: 800, color: col, marginTop: 1 }}>{v}</div></div>
+      <div style={{ textAlign: "center" }}><div style={{ fontSize: 11, color: C.sage, fontWeight: 700, textTransform: "uppercase" }}>{k}</div><div style={{ fontSize: 16, fontWeight: 800, color: col, marginTop: 1 }}>{v}</div></div>
     );
     return (
       <div key={"sum-" + label} style={{ background: C.green, color: C.cream, borderRadius: 13, padding: "11px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -630,13 +630,13 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
         ];
         return (
           <div style={{ marginTop: 10 }}>
-            <div style={{ color: C.faint, fontSize: 10, letterSpacing: 0.5, fontWeight: 800, textTransform: "uppercase", marginBottom: 6 }}>{strokeSixes ? "Sixes · net score" : "Sixes · net stableford"}</div>
+            <div style={{ color: C.faint, fontSize: 11, letterSpacing: 0.5, fontWeight: 800, textTransform: "uppercase", marginBottom: 6 }}>{strokeSixes ? "Sixes · net score" : "Sixes · net stableford"}</div>
             <div style={{ display: "flex", gap: 8 }}>
               {segs.map((sg) => (
                 <div key={sg.lbl} style={{ flex: 1, background: C.greenLight, borderRadius: 12, padding: "9px 6px", textAlign: "center" }}>
                   <div style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}>{sg.lbl}</div>
                   <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 20, marginTop: 2 }}>{sg.v}</div>
-                  <div style={{ color: C.faint, fontSize: 10 }}>holes {sg.sub}</div>
+                  <div style={{ color: C.faint, fontSize: 11 }}>holes {sg.sub}</div>
                 </div>
               ))}
             </div>
@@ -661,7 +661,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
         else body = <>Level match — no strokes given</>;
         return (
           <div style={{ background: C.greenLight, borderRadius: 10, padding: "8px 12px", marginTop: 10, color: "#EDE7D4", fontSize: 12.5, fontWeight: 600 }}>
-            <span style={{ color: C.sage, fontWeight: 800, fontSize: 10, letterSpacing: 1, textTransform: "uppercase", marginRight: 8 }}>Match strokes</span>{body}
+            <span style={{ color: C.sage, fontWeight: 800, fontSize: 11, letterSpacing: 1, textTransform: "uppercase", marginRight: 8 }}>Match strokes</span>{body}
           </div>
         );
       })()}
@@ -680,15 +680,15 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
       {!matchMode && has18 && (out > 0 || inn > 0) && (
         <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
           <div style={{ background: C.card, borderRadius: 10, padding: "8px 18px", textAlign: "center" }}>
-            <div style={{ color: C.sage, fontSize: 10, letterSpacing: 2 }}>OUT</div>
+            <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2 }}>OUT</div>
             <div style={{ color: C.ink, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif" }}>{out || "–"}</div>
           </div>
           <div style={{ background: C.card, borderRadius: 10, padding: "8px 18px", textAlign: "center" }}>
-            <div style={{ color: C.sage, fontSize: 10, letterSpacing: 2 }}>IN</div>
+            <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2 }}>IN</div>
             <div style={{ color: C.ink, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif" }}>{inn || "–"}</div>
           </div>
           <div style={{ background: C.green, borderRadius: 10, padding: "8px 18px", textAlign: "center" }}>
-            <div style={{ color: C.cream, fontSize: 10, letterSpacing: 2 }}>TOTAL</div>
+            <div style={{ color: C.cream, fontSize: 11, letterSpacing: 2 }}>TOTAL</div>
             <div style={{ color: "#fff", fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif" }}>{out + inn || "–"}</div>
           </div>
         </div>
@@ -730,7 +730,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
   const hasDots = round.holes.some((h) => (h.recv || 0) > 0);
   const hasFw = round.holes.some((h) => h.fairway != null);
 
-  const headStyle: React.CSSProperties = { color: C.faint, fontSize: 10, letterSpacing: 0.5, fontWeight: 700, textTransform: "uppercase" };
+  const headStyle: React.CSSProperties = { color: C.faint, fontSize: 11, letterSpacing: 0.5, fontWeight: 700, textTransform: "uppercase" };
 
   const block = (from: number, to: number, label: string) => {
     const seg = round.holes.slice(from, to);
@@ -816,9 +816,9 @@ export function ScoreViewCard({ round }: { round: Round }) {
   const partial = playedN > 0 && playedN < 18;
   const summaryBox = (label: string, val: number, primary?: boolean, sub?: string) => (
     <div style={{ background: primary ? C.gold : C.card, borderRadius: 10, padding: "8px 20px", textAlign: "center", minWidth: 70 }}>
-      <div style={{ color: primary ? "#3B2A00" : C.faint, fontSize: 10, letterSpacing: 2, fontWeight: 700 }}>{label}</div>
+      <div style={{ color: primary ? "#3B2A00" : C.faint, fontSize: 11, letterSpacing: 2, fontWeight: 700 }}>{label}</div>
       <div style={{ color: primary ? "#3B2A00" : C.ink, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{val || "–"}</div>
-      {sub ? <div style={{ color: primary ? "#3B2A00" : C.faint, fontSize: 10, letterSpacing: 1.5, fontWeight: 800, marginTop: 1 }}>{sub}</div> : null}
+      {sub ? <div style={{ color: primary ? "#3B2A00" : C.faint, fontSize: 11, letterSpacing: 1.5, fontWeight: 800, marginTop: 1 }}>{sub}</div> : null}
     </div>
   );
 

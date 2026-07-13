@@ -260,7 +260,7 @@ function Scorecard({ data }: { data: LiveData }) {
     <div>
       <div style={{ background: C.greenLight, borderRadius: 16, padding: "18px 18px 16px", marginTop: 18 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, padding: "3px 8px", borderRadius: 999, background: ended ? "#3F3414" : "#1f7a52", color: ended ? "#E4CF86" : "#CFF5E2" }}>{ended ? "FINAL" : "\u25cf LIVE"}</span>
+          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.5, padding: "3px 8px", borderRadius: 999, background: ended ? "#3F3414" : "#1f7a52", color: ended ? "#E4CF86" : "#CFF5E2" }}>{ended ? "FINAL" : "\u25cf LIVE"}</span>
           <span style={{ color: C.gold, fontSize: 11, letterSpacing: 1.5, fontWeight: 700 }}>{(label || game.game_type).toUpperCase()}</span>
         </div>
         <div style={{ fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, color: C.cream, marginTop: 10 }}>{game.name}</div>
@@ -422,7 +422,7 @@ function PlayerDetail({ stat, meta, gameType, strokeNet }: { stat: PStat; meta: 
           : <span style={{ color: C.faint }}>Stableford <b style={{ color: C.green }}>{stat.points} pts</b></span>}
       </div>
       {chips.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>{chips.map(([k, v]) => <div key={k} style={{ background: "#F2EEDF", borderRadius: 8, padding: "7px 11px", fontSize: 12 }}>{k} <b style={{ color: C.green }}>{v}</b></div>)}</div>}
-      <div style={{ color: C.faint, fontSize: 10, marginTop: 10, lineHeight: 1.5 }}><span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#E8730C", verticalAlign: "middle" }} /> gets a stroke (two = two strokes). Score color: under / par / over. Stats shown only if the player tracked them.</div>
+      <div style={{ color: C.faint, fontSize: 11, marginTop: 10, lineHeight: 1.5 }}><span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#E8730C", verticalAlign: "middle" }} /> gets a stroke (two = two strokes). Score color: under / par / over. Stats shown only if the player tracked them.</div>
     </div>
   );
 }
@@ -468,7 +468,7 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
 
   const Leg = (key: string, first: boolean, leftIds: string[], rightIds: string[], label: { text: string; color: string }, tag?: string) => (
     <div key={key} style={{ display: "flex", alignItems: "center", padding: "8px 0", borderTop: first ? "none" : `1px solid ${C.line}` }}>
-      {tag && <span style={{ color: C.faint, fontSize: 10, fontWeight: 700, width: 48, flex: "none" }}>{tag}</span>}
+      {tag && <span style={{ color: C.faint, fontSize: 11, fontWeight: 700, width: 48, flex: "none" }}>{tag}</span>}
       <span style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>{sq(colorOf(leftIds[0]))}<span style={nameStyle}>{leftIds.map(nm).join(" & ")}</span></span>
       <span style={{ color: "#B8B19A", fontSize: 11, fontWeight: 700, padding: "0 6px", flex: "none" }}>vs</span>
       <span style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0, justifyContent: "flex-end" }}><span style={{ ...nameStyle, textAlign: "right" }}>{rightIds.map(nm).join(" & ")}</span>{sq(colorOf(rightIds[0]))}</span>

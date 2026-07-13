@@ -344,7 +344,7 @@ export function HelpSearch({ onSendQuestion }: { onSendQuestion?: (q: string) =>
               )}
               {m.related && m.related.length > 0 && (
                 <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}>
-                  <div style={{ color: C.faint, fontSize: 10.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase" }}>
+                  <div style={{ color: C.faint, fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase" }}>
                     Related
                   </div>
                   {m.related.map((q) => chip(q, true))}

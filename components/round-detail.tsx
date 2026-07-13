@@ -68,8 +68,8 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
             {roundBadges.map(({ a, def }) => (
               <div key={a.key} style={{ width: 74, textAlign: "center" }}>
                 <div style={{ width: 46, height: 46, margin: "0 auto", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, background: "radial-gradient(circle at 50% 32%, #20624a, #0e3a2c)", border: `2px solid ${ROUND_TIER_COLOR[def.tier]}`, boxShadow: def.tier !== "common" ? `0 0 12px -4px ${ROUND_TIER_COLOR[def.tier]}` : "none" }}>{def.icon}</div>
-                <div style={{ fontSize: 10, color: C.cream, marginTop: 5, lineHeight: 1.2, fontWeight: 700 }}>{def.label}</div>
-                {a.kind === "best" && a.isRecord && <div style={{ fontSize: 10, color: C.gold, fontWeight: 800, marginTop: 1 }}>new record</div>}
+                <div style={{ fontSize: 11, color: C.cream, marginTop: 5, lineHeight: 1.2, fontWeight: 700 }}>{def.label}</div>
+                {a.kind === "best" && a.isRecord && <div style={{ fontSize: 11, color: C.gold, fontWeight: 800, marginTop: 1 }}>new record</div>}
               </div>
             ))}
           </div>
@@ -231,7 +231,7 @@ function GhinPanel({ round, ghinNumber, playerName }: { round: Round; ghinNumber
           </div>
           <div style={{ overflowX: "auto" }}>
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${holeRows.length}, 1fr)`, gap: 4, minWidth: holeRows.length * 34 }}>
-              {holeRows.map((r) => <div key={r.n} style={{ color: C.cream, opacity: 0.8, fontSize: 10, textAlign: "center", fontWeight: 700 }}>{r.n}</div>)}
+              {holeRows.map((r) => <div key={r.n} style={{ color: C.cream, opacity: 0.8, fontSize: 11, textAlign: "center", fontWeight: 700 }}>{r.n}</div>)}
               {holeRows.map((r) => <div key={r.n} style={{ color: "#16201C", background: C.cream, fontSize: 17, fontWeight: 800, textAlign: "center", borderRadius: 5, padding: "6px 0" }}>{r.gross}</div>)}
             </div>
           </div>
@@ -278,7 +278,7 @@ function RoundStats({ round }: { round: Round }) {
   const vsPar = (g: number) => { const d = g - parPlayed; return d === 0 ? "E" : d > 0 ? `+${d}` : `${d}`; };
 
   const cellTd: React.CSSProperties = { padding: "8px 6px", textAlign: "center" };
-  const th: React.CSSProperties = { ...cellTd, color: C.sage, fontSize: 10, letterSpacing: 1, fontWeight: 700, borderBottom: "1px solid rgba(169,196,181,.25)" };
+  const th: React.CSSProperties = { ...cellTd, color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 700, borderBottom: "1px solid rgba(169,196,181,.25)" };
   const sumV = (val: number | string, color: string) => <span style={{ fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 18, color }}>{val}</span>;
   const cellVal = (played: boolean, val: number) => (played ? val : "—");
   const sumRow = (label: string, o: number | string, i: number | string, t: number | string, color: string, top?: boolean) => {
@@ -297,7 +297,7 @@ function RoundStats({ round }: { round: Round }) {
     <div style={{ flex: "1 1 80px", background: C.greenLight, borderRadius: 10, padding: "10px 12px", minWidth: 80 }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: size, fontWeight: 800 }}>{value}</div>
       <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>{label}</div>
-      {hint ? <div style={{ color: C.faint, fontSize: 10, marginTop: 1 }}>{hint}</div> : null}
+      {hint ? <div style={{ color: C.faint, fontSize: 11, marginTop: 1 }}>{hint}</div> : null}
     </div>
   );
   return (

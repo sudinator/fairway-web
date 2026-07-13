@@ -101,13 +101,13 @@ function CourseChangeSummary({ req }: { req: CourseEditRequest }) {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
         <div style={{ background: C.cream, borderRadius: 10, padding: 10, border: `1px solid ${C.line}` }}>
-          <div style={{ color: C.faint, fontSize: 10, letterSpacing: 1.5, fontWeight: 800 }}>CURRENT GLOBAL</div>
+          <div style={{ color: C.faint, fontSize: 11, letterSpacing: 1.5, fontWeight: 800 }}>CURRENT GLOBAL</div>
           <div style={{ color: C.ink, fontWeight: 800, marginTop: 5 }}>{current ? courseLabel(current) : "Unknown course"}</div>
           <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{current?.location || "No location"}</div>
           <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{current?.tees?.length || 0} tee{(current?.tees?.length || 0) === 1 ? "" : "s"} · {current?.holes?.length || 0} holes</div>
         </div>
         <div style={{ background: C.cream, borderRadius: 10, padding: 10, border: `1px solid ${C.gold}` }}>
-          <div style={{ color: C.gold, fontSize: 10, letterSpacing: 1.5, fontWeight: 800 }}>PROPOSED GLOBAL</div>
+          <div style={{ color: C.gold, fontSize: 11, letterSpacing: 1.5, fontWeight: 800 }}>PROPOSED GLOBAL</div>
           <div style={{ color: C.ink, fontWeight: 800, marginTop: 5 }}>{proposed ? courseLabel(proposed) : req.proposed_name}</div>
           <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{proposed?.location || req.proposed_location || "No location"}</div>
           <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{proposed?.tees?.length || 0} tee{(proposed?.tees?.length || 0) === 1 ? "" : "s"} · {proposed?.holes?.length || 0} holes</div>
@@ -789,21 +789,21 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
           <React.Fragment key={i}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", marginTop: 8, background: C.greenLight, borderRadius: 10, padding: 10 }}>
             <div style={{ flex: 2, minWidth: 120 }}>
-              <label style={{ color: C.sage, fontSize: 10 }}>Name</label>
+              <label style={{ color: C.sage, fontSize: 11 }}>Name</label>
               <input style={{ ...inputStyle, marginTop: 2 }} value={t.name} onChange={(e) => updateTee(i, { name: e.target.value })} />
             </div>
             <div style={{ flex: 1, minWidth: 80 }}>
-              <label style={{ color: C.sage, fontSize: 10 }}>Rating</label>
+              <label style={{ color: C.sage, fontSize: 11 }}>Rating</label>
               <input style={{ ...inputStyle, marginTop: 2 }} inputMode="decimal" placeholder="72.1"
                 value={ratingTexts[i] ?? ""} onChange={(e) => setRating(i, e.target.value)} />
             </div>
             <div style={{ flex: 1, minWidth: 80 }}>
-              <label style={{ color: C.sage, fontSize: 10 }}>Slope</label>
+              <label style={{ color: C.sage, fontSize: 11 }}>Slope</label>
               <input style={{ ...inputStyle, marginTop: 2 }} inputMode="numeric" placeholder="130"
                 value={t.slope ?? ""} onChange={(e) => updateTee(i, { slope: e.target.value === "" ? 0 : parseInt(e.target.value, 10) || 0 })} />
             </div>
             <div style={{ flex: 1, minWidth: 90 }}>
-              <label style={{ color: C.sage, fontSize: 10 }}>Yards</label>
+              <label style={{ color: C.sage, fontSize: 11 }}>Yards</label>
               <button type="button" onClick={() => setYardTee(yardTee === i ? null : i)}
                 title={yd > 0 ? "Total yardage for this tee — tap to edit per hole" : "Tap to enter per-hole yardages"}
                 style={{ marginTop: 4, width: "100%", background: "#173a2c", border: `1px solid #37624f`, borderRadius: 8, padding: "6px 8px", color: yd > 0 ? C.cream : C.sage, fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "left" }}>
@@ -853,7 +853,7 @@ function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving
             return (
               <div style={{ background: C.card, borderRadius: 10, padding: 10, flex: 1, minWidth: 240 }}>
                 <div style={{ color: C.green, fontSize: 11, letterSpacing: 2, fontWeight: 800, marginBottom: 6 }}>{label}</div>
-                <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr", gap: 6, padding: "0 2px 5px", color: C.faint, fontSize: 10, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.line}` }}>
+                <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr", gap: 6, padding: "0 2px 5px", color: C.faint, fontSize: 11, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.line}` }}>
                   <div>HOLE</div><div style={{ textAlign: "center" }}>PAR</div><div style={{ textAlign: "center" }}>S.I.</div>
                 </div>
                 {seg.map((h, jj) => {
@@ -1026,7 +1026,7 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
           {NOTIF_TYPES.map((t) => (
             <div key={t.key} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 9 }}>
               <div style={{ flex: 1, color: C.cream, fontSize: 12 }}>
-                {t.label}{!t.live && <span style={{ color: C.faint, fontSize: 10 }}> · soon</span>}
+                {t.label}{!t.live && <span style={{ color: C.faint, fontSize: 11 }}> · soon</span>}
               </div>
               {seg(t.key, t.def)}
             </div>
@@ -1261,7 +1261,7 @@ function StatDrawerHost() {
                    <div style={{ fontSize: 14, fontWeight: 600, color: C.cream, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</div>
                    {u.detail ? <div style={{ fontSize: 11, color: C.sage, marginTop: 1 }}>{u.detail}</div> : null}
                  </div>
-                 {tc ? <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 800, borderRadius: 6, padding: "2px 7px", background: tc.bg, color: tc.fg, whiteSpace: "nowrap" }}>{u.tag === "friction" ? "unfinished" : u.tag}</span> : null}
+                 {tc ? <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, borderRadius: 6, padding: "2px 7px", background: tc.bg, color: tc.fg, whiteSpace: "nowrap" }}>{u.tag === "friction" ? "unfinished" : u.tag}</span> : null}
                </div>
              );
            })}
@@ -1297,7 +1297,7 @@ function AdminEngagement() {
     <div style={{ background: C.greenLight, borderRadius: 12, padding: "10px 12px", flex: 1, minWidth: 92 }}>
       <div style={{ color: C.cream, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif" }}>{n}</div>
       <div style={{ color: C.sage, fontSize: 11 }}>{l}</div>
-      {d ? <div style={{ color: C.sage, fontSize: 10, marginTop: 2, opacity: 0.8 }}>{d}</div> : null}
+      {d ? <div style={{ color: C.sage, fontSize: 11, marginTop: 2, opacity: 0.8 }}>{d}</div> : null}
     </div>
   );
 
@@ -1318,9 +1318,9 @@ function AdminEngagement() {
         {ws.length === 0 ? <div style={{ color: C.sage, fontSize: 12 }}>No rounds yet.</div> :
           ws.map((w, i) => (
             <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-              <div style={{ color: C.cream, fontSize: 10 }}>{w.golfers}</div>
+              <div style={{ color: C.cream, fontSize: 11 }}>{w.golfers}</div>
               <div title={`${w.golfers} golfers · ${w.rounds} rounds`} style={{ width: "70%", height: `${Math.round((w.golfers / maxG) * 54)}px`, minHeight: 2, background: C.gold, borderRadius: 3 }} />
-              <div style={{ color: C.sage, fontSize: 10, whiteSpace: "nowrap" }}>{w.week}</div>
+              <div style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap" }}>{w.week}</div>
             </div>
           ))}
       </div>
@@ -1332,17 +1332,17 @@ function AdminEngagement() {
             const tot = (w.new || 0) + (w.returning || 0);
             return (
               <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                <div style={{ color: C.cream, fontSize: 10 }}>{tot}</div>
+                <div style={{ color: C.cream, fontSize: 11 }}>{tot}</div>
                 <div style={{ width: "70%", height: 54, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
                   <div title={`${w.returning} returning`} style={{ height: `${Math.round(((w.returning || 0) / maxNR) * 54)}px`, background: C.sage, borderRadius: "3px 3px 0 0" }} />
                   <div title={`${w.new} new`} style={{ height: `${Math.round(((w.new || 0) / maxNR) * 54)}px`, background: C.gold }} />
                 </div>
-                <div style={{ color: C.sage, fontSize: 10, whiteSpace: "nowrap" }}>{w.week}</div>
+                <div style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap" }}>{w.week}</div>
               </div>
             );
           })}
       </div>
-      <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 10, color: C.sage }}>
+      <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 11, color: C.sage }}>
         <span><span style={{ display: "inline-block", width: 8, height: 8, background: C.gold, borderRadius: 2, marginRight: 4 }} />new</span>
         <span><span style={{ display: "inline-block", width: 8, height: 8, background: C.sage, borderRadius: 2, marginRight: 4 }} />returning</span>
       </div>
@@ -1455,7 +1455,7 @@ function AdminPowerUsers() {
                     </div>
                     {r.churned ? (
                       <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
-                        <span style={{ fontSize: 10, color: C.cream, background: C.greenMid, borderRadius: 4, padding: "0 5px", fontWeight: 700 }}>quiet</span>
+                        <span style={{ fontSize: 11, color: C.cream, background: C.greenMid, borderRadius: 4, padding: "0 5px", fontWeight: 700 }}>quiet</span>
                       </div>
                     ) : null}
                   </td>
@@ -1497,10 +1497,10 @@ function AdminAnalytics() {
   const tile = (n: React.ReactNode, l: string, d?: string, bg: string = C.greenLight, drill?: { stat: string; cap?: string }) => (
     <div onClick={drill ? () => openStatDrill({ stat: drill.stat, title: l, cap: drill.cap }) : undefined}
       style={{ background: bg, borderRadius: 12, padding: "10px 12px", flex: 1, minWidth: 88, position: "relative", cursor: drill ? "pointer" : "default" }}>
-      {drill ? <span style={{ position: "absolute", right: 8, top: 8, color: C.gold, fontSize: 10, fontWeight: 800 }}>who ›</span> : null}
+      {drill ? <span style={{ position: "absolute", right: 8, top: 8, color: C.gold, fontSize: 11, fontWeight: 800 }}>who ›</span> : null}
       <div style={{ color: C.cream, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif" }}>{n}</div>
       <div style={{ color: C.sage, fontSize: 11 }}>{l}</div>
-      {d ? <div style={{ color: "#5BD08A", fontSize: 10, marginTop: 2 }}>{d}</div> : null}
+      {d ? <div style={{ color: "#5BD08A", fontSize: 11, marginTop: 2 }}>{d}</div> : null}
     </div>
   );
 
@@ -1513,7 +1513,7 @@ function AdminAnalytics() {
 
   const bar = (label: string, n: number, denom: number, color: string, drillStat?: string) => (
     <div key={label} onClick={drillStat ? () => openStatDrill({ stat: drillStat, title: label }) : undefined} style={{ cursor: drillStat ? "pointer" : "default" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.cream, marginTop: 8 }}><span>{label}{drillStat ? <span style={{ color: C.gold, fontSize: 10, fontWeight: 800 }}>  who ›</span> : null}</span><span>{n}</span></div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.cream, marginTop: 8 }}><span>{label}{drillStat ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>  who ›</span> : null}</span><span>{n}</span></div>
       <div style={{ height: 8, borderRadius: 4, background: C.green, marginTop: 3, overflow: "hidden" }}>
         <div style={{ height: "100%", borderRadius: 4, width: `${denom > 0 ? Math.round((n / denom) * 100) : 0}%`, background: color }} />
       </div>
@@ -1530,7 +1530,7 @@ function AdminAnalytics() {
   const hrow = (label: string, val: string, good?: boolean, drill?: { stat: string; cap?: string }) => (
     <div onClick={drill ? () => openStatDrill({ stat: drill.stat, title: label, cap: drill.cap }) : undefined}
       style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "8px 0", borderTop: `1px solid ${C.greenMid}`, cursor: drill ? "pointer" : "default" }}>
-      <span style={{ color: C.cream, fontSize: 13 }}>{label}{drill ? <span style={{ color: C.gold, fontSize: 10, fontWeight: 800 }}>  who ›</span> : null}</span>
+      <span style={{ color: C.cream, fontSize: 13 }}>{label}{drill ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>  who ›</span> : null}</span>
       <span style={{ fontWeight: 800, fontSize: 15, color: good === undefined ? C.cream : good ? "#5BD08A" : "#E0796B" }}>{val}</span>
     </div>
   );
@@ -1547,9 +1547,9 @@ function AdminAnalytics() {
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
         <div style={{ display: "flex", textAlign: "center" }}>
-          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_dau", title: "Active today", cap: "Users who opened BNN today" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.dau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>Today · unique</div><div style={{ color: C.faint, fontSize: 10, marginTop: 1 }}>{ac.views_today ?? 0} views · who ›</div></div>
-          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_wau", title: "Active this week", cap: "Users active in the last 7 days" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.wau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This week · unique</div><div style={{ color: C.faint, fontSize: 10, marginTop: 1 }}>{ac.views_7d ?? 0} views · who ›</div></div>
-          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_mau", title: "Active this month", cap: "Users active in the last 30 days" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.mau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This month · unique</div><div style={{ color: C.faint, fontSize: 10, marginTop: 1 }}>{ac.views_30d ?? 0} views · who ›</div></div>
+          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_dau", title: "Active today", cap: "Users who opened BNN today" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.dau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>Today · unique</div><div style={{ color: C.faint, fontSize: 11, marginTop: 1 }}>{ac.views_today ?? 0} views · who ›</div></div>
+          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_wau", title: "Active this week", cap: "Users active in the last 7 days" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.wau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This week · unique</div><div style={{ color: C.faint, fontSize: 11, marginTop: 1 }}>{ac.views_7d ?? 0} views · who ›</div></div>
+          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_mau", title: "Active this month", cap: "Users active in the last 30 days" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.mau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This month · unique</div><div style={{ color: C.faint, fontSize: 11, marginTop: 1 }}>{ac.views_30d ?? 0} views · who ›</div></div>
         </div>
         {series.length > 0 && (
           <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 120, marginTop: 12 }}>
@@ -1558,7 +1558,7 @@ function AdminAnalytics() {
             {line && <path d={line} fill="none" stroke={C.gold} strokeWidth={2.5} strokeLinejoin="round" />}
           </svg>
         )}
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: C.faint }}><span>30 days ago</span><span>today</span></div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.faint }}><span>30 days ago</span><span>today</span></div>
         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
           {tile(ac.avg7 ?? 0, "7-day avg", undefined, C.green)}
           {tile(ac.avg30 ?? 0, "30-day avg", undefined, C.green)}
@@ -1568,7 +1568,7 @@ function AdminAnalytics() {
           {tile(t.rounds_per_active_user ?? 0, "Rounds / active user", undefined, C.green)}
           {tile(ac.churn_30d ?? 0, "Lapsed (30–60d, gone)", undefined, C.green, { stat: "lapsed", cap: "Active 30–60d ago, silent since" })}
         </div>
-        <div style={{ color: C.faint, fontSize: 10, marginTop: 8 }}>Unique = distinct users; views = total app opens. Test accounts are excluded from all figures. Trends build over time.</div>
+        <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Unique = distinct users; views = total app opens. Test accounts are excluded from all figures. Trends build over time.</div>
       </div>
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
@@ -1587,7 +1587,7 @@ function AdminAnalytics() {
         {hrow("Signups never joined a club", `${h.never_joined_group_pct ?? 0}%`, false, { stat: "never_joined_group", cap: "Users with no active club membership" })}
         {hrow("Retention \u2014 week 1", `${h.retention_w1_pct ?? 0}%`)}
         {hrow("Retention \u2014 week 4", `${h.retention_w4_pct ?? 0}%`)}
-        <div style={{ color: C.faint, fontSize: 10, marginTop: 8 }}>Rounds counted only when completed; deleted rounds never count. Retention accrues over the first weeks.</div>
+        <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Rounds counted only when completed; deleted rounds never count. Retention accrues over the first weeks.</div>
       </div>
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
@@ -1620,7 +1620,7 @@ function OpsMetrics() {
     <div style={{ background: C.greenLight, borderRadius: 12, padding: "10px 12px", flex: 1, minWidth: 92 }}>
       <div style={{ color: C.cream, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif" }}>{n}</div>
       <div style={{ color: C.sage, fontSize: 11 }}>{l}</div>
-      {d ? <div style={{ color: C.sage, fontSize: 10, marginTop: 2, opacity: 0.8 }}>{d}</div> : null}
+      {d ? <div style={{ color: C.sage, fontSize: 11, marginTop: 2, opacity: 0.8 }}>{d}</div> : null}
     </div>
   );
 
@@ -1702,7 +1702,7 @@ function RoundSaveDiag() {
             <button onClick={clear} style={{ ...btn(false), fontSize: 11, padding: "5px 10px" }}>Clear</button>
           </div>
           <div style={{ color: C.sage, fontSize: 11, marginBottom: 6 }}>{log.length} events · <span style={{ color: insertCount > 1 ? "#FB7185" : C.sage, fontWeight: 700 }}>{insertCount} insert{insertCount === 1 ? "" : "s"}</span></div>
-          <div style={{ maxHeight: 280, overflowY: "auto", background: "#0e2620", borderRadius: 8, padding: 8, fontFamily: "monospace", fontSize: 10.5, lineHeight: 1.5 }}>
+          <div style={{ maxHeight: 280, overflowY: "auto", background: "#0e2620", borderRadius: 8, padding: 8, fontFamily: "monospace", fontSize: 11, lineHeight: 1.5 }}>
             {log.length === 0 ? <div style={{ color: C.sage }}>No events yet.</div> : log.map((e, i) => (
               <div key={i} style={{ color: evColor(e), whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
                 {new Date(e.t).toLocaleTimeString()} [{e.sid}] {e.ev}{e.d ? " " + JSON.stringify(e.d) : ""}
@@ -1958,7 +1958,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
             <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>active {timeAgo(p.last_active)}</div>
           </div>
           <div>
-            <label style={{ color: C.sage, fontSize: 10 }}>Handicap index</label>
+            <label style={{ color: C.sage, fontSize: 11 }}>Handicap index</label>
             <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
               <input inputMode="decimal" defaultValue={p.handicap_index != null ? String(p.handicap_index) : ""}
                 onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setEdits((m) => ({ ...m, [p.id]: v })); }}
@@ -2024,7 +2024,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                           Delete permanently
                         </button>
                       </div>
-                      <div style={{ color: C.sage, fontSize: 10, marginTop: 6 }}>
+                      <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
                         Deactivate removes them from all groups and blocks access but keeps history (reversible). Delete erases the player and all their rounds for good.
                       </div>
                     </div>
@@ -2111,7 +2111,7 @@ export function NotificationBell({ user }: { user: any }) {
       <button onClick={openPanel} style={{ ...btn(false), fontSize: 14, padding: "8px 12px", position: "relative" }}>
         🔔
         {unread > 0 && (
-          <span style={{ position: "absolute", top: -4, right: -4, background: C.birdie, color: "#fff", borderRadius: 10, fontSize: 10, fontWeight: 800, padding: "1px 6px" }}>{unread}</span>
+          <span style={{ position: "absolute", top: -4, right: -4, background: C.birdie, color: "#fff", borderRadius: 10, fontSize: 11, fontWeight: 800, padding: "1px 6px" }}>{unread}</span>
         )}
       </button>
       {open && (
@@ -2198,7 +2198,7 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
         </div>
         <div style={{ color: C.sage, fontSize: 13, marginTop: 10 }}>{editing.course}{editing.tee_name ? ` · ${editing.tee_name}` : ""} · {fmtDate(editing.played_at)}</div>
         <div style={{ background: C.card, borderRadius: 12, padding: 12, marginTop: 10 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, padding: "0 2px 6px", color: C.faint, fontSize: 10, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.line}` }}>
+          <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, padding: "0 2px 6px", color: C.faint, fontSize: 11, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.line}` }}>
             <div>HOLE</div><div style={{ textAlign: "center" }}>PAR</div><div style={{ textAlign: "center" }}>SCORE</div><div style={{ textAlign: "center" }}>PUTTS</div>
           </div>
           {holes.map((h, i) => {
@@ -2378,7 +2378,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
             {isGroupAdmin && row.user_id && (
               <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "flex-end", flexWrap: "wrap", borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
                 <div>
-                  <label style={{ color: C.sage, fontSize: 10 }}>Handicap index</label>
+                  <label style={{ color: C.sage, fontSize: 11 }}>Handicap index</label>
                   <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
                     <input inputMode="decimal" defaultValue={p.handicap_index != null ? String(p.handicap_index) : ""}
                       onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setEdits((m) => ({ ...m, [row.id]: v })); }}
@@ -2455,7 +2455,7 @@ function AdminExtraStats() {
   const tile = (n: React.ReactNode, l: string, stat: string, cap?: string, arg?: string) => (
     <button onClick={() => openStatDrill({ stat, title: l, cap, arg })}
       style={{ background: C.greenLight, border: "none", borderRadius: 12, padding: "11px 12px", flex: 1, minWidth: 92, textAlign: "left", color: C.cream, cursor: "pointer", position: "relative" }}>
-      <span style={{ position: "absolute", right: 8, top: 8, color: C.gold, fontSize: 10, fontWeight: 800 }}>who ›</span>
+      <span style={{ position: "absolute", right: 8, top: 8, color: C.gold, fontSize: 11, fontWeight: 800 }}>who ›</span>
       <div style={{ color: C.cream, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{n}</div>
       <div style={{ color: C.sage, fontSize: 11 }}>{l}</div>
     </button>
@@ -2477,7 +2477,7 @@ function AdminExtraStats() {
         {tile(x.installed ?? 0, "Installed app", "installed", "Latest open = home-screen app")}
         {tile(x.browser ?? 0, "Browser only", "browser", "Latest open = browser tab")}
       </div>
-      <div style={{ color: C.faint, fontSize: 10, marginTop: 6 }}>
+      <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>
         {x.platform_unknown ? `${x.platform_unknown} not yet recorded \u00b7 ` : ""}counts forward from launch — no backfill.
       </div>
 
@@ -2570,13 +2570,13 @@ function AdminDailyReport() {
       <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
         <button onClick={() => openStatDrill({ stat: "active_day", title: `Active · ${selLabel}`, cap: "Users who opened BNN that day", date: sel })}
           style={{ flex: 1, background: C.greenLight, border: "none", borderRadius: 12, padding: "11px 12px", textAlign: "left", cursor: "pointer", position: "relative" }}>
-          <span style={{ position: "absolute", right: 8, top: 8, color: C.gold, fontSize: 10, fontWeight: 800 }}>who ›</span>
+          <span style={{ position: "absolute", right: 8, top: 8, color: C.gold, fontSize: 11, fontWeight: 800 }}>who ›</span>
           <div style={{ color: C.cream, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{active ? active.length : "…"}</div>
           <div style={{ color: C.sage, fontSize: 11 }}>Active users</div>
         </button>
         <button onClick={() => openStatDrill({ stat: "rounds_day", title: `Rounds · ${selLabel}`, cap: "Rounds played that day", date: sel })}
           style={{ flex: 1, background: C.greenLight, border: "none", borderRadius: 12, padding: "11px 12px", textAlign: "left", cursor: "pointer", position: "relative" }}>
-          <span style={{ position: "absolute", right: 8, top: 8, color: C.gold, fontSize: 10, fontWeight: 800 }}>list ›</span>
+          <span style={{ position: "absolute", right: 8, top: 8, color: C.gold, fontSize: 11, fontWeight: 800 }}>list ›</span>
           <div style={{ color: C.cream, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{rounds ? rounds.length : "…"}</div>
           <div style={{ color: C.sage, fontSize: 11 }}>Rounds played</div>
         </button>
@@ -2599,7 +2599,7 @@ function AdminDailyReport() {
         <div style={{ color: C.faint, fontSize: 12, marginTop: 10 }}>No rounds played on {selLabel}.</div>
       ) : null}
 
-      <div style={{ color: C.faint, fontSize: 10, marginTop: 8, lineHeight: 1.7 }}>
+      <div style={{ color: C.faint, fontSize: 11, marginTop: 8, lineHeight: 1.7 }}>
         {dot("#5BBE7E")}completed &nbsp; {dot(C.gold)}in progress &nbsp; {dot("#5AA9E6")}auto-finished &nbsp; {dot(C.birdie)}deleted / issue
       </div>
     </div>
@@ -2644,17 +2644,17 @@ function FrictionItem({ it, onDone }: { it: any; onDone: () => void }) {
     <div style={{ background: C.greenLight, borderRadius: 14, padding: 12, marginBottom: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontWeight: 700, fontSize: 15, color: C.cream }}>{it.subject_name}</span>
-        <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 800, borderRadius: 5, padding: "1px 6px", background: meta.bg, color: meta.fg }}>{meta.label}</span>
+        <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, borderRadius: 5, padding: "1px 6px", background: meta.bg, color: meta.fg }}>{meta.label}</span>
       </div>
       <div style={{ color: C.cream, fontSize: 12.5, margin: "8px 0 3px", lineHeight: 1.5 }}>{it.detail}</div>
       {resolved ? (
-        <div style={{ color: C.faint, fontSize: 10, marginTop: 4 }}>
+        <div style={{ color: C.faint, fontSize: 11, marginTop: 4 }}>
           {it.status === "auto_resolved" ? "Auto-resolved — the data was cleaned up." : `${it.status === "cleared" ? "Cleared" : "Needs action"}${it.reason ? " · " + it.reason : ""}`}
           {it.reviewed_at ? " · " + new Date(it.reviewed_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}
         </div>
       ) : (
         <>
-          <div style={{ color: C.faint, fontSize: 10, marginBottom: 8 }}>first seen {when}</div>
+          <div style={{ color: C.faint, fontSize: 11, marginBottom: 8 }}>first seen {when}</div>
           <button onClick={expand} style={{ background: C.gold, color: C.green, border: "none", borderRadius: 9, padding: "7px 14px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
             {open ? "Close" : "Review \u2192"}
           </button>
@@ -2673,7 +2673,7 @@ function FrictionItem({ it, onDone }: { it: any; onDone: () => void }) {
                           <span style={{ fontSize: 11.5, color: sel ? C.cream : C.sage, flex: 1 }}>
                             {r.course || "round"} · {new Date(r.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · {r.scored} holes{r.gross != null ? " \u00b7 gross " + r.gross : ""} · {r.status}
                           </span>
-                          {sel ? <span style={{ fontSize: 10, fontWeight: 800, color: C.gold }}>keep</span> : null}
+                          {sel ? <span style={{ fontSize: 11, fontWeight: 800, color: C.gold }}>keep</span> : null}
                         </div>
                       );
                     })}
@@ -2787,7 +2787,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
         : <span style={{ position: "absolute", top: 12, right: 12, color: C.sage, fontSize: 14 }}>›</span>}
       <div style={{ fontSize: 20, lineHeight: 1 }}>{icon}</div>
       <div style={{ color: C.cream, fontWeight: 800, fontSize: 13.5, marginTop: 8 }}>{name}</div>
-      <div style={{ color: C.sage, fontSize: 10.5, marginTop: 3, lineHeight: 1.35 }}>{cap}</div>
+      <div style={{ color: C.sage, fontSize: 11, marginTop: 3, lineHeight: 1.35 }}>{cap}</div>
     </button>
   );
   const grid = (children: React.ReactNode) => (
@@ -2797,7 +2797,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
     <>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 20 }}>
         <span style={{ fontFamily: "Georgia, serif", fontSize: 15, fontWeight: 700, color: C.cream }}>{title}</span>
-        <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.04em", padding: "2px 8px", borderRadius: 999, color: badgeSuper ? "#0e3a2c" : C.sage, background: badgeSuper ? C.gold : "#173a2c", border: badgeSuper ? "none" : "1px solid #37624f" }}>{badge}</span>
+        <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.04em", padding: "2px 8px", borderRadius: 999, color: badgeSuper ? "#0e3a2c" : C.sage, background: badgeSuper ? C.gold : "#173a2c", border: badgeSuper ? "none" : "1px solid #37624f" }}>{badge}</span>
       </div>
       <div style={{ color: C.faint, fontSize: 11, marginTop: 4 }}>{desc}</div>
     </>

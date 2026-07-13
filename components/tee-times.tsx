@@ -44,9 +44,9 @@ const EB: React.CSSProperties = { fontSize: 12, letterSpacing: 1.8, margin: "16p
 function DateBadge({ d }: { d: string }) {
   return (
     <div style={{ width: 46, textAlign: "center", background: C.sage, borderRadius: 10, padding: "6px 0", flex: "none" }}>
-      <div style={{ fontSize: 10, fontWeight: 800, color: C.green, letterSpacing: 0.5 }}>{dow(d)}</div>
+      <div style={{ fontSize: 11, fontWeight: 800, color: C.green, letterSpacing: 0.5 }}>{dow(d)}</div>
       <div style={{ fontSize: 20, fontWeight: 800, color: C.ink, lineHeight: 1 }}>{dayN(d)}</div>
-      <div style={{ fontSize: 10, fontWeight: 700, color: C.green }}>{monN(d)}</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: C.green }}>{monN(d)}</div>
     </div>
   );
 }
@@ -296,7 +296,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
               </div>
             ) : null}
           </div>
-          {wait ? <span style={{ fontSize: 10, fontWeight: 800, background: "#fbe9cf", color: "#9a6a12", borderRadius: 20, padding: "3px 9px" }}>Waitlist{waitPos.get(r.user_id) ? ` #${waitPos.get(r.user_id)}` : ""}</span> : null}
+          {wait ? <span style={{ fontSize: 11, fontWeight: 800, background: "#fbe9cf", color: "#9a6a12", borderRadius: 20, padding: "3px 9px" }}>Waitlist{waitPos.get(r.user_id) ? ` #${waitPos.get(r.user_id)}` : ""}</span> : null}
           {wait && canOrganizeTee ? <button onClick={() => promote(sel, r.user_id)} disabled={busy} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Move up</button> : null}
           {showOrg && canOrganizeTee ? (
             <button onClick={() => orgSetRsvp(sel, r.user_id, r.choice === "in" ? "out" : "in")} disabled={busy}
@@ -313,7 +313,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
             <button onClick={() => setScreen("list")} style={{ ...btn(false), fontSize: 12, padding: "6px 10px" }}>‹ Back</button>
             {canOrganizeTee && <button onClick={() => openEdit(sel.id)} style={{ ...btn(false), fontSize: 12, padding: "6px 10px" }}>Edit</button>}
           </div>
-          <div style={{ fontSize: 10, fontWeight: 800, color: C.gold, letterSpacing: 0.4, marginTop: 10 }}>TEE TIME #{sel.seq ?? "—"}</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: C.gold, letterSpacing: 0.4, marginTop: 10 }}>TEE TIME #{sel.seq ?? "—"}</div>
           <div style={{ fontSize: 22, fontWeight: 800, marginTop: 3 }}>{teeName(sel)}</div>
           <div style={{ fontSize: 13, opacity: 0.78, marginTop: 3 }}>
             {fmtFull(sel.play_date)}{sel.tee_off_times?.length ? ` · ${sel.tee_off_times.join("/")}` : ""}{sel.course ? ` · ${sel.course}` : ""}
@@ -398,7 +398,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
               {[["In", ins.reduce((s, r) => s + 1 + (r.guest_names?.length || 0), 0), "#1a7a3a"], ["Maybe", maybes.length, "#C9821F"], ["Out", outs.length, C.birdie], ["Left", spotsLeft ?? "—", C.green]].map(([l, n, col], i) => (
                 <div key={l as string} style={{ flex: 1, textAlign: "center", padding: "12px 0", borderRight: i < 3 ? `1px solid ${C.line}` : "none" }}>
                   <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "Georgia, serif", color: col as string }}>{n as any}</div>
-                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.6, color: C.faint, textTransform: "uppercase" }}>{l}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, color: C.faint, textTransform: "uppercase" }}>{l}</div>
                 </div>
               ))}
             </div>
@@ -480,7 +480,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
                   <div key={t.id} onClick={() => open(t.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: "pointer", borderBottom: `1px solid ${C.line}` }}>
                     <DateBadge d={t.play_date} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 10, fontWeight: 800, color: C.green }}>TEE TIME #{t.seq ?? "—"}</div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: C.green }}>TEE TIME #{t.seq ?? "—"}</div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>{teeName(t)}</div>
                       <div style={{ fontSize: 12, color: C.faint }}>{[t.course, (t.tee_off_times || []).join("/")].filter(Boolean).join(" · ")}</div>
                     </div>
@@ -505,14 +505,14 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
                   <div key={t.id} onClick={() => open(t.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: "pointer", borderBottom: i < shown.length - 1 ? `1px solid ${C.line}` : "none" }}>
                     <DateBadge d={t.play_date} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 10, fontWeight: 800, color: C.green }}>TEE TIME #{t.seq ?? "—"}</div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: C.green }}>TEE TIME #{t.seq ?? "—"}</div>
                       <div style={{ fontSize: 15, fontWeight: 700, color: C.ink, textDecoration: t.status === "cancelled" ? "line-through" : "none" }}>{teeName(t)}</div>
                       <div style={{ display: "flex", gap: 6, marginTop: 5, flexWrap: "wrap", alignItems: "center" }}>
-                        <span style={{ fontSize: 10, fontWeight: 800, borderRadius: 6, padding: "2px 7px", background: k.bg, color: k.fg }}>{k.label}</span>
+                        <span style={{ fontSize: 11, fontWeight: 800, borderRadius: 6, padding: "2px 7px", background: k.bg, color: k.fg }}>{k.label}</span>
                         {t.max_spots != null && <span style={{ fontSize: 11, color: C.faint }}>{used} / {t.max_spots} spots{over ? ` · waitlist ${used - t.max_spots}` : ""}</span>}
                       </div>
                     </div>
-                    {mine ? <span style={{ fontSize: 10, fontWeight: 800, borderRadius: 20, padding: "3px 9px", background: CHOICE[mine.choice].c + "22", color: CHOICE[mine.choice].c }}>{CHOICE[mine.choice].label.toUpperCase()}</span> : <span style={{ color: C.faint, fontSize: 18 }}>›</span>}
+                    {mine ? <span style={{ fontSize: 11, fontWeight: 800, borderRadius: 20, padding: "3px 9px", background: CHOICE[mine.choice].c + "22", color: CHOICE[mine.choice].c }}>{CHOICE[mine.choice].label.toUpperCase()}</span> : <span style={{ color: C.faint, fontSize: 18 }}>›</span>}
                   </div>
                 );
               })}
@@ -540,7 +540,7 @@ function RsvpSheet({ tt, mine, spotsLeft, warn, busy, onClose, onSubmit }: {
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 70, background: C.green, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: "8px 0 calc(16px + env(safe-area-inset-bottom))", maxWidth: 520, margin: "0 auto" }}>
         <div style={{ width: 40, height: 4, background: C.greenMid, borderRadius: 2, margin: "6px auto 10px" }} />
         <div style={{ padding: "0 16px 8px" }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: C.gold, letterSpacing: 0.4 }}>TEE TIME #{tt.seq ?? "—"} · {dow(tt.play_date)} {monN(tt.play_date)} {dayN(tt.play_date)}</div>
+          <div style={{ fontSize: 11, fontWeight: 800, color: C.gold, letterSpacing: 0.4 }}>TEE TIME #{tt.seq ?? "—"} · {dow(tt.play_date)} {monN(tt.play_date)} {dayN(tt.play_date)}</div>
           <div style={{ fontSize: 19, fontWeight: 800, color: C.cream, marginTop: 2 }}>Your response</div>
           {spotsLeft != null && <div style={{ fontSize: 12, fontWeight: 700, color: spotsLeft <= 0 ? "#ff9d7a" : C.sage, marginTop: 3 }}>{spotsLeft > 0 ? `${spotsLeft} of ${tt.max_spots} spots left` : "This tee time's full — sign up and you'll join the waitlist, moving into the field automatically if a spot opens. Your RSVP still counts; no further action needed."}</div>}
         </div>
@@ -557,7 +557,7 @@ function RsvpSheet({ tt, mine, spotsLeft, warn, busy, onClose, onSubmit }: {
         ))}
         {choice === "in" && (
           <div style={{ padding: "12px 16px 0" }}>
-            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.6, color: C.sage, textTransform: "uppercase", marginBottom: 8 }}>Guests</div>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.6, color: C.sage, textTransform: "uppercase", marginBottom: 8 }}>Guests</div>
             <div style={{ display: "flex", gap: 8 }}>
               {[0, 1, 2].map((n) => (
                 <div key={n} onClick={() => setGCount(n)} style={{ flex: 1, textAlign: "center", padding: 9, borderRadius: 9, cursor: "pointer", fontWeight: 800, color: gCount === n ? "#1c1706" : C.cream, background: gCount === n ? C.gold : C.greenMid }}>{n}</div>
@@ -695,7 +695,7 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
     onCreated();
   }
 
-  const label = (t: string) => <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.6, color: C.sage, textTransform: "uppercase", margin: "12px 0 5px" }}>{t}</div>;
+  const label = (t: string) => <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.6, color: C.sage, textTransform: "uppercase", margin: "12px 0 5px" }}>{t}</div>;
   const hint = (t: string) => <div style={{ fontSize: 11, color: C.sage, opacity: 0.72, margin: "5px 0 2px", lineHeight: 1.35 }}>{t}</div>;
   const dateStyle: React.CSSProperties = { ...inputStyle, width: "100%", maxWidth: "100%", minWidth: 0, WebkitAppearance: "none", appearance: "none" };
 

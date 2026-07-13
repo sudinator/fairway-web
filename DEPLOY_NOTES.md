@@ -2777,3 +2777,28 @@ games can't produce one since handicaps are required). Overall: the full single 
 A/B/C/D color tag per row. Row rendering was extracted into one renderLeaderRow used by both views.
 Six-hole segment winners + money banners are unchanged (decided overall among bettors, orthogonal
 to flights). Completes Flights Stage 1 end-to-end (setup → assignment → display).
+
+### v1.142.1 — Fix: handicap entry needs an explicit Set (was vanishing mid-type)
+The flighted 'Handicaps needed' fields committed on every keystroke, so the row left the list the
+instant a value parsed — the field disappeared before you could finish/confirm. Now each row keeps a
+local draft and only commits when you tap Set (or press Enter), validated to a 0–54 index. Includes
+everything in v1.142.0 (Flights Stage 1b segmented leaderboard). One deploy; migration 0093 still needed.
+
+### v1.142.2 — Readability: raise the minimum font to 11px (was 10) + CI guard
+Every shipped font under 11px was bumped to 11: 160 spots that were at 10px and 19 that were at
+10.5px, plus the Avatar initials dynamic floor (Math.max(10→11)). The dashboard 'Newest round
+first.' note (and its siblings) were among the 10s. Verified the tight layouts first — group-scorecard
+corner point-chips (fixed 15px boxes, single-digit content), the round-detail hole grid (scrolls
+horizontally) and the share-card scorecard grid (already 11 on base cells) — none break at 11; the
+only effects are cosmetic (multi-player name headers truncate ~1 char sooner). Added
+ci/check-min-fontsize.py, which fails the build on any literal font < 11px; run it as part of
+delivery going forward. No migration.
+
+### v1.143.0 — FEATURE: iOS-style back bar from Admin into reused pages — no migration
+Tapping Members or Club settings inside the admin home now records the origin (returnTab) and the
+reused page shows a back bar: a gold '‹ Admin' control on the left (labels the origin, per Apple's
+pattern of naming the screen you return TO) with the current page title centered. Tapping it returns
+to the admin home and clears the origin. The bar renders ONLY when arrived from Admin (returnTab set
+AND on players/groups AND not mid-flow); opening those pages directly from the More sheet or bottom
+nav shows no bar, and any bottom-nav / More navigation clears the origin. Shell-only change in
+components/home.tsx (returnTab state + tabTitle helper + bar render + clears).
