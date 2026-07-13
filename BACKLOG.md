@@ -17,7 +17,7 @@ pure `evaluateRound` (35 unit tests). Not yet wired into anything.
 - [x] Players-tab roster rows tappable -> peer PlayerCard (v1.127.0, via group_badges + group_cards / migration 0080).
 - [x] `show_card` opt-out toggle (v1.128.0) + member-to-member contact (phone tap + PII-free nudge, migration 0081).
 - [x] Dashboard teaser (v1.129.0, Variant B strip -> wall with 'Next up' milestone progress).
-- Post-round earned strip on round detail (still TODO, optional).
+- [x] Badges-earned-this-round strip on round detail (v1.130.0).
 - Peer trend on the card needs the peer's differentials (rounds RLS is own/admin) — likely a small
   denormalized card-stats field or a SECURITY DEFINER RPC; decide when building the card.
 

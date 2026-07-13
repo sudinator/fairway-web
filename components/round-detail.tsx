@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, isGrossOnly, hasHoleDetail,
@@ -12,12 +12,23 @@ import { createClient } from "@/lib/supabase";
 const supabase = createClient();
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
 import { ShareRoundModal } from "@/components/share-card";
+import { badgesForRound, BADGE_BY_KEY } from "@/lib/badges";
+
+const ROUND_TIER_COLOR: Record<string, string> = { common: C.sage, rare: "#7FB8FF", elite: C.gold };
 
 export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEmail, onBack, onEdit, onDelete }: {
   round: Round; ghinNumber?: string | null; playerName?: string; priorRounds?: Round[]; userEmail?: string | null; onBack: () => void; onEdit: () => void; onDelete: () => void;
 }) {
   const gross = isGrossOnly(round);
   const [showGhin, setShowGhin] = useState(false);
+  const roundBadges = useMemo(() => {
+    const full = [...(priorRounds || []), round];
+    const rank: Record<string, number> = { elite: 0, rare: 1, common: 2 };
+    return badgesForRound(full, round.id)
+      .map((a) => ({ a, def: BADGE_BY_KEY[a.key] }))
+      .filter((x) => x.def)
+      .sort((x, y) => rank[x.def.tier] - rank[y.def.tier]);
+  }, [priorRounds, round]);
   const [showShare, setShowShare] = useState(false);
   return (
     <div>
@@ -49,6 +60,21 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
 
 
       {showGhin && <GhinPanel round={round} ghinNumber={ghinNumber} playerName={playerName} />}
+
+      {roundBadges.length > 0 && (
+        <div style={{ background: C.greenLight, borderRadius: 14, padding: 14, marginTop: 14 }}>
+          <Eyebrow>BADGES EARNED THIS ROUND</Eyebrow>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 10 }}>
+            {roundBadges.map(({ a, def }) => (
+              <div key={a.key} style={{ width: 74, textAlign: "center" }}>
+                <div style={{ width: 46, height: 46, margin: "0 auto", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, background: "radial-gradient(circle at 50% 32%, #20624a, #0e3a2c)", border: `2px solid ${ROUND_TIER_COLOR[def.tier]}`, boxShadow: def.tier !== "common" ? `0 0 12px -4px ${ROUND_TIER_COLOR[def.tier]}` : "none" }}>{def.icon}</div>
+                <div style={{ fontSize: 9.5, color: C.cream, marginTop: 5, lineHeight: 1.2, fontWeight: 700 }}>{def.label}</div>
+                {a.kind === "best" && a.isRecord && <div style={{ fontSize: 9, color: C.gold, fontWeight: 800, marginTop: 1 }}>new record</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {gross ? (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 20, marginTop: 14 }}>

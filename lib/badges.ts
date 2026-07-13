@@ -220,6 +220,20 @@ export function computeBadgeState(finished: Round[]): Record<string, BadgeRow> {
   return rows;
 }
 
+// Awards a specific round produced, by replaying the player's finished rounds
+// chronologically up to (and including) it. `finished` must contain the target.
+export function badgesForRound(finished: Round[], roundId: string): Award[] {
+  const sorted = finished.slice().sort((a, b) => (a.played_at || "").localeCompare(b.played_at || "") || (a.id || "").localeCompare(b.id || ""));
+  const state: PriorBadges = { priorRounds: 0, bests: {}, earned: new Set() };
+  for (const r of sorted) {
+    const awards = evaluateRound(r, state);
+    if (r.id === roundId) return awards;
+    for (const a of awards) { state.earned.add(a.key); if (a.kind === "best") state.bests[a.key] = a.value as number; }
+    state.priorRounds++;
+  }
+  return [];
+}
+
 // Human-readable evidence for how a badge was earned in a given round, recomputed
 // from the round's holes. `holes` (when present) is the qualifying stretch to
 // highlight. Pure — the wall/card fetch the round and call this on tap.

@@ -1,5 +1,5 @@
 // Unit tests for evaluateRound in lib/badges.ts — run with `npm test`.
-import { evaluateRound, computeBadgeState, badgeEvidence, PriorBadges } from "./badges";
+import { evaluateRound, computeBadgeState, badgeEvidence, badgesForRound, PriorBadges } from "./badges";
 import type { Round, Hole } from "./golf";
 
 let pass = 0, fail = 0; const fails: string[] = [];
@@ -198,6 +198,18 @@ const parRound = () => mkRound(Array(18).fill([4, 4, 2, "hit"]) as HS[]);
   for (let i = 0; i < 5; i++) spec.push([4, 5, 2, "miss"]); // 77, par 72 => +5
   const ev = badgeEvidence("best_vs_par", mkRound(spec, { id: "E3" }));
   ok("best_vs_par text shows 77 and +5", /77/.test(ev.text) && /\+5/.test(ev.text));
+}
+
+// ---- badgesForRound: awards attributed to a specific round ----
+{
+  const r1 = mkRound(Array(18).fill([4, 4, 2, "hit"]) as HS[], { id: "F1", played_at: "2026-03-01" }); // par round -> bogey_free_round etc + first_round
+  const r2 = mkRound([[5, 3, 1, "hit"], ...Array(17).fill([4, 4, 2, "hit"])] as HS[], { id: "F2", played_at: "2026-03-08" }); // eagle on #1
+  const a1 = badgesForRound([r1, r2], "F1").map((a: any) => a.key);
+  const a2 = badgesForRound([r1, r2], "F2").map((a: any) => a.key);
+  ok("round 1 gets first_round", a1.includes("first_round"));
+  ok("round 2 does NOT get first_round again", !a2.includes("first_round"));
+  ok("round 2 gets the eagle", a2.includes("eagle") && a2.includes("first_eagle"));
+  ok("round 1 has no eagle", !a1.includes("eagle"));
 }
 
 console.log(`badges: ${pass} passed, ${fail} failed`);
