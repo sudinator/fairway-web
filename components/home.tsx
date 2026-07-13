@@ -10,7 +10,7 @@ import { loadDraft, draftHasScores } from "@/lib/draft";
 import { loadActiveGame, saveAppBootCache, loadAppBootCache } from "@/lib/draft";
 import { btn, Wordmark, inputStyle } from "@/components/ui";
 import Tournaments, { type GameSeed } from "@/components/tournaments";
-import { CoursesLibrary, ProfilePanel, NotificationBell, PlayersTab, AdminHome, HelpPage } from "@/components/manage";
+import { CoursesLibrary, ProfilePanel, NotificationBell, NotificationsScreen, PlayersTab, AdminHome, HelpPage } from "@/components/manage";
 import { MoneyTab } from "@/components/money";
 import { TeeTimes } from "@/components/tee-times";
 import { syncBadges } from "@/lib/badge-sync";
@@ -29,7 +29,7 @@ import type { AppGroup } from "@/lib/groups";
 
 const supabase = createClient();
 
-type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" | "admin" | "help" | "profile" | "money" | "teetimes";
+type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" | "admin" | "help" | "profile" | "money" | "teetimes" | "notifications";
 
 // Viewport diagnostic overlay — measures the real device numbers so we can locate the
 // gap below the nav precisely instead of guessing. Self-gates on diagEnabled(); zero cost
@@ -195,7 +195,7 @@ export function Home({ session }: { session: any }) {
   useEffect(() => {
     try {
       const t = new URLSearchParams(window.location.search).get("tab");
-      const allowed = ["dashboard", "rounds", "games", "courses", "players", "groups", "admin", "help", "profile", "money", "teetimes"];
+      const allowed = ["dashboard", "rounds", "games", "courses", "players", "groups", "admin", "help", "profile", "money", "teetimes", "notifications"];
       if (t && allowed.includes(t)) {
         setTab(t as Tab);
         const url = new URL(window.location.href); url.searchParams.delete("tab");
@@ -636,7 +636,7 @@ export function Home({ session }: { session: any }) {
           <div style={{ color: C.cream, fontSize: 15, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{displayName}</div>
           <div style={{ color: C.sage, fontSize: 12 }}>{index != null ? `Handicap ${index}` : "Set your handicap in Profile"}</div>
         </div>
-        <NotificationBell user={user} />
+        <NotificationBell user={user} onSeeAll={() => { setTab("notifications"); setReturnTab(null); setStage(null); setViewing(null); }} />
         {tab !== "money" && <button style={{ ...btn(true), opacity: activeGroup ? 1 : 0.5 }} disabled={!activeGroup} onClick={() => {
           if (dbInProgress) {
             if (typeof window !== "undefined") window.alert(`You have an unfinished round at ${dbInProgress.course || "a course"}. Finish it, mark it complete, or discard it before starting a new one.`);
@@ -769,6 +769,8 @@ export function Home({ session }: { session: any }) {
           />
         ) : tab === "help" ? (
           <HelpPage isAdmin={!!profile?.is_admin} user={user} displayName={displayName} groupId={activeGroupId} />
+        ) : tab === "notifications" ? (
+          <NotificationsScreen user={user} />
         ) : tab === "profile" ? (
           <ProfilePanel profile={profile} user={user} onSaved={loadProfile} badgeRefresh={badgeSync} rounds={rounds} />
         ) : tab === "teetimes" && activeGroup ? (
@@ -822,7 +824,7 @@ export function Home({ session }: { session: any }) {
                   {item(tab === p.key && !inFlow, p.icon, p.label, () => { setTab(p.key); setReturnTab(null); setStage(null); setViewing(null); setMoreOpen(false); })}
                 </React.Fragment>
               )}
-              {item(moreOpen || (["players","groups","admin","help","profile","money","teetimes"].includes(tab) && !inFlow), "⋯", "More", () => setMoreOpen((v) => !v))}
+              {item(moreOpen || (["players","groups","admin","help","profile","money","teetimes","notifications"].includes(tab) && !inFlow), "⋯", "More", () => setMoreOpen((v) => !v))}
             </>
           );
         })()}
@@ -847,6 +849,7 @@ export function Home({ session }: { session: any }) {
                 { key: "admin", label: "Admin ★", show: !!profile?.is_admin || activeGroup?.role === "admin" },
                 { key: "help", label: "Help", show: true },
                 { key: "profile", label: "Profile", show: true },
+                { key: "notifications", label: "Notifications", show: true },
               ];
               return more.filter((m) => m.show).map((m) => (
                 <button key={m.key} onClick={() => { setTab(m.key); setReturnTab(null); setStage(null); setViewing(null); setMoreOpen(false); }}

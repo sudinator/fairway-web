@@ -36,6 +36,11 @@ function timeAgo(iso: string | null): string {
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86400)}d ago`;
 }
+// Relative + absolute stamp for notifications, e.g. "3h ago · Jul 13, 3:42 PM".
+function notifWhen(iso: string | null): string {
+  if (!iso) return "";
+  return `${timeAgo(iso)} · ${new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`;
+}
 
 // Normalize a stored favorite into the current {tees:[{name,rating,slope,par}], holes:[{n,par,si}]} shape.
 function normalize(d: any): Course {
@@ -2086,7 +2091,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
 }
 
 // ================= Notification bell =================
-export function NotificationBell({ user }: { user: any }) {
+export function NotificationBell({ user, onSeeAll }: { user: any; onSeeAll?: () => void }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<any[]>([]);
 
@@ -2098,12 +2103,18 @@ export function NotificationBell({ user }: { user: any }) {
 
   const unread = items.filter((n) => !n.read).length;
 
-  const openPanel = async () => {
-    setOpen((v) => !v);
-    if (!open && unread > 0) {
-      await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
-      setItems((xs) => xs.map((n) => ({ ...n, read: true })));
-    }
+  const openPanel = () => setOpen((v) => !v); // opening no longer auto-marks read — unread stays bold until acknowledged
+  const markAllRead = async () => {
+    setItems((xs) => xs.map((n) => ({ ...n, read: true })));
+    await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
+  };
+  const markOne = async (id: string) => {
+    setItems((xs) => xs.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    try { await supabase.from("notifications").update({ read: true }).eq("id", id); } catch { /* no-op */ }
+  };
+  const fmtNotifTime = (iso: string | null) => {
+    if (!iso) return "";
+    return `${timeAgo(iso)} · ${new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`;
   };
 
   return (
@@ -2115,16 +2126,38 @@ export function NotificationBell({ user }: { user: any }) {
         )}
       </button>
       {open && (
-        <div style={{ position: "absolute", right: 0, top: 44, width: 280, maxHeight: 360, overflowY: "auto", background: C.card, borderRadius: 12, boxShadow: "0 8px 24px rgba(0,0,0,0.3)", zIndex: 50, padding: 8 }}>
-          <div style={{ color: C.faint, fontSize: 11, letterSpacing: 2, fontWeight: 700, padding: "6px 8px" }}>NOTIFICATIONS</div>
-          {items.length === 0 && <div style={{ color: C.faint, fontSize: 13, padding: 12 }}>Nothing yet.</div>}
-          {items.map((n) => (
-            <div key={n.id} style={{ padding: "10px 8px", borderTop: `1px solid ${C.line}` }}>
-              <div style={{ color: C.ink, fontSize: 13 }}>{n.message}</div>
-              <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>{timeAgo(n.created_at)}</div>
+        <>
+          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 80 }} />
+          <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 440, margin: "0 auto", zIndex: 90,
+            background: C.greenMid, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "82vh",
+            display: "flex", flexDirection: "column", boxShadow: "0 -10px 40px rgba(0,0,0,.5)",
+            paddingBottom: "calc(10px + env(safe-area-inset-bottom))" }}>
+            <div style={{ width: 40, height: 4, background: C.greenLight, borderRadius: 2, margin: "8px auto 4px", flexShrink: 0 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 14px 10px", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+              <span style={{ color: C.gold, fontSize: 12, letterSpacing: 2, fontWeight: 800 }}>NOTIFICATIONS</span>
+              <span style={{ flex: 1 }} />
+              {unread > 0 && (
+                <button onClick={markAllRead} style={{ background: "none", border: "none", color: C.sage, fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "4px 6px" }}>Mark all read</button>
+              )}
+              <button onClick={() => setOpen(false)} aria-label="Close" style={{ background: C.greenLight, border: "none", color: C.cream, width: 30, height: 30, borderRadius: 15, fontSize: 17, fontWeight: 800, cursor: "pointer", lineHeight: 1, flexShrink: 0 }}>×</button>
             </div>
-          ))}
-        </div>
+            <div style={{ overflowY: "auto", padding: "2px 8px 8px" }}>
+              {items.length === 0 && <div style={{ color: C.sage, fontSize: 13, padding: 18, textAlign: "center" }}>Nothing yet.</div>}
+              {items.map((n) => (
+                <div key={n.id} onClick={() => { if (!n.read) markOne(n.id); }} style={{ padding: "11px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", display: "flex", gap: 9, cursor: n.read ? "default" : "pointer" }}>
+                  <span style={{ width: 7, height: 7, borderRadius: 4, background: n.read ? "transparent" : C.gold, marginTop: 5, flexShrink: 0 }} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ color: n.read ? "#CFC9B4" : C.cream, fontSize: 13, lineHeight: 1.4, fontWeight: n.read ? 500 : 800 }}>{n.message}</div>
+                    <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{fmtNotifTime(n.created_at)}</div>
+                  </div>
+                </div>
+              ))}
+              {onSeeAll && (
+                <button onClick={() => { setOpen(false); onSeeAll(); }} style={{ width: "100%", marginTop: 8, background: "none", border: "none", color: C.gold, fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "10px 0" }}>See all notifications →</button>
+              )}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
@@ -2132,6 +2165,70 @@ export function NotificationBell({ user }: { user: any }) {
 
 // Exported so other parts of the app (e.g. admin score edits) can raise notifications.
 export { notify };
+
+// ================= Notifications screen (full history) =================
+// A user's complete notification history, paginated. The bell shows the recent 30 as a quick
+// peek; this is the durable record so nothing sent to a user is ever out of reach.
+export function NotificationsScreen({ user }: { user: any }) {
+  const [items, setItems] = useState<any[]>([]);
+  const [limit, setLimit] = useState(30);
+  const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+
+  const load = useCallback(async (lim: number) => {
+    setLoading(true);
+    const { data } = await supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(lim);
+    setItems(data || []);
+    setHasMore((data || []).length === lim);
+    setLoading(false);
+  }, [user.id]);
+  useEffect(() => { load(limit); }, [load, limit]);
+
+  const unread = items.filter((n) => !n.read).length;
+  const markAllRead = async () => {
+    setItems((xs) => xs.map((n) => ({ ...n, read: true })));
+    await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false);
+  };
+  const markOne = async (id: string) => {
+    setItems((xs) => xs.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    try { await supabase.from("notifications").update({ read: true }).eq("id", id); } catch { /* no-op */ }
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <h2 style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800 }}>Notifications</h2>
+        <span style={{ flex: 1 }} />
+        {unread > 0 && <button onClick={markAllRead} style={{ ...btn(false), fontSize: 13, padding: "7px 12px" }}>Mark all read</button>}
+      </div>
+      <div style={{ color: C.sage, fontSize: 13, marginTop: 4, marginBottom: 12 }}>{unread > 0 ? `${unread} unread` : "All caught up"}</div>
+      {loading && items.length === 0 ? (
+        <div style={{ color: C.sage, fontSize: 14, padding: 20, textAlign: "center" }}>Loading…</div>
+      ) : items.length === 0 ? (
+        <div style={{ background: C.greenLight, borderRadius: 14, padding: 28, color: C.sage, textAlign: "center" }}>No notifications yet. Anything sent your way will show up here.</div>
+      ) : (
+        <>
+          {items.map((n) => (
+            <div key={n.id} onClick={() => { if (!n.read) markOne(n.id); }}
+              style={{ background: C.card, borderRadius: 12, padding: "13px 16px", marginTop: 10, display: "flex", gap: 11, cursor: n.read ? "default" : "pointer" }}>
+              <span style={{ width: 8, height: 8, borderRadius: 4, background: n.read ? "transparent" : C.gold, marginTop: 6, flexShrink: 0 }} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: n.read ? "#6B6857" : C.ink, fontSize: 14, lineHeight: 1.4, fontWeight: n.read ? 500 : 800 }}>{n.message}</div>
+                <div style={{ color: C.faint, fontSize: 11, marginTop: 3 }}>{notifWhen(n.created_at)}</div>
+              </div>
+            </div>
+          ))}
+          {hasMore && (
+            <button onClick={() => setLimit((l) => l + 30)} style={{ ...btn(false), width: "100%", marginTop: 12, fontSize: 13 }}>Load older</button>
+          )}
+        </>
+      )}
+      <div style={{ color: C.faint, fontSize: 12, textAlign: "center", marginTop: 18, lineHeight: 1.5 }}>
+        Notifications are kept for 90 days, then removed automatically.
+      </div>
+    </div>
+  );
+}
 
 // ================= Admin score editor =================
 // Lets an admin browse a player's rounds and edit hole scores/putts.

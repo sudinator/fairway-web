@@ -2815,3 +2815,39 @@ rail (writes game_players + the member's profile) and block enabling until resol
 phone. Details = read-only summary; Field & Matchups = labeled next-phase placeholders. Reuses
 lib/flights + the 0093 columns; the phone flow is unchanged. Entry: a desktop-only link in the game
 room (organizer only, ≥900px) to /organize/<id>. NEXT: Matchups step, then full create-in-console + drag.
+
+### v1.144.1 — Notifications panel UI fixes — migration 0094 (optional but recommended)
+Rebuilt the bell panel as a bottom sheet consistent with the app's other popups (scrim + viewport-
+anchored panel, left:0/right:0/maxWidth 440/margin auto) — this also fixes the old absolute dropdown
+that ran off the left edge on phones. Added a header with an × close button and 'Clear all', and each
+notification now shows relative + absolute date/time ('3h ago · Jul 13, 3:42 PM'). Dark greenMid sheet
+with cream/sage text to match. 'Clear all' calls new RPC clear_my_notifications() (0094; SECURITY
+DEFINER scoped to auth.uid()) with a client-side delete fallback, so it works even before the
+migration is run. No behavior change to how notifications are created or marked read.
+
+### v1.144.2 — Notifications: dismiss (mark read) + bold unread, replacing hard-delete
+Reworked per the dismiss model: opening the bell no longer auto-marks everything read, so unread
+notifications now show BOLD with a gold dot and read ones are muted/normal weight. 'Clear all'
+(hard delete) is replaced by 'Mark all read' (shown only when there are unread); tapping a single
+unread notification acknowledges just that one. Nothing is deleted — rows persist; the panel still
+shows the 30 most recent. Retention unchanged: older-than-30 stay in the DB (no expiry, no history
+screen). Migration 0094 (clear_my_notifications) is now UNUSED — harmless if already applied; can be
+ignored or dropped. No new migration.
+
+### v1.145.0 — FEATURE: full Notifications screen (history) — no migration
+New NotificationsScreen (a 'notifications' tab) showing a user's COMPLETE notification history,
+paginated (30 at a time, 'Load older'), so nothing sent to a user is out of reach beyond the bell's
+recent-30 peek. Same dismiss model: unread bold + gold dot, tap one to acknowledge, 'Mark all read'.
+Reachable from the More menu ('Notifications') and a new 'See all notifications →' footer in the bell
+panel (onSeeAll prop). Shared notifWhen() timestamp helper. Note: the known-safe initials-regex
+escape false-positive moved from manage.tsx:1226 to :1231.
+
+### v1.145.1 — 90-day notification retention — migration 0095 (DB-only)
+purge_old_notifications() deletes notifications older than 90 days (read or unread); scheduled via
+pg_cron daily at 04:23 UTC ('purge-old-notifications'), same idempotent unschedule-then-schedule
+pattern as tee-reminders/friction-sweep. No client change — the bell and Notifications screen simply
+won't surface anything older than 90 days because it's gone. Run 0095 in the SQL editor.
+
+### v1.145.2 — Surface the 90-day retention to users
+Notifications screen now shows a footer line: 'Notifications are kept for 90 days, then removed
+automatically.' so the purge (0095) isn't a surprise. Client-only, no migration.
