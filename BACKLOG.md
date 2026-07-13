@@ -46,8 +46,12 @@ Living list. `[x]` = built & verified in code (file noted). `[~]` = partially do
 - [ ] Large-field leaderboard (>16 players): default to top-10 + a window around the viewer (pinned self-row + neighbors), a My-group / Overall / Flight filter, compact one-line rows (rank · name · thru · to-par), virtualized full-field view only on demand. Mockups shown; build pending. Flight filter depends on Flights (below).
 - [ ] In-app desktop pairings builder (large groups) — DECIDED: an in-app desktop screen (never leaves the app), two linked views: a spreadsheet grid (Player · Hcp · Flight · Group · Tee) with live validation, and a drag-and-drop board (unassigned tray → group cards with live 4/4 capacity checks). Plus "auto-fill by handicap". Assumes all players are registered members (accepted requirement — also what makes handicaps/leaderboard/analytics work). Phone flow stays for small groups. Depends on Flights.
   - Inline handicap adjustment on the pairings screen, with a read-only Course Handicap field that recomputes live from the player's index + their chosen tee (slope/rating/par). Design decision to settle: edit should be a per-event override (does NOT overwrite the player's stored WHS index used elsewhere), not a global change.
-- [ ] Flights (handicap-band divisions) — PREREQUISITE for the large-field leaderboard filter, the pairings builder's flight column, and auto-fill-by-handicap. Define divisions (e.g. A/B/C by handicap range, configurable per event), assign players, and scope leaderboards/results by flight. Not built today.
-- [ ] **Tee Times for the Livingston Early Morning Golfers Group (LEMG)** — NEW REQUEST (Jul 2026). Extend the Tee Times facility, today gated to TGC only (`home.tsx:643`, `activeGroupId === TGC_GROUP_ID`), to LEMG.
+- [x] Flights Stage 1 COMPLETE — 1a setup v1.141.0, handicap gate v1.141.1, 1b segmented leaderboard v1.142.0. NEXT: Stage 2 season league (group_flights + assignments under Club settings; enable greyed 'Season league'). Stage 3 enhancements (season-long running leaderboard, best-X-of-Y).
+- [~] Flights history — Stage 1a shipped v1.141.0 (one-off setup control + data model 0093 + lib/flights.ts). NEXT: Stage 1b segmented leaderboard. Then Stage 2 season. Original note below.
+- [ ] Flights (SEASON-LONG handicap bands) — REFRAMED (Jul 2026): flights are defined ONCE at the group/season level and stay stable, NOT split per-event. Model: group-level flight definitions (name + index range) + a persistent player->flight assignment (admin-owned). Default = use the defined flights; "auto-split" is an OPTIONAL convenience to seed assignments from handicap index. Late joiners: RECOMMEND a flight from their index but require the admin to assign affirmatively (no silent auto-place). Each event's leaderboard segments by the player's season flight (snapshot onto game at post time for historical stability). Prereq for large-field leaderboard flight filter, pairings flight column, auto-fill-by-handicap.
+- [ ] ENH (from Flights, Jul 2026): Season-long running leaderboard — aggregate results across all of a season's events, per flight + overall, updating as games finish. Depends on season-long flights.
+- [ ] ENH (from Flights, Jul 2026): Best X of Y rounds count — configurable per season (e.g. best 6 of 10) so only a player's top rounds count toward the season leaderboard; ties to the season leaderboard above.
+- [~] KILLED (Jul 2026): Tee Times for LEMG — the group confirmed it does not want the feature. Not building. Tee Times stays TGC-only.
   - Workflow: one or a few organizers book and post ~5–6 different tee times for up to 20–30 players total; members self sign-up or cancel their spot.
   - Enable per-group, not by hardcoded ID: replace the single-ID gate with a "tee-times enabled" group flag (or an allow-list) and turn it on for LEMG (needs LEMG's group id, like `TGC_GROUP_ID`).
   - **24-hour lock (the core new ask):** unused tee times must be released back to the course ≥24h before play, so signups must LOCK at a cutoff. Reuse existing `tee_times.signup_deadline` + `deadlinePassed()` (+ `max_spots`); default the deadline to (tee-off − 24h) on creation and hard-lock RSVP once it passes so the roster is final.
@@ -79,10 +83,10 @@ Living list. `[x]` = built & verified in code (file noted). `[~]` = partially do
 - [~] Behavioral tests for PL/pgSQL RPCs — existence-checked (`verify_migrations.sql`) but not behavior-tested (no pgTAP); validated ad-hoc in Postgres per change
 
 ### Ops / pending (carried from recent sessions — action items, not code)
-- [ ] Run migration 0075 (tee-time roles)
-- [ ] Run migration 0076 then 0077 (duplicate-hole fix — 0076 FIRST)
-- [ ] Run migration 0073 (recommended — restores bet / tee-new / game-finished / group-member push)
-- [ ] Run migration 0071 (optional — profile-name title-case backfill)
+- [x] Migration 0075 (tee-time roles) — CONFIRMED applied (pg catalog check, Jul 2026)
+- [x] Migrations 0076 + 0077 (duplicate-hole fix) — CONFIRMED applied
+- [x] Migration 0073 (bet / tee-new / game-finished / group-member notifications) — CONFIRMED applied
+- [x] Migration 0071 (name title-case backfill) — not needed: no lowercase names present (checked Jul 2026)
 - [ ] Group push onboarding — v1.111.3 added the iPhone install warning; members still need to install from Safari + enable to actually enroll
 
 ## Housekeeping

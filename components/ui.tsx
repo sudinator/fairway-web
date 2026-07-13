@@ -818,7 +818,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
     <div style={{ background: primary ? C.gold : C.card, borderRadius: 10, padding: "8px 20px", textAlign: "center", minWidth: 70 }}>
       <div style={{ color: primary ? "#3B2A00" : C.faint, fontSize: 10, letterSpacing: 2, fontWeight: 700 }}>{label}</div>
       <div style={{ color: primary ? "#3B2A00" : C.ink, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{val || "–"}</div>
-      {sub ? <div style={{ color: primary ? "#3B2A00" : C.faint, fontSize: 9, letterSpacing: 1.5, fontWeight: 800, marginTop: 1 }}>{sub}</div> : null}
+      {sub ? <div style={{ color: primary ? "#3B2A00" : C.faint, fontSize: 10, letterSpacing: 1.5, fontWeight: 800, marginTop: 1 }}>{sub}</div> : null}
     </div>
   );
 

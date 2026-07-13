@@ -1320,7 +1320,7 @@ function AdminEngagement() {
             <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
               <div style={{ color: C.cream, fontSize: 10 }}>{w.golfers}</div>
               <div title={`${w.golfers} golfers · ${w.rounds} rounds`} style={{ width: "70%", height: `${Math.round((w.golfers / maxG) * 54)}px`, minHeight: 2, background: C.gold, borderRadius: 3 }} />
-              <div style={{ color: C.sage, fontSize: 9, whiteSpace: "nowrap" }}>{w.week}</div>
+              <div style={{ color: C.sage, fontSize: 10, whiteSpace: "nowrap" }}>{w.week}</div>
             </div>
           ))}
       </div>
@@ -1337,7 +1337,7 @@ function AdminEngagement() {
                   <div title={`${w.returning} returning`} style={{ height: `${Math.round(((w.returning || 0) / maxNR) * 54)}px`, background: C.sage, borderRadius: "3px 3px 0 0" }} />
                   <div title={`${w.new} new`} style={{ height: `${Math.round(((w.new || 0) / maxNR) * 54)}px`, background: C.gold }} />
                 </div>
-                <div style={{ color: C.sage, fontSize: 9, whiteSpace: "nowrap" }}>{w.week}</div>
+                <div style={{ color: C.sage, fontSize: 10, whiteSpace: "nowrap" }}>{w.week}</div>
               </div>
             );
           })}

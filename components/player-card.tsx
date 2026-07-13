@@ -86,7 +86,7 @@ export function PlayerCardView({ view }: { view: CardView }) {
           <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{roundsPlayed} round{roundsPlayed === 1 ? "" : "s"}{badges.length ? ` · ${badges.length} badge${badges.length === 1 ? "" : "s"}` : ""}</div>
         </div>
         <div style={{ textAlign: "right", flex: "none" }}>
-          <div style={{ color: C.gold, fontSize: 9, letterSpacing: 1.5, fontWeight: 800, textTransform: "uppercase" }}>Index</div>
+          <div style={{ color: C.gold, fontSize: 10, letterSpacing: 1.5, fontWeight: 800, textTransform: "uppercase" }}>Index</div>
           <div style={{ fontFamily: "Georgia, serif", fontSize: 28, fontWeight: 800, color: C.cream, lineHeight: 1 }}>{index == null ? "—" : index.toFixed(1)}</div>
           {trend != null && Math.abs(trend) >= 0.05 && (
             <div style={{ fontSize: 11, fontWeight: 800, marginTop: 2, color: trend < 0 ? "#8FE0B0" : "#FB7185" }}>{trend < 0 ? "▼" : "▲"} {Math.abs(trend).toFixed(1)}</div>
@@ -99,7 +99,7 @@ export function PlayerCardView({ view }: { view: CardView }) {
           {bests.map((b) => (
             <div key={b.label} style={{ background: "rgba(0,0,0,.18)", borderRadius: 10, padding: "9px 6px", textAlign: "center" }}>
               <div style={{ fontSize: 16, fontWeight: 800, color: C.cream }}>{b.val}</div>
-              <div style={{ fontSize: 9.5, color: C.sage, marginTop: 2 }}>{b.label}</div>
+              <div style={{ fontSize: 10, color: C.sage, marginTop: 2 }}>{b.label}</div>
             </div>
           ))}
         </div>
@@ -112,7 +112,7 @@ export function PlayerCardView({ view }: { view: CardView }) {
             {badges.map((b) => (
               <div key={b.key} style={{ flex: "none", width: 62, textAlign: "center" }}>
                 <div style={{ width: 46, height: 46, margin: "0 auto", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, background: "radial-gradient(circle at 50% 32%, #20624a, #0e3a2c)", border: `2px solid ${TIER_COLOR[b.tier]}`, boxShadow: b.tier !== "common" ? `0 0 12px -4px ${TIER_COLOR[b.tier]}` : "none" }}>{b.icon}</div>
-                <div style={{ fontSize: 9, color: C.sage, marginTop: 5, lineHeight: 1.2 }}>{b.label}</div>
+                <div style={{ fontSize: 10, color: C.sage, marginTop: 5, lineHeight: 1.2 }}>{b.label}</div>
               </div>
             ))}
           </div>
@@ -135,7 +135,7 @@ export function PlayerCardView({ view }: { view: CardView }) {
               </div>
             </div>
             <div style={{ marginTop: 8 }}><FormChart data={form} /></div>
-            <div style={{ fontSize: 9.5, color: C.sage, marginTop: 6, lineHeight: 1.4 }}>
+            <div style={{ fontSize: 10, color: C.sage, marginTop: 6, lineHeight: 1.4 }}>
               5-round rolling average of your scoring differentials{good ? " — improving" : ""}. Lower is better; the gold line is your average over these rounds.
             </div>
           </div>

@@ -2744,3 +2744,36 @@ runningHandicap() now returns recentDetail[{d,used}] (newest-first, exact best-N
 expansion drops the duplicated 'used: X (of all Y)' line for a single newest-first list of the last
 20 differentials with the counted ones in gold+bold, a 'Newest round first.' note, and a payoff line
 ('The 8 in gold average 12.4 — that’s your index', or with the small-sample adjustment spelled out).
+
+### v1.140.4 — FIX: enforce 10px minimum font size
+Swept all sub-10px fonts up to 10 (rule: never below 10px). 11 instances across player-card,
+achievements, round-detail, manage (engagement week labels) and the shared ui sub-label. The
+handicap-index label on the player card was the visible one. Client-only.
+
+### v1.141.0 — FEATURE: Flights Stage 1a (one-off setup + data) — migration 0093
+Additive columns games.flight_mode / games.flights / game_players.flight (0093). Game setup (stroke
+or Stableford only) gains a Flights control next to Handicap allowance: Off / One-off flights /
+Season league (disabled until Stage 2). One-off shows a 2/3/4 picker and an even auto-split of the
+field by handicap index, with per-band counts; each player's band is written to game_players.flight
+at create, and flight_mode/flights onto the game. Players without an index start unassigned. New
+lib/flights.ts (autoSplitFlights, flightForIndex, flightRangeLabel). Setup draft persists the choice.
+NOT YET: the segmented By-flight/Overall leaderboard display — that's Stage 1b (fits into the
+StrokesSummary standings). So flights are captured now but not yet shown on the board.
+
+### v1.141.1 — Flights: require handicaps for flighted events
+One-off flights now enforce that every player has a handicap index (strict; no exclude). The Flights
+panel surfaces a 'Handicaps needed' list of selected members missing one, with inline index entry;
+Create is blocked with a clear message until all are filled (and the creator's own index is set).
+Entered handicaps save to each member's profile on create (becomes their handicap going forward).
+Guests already require an index, so they never appear here. Replaces Stage-1a's soft 'unassigned' note.
+
+### v1.142.0 — FEATURE: Flights Stage 1b (segmented leaderboard) — no migration
+The individual stroke/Stableford standings (game room → Play) now honor one-off flights. When a
+game has flight_mode='oneoff' with bands, a By-flight / Overall toggle appears above the board.
+By flight (default): one section per band (color dot + name + index range + count), each ranked
+WITHIN the band (own leader, own ties) reusing the exact net/Stableford ranking — scoring math
+untouched. Any flight-null players fall into an 'Unassigned' section (legacy/edge; new flighted
+games can't produce one since handicaps are required). Overall: the full single list with a small
+A/B/C/D color tag per row. Row rendering was extracted into one renderLeaderRow used by both views.
+Six-hole segment winners + money banners are unchanged (decided overall among bettors, orthogonal
+to flights). Completes Flights Stage 1 end-to-end (setup → assignment → display).

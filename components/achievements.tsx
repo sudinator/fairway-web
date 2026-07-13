@@ -37,7 +37,7 @@ function HoleChip({ h }: { h: Hole }) {
   const col = tp == null ? C.faint : tp < 0 ? C.birdie : tp > 0 ? C.bogey : C.ink;
   return (
     <div style={{ textAlign: "center", minWidth: 26 }}>
-      <div style={{ fontSize: 9, color: C.faint }}>{h.hole_number}</div>
+      <div style={{ fontSize: 10, color: C.faint }}>{h.hole_number}</div>
       <div style={{ fontSize: 13, fontWeight: 800, color: col, lineHeight: 1.1 }}>{h.strokes ?? "–"}</div>
     </div>
   );
@@ -139,7 +139,7 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
                         <span style={{ position: "absolute", right: -4, bottom: -4, minWidth: 18, height: 18, padding: "0 4px", borderRadius: 9, background: C.gold, color: "#1c1c15", fontSize: 10.5, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #10402f" }}>{"×"}{e!.count}</span>
                       )}
                     </div>
-                    <div style={{ fontSize: 9.5, color: C.cream, marginTop: 6, lineHeight: 1.2, fontWeight: on ? 700 : 500 }}>{b.label}</div>
+                    <div style={{ fontSize: 10, color: C.cream, marginTop: 6, lineHeight: 1.2, fontWeight: on ? 700 : 500 }}>{b.label}</div>
                     {best != null && <div style={{ fontSize: 10.5, color: C.gold, fontWeight: 800, marginTop: 1 }}>{best}</div>}
                   </button>
                 );

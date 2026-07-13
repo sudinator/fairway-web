@@ -24,6 +24,8 @@ export type SetupDraft = {
   skinsMode: string;
   team1: string;
   team2: string;
+  flightMode?: string;
+  flightCount?: number;
   selectedPlayers: Record<string, boolean>;
   guestPlayers: { id: string; display_name: string; handicap_index: number | null; guest_of: string }[];
 };

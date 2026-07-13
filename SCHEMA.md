@@ -308,3 +308,6 @@ Product model: any member creates a tee time; the creator organizes it; a captai
 - `get_friction_items(p_status)` / `get_friction_rounds(p_id)` / `resolve_friction(p_id,p_status,p_reason,p_keep,p_soft_delete)` — is_admin. resolve soft-deletes all cluster rounds except p_keep when p_soft_delete.
 - Detection: dup_day = same user+course+date with identical gross OR a stray in-progress partial beside a completed round; dup_game = >1 round per (user,game); multi_draft = >=2 in-progress drafts per user; integrity = final round where Σ hole strokes <> gross (>=18 holes).
 - Push: app/api/push DEFAULT_DELIVERY.friction='push', titleFor 'Data integrity flag'.
+
+## Flights (0093, Stage 1 one-off)
+- `games.flight_mode` text ('off'|'oneoff'|'league'); `games.flights` jsonb ([{key,name,hi}] — hi = inclusive upper index bound, null = open top); `game_players.flight` text (assigned band key, null = unassigned). One-off flights computed client-side via lib/flights.ts (autoSplitFlights = even split by index; flightForIndex). Only offered for stroke/stableford. 'league' (season flights) is Stage 2. Segmented leaderboard display is Stage 1b.

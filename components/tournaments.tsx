@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
 import { betResultToPost } from "@/lib/money";
 import type { BetNet, BetPost } from "@/lib/money";
@@ -47,6 +47,7 @@ import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG }
 import type { LegConfig, Leg } from "@/lib/legs";
 import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
 import { loadSetupDraft, saveSetupDraft, clearSetupDraft, draftHasProgress, draftAgeLabel, type SetupDraft } from "@/lib/setup-draft";
+import { autoSplitFlights, flightForIndex, flightRangeLabel, type FlightBand } from "@/lib/flights";
 
 // Every game_players INSERT must set these NOT-NULL columns explicitly rather than
 // leaning on the DB default. A drifted default (0059's `if not exists` skipped it)
@@ -519,6 +520,12 @@ function CreateGame({
   // Default 85 for four-ball, 100 otherwise. Resets to the standard when the
   // format changes; editable any time.
   const [allowancePct, setAllowancePct] = useState(100);
+  // Flights (Stage 1: one-off per-event). "off" | "oneoff". Season "league" is Stage 2.
+  const [flightMode, setFlightMode] = useState<"off" | "oneoff">("off");
+  const [flightCount, setFlightCount] = useState(3);
+  // Handicaps the organizer fills in during a flighted setup for members missing one.
+  // Saved to their profile on create (Amit's call), so it becomes their handicap going forward.
+  const [hcpOverrides, setHcpOverrides] = useState<Record<string, number>>({});
   useEffect(() => { setAllowancePct(gameType === "fourball" || gameType === "trifecta" ? 85 : 100); }, [gameType]);
   const [teamScoreMode, setTeamScoreMode] = useState<"best_ball" | "aggregate">("best_ball");
   const [trifectaScoring, setTrifectaScoring] = useState<"per_hole" | "match">("per_hole");
@@ -691,6 +698,8 @@ function CreateGame({
     setTrifectaScoring(d.trifectaScoring as any); setStrokeBasis(d.strokeBasis as any); setFmtFamily(d.fmtFamily as any);
     setMatchKind(d.matchKind as any); setTeamMode(d.teamMode); setSkinsTeamStyle(d.skinsTeamStyle as any);
     setSkinsMode(d.skinsMode as any); setTeam1(d.team1); setTeam2(d.team2);
+    setFlightMode((d.flightMode as any) === "oneoff" ? "oneoff" : "off");
+    setFlightCount(d.flightCount && d.flightCount >= 2 && d.flightCount <= 4 ? d.flightCount : 3);
     setSelectedPlayers(d.selectedPlayers || {}); setGuestPlayers(d.guestPlayers || []);
     setPendingFavName(d.favName);
     setDraftAvailable(null); setDraftDismissed(true); hydratedRef.current = true;
@@ -715,17 +724,36 @@ function CreateGame({
     const snap = {
       name, matchDate, favName: pickedFav?.name ?? null, teeIdx, idxStr, gameType, allowancePct,
       teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle,
-      skinsMode, team1, team2, selectedPlayers, guestPlayers,
+      skinsMode, team1, team2, selectedPlayers, guestPlayers, flightMode, flightCount,
     };
     if (draftHasProgress(snap, user.id)) saveSetupDraft(activeGroupId, teeTimeId, snap);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers]);
+  }, [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, flightMode, flightCount]);
 
   const tee = pickedFav?.tees?.[teeIdx];
   const coursePar = pickedFav
     ? pickedFav.holes.reduce((s: number, h: any) => s + (h.par || 0), 0)
     : null;
   const idxVal = idxStr.trim() === "" ? null : parseFloat(idxStr);
+  // The field's handicap indexes (creator + selected members + guests), for flight auto-split.
+  const fieldIndexes = useMemo<(number | null)[]>(() => {
+    const arr: (number | null)[] = [idxVal];
+    groupRoster.forEach((p) => { if (selectedPlayers[p.id] && p.id !== user.id) arr.push(hcpOverrides[p.id] ?? p.handicap_index); });
+    guestPlayers.forEach((g) => arr.push(g.handicap_index));
+    return arr;
+  }, [idxVal, groupRoster, selectedPlayers, guestPlayers, user.id, hcpOverrides]);
+  const flightsSupported = gameType === "stroke" || gameType === "stableford";
+  const flightBands = useMemo<FlightBand[] | null>(
+    () => (flightMode === "oneoff" && flightsSupported ? autoSplitFlights(fieldIndexes, flightCount) : null),
+    [flightMode, flightCount, fieldIndexes, flightsSupported]);
+  // Flighted events need every player's index. Guests always have one; the only gap is
+  // selected members whose profile handicap is blank (and the creator's own, entered above).
+  const flightNeedsHcp = useMemo(
+    () => (flightMode === "oneoff" && flightsSupported
+      ? groupRoster.filter((p) => selectedPlayers[p.id] && p.id !== user.id && (hcpOverrides[p.id] ?? p.handicap_index) == null)
+      : []),
+    [flightMode, flightsSupported, groupRoster, selectedPlayers, hcpOverrides, user.id]);
+  const flightBlocked = flightMode === "oneoff" && flightsSupported && (idxVal == null || flightNeedsHcp.length > 0);
   const ch =
     tee && idxVal != null && coursePar
       ? courseHandicap(idxVal, tee.slope, tee.rating, coursePar)
@@ -734,6 +762,12 @@ function CreateGame({
   const create = async () => {
     if (!pickedFav || !tee) {
       setErr("Pick a course (from your favorites).");
+      return;
+    }
+    if (flightBlocked) {
+      setErr(idxVal == null
+        ? "Enter your own handicap index before flighting this event."
+        : `${flightNeedsHcp.length} player${flightNeedsHcp.length === 1 ? "" : "s"} need a handicap index before this event can be flighted — set them under Flights, or turn flights off.`);
       return;
     }
     setBusy(true);
@@ -775,6 +809,8 @@ function CreateGame({
           trifecta_scoring: gameType === "trifecta" ? trifectaScoring : null,
           stroke_basis: gameType === "stroke" ? strokeBasis : null,
           skins_mode: gameType === "skins" ? skinsMode : null,
+          flight_mode: flightsSupported ? flightMode : "off",
+          flights: flightMode === "oneoff" && flightsSupported ? flightBands : null,
         })
         .select()
         .single();
@@ -783,6 +819,13 @@ function CreateGame({
       // save it back to their profile so it persists as the new default.
       if (idxVal != null && idxVal !== profileIdx) {
         try { await supabase.from("profiles").update({ handicap_index: idxVal }).eq("id", user.id); } catch {}
+      }
+      // Persist any handicaps the organizer entered for flighted members (Amit's call: it
+      // becomes their handicap going forward, not just this event).
+      for (const [uid, hi] of Object.entries(hcpOverrides)) {
+        if (uid !== user.id && hi != null) {
+          try { await supabase.from("profiles").update({ handicap_index: hi }).eq("id", uid); } catch {}
+        }
       }
       // Add creator plus any selected group members immediately, so group games do not require join codes.
       // Split skins stays simple only in a small field. Beyond 4, steer to teams or 1:1.
@@ -808,7 +851,7 @@ function CreateGame({
       // Each selected player already carries avatar_url from the group roster,
       // so we denormalize it straight onto the game_player row.
       const rosterRows = selectedRoster.map((p) => {
-        const playerIndex = p.id === user.id ? idxVal : p.handicap_index;
+        const playerIndex = p.id === user.id ? idxVal : (hcpOverrides[p.id] ?? p.handicap_index);
         const playerCourseHandicap =
           playerIndex != null && coursePar != null
             ? courseHandicap(playerIndex, tee.slope, tee.rating, coursePar)
@@ -826,6 +869,7 @@ function CreateGame({
           slope: tee.slope,
           tee_name: tee.name,
           course_handicap: playerCourseHandicap,
+          flight: flightMode === "oneoff" && flightsSupported && flightBands ? flightForIndex(playerIndex, flightBands) : null,
           scores: Array(holesMeta.length).fill(null),
           putts: Array(holesMeta.length).fill(null),
           fairways: Array(holesMeta.length).fill(null),
@@ -844,6 +888,7 @@ function CreateGame({
         slope: tee.slope,
         tee_name: tee.name,
         course_handicap: p.handicap_index != null && coursePar != null ? courseHandicap(p.handicap_index, tee.slope, tee.rating, coursePar) : null,
+        flight: flightMode === "oneoff" && flightsSupported && flightBands ? flightForIndex(p.handicap_index, flightBands) : null,
         scores: Array(holesMeta.length).fill(null),
         putts: Array(holesMeta.length).fill(null),
         fairways: Array(holesMeta.length).fill(null),
@@ -1401,6 +1446,56 @@ function CreateGame({
             Players play off this percentage of their course handicap. 100% for singles/Stableford/Skins, 85% standard for four-ball. The lower handicap still plays off the difference in match formats.
           </div>
         </div>
+        {flightsSupported && (
+          <div style={{ marginTop: 14 }}>
+            <label style={{ color: C.sage, fontSize: 12 }}>Flights</label>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+              <button onClick={() => setFlightMode("off")} style={{ ...btn(flightMode === "off"), fontSize: 13, padding: "8px 14px" }}>Off</button>
+              <button onClick={() => setFlightMode("oneoff")} style={{ ...btn(flightMode === "oneoff"), fontSize: 13, padding: "8px 14px" }}>One-off flights</button>
+              <button disabled title="Define season flights under Club settings (coming soon)"
+                style={{ ...btn(false), fontSize: 13, padding: "8px 14px", opacity: 0.4, cursor: "not-allowed" }}>Season league</button>
+            </div>
+            {flightMode === "oneoff" && flightBands ? (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+                  {[2, 3, 4].map((n) => (
+                    <button key={n} onClick={() => setFlightCount(n)} style={{ ...btn(flightCount === n), fontSize: 13, padding: "7px 0", flex: 1 }}>{n}</button>
+                  ))}
+                </div>
+                {(idxVal == null || flightNeedsHcp.length > 0) ? (
+                  <div style={{ background: "rgba(184,58,46,.12)", border: "1px solid rgba(184,58,46,.4)", borderRadius: 11, padding: "10px 12px", marginBottom: 10 }}>
+                    <div style={{ color: C.cream, fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Handicaps needed to flight this event</div>
+                    {idxVal == null ? <div style={{ color: C.sage, fontSize: 11, marginBottom: 6 }}>Enter your own index in the field above.</div> : null}
+                    {flightNeedsHcp.map((p) => (
+                      <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                        <span style={{ flex: 1, fontSize: 13, color: C.cream }}>{p.display_name}</span>
+                        <input type="number" step="0.1" inputMode="decimal" placeholder="index"
+                          onChange={(e) => { const v = parseFloat(e.target.value); setHcpOverrides((m) => { const nx = { ...m }; if (Number.isNaN(v)) { delete nx[p.id]; } else { nx[p.id] = v; } return nx; }); }}
+                          style={{ ...inputStyle, width: 84, padding: "6px 9px", fontSize: 13, textAlign: "center" }} />
+                      </div>
+                    ))}
+                    <div style={{ color: C.sage, fontSize: 10, marginTop: 2 }}>Saved to each player's profile as their handicap going forward.</div>
+                  </div>
+                ) : null}
+                {flightBands.map((b, i) => {
+                  const cnt = fieldIndexes.filter((x) => x != null && flightForIndex(x, flightBands) === b.key).length;
+                  return (
+                    <div key={b.key} style={{ display: "flex", alignItems: "center", gap: 8, background: C.greenLight, borderRadius: 10, padding: "9px 11px", marginBottom: 6 }}>
+                      <span style={{ fontWeight: 800, fontSize: 13 }}>{b.name}</span>
+                      <span style={{ color: C.sage, fontSize: 11 }}>index {flightRangeLabel(flightBands, i)}</span>
+                      <span style={{ marginLeft: "auto", fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 15, color: C.gold }}>{cnt}</span>
+                    </div>
+                  );
+                })}
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>
+                  Even split by handicap index into {flightCount} bands, each with its own net winner. Every player needs an index. Applies to this event only.
+                </div>
+              </div>
+            ) : flightMode === "off" ? (
+              <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Everyone competes on one leaderboard.</div>
+            ) : null}
+          </div>
+        )}
       </div>
 
       {err && (
@@ -1507,6 +1602,7 @@ function GameRoom({
   // Which step of the setup flow is showing: players & tees, teams, matchups, groups.
   const [setupTab, setSetupTab] = useState<"players" | "teams" | "matchups" | "groups">("players");
   const [cardView, setCardView] = useState(false); // show the whole-group vertical scorecard
+  const [flightView, setFlightView] = useState<"flight" | "overall">("flight"); // flighted standings: segmented vs one list
 
   // ---- Tee groups (foursomes that play together, each with its own marker) ----
   const myRow = players.find((p) => p.user_id === user.id) || null;
@@ -2796,6 +2892,61 @@ function GameRoom({
     if (d !== 0) return d;
     return isStroke ? 0 : playerPoints(b) - playerPoints(a);
   });
+  // Flights: one-off handicap-band divisions (stroke/Stableford only). When active, the
+  // standings can be viewed segmented by band (each with its own winner) or as one list.
+  const flightDefs: { key: string; name: string; hi: number | null }[] = Array.isArray((game as any).flights) ? ((game as any).flights as any[]) : [];
+  const hasFlights = (game as any).flight_mode === "oneoff" && flightDefs.length > 0 && (isStroke || game.game_type === "stableford");
+  const flightTagColor = (key: string) => (key === "A" ? "#5AA9E6" : key === "B" ? C.gold : key === "C" ? "#8FE0B0" : key === "D" ? "#E0915B" : C.sage);
+  const posWithin = (p: Player, pool: Player[]) => pool.filter((x) => rankVal(x) < rankVal(p)).length + 1;
+  const tiedWithin = (p: Player, pool: Player[]) => pool.filter((x) => rankVal(x) === rankVal(p)).length > 1;
+  const renderLeaderRow = (p: Player, pos: number, tied: boolean, showTag: boolean) => {
+    const pts = playerPoints(p);
+    const thru = playerThru(p);
+    const fkey = (p as any).flight as string | null;
+    return (
+      <div key={p.id} style={{
+        background: p.user_id === user.id ? C.cream : C.card,
+        borderRadius: 12, padding: "10px 16px", marginTop: 8,
+        display: "flex", alignItems: "center",
+      }}>
+        <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700, width: 20, fontSize: 15 }}>
+          {tied ? "T" : ""}{pos}
+        </div>
+        <Avatar src={p.avatar_url} name={p.display_name} size={32} />
+        <div style={{ flex: 1, minWidth: 0, marginLeft: 8 }}>
+          <div style={{ color: C.ink, fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {leaderName(p.display_name)}{p.user_id === user.id ? " (you)" : ""}
+            {showTag && fkey ? <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 800, borderRadius: 5, padding: "1px 6px", background: flightTagColor(fkey), color: "#06251A" }}>{fkey}</span> : null}
+          </div>
+          <div style={{ color: C.faint, fontSize: 11 }}>
+            {p.course_handicap != null ? `CH ${p.course_handicap}` : "no hcp"}
+            {p.bets === false ? <span style={{ color: C.gold, fontWeight: 800 }}> · no bet</span> : ""}
+          </div>
+        </div>
+        {isStroke ? (() => {
+          const relV = (strokeNet ? playerNet(p) : playerGross(p)) - parThru(p);
+          const relS = !thru ? "–" : relV === 0 ? "E" : relV > 0 ? `+${relV}` : `${relV}`;
+          const relCol = !thru ? C.faint : relV < 0 ? "#1F8F54" : relV > 0 ? C.birdie : "#6B6857";
+          return (<>
+            <div style={{ width: 40, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru || "–"}</div>
+            <div style={{ width: 48, textAlign: "center", color: C.ink, fontWeight: strokeNet ? 700 : 800, fontSize: strokeNet ? 15 : 18, fontFamily: strokeNet ? undefined : "Georgia, serif" }}>{thru ? playerGross(p) : "–"}</div>
+            <div style={{ width: 48, textAlign: "center", color: relCol, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{relS}</div>
+            <div style={{ width: 50, textAlign: "center", color: strokeNet ? C.green : C.ink, fontWeight: strokeNet ? 800 : 700, fontSize: strokeNet ? 19 : 15, fontFamily: strokeNet ? "Georgia, serif" : undefined }}>{thru ? playerNet(p) : "–"}</div>
+          </>);
+        })() : (<>
+          <div style={{ width: 44, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru || "–"}</div>
+          <div style={{ width: 48, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru ? playerGross(p) : "–"}</div>
+          {(() => {
+            if (!thru) return <div style={{ width: 44, textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 16, fontFamily: "Georgia, serif" }}>–</div>;
+            const rel = 2 * thru - pts;
+            const col = rel < 0 ? "#1F8F54" : rel > 0 ? C.birdie : "#6B6857";
+            return <div style={{ width: 44, textAlign: "center", color: col, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{relToParStr(p)}</div>;
+          })()}
+          <div style={{ width: 40, textAlign: "center", color: C.green, fontWeight: 800, fontSize: 19, fontFamily: "Georgia, serif" }}>{pts}</div>
+        </>)}
+      </div>
+    );
+  };
 
   // Segment winners (three sixes). While a six is IN PROGRESS the "leader" is whoever is
   // most under par for the holes they've actually played (pace) — matching the main
@@ -3455,6 +3606,18 @@ function GameRoom({
           {/* Leaderboard */}
           <div style={{ marginTop: 18 }}>
             <Eyebrow>{isStroke ? `STROKE PLAY · ${strokeNet ? "NET" : "GROSS"}` : "LEADERBOARD · NET STABLEFORD"}</Eyebrow>
+            {hasFlights ? (
+              <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                {(["flight", "overall"] as const).map((v) => (
+                  <button key={v} onClick={() => setFlightView(v)} style={{
+                    flex: 1, padding: "7px 0", borderRadius: 9,
+                    border: `1px solid ${flightView === v ? C.gold : "rgba(255,255,255,0.25)"}`,
+                    background: flightView === v ? C.gold : "transparent",
+                    color: flightView === v ? "#06251A" : C.cream, fontWeight: 800, fontSize: 12, cursor: "pointer",
+                  }}>{v === "flight" ? "By flight" : "Overall"}</button>
+                ))}
+              </div>
+            ) : null}
             {/* Column header */}
             <div style={{ display: "flex", alignItems: "center", padding: "9px 16px", marginTop: 4, color: C.cream, fontSize: 12, fontWeight: 800, letterSpacing: 0.3, background: C.greenMid, borderRadius: 10 }}>
               <div style={{ width: 20 }}>#</div>
@@ -3472,55 +3635,39 @@ function GameRoom({
                 <div style={{ width: 40, textAlign: "center" }}>Pts</div>
               </>)}
             </div>
-            {leaderboard.map((p) => {
-              const pts = playerPoints(p);
-              const thru = playerThru(p);
-              const mineOu = rankVal(p);
-              const pos = leaderboard.filter((x) => rankVal(x) < mineOu).length + 1;
-              const tied = leaderboard.filter((x) => rankVal(x) === mineOu).length > 1;
-              return (
-                <div key={p.id} style={{
-                  background: p.user_id === user.id ? C.cream : C.card,
-                  borderRadius: 12, padding: "10px 16px", marginTop: 8,
-                  display: "flex", alignItems: "center",
-                }}>
-                  <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700, width: 20, fontSize: 15 }}>
-                    {tied ? "T" : ""}{pos}
-                  </div>
-                  <Avatar src={p.avatar_url} name={p.display_name} size={32} />
-                  <div style={{ flex: 1, minWidth: 0, marginLeft: 8 }}>
-                    <div style={{ color: C.ink, fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {leaderName(p.display_name)}{p.user_id === user.id ? " (you)" : ""}
+            {hasFlights && flightView === "flight" ? (
+              <>
+                {flightDefs.map((b, bi) => {
+                  const inFlight = leaderboard.filter((p) => (p as any).flight === b.key);
+                  if (!inFlight.length) return null;
+                  return (
+                    <div key={b.key} style={{ marginTop: 12 }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "8px 4px 0" }}>
+                        <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: flightTagColor(b.key) }} />
+                        <span style={{ fontFamily: "Georgia, serif", fontSize: 15, fontWeight: 700, color: C.cream }}>{b.name}</span>
+                        <span style={{ color: C.sage, fontSize: 11 }}>index {flightRangeLabel(flightDefs, bi)} · {inFlight.length} player{inFlight.length === 1 ? "" : "s"}</span>
+                      </div>
+                      {inFlight.map((p) => renderLeaderRow(p, posWithin(p, inFlight), tiedWithin(p, inFlight), false))}
                     </div>
-                    <div style={{ color: C.faint, fontSize: 11 }}>
-                      {p.course_handicap != null ? `CH ${p.course_handicap}` : "no hcp"}
-                      {p.bets === false ? <span style={{ color: C.gold, fontWeight: 800 }}> · no bet</span> : ""}
+                  );
+                })}
+                {(() => {
+                  const un = leaderboard.filter((p) => !(p as any).flight);
+                  if (!un.length) return null;
+                  return (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "8px 4px 0" }}>
+                        <span style={{ fontFamily: "Georgia, serif", fontSize: 15, fontWeight: 700, color: C.cream }}>Unassigned</span>
+                        <span style={{ color: C.sage, fontSize: 11 }}>no flight · {un.length}</span>
+                      </div>
+                      {un.map((p) => renderLeaderRow(p, posWithin(p, un), tiedWithin(p, un), false))}
                     </div>
-                  </div>
-                  {isStroke ? (() => {
-                    const relV = (strokeNet ? playerNet(p) : playerGross(p)) - parThru(p);
-                    const relS = !thru ? "–" : relV === 0 ? "E" : relV > 0 ? `+${relV}` : `${relV}`;
-                    const relCol = !thru ? C.faint : relV < 0 ? "#1F8F54" : relV > 0 ? C.birdie : "#6B6857";
-                    return (<>
-                      <div style={{ width: 40, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru || "–"}</div>
-                      <div style={{ width: 48, textAlign: "center", color: C.ink, fontWeight: strokeNet ? 700 : 800, fontSize: strokeNet ? 15 : 18, fontFamily: strokeNet ? undefined : "Georgia, serif" }}>{thru ? playerGross(p) : "–"}</div>
-                      <div style={{ width: 48, textAlign: "center", color: relCol, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{relS}</div>
-                      <div style={{ width: 50, textAlign: "center", color: strokeNet ? C.green : C.ink, fontWeight: strokeNet ? 800 : 700, fontSize: strokeNet ? 19 : 15, fontFamily: strokeNet ? "Georgia, serif" : undefined }}>{thru ? playerNet(p) : "–"}</div>
-                    </>);
-                  })() : (<>
-                    <div style={{ width: 44, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru || "–"}</div>
-                    <div style={{ width: 48, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru ? playerGross(p) : "–"}</div>
-                    {(() => {
-                      if (!thru) return <div style={{ width: 44, textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 16, fontFamily: "Georgia, serif" }}>–</div>;
-                      const rel = 2 * thru - pts;
-                      const col = rel < 0 ? "#1F8F54" : rel > 0 ? C.birdie : "#6B6857";
-                      return <div style={{ width: 44, textAlign: "center", color: col, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{relToParStr(p)}</div>;
-                    })()}
-                    <div style={{ width: 40, textAlign: "center", color: C.green, fontWeight: 800, fontSize: 19, fontFamily: "Georgia, serif" }}>{pts}</div>
-                  </>)}
-                </div>
-              );
-            })}
+                  );
+                })()}
+              </>
+            ) : (
+              leaderboard.map((p) => renderLeaderRow(p, posWithin(p, leaderboard), tiedWithin(p, leaderboard), hasFlights))
+            )}
             <div style={{ color: C.sage, fontSize: 10, marginTop: 8 }}>
               {isStroke ? `Thru = holes played · Gross = total strokes · Par = ${strokeNet ? "net" : "gross"} vs par · Net = net total. Lowest ${strokeNet ? "net" : "gross"} wins.` : "Gross = total strokes · Thru = holes played · O/U = net Stableford vs par pace (under = green) · Pts = net Stableford points. Ranked by O/U."}
             </div>

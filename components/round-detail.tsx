@@ -68,8 +68,8 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
             {roundBadges.map(({ a, def }) => (
               <div key={a.key} style={{ width: 74, textAlign: "center" }}>
                 <div style={{ width: 46, height: 46, margin: "0 auto", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, background: "radial-gradient(circle at 50% 32%, #20624a, #0e3a2c)", border: `2px solid ${ROUND_TIER_COLOR[def.tier]}`, boxShadow: def.tier !== "common" ? `0 0 12px -4px ${ROUND_TIER_COLOR[def.tier]}` : "none" }}>{def.icon}</div>
-                <div style={{ fontSize: 9.5, color: C.cream, marginTop: 5, lineHeight: 1.2, fontWeight: 700 }}>{def.label}</div>
-                {a.kind === "best" && a.isRecord && <div style={{ fontSize: 9, color: C.gold, fontWeight: 800, marginTop: 1 }}>new record</div>}
+                <div style={{ fontSize: 10, color: C.cream, marginTop: 5, lineHeight: 1.2, fontWeight: 700 }}>{def.label}</div>
+                {a.kind === "best" && a.isRecord && <div style={{ fontSize: 10, color: C.gold, fontWeight: 800, marginTop: 1 }}>new record</div>}
               </div>
             ))}
           </div>
