@@ -2906,3 +2906,13 @@ Bogey-free round (elite) leads and 3+ (common) sits back. Within a tier they rea
 bogeyTie comparator (nine before 5+) instead of by count. Consequence: as normal badges they compete
 for the 8-chip cap, so 3+ can be pushed off on players with many common badges. buildConsistency and
 the ConsistItem type removed.
+
+### v1.148.3 — CHANGE: bogey-free streaks are now NET — no migration
+The bogey-free family (3+/5+/nine/round) is measured on NET score instead of gross. A hole counts
+toward the streak when the player is at net par or better — gross-to-par minus the handicap strokes
+their course handicap allocates to that hole (via allocateStrokes, the same allocator used across the
+app; course_handicap falls back to a computed one from index+rating+slope+par). This levels high vs
+low handicappers: playing to your handicap earns the streak. Badges relabelled 'Net bogey-free 3+/5+/
+nine/round' with updated descriptions. Par-train, bounce-back, blow-ups, even-par-nine stay GROSS
+(absolute scoring feats) — only bogey-free changed. Keys unchanged; syncBadges recomputes counts from
+each player's rounds on next load, so counts re-derive on net automatically (no backfill).

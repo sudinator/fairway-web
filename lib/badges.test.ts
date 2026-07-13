@@ -79,6 +79,22 @@ const parRound = () => mkRound(Array(18).fill([4, 4, 2, "hit"]) as HS[]);
   ok("bogey_free_9 still on clean back nine", has(aw, "bogey_free_9"));
 }
 
+// ---- Net bogey-free: handicap strokes level the streak ----
+{
+  const bogeys = Array(18).fill([4, 5, 2, "hit"]) as HS[]; // a gross bogey on every hole
+  // 18 course handicap = one stroke per hole, so every hole is net par → net bogey-free round.
+  const awNet = evaluateRound(mkRound(bogeys, { course_handicap: 18 }), emptyPrior());
+  ok("net bogey-free round when playing to an 18 handicap", has(awNet, "bogey_free_round"));
+  ok("net bogey-free nine follows", has(awNet, "bogey_free_9"));
+  // No handicap on record (scratch-equivalent): gross bogeys are real bogeys → no streak at all.
+  const awGross = evaluateRound(mkRound(bogeys), emptyPrior());
+  ok("no net bogey-free without handicap strokes", !has(awGross, "bogey_free_round") && !has(awGross, "bogey_free_3"));
+  // 9 handicap strokes only SI 1-9 (holes 1-9 here): front nine is net clean, but the unstroked
+  // back nine are net bogeys, so the nine earns but the full round does not.
+  const aw9 = evaluateRound(mkRound(bogeys, { course_handicap: 9 }), emptyPrior());
+  ok("partial handicap: net bogey-free nine but not round", has(aw9, "bogey_free_9") && !has(aw9, "bogey_free_round"));
+}
+
 // ---- Bounce-back: bogey then birdie ----
 {
   const spec: HS[] = [[4, 5, 2, "miss"], [4, 3, 1, "hit"], ...Array(16).fill([4, 4, 2, "hit"])] as HS[];

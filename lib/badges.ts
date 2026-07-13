@@ -1,7 +1,7 @@
 // Achievements / badges. This module is PURE: `evaluateRound` takes a finished
 // round + the player's prior badge state and returns the awards that round earns.
 // No I/O here — the caller (compute-on-finish / backfill) persists to member_badges.
-import { Round, Hole, played, isGrossOnly, isGIR, roundDifferential } from "./golf";
+import { Round, Hole, played, isGrossOnly, isGIR, roundDifferential, allocateStrokes, courseHandicap } from "./golf";
 
 export type BadgeKind = "once" | "count" | "best" | "milestone";
 export type BadgeTier = "common" | "rare" | "elite";
@@ -37,10 +37,10 @@ export const BADGES: BadgeDef[] = [
   { key: "broke_par", label: "Broke par", icon: "👑", tier: "elite", kind: "count", category: "scoring", desc: "Rounds you've shot at par or better." },
 
   // --- Streaks & consistency ---
-  { key: "bogey_free_3", label: "Bogey-free 3+", icon: "✅", tier: "common", kind: "count", category: "streaks", desc: "Three or more holes in a row without a bogey." },
-  { key: "bogey_free_5", label: "Bogey-free 5+", icon: "🔗", tier: "rare", kind: "count", category: "streaks", desc: "Five or more holes in a row without a bogey." },
-  { key: "bogey_free_9", label: "Bogey-free nine", icon: "🔥", tier: "rare", kind: "count", category: "streaks", desc: "A full front or back nine with no bogeys." },
-  { key: "bogey_free_round", label: "Bogey-free round", icon: "🧊", tier: "elite", kind: "count", category: "streaks", desc: "Eighteen holes without a single bogey." },
+  { key: "bogey_free_3", label: "Net bogey-free 3+", icon: "✅", tier: "common", kind: "count", category: "streaks", desc: "Three or more holes in a row at net par or better (your handicap strokes count)." },
+  { key: "bogey_free_5", label: "Net bogey-free 5+", icon: "🔗", tier: "rare", kind: "count", category: "streaks", desc: "Five or more holes in a row at net par or better (your handicap strokes count)." },
+  { key: "bogey_free_9", label: "Net bogey-free nine", icon: "🔥", tier: "rare", kind: "count", category: "streaks", desc: "A full front or back nine at net par or better." },
+  { key: "bogey_free_round", label: "Net bogey-free round", icon: "🧊", tier: "elite", kind: "count", category: "streaks", desc: "Eighteen holes with no net bogey — a round played to your handicap or better." },
   { key: "bounce_back", label: "Bounce-back", icon: "↩️", tier: "common", kind: "count", category: "streaks", desc: "A birdie on the hole right after a bogey." },
   { key: "no_blowups", label: "No blow-ups", icon: "🛡️", tier: "rare", kind: "count", category: "streaks", desc: "A full round with no double bogey or worse." },
 
@@ -126,11 +126,23 @@ export function evaluateRound(r: Round, prior: PriorBadges): Award[] {
 
     // Streaks over consecutive played holes
     const toPar = holes.map((h) => (h.strokes != null ? h.strokes - h.par : null));
+    // Bogey-free is measured NET: a hole counts when the player is at net par or better —
+    // gross-to-par minus the strokes their course handicap allocates to that hole. This lets a
+    // mid/high handicapper earn the streak by playing to their handicap, and levels low vs high.
+    // Par-train, bounce-back and blow-ups stay gross (they're absolute scoring feats).
+    let ch = r.course_handicap;
+    if (ch == null && r.handicap_index != null && r.rating != null && r.slope != null && r.course_par != null)
+      ch = courseHandicap(r.handicap_index, r.slope, r.rating, r.course_par);
+    const recv = allocateStrokes(holes, ch);
+    const netToPar = holes.map((h) => (h.strokes != null ? h.strokes - h.par - (recv[h.hole_number] || 0) : null));
+    const netFree = (h: Hole) => h.strokes != null && (h.strokes - h.par - (recv[h.hole_number] || 0)) <= 0;
+
     let curBF = 0, maxBF = 0, curPar = 0, maxPar = 0, bounce = 0, blowup = false;
     for (let i = 0; i < holes.length; i++) {
       const tp = toPar[i];
-      if (tp == null) { curBF = 0; curPar = 0; continue; }
-      if (tp <= 0) { curBF++; if (curBF > maxBF) maxBF = curBF; } else curBF = 0;
+      const ntp = netToPar[i];
+      if (ntp != null && ntp <= 0) { curBF++; if (curBF > maxBF) maxBF = curBF; } else curBF = 0;
+      if (tp == null) { curPar = 0; continue; }
       if (tp === 0) { curPar++; if (curPar > maxPar) maxPar = curPar; } else curPar = 0;
       if (tp >= 2) blowup = true;
       const prev = toPar[i - 1];
@@ -144,9 +156,9 @@ export function evaluateRound(r: Round, prior: PriorBadges): Award[] {
     // Nines / full round
     const front = holes.filter((h) => h.hole_number >= 1 && h.hole_number <= 9);
     const back = holes.filter((h) => h.hole_number >= 10 && h.hole_number <= 18);
-    const nineClean = (hs: Hole[]) => hs.length >= 9 && hs.every((h) => h.strokes != null && h.strokes - h.par <= 0);
+    const nineClean = (hs: Hole[]) => hs.length >= 9 && hs.every(netFree);
     if (nineClean(front) || nineClean(back)) add("bogey_free_9", "count");
-    if (holes.length >= 18 && holes.every((h) => h.strokes != null && h.strokes - h.par <= 0)) add("bogey_free_round", "count");
+    if (holes.length >= 18 && holes.every(netFree)) add("bogey_free_round", "count");
     const nineSum = (hs: Hole[]) => hs.reduce((s, h) => s + ((h.strokes || 0) - h.par), 0);
     if ((front.length >= 9 && nineSum(front) <= 0) || (back.length >= 9 && nineSum(back) <= 0)) add("even_par_nine", "count");
     if (holes.length >= 18 && !blowup) add("no_blowups", "count");
