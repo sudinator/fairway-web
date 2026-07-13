@@ -58,10 +58,14 @@ function ViewportDiag() {
     const nr = nav?.getBoundingClientRect();
     const inner = window.innerHeight;
     const navBottom = nr ? Math.round(nr.bottom) : -1;
+    const standalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || (navigator as any).standalone === true;
     setM({
+      mode: standalone ? "installed" : "browser",
       innerHeight: inner,
       docClientH: document.documentElement.clientHeight,
       visualVP_h: vv ? Math.round(vv.height) : -1,
+      vvOffsetTop: vv ? Math.round(vv.offsetTop) : -1,
+      appH_var: (getComputedStyle(document.documentElement).getPropertyValue("--app-h") || "unset").trim(),
       dvh: probe("100dvh"),
       svh: probe("100svh"),
       lvh: probe("100lvh"),
@@ -73,8 +77,7 @@ function ViewportDiag() {
       navH: nr ? Math.round(nr.height) : -1,
       navTop: nr ? Math.round(nr.top) : -1,
       navBottom,
-      GAP_below_nav: navBottom >= 0 ? inner - navBottom : -1,
-      shellBottom_vs_inner: sr ? inner - Math.round(sr.bottom) : -1,
+      navBottom_vs_visible: nr ? (vv ? Math.round(vv.height) : inner) - navBottom : -1,
     });
   };
 
@@ -127,8 +130,8 @@ function ViewportDiag() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
         {Object.entries(m).map(([k, v]) => (
           <div key={k} style={{ display: "flex", justifyContent: "space-between",
-            color: k === "GAP_below_nav" ? (Number(v) > 1 ? "#F08" : "#6f6") : "#ddd",
-            fontWeight: k.startsWith("GAP") || k.startsWith("shellBottom_vs") ? 800 : 400 }}>
+            color: k === "navBottom_vs_visible" ? (Math.abs(Number(v)) > 2 ? "#F08" : "#6f6") : "#ddd",
+            fontWeight: k === "navBottom_vs_visible" || k === "mode" ? 800 : 400 }}>
             <span>{k}</span><span>{String(v)}</span>
           </div>
         ))}
@@ -780,7 +783,7 @@ export function Home({ session }: { session: any }) {
         flexShrink: 0, zIndex: 50,
         background: C.green, borderTop: `1px solid ${C.greenMid}`,
         display: "flex", justifyContent: "space-around", alignItems: "stretch",
-        paddingBottom: "env(safe-area-inset-bottom)",
+        paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)",
       }}>
         {(() => {
           const primary: { key: Tab; label: string; icon: string }[] = [

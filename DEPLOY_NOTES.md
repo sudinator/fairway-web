@@ -2678,3 +2678,12 @@ fixed height, so the percentage fell back to auto and the shell grew to its full
 the .app-shell class (100lvh, fallback 100vh) so it's independent of the parent chain; top safe-area
 padding moved INTO the shell with box-sizing:border-box (no overflow); body padding-top removed.
 Expected diag now: bodyH ~956, shellH ~956, navBottom ~956; GAP_below_nav ~-62 (references svh, fine).
+
+### v1.136.7 — FIX: robust height for browser + installed; icon-clip cushion (no migration)
+Made the shell height context-aware instead of one-size: the installed app (display-mode:standalone)
+uses 100lvh (stable full glass, the known-good value from 1.136.6); a browser tab uses a LIVE
+JS-measured height (--app-h = visualViewport.height, published by new components/viewport-sync.tsx)
+that tracks Safari's toolbar so the nav stays pinned to the visible bottom instead of hiding behind it.
+Also added an 8px cushion to the nav's bottom padding so the icon labels are no longer clipped at the
+screen edge. Diag now reports mode (installed/browser), vvOffsetTop, the --app-h var, and
+navBottom_vs_visible (should be ~0 = nav flush to the visible bottom in BOTH contexts).

@@ -1,4 +1,5 @@
 import { RegisterSW } from "@/components/register-sw";
+import { ViewportSync } from "@/components/viewport-sync";
 import "./globals.css";
 
 export const metadata = {
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <RegisterSW />
+        <ViewportSync />
         {children}
       </body>
     </html>

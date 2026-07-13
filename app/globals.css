@@ -1,19 +1,17 @@
-/* Global viewport + scroll lock for the installed PWA.
+/* Global viewport + scroll lock for the PWA — robust in BOTH a browser tab and the installed app.
  *
- * The shell is sized with a viewport unit (100lvh), NOT height:100%, because there can be
- * wrapper elements between <body> and the shell without a fixed height — a percentage height
- * then falls back to auto and the shell grows to fit its content, pushing the bottom nav off
- * screen. A viewport unit resolves independently of the parent chain.
+ * The core problem: no single height value is correct in both contexts.
+ *  - Installed (display-mode: standalone): the viewport is stable and 100lvh is the true
+ *    full-screen height. svh/dvh under a fixed body clamp short and leave a bottom gap.
+ *  - Browser tab: Safari's toolbar grows/shrinks the visible area as you scroll, so a fixed
+ *    100lvh hides the bottom nav behind the toolbar. There we track the LIVE visible height
+ *    published by ViewportSync as --app-h (visualViewport.height), which follows the toolbar.
  *
- * 100lvh is the true full-screen height (svh/dvh under position:fixed clamp to the small
- * viewport and leave a gap at the bottom on iOS). 100vh is the fallback and on iOS also
- * resolves to the full screen, so either way the shell reaches the real bottom edge.
- *
- * Top safe area (status bar is black-translucent) is padded INSIDE the shell with border-box
- * so it doesn't add to the height. Bottom safe area (home indicator) is padded by the nav.
+ * So: browser uses var(--app-h); the installed app overrides to 100lvh via the media query.
  *
  * Bounce prevention: position:fixed body + overscroll-behavior:none. Only the inner scroll
- * container (home.tsx) scrolls. */
+ * container (home.tsx) scrolls. Top safe area (black-translucent status bar) is padded inside
+ * the shell with border-box; bottom safe area (home indicator) is padded by the nav. */
 html {
   height: 100%;
   overflow: hidden;
@@ -26,8 +24,8 @@ body {
   top: 0;
   left: 0;
   right: 0;
-  height: 100vh;   /* fallback (on iOS this is already the full screen) */
-  height: 100lvh;  /* true full-screen height */
+  height: 100vh;   /* fallback */
+  height: 100lvh;  /* full-screen backdrop; the shell controls the usable area */
   overflow: hidden;
   overscroll-behavior: none;
   background: #0E3B2E;
@@ -36,10 +34,15 @@ body {
 
 .app-shell {
   box-sizing: border-box;
-  height: 100vh;   /* fallback */
-  height: 100lvh;  /* full screen, independent of the parent chain */
+  height: 100dvh;                /* browser fallback before JS runs */
+  height: var(--app-h, 100dvh);  /* browser: live visible height (tracks Safari toolbar) */
   padding-top: env(safe-area-inset-top);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+@media (display-mode: standalone) {
+  /* Installed app: iOS gives a stable full-glass viewport. */
+  .app-shell { height: 100lvh; }
 }
