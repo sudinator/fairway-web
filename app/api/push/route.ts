@@ -21,6 +21,7 @@ const DEFAULT_DELIVERY: Record<string, "push" | "inapp" | "off"> = {
   bet_posted: "inapp",
   game_finished: "inapp",
   group_member: "inapp",
+  friction: "push",   // admin-only integrity alert; always push
 };
 
 function titleFor(type: string | null): string {
@@ -30,6 +31,7 @@ function titleFor(type: string | null): string {
     case "game_added": return "New game";
     case "tee_reminder":
     case "tee_new": return "Tee time";
+    case "friction": return "Data integrity flag";
     default: return "Birdie Num Num";
   }
 }

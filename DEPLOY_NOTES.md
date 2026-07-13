@@ -2716,3 +2716,14 @@ recent-day chips + a calendar date input; two drillable tiles (Active users, Rou
 counts are the length of the engine lists; an inline rounds list color-coded by status (completed /
 in progress / auto-finished / deleted-issue). Tapping a tile or row opens the shared drawer for the
 chosen date. Completes the analytics drill-down feature (stages 1-3). No new SQL to run.
+
+### v1.140.0 — FEATURE: Friction review (integrity sweep agent) — migration 0092 + push route
+Run migration 0092 (creates friction_items, sweep_friction, get_friction_items, get_friction_rounds,
+resolve_friction, and schedules the daily pg_cron job). If 'create extension pg_cron' errors, enable
+pg_cron once in Supabase > Database > Extensions (same as tee reminders). Optionally run
+'select public.sweep_friction(true);' once for an immediate first pass over historical data.
+Client: new AdminFrictionReview section at the top of Analytics (tabs Open/Needs action/Resolved,
+Run-check-now, keeper picker + soft-delete on clear). app/api/push/route.ts now treats type
+'friction' as push and titles it 'Data integrity flag' — admins get one summary push per sweep that
+flags something new. Retired the old 'friction' wording (Power Users badge -> 'restarts'; abandoned
+drill tag shown as 'unfinished') so 'friction' now means only the integrity ledger.

@@ -1261,7 +1261,7 @@ function StatDrawerHost() {
                    <div style={{ fontSize: 14, fontWeight: 600, color: C.cream, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</div>
                    {u.detail ? <div style={{ fontSize: 11, color: C.sage, marginTop: 1 }}>{u.detail}</div> : null}
                  </div>
-                 {tc ? <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 800, borderRadius: 6, padding: "2px 7px", background: tc.bg, color: tc.fg, whiteSpace: "nowrap" }}>{u.tag}</span> : null}
+                 {tc ? <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 800, borderRadius: 6, padding: "2px 7px", background: tc.bg, color: tc.fg, whiteSpace: "nowrap" }}>{u.tag === "friction" ? "unfinished" : u.tag}</span> : null}
                </div>
              );
            })}
@@ -1425,7 +1425,7 @@ function AdminPowerUsers() {
         </div>
       </div>
       <div style={{ color: C.sage, fontSize: 11, marginTop: 2, marginBottom: 8 }}>
-        Top 25 by composite score — tap a column to sort. <b style={{ color: C.gold }}>friction</b> = kept starting rounds that didn't finish; <b style={{ color: C.cream }}>quiet</b> = no activity 30d+.
+        Top 25 by composite score — tap a column to sort. <b style={{ color: C.gold }}>restarts</b> = kept starting rounds that didn't finish; <b style={{ color: C.cream }}>quiet</b> = no activity 30d+.
       </div>
 
       {!rows ? <div style={{ color: C.sage, fontSize: 12 }}>Loading…</div> :
@@ -1454,7 +1454,7 @@ function AdminPowerUsers() {
                     </div>
                     {(r.friction || r.churned) ? (
                       <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
-                        {r.friction ? <span style={{ fontSize: 10, color: C.green, background: C.gold, borderRadius: 4, padding: "0 5px", fontWeight: 700 }}>friction</span> : null}
+                        {r.friction ? <span style={{ fontSize: 10, color: C.green, background: C.gold, borderRadius: 4, padding: "0 5px", fontWeight: 700 }}>restarts</span> : null}
                         {r.churned ? <span style={{ fontSize: 10, color: C.cream, background: C.greenMid, borderRadius: 4, padding: "0 5px", fontWeight: 700 }}>quiet</span> : null}
                       </div>
                     ) : null}
@@ -1887,6 +1887,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
       {showAnalytics && (
         <>
           <Eyebrow>★ ADMIN · ANALYTICS</Eyebrow>
+          <AdminFrictionReview />
           <AdminAnalytics />
           <AdminExtraStats />
           <AdminDailyReport />
@@ -2606,6 +2607,164 @@ function AdminDailyReport() {
   );
 }
 
+// ★ Friction review: the daily integrity sweep's findings, with review + resolve. Reads
+// get_friction_items / get_friction_rounds and writes via resolve_friction (all is_admin-gated).
+const FRICTION_KIND: Record<string, { label: string; bg: string; fg: string }> = {
+  dup_day:     { label: "duplicate",   bg: "#5AA9E6",   fg: "#06251a" },
+  dup_game:    { label: "game dup",    bg: "#C58BE0",   fg: "#06251a" },
+  multi_draft: { label: "multi-draft", bg: C.gold,      fg: C.green },
+  integrity:   { label: "integrity",   bg: C.birdie,    fg: "#ffffff" },
+};
+
+function FrictionItem({ it, onDone }: { it: any; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [rounds, setRounds] = useState<any[] | null>(null);
+  const [keep, setKeep] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const isCluster = it.kind === "dup_day" || it.kind === "dup_game" || it.kind === "multi_draft";
+  const meta = FRICTION_KIND[it.kind] || { label: it.kind, bg: C.greenMid, fg: C.cream };
+  const resolved = it.status === "cleared" || it.status === "auto_resolved" || it.status === "needs_action";
+
+  const expand = async () => {
+    const next = !open; setOpen(next);
+    if (next && !rounds && isCluster) {
+      const { data } = await supabase.rpc("get_friction_rounds", { p_id: it.id });
+      const rows = data || []; setRounds(rows);
+      const rec = rows.find((r: any) => r.recommended); if (rec) setKeep(rec.round_id);
+    }
+  };
+  const resolve = async (status: string, soft: boolean) => {
+    setBusy(true);
+    await supabase.rpc("resolve_friction", { p_id: it.id, p_status: status, p_reason: note || null, p_keep: keep, p_soft_delete: soft });
+    setBusy(false); onDone();
+  };
+  const when = it.first_seen ? new Date(it.first_seen).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "";
+
+  return (
+    <div style={{ background: C.greenLight, borderRadius: 14, padding: 12, marginBottom: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={{ fontWeight: 700, fontSize: 15, color: C.cream }}>{it.subject_name}</span>
+        <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 800, borderRadius: 5, padding: "1px 6px", background: meta.bg, color: meta.fg }}>{meta.label}</span>
+      </div>
+      <div style={{ color: C.cream, fontSize: 12.5, margin: "8px 0 3px", lineHeight: 1.5 }}>{it.detail}</div>
+      {resolved ? (
+        <div style={{ color: C.faint, fontSize: 10, marginTop: 4 }}>
+          {it.status === "auto_resolved" ? "Auto-resolved — the data was cleaned up." : `${it.status === "cleared" ? "Cleared" : "Needs action"}${it.reason ? " · " + it.reason : ""}`}
+          {it.reviewed_at ? " · " + new Date(it.reviewed_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}
+        </div>
+      ) : (
+        <>
+          <div style={{ color: C.faint, fontSize: 10, marginBottom: 8 }}>first seen {when}</div>
+          <button onClick={expand} style={{ background: C.gold, color: C.green, border: "none", borderRadius: 9, padding: "7px 14px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+            {open ? "Close" : "Review \u2192"}
+          </button>
+          {open ? (
+            <div style={{ borderTop: `1px solid ${C.greenMid}`, marginTop: 10, paddingTop: 10 }}>
+              {isCluster ? (
+                <>
+                  <div style={{ color: C.sage, fontSize: 11, marginBottom: 6 }}>{it.kind === "multi_draft" ? "Which draft to keep (if any)?" : "Which round to keep?"}</div>
+                  <div style={{ background: C.green, borderRadius: 9, padding: 6, marginBottom: 8 }}>
+                    {(rounds || []).map((r: any) => {
+                      const sel = keep === r.round_id;
+                      return (
+                        <div key={r.round_id} onClick={() => setKeep(r.round_id)}
+                          style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 6px", cursor: "pointer" }}>
+                          <span style={{ width: 14, height: 14, borderRadius: "50%", flex: "0 0 14px", border: `2px solid ${sel ? C.gold : C.sage}`, background: sel ? C.gold : "transparent" }} />
+                          <span style={{ fontSize: 11.5, color: sel ? C.cream : C.sage, flex: 1 }}>
+                            {r.course || "round"} · {new Date(r.created_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · {r.scored} holes{r.gross != null ? " \u00b7 gross " + r.gross : ""} · {r.status}
+                          </span>
+                          {sel ? <span style={{ fontSize: 10, fontWeight: 800, color: C.gold }}>keep</span> : null}
+                        </div>
+                      );
+                    })}
+                    {it.kind === "multi_draft" ? (
+                      <div onClick={() => setKeep(null)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 6px", cursor: "pointer", borderTop: `1px solid ${C.greenMid}` }}>
+                        <span style={{ width: 14, height: 14, borderRadius: "50%", flex: "0 0 14px", border: `2px solid ${keep === null ? C.gold : C.sage}`, background: keep === null ? C.gold : "transparent" }} />
+                        <span style={{ fontSize: 11.5, color: keep === null ? C.cream : C.sage }}>Keep none — remove all these drafts</span>
+                      </div>
+                    ) : null}
+                  </div>
+                </>
+              ) : null}
+              <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Optional note (e.g. 'v1.135 in-progress inflation bug')"
+                style={{ width: "100%", background: C.green, border: `1px solid ${C.greenMid}`, borderRadius: 8, color: C.cream, fontSize: 13, padding: 8, marginBottom: 8, fontFamily: "inherit" }} />
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {isCluster ? (
+                  <>
+                    <button disabled={busy} onClick={() => resolve("cleared", true)} style={btnPrimary}>Confirm bug — remove{it.kind === "multi_draft" && keep === null ? " all" : " the rest"}</button>
+                    <button disabled={busy} onClick={() => resolve("cleared", false)} style={btnGhost}>Not a problem — keep all</button>
+                  </>
+                ) : (
+                  <button disabled={busy} onClick={() => resolve("cleared", false)} style={btnPrimary}>Acknowledge / fixed</button>
+                )}
+                <button disabled={busy} onClick={() => resolve("needs_action", false)} style={btnGhost}>Needs action</button>
+              </div>
+            </div>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+const btnPrimary: React.CSSProperties = { background: "#5BBE7E", color: "#06251a", border: "none", borderRadius: 9, padding: "8px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer" };
+const btnGhost: React.CSSProperties = { background: "transparent", color: C.cream, border: "1px solid #6f8a7e", borderRadius: 9, padding: "8px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" };
+
+function AdminFrictionReview() {
+  const [tab, setTab] = useState<"open" | "needs_action" | "resolved">("open");
+  const [items, setItems] = useState<any[] | null>(null);
+  const [gone, setGone] = useState(false);
+  const [sweeping, setSweeping] = useState(false);
+  const load = useCallback(() => {
+    supabase.rpc("get_friction_items", { p_status: null }).then(({ data, error }: any) => {
+      if (error) { setGone(true); return; }
+      setItems(data || []);
+    });
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  if (gone) return null; // hidden until 0092 is deployed
+
+  const list = items || [];
+  const groups = {
+    open: list.filter((i) => i.status === "open"),
+    needs_action: list.filter((i) => i.status === "needs_action"),
+    resolved: list.filter((i) => i.status === "cleared" || i.status === "auto_resolved"),
+  };
+  const runNow = async () => { setSweeping(true); try { await supabase.rpc("sweep_friction", { p_force: true }); } catch { /* ignore */ } setSweeping(false); load(); };
+  const cur = groups[tab];
+  const tabBtn = (k: "open" | "needs_action" | "resolved", label: string) => (
+    <button onClick={() => setTab(k)} style={{ flex: 1, border: "none", borderRadius: 999, padding: "7px 6px", fontSize: 11.5, fontWeight: 700, cursor: "pointer", background: tab === k ? C.gold : C.greenLight, color: tab === k ? C.green : C.cream }}>
+      {label} <span style={{ fontFamily: "Georgia, serif", fontWeight: 800 }}>{groups[k].length}</span>
+    </button>
+  );
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", margin: "18px 0 4px" }}>
+        <span style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700, color: C.cream }}>Friction review</span>
+        <button onClick={runNow} disabled={sweeping} style={{ marginLeft: "auto", background: C.greenLight, color: C.sage, border: `1px solid ${C.greenMid}`, borderRadius: 8, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+          {sweeping ? "Checking\u2026" : "Run check now"}
+        </button>
+      </div>
+      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 10, lineHeight: 1.5 }}>
+        States the app shouldn’t be able to produce. Swept daily; a flag is a to-do, not a mark against a player. Cleared items stay cleared; fixed ones auto-resolve.
+      </div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+        {tabBtn("open", "Open")}{tabBtn("needs_action", "Needs action")}{tabBtn("resolved", "Resolved")}
+      </div>
+      {items === null ? (
+        <div style={{ color: C.faint, fontSize: 12, padding: "16px 4px" }}>Loading…</div>
+      ) : cur.length === 0 ? (
+        <div style={{ color: C.faint, fontSize: 13, textAlign: "center", padding: "22px 10px" }}>
+          {tab === "open" ? "Nothing to review \u2014 the data looks clean." : tab === "needs_action" ? "No items flagged for follow-up." : "No resolved items yet."}
+        </div>
+      ) : (
+        cur.map((it) => <FrictionItem key={it.id} it={it} onDone={load} />)
+      )}
+    </div>
+  );
+}
+
 export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onGoto, onEnterGroup, onExitGroup, onGroupsChanged }: {
   user: any; profile: any; activeGroupName?: string | null; activeGroupRole?: string | null;
   onGoto: (tab: string) => void;
@@ -2646,7 +2805,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
   if (view) {
     let title = ""; let panel: React.ReactNode = null;
     switch (view) {
-      case "analytics": title = "Analytics"; panel = <><AdminAnalytics /><AdminExtraStats /><AdminDailyReport /><AdminEngagement /><AdminPowerUsers /></>; break;
+      case "analytics": title = "Analytics"; panel = <><AdminFrictionReview /><AdminAnalytics /><AdminExtraStats /><AdminDailyReport /><AdminEngagement /><AdminPowerUsers /></>; break;
       case "operations": title = "Operations"; panel = <OpsMetrics />; break;
       case "diagnostics": title = "Diagnostics"; panel = <RoundSaveDiag />; break;
       case "activity": title = "Activity log"; panel = <ActivityTab />; break;

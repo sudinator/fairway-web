@@ -301,3 +301,10 @@ Product model: any member creates a tee time; the creator organizes it; a captai
 - `admin_stat_users(p_stat text, p_arg text default null, p_date date default null)` (0090, is_admin) — drill-down engine: returns (name, detail, tag) for the users behind a stat. Keys: users_total, users_new_30d, active_dau/wau/mau, lapsed, never_joined_group, rounds_done, rounds_started, abandoned/unfinished, rounds_day(date), active_day(date), installed, browser, notif_on, notif_off, failing_subs, mute(arg=type), share_on, share_off, guests, avatars_set, ai_summaries.
 - `mark_active(p_standalone boolean default null)` (0089) — open-logger now also records install mode; old no-arg overload dropped.
 - `get_admin_extra_stats()` (0091, is_admin) — counts for stage-2 tiles: installed/browser/platform_unknown, notif_on/off, failing_subs, share_on/off, guests + guest_hosts, and mutes {type: count} (push_prefs value 'off'). Drill lists come from admin_stat_users.
+
+## Friction ledger (0092)
+- `friction_items` (id, signature UNIQUE, kind [dup_day|dup_game|multi_draft|integrity], subject_user, round_ids uuid[], detail, status [open|cleared|needs_action|auto_resolved], reason, reviewed_by, reviewed_at, first_seen, last_seen). RLS on, no policy — definer-only.
+- `sweep_friction(p_force bool)` — daily pg_cron agent (08:17 UTC) + admin force. Detects the four anomaly classes, upserts by signature, auto-resolves items no longer detected, and inserts ONE 'friction' notification per run with new items (push webhook delivers to admins). Throttled 20h via system_jobs('friction_sweep').
+- `get_friction_items(p_status)` / `get_friction_rounds(p_id)` / `resolve_friction(p_id,p_status,p_reason,p_keep,p_soft_delete)` — is_admin. resolve soft-deletes all cluster rounds except p_keep when p_soft_delete.
+- Detection: dup_day = same user+course+date with identical gross OR a stray in-progress partial beside a completed round; dup_game = >1 round per (user,game); multi_draft = >=2 in-progress drafts per user; integrity = final round where Σ hole strokes <> gross (>=18 holes).
+- Push: app/api/push DEFAULT_DELIVERY.friction='push', titleFor 'Data integrity flag'.
