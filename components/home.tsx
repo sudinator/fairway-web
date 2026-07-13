@@ -18,6 +18,7 @@ import { syncPlayerCard } from "@/lib/card-sync";
 import { RoundSetup } from "@/components/round-setup";
 import { RoundEditor } from "@/components/round-editor";
 import { RoundDetail } from "@/components/round-detail";
+import { diagEnabled } from "@/lib/debuglog";
 import { Dashboard } from "@/components/dashboard";
 import { RoundsList } from "@/components/rounds-list";
 import { GroupsPanel } from "@/components/groups";
@@ -29,6 +30,104 @@ import type { AppGroup } from "@/lib/groups";
 const supabase = createClient();
 
 type Tab = "dashboard" | "rounds" | "games" | "courses" | "players" | "groups" | "admin" | "help" | "profile" | "money" | "teetimes";
+
+// Viewport diagnostic overlay — measures the real device numbers so we can locate the
+// gap below the nav precisely instead of guessing. Self-gates on diagEnabled(); zero cost
+// for normal users. Toggle via Admin -> Diagnostics.
+function ViewportDiag() {
+  const [on, setOn] = useState(false);
+  const [m, setM] = useState<Record<string, number | string> | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const probe = (cssHeight: string): number => {
+    try {
+      const d = document.createElement("div");
+      d.style.cssText = `position:absolute;top:0;left:0;width:0;visibility:hidden;height:${cssHeight};`;
+      document.body.appendChild(d);
+      const h = d.getBoundingClientRect().height;
+      document.body.removeChild(d);
+      return Math.round(h * 100) / 100;
+    } catch { return -1; }
+  };
+
+  const measure = () => {
+    const vv = (window as any).visualViewport;
+    const shell = document.querySelector('[data-diag="shell"]') as HTMLElement | null;
+    const nav = document.querySelector('[data-diag="nav"]') as HTMLElement | null;
+    const sr = shell?.getBoundingClientRect();
+    const nr = nav?.getBoundingClientRect();
+    const inner = window.innerHeight;
+    const navBottom = nr ? Math.round(nr.bottom) : -1;
+    setM({
+      innerHeight: inner,
+      docClientH: document.documentElement.clientHeight,
+      visualVP_h: vv ? Math.round(vv.height) : -1,
+      dvh: probe("100dvh"),
+      svh: probe("100svh"),
+      lvh: probe("100lvh"),
+      safeTop: probe("env(safe-area-inset-top)"),
+      safeBottom: probe("env(safe-area-inset-bottom)"),
+      bodyH: Math.round(document.body.getBoundingClientRect().height),
+      shellH: sr ? Math.round(sr.height) : -1,
+      shellBottom: sr ? Math.round(sr.bottom) : -1,
+      navH: nr ? Math.round(nr.height) : -1,
+      navTop: nr ? Math.round(nr.top) : -1,
+      navBottom,
+      GAP_below_nav: navBottom >= 0 ? inner - navBottom : -1,
+      shellBottom_vs_inner: sr ? inner - Math.round(sr.bottom) : -1,
+    });
+  };
+
+  useEffect(() => {
+    setOn(diagEnabled());
+    if (!diagEnabled()) return;
+    const run = () => requestAnimationFrame(measure);
+    run();
+    const t = setTimeout(run, 400); // after layout settles
+    window.addEventListener("resize", run);
+    window.addEventListener("orientationchange", run);
+    const vv = (window as any).visualViewport;
+    vv?.addEventListener("resize", run);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("resize", run);
+      window.removeEventListener("orientationchange", run);
+      vv?.removeEventListener("resize", run);
+    };
+  }, []);
+
+  if (!on || !m) return null;
+
+  const copy = () => {
+    try { navigator.clipboard.writeText(JSON.stringify(m, null, 2)); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* ignore */ }
+  };
+
+  return (
+    <div style={{
+      position: "fixed", top: "calc(env(safe-area-inset-top) + 6px)", left: 6, right: 6, zIndex: 9999,
+      background: "rgba(0,0,0,0.86)", color: "#fff", borderRadius: 10, padding: "8px 10px",
+      fontFamily: "ui-monospace, Menlo, monospace", fontSize: 11, lineHeight: 1.5,
+      boxShadow: "0 4px 18px rgba(0,0,0,0.5)",
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+        <b style={{ fontSize: 12, color: "#C9A227" }}>VIEWPORT DIAG</b>
+        <span style={{ display: "flex", gap: 6 }}>
+          <button onClick={measure} style={{ fontSize: 11, background: "#16503D", color: "#fff", border: "none", borderRadius: 6, padding: "3px 8px", fontWeight: 700 }}>Remeasure</button>
+          <button onClick={copy} style={{ fontSize: 11, background: "#C9A227", color: "#0E3B2E", border: "none", borderRadius: 6, padding: "3px 8px", fontWeight: 700 }}>{copied ? "Copied" : "Copy"}</button>
+        </span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
+        {Object.entries(m).map(([k, v]) => (
+          <div key={k} style={{ display: "flex", justifyContent: "space-between",
+            color: k === "GAP_below_nav" ? (Number(v) > 1 ? "#F08" : "#6f6") : "#ddd",
+            fontWeight: k.startsWith("GAP") || k.startsWith("shellBottom_vs") ? 800 : 400 }}>
+            <span>{k}</span><span>{String(v)}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function Home({ session }: { session: any }) {
   const [rounds, setRounds] = useState<Round[]>([]);
@@ -499,8 +598,9 @@ export function Home({ session }: { session: any }) {
   }
 
   return (
-    <div style={{ height: "calc(100dvh - env(safe-area-inset-top))", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div data-diag="shell" style={{ height: "calc(100dvh - env(safe-area-inset-top))", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <Toaster />
+      <ViewportDiag />
       <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", WebkitOverflowScrolling: "touch" }}>
       <InstallHint />
       <PullToRefresh scrollEl={scrollRef} onRefresh={async () => { await Promise.all([loadProfile(), loadGroups(), loadRounds()]); }}>
@@ -668,7 +768,7 @@ export function Home({ session }: { session: any }) {
       </div>
       {/* Bottom navigation bar — a normal flex child pinned at the bottom by layout (NOT
           position:fixed, which drifts in iOS home-screen PWAs). */}
-      <nav style={{
+      <nav data-diag="nav" style={{
         flexShrink: 0, zIndex: 50,
         background: C.green, borderTop: `1px solid ${C.greenMid}`,
         display: "flex", justifyContent: "space-around", alignItems: "stretch",

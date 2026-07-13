@@ -2644,3 +2644,10 @@ elastic-bounced, revealing the body background below the icons as a phantom empt
 viewport at the document level in app/layout.tsx — html { height:100%; overflow:hidden }, body
 { position:fixed; inset:0; overflow:hidden; overscroll-behavior:none }. Only the inner container
 scrolls now; pull-to-refresh and the More sheet are unchanged.
+
+### v1.136.3 — DIAGNOSTIC: viewport readout for the nav gap (no migration, no layout change)
+The document bounce is fixed (1.136.2) but a persistent blank row remains below the nav. Rather than
+guess at dvh/safe-area again, added a ViewportDiag overlay (home.tsx, self-gates on diagEnabled, toggle
+in Admin -> Diagnostics) that measures innerHeight, docClientH, visualViewport, 100dvh/svh/lvh, both
+safe-area insets, and the real rects of the shell + nav, then reports GAP_below_nav = innerHeight -
+nav.bottom. Copy button dumps JSON. Once we have the numbers the fix is deterministic.
