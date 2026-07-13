@@ -2700,3 +2700,19 @@ Also: install-vs-browser capture is LIVE (0089) — mark_active(p_standalone) re
 open mode into profiles.last_standalone; home.tsx now passes display-mode. Forward-only, no backfill.
 Run 0089 then 0090 (full SQL posted in chat).
 STAGE 2 (next): new summary tiles. STAGE 3: Daily report.
+
+### v1.138.0 — FEATURE: Analytics stage 2 — new drillable tiles (migration 0091; 0090 corrected)
+New AdminExtraStats section under Analytics: Platform (installed vs browser), Notifications (on/off,
+failing/stale devices, most-muted types), Profile sharing (on/off), Guests — each tile drills to the
+named users via the shared engine. Counts from get_admin_extra_stats (0091).
+CORRECTION to 0090 (re-run it — create-or-replace, safe): push_prefs values are 'push'|'inapp'|'off',
+not true/false, so the mute drill now matches value='off', and notifications on/off is based purely on
+having an active push_subscription (no vestigial _master). Run order: 0089, 0090 (corrected), 0091.
+STAGE 3 next: Daily report (date-driven active users + rounds; engine branches already present).
+
+### v1.139.0 — FEATURE: Analytics stage 3 — Daily report (NO migration)
+Client-only; reuses engine branches active_day / rounds_day from 0090. New AdminDailyReport section:
+recent-day chips + a calendar date input; two drillable tiles (Active users, Rounds played) whose
+counts are the length of the engine lists; an inline rounds list color-coded by status (completed /
+in progress / auto-finished / deleted-issue). Tapping a tile or row opens the shared drawer for the
+chosen date. Completes the analytics drill-down feature (stages 1-3). No new SQL to run.

@@ -1888,6 +1888,8 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
         <>
           <Eyebrow>★ ADMIN · ANALYTICS</Eyebrow>
           <AdminAnalytics />
+          <AdminExtraStats />
+          <AdminDailyReport />
           <AdminEngagement />
           <AdminPowerUsers />
           <OpsMetrics />
@@ -2438,6 +2440,172 @@ function SystemTools({ user }: { user: any }) {
 // Consolidated admin hub. Two tiers: Club admin (any admin of the active club, scoped to
 // that club) and System / Super admin (master admin only). Reuses every existing panel;
 // club cards jump to the shared tabs, system cards render the panel inline.
+// ★ Stage-2 analytics: new drillable summary tiles (platform, notifications, sharing, guests).
+// Counts from get_admin_extra_stats (0091); every tile drills via the shared engine (0090).
+function AdminExtraStats() {
+  const [x, setX] = useState<any | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.rpc("get_admin_extra_stats").then(({ data, error }: any) => {
+      if (error) setErr(error.message); else setX(data);
+    });
+  }, []);
+  if (err || !x) return null; // supplementary; stays hidden until 0091 is deployed
+
+  const tile = (n: React.ReactNode, l: string, stat: string, cap?: string, arg?: string) => (
+    <button onClick={() => openStatDrill({ stat, title: l, cap, arg })}
+      style={{ background: C.greenLight, border: "none", borderRadius: 12, padding: "11px 12px", flex: 1, minWidth: 92, textAlign: "left", color: C.cream, cursor: "pointer", position: "relative" }}>
+      <span style={{ position: "absolute", right: 8, top: 8, color: C.gold, fontSize: 10, fontWeight: 800 }}>who ›</span>
+      <div style={{ color: C.cream, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{n}</div>
+      <div style={{ color: C.sage, fontSize: 11 }}>{l}</div>
+    </button>
+  );
+  const hdr = (t: string, c: string) => (
+    <div style={{ margin: "18px 0 8px" }}>
+      <span style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700, color: C.cream }}>{t}</span>
+      <span style={{ color: C.sage, fontSize: 11 }}> · {c}</span>
+    </div>
+  );
+
+  const mutes: Record<string, number> = x.mutes || {};
+  const mutedTypes = NOTIF_TYPES.map((t) => ({ ...t, n: mutes[t.key] || 0 })).filter((t) => t.n > 0).sort((a, b) => b.n - a.n);
+
+  return (
+    <div>
+      {hdr("Platform", "how people open BNN")}
+      <div style={{ display: "flex", gap: 10 }}>
+        {tile(x.installed ?? 0, "Installed app", "installed", "Latest open = home-screen app")}
+        {tile(x.browser ?? 0, "Browser only", "browser", "Latest open = browser tab")}
+      </div>
+      <div style={{ color: C.faint, fontSize: 10, marginTop: 6 }}>
+        {x.platform_unknown ? `${x.platform_unknown} not yet recorded \u00b7 ` : ""}counts forward from launch — no backfill.
+      </div>
+
+      {hdr("Notifications", "push reach & health")}
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {tile(x.notif_on ?? 0, "Notifications on", "notif_on", "Has an active push device")}
+        {tile(x.notif_off ?? 0, "Off / none", "notif_off", "No active push device")}
+      </div>
+      <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+        {tile(x.failing_subs ?? 0, "Failing / stale devices", "failing_subs", "Push not being delivered")}
+      </div>
+      {mutedTypes.length ? (
+        <>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 12, marginBottom: 2 }}>Most-muted types (tap for who)</div>
+          <div style={{ background: C.greenLight, borderRadius: 12, padding: 6 }}>
+            {mutedTypes.map((t, i) => (
+              <div key={t.key} onClick={() => openStatDrill({ stat: "mute", arg: t.key, title: t.label, cap: "Users who set this to Off" })}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 10px", borderTop: i ? `1px solid ${C.greenMid}` : "none", cursor: "pointer" }}>
+                <span style={{ fontSize: 13, color: C.cream }}>{t.label}</span>
+                <span style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 15 }}>{t.n} ›</span>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {hdr("Profile sharing", "peer-visible player card")}
+      <div style={{ display: "flex", gap: 10 }}>
+        {tile(x.share_on ?? 0, "Sharing on", "share_on", "Card visible to peers")}
+        {tile(x.share_off ?? 0, "Turned off", "share_off", "Opted out of the card")}
+      </div>
+
+      {hdr("Guests", "non-registered players")}
+      <div style={{ display: "flex", gap: 10 }}>
+        {tile(x.guests ?? 0, x.guest_hosts ? `Guest rounds \u00b7 ${x.guest_hosts} hosts` : "Guest rounds", "guests", "Hosts who brought guests")}
+      </div>
+    </div>
+  );
+}
+
+// ★ Stage-3 analytics: Daily report. Pick a day; see active users + that day's rounds, both
+// drillable. Reuses engine branches active_day / rounds_day (0090) — no new migration. Counts
+// are just the length of those lists; the inline list is the rounds_day rows color-coded by status.
+function AdminDailyReport() {
+  const [days, setDays] = useState<{ label: string; iso: string }[]>([]);
+  const [sel, setSel] = useState<string>("");
+  const [active, setActive] = useState<any[] | null>(null);
+  const [rounds, setRounds] = useState<any[] | null>(null);
+  const [gone, setGone] = useState(false);
+
+  useEffect(() => {
+    const arr: { label: string; iso: string }[] = [];
+    for (let i = 0; i < 7; i++) {
+      const dt = new Date(); dt.setDate(dt.getDate() - i);
+      const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+      arr.push({ iso, label: i === 0 ? "Today" : i === 1 ? "Yesterday" : dt.toLocaleDateString(undefined, { month: "short", day: "numeric" }) });
+    }
+    setDays(arr); setSel(arr[0].iso);
+  }, []);
+
+  useEffect(() => {
+    if (!sel) return;
+    setActive(null); setRounds(null);
+    supabase.rpc("admin_stat_users", { p_stat: "active_day", p_arg: null, p_date: sel }).then(({ data, error }: any) => { if (error) setGone(true); else setActive(data || []); });
+    supabase.rpc("admin_stat_users", { p_stat: "rounds_day", p_arg: null, p_date: sel }).then(({ data, error }: any) => { if (!error) setRounds(data || []); });
+  }, [sel]);
+
+  if (gone) return null;
+  const dotColor = (tag: string) =>
+    tag === "completed" ? "#5BBE7E" : tag === "in progress" ? C.gold : tag === "auto-finished" ? "#5AA9E6" : tag === "deleted" ? C.birdie : C.sage;
+  const selLabel = days.find((d) => d.iso === sel)?.label || sel;
+  const dot = (bg: string) => <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: bg, marginRight: 4 }} />;
+
+  return (
+    <div>
+      <div style={{ margin: "18px 0 8px" }}>
+        <span style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700, color: C.cream }}>Daily report</span>
+        <span style={{ color: C.sage, fontSize: 11 }}> · pick a day</span>
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        {days.map((d) => (
+          <button key={d.iso} onClick={() => setSel(d.iso)}
+            style={{ fontSize: 11, fontWeight: 700, borderRadius: 999, padding: "5px 11px", border: "none", cursor: "pointer",
+              background: sel === d.iso ? C.gold : C.greenLight, color: sel === d.iso ? C.green : C.cream }}>{d.label}</button>
+        ))}
+        <input type="date" value={sel} max={days[0]?.iso} onChange={(e) => setSel(e.target.value)}
+          style={{ fontSize: 11, borderRadius: 8, border: `1px solid ${C.greenMid}`, background: C.green, color: C.cream, padding: "4px 8px" }} />
+      </div>
+
+      <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+        <button onClick={() => openStatDrill({ stat: "active_day", title: `Active · ${selLabel}`, cap: "Users who opened BNN that day", date: sel })}
+          style={{ flex: 1, background: C.greenLight, border: "none", borderRadius: 12, padding: "11px 12px", textAlign: "left", cursor: "pointer", position: "relative" }}>
+          <span style={{ position: "absolute", right: 8, top: 8, color: C.gold, fontSize: 10, fontWeight: 800 }}>who ›</span>
+          <div style={{ color: C.cream, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{active ? active.length : "…"}</div>
+          <div style={{ color: C.sage, fontSize: 11 }}>Active users</div>
+        </button>
+        <button onClick={() => openStatDrill({ stat: "rounds_day", title: `Rounds · ${selLabel}`, cap: "Rounds played that day", date: sel })}
+          style={{ flex: 1, background: C.greenLight, border: "none", borderRadius: 12, padding: "11px 12px", textAlign: "left", cursor: "pointer", position: "relative" }}>
+          <span style={{ position: "absolute", right: 8, top: 8, color: C.gold, fontSize: 10, fontWeight: 800 }}>list ›</span>
+          <div style={{ color: C.cream, fontWeight: 800, fontSize: 22, fontFamily: "Georgia, serif" }}>{rounds ? rounds.length : "…"}</div>
+          <div style={{ color: C.sage, fontSize: 11 }}>Rounds played</div>
+        </button>
+      </div>
+
+      {rounds && rounds.length > 0 ? (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: 6, marginTop: 10 }}>
+          {rounds.map((r: any, i: number) => (
+            <div key={i} onClick={() => openStatDrill({ stat: "rounds_day", title: `Rounds · ${selLabel}`, cap: "Rounds played that day", date: sel })}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 8px", borderTop: i ? `1px solid ${C.greenMid}` : "none", cursor: "pointer" }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", flex: "0 0 8px", background: dotColor(r.tag) }} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, color: C.cream, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</div>
+                <div style={{ fontSize: 11, color: C.sage }}>{r.detail} · {r.tag}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : rounds && rounds.length === 0 ? (
+        <div style={{ color: C.faint, fontSize: 12, marginTop: 10 }}>No rounds played on {selLabel}.</div>
+      ) : null}
+
+      <div style={{ color: C.faint, fontSize: 10, marginTop: 8, lineHeight: 1.7 }}>
+        {dot("#5BBE7E")}completed &nbsp; {dot(C.gold)}in progress &nbsp; {dot("#5AA9E6")}auto-finished &nbsp; {dot(C.birdie)}deleted / issue
+      </div>
+    </div>
+  );
+}
+
 export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onGoto, onEnterGroup, onExitGroup, onGroupsChanged }: {
   user: any; profile: any; activeGroupName?: string | null; activeGroupRole?: string | null;
   onGoto: (tab: string) => void;
@@ -2478,7 +2646,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
   if (view) {
     let title = ""; let panel: React.ReactNode = null;
     switch (view) {
-      case "analytics": title = "Analytics"; panel = <><AdminAnalytics /><AdminEngagement /><AdminPowerUsers /></>; break;
+      case "analytics": title = "Analytics"; panel = <><AdminAnalytics /><AdminExtraStats /><AdminDailyReport /><AdminEngagement /><AdminPowerUsers /></>; break;
       case "operations": title = "Operations"; panel = <OpsMetrics />; break;
       case "diagnostics": title = "Diagnostics"; panel = <RoundSaveDiag />; break;
       case "activity": title = "Activity log"; panel = <ActivityTab />; break;
