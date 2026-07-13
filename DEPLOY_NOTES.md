@@ -2802,3 +2802,16 @@ to the admin home and clears the origin. The bar renders ONLY when arrived from 
 AND on players/groups AND not mid-flow); opening those pages directly from the More sheet or bottom
 nav shows no bar, and any bottom-nav / More navigation clears the origin. Shell-only change in
 components/home.tsx (returnTab state + tabTitle helper + bar render + clears).
+
+### v1.144.0 — FEATURE: Desktop Organizer console (Phase 1: Flights) — no migration
+New authenticated, desktop-only route /organize/<gameId> (components/organizer.tsx). Shares the app
+Supabase session, so you can create a game on the phone and organize it on a laptop. Wide-viewport
+gated (≥900px; narrow shows an 'open on a larger screen' note). Layout: top game-context bar, step
+tabs (Details · Field · Flights · Matchups), a persistent left field rail, and a canvas. PHASE 1 ships
+the Flights step fully working: enable flights / pick 2-3-4 bands / rebalance evenly / turn off, and
+CLICK-TO-ASSIGN (click a chip's A/B/C to move a player between bands) with optimistic writes to
+game_players.flight and games.flight_mode/flights. Missing indexes are filled inline from the field
+rail (writes game_players + the member's profile) and block enabling until resolved — same rule as the
+phone. Details = read-only summary; Field & Matchups = labeled next-phase placeholders. Reuses
+lib/flights + the 0093 columns; the phone flow is unchanged. Entry: a desktop-only link in the game
+room (organizer only, ≥900px) to /organize/<id>. NEXT: Matchups step, then full create-in-console + drag.

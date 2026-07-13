@@ -1587,6 +1587,15 @@ function GameRoom({
     () => initialTab || loadActiveGame()?.tab || "play",
   );
   useEffect(() => { saveActiveGame(gameId, roomTab); }, [gameId, roomTab]);
+  // Desktop-only affordance: surface the organizer-console link on wide viewports.
+  const [orgWide, setOrgWide] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 900px)");
+    const on = () => setOrgWide(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
   // Phase 2: the Betting panel signals when posted winnings no longer match the
   // current scores. Show a room-level banner (visible right after an edit) and
   // notify the organizer once per session.
@@ -3126,6 +3135,11 @@ function GameRoom({
           </button>
         )}
       </div>
+      {isOrganizer && orgWide && (
+        <a href={`/organize/${game.id}`} style={{ display: "block", marginTop: 10, textAlign: "center", color: C.gold, fontSize: 13, fontWeight: 700, textDecoration: "none", border: `1px solid ${C.gold}`, borderRadius: 9, padding: "9px 0" }}>
+          Set up flights &amp; matchups in the desktop organizer →
+        </a>
+      )}
 
       {roomTab === "play" && cleanSweepDone && (game as any)?.group_id === TGC_GROUP_ID && (game.game_type === "stableford" || game.game_type === "stroke") && (
         <SweepAchievedBanner name={cleanSweepDone.name} />
