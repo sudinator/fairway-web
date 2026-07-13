@@ -295,3 +295,5 @@ Product model: any member creates a tee time; the creator organizes it; a captai
 - `get_ops_metrics()` (is_admin) — jsonb: profile-nudge funnel (shown/clicked 7d & 28d), profiles_incomplete,
   stale_ready / stale_partial, auto_finished_7d.
 - New activity_log actions: `profile_nudge_shown`, `profile_nudge_clicked` (logged client-side; accumulate forward).
+
+- `get_power_users(p_days int default null)` (0088, is_admin): top 25 users by composite score (completed*4 + games*2 + active_days*1 + opens*0.1); returns each metric individually (client sorts) plus completion_pct, unfinished/deleted rounds, days_since_active, churned (30d+), friction (>=3 abandoned/deleted & completion<60%). Window param: null=all-time, 90=last 90d. Real rounds only; test/deactivated excluded.

@@ -2342,3 +2342,196 @@ entered yardages. Option A applied: `normalizeTeesForDiff` now carries `yardages
 Result: yardage edits follow the SAME pattern as par/stroke-index — member edit creates the immediate
 group override + a pending global change request with the yardage diff shown to the approving admin;
 yardage-only edits are detected and persisted. Added-tee lines also show the tee's total yardage.
+
+### v1.135.2 — FIX: Admin -> Users round count (migration 0085)
+`admin_list_users.rounds_count` counted ALL rows in `rounds` (incl. soft-deleted + in-progress), so a
+user with phantom duplicates showed an inflated count (Nihar: 38) that disagreed with the player card
+(3). Now filtered to real rounds (deleted_at is null, status <> in_progress) to match the card and the
+rest of the app. Pure function fix, no data change. Run 0085:
+```sql
+-- 0085_admin_list_users_real_rounds.sql
+-- Fix: admin_list_users.rounds_count counted ALL rows in `rounds` for a user, including
+-- soft-deleted (deleted_at not null) and in-progress rounds. A user with phantom/duplicate
+-- in-progress rows or soft-deleted rounds therefore showed an inflated count in Admin ->
+-- Users (e.g. 38) that disagreed with the player card's real-round count (e.g. 3).
+-- Align the count with the app's standard real-round definition used everywhere else:
+-- not deleted, and not in-progress. Pure function fix; no data changes. Safe to re-run.
+create or replace function public.admin_list_users()
+returns table (
+  id uuid, display_name text, email text, is_admin boolean, banned boolean,
+  handicap_index numeric, group_count int, rounds_count int
+)
+language sql security definer set search_path = public as $$
+  select p.id, p.display_name, p.email, p.is_admin, coalesce(p.banned, false),
+         p.handicap_index,
+         (select count(*) from group_members gm where gm.user_id = p.id and gm.status = 'active')::int,
+         (select count(*) from rounds r
+            where r.user_id = p.id
+              and r.deleted_at is null
+              and coalesce(r.status, 'final') <> 'in_progress')::int
+  from profiles p
+  where public.is_admin()
+  order by p.display_name nulls last;
+$$;
+grant execute on function public.admin_list_users() to authenticated;
+```
+KNOWN SIBLING (flagged, not yet fixed): the GROUP-level rounds_count in admin group oversight
+(migrations 0027/0028/0030, `count(*) from rounds where group_id=g.id`) has the same missing filter,
+so per-club round totals in Clubs oversight are similarly inflated. Fix pending owner go-ahead.
+
+### v1.135.3 — FIX: Clubs oversight per-club round count (migration 0086)
+Sibling of 0085: admin_group_overview.rounds_count counted soft-deleted + in-progress rounds, inflating
+per-club totals; the last_activity round lookup did too. Both now filtered to real rounds. Run 0086:
+```sql
+-- 0086_admin_group_overview_real_rounds.sql
+-- Fix (sibling of 0085): admin_group_overview.rounds_count counted ALL rows in `rounds`
+-- for a club, including soft-deleted + in-progress, inflating per-club round totals in
+-- Clubs oversight. Also filter the last_activity round lookup so a deleted/in-progress
+-- round doesn't register as club activity. Real-round definition matches the rest of the
+-- app: deleted_at is null AND status <> 'in_progress'. Pure function fix; no data change.
+create or replace function public.admin_group_overview()
+returns table (
+  group_id uuid, name text, status text,
+  admin_names text, member_count int, rounds_count int, games_count int,
+  last_activity timestamptz, my_support boolean, is_default boolean
+)
+language sql security definer set search_path = public
+as $$
+  select
+    g.id, g.name, coalesce(g.status, 'active') as status,
+    (select string_agg(coalesce(p.display_name, gm2.email, 'admin'), ', ')
+       from group_members gm2 left join profiles p on p.id = gm2.user_id
+       where gm2.group_id = g.id and gm2.role = 'admin' and gm2.status = 'active'
+         and gm2.is_support = false) as admin_names,
+    (select count(*) from group_members gm where gm.group_id = g.id and gm.status = 'active' and gm.is_support = false)::int as member_count,
+    (select count(*) from rounds r
+       where r.group_id = g.id and r.deleted_at is null
+         and coalesce(r.status, 'final') <> 'in_progress')::int as rounds_count,
+    (select count(*) from games ga where ga.group_id = g.id)::int as games_count,
+    greatest(
+      coalesce((select max(r.played_at) from rounds r
+                  where r.group_id = g.id and r.deleted_at is null
+                    and coalesce(r.status, 'final') <> 'in_progress'), 'epoch'::timestamptz),
+      coalesce((select max(ga.created_at) from games ga where ga.group_id = g.id), 'epoch'::timestamptz),
+      coalesce(g.created_at, 'epoch'::timestamptz)
+    ) as last_activity,
+    exists (select 1 from group_members gm3
+            where gm3.group_id = g.id and gm3.user_id = auth.uid() and gm3.is_support = true) as my_support,
+    coalesce(g.is_default, false) as is_default
+  from groups g
+  where public.is_admin()
+  order by last_activity desc;
+$$;
+grant execute on function public.admin_group_overview() to authenticated;
+```
+
+### v1.135.4 — engagement analytics count real rounds only (migration 0087)
+Audit of round-counting after 0085/0086: get_admin_analytics (0068) was already correct (final,
+non-deleted, test excluded). get_admin_engagement (0078) filtered deleted_at but NOT in-progress, so
+unfinished rounds (which carry played_at) inflated WAU/MAU, weekend reach/share, new-vs-returning, and
+the game/solo split. 0087 recreates it excluding in-progress everywhere. Full SQL posted in chat / here.
+OBSERVATION (not changed): get_admin_engagement does not exclude test accounts (get_admin_analytics
+does). Left as-is pending owner decision — flag only.
+
+### v1.136.0 — FEATURE: Power Users analytics (migration 0088)
+New super-admin Analytics section: top 25 users by composite engagement score, with every metric
+shown individually and tap-to-sort on any column, an All-time / 90-day window toggle, and friction
+(kept starting rounds that didn't finish) + quiet (no activity 30d+) badges — directly answering
+'did engaged users try, hit breakage, and give up?'. Reuses daily_active/rounds/game_players; no new
+tracking tables. New RPC get_power_users(p_days); component AdminPowerUsers in manage.tsx, rendered
+under the Analytics view. Run 0088:
+```sql
+-- 0088_power_users.sql
+-- Super-admin analytics: top users by a composite engagement score, with every underlying
+-- metric exposed individually (client re-sorts) plus friction/churn signals that answer
+-- "did engaged users try, hit breakage, and give up?".
+--
+-- Composite score = completed*4 + games*2 + active_days*1 + opens*0.1
+--   completed rounds are the real unit of value; opens are noisy so weighted low.
+-- Friction flag: >=3 abandoned/deleted attempts AND completion rate < 60% (kept starting
+--   rounds that never finalized — the phantom-round-bug signature).
+-- Churn flag: no activity in > 30 days (or never active).
+--
+-- All metrics honor the window param: p_days null = all-time; e.g. 90 = last 90 days.
+-- Real-round definition matches the rest of the app: deleted_at is null AND status<>'in_progress'.
+-- Test + deactivated accounts excluded. is_admin() gate returns zero rows to non-admins.
+create or replace function public.get_power_users(p_days int default null)
+returns table (
+  user_id uuid,
+  display_name text,
+  completed_rounds int,
+  unfinished_rounds int,
+  deleted_rounds int,
+  games_played int,
+  active_days int,
+  total_opens int,
+  completion_pct int,
+  last_active date,
+  days_since_active int,
+  churned boolean,
+  friction boolean,
+  score numeric
+)
+language sql security definer set search_path = public as $$
+  with base as (
+    select p.id, p.display_name, p.last_active
+    from profiles p
+    where public.is_admin()
+      and coalesce(p.is_test, false) = false
+      and coalesce(p.deactivated, false) = false
+  ),
+  rc as (
+    select r.user_id,
+      count(*) filter (where r.deleted_at is null and coalesce(r.status,'final') <> 'in_progress'
+                        and (p_days is null or r.played_at > current_date - p_days))                         as completed,
+      count(*) filter (where r.deleted_at is null and coalesce(r.status,'final') = 'in_progress'
+                        and (p_days is null or r.created_at > now() - make_interval(days => p_days)))         as unfinished,
+      count(*) filter (where r.deleted_at is not null
+                        and (p_days is null or r.created_at > now() - make_interval(days => p_days)))         as deleted
+    from rounds r
+    group by r.user_id
+  ),
+  gp as (
+    select gpl.user_id, count(*) as games
+    from game_players gpl
+    join games g on g.id = gpl.game_id
+    where (p_days is null or g.created_at > now() - make_interval(days => p_days))
+    group by gpl.user_id
+  ),
+  da as (
+    select user_id, count(*) as active_days, coalesce(sum(opens), 0) as opens
+    from daily_active
+    where (p_days is null or day > current_date - p_days)
+    group by user_id
+  )
+  select
+    b.id,
+    b.display_name,
+    coalesce(rc.completed, 0)::int,
+    coalesce(rc.unfinished, 0)::int,
+    coalesce(rc.deleted, 0)::int,
+    coalesce(gp.games, 0)::int,
+    coalesce(da.active_days, 0)::int,
+    coalesce(da.opens, 0)::int,
+    case when coalesce(rc.completed,0) + coalesce(rc.unfinished,0) + coalesce(rc.deleted,0) > 0
+         then round(100.0 * coalesce(rc.completed,0)
+                    / (coalesce(rc.completed,0) + coalesce(rc.unfinished,0) + coalesce(rc.deleted,0)))::int
+         else null end,
+    b.last_active::date,
+    case when b.last_active is null then null else (current_date - b.last_active::date) end,
+    case when b.last_active is null then true else (current_date - b.last_active::date) > 30 end,
+    (coalesce(rc.unfinished,0) + coalesce(rc.deleted,0) >= 3
+      and (coalesce(rc.completed,0) + coalesce(rc.unfinished,0) + coalesce(rc.deleted,0)) > 0
+      and 100.0 * coalesce(rc.completed,0)
+          / (coalesce(rc.completed,0) + coalesce(rc.unfinished,0) + coalesce(rc.deleted,0)) < 60),
+    (coalesce(rc.completed,0) * 4 + coalesce(gp.games,0) * 2 + coalesce(da.active_days,0) * 1
+      + coalesce(da.opens,0) * 0.1)::numeric
+  from base b
+  left join rc on rc.user_id = b.id
+  left join gp on gp.user_id = b.id
+  left join da on da.user_id = b.id
+  order by score desc nulls last
+  limit 25;
+$$;
+grant execute on function public.get_power_users(int) to authenticated;
+```

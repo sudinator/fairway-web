@@ -1290,6 +1290,126 @@ function AdminEngagement() {
   );
 }
 
+// ★ Power users — top 25 by composite engagement score, every metric individually sortable,
+// with friction ("kept starting rounds that didn't finish") + churn ("quiet 30d+") signals.
+// Reads the is_admin-gated get_power_users() RPC (migration 0088).
+type PUCol =
+  | "score" | "completed_rounds" | "games_played" | "active_days" | "total_opens"
+  | "completion_pct" | "unfinished_rounds" | "deleted_rounds" | "days_since_active";
+function AdminPowerUsers() {
+  const [rows, setRows] = useState<any[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [days, setDays] = useState<number | null>(null); // null = all-time
+  const [sortCol, setSortCol] = useState<PUCol>("score");
+  const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
+
+  useEffect(() => {
+    setRows(null); setErr(null);
+    supabase.rpc("get_power_users", { p_days: days }).then(({ data, error }: any) => {
+      if (error) setErr(error.message); else setRows(data || []);
+    });
+  }, [days]);
+
+  const sorted = React.useMemo(() => {
+    if (!rows) return [];
+    const arr = [...rows];
+    arr.sort((a, b) => {
+      const av = a[sortCol] ?? -1, bv = b[sortCol] ?? -1;
+      return sortDir === "desc" ? bv - av : av - bv;
+    });
+    return arr;
+  }, [rows, sortCol, sortDir]);
+
+  const setSort = (c: PUCol) => {
+    if (c === sortCol) setSortDir((d) => (d === "desc" ? "asc" : "desc"));
+    else { setSortCol(c); setSortDir("desc"); }
+  };
+
+  if (err) return null; // supplementary; stay quiet if the RPC isn't deployed yet
+
+  const cols: { key: PUCol; label: string; title: string }[] = [
+    { key: "score", label: "Score", title: "Composite: completed×4 + games×2 + active days×1 + opens×0.1" },
+    { key: "completed_rounds", label: "Rnds", title: "Completed rounds (final, not deleted)" },
+    { key: "games_played", label: "Games", title: "Games played" },
+    { key: "active_days", label: "Days", title: "Days active (opened the app)" },
+    { key: "total_opens", label: "Opens", title: "Total app opens" },
+    { key: "completion_pct", label: "Cmpl%", title: "Completed ÷ all started rounds" },
+    { key: "unfinished_rounds", label: "Unfin", title: "Started but never finished (in-progress)" },
+    { key: "deleted_rounds", label: "Del", title: "Soft-deleted rounds (mostly phantom-round cleanup)" },
+    { key: "days_since_active", label: "Idle", title: "Days since last active" },
+  ];
+  const arrow = (c: PUCol) => (c === sortCol ? (sortDir === "desc" ? " ▾" : " ▴") : "");
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+        <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>Power users</div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {([[null, "All-time"], [90, "90 days"]] as [number | null, string][]).map(([d, lbl]) => (
+            <button key={lbl} onClick={() => setDays(d)}
+              style={{ fontSize: 11, padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
+                background: days === d ? C.gold : C.greenLight, color: days === d ? C.green : C.cream, fontWeight: 700 }}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div style={{ color: C.sage, fontSize: 11, marginTop: 2, marginBottom: 8 }}>
+        Top 25 by composite score — tap a column to sort. <b style={{ color: C.gold }}>friction</b> = kept starting rounds that didn't finish; <b style={{ color: C.cream }}>quiet</b> = no activity 30d+.
+      </div>
+
+      {!rows ? <div style={{ color: C.sage, fontSize: 12 }}>Loading…</div> :
+        sorted.length === 0 ? <div style={{ color: C.sage, fontSize: 12 }}>No users yet.</div> : (
+        <div style={{ overflowX: "auto", background: C.greenLight, borderRadius: 12, padding: 4 }}>
+          <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 640 }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left", padding: "6px 8px", position: "sticky", left: 0, background: C.greenLight }}>
+                  <span style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}>Player</span>
+                </th>
+                {cols.map((c) => (
+                  <th key={c.key} title={c.title} onClick={() => setSort(c.key)}
+                    style={{ padding: "6px 8px", textAlign: "right", cursor: "pointer", whiteSpace: "nowrap" }}>
+                    <span style={{ color: c.key === sortCol ? C.gold : C.sage, fontSize: 11, fontWeight: 700 }}>{c.label}{arrow(c.key)}</span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((r) => (
+                <tr key={r.user_id} style={{ borderTop: `1px solid ${C.greenMid}` }}>
+                  <td style={{ padding: "6px 8px", position: "sticky", left: 0, background: C.greenLight, maxWidth: 160 }}>
+                    <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {r.display_name || "—"}
+                    </div>
+                    {(r.friction || r.churned) ? (
+                      <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
+                        {r.friction ? <span style={{ fontSize: 10, color: C.green, background: C.gold, borderRadius: 4, padding: "0 5px", fontWeight: 700 }}>friction</span> : null}
+                        {r.churned ? <span style={{ fontSize: 10, color: C.cream, background: C.greenMid, borderRadius: 4, padding: "0 5px", fontWeight: 700 }}>quiet</span> : null}
+                      </div>
+                    ) : null}
+                  </td>
+                  {cols.map((c) => {
+                    const v = r[c.key];
+                    const flagHot = (c.key === "unfinished_rounds" || c.key === "deleted_rounds") && (v || 0) > 0;
+                    return (
+                      <td key={c.key} style={{ padding: "6px 8px", textAlign: "right", whiteSpace: "nowrap",
+                        color: c.key === sortCol ? C.cream : (flagHot ? C.gold : C.sage), fontSize: 12,
+                        fontWeight: c.key === "score" ? 800 : 500 }}>
+                        {v == null ? "—" : c.key === "score" ? Math.round(v) : c.key === "completion_pct" ? `${v}%` : v}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminAnalytics() {
   const [a, setA] = useState<any | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -1695,6 +1815,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
           <Eyebrow>★ ADMIN · ANALYTICS</Eyebrow>
           <AdminAnalytics />
           <AdminEngagement />
+          <AdminPowerUsers />
           <OpsMetrics />
           <RoundSaveDiag />
           <div style={{ height: 22 }} />
@@ -2283,7 +2404,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
   if (view) {
     let title = ""; let panel: React.ReactNode = null;
     switch (view) {
-      case "analytics": title = "Analytics"; panel = <><AdminAnalytics /><AdminEngagement /></>; break;
+      case "analytics": title = "Analytics"; panel = <><AdminAnalytics /><AdminEngagement /><AdminPowerUsers /></>; break;
       case "operations": title = "Operations"; panel = <OpsMetrics />; break;
       case "diagnostics": title = "Diagnostics"; panel = <RoundSaveDiag />; break;
       case "activity": title = "Activity log"; panel = <ActivityTab />; break;

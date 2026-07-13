@@ -240,4 +240,4 @@ Living list. `[x]` = built & verified in code (file noted). `[~]` = partially do
 - v1.50.2 — error-handling pass: admin/game mutations (setFormat, setTeamScoreMode, endGame, enter/exitSupportGroup) now surface errors and don't optimistically proceed; RoundEditor backgroundSave detects returned .error and shows a calm "saved on device, retrying" indicator instead of swallowing failures.
 
 - Match-play layout DECISION (Jun 2026): keep per-hole CARD layout, not the grid (tap-target/readability on phone). Grid mockups were exploratory.
-
+- [x] Super-admin Power Users analytics (composite ranking, sortable per-metric, friction/churn flags) — v1.136.0 / migration 0088.
