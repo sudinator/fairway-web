@@ -302,8 +302,31 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
     setPicked(c); setTeeIdx(0); setShowCustom(false);
   };
 
-  const start = () => {
+  const start = async () => {
     if (!picked || !tee) return;
+    // Guard against duplicate rounds: if the player is already in an ACTIVE game (being scored by
+    // the group) at this course, logging a separate round here just duplicates what the game posts.
+    // Warn — but don't hard-block, so legitimate second rounds / back-entry still work.
+    try {
+      const { data: au } = await supabase.auth.getUser();
+      const uid = au?.user?.id;
+      if (uid) {
+        const { data: gp } = await supabase.from("game_players").select("game_id").eq("user_id", uid);
+        const ids = Array.from(new Set((gp || []).map((r: any) => r.game_id).filter(Boolean)));
+        if (ids.length) {
+          const { data: gs } = await supabase.from("games").select("id, name, course, status").in("id", ids).neq("status", "ended");
+          const norm = (s: string) => (s || "").trim().toLowerCase();
+          const label = courseLabel(picked);
+          const match = (gs || []).find((g: any) => norm(g.course) === norm(label));
+          if (match) {
+            const ok = confirm(`You're already in the game "${match.name}" at ${match.course}, being scored by the group. Your scores there post to your Rounds automatically — and you can add your own putts, fairways, sand and penalties right on that game's scorecard. Log a SEPARATE round here anyway? This usually creates a duplicate.`);
+            if (!ok) return;
+          }
+        }
+      }
+    } catch {
+      // Never block starting a round if this check fails.
+    }
     if (idxVal != null && idxVal !== index) saveIndex(idxVal);
     const coursePar = picked.holes.reduce((s, h) => s + (h.par || 0), 0);
     const alloc = allocateStrokes(picked.holes.map((h) => ({ hole_number: h.n, stroke_index: h.si })), realCH);

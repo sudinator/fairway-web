@@ -3026,3 +3026,19 @@ read as 'amitsud@gmail.com' next to 'Amit Sud'. Fixed centrally: logActivity (li
 resolves display_name from actor_id when the passed name is empty or looks like an email, so ALL entries
 (games, groups, admin actions) read as names. Also set game_deleted to pass displayName directly.
 Same actor_id throughout — this was only a label. Existing historical rows keep their old label.
+
+### v1.152.5 — FIX: 'Completed a round' logs once, on first finalization (no migration)
+round-editor save() logged a round_completed activity on EVERY save of a solo round, so re-opening a
+round to fix a score/add stats wrote a new 'Completed a round (score)' line each time (the drifting
+scores + partials seen in the log). Now it captures the round's prior status and logs a completion only
+when the round FIRST becomes final; re-saves of an already-final round no longer log. Game rounds remain
+excluded as before. Fixes audit-trail spam; no change to the rounds data itself.
+
+### v1.153.0 — FEATURE: warn before logging a round that duplicates an active game (no migration)
+Root cause of the Preet-style duplicate: a player who's being scored in a group game could also start a
+SEPARATE manual round via New round (game_id NULL), which the rounds(game_id,user_id) unique index can't
+dedupe. RoundSetup.start() now checks whether the player is in an ACTIVE (status<>'ended') game at the
+same course; if so it warns: their scores post automatically and they can add their own putts/fairways/
+sand/penalties on the game's scorecard — 'Log a SEPARATE round anyway? This usually creates a duplicate.'
+Warn, not block (legit second rounds / back-entry still allowed). In-game guidance for view-only gross +
+editable stats already existed (tournaments.tsx). No rounds-data change.

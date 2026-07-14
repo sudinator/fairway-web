@@ -380,8 +380,13 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     try {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       let roundId = dbIdRef.current || round.id;
+      let wasFinal = false;
       if (roundId) {
         // Round already exists (from the background save, or a gross round gaining detail).
+        // Capture whether it was ALREADY final, so we only log a completion on the FIRST
+        // finalization — not on every later edit/re-save.
+        const { data: prev } = await supabase.from("rounds").select("status").eq("id", roundId).maybeSingle();
+        wasFinal = prev?.status === "final";
         // Make sure every hole row exists, then write current values and mark it final.
         const { data: existing } = await supabase.from("holes").select("hole_number").eq("round_id", roundId);
         const have = new Set((existing || []).map((x: any) => x.hole_number));
@@ -417,11 +422,11 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         const { error: e2 } = await supabase.from("holes").insert(rows);
         if (e2) throw e2;
       }
-      // Don't log "completed a round" for rounds that came from a game: the game
-      // already logs its own create/end activity, and a game posts one round per
-      // player — which otherwise spams the audit trail with a row per golfer every
-      // time someone opens their posted round to add stats and saves.
-      if (!round.game_id) {
+      // Log "Completed a round" only on the FIRST finalization — not on later edits/re-saves of an
+      // already-final round (which otherwise spam the audit trail with a line per save). Also never
+      // for game rounds: the game logs its own create/end activity and posts one round per player, so
+      // opening a posted round to add stats and saving shouldn't log a completion.
+      if (!round.game_id && !wasFinal) {
         try {
           const { data: u } = await supabase.auth.getUser();
           const total = holes.reduce((s, h) => s + (h.strokes || 0), 0);
