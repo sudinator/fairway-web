@@ -2421,7 +2421,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
   const toggleRole = async (row: any) => {
     setBusyId(row.id); setMsg(null);
     await supabase.from("group_members").update({ role: row.role === "admin" ? "member" : "admin" }).eq("id", row.id);
-    await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Group admin", action: "role_changed", group_id: activeGroupId, target_user_id: row.user_id, summary: `Changed ${row.profiles?.display_name || row.email} to ${row.role === "admin" ? "member" : "admin"}` });
+    await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Group admin", action: "role_changed", group_id: activeGroupId, target_user_id: row.user_id, summary: `Changed ${row.profiles?.display_name || row.email} to ${row.role === "admin" ? "member" : "club admin"}` });
     setBusyId(null);
     await load(); onChanged?.();
   };
@@ -2489,7 +2489,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
                 <div style={{ flex: 1 }} />
                 {!self && (
                   <>
-                    <button style={{ ...btn(false), padding: "7px 10px", fontSize: 12 }} disabled={busyId === row.id} onClick={() => toggleRole(row)}>{row.role === "admin" ? "Make member" : "Make admin"}</button>
+                    <button style={{ ...btn(false), padding: "7px 10px", fontSize: 12 }} disabled={busyId === row.id} onClick={() => toggleRole(row)}>{row.role === "admin" ? "Remove club admin" : "Make club admin"}</button>
                     <button style={{ ...btn(false), padding: "7px 10px", fontSize: 12, color: C.birdie }} disabled={busyId === row.id} onClick={() => removeFromGroup(row)}>Remove</button>
                   </>
                 )}
@@ -3313,7 +3313,7 @@ export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean 
     <div>
       <Eyebrow>★ OVERSIGHT · ALL USERS</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
-        Every account. Suspend a bad actor, wipe a user&apos;s data on request, or merge two accounts that are the same person (dedup). Merge and wipe are irreversible.{isOwner ? " As the owner, you can also grant or revoke system-admin access — only you can." : ""}
+        Every account. Suspend a bad actor, wipe a user&apos;s data on request, or merge two accounts that are the same person (dedup). Merge and wipe are irreversible.{isOwner ? " As the owner, you can also grant or revoke system-admin access (app-wide — separate from club admin). Only you can." : ""}
       </div>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or email…"
         style={{ width: "100%", marginTop: 12, background: C.card, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 10, padding: "9px 12px", fontSize: 14 }} />
@@ -3337,7 +3337,7 @@ export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean 
               {isOwner && !u.is_owner && !isSelf && (
                 <button disabled={busy === u.id} onClick={() => setSystemAdmin(u, !u.is_admin)}
                   style={{ background: "transparent", color: u.is_admin ? C.birdie : C.sage, border: `1px solid ${u.is_admin ? C.birdie : C.sage}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}>
-                  {u.is_admin ? "Remove admin" : "Make admin"}
+                  {u.is_admin ? "Remove system admin" : "Make system admin"}
                 </button>
               )}
               <button disabled={busy === u.id} onClick={() => { setMergeKeep(mergeKeep === u.id ? null : u.id); setMergeRemove(""); setPreview(null); }}

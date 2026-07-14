@@ -2995,3 +2995,19 @@ never shown on the owner row or your own).
 SEED: 0102 auto-sets is_owner on the sole existing admin. If you had >1 admin already it no-ops — then
 run the manual seed line in the migration with your email. After deploy, confirm you show '★ owner'.
 DEPLOY: run migration 0102.
+
+### v1.152.1 — FIX: Admin tab horizontal drift (no migration)
+The Admin views had no width guard, so a wide child (dense stat/bar rows, the drill-down table) could
+push the whole page and let it drift left/right on a phone — only on Admin. Clamped both AdminHome
+containers to width:100% / maxWidth:100% / overflowX:hidden. Content that's legitimately wide (the
+admin_stat_users drill table) keeps its own local horizontal scroll inside its box; everything else
+(flex tiles, flex:1 bar charts) reflows to fit. No data or logic change.
+
+### v1.152.2 — Global no-horizontal-scroll + admin label clarity + APP_RULES.md (no migration)
+1) No-horizontal-scroll is now APP-WIDE, enforced at the single inner scroll container
+   (home.tsx scrollRef: overflowY:auto + overflowX:hidden). Reverted the admin-only clamps from
+   v1.152.1 (global rule supersedes). Wide content must use its own local overflowX:auto box.
+2) Admin label clarity: system-admin button now reads 'Make system admin' / 'Remove system admin';
+   club-admin toggle reads 'Make club admin' / 'Remove club admin' (+ audit text). No more bare 'admin'.
+3) Added APP_RULES.md (global invariants reference) + ci/check-global-rules.py (guards Rule 1: the
+   scrollRef horizontal clamp). Release builds now run this check alongside fontsize + jsx-escape.
