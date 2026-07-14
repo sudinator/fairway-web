@@ -249,3 +249,14 @@ Living list. `[x]` = built & verified in code (file noted). `[~]` = partially do
 - [x] Friction review (v1.140.0): daily integrity sweep agent (0092) + admin push on new flags + review/resolve UI with keeper picker & soft-delete. Retired old 'friction' wording (Power Users -> 'restarts'; abandoned drill tag -> 'unfinished').
 - [ ] Follow-up: once historical multi_draft/dup residue is cleared via the tool, add a DB-level partial unique index to make >1 in-progress draft per user structurally impossible.
 - [x] Badge curation: selective profile/peer card + times-earned counts + bogey-free consistency funnel (v1.148.0)
+
+## Admin roles
+- [x] Multiple System Admins (owner model) — SHIPPED v1.152.0 (migration 0102). is_owner marker +
+  is_owner() + admin_set_system_admin(owner-gated, owner can't be demoted, self-change blocked, audited)
+  + owner-only Make/Remove admin controls in the Users tab. Original note: Today `profiles.is_admin` is the single system-admin flag.
+  Allow more than one System Admin, but keep an OWNER (Amit) above them: only the owner can revoke
+  system-admin access or demote another admin. Design: add an `is_owner` (or `admin_role` = owner|system)
+  flag distinct from is_admin. DECIDED: ONLY the owner can ADD or REMOVE system admins — both promote and
+  revoke/demote are owner-only. System admins keep full system powers but cannot change the admin roster.
+  Guard so the owner cannot be demoted and there is always exactly one owner. Surface in the Users tab with
+  add/remove controls visible ONLY to the owner; audit-log every change. RPCs that gate on is_admin() stay unchanged.

@@ -2538,7 +2538,7 @@ function SystemTools({ user }: { user: any }) {
 }
 
 // Consolidated admin hub. Two tiers: Club admin (any admin of the active club, scoped to
-// that club) and System / Super admin (master admin only). Reuses every existing panel;
+// that club) and System Admin (master only). Reuses every existing panel;
 // club cards jump to the shared tabs, system cards render the panel inline.
 // ★ Stage-2 analytics: new drillable summary tiles (platform, notifications, sharing, guests).
 // Counts from get_admin_extra_stats (0091); every tile drills via the shared engine (0090).
@@ -2877,7 +2877,7 @@ function AdminSandbaggers() {
   useEffect(() => {
     supabase.rpc("admin_sandbaggers").then(({ data, error }: any) => { if (error) setErr(true); else setRows(data || []); });
   }, []);
-  if (err) return <div style={{ color: C.sage, fontSize: 13 }}>Couldn’t load — the admin_sandbaggers migration (0099) may not be applied yet.</div>;
+  if (err) return <div style={{ color: C.sage, fontSize: 13 }}>Couldn’t load — the admin_sandbaggers migration (0101) may not be applied yet.</div>;
   if (!rows) return <div style={{ color: C.sage, fontSize: 13 }}>Loading…</div>;
   return (
     <div>
@@ -2950,7 +2950,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
       case "diagnostics": title = "Diagnostics"; panel = <RoundSaveDiag />; break;
       case "activity": title = "Activity log"; panel = <ActivityTab />; break;
       case "oversight": title = "Clubs oversight"; panel = <AdminGroupsTab user={user} onEnterGroup={onEnterGroup} onExitGroup={onExitGroup} onGroupsChanged={onGroupsChanged} />; break;
-      case "users": title = "Users"; panel = <AdminUsersTab user={user} />; break;
+      case "users": title = "Users"; panel = <AdminUsersTab user={user} isOwner={!!profile?.is_owner} />; break;
       case "players": title = "Player admin"; panel = <AdminPanel user={user} showAnalytics={false} />; break;
       case "feedback": title = "Feedback"; panel = <AdminFeedbackTab />; break;
       case "sandbaggers": title = "Sandbaggers"; panel = <AdminSandbaggers />; break;
@@ -2984,7 +2984,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
 
       {isMaster && (
         <>
-          {tierHead("System", "SUPER ADMIN", true, "Cross-club and system-wide. Master admin only.")}
+          {tierHead("System", "SYSTEM ADMIN", true, "Cross-club and system-wide. System admins only.")}
           {grid(<>
             <Card icon="📊" name="Analytics" cap="Usage, engagement & golf cadence" onClick={() => setView("analytics")} />
             <Card icon="🧭" name="Operations" cap="Nudge funnel, auto-finish, stale rounds" onClick={() => setView("operations")} badge={todos.stale_ready} />
@@ -3233,7 +3233,7 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
 }
 
 // ================= Master-admin oversight: all users =================
-export function AdminUsersTab({ user }: { user: any }) {
+export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean }) {
   const [rows, setRows] = useState<any[] | null>(null);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -3246,6 +3246,19 @@ export function AdminUsersTab({ user }: { user: any }) {
     setRows(Array.isArray(data) ? data : []);
   };
   useEffect(() => { load(); }, []);
+
+  const setSystemAdmin = async (u: any, make: boolean) => {
+    if (!confirm(make
+      ? `Make ${u.display_name || u.email || "this user"} a system admin? They'll get full system-admin access across the app.`
+      : `Remove system admin from ${u.display_name || u.email || "this user"}? They'll lose all system-admin access.`)) return;
+    setBusy(u.id);
+    try {
+      // The RPC is owner-gated and writes its own audit entry, so no client-side logging here.
+      const { error } = await supabase.rpc("admin_set_system_admin", { p_user: u.id, p_make: make });
+      if (error) { alert("Couldn't update — " + error.message); return; }
+      await load();
+    } finally { setBusy(null); }
+  };
 
   const shown = (rows || []).filter((r) => {
     const s = q.trim().toLowerCase();
@@ -3300,7 +3313,7 @@ export function AdminUsersTab({ user }: { user: any }) {
     <div>
       <Eyebrow>★ OVERSIGHT · ALL USERS</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
-        Every account. Suspend a bad actor, wipe a user&apos;s data on request, or merge two accounts that are the same person (dedup). Merge and wipe are irreversible.
+        Every account. Suspend a bad actor, wipe a user&apos;s data on request, or merge two accounts that are the same person (dedup). Merge and wipe are irreversible.{isOwner ? " As the owner, you can also grant or revoke system-admin access — only you can." : ""}
       </div>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or email…"
         style={{ width: "100%", marginTop: 12, background: C.card, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 10, padding: "9px 12px", fontSize: 14 }} />
@@ -3312,7 +3325,8 @@ export function AdminUsersTab({ user }: { user: any }) {
           <div key={u.id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 8, opacity: banned ? 0.65 : 1 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
               <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{u.display_name || "(no name)"}</div>
-              {u.is_admin && <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>★ admin</span>}
+              {u.is_owner ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>★ owner</span>
+                : u.is_admin ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>★ system admin</span> : null}
               {banned && <span style={{ color: C.birdie, fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>· suspended</span>}
             </div>
             <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{u.email || "—"}</div>
@@ -3320,6 +3334,12 @@ export function AdminUsersTab({ user }: { user: any }) {
               {u.group_count} group{u.group_count === 1 ? "" : "s"} · {u.rounds_count} round{u.rounds_count === 1 ? "" : "s"}{u.handicap_index != null ? ` · hcp ${u.handicap_index}` : ""}
             </div>
             <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+              {isOwner && !u.is_owner && !isSelf && (
+                <button disabled={busy === u.id} onClick={() => setSystemAdmin(u, !u.is_admin)}
+                  style={{ background: "transparent", color: u.is_admin ? C.birdie : C.sage, border: `1px solid ${u.is_admin ? C.birdie : C.sage}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}>
+                  {u.is_admin ? "Remove admin" : "Make admin"}
+                </button>
+              )}
               <button disabled={busy === u.id} onClick={() => { setMergeKeep(mergeKeep === u.id ? null : u.id); setMergeRemove(""); setPreview(null); }}
                 style={{ background: "transparent", color: C.faint, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}>
                 Merge another into this…

@@ -2968,3 +2968,30 @@ DEPLOY: run migration 0098.
    rounds (a thinner record skews the computed index, so GHIN is trusted as-is below that). Shows
    entered vs scoring, rounds, %, and direction (index looks high = classic sandbag / low). RPC
    admin_sandbaggers() (0099), is_admin-gated, security definer. DEPLOY: run migration 0099.
+
+### v1.151.1 — CHANGE: Sandbaggers is now a CLUB-admin tab, club-scoped — MIGRATION 0100 (RUN IT)
+Moved the Sandbaggers card from System (master-only) to the Club-admin tier, and made it club-scoped.
+admin_sandbaggers(p_group) (0100, supersedes 0099) returns flagged members of THAT club and is callable
+by an admin of the group (is_group_admin) OR a master admin. Same rule: >=18 posted rounds, >=20%
+relative gap. AdminHome now receives activeGroupId and passes it through. DEPLOY: run migration 0100
+(if 0099 was never run, 0100 is all you need; if it was, 0100 replaces it).
+
+### v1.151.2 — ROLLBACK + RENAME: Sandbaggers system-only again; 'Super admin' → 'System Admin' — MIGRATION 0101 (RUN IT)
+Reverted 0100's club-scoping: Sandbaggers is a System-admin (master) tool again — app-wide, master-gated,
+card back in the System tier. admin_sandbaggers() (0101, no-arg, is_admin-gated) supersedes 0099 + 0100 —
+run 0101 and ignore those. Removed the now-unused activeGroupId plumbing from AdminHome.
+Renamed the admin tier badge 'SUPER ADMIN' → 'SYSTEM ADMIN' (desc: 'System admins only').
+BACKLOG: logged 'Multiple System Admins (owner model)' — allow >1 system admin with an owner (Amit) who
+alone can revoke/demote; owner cannot be demoted; audit every change.
+DEPLOY: run migration 0101.
+
+### v1.152.0 — FEATURE: owner model / multiple System Admins — MIGRATION 0102 (RUN IT)
+profiles.is_owner marker above is_admin. Only the OWNER can add or remove system admins (promote AND
+demote owner-only); owner cannot be demoted; you can't change your own admin status; every change is
+audit-logged server-side. New RPCs: is_owner(), admin_set_system_admin(p_user,p_make) (owner-gated).
+admin_list_users() now returns is_owner (owner sorted first). Users tab: role badge ('★ owner' /
+'★ system admin') + owner-only 'Make admin' / 'Remove admin' buttons (hidden for everyone but the owner,
+never shown on the owner row or your own).
+SEED: 0102 auto-sets is_owner on the sole existing admin. If you had >1 admin already it no-ops — then
+run the manual seed line in the migration with your email. After deploy, confirm you show '★ owner'.
+DEPLOY: run migration 0102.
