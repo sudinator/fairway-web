@@ -8,7 +8,7 @@ Regenerate after shipping (adds new files, keeps your ticks):
 
 Each release's DEPLOY_NOTES also flags any migration that must be run for that version.
 
-Total: 93 migrations. Unchecked = not yet confirmed applied.
+Total: 94 migrations. Unchecked = not yet confirmed applied.
 
 ## Checklist (oldest → newest)
 
@@ -105,3 +105,4 @@ Total: 93 migrations. Unchecked = not yet confirmed applied.
 - [ ] 0105_admin_delete_stale_game.sql
 - [ ] 0106_test_groups.sql
 - [ ] 0107_admin_wipe_group.sql
+- [ ] 0108_admin_stat_users_avatars.sql

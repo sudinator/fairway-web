@@ -311,3 +311,5 @@ Product model: any member creates a tee time; the creator organizes it; a captai
 
 ## Flights (0093, Stage 1 one-off)
 - `games.flight_mode` text ('off'|'oneoff'|'league'); `games.flights` jsonb ([{key,name,hi}] — hi = inclusive upper index bound, null = open top); `game_players.flight` text (assigned band key, null = unassigned). One-off flights computed client-side via lib/flights.ts (autoSplitFlights = even split by index; flightForIndex). Only offered for stroke/stableford. 'league' (season flights) is Stage 2. Segmented leaderboard display is Stage 1b.
+
+- `admin_stat_users(p_stat,p_arg,p_date)` returns `(name, detail, tag, avatar_url)` as of 0108 (avatar_url added for the analytics drill sheet). America/New_York timezone set on the function.

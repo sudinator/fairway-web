@@ -1228,9 +1228,6 @@ function StatDrawerHost() {
     return () => { _openDrill = null; };
   }, []);
   const close = () => setOpen(false);
-  const initials = (n: string) =>
-    (n || "?").replace(/[\u201c\u201d"].*/, "").split("\u00b7")[0].trim().split(/\s+/).slice(0, 2)
-      .map((s) => s[0] || "").join("").toUpperCase() || "?";
   const tagColor = (t: string) => {
     const bad = ["friction", "off", "stale", "lapsed", "deleted", "muted", "in progress"];
     const good = ["on", "installed", "new"];
@@ -1240,7 +1237,7 @@ function StatDrawerHost() {
   };
   return (
     <>
-      <div onClick={close} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 80,
+      <div aria-hidden style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 80,
         opacity: open ? 1 : 0, pointerEvents: open ? "auto" : "none", transition: "opacity .2s" }} />
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 440, margin: "0 auto", zIndex: 90,
         background: C.greenMid, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "82vh",
@@ -1262,7 +1259,7 @@ function StatDrawerHost() {
              const tc = u.tag ? tagColor(u.tag) : null;
              return (
                <div key={i} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 8px", borderTop: i ? "1px solid rgba(255,255,255,.06)" : "none" }}>
-                 <div style={{ width: 34, height: 34, borderRadius: "50%", flex: "0 0 34px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 13, color: C.green, background: C.sage }}>{initials(u.name)}</div>
+                 <Avatar src={u.avatar_url} name={u.name || "?"} size={34} />
                  <div style={{ minWidth: 0 }}>
                    <div style={{ fontSize: 14, fontWeight: 600, color: C.cream, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</div>
                    {u.detail ? <div style={{ fontSize: 11, color: C.sage, marginTop: 1 }}>{u.detail}</div> : null}
@@ -1383,6 +1380,7 @@ function AdminPowerUsers() {
   const [days, setDays] = useState<number | null>(null); // null = all-time
   const [sortCol, setSortCol] = useState<PUCol>("score");
   const [sortDir, setSortDir] = useState<"desc" | "asc">("desc");
+  const [avatars, setAvatars] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     setRows(null); setErr(null);
@@ -1390,6 +1388,16 @@ function AdminPowerUsers() {
       if (error) setErr(error.message); else setRows(data || []);
     });
   }, [days]);
+
+  // Photos, best-effort: if row-level security lets this admin read the profiles, show avatars;
+  // otherwise the Avatar falls back to initials. Never blocks the table.
+  useEffect(() => {
+    const ids = (rows || []).map((r: any) => r.user_id).filter(Boolean);
+    if (!ids.length) return;
+    supabase.from("profiles").select("id, avatar_url").in("id", ids).then(({ data }: any) => {
+      if (data) setAvatars(Object.fromEntries(data.map((p: any) => [p.id, p.avatar_url ?? null])));
+    });
+  }, [rows]);
 
   const sorted = React.useMemo(() => {
     if (!rows) return [];
@@ -1460,8 +1468,11 @@ function AdminPowerUsers() {
               {sorted.map((r) => (
                 <tr key={r.user_id} style={{ borderTop: `1px solid ${C.greenMid}` }}>
                   <td style={{ padding: "6px 8px", position: "sticky", left: 0, background: C.greenLight, maxWidth: 160 }}>
-                    <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {r.display_name || "—"}
+                    <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                      <Avatar src={avatars[r.user_id]} name={r.display_name || "?"} size={22} enlargeable={false} />
+                      <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {r.display_name || "—"}
+                      </div>
                     </div>
                     {r.churned ? (
                       <div style={{ display: "flex", gap: 4, marginTop: 2 }}>

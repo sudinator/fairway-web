@@ -3138,3 +3138,59 @@ Stripped the v1.159.0 automated-overflow harness: deleted playwright.config.ts, 
 (no export/inject); removed the @playwright/test devDep + `e2e` script (lockfile reconciled). RETAINED
 the real fixes: the v1.158.1 two-chart overflow fix, the ci/check-chart-overflow.py static guard (still
 runs every build), and the v1.158.0 TEST MODE border. Overflow is now guarded statically + by eye.
+
+### v1.160.0 — trend-chart fixes: 3-putt data, dynamic axis, red/green bars (no migration)
+Dashboard stat drill-down (the click-to-expand TREND charts):
+- 3+ putts (item 9): now returns null for rounds with no putt data (gross-only or untracked), so they're
+  excluded instead of charted as a false 0. A valid round with zero 3-putts still shows 0.
+- Dynamic y-axis (item 4): drill-down trends now fit the data via niceDomain (pct stats clamped 0-100)
+  instead of a generic auto axis — same data-fit treatment the scoring-form differential already uses.
+- Colourful bars (item 8): bars now run green (beat your average) / red (didn't), direction-aware
+  (lower-is-better vs higher), matching the scoring-form differential; rolling lines recoloured
+  (cream 5-rd, gold 10-rd) and caption updated.
+- Items 5/6/7 (scrambling 0%, missing putts bar, missing Stableford bar) are data-specific and pending
+  a round-level diagnostic. Items 1 (avatars in analytics), 2/3 (popup dismissal global rule), and a
+  full trend audit (10) are queued.
+
+### v1.160.1 — popup dismissal + trend NaN hardening (no migration)
+- Item 2: admin 'who' drill sheet (DrillModal) no longer dismisses on backdrop tap — a scroll that
+  ended on the backdrop was reading as a tap and closing it. Now ×-only (backdrop dims but doesn't
+  close). APP_RULES rule 4 extended: popups need an always-reachable × and must not close on scroll.
+- Items 6/7 hardening: drill-down trend series now filters Number.isFinite(v), not just v!=null, so a
+  NaN can't slip through as an invisible bar. (FB Jul 10 putts 31/15 and Weequahic Jun 17 Stableford
+  are both finite/estimable per data, so please re-verify on this build.)
+
+### v1.160.2 — dismissable chart tooltips (item 3) (no migration)
+The recharts hover tooltip stuck 'on' after a tap on touch, with no way to dismiss (screenshot IMG_1366).
+Fixed at the shared ChartTip level so it's fixed on every dashboard chart at once:
+- ChartTip now renders a corner × that fires a global 'bnn-chart-dismiss' event.
+- New DismissableChart wrapper listens for that event and remounts the chart (clears recharts' internal
+  active-tooltip state). Wraps the scoring-form differential and the stat drill-down charts.
+- All three <Tooltip> layers set wrapperStyle pointerEvents:auto so the × is tappable (recharts sets the
+  tooltip layer pointer-events:none by default, which would swallow the tap).
+Note: screenshot shows this Weequahic round labelled 'Jun 16' while the DB date is Jun 17 — a separate
+date-display off-by-one (UTC parse) worth fixing; flagged, not yet addressed.
+
+### v1.161.0 — avatars in the analytics 'who' drill (item 1) · MIGRATION 0108
+- admin_stat_users (the shared is_admin-gated drill that every analytics stat routes through) now
+  returns a 4th column, avatar_url, pulled from the profile behind each row (host.avatar_url for the
+  guests stat). DROP+CREATE because the return shape changed; re-applies the 0096 America/New_York
+  timezone and the authenticated grant. Regenerated from 0090 (paren-aware insert so rounds_day's
+  subquery FROM wasn't touched).
+- DrillModal rows now render <Avatar src={u.avatar_url} name={u.name}/> — a real photo when set, the
+  initials circle otherwise (Avatar's own fallback), with tap-to-enlarge for real photos. Removed the
+  now-dead local initials() helper (also clears a jsx-escape advisory false positive).
+- Covers the primary analytics 'who' lists. The power-users TABLE (get_power_users) is a separate
+  stats grid — avatars there deferred unless wanted.
+
+### v1.161.1 — avatars in more people-lists (item 1, breadth) (no migration)
+All client-side (no DB change) — the profile/player objects already carry avatar_url; Avatar falls
+back to initials when a photo is absent:
+- tournaments.tsx: flight handicap editor rows, guest members list, and flight members list now show
+  a small avatar beside each name (native <select> option rows can't hold avatars, left as-is).
+- manage.tsx Power users table: small avatar in the sticky name cell. get_power_users already returns
+  user_id, so avatars are fetched client-side by id (best-effort; if RLS blocks reading those profiles
+  it silently falls back to initials — never blocks the table). No migration.
+- money.tsx settlements/balances already had avatars — confirmed, unchanged.
+Still pending avatars: round-setup player picker, round-detail playing partners, share-card, a couple
+of remaining tournaments guest/scorecard-header spots.

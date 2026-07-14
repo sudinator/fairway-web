@@ -1480,7 +1480,7 @@ function CreateGame({
                       };
                       return (
                         <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                          <span style={{ flex: 1, fontSize: 13, color: C.cream }}>{p.display_name}</span>
+                          <span style={{ flex: 1, display: "flex", alignItems: "center", gap: 7, minWidth: 0, fontSize: 13, color: C.cream }}><Avatar src={p.avatar_url} name={p.display_name} size={22} enlargeable={false} /><span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_name}</span></span>
                           <input type="number" step="0.1" inputMode="decimal" placeholder="index"
                             value={draft}
                             onChange={(e) => setFlightHcpDraft((d) => ({ ...d, [p.id]: e.target.value }))}
@@ -5779,7 +5779,7 @@ function GroupsBuilder({ game, players, onSetTeeGroup, onRandomize, canRandomize
                 <div style={{ marginTop: 8, color: C.ink, fontSize: 13, lineHeight: 1.7 }}>
                   {mem.map((p) => {
                     const sponsor = p.is_guest && p.guest_of ? (players.find((m) => m.user_id === p.guest_of)?.display_name || null) : null;
-                    return <div key={p.id}>{p.display_name}{sponsor ? <span style={{ color: C.faint, fontSize: 11 }}> · guest of {sponsor}</span> : null}</div>;
+                    return <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 7 }}><Avatar src={p.avatar_url} name={p.display_name} size={20} enlargeable={false} /><span>{p.display_name}{sponsor ? <span style={{ color: C.faint, fontSize: 11 }}> · guest of {sponsor}</span> : null}</span></div>;
                   })}
                 </div>
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Scorer: chosen on the course</div>
@@ -6119,7 +6119,7 @@ function OrganizerPanel({
                     <div style={{ color: accent, fontWeight: 800, fontSize: 13 }}>{t.name}</div>
                     <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>{mem.length} player{mem.length === 1 ? "" : "s"}</div>
                     <div style={{ marginTop: 8, color: C.ink, fontSize: 13, lineHeight: 1.8 }}>
-                      {mem.length ? mem.map((p) => <div key={p.id}>{p.display_name} <span style={{ color: C.faint }}>CH {p.course_handicap ?? "—"}</span></div>) : <span style={{ color: C.faint }}>No players assigned</span>}
+                      {mem.length ? mem.map((p) => <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 7 }}><Avatar src={p.avatar_url} name={p.display_name} size={20} enlargeable={false} /><span>{p.display_name} <span style={{ color: C.faint }}>CH {p.course_handicap ?? "—"}</span></span></div>) : <span style={{ color: C.faint }}>No players assigned</span>}
                     </div>
                   </div>
                 );

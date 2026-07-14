@@ -30,7 +30,11 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
 3. **Real glyphs in JSX text, never literal `\uXXXX` escapes** (·, ›, —, …, ×, ‹, ▼). JS string/template
    literals may use `\u`. — CI (`ci/check-jsx-escapes.py`)
 4. **Standard popup close control.** Pop-ups/modals close via a corner `×` button: `background:C.greenMid`,
-   30×30, `borderRadius:15`, `fontSize:17`, a real `×` glyph. — manual
+   30×30, `borderRadius:15`, `fontSize:17`, a real `×` glyph. Every popup MUST have a visible, always-
+   reachable dismiss (the `×`), and MUST NOT dismiss itself on scroll or an incidental gesture. If a
+   dimming backdrop is used behind a *scrollable* sheet, the backdrop must not close on tap (a scroll that
+   ends on it reads as a tap and dismisses the sheet) — dismiss via the `×` only. Bug history: admin "who"
+   drill sheet closed on scroll (v1.160.x). — manual
 5. **Deliberate name-list order.** Any list of people has an intentional order (default alphabetical).
    If the right order is unclear, ask before shipping. — manual
 
