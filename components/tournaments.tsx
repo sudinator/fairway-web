@@ -2825,7 +2825,7 @@ function GameRoom({
       : `Delete "${game.name}"? It's removed for everyone, but each player's posted round stays in their own Rounds history. This can't be undone.`;
     if (!confirm(msg)) return;
     await supabase.rpc("delete_game", { p_game: game.id, p_delete_rounds: sameDay });
-    await logActivity(supabase, { actor_id: user.id, actor_name: (user.email || "Someone"), action: "game_deleted", group_id: (game as any).group_id || null, summary: `Deleted the game "${game.name}"${sameDay ? " (and its posted rounds)" : ""}` });
+    await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_deleted", group_id: (game as any).group_id || null, summary: `Deleted the game "${game.name}"${sameDay ? " (and its posted rounds)" : ""}` });
     // Coherent local wipe so a deleted game leaves no snapshot, backups, watermarks,
     // or active-game pointer that could resurface or boot straight back into it.
     clearAllGameScores(game.id);

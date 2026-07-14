@@ -11,9 +11,21 @@ export type ActivityEntry = {
 
 export async function logActivity(supabase: any, entry: ActivityEntry): Promise<void> {
   try {
+    // Prefer a human display name for the actor. Some call sites pass an email (or nothing) —
+    // resolve the profile's display_name from actor_id so the Activity log reads consistently as
+    // names, not emails. Best-effort; falls back to whatever was passed, then "Someone".
+    let name = entry.actor_name;
+    if (entry.actor_id && (!name || name.includes("@"))) {
+      try {
+        const { data } = await supabase.from("profiles").select("display_name").eq("id", entry.actor_id).maybeSingle();
+        if (data?.display_name) name = data.display_name;
+      } catch {
+        // keep the passed value
+      }
+    }
     await supabase.from("activity_log").insert({
       actor_id: entry.actor_id,
-      actor_name: entry.actor_name || "Someone",
+      actor_name: name || "Someone",
       action: entry.action,
       summary: entry.summary,
       group_id: entry.group_id ?? null,

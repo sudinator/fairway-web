@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { HScroll } from "@/components/hscroll";
 import { createClient } from "@/lib/supabase";
 import { pushGate, subscribeToPush, unsubscribeFromPush, currentPermission, syncPushSubscription } from "@/lib/push";
 import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID } from "@/lib/golf";
@@ -1436,7 +1437,7 @@ function AdminPowerUsers() {
 
       {!rows ? <div style={{ color: C.sage, fontSize: 12 }}>Loading…</div> :
         sorted.length === 0 ? <div style={{ color: C.sage, fontSize: 12 }}>No users yet.</div> : (
-        <div style={{ overflowX: "auto", background: C.greenLight, borderRadius: 12, padding: 4 }}>
+        <HScroll style={{ background: C.greenLight, borderRadius: 12, padding: 4 }}>
           <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 640 }}>
             <thead>
               <tr>
@@ -1479,7 +1480,7 @@ function AdminPowerUsers() {
               ))}
             </tbody>
           </table>
-        </div>
+        </HScroll>
       )}
     </div>
   );

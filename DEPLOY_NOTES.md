@@ -3011,3 +3011,18 @@ admin_stat_users drill table) keeps its own local horizontal scroll inside its b
    club-admin toggle reads 'Make club admin' / 'Remove club admin' (+ audit text). No more bare 'admin'.
 3) Added APP_RULES.md (global invariants reference) + ci/check-global-rules.py (guards Rule 1: the
    scrollRef horizontal clamp). Release builds now run this check alongside fontsize + jsx-escape.
+
+### v1.152.3 — Swipe-cue for horizontal-scroll boxes (no migration)
+New shared <HScroll> (components/hscroll.tsx): an overflowX:auto box that shows a "Swipe →" cue in
+the corner ONLY while there's more content to the right (mobile hides native scrollbars); the cue
+vanishes at the end and never shows when content fits. Applied to the two wide data boxes — admin
+drill table (manage.tsx) and the round-detail hole strip (round-detail.tsx). Codified in APP_RULES.md
+rule 1: any new horizontally-scrollable box uses <HScroll> (badge-shelf carousels keep their
+half-clipped-badge cue). No data/logic change.
+
+### v1.152.4 — FIX: Activity log actor shows name, not email (no migration)
+The game-delete log used the actor's email while game-create/end/reset used display name, so a delete
+read as 'amitsud@gmail.com' next to 'Amit Sud'. Fixed centrally: logActivity (lib/activity.ts) now
+resolves display_name from actor_id when the passed name is empty or looks like an email, so ALL entries
+(games, groups, admin actions) read as names. Also set game_deleted to pass displayName directly.
+Same actor_id throughout — this was only a label. Existing historical rows keep their old label.

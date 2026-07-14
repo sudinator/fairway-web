@@ -7,9 +7,19 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
 ## UI / layout
 1. **No horizontal page scroll — app-wide.** The page never drifts left/right. The single inner
    scroll container (`components/home.tsx`, `scrollRef`) is `overflowY:auto` + `overflowX:hidden`.
-   Content that is legitimately wider than the phone (e.g. a dense data table) must live in its OWN
-   `overflowX:auto` box so only that element scrolls — never the page. Charts/rows must resize to fit
-   the viewport, not force the page wider. — CI (`ci/check-global-rules.py`)
+   When content is wider than the phone, resolve it in this order — never let it clip silently or push
+   the page:
+   1. **Resize / reflow to fit (preferred):** flex `flex:1`, `flexWrap:"wrap"`, responsive
+      `gridTemplateColumns: repeat(auto-fit, minmax(…))`, `tableLayout:"fixed"` + `width:"100%"`.
+   2. **If it genuinely can't shrink (dense data table, full 18-hole strip):** wrap it in the shared
+      `<HScroll>` (`components/hscroll.tsx`) so only that element scrolls AND it shows a "Swipe →"
+      discoverability cue that appears only while there's more to the right (mobile hides native
+      scrollbars) and vanishes at the end. Any new horizontally-scrollable box uses `<HScroll>` — don't
+      hand-roll a bare `overflowX:"auto"` div.
+   Boxes using it today: admin drill table (`manage.tsx`), round-detail hole strip (`round-detail.tsx`).
+   Intentional exception: the profile/peer badge shelves are carousels that hide the scrollbar on purpose
+   (a half-clipped badge is their swipe cue) — leave them. — CI (`ci/check-global-rules.py` guards the
+   scrollRef clamp; using HScroll for new boxes is manual)
 2. **Minimum font size 11px.** No rendered text below 11px anywhere. — CI (`ci/check-min-fontsize.py`)
 3. **Real glyphs in JSX text, never literal `\uXXXX` escapes** (·, ›, —, …, ×, ‹, ▼). JS string/template
    literals may use `\u`. — CI (`ci/check-jsx-escapes.py`)
@@ -24,6 +34,9 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
 7. **Owner model.** Exactly one owner (`profiles.is_owner`, seeded to Amit). Only the owner can add or
    remove system admins (promote AND demote); the owner cannot be demoted; no one can change their own
    admin status. All role changes are audit-logged. — enforced in `admin_set_system_admin` (DB)
+
+7b. **Audit log shows names, not emails.** Activity-log entries display the actor's `display_name`
+   (resolved centrally in `lib/activity.ts` from `actor_id`), never their email. — code (logActivity)
 
 ## Data safety
 8. **Never blank a screen on a query error.** A failed/empty query must not delete data or drop the user

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { HScroll } from "@/components/hscroll";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, isGrossOnly, hasHoleDetail,
@@ -229,12 +230,12 @@ function GhinPanel({ round, ghinNumber, playerName }: { round: Round; ghinNumber
           <div style={{ color: C.cream, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginBottom: 6 }}>
             PREFER HOLE-BY-HOLE? READ THESE OFF AS YOU TYPE
           </div>
-          <div style={{ overflowX: "auto" }}>
+          <HScroll>
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${holeRows.length}, 1fr)`, gap: 4, minWidth: holeRows.length * 34 }}>
               {holeRows.map((r) => <div key={r.n} style={{ color: C.cream, opacity: 0.8, fontSize: 11, textAlign: "center", fontWeight: 700 }}>{r.n}</div>)}
               {holeRows.map((r) => <div key={r.n} style={{ color: "#16201C", background: C.cream, fontSize: 17, fontWeight: 800, textAlign: "center", borderRadius: 5, padding: "6px 0" }}>{r.gross}</div>)}
             </div>
-          </div>
+          </HScroll>
           <div style={{ color: C.cream, fontSize: 11, marginTop: 6, opacity: 0.85 }}>
             GHIN's hole-by-hole screen has a separate box per hole, so these are typed in one at a time — the big numbers above are easy to read while you do. (No app can paste all 18 into GHIN at once; only the Total Score above is a single field.)
           </div>
