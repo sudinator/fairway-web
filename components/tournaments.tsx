@@ -2687,6 +2687,10 @@ function GameRoom({
       const entered = scores.filter((s) => s != null && s > 0).length;
       if (entered === 0) return; // didn't play / nothing entered
 
+      // Test group: sandboxed — its games never post to individual Rounds / handicaps / stats.
+      const { data: grp } = await supabase.from("groups").select("is_test").eq("id", (game as any).group_id).maybeSingle();
+      if (grp?.is_test) return;
+
       const gross = scores.reduce((s: number, v) => s + (v && v > 0 ? v : 0), 0);
       const roundFields = {
         user_id: me.user_id,

@@ -1614,6 +1614,7 @@ function OpsMetrics() {
   const [m, setM] = useState<any | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [sg, setSg] = useState<any[] | null>(null);
+  const [delId, setDelId] = useState<string | null>(null);
   useEffect(() => {
     supabase.rpc("get_ops_metrics").then(({ data, error }: any) => {
       if (error) setErr(error.message); else setM(data);
@@ -1624,6 +1625,18 @@ function OpsMetrics() {
   }, []);
   if (err) return null; // supplementary; quiet if the RPC isn't deployed yet
   if (!m || Object.keys(m).length === 0) return null;
+
+  const delStale = async (g: any) => {
+    if (g.rounds_posted > 0 || delId) return;
+    if (!confirm(`Delete "${g.name}"? This removes the game and its ${g.players} player row${g.players === 1 ? "" : "s"} app-wide. It can't be undone.`)) return;
+    setDelId(g.game_id);
+    const { data } = await supabase.rpc("admin_delete_stale_game", { p_game: g.game_id });
+    setDelId(null);
+    if (data === "deleted") setSg((prev) => (prev || []).filter((x) => x.game_id !== g.game_id));
+    else if (data === "has_rounds") alert("Skipped — this game has posted rounds, so it wasn't deleted (avoids orphaning player rounds).");
+    else if (data === "not_stale") alert("Skipped — this game is already completed.");
+    else alert("Couldn't delete (permission or already gone).");
+  };
 
   const ctr = (c: number, s: number) => (s ? `${Math.round((100 * c) / s)}% click-through` : "no impressions yet");
   const tile = (n: React.ReactNode, l: string, d?: string) => (
@@ -1657,7 +1670,7 @@ function OpsMetrics() {
           <div style={{ marginTop: 16 }}>
             <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 700 }}>Stale games · 24h+</div>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 2, marginBottom: 8 }}>
-              Unfinished games older than a day, app-wide. Fully-scored ones (gold) auto-complete on the next sweep if under 30 days old; the rest are abandoned shells you may want to clear.
+              Unfinished games older than a day, app-wide. Fully-scored ones (gold) auto-complete on the next sweep if under 30 days old; the rest are abandoned shells you can Delete here (games with posted rounds are protected).
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
               {tile(sg.length, "Total stale", "not ended, 24h+")}
@@ -1680,8 +1693,21 @@ function OpsMetrics() {
                         {g.rounds_posted ? ` · ${g.rounds_posted} posted` : ""}
                       </div>
                     </div>
-                    <div style={{ background: vcolor[g.verdict] || C.faint, color: g.verdict === "fully_scored" ? "#1A1A1A" : C.cream, borderRadius: 8, padding: "2px 8px", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" }}>
-                      {vlabel[g.verdict] || g.verdict}
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                      <div style={{ background: vcolor[g.verdict] || C.faint, color: g.verdict === "fully_scored" ? "#1A1A1A" : C.cream, borderRadius: 8, padding: "2px 8px", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" }}>
+                        {vlabel[g.verdict] || g.verdict}
+                      </div>
+                      {g.rounds_posted > 0 ? (
+                        <div style={{ color: C.faint, fontSize: 11, whiteSpace: "nowrap" }}>has rounds</div>
+                      ) : (
+                        <button
+                          onClick={() => delStale(g)}
+                          disabled={delId === g.game_id}
+                          style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, padding: "2px 8px", fontSize: 11, fontWeight: 700, cursor: delId === g.game_id ? "default" : "pointer", opacity: delId === g.game_id ? 0.5 : 1, whiteSpace: "nowrap" }}
+                        >
+                          {delId === g.game_id ? "Deleting…" : "Delete"}
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -3122,7 +3148,10 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
     // Opportunistically clear any forgotten support sessions before showing the overview.
     await supabase.rpc("expire_support_sessions", { p_max_hours: 12 }).then(() => {}, () => {});
     const { data } = await supabase.rpc("admin_group_overview");
-    setRows(Array.isArray(data) ? data : []);
+    const base = Array.isArray(data) ? data : [];
+    const { data: flags } = await supabase.from("groups").select("id, is_test");
+    const tmap = new Map((flags || []).map((f: any) => [f.id, !!f.is_test]));
+    setRows(base.map((r: any) => ({ ...r, is_test: tmap.get(r.group_id) ?? false })));
   };
   useEffect(() => { load(); }, []);
 
@@ -3165,6 +3194,24 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
       if (error) { alert("Couldn't set default — " + error.message); return; }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "group_set_default", group_id: g.group_id, summary: `Set "${g.name}" as the default group` });
       await load();
+    } finally { setBusy(null); }
+  };
+
+  const wipeGroup = async (g: any) => {
+    const typed = prompt(`Wipe ALL data in test club "${g.name}"? This deletes its games, rounds and money ledger but KEEPS the club and its members. Type the club name to confirm:`);
+    if (typed == null) return;
+    if (typed.trim() !== g.name) { alert("Name didn't match — nothing was wiped."); return; }
+    setBusy(g.group_id);
+    try {
+      const { data, error } = await supabase.rpc("admin_wipe_group", { p_group: g.group_id });
+      if (error) { alert("Couldn't wipe — " + error.message); return; }
+      if (data === "wiped") {
+        await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "group_wiped", group_id: g.group_id, summary: `Wiped test club "${g.name}" data` });
+        alert(`Wiped all data in "${g.name}".`);
+        await load();
+        if (onGroupsChanged) await onGroupsChanged();
+      } else if (data === "not_test") alert("Refused — this isn't a test club.");
+      else alert("Couldn't wipe (permission or not found).");
     } finally { setBusy(null); }
   };
 
@@ -3257,6 +3304,12 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
                 style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
                 Delete group
               </button>
+              {g.is_test && (
+                <button disabled={busy === g.group_id} onClick={() => wipeGroup(g)}
+                  style={{ background: "transparent", color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                  Wipe data
+                </button>
+              )}
             </div>
             {mergeSrc === g.group_id && (
               <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", background: C.greenLight, borderRadius: 8, padding: 8 }}>

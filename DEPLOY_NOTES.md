@@ -3075,3 +3075,29 @@ admin can see how much stale/abandoned game data is awaiting cleanup.
   sage=in progress, red=no scores, grey=no players). Read-only — no in-app delete yet.
 - Note: fully_scored stale games under 30d auto-complete via sweep_stale_games (0103); this panel
   surfaces the longer tail (abandoned partials, empty shells, >30d fully-scored).
+
+### v1.156.0 — stale-games panel: per-row Delete (System Admin) — MIGRATION 0105 (RUN THIS)
+The Operations → Stale games panel now has a Delete button per row for clearing abandoned games
+without dropping to SQL.
+- New RPC admin_delete_stale_game(p_game) returns text (is_admin-gated, security definer). Guards:
+  refuses if the game is already 'ended' (not_stale) or has any live non-deleted rounds (has_rounds),
+  so it can never orphan a posted round. Nulls game_id on any soft-deleted rounds, then deletes
+  game_players + games (mirrors admin_delete_game). Returns forbidden|not_found|not_stale|has_rounds|deleted.
+- OpsMetrics (manage.tsx): each stale row shows a red outline Delete button when rounds_posted=0
+  (behind a confirm), or a 'has rounds' note when protected. On 'deleted' the row is removed from the
+  list in place; other statuses surface a short alert.
+
+### v1.157.0 — test-group sandbox + wipe — MIGRATIONS 0106 & 0107 (RUN BOTH)
+App Testing (group 41935c40-…) is now a true sandbox.
+- 0106: groups.is_test (App Testing=true) + is_test_group() helper. post_game_rounds_internal bails
+  before creating any rounds for a test group (covers game-end + auto-complete sweep); recordMyGameRound
+  (client) does the same. sweep_stale_games and admin_stale_games now skip test groups (no nudges, no
+  ops-panel clutter). Aggregate analytics already exclude is_test PROFILES, so test activity is fully
+  sandboxed: games/betting/money work, but nothing hits Rounds/handicaps/stats.
+- 0107: admin_wipe_group(p_group) — is_admin-gated AND hard-guarded to is_test groups only. Clears the
+  group's games+game_players, rounds+holes, money (expenses/expense_shares/group_guests/settlements),
+  group_activity, tee_times+rsvps, notifications; resets player_cards/member_badges for the group's TEST
+  members only. KEEPS the group + members. Returns forbidden|not_found|not_test|wiped.
+- manage.tsx GroupsAdmin: gold 'Wipe data' button on test-group rows (type-the-name confirm).
+- NOTE: manual rounds a real user logs directly to a test group are not gated (phantom users can't log
+  manually; games are the only phantom vector). Revisit if that edge matters.
