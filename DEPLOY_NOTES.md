@@ -3101,3 +3101,40 @@ App Testing (group 41935c40-…) is now a true sandbox.
 - manage.tsx GroupsAdmin: gold 'Wipe data' button on test-group rows (type-the-name confirm).
 - NOTE: manual rounds a real user logs directly to a test group are not gated (phantom users can't log
   manually; games are the only phantom vector). Revisit if that edge matters.
+
+### v1.158.0 — TEST MODE border (no migration)
+A thin red border + centered 'TEST MODE' label now frames the whole app whenever the user is in a
+test state, so it's never invisible. Shows when EITHER the account is a test account (profiles.is_test)
+OR the active club is a test group (groups.is_test). home.tsx: groups query/AppGroup now carry is_test;
+derived `testMode = profile.is_test || active group is_test`; fixed pointer-events:none overlay
+(#DC2626, z-9999) in the app shell, label offset by safe-area-inset-top for notch/PWA. Purely visual;
+the two underlying mechanisms are unchanged and remain distinct (is_test USER = excluded from
+aggregate analytics; is_test GROUP = games never post rounds / sandboxed).
+
+### v1.158.1 — FIX: analytics charts overflowed narrow screens (no migration)
+Weekend-reach and New-vs-returning charts ran off the right edge on phones. Root cause: horizontal
+flex bar rows whose columns were flex:1 but lacked minWidth:0 — a flex item defaults to min-width:auto
+and can't shrink below content, so the per-column nowrap week label pinned each column to its intrinsic
+width and ~13 weeks summed past the viewport; the app-shell overflowX:hidden then clipped the right
+side silently (invisible on wide desktop, broken on phone). Fix: minWidth:0 on each column + overflow
+hidden on the row + thinned week labels (~6 max, showWk()). Audited all other charts — SVGs are
+width:100%, the hole-outcomes bar is percentage-width in an overflow-hidden box, legends flex-wrap —
+all safe. Added ci/check-chart-overflow.py (flags a mapped bar-column with a nowrap label missing
+minWidth:0) to the pipeline, and documented the flex minWidth:0 idiom in APP_RULES rule 1.
+
+### v1.159.0 — automated layout-overflow e2e (Playwright + GitHub Actions) — no migration
+Runtime guard so chart/layout overflow can't silently ship. AdminEngagement now accepts an optional
+`inject` prop (skips its fetch) and is exported. New dev-only route app/dev/layoutprobe renders it with
+worst-case 13-week mock data (inert in prod; only active when NEXT_PUBLIC_LAYOUT_PROBE=1). Playwright
+(playwright.config.ts, e2e/overflow.spec.ts) builds+starts the app at a 360px viewport with placeholder
+Supabase env (no secrets, no login — the probe never hits the backend) and fails if scrollWidth>clientWidth
+or any element extends past the viewport. .github/workflows/e2e-overflow.yml runs it on every push/PR.
+npm script: `npm run e2e`. devDep @playwright/test. NOTE: GH Actions reports pass/fail on the commit;
+it does not block a Vercel deploy unless branch protection requiring the check is added.
+
+### v1.159.1 — remove the e2e/Playwright harness (per owner) — no migration
+Stripped the v1.159.0 automated-overflow harness: deleted playwright.config.ts, e2e/overflow.spec.ts,
+.github/workflows/e2e-overflow.yml, and app/dev/layoutprobe; reverted AdminEngagement to its original
+(no export/inject); removed the @playwright/test devDep + `e2e` script (lockfile reconciled). RETAINED
+the real fixes: the v1.158.1 two-chart overflow fix, the ci/check-chart-overflow.py static guard (still
+runs every build), and the v1.158.0 TEST MODE border. Overflow is now guarded statically + by eye.

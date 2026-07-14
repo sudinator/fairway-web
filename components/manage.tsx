@@ -1298,6 +1298,10 @@ function AdminEngagement() {
   const featTot = (feat.in_game || 0) + (feat.solo || 0);
   const maxG = Math.max(1, ...ws.map((w) => w.golfers));
   const maxNR = Math.max(1, ...nr.map((w) => (w.new || 0) + (w.returning || 0)));
+  // Show at most ~6 week labels so they never collide / force the row wider than the screen.
+  const stepW = Math.max(1, Math.ceil(ws.length / 6));
+  const stepNR = Math.max(1, Math.ceil(nr.length / 6));
+  const showWk = (i: number, n: number, step: number) => i % step === 0 || i === n - 1;
 
   const tile = (n: React.ReactNode, l: string, d?: string) => (
     <div style={{ background: C.greenLight, borderRadius: 12, padding: "10px 12px", flex: 1, minWidth: 92 }}>
@@ -1320,30 +1324,30 @@ function AdminEngagement() {
       </div>
 
       <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 14, marginBottom: 4 }}>Weekend reach — golfers logging Fri–Sun</div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 92, background: C.greenLight, borderRadius: 12, padding: 10 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 92, background: C.greenLight, borderRadius: 12, padding: 10, overflow: "hidden", minWidth: 0 }}>
         {ws.length === 0 ? <div style={{ color: C.sage, fontSize: 12 }}>No rounds yet.</div> :
           ws.map((w, i) => (
-            <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+            <div key={i} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
               <div style={{ color: C.cream, fontSize: 11 }}>{w.golfers}</div>
               <div title={`${w.golfers} golfers · ${w.rounds} rounds`} style={{ width: "70%", height: `${Math.round((w.golfers / maxG) * 54)}px`, minHeight: 2, background: C.gold, borderRadius: 3 }} />
-              <div style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap" }}>{w.week}</div>
+              <div style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap" }}>{showWk(i, ws.length, stepW) ? w.week : ""}</div>
             </div>
           ))}
       </div>
 
       <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 14, marginBottom: 4 }}>New vs returning golfers, per week</div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 92, background: C.greenLight, borderRadius: 12, padding: 10 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 92, background: C.greenLight, borderRadius: 12, padding: 10, overflow: "hidden", minWidth: 0 }}>
         {nr.length === 0 ? <div style={{ color: C.sage, fontSize: 12 }}>No rounds yet.</div> :
           nr.map((w, i) => {
             const tot = (w.new || 0) + (w.returning || 0);
             return (
-              <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+              <div key={i} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
                 <div style={{ color: C.cream, fontSize: 11 }}>{tot}</div>
                 <div style={{ width: "70%", height: 54, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
                   <div title={`${w.returning} returning`} style={{ height: `${Math.round(((w.returning || 0) / maxNR) * 54)}px`, background: C.sage, borderRadius: "3px 3px 0 0" }} />
                   <div title={`${w.new} new`} style={{ height: `${Math.round(((w.new || 0) / maxNR) * 54)}px`, background: C.gold }} />
                 </div>
-                <div style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap" }}>{w.week}</div>
+                <div style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap" }}>{showWk(i, nr.length, stepNR) ? w.week : ""}</div>
               </div>
             );
           })}

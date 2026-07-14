@@ -318,7 +318,7 @@ export function Home({ session }: { session: any }) {
     await activateEmailInvites();
     const { data } = await supabase
       .from("group_members")
-      .select("group_id, role, status, is_support, groups(id, name, status)")
+      .select("group_id, role, status, is_support, groups(id, name, status, is_test)")
       .eq("user_id", user.id)
       .eq("status", "active")
       .order("created_at", { ascending: true });
@@ -335,6 +335,7 @@ export function Home({ session }: { session: any }) {
         role: m.role,
         status: m.status,
         is_support: !!m.is_support,
+        is_test: !!m.groups?.is_test,
       })).filter((g: AppGroup) => !!g.id);
 
     if (!list.length && !(data && data.length)) {
@@ -639,10 +640,17 @@ export function Home({ session }: { session: any }) {
     return <NameGate user={user} onSaved={loadProfile} />;
   }
 
+  const testMode = !!profile?.is_test || !!groups.find((g) => g.id === activeGroupId)?.is_test;
+
   return (
     <div data-diag="shell" className="app-shell">
       <Toaster />
       <ViewportDiag />
+      {testMode && (
+        <div aria-hidden="true" style={{ position: "fixed", inset: 0, border: "3px solid #DC2626", pointerEvents: "none", zIndex: 9999 }}>
+          <div style={{ position: "absolute", top: "env(safe-area-inset-top, 0px)", left: "50%", transform: "translateX(-50%)", background: "#DC2626", color: "#fff", fontSize: 11, fontWeight: 800, letterSpacing: 1, padding: "2px 10px", borderRadius: "0 0 8px 8px" }}>TEST MODE</div>
+        </div>
+      )}
       <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch" }}>
       <InstallHint />
       <PullToRefresh scrollEl={scrollRef} onRefresh={async () => { await Promise.all([loadProfile(), loadGroups(), loadRounds()]); }}>

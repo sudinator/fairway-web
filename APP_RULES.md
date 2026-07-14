@@ -11,6 +11,11 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
    the page:
    1. **Resize / reflow to fit (preferred):** flex `flex:1`, `flexWrap:"wrap"`, responsive
       `gridTemplateColumns: repeat(auto-fit, minmax(…))`, `tableLayout:"fixed"` + `width:"100%"`.
+      **Flex bar charts / any horizontal row of mapped items MUST put `minWidth:0` on each child**
+      (flex items default to `min-width:auto` and won't shrink below their content — a `nowrap` label
+      then forces the row past the screen and it clips). Put `overflow:"hidden"` on the row, and thin
+      out per-item labels (show ~6 max) so they don't collide. Bug history: analytics Weekend-reach /
+      New-vs-returning charts (v1.158.x).
    2. **If it genuinely can't shrink (dense data table, full 18-hole strip):** wrap it in the shared
       `<HScroll>` (`components/hscroll.tsx`) so only that element scrolls AND it shows a "Swipe →"
       discoverability cue that appears only while there's more to the right (mobile hides native
@@ -19,7 +24,8 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
    Boxes using it today: admin drill table (`manage.tsx`), round-detail hole strip (`round-detail.tsx`).
    Intentional exception: the profile/peer badge shelves are carousels that hide the scrollbar on purpose
    (a half-clipped badge is their swipe cue) — leave them. — CI (`ci/check-global-rules.py` guards the
-   scrollRef clamp; using HScroll for new boxes is manual)
+   scrollRef clamp; `ci/check-chart-overflow.py` flags flex bar-columns missing `minWidth:0`; using
+   HScroll for new boxes is manual)
 2. **Minimum font size 11px.** No rendered text below 11px anywhere. — CI (`ci/check-min-fontsize.py`)
 3. **Real glyphs in JSX text, never literal `\uXXXX` escapes** (·, ›, —, …, ×, ‹, ▼). JS string/template
    literals may use `\u`. — CI (`ci/check-jsx-escapes.py`)

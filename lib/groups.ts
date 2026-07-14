@@ -7,4 +7,5 @@ export type AppGroup = {
   role: GroupRole;
   status: GroupStatus;
   is_support?: boolean;
+  is_test?: boolean;
 };
