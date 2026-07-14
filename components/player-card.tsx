@@ -12,7 +12,7 @@ const TIER_COLOR: Record<string, string> = { common: C.sage, rare: "#7FB8FF", el
 const TIER_RANK: Record<string, number> = { elite: 0, rare: 1, common: 2 };
 
 type BadgeItem = { key: string; icon: string; label: string; tier: string; count?: number };
-type CardView = { name: string; avatarUrl?: string | null; index: number | null; trend: number | null; roundsPlayed: number; badges: BadgeItem[]; form: number[] };
+type CardView = { name: string; avatarUrl?: string | null; index: number | null; trend: number | null; roundsPlayed: number; badges: BadgeItem[]; form: number[]; shareOff?: boolean };
 
 type EarnedLite = { badge_key: string; count?: number; last_earned_at?: string };
 
@@ -228,6 +228,7 @@ export function PeerCardModal({ member, groupId, viewerUserId, onClose }: { memb
         roundsPlayed: card?.rounds ?? 0,
         badges: buildBadges(badgeRows),
         form: (card?.form as number[]) || [],
+        shareOff: card ? card.show_card === false : false,
       });
       setLoading(false);
     })();
@@ -244,9 +245,11 @@ export function PeerCardModal({ member, groupId, viewerUserId, onClose }: { memb
           <>
             <PlayerCardView view={view} />
             {!isSelf && <ContactBar recipientId={member.user_id} groupId={groupId} name={view.name} phone={phone} />}
-            {view.roundsPlayed === 0 && view.badges.length === 0 && (
+            {view.shareOff ? (
+              <div style={{ color: C.sage, fontSize: 11, textAlign: "center", marginTop: 8 }}>{view.name.split(" ")[0]} has profile sharing off — badges and form are hidden.</div>
+            ) : view.roundsPlayed === 0 && view.badges.length === 0 ? (
               <div style={{ color: C.sage, fontSize: 11, textAlign: "center", marginTop: 8 }}>No card details yet.</div>
-            )}
+            ) : null}
           </>
         ) : null}
       </div>

@@ -2921,3 +2921,41 @@ each player's rounds on next load, so counts re-derive on net automatically (no 
 no_penalties relabelled 'Penalty-free round' (Clean card was misleading — read as no-bogeys). Evidence
 text updated. Added to the card's CARD_EXCLUDE so it no longer appears on the profile/peer card; it
 still lives on the full Achievements wall. Key unchanged.
+
+### v1.149.0 — FIX: analytics day anchored to US Eastern — MIGRATION 0096 (RUN IT)
+Resolves the discrepancy where the DAU tile (server UTC day) and the Daily report (browser-local day)
+counted different 24-hour windows. Now a new analytics day starts at MIDNIGHT US EASTERN for everyone,
+regardless of device timezone. Implemented by setting `timezone = America/New_York` ON the functions
+(ALTER FUNCTION ... SET timezone), so every current_date / calendar-day comparison inside them evaluates
+in ET without rewriting the bodies. Functions altered: mark_active (stamps daily_active.day in ET now),
+get_admin_analytics (DAU/WAU/MAU/views/sparkline/churn), admin_stat_users (drill-downs incl active_day),
+get_admin_engagement (rounds-cadence windows). Rolling `now() - interval` windows are absolute instants
+and unchanged. Client: the Daily report builds its Today/Yesterday buttons in ET (Intl en-CA / America/
+New_York) so they match the tiles; captions note 'Days run midnight–midnight US Eastern'.
+FORWARD-ONLY: daily_active stores a date (not a timestamp), so opens already stamped in UTC can't be
+perfectly reclassified — only opens from this migration forward are ET-exact; history is within ~1 day.
+DEPLOY: run migration 0096.
+
+### v1.149.1 — FIX: last UTC calendar-day touchpoints → Eastern — MIGRATION 0097 (RUN IT)
+Follow-up to 0096. Anchored the remaining live functions that decided a calendar day in UTC:
+get_power_users (activity window + days-since-active/churn flags) and the round-recording RPCs
+post_game_rounds / post_group_rounds (only their played_at FALLBACK used UTC; primary is the game's
+match date, unchanged). All via ALTER FUNCTION ... SET timezone. After this no live function uses a
+UTC calendar day (only a cosmetic 2-digit-year fallback in the 0060 tee-code trigger remains).
+DB-only. DEPLOY: run migration 0097.
+
+### v1.149.2 — TOOLING: migrations run-ledger
+Added MIGRATIONS.md (checklist of every migration; tick when run) + ci/gen-migrations-checklist.py
+to regenerate it (adds new files, preserves ticks). Manual-run workflow has no tracking table, so
+this is the record for catching un-run migrations. Currently flagged to verify-applied: 0082, 0092,
+0093, 0095, 0096, 0097 (0094 is optional/unused).
+
+### v1.150.0 — FEATURE: profile sharing gates showcase only (Option B) — MIGRATION 0098 (RUN IT)
+show_card (profile sharing) now hides only the SHOWCASE — badges + the form sparkline. Name, handicap
+index, and round count stay visible to club-mates (roster basics), so a private member's card reads
+'N rounds' instead of a broken '0'. group_cards (0098, supersedes 0082) returns a row for every active
+member incl. opted-out, always populates idx/idx_trend/live-rounds, blanks form when sharing off, and
+returns show_card. group_badges unchanged (still hides badges for opted-out = correct). Client peer card
+surfaces show_card, keeps rounds/index, and shows a clear '<name> has profile sharing off — badges and
+form are hidden' note instead of the old misleading 'No card details'. Fixes Karan Sarin showing 0 rounds.
+DEPLOY: run migration 0098.

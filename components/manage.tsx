@@ -1573,7 +1573,7 @@ function AdminAnalytics() {
           {tile(t.rounds_per_active_user ?? 0, "Rounds / active user", undefined, C.green)}
           {tile(ac.churn_30d ?? 0, "Lapsed (30–60d, gone)", undefined, C.green, { stat: "lapsed", cap: "Active 30–60d ago, silent since" })}
         </div>
-        <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Unique = distinct users; views = total app opens. Test accounts are excluded from all figures. Trends build over time.</div>
+        <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Unique = distinct users; views = total app opens. Test accounts are excluded from all figures. Days run midnight–midnight US Eastern. Trends build over time.</div>
       </div>
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
@@ -2629,11 +2629,15 @@ function AdminDailyReport() {
   const [gone, setGone] = useState(false);
 
   useEffect(() => {
+    // Days are US Eastern (America/New_York) for everyone — "Today" is the same midnight-to-midnight
+    // window no matter the viewer's device timezone, matching the DAU tiles (which now anchor ET too).
+    const east = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(new Date()); // YYYY-MM-DD
+    const [Y, M, D] = east.split("-").map(Number);
     const arr: { label: string; iso: string }[] = [];
     for (let i = 0; i < 7; i++) {
-      const dt = new Date(); dt.setDate(dt.getDate() - i);
-      const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-      arr.push({ iso, label: i === 0 ? "Today" : i === 1 ? "Yesterday" : dt.toLocaleDateString(undefined, { month: "short", day: "numeric" }) });
+      const dt = new Date(Date.UTC(Y, M - 1, D)); dt.setUTCDate(dt.getUTCDate() - i);
+      const iso = dt.toISOString().slice(0, 10);
+      arr.push({ iso, label: i === 0 ? "Today" : i === 1 ? "Yesterday" : dt.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" }) });
     }
     setDays(arr); setSel(arr[0].iso);
   }, []);
@@ -2701,6 +2705,7 @@ function AdminDailyReport() {
 
       <div style={{ color: C.faint, fontSize: 11, marginTop: 8, lineHeight: 1.7 }}>
         {dot("#5BBE7E")}completed &nbsp; {dot(C.gold)}in progress &nbsp; {dot("#5AA9E6")}auto-finished &nbsp; {dot(C.birdie)}deleted / issue
+        <div style={{ marginTop: 4 }}>Days run midnight–midnight US Eastern.</div>
       </div>
     </div>
   );
