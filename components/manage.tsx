@@ -2869,6 +2869,39 @@ function AdminFrictionReview() {
   );
 }
 
+// Sandbaggers: entered (GHIN) index vs the app's scoring-derived index, flagged at >=20% apart
+// once a player has >=18 posted rounds (below that the record is too thin to judge).
+function AdminSandbaggers() {
+  const [rows, setRows] = useState<any[] | null>(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    supabase.rpc("admin_sandbaggers").then(({ data, error }: any) => { if (error) setErr(true); else setRows(data || []); });
+  }, []);
+  if (err) return <div style={{ color: C.sage, fontSize: 13 }}>Couldn’t load — the admin_sandbaggers migration (0099) may not be applied yet.</div>;
+  if (!rows) return <div style={{ color: C.sage, fontSize: 13 }}>Loading…</div>;
+  return (
+    <div>
+      <div style={{ color: C.sage, fontSize: 12.5, lineHeight: 1.55, marginBottom: 12 }}>
+        Players whose entered index differs from what their scoring in the app implies by 20% or more, once they have at least 18 posted rounds. An entered index higher than their scoring warrants (“index looks high”) is the classic sandbag — more strokes than their game deserves. The entered (GHIN) index always wins for display; this is only a flag to review. Under 18 rounds, nobody is judged.
+      </div>
+      {rows.length === 0 ? (
+        <div style={{ background: C.card, borderRadius: 12, padding: 16, color: C.faint, fontSize: 13 }}>No one flagged — every player with 18+ rounds has an entered index within 20% of their scoring.</div>
+      ) : rows.map((r) => (
+        <div key={r.user_id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ color: C.ink, fontWeight: 800, fontSize: 14 }}>{r.name}</div>
+            <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>Entered {Number(r.entered).toFixed(1)} · scoring says {Number(r.calc).toFixed(1)} · {r.rounds} rounds</div>
+          </div>
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ color: r.direction === "entered_high" ? C.birdie : C.gold, fontWeight: 800, fontSize: 15 }}>{r.diff_pct}%</div>
+            <div style={{ color: C.faint, fontSize: 11 }}>{r.direction === "entered_high" ? "index looks high" : "index looks low"}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onGoto, onEnterGroup, onExitGroup, onGroupsChanged }: {
   user: any; profile: any; activeGroupName?: string | null; activeGroupRole?: string | null;
   onGoto: (tab: string) => void;
@@ -2920,6 +2953,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
       case "users": title = "Users"; panel = <AdminUsersTab user={user} />; break;
       case "players": title = "Player admin"; panel = <AdminPanel user={user} showAnalytics={false} />; break;
       case "feedback": title = "Feedback"; panel = <AdminFeedbackTab />; break;
+      case "sandbaggers": title = "Sandbaggers"; panel = <AdminSandbaggers />; break;
       case "systools": title = "System tools"; panel = <SystemTools user={user} />; break;
     }
     return (
@@ -2960,6 +2994,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
             <Card icon="🧑‍🤝‍🧑" name="Users" cap="Global roster, suspend, merge" onClick={() => setView("users")} />
             <Card icon="🗂" name="Player admin" cap="Handicaps, scores, memberships, courses" onClick={() => setView("players")} />
             <Card icon="💬" name="Feedback" cap="User-submitted feedback" onClick={() => setView("feedback")} badge={todos.new_feedback} />
+            <Card icon="🚩" name="Sandbaggers" cap="Entered index vs scoring (18+ rounds)" onClick={() => setView("sandbaggers")} />
             <Card icon="🩺" name="Diagnostics" cap="Round-save log & reproduce toggle" onClick={() => setView("diagnostics")} />
             <Card icon="🔧" name="System tools" cap="Test account, yardage backfill" onClick={() => setView("systools")} />
           </>)}

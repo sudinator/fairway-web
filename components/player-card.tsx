@@ -188,7 +188,7 @@ export function PlayerCard({ profile, user, rounds = [] }: { profile: any; user:
     return {
       name: profile?.display_name || "Player",
       avatarUrl: profile?.avatar_url,
-      index: s.idx ?? (profile?.handicap_index != null ? Number(profile.handicap_index) : null),
+      index: profile?.handicap_index != null ? Number(profile.handicap_index) : s.idx,
       trend: s.idx_trend,
       roundsPlayed: s.rounds,
       badges: buildBadges(earned),
@@ -223,7 +223,7 @@ export function PeerCardModal({ member, groupId, viewerUserId, onClose }: { memb
       setView({
         name: p.display_name || member.email || "Player",
         avatarUrl: member.avatar_url,
-        index: card?.idx != null ? Number(card.idx) : (p.handicap_index != null ? Number(p.handicap_index) : null),
+        index: p.handicap_index != null ? Number(p.handicap_index) : (card?.idx != null ? Number(card.idx) : null),
         trend: card?.idx_trend != null ? Number(card.idx_trend) : null,
         roundsPlayed: card?.rounds ?? 0,
         badges: buildBadges(badgeRows),

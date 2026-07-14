@@ -8,7 +8,7 @@ Regenerate after shipping (adds new files, keeps your ticks):
 
 Each release's DEPLOY_NOTES also flags any migration that must be run for that version.
 
-Total: 84 migrations. Unchecked = not yet confirmed applied.
+Total: 85 migrations. Unchecked = not yet confirmed applied.
 
 ## Checklist (oldest → newest)
 
@@ -72,7 +72,7 @@ Total: 84 migrations. Unchecked = not yet confirmed applied.
 - [x] 0072_profiles_readable_by_comembers.sql
 - [x] 0073_push_events_more.sql
 - [x] 0074_tee_reminders.sql
-- [x] 0075_tee_time_roles.sql
+- [ ] 0075_tee_time_roles.sql
 - [x] 0076_holes_unique.sql
 - [x] 0077_holes_upsert.sql
 - [x] 0078_admin_engagement.sql
@@ -96,3 +96,4 @@ Total: 84 migrations. Unchecked = not yet confirmed applied.
 - [ ] 0096_analytics_eastern_day.sql
 - [ ] 0097_power_users_eastern_day.sql
 - [ ] 0098_group_cards_show_basics.sql
+- [ ] 0099_admin_sandbaggers.sql

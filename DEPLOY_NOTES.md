@@ -2959,3 +2959,12 @@ returns show_card. group_badges unchanged (still hides badges for opted-out = co
 surfaces show_card, keeps rounds/index, and shows a clear '<name> has profile sharing off — badges and
 form are hidden' note instead of the old misleading 'No card details'. Fixes Karan Sarin showing 0 rounds.
 DEPLOY: run migration 0098.
+
+### v1.151.0 — FEATURE: card index default = entered; Sandbaggers admin tab — MIGRATION 0099 (RUN IT)
+1) Profile card now shows the player-ENTERED (GHIN) index by default, falling back to the app's
+   scoring-computed index only when none is entered. (Was: computed first.) Both self + peer cards.
+2) New System-admin tab 'Sandbaggers' (🚩): flags players whose entered index differs from the app's
+   scoring-computed index (player_cards.idx) by >=20% RELATIVE, but ONLY once they have >=18 posted
+   rounds (a thinner record skews the computed index, so GHIN is trusted as-is below that). Shows
+   entered vs scoring, rounds, %, and direction (index looks high = classic sandbag / low). RPC
+   admin_sandbaggers() (0099), is_admin-gated, security definer. DEPLOY: run migration 0099.
