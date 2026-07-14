@@ -461,6 +461,16 @@ export function Home({ session }: { session: any }) {
     }, () => {});
   }, [user?.id, loadRounds]);
 
+  // Best-effort: nudge organizers of fully-scored games to end them, and auto-complete any that are
+  // past the end of their ET day (self-throttled to once/hour server-side). Reloads if any completed,
+  // since the current user may have had a round posted by the auto-complete.
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.rpc("sweep_stale_games").then(({ data }: any) => {
+      if (typeof data === "number" && data > 0) loadRounds();
+    }, () => {});
+  }, [user?.id, loadRounds]);
+
   // Keep achievements in step with finished rounds. This single reconcile covers
   // every finalize path (new round, mark-complete, game-recorded) and doubles as
   // the one-time backfill of history — it's idempotent and a no-op when nothing

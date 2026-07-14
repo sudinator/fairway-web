@@ -319,8 +319,18 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
           const label = courseLabel(picked);
           const match = (gs || []).find((g: any) => norm(g.course) === norm(label));
           if (match) {
-            const ok = confirm(`You're already in the game "${match.name}" at ${match.course}, being scored by the group. Your scores there post to your Rounds automatically — and you can add your own putts, fairways, sand and penalties right on that game's scorecard. Log a SEPARATE round here anyway? This usually creates a duplicate.`);
-            if (!ok) return;
+            // Only warn if the player's round in that game is still UNFINISHED (holes left to score).
+            // A fully-scored-but-not-yet-ended game is effectively done — logging now is likely a
+            // genuine second round, so don't nag. (Nothing auto-ends games, so they can linger active.)
+            const { data: gpRow } = await supabase.from("game_players").select("scores").eq("game_id", match.id).eq("user_id", uid).maybeSingle();
+            const scores = (gpRow?.scores || {}) as Record<string, any>;
+            const n = picked.holes.length || 18;
+            let entered = 0;
+            for (let i = 0; i < n; i++) { const v = scores[String(i)]; if (v != null && v !== "" && Number(v) > 0) entered++; }
+            if (entered < n) {
+              const ok = confirm(`You're in the game "${match.name}" at ${match.course} and it's still being scored (${entered}/${n} holes in). Your scores there post to your Rounds automatically — and you can add your own putts, fairways, sand and penalties right on that game's scorecard. Log a SEPARATE round here anyway? This usually creates a duplicate.`);
+              if (!ok) return;
+            }
           }
         }
       }

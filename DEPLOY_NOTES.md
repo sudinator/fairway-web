@@ -3042,3 +3042,36 @@ same course; if so it warns: their scores post automatically and they can add th
 sand/penalties on the game's scorecard — 'Log a SEPARATE round anyway? This usually creates a duplicate.'
 Warn, not block (legit second rounds / back-entry still allowed). In-game guidance for view-only gross +
 editable stats already existed (tournaments.tsx). No rounds-data change.
+
+### v1.153.1 — refine duplicate-round warning: only when the game is still unfinished (no migration)
+v1.153.0 warned whenever the player was in any active game at that course. Refined: it now also checks
+the player's own scores in that game (game_players.scores, 0-based hole keys) and only warns if the
+round is still UNFINISHED (fewer scored holes than the course's hole count). A fully-scored game that
+the organizer simply hasn't ended no longer triggers it (that's likely a genuine second round). Message
+shows progress (e.g. '11/18 holes in'). NOTE: there is no system auto-END for games — only stale-complete
+in-progress ROUNDS auto-finish (0083). Auto-ending fully-scored stale games is a possible follow-up.
+
+### v1.154.0 — game auto-complete + organizer nudge — MIGRATION 0103 (RUN THIS)
+Fully-scored games that the organizer never ended no longer linger 'active' forever.
+- New games columns: scored_at (first seen fully scored), end_nudge_at (nudge sent).
+- post_game_rounds refactored: posting body extracted to post_game_rounds_internal(p_game, p_system);
+  post_game_rounds keeps its organizer-only gate and delegates (client 'End game' unchanged).
+- sweep_stale_games() (throttled once/hour via system_jobs, called on app open in home.tsx): a game is
+  'fully scored' when every player who started has all holes in and NO player is mid-round (partials
+  keep it in progress). Stamps scored_at; nudges the organizer 2h later ('...auto-complete at the end
+  of today...', type game_autocomplete, link /?tab=games); auto-ends + posts everyone's rounds at the
+  end of the ET day, attributed finished_by='system:auto' (mirrors the stale-round sweep 0083).
+- Guard: only games created within the last 30 days are swept (avoids resurrecting ancient games).
+- There is still NO auto-complete for single in-progress ROUNDS beyond finish_stale_rounds (0083).
+
+### v1.155.0 — System Admin: stale games panel — MIGRATION 0104 (RUN THIS)
+Operations panel (System Admin) now lists every unfinished game older than 24h, app-wide, so an
+admin can see how much stale/abandoned game data is awaiting cleanup.
+- New RPC admin_stale_games() (is_admin-gated, security definer, READ-ONLY): returns each non-ended
+  game >24h old with per-player completeness (same scores read as post_game_rounds) and a verdict:
+  fully_scored / in_progress / no_scores / empty, ordered cleanable-first then oldest.
+- OpsMetrics (manage.tsx): fetches it alongside get_ops_metrics; adds three count tiles (Total stale,
+  Fully scored, Abandoned) and a per-game list with a colour-coded verdict badge (gold=fully scored,
+  sage=in progress, red=no scores, grey=no players). Read-only — no in-app delete yet.
+- Note: fully_scored stale games under 30d auto-complete via sweep_stale_games (0103); this panel
+  surfaces the longer tail (abandoned partials, empty shells, >30d fully-scored).

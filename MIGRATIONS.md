@@ -8,7 +8,7 @@ Regenerate after shipping (adds new files, keeps your ticks):
 
 Each release's DEPLOY_NOTES also flags any migration that must be run for that version.
 
-Total: 88 migrations. Unchecked = not yet confirmed applied.
+Total: 90 migrations. Unchecked = not yet confirmed applied.
 
 ## Checklist (oldest → newest)
 
@@ -100,3 +100,5 @@ Total: 88 migrations. Unchecked = not yet confirmed applied.
 - [ ] 0100_admin_sandbaggers_club.sql
 - [ ] 0101_admin_sandbaggers_system_only.sql
 - [ ] 0102_owner_system_admins.sql
+- [ ] 0103_game_autocomplete.sql
+- [ ] 0104_admin_stale_games.sql

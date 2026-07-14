@@ -1613,10 +1613,14 @@ function AdminAnalytics() {
 function OpsMetrics() {
   const [m, setM] = useState<any | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [sg, setSg] = useState<any[] | null>(null);
   useEffect(() => {
     supabase.rpc("get_ops_metrics").then(({ data, error }: any) => {
       if (error) setErr(error.message); else setM(data);
     });
+    supabase.rpc("admin_stale_games").then(({ data }: any) => {
+      if (Array.isArray(data)) setSg(data);
+    }, () => {});
   }, []);
   if (err) return null; // supplementary; quiet if the RPC isn't deployed yet
   if (!m || Object.keys(m).length === 0) return null;
@@ -1644,6 +1648,48 @@ function OpsMetrics() {
         {tile(m.stale_partial ?? 0, "Stuck & partial", "left for the player to resolve")}
         {tile(m.auto_finished_7d ?? 0, "Auto-finished · 7d", "recovered into handicaps")}
       </div>
+      {sg ? (() => {
+        const clean = sg.filter((g) => g.verdict === "fully_scored").length;
+        const abandoned = sg.filter((g) => g.verdict === "in_progress" || g.verdict === "no_scores" || g.verdict === "empty").length;
+        const vlabel: Record<string, string> = { fully_scored: "fully scored", in_progress: "in progress", no_scores: "no scores", empty: "no players" };
+        const vcolor: Record<string, string> = { fully_scored: C.gold, in_progress: C.sage, no_scores: C.birdie, empty: C.faint };
+        return (
+          <div style={{ marginTop: 16 }}>
+            <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 14, fontWeight: 700 }}>Stale games · 24h+</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 2, marginBottom: 8 }}>
+              Unfinished games older than a day, app-wide. Fully-scored ones (gold) auto-complete on the next sweep if under 30 days old; the rest are abandoned shells you may want to clear.
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+              {tile(sg.length, "Total stale", "not ended, 24h+")}
+              {tile(clean, "Fully scored", "done but left open")}
+              {tile(abandoned, "Abandoned", "partial / empty")}
+            </div>
+            {sg.length === 0 ? (
+              <div style={{ color: C.sage, fontSize: 12, padding: "8px 2px" }}>No stale games — nothing to clean up.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {sg.map((g) => (
+                  <div key={g.game_id} style={{ background: C.greenLight, borderRadius: 10, padding: "8px 10px", display: "flex", alignItems: "flex-start", gap: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>{g.name}</div>
+                      <div style={{ color: C.sage, fontSize: 11, marginTop: 1 }}>
+                        {g.course} · {g.club} · {Math.round(g.age_days)}d · {g.organizer}
+                      </div>
+                      <div style={{ color: C.sage, fontSize: 11, marginTop: 1, opacity: 0.85 }}>
+                        {g.players} player{g.players === 1 ? "" : "s"} · {g.complete} done · {g.partial} mid-round · {g.not_started} no score
+                        {g.rounds_posted ? ` · ${g.rounds_posted} posted` : ""}
+                      </div>
+                    </div>
+                    <div style={{ background: vcolor[g.verdict] || C.faint, color: g.verdict === "fully_scored" ? "#1A1A1A" : C.cream, borderRadius: 8, padding: "2px 8px", fontSize: 11, fontWeight: 800, whiteSpace: "nowrap" }}>
+                      {vlabel[g.verdict] || g.verdict}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })() : null}
     </div>
   );
 }
@@ -2988,7 +3034,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
           {tierHead("System", "SYSTEM ADMIN", true, "Cross-club and system-wide. System admins only.")}
           {grid(<>
             <Card icon="📊" name="Analytics" cap="Usage, engagement & golf cadence" onClick={() => setView("analytics")} />
-            <Card icon="🧭" name="Operations" cap="Nudge funnel, auto-finish, stale rounds" onClick={() => setView("operations")} badge={todos.stale_ready} />
+            <Card icon="🧭" name="Operations" cap="Nudge funnel, auto-finish, stale rounds & games" onClick={() => setView("operations")} badge={todos.stale_ready} />
             <Card icon="⚠︎" name="Friction review" cap="Data-integrity flags to review & clear" onClick={() => setView("friction")} badge={todos.friction_open} />
             <Card icon="📜" name="Activity log" cap="Audit trail across all clubs" onClick={() => setView("activity")} />
             <Card icon="🏟" name="Clubs oversight" cap="Approve clubs, support sessions" onClick={() => setView("oversight")} badge={todos.pending_clubs} />
