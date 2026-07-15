@@ -6,8 +6,9 @@ import { C } from "@/lib/golf";
 import { Avatar, btn, inputStyle, Eyebrow } from "@/components/ui";
 import {
   computeBalances, simplify, pairwiseDebts, evenShares, validateCustomTotal, guestCoverageBySponsor,
-  fmtUSD, payLink, nudgeSms,
+  fmtUSD, payLink, nudgeSms, auditVersionsByExpense,
   type Expense, type Share, type Settlement, type Guest, type Payer,
+  type AuditRow, type AuditVersion, type AuditSnapshot,
 } from "@/lib/money";
 
 const supabase = createClient();
@@ -36,6 +37,8 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
   const [settlements, setSettlements] = useState<SettlementRow[]>([]);
   const [payers, setPayers] = useState<PayerRow[]>([]);
   const [activity, setActivity] = useState<any[]>([]);
+  const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
+  const [viewingSnap, setViewingSnap] = useState<{ snapshot: AuditSnapshot; at?: string } | null>(null); // read-only view of a deleted expense
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<ExpenseRow | null>(null);
   const [viewing, setViewing] = useState<ExpenseRow | null>(null);
@@ -73,6 +76,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     const { data: grp } = await supabase.from("groups").select("money_simplify").eq("id", gid).single();
     setSimplifyMode(grp?.money_simplify !== false); // default to simplified when column/absent
     const { data: act } = await supabase.from("group_activity").select("*").eq("group_id", gid).not("action", "like", "tt%").order("created_at", { ascending: false }).limit(200);
+    const { data: aud } = await supabase.from("money_audit").select("id, expense_id, actor_id, action, snapshot, created_at").eq("group_id", gid).order("created_at", { ascending: true }).limit(1000);
     setMembers((profs || []).map((p: any) => ({ id: p.id, display_name: p.display_name || "Player", avatar_url: p.avatar_url, venmo_handle: p.venmo_handle, paypal_handle: p.paypal_handle, zelle_handle: p.zelle_handle, phone: p.phone })).sort((a, b) => a.display_name.localeCompare(b.display_name, undefined, { sensitivity: "base" })));
     setGuests(((gRows || []) as GuestRow[]).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })));
     setExpenses((exp || []) as ExpenseRow[]);
@@ -80,12 +84,25 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     setSettlements((setl || []) as SettlementRow[]);
     setPayers((py || []) as PayerRow[]);
     setActivity((act || []) as any[]);
+    setAuditRows((aud || []) as AuditRow[]);
     setLoading(false);
     onChanged?.();
   }, [gid, onChanged]);
   useEffect(() => { load(); }, [load]);
 
   const memberById = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m])), [members]);
+  const auditByExpense = useMemo(() => auditVersionsByExpense(auditRows), [auditRows]);
+  const liveExpenseIds = useMemo(() => new Set(expenses.map((e) => e.id)), [expenses]);
+  // Frozen snapshot for an expense that no longer exists live (deleted): the last version's snapshot.
+  const deletedSnapById = useMemo(() => {
+    const out: Record<string, { snapshot: AuditSnapshot; at?: string }> = {};
+    for (const eid of Object.keys(auditByExpense)) {
+      if (liveExpenseIds.has(eid)) continue;
+      const vers = auditByExpense[eid];
+      for (let i = vers.length - 1; i >= 0; i--) { if (vers[i].snapshot) { out[eid] = { snapshot: vers[i].snapshot as AuditSnapshot, at: vers[i].at }; break; } }
+    }
+    return out;
+  }, [auditByExpense, liveExpenseIds]);
   const guestById = useMemo(() => Object.fromEntries(guests.map((g) => [g.id, g])), [guests]);
   const balances = useMemo(() => computeBalances(expenses, shares, settlements, guests, payers), [expenses, shares, settlements, guests, payers]);
   const transfers = useMemo(() => (simplifyMode ? simplify(balances) : pairwiseDebts(expenses, shares, settlements, guests, payers)), [simplifyMode, balances, expenses, shares, settlements, guests, payers]);
@@ -215,7 +232,14 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
           settlements={settlements} onUnmark={deleteSettlement}
           onPay={startPay} onZelle={startZelle} onMark={(t) => recordSettlement(t.from, t.to, t.amt, "cash")} />
       )}
-      {screen === "log" && <ActivityLog activity={activity} memberById={memberById} onOpenExpense={(id) => { const e = expenses.find((x) => x.id === id); if (e) setViewing(e); }} />}
+      {screen === "log" && <ActivityLog activity={activity} memberById={memberById}
+        onOpenExpense={(id) => {
+          const e = expenses.find((x) => x.id === id);
+          if (e) { setViewing(e); return; }
+          const snap = deletedSnapById[id];
+          if (snap) setViewingSnap(snap);
+        }}
+        canOpen={(id) => liveExpenseIds.has(id) || !!deletedSnapById[id]} />}
 
       {/* expenses list (under balances) */}
       {screen === "balances" && (
@@ -248,10 +272,14 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
 
       {viewing && (
         <ExpenseDetail expense={viewing} shares={shares} payers={payers} memberById={memberById} guestById={guestById}
-          history={activity.filter((a) => a?.meta?.expense_id === viewing.id && (a.action === "expense_created" || a.action === "expense_edited"))}
+          versions={auditByExpense[viewing.id] || []}
           canEdit={viewing.created_by === user.id || isAdmin}
           onEdit={() => { const v = viewing; setViewing(null); setEditing(v); setScreen("add"); }}
           onClose={() => setViewing(null)} />
+      )}
+
+      {viewingSnap && (
+        <SnapshotDetail snap={viewingSnap.snapshot} at={viewingSnap.at} onClose={() => setViewingSnap(null)} />
       )}
 
       {zelleInfo && (
@@ -674,11 +702,56 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
   );
 }
 
-function ExpenseDetail({ expense, shares, payers, memberById, guestById, history, canEdit, onEdit, onClose }: {
+// Shared bits for rendering a frozen snapshot's allocation (used by both the live
+// ExpenseDetail version history and the read-only SnapshotDetail for deleted rows).
+const fmtWhen = (iso?: string) => (iso ? new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "");
+const verbFor = (a: string) => (a === "created" ? "Created" : a === "deleted" ? "Deleted" : "Edited");
+
+function SnapshotBody({ snap }: { snap: AuditSnapshot }) {
+  const payers = snap.payers || [];
+  const shares = snap.shares || [];
+  return (
+    <>
+      <Eyebrow>Paid by</Eyebrow>
+      {(payers.length ? payers : [{ name: snap.created_by_name || "?", paid_cents: snap.amount_cents || 0 }]).map((r, i) => (
+        <div key={i} style={{ display: "flex", color: C.cream, fontSize: 13.5, padding: "3px 0" }}><span style={{ flex: 1 }}>{r.name}</span><span style={{ color: C.gold }}>{fmtUSD(r.paid_cents)}</span></div>
+      ))}
+      <Eyebrow>Split · {shares.length} {shares.length === 1 ? "person" : "people"}</Eyebrow>
+      {shares.map((s, i) => (
+        <div key={i} style={{ display: "flex", color: C.cream, fontSize: 13.5, padding: "3px 0" }}><span style={{ flex: 1 }}>{s.name}{s.is_guest ? " (guest)" : ""}</span><span style={{ color: C.sage }}>{fmtUSD(s.share_cents)}</span></div>
+      ))}
+    </>
+  );
+}
+
+// Read-only detail for an expense that no longer exists live (deleted). Rendered
+// entirely from the frozen money_audit snapshot, so the full allocation survives.
+function SnapshotDetail({ snap, at, onClose }: { snap: AuditSnapshot; at?: string; onClose: () => void }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px 24px", width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          <div style={{ flex: 1, color: C.cream, fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 800 }}>{snap.description || catLabel(snap.category || "other")}</div>
+          <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800 }}>{fmtUSD(snap.amount_cents || 0)}</div>
+        </div>
+        <div style={{ display: "inline-block", background: "#5a2d2d", color: "#ffd9d9", fontSize: 11, fontWeight: 800, padding: "2px 8px", borderRadius: 10, marginTop: 6 }}>DELETED{at ? " · " + fmtWhen(at) : ""}</div>
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>{catLabel(snap.category || "other")} · entered by {snap.created_by_name || "someone"}</div>
+        <SnapshotBody snap={snap} />
+        <div style={{ color: C.faint, fontSize: 11, marginTop: 12, lineHeight: 1.5 }}>This expense was deleted. The allocation above is the record as it stood at deletion — kept for the club's audit trail and can't be edited.</div>
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button onClick={onClose} style={{ ...btn(false), flex: 1 }}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExpenseDetail({ expense, shares, payers, memberById, guestById, versions, canEdit, onEdit, onClose }: {
   expense: ExpenseRow; shares: ShareRow[]; payers: PayerRow[];
   memberById: Record<string, Member>; guestById: Record<string, GuestRow>;
-  history: any[]; canEdit: boolean; onEdit: () => void; onClose: () => void;
+  versions: AuditVersion[]; canEdit: boolean; onEdit: () => void; onClose: () => void;
 }) {
+  const [openVer, setOpenVer] = useState<number | null>(null);
   const prs = payers.filter((p) => p.expense_id === expense.id);
   const parts = shares.filter((s) => s.expense_id === expense.id);
   const paidRows = prs.length
@@ -704,11 +777,31 @@ function ExpenseDetail({ expense, shares, payers, memberById, guestById, history
           return <div key={s.id || i} style={{ display: "flex", color: C.cream, fontSize: 13.5, padding: "3px 0" }}><span style={{ flex: 1 }}>{nm}</span><span style={{ color: C.sage }}>{fmtUSD(s.share_cents)}</span></div>;
         })}
 
-        {history.length > 0 && (<>
-          <Eyebrow>History</Eyebrow>
-          {history.map((h) => (
-            <div key={h.id} style={{ color: C.sage, fontSize: 11.5, padding: "2px 0" }}>{h.action === "expense_created" ? "Created" : "Edited"} by {memberById[h.actor_user_id]?.display_name || "Someone"} · {new Date(h.created_at).toLocaleDateString()}</div>
-          ))}
+        {versions.length > 0 && (<>
+          <Eyebrow>History · {versions.length} {versions.length === 1 ? "change" : "changes"}</Eyebrow>
+          {versions.map((v, i) => {
+            const who = (v.actor_id && memberById[v.actor_id]?.display_name) || v.snapshot?.created_by_name || "Someone";
+            const isOpen = openVer === i;
+            const expandable = !!v.snapshot;
+            return (
+              <div key={i} style={{ borderBottom: `1px solid ${C.greenMid}`, padding: "6px 0" }}>
+                <div onClick={expandable ? () => setOpenVer(isOpen ? null : i) : undefined}
+                  style={{ display: "flex", alignItems: "center", gap: 8, cursor: expandable ? "pointer" : "default" }}>
+                  <span style={{ color: C.gold, fontSize: 13, width: 16, textAlign: "center" }}>{v.action === "created" ? "+" : v.action === "deleted" ? "✕" : "✎"}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: C.cream, fontSize: 12.5 }}>{verbFor(v.action)} by {who}</div>
+                    <div style={{ color: C.faint, fontSize: 11 }}>{fmtWhen(v.at)}{v.snapshot?.amount_cents != null ? " · " + fmtUSD(v.snapshot.amount_cents) : ""}</div>
+                  </div>
+                  {expandable && <span style={{ color: C.sage, fontSize: 13 }}>{isOpen ? "▾" : "›"}</span>}
+                </div>
+                {isOpen && v.snapshot && (
+                  <div style={{ background: "#123528", borderRadius: 10, padding: "6px 10px", marginTop: 6 }}>
+                    <SnapshotBody snap={v.snapshot} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </>)}
 
         <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
@@ -722,7 +815,7 @@ function ExpenseDetail({ expense, shares, payers, memberById, guestById, history
 }
 
 const ACT_ICON: Record<string, string> = { expense_created: "+", expense_edited: "✎", expense_deleted: "✕", settlement_added: "✓", guest_added: "☺" };
-function ActivityLog({ activity, memberById, onOpenExpense }: { activity: any[]; memberById: Record<string, Member>; onOpenExpense?: (expenseId: string) => void }) {
+function ActivityLog({ activity, memberById, onOpenExpense, canOpen }: { activity: any[]; memberById: Record<string, Member>; onOpenExpense?: (expenseId: string) => void; canOpen?: (expenseId: string) => boolean }) {
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Activity log</div>
@@ -730,14 +823,16 @@ function ActivityLog({ activity, memberById, onOpenExpense }: { activity: any[];
       {activity.length === 0 && <div style={{ color: C.sage, fontSize: 13, padding: "8px 2px" }}>Nothing logged yet.</div>}
       {activity.map((a) => {
         const who = memberById[a.actor_user_id]?.display_name || "Someone";
-        const openable = !!a?.meta?.expense_id && (a.action === "expense_created" || a.action === "expense_edited");
+        const eid = a?.meta?.expense_id;
+        const isExpenseEvent = eid && (a.action === "expense_created" || a.action === "expense_edited" || a.action === "expense_deleted");
+        const openable = !!isExpenseEvent && (canOpen ? canOpen(eid) : a.action !== "expense_deleted");
         return (
-          <div key={a.id} onClick={openable ? () => onOpenExpense?.(a.meta.expense_id) : undefined}
+          <div key={a.id} onClick={openable ? () => onOpenExpense?.(eid) : undefined}
             style={{ display: "flex", gap: 9, padding: "9px 2px", borderBottom: `1px solid ${C.greenMid}`, cursor: openable ? "pointer" : "default", alignItems: "center" }}>
             <span style={{ fontSize: 14, width: 18, textAlign: "center", color: C.gold }}>{ACT_ICON[a.action] || "•"}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: C.cream, fontSize: 13 }}><b>{who}</b> {a.summary}</div>
-              <div style={{ color: C.faint, fontSize: 11 }}>{new Date(a.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div>
+              <div style={{ color: C.faint, fontSize: 11 }}>{new Date(a.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}{a.action === "expense_deleted" && openable ? " · tap to see the deleted detail" : ""}</div>
             </div>
             {openable && <span style={{ color: C.sage, fontSize: 16 }}>&#8250;</span>}
           </div>

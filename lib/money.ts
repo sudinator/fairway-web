@@ -262,3 +262,79 @@ export function betResultToPost(nets: BetNet[]): BetPost {
   const ok = amount_cents === shareTotal;
   return { amount_cents, payers, shares, ok, reason: ok ? undefined : "Rounding failed to balance." };
 }
+
+// ---------------------------------------------------------------------------
+// Money audit trail (v1.165.0)
+// ---------------------------------------------------------------------------
+// The `money_audit` table gets one row per underlying table write (see migration
+// 0111). Because the app writes an expense and its shares/payers in SEPARATE
+// requests, a single logical create/edit produces a BURST of snapshot rows that
+// arrive within a second or two from the same actor. collapseAuditBursts folds
+// each burst into one clean VERSION: the action of the first row in the burst
+// (created vs edited) with the snapshot of the LAST row (the settled final state
+// once every child write has landed). A 'deleted' row always stands alone and is
+// terminal. Pure + unit-tested; the UI renders whatever this returns.
+
+export interface AuditRow {
+  id: string;
+  expense_id: string;
+  actor_id: string | null;
+  action: "created" | "edited" | "deleted";
+  snapshot: AuditSnapshot | null;
+  created_at: string; // ISO
+}
+export interface AuditSnapshot {
+  expense_id?: string;
+  group_id?: string;
+  description?: string;
+  category?: string;
+  amount_cents?: Cents;
+  currency?: string;
+  split_type?: string;
+  source_kind?: string | null;
+  created_by?: string | null;
+  created_by_name?: string | null;
+  payers?: { user_id: string | null; name: string; paid_cents: Cents }[];
+  shares?: { user_id: string | null; guest_id: string | null; name: string; is_guest?: boolean; share_cents: Cents }[];
+}
+export interface AuditVersion {
+  action: "created" | "edited" | "deleted";
+  actor_id: string | null;
+  at: string;           // ISO of the first row in the burst
+  snapshot: AuditSnapshot | null; // the settled (last) snapshot in the burst
+}
+
+/** Fold per-row audit snapshots into clean per-edit versions, chronological. */
+export function collapseAuditBursts(rows: AuditRow[], windowMs = 8000): AuditVersion[] {
+  const sorted = [...rows].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const out: AuditVersion[] = [];
+  let cur: { action: AuditRow["action"]; actor_id: string | null; at: string; snapshot: AuditSnapshot | null; lastMs: number } | null = null;
+  const flush = () => { if (cur) { out.push({ action: cur.action, actor_id: cur.actor_id, at: cur.at, snapshot: cur.snapshot }); cur = null; } };
+  for (const r of sorted) {
+    const ms = Date.parse(r.created_at);
+    const sameBurst =
+      cur !== null &&
+      r.action !== "deleted" &&           // a delete always starts fresh…
+      cur.action !== "deleted" &&         // …and nothing merges into a delete
+      r.actor_id === cur.actor_id &&
+      ms - cur.lastMs <= windowMs;
+    if (sameBurst && cur) {
+      cur.snapshot = r.snapshot ?? cur.snapshot; // keep the latest non-null snapshot
+      cur.lastMs = ms;
+    } else {
+      flush();
+      cur = { action: r.action, actor_id: r.actor_id, at: r.created_at, snapshot: r.snapshot, lastMs: ms };
+    }
+  }
+  flush();
+  return out;
+}
+
+/** Group collapsed versions by expense_id (each list chronological). */
+export function auditVersionsByExpense(rows: AuditRow[], windowMs = 8000): Record<string, AuditVersion[]> {
+  const byExp: Record<string, AuditRow[]> = {};
+  for (const r of rows) (byExp[r.expense_id] || (byExp[r.expense_id] = [])).push(r);
+  const out: Record<string, AuditVersion[]> = {};
+  for (const eid of Object.keys(byExp)) out[eid] = collapseAuditBursts(byExp[eid], windowMs);
+  return out;
+}

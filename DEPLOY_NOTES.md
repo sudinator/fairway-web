@@ -3295,3 +3295,35 @@ A table taller than the phone lost its column headers as you scrolled down. HScr
 optional maxHeight so the box scrolls vertically too, and a thead marked position:sticky;top:0 stays
 frozen while rows scroll under it. Applied to the Power Users table (manage.tsx, maxHeight 70vh, sticky
 header with the sticky-left Player corner at the highest z-index). New global rule in APP_RULES (rule 1).
+
+### v1.165.0 — durable, immutable Money audit trail + integrity fixes · MIGRATION 0111
+The Money ledger now keeps a permanent, tamper-proof record of every change, so an expense's full
+allocation can always be traced — even after it's deleted. Fixes the gap where deleting an expense
+erased its own history (the old `expense_audit`, 0050, was `on delete cascade`) and the allocation
+breakdown vanished with the live rows.
+- **New `money_audit` table**: one immutable snapshot per underlying write. NOT cascade-linked to the
+  expense, so a deletion's snapshot outlives the expense. Read-only to members; NO update/delete policy
+  (append-only, can't be doctored). Snapshots denormalize member/guest names so they still render after
+  those rows change or are gone.
+- **Captured by DB triggers, not app code** — they fire on every write path (manual expenses, admin
+  edits, bet-posting from games, or a raw API call), so the trail can't be bypassed. A `BEFORE DELETE`
+  trigger freezes the full allocation the instant before it cascades. The snapshot insert is
+  exception-guarded so an auditing hiccup can never block a user's save/delete.
+- **Because the app writes an expense and its shares/payers in separate requests**, one logical
+  create/edit produces a short burst of snapshot rows; `collapseAuditBursts` (lib/money.ts, unit-tested)
+  folds each burst into one clean version (first row's action, last row's settled snapshot). A delete is
+  always its own terminal version.
+- **UI**: the expense detail sheet now shows a full "History · N changes" list, each version expandable
+  to its allocation as it stood then. A deleted expense's log entry is tappable and opens a read-only
+  frozen snapshot ("DELETED" badge, full paid-by + split). No write code was touched.
+- **Integrity fix — child-row write lock**: `expense_shares` / `expense_payers` writes are now scoped to
+  the parent expense's `created_by` or a group admin/owner (previously ANY active member could rewrite
+  another member's split directly via the API). Reads stay open to all members. Matches the app's own
+  UI gate and the parent expense's update policy — makes true the model "edit only your own; admins edit
+  anyone, all logged."
+- **Sanity rail**: a single expense is capped at $100,000 (`amount_cents <= 10000000`) via CHECK
+  constraint.
+- Settlement permissions unchanged (honor system, by design — convenience over airtight).
+- **Migration 0111 must be run** in the Supabase SQL editor. Deploying the code ahead of it is safe
+  (the audit UI simply shows nothing until snapshots exist), but the audit trail and the child-write
+  lock don't take effect until it's applied.

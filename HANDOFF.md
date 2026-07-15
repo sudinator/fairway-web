@@ -106,13 +106,17 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current version: v1.164.3 (this zip).**
-- **All migrations through 0110 have been run** — the database is fully current with this source
-  (0108 avatars, 0109 play-date-when-scored, 0110 games always-scored-date + `set_game_played_date` RPC,
-  and everything before). **No pending schema work.**
-- **Deploy v1.164.3** if not already live (date-of-play work + the HScroll scroll-bar change).
-- Optional sanity check: the Weequahic game should read **Jun 20** on all scorecards (0110 backfill).
-- Next code work comes from the backlog (§10) or Amit's direction.
+**Current version: v1.165.0 (this zip).**
+- **Migration 0111 is PENDING** — run `0111_money_audit.sql` in the Supabase SQL editor (full SQL is in
+  the file and was printed inline at delivery). It adds the `money_audit` trail + triggers, locks
+  `expense_shares`/`expense_payers` writes to the expense creator/admin, and caps a single expense at
+  $100k. The v1.165.0 code is safe to deploy ahead of it (the audit UI just shows nothing until
+  snapshots exist), but the trail and the child-write lock don't take effect until it's applied.
+- **All migrations through 0110 have been run**; 0111 is the only unapplied one (see MIGRATIONS.md).
+- After running 0111: create a test expense, edit it, delete it — the log entry for the deleted expense
+  should remain tappable and show its frozen allocation ("DELETED" badge).
+- Next code work comes from the backlog (§10) or Amit's direction. Money Tier-2/3 (settlement
+  counterparty-confirm, dispute flags, server-side child-write audit) remain optional follow-ups.
 
 ## 9. Recent major thread — "date of play" (context you'll need)
 The recent work overhauled how a round's date is recorded:

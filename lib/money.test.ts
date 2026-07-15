@@ -2,8 +2,9 @@
 import {
   evenShares, validateCustomTotal, computeBalances, simplify, pairwiseDebts, aggregateOwed,
   payLink, nudgeSms, fmtUSD, guestOwedFor, guestCoverageBySponsor, betResultToPost,
+  collapseAuditBursts, auditVersionsByExpense,
 } from "./money";
-import type { Expense, Share, Settlement, Guest, Transfer, Payer } from "./money";
+import type { Expense, Share, Settlement, Guest, Transfer, Payer, AuditRow } from "./money";
 
 let pass = 0, fail = 0; const fails: string[] = [];
 // Canonicalize: sort object keys (leave arrays in order) so {a,b} == {b,a}.
@@ -263,6 +264,62 @@ ok("nudge sms has body", nudgeSms("2015550102", "Dev", 6500, "Saturday Golf", "b
   ok("betResultToPost balances", bp.ok);
   const samPayer = bp.payers.find((p: any) => p.guest_id === "gSam");
   check("guest winner booked as guest payer with sponsor", { g: samPayer?.guest_id, s: samPayer?.sponsor_user_id, c: samPayer?.paid_cents }, { g: "gSam", s: "amit", c: 4000 });
+}
+
+// --- audit burst collapse (money_audit → clean versions) ---
+{
+  const snap = (amt: number, shares: number) => ({ amount_cents: amt, shares: Array.from({ length: shares }, (_, i) => ({ user_id: "u" + i, guest_id: null, name: "P" + i, share_cents: Math.floor(amt / shares) })) });
+  // A CREATE arrives as: expense insert (no children) → shares insert → payers insert, same actor, ~sub-second apart.
+  const createBurst: AuditRow[] = [
+    { id: "1", expense_id: "e1", actor_id: "amit", action: "created", snapshot: snap(3000, 0) as any, created_at: "2026-07-14T10:00:00.000Z" },
+    { id: "2", expense_id: "e1", actor_id: "amit", action: "edited",  snapshot: snap(3000, 3) as any, created_at: "2026-07-14T10:00:00.400Z" },
+    { id: "3", expense_id: "e1", actor_id: "amit", action: "edited",  snapshot: snap(3000, 3) as any, created_at: "2026-07-14T10:00:00.800Z" },
+  ];
+  const v1 = collapseAuditBursts(createBurst);
+  check("create burst collapses to one version", v1.length, 1);
+  check("create burst keeps 'created' action", v1[0].action, "created");
+  check("create burst keeps final (complete) snapshot", (v1[0].snapshot as any).shares.length, 3);
+
+  // A later EDIT by an admin: expense update → shares delete/insert → payers delete/insert.
+  const editBurst: AuditRow[] = [
+    { id: "4", expense_id: "e1", actor_id: "bob", action: "edited", snapshot: snap(5000, 3) as any, created_at: "2026-07-14T11:30:00.000Z" },
+    { id: "5", expense_id: "e1", actor_id: "bob", action: "edited", snapshot: snap(5000, 2) as any, created_at: "2026-07-14T11:30:00.500Z" },
+    { id: "6", expense_id: "e1", actor_id: "bob", action: "edited", snapshot: snap(5000, 2) as any, created_at: "2026-07-14T11:30:00.900Z" },
+  ];
+  const v2 = collapseAuditBursts([...createBurst, ...editBurst]);
+  check("create + edit = two versions", v2.length, 2);
+  check("second version is an edit", v2[1].action, "edited");
+  check("second version by bob", v2[1].actor_id, "bob");
+  check("edit keeps final amount", (v2[1].snapshot as any).amount_cents, 5000);
+
+  // A DELETE is always its own terminal version and never merges, even if close in time.
+  const withDelete: AuditRow[] = [
+    ...createBurst,
+    { id: "7", expense_id: "e1", actor_id: "amit", action: "deleted", snapshot: snap(3000, 3) as any, created_at: "2026-07-14T10:00:01.000Z" },
+  ];
+  const v3 = collapseAuditBursts(withDelete);
+  check("delete does not merge into create burst", v3.length, 2);
+  check("delete is terminal version", v3[v3.length - 1].action, "deleted");
+  check("deleted version retains frozen allocation", (v3[1].snapshot as any).shares.length, 3);
+
+  // Different actors within the window do NOT merge.
+  const twoActors: AuditRow[] = [
+    { id: "8", expense_id: "e2", actor_id: "amit", action: "created", snapshot: snap(1000, 2) as any, created_at: "2026-07-14T12:00:00.000Z" },
+    { id: "9", expense_id: "e2", actor_id: "bob",  action: "edited",  snapshot: snap(1000, 2) as any, created_at: "2026-07-14T12:00:00.300Z" },
+  ];
+  check("distinct actors stay distinct versions", collapseAuditBursts(twoActors).length, 2);
+
+  // A gap larger than the window splits versions even for the same actor.
+  const gapped: AuditRow[] = [
+    { id: "10", expense_id: "e3", actor_id: "amit", action: "created", snapshot: snap(1000, 1) as any, created_at: "2026-07-14T13:00:00.000Z" },
+    { id: "11", expense_id: "e3", actor_id: "amit", action: "edited",  snapshot: snap(2000, 1) as any, created_at: "2026-07-14T13:05:00.000Z" },
+  ];
+  check("large time gap splits versions", collapseAuditBursts(gapped).length, 2);
+
+  // Grouping helper keys by expense.
+  const grouped = auditVersionsByExpense([...withDelete, ...twoActors]);
+  check("grouped has e1", grouped["e1"].length, 2);
+  check("grouped has e2", grouped["e2"].length, 2);
 }
 
 console.log(`\n=== money.test ===\nPASS ${pass}  FAIL ${fail}`);
