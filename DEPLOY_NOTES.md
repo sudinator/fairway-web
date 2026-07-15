@@ -3275,3 +3275,9 @@ the default, the scored-date fallback still records the day it was actually play
   button appears only when changed; past-date confirmation before it moves anything).
 - Backfill completes 0109: forces every game round to its scored (first-post/creation) day, ET.
 - Solo rounds are unaffected (user-entered date, editable per v1.163.0).
+
+### v1.164.1 — move the 'Swipe ->' cue to the top of scrollers (no migration)
+The HScroll discoverability cue sat at bottom-right and overlapped the last row of content (visible in
+the Power Users table, where it hid the last user). Moved it to top-right in the shared component, so
+it never covers content. Global change — applies to both boxes that use HScroll (admin/power-users
+table in manage.tsx, and the round-detail hole strip).

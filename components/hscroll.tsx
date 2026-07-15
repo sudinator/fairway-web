@@ -5,9 +5,10 @@ import { C } from "@/lib/golf";
 /**
  * HScroll — the standard wrapper for any horizontally-scrollable content box.
  * Renders an overflowX:auto scroller and, ONLY when the content actually overflows and the user
- * hasn't yet scrolled to the end, a small "Swipe →" cue in the corner for discoverability
- * (mobile auto-hides native scrollbars). The cue disappears once scrolled to the end and never
- * shows when everything already fits. See APP_RULES.md rule 1.
+ * hasn't yet scrolled to the end, a small "Swipe →" cue in the top corner for discoverability
+ * (mobile auto-hides native scrollbars). Placed at the top so it never covers the last row of
+ * content. The cue disappears once scrolled to the end and never shows when everything already fits.
+ * See APP_RULES.md rule 1.
  */
 export function HScroll({
   children,
@@ -50,7 +51,7 @@ export function HScroll({
           style={{
             position: "absolute",
             right: 6,
-            bottom: 6,
+            top: 6,
             pointerEvents: "none",
             fontSize: 11,
             fontWeight: 800,
