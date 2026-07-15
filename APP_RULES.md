@@ -17,10 +17,11 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
       out per-item labels (show ~6 max) so they don't collide. Bug history: analytics Weekend-reach /
       New-vs-returning charts (v1.158.x).
    2. **If it genuinely can't shrink (dense data table, full 18-hole strip):** wrap it in the shared
-      `<HScroll>` (`components/hscroll.tsx`) so only that element scrolls AND it shows a "Swipe →"
-      discoverability cue that appears only while there's more to the right (mobile hides native
-      scrollbars) and vanishes at the end. Any new horizontally-scrollable box uses `<HScroll>` — don't
-      hand-roll a bare `overflowX:"auto"` div.
+      `<HScroll>` (`components/hscroll.tsx`) so only that element scrolls. It hides the native scrollbar
+      and, only while the content overflows, shows a slim custom scroll-position bar BELOW the content
+      (in normal flow, so it never overlaps any text or data); the thumb shows position + how much is
+      off-screen and is draggable. Hidden when everything fits. Any new horizontally-scrollable box uses
+      `<HScroll>` — don't hand-roll a bare `overflowX:"auto"` div.
    Boxes using it today: admin drill table (`manage.tsx`), round-detail hole strip (`round-detail.tsx`).
    Intentional exception: the profile/peer badge shelves are carousels that hide the scrollbar on purpose
    (a half-clipped badge is their swipe cue) — leave them. — CI (`ci/check-global-rules.py` guards the

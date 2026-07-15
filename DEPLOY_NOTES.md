@@ -3281,3 +3281,11 @@ The HScroll discoverability cue sat at bottom-right and overlapped the last row 
 the Power Users table, where it hid the last user). Moved it to top-right in the shared component, so
 it never covers content. Global change — applies to both boxes that use HScroll (admin/power-users
 table in manage.tsx, and the round-detail hole strip).
+
+### v1.164.2 — HScroll: swipe pill -> slim scroll-position bar (no migration)
+Replaced the overlay 'Swipe ->' cue (which covered content wherever it was anchored) with a slim
+custom scroll bar placed BELOW the content in normal flow — it never overlaps any text or data.
+Shows only while the box overflows; the gold thumb reflects position + how much is off-screen and is
+draggable (or scroll the content). Native scrollbar hidden to avoid a double bar. Global change via
+the shared component — applies to the Power Users table (manage.tsx) and the round-detail hole strip
+(round-detail.tsx). Chosen from an A/B mockup.
