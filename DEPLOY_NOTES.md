@@ -3577,3 +3577,28 @@ No migration.
 - **Removed the "Built: <date>" line** in Help → version tile (redundant now the date is in the version
   number). Dropped the now-unused APP_BUILT_AT import.
 No migration.
+
+### 168.1.260715 — bottom-popup safe-area sweep + guard (no migration)
+Swept every bottom-docked popup for the nav-bar/safe-area rule (#17), and added a blocking CI guard so it
+can't regress.
+- Found: the manage handicap-override drawer, the notification-bell drawer, and the three tee-times
+  drawers (RSVP / assign-captain / captain-duties) included env(safe-area-inset-bottom) but only ~10-16px
+  of it — not enough to clear the ~56px nav bar (these are viewport-fixed, so on iOS PWAs they paint over
+  the nav). Brought all to the standard `calc(72px + env(safe-area-inset-bottom))`, matching Money.
+- Left as-is (correct): the home More-menu — it's the nav's own overflow menu and docks directly against
+  the nav (`16px + safe`), so it must NOT clear the nav.
+- New guard `ci/check-bottom-sheets.py` (blocking): every bottom-docked sheet panel must include
+  env(safe-area-inset-bottom). Added to the pre-ship pipeline; rule #17 updated.
+No migration.
+
+### 168.2.260715 — closed events seal their payments too · MIGRATION 0115
+Consistency fix (reported): an admin could "Unmark" a payment on a closed (sealed) event without reopening
+it — contradicting "closed = sealed." Now the flow is reopen → unmark, matching how closed-event expenses
+already behave.
+- **Migration 0115**: `_guard_settlement_frozen_event` trigger blocks DELETE of a settlement tied to a
+  closed event ("reopen the event to unmark it") and blocks INSERT of a new payment into a closed event.
+  UPDATE is allowed so a pending settle armed before the event closed can still be confirmed.
+- **UI**: the Unmark button is hidden on closed-event payments (shows a "🔒 closed" note instead); the
+  unmark handler also pre-checks and tells the admin to reopen first. Reopen the event (existing admin
+  control on the closed island) and Unmark returns.
+- **Run migration 0115** (after 0114). Confirm with `select id, applied_at from public.schema_migrations order by id;`.

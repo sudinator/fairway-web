@@ -58,6 +58,7 @@ values, never real secrets.)
    - `python3 ci/check-min-fontsize.py` — no rendered text < 11px. **Blocking.**
    - `python3 ci/check-global-rules.py` — global invariants (e.g. scrollRef clamp). **Blocking.**
    - `python3 ci/check-chart-overflow.py` — flex bar-columns must have `minWidth:0`. **Blocking.**
+   - `python3 ci/check-bottom-sheets.py` — every bottom-docked popup includes env(safe-area-inset-bottom). **Blocking.**
    - `python3 ci/check-date-inputs.py` — every `type="date"` is iOS-safe (ShortDateInput or the
      WebkitAppearance workaround). **Blocking.** (Known iPhone bug with bare date inputs.)
    - `python3 ci/check-jsx-escapes.py` — flags literal `\uXXXX` in JSX text. **Advisory (rc=1).** Only
@@ -113,7 +114,7 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current version: 167.2.260715 (this zip).** (New version scheme `FEATURE.EDIT.YYMMDD` — see APP_RULES #13.)
+**Current version: 168.2.260715 (this zip). Migration 0115 is the outstanding DB step (0111-0114 already applied per the ledger).** (New version scheme `FEATURE.EDIT.YYMMDD` — see APP_RULES #13.)
 - **Two migrations are PENDING** — run in the Supabase SQL editor in order (full SQL printed inline at
   delivery, and in the files):
   - **`0111_money_audit.sql`** — durable Money audit trail + triggers, child-write lock, $100k cap.

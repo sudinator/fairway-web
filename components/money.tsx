@@ -226,6 +226,8 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
 
   async function deleteSettlement(s2: SettlementRow) {
     if (!requireOnline()) return;
+    const ev = s2.event_id ? events.find((e) => e.id === s2.event_id) : null;
+    if (ev && ev.status === "closed") { alert(`This payment is in a closed event ("${ev.name}"). Reopen the event first, then unmark it.`); return; }
     if (!window.confirm("Unmark this payment? " + nameOf(s2.from_user_id) + " → " + nameOf(s2.to_user_id) + " " + fmtUSD(s2.amount_cents) + ". Balances will recompute.")) return;
     setBusy(true);
     const { error } = await supabase.from("settlements").delete().eq("id", s2.id);
@@ -320,6 +322,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
         <SettleScreen transfers={transfers} nameOf={nameOf} memberById={memberById} busy={busy} me={user.id} isAdmin={isAdmin}
           simplifyOn={simplifyMode} canToggle={isAdmin} onToggle={setSimplify}
           settlements={settlements} onUnmark={deleteSettlement}
+          closedEventIds={new Set(events.filter((e) => e.status === "closed").map((e) => e.id))}
           onPay={startPay} onZelle={startZelle} onMark={(t) => recordSettlement(t.from, t.to, t.amt, "cash")} />
       )}
       {screen === "log" && <ActivityLog activity={activity} memberById={memberById}
@@ -518,11 +521,11 @@ function BalancesScreen({ members, guests, shares, payers, balances, me, onNudge
 }
 
 // ---------------- Settle up ----------------
-function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simplifyOn, canToggle, onToggle, settlements, onUnmark, onPay, onZelle, onMark }: {
+function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simplifyOn, canToggle, onToggle, settlements, onUnmark, closedEventIds, onPay, onZelle, onMark }: {
   transfers: { from: string; to: string; amt: number }[]; nameOf: (id: string) => string;
   memberById: Record<string, Member>; busy: boolean; me: string; isAdmin: boolean;
   simplifyOn: boolean; canToggle: boolean; onToggle: (v: boolean) => void;
-  settlements: SettlementRow[]; onUnmark: (s: SettlementRow) => void;
+  settlements: SettlementRow[]; onUnmark: (s: SettlementRow) => void; closedEventIds: Set<string>;
   onPay: (kind: "venmo" | "paypal", t: { from: string; to: string; amt: number }) => void;
   onZelle: (t: { from: string; to: string; amt: number }) => void;
   onMark: (t: { from: string; to: string; amt: number }) => void;
@@ -572,13 +575,15 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
           <Eyebrow>Payments recorded</Eyebrow>
           {[...settlements].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")).map((s2) => {
             const canUndo = isAdmin || s2.created_by === me;
+            const inClosed = !!(s2.event_id && closedEventIds.has(s2.event_id));
             return (
               <div key={s2.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 2px", borderBottom: `1px solid ${C.greenMid}` }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: C.cream, fontSize: 13 }}><b>{nameOf(s2.from_user_id)}</b> paid <b>{nameOf(s2.to_user_id)}</b> {fmtUSD(s2.amount_cents)}</div>
                   <div style={{ color: C.faint, fontSize: 11 }}>{s2.method || "cash"}{s2.created_at ? " · " + new Date(s2.created_at).toLocaleDateString() : ""}</div>
                 </div>
-                {canUndo && <button disabled={busy} onClick={() => onUnmark(s2)} style={{ border: `1px solid ${C.line}`, background: "transparent", color: C.sage, borderRadius: 8, padding: "6px 10px", fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>Unmark</button>}
+                {canUndo && !inClosed && <button disabled={busy} onClick={() => onUnmark(s2)} style={{ border: `1px solid ${C.line}`, background: "transparent", color: C.sage, borderRadius: 8, padding: "6px 10px", fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>Unmark</button>}
+                {canUndo && inClosed && <span style={{ color: C.faint, fontSize: 11, whiteSpace: "nowrap" }}>{"\uD83D\uDD12"} closed</span>}
               </div>
             );
           })}

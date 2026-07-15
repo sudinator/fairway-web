@@ -1244,7 +1244,7 @@ function StatDrawerHost() {
         background: C.greenMid, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "82vh",
         display: "flex", flexDirection: "column", transform: open ? "translateY(0)" : "translateY(102%)",
         transition: "transform .24s cubic-bezier(.2,.7,.2,1)", boxShadow: "0 -10px 40px rgba(0,0,0,.5)",
-        paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)" }}>
+        paddingBottom: "calc(72px + env(safe-area-inset-bottom))" }}>
         <div style={{ width: 42, height: 5, borderRadius: 3, background: "rgba(255,255,255,.25)", margin: "9px auto 4px" }} />
         <div style={{ padding: "6px 16px 12px", borderBottom: `1px solid ${C.greenLight}`, position: "relative" }}>
           <button onClick={close} style={{ position: "absolute", right: 12, top: 4, background: "none", border: "none", color: C.sage, fontSize: 22, cursor: "pointer", lineHeight: 1 }}>×</button>
@@ -2216,7 +2216,7 @@ export function NotificationBell({ user, onSeeAll, onNavigate }: { user: any; on
           <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 440, margin: "0 auto", zIndex: 90,
             background: C.greenMid, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "82vh",
             display: "flex", flexDirection: "column", boxShadow: "0 -10px 40px rgba(0,0,0,.5)",
-            paddingBottom: "calc(10px + env(safe-area-inset-bottom))" }}>
+            paddingBottom: "calc(72px + env(safe-area-inset-bottom))" }}>
             <div style={{ width: 40, height: 4, background: C.greenLight, borderRadius: 2, margin: "8px auto 4px", flexShrink: 0 }} />
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 14px 10px", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
               <Eyebrow style={{ margin: 0 }}>NOTIFICATIONS</Eyebrow>

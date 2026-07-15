@@ -73,5 +73,5 @@ Going-forward compliance: APP_RULES #15/#16.
 
 ## BottomSheet (popup safe-area) migration — started 168.0
 Shared `<BottomSheet>` added (ui.tsx): clears nav bar + safe areas. Money sheets patched in place
-(paddingBottom/maxHeight). TODO sweep: migrate other screens' bottom-docked sheets to `<BottomSheet>`
+(paddingBottom/maxHeight). DONE: brought all bottom drawers to nav+safe clearance
 (tee-times, manage, round-detail, round-setup, groups, organizer modals). Rule: APP_RULES #17.
