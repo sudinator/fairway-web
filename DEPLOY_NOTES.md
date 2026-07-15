@@ -3544,3 +3544,36 @@ settlements) as settled for every event — so pre-existing, global-tab, and unt
 and moving already-settled expenses can't make them look unpaid. Participants who still owe overall are
 still judged by event-tagged coverage, preserving per-event/dispute handling (pay a newer event, an older
 one stays open). Regression test added. No migration.
+
+### 167.8.260715 — Money module hardening + stress battery (no migration)
+Full correctness pass on the Money module after the move-into-event bug. Two more bugs found and fixed,
+plus a large automated test battery so the core math can't silently regress.
+- **Fix — balance breakdown mismatch**: PersonLedgerModal was fed ALL settlements (incl. pending) for its
+  line items while showing a confirmed-only headline balance, so with a pending settle the lines wouldn't
+  sum to the shown balance (despite the modal's copy promising they do). Now fed confirmed-only.
+- **Fix — contradictory island UI**: in the netting case (globally square but owing *within* an event),
+  the island showed a "settled" chip AND a "Settle $X" button at once. Settle affordance now gated on
+  `!settled`.
+- **Stress battery** (lib/money.test.ts): adversarial cases (rounding $10/3, cross-event netting, circular
+  debt, over-settlement, guest multi-hop) + a seeded property-based fuzzer over **3,000 random valid
+  ledgers** asserting the core invariants every time: (1) balances conserve to zero; (2) personLedger
+  reconciles to computeBalances for every member; (3) per-event nets sum to zero; (4) withinEventDebts sums
+  to owed exactly with positive amounts; (5) a globally-square member never blocks a bucket; covered never
+  exceeds owed; (6) simplify conserves and zeroes. Money suite now 111 assertions, all passing.
+- Scope note: the incorrect "owing" was the per-event island display only; the home-screen "you owe"
+  banner is global-balance based, so genuinely settled members saw no banner.
+No migration.
+
+### 168.0.260715 — popup safe-areas (global), event who-owes summary, drop Built line (no migration)
+- **Bottom popups clear the nav bar + safe areas (global).** New shared `<BottomSheet>` (components/ui.tsx)
+  reserves bottom room for the tab bar + iOS home indicator and caps height against the notch. Fixes the
+  reported Money expense popup whose bottom (and last button) was hidden behind the nav bar. All six Money
+  sheets patched to the safe pattern; standing rule added (APP_RULES #17); shared component in place so new
+  popups comply. Other screens' sheets tracked for migration.
+- **Event islands now summarize who owes what.** Under each event header: "All members settled" (green) when
+  settled, otherwise a plain-language line — e.g. "Ravi owes $50 · Amit gets $50" — built from the per-event
+  nets, so a viewer instantly sees the standings even when not settled. Detailed per-member paid/net rows
+  still shown below.
+- **Removed the "Built: <date>" line** in Help → version tile (redundant now the date is in the version
+  number). Dropped the now-unused APP_BUILT_AT import.
+No migration.

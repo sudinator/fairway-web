@@ -16,7 +16,7 @@ import { YardageBackfill } from "@/components/yardage-backfill";
 import { AchievementsWall } from "@/components/achievements";
 import { PlayerCard, PeerCardModal, CardVisibilityToggle } from "@/components/player-card";
 import { resizeToAvatar } from "@/lib/image";
-import { APP_VERSION, APP_BUILT_AT } from "@/lib/app-version";
+import { APP_VERSION } from "@/lib/app-version";
 import { courseChangeLines, buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
 import { loadFormDraft, saveFormDraft, clearFormDraft, draftAgeLabel } from "@/lib/form-draft";
 import { HelpSearch } from "@/components/help-search";
@@ -3656,7 +3656,6 @@ function UpdateChecker() {
       <div style={{ color: C.cream, fontSize: 13, marginTop: 10, lineHeight: 1.7 }}>
         <div><b>Current version:</b> {APP_VERSION}</div>
         <div><b>Latest version:</b> {latest || "Not checked yet"}</div>
-        {APP_BUILT_AT ? <div style={{ color: C.sage, fontSize: 11 }}>Built: {new Date(APP_BUILT_AT).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</div> : null}
         <div style={{ color: C.faint, fontSize: 11, marginTop: 12, lineHeight: 1.6 }}>
           Birdie Num Num — created by Amit Sud
           <br />© 2026 Amit Sud. All rights reserved.

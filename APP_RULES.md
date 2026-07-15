@@ -98,6 +98,12 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
     (missized/clipped/invisible chrome) — a known, recurring bug. Always use the shared `<ShortDateInput>`
     (components/ui.tsx) or, for a full-width field, a raw input whose style includes
     `WebkitAppearance:"none"` (and `appearance:"none"`). Enforced by `ci/check-date-inputs.py`. — manual
+17. **Bottom popups must clear the nav bar + device safe areas.** Any bottom-docked sheet/modal uses the
+    shared `<BottomSheet>` (components/ui.tsx): it reserves bottom space for the tab bar and the iOS home
+    indicator (`paddingBottom: calc(72px + env(safe-area-inset-bottom))`) and caps height against the notch
+    (`maxHeight: calc(100dvh - env(safe-area-inset-top) - 20px)`). Never dock a raw `position:fixed; inset:0`
+    sheet with a plain bottom padding — the last button ends up hidden behind the nav bar. Money's sheets
+    are migrated; other screens' sheets are being moved to `<BottomSheet>` and new ones must use it. — manual
 14. **Every migration's full SQL is printed inline in chat** for copy-paste into the Supabase SQL editor,
     and tracked in `MIGRATIONS.md` (tick when run). — manual
 15. **Repo docs stay in sync each bundle:** DEPLOY_NOTES.md, SCHEMA.md, BACKLOG.md, README.md,

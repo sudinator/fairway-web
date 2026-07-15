@@ -106,6 +106,24 @@ export const FieldLabel = ({ children, style }: { children: React.ReactNode; sty
   <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5, ...style }}>{children}</div>
 );
 
+// Standard bottom-sheet popup. Docks to the bottom, but its content ALWAYS clears the bottom nav bar
+// + the iOS home indicator (paddingBottom), and never slides under the notch/status bar (maxHeight caps
+// against safe-area-inset-top). Every bottom popup should use this so the last button is never hidden
+// behind the nav bar. Pass panelStyle only for genuine per-sheet tweaks (e.g. textAlign).
+export const SHEET_PANEL_BOTTOM = "calc(72px + env(safe-area-inset-bottom))"; // clears the ~56px nav + home indicator
+export function BottomSheet({ onClose, children, panelStyle }: { onClose?: () => void; children: React.ReactNode; panelStyle?: React.CSSProperties }) {
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background: C.greenLight, borderRadius: "16px 16px 0 0", width: "100%", maxWidth: 520,
+        padding: "18px 16px", paddingBottom: SHEET_PANEL_BOTTOM,
+        maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto",
+        ...panelStyle,
+      }}>{children}</div>
+    </div>
+  );
+}
+
 // Compact date field: shows a short M/D/YY date in the page font (so it matches
 // every other input) with a real native date picker layered transparently on top.
 export function ShortDateInput({ value, onChange, max }: { value: string; onChange: (v: string) => void; max?: string }) {

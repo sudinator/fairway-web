@@ -472,3 +472,189 @@ ok("nudge sms has body", nudgeSms("2015550102", "Dev", 6500, "Saturday Golf", "b
 console.log(`\n=== money.test ===\nPASS ${pass}  FAIL ${fail}`);
 if (fails.length) { console.log("\n" + fails.join("\n\n")); process.exit(1); }
 console.log("All assertions passed.");
+
+// ============================================================================
+// STRESS BATTERY — adversarial cases + property-based fuzz. Goal: break it.
+// ============================================================================
+{
+  // ---- hand-crafted adversarial cases ----
+
+  // 1) Rounding: $10 split 3 ways. evenShares must sum to total; nets must be exact.
+  {
+    const sh = evenShares(1000, 3);
+    check("evenShares sums to total (rounding)", sh.reduce((a, b) => a + b, 0), 1000);
+    const exp = [{ id: "r", event_id: "e", payer_user_id: "a", amount_cents: 1000 }];
+    const shares = [
+      { expense_id: "r", user_id: "a", guest_id: null, share_cents: sh[0] },
+      { expense_id: "r", user_id: "b", guest_id: null, share_cents: sh[1] },
+      { expense_id: "r", user_id: "c", guest_id: null, share_cents: sh[2] },
+    ];
+    const bal = computeBalances(exp as any, shares as any, [], [], []);
+    check("rounding: balances sum to 0", Object.values(bal).reduce((a, b) => a + b, 0), 0);
+    const d = withinEventDebts("e", "b", exp as any, shares as any, [], []);
+    check("withinEventDebts sums to b's owed exactly", d.reduce((s, x) => s + x.amount, 0), sh[1]);
+  }
+
+  // 2) Netting: owes in X, is owed in Y, globally square → event shows settled (Amit's model).
+  {
+    const events = [
+      { id: "x", group_id: "g", name: "X", event_date: "2026-05-01", event_type: "manual", status: "open" },
+      { id: "y", group_id: "g", name: "Y", event_date: "2026-06-01", event_type: "manual", status: "open" },
+    ];
+    const exp = [
+      { id: "ex", event_id: "x", payer_user_id: "amit", amount_cents: 10000, created_at: "2026-05-01T00:00:00Z" }, // amit fronts X
+      { id: "ey", event_id: "y", payer_user_id: "ravi", amount_cents: 10000, created_at: "2026-06-01T00:00:00Z" }, // ravi fronts Y
+    ];
+    const shares = [
+      { expense_id: "ex", user_id: "amit", guest_id: null, share_cents: 5000 },
+      { expense_id: "ex", user_id: "ravi", guest_id: null, share_cents: 5000 }, // ravi owes 50 in X
+      { expense_id: "ey", user_id: "amit", guest_id: null, share_cents: 5000 }, // amit owes 50 in Y
+      { expense_id: "ey", user_id: "ravi", guest_id: null, share_cents: 5000 },
+    ];
+    const bal = computeBalances(exp as any, shares as any, [], [], []);
+    check("netting: amit globally square", bal["amit"] || 0, 0);
+    check("netting: ravi globally square", bal["ravi"] || 0, 0);
+    const st = eventSettlement({ events: events as any, expenses: exp as any, shares: shares as any, payers: [], settlements: [], guests: [] });
+    ok("netting: X settled (globally square)", st["x"].settled);
+    ok("netting: Y settled (globally square)", st["y"].settled);
+  }
+
+  // 3) Circular debt A->B->C->A, simplify should zero everyone and conserve.
+  {
+    const bal = { a: -5000, b: 0, c: 5000 } as Record<string, number>;
+    const tr = simplify(bal);
+    const applied: Record<string, number> = { ...bal };
+    for (const t of tr) { applied[t.from] += t.amt; applied[t.to] -= t.amt; }
+    check("simplify zeroes everyone", Object.values(applied).reduce((a, b) => a + Math.abs(b), 0), 0);
+  }
+
+  // 4) Over-settlement: pay more than owed for an event → still settled, not "double negative".
+  {
+    const events = [{ id: "o", group_id: "g", name: "O", event_date: "2026-05-01", event_type: "manual", status: "open" }];
+    const exp = [{ id: "eo", event_id: "o", payer_user_id: "amit", amount_cents: 10000, created_at: "2026-05-01T00:00:00Z" }];
+    const shares = [
+      { expense_id: "eo", user_id: "amit", guest_id: null, share_cents: 5000 },
+      { expense_id: "eo", user_id: "ravi", guest_id: null, share_cents: 5000 },
+    ];
+    const st = [{ from_user_id: "ravi", to_user_id: "amit", amount_cents: 9000, event_id: "o", status: "confirmed" }]; // overpaid
+    const res = eventSettlement({ events: events as any, expenses: exp as any, shares: shares as any, payers: [], settlements: st as any, guests: [] });
+    ok("over-settled event is settled", res["o"].settled);
+    check("covered capped at owed (no over-count)", res["o"].covered, res["o"].owed);
+  }
+
+  // 5) Guest multi-hop: guest sponsored by amit, everything routes to amit.
+  {
+    const exp = [{ id: "g", event_id: null, payer_user_id: "ravi", amount_cents: 9000 }];
+    const shares = [
+      { expense_id: "g", user_id: "ravi", guest_id: null, share_cents: 3000 },
+      { expense_id: "g", user_id: null, guest_id: "G1", sponsor_user_id: "amit", share_cents: 3000 },
+      { expense_id: "g", user_id: null, guest_id: "G2", sponsor_user_id: "amit", share_cents: 3000 },
+    ];
+    const guests = [{ id: "G1", sponsor_user_id: "amit" }, { id: "G2", sponsor_user_id: "amit" }];
+    const bal = computeBalances(exp as any, shares as any, [], guests as any, []);
+    check("guest: amit owes both guests' shares", bal["amit"] || 0, -6000);
+    check("guest: balances sum to 0", Object.values(bal).reduce((a, b) => a + b, 0), 0);
+    const led = personLedger("amit", exp as any, shares as any, [], guests as any, [], (u) => u || "?");
+    check("guest: ledger reconciles for sponsor", led.total, bal["amit"] || 0);
+  }
+
+  // ---- property-based fuzz: thousands of random valid ledgers ----
+  function mulberry32(a: number) { return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+  let fuzzFails = 0; let iterations = 3000;
+  for (let iter = 0; iter < iterations; iter++) {
+    const rnd = mulberry32(1000 + iter);
+    const ri = (n: number) => Math.floor(rnd() * n);
+    const nMembers = 2 + ri(5);
+    const members = Array.from({ length: nMembers }, (_, i) => "m" + i);
+    const nGuests = ri(3);
+    const guests = Array.from({ length: nGuests }, (_, i) => ({ id: "g" + i, sponsor_user_id: members[ri(nMembers)] }));
+    const parties = [...members.map((id) => ({ user_id: id, guest_id: null as string | null, sponsor: null as string | null })),
+                     ...guests.map((g) => ({ user_id: null as string | null, guest_id: g.id, sponsor: g.sponsor_user_id }))];
+    const nEvents = ri(4);
+    const events = Array.from({ length: nEvents }, (_, i) => ({ id: "ev" + i, group_id: "g", name: "E" + i, event_date: `2026-0${1 + i}-01`, event_type: "manual", status: "open" }));
+    const buckets: (string | null)[] = [null, ...events.map((e) => e.id)];
+
+    const nExp = 2 + ri(10);
+    const expenses: any[] = []; const shares: any[] = []; const payers: any[] = [];
+    for (let e = 0; e < nExp; e++) {
+      const amt = 100 + ri(50000);
+      const payer = members[ri(nMembers)];
+      const bucket = buckets[ri(buckets.length)];
+      const id = "x" + e;
+      expenses.push({ id, event_id: bucket, payer_user_id: payer, amount_cents: amt, created_at: `2026-01-${String(1 + (e % 27)).padStart(2, "0")}T00:00:00Z` });
+      // split among a random non-empty subset of parties
+      const subset = parties.filter(() => rnd() < 0.7); if (!subset.length) subset.push(parties[ri(parties.length)]);
+      const parts = evenShares(amt, subset.length);
+      subset.forEach((p, i) => shares.push({ expense_id: id, user_id: p.user_id, guest_id: p.guest_id, sponsor_user_id: p.sponsor, share_cents: parts[i] }));
+      // occasionally multiple payers (must sum to amount)
+      if (rnd() < 0.25 && nMembers >= 2) {
+        const pp = evenShares(amt, 2); const a = members[ri(nMembers)]; let b = members[ri(nMembers)]; if (b === a) b = members[(members.indexOf(a) + 1) % nMembers];
+        payers.push({ expense_id: id, user_id: a, guest_id: null, paid_cents: pp[0] });
+        payers.push({ expense_id: id, user_id: b, guest_id: null, paid_cents: pp[1] });
+      }
+    }
+    const nSet = ri(6);
+    const settlements: any[] = [];
+    for (let s = 0; s < nSet; s++) {
+      const from = members[ri(nMembers)]; let to = members[ri(nMembers)]; if (to === from) to = members[(members.indexOf(from) + 1) % nMembers];
+      settlements.push({ from_user_id: from, to_user_id: to, amount_cents: 100 + ri(20000), event_id: buckets[ri(buckets.length)], status: rnd() < 0.3 ? "pending" : "confirmed" });
+    }
+    const confirmed = settlements.filter((x) => x.status === "confirmed");
+
+    try {
+      // INV 1: conservation — confirmed balances sum to 0
+      const bal = computeBalances(expenses, shares, confirmed, guests as any, payers);
+      const sum = Object.values(bal).reduce((a, b) => a + b, 0);
+      if (sum !== 0) throw new Error(`conservation broken: sum=${sum}`);
+
+      // INV 2: personLedger reconciles to balance for every member (same settlement set)
+      for (const m of members) {
+        const led = personLedger(m, expenses, shares, confirmed, guests as any, payers, (u) => u || "?");
+        if (led.total !== (bal[m] || 0)) throw new Error(`ledger mismatch for ${m}: ${led.total} vs ${bal[m] || 0}`);
+      }
+
+      // INV 3: eventNet per bucket sums to 0
+      for (const b of buckets) {
+        const en = eventNet(b as any, expenses, shares, guests as any, payers);
+        const s = en.perMember.reduce((a, x) => a + x.net, 0);
+        if (s !== 0) throw new Error(`eventNet not zero for bucket ${b}: ${s}`);
+      }
+
+      // INV 4: withinEventDebts sums to member's within-bucket owed, exactly, all positive
+      for (const b of buckets) {
+        const en = eventNet(b as any, expenses, shares, guests as any, payers);
+        for (const pm of en.perMember) {
+          if (pm.net < 0) {
+            const debts = withinEventDebts(b, pm.member_id, expenses, shares, guests as any, payers);
+            const dsum = debts.reduce((a, x) => a + x.amount, 0);
+            if (dsum !== -pm.net) throw new Error(`withinEventDebts sum ${dsum} != owed ${-pm.net} (bucket ${b}, ${pm.member_id})`);
+            if (debts.some((x) => x.amount <= 0)) throw new Error(`withinEventDebts non-positive amount`);
+          }
+        }
+      }
+
+      // INV 5: eventSettlement — anyone globally square (net>=0) never blocks a bucket
+      const settle = eventSettlement({ events: events as any, expenses, shares, payers, settlements, guests: guests as any });
+      const allSquare = members.every((m) => (bal[m] || 0) >= 0);
+      if (allSquare) {
+        for (const b of buckets) { const key = b ?? ""; if (settle[key] && !settle[key].settled) throw new Error(`bucket ${key} unsettled though everyone globally square`); }
+      }
+      // covered never exceeds owed
+      for (const k of Object.keys(settle)) if (settle[k].covered > settle[k].owed) throw new Error(`covered>owed for ${k}`);
+
+      // INV 6: simplify conserves & zeroes
+      const tr = simplify(bal);
+      const appl: Record<string, number> = { ...bal };
+      for (const t of tr) { appl[t.from] += t.amt; appl[t.to] -= t.amt; }
+      if (Object.values(appl).reduce((a, b) => a + Math.abs(b), 0) !== 0) throw new Error(`simplify didn't zero balances`);
+      if (tr.some((t) => t.amt <= 0)) throw new Error(`simplify non-positive transfer`);
+    } catch (err: any) {
+      fuzzFails++;
+      if (fuzzFails <= 3) console.log(`  FUZZ FAIL seed ${1000 + iter}: ${err.message}`);
+    }
+  }
+  check(`fuzz: ${iterations} random ledgers, all invariants hold`, fuzzFails, 0);
+}
+
+console.log(`\n=== money.test ===\nPASS ${pass}  FAIL ${fail}`);

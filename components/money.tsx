@@ -362,14 +362,14 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
           memberId={ledgerFor} me={user.id}
           name={(memberById[ledgerFor]?.display_name) || "Player"}
           net={balances[ledgerFor] || 0}
-          expenses={expenses} shares={shares} settlements={settlements} guests={guests} payers={payers}
+          expenses={expenses} shares={shares} settlements={confirmedSettlements} guests={guests} payers={payers}
           events={events} memberById={memberById}
           onClose={() => setLedgerFor(null)} />
       )}
 
       {zelleInfo && (
         <div onClick={() => setZelleInfo(null)} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px 24px", width: "100%", maxWidth: 520 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px", paddingBottom: "calc(72px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 520, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
             <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>Pay {nameOf(zelleInfo.to)} with Zelle</div>
             <div style={{ color: C.sage, fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>Zelle happens inside your bank app. Open it, send to the contact below, then mark it settled here.</div>
             <div style={{ background: "#123528", borderRadius: 12, padding: 14, marginTop: 12 }}>
@@ -389,7 +389,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
       {/* confirm-on-return sheet */}
       {askReturn && (myPending.length > 0 || pending) && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.66)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
-          <div style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "22px 18px 26px", width: "100%", maxWidth: 520, textAlign: "center" }}>
+          <div style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "22px 18px", paddingBottom: "calc(72px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 520, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto", textAlign: "center" }}>
             <div style={{ color: C.cream, fontWeight: 800, fontSize: 17 }}>Back from paying — did it go through?</div>
             <div style={{ color: C.sage, fontSize: 13, margin: "8px 0 4px" }}>You were settling <b style={{ color: C.gold }}>{fmtUSD(myPending.length > 0 ? myPending.reduce((s, p) => s + p.amount_cents, 0) : (pending?.amt || 0))}</b></div>
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
@@ -403,7 +403,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
       {/* pay-method chooser for an armed event settle */}
       {payChoose && (
         <div onClick={() => setPayChoose(null)} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.66)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "20px 18px 26px", width: "100%", maxWidth: 520 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "20px 18px", paddingBottom: "calc(72px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 520, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
             <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>Pay {nameOf(payChoose.to)} {fmtUSD(payChoose.amt)}</div>
             <div style={{ color: C.sage, fontSize: 12.5, marginTop: 4, lineHeight: 1.5 }}>Send it, then come back and confirm — we'll ask when you return.{payChoose.count > 1 ? ` (${payChoose.count} people to pay for this settle; open each below.)` : ""}</div>
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
@@ -864,7 +864,7 @@ function SnapshotBody({ snap }: { snap: AuditSnapshot }) {
 function SnapshotDetail({ snap, at, onClose }: { snap: AuditSnapshot; at?: string; onClose: () => void }) {
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px 24px", width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px", paddingBottom: "calc(72px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 520, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
           <div style={{ flex: 1, color: C.cream, fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 800 }}>{snap.description || "Expense"}</div>
           <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800 }}>{fmtUSD(snap.amount_cents || 0)}</div>
@@ -896,7 +896,7 @@ function ExpenseDetail({ expense, shares, payers, memberById, guestById, version
     : [{ name: memberById[expense.payer_user_id]?.display_name || "?", cents: expense.amount_cents }];
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px 24px", width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px", paddingBottom: "calc(72px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 520, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
           <div style={{ flex: 1, color: C.cream, fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 800 }}>{expense.description || "Expense"}</div>
           <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800 }}>{fmtUSD(expense.amount_cents)}</div>
@@ -1022,7 +1022,7 @@ function PersonLedgerModal({ memberId, me, name, net, expenses, shares, settleme
   const who = memberId === me ? "You" : name;
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px 24px", width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px", paddingBottom: "calc(72px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 520, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
           <div style={{ flex: 1, color: C.cream, fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 800 }}>{name}{memberId === me ? " (you)" : ""}</div>
           <div style={{ color: net > 0 ? "#7fd6a3" : net < 0 ? "#ef9d90" : C.sage, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>
@@ -1119,6 +1119,15 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
                   : <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 9, background: "#123528", color: C.sage }}>open</span>)}
           </div>
         </div>
+        {list.length > 0 && (
+          <div style={{ marginTop: 8, fontSize: 12.5, lineHeight: 1.5, color: settled ? "#8fd6b0" : C.cream, fontWeight: settled ? 700 : 400 }}>
+            {settled
+              ? "All members settled"
+              : [...net.perMember].filter((m) => m.net !== 0).sort((a, b) => a.net - b.net)
+                  .map((m) => `${memberById[m.member_id]?.display_name || "Player"} ${m.net < 0 ? "owes" : "gets"} ${fmtUSD(Math.abs(m.net))}`)
+                  .join(" · ")}
+          </div>
+        )}
         {perMember.length > 0 && (
           <div style={{ marginTop: 10, borderTop: `1px solid ${C.greenMid}`, paddingTop: 8 }}>
             {perMember.map((m) => (
@@ -1136,7 +1145,7 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
           const owe = mine && mine.net < 0 ? -mine.net : 0;
           const pendingHere = settlements.some((s) => s.from_user_id === me && (s.event_id ?? null) === ev.id && s.status === "pending");
           const paidHere = settlements.filter((s) => s.from_user_id === me && (s.event_id ?? null) === ev.id && (s.status || "confirmed") === "confirmed").reduce((s2, s) => s2 + s.amount_cents, 0);
-          if (owe > 0 && paidHere < owe && !pendingHere) {
+          if (!settled && owe > 0 && paidHere < owe && !pendingHere) {
             return (
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, background: "#0f3529", borderRadius: 9, padding: "8px 10px" }}>
                 <span style={{ flex: 1, color: C.cream, fontSize: 12.5 }}>You owe {fmtUSD(owe - paidHere)} for this event</span>

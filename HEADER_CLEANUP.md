@@ -70,3 +70,8 @@ compare-stats, home, player-card, tee-times (dropped local EB override; title �
 FieldLabel), organizer (railH3 → standard values). Dashboard shipped earlier (167.4). Lookalikes left
 as agreed (color-coded diff labels, column headers, pills, banners, title hierarchy, dashboard sage divider).
 Going-forward compliance: APP_RULES #15/#16.
+
+## BottomSheet (popup safe-area) migration — started 168.0
+Shared `<BottomSheet>` added (ui.tsx): clears nav bar + safe areas. Money sheets patched in place
+(paddingBottom/maxHeight). TODO sweep: migrate other screens' bottom-docked sheets to `<BottomSheet>`
+(tee-times, manage, round-detail, round-setup, groups, organizer modals). Rule: APP_RULES #17.
