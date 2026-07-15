@@ -294,7 +294,7 @@ const S: Record<string, React.CSSProperties> = {
   body: { display: "grid", gridTemplateColumns: "300px 1fr", minHeight: 520 },
   rail: { background: "rgba(8,20,15,.28)", borderRight: "1px solid rgba(255,255,255,.08)", padding: 14, maxHeight: "78vh", overflowY: "auto" },
   railHdr: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
-  railH3: { fontSize: 13, letterSpacing: 1, textTransform: "uppercase", color: C.gold },
+  railH3: { fontSize: 11, letterSpacing: 3, fontWeight: 700, textTransform: "uppercase", color: C.gold, marginTop: 16, marginBottom: 8 },
   chip: { display: "flex", alignItems: "center", gap: 9, background: C.card, borderRadius: 11, padding: "8px 10px", marginBottom: 8, boxShadow: "0 1px 0 rgba(0,0,0,.04)" },
   chipName: { color: C.ink, fontWeight: 700, fontSize: 13, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   tag: { fontSize: 11, fontWeight: 800, color: "#06251A", borderRadius: 6, padding: "2px 7px" },

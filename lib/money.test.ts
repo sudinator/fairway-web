@@ -2,7 +2,7 @@
 import {
   evenShares, validateCustomTotal, computeBalances, simplify, pairwiseDebts, aggregateOwed,
   payLink, nudgeSms, fmtUSD, guestOwedFor, guestCoverageBySponsor, betResultToPost,
-  collapseAuditBursts, auditVersionsByExpense, eventNet, expensesByEvent,
+  collapseAuditBursts, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, eventSettlement, withinEventDebts,
 } from "./money";
 import type { Expense, Share, Settlement, Guest, Transfer, Payer, AuditRow } from "./money";
 
@@ -344,8 +344,9 @@ ok("nudge sms has body", nudgeSms("2015550102", "Dev", 6500, "Saturday Golf", "b
   ];
   const en = eventNet("ire", exps as any, shares as any, [], []);
   check("event total sums only its expenses", en.total, 241000);
-  check("event nets sum to zero (balanced)", en.perMember.reduce((s, m) => s + m.net, 0), 0);
-  ok("balanced flag true", en.balanced);
+  check("nets still sum to zero by identity", en.perMember.reduce((s, m) => s + m.net, 0), 0);
+  ok("owedWithin is positive when someone fronted", en.owedWithin > 0);
+  check("owedWithin = sum of positive nets", en.owedWithin, en.perMember.reduce((s, m) => s + (m.net > 0 ? m.net : 0), 0));
   const amit = en.perMember.find((m) => m.member_id === "amit")!;
   check("amit paid within event", amit.paid, 160000);
   check("amit share within event", amit.share, 80334);
@@ -368,7 +369,90 @@ ok("nudge sms has body", nudgeSms("2015550102", "Dev", 6500, "Saturday Golf", "b
   const gen = eventNet("trip", gexps as any, gshares as any, [{ id: "gX", sponsor_user_id: "dave" }] as any, []);
   const dave = gen.perMember.find((m) => m.member_id === "dave")!;
   check("guest share billed to sponsor in event", dave.net, -5000);
-  ok("guest event still balances", gen.balanced);
+  check("guest event owedWithin = amount fronted", gen.owedWithin, 5000);
+
+  // Everyone pays exactly their own share → nothing fronted → owedWithin 0.
+  const sq = eventNet("sq",
+    [{ id: "s1", event_id: "sq", payer_user_id: "amit", amount_cents: 5000 },
+     { id: "s2", event_id: "sq", payer_user_id: "dave", amount_cents: 5000 }] as any,
+    [{ expense_id: "s1", user_id: "amit", guest_id: null, share_cents: 5000 },
+     { expense_id: "s2", user_id: "dave", guest_id: null, share_cents: 5000 }] as any, [], []);
+  check("self-square event owedWithin is 0", sq.owedWithin, 0);
+}
+
+// --- personLedger reconciles to computeBalances for every member ---
+{
+  const exps = [
+    { id: "x1", event_id: "ire", payer_user_id: "amit", amount_cents: 30000, description: "Rental" },
+    { id: "x2", event_id: null, payer_user_id: "dave", amount_cents: 6000, description: "Beer" },
+  ];
+  const shares = [
+    { expense_id: "x1", user_id: "amit", guest_id: null, share_cents: 10000 },
+    { expense_id: "x1", user_id: "dave", guest_id: null, share_cents: 10000 },
+    { expense_id: "x1", user_id: null, guest_id: "gz", sponsor_user_id: "ravi", share_cents: 10000 },
+    { expense_id: "x2", user_id: "amit", guest_id: null, share_cents: 3000 },
+    { expense_id: "x2", user_id: "dave", guest_id: null, share_cents: 3000 },
+  ];
+  const setts = [{ from_user_id: "dave", to_user_id: "amit", amount_cents: 5000 }];
+  const gs = [{ id: "gz", sponsor_user_id: "ravi", name: "Guest Z" }];
+  const bal = computeBalances(exps as any, shares as any, setts as any, gs as any, []);
+  for (const mid of ["amit", "dave", "ravi"]) {
+    const led = personLedger(mid, exps as any, shares as any, setts as any, gs as any, [], (u) => u || "?");
+    check(`ledger total reconciles to balance for ${mid}`, led.total, bal[mid] || 0);
+  }
+  // ravi's guest line is attributed to the sponsor with a guest label
+  const ravi = personLedger("ravi", exps as any, shares as any, setts as any, gs as any, []);
+  ok("sponsor sees guest share line", ravi.lines.some((l) => l.kind === "owe" && l.label.includes("Guest Z")));
+  // dave's settlement out appears and reduces what he owes (positive delta)
+  const dave = personLedger("dave", exps as any, shares as any, setts as any, gs as any, [], (u) => u || "?");
+  ok("settlement-out line present", dave.lines.some((l) => l.kind === "settle_out" && l.delta === 5000));
+}
+
+// --- per-event settlement: event-tagged coverage (all-or-nothing) ---
+{
+  const events = [
+    { id: "may", group_id: "g", name: "May", event_date: "2026-05-01", event_type: "manual", status: "open" },
+    { id: "jul", group_id: "g", name: "Jul", event_date: "2026-07-01", event_type: "manual", status: "open" },
+  ];
+  const expenses = [
+    { id: "e_may", event_id: "may", payer_user_id: "amit", amount_cents: 20000, created_at: "2026-05-01T00:00:00Z" },
+    { id: "e_jul", event_id: "jul", payer_user_id: "amit", amount_cents: 20000, created_at: "2026-07-01T00:00:00Z" },
+  ];
+  const shares = [
+    { expense_id: "e_may", user_id: "amit", guest_id: null, share_cents: 10000 },
+    { expense_id: "e_may", user_id: "ravi", guest_id: null, share_cents: 10000 },
+    { expense_id: "e_jul", user_id: "amit", guest_id: null, share_cents: 10000 },
+    { expense_id: "e_jul", user_id: "ravi", guest_id: null, share_cents: 10000 },
+  ];
+  // Ravi owes $100 within each event, to Amit. Confirm coverage is event-specific.
+  const debtsMay = withinEventDebts("may", "ravi", expenses as any, shares as any, [], []);
+  check("within-event debt points to fronter Amit", debtsMay[0].to, "amit");
+  check("within-event debt amount", debtsMay[0].amount, 10000);
+
+  // Pay ONLY the newer event (Jul) — Jul settles, May stays open. No cross-event ordering.
+  const paidJul = eventSettlement({ events: events as any, expenses: expenses as any, shares: shares as any, payers: [],
+    settlements: [{ from_user_id: "ravi", to_user_id: "amit", amount_cents: 10000, event_id: "jul", status: "confirmed" }] as any, guests: [] });
+  ok("Jul settled (its own coverage)", paidJul["jul"].settled);
+  ok("May still open (untouched by Jul payment)", !paidJul["may"].settled);
+
+  // Pending settlement does NOT count.
+  const pendingOnly = eventSettlement({ events: events as any, expenses: expenses as any, shares: shares as any, payers: [],
+    settlements: [{ from_user_id: "ravi", to_user_id: "amit", amount_cents: 10000, event_id: "may", status: "pending" }] as any, guests: [] });
+  ok("pending settlement doesn't settle the event", !pendingOnly["may"].settled);
+
+  // Editing an expense UP re-opens automatically: coverage $100 no longer covers new $150 owed.
+  const bigger = [{ ...shares[1], share_cents: 15000 }, ...shares.filter((_, i) => i !== 1)];
+  const afterEdit = eventSettlement({ events: events as any, expenses: [{ ...expenses[0], amount_cents: 25000 }, expenses[1]] as any, shares: bigger as any, payers: [],
+    settlements: [{ from_user_id: "ravi", to_user_id: "amit", amount_cents: 10000, event_id: "may", status: "confirmed" }] as any, guests: [] });
+  ok("edit up re-opens the event (coverage now short)", !afterEdit["may"].settled);
+
+  // Full coverage settles.
+  const full = eventSettlement({ events: events as any, expenses: expenses as any, shares: shares as any, payers: [],
+    settlements: [
+      { from_user_id: "ravi", to_user_id: "amit", amount_cents: 10000, event_id: "may", status: "confirmed" },
+      { from_user_id: "ravi", to_user_id: "amit", amount_cents: 10000, event_id: "jul", status: "confirmed" },
+    ] as any, guests: [] });
+  ok("both settled with full coverage", full["may"].settled && full["jul"].settled);
 }
 
 console.log(`\n=== money.test ===\nPASS ${pass}  FAIL ${fail}`);

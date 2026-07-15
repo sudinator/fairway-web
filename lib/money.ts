@@ -369,7 +369,7 @@ export function eventNet(
   eventId: string,
   expenses: (Expense & { event_id?: string | null })[],
   shares: Share[], guests: Guest[], payers: Payer[] = [],
-): { total: Cents; perMember: EventPersonNet[]; balanced: boolean } {
+): { total: Cents; perMember: EventPersonNet[]; owedWithin: Cents } {
   const gById: Record<string, Guest> = {};
   for (const g of guests) gById[g.id] = g;
   const inEvent = new Set(expenses.filter((e) => (e.event_id ?? null) === eventId).map((e) => e.id));
@@ -396,13 +396,177 @@ export function eventNet(
     member_id, paid: paid[member_id] || 0, share: share[member_id] || 0,
     net: (paid[member_id] || 0) - (share[member_id] || 0),
   }));
-  const balanced = perMember.reduce((s, m) => s + m.net, 0) === 0;
-  return { total, perMember, balanced };
+  // Amount that someone fronted for others WITHIN this event (= sum of the positive nets). This is NOT a
+  // payment/settled signal — settlements are group-wide and not tagged to an event, so an event can't know
+  // if it's been paid. owedWithin just says "is anyone carrying anyone else here." 0 = everyone paid their
+  // own share; >0 = there is fronting. Note the old `balanced` (nets sum to 0) was always true by identity.
+  const owedWithin = perMember.reduce((s, m) => s + (m.net > 0 ? m.net : 0), 0);
+  return { total, perMember, owedWithin };
 }
 
 /** Bucket expenses by event id; event-less expenses go under the "" (Ungrouped) key. */
 export function expensesByEvent<T extends EventExpense>(expenses: T[]): Record<string, T[]> {
   const out: Record<string, T[]> = {};
   for (const e of expenses) { const k = e.event_id ?? ""; (out[k] || (out[k] = [])).push(e); }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Per-person balance breakdown (v166.5) — the "how did I get to this number" view
+// ---------------------------------------------------------------------------
+// Plain-language line items that build ONE member's global balance. This is the RAW
+// obligation ledger (each expense share you owe, each amount you paid, each recorded
+// settlement) — deliberately NOT the simplified who-pays-whom. Sum of line.delta
+// equals computeBalances()[memberId] exactly (mirrors its sign conventions).
+
+export interface LedgerLine {
+  kind: "owe" | "paid" | "settle_out" | "settle_in";
+  label: string;
+  eventId: string | null;
+  delta: Cents; // signed: + increases net (you're owed), - decreases (you owe)
+}
+
+export function personLedger(
+  memberId: string,
+  expenses: (Expense & { event_id?: string | null; description?: string })[],
+  shares: Share[], settlements: Settlement[], guests: Guest[], payers: Payer[] = [],
+  nameOf: (userId: string | null) => string = (u) => u || "someone",
+): { lines: LedgerLine[]; total: Cents } {
+  const gById: Record<string, Guest> = {};
+  for (const g of guests) gById[g.id] = g;
+  const gName: Record<string, string> = {};
+  for (const g of guests) gName[g.id] = (g as any).name || "guest";
+  const expById: Record<string, any> = {};
+  for (const e of expenses) expById[e.id] = e;
+  const desc = (eid: string) => (expById[eid]?.description || "expense");
+  const evOf = (eid: string) => (expById[eid]?.event_id ?? null);
+  const lines: LedgerLine[] = [];
+
+  // amounts this member paid (via payers rows, else sole payer)
+  const payersByExp: Record<string, Payer[]> = {};
+  for (const p of payers) (payersByExp[p.expense_id] || (payersByExp[p.expense_id] = [])).push(p);
+  for (const e of expenses) {
+    const ps = payersByExp[e.id];
+    if (ps && ps.length) {
+      for (const p of ps) {
+        if (resolveMember(p.user_id, p.guest_id, gById, p.sponsor_user_id) === memberId && p.paid_cents)
+          lines.push({ kind: "paid", label: `You paid ${fmtUSD(p.paid_cents)} for “${desc(e.id)}”`, eventId: evOf(e.id), delta: p.paid_cents });
+      }
+    } else if (e.payer_user_id === memberId && e.amount_cents) {
+      lines.push({ kind: "paid", label: `You paid ${fmtUSD(e.amount_cents)} for “${desc(e.id)}”`, eventId: evOf(e.id), delta: e.amount_cents });
+    }
+  }
+  // shares this member owes (own + sponsored guests)
+  for (const s of shares) {
+    if (!s.expense_id) continue;
+    if (resolveMember(s.user_id, s.guest_id, gById, s.sponsor_user_id) !== memberId || !s.share_cents) continue;
+    const isGuest = !s.user_id && s.guest_id;
+    const label = isGuest
+      ? `You owe ${fmtUSD(s.share_cents)} — ${gName[s.guest_id as string] || "guest"}’s share of “${desc(s.expense_id)}”`
+      : `You owe ${fmtUSD(s.share_cents)} — your share of “${desc(s.expense_id)}”`;
+    lines.push({ kind: "owe", label, eventId: evOf(s.expense_id), delta: -s.share_cents });
+  }
+  // settlements
+  for (const st of settlements) {
+    if (st.from_user_id === memberId) lines.push({ kind: "settle_out", label: `You paid ${fmtUSD(st.amount_cents)} to ${nameOf(st.to_user_id)}`, eventId: null, delta: st.amount_cents });
+    if (st.to_user_id === memberId) lines.push({ kind: "settle_in", label: `${nameOf(st.from_user_id)} paid you ${fmtUSD(st.amount_cents)}`, eventId: null, delta: -st.amount_cents });
+  }
+  const total = lines.reduce((s, l) => s + l.delta, 0);
+  return { lines, total };
+}
+
+// ---------------------------------------------------------------------------
+// Per-event settlement (v167.2) — event-attributable, all-or-nothing
+// ---------------------------------------------------------------------------
+// Settlements now carry an event_id (null = the Ungrouped bucket). A person is
+// "settled" for an event when their CONFIRMED, event-tagged payments cover their
+// within-event owed amount. An event is settled when every owing participant is.
+// No cross-event ordering (FIFO is gone): each event's coverage is its own, so a
+// disputed/old event never blocks settling a newer one. Editing an expense changes
+// the within-event owed, which naturally re-opens the event if coverage now falls
+// short — no destructive deletion needed (this is Amit's option (a), computed).
+// Only CONFIRMED settlements count; pending (armed-but-unconfirmed) ones are ignored
+// here and by computeBalances — they only drive the "confirm your payment" nudge.
+
+export interface EventSettleState {
+  eventId: string | null;  // null = Ungrouped
+  owed: Cents;             // total within-event owed across owing participants (current)
+  covered: Cents;          // confirmed event-tagged coverage applied to that owed
+  settled: boolean;        // every owing participant fully covered
+  date: number;            // sort key
+}
+
+/** What `memberId` owes WITHIN one event, split across that event's fronters
+ *  (proportional to their positive net; largest-remainder for exact cents). */
+export function withinEventDebts(
+  eventId: string | null, memberId: string,
+  expenses: (Expense & { event_id?: string | null })[], shares: Share[], guests: Guest[], payers: Payer[] = [],
+): { to: string; amount: Cents }[] {
+  const { perMember } = eventNet(eventId as any, expenses as any, shares, guests, payers);
+  const mine = perMember.find((m) => m.member_id === memberId);
+  if (!mine || mine.net >= 0) return [];
+  const owed = -mine.net;
+  const creditors = perMember.filter((m) => m.net > 0).sort((a, b) => b.net - a.net);
+  const totalPos = creditors.reduce((s, c) => s + c.net, 0);
+  if (totalPos <= 0) return [];
+  const raw = creditors.map((c) => ({ to: c.member_id, exact: (owed * c.net) / totalPos }));
+  const out = raw.map((r) => ({ to: r.to, amount: Math.floor(r.exact) }));
+  let rem = owed - out.reduce((s, r) => s + r.amount, 0);
+  const order = raw.map((r, i) => ({ i, frac: r.exact - Math.floor(r.exact) })).sort((a, b) => b.frac - a.frac);
+  for (let k = 0; k < order.length && rem > 0; k++) { out[order[k].i].amount += 1; rem -= 1; }
+  return out.filter((r) => r.amount > 0);
+}
+
+/** Per-bucket settled state from CONFIRMED, event-tagged settlements. */
+export function eventSettlement(input: {
+  events: EventRow[];
+  expenses: (Expense & { event_id?: string | null })[];
+  shares: Share[]; payers: Payer[];
+  settlements: (Settlement & { event_id?: string | null; status?: string })[];
+  guests: Guest[];
+}): Record<string, EventSettleState> {
+  const { events, expenses, shares, payers, settlements, guests } = input;
+  const gById: Record<string, Guest> = {};
+  for (const g of guests) gById[g.id] = g;
+  const evById: Record<string, EventRow> = {};
+  for (const e of events) evById[e.id] = e;
+  const bkey = (eid: string | null | undefined) => eid ?? "";
+
+  // bucket set + date
+  const bucketDate: Record<string, number> = {};
+  const noteDate = (k: string, ms: number) => { if (!Number.isNaN(ms) && (bucketDate[k] == null || ms < bucketDate[k])) bucketDate[k] = ms; };
+  const bucketExpenses: Record<string, typeof expenses> = {};
+  for (const e of expenses) {
+    const k = bkey(e.event_id);
+    (bucketExpenses[k] || (bucketExpenses[k] = [])).push(e);
+    const ev = e.event_id ? evById[e.event_id] : null;
+    const ms = ev?.event_date ? Date.parse(ev.event_date + "T00:00:00") : ev?.created_at ? Date.parse(ev.created_at) : (e as any).created_at ? Date.parse((e as any).created_at) : 0;
+    noteDate(k, ms);
+  }
+
+  // confirmed coverage per (bucket -> member -> paid)
+  const cover: Record<string, Record<string, Cents>> = {};
+  for (const st of settlements) {
+    if ((st.status || "confirmed") !== "confirmed") continue;
+    const k = bkey(st.event_id);
+    (cover[k] || (cover[k] = {}));
+    cover[k][st.from_user_id] = (cover[k][st.from_user_id] || 0) + st.amount_cents;
+  }
+
+  const out: Record<string, EventSettleState> = {};
+  for (const k of Object.keys(bucketExpenses)) {
+    const eid = k === "" ? null : k;
+    const { perMember } = eventNet(eid as any, expenses as any, shares, guests, payers);
+    let owed = 0, covered = 0, allSettled = true;
+    for (const m of perMember) {
+      if (m.net >= 0) continue; // only owers must settle
+      const need = -m.net;
+      owed += need;
+      const paid = (cover[k]?.[m.member_id]) || 0;
+      covered += Math.min(paid, need);
+      if (paid < need) allSettled = false;
+    }
+    out[k] = { eventId: eid, owed, covered, settled: owed === 0 || allSettled, date: bucketDate[k] ?? 0 };
+  }
   return out;
 }

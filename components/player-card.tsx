@@ -5,7 +5,7 @@ import { C } from "@/lib/golf";
 import type { Round } from "@/lib/golf";
 import { computeCardStats } from "@/lib/card";
 import { BADGE_BY_KEY } from "@/lib/badges";
-import { Avatar } from "@/components/ui";
+import { Avatar, Eyebrow } from "@/components/ui";
 
 const supabase = createClient();
 const TIER_COLOR: Record<string, string> = { common: C.sage, rare: "#7FB8FF", elite: C.gold };
@@ -116,7 +116,7 @@ export function PlayerCardView({ view }: { view: CardView }) {
           <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{roundsPlayed} round{roundsPlayed === 1 ? "" : "s"}{badges.length ? ` · ${badges.length} badge${badges.length === 1 ? "" : "s"}` : ""}</div>
         </div>
         <div style={{ textAlign: "right", flex: "none" }}>
-          <div style={{ color: C.gold, fontSize: 11, letterSpacing: 1.5, fontWeight: 800, textTransform: "uppercase" }}>Index</div>
+          <Eyebrow style={{ margin: 0 }}>Index</Eyebrow>
           <div style={{ fontFamily: "Georgia, serif", fontSize: 28, fontWeight: 800, color: C.cream, lineHeight: 1 }}>{index == null ? "—" : index.toFixed(1)}</div>
           {trend != null && Math.abs(trend) >= 0.05 && (
             <div style={{ fontSize: 11, fontWeight: 800, marginTop: 2, color: trend < 0 ? "#8FE0B0" : "#FB7185" }}>{trend < 0 ? "▼" : "▲"} {Math.abs(trend).toFixed(1)}</div>
@@ -126,7 +126,7 @@ export function PlayerCardView({ view }: { view: CardView }) {
 
       {badges.length > 0 && (
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 8 }}>Badges</div>
+          <Eyebrow>Badges</Eyebrow>
           <div className="bnn-noscroll" style={{ display: "flex", gap: 12, overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}>
             {badges.map((b) => (
               <div key={b.key} style={{ flex: "none", width: 62, textAlign: "center" }}>
@@ -153,7 +153,7 @@ export function PlayerCardView({ view }: { view: CardView }) {
         return (
           <div style={{ marginTop: 14 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-              <div style={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 800, textTransform: "uppercase", color: C.gold }}>Recent form</div>
+              <Eyebrow>Recent form</Eyebrow>
               <div style={{ fontSize: 11, fontWeight: 800, color: col }}>
                 {verdict}{Math.abs(delta) >= 0.1 ? ` ${delta < 0 ? "▼" : "▲"} ${Math.abs(delta).toFixed(1)}` : ""}
               </div>

@@ -81,6 +81,23 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
     the DB keeps its own logbook of what ran. Confirm applied state anytime with
     `select id, applied_at from public.schema_migrations order by id;` — this is the source of truth, not
     the manual MIGRATIONS.md checklist. Never assert a migration is/isn't applied from the checklist alone. — manual
+15. **Section-header spacing is standardized.** All section/eyebrow headers use the shared `<Eyebrow>`
+    component (components/ui.tsx), which carries the app benchmark spacing (`marginTop:16, marginBottom:8`)
+    by default. Don't hand-roll header `<div>`s with ad-hoc margins, and don't zero out the spacing — pass
+    a `style` override only for a deliberate exception. This keeps vertical rhythm consistent across every
+    screen; new screens get it for free by using `<Eyebrow>`.
+    - **Tile headers** (the gold, letter-spaced label at the top of a card/tile) ARE `<Eyebrow>`. When the
+      header sits in a flex ROW with a control (e.g. a chevron on a collapsible tile), pass
+      `style={{ margin: 0 }}` so the row alignment holds and the tile's own padding provides spacing.
+    - Distinct patterns that are NOT tile headers stay as they are: e.g. the dashboard's sage
+      section-divider (`sectionHead`, a label with a rule line), status pills, badge chips, table column
+      headers, and banners. Consistency means "same pattern rendered the same way," not "make everything
+      an Eyebrow." Cleanup is being done screen-by-screen; converting a screen means folding its genuine
+      tile/section headers onto `<Eyebrow>` while leaving lookalikes alone. — manual
+16. **Date inputs must be iOS-safe.** A bare `<input type="date">` renders inconsistently on iPhone
+    (missized/clipped/invisible chrome) — a known, recurring bug. Always use the shared `<ShortDateInput>`
+    (components/ui.tsx) or, for a full-width field, a raw input whose style includes
+    `WebkitAppearance:"none"` (and `appearance:"none"`). Enforced by `ci/check-date-inputs.py`. — manual
 14. **Every migration's full SQL is printed inline in chat** for copy-paste into the Supabase SQL editor,
     and tracked in `MIGRATIONS.md` (tick when run). — manual
 15. **Repo docs stay in sync each bundle:** DEPLOY_NOTES.md, SCHEMA.md, BACKLOG.md, README.md,

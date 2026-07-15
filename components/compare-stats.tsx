@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { C } from "@/lib/golf";
 import { BENCH_DIR, BENCH_LABEL, bandFor, goalOptions, type StatKey, type Band } from "@/lib/benchmarks";
+import { Eyebrow } from "@/components/ui";
 
 const clampPct = (v: number) => Math.max(0, Math.min(100, v));
 const fmtVal = (key: StatKey, v: number) => (key === "putts" ? (Math.round(v * 10) / 10).toFixed(1) : Math.round(v) + "%");
@@ -69,9 +70,9 @@ function CatBar({ name, score, sub, statKey, open, onToggle }: {
       </div>
       {open && desc && (
         <div style={{ background: C.green, borderRadius: 10, padding: "11px 13px", marginTop: 8 }}>
-          <div style={{ color: C.gold, fontSize: 11, letterSpacing: 1.5, fontWeight: 700 }}>HOW IT'S MEASURED</div>
+          <Eyebrow>HOW IT'S MEASURED</Eyebrow>
           <div style={{ color: C.cream, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>{desc.measured}</div>
-          <div style={{ color: C.gold, fontSize: 11, letterSpacing: 1.5, fontWeight: 700, marginTop: 11 }}>WHAT TO WORK ON</div>
+          <Eyebrow>WHAT TO WORK ON</Eyebrow>
           <div style={{ color: C.cream, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>{desc.work}</div>
         </div>
       )}
@@ -117,7 +118,7 @@ export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHc
 
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12, border: "1px solid #245A47" }}>
-      <div style={{ color: C.gold, fontSize: 11, letterSpacing: 2, fontWeight: 700 }}>WHERE YOU’RE GAINING &amp; LOSING SHOTS</div>
+      <Eyebrow>WHERE YOU’RE GAINING &amp; LOSING SHOTS</Eyebrow>
 
       {goals.length > 0 && (
         <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 11, flexWrap: "wrap" }}>

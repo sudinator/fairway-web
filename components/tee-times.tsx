@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { C, courseHandicap } from "@/lib/golf";
-import { Avatar, btn, inputStyle, Eyebrow } from "@/components/ui";
+import { Avatar, btn, inputStyle, Eyebrow, FieldLabel } from "@/components/ui";
 import { loadFormDraft, saveFormDraft, clearFormDraft, draftAgeLabel } from "@/lib/form-draft";
 
 const supabase = createClient();
@@ -39,7 +39,6 @@ const teeName = (t: { title: string | null; kind: string | null; course: string 
   (t.title && t.title.trim()) || [kindOf(t.kind).label, shortCourse(t.course), shortDate(t.play_date)].filter(Boolean).join(" \u00b7 ");
 
 // Section-label spacing for Tee Times (gold eyebrows were flush against the cards).
-const EB: React.CSSProperties = { fontSize: 12, letterSpacing: 1.8, margin: "16px 0 8px" };
 
 function DateBadge({ d }: { d: string }) {
   return (
@@ -402,11 +401,11 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
                 </div>
               ))}
             </div>
-            {ins.length > 0 && <><Eyebrow style={EB}>{`In — ${ins.reduce((s, r) => s + 1 + (r.guest_names?.length || 0), 0)}${sel.max_spots != null ? ` of ${sel.max_spots} spots` : ""}`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{ins.map((r) => memberRow(r, true, waitSet.has(r.user_id)))}</div></>}
-            {maybes.length > 0 && <><Eyebrow style={EB}>{`Maybe (${maybes.length})`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{maybes.map((r) => memberRow(r, true))}</div></>}
-            {outs.length > 0 && <><Eyebrow style={EB}>{`Out (${outs.length})`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{outs.map((r) => memberRow(r, true))}</div></>}
+            {ins.length > 0 && <><Eyebrow>{`In — ${ins.reduce((s, r) => s + 1 + (r.guest_names?.length || 0), 0)}${sel.max_spots != null ? ` of ${sel.max_spots} spots` : ""}`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{ins.map((r) => memberRow(r, true, waitSet.has(r.user_id)))}</div></>}
+            {maybes.length > 0 && <><Eyebrow>{`Maybe (${maybes.length})`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{maybes.map((r) => memberRow(r, true))}</div></>}
+            {outs.length > 0 && <><Eyebrow>{`Out (${outs.length})`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{outs.map((r) => memberRow(r, true))}</div></>}
             {canOrganizeTee && notResponded.length > 0 && (
-              <><Eyebrow style={EB}>{`Not responded (${notResponded.length})`}</Eyebrow>
+              <><Eyebrow>{`Not responded (${notResponded.length})`}</Eyebrow>
                 <div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>
                   {notResponded.map((m) => (
                     <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: `1px solid ${C.line}` }}>
@@ -458,7 +457,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: 10 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 22, fontWeight: 800, color: C.cream, letterSpacing: 0.5 }}>Tee Times</div>
+          <div style={{ fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, color: C.cream }}>Tee Times</div>
           <div style={{ fontSize: 11, color: C.sage, textTransform: "uppercase", letterSpacing: 1 }}>{activeGroupName}</div>
         </div>
         <button onClick={() => setScreen("create")} style={{ ...btn(true), fontSize: 13, padding: "9px 14px" }}>+ New</button>
@@ -474,7 +473,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
         <>
           {filter === "upcoming" && pending.length > 0 && (
             <>
-              <Eyebrow style={EB}>{`Needs your response (${pending.length})`}</Eyebrow>
+              <Eyebrow>{`Needs your response (${pending.length})`}</Eyebrow>
               <div style={{ background: C.card, borderRadius: 14, overflow: "hidden", border: `1.5px solid ${C.gold}`, marginBottom: 10 }}>
                 {pending.map((t) => (
                   <div key={t.id} onClick={() => open(t.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: "pointer", borderBottom: `1px solid ${C.line}` }}>
@@ -491,7 +490,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
             </>
           )}
 
-          <Eyebrow style={EB}>{filter === "upcoming" ? "All upcoming" : filter === "past" ? "Past" : "Cancelled"}</Eyebrow>
+          <Eyebrow>{filter === "upcoming" ? "All upcoming" : filter === "past" ? "Past" : "Cancelled"}</Eyebrow>
           {shown.length === 0 ? (
             <div style={{ background: C.card, borderRadius: 14, padding: 24, textAlign: "center", color: C.faint, fontSize: 13 }}>Nothing here yet.</div>
           ) : (
@@ -557,7 +556,7 @@ function RsvpSheet({ tt, mine, spotsLeft, warn, busy, onClose, onSubmit }: {
         ))}
         {choice === "in" && (
           <div style={{ padding: "12px 16px 0" }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.6, color: C.sage, textTransform: "uppercase", marginBottom: 8 }}>Guests</div>
+            <FieldLabel style={{ marginBottom: 8 }}>Guests</FieldLabel>
             <div style={{ display: "flex", gap: 8 }}>
               {[0, 1, 2].map((n) => (
                 <div key={n} onClick={() => setGCount(n)} style={{ flex: 1, textAlign: "center", padding: 9, borderRadius: 9, cursor: "pointer", fontWeight: 800, color: gCount === n ? "#1c1706" : C.cream, background: gCount === n ? C.gold : C.greenMid }}>{n}</div>
@@ -695,7 +694,7 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
     onCreated();
   }
 
-  const label = (t: string) => <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.6, color: C.sage, textTransform: "uppercase", margin: "12px 0 5px" }}>{t}</div>;
+  const label = (t: string) => <FieldLabel style={{ marginTop: 12 }}>{t}</FieldLabel>;
   const hint = (t: string) => <div style={{ fontSize: 11, color: C.sage, opacity: 0.72, margin: "5px 0 2px", lineHeight: 1.35 }}>{t}</div>;
   const dateStyle: React.CSSProperties = { ...inputStyle, width: "100%", maxWidth: "100%", minWidth: 0, WebkitAppearance: "none", appearance: "none" };
 

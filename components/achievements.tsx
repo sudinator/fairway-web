@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase";
 import { C, Round, Hole } from "@/lib/golf";
 import { BADGES, BADGE_BY_KEY, badgeEvidence } from "@/lib/badges";
 import { syncBadges } from "@/lib/badge-sync";
+import { Eyebrow } from "@/components/ui";
 
 const supabase = createClient();
 
@@ -114,7 +115,7 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
         const openDefInCat = defs.find((d) => d.key === open && earned?.[d.key]);
         return (
           <div key={cat} style={{ marginTop: 14 }}>
-            <div style={{ fontSize: 11, letterSpacing: 1.5, fontWeight: 800, textTransform: "uppercase", color: C.gold, marginBottom: 10 }}>{CAT_LABEL[cat]}</div>
+            <Eyebrow>{CAT_LABEL[cat]}</Eyebrow>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))", gap: 12 }}>
               {defs.map((b) => {
                 const e = earned?.[b.key];

@@ -3400,3 +3400,121 @@ package.json now; the date in package.json is a placeholder the build overrides,
 always carries the true Eastern ship date and can't be fat-fingered (a 6-digit third segment marks the
 new scheme; legacy 1.MINOR.PATCH is left untouched). Rule updated in APP_RULES #13 / HANDOFF §4. This is
 also the first build to correctly land on 260715 rather than carrying 260714 forward.
+
+### 166.4.260715 — fix false "settled" on event islands; rename Delete → Void (no migration)
+- **Bug fix:** event islands showed "settled / ready to close" the moment they had any expenses, before
+  any payment. Cause: the old `balanced` flag checked whether per-person nets sum to zero — a mathematical
+  identity that's ALWAYS true (total paid always equals total owed). Replaced with `eventNet.owedWithin`
+  (sum of positive nets = amount someone fronted for others within the event). The chip now reads
+  **"all square"** only when nobody fronted, otherwise **"$X fronted"** (neutral, C.sage) — never a
+  payment claim. Removed the misleading "Shares balance — ready to close" admin hint. Rationale:
+  settlements are group-wide and not tagged to an event, so an event genuinely can't know if it's been
+  paid — the admin asserts done-ness by CLOSING it; the app never fabricates "settled." `owedWithin` is
+  unit-tested (fronting case, self-square case, guest-to-sponsor case).
+- **Rename Delete → Void** on the expense edit screen: "Void expense" button + reworded confirm ("removed
+  from everyone's balances, but the record stays in the activity log"). The frozen-snapshot badge now reads
+  VOIDED and the log/version wording says "voided." Void better fits the connotation of reversing a charge,
+  and matches what already happens — the record persists in the audit trail, only the live row is removed.
+  Internal action key stays `expense_deleted` (icons, log history, existing rows unaffected). Mechanic
+  unchanged. No migration.
+
+### 167.0.260715 — event settled-state (derived), tap-through balance breakdown, Money spacing (no migration)
+- **Event settled-state — now real.** Corrects 166.4: an event is settled when every participant is
+  globally square (per the model "settle globally = settled everywhere"; owedWithin===0 events are
+  trivially settled). Islands show **settled** (green) / **$X outstanding** / **open**, and the admin
+  "ready to close" hint returns but only when actually settled. Global balances (computeBalances) are
+  passed into the islands to derive this; settle-up itself is unchanged and stays group-wide.
+- **Tap-through balance breakdown (new).** Tapping a person on the Balances tab opens a plain-language
+  ledger of how their number was built — "You paid $60 for Beer cart" (+), "You owe $100 — your share of
+  Rental (Ireland Trip)" (−), "You paid $50 to Dave" — grouped by event, with a running total that
+  reconciles exactly to the shown balance. This is the RAW obligation list, deliberately NOT the
+  simplified who-pays-whom (that stays on the Settle tab). New pure helper `personLedger` in lib/money.ts,
+  unit-tested to reconcile to computeBalances for every member (incl. guest-sponsor and settlements).
+- **Spacing fix.** The shared `Eyebrow` header has zero margin, so Money's Add tab and "Expenses by
+  event" headers sat flush together. Added a spaced local `MoneyHead` (18px top / 8px bottom) for all
+  Money section headers — scoped to Money to avoid touching other screens' spacing.
+No migration; app-only.
+
+### 167.1.260715 — FIFO event settlement, oldest-first (no migration)
+Refines 167.0's settled logic to handle partial payments the way Amit specified: a person's cumulative
+payments retire their debts **oldest-first**, with Ungrouped treated as just another dated bucket (ordered
+by date alongside events). So paying half clears your oldest events first instead of nothing settling.
+- New pure helper `eventSettlement` (lib/money.ts): buckets each person's net by event/ungrouped, orders
+  by date, and FIFO-allocates their net payments-out (settlement "from" minus "to") oldest-first. An event
+  is settled when its total owed is fully covered by participants' oldest-first allocations. Unit-tested:
+  partial payment settles the older event and leaves the newer open; no payment settles nothing; full
+  payment settles all; an older Ungrouped bucket takes the payment before a later event.
+- Island chip now shows **settled** / **"$X of $Y settled"** (partial, amber) / **"$X outstanding"** /
+  **open**, and "ready to close" only when truly settled. Replaces the all-or-nothing global-square check
+  from 167.0.
+No migration; app-only.
+
+### 167.2.260715 — per-event settling with confirm-on-return · MIGRATION 0114
+Settlements are now event-attributable, per person, all-or-nothing — replacing FIFO (which let a disputed
+old event block newer ones). Approved via mockups before build.
+- **Migration 0114**: `settlements.event_id` (null = Ungrouped/legacy global) + `settlements.status`
+  ('pending' | 'confirmed', default confirmed). Pending rows are ignored by balances AND event
+  settled-state — they only drive the "confirm your payment" nudge and persist so a settle survives an
+  app close.
+- **Settled-state is computed** (lib `eventSettlement`): a person is settled for an event when their
+  confirmed, event-tagged coverage ≥ their current within-event owed; the event is settled when every
+  ower is. No cross-event ordering, so a stuck/disputed event never blocks another. Editing an expense
+  changes the owed and thus re-opens the event automatically when coverage falls short (Amit's option (a),
+  computed — no destructive deletion, no trigger). `withinEventDebts` splits a person's within-event debt
+  across that event's fronters (largest-remainder). Both unit-tested (pay-newer-leaves-older-open,
+  pending-doesn't-count, edit-up-reopens, full-coverage-settles).
+- **Confirm-on-return flow**: tapping Settle on an event arms pending settlement rows (persisted), hands
+  off to Venmo/PayPal (deep link) or shows the Zelle handle to copy; on return the app asks "did it go
+  through?" → confirm flips pending→confirmed (counts immediately) and notifies each payee via
+  `create_notification`; "Not yet" leaves it pending with a persistent "confirm your payment" banner +
+  Settle-tab-independent nag on Balances. We can't force the pay app to return the user, so this catches
+  them on return and nags until resolved. No payee verification (trust model) — the notification is a
+  courtesy heads-up.
+- Balances/transfers now count **confirmed settlements only**. The existing global Settle tab is unchanged
+  (records confirmed, event_id null) so nothing regresses.
+- **Run migration 0114** (after 0113). Per the DB ledger, 0111–0113 are already applied; 0114 is the only
+  new one. Confirm afterward with `select id, applied_at from public.schema_migrations order by id;`.
+
+### 167.3.260715 — standardized header spacing + iOS-safe date fields (app-wide; no new migration)
+Two consistency changes that apply across every screen, not just Money.
+- **Header spacing is now a default, app-wide.** The shared `<Eyebrow>` header (components/ui.tsx) carries
+  the benchmark spacing (`marginTop:16, marginBottom:8`) by default — matching the value tee-times already
+  used. Removed the Money-local `MoneyHead` workaround from 167.0; Money now uses `<Eyebrow>` like
+  everywhere else. Every screen that uses `<Eyebrow>` gets consistent vertical rhythm for free, and new
+  screens comply automatically. Standing rule added (APP_RULES #15). NOTE: this nudges header spacing on
+  all screens by design — if any specific screen looks off, flag it and I'll tune that spot.
+- **Date fields are now guarded for the known iOS bug.** Bare `<input type="date">` renders badly on
+  iPhone; the compliant patterns are `<ShortDateInput>` or a raw input with `WebkitAppearance:"none"`.
+  Fixed one non-compliant input (admin analytics date picker in manage.tsx) and added
+  `ci/check-date-inputs.py` (blocking) to the pre-ship pipeline so a non-compliant date field can never
+  ship again. Standing rule added (APP_RULES #16), pipeline updated (HANDOFF §4).
+- No new migration. 0114 (from 167.2) remains the outstanding one to run in Supabase if not already done.
+
+### 167.4.260715 — dashboard tile-header consistency (stage 1 of header cleanup; no migration)
+First screen in the staged header-consistency pass. Dashboard tile headers are now uniformly `<Eyebrow>`:
+- Converted two hand-rolled stragglers: "RUNNING HANDICAP INDEX" (was a bare gold div with no margin →
+  now standard `<Eyebrow>` spacing 16/8) and "✦ AI COACH" (was fontWeight 800 → normalized to the standard
+  700; kept `margin:0` because it's a collapsible row header with a chevron, so the tile padding handles
+  spacing and the chevron stays aligned).
+- Left alone (correctly): the sage `sectionHead` divider (label + rule line) — a distinct, already-uniform
+  pattern, not a tile header.
+- Policy codified in APP_RULES #15: tile headers are `<Eyebrow>`; row-headers with a control pass
+  `style={{margin:0}}`; lookalikes (pills, chips, column headers, banners, the sage divider) stay as-is.
+NOTE for review: "RUNNING HANDICAP INDEX" gains the standard 16px top / 8px bottom spacing it didn't have
+before — please eyeball that tile and confirm it looks right before I apply the same pass to the next screen.
+No migration.
+
+### 167.5.260715 — header-consistency sweep, app-wide (no migration)
+Single pass applying the agreed three-tier header policy across the app (dashboard was 167.4).
+- New shared `<FieldLabel>` (ui.tsx) for quiet sage form labels (a tier below Eyebrow section headers).
+- Converted hand-rolled section headers to `<Eyebrow>`: money (Payments recorded, ledger bucket titles),
+  manage (WHAT TO NOTIFY ME ABOUT, NOTIFICATIONS, CLUBS/ANALYTICS/REMOVE FROM APP), achievements (category
+  labels), compare-stats (all 3), home (WELCOME), player-card (Index[margin:0]/Badges/Recent form),
+  organizer (railH3 aligned to standard).
+- Money field labels (Zelle contact, Now a member?, Sponsored by) → `<FieldLabel>`; "Guests" title 16→17.
+- tee-times aligned to the app standard: dropped its local `EB` header override (was 12px/ls1.8 → now the
+  standard 11/ls3), screen title "Tee Times" → Georgia serif (was sans), section field-labels → FieldLabel.
+- Left as-is (intentional, not tile headers): color-coded course-diff labels (current vs proposed cue),
+  table column headers, status/badge pills, banners (TEST MODE), the Tier-1 title-size hierarchy, and the
+  dashboard's sage section-divider.
+- Going-forward: APP_RULES #15 (headers use Eyebrow; tile/row rules) + #16 (date fields). No migration.

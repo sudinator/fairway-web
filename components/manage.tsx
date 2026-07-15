@@ -1028,7 +1028,7 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
 
       {gate !== "unconfigured" && (
         <div style={{ marginTop: 14, borderTop: `1px solid ${C.greenMid}`, paddingTop: 10 }}>
-          <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>WHAT TO NOTIFY ME ABOUT</div>
+          <Eyebrow>WHAT TO NOTIFY ME ABOUT</Eyebrow>
           <div style={{ color: C.faint, fontSize: 11, marginTop: 3 }}>Push buzzes your phone (needs notifications on for the device); In-app just shows in the bell.</div>
           {NOTIF_TYPES.map((t) => (
             <div key={t.key} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 9 }}>
@@ -2064,7 +2064,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
 
           {manageGroupsFor === p.id && (
             <div style={{ width: "100%", background: C.greenLight, borderRadius: 10, padding: 12, marginTop: 8 }}>
-              <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>CLUBS</div>
+              <Eyebrow>CLUBS</Eyebrow>
               {(() => {
                 const mine = memberships.filter((m) => m.user_id === p.id);
                 const myGroupIds = new Set(mine.map((m) => m.group_id));
@@ -2090,7 +2090,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                     </div>
 
                     <div style={{ borderTop: `1px solid ${C.greenMid}`, marginTop: 12, paddingTop: 10 }}>
-                      <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>ANALYTICS</div>
+                      <Eyebrow>ANALYTICS</Eyebrow>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
                         <div style={{ flex: 1, color: C.cream, fontSize: 12 }}>
                           Test account {p.is_test ? "· ON" : "· off"}
@@ -2101,7 +2101,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                     </div>
 
                     <div style={{ borderTop: `1px solid ${C.greenMid}`, marginTop: 12, paddingTop: 10 }}>
-                      <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>REMOVE FROM APP</div>
+                      <Eyebrow>REMOVE FROM APP</Eyebrow>
                       <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                         {p.deactivated ? (
                           <button style={{ ...btn(true), padding: "7px 12px", fontSize: 12 }} onClick={() => reactivatePlayer(p)}>Reactivate</button>
@@ -2219,7 +2219,7 @@ export function NotificationBell({ user, onSeeAll, onNavigate }: { user: any; on
             paddingBottom: "calc(10px + env(safe-area-inset-bottom))" }}>
             <div style={{ width: 40, height: 4, background: C.greenLight, borderRadius: 2, margin: "8px auto 4px", flexShrink: 0 }} />
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 14px 10px", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
-              <span style={{ color: C.gold, fontSize: 12, letterSpacing: 2, fontWeight: 800 }}>NOTIFICATIONS</span>
+              <Eyebrow style={{ margin: 0 }}>NOTIFICATIONS</Eyebrow>
               <span style={{ flex: 1 }} />
               {unread > 0 && (
                 <button onClick={markAllRead} style={{ background: "none", border: "none", color: C.sage, fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "4px 6px" }}>Mark all read</button>
@@ -2753,7 +2753,7 @@ function AdminDailyReport() {
               background: sel === d.iso ? C.gold : C.greenLight, color: sel === d.iso ? C.green : C.cream }}>{d.label}</button>
         ))}
         <input type="date" value={sel} max={days[0]?.iso} onChange={(e) => setSel(e.target.value)}
-          style={{ fontSize: 11, borderRadius: 8, border: `1px solid ${C.greenMid}`, background: C.green, color: C.cream, padding: "4px 8px" }} />
+          style={{ fontSize: 11, borderRadius: 8, border: `1px solid ${C.greenMid}`, background: C.green, color: C.cream, padding: "4px 8px", WebkitAppearance: "none", appearance: "none" }} />
       </div>
 
       <div style={{ display: "flex", gap: 10, marginTop: 10 }}>

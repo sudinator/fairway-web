@@ -293,7 +293,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
             )
           )}
         </div>
-        <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 700 }}>RUNNING HANDICAP INDEX</div>
+        <Eyebrow>RUNNING HANDICAP INDEX</Eyebrow>
         <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
           {hcp.index == null
             ? `Need at least 3 full 18-hole rounds (with rating & slope). You have ${hcp.total}.`
@@ -604,7 +604,7 @@ function DashboardCoach({ aggregate, roundsUsed, userEmail, userId, saved, onSav
     <div style={{ background: C.greenLight, borderRadius: 14, padding: 14, marginTop: 16, marginBottom: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: data ? "pointer" : "default" }}
         onClick={() => data && setOpen((v) => !v)}>
-        <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 800 }}>✦ AI COACH</div>
+        <Eyebrow style={{ margin: 0 }}>✦ AI COACH</Eyebrow>
         <div style={{ flex: 1 }} />
         {data && <span style={{ color: C.sage, fontSize: 16 }}>{open ? "▾" : "▸"}</span>}
       </div>

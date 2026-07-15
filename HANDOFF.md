@@ -58,8 +58,10 @@ values, never real secrets.)
    - `python3 ci/check-min-fontsize.py` — no rendered text < 11px. **Blocking.**
    - `python3 ci/check-global-rules.py` — global invariants (e.g. scrollRef clamp). **Blocking.**
    - `python3 ci/check-chart-overflow.py` — flex bar-columns must have `minWidth:0`. **Blocking.**
+   - `python3 ci/check-date-inputs.py` — every `type="date"` is iOS-safe (ShortDateInput or the
+     WebkitAppearance workaround). **Blocking.** (Known iPhone bug with bare date inputs.)
    - `python3 ci/check-jsx-escapes.py` — flags literal `\uXXXX` in JSX text. **Advisory (rc=1).** Only
-     known false positive: `tee-times.tsx:285`. Any NEW hit must be fixed (use real glyphs).
+     known false positive: `tee-times.tsx:284`. Any NEW hit must be fixed (use real glyphs).
 6. **If you added a migration:** regenerate the ledger — `python3 ci/gen-migrations-checklist.py` (updates
    `MIGRATIONS.md`).
 7. **Line endings:** normalize all text files to **CRLF**, EXCEPT everything under `ci/` and `.github/`,
@@ -111,7 +113,7 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current version: 166.0.260714 (this zip).** (New version scheme `FEATURE.EDIT.YYMMDD` — see APP_RULES #13.)
+**Current version: 167.2.260715 (this zip).** (New version scheme `FEATURE.EDIT.YYMMDD` — see APP_RULES #13.)
 - **Two migrations are PENDING** — run in the Supabase SQL editor in order (full SQL printed inline at
   delivery, and in the files):
   - **`0111_money_audit.sql`** — durable Money audit trail + triggers, child-write lock, $100k cap.

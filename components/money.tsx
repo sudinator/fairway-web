@@ -3,18 +3,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
-import { Avatar, btn, inputStyle, Eyebrow } from "@/components/ui";
+import { Avatar, btn, inputStyle, Eyebrow, FieldLabel } from "@/components/ui";
 import {
   computeBalances, simplify, pairwiseDebts, evenShares, validateCustomTotal, guestCoverageBySponsor,
-  fmtUSD, payLink, nudgeSms, auditVersionsByExpense, eventNet, expensesByEvent,
+  fmtUSD, payLink, nudgeSms, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, eventSettlement, withinEventDebts,
   type Expense, type Share, type Settlement, type Guest, type Payer,
-  type AuditRow, type AuditVersion, type AuditSnapshot, type EventRow,
+  type AuditRow, type AuditVersion, type AuditSnapshot, type EventRow, type LedgerLine,
 } from "@/lib/money";
 
 const supabase = createClient();
 
 type Member = { id: string; display_name: string; avatar_url?: string | null; venmo_handle?: string | null; paypal_handle?: string | null; zelle_handle?: string | null; phone?: string | null };
-type SettlementRow = Settlement & { id: string; method?: string | null; created_by?: string | null; created_at?: string };
+type SettlementRow = Settlement & { id: string; method?: string | null; created_by?: string | null; created_at?: string; event_id?: string | null; status?: "pending" | "confirmed" };
 type GuestRow = Guest & { name: string; group_id: string; archived?: boolean; became_member_id?: string | null; source_game_id?: string | null };
 type ExpenseRow = Expense & { group_id: string; created_by: string | null; description: string; category: string; split_type: "even" | "custom"; created_at: string; event_id?: string | null };
 type ShareRow = Share & { id: string };
@@ -35,6 +35,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
   const [events, setEvents] = useState<EventRow[]>([]);
   const [viewingSnap, setViewingSnap] = useState<{ snapshot: AuditSnapshot; at?: string } | null>(null); // read-only view of a deleted expense
+  const [ledgerFor, setLedgerFor] = useState<string | null>(null); // member whose balance breakdown is open
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<ExpenseRow | null>(null);
   const [viewing, setViewing] = useState<ExpenseRow | null>(null);
@@ -102,8 +103,10 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     return out;
   }, [auditByExpense, liveExpenseIds]);
   const guestById = useMemo(() => Object.fromEntries(guests.map((g) => [g.id, g])), [guests]);
-  const balances = useMemo(() => computeBalances(expenses, shares, settlements, guests, payers), [expenses, shares, settlements, guests, payers]);
-  const transfers = useMemo(() => (simplifyMode ? simplify(balances) : pairwiseDebts(expenses, shares, settlements, guests, payers)), [simplifyMode, balances, expenses, shares, settlements, guests, payers]);
+  const confirmedSettlements = useMemo(() => settlements.filter((s) => (s.status || "confirmed") === "confirmed"), [settlements]);
+  const myPending = useMemo(() => settlements.filter((s) => (s.status === "pending") && s.from_user_id === user.id), [settlements, user.id]);
+  const balances = useMemo(() => computeBalances(expenses, shares, confirmedSettlements, guests, payers), [expenses, shares, confirmedSettlements, guests, payers]);
+  const transfers = useMemo(() => (simplifyMode ? simplify(balances) : pairwiseDebts(expenses, shares, confirmedSettlements, guests, payers)), [simplifyMode, balances, expenses, shares, confirmedSettlements, guests, payers]);
 
   const nameOf = (uid: string) => memberById[uid]?.display_name || "Player";
   const requireOnline = () => {
@@ -115,11 +118,12 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
   const [pending, setPending] = useState<{ from: string; to: string; amt: number } | null>(null);
   const [zelleInfo, setZelleInfo] = useState<{ from: string; to: string; amt: number; handle: string } | null>(null);
   const [askReturn, setAskReturn] = useState(false);
+  const [payChoose, setPayChoose] = useState<{ to: string; amt: number; total: number; count: number } | null>(null);
   useEffect(() => {
-    const onVis = () => { if (document.visibilityState === "visible" && pending) setAskReturn(true); };
+    const onVis = () => { if (document.visibilityState === "visible" && (pending || myPending.length > 0)) { setPayChoose(null); setAskReturn(true); } };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
-  }, [pending]);
+  }, [pending, myPending.length]);
 
   const logActivity = useCallback(async (action: string, summary: string, meta: any = {}) => {
     await supabase.from("group_activity").insert({ group_id: gid, actor_user_id: user.id, action, summary, meta });
@@ -158,6 +162,54 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     setSimplifyMode(v);
     const { error } = await supabase.from("groups").update({ money_simplify: v }).eq("id", gid);
     if (error) { setSimplifyMode(!v); alert("Couldn't change the setting - please try again."); }
+  };
+
+  // ---- per-event settle: arm (pending) → confirm on return ----
+  const armSettle = async (buckets: (string | null)[]) => {
+    if (!requireOnline()) return;
+    const rows: any[] = [];
+    for (const b of buckets) {
+      const debts = withinEventDebts(b, user.id, expenses as any, shares as any, guests as any, payers as any);
+      for (const d of debts) rows.push({ group_id: gid, from_user_id: user.id, to_user_id: d.to, amount_cents: d.amount, method: "pending", event_id: b, status: "pending", created_by: user.id });
+    }
+    if (rows.length === 0) { alert("Nothing to settle here."); return; }
+    setBusy(true);
+    const { error } = await supabase.from("settlements").insert(rows);
+    setBusy(false);
+    if (error) { alert("Couldn't start the settlement — please try again."); return; }
+    const byTo: Record<string, number> = {};
+    for (const r of rows) byTo[r.to_user_id] = (byTo[r.to_user_id] || 0) + r.amount_cents;
+    const primaryTo = Object.keys(byTo).sort((a, b) => byTo[b] - byTo[a])[0];
+    const total = rows.reduce((s, r) => s + r.amount_cents, 0);
+    await load();
+    setPending({ from: user.id, to: primaryTo, amt: byTo[primaryTo] });
+    setPayChoose({ to: primaryTo, amt: byTo[primaryTo], total, count: Object.keys(byTo).length });
+  };
+  const confirmPending = async () => {
+    if (!requireOnline()) return;
+    setBusy(true);
+    const ids = myPending.map((s) => s.id);
+    if (ids.length) {
+      await supabase.from("settlements").update({ status: "confirmed" }).in("id", ids);
+      const byTo: Record<string, number> = {};
+      for (const s of myPending) byTo[s.to_user_id] = (byTo[s.to_user_id] || 0) + s.amount_cents;
+      for (const to of Object.keys(byTo)) {
+        try { await supabase.rpc("create_notification", { p_recipient: to, p_message: `${nameOf(user.id)} settled ${fmtUSD(byTo[to])} with you.`, p_group_id: gid }); } catch { /* best-effort */ }
+      }
+      await logActivity("settlement_added", "settled " + fmtUSD(Object.values(byTo).reduce((a, b) => a + b, 0)), { count: ids.length });
+    }
+    setBusy(false);
+    setPending(null); setAskReturn(false); setPayChoose(null);
+    await load();
+    onChanged?.();
+  };
+  const discardPending = async () => {
+    setBusy(true);
+    const ids = myPending.map((s) => s.id);
+    if (ids.length) await supabase.from("settlements").delete().in("id", ids);
+    setBusy(false);
+    setPending(null); setAskReturn(false); setPayChoose(null);
+    await load();
   };
 
   async function recordSettlement(from: string, to: string, amt: number, method: string) {
@@ -233,7 +285,18 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
 
       {screen === "balances" && (
         <>
+        {myPending.length > 0 && (
+          <div style={{ background: "#3a3320", border: "1px solid #6b5e2e", borderRadius: 12, padding: "11px 13px", marginBottom: 12 }}>
+            <div style={{ color: "#f3e2a8", fontSize: 13, fontWeight: 700 }}>Confirm your payment</div>
+            <div style={{ color: "#e6cf8a", fontSize: 12, marginTop: 2 }}>You started settling {fmtUSD(myPending.reduce((s, p) => s + p.amount_cents, 0))} but haven't confirmed it went through.</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button disabled={busy} onClick={confirmPending} style={{ ...btn(true), flex: 1, background: "#7fd6a3", color: C.green }}>Mark settled</button>
+              <button disabled={busy} onClick={discardPending} style={{ ...btn(false), flex: 0, padding: "8px 14px" }}>Undo</button>
+            </div>
+          </div>
+        )}
         <BalancesScreen members={members} guests={guests} shares={shares} payers={payers} balances={balances} me={user.id} groupName={activeGroup.name}
+          onOpenLedger={(mid) => setLedgerFor(mid)}
           onNudge={(m, owe) => { const link = "https://birdienumnum.vercel.app"; if (m.phone) window.location.href = nudgeSms(m.phone, m.display_name, owe, activeGroup.name, link); }} />
         <GuestManager guests={guests} members={members} busy={busy} onRetire={retireGuest} onUnretire={unretireGuest} />
         </>
@@ -244,7 +307,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
           openEvents={events.filter((e) => e.status === "open")} onCreateEvent={createEvent}
           editing={editing} editShares={editing ? shares.filter((s) => s.expense_id === editing.id) : []} editPayers={editing ? payers.filter((p) => p.expense_id === editing.id) : []} editHistory={editing ? activity.filter((a) => a?.meta?.expense_id === editing.id && (a.action === "expense_created" || a.action === "expense_edited")) : []} onLog={logActivity}
           canDelete={!!editing && (editing.created_by === user.id || isAdmin)}
-          onDelete={async () => { if (!editing) return; const d = editing; setBusy(true); const { error } = await supabase.from("expenses").delete().eq("id", d.id); if (error) { setBusy(false); alert("Couldn't delete this expense — please try again."); return; } await logActivity("expense_deleted", "deleted “" + (d.description || "expense") + "” — " + fmtUSD(d.amount_cents), { expense_id: d.id, amount_cents: d.amount_cents }); setBusy(false); setEditing(null); await load(); setScreen("balances"); }}
+          onDelete={async () => { if (!editing) return; const d = editing; setBusy(true); const { error } = await supabase.from("expenses").delete().eq("id", d.id); if (error) { setBusy(false); alert("Couldn't void this expense — please try again."); return; } await logActivity("expense_deleted", "voided “" + (d.description || "expense") + "” — " + fmtUSD(d.amount_cents), { expense_id: d.id, amount_cents: d.amount_cents }); setBusy(false); setEditing(null); await load(); setScreen("balances"); }}
           onAddGuest={async (name) => {
             if (!requireOnline()) return;
             const { data, error } = await supabase.from("group_guests").insert({ group_id: gid, name, archived: false, created_by: user.id }).select("id, name, sponsor_user_id, group_id, archived, became_member_id").single();
@@ -273,6 +336,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
         <EventGroupedExpenses
           expenses={expenses} shares={shares} payers={payers} guests={guests} events={events}
           memberById={memberById} guestById={guestById} partyCount={members.length + guests.length}
+          settlements={settlements} me={user.id} onSettleEvent={(eid) => armSettle([eid])}
           isAdmin={isAdmin} onView={(e) => setViewing(e)}
           onCloseEvent={(ev, closed) => setEventClosed(ev, closed)} />
       )}
@@ -293,13 +357,23 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
         <SnapshotDetail snap={viewingSnap.snapshot} at={viewingSnap.at} onClose={() => setViewingSnap(null)} />
       )}
 
+      {ledgerFor && (
+        <PersonLedgerModal
+          memberId={ledgerFor} me={user.id}
+          name={(memberById[ledgerFor]?.display_name) || "Player"}
+          net={balances[ledgerFor] || 0}
+          expenses={expenses} shares={shares} settlements={settlements} guests={guests} payers={payers}
+          events={events} memberById={memberById}
+          onClose={() => setLedgerFor(null)} />
+      )}
+
       {zelleInfo && (
         <div onClick={() => setZelleInfo(null)} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px 24px", width: "100%", maxWidth: 520 }}>
             <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>Pay {nameOf(zelleInfo.to)} with Zelle</div>
             <div style={{ color: C.sage, fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>Zelle happens inside your bank app. Open it, send to the contact below, then mark it settled here.</div>
             <div style={{ background: "#123528", borderRadius: 12, padding: 14, marginTop: 12 }}>
-              <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.5 }}>Zelle contact</div>
+              <FieldLabel>Zelle contact</FieldLabel>
               <div style={{ color: C.cream, fontSize: 16, fontWeight: 800, marginTop: 3, wordBreak: "break-all" }}>{zelleInfo.handle}</div>
               <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, marginTop: 8 }}>{fmtUSD(zelleInfo.amt)}</div>
               <button onClick={() => { try { navigator.clipboard?.writeText(zelleInfo.handle); } catch {} }} style={{ ...btn(false), marginTop: 10, fontSize: 12.5, padding: "8px 12px" }}>Copy contact</button>
@@ -313,14 +387,41 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
       )}
 
       {/* confirm-on-return sheet */}
-      {askReturn && pending && (
+      {askReturn && (myPending.length > 0 || pending) && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.66)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
           <div style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "22px 18px 26px", width: "100%", maxWidth: 520, textAlign: "center" }}>
-            <div style={{ color: C.cream, fontWeight: 800, fontSize: 17 }}>Welcome back — did you pay?</div>
-            <div style={{ color: C.sage, fontSize: 13, margin: "8px 0 4px" }}>You were paying <b style={{ color: C.cream }}>{nameOf(pending.to)}</b> <b style={{ color: C.gold }}>{fmtUSD(pending.amt)}</b></div>
+            <div style={{ color: C.cream, fontWeight: 800, fontSize: 17 }}>Back from paying — did it go through?</div>
+            <div style={{ color: C.sage, fontSize: 13, margin: "8px 0 4px" }}>You were settling <b style={{ color: C.gold }}>{fmtUSD(myPending.length > 0 ? myPending.reduce((s, p) => s + p.amount_cents, 0) : (pending?.amt || 0))}</b></div>
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button disabled={busy} onClick={() => recordSettlement(pending.from, pending.to, pending.amt, "venmo")} style={{ ...btn(true), flex: 1, background: "#7fd6a3", color: C.green }}>✓ Yes, mark settled</button>
-              <button onClick={() => { setPending(null); setAskReturn(false); }} style={{ ...btn(false), flex: 1 }}>Not yet</button>
+              <button disabled={busy} onClick={() => { if (myPending.length > 0) confirmPending(); else if (pending) recordSettlement(pending.from, pending.to, pending.amt, "venmo"); }} style={{ ...btn(true), flex: 1, background: "#7fd6a3", color: C.green }}>✓ Yes, mark settled</button>
+              <button onClick={() => { setAskReturn(false); if (!myPending.length) setPending(null); }} style={{ ...btn(false), flex: 1 }}>Not yet</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* pay-method chooser for an armed event settle */}
+      {payChoose && (
+        <div onClick={() => setPayChoose(null)} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.66)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "20px 18px 26px", width: "100%", maxWidth: 520 }}>
+            <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>Pay {nameOf(payChoose.to)} {fmtUSD(payChoose.amt)}</div>
+            <div style={{ color: C.sage, fontSize: 12.5, marginTop: 4, lineHeight: 1.5 }}>Send it, then come back and confirm — we'll ask when you return.{payChoose.count > 1 ? ` (${payChoose.count} people to pay for this settle; open each below.)` : ""}</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+              {memberById[payChoose.to]?.venmo_handle && <button onClick={() => { const u = payLink("venmo", memberById[payChoose.to]!.venmo_handle!, payChoose.amt, `${activeGroup.name} golf`); if (typeof window !== "undefined") window.location.href = u; }} style={{ ...btn(true), flex: 1, background: "#3d95ce", color: "#fff" }}>Venmo</button>}
+              {memberById[payChoose.to]?.paypal_handle && <button onClick={() => { const u = payLink("paypal", memberById[payChoose.to]!.paypal_handle!, payChoose.amt, `${activeGroup.name} golf`); if (typeof window !== "undefined") window.location.href = u; }} style={{ ...btn(false), flex: 1 }}>PayPal</button>}
+            </div>
+            {memberById[payChoose.to]?.zelle_handle && (
+              <div style={{ background: "#123528", borderRadius: 10, padding: "9px 11px", marginTop: 10 }}>
+                <div style={{ color: C.sage, fontSize: 11 }}>Or Zelle to</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ color: C.cream, fontSize: 14, fontWeight: 700, wordBreak: "break-all", flex: 1 }}>{memberById[payChoose.to]!.zelle_handle}</span>
+                  <button onClick={() => { try { navigator.clipboard?.writeText(memberById[payChoose.to]!.zelle_handle!); } catch {} }} style={{ ...btn(false), fontSize: 11, padding: "5px 10px" }}>Copy</button>
+                </div>
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button disabled={busy} onClick={confirmPending} style={{ ...btn(true), flex: 1, background: "#7fd6a3", color: C.green }}>Paid — mark settled</button>
+              <button disabled={busy} onClick={discardPending} style={{ ...btn(false), flex: 0, padding: "10px 16px" }}>Cancel</button>
             </div>
           </div>
         </div>
@@ -345,7 +446,7 @@ function GuestManager({ guests, members, busy, onRetire, onUnretire }: {
   const nameOf = (uid: string) => members.find((m) => m.id === uid)?.display_name || "member";
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px", marginTop: 12 }}>
-      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 800 }}>Guests</div>
+      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Guests</div>
       <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 6 }}>Retire a guest to stop offering them on new expenses. Past expenses stay untouched.</div>
       {active.length === 0 && <div style={{ color: C.sage, fontSize: 12, padding: "6px 2px" }}>No active guests. Add one from the Add screen.</div>}
       {active.map((g) => (
@@ -356,7 +457,7 @@ function GuestManager({ guests, members, busy, onRetire, onUnretire }: {
           </div>
           {openId === g.id && (
             <div style={{ marginTop: 8, background: "#14352b", borderRadius: 10, padding: 10 }}>
-              <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>Now a member? (optional)</div>
+              <FieldLabel>Now a member? (optional)</FieldLabel>
               <select value={became} onChange={(e) => setBecame(e.target.value)} style={{ ...inputStyle, padding: "8px 11px", fontSize: 14 }}>
                 <option value="">— not a member —</option>
                 {members.map((m) => <option key={m.id} value={m.id}>{m.display_name}</option>)}
@@ -381,9 +482,10 @@ function GuestManager({ guests, members, busy, onRetire, onUnretire }: {
   );
 }
 
-function BalancesScreen({ members, guests, shares, payers, balances, me, onNudge }: {
+function BalancesScreen({ members, guests, shares, payers, balances, me, onNudge, onOpenLedger }: {
   members: Member[]; guests: GuestRow[]; shares: ShareRow[]; payers: PayerRow[]; balances: Record<string, number>; me: string; groupName: string;
   onNudge: (m: Member, owe: number) => void;
+  onOpenLedger: (memberId: string) => void;
 }) {
   const rows = members.map((m) => ({ m, v: balances[m.id] || 0 }));
   const gById = Object.fromEntries(guests.map((g) => [g.id, g]));
@@ -391,13 +493,13 @@ function BalancesScreen({ members, guests, shares, payers, balances, me, onNudge
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Balances</div>
-      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 6 }}>Net across all unsettled expenses</div>
+      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 6 }}>Net across all unsettled expenses · tap a name for the breakdown</div>
       {rows.map(({ m, v }) => {
         const owes = v < 0, owed = v > 0;
         const cov = coverage[m.id] || {};
         const covNames = Object.keys(cov).map((id) => gById[id]?.name).filter(Boolean) as string[];
         return (
-          <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 2px", borderBottom: `1px solid ${C.greenMid}` }}>
+          <div key={m.id} onClick={() => onOpenLedger(m.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 2px", borderBottom: `1px solid ${C.greenMid}`, cursor: "pointer" }}>
             <Avatar src={m.avatar_url} name={m.display_name} size={30} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: C.cream, fontSize: 14, fontWeight: 700 }}>{m.display_name}{m.id === me ? " (you)" : ""}</div>
@@ -406,7 +508,8 @@ function BalancesScreen({ members, guests, shares, payers, balances, me, onNudge
             <div style={{ color: owed ? "#7fd6a3" : owes ? "#ef9d90" : C.sage, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 15 }}>
               {owed ? "is owed " + fmtUSD(v) : owes ? "owes " + fmtUSD(-v) : "settled"}
             </div>
-            {owes && m.phone && <button onClick={() => onNudge(m, -v)} style={{ marginLeft: 6, background: "#173a2c", color: C.cream, border: `1px solid #37624f`, borderRadius: 8, padding: "5px 10px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>Nudge</button>}
+            {owes && m.phone && <button onClick={(e) => { e.stopPropagation(); onNudge(m, -v); }} style={{ marginLeft: 6, background: "#173a2c", color: C.cream, border: `1px solid #37624f`, borderRadius: 8, padding: "5px 10px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>Nudge</button>}
+            <span style={{ color: C.sage, fontSize: 16, marginLeft: 2 }}>&#8250;</span>
           </div>
         );
       })}
@@ -466,7 +569,7 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
       })}
       {settlements.length > 0 && (
         <>
-          <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", margin: "16px 0 4px" }}>Payments recorded</div>
+          <Eyebrow>Payments recorded</Eyebrow>
           {[...settlements].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || "")).map((s2) => {
             const canUndo = isAdmin || s2.created_by === me;
             return (
@@ -685,9 +788,9 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
           </div>
           {isGuest && on && (
             <div onClick={(e) => e.stopPropagation()} style={{ background: "#14352b", border: `1.5px solid ${needSponsor ? C.birdie : "#3c6f59"}`, borderTop: "none", borderRadius: "0 0 10px 10px", padding: "8px 10px 9px 38px" }}>
-              <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>
+              <FieldLabel>
                 Sponsored by {needSponsor ? <span style={{ color: C.birdie }}>· required</span> : <span style={{ color: "#7fbf9c" }}>✓</span>}
-              </div>
+              </FieldLabel>
               <select value={guestSponsors[p.id] || ""} onChange={(e) => setGuestSponsors((s) => ({ ...s, [p.id]: e.target.value }))}
                 style={{ ...inputStyle, padding: "8px 11px", fontSize: 14, borderColor: needSponsor ? C.birdie : C.line, color: needSponsor ? C.faint : C.ink }}>
                 <option value="">Select member…</option>
@@ -717,8 +820,8 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
 
       <button disabled={!canSave} onClick={save} style={{ ...btn(true), marginTop: 14, opacity: canSave ? 1 : 0.5 }}>{editing ? "Save changes" : "Add expense"}</button>
       {editing && canDelete && (
-        <button disabled={busy} onClick={async () => { if (!requireOnline()) return; if (!window.confirm("Delete this expense? Everyone's balances will recompute. Payments already marked settled stay recorded.")) return; setBusy(true); await onDelete?.(); }}
-          style={{ ...btn(false), marginTop: 8, color: C.birdie, borderColor: C.birdie }}>Delete expense</button>
+        <button disabled={busy} onClick={async () => { if (!requireOnline()) return; if (!window.confirm("Void this expense? It's removed from everyone's balances, but the record stays in the activity log for the audit trail.")) return; setBusy(true); await onDelete?.(); }}
+          style={{ ...btn(false), marginTop: 8, color: C.birdie, borderColor: C.birdie }}>Void expense</button>
       )}
       {editing && (editHistory || []).length > 0 && (
         <div style={{ marginTop: 16, borderTop: `1px solid ${C.greenMid}`, paddingTop: 12 }}>
@@ -737,7 +840,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
 // Shared bits for rendering a frozen snapshot's allocation (used by both the live
 // ExpenseDetail version history and the read-only SnapshotDetail for deleted rows).
 const fmtWhen = (iso?: string) => (iso ? new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : "");
-const verbFor = (a: string) => (a === "created" ? "Created" : a === "deleted" ? "Deleted" : "Edited");
+const verbFor = (a: string) => (a === "created" ? "Created" : a === "deleted" ? "Voided" : "Edited");
 
 function SnapshotBody({ snap }: { snap: AuditSnapshot }) {
   const payers = snap.payers || [];
@@ -766,10 +869,10 @@ function SnapshotDetail({ snap, at, onClose }: { snap: AuditSnapshot; at?: strin
           <div style={{ flex: 1, color: C.cream, fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 800 }}>{snap.description || "Expense"}</div>
           <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800 }}>{fmtUSD(snap.amount_cents || 0)}</div>
         </div>
-        <div style={{ display: "inline-block", background: "#5a2d2d", color: "#ffd9d9", fontSize: 11, fontWeight: 800, padding: "2px 8px", borderRadius: 10, marginTop: 6 }}>DELETED{at ? " · " + fmtWhen(at) : ""}</div>
+        <div style={{ display: "inline-block", background: "#5a2d2d", color: "#ffd9d9", fontSize: 11, fontWeight: 800, padding: "2px 8px", borderRadius: 10, marginTop: 6 }}>VOIDED{at ? " · " + fmtWhen(at) : ""}</div>
         <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>entered by {snap.created_by_name || "someone"}</div>
         <SnapshotBody snap={snap} />
-        <div style={{ color: C.faint, fontSize: 11, marginTop: 12, lineHeight: 1.5 }}>This expense was deleted. The allocation above is the record as it stood at deletion — kept for the club's audit trail and can't be edited.</div>
+        <div style={{ color: C.faint, fontSize: 11, marginTop: 12, lineHeight: 1.5 }}>This expense was voided. The allocation above is the record as it stood when it was voided — kept for the club's audit trail and can't be edited.</div>
         <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
           <button onClick={onClose} style={{ ...btn(false), flex: 1 }}>Close</button>
         </div>
@@ -885,7 +988,7 @@ function ActivityLog({ activity, memberById, onOpenExpense, canOpen }: { activit
             <span style={{ fontSize: 14, width: 18, textAlign: "center", color: C.gold }}>{ACT_ICON[a.action] || "•"}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: C.cream, fontSize: 13 }}><b>{who}</b> {a.summary}</div>
-              <div style={{ color: C.faint, fontSize: 11 }}>{new Date(a.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}{a.action === "expense_deleted" && openable ? " · tap to see the deleted detail" : ""}</div>
+              <div style={{ color: C.faint, fontSize: 11 }}>{new Date(a.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}{a.action === "expense_deleted" && openable ? " · tap to see the voided detail" : ""}</div>
             </div>
             {openable && <span style={{ color: C.sage, fontSize: 16 }}>&#8250;</span>}
           </div>
@@ -895,17 +998,75 @@ function ActivityLog({ activity, memberById, onOpenExpense, canOpen }: { activit
   );
 }
 
+// Plain-language breakdown of how a person's balance was built — raw obligations,
+// grouped by event, NOT the simplified who-pays-whom. Reconciles to the shown net.
+function PersonLedgerModal({ memberId, me, name, net, expenses, shares, settlements, guests, payers, events, memberById, onClose }: {
+  memberId: string; me: string; name: string; net: number;
+  expenses: ExpenseRow[]; shares: ShareRow[]; settlements: SettlementRow[]; guests: GuestRow[]; payers: PayerRow[];
+  events: EventRow[]; memberById: Record<string, Member>; onClose: () => void;
+}) {
+  const nameOf = (uid: string | null) => (uid ? (memberById[uid]?.display_name || "someone") : "someone");
+  const { lines } = personLedger(memberId, expenses as any, shares as any, settlements as any, guests as any, payers as any, nameOf);
+  const evName = (id: string | null) => (id ? (events.find((e) => e.id === id)?.name || "Event") : "Ungrouped");
+  // group lines by event bucket (settlements have no event → "Payments")
+  const buckets: { key: string; title: string; lines: LedgerLine[] }[] = [];
+  const push = (key: string, title: string, l: LedgerLine) => {
+    let b = buckets.find((x) => x.key === key);
+    if (!b) { b = { key, title, lines: [] }; buckets.push(b); }
+    b.lines.push(l);
+  };
+  for (const l of lines) {
+    if (l.kind === "settle_out" || l.kind === "settle_in") push("__pay", "Payments", l);
+    else push(l.eventId || "__ung", evName(l.eventId), l);
+  }
+  const who = memberId === me ? "You" : name;
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px 24px", width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+          <div style={{ flex: 1, color: C.cream, fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 800 }}>{name}{memberId === me ? " (you)" : ""}</div>
+          <div style={{ color: net > 0 ? "#7fd6a3" : net < 0 ? "#ef9d90" : C.sage, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>
+            {net > 0 ? "owed " + fmtUSD(net) : net < 0 ? "owes " + fmtUSD(-net) : "settled"}
+          </div>
+        </div>
+        <div style={{ color: C.faint, fontSize: 11.5, marginTop: 4, lineHeight: 1.5 }}>How this number is built, item by item. This is the raw list — who ultimately pays whom is decided separately on the Settle tab.</div>
+
+        {lines.length === 0 && <div style={{ color: C.sage, fontSize: 13, padding: "12px 2px" }}>No expenses or payments yet.</div>}
+        {buckets.map((b) => (
+          <div key={b.key} style={{ marginTop: 14 }}>
+            <Eyebrow>{b.title.toUpperCase()}</Eyebrow>
+            {b.lines.map((l, i) => (
+              <div key={i} style={{ display: "flex", gap: 8, padding: "6px 0", borderBottom: `1px solid ${C.greenMid}`, alignItems: "center" }}>
+                <span style={{ flex: 1, color: C.cream, fontSize: 13, lineHeight: 1.4 }}>{l.label}</span>
+                <span style={{ color: l.delta > 0 ? "#7fd6a3" : "#ef9d90", fontWeight: 800, fontSize: 13, whiteSpace: "nowrap" }}>{l.delta > 0 ? "+" : "\u2212"}{fmtUSD(Math.abs(l.delta))}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16, paddingTop: 10, borderTop: `2px solid ${C.greenMid}` }}>
+          <span style={{ color: C.cream, fontWeight: 800, fontSize: 14 }}>{who === "You" ? "Your balance" : "Balance"}</span>
+          <span style={{ color: net > 0 ? "#7fd6a3" : net < 0 ? "#ef9d90" : C.sage, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 15 }}>{net > 0 ? "+" : net < 0 ? "\u2212" : ""}{fmtUSD(Math.abs(net))}</span>
+        </div>
+        <button onClick={onClose} style={{ ...btn(false), width: "100%", marginTop: 16 }}>Close</button>
+      </div>
+    </div>
+  );
+}
+
 // Balances → expenses grouped into event islands (open events, Ungrouped, then a
 // collapsed Closed section). Per-event nets come from eventNet(); settlement stays
 // group-wide (handled elsewhere). Reuses one row renderer for every expense.
-function EventGroupedExpenses({ expenses, shares, payers, guests, events, memberById, guestById, partyCount, isAdmin, onView, onCloseEvent }: {
+function EventGroupedExpenses({ expenses, shares, payers, guests, events, memberById, guestById, partyCount, settlements, me, onSettleEvent, isAdmin, onView, onCloseEvent }: {
   expenses: ExpenseRow[]; shares: ShareRow[]; payers: PayerRow[]; guests: GuestRow[]; events: EventRow[];
   memberById: Record<string, Member>; guestById: Record<string, GuestRow>; partyCount: number;
+  settlements: SettlementRow[]; me: string; onSettleEvent: (eventId: string | null) => void;
   isAdmin: boolean; onView: (e: ExpenseRow) => void;
   onCloseEvent: (ev: EventRow, closed: boolean) => void;
 }) {
   const [showClosed, setShowClosed] = useState(false);
   const byEv = useMemo(() => expensesByEvent(expenses), [expenses]);
+  const settle = useMemo(() => eventSettlement({ events, expenses: expenses as any, shares: shares as any, payers: payers as any, settlements: settlements as any, guests: guests as any }), [events, expenses, shares, payers, settlements, guests]);
   const openEvents = events.filter((e) => e.status === "open");
   const closedEvents = events.filter((e) => e.status === "closed");
   const ungrouped = byEv[""] || [];
@@ -933,6 +1094,9 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
   const island = (ev: EventRow) => {
     const net = eventNet(ev.id, expenses as any, shares as any, guests as any, payers as any);
     const list = byEv[ev.id] || [];
+    const st = settle[ev.id];
+    const settled = !!st && st.settled && list.length > 0;
+    const partial = !!st && !st.settled && st.covered > 0;
     const created = ev.created_at ? new Date(ev.created_at).toLocaleDateString([], { month: "short", day: "numeric" }) : null;
     const perMember = [...net.perMember].sort((a, b) => (memberById[a.member_id]?.display_name || "").localeCompare(memberById[b.member_id]?.display_name || ""));
     return (
@@ -946,7 +1110,13 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>{fmtUSD(net.total)}</div>
-            {list.length > 0 && <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 7px", borderRadius: 9, background: net.balanced ? "#123f2e" : "#4a2420", color: net.balanced ? "#8fd6b0" : "#f0b4ab" }}>{net.balanced ? "settled" : "unbalanced"}</span>}
+            {list.length > 0 && (settled
+              ? <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 7px", borderRadius: 9, background: "#123f2e", color: "#8fd6b0" }}>settled</span>
+              : partial
+                ? <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 9, background: "#3a3320", color: "#e6cf8a" }}>{fmtUSD(st!.covered)} of {fmtUSD(st!.owed)} settled</span>
+                : net.owedWithin > 0
+                  ? <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 9, background: "#123528", color: C.sage }}>{fmtUSD(net.owedWithin)} outstanding</span>
+                  : <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 9, background: "#123528", color: C.sage }}>open</span>)}
           </div>
         </div>
         {perMember.length > 0 && (
@@ -961,10 +1131,26 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
           </div>
         )}
         {list.length > 0 && <div style={{ marginTop: 8, borderTop: `1px dashed ${C.greenMid}`, paddingTop: 4 }}>{list.map(row)}</div>}
+        {(() => {
+          const mine = net.perMember.find((m) => m.member_id === me);
+          const owe = mine && mine.net < 0 ? -mine.net : 0;
+          const pendingHere = settlements.some((s) => s.from_user_id === me && (s.event_id ?? null) === ev.id && s.status === "pending");
+          const paidHere = settlements.filter((s) => s.from_user_id === me && (s.event_id ?? null) === ev.id && (s.status || "confirmed") === "confirmed").reduce((s2, s) => s2 + s.amount_cents, 0);
+          if (owe > 0 && paidHere < owe && !pendingHere) {
+            return (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, background: "#0f3529", borderRadius: 9, padding: "8px 10px" }}>
+                <span style={{ flex: 1, color: C.cream, fontSize: 12.5 }}>You owe {fmtUSD(owe - paidHere)} for this event</span>
+                <button onClick={() => onSettleEvent(ev.id)} style={{ border: "none", background: "#7fd6a3", color: C.green, fontSize: 11.5, fontWeight: 800, padding: "7px 14px", borderRadius: 8, cursor: "pointer" }}>Settle</button>
+              </div>
+            );
+          }
+          if (pendingHere) return <div style={{ marginTop: 10, background: "#3a3320", borderRadius: 9, padding: "7px 10px", color: "#e6cf8a", fontSize: 11.5 }}>You started settling this — confirm it up top.</div>;
+          return null;
+        })()}
         {ev.event_type === "game" && <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Name &amp; date come from the game.</div>}
         {isAdmin && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, background: "#0f3529", borderRadius: 9, padding: "6px 9px" }}>
-            <span style={{ flex: 1, color: C.sage, fontSize: 11 }}>{net.balanced ? "Shares balance — ready to close" : "Admin"}</span>
+            <span style={{ flex: 1, color: C.sage, fontSize: 11 }}>{settled ? "Settled — ready to close" : "Admin"}</span>
             <button onClick={() => onCloseEvent(ev, true)} style={{ border: "none", background: "#5a2d2d", color: "#ffd9d9", fontSize: 11, fontWeight: 800, padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>Close event</button>
           </div>
         )}

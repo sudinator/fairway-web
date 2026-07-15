@@ -2,6 +2,12 @@
 
 Running list of things to build or tighten. Newest ideas near the top of each section.
 
+## Batched for next release (small)
+- **Remove the "Built: <date>" line** in the version display — `components/manage.tsx:3659`
+  (the `{APP_BUILT_AT ? <div ...>Built: …</div> : null}` line). Redundant now that the release date is
+  in the version number itself (FEATURE.EDIT.YYMMDD, auto-stamped as of 166.3). Display-only, no
+  migration. Requested during 166.3; do not ship standalone — fold into the next release.
+
 ## Achievements / badges
 **Phase 1 — data foundation (SHIPPED v1.123.0):** `member_badges` table + `show_card` opt-out +
 `group_badges` peer-read RPC (migration 0079); `lib/badges.ts` = 33-badge catalog (`BADGES`) +

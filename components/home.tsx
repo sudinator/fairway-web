@@ -8,7 +8,7 @@ import { logActivity } from "@/lib/activity";
 import { Toaster } from "@/components/toast";
 import { loadDraft, draftHasScores } from "@/lib/draft";
 import { loadActiveGame, saveAppBootCache, loadAppBootCache } from "@/lib/draft";
-import { btn, Wordmark, inputStyle } from "@/components/ui";
+import { btn, Wordmark, inputStyle, Eyebrow } from "@/components/ui";
 import Tournaments, { type GameSeed } from "@/components/tournaments";
 import { CoursesLibrary, ProfilePanel, NotificationBell, NotificationsScreen, PlayersTab, AdminHome, HelpPage } from "@/components/manage";
 import { MoneyTab } from "@/components/money";
@@ -921,7 +921,7 @@ function NameGate({ user, onSaved }: { user: any; onSaved: () => void }) {
     <div style={{ maxWidth: 440, margin: "70px auto", padding: 24, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "center" }}><Wordmark width={240} /></div>
       <div style={{ background: C.greenLight, borderRadius: 16, padding: 26, marginTop: 26, textAlign: "left" }}>
-        <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 800 }}>WELCOME</div>
+        <Eyebrow style={{ marginTop: 0 }}>WELCOME</Eyebrow>
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, marginTop: 8 }}>
           What's your name?
         </div>

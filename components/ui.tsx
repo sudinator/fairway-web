@@ -97,7 +97,13 @@ export const inputStyle: React.CSSProperties = {
 };
 
 export const Eyebrow = ({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) => (
-  <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 700, ...style }}>{children}</div>
+  <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 700, marginTop: 16, marginBottom: 8, ...style }}>{children}</div>
+);
+
+// Quiet secondary label bolted to a form control (a tier below Eyebrow section headers).
+// Sage, uppercase, tight bottom margin so it sits right above its input.
+export const FieldLabel = ({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) => (
+  <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5, ...style }}>{children}</div>
 );
 
 // Compact date field: shows a short M/D/YY date in the page font (so it matches
