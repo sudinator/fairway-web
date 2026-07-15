@@ -4,8 +4,24 @@ import { dirname, join } from 'node:path';
 const root = process.cwd();
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 
-// User-facing version. Keep this friendly: 1.0.11, 1.0.12, etc.
-const appVersion = String(process.env.NEXT_PUBLIC_APP_VERSION || pkg.version || '1.0.0');
+// Today's date in US/Eastern (the app's canonical tz) as YYMMDD. DST-safe via IANA tz.
+function easternYYMMDD(d = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', year: '2-digit', month: '2-digit', day: '2-digit',
+  }).formatToParts(d);
+  const g = (t) => parts.find((p) => p.type === t).value;
+  return `${g('year')}${g('month')}${g('day')}`;
+}
+
+// User-facing version. New scheme FEATURE.EDIT.YYMMDD: the date segment is AUTO-STAMPED here to today's
+// Eastern date, so it's always correct and never hand-typed. Only FEATURE.EDIT is maintained in
+// package.json. A 6-digit third segment marks the new scheme; the legacy 1.MINOR.PATCH form is left as-is.
+const rawVersion = String(process.env.NEXT_PUBLIC_APP_VERSION || pkg.version || '1.0.0');
+let appVersion = rawVersion;
+const m = rawVersion.match(/^(\d+)\.(\d+)\.(\d+)$/);
+if (m && m[3].length === 6) {
+  appVersion = `${m[1]}.${m[2]}.${easternYYMMDD()}`;
+}
 
 // Machine/support build id. Useful for debugging, but not the primary label shown to users.
 const buildId = String(

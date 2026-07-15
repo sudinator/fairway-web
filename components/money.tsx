@@ -20,11 +20,6 @@ type ExpenseRow = Expense & { group_id: string; created_by: string | null; descr
 type ShareRow = Share & { id: string };
 type PayerRow = Payer & { id?: string };
 
-const CATS: { k: string; label: string }[] = [
-  { k: "tee", label: "Tee time" }, { k: "bet", label: "Bet" },
-  { k: "food", label: "Food & drink" }, { k: "other", label: "Other" },
-];
-const catLabel = (k: string) => CATS.find((c) => c.k === k)?.label || "Other";
 const ini = (n: string) => n.split(/\s+/).map((w) => w[0] || "").join("").slice(0, 2).toUpperCase();
 
 export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: { id: string }; activeGroup: { id: string; name: string; role?: string }; onChanged?: () => void; initialTab?: "balances" | "add" | "settle" | "log" | null }) {
@@ -78,7 +73,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     setSimplifyMode(grp?.money_simplify !== false); // default to simplified when column/absent
     const { data: act } = await supabase.from("group_activity").select("*").eq("group_id", gid).not("action", "like", "tt%").order("created_at", { ascending: false }).limit(200);
     const { data: aud } = await supabase.from("money_audit").select("id, expense_id, actor_id, action, snapshot, created_at").eq("group_id", gid).order("created_at", { ascending: true }).limit(1000);
-    const { data: evs } = await supabase.from("group_events").select("*").eq("group_id", gid).order("event_date", { ascending: false, nullsFirst: false });
+    const { data: evs } = await supabase.from("group_events").select("*").eq("group_id", gid).order("created_at", { ascending: false });
     setMembers((profs || []).map((p: any) => ({ id: p.id, display_name: p.display_name || "Player", avatar_url: p.avatar_url, venmo_handle: p.venmo_handle, paypal_handle: p.paypal_handle, zelle_handle: p.zelle_handle, phone: p.phone })).sort((a, b) => a.display_name.localeCompare(b.display_name, undefined, { sensitivity: "base" })));
     setGuests(((gRows || []) as GuestRow[]).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })));
     setExpenses((exp || []) as ExpenseRow[]);
@@ -130,10 +125,10 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     await supabase.from("group_activity").insert({ group_id: gid, actor_user_id: user.id, action, summary, meta });
   }, [gid, user.id]);
 
-  const createEvent = async (name: string, date: string | null): Promise<string | null> => {
+  const createEvent = async (name: string): Promise<string | null> => {
     if (!requireOnline()) return null;
     const { data, error } = await supabase.from("group_events")
-      .insert({ group_id: gid, name: name.trim(), event_date: date || null, event_type: "manual", status: "open", created_by: user.id })
+      .insert({ group_id: gid, name: name.trim(), event_type: "manual", status: "open", created_by: user.id })
       .select("*").single();
     if (error || !data) { alert("Couldn't create the event — please try again."); return null; }
     setEvents((e) => [data as EventRow, ...e]);
@@ -225,7 +220,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
 
 
   return (
-    <div style={{ maxWidth: 520, margin: "0 auto" }}>
+    <div style={{ maxWidth: 520, margin: "0 auto", padding: "0 14px" }}>
       {/* screen switch */}
       <div style={{ display: "flex", background: "#123528", borderRadius: 999, padding: 3, marginBottom: 12 }}>
         {([["balances", "Balances"], ["add", "Add"], ["settle", "Settle"], ["log", "Log"]] as const).map(([k, label]) => (
@@ -249,7 +244,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
           openEvents={events.filter((e) => e.status === "open")} onCreateEvent={createEvent}
           editing={editing} editShares={editing ? shares.filter((s) => s.expense_id === editing.id) : []} editPayers={editing ? payers.filter((p) => p.expense_id === editing.id) : []} editHistory={editing ? activity.filter((a) => a?.meta?.expense_id === editing.id && (a.action === "expense_created" || a.action === "expense_edited")) : []} onLog={logActivity}
           canDelete={!!editing && (editing.created_by === user.id || isAdmin)}
-          onDelete={async () => { if (!editing) return; const d = editing; setBusy(true); const { error } = await supabase.from("expenses").delete().eq("id", d.id); if (error) { setBusy(false); alert("Couldn't delete this expense — please try again."); return; } await logActivity("expense_deleted", "deleted “" + (d.description || catLabel(d.category)) + "” — " + fmtUSD(d.amount_cents), { expense_id: d.id, amount_cents: d.amount_cents }); setBusy(false); setEditing(null); await load(); setScreen("balances"); }}
+          onDelete={async () => { if (!editing) return; const d = editing; setBusy(true); const { error } = await supabase.from("expenses").delete().eq("id", d.id); if (error) { setBusy(false); alert("Couldn't delete this expense — please try again."); return; } await logActivity("expense_deleted", "deleted “" + (d.description || "expense") + "” — " + fmtUSD(d.amount_cents), { expense_id: d.id, amount_cents: d.amount_cents }); setBusy(false); setEditing(null); await load(); setScreen("balances"); }}
           onAddGuest={async (name) => {
             if (!requireOnline()) return;
             const { data, error } = await supabase.from("group_guests").insert({ group_id: gid, name, archived: false, created_by: user.id }).select("id, name, sponsor_user_id, group_id, archived, became_member_id").single();
@@ -499,17 +494,15 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
   requireOnline: () => boolean;
   onAddGuest: (name: string) => Promise<void>;
   onSaved: () => Promise<void>;
-  openEvents: EventRow[]; onCreateEvent: (name: string, date: string | null) => Promise<string | null>;
+  openEvents: EventRow[]; onCreateEvent: (name: string) => Promise<string | null>;
   editing?: ExpenseRow | null; editShares?: ShareRow[]; editPayers?: PayerRow[]; editHistory?: any[]; onLog?: (action: string, summary: string, meta?: any) => Promise<void>; canDelete?: boolean; onDelete?: () => Promise<void>;
 }) {
   const skey = (s: ShareRow) => (s.user_id ? "u:" + s.user_id : "g:" + s.guest_id);
   const [eventId, setEventId] = useState<string | null>(editing?.event_id ?? null);
   const [newEventOpen, setNewEventOpen] = useState(false);
   const [newEventName, setNewEventName] = useState("");
-  const [newEventDate, setNewEventDate] = useState("");
   const [desc, setDesc] = useState(editing?.description || "");
   const [amount, setAmount] = useState(editing ? (editing.amount_cents / 100).toString() : "");
-  const [cat, setCat] = useState(editing?.category || "tee");
   const initP = editPayers || [];
   const [payer, setPayer] = useState(initP[0]?.user_id || editing?.payer_user_id || ""); // no default payer on a new expense - must be chosen
   const [multiPayer, setMultiPayer] = useState(initP.length > 1);
@@ -561,7 +554,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
     if (!requireOnline() || !canSave) return;
     setBusy(true);
     const primaryPayer = paidPayers[0];
-    const payload = { payer_user_id: primaryPayer, description: desc.trim(), category: cat, amount_cents: amtCents, split_type: mode, event_id: eventId };
+    const payload = { payer_user_id: primaryPayer, description: desc.trim(), amount_cents: amtCents, split_type: mode, event_id: eventId };
     let expId = editing?.id;
     if (editing) {
       const { error } = await supabase.from("expenses").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", editing.id);
@@ -593,7 +586,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
           + (pyErr && !shErr ? " (If this persists, the payers migration 0049 may not be applied yet.)" : ""));
       return;
     }
-    await onLog?.(editing ? "expense_edited" : "expense_created", (editing ? "edited “" : "added “") + (desc.trim() || catLabel(cat)) + "” — " + fmtUSD(amtCents), { expense_id: expId, amount_cents: amtCents });
+    await onLog?.(editing ? "expense_edited" : "expense_created", (editing ? "edited “" : "added “") + (desc.trim() || "expense") + "” — " + fmtUSD(amtCents), { expense_id: expId, amount_cents: amtCents });
     setBusy(false);
     await onSaved();
   }
@@ -639,17 +632,12 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
         </>
       )}
 
-      <Eyebrow>Category</Eyebrow>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-        {CATS.map((c) => <button key={c.k} onClick={() => setCat(c.k)} style={chip(cat === c.k)}>{c.label}</button>)}
-      </div>
-
       <Eyebrow>Event (optional)</Eyebrow>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         <button onClick={() => { setEventId(null); setNewEventOpen(false); }} style={chip(eventId === null && !newEventOpen)}>No event</button>
         {openEvents.map((ev) => (
           <button key={ev.id} onClick={() => { setEventId(ev.id); setNewEventOpen(false); }} style={chip(eventId === ev.id)}>
-            {ev.name}{ev.event_date ? " · " + new Date(ev.event_date + "T00:00:00").toLocaleDateString([], { month: "short", day: "numeric" }) : ""}
+            {ev.name}
           </button>
         ))}
         <button onClick={() => { setNewEventOpen(true); setEventId(null); }} style={{ ...chip(newEventOpen), borderStyle: "dashed" }}>＋ New event</button>
@@ -657,12 +645,11 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
       {newEventOpen && (
         <div style={{ background: "#0f3529", borderRadius: 10, padding: 10, marginTop: 8 }}>
           <input value={newEventName} onChange={(e) => setNewEventName(e.target.value)} placeholder="Event name (e.g. Ireland Trip)" style={inputStyle} />
-          <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
-            <input type="date" value={newEventDate} onChange={(e) => setNewEventDate(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+          <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", justifyContent: "flex-end" }}>
             <button disabled={busy || !newEventName.trim()} onClick={async () => {
-              const id = await onCreateEvent(newEventName, newEventDate || null);
-              if (id) { setEventId(id); setNewEventOpen(false); setNewEventName(""); setNewEventDate(""); }
-            }} style={{ ...btn(true), flex: 0, padding: "8px 14px", opacity: (busy || !newEventName.trim()) ? 0.5 : 1 }}>Create</button>
+              const id = await onCreateEvent(newEventName);
+              if (id) { setEventId(id); setNewEventOpen(false); setNewEventName(""); }
+            }} style={{ ...btn(true), flex: 0, padding: "8px 18px", opacity: (busy || !newEventName.trim()) ? 0.5 : 1 }}>Create event</button>
           </div>
           <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Date is optional. Anyone can add expenses to this event until an admin closes it.</div>
         </div>
@@ -776,11 +763,11 @@ function SnapshotDetail({ snap, at, onClose }: { snap: AuditSnapshot; at?: strin
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px 24px", width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          <div style={{ flex: 1, color: C.cream, fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 800 }}>{snap.description || catLabel(snap.category || "other")}</div>
+          <div style={{ flex: 1, color: C.cream, fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 800 }}>{snap.description || "Expense"}</div>
           <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800 }}>{fmtUSD(snap.amount_cents || 0)}</div>
         </div>
         <div style={{ display: "inline-block", background: "#5a2d2d", color: "#ffd9d9", fontSize: 11, fontWeight: 800, padding: "2px 8px", borderRadius: 10, marginTop: 6 }}>DELETED{at ? " · " + fmtWhen(at) : ""}</div>
-        <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>{catLabel(snap.category || "other")} · entered by {snap.created_by_name || "someone"}</div>
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>entered by {snap.created_by_name || "someone"}</div>
         <SnapshotBody snap={snap} />
         <div style={{ color: C.faint, fontSize: 11, marginTop: 12, lineHeight: 1.5 }}>This expense was deleted. The allocation above is the record as it stood at deletion — kept for the club's audit trail and can't be edited.</div>
         <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
@@ -808,10 +795,10 @@ function ExpenseDetail({ expense, shares, payers, memberById, guestById, version
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px 24px", width: "100%", maxWidth: 520, maxHeight: "88vh", overflowY: "auto" }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          <div style={{ flex: 1, color: C.cream, fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 800 }}>{expense.description || catLabel(expense.category)}</div>
+          <div style={{ flex: 1, color: C.cream, fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 800 }}>{expense.description || "Expense"}</div>
           <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800 }}>{fmtUSD(expense.amount_cents)}</div>
         </div>
-        <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{catLabel(expense.category)} · {new Date(expense.created_at).toLocaleDateString()}</div>
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{new Date(expense.created_at).toLocaleDateString()}</div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
           <span style={{ color: C.faint, fontSize: 12 }}>Event:</span>
@@ -934,8 +921,8 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
         style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 2px", borderBottom: `1px solid ${C.greenMid}`, cursor: "pointer" }}>
         <Avatar src={payer?.avatar_url} name={payer?.display_name || "?"} size={30} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: C.cream, fontSize: 13.5, fontWeight: 600 }}>{e.description || catLabel(e.category)}</div>
-          <div style={{ color: C.sage, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{catLabel(e.category)} · {paidNames} paid · {who}</div>
+          <div style={{ color: C.cream, fontSize: 13.5, fontWeight: 600 }}>{e.description || "Expense"}</div>
+          <div style={{ color: C.sage, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{paidNames} paid · {who}</div>
         </div>
         <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700 }}>{fmtUSD(e.amount_cents)}</div>
         <span style={{ color: C.sage, fontSize: 17, marginLeft: 2 }}>&#8250;</span>
@@ -946,7 +933,7 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
   const island = (ev: EventRow) => {
     const net = eventNet(ev.id, expenses as any, shares as any, guests as any, payers as any);
     const list = byEv[ev.id] || [];
-    const dateStr = ev.event_date ? new Date(ev.event_date + "T00:00:00").toLocaleDateString([], { month: "short", day: "numeric" }) : null;
+    const created = ev.created_at ? new Date(ev.created_at).toLocaleDateString([], { month: "short", day: "numeric" }) : null;
     const perMember = [...net.perMember].sort((a, b) => (memberById[a.member_id]?.display_name || "").localeCompare(memberById[b.member_id]?.display_name || ""));
     return (
       <div key={ev.id} style={{ background: C.greenLight, borderRadius: 14, padding: "12px 13px", marginBottom: 12, border: ev.event_type === "game" ? "1px solid #2c7d5f" : undefined }}>
@@ -955,7 +942,7 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
             <div style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 800, color: C.cream }}>
               {ev.name}{ev.event_type === "game" && <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 7px", borderRadius: 9, marginLeft: 6, background: "#0d3a2c", color: "#8fd6b0", border: "1px solid #2c7d5f" }}>from game</span>}
             </div>
-            <div style={{ color: C.sage, fontSize: 11.5, marginTop: 1 }}>{[dateStr, `${list.length} ${list.length === 1 ? "expense" : "expenses"}`].filter(Boolean).join(" · ")}</div>
+            <div style={{ color: C.sage, fontSize: 11.5, marginTop: 1 }}>{[created ? "created " + created : null, `${list.length} ${list.length === 1 ? "expense" : "expenses"}`].filter(Boolean).join(" · ")}</div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>{fmtUSD(net.total)}</div>
@@ -1017,7 +1004,7 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
               <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: "Georgia, serif", fontSize: 15.5, fontWeight: 800, color: C.cream }}>{ev.name} <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 7px", borderRadius: 9, background: "#3a3320", color: "#e6cf8a" }}>CLOSED</span></div>
-                  <div style={{ color: C.sage, fontSize: 11.5, marginTop: 1 }}>{[ev.event_date ? new Date(ev.event_date + "T00:00:00").toLocaleDateString([], { month: "short", day: "numeric" }) : null, `${list.length} ${list.length === 1 ? "expense" : "expenses"}`, ev.closed_at ? "closed " + new Date(ev.closed_at).toLocaleDateString() : null].filter(Boolean).join(" · ")}</div>
+                  <div style={{ color: C.sage, fontSize: 11.5, marginTop: 1 }}>{[ev.created_at ? "created " + new Date(ev.created_at).toLocaleDateString([], { month: "short", day: "numeric" }) : null, `${list.length} ${list.length === 1 ? "expense" : "expenses"}`, ev.closed_at ? "closed " + new Date(ev.closed_at).toLocaleDateString([], { month: "short", day: "numeric" }) : null].filter(Boolean).join(" · ")}</div>
                 </div>
                 <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 800 }}>{fmtUSD(net.total)}</div>
               </div>
@@ -1030,32 +1017,6 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
       </>)}
 
       {expenses.length > 0 && <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Tap any expense to see full details.</div>}
-      <CategorySummary expenses={expenses} />
-    </div>
-  );
-}
-
-
-function CategorySummary({ expenses }: { expenses: ExpenseRow[] }) {
-  const total = expenses.reduce((s, e) => s + e.amount_cents, 0);
-  if (!total) return null;
-  const byCat: Record<string, number> = {};
-  expenses.forEach((e) => { byCat[e.category] = (byCat[e.category] || 0) + e.amount_cents; });
-  const rows = CATS.map((c) => ({ label: c.label, cents: byCat[c.k] || 0 })).filter((r) => r.cents > 0).sort((a, b) => b.cents - a.cents);
-  return (
-    <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px", marginTop: 14 }}>
-      <div style={{ display: "flex", alignItems: "baseline" }}>
-        <div style={{ flex: 1, color: C.cream, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 800 }}>Spend by category</div>
-        <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 800 }}>{fmtUSD(total)}</div>
-      </div>
-      {rows.map((r) => (
-        <div key={r.label} style={{ marginTop: 9 }}>
-          <div style={{ display: "flex", fontSize: 12.5, color: C.cream }}><span style={{ flex: 1 }}>{r.label}</span><span style={{ color: C.sage }}>{fmtUSD(r.cents)} · {Math.round((r.cents / total) * 100)}%</span></div>
-          <div style={{ height: 7, background: "#123528", borderRadius: 4, marginTop: 3, overflow: "hidden" }}>
-            <div style={{ width: `${((r.cents / total) * 100).toFixed(1)}%`, height: "100%", background: C.gold }} />
-          </div>
-        </div>
-      ))}
     </div>
   );
 }

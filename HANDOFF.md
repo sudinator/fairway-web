@@ -45,11 +45,11 @@ values, never real secrets.)
 
 1. **Type-check:** `npx tsc --noEmit` → must be **rc 0**. (A piped `grep` can hide the real return code —
    check it. If generated types seem stale, `rm -rf .next` and retry.)
-2. **Bump version** in `package.json`. Format `FEATURE.EDIT.YYMMDD` (e.g. `165.1.260714`): **FEATURE**
+2. **Bump version** in `package.json`. Format `FEATURE.EDIT.YYMMDD` (e.g. `166.3.260715`): **FEATURE**
    bumps on a new feature; **EDIT** counts refinements/fixes within that feature and resets to 0 on a
-   FEATURE bump; **YYMMDD** is the release date in **US/Eastern** (set it by hand to the ET date — don't
-   derive from a UTC build clock). Bump EDIT on every ship, even same-day, so no two builds collide.
-   (Versions ≤ `1.165.0` used the old `1.MINOR.PATCH` semver; the scheme changed right after.)
+   FEATURE bump. **The YYMMDD date is auto-stamped from the Eastern date at build time** (`write-version.mjs`)
+   — you only set FEATURE.EDIT; the date in package.json is a placeholder the build overwrites, so it's
+   always the true ship date. Bump EDIT on every ship. (Versions ≤ `1.165.0` used old `1.MINOR.PATCH`.)
 3. **Unit tests:** `npm test` → all must pass. (Compiles + runs `lib/*.test.ts`: game-shape, golf, money,
    legs, grouping, sync, badges, card.)
 4. **Build:** `npm run build` → **rc 0**. `prebuild` (`scripts/write-version.mjs`) stamps

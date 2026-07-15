@@ -70,8 +70,11 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
     feature; **EDIT** is the refinement/fix counter within that feature and **resets to 0 when FEATURE
     bumps**; **YYMMDD** is the release date in **US/Eastern** (the app's canonical tz — not UTC).
     **Bump EDIT on every ship, even two on the same day**, so two builds on one date never collide to the
-    same string (the date is "when," FEATURE.EDIT is "which"). This is valid semver (three non-negative
-    integers), so npm/`write-version.mjs` accept it unchanged. History note: versions ≤ `1.165.0` used the
+    same string (the date is "when," FEATURE.EDIT is "which"). **The YYMMDD segment is auto-stamped at
+    build time from the Eastern date by `scripts/write-version.mjs` — you only maintain FEATURE.EDIT in
+    package.json; whatever date is written there is a placeholder the build overrides, so it's always the
+    real ship date and never hand-typed.** This is valid semver (three non-negative integers), so
+    npm/`write-version.mjs` accept it unchanged. History note: versions ≤ `1.165.0` used the
     old `1.MINOR.PATCH` semver (the leading `1` never moved); the scheme changed right after `1.165.0`. — manual
 14. **Every migration self-records.** As of 0113 there is a `schema_migrations` ledger. Every migration
     from 0113 onward MUST end with `select record_migration('NNNN_filename');` as its last statement, so

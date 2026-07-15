@@ -358,6 +358,7 @@ export interface EventRow {
   closed_by?: string | null;
   closed_at?: string | null;
   created_by?: string | null;
+  created_at?: string | null;
 }
 export interface EventExpense { id: string; event_id?: string | null; }
 export interface EventPersonNet { member_id: string; paid: Cents; share: Cents; net: Cents } // net = paid - share

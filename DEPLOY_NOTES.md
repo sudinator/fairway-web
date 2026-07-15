@@ -3379,3 +3379,24 @@ Confirming which migrations have run is now a query, not an honor-system checkli
 ledger is accurate the moment 0113 runs regardless of order. Confirm state anytime with
 `select id, applied_at from public.schema_migrations order by id;`. New standing rule in APP_RULES (#14).
 No app-behavior change. Run 0113 LAST, after 0111 and 0112.
+
+### 166.2.260714 — Money UI cleanup: drop Category, drop manual event date, header padding (no migration)
+Refinements to the Money tab, display-only — no schema change.
+- **Category removed** end-to-end: gone from the add/edit form, expense rows, the detail sheet, and the
+  old "Spend by category" summary block. Description carries the expense now. The `expenses.category`
+  column is left in place (DB default 'other'); nothing destructive, old values just stop showing.
+- **Manual event-date field removed.** Events no longer ask for a typed date. Islands now show the
+  auto-recorded **created** date and, once closed, the **closed** date (from `created_at`/`closed_at`) —
+  shown on both open and closed islands. Game-linked events keep their date in the description text
+  (built by `ensure_game_event` from the game), so no date is lost there.
+- **Header padding**: the Money screen root had no horizontal padding, so content sat flush against the
+  phone edges — added `0 14px` so headers and islands breathe.
+No migration. Deploy via the normal flow.
+
+### 166.3.260715 — auto-stamp the version date (build tooling; no migration, no app change)
+The `YYMMDD` segment of the version is now computed from the US/Eastern date at build time in
+`scripts/write-version.mjs`, instead of being typed by hand. Only FEATURE.EDIT is maintained in
+package.json now; the date in package.json is a placeholder the build overrides, so the shipped version
+always carries the true Eastern ship date and can't be fat-fingered (a 6-digit third segment marks the
+new scheme; legacy 1.MINOR.PATCH is left untouched). Rule updated in APP_RULES #13 / HANDOFF §4. This is
+also the first build to correctly land on 260715 rather than carrying 260714 forward.
