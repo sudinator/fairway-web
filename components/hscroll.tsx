@@ -8,14 +8,20 @@ import { C } from "@/lib/golf";
  * actually overflows — a slim custom scroll-position bar placed BELOW the content in normal flow, so
  * it never overlaps any text or data. The thumb shows both position and how much is off-screen, and
  * can be dragged (or the content scrolled) to move. Hidden entirely when everything already fits.
- * Any new horizontally-scrollable box uses <HScroll>. See APP_RULES.md rule 1.
+ *
+ * Pass `maxHeight` for a long table that can exceed the phone height: the box then also scrolls
+ * VERTICALLY, and a thead marked `position:sticky; top:0` (with a matching bg) stays frozen at the top
+ * while the rows scroll under it. Any new horizontally-scrollable box uses <HScroll>. See APP_RULES.md
+ * rule 1.
  */
 export function HScroll({
   children,
   style,
+  maxHeight,
 }: {
   children: React.ReactNode;
   style?: React.CSSProperties;
+  maxHeight?: number | string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -58,7 +64,7 @@ export function HScroll({
   return (
     <div>
       <style>{`.hscroll-x::-webkit-scrollbar{display:none}`}</style>
-      <div ref={ref} className="hscroll-x" style={{ overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none", ...style } as React.CSSProperties}>
+      <div ref={ref} className="hscroll-x" style={{ overflowX: "auto", scrollbarWidth: "none", msOverflowStyle: "none", ...style, ...(maxHeight != null ? { maxHeight, overflowY: "auto" } : {}) } as React.CSSProperties}>
         {children}
       </div>
       {show && (

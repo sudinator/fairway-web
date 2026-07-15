@@ -22,6 +22,11 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
       (in normal flow, so it never overlaps any text or data); the thumb shows position + how much is
       off-screen and is draggable. Hidden when everything fits. Any new horizontally-scrollable box uses
       `<HScroll>` — don't hand-roll a bare `overflowX:"auto"` div.
+   3. **Long tables that can exceed the phone height freeze their header.** Pass `maxHeight` to `<HScroll>`
+      (so the box scrolls vertically too) and mark the `thead` cells `position:sticky; top:0` with a
+      matching background. The top-left corner cell (also sticky-left) gets the highest z-index, other
+      header cells next, sticky body cells lowest — so the header row stays readable while rows scroll
+      under it. Applied to the Power Users table (`manage.tsx`); use the same pattern for any new long table.
    Boxes using it today: admin drill table (`manage.tsx`), round-detail hole strip (`round-detail.tsx`).
    Intentional exception: the profile/peer badge shelves are carousels that hide the scrollbar on purpose
    (a half-clipped badge is their swipe cue) — leave them. — CI (`ci/check-global-rules.py` guards the

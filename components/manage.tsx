@@ -1446,16 +1446,16 @@ function AdminPowerUsers() {
 
       {!rows ? <div style={{ color: C.sage, fontSize: 12 }}>Loading…</div> :
         sorted.length === 0 ? <div style={{ color: C.sage, fontSize: 12 }}>No users yet.</div> : (
-        <HScroll style={{ background: C.greenLight, borderRadius: 12, padding: 4 }}>
+        <HScroll maxHeight="70vh" style={{ background: C.greenLight, borderRadius: 12, padding: 4 }}>
           <table style={{ borderCollapse: "collapse", width: "100%", minWidth: 640 }}>
             <thead>
               <tr>
-                <th style={{ textAlign: "left", padding: "6px 8px", position: "sticky", left: 0, background: C.greenLight }}>
+                <th style={{ textAlign: "left", padding: "6px 8px", position: "sticky", left: 0, top: 0, zIndex: 3, background: C.greenLight }}>
                   <span style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}>Player</span>
                 </th>
                 {cols.map((c) => (
                   <th key={c.key} title={c.title} onClick={() => setSort(c.key)}
-                    style={{ padding: "6px 8px", textAlign: "right", cursor: "pointer", whiteSpace: "nowrap" }}>
+                    style={{ padding: "6px 8px", textAlign: "right", cursor: "pointer", whiteSpace: "nowrap", position: "sticky", top: 0, zIndex: 2, background: C.greenLight }}>
                     <span style={{ color: c.key === sortCol ? C.gold : C.sage, fontSize: 11, fontWeight: 700 }}>{c.label}{arrow(c.key)}</span>
                   </th>
                 ))}
@@ -1464,7 +1464,7 @@ function AdminPowerUsers() {
             <tbody>
               {sorted.map((r) => (
                 <tr key={r.user_id} style={{ borderTop: `1px solid ${C.greenMid}` }}>
-                  <td style={{ padding: "6px 8px", position: "sticky", left: 0, background: C.greenLight, maxWidth: 160 }}>
+                  <td style={{ padding: "6px 8px", position: "sticky", left: 0, zIndex: 1, background: C.greenLight, maxWidth: 160 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
                       <Avatar src={avatars[r.user_id]} name={r.display_name || "?"} size={22} enlargeable={false} />
                       <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>

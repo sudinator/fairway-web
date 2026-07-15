@@ -8,7 +8,7 @@ Regenerate after shipping (adds new files, keeps your ticks):
 
 Each release's DEPLOY_NOTES also flags any migration that must be run for that version.
 
-Total: 96 migrations. Unchecked = not yet confirmed applied.
+Total: 96 migrations. **All applied through 0110 as of v1.164.3.** Unchecked = not yet confirmed applied.
 
 ## Checklist (oldest → newest)
 
@@ -72,14 +72,14 @@ Total: 96 migrations. Unchecked = not yet confirmed applied.
 - [x] 0072_profiles_readable_by_comembers.sql
 - [x] 0073_push_events_more.sql
 - [x] 0074_tee_reminders.sql
-- [ ] 0075_tee_time_roles.sql
+- [x] 0075_tee_time_roles.sql
 - [x] 0076_holes_unique.sql
 - [x] 0077_holes_upsert.sql
 - [x] 0078_admin_engagement.sql
 - [x] 0079_achievements.sql
 - [x] 0080_player_cards.sql
 - [x] 0081_nudges.sql
-- [ ] 0082_group_cards_live_rounds.sql
+- [x] 0082_group_cards_live_rounds.sql
 - [x] 0083_ops_autofinish_and_funnel.sql
 - [x] 0084_admin_todos.sql
 - [x] 0085_admin_list_users_real_rounds.sql
@@ -89,22 +89,22 @@ Total: 96 migrations. Unchecked = not yet confirmed applied.
 - [x] 0089_install_capture.sql
 - [x] 0090_admin_stat_users.sql
 - [x] 0091_admin_extra_stats.sql
-- [ ] 0092_friction_ledger.sql
-- [ ] 0093_flights_oneoff.sql
-- [ ] 0094_clear_notifications.sql
-- [ ] 0095_notifications_retention.sql
-- [ ] 0096_analytics_eastern_day.sql
-- [ ] 0097_power_users_eastern_day.sql
-- [ ] 0098_group_cards_show_basics.sql
-- [ ] 0099_admin_sandbaggers.sql
-- [ ] 0100_admin_sandbaggers_club.sql
-- [ ] 0101_admin_sandbaggers_system_only.sql
-- [ ] 0102_owner_system_admins.sql
-- [ ] 0103_game_autocomplete.sql
-- [ ] 0104_admin_stale_games.sql
-- [ ] 0105_admin_delete_stale_game.sql
-- [ ] 0106_test_groups.sql
-- [ ] 0107_admin_wipe_group.sql
-- [ ] 0108_admin_stat_users_avatars.sql
-- [ ] 0109_play_date_when_scored.sql
-- [ ] 0110_games_always_scored_date.sql
+- [x] 0092_friction_ledger.sql
+- [x] 0093_flights_oneoff.sql
+- [x] 0094_clear_notifications.sql
+- [x] 0095_notifications_retention.sql
+- [x] 0096_analytics_eastern_day.sql
+- [x] 0097_power_users_eastern_day.sql
+- [x] 0098_group_cards_show_basics.sql
+- [x] 0099_admin_sandbaggers.sql
+- [x] 0100_admin_sandbaggers_club.sql
+- [x] 0101_admin_sandbaggers_system_only.sql
+- [x] 0102_owner_system_admins.sql
+- [x] 0103_game_autocomplete.sql
+- [x] 0104_admin_stale_games.sql
+- [x] 0105_admin_delete_stale_game.sql
+- [x] 0106_test_groups.sql
+- [x] 0107_admin_wipe_group.sql
+- [x] 0108_admin_stat_users_avatars.sql
+- [x] 0109_play_date_when_scored.sql
+- [x] 0110_games_always_scored_date.sql

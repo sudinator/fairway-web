@@ -3289,3 +3289,9 @@ Shows only while the box overflows; the gold thumb reflects position + how much 
 draggable (or scroll the content). Native scrollbar hidden to avoid a double bar. Global change via
 the shared component — applies to the Power Users table (manage.tsx) and the round-detail hole strip
 (round-detail.tsx). Chosen from an A/B mockup.
+
+### v1.164.3 — freeze table headers on long tables (no migration)
+A table taller than the phone lost its column headers as you scrolled down. HScroll now takes an
+optional maxHeight so the box scrolls vertically too, and a thead marked position:sticky;top:0 stays
+frozen while rows scroll under it. Applied to the Power Users table (manage.tsx, maxHeight 70vh, sticky
+header with the sticky-left Player corner at the highest z-index). New global rule in APP_RULES (rule 1).
