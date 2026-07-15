@@ -177,8 +177,13 @@ export const stablefordDisplay = (r: Round) =>
   !stablefordEstimable(r) ? "—" :
   hasEstimatedStableford(r) ? `${estimatedStablefordPts(r)} est pts` : `${ptsOf(r)} pts`;
 export const toParStr = (d: number) => (d === 0 ? "E" : d > 0 ? `+${d}` : `${d}`);
-export const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+// A plain "YYYY-MM-DD" (a DATE column like played_at) must be read as a LOCAL calendar day.
+// new Date("2026-06-17") parses as UTC midnight, which renders as the day before in the Americas.
+export const fmtDate = (iso: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+  const d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(iso);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+};
 
 export const isGIR = (h: Hole) =>
   h.strokes != null && h.putts != null && h.strokes - h.putts <= h.par - 2;

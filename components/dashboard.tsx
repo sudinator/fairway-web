@@ -84,6 +84,14 @@ function AdaptiveTrend({ data, valueKey, rollKey, avg, lowerBetter, domain, pctS
   const stops: [number, string][] = lowerBetter
     ? [[0, miss], [off, miss], [off, beat], [1, beat]]
     : [[0, beat], [off, beat], [off, miss], [1, miss]];
+  // Self-fit: if no domain is passed, fit the axis to the data range so the chart always uses its
+  // vertical space well (pct stats clamped 0–100). Callers can still override with `domain`.
+  const fitVals = data.flatMap((d) => [d[valueKey], d[rollKey]]).filter((v: any): v is number => v != null && Number.isFinite(v));
+  const autoDomain: [number, number] = fitVals.length
+    ? (pctStat
+        ? [Math.max(0, Math.floor(Math.min(...fitVals) - 3)), Math.min(100, Math.ceil(Math.max(...fitVals) + 3))]
+        : [Math.floor(Math.min(...fitVals) - 1), Math.ceil(Math.max(...fitVals) + 1)])
+    : [0, 1];
   return (
     <ResponsiveContainer>
       <ComposedChart data={data} margin={{ top: 5, right: 6, left: -8, bottom: 0 }}>
@@ -93,7 +101,7 @@ function AdaptiveTrend({ data, valueKey, rollKey, avg, lowerBetter, domain, pctS
           </linearGradient>
         </defs>
         <XAxis dataKey="name" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} interval="preserveStartEnd" minTickGap={28} />
-        <YAxis domain={domain ?? ["auto", "auto"]} allowDecimals={!pctStat} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={30} />
+        <YAxis domain={domain ?? autoDomain} allowDecimals={!pctStat} tickFormatter={pctStat ? (v: any) => `${Math.round(v)}%` : undefined} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={pctStat ? 34 : 30} />
         <Tooltip wrapperStyle={{ pointerEvents: "auto" }} cursor={{ stroke: "rgba(255,255,255,0.12)" }} content={<ChartTip nameMap={nameMap} fmt={fmt} />} />
         {avg != null && <ReferenceLine y={Math.round(avg * 10) / 10} stroke={C.gold} strokeDasharray="5 4" />}
         <Line type="monotone" dataKey={valueKey} stroke="transparent" isAnimationActive={false} dot={{ r: 2, fill: C.sage, fillOpacity: 0.28, stroke: "none" }} />
@@ -177,7 +185,6 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
     penaltiesTotal: pens,
   };
 
-  const trend = sorted.map((r, i) => ({ i: i + 1, name: fmtDate(r.played_at), diff: diffOf(r), pts: stablefordEstimable(r) ? estimatedStablefordPts(r) : null, course: r.course, estimated: hasEstimatedStableford(r) }));
   // Dynamic axis domains: fit the data range with a little padding, instead of anchoring at 0.
   const niceDomain = (vals: number[], pad: number): [number, number] => {
     if (vals.length === 0) return [0, 1];
@@ -186,9 +193,6 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
     else { const p = Math.max(pad, Math.round((hi - lo) * 0.15)); lo -= p; hi += p; }
     return [Math.floor(lo), Math.ceil(hi)];
   };
-  const diffDomain = niceDomain(trend.map((t) => t.diff), 2);
-  const ptsVals = trend.map((t) => t.pts).filter((v): v is number => v != null && v > 0);
-  const ptsDomain = niceDomain(ptsVals, 2);
   // ---- Scoring form on differentials (course-adjusted) ----
   // Only rounds with a valid 18-hole differential (need rating + slope) can be
   // charted. Bars are coloured vs the player's own average differential; a cream
@@ -480,7 +484,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
                   <ResponsiveContainer>
                     <ComposedChart data={data} margin={{ top: 5, right: 6, left: -8, bottom: 0 }}>
                       <XAxis dataKey="i" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} />
-                      <YAxis allowDecimals={!pctStat} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={30} domain={valDomain} />
+                      <YAxis allowDecimals={!pctStat} tickFormatter={pctStat ? (v: any) => `${Math.round(v)}%` : undefined} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={pctStat ? 34 : 30} domain={valDomain} />
                       <Tooltip wrapperStyle={{ pointerEvents: "auto" }} cursor={{ fill: "rgba(255,255,255,0.06)" }} content={<ChartTip nameMap={{ val: detailLabels[key], roll5: "5-rd avg", roll10: "10-rd avg" }} fmt={(v: any) => (typeof v === "number" ? (pctStat ? Math.round(v) + "%" : String(v)) : v)} />} />
                       <Bar dataKey="val" radius={[3, 3, 0, 0]} maxBarSize={26}>
                         {data.map((d, i) => <Cell key={i} fill={barColor(d.val)} />)}

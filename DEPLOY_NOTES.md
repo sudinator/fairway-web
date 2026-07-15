@@ -3194,3 +3194,84 @@ back to initials when a photo is absent:
 - money.tsx settlements/balances already had avatars — confirmed, unchanged.
 Still pending avatars: round-setup player picker, round-detail playing partners, share-card, a couple
 of remaining tournaments guest/scorecard-header spots.
+
+### v1.161.2 — avatar sweep finish (no migration)
+- tournaments.tsx guest row now shows an avatar (guests have no profile photo, so it's the initials
+  circle — consistent with member rows).
+- Audited the rest: round-setup is a solo round-entry flow (no player picker), round-detail is a single
+  player's scorecard, tee-times roster + money settlements already had avatars. Remaining name displays
+  are not 'who is this' lists: native <select> options (can't hold avatars), the dense live-scoring grid
+  column headers, action pills (mark-out), inline sentence mentions, and the stylized share card.
+
+### v1.161.3 — analytics engagement charts rebuilt on recharts (no migration)
+The Weekend-reach and New-vs-returning charts were hand-rolled flex div-bars: a value of 1 became a
+~4px sliver (read as a broken dash), one tall bar crushed the rest, and labels didn't sit under bars.
+Rebuilt both as recharts BarCharts (160px tall) matching the dashboard aesthetic:
+- Weekend reach: gold bars, radius top, a thin y-axis for scale, aligned x labels (interval
+  preserveStartEnd + minTickGap), value labels on each bar via LabelList. Small bars are now readable.
+- New vs returning: proper stacked bars (new=gold bottom, returning=sage top), the week TOTAL labelled
+  on top, legend kept below. Replaces the two-number-per-column clutter.
+- Removed the old flex-bar scaling helpers (maxG/maxNR/stepW/stepNR/showWk). Imported recharts into
+  manage.tsx. No tooltips (values are labelled) — avoids the stuck-tooltip issue on these admin charts.
+
+### v1.161.4 — chart axis-fit as a default (no migration)
+Making 'fit the axis to the data' a standing rule instead of a per-chart fix (APP_RULES rule 17):
+- AdaptiveTrend now self-fits its y-axis to the data range when no explicit domain is passed (pct
+  stats clamp 0-100) — so no future chart using it can ship un-fitted.
+- Removed dead code: trend/diffDomain/ptsVals/ptsDomain (a leftover block that fed no chart).
+Audit of every chart in the app (all now fit their space): dashboard scoring-form differential
+(niceDomain), stat drill-down trends (niceDomain / pct-clamped), AdaptiveTrend (self-fit),
+hole-outcomes proportion bar (no axis), manage engagement weekend + new-vs-returning (recharts,
+0-based count bars, 160px tall), feature proportion bars, player-card FormChart (SVG, data-range
+fit + span-0 guard). No un-fitted charts remain.
+
+### v1.161.5 — date off-by-one display fix + % axis labels (no migration)
+- fmtDate: a plain 'YYYY-MM-DD' (a DATE column like played_at) was parsed by new Date() as UTC
+  midnight, rendering as the previous day in the Americas (e.g. Jun 17 -> 'Jun 16'). Now parsed as a
+  local calendar day. Full ISO timestamps still parse as before. Fixes dates across scorecards, round
+  lists, tooltips, share cards — anything via fmtDate.
+- Percentage trend charts (scrambling, GIR, fairways, sand saves) now label the y-axis with '%' via a
+  tickFormatter, in both the dense (AdaptiveTrend) and bar drill-downs — answers 'is that a percentage?'
+- NOTE: the deeper 'played_at = game creation date, not actual play/record date' issue is separate and
+  pending a design decision (see chat) — not changed here.
+
+### v1.162.0 — round date = when it was actually played/scored · MIGRATION 0109
+Server-only (no client change). Date priority for a recorded round is now: a deliberately-entered
+date > the date it was actually scored > the game's creation date.
+- post_game_rounds_internal (games) and post_group_rounds (tee-group posting): rdate is now the game's
+  match date ONLY if it was deliberately entered (differs from the game's creation day, ET); otherwise
+  the date it's being scored (now, ET). And played_at is no longer overwritten on re-post — it locks to
+  the first (scoring-day) value, so finalizing a day later doesn't move the date.
+- Backfill: every existing game round whose date was the non-deliberate default (match date = creation
+  day, or null) is reset to the day it was scored (round.created_at, ET). Deliberate match dates and
+  solo rounds (user-picked date) are left untouched.
+- Worked example: the Weequahic 'Match Play' game (created Jun 17 ET, match date stored Jun 17, scored
+  Jun 20, ended Jun 21) → backfill sets it to Jun 20, the day it was played.
+- Separate/optional: the game 'Match date' field is still capped at max=today (can't schedule a future
+  play date) — not changed here; the new rule makes it moot for the recorded date.
+
+### v1.162.1 — allow scheduling a game ahead (remove today-cap on play date) (no migration)
+The game date field was capped at max=today, so you couldn't set a future play date when scheduling a
+game the night before / a few days out — and a tee-time's future play_date got clamped down to the
+creation day (the root of the 'Jun 20 -> stored Jun 17' bug). Removed the cap and relabeled the field
+'Play date'. Works with the 0109 rule: a deliberately-set (incl. future) date is honoured; if left at
+the default, the scored-date fallback still records the day it was actually played.
+
+### v1.163.0 — editable play date + past-date confirmation (solo rounds) (no migration)
+- Round editor now shows an editable 'Play date' (defaults to the round's stored date); saving writes
+  it to rounds.played_at on both the update and insert paths.
+- Any round saved with a date before today prompts 'This round is dated {date} — {N} days in the past.
+  Save it with that date?' Wired into new-round entry (hole-by-hole + gross) and the round editor.
+  Backdating stays a deliberate one-tap-to-confirm action rather than a silent default.
+- Still to do (team side): organizer-edits-a-game's-date (all players' rounds move together) and the
+  0110 change making games always record the scored date. This release is the solo-round half.
+
+### v1.164.0 — games always record the scored date + organizer date-edit · MIGRATION 0110
+- Games are scored live and never back-dated, so a game round's recorded date is now ALWAYS the day it
+  was scored. Dropped the 'deliberately-entered date wins' branch (0109) for games; the game's play
+  date is scheduling/display only. Rain-delay case (scheduled Jun 19, played Jun 20) now records Jun 20.
+- New RPC set_game_played_date(p_game, p_date): organizer-only; moves the game's date AND every
+  player's round together. Surfaced as an organizer-only 'Play date' control in the game view (Save
+  button appears only when changed; past-date confirmation before it moves anything).
+- Backfill completes 0109: forces every game round to its scored (first-post/creation) day, ET.
+- Solo rounds are unaffected (user-entered date, editable per v1.163.0).

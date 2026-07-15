@@ -958,8 +958,8 @@ function CreateGame({
           />
         </div>
         <div>
-          <label style={{ color: C.sage, fontSize: 12 }}>Match date</label>
-          <div><ShortDateInput value={matchDate} onChange={(v) => setMatchDate(v || todayLocal())} max={todayLocal()} /></div>
+          <label style={{ color: C.sage, fontSize: 12 }}>Play date</label>
+          <div><ShortDateInput value={matchDate} onChange={(v) => setMatchDate(v || todayLocal())} /></div>
         </div>
       </div>
 
@@ -1048,6 +1048,7 @@ function CreateGame({
                 const ch = hasIdx && tee && coursePar != null ? courseHandicap(g.handicap_index as number, tee.slope, tee.rating, coursePar) : null;
                 return (
                 <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 8, background: C.greenMid, borderRadius: 10, padding: "6px 10px" }}>
+                  <Avatar src={(g as any).avatar_url ?? null} name={g.display_name} size={22} enlargeable={false} />
                   <span style={{ color: C.cream, fontSize: 13, flex: 1, minWidth: 0 }}>
                     {g.display_name}
                     <span style={{ color: C.sage, fontSize: 11 }}> · guest of {g.guest_of === user.id ? "me" : (groupRoster.find((m) => m.id === g.guest_of)?.display_name || "member")}</span>
@@ -1537,6 +1538,33 @@ function CreateGame({
 }
 
 // ---------------- Game room: score entry + leaderboard ----------------
+
+// Local YYYY-MM-DD (module-level so both the create form's clone and GameRoom can use it).
+function todayLocalStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Organizer-only control to correct a whole game's date. Local draft state; the Save button appears
+// only when the date is changed. Past-date confirmation is handled by the onSave handler.
+function GameDatePicker({ current, onSave }: { current: string | null; onSave: (d: string) => Promise<void> }) {
+  const initial = current ? String(current).slice(0, 10) : todayLocalStr();
+  const [d, setD] = React.useState<string>(initial);
+  const [busy, setBusy] = React.useState(false);
+  React.useEffect(() => { setD(current ? String(current).slice(0, 10) : todayLocalStr()); }, [current]);
+  const dirty = !!d && d !== initial;
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: C.greenMid, border: `1px solid ${C.greenLight}`, borderRadius: 10, padding: "8px 12px", marginTop: 10 }}>
+      <span style={{ color: C.sage, fontSize: 12 }}>Play date</span>
+      <ShortDateInput value={d} onChange={(v) => setD(v || todayLocalStr())} />
+      {dirty && (
+        <button disabled={busy} onClick={async () => { setBusy(true); try { await onSave(d); } finally { setBusy(false); } }}
+          style={{ ...btn(true), fontSize: 12, padding: "6px 12px" }}>{busy ? "Saving…" : "Save date"}</button>
+      )}
+    </div>
+  );
+}
+
 function GameRoom({
   gameId,
   initialTab,
@@ -2521,6 +2549,19 @@ function GameRoom({
     await load();
   };
 
+  // Organizer corrects a whole game's date; all players' rounds move together (server RPC).
+  const setGameDate = async (newDate: string) => {
+    if (!game || !newDate) return;
+    const today = todayLocalStr();
+    if (newDate < today) {
+      const days = Math.round((+new Date(today + "T00:00:00") - +new Date(newDate + "T00:00:00")) / 86400000);
+      if (!confirm(`This game is dated ${newDate} — ${days} day${days === 1 ? "" : "s"} in the past. Move all players' rounds to that date?`)) return;
+    }
+    const { error } = await supabase.rpc("set_game_played_date", { p_game: game.id, p_date: newDate });
+    if (error) { alert("Couldn't change the date: " + error.message); return; }
+    await load();
+  };
+
   // Organizer: change the handicap allowance on a live game. Views read
   // allowance_pct live, so standings/strokes recompute on the next load.
   const setAllowance = async (pct: number) => {
@@ -3143,6 +3184,9 @@ function GameRoom({
         <a href={`/organize/${game.id}`} style={{ display: "block", marginTop: 10, textAlign: "center", color: C.gold, fontSize: 13, fontWeight: 700, textDecoration: "none", border: `1px solid ${C.gold}`, borderRadius: 9, padding: "9px 0" }}>
           Set up flights &amp; matchups in the desktop organizer →
         </a>
+      )}
+      {isOrganizer && (
+        <GameDatePicker current={(game as any).played_at ?? null} onSave={setGameDate} />
       )}
 
       {roomTab === "play" && cleanSweepDone && (game as any)?.group_id === TGC_GROUP_ID && (game.game_type === "stableford" || game.game_type === "stroke") && (

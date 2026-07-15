@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase";
 import { pushGate, subscribeToPush, unsubscribeFromPush, currentPermission, syncPushSubscription } from "@/lib/push";
 import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID } from "@/lib/golf";
 import capabilities from "@/lib/capabilities.json";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LabelList } from "recharts";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { diagEnabled, setDiagEnabled, reproduceBug, setReproduceBug, getDiagLog, clearDiagLog } from "@/lib/debuglog";
@@ -1291,14 +1292,9 @@ function AdminEngagement() {
 
   const ws: { week: string; golfers: number; rounds: number }[] = e.weekend_series || [];
   const nr: { week: string; new: number; returning: number }[] = e.weekly_new_returning || [];
+  const nrData = nr.map((w) => ({ week: w.week, new: w.new || 0, returning: w.returning || 0, total: (w.new || 0) + (w.returning || 0) }));
   const feat = e.feature || { in_game: 0, solo: 0 };
   const featTot = (feat.in_game || 0) + (feat.solo || 0);
-  const maxG = Math.max(1, ...ws.map((w) => w.golfers));
-  const maxNR = Math.max(1, ...nr.map((w) => (w.new || 0) + (w.returning || 0)));
-  // Show at most ~6 week labels so they never collide / force the row wider than the screen.
-  const stepW = Math.max(1, Math.ceil(ws.length / 6));
-  const stepNR = Math.max(1, Math.ceil(nr.length / 6));
-  const showWk = (i: number, n: number, step: number) => i % step === 0 || i === n - 1;
 
   const tile = (n: React.ReactNode, l: string, d?: string) => (
     <div style={{ background: C.greenLight, borderRadius: 12, padding: "10px 12px", flex: 1, minWidth: 92 }}>
@@ -1320,34 +1316,35 @@ function AdminEngagement() {
         {tile(e.active_28d ?? 0, "Active golfers", "logged a round, 28d")}
       </div>
 
-      <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 14, marginBottom: 4 }}>Weekend reach — golfers logging Fri–Sun</div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 92, background: C.greenLight, borderRadius: 12, padding: 10, overflow: "hidden", minWidth: 0 }}>
-        {ws.length === 0 ? <div style={{ color: C.sage, fontSize: 12 }}>No rounds yet.</div> :
-          ws.map((w, i) => (
-            <div key={i} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-              <div style={{ color: C.cream, fontSize: 11 }}>{w.golfers}</div>
-              <div title={`${w.golfers} golfers · ${w.rounds} rounds`} style={{ width: "70%", height: `${Math.round((w.golfers / maxG) * 54)}px`, minHeight: 2, background: C.gold, borderRadius: 3 }} />
-              <div style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap" }}>{showWk(i, ws.length, stepW) ? w.week : ""}</div>
-            </div>
-          ))}
+      <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 16, marginBottom: 6 }}>Weekend reach — golfers logging Fri–Sun</div>
+      <div style={{ height: 160, background: C.greenLight, borderRadius: 12, padding: "14px 10px 6px" }}>
+        {ws.length === 0 ? <div style={{ color: C.sage, fontSize: 12 }}>No rounds yet.</div> : (
+          <ResponsiveContainer>
+            <BarChart data={ws} margin={{ top: 14, right: 8, left: -20, bottom: 0 }}>
+              <XAxis dataKey="week" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} interval="preserveStartEnd" minTickGap={16} />
+              <YAxis allowDecimals={false} tick={{ fill: C.faint, fontSize: 11 }} axisLine={false} tickLine={false} width={22} />
+              <Bar dataKey="golfers" fill={C.gold} radius={[4, 4, 0, 0]} maxBarSize={34} isAnimationActive={false}>
+                <LabelList dataKey="golfers" position="top" fill={C.cream} fontSize={11} fontWeight={700} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
-      <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 14, marginBottom: 4 }}>New vs returning golfers, per week</div>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 92, background: C.greenLight, borderRadius: 12, padding: 10, overflow: "hidden", minWidth: 0 }}>
-        {nr.length === 0 ? <div style={{ color: C.sage, fontSize: 12 }}>No rounds yet.</div> :
-          nr.map((w, i) => {
-            const tot = (w.new || 0) + (w.returning || 0);
-            return (
-              <div key={i} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                <div style={{ color: C.cream, fontSize: 11 }}>{tot}</div>
-                <div style={{ width: "70%", height: 54, display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
-                  <div title={`${w.returning} returning`} style={{ height: `${Math.round(((w.returning || 0) / maxNR) * 54)}px`, background: C.sage, borderRadius: "3px 3px 0 0" }} />
-                  <div title={`${w.new} new`} style={{ height: `${Math.round(((w.new || 0) / maxNR) * 54)}px`, background: C.gold }} />
-                </div>
-                <div style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap" }}>{showWk(i, nr.length, stepNR) ? w.week : ""}</div>
-              </div>
-            );
-          })}
+      <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 16, marginBottom: 6 }}>New vs returning golfers, per week</div>
+      <div style={{ height: 160, background: C.greenLight, borderRadius: 12, padding: "14px 10px 6px" }}>
+        {nr.length === 0 ? <div style={{ color: C.sage, fontSize: 12 }}>No rounds yet.</div> : (
+          <ResponsiveContainer>
+            <BarChart data={nrData} margin={{ top: 14, right: 8, left: -20, bottom: 0 }}>
+              <XAxis dataKey="week" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} interval="preserveStartEnd" minTickGap={16} />
+              <YAxis allowDecimals={false} tick={{ fill: C.faint, fontSize: 11 }} axisLine={false} tickLine={false} width={22} />
+              <Bar dataKey="new" stackId="a" fill={C.gold} maxBarSize={34} isAnimationActive={false} />
+              <Bar dataKey="returning" stackId="a" fill={C.sage} radius={[4, 4, 0, 0]} maxBarSize={34} isAnimationActive={false}>
+                <LabelList dataKey="total" position="top" fill={C.cream} fontSize={11} fontWeight={700} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </div>
       <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 11, color: C.sage }}>
         <span><span style={{ display: "inline-block", width: 8, height: 8, background: C.gold, borderRadius: 2, marginRight: 4 }} />new</span>

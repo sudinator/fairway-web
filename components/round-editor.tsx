@@ -11,7 +11,7 @@ import {
 import { buildCustomCourse, linkCourseToGroup, loadCoursesForGroup } from "@/lib/courses";
 import { saveDraft, loadDraft, clearDraft, draftHasScores } from "@/lib/draft";
 import { logActivity } from "@/lib/activity";
-import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark, ShortDateInput } from "@/components/ui";
 import { buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
 
 const supabase = createClient();
@@ -35,6 +35,16 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     return fromProp;
   }, []); // mount only
   const [holes, setHoles] = useState<Hole[]>(initialHoles);
+  // Editable play date — defaults to the round's stored date (falls back to today).
+  const todayLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  const [playDate, setPlayDate] = useState<string>(() => (round.played_at ? String(round.played_at).slice(0, 10) : todayLocal()));
+  // Backdating is deliberate but easy to fumble — confirm when the play date is before today.
+  const confirmPastDate = (): boolean => {
+    const today = todayLocal();
+    if (!playDate || playDate >= today) return true;
+    const days = Math.round((+new Date(today + "T00:00:00") - +new Date(playDate + "T00:00:00")) / 86400000);
+    return confirm(`This round is dated ${playDate} — ${days} day${days === 1 ? "" : "s"} in the past. Save it with that date?`);
+  };
   // Single source of truth = `holes` state. A ref mirrors it for the lock/flush
   // handler to read synchronously; written only inside setHole.
   const holesRef = React.useRef<Hole[]>(initialHoles);
@@ -376,6 +386,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   const gir = girStats([live]), fir = firStats([live]);
 
   const save = async () => {
+    if (!confirmPastDate()) return;
     setSaving(true); setErr(null);
     try {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -402,7 +413,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
             strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties || 0, sand: h.sand ?? false,
           }).eq("round_id", roundId).eq("hole_number", h.hole_number);
         }
-        await supabase.from("rounds").update({ course_par: round.course_par, gross_score: null, status: "final" }).eq("id", roundId);
+        await supabase.from("rounds").update({ course_par: round.course_par, gross_score: null, status: "final", played_at: playDate }).eq("id", roundId);
       } else {
         const { data: u } = await supabase.auth.getUser();
         const { data: r, error: e1 } = await supabase.from("rounds").insert({
@@ -410,7 +421,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
           course: round.course, tee_name: round.tee_name,
           rating: round.rating, slope: round.slope, course_par: round.course_par,
           handicap_index: round.handicap_index, course_handicap: round.course_handicap,
-          played_at: round.played_at, group_id: round.group_id || null, status: "final",
+          played_at: playDate, group_id: round.group_id || null, status: "final",
         }).select().single();
         if (e1 || !r) throw e1 || new Error("Could not save round");
         roundId = r.id;
@@ -484,6 +495,10 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
       <div style={{ color: C.sage, fontSize: 13, marginBottom: 10 }}>
         {round.course}{round.tee_name ? ` · ${round.tee_name} tees (${round.rating}/${round.slope})` : ""}
         {round.course_handicap != null ? ` · course handicap ${round.course_handicap}` : " · no handicap — Stableford scored gross"}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <span style={{ color: C.sage, fontSize: 12 }}>Play date</span>
+        <ShortDateInput value={playDate} onChange={(v) => setPlayDate(v || todayLocal())} />
       </div>
       <div style={{ color: C.gold, fontSize: 12, marginBottom: 10 }}>
         Scores save to this device as you tap — lock your phone or close the app and you'll come right back to this scorecard. Tap "Finish round" when you're done to record it.

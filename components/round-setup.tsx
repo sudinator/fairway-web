@@ -302,6 +302,14 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
     setPicked(c); setTeeIdx(0); setShowCustom(false);
   };
 
+  // Backdating a round is deliberate but easy to fumble — confirm when the play date is before today.
+  const confirmPastDate = (): boolean => {
+    const today = todayLocal();
+    if (!playDate || playDate >= today) return true;
+    const days = Math.round((+new Date(today + "T00:00:00") - +new Date(playDate + "T00:00:00")) / 86400000);
+    return confirm(`This round is dated ${playDate} — ${days} day${days === 1 ? "" : "s"} in the past. Save it with that date?`);
+  };
+
   const start = async () => {
     if (!picked || !tee) return;
     // Guard against duplicate rounds: if the player is already in an ACTIVE game (being scored by
@@ -338,6 +346,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
       // Never block starting a round if this check fails.
     }
     if (idxVal != null && idxVal !== index) saveIndex(idxVal);
+    if (!confirmPastDate()) return;
     const coursePar = picked.holes.reduce((s, h) => s + (h.par || 0), 0);
     const alloc = allocateStrokes(picked.holes.map((h) => ({ hole_number: h.n, stroke_index: h.si })), realCH);
     const holes: Hole[] = picked.holes.map((h, i) => ({
@@ -362,6 +371,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
     const g = parseInt(grossStr, 10);
     if (!g || g < 18 || g > 200) { setGrossErr("Enter a valid total score (e.g. 86)."); return; }
     if (idxVal != null && idxVal !== index) saveIndex(idxVal);
+    if (!confirmPastDate()) return;
     setGrossSaving(true); setGrossErr(null);
     const coursePar = picked.holes.reduce((s, h) => s + (h.par || 0), 0);
     const { data: u } = await supabase.auth.getUser();
