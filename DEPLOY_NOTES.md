@@ -9,6 +9,16 @@
 - App code is cumulative: deploying the latest bundle ships all prior code. Only
   the **migrations** must be applied by hand.
 
+## Versioning (changed after v1.165.0)
+Through `v1.165.0` the version was semver `1.MINOR.PATCH` — the leading `1` never
+moved (this app never goes to a "v2"). From the next release the scheme is
+**`FEATURE.EDIT.YYMMDD`** (e.g. `165.1.260714`): **FEATURE** bumps on a new feature;
+**EDIT** counts refinements within that feature and resets to 0 on a FEATURE bump;
+**YYMMDD** is the release date in **US/Eastern**. Bump EDIT on every ship (even two
+on the same day) so no two builds share a string. Still valid semver, so npm and
+`scripts/write-version.mjs` are unchanged. So the changelog below reads
+`… v1.164.3 → v1.165.0 → 165.1.260714 → …`.
+
 ## Migration order (run in this sequence)
 Baseline (supabase/migrations/): 0001 → 0013. These are the original schema and
 core RPCs (groups, members, games, scoring, markers, finish_game, delete_game).
@@ -3327,3 +3337,45 @@ breakdown vanished with the live rows.
 - **Migration 0111 must be run** in the Supabase SQL editor. Deploying the code ahead of it is safe
   (the audit UI simply shows nothing until snapshots exist), but the audit trail and the child-write
   lock don't take effect until it's applied.
+
+### 165.1.260714 — adopt new version scheme + doc sync (no migration, no app change)
+First release under the new `FEATURE.EDIT.YYMMDD` version scheme (see "Versioning" note at the top).
+Docs-only: recorded the scheme in APP_RULES (#13), HANDOFF (§4 step 2, §5), and here. No code or app
+behavior changed and there is no migration — deploy at leisure (it only refreshes repo docs and the
+version label; users will see a routine "update available" from the version-string change).
+
+### 166.0.260714 — Events: group expenses into islands · MIGRATION 0112
+Expenses can now be grouped under an Event (e.g. "Ireland Trip", or a game), so each event's spend sits
+in its own island with its own per-person breakdown — while settlement stays group-wide.
+- **`group_events`** (migration 0112): one member creates an event (name + optional free-form date);
+  anyone can attach expenses to an OPEN event. `expenses.event_id` is nullable (optional field) and
+  `on delete set null` (deleting an event never deletes its expenses — they fall back to Ungrouped).
+- **Lifecycle open → closed.** An admin CLOSES a settled event via `set_event_closed` (admin/owner only,
+  logged): it drops out of the picker, its expenses are sealed (no edits/deletes), and it moves to a
+  collapsed "Closed events" section that stays fully viewable. Admin can reopen. **Enforced by DB
+  triggers**, not just UI — a closed event's expenses can't be changed and nothing can be added/moved
+  into it (consistent with the 0111 audit work). Closed events can't be deleted (sealed record); open
+  ones can (by creator/admin), and their expenses fall back to Ungrouped.
+- **Move an expense** between open events (or ungroup) via `move_expense_event` — expense creator or
+  admin; target must be open; moving out of a closed event requires a reopen first. Logged.
+- **Game-linked events auto-create on bet-post** (`ensure_game_event`): the game becomes an event whose
+  name/date come from the game and are locked (a game event can't be hand-renamed). Reposting a bet into
+  a closed game-event is blocked with a "reopen it first" message.
+- **Balances view** now renders event islands (open → Ungrouped → collapsed Closed), each with its total,
+  a "settled/unbalanced" chip (per-event nets to zero = settled), and — for admins — a Close/Reopen
+  control. The add/edit form has an optional Event picker with inline "＋ New event"; the expense detail
+  sheet has a "Move" control. Settle-up is unchanged and stays group-wide.
+- New pure, unit-tested helpers in `lib/money.ts`: `eventNet` (per-member spent/share/net for one event)
+  and `expensesByEvent`. `computeBalances`/`simplify` are untouched — events are a reporting lens only.
+- **Migration 0112 must be run** (after 0111). Code is safe to deploy ahead of it (the events UI simply
+  shows nothing until the table exists), but events don't work until it's applied.
+- First release using `FEATURE.EDIT.YYMMDD`: this is FEATURE 166.
+
+### 166.1.260714 — migration ledger (self-recording) · MIGRATION 0113
+Confirming which migrations have run is now a query, not an honor-system checklist. Adds a
+`schema_migrations` table + `record_migration()` helper; from 0113 on, every migration ends with
+`select record_migration('NNNN_name');` and signs the log when it runs. Backfills a single
+`baseline_through_0110` marker (confirmed applied) and auto-detects 0111/0112 by object existence, so the
+ledger is accurate the moment 0113 runs regardless of order. Confirm state anytime with
+`select id, applied_at from public.schema_migrations order by id;`. New standing rule in APP_RULES (#14).
+No app-behavior change. Run 0113 LAST, after 0111 and 0112.

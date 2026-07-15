@@ -45,7 +45,11 @@ values, never real secrets.)
 
 1. **Type-check:** `npx tsc --noEmit` → must be **rc 0**. (A piped `grep` can hide the real return code —
    check it. If generated types seem stale, `rm -rf .next` and retry.)
-2. **Bump version** in `package.json`. New feature = **MINOR**; refinement/bugfix = **PATCH**.
+2. **Bump version** in `package.json`. Format `FEATURE.EDIT.YYMMDD` (e.g. `165.1.260714`): **FEATURE**
+   bumps on a new feature; **EDIT** counts refinements/fixes within that feature and resets to 0 on a
+   FEATURE bump; **YYMMDD** is the release date in **US/Eastern** (set it by hand to the ET date — don't
+   derive from a UTC build clock). Bump EDIT on every ship, even same-day, so no two builds collide.
+   (Versions ≤ `1.165.0` used the old `1.MINOR.PATCH` semver; the scheme changed right after.)
 3. **Unit tests:** `npm test` → all must pass. (Compiles + runs `lib/*.test.ts`: game-shape, golf, money,
    legs, grouping, sync, badges, card.)
 4. **Build:** `npm run build` → **rc 0**. `prebuild` (`scripts/write-version.mjs`) stamps
@@ -80,7 +84,8 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - Horizontally-scrollable boxes use the shared **`<HScroll>`** (`components/hscroll.tsx`) — hides the
   native scrollbar and shows a slim scroll-position bar BELOW the content (never over data).
 - **Charts must fit their data to the space** (fit axis to data range; guard flat series).
-- **Versioning:** feature = MINOR, refinement/fix = PATCH.
+- **Versioning:** `FEATURE.EDIT.YYMMDD` (ET date), e.g. `165.1.260714`. FEATURE = new feature, EDIT =
+  refinement (resets on FEATURE bump), bump EDIT every ship. (≤ `1.165.0` used old `1.MINOR.PATCH`.)
 - **Deliberate name-list order** (default alphabetical; ask if unclear before shipping).
 - **Never blank a screen on a query error**; never delete data or present a blank/new screen unexpectedly.
 - **Confirm the plan before BIG / DB / semantic changes**; build **HTML mockups before visual changes**.
@@ -106,17 +111,25 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current version: v1.165.0 (this zip).**
-- **Migration 0111 is PENDING** — run `0111_money_audit.sql` in the Supabase SQL editor (full SQL is in
-  the file and was printed inline at delivery). It adds the `money_audit` trail + triggers, locks
-  `expense_shares`/`expense_payers` writes to the expense creator/admin, and caps a single expense at
-  $100k. The v1.165.0 code is safe to deploy ahead of it (the audit UI just shows nothing until
-  snapshots exist), but the trail and the child-write lock don't take effect until it's applied.
-- **All migrations through 0110 have been run**; 0111 is the only unapplied one (see MIGRATIONS.md).
-- After running 0111: create a test expense, edit it, delete it — the log entry for the deleted expense
-  should remain tappable and show its frozen allocation ("DELETED" badge).
-- Next code work comes from the backlog (§10) or Amit's direction. Money Tier-2/3 (settlement
-  counterparty-confirm, dispute flags, server-side child-write audit) remain optional follow-ups.
+**Current version: 166.0.260714 (this zip).** (New version scheme `FEATURE.EDIT.YYMMDD` — see APP_RULES #13.)
+- **Two migrations are PENDING** — run in the Supabase SQL editor in order (full SQL printed inline at
+  delivery, and in the files):
+  - **`0111_money_audit.sql`** — durable Money audit trail + triggers, child-write lock, $100k cap.
+  - **`0112_events.sql`** — `group_events` + `expenses.event_id`, freeze-enforcement triggers, and the
+    `set_event_closed` / `move_expense_event` / `ensure_game_event` RPCs.
+  Code is safe to deploy ahead of both (the audit + events UI simply show nothing until the tables
+  exist), but neither feature works until its migration is applied.
+- To confirm whether a migration is live, the **source of truth is the ledger** (added in 0113):
+  `select id, applied_at from public.schema_migrations order by id;`. Every migration from 0113 onward
+  ends with `select record_migration('NNNN_filename');`, so it records itself when run. The manual
+  MIGRATIONS.md checklist is a convenience only — never assert applied-state from it alone. (For anything
+  before 0113, or to spot-check, probe the object directly, e.g.
+  `select to_regclass('public.money_audit'), to_regclass('public.group_events');`.)
+- All migrations **through 0110** were previously confirmed applied.
+- After running: create an event, attach an expense, close it (admin) → its expenses should seal; a game
+  bet-post should auto-create a "from game" event.
+- Optional Money follow-ups still open: settlement counterparty-confirm / dispute flags (Tier 2/3 from
+  the audit work).
 
 ## 9. Recent major thread — "date of play" (context you'll need)
 The recent work overhauled how a round's date is recorded:

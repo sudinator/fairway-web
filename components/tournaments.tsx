@@ -6564,11 +6564,12 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
       const pp = primaryPayer(post);
       if (!pp) { setPostMsg("Couldn't post — no member to record as payer."); setBusy(false); return; }
       const desc = `TGC bet — ${game.name || game.course || "game"}`;
+      const { data: betEventId } = await supabase.rpc("ensure_game_event", { p_game: game.id });
       const { data: exp, error: e1 } = await supabase.from("expenses").insert({
         group_id: game.group_id, created_by: user.id,
         payer_user_id: pp,
         amount_cents: post.amount_cents, description: desc, category: "bet", split_type: "custom",
-        source_game_id: game.id, source_kind: "tgc_bet",
+        source_game_id: game.id, source_kind: "tgc_bet", event_id: betEventId ?? null,
       }).select("id, created_at").single();
       if (e1 || !exp) { setPostMsg("Couldn't post — please try again."); setBusy(false); return; }
       const { error: e2 } = await supabase.from("expense_payers").insert(payerRows(post, exp.id));
@@ -6659,10 +6660,11 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
       const { error: ed } = await supabase.from("expenses").delete().eq("id", postedExpense.id);
       if (ed) { setPostMsg("Couldn't update — please try again."); setBusy(false); return; }
       const desc = `TGC bet — ${game.name || game.course || "game"}`;
+      const { data: betEventId2 } = await supabase.rpc("ensure_game_event", { p_game: game.id });
       const { data: exp, error: e1 } = await supabase.from("expenses").insert({
         group_id: game.group_id, created_by: user.id, payer_user_id: pp,
         amount_cents: post.amount_cents, description: desc, category: "bet", split_type: "custom",
-        source_game_id: game.id, source_kind: "tgc_bet",
+        source_game_id: game.id, source_kind: "tgc_bet", event_id: betEventId2 ?? null,
       }).select("id, created_at").single();
       if (e1 || !exp) { setPostedExpense(null); setPostedNets(null); setPostMsg("Removed the old winnings but couldn't re-post — tap Post winnings again."); setBusy(false); return; }
       const { error: e2 } = await supabase.from("expense_payers").insert(payerRows(post, exp.id));

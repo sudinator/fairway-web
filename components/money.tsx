@@ -6,9 +6,9 @@ import { C } from "@/lib/golf";
 import { Avatar, btn, inputStyle, Eyebrow } from "@/components/ui";
 import {
   computeBalances, simplify, pairwiseDebts, evenShares, validateCustomTotal, guestCoverageBySponsor,
-  fmtUSD, payLink, nudgeSms, auditVersionsByExpense,
+  fmtUSD, payLink, nudgeSms, auditVersionsByExpense, eventNet, expensesByEvent,
   type Expense, type Share, type Settlement, type Guest, type Payer,
-  type AuditRow, type AuditVersion, type AuditSnapshot,
+  type AuditRow, type AuditVersion, type AuditSnapshot, type EventRow,
 } from "@/lib/money";
 
 const supabase = createClient();
@@ -16,7 +16,7 @@ const supabase = createClient();
 type Member = { id: string; display_name: string; avatar_url?: string | null; venmo_handle?: string | null; paypal_handle?: string | null; zelle_handle?: string | null; phone?: string | null };
 type SettlementRow = Settlement & { id: string; method?: string | null; created_by?: string | null; created_at?: string };
 type GuestRow = Guest & { name: string; group_id: string; archived?: boolean; became_member_id?: string | null; source_game_id?: string | null };
-type ExpenseRow = Expense & { group_id: string; created_by: string | null; description: string; category: string; split_type: "even" | "custom"; created_at: string };
+type ExpenseRow = Expense & { group_id: string; created_by: string | null; description: string; category: string; split_type: "even" | "custom"; created_at: string; event_id?: string | null };
 type ShareRow = Share & { id: string };
 type PayerRow = Payer & { id?: string };
 
@@ -38,6 +38,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
   const [payers, setPayers] = useState<PayerRow[]>([]);
   const [activity, setActivity] = useState<any[]>([]);
   const [auditRows, setAuditRows] = useState<AuditRow[]>([]);
+  const [events, setEvents] = useState<EventRow[]>([]);
   const [viewingSnap, setViewingSnap] = useState<{ snapshot: AuditSnapshot; at?: string } | null>(null); // read-only view of a deleted expense
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<ExpenseRow | null>(null);
@@ -77,6 +78,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     setSimplifyMode(grp?.money_simplify !== false); // default to simplified when column/absent
     const { data: act } = await supabase.from("group_activity").select("*").eq("group_id", gid).not("action", "like", "tt%").order("created_at", { ascending: false }).limit(200);
     const { data: aud } = await supabase.from("money_audit").select("id, expense_id, actor_id, action, snapshot, created_at").eq("group_id", gid).order("created_at", { ascending: true }).limit(1000);
+    const { data: evs } = await supabase.from("group_events").select("*").eq("group_id", gid).order("event_date", { ascending: false, nullsFirst: false });
     setMembers((profs || []).map((p: any) => ({ id: p.id, display_name: p.display_name || "Player", avatar_url: p.avatar_url, venmo_handle: p.venmo_handle, paypal_handle: p.paypal_handle, zelle_handle: p.zelle_handle, phone: p.phone })).sort((a, b) => a.display_name.localeCompare(b.display_name, undefined, { sensitivity: "base" })));
     setGuests(((gRows || []) as GuestRow[]).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })));
     setExpenses((exp || []) as ExpenseRow[]);
@@ -85,6 +87,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     setPayers((py || []) as PayerRow[]);
     setActivity((act || []) as any[]);
     setAuditRows((aud || []) as AuditRow[]);
+    setEvents((evs || []) as EventRow[]);
     setLoading(false);
     onChanged?.();
   }, [gid, onChanged]);
@@ -126,6 +129,34 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
   const logActivity = useCallback(async (action: string, summary: string, meta: any = {}) => {
     await supabase.from("group_activity").insert({ group_id: gid, actor_user_id: user.id, action, summary, meta });
   }, [gid, user.id]);
+
+  const createEvent = async (name: string, date: string | null): Promise<string | null> => {
+    if (!requireOnline()) return null;
+    const { data, error } = await supabase.from("group_events")
+      .insert({ group_id: gid, name: name.trim(), event_date: date || null, event_type: "manual", status: "open", created_by: user.id })
+      .select("*").single();
+    if (error || !data) { alert("Couldn't create the event — please try again."); return null; }
+    setEvents((e) => [data as EventRow, ...e]);
+    await logActivity("event_created", "created event " + name.trim(), { event_id: (data as any).id });
+    return (data as any).id as string;
+  };
+  const setEventClosed = async (ev: EventRow, closed: boolean) => {
+    if (!requireOnline()) return;
+    if (closed && !window.confirm(`Close "${ev.name}"? It will be sealed — no more expenses, and its expenses can't be edited. You (an admin) can reopen it later.`)) return;
+    setBusy(true);
+    const { error } = await supabase.rpc("set_event_closed", { p_event: ev.id, p_closed: closed });
+    setBusy(false);
+    if (error) { alert("Couldn't " + (closed ? "close" : "reopen") + " the event — " + error.message); return; }
+    await load();
+  };
+  const moveExpenseEvent = async (expenseId: string, eventId: string | null) => {
+    if (!requireOnline()) return;
+    setBusy(true);
+    const { error } = await supabase.rpc("move_expense_event", { p_expense: expenseId, p_event: eventId });
+    setBusy(false);
+    if (error) { alert("Couldn't move the expense — " + error.message); return; }
+    await load();
+  };
 
   const setSimplify = async (v: boolean) => {
     if (!isAdmin || !requireOnline()) return;
@@ -215,6 +246,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
       {screen === "add" && (
         <AddExpense key={editing?.id || "new"} user={user} gid={gid} members={members} guests={guests} busy={busy} setBusy={setBusy}
           requireOnline={requireOnline}
+          openEvents={events.filter((e) => e.status === "open")} onCreateEvent={createEvent}
           editing={editing} editShares={editing ? shares.filter((s) => s.expense_id === editing.id) : []} editPayers={editing ? payers.filter((p) => p.expense_id === editing.id) : []} editHistory={editing ? activity.filter((a) => a?.meta?.expense_id === editing.id && (a.action === "expense_created" || a.action === "expense_edited")) : []} onLog={logActivity}
           canDelete={!!editing && (editing.created_by === user.id || isAdmin)}
           onDelete={async () => { if (!editing) return; const d = editing; setBusy(true); const { error } = await supabase.from("expenses").delete().eq("id", d.id); if (error) { setBusy(false); alert("Couldn't delete this expense — please try again."); return; } await logActivity("expense_deleted", "deleted “" + (d.description || catLabel(d.category)) + "” — " + fmtUSD(d.amount_cents), { expense_id: d.id, amount_cents: d.amount_cents }); setBusy(false); setEditing(null); await load(); setScreen("balances"); }}
@@ -241,39 +273,23 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
         }}
         canOpen={(id) => liveExpenseIds.has(id) || !!deletedSnapById[id]} />}
 
-      {/* expenses list (under balances) */}
+      {/* expenses list (under balances) — grouped into event islands */}
       {screen === "balances" && (
-        <div style={{ marginTop: 16 }}>
-          <Eyebrow>Expenses</Eyebrow>
-          {expenses.length === 0 && <div style={{ color: C.sage, fontSize: 13, padding: "8px 2px" }}>No expenses yet. Add one to start the ledger.</div>}
-          {expenses.map((e) => {
-            const payer = memberById[e.payer_user_id];
-            const prs = payers.filter((p) => p.expense_id === e.id);
-            const paidNames = prs.length ? prs.map((p) => p.user_id ? (memberById[p.user_id]?.display_name || "?") : (guestById[p.guest_id || ""]?.name || "guest")).join(" & ") : (memberById[e.payer_user_id]?.display_name || "?");
-            const parts = shares.filter((s) => s.expense_id === e.id);
-            const who = parts.length >= members.length + guests.length ? "whole group" : parts.map((s) => s.user_id ? (memberById[s.user_id]?.display_name || "?") : (guestById[s.guest_id || ""]?.name || "guest")).join(", ");
-            return (
-              <div key={e.id} onClick={() => setViewing(e)}
-                style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 2px", borderBottom: `1px solid ${C.greenMid}`, cursor: "pointer" }}>
-                <Avatar src={payer?.avatar_url} name={payer?.display_name || "?"} size={30} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: C.cream, fontSize: 13.5, fontWeight: 600 }}>{e.description || catLabel(e.category)}</div>
-                  <div style={{ color: C.sage, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{catLabel(e.category)} · {paidNames} paid · {who}</div>
-                </div>
-                <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700 }}>{fmtUSD(e.amount_cents)}</div>
-                <span style={{ color: C.sage, fontSize: 17, marginLeft: 2 }}>&#8250;</span>
-              </div>
-            );
-          })}
-          {expenses.length > 0 && <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Tap any expense to see full details.</div>}
-          <CategorySummary expenses={expenses} />
-        </div>
+        <EventGroupedExpenses
+          expenses={expenses} shares={shares} payers={payers} guests={guests} events={events}
+          memberById={memberById} guestById={guestById} partyCount={members.length + guests.length}
+          isAdmin={isAdmin} onView={(e) => setViewing(e)}
+          onCloseEvent={(ev, closed) => setEventClosed(ev, closed)} />
       )}
 
       {viewing && (
         <ExpenseDetail expense={viewing} shares={shares} payers={payers} memberById={memberById} guestById={guestById}
           versions={auditByExpense[viewing.id] || []}
-          canEdit={viewing.created_by === user.id || isAdmin}
+          openEvents={events.filter((e) => e.status === "open")}
+          currentEvent={events.find((e) => e.id === viewing.event_id) || null}
+          canEdit={(viewing.created_by === user.id || isAdmin) && events.find((e) => e.id === viewing.event_id)?.status !== "closed"}
+          canMove={(viewing.created_by === user.id || isAdmin) && events.find((e) => e.id === viewing.event_id)?.status !== "closed"}
+          onMove={(evId) => { const v = viewing; setViewing(null); moveExpenseEvent(v.id, evId); }}
           onEdit={() => { const v = viewing; setViewing(null); setEditing(v); setScreen("add"); }}
           onClose={() => setViewing(null)} />
       )}
@@ -478,14 +494,19 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
 // ---------------- Add / Edit expense ----------------
 type Party = { kind: "member" | "guest"; id: string; name: string; avatar_url?: string | null; sponsor?: string };
 
-function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, onAddGuest, onSaved, editing, editShares, editPayers, editHistory, onLog, canDelete, onDelete }: {
+function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, onAddGuest, onSaved, openEvents, onCreateEvent, editing, editShares, editPayers, editHistory, onLog, canDelete, onDelete }: {
   user: { id: string }; gid: string; members: Member[]; guests: GuestRow[]; busy: boolean; setBusy: (b: boolean) => void;
   requireOnline: () => boolean;
   onAddGuest: (name: string) => Promise<void>;
   onSaved: () => Promise<void>;
+  openEvents: EventRow[]; onCreateEvent: (name: string, date: string | null) => Promise<string | null>;
   editing?: ExpenseRow | null; editShares?: ShareRow[]; editPayers?: PayerRow[]; editHistory?: any[]; onLog?: (action: string, summary: string, meta?: any) => Promise<void>; canDelete?: boolean; onDelete?: () => Promise<void>;
 }) {
   const skey = (s: ShareRow) => (s.user_id ? "u:" + s.user_id : "g:" + s.guest_id);
+  const [eventId, setEventId] = useState<string | null>(editing?.event_id ?? null);
+  const [newEventOpen, setNewEventOpen] = useState(false);
+  const [newEventName, setNewEventName] = useState("");
+  const [newEventDate, setNewEventDate] = useState("");
   const [desc, setDesc] = useState(editing?.description || "");
   const [amount, setAmount] = useState(editing ? (editing.amount_cents / 100).toString() : "");
   const [cat, setCat] = useState(editing?.category || "tee");
@@ -540,7 +561,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
     if (!requireOnline() || !canSave) return;
     setBusy(true);
     const primaryPayer = paidPayers[0];
-    const payload = { payer_user_id: primaryPayer, description: desc.trim(), category: cat, amount_cents: amtCents, split_type: mode };
+    const payload = { payer_user_id: primaryPayer, description: desc.trim(), category: cat, amount_cents: amtCents, split_type: mode, event_id: eventId };
     let expId = editing?.id;
     if (editing) {
       const { error } = await supabase.from("expenses").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", editing.id);
@@ -622,6 +643,30 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {CATS.map((c) => <button key={c.k} onClick={() => setCat(c.k)} style={chip(cat === c.k)}>{c.label}</button>)}
       </div>
+
+      <Eyebrow>Event (optional)</Eyebrow>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <button onClick={() => { setEventId(null); setNewEventOpen(false); }} style={chip(eventId === null && !newEventOpen)}>No event</button>
+        {openEvents.map((ev) => (
+          <button key={ev.id} onClick={() => { setEventId(ev.id); setNewEventOpen(false); }} style={chip(eventId === ev.id)}>
+            {ev.name}{ev.event_date ? " · " + new Date(ev.event_date + "T00:00:00").toLocaleDateString([], { month: "short", day: "numeric" }) : ""}
+          </button>
+        ))}
+        <button onClick={() => { setNewEventOpen(true); setEventId(null); }} style={{ ...chip(newEventOpen), borderStyle: "dashed" }}>＋ New event</button>
+      </div>
+      {newEventOpen && (
+        <div style={{ background: "#0f3529", borderRadius: 10, padding: 10, marginTop: 8 }}>
+          <input value={newEventName} onChange={(e) => setNewEventName(e.target.value)} placeholder="Event name (e.g. Ireland Trip)" style={inputStyle} />
+          <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+            <input type="date" value={newEventDate} onChange={(e) => setNewEventDate(e.target.value)} style={{ ...inputStyle, flex: 1 }} />
+            <button disabled={busy || !newEventName.trim()} onClick={async () => {
+              const id = await onCreateEvent(newEventName, newEventDate || null);
+              if (id) { setEventId(id); setNewEventOpen(false); setNewEventName(""); setNewEventDate(""); }
+            }} style={{ ...btn(true), flex: 0, padding: "8px 14px", opacity: (busy || !newEventName.trim()) ? 0.5 : 1 }}>Create</button>
+          </div>
+          <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Date is optional. Anyone can add expenses to this event until an admin closes it.</div>
+        </div>
+      )}
 
       <div style={{ display: "flex", alignItems: "center" }}>
         <Eyebrow>Split between</Eyebrow>
@@ -746,11 +791,13 @@ function SnapshotDetail({ snap, at, onClose }: { snap: AuditSnapshot; at?: strin
   );
 }
 
-function ExpenseDetail({ expense, shares, payers, memberById, guestById, versions, canEdit, onEdit, onClose }: {
+function ExpenseDetail({ expense, shares, payers, memberById, guestById, versions, openEvents, currentEvent, canEdit, canMove, onMove, onEdit, onClose }: {
   expense: ExpenseRow; shares: ShareRow[]; payers: PayerRow[];
   memberById: Record<string, Member>; guestById: Record<string, GuestRow>;
-  versions: AuditVersion[]; canEdit: boolean; onEdit: () => void; onClose: () => void;
+  versions: AuditVersion[]; openEvents: EventRow[]; currentEvent: EventRow | null;
+  canEdit: boolean; canMove: boolean; onMove: (eventId: string | null) => void; onEdit: () => void; onClose: () => void;
 }) {
+  const [moving, setMoving] = useState(false);
   const [openVer, setOpenVer] = useState<number | null>(null);
   const prs = payers.filter((p) => p.expense_id === expense.id);
   const parts = shares.filter((s) => s.expense_id === expense.id);
@@ -765,6 +812,25 @@ function ExpenseDetail({ expense, shares, payers, memberById, guestById, version
           <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800 }}>{fmtUSD(expense.amount_cents)}</div>
         </div>
         <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{catLabel(expense.category)} · {new Date(expense.created_at).toLocaleDateString()}</div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+          <span style={{ color: C.faint, fontSize: 12 }}>Event:</span>
+          <span style={{ color: C.cream, fontSize: 12.5, fontWeight: 700, flex: 1 }}>
+            {currentEvent ? currentEvent.name : "Ungrouped"}{currentEvent?.status === "closed" ? " · closed" : ""}
+          </span>
+          {canMove && !moving && <button onClick={() => setMoving(true)} style={{ border: `1px solid ${C.greenMid}`, background: "transparent", color: C.sage, fontSize: 11, fontWeight: 800, padding: "5px 10px", borderRadius: 8, cursor: "pointer" }}>Move</button>}
+        </div>
+        {moving && (
+          <div style={{ background: "#0f3529", borderRadius: 10, padding: 10, marginTop: 8 }}>
+            <div style={{ color: C.sage, fontSize: 11, marginBottom: 6 }}>Move this expense to an open event (or ungroup):</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <button onClick={() => onMove(null)} style={chip(!currentEvent)}>Ungrouped</button>
+              {openEvents.map((ev) => (
+                <button key={ev.id} onClick={() => onMove(ev.id)} style={chip(currentEvent?.id === ev.id)}>{ev.name}</button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <Eyebrow>Paid by</Eyebrow>
         {paidRows.map((r, i) => (
@@ -841,6 +907,134 @@ function ActivityLog({ activity, memberById, onOpenExpense, canOpen }: { activit
     </div>
   );
 }
+
+// Balances → expenses grouped into event islands (open events, Ungrouped, then a
+// collapsed Closed section). Per-event nets come from eventNet(); settlement stays
+// group-wide (handled elsewhere). Reuses one row renderer for every expense.
+function EventGroupedExpenses({ expenses, shares, payers, guests, events, memberById, guestById, partyCount, isAdmin, onView, onCloseEvent }: {
+  expenses: ExpenseRow[]; shares: ShareRow[]; payers: PayerRow[]; guests: GuestRow[]; events: EventRow[];
+  memberById: Record<string, Member>; guestById: Record<string, GuestRow>; partyCount: number;
+  isAdmin: boolean; onView: (e: ExpenseRow) => void;
+  onCloseEvent: (ev: EventRow, closed: boolean) => void;
+}) {
+  const [showClosed, setShowClosed] = useState(false);
+  const byEv = useMemo(() => expensesByEvent(expenses), [expenses]);
+  const openEvents = events.filter((e) => e.status === "open");
+  const closedEvents = events.filter((e) => e.status === "closed");
+  const ungrouped = byEv[""] || [];
+
+  const row = (e: ExpenseRow) => {
+    const payer = memberById[e.payer_user_id];
+    const prs = payers.filter((p) => p.expense_id === e.id);
+    const paidNames = prs.length ? prs.map((p) => p.user_id ? (memberById[p.user_id]?.display_name || "?") : (guestById[p.guest_id || ""]?.name || "guest")).join(" & ") : (memberById[e.payer_user_id]?.display_name || "?");
+    const parts = shares.filter((s) => s.expense_id === e.id);
+    const who = parts.length >= partyCount ? "whole group" : parts.map((s) => s.user_id ? (memberById[s.user_id]?.display_name || "?") : (guestById[s.guest_id || ""]?.name || "guest")).join(", ");
+    return (
+      <div key={e.id} onClick={() => onView(e)}
+        style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 2px", borderBottom: `1px solid ${C.greenMid}`, cursor: "pointer" }}>
+        <Avatar src={payer?.avatar_url} name={payer?.display_name || "?"} size={30} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ color: C.cream, fontSize: 13.5, fontWeight: 600 }}>{e.description || catLabel(e.category)}</div>
+          <div style={{ color: C.sage, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{catLabel(e.category)} · {paidNames} paid · {who}</div>
+        </div>
+        <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700 }}>{fmtUSD(e.amount_cents)}</div>
+        <span style={{ color: C.sage, fontSize: 17, marginLeft: 2 }}>&#8250;</span>
+      </div>
+    );
+  };
+
+  const island = (ev: EventRow) => {
+    const net = eventNet(ev.id, expenses as any, shares as any, guests as any, payers as any);
+    const list = byEv[ev.id] || [];
+    const dateStr = ev.event_date ? new Date(ev.event_date + "T00:00:00").toLocaleDateString([], { month: "short", day: "numeric" }) : null;
+    const perMember = [...net.perMember].sort((a, b) => (memberById[a.member_id]?.display_name || "").localeCompare(memberById[b.member_id]?.display_name || ""));
+    return (
+      <div key={ev.id} style={{ background: C.greenLight, borderRadius: 14, padding: "12px 13px", marginBottom: 12, border: ev.event_type === "game" ? "1px solid #2c7d5f" : undefined }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 800, color: C.cream }}>
+              {ev.name}{ev.event_type === "game" && <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 7px", borderRadius: 9, marginLeft: 6, background: "#0d3a2c", color: "#8fd6b0", border: "1px solid #2c7d5f" }}>from game</span>}
+            </div>
+            <div style={{ color: C.sage, fontSize: 11.5, marginTop: 1 }}>{[dateStr, `${list.length} ${list.length === 1 ? "expense" : "expenses"}`].filter(Boolean).join(" · ")}</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>{fmtUSD(net.total)}</div>
+            {list.length > 0 && <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 7px", borderRadius: 9, background: net.balanced ? "#123f2e" : "#4a2420", color: net.balanced ? "#8fd6b0" : "#f0b4ab" }}>{net.balanced ? "settled" : "unbalanced"}</span>}
+          </div>
+        </div>
+        {perMember.length > 0 && (
+          <div style={{ marginTop: 10, borderTop: `1px solid ${C.greenMid}`, paddingTop: 8 }}>
+            {perMember.map((m) => (
+              <div key={m.member_id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, padding: "3px 0", color: C.cream }}>
+                <span style={{ flex: 1 }}>{memberById[m.member_id]?.display_name || "Player"}</span>
+                <span style={{ color: C.sage, width: 92, textAlign: "right" }}>paid {fmtUSD(m.paid)}</span>
+                <span style={{ width: 68, textAlign: "right", fontWeight: 800, color: m.net > 0 ? "#8fd6b0" : m.net < 0 ? "#f0b4ab" : C.faint }}>{m.net > 0 ? "+" : m.net < 0 ? "\u2212" : ""}{fmtUSD(Math.abs(m.net))}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {list.length > 0 && <div style={{ marginTop: 8, borderTop: `1px dashed ${C.greenMid}`, paddingTop: 4 }}>{list.map(row)}</div>}
+        {ev.event_type === "game" && <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Name &amp; date come from the game.</div>}
+        {isAdmin && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, background: "#0f3529", borderRadius: 9, padding: "6px 9px" }}>
+            <span style={{ flex: 1, color: C.sage, fontSize: 11 }}>{net.balanced ? "Shares balance — ready to close" : "Admin"}</span>
+            <button onClick={() => onCloseEvent(ev, true)} style={{ border: "none", background: "#5a2d2d", color: "#ffd9d9", fontSize: 11, fontWeight: 800, padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>Close event</button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <Eyebrow>Expenses by event</Eyebrow>
+      {expenses.length === 0 && <div style={{ color: C.sage, fontSize: 13, padding: "8px 2px" }}>No expenses yet. Add one to start the ledger.</div>}
+
+      {openEvents.map(island)}
+
+      {ungrouped.length > 0 && (
+        <div style={{ background: C.greenLight, borderRadius: 14, padding: "12px 13px", marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "baseline" }}>
+            <div style={{ flex: 1, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 800, color: C.sage }}>Ungrouped</div>
+            <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>{fmtUSD(ungrouped.reduce((s, e) => s + e.amount_cents, 0))}</div>
+          </div>
+          <div style={{ color: C.sage, fontSize: 11.5, marginTop: 1 }}>{ungrouped.length} {ungrouped.length === 1 ? "expense" : "expenses"} with no event</div>
+          <div style={{ marginTop: 8, borderTop: `1px dashed ${C.greenMid}`, paddingTop: 4 }}>{ungrouped.map(row)}</div>
+        </div>
+      )}
+
+      {closedEvents.length > 0 && (<>
+        <div onClick={() => setShowClosed((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 8, background: "#123f31", borderRadius: 10, padding: "9px 11px", cursor: "pointer", marginBottom: showClosed ? 12 : 0 }}>
+          <span style={{ fontSize: 12 }}>{"\uD83D\uDD12"}</span>
+          <div style={{ flex: 1, color: C.cream, fontSize: 13, fontWeight: 800 }}>Closed events ({closedEvents.length})</div>
+          <span style={{ color: C.sage }}>{showClosed ? "\u25BE" : "\u203A"}</span>
+        </div>
+        {showClosed && closedEvents.map((ev) => {
+          const net = eventNet(ev.id, expenses as any, shares as any, guests as any, payers as any);
+          const list = byEv[ev.id] || [];
+          return (
+            <div key={ev.id} style={{ background: "#143f31", borderRadius: 14, padding: "12px 13px", marginBottom: 12, opacity: 0.95 }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: "Georgia, serif", fontSize: 15.5, fontWeight: 800, color: C.cream }}>{ev.name} <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 7px", borderRadius: 9, background: "#3a3320", color: "#e6cf8a" }}>CLOSED</span></div>
+                  <div style={{ color: C.sage, fontSize: 11.5, marginTop: 1 }}>{[ev.event_date ? new Date(ev.event_date + "T00:00:00").toLocaleDateString([], { month: "short", day: "numeric" }) : null, `${list.length} ${list.length === 1 ? "expense" : "expenses"}`, ev.closed_at ? "closed " + new Date(ev.closed_at).toLocaleDateString() : null].filter(Boolean).join(" · ")}</div>
+                </div>
+                <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 800 }}>{fmtUSD(net.total)}</div>
+              </div>
+              <div style={{ marginTop: 8, borderTop: `1px dashed ${C.greenMid}`, paddingTop: 4 }}>{list.map(row)}</div>
+              <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Sealed — view only.</div>
+              {isAdmin && <button onClick={() => onCloseEvent(ev, false)} style={{ marginTop: 8, border: `1px solid ${C.greenMid}`, background: "transparent", color: C.sage, fontSize: 11.5, fontWeight: 800, padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>Reopen event</button>}
+            </div>
+          );
+        })}
+      </>)}
+
+      {expenses.length > 0 && <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Tap any expense to see full details.</div>}
+      <CategorySummary expenses={expenses} />
+    </div>
+  );
+}
+
 
 function CategorySummary({ expenses }: { expenses: ExpenseRow[] }) {
   const total = expenses.reduce((s, e) => s + e.amount_cents, 0);

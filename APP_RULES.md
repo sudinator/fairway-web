@@ -66,7 +66,18 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
     cross-environment tensions (installed PWA vs browser viewport) up front. — manual
 11. **Mock before visual changes; confirm before big/DB/risky/privacy-semantic changes.** — manual
 12. **Reuse check before building.** Look for an existing helper/component before adding a new one. — manual
-13. **Versioning.** New feature = MINOR bump; refinement/fix = PATCH. — manual
+13. **Versioning.** Format is `FEATURE.EDIT.YYMMDD` (e.g. `165.1.260714`). **FEATURE** bumps on a new
+    feature; **EDIT** is the refinement/fix counter within that feature and **resets to 0 when FEATURE
+    bumps**; **YYMMDD** is the release date in **US/Eastern** (the app's canonical tz — not UTC).
+    **Bump EDIT on every ship, even two on the same day**, so two builds on one date never collide to the
+    same string (the date is "when," FEATURE.EDIT is "which"). This is valid semver (three non-negative
+    integers), so npm/`write-version.mjs` accept it unchanged. History note: versions ≤ `1.165.0` used the
+    old `1.MINOR.PATCH` semver (the leading `1` never moved); the scheme changed right after `1.165.0`. — manual
+14. **Every migration self-records.** As of 0113 there is a `schema_migrations` ledger. Every migration
+    from 0113 onward MUST end with `select record_migration('NNNN_filename');` as its last statement, so
+    the DB keeps its own logbook of what ran. Confirm applied state anytime with
+    `select id, applied_at from public.schema_migrations order by id;` — this is the source of truth, not
+    the manual MIGRATIONS.md checklist. Never assert a migration is/isn't applied from the checklist alone. — manual
 14. **Every migration's full SQL is printed inline in chat** for copy-paste into the Supabase SQL editor,
     and tracked in `MIGRATIONS.md` (tick when run). — manual
 15. **Repo docs stay in sync each bundle:** DEPLOY_NOTES.md, SCHEMA.md, BACKLOG.md, README.md,

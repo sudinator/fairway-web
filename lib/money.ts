@@ -338,3 +338,70 @@ export function auditVersionsByExpense(rows: AuditRow[], windowMs = 8000): Recor
   for (const eid of Object.keys(byExp)) out[eid] = collapseAuditBursts(byExp[eid], windowMs);
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Events (v166) — group expenses into event "islands" (migration 0112)
+// ---------------------------------------------------------------------------
+// Events are a reporting lens: each island shows its own spent/share/net per
+// person so a group can see "all Ireland expenses are settled." Settlement itself
+// stays GROUP-WIDE (computeBalances/simplify are unchanged) — nobody settles
+// inside an event. These helpers are pure and drive only the island display.
+
+export interface EventRow {
+  id: string;
+  group_id: string;
+  name: string;
+  event_date?: string | null;
+  event_type: "manual" | "game";
+  source_game_id?: string | null;
+  status: "open" | "closed";
+  closed_by?: string | null;
+  closed_at?: string | null;
+  created_by?: string | null;
+}
+export interface EventExpense { id: string; event_id?: string | null; }
+export interface EventPersonNet { member_id: string; paid: Cents; share: Cents; net: Cents } // net = paid - share
+
+/** Per-member spent/share/net for ONE event's expenses. Guests resolve to sponsor,
+ *  exactly like computeBalances, so an event's nets sum to zero when it balances. */
+export function eventNet(
+  eventId: string,
+  expenses: (Expense & { event_id?: string | null })[],
+  shares: Share[], guests: Guest[], payers: Payer[] = [],
+): { total: Cents; perMember: EventPersonNet[]; balanced: boolean } {
+  const gById: Record<string, Guest> = {};
+  for (const g of guests) gById[g.id] = g;
+  const inEvent = new Set(expenses.filter((e) => (e.event_id ?? null) === eventId).map((e) => e.id));
+  const payersByExp: Record<string, Payer[]> = {};
+  for (const p of payers) if (inEvent.has(p.expense_id)) (payersByExp[p.expense_id] || (payersByExp[p.expense_id] = [])).push(p);
+  const paid: Record<string, Cents> = {};
+  const share: Record<string, Cents> = {};
+  let total = 0;
+  const addPaid = (uid: string | null, amt: Cents) => { if (uid) paid[uid] = (paid[uid] || 0) + amt; };
+  const addShare = (uid: string | null, amt: Cents) => { if (uid) share[uid] = (share[uid] || 0) + amt; };
+  for (const e of expenses) {
+    if (!inEvent.has(e.id)) continue;
+    total += e.amount_cents;
+    const ps = payersByExp[e.id];
+    if (ps && ps.length) ps.forEach((p) => addPaid(resolveMember(p.user_id, p.guest_id, gById, p.sponsor_user_id), p.paid_cents));
+    else addPaid(e.payer_user_id, e.amount_cents);
+  }
+  for (const s of shares) {
+    if (!s.expense_id || !inEvent.has(s.expense_id)) continue;
+    addShare(resolveMember(s.user_id, s.guest_id, gById, s.sponsor_user_id), s.share_cents);
+  }
+  const ids = Array.from(new Set([...Object.keys(paid), ...Object.keys(share)]));
+  const perMember = ids.map((member_id) => ({
+    member_id, paid: paid[member_id] || 0, share: share[member_id] || 0,
+    net: (paid[member_id] || 0) - (share[member_id] || 0),
+  }));
+  const balanced = perMember.reduce((s, m) => s + m.net, 0) === 0;
+  return { total, perMember, balanced };
+}
+
+/** Bucket expenses by event id; event-less expenses go under the "" (Ungrouped) key. */
+export function expensesByEvent<T extends EventExpense>(expenses: T[]): Record<string, T[]> {
+  const out: Record<string, T[]> = {};
+  for (const e of expenses) { const k = e.event_id ?? ""; (out[k] || (out[k] = [])).push(e); }
+  return out;
+}

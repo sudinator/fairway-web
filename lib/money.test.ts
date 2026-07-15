@@ -2,7 +2,7 @@
 import {
   evenShares, validateCustomTotal, computeBalances, simplify, pairwiseDebts, aggregateOwed,
   payLink, nudgeSms, fmtUSD, guestOwedFor, guestCoverageBySponsor, betResultToPost,
-  collapseAuditBursts, auditVersionsByExpense,
+  collapseAuditBursts, auditVersionsByExpense, eventNet, expensesByEvent,
 } from "./money";
 import type { Expense, Share, Settlement, Guest, Transfer, Payer, AuditRow } from "./money";
 
@@ -320,6 +320,55 @@ ok("nudge sms has body", nudgeSms("2015550102", "Dev", 6500, "Saturday Golf", "b
   const grouped = auditVersionsByExpense([...withDelete, ...twoActors]);
   check("grouped has e1", grouped["e1"].length, 2);
   check("grouped has e2", grouped["e2"].length, 2);
+}
+
+// --- event islands: per-member net + grouping ---
+{
+  // Ireland: Amit paid $1600, Dave paid $810; split evenly 3 ways across the two expenses.
+  const exps = [
+    { id: "e1", event_id: "ire", payer_user_id: "amit", amount_cents: 160000 },
+    { id: "e2", event_id: "ire", payer_user_id: "dave", amount_cents: 81000 },
+    { id: "e3", event_id: null,  payer_user_id: "ravi", amount_cents: 3600 }, // ungrouped, must be ignored
+  ];
+  const shares = [
+    // e1 split 3 ways
+    { expense_id: "e1", user_id: "amit", guest_id: null, share_cents: 53334 },
+    { expense_id: "e1", user_id: "dave", guest_id: null, share_cents: 53333 },
+    { expense_id: "e1", user_id: "ravi", guest_id: null, share_cents: 53333 },
+    // e2 split 3 ways
+    { expense_id: "e2", user_id: "amit", guest_id: null, share_cents: 27000 },
+    { expense_id: "e2", user_id: "dave", guest_id: null, share_cents: 27000 },
+    { expense_id: "e2", user_id: "ravi", guest_id: null, share_cents: 27000 },
+    // ungrouped share (must be ignored by the event lens)
+    { expense_id: "e3", user_id: "amit", guest_id: null, share_cents: 3600 },
+  ];
+  const en = eventNet("ire", exps as any, shares as any, [], []);
+  check("event total sums only its expenses", en.total, 241000);
+  check("event nets sum to zero (balanced)", en.perMember.reduce((s, m) => s + m.net, 0), 0);
+  ok("balanced flag true", en.balanced);
+  const amit = en.perMember.find((m) => m.member_id === "amit")!;
+  check("amit paid within event", amit.paid, 160000);
+  check("amit share within event", amit.share, 80334);
+  check("amit net within event", amit.net, 79666);
+  const ravi = en.perMember.find((m) => m.member_id === "ravi")!;
+  check("ravi net within event (owes)", ravi.net, -80333);
+  check("ungrouped expense excluded from event", en.perMember.some((m) => m.paid === 3600), false);
+
+  // Grouping buckets event-less under "".
+  const byEv = expensesByEvent(exps as any);
+  check("grouped ire has 2", byEv["ire"].length, 2);
+  check("grouped ungrouped has 1", byEv[""].length, 1);
+
+  // Guest share routes to sponsor inside the event, too.
+  const gexps = [{ id: "g1", event_id: "trip", payer_user_id: "amit", amount_cents: 10000 }];
+  const gshares = [
+    { expense_id: "g1", user_id: "amit", guest_id: null, share_cents: 5000 },
+    { expense_id: "g1", user_id: null, guest_id: "gX", sponsor_user_id: "dave", share_cents: 5000 },
+  ];
+  const gen = eventNet("trip", gexps as any, gshares as any, [{ id: "gX", sponsor_user_id: "dave" }] as any, []);
+  const dave = gen.perMember.find((m) => m.member_id === "dave")!;
+  check("guest share billed to sponsor in event", dave.net, -5000);
+  ok("guest event still balances", gen.balanced);
 }
 
 console.log(`\n=== money.test ===\nPASS ${pass}  FAIL ${fail}`);
