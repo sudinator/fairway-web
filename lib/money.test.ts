@@ -453,6 +453,20 @@ ok("nudge sms has body", nudgeSms("2015550102", "Dev", 6500, "Saturday Golf", "b
       { from_user_id: "ravi", to_user_id: "amit", amount_cents: 10000, event_id: "jul", status: "confirmed" },
     ] as any, guests: [] });
   ok("both settled with full coverage", full["may"].settled && full["jul"].settled);
+  // BUG REGRESSION (Livingston): expenses settled globally (untagged settlement), then moved into an
+  // event, must stay settled — global-square covers the event even with no event-tagged payment.
+  {
+    const ev = [{ id: "arch", group_id: "g", name: "Architects 7/5", event_date: "2026-07-05", event_type: "manual", status: "open" }];
+    const exp = [{ id: "u1", event_id: "arch", payer_user_id: "amit", amount_cents: 12000, created_at: "2026-07-05T00:00:00Z" }];
+    const sh = [
+      { expense_id: "u1", user_id: "amit", guest_id: null, share_cents: 6000 },
+      { expense_id: "u1", user_id: "ravi", guest_id: null, share_cents: 6000 },
+    ];
+    // Ravi already settled his $60 via the GLOBAL tab (event_id null) — before the move.
+    const st = [{ from_user_id: "ravi", to_user_id: "amit", amount_cents: 6000, event_id: null, status: "confirmed" }];
+    const res = eventSettlement({ events: ev as any, expenses: exp as any, shares: sh as any, payers: [], settlements: st as any, guests: [] });
+    ok("moved-in expenses stay settled when globally square", res["arch"].settled);
+  }
 }
 
 console.log(`\n=== money.test ===\nPASS ${pass}  FAIL ${fail}`);

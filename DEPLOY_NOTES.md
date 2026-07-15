@@ -3518,3 +3518,29 @@ Single pass applying the agreed three-tier header policy across the app (dashboa
   table column headers, status/badge pills, banners (TEST MODE), the Tier-1 title-size hierarchy, and the
   dashboard's sage section-divider.
 - Going-forward: APP_RULES #15 (headers use Eyebrow; tile/row rules) + #16 (date fields). No migration.
+
+### 167.6.260715 — owe reminder is per-club + switches club on tap (no migration)
+The top-of-app "you owe" banner no longer lumps clubs together.
+- **Per-club reminders**: one line per club you owe in (kept separate, not summed). The club is NAMED only
+  if you belong to multiple clubs ("You owe $X in Pebble Beach"); with a single club it stays "You owe $X
+  to settle up".
+- **Tap switches club + opens Balances**: tapping a reminder switches the active club to that one (reusing
+  the same group-switch path the tee-time notifications use), opens Money → Balances so you see the
+  expenses, and shows a transient toast "Switched to {Club} to view expense" — only when a switch actually
+  happened (no toast if it's already your active club).
+- **Bug fix (from 167.2)**: `loadOwed` counted ALL settlements including pending/armed ones, so a
+  not-yet-confirmed settle wrongly shrank the owe banner. Now counts confirmed settlements only —
+  balances and the banner agree.
+No migration.
+
+### 167.7.260715 — fix: moving settled expenses into an event showed people owing (no migration)
+Bug (reported on Livingston Early Morning Golfers): a group where everything was settled, with ungrouped
+expenses moved into a new event, showed the event as people owing money. Cause: per-event settled-state
+(167.2) only counted settlements tagged to that event, but the payments that squared those expenses were
+tagged to no event (global/ungrouped) and weren't moved with the expenses — so the new event saw the debts
+but none of the coverage. Global balances were always correct; only the per-event display was wrong.
+Fix: `eventSettlement` now treats a participant who owes nothing GLOBALLY (net >= 0 over confirmed
+settlements) as settled for every event — so pre-existing, global-tab, and untagged settlements all count,
+and moving already-settled expenses can't make them look unpaid. Participants who still owe overall are
+still judged by event-tagged coverage, preserving per-event/dispute handling (pay a newer event, an older
+one stays open). Regression test added. No migration.

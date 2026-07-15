@@ -553,6 +553,13 @@ export function eventSettlement(input: {
     cover[k][st.from_user_id] = (cover[k][st.from_user_id] || 0) + st.amount_cents;
   }
 
+  // Global net per member (CONFIRMED settlements only). A member who owes nothing overall
+  // (net >= 0) is settled for EVERY event — pre-existing/untagged/global settlements count, and
+  // moving already-settled expenses into an event can't make them look unpaid. Members who DO
+  // still owe globally are judged by event-tagged coverage (preserves per-event / dispute handling).
+  const confirmed = settlements.filter((s) => (s.status || "confirmed") === "confirmed");
+  const gnet = computeBalances(expenses as any, shares, confirmed as any, guests, payers);
+
   const out: Record<string, EventSettleState> = {};
   for (const k of Object.keys(bucketExpenses)) {
     const eid = k === "" ? null : k;
@@ -562,7 +569,8 @@ export function eventSettlement(input: {
       if (m.net >= 0) continue; // only owers must settle
       const need = -m.net;
       owed += need;
-      const paid = (cover[k]?.[m.member_id]) || 0;
+      const globallySquare = (gnet[m.member_id] || 0) >= 0;
+      const paid = globallySquare ? need : ((cover[k]?.[m.member_id]) || 0);
       covered += Math.min(paid, need);
       if (paid < need) allSettled = false;
     }

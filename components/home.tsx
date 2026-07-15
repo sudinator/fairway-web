@@ -3,9 +3,9 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 import { C, titleCaseName, Round, Hole, allocateStrokes, dedupeHoles, TGC_GROUP_ID } from "@/lib/golf";
-import { computeBalances, aggregateOwed, fmtUSD } from "@/lib/money";
+import { computeBalances, fmtUSD } from "@/lib/money";
 import { logActivity } from "@/lib/activity";
-import { Toaster } from "@/components/toast";
+import { Toaster, notifyInfo } from "@/components/toast";
 import { loadDraft, draftHasScores } from "@/lib/draft";
 import { loadActiveGame, saveAppBootCache, loadAppBootCache } from "@/lib/draft";
 import { btn, Wordmark, inputStyle, Eyebrow } from "@/components/ui";
@@ -164,7 +164,7 @@ export function Home({ session }: { session: any }) {
   // When the owe banner is tapped we want the Money tab to open straight on "Settle".
   // The MoneyTab remounts each time you enter it, so this one-shot flag is read on mount;
   // clear it whenever we're not on the money tab so a normal re-entry lands on Balances.
-  const [moneyInitialTab, setMoneyInitialTab] = useState<"settle" | null>(null);
+  const [moneyInitialTab, setMoneyInitialTab] = useState<"settle" | "balances" | null>(null);
   useEffect(() => { if (tab !== "money") setMoneyInitialTab(null); }, [tab]);
   // Tee Times → game handoff (P4): a seed prefills Create Game; openGameId opens an
   // already-linked game. One-shot, cleared when we leave the Games tab (like money).
@@ -573,13 +573,13 @@ export function Home({ session }: { session: any }) {
   }, [showProfNudge, user?.id, displayName]);
 
   // Aggregated owe-banner: how much the current user owes across ALL their groups.
-  const [owed, setOwed] = useState<{ cents: number; groups: number }>({ cents: 0, groups: 0 });
+  const [owed, setOwed] = useState<{ cents: number; clubs: { id: string; name: string; cents: number }[] }>({ cents: 0, clubs: [] });
   const loadOwed = useCallback(async () => {
     const gids = groups.map((g) => g.id);
-    if (!gids.length) { setOwed({ cents: 0, groups: 0 }); return; }
+    if (!gids.length) { setOwed({ cents: 0, clubs: [] }); return; }
     const [{ data: exp }, { data: setl }, { data: gg }] = await Promise.all([
       supabase.from("expenses").select("id, group_id, payer_user_id, amount_cents").in("group_id", gids),
-      supabase.from("settlements").select("group_id, from_user_id, to_user_id, amount_cents").in("group_id", gids),
+      supabase.from("settlements").select("group_id, from_user_id, to_user_id, amount_cents, status").in("group_id", gids),
       supabase.from("group_guests").select("id, group_id, sponsor_user_id").in("group_id", gids),
     ]);
     const exps = (exp || []) as any[];
@@ -592,13 +592,17 @@ export function Home({ session }: { session: any }) {
       : { data: [] as any[] };
     const g2 = (o: Record<string, any[]>, k: string) => (o[k] || (o[k] = []));
     const expBy: Record<string, any[]> = {}; exps.forEach((e) => g2(expBy, e.group_id).push(e));
-    const setlBy: Record<string, any[]> = {}; ((setl || []) as any[]).forEach((x) => g2(setlBy, x.group_id).push(x));
+    const setlBy: Record<string, any[]> = {}; ((setl || []) as any[]).filter((x) => (x.status || "confirmed") === "confirmed").forEach((x) => g2(setlBy, x.group_id).push(x));
     const ggBy: Record<string, any[]> = {}; ((gg || []) as any[]).forEach((x) => g2(ggBy, x.group_id).push(x));
     const expToGroup: Record<string, string> = {}; exps.forEach((e) => { expToGroup[e.id] = e.group_id; });
     const shBy: Record<string, any[]> = {}; ((sh || []) as any[]).forEach((x) => { const gid = expToGroup[x.expense_id]; if (gid) g2(shBy, gid).push(x); });
     const pyBy: Record<string, any[]> = {}; ((py || []) as any[]).forEach((x) => { const gid = expToGroup[x.expense_id]; if (gid) g2(pyBy, gid).push(x); });
-    const perGroup = gids.map((gid) => computeBalances(expBy[gid] || [], shBy[gid] || [], setlBy[gid] || [], ggBy[gid] || [], pyBy[gid] || []));
-    setOwed({ cents: aggregateOwed(perGroup, user.id), groups: perGroup.filter((b) => (b[user.id] || 0) < 0).length });
+    const nameById: Record<string, string> = {}; groups.forEach((g) => { nameById[g.id] = g.name; });
+    const clubs = gids
+      .map((gid) => ({ id: gid, name: nameById[gid] || "Club", cents: -(computeBalances(expBy[gid] || [], shBy[gid] || [], setlBy[gid] || [], ggBy[gid] || [], pyBy[gid] || [])[user.id] || 0) }))
+      .filter((c) => c.cents > 0)
+      .sort((a, b) => b.cents - a.cents);
+    setOwed({ cents: clubs.reduce((s, c) => s + c.cents, 0), clubs });
   }, [groups, user.id]);
   useEffect(() => { loadOwed(); }, [loadOwed]);
   // Everyone can see the Clubs tab — that's where a member requests a new club and
@@ -753,14 +757,28 @@ export function Home({ session }: { session: any }) {
         </div>
       )}
 
-      {owed.cents > 0 && !inFlow && (
-        <button onClick={() => { setMoneyInitialTab("settle"); setTab("money"); setStage(null); setViewing(null); }}
-          style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: "#5a2018", border: "1px solid #7a2e22", borderRadius: 12, padding: "11px 14px", marginTop: 14, cursor: "pointer" }}>
-          <span style={{ fontSize: 18 }}>&#9888;&#65039;</span>
-          <span style={{ flex: 1, color: "#ffd9d2", fontSize: 13 }}>You owe <b style={{ color: "#fff" }}>{fmtUSD(owed.cents)}</b> to settle up{owed.groups > 1 ? ` across ${owed.groups} clubs` : ""}</span>
-          <span style={{ background: C.gold, color: "#2a2410", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>Settle up &#8594;</span>
-        </button>
-      )}
+      {owed.cents > 0 && !inFlow && owed.clubs.map((club) => {
+        const multi = groups.length > 1;
+        const goToClub = () => {
+          const switched = club.id !== activeGroupId;
+          if (switched) {
+            setActiveGroupId(club.id);
+            saveAppBootCache({ groups, activeGroupId: club.id });
+            supabase.from("profiles").update({ active_group_id: club.id }).eq("id", user.id).then(() => {});
+            setProfile((p: any) => (p ? { ...p, active_group_id: club.id } : p));
+          }
+          setMoneyInitialTab("balances"); setTab("money"); setStage(null); setViewing(null);
+          if (switched) notifyInfo(`Switched to ${club.name} to view expense`);
+        };
+        return (
+          <button key={club.id} onClick={goToClub}
+            style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: "#5a2018", border: "1px solid #7a2e22", borderRadius: 12, padding: "11px 14px", marginTop: 14, cursor: "pointer" }}>
+            <span style={{ fontSize: 18 }}>&#9888;&#65039;</span>
+            <span style={{ flex: 1, color: "#ffd9d2", fontSize: 13 }}>You owe <b style={{ color: "#fff" }}>{fmtUSD(club.cents)}</b>{multi ? <> in <b style={{ color: "#fff" }}>{club.name}</b></> : " to settle up"}</span>
+            <span style={{ background: C.gold, color: "#2a2410", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>Settle up &#8594;</span>
+          </button>
+        );
+      })}
 
       <div style={{ marginTop: 20 }}>
         {returnTab && !stage && !viewing && (tab === "players" || tab === "groups") && (
