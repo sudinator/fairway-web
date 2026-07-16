@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase";
-import { C, titleCaseName, Round, Hole, allocateStrokes, dedupeHoles, TGC_GROUP_ID } from "@/lib/golf";
+import { C, titleCaseName, Round, Hole, allocateStrokes, dedupeHoles, TGC_GROUP_ID, effectiveGroupId } from "@/lib/golf";
 import { computeBalances, fmtUSD } from "@/lib/money";
 import { logActivity } from "@/lib/activity";
 import { Toaster, notifyInfo } from "@/components/toast";
@@ -899,7 +899,7 @@ export function Home({ session }: { session: any }) {
             {(() => {
               const more: { key: Tab; label: string; show: boolean }[] = [
                 { key: "money", label: "Money", show: !!activeGroup },
-                { key: "teetimes", label: "Tee Times", show: !!activeGroup && activeGroupId === TGC_GROUP_ID },
+                { key: "teetimes", label: "Tee Times", show: !!activeGroup && effectiveGroupId(activeGroupId) === TGC_GROUP_ID },
                 { key: "players", label: "Players", show: true },
                 { key: "groups", label: "Clubs", show: showGroupsTab },
                 { key: "admin", label: "Admin ★", show: !!profile?.is_admin || activeGroup?.role === "admin" },

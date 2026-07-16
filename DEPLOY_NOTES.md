@@ -3804,3 +3804,13 @@ but restorable. The admin Untangle view is now actionable:
 - **Voided expenses** section lists soft-deleted expenses with one-tap **Restore** (inline confirm).
 - Reconciliation banner + audit log (now includes expense_restored).
 All destructive actions preview their per-member balance impact before committing. RUN MIGRATION 0119.
+
+### 171.0.260716 — feature mirror: App Testing can assume any club's feature set (no migration)
+New effectiveGroupId(groupId) helper in lib/golf: the App Testing club maps to a mirror target so its feature
+gates behave like another club's, without touching that club's data. Defaults to TGC, so App Testing now has
+the full TGC workflow — Tee Times nav, money-game betting defaults, clean-sweep posting to Money, six-hole
+subtotals, member-tee defaults. All 8 TGC gate sites (home nav, tournaments tee/sweep/sixes, manage edition)
+now go through effectiveGroupId. A "Feature mirror (testing)" control in Club settings (shown only for App
+Testing) lets you point it at TGC, any other club, or off — per-device (localStorage), reloads on change,
+copies/changes no data. Server side is membership-gated throughout (tee_times RLS, bet→money inserts), so no
+server changes needed. No migration.

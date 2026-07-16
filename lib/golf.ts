@@ -930,6 +930,22 @@ export function puttDistribution(rounds: Round[]) {
 // group by ID, not name — so renaming the group never breaks the gate. If TGC's
 // group id ever changes, update this single constant.
 export const TGC_GROUP_ID = "640fb606-1a78-4a7f-a632-22446bc934c1";
+// The App Testing club can "assume" another club's feature set for QA without touching that club's data.
+// effectiveGroupId() maps App Testing -> a mirror target (localStorage), defaulting to TGC so the full
+// TGC workflow (tee times, money-game betting, clean-sweep posting, six-hole subtotals) is available for
+// testing. Set the mirror to any club id to test that club's features, or to "__self__" to turn it off.
+export const APP_TESTING_GROUP_ID = "41935c40-282b-4c61-8887-5d4554b764f7";
+export const MIRROR_KEY = "bnn_apptest_mirror";
+export function effectiveGroupId(groupId: string | null | undefined): string | null {
+  if (!groupId) return groupId ?? null;
+  if (groupId !== APP_TESTING_GROUP_ID) return groupId;
+  if (typeof window === "undefined") return TGC_GROUP_ID;
+  try {
+    const v = window.localStorage.getItem(MIRROR_KEY);
+    if (v === "__self__") return APP_TESTING_GROUP_ID;
+    return v || TGC_GROUP_ID;
+  } catch { return TGC_GROUP_ID; }
+}
 // Pot = bet * number of bettors. Prizes are PERCENTAGES of the pot:
 //   - each of the 3 six-hole segments: segPct (default 10/75)
 //   - overall 2nd place (18-hole): secondPct (default 15/75)

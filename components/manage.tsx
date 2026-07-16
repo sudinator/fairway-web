@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { HScroll } from "@/components/hscroll";
 import { createClient } from "@/lib/supabase";
 import { pushGate, subscribeToPush, unsubscribeFromPush, currentPermission, syncPushSubscription } from "@/lib/push";
-import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID } from "@/lib/golf";
+import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID, effectiveGroupId } from "@/lib/golf";
 import capabilities from "@/lib/capabilities.json";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LabelList } from "recharts";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
@@ -3517,7 +3517,7 @@ export function HelpPage({ isAdmin, user, displayName, groupId }: { isAdmin: boo
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>A quick guide to the basics. Tap the SCREEN selector at the top to move around.</div>
 
       {(() => {
-        const isTGC = groupId === TGC_GROUP_ID;
+        const isTGC = effectiveGroupId(groupId) === TGC_GROUP_ID;
         const edition = isTGC ? "tgc" : "club";
         const cards = (capabilities.cards as { title: string; body: string; editions: string[] }[])
           .filter((c) => c.editions.includes("all") || c.editions.includes(edition));

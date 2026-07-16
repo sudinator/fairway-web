@@ -35,6 +35,7 @@ import {
   computeBetting,
   DEFAULT_BET_SPLIT,
   TGC_GROUP_ID,
+  effectiveGroupId,
   type BetPlayer,
   type BetSplit,
   markerOwnsMyRow,
@@ -660,7 +661,7 @@ function CreateGame({
     if (resumedRef.current) return;
     if (!seed?.course || pickedFav || favorites.length === 0) return;
     const f = favorites.find((x) => x.name === seed.course);
-    if (f) { setPickedFav(f); setTeeIdx(defaultTeeIdx(f.tees, activeGroupId === TGC_GROUP_ID)); }
+    if (f) { setPickedFav(f); setTeeIdx(defaultTeeIdx(f.tees, effectiveGroupId(activeGroupId) === TGC_GROUP_ID)); }
   }, [seed, favorites, pickedFav, activeGroupId]);
   useEffect(() => {
     if (resumedRef.current) return;
@@ -1145,7 +1146,7 @@ function CreateGame({
             key={i}
             onClick={() => {
               setPickedFav(f);
-              setTeeIdx(defaultTeeIdx(f.tees, activeGroupId === TGC_GROUP_ID));
+              setTeeIdx(defaultTeeIdx(f.tees, effectiveGroupId(activeGroupId) === TGC_GROUP_ID));
             }}
             style={{
               display: "flex",
@@ -3189,10 +3190,10 @@ function GameRoom({
         <GameDatePicker current={(game as any).played_at ?? null} onSave={setGameDate} />
       )}
 
-      {roomTab === "play" && cleanSweepDone && (game as any)?.group_id === TGC_GROUP_ID && (game.game_type === "stableford" || game.game_type === "stroke") && (
+      {roomTab === "play" && cleanSweepDone && effectiveGroupId((game as any)?.group_id) === TGC_GROUP_ID && (game.game_type === "stableford" || game.game_type === "stroke") && (
         <SweepAchievedBanner name={cleanSweepDone.name} />
       )}
-      {roomTab === "play" && !cleanSweepDone && sweepWatch && (game as any)?.group_id === TGC_GROUP_ID && (game.game_type === "stableford" || game.game_type === "stroke") && (
+      {roomTab === "play" && !cleanSweepDone && sweepWatch && effectiveGroupId((game as any)?.group_id) === TGC_GROUP_ID && (game.game_type === "stableford" || game.game_type === "stroke") && (
         <CleanSweepBanner name={sweepWatch.name} val={sweepWatch.val} thru={sweepWatch.thru} unit={sweepWatch.unit} />
       )}
 
@@ -3819,7 +3820,7 @@ function GameRoom({
             />
           </div>
 
-          {(game as any)?.group_id === TGC_GROUP_ID && (
+          {effectiveGroupId((game as any)?.group_id) === TGC_GROUP_ID && (
             <BettingPanel
               players={players}
               playerPoints={playerPoints}
@@ -3913,7 +3914,7 @@ function GameRoom({
             showIndivDots={shapeOf(game).dotBasis !== "absolute"}
             matchMode={game.game_type === "match"}
             uncap={game.game_type === "stroke"}
-            showSixes={(game as any).group_id === TGC_GROUP_ID}
+            showSixes={effectiveGroupId((game as any).group_id) === TGC_GROUP_ID}
             strokeSixes={game.game_type === "stroke"}
             scoreLocked={myScoreLocked}
             lockedByName={mkName}

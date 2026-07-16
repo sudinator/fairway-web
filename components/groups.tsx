@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
-import { C } from "@/lib/golf";
+import { C, TGC_GROUP_ID, APP_TESTING_GROUP_ID, MIRROR_KEY, effectiveGroupId } from "@/lib/golf";
 import { btn, inputStyle, Eyebrow, Avatar } from "@/components/ui";
 import type { AppGroup } from "@/lib/groups";
 import { logActivity } from "@/lib/activity";
@@ -33,6 +33,29 @@ export function GroupSelector({ groups, activeGroupId, onChange }: { groups: App
           {groups.map((g) => <option key={g.id} value={g.id}>{g.name}{g.role === "admin" ? " ★" : ""}</option>)}
         </select>
       )}
+    </div>
+  );
+}
+
+function FeatureMirrorControl({ groups, activeGroupId }: { groups: AppGroup[]; activeGroupId: string | null }) {
+  if (activeGroupId !== APP_TESTING_GROUP_ID) return null;
+  const current = (typeof window !== "undefined" && (() => { try { return window.localStorage.getItem(MIRROR_KEY); } catch { return null; } })()) || "";
+  const effective = effectiveGroupId(APP_TESTING_GROUP_ID);
+  const targetName = effective === APP_TESTING_GROUP_ID ? "off (App Testing itself)" : effective === TGC_GROUP_ID ? "TGC" : (groups.find((g) => g.id === effective)?.name || "another club");
+  const setMirror = (v: string) => { try { window.localStorage.setItem(MIRROR_KEY, v); } catch {} window.location.reload(); };
+  const value = current || TGC_GROUP_ID; // default (unset) mirrors TGC
+  return (
+    <div style={{ background: "#2a2320", border: "1px solid #6b5e2e", borderRadius: 12, padding: "12px 14px", marginBottom: 16 }}>
+      <Eyebrow>TESTING · FEATURE MIRROR</Eyebrow>
+      <div style={{ color: "#e6cf8a", fontSize: 12.5, lineHeight: 1.5, marginBottom: 10 }}>App Testing is currently behaving like <b style={{ color: C.cream }}>{targetName}</b>. This makes tee times, live betting, and posting-to-Money work here so you can test without touching the real club&rsquo;s data.</div>
+      <select value={value} onChange={(e) => setMirror(e.target.value)} style={{ ...inputStyle, width: "100%" }}>
+        <option value={TGC_GROUP_ID}>Mirror: TGC (full workflow)</option>
+        {groups.filter((g) => g.id !== APP_TESTING_GROUP_ID && g.id !== TGC_GROUP_ID).map((g) => (
+          <option key={g.id} value={g.id}>Mirror: {g.name}</option>
+        ))}
+        <option value="__self__">Off — App Testing behaves as itself</option>
+      </select>
+      <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Per-device setting; changing it reloads the app. No data is copied or changed.</div>
     </div>
   );
 }
@@ -257,6 +280,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
 
   return (
     <div>
+      <FeatureMirrorControl groups={groups} activeGroupId={activeGroupId} />
       <Eyebrow>CLUBS</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
         Clubs keep games, players, and shared courses limited to the people in that club. Your personal dashboard still includes your own rounds across every club.
