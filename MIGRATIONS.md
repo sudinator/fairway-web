@@ -8,7 +8,7 @@ Regenerate after shipping (adds new files, keeps your ticks):
 
 Each release's DEPLOY_NOTES also flags any migration that must be run for that version.
 
-Total: 101 migrations. Unchecked = not yet confirmed applied.
+Total: 104 migrations. Unchecked = not yet confirmed applied.
 
 ## Checklist (oldest → newest)
 
@@ -113,3 +113,6 @@ Total: 101 migrations. Unchecked = not yet confirmed applied.
 - [ ] 0113_migration_ledger.sql
 - [ ] 0114_settlement_events.sql
 - [ ] 0115_settlement_frozen_event.sql
+- [ ] 0116_money_permissions.sql
+- [ ] 0117_settlement_dedup.sql
+- [ ] 0118_settlement_allocations.sql

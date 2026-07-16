@@ -518,14 +518,55 @@ export function withinEventDebts(
 }
 
 /** Per-bucket settled state from CONFIRMED, event-tagged settlements. */
+// Split a payment (from -> to, `amount` cents) across the specific expenses it clears, FIFO by expense
+// created_at. Scope = a single event (eventId) or all of the pair's obligations (eventId null, e.g. a
+// global "Settle up" transfer). Each expense gets the portion `from` owes `to` for it (from's share ×
+// to's paid fraction). Any amount that can't be mapped to an expense — e.g. a debt rerouted by debt
+// simplification, where `from` doesn't directly owe `to` — lands in a single general (null-expense) line.
+// The returned lines ALWAYS sum to `amount`, so record_settlement's invariant holds.
+export function allocateSettlement(
+  from: string, to: string, eventId: string | null, amount: Cents,
+  expenses: (Expense & { event_id?: string | null; created_at?: string })[],
+  shares: Share[], guests: Guest[], payers: Payer[] = [],
+): { expense_id: string | null; amount_cents: Cents }[] {
+  const gById: Record<string, Guest> = {};
+  for (const g of guests) gById[g.id] = g;
+  const scope = expenses.filter((e) => (eventId == null ? true : (e.event_id ?? null) === eventId));
+  const cand: { id: string; amt: Cents; at: string }[] = [];
+  for (const e of scope) {
+    const total = e.amount_cents; if (total <= 0) continue;
+    const ps = payers.filter((p) => p.expense_id === e.id);
+    let toPaid = 0;
+    if (ps.length) ps.forEach((p) => { if (resolveMember(p.user_id, p.guest_id, gById, p.sponsor_user_id) === to) toPaid += p.paid_cents; });
+    else if (e.payer_user_id === to) toPaid = total;
+    if (toPaid <= 0) continue;
+    let fromShare = 0;
+    for (const s of shares) if (s.expense_id === e.id && resolveMember(s.user_id, s.guest_id, gById, s.sponsor_user_id) === from) fromShare += s.share_cents;
+    if (fromShare <= 0) continue;
+    const attributable = Math.round((fromShare * toPaid) / total);
+    if (attributable > 0) cand.push({ id: e.id, amt: attributable, at: e.created_at || "" });
+  }
+  cand.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)); // FIFO — oldest first
+  const out: { expense_id: string | null; amount_cents: Cents }[] = [];
+  let remaining = amount;
+  for (const c of cand) {
+    if (remaining <= 0) break;
+    const take = Math.min(c.amt, remaining);
+    if (take > 0) { out.push({ expense_id: c.id, amount_cents: take }); remaining -= take; }
+  }
+  if (remaining > 0) out.push({ expense_id: null, amount_cents: remaining });
+  return out;
+}
+
 export function eventSettlement(input: {
   events: EventRow[];
   expenses: (Expense & { event_id?: string | null })[];
   shares: Share[]; payers: Payer[];
-  settlements: (Settlement & { event_id?: string | null; status?: string })[];
+  settlements: (Settlement & { id?: string; event_id?: string | null; status?: string })[];
   guests: Guest[];
+  allocations?: { settlement_id: string; expense_id: string | null; amount_cents: Cents }[];
 }): Record<string, EventSettleState> {
-  const { events, expenses, shares, payers, settlements, guests } = input;
+  const { events, expenses, shares, payers, settlements, guests, allocations } = input;
   const gById: Record<string, Guest> = {};
   for (const g of guests) gById[g.id] = g;
   const evById: Record<string, EventRow> = {};
@@ -544,13 +585,32 @@ export function eventSettlement(input: {
     noteDate(k, ms);
   }
 
-  // confirmed coverage per (bucket -> member -> paid)
+  // Confirmed coverage per (bucket -> member -> paid). Preferred source: settlement_allocations, which tie
+  // a payment to specific expenses — so coverage follows an expense's CURRENT event (moving an expense
+  // moves its coverage), and general (null-expense) allocations don't attribute to any event (global-square
+  // handles those). Legacy fallback (no allocations passed): the old event-tagged-settlement coverage.
   const cover: Record<string, Record<string, Cents>> = {};
-  for (const st of settlements) {
-    if ((st.status || "confirmed") !== "confirmed") continue;
-    const k = bkey(st.event_id);
-    (cover[k] || (cover[k] = {}));
-    cover[k][st.from_user_id] = (cover[k][st.from_user_id] || 0) + st.amount_cents;
+  if (allocations && allocations.length) {
+    const confSet = new Set(settlements.filter((s) => (s.status || "confirmed") === "confirmed").map((s) => s.id).filter(Boolean));
+    const stFrom: Record<string, string> = {};
+    for (const s of settlements) if (s.id) stFrom[s.id] = s.from_user_id;
+    const expBucket: Record<string, string> = {};
+    for (const e of expenses) expBucket[e.id] = bkey(e.event_id);
+    for (const a of allocations) {
+      if (!a.expense_id) continue;                 // general → global-square handles it
+      if (!confSet.has(a.settlement_id)) continue; // confirmed only
+      const from = stFrom[a.settlement_id]; if (!from) continue;
+      const k = expBucket[a.expense_id]; if (k == null) continue;
+      (cover[k] || (cover[k] = {}));
+      cover[k][from] = (cover[k][from] || 0) + a.amount_cents;
+    }
+  } else {
+    for (const st of settlements) {
+      if ((st.status || "confirmed") !== "confirmed") continue;
+      const k = bkey(st.event_id);
+      (cover[k] || (cover[k] = {}));
+      cover[k][st.from_user_id] = (cover[k][st.from_user_id] || 0) + st.amount_cents;
+    }
   }
 
   // Global net per member (CONFIRMED settlements only). A member who owes nothing overall

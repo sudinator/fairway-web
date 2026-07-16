@@ -2,7 +2,7 @@
 import {
   evenShares, validateCustomTotal, computeBalances, simplify, pairwiseDebts, aggregateOwed,
   payLink, nudgeSms, fmtUSD, guestOwedFor, guestCoverageBySponsor, betResultToPost,
-  collapseAuditBursts, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, eventSettlement, withinEventDebts,
+  collapseAuditBursts, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, eventSettlement, withinEventDebts, allocateSettlement,
 } from "./money";
 import type { Expense, Share, Settlement, Guest, Transfer, Payer, AuditRow } from "./money";
 
@@ -655,6 +655,43 @@ console.log("All assertions passed.");
     }
   }
   check(`fuzz: ${iterations} random ledgers, all invariants hold`, fuzzFails, 0);
+}
+
+
+// ---- settlement allocation (expense-level ledger) ----
+{
+  const exp = [
+    { id: "e1", event_id: "E", payer_user_id: "A", amount_cents: 6000, created_at: "2026-05-01T00:00:00Z" },
+    { id: "e2", event_id: "E", payer_user_id: "A", amount_cents: 4000, created_at: "2026-05-02T00:00:00Z" },
+  ];
+  const sh = [
+    { expense_id: "e1", user_id: "A", guest_id: null, share_cents: 3000 },
+    { expense_id: "e1", user_id: "B", guest_id: null, share_cents: 3000 },
+    { expense_id: "e2", user_id: "A", guest_id: null, share_cents: 2000 },
+    { expense_id: "e2", user_id: "B", guest_id: null, share_cents: 2000 },
+  ];
+  const alloc = allocateSettlement("B", "A", "E", 5000, exp as any, sh as any, [], []);
+  check("alloc sums to payment", alloc.reduce((s, a) => s + a.amount_cents, 0), 5000);
+  ok("alloc is FIFO (e1 first)", alloc[0].expense_id === "e1");
+  check("alloc e1 = B's $30 share", alloc[0].amount_cents, 3000);
+  ok("all alloc lines positive", alloc.every((a) => a.amount_cents > 0));
+
+  const alloc2 = allocateSettlement("B", "C", null, 5000, exp as any, sh as any, [], []);
+  ok("unmappable payment -> general (null) line", alloc2.length === 1 && alloc2[0].expense_id === null);
+  check("general line sums to payment", alloc2[0].amount_cents, 5000);
+
+  const st = [{ id: "s1", from_user_id: "B", to_user_id: "A", amount_cents: 5000, event_id: null, status: "confirmed" }];
+  const allocRows = alloc.map((a) => ({ settlement_id: "s1", expense_id: a.expense_id, amount_cents: a.amount_cents }));
+  const ev = [
+    { id: "E", group_id: "g", name: "E", event_date: "2026-05-01", event_type: "manual", status: "open" },
+    { id: "F", group_id: "g", name: "F", event_date: "2026-06-01", event_type: "manual", status: "open" },
+  ];
+  const before = eventSettlement({ events: ev as any, expenses: exp as any, shares: sh as any, payers: [], settlements: st as any, guests: [], allocations: allocRows });
+  ok("E settled via allocations", before["E"].settled);
+  const expMoved = exp.map((e) => (e.id === "e2" ? { ...e, event_id: "F" } : e));
+  const after = eventSettlement({ events: ev as any, expenses: expMoved as any, shares: sh as any, payers: [], settlements: st as any, guests: [], allocations: allocRows });
+  ok("after move: E still settled", after["E"].settled);
+  ok("after move: F settled (coverage followed the expense)", after["F"].settled);
 }
 
 console.log(`\n=== money.test ===\nPASS ${pass}  FAIL ${fail}`);

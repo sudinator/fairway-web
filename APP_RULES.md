@@ -106,6 +106,11 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
     `ci/check-bottom-sheets.py` (every bottom-docked panel must include env(safe-area-inset-bottom)).
     Standalone sheets clear the full nav bar (`calc(72px + safe)`); the nav's own overflow menu docks
     against it (`16px + safe`). New sheets should use `<BottomSheet>`. — manual
+18. **Every popup/menu needs a visible way to close it, and pop-up menus keep the nav visible.** Any
+    overlay must offer an explicit close control (a `×`, a "Close"/"Done" button) — backdrop-tap alone is
+    not enough (it's undiscoverable). Menus that extend the bottom nav (e.g. the "More" sheet) dock ABOVE
+    the nav (`bottom: navH`, the measured nav height) so the nav stays visible and usable underneath; they
+    don't cover it. Full-screen detail sheets may cover the screen but must have a visible Close. — manual
 14. **Every migration's full SQL is printed inline in chat** for copy-paste into the Supabase SQL editor,
     and tracked in `MIGRATIONS.md` (tick when run). — manual
 15. **Repo docs stay in sync each bundle:** DEPLOY_NOTES.md, SCHEMA.md, BACKLOG.md, README.md,

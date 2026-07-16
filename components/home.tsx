@@ -293,6 +293,16 @@ export function Home({ session }: { session: any }) {
   // position:fixed drifts during scroll and visualViewport reports the wrong height, so
   // layout-pinning the nav is the only reliable way to keep it glued to the bottom.
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Measured nav height so pop-up menus can sit ABOVE the nav (keeping it visible) instead of over it.
+  const navRef = useRef<HTMLElement>(null);
+  const [navH, setNavH] = useState(64);
+  useEffect(() => {
+    const el = navRef.current; if (!el) return;
+    const measure = () => setNavH(el.offsetHeight);
+    measure();
+    const ro = new ResizeObserver(measure); ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const index = profile?.handicap_index ?? null;
 
@@ -847,7 +857,7 @@ export function Home({ session }: { session: any }) {
       </div>
       {/* Bottom navigation bar — a normal flex child pinned at the bottom by layout (NOT
           position:fixed, which drifts in iOS home-screen PWAs). */}
-      <nav data-diag="nav" style={{
+      <nav ref={navRef} data-diag="nav" style={{
         flexShrink: 0, zIndex: 50,
         background: C.green, borderTop: `1px solid ${C.greenMid}`,
         display: "flex", justifyContent: "space-around", alignItems: "stretch",
@@ -886,13 +896,16 @@ export function Home({ session }: { session: any }) {
       {/* "More" sheet */}
       {moreOpen && (
         <>
-          <div onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 60 }} />
+          <div onClick={() => setMoreOpen(false)} style={{ position: "fixed", left: 0, right: 0, top: 0, bottom: navH, background: "rgba(0,0,0,0.4)", zIndex: 60 }} />
           <div style={{
-            position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 70,
+            position: "fixed", left: 0, right: 0, bottom: navH, zIndex: 70,
             background: C.greenLight, borderTopLeftRadius: 18, borderTopRightRadius: 18,
-            padding: "10px 12px calc(16px + env(safe-area-inset-bottom))",
+            padding: "6px 12px 12px", boxShadow: "0 -8px 30px rgba(0,0,0,.4)",
           }}>
-            <div style={{ width: 40, height: 4, background: C.greenMid, borderRadius: 2, margin: "6px auto 12px" }} />
+            <div style={{ display: "flex", alignItems: "center", padding: "2px 2px 8px" }}>
+              <span style={{ flex: 1, color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 700 }}>MORE</span>
+              <button onClick={() => setMoreOpen(false)} aria-label="Close menu" style={{ background: "none", border: "none", color: C.sage, fontSize: 22, lineHeight: 1, cursor: "pointer", padding: "0 4px" }}>×</button>
+            </div>
             {(() => {
               const more: { key: Tab; label: string; show: boolean }[] = [
                 { key: "money", label: "Money", show: !!activeGroup },

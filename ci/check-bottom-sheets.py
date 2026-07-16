@@ -33,8 +33,10 @@ for f in sorted(COMPONENTS.glob("*.tsx")):
     for i, line in enumerate(lines):
         if not is_panel(line):
             continue
-        window = " ".join(lines[i:i + 7])
-        if "env(safe-area-inset-bottom)" not in window:
+        window = " ".join(lines[max(0, i - 3):i + 7])
+        # Compliant if it reserves the bottom safe inset, OR it sits ABOVE the nav (docked at bottom:navH,
+        # so the always-visible nav — which already carries the safe inset — is between it and the edge).
+        if "env(safe-area-inset-bottom)" not in window and "bottom: navH" not in window:
             violations.append(f"{f.relative_to(ROOT)}:{i+1}  bottom sheet panel without env(safe-area-inset-bottom) (use <BottomSheet> or add it)")
 
 if violations:

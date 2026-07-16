@@ -3602,3 +3602,63 @@ already behave.
   unmark handler also pre-checks and tells the admin to reopen first. Reopen the event (existing admin
   control on the closed island) and Unmark returns.
 - **Run migration 0115** (after 0114). Confirm with `select id, applied_at from public.schema_migrations order by id;`.
+
+### 168.3.260715 — Money permission/lifecycle audit fixes · MIGRATION 0116
+Full audit of every Money write path against the permission model (who) and lifecycle model (open/closed,
+pending/confirmed). Findings + fixes:
+- **CRITICAL — confirm-on-return was silently blocked.** `settlements` had no UPDATE RLS policy, so the
+  pending→confirmed transition was denied by RLS with no error — armed payments never actually confirmed.
+  0116 adds an UPDATE policy (payer OR payee OR admin). The confirm handler now also checks the result and
+  surfaces a failure instead of silently swallowing it.
+- **Both parties can clear a line (your call).** Payee can now "Mark received", not just the payer "Mark
+  paid" (admin still can too) — two chances to settle a line item. (INSERT policy already allowed a party;
+  UI now exposes it to the payee.)
+- **Guest retire/un-retire is now creator-or-admin** (was any member). 0116 splits the guest RLS: any
+  member adds; only the guest's creator or an admin edits/retires/deletes. UI gates the buttons and shows
+  "added by X" otherwise. (Keys off group_guests.created_by; a guest's sponsor can still vary per expense.)
+- **A game bet posts to a FRESH event if the game's prior event was closed** (your call). Dropped the
+  one-event-per-game unique index; ensure_game_event now reuses the game's OPEN event or creates a new one.
+- **Non-issue confirmed:** group_pay_roster is a read-only, membership-checked handles lookup — no bulk-pay
+  bypass. Event creation stays open to any member (your call).
+- Recorded the full who-can-do-what matrix in MONEY_PERMISSIONS.md.
+- **Run migration 0116** (after 0115). Confirm with `select id, applied_at from public.schema_migrations order by id;`.
+
+### 168.4.260715 — More menu: visible close + keeps nav visible (no migration)
+- The "⋯ More" menu previously covered the bottom nav and could only be dismissed by tapping the (dim,
+  undiscoverable) backdrop. Now it docks ABOVE the nav (measured nav height via ResizeObserver), so the
+  nav stays visible and usable, and it has an explicit "MORE ×" header to close it.
+- Standing rule #18: every popup/menu needs a visible close control; nav-extension menus sit above the
+  (always-visible) nav. Bottom-sheet guard updated to recognize above-nav menus as compliant.
+No migration.
+
+### 168.5.260715 — one-confirmation-per-line (race-proof) · MIGRATION 0117 (includes 168.4 menu fix)
+- **Double-post fixed at the DB layer.** With both parties able to clear a line ("Mark paid" / "Mark
+  received"), two simultaneous confirmations could post twice and over-count. Migration 0117 adds a
+  `dedup_key` + unique index: the client stamps a stable key for the debt line (derived from pair + event
+  + how much is already confirmed-settled), so both parties compute the SAME key for the same line and the
+  DB rejects the second — guaranteed one confirmation per line even under an exact race. A genuinely new
+  later debt for the same pair carries a different key, so repeat settlements still work. Both settle paths
+  (arm-pending and mark) stamp the key and handle the unique-violation (23505) gracefully with a refresh.
+- **Void-of-settled-expense: confirmed correct, no change.** If an expense is voided after payment, the
+  payment stays and the payer is shown as owed a refund — which is the intended outcome.
+- **Run migration 0117** (after 0116).
+
+### 169.0.260715 — payments recorded at the expense level (stage 2) · MIGRATION 0118
+Settlements now carry expense-level allocation lines (the sub-ledger from the design doc). OVERALL BALANCES
+ARE UNCHANGED — they're still computed from payment totals; allocations only make per-event/per-expense
+attribution exact and traceable.
+- `lib/money.ts`: new `allocateSettlement` (FIFO split of a payment across the expenses it clears; unmapped
+  remainder — e.g. a simplify-rerouted debt — becomes a single general/null line so lines always sum to the
+  payment). `eventSettlement` now derives per-event coverage from allocations, so coverage FOLLOWS an
+  expense when it's moved between events (the original bug, now correct by construction). Global-square kept
+  as a fallback for general/historical (null-expense) allocations.
+- Writes: both settle paths (`recordSettlement`, `armSettle`) go through the atomic `record_settlement`
+  RPC (0118) — one payment header + its allocation lines in a single transaction, with the sum-check and
+  party/admin permission enforced server-side. No settlement is ever written without allocations.
+- Tests: +9 (allocator sums/FIFO/unmapped-remainder; allocation-based coverage; and the move-carries-
+  coverage proof). Money suite now 120 assertions, all passing. Overall-balance math untouched (the fuzzer's
+  conservation/reconciliation invariants still hold).
+- **Run migration 0118** (after 0117; run 0117 first if you haven't). It creates the sub-ledger, the RPC,
+  backfills history as general allocations, and self-aborts via a reconciliation gate if any payment's
+  allocations don't sum. Confirm with `select id, applied_at from public.schema_migrations order by id;`.
+No user-facing change except the move case is exact and payments are now traceable to expenses.
