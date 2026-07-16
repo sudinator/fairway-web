@@ -3814,3 +3814,10 @@ now go through effectiveGroupId. A "Feature mirror (testing)" control in Club se
 Testing) lets you point it at TGC, any other club, or off — per-device (localStorage), reloads on change,
 copies/changes no data. Server side is membership-gated throughout (tee_times RLS, bet→money inserts), so no
 server changes needed. No migration.
+
+### 171.1.260716 — mirror also sources the course library (no migration)
+Fix: when App Testing mirrors a club, the tee-time course dropdown (favorite_courses.group_id) and the
+game-creation course list (loadCoursesForGroup via group_courses) were still reading App Testing's own
+(empty) courses, so no courses showed. Both now read from effectiveGroupId, so mirroring TGC surfaces TGC's
+course library for tee times and games. Read-only lookups (RLS lets a member of the mirrored club read them);
+tee times / games / money still write to App Testing. No migration.

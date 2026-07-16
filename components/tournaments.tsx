@@ -588,7 +588,7 @@ function CreateGame({
   };
 
   useEffect(() => {
-    loadCoursesForGroup(supabase, activeGroupId).then((data) => {
+    loadCoursesForGroup(supabase, (effectiveGroupId(activeGroupId) as string)).then((data) => {
       if (data)
         setFavorites(
           data.map((f: any) => normalizeFavoriteCourse(f)),

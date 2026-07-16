@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
-import { C, courseHandicap } from "@/lib/golf";
+import { C, courseHandicap, effectiveGroupId } from "@/lib/golf";
 import { Avatar, btn, inputStyle, Eyebrow, FieldLabel } from "@/components/ui";
 import { loadFormDraft, saveFormDraft, clearFormDraft, draftAgeLabel } from "@/lib/form-draft";
 
@@ -93,7 +93,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
     } else setRsvps([]);
     const rpc = await supabase.rpc("group_roster", { p_group: activeGroupId });
     setMembers(((rpc.data as any[]) || []).map((m) => ({ id: m.id, display_name: m.display_name, avatar_url: m.avatar_url, handicap_index: m.handicap_index })));
-    const { data: fc } = await supabase.from("favorite_courses").select("name, data").eq("group_id", activeGroupId);
+    const { data: fc } = await supabase.from("favorite_courses").select("name, data").eq("group_id", effectiveGroupId(activeGroupId));
     const cmap: Record<string, { slope: number; rating: number; par: number }> = {};
     (fc || []).forEach((row: any) => {
       const d = row?.data || {};
@@ -595,7 +595,7 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from("favorite_courses").select("name").eq("group_id", groupId);
+      const { data } = await supabase.from("favorite_courses").select("name").eq("group_id", effectiveGroupId(groupId));
       const names = Array.from(new Set(((data as any[]) || []).map((c) => c.name).filter(Boolean)));
       setCourses(names);
     })();
