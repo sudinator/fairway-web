@@ -6,7 +6,7 @@ import { C } from "@/lib/golf";
 import { Avatar, btn, inputStyle, Eyebrow, FieldLabel } from "@/components/ui";
 import {
   computeBalances, simplify, pairwiseDebts, evenShares, validateCustomTotal, guestCoverageBySponsor,
-  fmtUSD, payLink, nudgeSms, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, eventSettlement, withinEventDebts, withinEventDebtsRemaining, allocateSettlement, eventStandings,
+  fmtUSD, payLink, nudgeSms, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, eventSettlement, withinEventDebts, withinEventDebtsRemaining, allocateSettlement, eventStandings, expenseImpact,
   type Expense, type Share, type Settlement, type Guest, type Payer,
   type AuditRow, type AuditVersion, type AuditSnapshot, type EventRow, type LedgerLine,
 } from "@/lib/money";
@@ -23,7 +23,8 @@ type PayerRow = Payer & { id?: string };
 const ini = (n: string) => n.split(/\s+/).map((w) => w[0] || "").join("").slice(0, 2).toUpperCase();
 
 export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: { id: string }; activeGroup: { id: string; name: string; role?: string }; onChanged?: () => void; initialTab?: "balances" | "add" | "settle" | "log" | null }) {
-  const [screen, setScreen] = useState<"balances" | "add" | "settle" | "log">(initialTab ?? "balances");
+  const [screen, setScreen] = useState<"balances" | "add" | "settle" | "log" | "untangle">(initialTab ?? "balances");
+  const [deletedExpenses, setDeletedExpenses] = useState<ExpenseRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState<Member[]>([]);
   const [guests, setGuests] = useState<GuestRow[]>([]);
@@ -62,7 +63,9 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
       profs = p2 || [];
     }
     const { data: gRows } = await supabase.from("group_guests").select("id, name, sponsor_user_id, group_id, archived, became_member_id, source_game_id, created_by").eq("group_id", gid);
-    const { data: exp } = await supabase.from("expenses").select("*").eq("group_id", gid).order("created_at", { ascending: false });
+    const { data: exp } = await supabase.from("expenses").select("*").eq("group_id", gid).is("deleted_at", null).order("created_at", { ascending: false });
+    const { data: delExp } = await supabase.from("expenses").select("*").eq("group_id", gid).not("deleted_at", "is", null).order("created_at", { ascending: false });
+    setDeletedExpenses((delExp || []) as ExpenseRow[]);
     const expIds = (exp || []).map((e: any) => e.id);
     const { data: sh } = expIds.length
       ? await supabase.from("expense_shares").select("*").in("expense_id", expIds)
@@ -241,6 +244,22 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     onChanged?.();
   }
 
+  const voidExpenseRow = async (d: ExpenseRow) => {
+    if (!requireOnline()) return;
+    setBusy(true);
+    const { error } = await supabase.from("expenses").update({ deleted_at: new Date().toISOString() }).eq("id", d.id);
+    if (error) { setBusy(false); alert("Couldn't void this expense — please try again."); return; }
+    await logActivity("expense_deleted", "voided \u201C" + (d.description || "expense") + "\u201D \u2014 " + fmtUSD(d.amount_cents), { expense_id: d.id, amount_cents: d.amount_cents });
+    setBusy(false); await load();
+  };
+  const restoreExpense = async (d: ExpenseRow) => {
+    if (!requireOnline()) return;
+    setBusy(true);
+    const { error } = await supabase.from("expenses").update({ deleted_at: null }).eq("id", d.id);
+    if (error) { setBusy(false); alert("Couldn't restore this expense — please try again."); return; }
+    await logActivity("expense_restored", "restored \u201C" + (d.description || "expense") + "\u201D \u2014 " + fmtUSD(d.amount_cents), { expense_id: d.id, amount_cents: d.amount_cents });
+    setBusy(false); await load();
+  };
   async function deleteSettlement(s2: SettlementRow) {
     if (!requireOnline()) return;
     const ev = s2.event_id ? events.find((e) => e.id === s2.event_id) : null;
@@ -317,6 +336,11 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
         <BalancesScreen members={members} guests={guests} shares={shares} payers={payers} balances={balances} me={user.id} groupName={activeGroup.name}
           onOpenLedger={(mid) => setLedgerFor(mid)}
           onNudge={(m, owe) => { const link = "https://birdienumnum.vercel.app"; if (m.phone) window.location.href = nudgeSms(m.phone, m.display_name, owe, activeGroup.name, link); }} />
+        {isAdmin && (
+          <button onClick={() => setScreen("untangle")} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginTop: 12, background: "#123528", border: `1px solid ${C.greenMid}`, borderRadius: 12, padding: "11px 13px", color: C.sage, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+            <span style={{ fontSize: 15 }}>&#9874;</span> Untangle payments <span style={{ marginLeft: "auto", color: C.faint, fontWeight: 500, fontSize: 11.5 }}>admin · fix an entry</span>
+          </button>
+        )}
         <GuestManager guests={guests} members={members} busy={busy} me={user.id} isAdmin={isAdmin} onRetire={retireGuest} onUnretire={unretireGuest} />
         </>
       )}
@@ -326,7 +350,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
           openEvents={events.filter((e) => e.status === "open")} onCreateEvent={createEvent}
           editing={editing} editShares={editing ? shares.filter((s) => s.expense_id === editing.id) : []} editPayers={editing ? payers.filter((p) => p.expense_id === editing.id) : []} editHistory={editing ? activity.filter((a) => a?.meta?.expense_id === editing.id && (a.action === "expense_created" || a.action === "expense_edited")) : []} onLog={logActivity}
           canDelete={!!editing && (editing.created_by === user.id || isAdmin)}
-          onDelete={async () => { if (!editing) return; const d = editing; setBusy(true); const { error } = await supabase.from("expenses").delete().eq("id", d.id); if (error) { setBusy(false); alert("Couldn't void this expense — please try again."); return; } await logActivity("expense_deleted", "voided “" + (d.description || "expense") + "” — " + fmtUSD(d.amount_cents), { expense_id: d.id, amount_cents: d.amount_cents }); setBusy(false); setEditing(null); await load(); setScreen("balances"); }}
+          onDelete={async () => { if (!editing) return; const d = editing; setBusy(true); const { error } = await supabase.from("expenses").update({ deleted_at: new Date().toISOString() }).eq("id", d.id); if (error) { setBusy(false); alert("Couldn't void this expense — please try again."); return; } await logActivity("expense_deleted", "voided “" + (d.description || "expense") + "” — " + fmtUSD(d.amount_cents), { expense_id: d.id, amount_cents: d.amount_cents }); setBusy(false); setEditing(null); await load(); setScreen("balances"); }}
           onAddGuest={async (name) => {
             if (!requireOnline()) return;
             const { data, error } = await supabase.from("group_guests").insert({ group_id: gid, name, archived: false, created_by: user.id }).select("id, name, sponsor_user_id, group_id, archived, became_member_id").single();
@@ -341,6 +365,13 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
           settlements={settlements} onUnmark={deleteSettlement}
           closedEventIds={new Set(events.filter((e) => e.status === "closed").map((e) => e.id))}
           onPay={startPay} onZelle={startZelle} onMark={(t) => recordSettlement(t.from, t.to, t.amt, "cash")} />
+      )}
+      {screen === "untangle" && isAdmin && (
+        <AdminUntangle members={members} expenses={expenses} deletedExpenses={deletedExpenses} shares={shares} payers={payers}
+          settlements={settlements} allocations={allocations} guests={guests} events={events}
+          activity={activity} memberById={memberById} busy={busy}
+          onVoidExpense={voidExpenseRow} onRestoreExpense={restoreExpense} onUnmarkSettlement={deleteSettlement}
+          onEditExpense={(e) => { setEditing(e); setScreen("add"); }} onBack={() => setScreen("balances")} />
       )}
       {screen === "log" && <ActivityLog activity={activity} memberById={memberById}
         onOpenExpense={(id) => {
@@ -540,6 +571,130 @@ function BalancesScreen({ members, guests, shares, payers, balances, me, onNudge
 }
 
 // ---------------- Settle up ----------------
+function AdminUntangle({ members, expenses, deletedExpenses, shares, payers, settlements, allocations, guests, events, activity, memberById, busy, onVoidExpense, onRestoreExpense, onUnmarkSettlement, onEditExpense, onBack }: {
+  members: Member[]; expenses: ExpenseRow[]; deletedExpenses: ExpenseRow[]; shares: ShareRow[]; payers: PayerRow[];
+  settlements: SettlementRow[]; allocations: { settlement_id: string; expense_id: string | null; amount_cents: number }[];
+  guests: GuestRow[]; events: EventRow[]; activity: any[]; memberById: Record<string, Member>; busy: boolean;
+  onVoidExpense: (e: ExpenseRow) => Promise<void>; onRestoreExpense: (e: ExpenseRow) => Promise<void>;
+  onUnmarkSettlement: (s: SettlementRow) => void; onEditExpense: (e: ExpenseRow) => void; onBack: () => void;
+}) {
+  const nameOf = (uid: string | null) => (uid ? (memberById[uid]?.display_name || "someone") : "someone");
+  const evName = (id: string | null) => (id ? (events.find((e) => e.id === id)?.name || "Event") : "Ungrouped");
+  const confirmed = useMemo(() => settlements.filter((s) => (s.status || "confirmed") === "confirmed"), [settlements]);
+  const balances = useMemo(() => computeBalances(expenses as any, shares as any, confirmed as any, guests as any, payers as any), [expenses, shares, confirmed, guests, payers]);
+  const sum = Object.values(balances).reduce((a, b) => a + b, 0);
+  const conserves = sum === 0;
+  const ranked = useMemo(() => [...members].sort((a, b) => Math.abs(balances[b.id] || 0) - Math.abs(balances[a.id] || 0)), [members, balances]);
+  const [sel, setSel] = useState(ranked[0]?.id || members[0]?.id || "");
+  const [pending, setPending] = useState<null | { impact: Record<string, number>; title: string; subtitle: string; label: string; danger?: boolean; run: () => void }>(null);
+  const [restoreId, setRestoreId] = useState<string | null>(null);
+  const netColor = (v: number) => (v > 0 ? "#7fd6a3" : v < 0 ? "#ef9d90" : C.sage);
+
+  const shareOfIn = (expId: string, m: string) => shares.filter((s) => s.expense_id === expId && (s.user_id === m || s.sponsor_user_id === m)).reduce((a, s) => a + s.share_cents, 0);
+  const paidOfIn = (e: ExpenseRow, m: string) => { const py = payers.filter((p) => p.expense_id === e.id); if (py.length) return py.filter((p) => p.user_id === m).reduce((a, p) => a + p.paid_cents, 0); return e.payer_user_id === m ? e.amount_cents : 0; };
+  const voidImpact = (e: ExpenseRow) => {
+    const sh = shares.filter((s) => s.expense_id === e.id).map((s) => ({ member: (s.user_id || s.sponsor_user_id || "") as string, cents: s.share_cents })).filter((x) => x.member);
+    const pyRows = payers.filter((p) => p.expense_id === e.id);
+    const pd = pyRows.length ? pyRows.map((p) => ({ member: (p.user_id || "") as string, cents: p.paid_cents })).filter((x) => x.member) : [{ member: e.payer_user_id, cents: e.amount_cents }];
+    return expenseImpact(sh, pd, [], []);
+  };
+
+  type Row = { kind: "exp" | "settle"; at: string; label: string; sub: string; delta: number; exp?: ExpenseRow; s?: SettlementRow };
+  const rows: Row[] = [];
+  for (const e of expenses) { const sh = shareOfIn(e.id, sel); const pd = paidOfIn(e, sel); if (sh === 0 && pd === 0) continue; rows.push({ kind: "exp", at: e.created_at, label: e.description || "expense", sub: evName(e.event_id ?? null) + " \u00B7 paid by " + nameOf(e.payer_user_id), delta: pd - sh, exp: e }); }
+  for (const st of confirmed) { if (st.from_user_id !== sel && st.to_user_id !== sel) continue; const out = st.from_user_id === sel; rows.push({ kind: "settle", at: st.created_at || "", label: out ? "Paid " + nameOf(st.to_user_id) : "Received from " + nameOf(st.from_user_id), sub: (st.method || "cash") as string, delta: out ? st.amount_cents : -st.amount_cents, s: st }); }
+  rows.sort((a, b) => (a.at || "").localeCompare(b.at || ""));
+  let run = 0;
+
+  const money = activity.filter((a) => a && ["expense_created", "expense_edited", "expense_deleted", "expense_restored", "settlement_added", "settlement_removed"].includes(a.action)).slice(0, 12);
+  const actBtn: React.CSSProperties = { padding: "5px 10px", borderRadius: 8, fontSize: 11.5, fontWeight: 800, cursor: "pointer" };
+
+  return (
+    <div style={{ maxWidth: 860, margin: "0 auto" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.greenMid}`, borderRadius: 9, color: C.sage, fontSize: 12.5, padding: "6px 11px", cursor: "pointer" }}>&#8592; Back</button>
+        <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Untangle payments</div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 8, background: conserves ? "#0f3529" : "#3a2320", border: `1px solid ${conserves ? C.greenMid : "#8a3b34"}`, borderRadius: 11, padding: "9px 12px", marginBottom: 12 }}>
+        <span style={{ fontSize: 15, color: conserves ? "#7fd6a3" : "#ef9d90" }}>{conserves ? "\u2713" : "\u26A0"}</span>
+        <span style={{ color: C.cream, fontSize: 12.5 }}>{conserves ? "Balances reconcile \u2014 the club nets to $0.00" : `Balances are off by ${fmtUSD(Math.abs(sum))} \u2014 investigate below`}</span>
+      </div>
+
+      <div style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 4, marginBottom: 12 }}>
+        {ranked.map((m) => { const v = balances[m.id] || 0; const on = m.id === sel; return (
+          <button key={m.id} onClick={() => setSel(m.id)} style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2, background: on ? C.gold : "#123528", border: on ? "none" : `1px solid ${C.greenMid}`, borderRadius: 10, padding: "7px 11px", cursor: "pointer", minWidth: 92 }}>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: on ? "#2a2410" : C.cream }}>{m.display_name}</span>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: on ? "#5a4a12" : netColor(v) }}>{v === 0 ? "square" : (v > 0 ? "gets " : "owes ") + fmtUSD(Math.abs(v))}</span>
+          </button>
+        ); })}
+      </div>
+
+      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 8 }}>{memberById[sel]?.display_name}&rsquo;s ledger &middot; {rows.length} entries &middot; running balance ends at {fmtUSD(balances[sel] || 0)}</div>
+      {rows.length === 0 && <div style={{ color: C.faint, fontSize: 12.5, padding: "16px 0", textAlign: "center" }}>No expenses or payments for this member.</div>}
+
+      {rows.map((r, i) => {
+        run += r.delta;
+        return (
+          <div key={i} style={{ background: "#173a2c", borderRadius: 12, padding: "10px 12px", marginTop: 8 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+              <span style={{ flex: 1, color: C.cream, fontSize: 13 }}>{r.kind === "settle" ? <span style={{ color: C.sage }}>&#8599; </span> : null}{r.label}</span>
+              <span style={{ color: r.delta >= 0 ? "#7fd6a3" : "#ef9d90", fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 14 }}>{r.delta >= 0 ? "+" : "\u2212"}{fmtUSD(Math.abs(r.delta))}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
+              <span style={{ color: C.faint, fontSize: 11 }}>{r.sub}</span>
+              <span style={{ color: C.sage, fontSize: 11 }}>running {fmtUSD(run)}</span>
+            </div>
+            <div style={{ display: "flex", gap: 7, marginTop: 9, justifyContent: "flex-end" }}>
+              {r.kind === "exp" && r.exp && (<>
+                <button disabled={busy} onClick={() => onEditExpense(r.exp!)} style={{ ...actBtn, border: `1px solid ${C.greenMid}`, background: "transparent", color: C.sage }}>Edit</button>
+                <button disabled={busy} onClick={() => { const e = r.exp!; setPending({ impact: voidImpact(e), title: "Void \u201C" + (e.description || "expense") + "\u201D?", subtitle: "Removes it from everyone's balances. Reversible \u2014 you can restore it below.", label: "Confirm void", danger: true, run: () => onVoidExpense(e) }); }} style={{ ...actBtn, border: "1px solid #8a3b34", background: "transparent", color: "#ef9d90" }}>Void</button>
+              </>)}
+              {r.kind === "settle" && r.s && (
+                <button disabled={busy} onClick={() => { const st = r.s!; setPending({ impact: { [st.from_user_id]: -st.amount_cents, [st.to_user_id]: st.amount_cents }, title: "Unmark this payment?", subtitle: "Puts the debt back on the books.", label: "Confirm unmark", danger: true, run: () => onUnmarkSettlement(st) }); }} style={{ ...actBtn, border: "1px solid #8a3b34", background: "transparent", color: "#ef9d90" }}>Unmark</button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+
+      {deletedExpenses.length > 0 && (
+        <div style={{ marginTop: 16, background: "#2a2320", border: "1px solid #6b5e2e", borderRadius: 12, padding: "10px 12px" }}>
+          <Eyebrow>Voided expenses</Eyebrow>
+          {deletedExpenses.map((e) => (
+            <div key={e.id} style={{ padding: "7px 0", borderTop: `1px solid #4a4020` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                <span style={{ color: C.cream, fontSize: 12.5 }}>{e.description || "expense"} &middot; {fmtUSD(e.amount_cents)}</span>
+                {restoreId === e.id
+                  ? <span style={{ display: "flex", gap: 6 }}><button disabled={busy} onClick={async () => { setRestoreId(null); await onRestoreExpense(e); }} style={{ ...actBtn, background: "#7fd6a3", color: C.green, border: "none" }}>Confirm</button><button disabled={busy} onClick={() => setRestoreId(null)} style={{ ...actBtn, background: "transparent", color: C.sage, border: `1px solid ${C.greenMid}` }}>Cancel</button></span>
+                  : <button disabled={busy} onClick={() => setRestoreId(e.id)} style={{ ...actBtn, background: "transparent", color: "#e6cf8a", border: "1px solid #6b5e2e" }}>Restore</button>}
+              </div>
+              {restoreId === e.id && <div style={{ color: "#e6cf8a", fontSize: 11, marginTop: 4 }}>Restores it to everyone's balances exactly as it was.</div>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ marginTop: 16, background: "#0f2a20", border: `1px solid ${C.greenMid}`, borderRadius: 12, padding: "10px 12px" }}>
+        <Eyebrow>Audit log</Eyebrow>
+        {money.length === 0 && <div style={{ color: C.faint, fontSize: 12 }}>No money changes recorded yet.</div>}
+        {money.map((a, i) => (
+          <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "5px 0", borderTop: i ? `1px solid #123528` : "none" }}>
+            <span style={{ color: C.cream, fontSize: 12 }}>{a.summary || a.action}</span>
+            <span style={{ color: C.faint, fontSize: 11, whiteSpace: "nowrap" }}>{nameOf(a.actor_user_id || null)}</span>
+          </div>
+        ))}
+      </div>
+
+      {pending && (
+        <ImpactModal title={pending.title} subtitle={pending.subtitle} impact={pending.impact} nameOf={(id) => (memberById[id]?.display_name || "someone")}
+          busy={busy} confirmLabel={pending.label} danger={pending.danger}
+          onCancel={() => setPending(null)} onConfirm={() => { const p = pending; setPending(null); p.run(); }} />
+      )}
+    </div>
+  );
+}
+
 function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simplifyOn, canToggle, onToggle, settlements, onUnmark, closedEventIds, onPay, onZelle, onMark }: {
   transfers: { from: string; to: string; amt: number }[]; nameOf: (id: string) => string;
   memberById: Record<string, Member>; busy: boolean; me: string; isAdmin: boolean;
@@ -550,6 +705,9 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
   onMark: (t: { from: string; to: string; amt: number }) => void;
 }) {
   const segBtn = (on: boolean): React.CSSProperties => ({ flex: 1, border: "none", background: on ? C.gold : "transparent", color: on ? "#2a2410" : C.sage, borderRadius: 999, padding: "7px 6px", fontSize: 12, fontWeight: 800, cursor: "pointer" });
+  const [confirm, setConfirm] = useState<null | { kind: "mark" | "unmark"; t?: { from: string; to: string; amt: number }; s?: SettlementRow; impact: Record<string, number>; label: string }>(null);
+  const askMark = (t: { from: string; to: string; amt: number }) => setConfirm({ kind: "mark", t, impact: { [t.from]: t.amt, [t.to]: -t.amt }, label: "Confirm payment" });
+  const askUnmark = (s2: SettlementRow) => setConfirm({ kind: "unmark", s: s2, impact: { [s2.from_user_id]: -s2.amount_cents, [s2.to_user_id]: s2.amount_cents }, label: "Confirm unmark" });
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Settle up</div>
@@ -582,7 +740,7 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
                   {isMine && to?.zelle_handle && <button disabled={busy} onClick={() => onZelle(t)} style={{ flex: "1 1 68px", border: "none", borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#6D1ED4", color: "#fff" }}>Zelle</button>}
                   {isMine && !to?.venmo_handle && !to?.paypal_handle && !to?.zelle_handle && <span style={{ flex: 1, color: C.sage, fontSize: 11 }}>no handle on file — pay cash</span>}
                   {canMark
-                    ? <button disabled={busy} onClick={() => onMark(t)} style={{ flex: "1 1 68px", border: `1px solid ${C.line}`, borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: C.cream, color: C.green }}>{isMine ? "Mark paid" : isPayee ? "Mark received" : "Mark paid (admin)"}</button>
+                    ? <button disabled={busy} onClick={() => askMark(t)} style={{ flex: "1 1 68px", border: `1px solid ${C.line}`, borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: C.cream, color: C.green }}>{isMine ? "Mark paid" : isPayee ? "Mark received" : "Mark paid (admin)"}</button>
                     : <span style={{ flex: 1, color: C.faint, fontSize: 11.5, textAlign: "right" }}>Only {nameOf(t.from)} or {nameOf(t.to)} can mark this</span>}
                 </div>
               );
@@ -602,7 +760,7 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
                   <div style={{ color: C.cream, fontSize: 13 }}><b>{nameOf(s2.from_user_id)}</b> paid <b>{nameOf(s2.to_user_id)}</b> {fmtUSD(s2.amount_cents)}</div>
                   <div style={{ color: C.faint, fontSize: 11 }}>{s2.method || "cash"}{s2.created_at ? " · " + new Date(s2.created_at).toLocaleDateString() : ""}</div>
                 </div>
-                {canUndo && !inClosed && <button disabled={busy} onClick={() => onUnmark(s2)} style={{ border: `1px solid ${C.line}`, background: "transparent", color: C.sage, borderRadius: 8, padding: "6px 10px", fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>Unmark</button>}
+                {canUndo && !inClosed && <button disabled={busy} onClick={() => askUnmark(s2)} style={{ border: `1px solid ${C.line}`, background: "transparent", color: C.sage, borderRadius: 8, padding: "6px 10px", fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>Unmark</button>}
                 {canUndo && inClosed && <span style={{ color: C.faint, fontSize: 11, whiteSpace: "nowrap" }}>{"\uD83D\uDD12"} closed</span>}
               </div>
             );
@@ -610,12 +768,48 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
           <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Unmark reverses a payment and recomputes balances. Admins can unmark any; you can unmark ones you recorded.</div>
         </>
       )}
+      {confirm && (
+        <ImpactModal title={confirm.kind === "unmark" ? "Unmark this payment?" : "Record this payment?"}
+          subtitle={confirm.kind === "unmark" ? "Puts the debt back on the books." : "Marks it settled and credits it across the shared expenses."}
+          impact={confirm.impact} nameOf={nameOf} busy={busy} confirmLabel={confirm.label} danger={confirm.kind === "unmark"}
+          onCancel={() => setConfirm(null)}
+          onConfirm={() => { const c = confirm; setConfirm(null); if (c.kind === "mark" && c.t) onMark(c.t); else if (c.kind === "unmark" && c.s) onUnmark(c.s); }} />
+      )}
     </div>
   );
 }
 
 // ---------------- Add / Edit expense ----------------
 type Party = { kind: "member" | "guest"; id: string; name: string; avatar_url?: string | null; sponsor?: string };
+
+function ImpactModal({ title, subtitle, impact, nameOf, busy, confirmLabel, danger, onConfirm, onCancel }: {
+  title: string; subtitle?: string; impact: Record<string, number>; nameOf: (id: string) => string;
+  busy: boolean; confirmLabel: string; danger?: boolean; onConfirm: () => void; onCancel: () => void;
+}) {
+  const rows = Object.entries(impact).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  return (
+    <div onClick={onCancel} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.66)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 90 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px", paddingBottom: "calc(20px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 520, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
+        <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>{title}</div>
+        {subtitle && <div style={{ color: C.sage, fontSize: 12.5, marginTop: 4, lineHeight: 1.5 }}>{subtitle}</div>}
+        <div style={{ marginTop: 12 }}>
+          {rows.length === 0 && <div style={{ color: C.faint, fontSize: 12.5 }}>No change to anyone's balance.</div>}
+          {rows.map(([id, v]) => (
+            <div key={id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderTop: `1px solid #123528` }}>
+              <span style={{ color: C.cream, fontSize: 13 }}>{nameOf(id)}</span>
+              <span style={{ color: v >= 0 ? "#7fd6a3" : "#ef9d90", fontWeight: 800, fontSize: 13.5, fontFamily: "Georgia, serif" }}>{v >= 0 ? "+" : "\u2212"}{fmtUSD(Math.abs(v))}</span>
+            </div>
+          ))}
+        </div>
+        {rows.length > 0 && <div style={{ color: C.faint, fontSize: 11, marginTop: 8, lineHeight: 1.5 }}>+ their balance rises (owed more / owes less) &middot; &minus; their balance falls. Always nets to $0 across the club.</div>}
+        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+          <button disabled={busy} onClick={onConfirm} style={{ ...btn(true), flex: 1, background: danger ? "#d98b80" : "#7fd6a3", color: danger ? "#3a1712" : C.green }}>{confirmLabel}</button>
+          <button disabled={busy} onClick={onCancel} style={{ ...btn(false), flex: 0, padding: "10px 18px" }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, onAddGuest, onSaved, openEvents, onCreateEvent, editing, editShares, editPayers, editHistory, onLog, canDelete, onDelete }: {
   user: { id: string }; gid: string; members: Member[]; guests: GuestRow[]; busy: boolean; setBusy: (b: boolean) => void;
@@ -678,8 +872,20 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
 
   const toggle = (p: Party) => { const k = keyOf(p); const n = new Set(checked); n.has(k) ? n.delete(k) : n.add(k); setChecked(n); };
 
-  async function save() {
+  const [pendingConfirm, setPendingConfirm] = useState<null | { mode: "save" | "void"; impact: Record<string, number>; label: string }>(null);
+  const impactName = (id: string) => members.find((mm) => mm.id === id)?.display_name || "someone";
+  const buildImpact = (voiding: boolean) => {
+    const afterShares = voiding ? [] : selected.map((p) => ({ member: p.kind === "member" ? p.id : (guestSponsors[p.id] || ""), cents: shareOf(p) })).filter((x) => x.member);
+    const afterPaid = voiding ? [] : paidPayers.map((uid) => ({ member: uid, cents: multiPayer ? centsOf(payerAmt[uid]) : amtCents }));
+    const beforeShares = editing ? (editShares || []).map((sr) => ({ member: (sr.user_id || sr.sponsor_user_id || "") as string, cents: sr.share_cents })).filter((x) => x.member) : [];
+    const beforePaid = editing ? (editPayers || []).map((pr) => ({ member: (pr.user_id || "") as string, cents: pr.paid_cents })).filter((x) => x.member) : [];
+    return expenseImpact(beforeShares, beforePaid, afterShares, afterPaid);
+  };
+  const save = () => { if (!requireOnline() || !canSave) return; setPendingConfirm({ mode: "save", impact: buildImpact(false), label: editing ? "Confirm changes" : "Confirm & add" }); };
+  const askVoid = () => { if (!requireOnline()) return; setPendingConfirm({ mode: "void", impact: buildImpact(true), label: "Confirm void" }); };
+  async function commit() {
     if (!requireOnline() || !canSave) return;
+    setPendingConfirm(null);
     setBusy(true);
     const primaryPayer = paidPayers[0];
     const payload = { payer_user_id: primaryPayer, description: desc.trim(), amount_cents: amtCents, split_type: mode, event_id: eventId };
@@ -845,8 +1051,15 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
 
       <button disabled={!canSave} onClick={save} style={{ ...btn(true), marginTop: 14, opacity: canSave ? 1 : 0.5 }}>{editing ? "Save changes" : "Add expense"}</button>
       {editing && canDelete && (
-        <button disabled={busy} onClick={async () => { if (!requireOnline()) return; if (!window.confirm("Void this expense? It's removed from everyone's balances, but the record stays in the activity log for the audit trail.")) return; setBusy(true); await onDelete?.(); }}
+        <button disabled={busy} onClick={askVoid}
           style={{ ...btn(false), marginTop: 8, color: C.birdie, borderColor: C.birdie }}>Void expense</button>
+      )}
+      {pendingConfirm && (
+        <ImpactModal title={pendingConfirm.mode === "void" ? "Void “" + (desc.trim() || editing?.description || "expense") + "”?" : (editing ? "Save these changes?" : "Add this expense?")}
+          subtitle={pendingConfirm.mode === "void" ? "Removes it from everyone's balances (kept in the audit log)." : "Here's how it changes each person's balance."}
+          impact={pendingConfirm.impact} nameOf={impactName} busy={busy} confirmLabel={pendingConfirm.label} danger={pendingConfirm.mode === "void"}
+          onCancel={() => setPendingConfirm(null)}
+          onConfirm={async () => { if (pendingConfirm.mode === "void") { setPendingConfirm(null); setBusy(true); await onDelete?.(); } else { await commit(); } }} />
       )}
       {editing && (editHistory || []).length > 0 && (
         <div style={{ marginTop: 16, borderTop: `1px solid ${C.greenMid}`, paddingTop: 12 }}>

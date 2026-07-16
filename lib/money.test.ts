@@ -2,7 +2,7 @@
 import {
   evenShares, validateCustomTotal, computeBalances, simplify, pairwiseDebts, aggregateOwed,
   payLink, nudgeSms, fmtUSD, guestOwedFor, guestCoverageBySponsor, betResultToPost,
-  collapseAuditBursts, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, eventSettlement, withinEventDebts, withinEventDebtsRemaining, eventStandings, allocateSettlement,
+  collapseAuditBursts, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, eventSettlement, withinEventDebts, withinEventDebtsRemaining, eventStandings, expenseImpact, allocateSettlement,
 } from "./money";
 import type { Expense, Share, Settlement, Guest, Transfer, Payer, AuditRow } from "./money";
 
@@ -817,6 +817,28 @@ console.log("All assertions passed.");
   ok("remaining is owed to Monica", rem.length === 1 && rem[0].to === "monica");
   // and raw withinEventDebts (no payments) would have been 188.75 — proving the difference
   check("raw within-event debt was 188.75", withinEventDebts("F", "amit", exp as any, sh as any, [], pay as any).reduce((a, r) => a + r.amount, 0), 18875);
+}
+
+
+// ---- expenseImpact: preview deltas for add / edit / void ----
+{
+  // ADD a $60 expense, 3-way ($20 each), A paid all. Impact: A +40, B -20, C -20 (sums 0).
+  const addI = expenseImpact([], [], [{member:"A",cents:2000},{member:"B",cents:2000},{member:"C",cents:2000}], [{member:"A",cents:6000}]);
+  check("add: A net +40", addI["A"], 4000);
+  check("add: B net -20", addI["B"], -2000);
+  check("add: C net -20", addI["C"], -2000);
+  check("add: sums to 0", (addI["A"]||0)+(addI["B"]||0)+(addI["C"]||0), 0);
+  // VOID that same expense: exact inverse.
+  const voidI = expenseImpact([{member:"A",cents:2000},{member:"B",cents:2000},{member:"C",cents:2000}], [{member:"A",cents:6000}], [], []);
+  check("void: A net -40", voidI["A"], -4000);
+  check("void: B net +20", voidI["B"], 2000);
+  check("void: sums to 0", (voidI["A"]||0)+(voidI["B"]||0)+(voidI["C"]||0), 0);
+  // EDIT: was A paid 60 split 3-way; now B pays 60 split 2-way (A,B). Only the diff shows.
+  const editI = expenseImpact(
+    [{member:"A",cents:2000},{member:"B",cents:2000},{member:"C",cents:2000}], [{member:"A",cents:6000}],
+    [{member:"A",cents:3000},{member:"B",cents:3000}], [{member:"B",cents:6000}]);
+  check("edit: C drops out => +20", editI["C"], 2000);
+  check("edit: sums to 0", (editI["A"]||0)+(editI["B"]||0)+(editI["C"]||0), 0);
 }
 
 console.log(`\n=== money.test ===\nPASS ${pass}  FAIL ${fail}`);

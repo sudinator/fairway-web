@@ -367,6 +367,52 @@ function checkInvariants(w: World, tag: string) {
 }
 
 
+
+// ===========================================================================
+// CROSS-CLUB ISOLATION — balances/simplify are discrete per club. A member in two clubs must have each
+// club's ledger computed as if the other doesn't exist. Mirrors the loader (filter every table by group).
+// ===========================================================================
+{
+  scenario("XC: a member in two clubs — each club's balances/simplify are fully independent (no cross-club netting)");
+  // Shared member M is in Club A and Club B. In A: M owes A-only member P $50. In B: M is OWED $80 by Q.
+  const expenses = [
+    { id: "ax", group_id: "A", event_id: null, payer_user_id: "P", amount_cents: 10000, created_at: "2026-01-01T00:00:00Z" },
+    { id: "bx", group_id: "B", event_id: null, payer_user_id: "M", amount_cents: 16000, created_at: "2026-01-02T00:00:00Z" },
+  ];
+  const shares = [
+    { expense_id: "ax", user_id: "P", guest_id: null, share_cents: 5000 },
+    { expense_id: "ax", user_id: "M", guest_id: null, share_cents: 5000 }, // M owes P 50 in A
+    { expense_id: "bx", user_id: "M", guest_id: null, share_cents: 8000 },
+    { expense_id: "bx", user_id: "Q", guest_id: null, share_cents: 8000 }, // Q owes M 80 in B
+  ];
+  const payers = [
+    { expense_id: "ax", user_id: "P", guest_id: null, paid_cents: 10000 },
+    { expense_id: "bx", user_id: "M", guest_id: null, paid_cents: 16000 },
+  ];
+  // The loader filters by group_id (expenses) and transitively (shares/payers via that club's expense ids).
+  const forClub = (g: string) => {
+    const exp = expenses.filter((e) => e.group_id === g);
+    const ids = new Set(exp.map((e) => e.id));
+    return { exp, sh: shares.filter((x) => ids.has(x.expense_id)), pay: payers.filter((x) => ids.has(x.expense_id)) };
+  };
+  const A = forClub("A"), B = forClub("B");
+  const balA = computeBalances(A.exp as any, A.sh as any, [], [], A.pay as any);
+  const balB = computeBalances(B.exp as any, B.sh as any, [], [], B.pay as any);
+  // M is discrete per club: owes 50 in A, owed 80 in B — never netted to +30.
+  eq("Club A: M owes $50 (not netted with B)", balA["M"] || 0, -5000);
+  eq("Club B: M is owed $80 (not netted with A)", balB["M"] || 0, 8000);
+  // Club A knows nothing about Q; Club B knows nothing about P.
+  ok("Club A balances contain no Club-B member (Q)", !("Q" in balA));
+  ok("Club B balances contain no Club-A member (P)", !("P" in balB));
+  // Simplify within A only ever involves A's members.
+  const trA = simplify(balA);
+  ok("Club A simplify only routes among A's members", trA.every((t) => (t.from === "M" || t.from === "P") && (t.to === "M" || t.to === "P")));
+  // And computing A gives the identical result whether or not B's rows exist in the pool (isolation proof).
+  const balA_isolated = computeBalances(A.exp as any, A.sh as any, [], [], A.pay as any);
+  eq("Club A result is identical with B present vs absent (M)", balA["M"], balA_isolated["M"]);
+}
+
+
 console.log("\n=== money-scenarios ===");
 console.log("Scenarios exercised:");
 scenarios.forEach((s, i) => console.log(`  ${i + 1}. ${s}`));

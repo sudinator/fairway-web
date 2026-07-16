@@ -710,3 +710,20 @@ export function eventSettlement(input: {
   }
   return out;
 }
+
+// Net-balance delta per member for a single expense add/edit/void, used to preview the impact before
+// committing. delta = (afterPaid - afterShare) - (beforePaid - beforeShare) per member. Guests should be
+// pre-resolved to their sponsor by the caller. Sums to 0 for a valid change (paid total == share total).
+export function expenseImpact(
+  beforeShares: { member: string; cents: Cents }[], beforePaid: { member: string; cents: Cents }[],
+  afterShares: { member: string; cents: Cents }[], afterPaid: { member: string; cents: Cents }[],
+): Record<string, Cents> {
+  const d: Record<string, Cents> = {};
+  const add = (m: string, v: number) => { if (m) d[m] = (d[m] || 0) + v; };
+  for (const s of beforeShares) add(s.member, s.cents);   // removing an old share => owe less => net up
+  for (const p of beforePaid) add(p.member, -p.cents);    // removing old outlay => net down
+  for (const s of afterShares) add(s.member, -s.cents);   // new share => owe more => net down
+  for (const p of afterPaid) add(p.member, p.cents);      // new outlay => net up
+  for (const k of Object.keys(d)) if (d[k] === 0) delete d[k];
+  return d;
+}

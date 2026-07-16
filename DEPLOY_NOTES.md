@@ -3762,3 +3762,45 @@ No migration.
   prop) left over from removing the event-island Settle button. The club-level Venmo flow (startPay) is
   unchanged. (The `payChoose` modal is now inert; left in place for a later dedicated cleanup.)
 No migration.
+
+### 169.10.260716 — cross-club isolation test (no app change)
+Added a scenario proving a member in two clubs has each club's balances/simplify computed independently
+(no cross-club netting), mirroring the loader's per-group filtering. Scenario suite now 125 assertions.
+Test-only; no app-code change.
+
+### 170.0.260716 — admin "Untangle payments" view, read-only first increment (no migration)
+New admin-only screen for resolving erroneous entries. Reachable from Balances (admin only) → "Untangle
+payments". Responsive: single-column card layout that works on both phone and desktop.
+- **Reconciliation banner**: recomputes club balances and confirms they net to $0.00 (or flags the gap).
+- **Member picker** (ranked by |balance|) → shows that member's full itemized ledger via personLedger:
+  every expense share and every payment (with allocations), each with its signed effect and a running
+  balance that ends at the member's true net.
+- **Audit log**: recent money changes (expense add/edit/void, settle/unmark) with actor, from group_activity.
+This increment is READ-ONLY (highest value, zero risk). Next: per-line Void (soft-delete, reversible) /
+Unmark / Edit (new version, keeps audit) with a live balance-impact preview before commit, per the mockups.
+No migration.
+
+### 170.1.260716 — impact-confirmation modal on add / edit / void (no migration)
+Adding, editing, or voiding an expense now pops a confirmation that previews the balance impact before it
+commits. New pure helper expenseImpact(beforeShares,beforePaid,afterShares,afterPaid) returns the signed net
+delta per member (guests resolved to sponsors); it always sums to $0 for a valid change. The Save/Add button
+and the Void button open a shared <ImpactModal> showing each affected person's +/- change; only Confirm writes
+to the DB. Void shows the same preview (danger-styled) before removing. Tested: 9 new assertions for
+add/edit/void deltas (all conserve). Money suite 141. No migration.
+
+### 170.2.260716 — impact confirmation on mark-paid + unmark too (no migration)
+Extended the impact-preview modal to the two remaining direct money actions: marking a payment paid and
+unmarking one. Marking shows payer +$X / payee −$X; unmarking shows the inverse (danger-styled). Both now
+route through the shared <ImpactModal> in SettleScreen — Confirm commits, Cancel aborts. The Venmo/PayPal/Zelle
+flow keeps its own confirm-on-return. No migration.
+
+### 170.3.260716 — untangle actions + expense soft-delete (migration 0119)
+Migration 0119 adds expenses.deleted_at (soft delete) + a partial index; all reads now filter deleted_at is
+null. Void is now a SOFT delete (reversible) instead of a hard delete — the expense is hidden from balances
+but restorable. The admin Untangle view is now actionable:
+- Expense rows: **Edit** (opens the editor → new version, keeps audit) and **Void** (soft-delete, impact
+  preview first via ImpactModal).
+- Payment rows: **Unmark** (impact preview first).
+- **Voided expenses** section lists soft-deleted expenses with one-tap **Restore** (inline confirm).
+- Reconciliation banner + audit log (now includes expense_restored).
+All destructive actions preview their per-member balance impact before committing. RUN MIGRATION 0119.
