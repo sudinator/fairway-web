@@ -1053,7 +1053,7 @@ function CreateGame({
                   <span style={{ color: C.cream, fontSize: 13, flex: 1, minWidth: 0 }}>
                     {g.display_name}
                     <span style={{ color: C.sage, fontSize: 11 }}> · guest of {g.guest_of === user.id ? "me" : (groupRoster.find((m) => m.id === g.guest_of)?.display_name || "member")}</span>
-                    {hasIdx ? <span style={{ color: C.sage, fontSize: 11 }}> · idx {g.handicap_index}{ch != null ? ` · ch ${ch}` : ""}</span> : null}
+                    {hasIdx ? <span style={{ color: C.sage, fontSize: 11 }}> · idx {g.handicap_index}{ch != null ? ` · ch ${ch}` : ""} <button onClick={() => { setGuestIdxEdits((m) => ({ ...m, [g.id]: String(g.handicap_index) })); setGuestPlayers((prev) => prev.map((p) => (p.id === g.id ? { ...p, handicap_index: null } : p))); }} style={{ background: "none", border: "none", color: "#f6c66b", cursor: "pointer", fontSize: 11, padding: 0, textDecoration: "underline" }}>edit</button></span> : null}
                   </span>
                   {!hasIdx && (
                     <>
@@ -1064,13 +1064,15 @@ function CreateGame({
                           const v = e.target.value;
                           if (v !== "" && !/^-?\d*\.?\d*$/.test(v)) return;
                           setGuestIdxEdits((m) => ({ ...m, [g.id]: v }));
-                          const num = v === "" ? null : parseFloat(v);
-                          setGuestPlayers((prev) => prev.map((p) => (p.id === g.id ? { ...p, handicap_index: num == null || Number.isNaN(num) ? null : num } : p)));
                         }}
                         inputMode="decimal"
                         placeholder="Idx"
-                        style={{ ...inputStyle, width: 60, padding: "4px 8px", fontSize: 12 }}
+                        style={{ ...inputStyle, width: 54, padding: "4px 8px", fontSize: 12 }}
                       />
+                      <button
+                        onClick={() => { const raw = (guestIdxEdits[g.id] ?? "").trim(); const num = parseFloat(raw); if (raw === "" || Number.isNaN(num)) return; setGuestPlayers((prev) => prev.map((p) => (p.id === g.id ? { ...p, handicap_index: num } : p))); }}
+                        style={{ background: "#7fd6a3", color: C.green, border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}
+                      >✓</button>
                     </>
                   )}
                   <button
@@ -6535,21 +6537,28 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
     const { data: existing } = await supabase.from("group_guests").select("id").eq("group_id", game.group_id).eq("name", name).eq("source_game_id", game.id).limit(1);
     if (existing && existing.length) return (existing[0] as any).id;
     const { data, error } = await supabase.from("group_guests").insert({ group_id: game.group_id, name, sponsor_user_id: null, archived: false, source_game_id: game.id, created_by: user.id }).select("id").single();
-    return error || !data ? null : (data as any).id;
+    if (!error && data) return (data as any).id;
+    // Insert failed — most often a uniqueness collision because a guest with this name already
+    // exists in the group (e.g. carried in from the tee time). Reuse that record so posting still
+    // succeeds rather than blocking with a misleading "assign a sponsor" message.
+    const { data: byName } = await supabase.from("group_guests").select("id").eq("group_id", game.group_id).eq("name", name).limit(1);
+    if (byName && byName.length) return (byName[0] as any).id;
+    if (error) console.error("findOrCreateGuestId failed", error);
+    return null;
   }
   // Build the nets for posting, materializing a guest record + sponsor for each guest bettor.
-  async function buildPostNets(): Promise<BetNet[] | null> {
+  async function buildPostNets(): Promise<{ ok: true; nets: BetNet[] } | { ok: false; reason: string }> {
     const out: BetNet[] = [];
     for (const pp of result.perPlayer) {
       const uid = idToUser[pp.id];
       if (uid) { out.push({ user_id: uid, name: pp.name, net: pp.net }); continue; }
       const sponsor = idToGuestOf[pp.id];
-      if (!sponsor) return null; // guest with no sponsor — blocked upstream, guard anyway
+      if (!sponsor) return { ok: false, reason: `Assign a sponsor for ${pp.name} first.` };
       const gid = await findOrCreateGuestId(pp.name);
-      if (!gid) return null;
+      if (!gid) return { ok: false, reason: `Couldn't create a guest record for ${pp.name} — please try again.` };
       out.push({ user_id: null, guest_id: gid, sponsor_user_id: sponsor, name: pp.name, net: pp.net });
     }
-    return out;
+    return { ok: true, nets: out };
   }
   const payerRows = (post: BetPost, expId: string) => post.payers.map((py) => ({ expense_id: expId, user_id: py.user_id, guest_id: py.guest_id, sponsor_user_id: py.sponsor_user_id, paid_cents: py.paid_cents }));
   const shareRows = (post: BetPost, expId: string) => post.shares.map((sh) => ({ expense_id: expId, user_id: sh.user_id, guest_id: sh.guest_id, sponsor_user_id: sh.sponsor_user_id, share_cents: sh.share_cents }));
@@ -6558,9 +6567,9 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
   async function doPost() {
     setBusy(true); setPostMsg(null);
     try {
-      const nets = await buildPostNets();
-      if (!nets) { setPostMsg("Assign a sponsor for each guest first."); setBusy(false); return; }
-      const post = betResultToPost(nets);
+      const built = await buildPostNets();
+      if (!built.ok) { setPostMsg(built.reason); setBusy(false); return; }
+      const post = betResultToPost(built.nets);
       if (!post.ok) { setPostMsg(post.reason || "Couldn't balance the bet."); setBusy(false); return; }
       const pp = primaryPayer(post);
       if (!pp) { setPostMsg("Couldn't post — no member to record as payer."); setBusy(false); return; }
@@ -6648,9 +6657,9 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
     if (!postedExpense) return;
     setBusy(true); setPostMsg(null);
     try {
-      const nets = await buildPostNets();
-      if (!nets) { setPostMsg("Assign a sponsor for each guest first."); setBusy(false); return; }
-      const post = betResultToPost(nets);
+      const built = await buildPostNets();
+      if (!built.ok) { setPostMsg(built.reason); setBusy(false); return; }
+      const post = betResultToPost(built.nets);
       if (!post.ok) { setPostMsg(post.reason || "Couldn't balance the corrected bet."); setBusy(false); return; }
       const pp = primaryPayer(post);
       if (!pp) { setPostMsg("Couldn't re-post — no member to record as payer."); setBusy(false); return; }

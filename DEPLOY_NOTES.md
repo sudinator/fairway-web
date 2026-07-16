@@ -3821,3 +3821,50 @@ game-creation course list (loadCoursesForGroup via group_courses) were still rea
 (empty) courses, so no courses showed. Both now read from effectiveGroupId, so mirroring TGC surfaces TGC's
 course library for tee times and games. Read-only lookups (RLS lets a member of the mirrored club read them);
 tee times / games / money still write to App Testing. No migration.
+
+### 171.2.260716 — real-time Tee Times (migration 0120)
+The Tee Times tab now updates live instead of only on pull-to-refresh. Added a Supabase realtime subscription
+(channel per group) on tee_times (group-filtered) and tee_time_rsvps; any change reloads the tab. Migration
+0120 publishes tee_times + tee_time_rsvps to the supabase_realtime publication (idempotent, guarded). RLS
+scopes which events each client receives. RUN MIGRATION 0120.
+
+### 171.3.260716 — live-test bug batch
+Fixes from App Testing (mirroring TGC). No new migration (still requires 0120 from 171.2 for realtime).
+- **Guest handicap (game setup):** the inline "NEEDS HCP" field committed on the first keystroke, so typing 11 recorded 1 and the field vanished. Typing no longer commits; a ✓ button confirms, and a committed index shows an "edit" link.
+- **Waitlist → game roster:** creating a game from a tee time seeded the roster from every "in" RSVP including waitlisted signups. Now excludes anyone in the waitlist set (a member's guest correctly consumes a spot).
+- **Post bet winnings blocked despite sponsor:** buildPostNets returned null for two different reasons but both showed "Assign a sponsor for each guest first." The real cause was guest-record creation failing on a name collision (guest already in the group). findOrCreateGuestId now falls back to the existing same-name guest, and the two failure modes show distinct, accurate messages.
+- **Settle default:** the Settle tab now always opens on Fewest payments (As entered is a read-only reference view).
+- **Confirmation modal:** the impact modal for settle / mark / unmark / add / edit / void now shows each person's resulting club balance (e.g. "owes $37.50 → settled up · owed $45.00 → owed $7.50") instead of raw +/- accounting deltas.
+
+### Open — under investigation (needs live data, not guessed)
+- **"$37.50 paid but $27.50 settled" on the bet event:** a club-level settle allocates FIFO (oldest first) across ALL of the payer's fronted expenses the payer shares, including closed events. Jonny's $37.50 net payment appears to have paid an older debt first, leaving the bet under-covered on the per-event view even though the overall pair balance is likely square. Needs a ledger trace before any allocation change.
+
+### 171.4.260716 — settled events read consistently (display only, no lib change)
+Traced the "$37.50 paid / $27.50 settled" report against live App Testing data: the money is correct — every
+pair is globally square (conservation = 0). Jonny's $37.50 club-level payment FIFO-allocated $10 to an older
+Tip debt (event E) and $27.50 to the bet; Ameya's $7.50 landed on Golf cart (event F). So the bet expense
+only shows $27.50 of allocation coverage even though everyone is settled.
+The real defect was a display contradiction: eventSettlement flags the event "settled" (it honours global
+square), but eventStandings is allocation-literal and still listed "Jonny owes $10." Fix is display-only —
+when an event is settled we now show "All members settled" instead of the per-event allocation remainder, so
+the badge and the line always agree. eventStandings and all settle/offer math are unchanged (a clamp attempt
+in the lib broke the event-balance and settle-offer invariants and was reverted). Full suite green.
+Known cosmetic note: while an event is only PARTIALLY settled, the "$X of $Y settled" chip counts coverage
+allocated to that event's expenses, so a payment that FIFO-lands on an older event can make an event look
+less-progressed than the payer expects. The overall balances are always correct; revisiting per-event
+coverage display is a separate design task.
+
+### 172.0.260716 — one ledger: settlement is club-level only (display/flow, no money-math change)
+Resolved the two-ledger conflict at its root by removing the second ledger. Events no longer claim to be
+"settled" — that was a per-event lens that can only reconcile with the club lens by fiat, which is what
+produced the "$27.50 of $45 / Jonny owes $10" contradiction. Now:
+- Event islands show only the expenses and the raw per-member split (paid / net) as a record. Removed the
+  settled / "$X of $Y settled" / outstanding badges and the per-event standings line.
+- Settlement happens exclusively in the Settle tab, club-level, Fewest payments. Removed the
+  As-entered / Fewest-payments toggle (Fewest payments is the only mode; overall balances are the source of truth).
+- Event close is now a no-gate "Archive event" (option a) — no longer requires the event to look settled.
+  Archived events are relabelled from CLOSED and now also show the split for the record; reopen unchanged.
+- Removed eventSettlement / eventStandings / withinEventDebtsRemaining / pairwiseDebts usage from the UI.
+  lib/money.ts is UNCHANGED — allocateSettlement and all balance math untouched. Full suite green.
+Disputes workflow: fix the numbers in the event (edit / void / restore, all reversible), then settle at club
+level. If a dispute surfaces after payment, unmark in the Settle tab, correct, re-settle.

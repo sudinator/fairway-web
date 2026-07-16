@@ -110,6 +110,19 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
   }, [activeGroupId]);
   useEffect(() => { load(); }, [load]);
 
+  // Real-time: reflect other people's changes (new tee times, RSVPs, waitlist, cancellations, reordering)
+  // without waiting for a manual pull-to-refresh. RLS scopes which change events we receive, so the
+  // unfiltered rsvps listener only fires for tee times in groups we belong to.
+  useEffect(() => {
+    if (!activeGroupId) return;
+    const ch = supabase
+      .channel(`teetimes-${activeGroupId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "tee_times", filter: `group_id=eq.${activeGroupId}` }, () => { load(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "tee_time_rsvps" }, () => { load(); })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [activeGroupId, load]);
+
   const memberOf = (id: string) => members.find((m) => m.id === id);
   const rsvpsFor = (ttId: string) => rsvps.filter((r) => r.tee_time_id === ttId);
   const myRsvp = (ttId: string) => rsvpsFor(ttId).find((r) => r.user_id === user.id);
@@ -268,7 +281,8 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
     const isCaptain = sel.captain_user_id === user.id;
     const frozen = isPast(sel) && !canOrganizeTee;
     const hasGameBtn = sel.status !== "cancelled" && (!!sel.game_id || (ins.length > 0 && (canOrganizeTee || isCaptain)));
-    const spawnGame = () => onSpawnGame?.({ teeTimeId: sel.id, course: sel.course, playDate: sel.play_date, memberIds: ins.map((r) => r.user_id), guests: ins.flatMap((r) => (r.guest_names || []).map((name) => ({ name, sponsorUserId: r.user_id }))) });
+    const fieldIns = ins.filter((r) => !waitSet.has(r.user_id));
+    const spawnGame = () => onSpawnGame?.({ teeTimeId: sel.id, course: sel.course, playDate: sel.play_date, memberIds: fieldIns.map((r) => r.user_id), guests: fieldIns.flatMap((r) => (r.guest_names || []).map((name) => ({ name, sponsorUserId: r.user_id }))) });
 
     const memberRow = (r: Rsvp, showOrg: boolean, wait?: boolean) => {
       const m = memberOf(r.user_id);

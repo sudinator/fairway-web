@@ -5,8 +5,8 @@ import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
 import { Avatar, btn, inputStyle, Eyebrow, FieldLabel } from "@/components/ui";
 import {
-  computeBalances, simplify, pairwiseDebts, evenShares, validateCustomTotal, guestCoverageBySponsor,
-  fmtUSD, payLink, nudgeSms, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, eventSettlement, withinEventDebts, withinEventDebtsRemaining, allocateSettlement, eventStandings, expenseImpact,
+  computeBalances, simplify, evenShares, validateCustomTotal, guestCoverageBySponsor,
+  fmtUSD, payLink, nudgeSms, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, allocateSettlement, expenseImpact,
   type Expense, type Share, type Settlement, type Guest, type Payer,
   type AuditRow, type AuditVersion, type AuditSnapshot, type EventRow, type LedgerLine,
 } from "@/lib/money";
@@ -41,7 +41,6 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<ExpenseRow | null>(null);
   const [viewing, setViewing] = useState<ExpenseRow | null>(null);
-  const [simplifyMode, setSimplifyMode] = useState(true); // group-wide: true = fewest payments, false = as entered
   const isAdmin = activeGroup.role === "admin" || activeGroup.role === "owner";
   const gid = activeGroup.id;
 
@@ -75,8 +74,6 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
       : { data: [] as any[] };
     const { data: setl } = await supabase.from("settlements").select("*").eq("group_id", gid);
     const { data: alloc } = await supabase.from("settlement_allocations").select("settlement_id, expense_id, amount_cents").eq("group_id", gid);
-    const { data: grp } = await supabase.from("groups").select("money_simplify").eq("id", gid).single();
-    setSimplifyMode(grp?.money_simplify !== false); // default to simplified when column/absent
     const { data: act } = await supabase.from("group_activity").select("*").eq("group_id", gid).not("action", "like", "tt%").order("created_at", { ascending: false }).limit(200);
     const { data: aud } = await supabase.from("money_audit").select("id, expense_id, actor_id, action, snapshot, created_at").eq("group_id", gid).order("created_at", { ascending: true }).limit(1000);
     const { data: evs } = await supabase.from("group_events").select("*").eq("group_id", gid).order("created_at", { ascending: false });
@@ -112,7 +109,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
   const confirmedSettlements = useMemo(() => settlements.filter((s) => (s.status || "confirmed") === "confirmed"), [settlements]);
   const myPending = useMemo(() => settlements.filter((s) => (s.status === "pending") && s.from_user_id === user.id), [settlements, user.id]);
   const balances = useMemo(() => computeBalances(expenses, shares, confirmedSettlements, guests, payers), [expenses, shares, confirmedSettlements, guests, payers]);
-  const transfers = useMemo(() => (simplifyMode ? simplify(balances) : pairwiseDebts(expenses, shares, confirmedSettlements, guests, payers)), [simplifyMode, balances, expenses, shares, confirmedSettlements, guests, payers]);
+  const transfers = useMemo(() => simplify(balances), [balances]);
 
   const nameOf = (uid: string) => memberById[uid]?.display_name || "Player";
   const requireOnline = () => {
@@ -173,13 +170,6 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     setBusy(false);
     if (error) { alert("Couldn't move the expense — " + error.message); return; }
     await load();
-  };
-
-  const setSimplify = async (v: boolean) => {
-    if (!isAdmin || !requireOnline()) return;
-    setSimplifyMode(v);
-    const { error } = await supabase.from("groups").update({ money_simplify: v }).eq("id", gid);
-    if (error) { setSimplifyMode(!v); alert("Couldn't change the setting - please try again."); }
   };
 
   // ---- per-event settle: arm (pending) → confirm on return ----
@@ -345,7 +335,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
         </>
       )}
       {screen === "add" && (
-        <AddExpense key={editing?.id || "new"} user={user} gid={gid} members={members} guests={guests} busy={busy} setBusy={setBusy}
+        <AddExpense key={editing?.id || "new"} user={user} gid={gid} members={members} guests={guests} balances={balances} busy={busy} setBusy={setBusy}
           requireOnline={requireOnline}
           openEvents={events.filter((e) => e.status === "open")} onCreateEvent={createEvent}
           editing={editing} editShares={editing ? shares.filter((s) => s.expense_id === editing.id) : []} editPayers={editing ? payers.filter((p) => p.expense_id === editing.id) : []} editHistory={editing ? activity.filter((a) => a?.meta?.expense_id === editing.id && (a.action === "expense_created" || a.action === "expense_edited")) : []} onLog={logActivity}
@@ -360,8 +350,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
           onSaved={async () => { setEditing(null); await load(); setScreen("balances"); }} />
       )}
       {screen === "settle" && (
-        <SettleScreen transfers={transfers} nameOf={nameOf} memberById={memberById} busy={busy} me={user.id} isAdmin={isAdmin}
-          simplifyOn={simplifyMode} canToggle={true} onToggle={setSimplifyMode}
+        <SettleScreen transfers={transfers} nameOf={nameOf} memberById={memberById} balances={balances} busy={busy} me={user.id} isAdmin={isAdmin}
           settlements={settlements} onUnmark={deleteSettlement}
           closedEventIds={new Set(events.filter((e) => e.status === "closed").map((e) => e.id))}
           onPay={startPay} onZelle={startZelle} onMark={(t) => recordSettlement(t.from, t.to, t.amt, "cash")} />
@@ -687,7 +676,7 @@ function AdminUntangle({ members, expenses, deletedExpenses, shares, payers, set
       </div>
 
       {pending && (
-        <ImpactModal title={pending.title} subtitle={pending.subtitle} impact={pending.impact} nameOf={(id) => (memberById[id]?.display_name || "someone")}
+        <ImpactModal title={pending.title} subtitle={pending.subtitle} impact={pending.impact} balancesBefore={balances} nameOf={(id) => (memberById[id]?.display_name || "someone")}
           busy={busy} confirmLabel={pending.label} danger={pending.danger}
           onCancel={() => setPending(null)} onConfirm={() => { const p = pending; setPending(null); p.run(); }} />
       )}
@@ -695,31 +684,21 @@ function AdminUntangle({ members, expenses, deletedExpenses, shares, payers, set
   );
 }
 
-function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simplifyOn, canToggle, onToggle, settlements, onUnmark, closedEventIds, onPay, onZelle, onMark }: {
+function SettleScreen({ transfers, nameOf, memberById, balances, busy, me, isAdmin, settlements, onUnmark, closedEventIds, onPay, onZelle, onMark }: {
   transfers: { from: string; to: string; amt: number }[]; nameOf: (id: string) => string;
-  memberById: Record<string, Member>; busy: boolean; me: string; isAdmin: boolean;
-  simplifyOn: boolean; canToggle: boolean; onToggle: (v: boolean) => void;
+  memberById: Record<string, Member>; balances: Record<string, number>; busy: boolean; me: string; isAdmin: boolean;
   settlements: SettlementRow[]; onUnmark: (s: SettlementRow) => void; closedEventIds: Set<string>;
   onPay: (kind: "venmo" | "paypal", t: { from: string; to: string; amt: number }) => void;
   onZelle: (t: { from: string; to: string; amt: number }) => void;
   onMark: (t: { from: string; to: string; amt: number }) => void;
 }) {
-  const segBtn = (on: boolean): React.CSSProperties => ({ flex: 1, border: "none", background: on ? C.gold : "transparent", color: on ? "#2a2410" : C.sage, borderRadius: 999, padding: "7px 6px", fontSize: 12, fontWeight: 800, cursor: "pointer" });
   const [confirm, setConfirm] = useState<null | { kind: "mark" | "unmark"; t?: { from: string; to: string; amt: number }; s?: SettlementRow; impact: Record<string, number>; label: string }>(null);
   const askMark = (t: { from: string; to: string; amt: number }) => setConfirm({ kind: "mark", t, impact: { [t.from]: t.amt, [t.to]: -t.amt }, label: "Confirm payment" });
   const askUnmark = (s2: SettlementRow) => setConfirm({ kind: "unmark", s: s2, impact: { [s2.from_user_id]: -s2.amount_cents, [s2.to_user_id]: s2.amount_cents }, label: "Confirm unmark" });
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Settle up</div>
-      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 8 }}>{simplifyOn ? "Fewest payments to square the club" : "Reference: who owes whom by expense (settle from Fewest payments)"}</div>
-      {canToggle ? (
-        <div style={{ display: "flex", background: "#123528", borderRadius: 999, padding: 3, marginBottom: 8 }}>
-          <button onClick={() => onToggle(true)} style={segBtn(simplifyOn)}>Fewest payments</button>
-          <button onClick={() => onToggle(false)} style={segBtn(!simplifyOn)}>As entered</button>
-        </div>
-      ) : (
-        <div style={{ color: C.faint, fontSize: 11, marginBottom: 8 }}>{simplifyOn ? "Showing fewest payments." : "Showing debts as entered."} Set by a club admin.</div>
-      )}
+      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 10 }}>Fewest payments to square the whole club</div>
       {transfers.length === 0 && <div style={{ color: "#7fd6a3", textAlign: "center", fontFamily: "Georgia, serif", fontSize: 17, padding: "22px 0" }}>✓ All square</div>}
       {transfers.map((t, i) => {
         const to = memberById[t.to];
@@ -729,7 +708,7 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
               <span style={{ flex: 1, color: C.cream, fontSize: 14 }}><b>{nameOf(t.from)}</b> pays <b>{nameOf(t.to)}</b></span>
               <span style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 17 }}>{fmtUSD(t.amt)}</span>
             </div>
-            {simplifyOn ? (() => {
+            {(() => {
               const isMine = t.from === me;
               const isPayee = t.to === me;
               const canMark = isMine || isPayee || isAdmin;
@@ -744,7 +723,7 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
                     : <span style={{ flex: 1, color: C.faint, fontSize: 11.5, textAlign: "right" }}>Only {nameOf(t.from)} or {nameOf(t.to)} can mark this</span>}
                 </div>
               );
-            })() : <div style={{ marginTop: 6, color: C.faint, fontSize: 11 }}>For reference only — settle from the “Fewest payments” view.</div>}
+            })()}
           </div>
         );
       })}
@@ -771,7 +750,7 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
       {confirm && (
         <ImpactModal title={confirm.kind === "unmark" ? "Unmark this payment?" : "Record this payment?"}
           subtitle={confirm.kind === "unmark" ? "Puts the debt back on the books." : "Marks it settled and credits it across the shared expenses."}
-          impact={confirm.impact} nameOf={nameOf} busy={busy} confirmLabel={confirm.label} danger={confirm.kind === "unmark"}
+          impact={confirm.impact} balancesBefore={balances} nameOf={nameOf} busy={busy} confirmLabel={confirm.label} danger={confirm.kind === "unmark"}
           onCancel={() => setConfirm(null)}
           onConfirm={() => { const c = confirm; setConfirm(null); if (c.kind === "mark" && c.t) onMark(c.t); else if (c.kind === "unmark" && c.s) onUnmark(c.s); }} />
       )}
@@ -782,26 +761,42 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
 // ---------------- Add / Edit expense ----------------
 type Party = { kind: "member" | "guest"; id: string; name: string; avatar_url?: string | null; sponsor?: string };
 
-function ImpactModal({ title, subtitle, impact, nameOf, busy, confirmLabel, danger, onConfirm, onCancel }: {
-  title: string; subtitle?: string; impact: Record<string, number>; nameOf: (id: string) => string;
+function ImpactModal({ title, subtitle, impact, balancesBefore, nameOf, busy, confirmLabel, danger, onConfirm, onCancel }: {
+  title: string; subtitle?: string; impact: Record<string, number>; balancesBefore?: Record<string, number>; nameOf: (id: string) => string;
   busy: boolean; confirmLabel: string; danger?: boolean; onConfirm: () => void; onCancel: () => void;
 }) {
   const rows = Object.entries(impact).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+  const bb = balancesBefore || {};
+  const haveBal = !!balancesBefore;
+  const fmtBal = (v: number) => Math.abs(v) < 1 ? "settled up" : v > 0 ? `owed ${fmtUSD(v)}` : `owes ${fmtUSD(-v)}`;
+  const balColor = (v: number) => Math.abs(v) < 1 ? C.sage : v > 0 ? "#7fd6a3" : "#ef9d90";
   return (
     <div onClick={onCancel} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.66)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 90 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px", paddingBottom: "calc(20px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 520, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>{title}</div>
         {subtitle && <div style={{ color: C.sage, fontSize: 12.5, marginTop: 4, lineHeight: 1.5 }}>{subtitle}</div>}
         <div style={{ marginTop: 12 }}>
-          {rows.length === 0 && <div style={{ color: C.faint, fontSize: 12.5 }}>No change to anyone's balance.</div>}
-          {rows.map(([id, v]) => (
+          {rows.length === 0 && <div style={{ color: C.faint, fontSize: 12.5 }}>No change to anyone&rsquo;s balance.</div>}
+          {haveBal ? rows.map(([id, delta]) => {
+            const before = bb[id] || 0; const after = before + delta;
+            return (
+              <div key={id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: `1px solid #123528`, gap: 10 }}>
+                <span style={{ color: C.cream, fontSize: 13, flexShrink: 0 }}>{nameOf(id)}</span>
+                <span style={{ fontSize: 12.5, textAlign: "right", minWidth: 0 }}>
+                  <span style={{ color: C.faint }}>{fmtBal(before)}</span>
+                  <span style={{ color: C.faint }}> &rarr; </span>
+                  <span style={{ color: balColor(after), fontWeight: 800, fontFamily: "Georgia, serif" }}>{fmtBal(after)}</span>
+                </span>
+              </div>
+            );
+          }) : rows.map(([id, v]) => (
             <div key={id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderTop: `1px solid #123528` }}>
               <span style={{ color: C.cream, fontSize: 13 }}>{nameOf(id)}</span>
               <span style={{ color: v >= 0 ? "#7fd6a3" : "#ef9d90", fontWeight: 800, fontSize: 13.5, fontFamily: "Georgia, serif" }}>{v >= 0 ? "+" : "\u2212"}{fmtUSD(Math.abs(v))}</span>
             </div>
           ))}
         </div>
-        {rows.length > 0 && <div style={{ color: C.faint, fontSize: 11, marginTop: 8, lineHeight: 1.5 }}>+ their balance rises (owed more / owes less) &middot; &minus; their balance falls. Always nets to $0 across the club.</div>}
+        {rows.length > 0 && <div style={{ color: C.faint, fontSize: 11, marginTop: 8, lineHeight: 1.5 }}>{haveBal ? "Each person\u2019s club balance after this. \u201cowed\u201d = the club owes them \u00b7 \u201cowes\u201d = they owe the club." : "+ their balance rises (owed more / owes less) \u00b7 \u2212 their balance falls. Always nets to $0 across the club."}</div>}
         <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
           <button disabled={busy} onClick={onConfirm} style={{ ...btn(true), flex: 1, background: danger ? "#d98b80" : "#7fd6a3", color: danger ? "#3a1712" : C.green }}>{confirmLabel}</button>
           <button disabled={busy} onClick={onCancel} style={{ ...btn(false), flex: 0, padding: "10px 18px" }}>Cancel</button>
@@ -811,8 +806,8 @@ function ImpactModal({ title, subtitle, impact, nameOf, busy, confirmLabel, dang
   );
 }
 
-function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, onAddGuest, onSaved, openEvents, onCreateEvent, editing, editShares, editPayers, editHistory, onLog, canDelete, onDelete }: {
-  user: { id: string }; gid: string; members: Member[]; guests: GuestRow[]; busy: boolean; setBusy: (b: boolean) => void;
+function AddExpense({ user, gid, members, guests, balances, busy, setBusy, requireOnline, onAddGuest, onSaved, openEvents, onCreateEvent, editing, editShares, editPayers, editHistory, onLog, canDelete, onDelete }: {
+  user: { id: string }; gid: string; members: Member[]; guests: GuestRow[]; balances: Record<string, number>; busy: boolean; setBusy: (b: boolean) => void;
   requireOnline: () => boolean;
   onAddGuest: (name: string) => Promise<void>;
   onSaved: () => Promise<void>;
@@ -1057,7 +1052,7 @@ function AddExpense({ user, gid, members, guests, busy, setBusy, requireOnline, 
       {pendingConfirm && (
         <ImpactModal title={pendingConfirm.mode === "void" ? "Void “" + (desc.trim() || editing?.description || "expense") + "”?" : (editing ? "Save these changes?" : "Add this expense?")}
           subtitle={pendingConfirm.mode === "void" ? "Removes it from everyone's balances (kept in the audit log)." : "Here's how it changes each person's balance."}
-          impact={pendingConfirm.impact} nameOf={impactName} busy={busy} confirmLabel={pendingConfirm.label} danger={pendingConfirm.mode === "void"}
+          impact={pendingConfirm.impact} balancesBefore={balances} nameOf={impactName} busy={busy} confirmLabel={pendingConfirm.label} danger={pendingConfirm.mode === "void"}
           onCancel={() => setPendingConfirm(null)}
           onConfirm={async () => { if (pendingConfirm.mode === "void") { setPendingConfirm(null); setBusy(true); await onDelete?.(); } else { await commit(); } }} />
       )}
@@ -1304,7 +1299,6 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
 }) {
   const [showClosed, setShowClosed] = useState(false);
   const byEv = useMemo(() => expensesByEvent(expenses), [expenses]);
-  const settle = useMemo(() => eventSettlement({ events, expenses: expenses as any, shares: shares as any, payers: payers as any, settlements: settlements as any, guests: guests as any, allocations }), [events, expenses, shares, payers, settlements, guests, allocations]);
   const openEvents = events.filter((e) => e.status === "open");
   const closedEvents = events.filter((e) => e.status === "closed");
   const ungrouped = byEv[""] || [];
@@ -1332,9 +1326,6 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
   const island = (ev: EventRow) => {
     const net = eventNet(ev.id, expenses as any, shares as any, guests as any, payers as any);
     const list = byEv[ev.id] || [];
-    const st = settle[ev.id];
-    const settled = !!st && st.settled && list.length > 0;
-    const partial = !!st && !st.settled && st.covered > 0;
     const created = ev.created_at ? new Date(ev.created_at).toLocaleDateString([], { month: "short", day: "numeric" }) : null;
     const perMember = [...net.perMember].sort((a, b) => (memberById[a.member_id]?.display_name || "").localeCompare(memberById[b.member_id]?.display_name || ""));
     return (
@@ -1348,27 +1339,9 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>{fmtUSD(net.total)}</div>
-            {list.length > 0 && (settled
-              ? <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 7px", borderRadius: 9, background: "#123f2e", color: "#8fd6b0" }}>settled</span>
-              : partial
-                ? <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 9, background: "#3a3320", color: "#e6cf8a" }}>{fmtUSD(st!.covered)} of {fmtUSD(st!.owed)} settled</span>
-                : net.owedWithin > 0
-                  ? <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 9, background: "#123528", color: C.sage }}>{fmtUSD(net.owedWithin)} outstanding</span>
-                  : <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 9, background: "#123528", color: C.sage }}>open</span>)}
+            {list.length > 0 && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 9, background: "#123f2e", color: "#8fd6b0" }}>open</span>}
           </div>
         </div>
-        {list.length > 0 && (() => {
-          const standings = eventStandings(ev.id, expenses as any, shares as any, guests as any, payers as any, settlements as any, allocations);
-          return (
-          <div style={{ marginTop: 8, fontSize: 12.5, lineHeight: 1.5, color: standings.length === 0 ? "#8fd6b0" : C.cream, fontWeight: standings.length === 0 ? 700 : 400 }}>
-            {standings.length === 0
-              ? "All members settled"
-              : standings.sort((a, b) => (b.owes + b.gets) - (a.owes + a.gets))
-                  .map((s) => `${memberById[s.member_id]?.display_name || "Player"} ${s.owes > 0 ? "owes " + fmtUSD(s.owes) : "gets " + fmtUSD(s.gets)}`)
-                  .join(" · ")}
-          </div>
-          );
-        })()}
         {perMember.length > 0 && (
           <div style={{ marginTop: 10, borderTop: `1px solid ${C.greenMid}`, paddingTop: 8 }}>
             {perMember.map((m) => (
@@ -1381,24 +1354,11 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
           </div>
         )}
         {list.length > 0 && <div style={{ marginTop: 8, borderTop: `1px dashed ${C.greenMid}`, paddingTop: 4 }}>{list.map(row)}</div>}
-        {(() => {
-          const myRemaining = withinEventDebtsRemaining(ev.id, me, expenses as any, shares as any, guests as any, payers as any, settlements as any, allocations).reduce((s, d) => s + d.amount, 0);
-          if (!settled && myRemaining > 0) {
-            return (
-              <div style={{ marginTop: 10, background: "#0f3529", borderRadius: 9, padding: "8px 10px", color: C.sage, fontSize: 11.5 }}>
-                You owe {fmtUSD(myRemaining)} here — settle it from the <strong style={{ color: C.cream }}>Settle</strong> tab (payments apply across the whole club and are credited back to this event).
-              </div>
-            );
-          }
-          return null;
-        })()}
         {ev.event_type === "game" && <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Name &amp; date come from the game.</div>}
-        {isAdmin && (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, background: "#0f3529", borderRadius: 9, padding: "6px 9px" }}>
-            <span style={{ flex: 1, color: C.sage, fontSize: 11 }}>{settled ? "Settled — ready to close" : "Admin"}</span>
-            <button onClick={() => onCloseEvent(ev, true)} style={{ border: "none", background: "#5a2d2d", color: "#ffd9d9", fontSize: 11, fontWeight: 800, padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>Close event</button>
-          </div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, background: "#0f3529", borderRadius: 9, padding: "8px 10px" }}>
+          <span style={{ flex: 1, color: C.sage, fontSize: 11.5, lineHeight: 1.4 }}>Settle up in the <strong style={{ color: C.cream }}>Settle</strong> tab — payments cover the whole club.</span>
+          {isAdmin && <button onClick={() => onCloseEvent(ev, true)} style={{ border: `1px solid ${C.greenMid}`, background: "transparent", color: C.sage, fontSize: 11, fontWeight: 800, padding: "6px 12px", borderRadius: 8, cursor: "pointer", whiteSpace: "nowrap" }}>Archive event</button>}
+        </div>
       </div>
     );
   };
@@ -1424,23 +1384,35 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
       {closedEvents.length > 0 && (<>
         <div onClick={() => setShowClosed((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 8, background: "#123f31", borderRadius: 10, padding: "9px 11px", cursor: "pointer", marginBottom: showClosed ? 12 : 0 }}>
           <span style={{ fontSize: 12 }}>{"\uD83D\uDD12"}</span>
-          <div style={{ flex: 1, color: C.cream, fontSize: 13, fontWeight: 800 }}>Closed events ({closedEvents.length})</div>
+          <div style={{ flex: 1, color: C.cream, fontSize: 13, fontWeight: 800 }}>Archived events ({closedEvents.length})</div>
           <span style={{ color: C.sage }}>{showClosed ? "\u25BE" : "\u203A"}</span>
         </div>
         {showClosed && closedEvents.map((ev) => {
           const net = eventNet(ev.id, expenses as any, shares as any, guests as any, payers as any);
           const list = byEv[ev.id] || [];
+          const perMember = [...net.perMember].sort((a, b) => (memberById[a.member_id]?.display_name || "").localeCompare(memberById[b.member_id]?.display_name || ""));
           return (
             <div key={ev.id} style={{ background: "#143f31", borderRadius: 14, padding: "12px 13px", marginBottom: 12, opacity: 0.95 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: "Georgia, serif", fontSize: 15.5, fontWeight: 800, color: C.cream }}>{ev.name} <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 7px", borderRadius: 9, background: "#3a3320", color: "#e6cf8a" }}>CLOSED</span></div>
-                  <div style={{ color: C.sage, fontSize: 11.5, marginTop: 1 }}>{[ev.created_at ? "created " + new Date(ev.created_at).toLocaleDateString([], { month: "short", day: "numeric" }) : null, `${list.length} ${list.length === 1 ? "expense" : "expenses"}`, ev.closed_at ? "closed " + new Date(ev.closed_at).toLocaleDateString([], { month: "short", day: "numeric" }) : null].filter(Boolean).join(" · ")}</div>
+                  <div style={{ fontFamily: "Georgia, serif", fontSize: 15.5, fontWeight: 800, color: C.cream }}>{ev.name} <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 9, background: "#123528", color: C.sage }}>archived</span></div>
+                  <div style={{ color: C.sage, fontSize: 11.5, marginTop: 1 }}>{[ev.created_at ? "created " + new Date(ev.created_at).toLocaleDateString([], { month: "short", day: "numeric" }) : null, `${list.length} ${list.length === 1 ? "expense" : "expenses"}`, ev.closed_at ? "archived " + new Date(ev.closed_at).toLocaleDateString([], { month: "short", day: "numeric" }) : null].filter(Boolean).join(" · ")}</div>
                 </div>
                 <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 800 }}>{fmtUSD(net.total)}</div>
               </div>
+              {perMember.length > 0 && (
+                <div style={{ marginTop: 10, borderTop: `1px solid ${C.greenMid}`, paddingTop: 8 }}>
+                  {perMember.map((m) => (
+                    <div key={m.member_id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, padding: "3px 0", color: C.cream }}>
+                      <span style={{ flex: 1 }}>{memberById[m.member_id]?.display_name || "Player"}</span>
+                      <span style={{ color: C.sage, width: 92, textAlign: "right" }}>paid {fmtUSD(m.paid)}</span>
+                      <span style={{ width: 68, textAlign: "right", fontWeight: 800, color: m.net > 0 ? "#8fd6b0" : m.net < 0 ? "#f0b4ab" : C.faint }}>{m.net > 0 ? "+" : m.net < 0 ? "\u2212" : ""}{fmtUSD(Math.abs(m.net))}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div style={{ marginTop: 8, borderTop: `1px dashed ${C.greenMid}`, paddingTop: 4 }}>{list.map(row)}</div>
-              <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Sealed — view only.</div>
+              <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Archived — view only.</div>
               {isAdmin && <button onClick={() => onCloseEvent(ev, false)} style={{ marginTop: 8, border: `1px solid ${C.greenMid}`, background: "transparent", color: C.sage, fontSize: 11.5, fontWeight: 800, padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>Reopen event</button>}
             </div>
           );
