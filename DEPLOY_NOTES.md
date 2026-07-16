@@ -3702,3 +3702,18 @@ rule was counting a net-creditor member's unpaid share as "covered." Fix: the co
 ACTUAL payment coverage only; global-square still decides whether an event is fully settled (keeps a
 fully-squared group green) but no longer inflates the "$X settled" number. So with no payments, an event
 reads "$0 / owes full" as it should. Regression test added. Money suite 129 assertions, all green. No migration.
+
+### 169.5.260716 — comprehensive money scenario suite + two logic fixes (no migration)
+Wrote and executed a full math-logic + process/workflow test plan (lib/money-scenarios.test.ts): 11 named
+workflows (settle, unmark, move-in/out, dispute, net-creditor, global-square, re-mark, guest, multi-payer,
+edit) each asserting derived state after every step, plus a 1,500-run RANDOM-WORKFLOW fuzzer that applies
+random action sequences and checks invariants after EVERY step (conservation, covered<=owed, standings
+balance, allocation sums). Now part of `npm test`. It caught two real holes, both fixed:
+- **global-square was too generous.** It settled any member who owed nothing NET — including net creditors
+  (owed overall), so an event whose only ower was a creditor showed green "settled" with $0 paid. Now it
+  applies only to members who are FULLY square (net exactly 0, i.e. actually paid up); a net creditor still
+  owes their in-event share until it's paid/netted.
+- **eventStandings could go unbalanced** (owes != gets) in cross-bucket cases (independent flooring). Rewrote
+  it to compute a signed remaining position per member, which sums to zero by construction — owes == gets
+  always.
+Main money suite 129 + scenario suite 118, all green. No migration.

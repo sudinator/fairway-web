@@ -636,7 +636,7 @@ console.log("All assertions passed.");
 
       // INV 5: eventSettlement — anyone globally square (net>=0) never blocks a bucket
       const settle = eventSettlement({ events: events as any, expenses, shares, payers, settlements, guests: guests as any });
-      const allSquare = members.every((m) => (bal[m] || 0) >= 0);
+      const allSquare = members.every((m) => (bal[m] || 0) === 0);
       if (allSquare) {
         for (const b of buckets) { const key = b ?? ""; if (settle[key] && !settle[key].settled) throw new Error(`bucket ${key} unsettled though everyone globally square`); }
       }

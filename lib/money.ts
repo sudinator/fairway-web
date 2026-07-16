@@ -540,19 +540,24 @@ export function eventStandings(
   for (const s of settlements) if (s.id) { sFrom[s.id] = s.from_user_id; sTo[s.id] = s.to_user_id; sEv[s.id] = s.event_id ?? ""; }
   const inEvent = new Set(expenses.filter((e) => (e.event_id ?? null) === eventId).map((e) => e.id));
   const bk = eventId ?? "";
-  const paidBy: Record<string, Cents> = {}, recvBy: Record<string, Cents> = {};
+  // Signed remaining position per member: start from the event net, then apply payments attributed to this
+  // event (payer's debt shrinks, payee's credit shrinks). Because every applied payment moves one member up
+  // and the other down by the same amount, the remaining positions always sum to zero → owes == gets.
+  const rem: Record<string, number> = {};
+  for (const m of perMember) rem[m.member_id] = m.net;
   for (const a of allocations) {
     if (!conf.has(a.settlement_id)) continue;
     const belongs = a.expense_id ? inEvent.has(a.expense_id) : (sEv[a.settlement_id] === bk);
     if (!belongs) continue;
     const f = sFrom[a.settlement_id], t = sTo[a.settlement_id];
-    if (f) paidBy[f] = (paidBy[f] || 0) + a.amount_cents;
-    if (t) recvBy[t] = (recvBy[t] || 0) + a.amount_cents;
+    if (f) rem[f] = (rem[f] || 0) + a.amount_cents;
+    if (t) rem[t] = (rem[t] || 0) - a.amount_cents;
   }
   const out: { member_id: string; owes: Cents; gets: Cents }[] = [];
-  for (const m of perMember) {
-    if (m.net < 0) { const owes = Math.max(0, -m.net - (paidBy[m.member_id] || 0)); if (owes > 0) out.push({ member_id: m.member_id, owes, gets: 0 }); }
-    else if (m.net > 0) { const gets = Math.max(0, m.net - (recvBy[m.member_id] || 0)); if (gets > 0) out.push({ member_id: m.member_id, owes: 0, gets }); }
+  for (const member_id of Object.keys(rem)) {
+    const r = rem[member_id];
+    if (r < 0) out.push({ member_id, owes: -r, gets: 0 });
+    else if (r > 0) out.push({ member_id, owes: 0, gets: r });
   }
   return out;
 }
@@ -673,8 +678,8 @@ export function eventSettlement(input: {
       owed += need;
       const real = (cover[k]?.[m.member_id]) || 0;       // ACTUAL paid coverage (drives the $ figure)
       covered += Math.min(real, need);
-      const globallySquare = (gnet[m.member_id] || 0) >= 0; // owes nothing overall → settled everywhere,
-      if (!(globallySquare || real >= need)) allSettled = false; // but doesn't add to the $ covered
+      const globallySquare = (gnet[m.member_id] || 0) === 0; // fully square (actually paid up) — NOT a
+      if (!(globallySquare || real >= need)) allSettled = false; // net creditor, who still owes their share
     }
     out[k] = { eventId: eid, owed, covered, settled: owed === 0 || allSettled, date: bucketDate[k] ?? 0 };
   }
