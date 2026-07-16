@@ -9,7 +9,7 @@
 // ============================================================================
 import {
   computeBalances, eventNet, withinEventDebts, allocateSettlement, eventSettlement,
-  eventStandings, simplify, fmtUSD,
+  eventStandings, withinEventDebtsRemaining, simplify, fmtUSD,
 } from "./money";
 
 let pass = 0, fail = 0;
@@ -306,6 +306,66 @@ function checkInvariants(w: World, tag: string) {
     }
   }
 }
+
+
+// ===========================================================================
+// INTENT / ROUND-TRIP PROPERTY — the class of check that was missing.
+// For random states: the amount the app OFFERS to settle must equal the member's TRUE remaining, and
+// paying exactly that must leave them EXACTLY square in the event (never over, never short). This is a
+// ground-truth oracle (recomputed independently), so it catches "the offer is computed wrong" bugs that
+// self-consistency invariants miss — e.g. offering the raw share instead of the remaining.
+// ===========================================================================
+{
+  scenario("RT: 1500 random states — the settle OFFER equals true remaining, and paying it squares the member exactly (never over)");
+  function mulberry32(a: number){ return () => { a|=0; a=(a+0x6D2B79F5)|0; let t=Math.imul(a^(a>>>15),1|a); t=(t+Math.imul(t^(t>>>7),61|t))^t; return ((t^(t>>>14))>>>0)/4294967296; }; }
+  let fails = 0; const N = 1500;
+  for (let iter=0; iter<N; iter++){
+    const rnd = mulberry32(20000+iter); const ri=(n: number)=>Math.floor(rnd()*n);
+    const w = W();
+    const members = ["A","B","C","D"].slice(0, 2+ri(3));
+    const evs: (string|null)[] = [addEvent(w)]; if (rnd()<0.6) evs.push(addEvent(w));
+    // build some expenses
+    for (let i=0;i<2+ri(4);i++){ const ev=evs[ri(evs.length)]; const payer=members[ri(members.length)];
+      const subset=members.filter(()=>rnd()<0.7); if(!subset.length) subset.push(members[ri(members.length)]);
+      addExpense(w, ev, payer, subset.map((m)=>({m, cents:100+ri(5000)}))); }
+    // optionally make some prior payments (mix of event + parent-level) to create partial coverage
+    for (let i=0;i<ri(3);i++){ const from=members[ri(members.length)]; const ev = rnd()<0.5 ? evs[ri(evs.length)] : null;
+      settleEventPartial(w, from, ev, rnd()); }
+    try {
+      // Now: for a random member+event, the OFFER must equal true remaining, and paying it squares them.
+      const who = members[ri(members.length)]; const ev = evs[ri(evs.length)];
+      const offer = withinEventDebtsRemaining(ev, who, w.expenses, w.shares, w.guests, w.payers, w.settlements, w.allocations);
+      const offerTotal = offer.reduce((a,r)=>a+r.amount,0);
+      // ground-truth remaining, computed INDEPENDENTLY from standings
+      const st0 = eventStandings(ev, w.expenses, w.shares, w.guests, w.payers, w.settlements, w.allocations);
+      const trueRemaining = (st0.find((x)=>x.member_id===who)?.owes) || 0;
+      if (trueRemaining <= 0) continue; // only owers settle; a creditor legitimately keeps a "gets"
+      if (offerTotal !== trueRemaining) throw new Error(`offer ${offerTotal} != true remaining ${trueRemaining} (seed ${20000+iter})`);
+      // pay exactly the offer, then the ower must be EXACTLY square (no overshoot into a credit)
+      for (const d of offer){ const sid=nid("s"); const al=allocateSettlement(who,d.to,ev,d.amount,w.expenses,w.shares,w.guests,w.payers);
+        w.settlements.push({id:sid,group_id:"g",from_user_id:who,to_user_id:d.to,amount_cents:d.amount,event_id:ev,status:"confirmed"});
+        for (const a of al) w.allocations.push({settlement_id:sid,expense_id:a.expense_id,amount_cents:a.amount_cents}); }
+      const st1 = eventStandings(ev, w.expenses, w.shares, w.guests, w.payers, w.settlements, w.allocations);
+      const after = st1.find((x)=>x.member_id===who);
+      if (after && (after.owes !== 0 || after.gets !== 0)) throw new Error(`after paying offer, ower ${who} not square: owes ${after?.owes} gets ${after?.gets} (seed ${20000+iter})`);
+    } catch(err: any){ fails++; if (fails<=4) console.log("  RT FAIL: "+err.message); }
+  }
+  eq(`RT: ${N} states — offer==remaining and paying squares exactly`, fails, 0);
+
+  // partial settle helper: settle a random fraction of a member's within-event remaining (mimics real
+  // partial coverage from prior event/parent payments)
+  function settleEventPartial(w: World, from: string, event: string|null, frac: number){
+    const debts = withinEventDebtsRemaining(event, from, w.expenses, w.shares, w.guests, w.payers, w.settlements, w.allocations);
+    for (const d of debts){ const amt = Math.max(0, Math.min(d.amount, Math.round(d.amount*frac)));
+      if (amt<=0) continue; const sid=nid("s");
+      // half the time record as a PARENT-LEVEL (null event) payment to mimic the cross-surface case
+      const tag = (frac>0.5) ? null : event;
+      const al = allocateSettlement(from, d.to, tag, amt, w.expenses, w.shares, w.guests, w.payers);
+      w.settlements.push({id:sid,group_id:"g",from_user_id:from,to_user_id:d.to,amount_cents:amt,event_id:tag,status:"confirmed"});
+      for (const a of al) w.allocations.push({settlement_id:sid,expense_id:a.expense_id,amount_cents:a.amount_cents}); }
+  }
+}
+
 
 console.log("\n=== money-scenarios ===");
 console.log("Scenarios exercised:");

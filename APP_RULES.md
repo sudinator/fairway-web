@@ -122,3 +122,7 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
 Cumulative `.zip` → unzip to `C:\dev\fairway-web` → GitHub Desktop commit → Vercel auto-deploy →
 run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
 17. **Charts must fit their data to the space.** Before shipping any chart, look at the actual values and set the axis to the best fit — never leave a chart cramped or dominated by one bar. For trend/line charts fit the y-axis to the data range (use `niceDomain` in dashboard.tsx, or AdaptiveTrend which now self-fits when no `domain` is passed); pct stats clamp 0–100. For count bar charts the bars start at 0 but the chart must be tall enough that small bars read as bars, not slivers (min ~150px) — if the fit is still poor, make the chart larger rather than leaving it. Guard flat series (span 0). This is a default, not a per-chart request — don't wait to be told a chart looks wrong. — manual
+19. **Money settles at the CLUB level only, via the "Fewest payments" (simplified) view.** Event islands
+    have no Settle button (they show settled-state from allocations). "As entered" is a read-only reference
+    view. Club payments allocate down to events (audit trail). An expense CANNOT be moved in/out of an event
+    that has recorded payments — unmark first (guard in moveExpenseEvent). — manual

@@ -153,6 +153,18 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
   };
   const moveExpenseEvent = async (expenseId: string, eventId: string | null) => {
     if (!requireOnline()) return;
+    // Guard: an event whose debts have been (partly) paid was settled against a fixed set of expenses.
+    // Moving an expense in/out of it would misroute that coverage. Require unmarking first.
+    const confIds = new Set(settlements.filter((s) => (s.status || "confirmed") === "confirmed").map((s) => s.id));
+    const eventHasPayments = (evId: string | null) => {
+      if (evId == null) return false;
+      if (settlements.some((s) => (s.event_id ?? null) === evId && (s.status || "confirmed") === "confirmed")) return true;
+      const inEv = new Set(expenses.filter((e) => (e.event_id ?? null) === evId).map((e) => e.id));
+      return allocations.some((a) => a.expense_id && inEv.has(a.expense_id) && confIds.has(a.settlement_id));
+    };
+    const srcEvent = expenses.find((e) => e.id === expenseId)?.event_id ?? null;
+    if (eventHasPayments(srcEvent)) { alert("This event has recorded payments, so its expenses can't be moved — the payments were settled against these expenses. Unmark them in the Settle tab first, then move."); return; }
+    if (eventHasPayments(eventId)) { alert("The event you're moving into has recorded payments. Unmark them in the Settle tab first, then move the expense in."); return; }
     setBusy(true);
     const { error } = await supabase.rpc("move_expense_event", { p_expense: expenseId, p_event: eventId });
     setBusy(false);
@@ -168,32 +180,6 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
   };
 
   // ---- per-event settle: arm (pending) → confirm on return ----
-  const armSettle = async (buckets: (string | null)[]) => {
-    if (!requireOnline()) return;
-    const arms: { to: string; amt: number; event: string | null; allocs: { expense_id: string | null; amount_cents: number }[]; dedup: string }[] = [];
-    for (const b of buckets) {
-      const debts = withinEventDebtsRemaining(b, user.id, expenses as any, shares as any, guests as any, payers as any, settlements as any, allocations);
-      for (const d of debts) arms.push({ to: d.to, amt: d.amount, event: b, allocs: allocateSettlement(user.id, d.to, b, d.amount, expenses as any, shares as any, guests as any, payers as any), dedup: settleKey(user.id, d.to, b) });
-    }
-    if (arms.length === 0) { alert("Nothing to settle here."); return; }
-    setBusy(true);
-    for (const a of arms) {
-      const { error } = await supabase.rpc("record_settlement", { p_group: gid, p_from: user.id, p_to: a.to, p_amount: a.amt, p_method: "pending", p_event: a.event, p_status: "pending", p_dedup: a.dedup, p_allocs: a.allocs });
-      if (error) {
-        setBusy(false);
-        if ((error as any).code === "23505" || /duplicate|unique/i.test((error as any).message || "")) { alert("Looks like this was already settled or is being settled — refreshing."); await load(); return; }
-        alert("Couldn't start the settlement — please try again."); return;
-      }
-    }
-    setBusy(false);
-    const byTo: Record<string, number> = {};
-    for (const a of arms) byTo[a.to] = (byTo[a.to] || 0) + a.amt;
-    const primaryTo = Object.keys(byTo).sort((a, b) => byTo[b] - byTo[a])[0];
-    const total = arms.reduce((s, a) => s + a.amt, 0);
-    await load();
-    setPending({ from: user.id, to: primaryTo, amt: byTo[primaryTo] });
-    setPayChoose({ to: primaryTo, amt: byTo[primaryTo], total, count: Object.keys(byTo).length });
-  };
   const confirmPending = async () => {
     if (!requireOnline()) return;
     setBusy(true);
@@ -351,7 +337,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
       )}
       {screen === "settle" && (
         <SettleScreen transfers={transfers} nameOf={nameOf} memberById={memberById} busy={busy} me={user.id} isAdmin={isAdmin}
-          simplifyOn={simplifyMode} canToggle={isAdmin} onToggle={setSimplify}
+          simplifyOn={simplifyMode} canToggle={true} onToggle={setSimplifyMode}
           settlements={settlements} onUnmark={deleteSettlement}
           closedEventIds={new Set(events.filter((e) => e.status === "closed").map((e) => e.id))}
           onPay={startPay} onZelle={startZelle} onMark={(t) => recordSettlement(t.from, t.to, t.amt, "cash")} />
@@ -370,7 +356,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
         <EventGroupedExpenses
           expenses={expenses} shares={shares} payers={payers} guests={guests} events={events}
           memberById={memberById} guestById={guestById} partyCount={members.length + guests.length}
-          settlements={settlements} allocations={allocations} me={user.id} onSettleEvent={(eid) => armSettle([eid])}
+          settlements={settlements} allocations={allocations} me={user.id}
           isAdmin={isAdmin} onView={(e) => setViewing(e)}
           onCloseEvent={(ev, closed) => setEventClosed(ev, closed)} />
       )}
@@ -567,7 +553,7 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Settle up</div>
-      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 8 }}>{simplifyOn ? "Fewest payments to square the club" : "Each payment matches an expense you shared - who owes whom"}</div>
+      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 8 }}>{simplifyOn ? "Fewest payments to square the club" : "Reference: who owes whom by expense (settle from Fewest payments)"}</div>
       {canToggle ? (
         <div style={{ display: "flex", background: "#123528", borderRadius: 999, padding: 3, marginBottom: 8 }}>
           <button onClick={() => onToggle(true)} style={segBtn(simplifyOn)}>Fewest payments</button>
@@ -585,7 +571,7 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
               <span style={{ flex: 1, color: C.cream, fontSize: 14 }}><b>{nameOf(t.from)}</b> pays <b>{nameOf(t.to)}</b></span>
               <span style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 17 }}>{fmtUSD(t.amt)}</span>
             </div>
-            {(() => {
+            {simplifyOn ? (() => {
               const isMine = t.from === me;
               const isPayee = t.to === me;
               const canMark = isMine || isPayee || isAdmin;
@@ -600,7 +586,7 @@ function SettleScreen({ transfers, nameOf, memberById, busy, me, isAdmin, simpli
                     : <span style={{ flex: 1, color: C.faint, fontSize: 11.5, textAlign: "right" }}>Only {nameOf(t.from)} or {nameOf(t.to)} can mark this</span>}
                 </div>
               );
-            })()}
+            })() : <div style={{ marginTop: 6, color: C.faint, fontSize: 11 }}>For reference only — settle from the “Fewest payments” view.</div>}
           </div>
         );
       })}
@@ -1096,10 +1082,10 @@ function PersonLedgerModal({ memberId, me, name, net, expenses, shares, settleme
 // Balances → expenses grouped into event islands (open events, Ungrouped, then a
 // collapsed Closed section). Per-event nets come from eventNet(); settlement stays
 // group-wide (handled elsewhere). Reuses one row renderer for every expense.
-function EventGroupedExpenses({ expenses, shares, payers, guests, events, memberById, guestById, partyCount, settlements, allocations, me, onSettleEvent, isAdmin, onView, onCloseEvent }: {
+function EventGroupedExpenses({ expenses, shares, payers, guests, events, memberById, guestById, partyCount, settlements, allocations, me, isAdmin, onView, onCloseEvent }: {
   expenses: ExpenseRow[]; shares: ShareRow[]; payers: PayerRow[]; guests: GuestRow[]; events: EventRow[];
   memberById: Record<string, Member>; guestById: Record<string, GuestRow>; partyCount: number;
-  settlements: SettlementRow[]; allocations: { settlement_id: string; expense_id: string | null; amount_cents: number }[]; me: string; onSettleEvent: (eventId: string | null) => void;
+  settlements: SettlementRow[]; allocations: { settlement_id: string; expense_id: string | null; amount_cents: number }[]; me: string;
   isAdmin: boolean; onView: (e: ExpenseRow) => void;
   onCloseEvent: (ev: EventRow, closed: boolean) => void;
 }) {
@@ -1184,16 +1170,13 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
         {list.length > 0 && <div style={{ marginTop: 8, borderTop: `1px dashed ${C.greenMid}`, paddingTop: 4 }}>{list.map(row)}</div>}
         {(() => {
           const myRemaining = withinEventDebtsRemaining(ev.id, me, expenses as any, shares as any, guests as any, payers as any, settlements as any, allocations).reduce((s, d) => s + d.amount, 0);
-          const pendingHere = settlements.some((s) => s.from_user_id === me && (s.event_id ?? null) === ev.id && s.status === "pending");
-          if (!settled && myRemaining > 0 && !pendingHere) {
+          if (!settled && myRemaining > 0) {
             return (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, background: "#0f3529", borderRadius: 9, padding: "8px 10px" }}>
-                <span style={{ flex: 1, color: C.cream, fontSize: 12.5 }}>You owe {fmtUSD(myRemaining)} for this event</span>
-                <button onClick={() => onSettleEvent(ev.id)} style={{ border: "none", background: "#7fd6a3", color: C.green, fontSize: 11.5, fontWeight: 800, padding: "7px 14px", borderRadius: 8, cursor: "pointer" }}>Settle</button>
+              <div style={{ marginTop: 10, background: "#0f3529", borderRadius: 9, padding: "8px 10px", color: C.sage, fontSize: 11.5 }}>
+                You owe {fmtUSD(myRemaining)} here — settle it from the <strong style={{ color: C.cream }}>Settle</strong> tab (payments apply across the whole club and are credited back to this event).
               </div>
             );
           }
-          if (pendingHere) return <div style={{ marginTop: 10, background: "#3a3320", borderRadius: 9, padding: "7px 10px", color: "#e6cf8a", fontSize: 11.5 }}>You started settling this — confirm it up top.</div>;
           return null;
         })()}
         {ev.event_type === "game" && <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Name &amp; date come from the game.</div>}

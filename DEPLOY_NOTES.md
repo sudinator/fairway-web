@@ -3726,3 +3726,39 @@ parent-level/global payments whose coverage landed on the event. Fix: new within
 each ower's debt from the post-payment standings (eventStandings), and both the event's "Settle" button and
 armSettle now use it — so a re-settle only asks for what's genuinely left, routed to whoever is still owed.
 Regression test proves raw 188.75 → remaining 18.33. Money suite 132 + scenarios 118, all green. No migration.
+
+### 169.7.260716 — test hardening: intent/round-trip property (no app change)
+Answering "why did the suite pass while real bugs slipped?": the suite tested the pure lib with
+self-consistency invariants (conservation, balance) — but (a) the test oracle shared the app's mental model,
+(b) invariants aren't user-intent, and (c) two live bugs lived in the COMPONENT, which the lib suite doesn't
+cover. Added an INTENT/ROUND-TRIP property to money-scenarios: across 1500 random states, the settle OFFER
+must equal the member's true remaining (computed independently from standings), and an ower who pays the
+offer must end EXACTLY square — never overshoot. This is the check that would have caught the $188.75 bug.
+It passes. Standing principle going forward: the component must derive all money figures from the tested lib
+(no inline math). No app-code change this version; test-suite only.
+
+### 169.8.260716 — one settle surface: club-level only, "As entered" is view-only (no migration)
+Collapsed the settle model to a single canonical surface, eliminating the cross-surface/cross-basis bug
+family (event-vs-club, simplified-vs-as-entered double-pay).
+- **Event islands no longer have a Settle button.** They show each event's settled state (from allocations)
+  and, if you still owe, a note to settle from the Settle tab. All settling is club-level; club payments
+  allocate down to events (audit trail + per-event settled-state retained).
+- **"As entered" is now read-only** — it shows who owes whom by expense for reference, with no Mark/Pay
+  buttons. Settling happens only from **"Fewest payments"** (simplified), which is derived from net balances
+  so it can never over-settle. This fixes the bug where, after clearing everything, the as-entered view still
+  asked for (stale, cycle) payments that would have corrupted balances.
+- The view toggle is now a local per-user view switch (anyone can flip to the reference view); settling is
+  always via Fewest payments. The event-level arm/pending machinery is retired from the UI (club Venmo flow
+  via startPay is unchanged).
+No migration.
+
+### 169.9.260716 — move-with-payments guard + retire event-level arm/pending (no migration)
+- **Move guard.** You can no longer move an expense in or out of an event that has recorded payments —
+  those payments were settled against a fixed set of expenses, so moving would misroute their coverage
+  (the settle-then-move bug). The move is blocked with a message to unmark the event's payments (Settle tab)
+  first. Checks both the source and destination event (event-tagged settlements OR club-payment allocations
+  landing on the event's expenses).
+- **Dead-code cleanup.** Removed the orphaned event-level settle path (`armSettle` + the `onSettleEvent`
+  prop) left over from removing the event-island Settle button. The club-level Venmo flow (startPay) is
+  unchanged. (The `payChoose` modal is now inert; left in place for a later dedicated cleanup.)
+No migration.
