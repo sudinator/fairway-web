@@ -3695,3 +3695,10 @@ Display catch-up to the payment model (found in the live App Testing session).
 - #2 (how to retract a payment): it's the "Unmark" button in the Settle tab → "Payments recorded" list
   (hidden only for closed events). No code change; can surface it more prominently if wanted.
 - Tests +5 (eventStandings). Money suite 127 assertions, all green. No migration.
+
+### 169.4.260715 — "covered" reflects real payments only (no migration)
+Live finding: after unmarking the only payment, event E still read "$42 of $97.67 settled" — the global-square
+rule was counting a net-creditor member's unpaid share as "covered." Fix: the covered dollar figure now sums
+ACTUAL payment coverage only; global-square still decides whether an event is fully settled (keeps a
+fully-squared group green) but no longer inflates the "$X settled" number. So with no payments, an event
+reads "$0 / owes full" as it should. Regression test added. Money suite 129 assertions, all green. No migration.

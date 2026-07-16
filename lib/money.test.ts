@@ -756,4 +756,31 @@ console.log("All assertions passed.");
   check("standings balance (owes == gets)", owes, gets);
 }
 
+
+// ---- REGRESSION (unmark): a net-creditor member must NOT inflate "covered" with no real payment.
+// App Testing E + F, NO settlements. Monica is a global creditor (fronted F's Golf). E covered must be 0. ----
+{
+  const ev = [
+    { id: "E", group_id: "g", name: "E", event_date: null, event_type: "manual", status: "open" },
+    { id: "F", group_id: "g", name: "F", event_date: null, event_type: "manual", status: "open" },
+  ];
+  const exp = [
+    { id: "food", event_id: "E", payer_user_id: "jonny",  amount_cents: 16800 },
+    { id: "golf", event_id: "F", payer_user_id: "monica", amount_cents: 85500 },
+  ];
+  const sh = [
+    { expense_id: "food", user_id: "amit",  guest_id: null, share_cents: 4200 },
+    { expense_id: "food", user_id: "jonny", guest_id: null, share_cents: 4200 },
+    { expense_id: "food", user_id: "monica",guest_id: null, share_cents: 4200 },
+    { expense_id: "food", user_id: "ameya", guest_id: null, share_cents: 4200 },
+    { expense_id: "golf", user_id: "amit",  guest_id: null, share_cents: 21375 },
+    { expense_id: "golf", user_id: "jonny", guest_id: null, share_cents: 21375 },
+    { expense_id: "golf", user_id: "monica",guest_id: null, share_cents: 21375 },
+    { expense_id: "golf", user_id: "ameya", guest_id: null, share_cents: 21375 },
+  ];
+  const res = eventSettlement({ events: ev as any, expenses: exp as any, shares: sh as any, payers: [], settlements: [], guests: [], allocations: [] });
+  check("no payments → E covered is 0 (net creditor does not inflate)", res["E"].covered, 0);
+  ok("E not settled with no payments", res["E"].settled === false);
+}
+
 console.log(`\n=== money.test ===\nPASS ${pass}  FAIL ${fail}`);

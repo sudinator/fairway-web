@@ -671,10 +671,10 @@ export function eventSettlement(input: {
       if (m.net >= 0) continue; // only owers must settle
       const need = -m.net;
       owed += need;
-      const globallySquare = (gnet[m.member_id] || 0) >= 0;
-      const paid = globallySquare ? need : ((cover[k]?.[m.member_id]) || 0);
-      covered += Math.min(paid, need);
-      if (paid < need) allSettled = false;
+      const real = (cover[k]?.[m.member_id]) || 0;       // ACTUAL paid coverage (drives the $ figure)
+      covered += Math.min(real, need);
+      const globallySquare = (gnet[m.member_id] || 0) >= 0; // owes nothing overall → settled everywhere,
+      if (!(globallySquare || real >= need)) allSettled = false; // but doesn't add to the $ covered
     }
     out[k] = { eventId: eid, owed, covered, settled: owed === 0 || allSettled, date: bucketDate[k] ?? 0 };
   }
