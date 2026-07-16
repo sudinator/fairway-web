@@ -2,7 +2,7 @@
 import {
   evenShares, validateCustomTotal, computeBalances, simplify, pairwiseDebts, aggregateOwed,
   payLink, nudgeSms, fmtUSD, guestOwedFor, guestCoverageBySponsor, betResultToPost,
-  collapseAuditBursts, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, eventSettlement, withinEventDebts, eventStandings, allocateSettlement,
+  collapseAuditBursts, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, eventSettlement, withinEventDebts, withinEventDebtsRemaining, eventStandings, allocateSettlement,
 } from "./money";
 import type { Expense, Share, Settlement, Guest, Transfer, Payer, AuditRow } from "./money";
 
@@ -781,6 +781,42 @@ console.log("All assertions passed.");
   const res = eventSettlement({ events: ev as any, expenses: exp as any, shares: sh as any, payers: [], settlements: [], guests: [], allocations: [] });
   check("no payments → E covered is 0 (net creditor does not inflate)", res["E"].covered, 0);
   ok("E not settled with no payments", res["E"].settled === false);
+}
+
+
+// ---- REGRESSION (settle asks remaining, not raw): App Testing F. Amit's raw F debt is 188.75 but he
+// already paid 170.42 (parent-level, coverage on Golf). Re-settling must ask for 18.33, not 188.75. ----
+{
+  const exp = [
+    { id: "golf", event_id: "F", payer_user_id: "monica", amount_cents: 85500 },
+    { id: "cart", event_id: "F", payer_user_id: "amit",   amount_cents: 6500 },
+    { id: "beer", event_id: "F", payer_user_id: "ameya",  amount_cents: 5500 },
+  ];
+  const sh = [
+    { expense_id: "golf", user_id: "ameya", guest_id: null, share_cents: 21375 },
+    { expense_id: "golf", user_id: "amit",  guest_id: null, share_cents: 21375 },
+    { expense_id: "golf", user_id: "jonny", guest_id: null, share_cents: 21375 },
+    { expense_id: "golf", user_id: "monica",guest_id: null, share_cents: 21375 },
+    { expense_id: "cart", user_id: "ameya", guest_id: null, share_cents: 2167 },
+    { expense_id: "cart", user_id: "amit",  guest_id: null, share_cents: 2167 },
+    { expense_id: "cart", user_id: "monica",guest_id: null, share_cents: 2166 },
+    { expense_id: "beer", user_id: "ameya", guest_id: null, share_cents: 1834 },
+    { expense_id: "beer", user_id: "amit",  guest_id: null, share_cents: 1833 },
+    { expense_id: "beer", user_id: "jonny", guest_id: null, share_cents: 1833 },
+  ];
+  const pay = [
+    { expense_id: "golf", user_id: "monica", guest_id: null, paid_cents: 85500 },
+    { expense_id: "cart", user_id: "amit",   guest_id: null, paid_cents: 6500 },
+    { expense_id: "beer", user_id: "ameya",  guest_id: null, paid_cents: 5500 },
+  ];
+  const st = [{ id: "s2", from_user_id: "amit", to_user_id: "monica", amount_cents: 17042, event_id: null, status: "confirmed" }];
+  const al = [{ settlement_id: "s2", expense_id: "golf", amount_cents: 17042 }];
+  const rem = withinEventDebtsRemaining("F", "amit", exp as any, sh as any, [], pay as any, st as any, al);
+  const total = rem.reduce((a, r) => a + r.amount, 0);
+  check("settle asks remaining 18.33, not raw 188.75", total, 1833);
+  ok("remaining is owed to Monica", rem.length === 1 && rem[0].to === "monica");
+  // and raw withinEventDebts (no payments) would have been 188.75 — proving the difference
+  check("raw within-event debt was 188.75", withinEventDebts("F", "amit", exp as any, sh as any, [], pay as any).reduce((a, r) => a + r.amount, 0), 18875);
 }
 
 console.log(`\n=== money.test ===\nPASS ${pass}  FAIL ${fail}`);

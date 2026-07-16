@@ -504,6 +504,31 @@ export interface EventSettleState {
 
 /** What `memberId` owes WITHIN one event, split across that event's fronters
  *  (proportional to their positive net; largest-remainder for exact cents). */
+// Like withinEventDebts, but on the REMAINING positions after payments (via eventStandings) — so a
+// re-settle only asks for what's still owed, not the raw share. Used by the settle action so a member who
+// already paid (even via a parent-level/global payment whose coverage landed on this event) isn't asked
+// to pay again.
+export function withinEventDebtsRemaining(
+  eventId: string | null, memberId: string,
+  expenses: (Expense & { event_id?: string | null })[], shares: Share[], guests: Guest[], payers: Payer[],
+  settlements: (Settlement & { id?: string; event_id?: string | null; status?: string })[],
+  allocations: { settlement_id: string; expense_id: string | null; amount_cents: Cents }[] = [],
+): { to: string; amount: Cents }[] {
+  const stand = eventStandings(eventId, expenses, shares, guests, payers, settlements, allocations);
+  const mine = stand.find((s) => s.member_id === memberId);
+  if (!mine || mine.owes <= 0) return [];
+  const owed = mine.owes;
+  const creditors = stand.filter((s) => s.gets > 0).map((s) => ({ to: s.member_id, net: s.gets })).sort((a, b) => b.net - a.net);
+  const totalPos = creditors.reduce((s, c) => s + c.net, 0);
+  if (totalPos <= 0) return [];
+  const raw = creditors.map((c) => ({ to: c.to, exact: (owed * c.net) / totalPos }));
+  const out = raw.map((r) => ({ to: r.to, amount: Math.floor(r.exact) }));
+  let rem = owed - out.reduce((s, r) => s + r.amount, 0);
+  const order = raw.map((r, i) => ({ i, frac: r.exact - Math.floor(r.exact) })).sort((a, b) => b.frac - a.frac);
+  for (let k = 0; k < order.length && rem > 0; k++) { out[order[k].i].amount += 1; rem -= 1; }
+  return out.filter((r) => r.amount > 0);
+}
+
 export function withinEventDebts(
   eventId: string | null, memberId: string,
   expenses: (Expense & { event_id?: string | null })[], shares: Share[], guests: Guest[], payers: Payer[] = [],

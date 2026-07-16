@@ -3717,3 +3717,12 @@ balance, allocation sums). Now part of `npm test`. It caught two real holes, bot
   it to compute a signed remaining position per member, which sums to zero by construction — owes == gets
   always.
 Main money suite 129 + scenario suite 118, all green. No migration.
+
+### 169.6.260716 — settle asks the REMAINING amount, not the raw share (no migration)
+Live bug: event F asked Amit to settle $188.75 (his raw within-event share) even though he'd already paid
+$170.42 toward F via a parent-level payment — it should have asked for the $18.33 remainder. Cause: the
+settle action used raw within-event debt and only subtracted payments TAGGED to that event, missing
+parent-level/global payments whose coverage landed on the event. Fix: new withinEventDebtsRemaining computes
+each ower's debt from the post-payment standings (eventStandings), and both the event's "Settle" button and
+armSettle now use it — so a re-settle only asks for what's genuinely left, routed to whoever is still owed.
+Regression test proves raw 188.75 → remaining 18.33. Money suite 132 + scenarios 118, all green. No migration.

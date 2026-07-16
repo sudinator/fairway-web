@@ -6,7 +6,7 @@ import { C } from "@/lib/golf";
 import { Avatar, btn, inputStyle, Eyebrow, FieldLabel } from "@/components/ui";
 import {
   computeBalances, simplify, pairwiseDebts, evenShares, validateCustomTotal, guestCoverageBySponsor,
-  fmtUSD, payLink, nudgeSms, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, eventSettlement, withinEventDebts, allocateSettlement, eventStandings,
+  fmtUSD, payLink, nudgeSms, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, eventSettlement, withinEventDebts, withinEventDebtsRemaining, allocateSettlement, eventStandings,
   type Expense, type Share, type Settlement, type Guest, type Payer,
   type AuditRow, type AuditVersion, type AuditSnapshot, type EventRow, type LedgerLine,
 } from "@/lib/money";
@@ -172,7 +172,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     if (!requireOnline()) return;
     const arms: { to: string; amt: number; event: string | null; allocs: { expense_id: string | null; amount_cents: number }[]; dedup: string }[] = [];
     for (const b of buckets) {
-      const debts = withinEventDebts(b, user.id, expenses as any, shares as any, guests as any, payers as any);
+      const debts = withinEventDebtsRemaining(b, user.id, expenses as any, shares as any, guests as any, payers as any, settlements as any, allocations);
       for (const d of debts) arms.push({ to: d.to, amt: d.amount, event: b, allocs: allocateSettlement(user.id, d.to, b, d.amount, expenses as any, shares as any, guests as any, payers as any), dedup: settleKey(user.id, d.to, b) });
     }
     if (arms.length === 0) { alert("Nothing to settle here."); return; }
@@ -1183,14 +1183,12 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
         )}
         {list.length > 0 && <div style={{ marginTop: 8, borderTop: `1px dashed ${C.greenMid}`, paddingTop: 4 }}>{list.map(row)}</div>}
         {(() => {
-          const mine = net.perMember.find((m) => m.member_id === me);
-          const owe = mine && mine.net < 0 ? -mine.net : 0;
+          const myRemaining = withinEventDebtsRemaining(ev.id, me, expenses as any, shares as any, guests as any, payers as any, settlements as any, allocations).reduce((s, d) => s + d.amount, 0);
           const pendingHere = settlements.some((s) => s.from_user_id === me && (s.event_id ?? null) === ev.id && s.status === "pending");
-          const paidHere = settlements.filter((s) => s.from_user_id === me && (s.event_id ?? null) === ev.id && (s.status || "confirmed") === "confirmed").reduce((s2, s) => s2 + s.amount_cents, 0);
-          if (!settled && owe > 0 && paidHere < owe && !pendingHere) {
+          if (!settled && myRemaining > 0 && !pendingHere) {
             return (
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, background: "#0f3529", borderRadius: 9, padding: "8px 10px" }}>
-                <span style={{ flex: 1, color: C.cream, fontSize: 12.5 }}>You owe {fmtUSD(owe - paidHere)} for this event</span>
+                <span style={{ flex: 1, color: C.cream, fontSize: 12.5 }}>You owe {fmtUSD(myRemaining)} for this event</span>
                 <button onClick={() => onSettleEvent(ev.id)} style={{ border: "none", background: "#7fd6a3", color: C.green, fontSize: 11.5, fontWeight: 800, padding: "7px 14px", borderRadius: 8, cursor: "pointer" }}>Settle</button>
               </div>
             );
