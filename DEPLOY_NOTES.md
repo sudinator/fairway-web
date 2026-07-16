@@ -3868,3 +3868,9 @@ produced the "$27.50 of $45 / Jonny owes $10" contradiction. Now:
   lib/money.ts is UNCHANGED — allocateSettlement and all balance math untouched. Full suite green.
 Disputes workflow: fix the numbers in the event (edit / void / restore, all reversible), then settle at club
 level. If a dispute surfaces after payment, unmark in the Settle tab, correct, re-settle.
+
+### 172.1.260716 — drop the "open" pill from event cards
+The active-event card was showing a green "open" pill, which read like the old "outstanding" settlement
+status and re-created the exact confusion 172.0 removed. Events don't reflect settlement anymore, so the pill
+is gone — an active event shows only its expenses and split. Archived events keep the "archived" tag (that's a
+real lifecycle state). Display only; no lib or schema change.

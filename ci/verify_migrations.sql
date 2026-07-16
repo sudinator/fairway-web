@@ -57,7 +57,7 @@ with checks(migration, kind, a, b, human) as (values
   ('0068_analytics_v2.sql','function','mark_active','','function mark_active()'),
   ('0069_push_subscriptions.sql','table','push_subscriptions','','table push_subscriptions'),
   ('0070_push_events.sql','function','notify_game_added','','function notify_game_added()'),
-  ('0071_title_case_names.sql','function','bnn_title_case','','function bnn_title_case()'),
+  ('0071_title_case_names.sql','data_only','','','data-only name backfill: creates+drops a helper, leaves no object — verify by app (names title-cased), not this script'),
   ('0072_profiles_readable_by_comembers.sql','function','shares_active_club','','function shares_active_club()'),
   ('0073_push_events_more.sql','function','notify_tee_new','','function notify_tee_new()'),
   ('0074_tee_reminders.sql','function','send_tee_reminders','','function send_tee_reminders()'),
@@ -74,6 +74,7 @@ select migration, human as expected_object,
     when 'policy'     then exists (select 1 from pg_policies pol where pol.schemaname='public' and pol.tablename=a and pol.policyname=b)
     when 'trigger'    then exists (select 1 from pg_trigger t where not t.tgisinternal and t.tgname=a)
     when 'index'      then exists (select 1 from pg_indexes i where i.schemaname='public' and i.indexname=a)
+    when 'data_only'  then null
     else null
   end as present
 from checks order by migration;

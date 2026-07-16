@@ -1339,7 +1339,6 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>{fmtUSD(net.total)}</div>
-            {list.length > 0 && <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 9, background: "#123f2e", color: "#8fd6b0" }}>open</span>}
           </div>
         </div>
         {perMember.length > 0 && (
