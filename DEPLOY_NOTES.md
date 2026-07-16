@@ -3662,3 +3662,23 @@ attribution exact and traceable.
   backfills history as general allocations, and self-aborts via a reconciliation gate if any payment's
   allocations don't sum. Confirm with `select id, applied_at from public.schema_migrations order by id;`.
 No user-facing change except the move case is exact and payments are now traceable to expenses.
+
+### 169.1.260715 — More menu: flush to nav + no background scroll (no migration)
+- The "⋯ More" menu no longer floats above the nav with a gap. It's now anchored structurally (an absolute
+  panel at `bottom:100%` of a wrapper around the nav), so its bottom edge is exactly the nav's top edge
+  regardless of nav height/safe-area — no measured offset to drift. Removed the ResizeObserver/navH
+  measurement it relied on.
+- The screen behind the menu no longer scrolls while it's open (scrollRef locks to `overflow:hidden` when
+  moreOpen). Backdrop still closes on tap; the × still closes it.
+- CI: global-rules guard accepts the intentional scroll-lock; bottom-sheet guard recognizes above-nav
+  (`bottom:100%`) menus as compliant.
+No migration.
+
+### 169.2.260715 — fix: event-tagged payment's general remainder now counts toward that event (no migration)
+Live-trace finding (App Testing group): a payment made toward an event can have a portion that doesn't map
+to a specific expense (a within-event netting remainder → a general/null allocation line). eventSettlement
+was skipping ALL null-expense allocations, so that remainder didn't count toward the event — making a payer
+who settled IN FULL still look short in that event (e.g. paid $50.33, only $42 counted). Fix: a general
+(null-expense) allocation now counts toward its settlement's OWN event bucket; only truly global settlements
+(no event) stay on the global-square path. Regression test added from the live scenario. Money suite 122
+assertions, all green. No migration (pure logic in eventSettlement).

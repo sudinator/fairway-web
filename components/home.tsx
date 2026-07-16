@@ -293,16 +293,6 @@ export function Home({ session }: { session: any }) {
   // position:fixed drifts during scroll and visualViewport reports the wrong height, so
   // layout-pinning the nav is the only reliable way to keep it glued to the bottom.
   const scrollRef = useRef<HTMLDivElement>(null);
-  // Measured nav height so pop-up menus can sit ABOVE the nav (keeping it visible) instead of over it.
-  const navRef = useRef<HTMLElement>(null);
-  const [navH, setNavH] = useState(64);
-  useEffect(() => {
-    const el = navRef.current; if (!el) return;
-    const measure = () => setNavH(el.offsetHeight);
-    measure();
-    const ro = new ResizeObserver(measure); ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
 
   const index = profile?.handicap_index ?? null;
 
@@ -665,7 +655,7 @@ export function Home({ session }: { session: any }) {
           <div style={{ position: "absolute", top: "env(safe-area-inset-top, 0px)", left: "50%", transform: "translateX(-50%)", background: "#DC2626", color: "#fff", fontSize: 11, fontWeight: 800, letterSpacing: 1, padding: "2px 10px", borderRadius: "0 0 8px 8px" }}>TEST MODE</div>
         </div>
       )}
-      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch" }}>
+      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: moreOpen ? "hidden" : "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch" }}>
       <InstallHint />
       <PullToRefresh scrollEl={scrollRef} onRefresh={async () => { await Promise.all([loadProfile(), loadGroups(), loadRounds()]); }}>
       <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 24px" }}>
@@ -857,7 +847,8 @@ export function Home({ session }: { session: any }) {
       </div>
       {/* Bottom navigation bar — a normal flex child pinned at the bottom by layout (NOT
           position:fixed, which drifts in iOS home-screen PWAs). */}
-      <nav ref={navRef} data-diag="nav" style={{
+      <div style={{ position: "relative", flexShrink: 0, zIndex: 61 }}>
+      <nav data-diag="nav" style={{
         flexShrink: 0, zIndex: 50,
         background: C.green, borderTop: `1px solid ${C.greenMid}`,
         display: "flex", justifyContent: "space-around", alignItems: "stretch",
@@ -893,14 +884,13 @@ export function Home({ session }: { session: any }) {
         })()}
       </nav>
 
-      {/* "More" sheet */}
+      {/* "More" menu — anchored flush above the nav; nav stays visible below it */}
       {moreOpen && (
-        <>
-          <div onClick={() => setMoreOpen(false)} style={{ position: "fixed", left: 0, right: 0, top: 0, bottom: navH, background: "rgba(0,0,0,0.4)", zIndex: 60 }} />
           <div style={{
-            position: "fixed", left: 0, right: 0, bottom: navH, zIndex: 70,
+            position: "absolute", left: 0, right: 0, bottom: "100%",
             background: C.greenLight, borderTopLeftRadius: 18, borderTopRightRadius: 18,
             padding: "6px 12px 12px", boxShadow: "0 -8px 30px rgba(0,0,0,.4)",
+            maxHeight: "70vh", overflowY: "auto",
           }}>
             <div style={{ display: "flex", alignItems: "center", padding: "2px 2px 8px" }}>
               <span style={{ flex: 1, color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 700 }}>MORE</span>
@@ -928,8 +918,9 @@ export function Home({ session }: { session: any }) {
               ));
             })()}
           </div>
-        </>
       )}
+      </div>
+      {moreOpen && <div onClick={() => setMoreOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 60 }} />}
     </div>
   );
 }

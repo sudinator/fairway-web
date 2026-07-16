@@ -20,8 +20,8 @@ if not m:
     fails.append("home.tsx: could not find the scrollRef scroll container.")
 else:
     style = m.group(1)
-    if 'overflowY: "auto"' not in style:
-        fails.append("home.tsx scrollRef: expected overflowY:\"auto\".")
+    if 'overflowY: "auto"' not in style and 'overflowY: moreOpen ? "hidden" : "auto"' not in style:
+        fails.append("home.tsx scrollRef: expected overflowY:\"auto\" (or the moreOpen scroll-lock).")
     if 'overflowX: "hidden"' not in style:
         fails.append("home.tsx scrollRef: missing overflowX:\"hidden\" — Rule 1 (no horizontal page scroll).")
 

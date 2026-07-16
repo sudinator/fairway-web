@@ -694,4 +694,35 @@ console.log("All assertions passed.");
   ok("after move: F settled (coverage followed the expense)", after["F"].settled);
 }
 
+
+// ---- REGRESSION (App Testing live): an event-tagged payment's GENERAL remainder must count toward
+// that event. Amit owes Jonny $50.33 net in event E (sole creditor); only $42 maps to Jonny's Food
+// expense, $8.33 is a netting remainder → general. The full $50.33 must count as E coverage. ----
+{
+  const ev = [{ id: "E", group_id: "g", name: "E", event_date: null, event_type: "manual", status: "open" }];
+  const exp = [
+    { id: "beer", event_id: "E", payer_user_id: "ameya", amount_cents: 5500, created_at: "2026-07-16T03:16:00Z" },
+    { id: "food", event_id: "E", payer_user_id: "jonny", amount_cents: 16800, created_at: "2026-07-16T03:16:40Z" },
+    { id: "tip",  event_id: "E", payer_user_id: "amit",  amount_cents: 2000,  created_at: "2026-07-16T03:17:00Z" },
+  ];
+  const sh = [
+    { expense_id: "beer", user_id: "ameya", guest_id: null, share_cents: 1834 },
+    { expense_id: "beer", user_id: "amit",  guest_id: null, share_cents: 1833 },
+    { expense_id: "beer", user_id: "jonny", guest_id: null, share_cents: 1833 },
+    { expense_id: "food", user_id: "ameya", guest_id: null, share_cents: 4200 },
+    { expense_id: "food", user_id: "amit",  guest_id: null, share_cents: 4200 },
+    { expense_id: "food", user_id: "jonny", guest_id: null, share_cents: 4200 },
+    { expense_id: "food", user_id: "monica",guest_id: null, share_cents: 4200 },
+    { expense_id: "tip",  user_id: "amit",  guest_id: null, share_cents: 1000 },
+    { expense_id: "tip",  user_id: "jonny", guest_id: null, share_cents: 1000 },
+  ];
+  const st = [{ id: "s1", from_user_id: "amit", to_user_id: "jonny", amount_cents: 5033, event_id: "E", status: "confirmed" }];
+  const al = [{ settlement_id: "s1", expense_id: "food", amount_cents: 4200 }, { settlement_id: "s1", expense_id: null, amount_cents: 833 }];
+  const res = eventSettlement({ events: ev as any, expenses: exp as any, shares: sh as any, payers: [], settlements: st as any, guests: [], allocations: al });
+  // Amit fully paid (42 mapped + 8.33 general, both toward E) → covered counts his full 5033; only
+  // Ameya (5.34) and Monica (42) remain unpaid (neither globally square here).
+  check("event-tagged general remainder counts toward the event", res["E"].covered, 5033);
+  ok("event still open (Ameya/Monica unpaid)", res["E"].settled === false);
+}
+
 console.log(`\n=== money.test ===\nPASS ${pass}  FAIL ${fail}`);

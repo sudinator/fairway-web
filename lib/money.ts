@@ -593,14 +593,17 @@ export function eventSettlement(input: {
   if (allocations && allocations.length) {
     const confSet = new Set(settlements.filter((s) => (s.status || "confirmed") === "confirmed").map((s) => s.id).filter(Boolean));
     const stFrom: Record<string, string> = {};
-    for (const s of settlements) if (s.id) stFrom[s.id] = s.from_user_id;
+    const stBucket: Record<string, string> = {};
+    for (const s of settlements) if (s.id) { stFrom[s.id] = s.from_user_id; stBucket[s.id] = bkey(s.event_id); }
     const expBucket: Record<string, string> = {};
     for (const e of expenses) expBucket[e.id] = bkey(e.event_id);
     for (const a of allocations) {
-      if (!a.expense_id) continue;                 // general → global-square handles it
       if (!confSet.has(a.settlement_id)) continue; // confirmed only
       const from = stFrom[a.settlement_id]; if (!from) continue;
-      const k = expBucket[a.expense_id]; if (k == null) continue;
+      // expense-tagged → the expense's current event; general remainder → the payment's own event bucket
+      // (so a payment made toward an event still fully counts even if part of it can't map to an expense).
+      const k = a.expense_id ? expBucket[a.expense_id] : stBucket[a.settlement_id];
+      if (k == null) continue;
       (cover[k] || (cover[k] = {}));
       cover[k][from] = (cover[k][from] || 0) + a.amount_cents;
     }
