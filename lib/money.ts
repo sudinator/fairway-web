@@ -359,6 +359,7 @@ export interface EventRow {
   closed_at?: string | null;
   created_by?: string | null;
   created_at?: string | null;
+  is_general?: boolean;
 }
 export interface EventExpense { id: string; event_id?: string | null; }
 export interface EventPersonNet { member_id: string; paid: Cents; share: Cents; net: Cents } // net = paid - share
@@ -366,7 +367,7 @@ export interface EventPersonNet { member_id: string; paid: Cents; share: Cents; 
 /** Per-member spent/share/net for ONE event's expenses. Guests resolve to sponsor,
  *  exactly like computeBalances, so an event's nets sum to zero when it balances. */
 export function eventNet(
-  eventId: string,
+  eventId: string | null,
   expenses: (Expense & { event_id?: string | null })[],
   shares: Share[], guests: Guest[], payers: Payer[] = [],
 ): { total: Cents; perMember: EventPersonNet[]; owedWithin: Cents } {
@@ -726,4 +727,72 @@ export function expenseImpact(
   for (const p of afterPaid) add(p.member, p.cents);      // new outlay => net up
   for (const k of Object.keys(d)) if (d[k] === 0) delete d[k];
   return d;
+}
+
+// ---------------- Bucket-scoped settlement (nested worlds that roll up to the Club) ----------------
+// A Bucket (group_events row) is a closed money world: its expenses net among its members, its OWN
+// confirmed settlements pay those down, and it is SETTLED when everyone in it is net-square. Settlement
+// never crosses Buckets. A member's Club balance is exactly the sum of their Bucket balances — that
+// partition identity is what lets the Club act as a read-only scoreboard over independent Buckets.
+type BucketSettlement = Settlement & { id?: string; event_id?: string | null; status?: string };
+
+// Net position per member within ONE Bucket, AFTER that Bucket's confirmed settlements.
+// Sign: positive = owed (creditor in the bucket), negative = owes (debtor). Zero balances are dropped.
+export function bucketBalances(
+  bucketId: string | null,
+  expenses: (Expense & { event_id?: string | null })[],
+  shares: Share[], settlements: BucketSettlement[], guests: Guest[], payers: Payer[] = [],
+): Record<string, Cents> {
+  const bal: Record<string, Cents> = {};
+  const { perMember } = eventNet(bucketId, expenses, shares, guests, payers);
+  for (const m of perMember) bal[m.member_id] = (bal[m.member_id] || 0) + m.net;
+  for (const s of settlements) {
+    if ((s.status || "confirmed") !== "confirmed") continue;
+    if ((s.event_id ?? null) !== bucketId) continue;
+    bal[s.from_user_id] = (bal[s.from_user_id] || 0) + s.amount_cents; // debtor pays down
+    bal[s.to_user_id] = (bal[s.to_user_id] || 0) - s.amount_cents;     // creditor made whole
+  }
+  for (const k of Object.keys(bal)) if (bal[k] === 0) delete bal[k];
+  return bal;
+}
+
+// Fewest-payments transfers to square ONE Bucket (after its settlements).
+export function bucketTransfers(
+  bucketId: string | null,
+  expenses: (Expense & { event_id?: string | null })[],
+  shares: Share[], settlements: BucketSettlement[], guests: Guest[], payers: Payer[] = [],
+): Transfer[] {
+  return simplify(bucketBalances(bucketId, expenses, shares, settlements, guests, payers));
+}
+
+// A Bucket is settled when nobody is left owing within it (all balances zero → no transfers remain).
+export function bucketSettled(
+  bucketId: string | null,
+  expenses: (Expense & { event_id?: string | null })[],
+  shares: Share[], settlements: BucketSettlement[], guests: Guest[], payers: Payer[] = [],
+): boolean {
+  return Object.keys(bucketBalances(bucketId, expenses, shares, settlements, guests, payers)).length === 0;
+}
+
+// Club rollup (read-only scoreboard): each member's net across ALL buckets + the per-bucket breakdown,
+// so a member who is net-$0 overall still sees "owe $X in bucket Y, due $Z in bucket K". By construction
+// net === computeBalances (a member's club balance is the sum of their bucket balances) — the invariant
+// the scoreboard rests on. Pass every bucket id (a null entry folds in any still-ungrouped expenses).
+export interface ClubRollupLine { member_id: string; net: Cents; byBucket: { bucket_id: string | null; amount: Cents }[] }
+export function clubRollup(
+  bucketIds: (string | null)[],
+  expenses: (Expense & { event_id?: string | null })[],
+  shares: Share[], settlements: BucketSettlement[], guests: Guest[], payers: Payer[] = [],
+): ClubRollupLine[] {
+  const confirmed = settlements.filter((s) => (s.status || "confirmed") === "confirmed");
+  const net = computeBalances(expenses as Expense[], shares, confirmed as Settlement[], guests, payers);
+  const byMember: Record<string, { bucket_id: string | null; amount: Cents }[]> = {};
+  for (const bid of bucketIds) {
+    const bb = bucketBalances(bid, expenses, shares, settlements, guests, payers);
+    for (const [m, v] of Object.entries(bb)) (byMember[m] || (byMember[m] = [])).push({ bucket_id: bid, amount: v });
+  }
+  const members = new Set<string>([...Object.keys(net), ...Object.keys(byMember)]);
+  const out: ClubRollupLine[] = [];
+  for (const m of members) { const v = net[m] || 0; if (v !== 0 || (byMember[m] || []).length) out.push({ member_id: m, net: v, byBucket: byMember[m] || [] }); }
+  return out;
 }

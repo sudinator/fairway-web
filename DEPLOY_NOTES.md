@@ -3874,3 +3874,38 @@ The active-event card was showing a green "open" pill, which read like the old "
 status and re-created the exact confusion 172.0 removed. Events don't reflect settlement anymore, so the pill
 is gone — an active event shows only its expenses and split. Archived events keep the "archived" tag (that's a
 real lifecycle state). Display only; no lib or schema change.
+
+### 173.0.260716 — Buckets: per-Bucket settlement worlds rolling up to the Club (migration 0121)
+The money model, reworked from first principles. A **Bucket** (the renamed "event", DB table stays
+`group_events`) is now a self-contained settlement world: its expenses net among its members, its own
+confirmed settlements pay those down, and it is SETTLED when everyone in it is net-square. Settlement is
+scoped to a single Bucket — `allocateSettlement`/`record_settlement` always carry the Bucket's `event_id`,
+so no payment ever reroutes across Buckets (the cross-Bucket FIFO netting was the root cause of the
+"$27.50 of $45 / Jonny owes $10" contradiction). The **Club** is a read-only rollup: each member's net is
+the sum of their Bucket balances (== computeBalances, an exact partition identity). A member can be net-$0
+at the Club while owing in one Bucket and owed in another — you settle inside Buckets, never at Club level.
+
+Engine (lib/money.ts, additive — existing functions unchanged): `bucketBalances`, `bucketTransfers`,
+`bucketSettled`, `clubRollup`. New tests lib/bucket-model.test.ts — 34 assertions incl. a 1,500-run
+multi-Bucket fuzzer proving partition, per-Bucket conservation, Bucket-settled⟺no-transfers, and Bucket
+isolation (settling one Bucket never moves another). Full suite green.
+
+UI (components/money.tsx):
+- Settle is per-Bucket — transfers computed with `bucketTransfers` and grouped under Bucket headers; each
+  row carries its `bucketId`; Pay/Mark/Venmo/PayPal/Zelle and the confirm-on-return flow all thread it.
+  A Bucket with no transfers shows "✓ settled". Recorded payments are labelled with their Bucket.
+- `recordSettlement(from,to,amt,method,bucketId)` — now REQUIRES a Bucket; records `p_event=bucketId`,
+  `allocateSettlement(...,bucketId,...)`, `settleKey(...,bucketId)`.
+- Balances stays the Club scoreboard (net per member); tapping a member shows the per-Bucket breakdown
+  (PersonLedgerModal groups lines by Bucket, shown even at net-zero).
+- Add: the Bucket picker defaults to **General**; "New event" → "New Bucket"; bets still auto-create their
+  own Bucket; guests still resolve to sponsor within each Bucket.
+- Log tab renamed **Activity**.
+
+Migration 0121_money_clean_slate — ONE-TIME clean slate (approved: only disposable test data existed) +
+Bucket foundation. Run it ONCE, right AFTER deploying this build (it makes `settlements.event_id` NOT NULL,
+which the previous UI would violate). Guarded by the ledger so re-running never re-wipes. Also creates one
+**General** Bucket per club and adds `group_events.is_general`.
+
+DEPLOY ORDER: deploy 173.0 first → then run 0121 in the Supabase SQL editor. (0120 from 171.2 is still
+required for realtime Tee Times if not already applied.)

@@ -64,6 +64,7 @@ with checks(migration, kind, a, b, human) as (values
   ('0075_tee_time_roles.sql','function','set_tee_time_captain','','function set_tee_time_captain()'),
   ('0076_holes_unique.sql','index','holes_round_hole_uk','','index holes_round_hole_uk'),
   ('0077_holes_upsert.sql','function','post_game_rounds','','function post_game_rounds()')
+  ,('0121_money_clean_slate.sql','column','group_events','is_general','column group_events.is_general')
 )
 select migration, human as expected_object,
   case kind
