@@ -429,8 +429,10 @@ export interface LedgerLine {
 export function personLedger(
   memberId: string,
   expenses: (Expense & { event_id?: string | null; description?: string })[],
-  shares: Share[], settlements: Settlement[], guests: Guest[], payers: Payer[] = [],
+  shares: Share[], settlements: (Settlement & { id?: string; event_id?: string | null })[], guests: Guest[], payers: Payer[] = [],
   nameOf: (userId: string | null) => string = (u) => u || "someone",
+  allocations: { settlement_id: string; expense_id: string | null; amount_cents: Cents }[] = [],
+  eventName: (eventId: string | null) => string = () => "",
 ): { lines: LedgerLine[]; total: Cents } {
   const gById: Record<string, Guest> = {};
   for (const g of guests) gById[g.id] = g;
@@ -466,10 +468,14 @@ export function personLedger(
       : `You owe ${fmtUSD(s.share_cents)} — your share of “${desc(s.expense_id)}”`;
     lines.push({ kind: "owe", label, eventId: evOf(s.expense_id), delta: -s.share_cents });
   }
-  // settlements
+  // settlements — attributed to the event(s) they cleared (via allocations, else the payment's event tag)
   for (const st of settlements) {
-    if (st.from_user_id === memberId) lines.push({ kind: "settle_out", label: `You paid ${fmtUSD(st.amount_cents)} to ${nameOf(st.to_user_id)}`, eventId: null, delta: st.amount_cents });
-    if (st.to_user_id === memberId) lines.push({ kind: "settle_in", label: `${nameOf(st.from_user_id)} paid you ${fmtUSD(st.amount_cents)}`, eventId: null, delta: -st.amount_cents });
+    const als = allocations.filter((a) => a.settlement_id === st.id);
+    const evIds = Array.from(new Set(als.map((a) => (a.expense_id ? evOf(a.expense_id) : (st.event_id ?? null))).filter(Boolean))) as string[];
+    const names = (evIds.length ? evIds.map((e) => eventName(e)) : (st.event_id ? [eventName(st.event_id)] : [])).filter(Boolean);
+    const evLabel = names.length ? ` · ${names.join(", ")}` : "";
+    if (st.from_user_id === memberId) lines.push({ kind: "settle_out", label: `You paid ${fmtUSD(st.amount_cents)} to ${nameOf(st.to_user_id)}${evLabel}`, eventId: st.event_id ?? null, delta: st.amount_cents });
+    if (st.to_user_id === memberId) lines.push({ kind: "settle_in", label: `${nameOf(st.from_user_id)} paid you ${fmtUSD(st.amount_cents)}${evLabel}`, eventId: st.event_id ?? null, delta: -st.amount_cents });
   }
   const total = lines.reduce((s, l) => s + l.delta, 0);
   return { lines, total };
@@ -518,6 +524,39 @@ export function withinEventDebts(
 }
 
 /** Per-bucket settled state from CONFIRMED, event-tagged settlements. */
+// Per-member standing within an event AFTER payments — what each person still owes / is still owed,
+// with confirmed allocations (expense-in-event, or a general remainder on a settlement tagged to this
+// event) subtracted. Drives the event summary line so a member who has settled stops showing as owing.
+export function eventStandings(
+  eventId: string | null,
+  expenses: (Expense & { event_id?: string | null })[],
+  shares: Share[], guests: Guest[], payers: Payer[],
+  settlements: (Settlement & { id?: string; event_id?: string | null; status?: string })[],
+  allocations: { settlement_id: string; expense_id: string | null; amount_cents: Cents }[] = [],
+): { member_id: string; owes: Cents; gets: Cents }[] {
+  const { perMember } = eventNet(eventId as any, expenses, shares, guests, payers);
+  const conf = new Set(settlements.filter((s) => (s.status || "confirmed") === "confirmed").map((s) => s.id).filter(Boolean));
+  const sFrom: Record<string, string> = {}, sTo: Record<string, string> = {}, sEv: Record<string, string> = {};
+  for (const s of settlements) if (s.id) { sFrom[s.id] = s.from_user_id; sTo[s.id] = s.to_user_id; sEv[s.id] = s.event_id ?? ""; }
+  const inEvent = new Set(expenses.filter((e) => (e.event_id ?? null) === eventId).map((e) => e.id));
+  const bk = eventId ?? "";
+  const paidBy: Record<string, Cents> = {}, recvBy: Record<string, Cents> = {};
+  for (const a of allocations) {
+    if (!conf.has(a.settlement_id)) continue;
+    const belongs = a.expense_id ? inEvent.has(a.expense_id) : (sEv[a.settlement_id] === bk);
+    if (!belongs) continue;
+    const f = sFrom[a.settlement_id], t = sTo[a.settlement_id];
+    if (f) paidBy[f] = (paidBy[f] || 0) + a.amount_cents;
+    if (t) recvBy[t] = (recvBy[t] || 0) + a.amount_cents;
+  }
+  const out: { member_id: string; owes: Cents; gets: Cents }[] = [];
+  for (const m of perMember) {
+    if (m.net < 0) { const owes = Math.max(0, -m.net - (paidBy[m.member_id] || 0)); if (owes > 0) out.push({ member_id: m.member_id, owes, gets: 0 }); }
+    else if (m.net > 0) { const gets = Math.max(0, m.net - (recvBy[m.member_id] || 0)); if (gets > 0) out.push({ member_id: m.member_id, owes: 0, gets }); }
+  }
+  return out;
+}
+
 // Split a payment (from -> to, `amount` cents) across the specific expenses it clears, FIFO by expense
 // created_at. Scope = a single event (eventId) or all of the pair's obligations (eventId null, e.g. a
 // global "Settle up" transfer). Each expense gets the portion `from` owes `to` for it (from's share ×

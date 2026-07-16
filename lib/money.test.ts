@@ -2,7 +2,7 @@
 import {
   evenShares, validateCustomTotal, computeBalances, simplify, pairwiseDebts, aggregateOwed,
   payLink, nudgeSms, fmtUSD, guestOwedFor, guestCoverageBySponsor, betResultToPost,
-  collapseAuditBursts, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, eventSettlement, withinEventDebts, allocateSettlement,
+  collapseAuditBursts, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, eventSettlement, withinEventDebts, eventStandings, allocateSettlement,
 } from "./money";
 import type { Expense, Share, Settlement, Guest, Transfer, Payer, AuditRow } from "./money";
 
@@ -723,6 +723,37 @@ console.log("All assertions passed.");
   // Ameya (5.34) and Monica (42) remain unpaid (neither globally square here).
   check("event-tagged general remainder counts toward the event", res["E"].covered, 5033);
   ok("event still open (Ameya/Monica unpaid)", res["E"].settled === false);
+}
+
+
+// ---- eventStandings: summary reflects payments (App Testing E: after Amit pays, he drops off) ----
+{
+  const exp = [
+    { id: "beer", event_id: "E", payer_user_id: "ameya", amount_cents: 5500 },
+    { id: "food", event_id: "E", payer_user_id: "jonny", amount_cents: 16800 },
+    { id: "tip",  event_id: "E", payer_user_id: "amit",  amount_cents: 2000 },
+  ];
+  const sh = [
+    { expense_id: "beer", user_id: "ameya", guest_id: null, share_cents: 1834 },
+    { expense_id: "beer", user_id: "amit",  guest_id: null, share_cents: 1833 },
+    { expense_id: "beer", user_id: "jonny", guest_id: null, share_cents: 1833 },
+    { expense_id: "food", user_id: "ameya", guest_id: null, share_cents: 4200 },
+    { expense_id: "food", user_id: "amit",  guest_id: null, share_cents: 4200 },
+    { expense_id: "food", user_id: "jonny", guest_id: null, share_cents: 4200 },
+    { expense_id: "food", user_id: "monica",guest_id: null, share_cents: 4200 },
+    { expense_id: "tip",  user_id: "amit",  guest_id: null, share_cents: 1000 },
+    { expense_id: "tip",  user_id: "jonny", guest_id: null, share_cents: 1000 },
+  ];
+  const st = [{ id: "s1", from_user_id: "amit", to_user_id: "jonny", amount_cents: 5033, event_id: "E", status: "confirmed" }];
+  const al = [{ settlement_id: "s1", expense_id: "food", amount_cents: 4200 }, { settlement_id: "s1", expense_id: null, amount_cents: 833 }];
+  const stand = eventStandings("E", exp as any, sh as any, [], [], st as any, al);
+  const byId: Record<string, any> = {}; stand.forEach((x) => (byId[x.member_id] = x));
+  ok("Amit no longer owes in the summary after paying", !byId["amit"]);
+  check("Ameya still owes 5.34", byId["ameya"]?.owes || 0, 534);
+  check("Monica still owes 42 (unpaid)", byId["monica"]?.owes || 0, 4200);
+  check("Jonny still to receive 47.34", byId["jonny"]?.gets || 0, 4734);
+  const owes = stand.reduce((a, x) => a + x.owes, 0), gets = stand.reduce((a, x) => a + x.gets, 0);
+  check("standings balance (owes == gets)", owes, gets);
 }
 
 console.log(`\n=== money.test ===\nPASS ${pass}  FAIL ${fail}`);

@@ -3682,3 +3682,16 @@ who settled IN FULL still look short in that event (e.g. paid $50.33, only $42 c
 (null-expense) allocation now counts toward its settlement's OWN event bucket; only truly global settlements
 (no event) stay on the global-square path. Regression test added from the live scenario. Money suite 122
 assertions, all green. No migration (pure logic in eventSettlement).
+
+### 169.3.260715 — event summary + balances reflect payments (no migration)
+Display catch-up to the payment model (found in the live App Testing session).
+- **#1 Event summary now reflects payments.** The event "who owes what" line used raw expense fronting nets,
+  so a member who had settled still showed as owing. New `eventStandings` subtracts confirmed payments
+  (expense-tagged + event-tagged general remainder) per member, so a paid member drops off and only genuine
+  remaining owes/gets show; "All members settled" appears when none remain. Balanced (owes == gets).
+- **#3 Balances breakdown attributes payments to events.** personLedger settlement lines now label the
+  event(s) a payment cleared (via allocations), e.g. "You paid $50.33 to Jonny · E", instead of showing at
+  the parent level with no event.
+- #2 (how to retract a payment): it's the "Unmark" button in the Settle tab → "Payments recorded" list
+  (hidden only for closed events). No code change; can surface it more prominently if wanted.
+- Tests +5 (eventStandings). Money suite 127 assertions, all green. No migration.

@@ -6,7 +6,7 @@ import { C } from "@/lib/golf";
 import { Avatar, btn, inputStyle, Eyebrow, FieldLabel } from "@/components/ui";
 import {
   computeBalances, simplify, pairwiseDebts, evenShares, validateCustomTotal, guestCoverageBySponsor,
-  fmtUSD, payLink, nudgeSms, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, eventSettlement, withinEventDebts, allocateSettlement,
+  fmtUSD, payLink, nudgeSms, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, eventSettlement, withinEventDebts, allocateSettlement, eventStandings,
   type Expense, type Share, type Settlement, type Guest, type Payer,
   type AuditRow, type AuditVersion, type AuditSnapshot, type EventRow, type LedgerLine,
 } from "@/lib/money";
@@ -396,7 +396,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
           memberId={ledgerFor} me={user.id}
           name={(memberById[ledgerFor]?.display_name) || "Player"}
           net={balances[ledgerFor] || 0}
-          expenses={expenses} shares={shares} settlements={confirmedSettlements} guests={guests} payers={payers}
+          expenses={expenses} shares={shares} settlements={confirmedSettlements} allocations={allocations} guests={guests} payers={payers}
           events={events} memberById={memberById}
           onClose={() => setLedgerFor(null)} />
       )}
@@ -1039,14 +1039,14 @@ function ActivityLog({ activity, memberById, onOpenExpense, canOpen }: { activit
 
 // Plain-language breakdown of how a person's balance was built — raw obligations,
 // grouped by event, NOT the simplified who-pays-whom. Reconciles to the shown net.
-function PersonLedgerModal({ memberId, me, name, net, expenses, shares, settlements, guests, payers, events, memberById, onClose }: {
+function PersonLedgerModal({ memberId, me, name, net, expenses, shares, settlements, allocations, guests, payers, events, memberById, onClose }: {
   memberId: string; me: string; name: string; net: number;
-  expenses: ExpenseRow[]; shares: ShareRow[]; settlements: SettlementRow[]; guests: GuestRow[]; payers: PayerRow[];
+  expenses: ExpenseRow[]; shares: ShareRow[]; settlements: SettlementRow[]; allocations: { settlement_id: string; expense_id: string | null; amount_cents: number }[]; guests: GuestRow[]; payers: PayerRow[];
   events: EventRow[]; memberById: Record<string, Member>; onClose: () => void;
 }) {
   const nameOf = (uid: string | null) => (uid ? (memberById[uid]?.display_name || "someone") : "someone");
-  const { lines } = personLedger(memberId, expenses as any, shares as any, settlements as any, guests as any, payers as any, nameOf);
   const evName = (id: string | null) => (id ? (events.find((e) => e.id === id)?.name || "Event") : "Ungrouped");
+  const { lines } = personLedger(memberId, expenses as any, shares as any, settlements as any, guests as any, payers as any, nameOf, allocations, evName);
   // group lines by event bucket (settlements have no event → "Payments")
   const buckets: { key: string; title: string; lines: LedgerLine[] }[] = [];
   const push = (key: string, title: string, l: LedgerLine) => {
@@ -1158,15 +1158,18 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
                   : <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 9, background: "#123528", color: C.sage }}>open</span>)}
           </div>
         </div>
-        {list.length > 0 && (
-          <div style={{ marginTop: 8, fontSize: 12.5, lineHeight: 1.5, color: settled ? "#8fd6b0" : C.cream, fontWeight: settled ? 700 : 400 }}>
-            {settled
+        {list.length > 0 && (() => {
+          const standings = eventStandings(ev.id, expenses as any, shares as any, guests as any, payers as any, settlements as any, allocations);
+          return (
+          <div style={{ marginTop: 8, fontSize: 12.5, lineHeight: 1.5, color: standings.length === 0 ? "#8fd6b0" : C.cream, fontWeight: standings.length === 0 ? 700 : 400 }}>
+            {standings.length === 0
               ? "All members settled"
-              : [...net.perMember].filter((m) => m.net !== 0).sort((a, b) => a.net - b.net)
-                  .map((m) => `${memberById[m.member_id]?.display_name || "Player"} ${m.net < 0 ? "owes" : "gets"} ${fmtUSD(Math.abs(m.net))}`)
+              : standings.sort((a, b) => (b.owes + b.gets) - (a.owes + a.gets))
+                  .map((s) => `${memberById[s.member_id]?.display_name || "Player"} ${s.owes > 0 ? "owes " + fmtUSD(s.owes) : "gets " + fmtUSD(s.gets)}`)
                   .join(" · ")}
           </div>
-        )}
+          );
+        })()}
         {perMember.length > 0 && (
           <div style={{ marginTop: 10, borderTop: `1px solid ${C.greenMid}`, paddingTop: 8 }}>
             {perMember.map((m) => (
