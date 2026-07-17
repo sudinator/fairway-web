@@ -98,18 +98,24 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
     (missized/clipped/invisible chrome) — a known, recurring bug. Always use the shared `<ShortDateInput>`
     (components/ui.tsx) or, for a full-width field, a raw input whose style includes
     `WebkitAppearance:"none"` (and `appearance:"none"`). Enforced by `ci/check-date-inputs.py`. — manual
-17. **Bottom popups must clear the nav bar + device safe areas — top AND bottom.** Any bottom-docked
-    sheet/modal uses the shared `<BottomSheet>` (components/ui.tsx): it reserves bottom space for the tab bar
-    and the iOS home indicator (`paddingBottom: calc(72px + env(safe-area-inset-bottom))`) and caps height
-    against the notch (`maxHeight: calc(100dvh - env(safe-area-inset-top) - 20px)`). The height cap MUST use
-    the **dynamic** viewport (`100dvh`) and reserve `env(safe-area-inset-top)` — a bare `NNvh` maxHeight uses
-    the LARGE viewport on iOS and pushes the sheet's top (its header + `×`) up under the status bar, clipping
-    it (the notification-sheet bug, v173). Never dock a raw `position:fixed; inset:0` sheet with a plain
-    bottom padding, and never cap a bottom sheet with a bare `vh`. Enforced by `ci/check-bottom-sheets.py`
-    (every bottom-docked panel must include `env(safe-area-inset-bottom)` AND must not use a bare `vh`
-    maxHeight). Centered modals likewise cap with `calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 32px)`.
-    Standalone sheets clear the full nav bar (`calc(72px + safe)`); the nav's own overflow menu docks
-    against it (`16px + safe`). New sheets should use `<BottomSheet>`. — manual
+17. **Know the perimeter; every popup is POSITIONED inside it.** The screen has a safe usable rectangle —
+    inside the notch on top (`env(safe-area-inset-top)`), the tab bar + iOS home indicator on the bottom
+    (`72px + env(safe-area-inset-bottom)`), and the side insets — with a small margin off every edge. This
+    rectangle is knowable exactly (the red TEST-MODE frame, #20, proves it). Every popup — bottom sheet,
+    modal, menu — is built by positioning a bounds box to that rectangle and docking the card inside it, so
+    the card's edges are POSITIONED to the perimeter. The card's max size is the perimeter; if content is
+    taller it fills the rectangle and scrolls internally. **Never size a popup by height math** — no
+    `maxHeight: NNvh`, no fraction of the RAW screen, no "screen minus computed height" leftover. Those
+    ignore the notch/nav and are exactly what kept clipping the top under the notch.
+    **Use the one primitive:** `<BottomSheet>` (components/ui.tsx) encodes the perimeter once — a scrim + a
+    bounds box (`position:fixed; top: calc(env(safe-area-inset-top)+margin); bottom: calc(72px +
+    env(safe-area-inset-bottom)+margin); left/right: margin`) with the card docked inside (`flex:"0 1 auto";
+    minHeight:0`) and an optional sticky `header` above a scrolling body (`flex:1; minHeight:0; overflowY`).
+    Every new popup uses it; don't hand-roll a `position:fixed; inset:0` sheet. Props: `header`, `panelStyle`,
+    `bodyStyle`, `maxWidth`, `margin`, `scrim`, `dismissOnBackdrop`.
+    Enforced by `ci/check-bottom-sheets.py`: bottom-docked panels must reserve `env(safe-area-inset-bottom)`
+    and must not cap with a viewport-relative `maxHeight` (`%`/`vh`/`dvh`) that omits `env(safe-area-inset-top)`.
+    — manual
 18. **Every popup/menu needs a visible way to close it, and pop-up menus keep the nav visible.** Any
     overlay must offer an explicit close control (a `×`, a "Close"/"Done" button) — backdrop-tap alone is
     not enough (it's undiscoverable). Menus that extend the bottom nav (e.g. the "More" sheet) dock ABOVE

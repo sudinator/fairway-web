@@ -4005,3 +4005,39 @@ the screen by (notch + 20px); the list below already scrolls (flex:1; minHeight:
 Institutionalized: check-bottom-sheets.py now flags ANY viewport-relative maxHeight (%, vh, or dvh) that
 doesn't subtract env(safe-area-inset-top) — previously it only caught bare "NNvh", which is why "100%"
 slipped through. Verified it now fails the 100% pattern.
+
+### 173.8.260716 — notification sheet: pin the top by POSITION, not height math (no migration)
+Root cause of the recurring notch clip: the notification panel was a flex CHILD inside a position:fixed
+inset:0 flex-end backdrop, capped by maxHeight. On iOS that flex-item + maxHeight + fixed-viewport combo
+positions the top as a derived leftover of (screen − height), which doesn't hold — the top rode up under the
+notch whenever the list got long (short sheets like the money popups never hit the cap, which is why only
+this one showed it). Fix mirrors the red TEST-MODE frame, which never clips because it POSITIONS its top
+edge (top: env(safe-area-inset-top)). The sheet now lives inside a bounds box pinned to that exact
+notch-to-bottom rectangle (position:fixed; top: env(safe-area-inset-top); bottom:0) and docks inside it
+(flex:"0 1 auto"; minHeight:0); the inner list scrolls (flex:1; minHeight:0; overflowY) with the nav
+clearance moved into its padding. No maxHeight/dvh/box-model dependence. APP_RULES #17 updated with this as
+the robust pattern for tall sheets. (The stat drawer + money sheets use the fixed-bottom:0 + maxHeight form,
+which does work; only the flex-item variant was broken.)
+
+### 173.9.260716 — notification popup bounded on ALL edges; guard no longer blind to it (no migration)
+Extends 173.8. The sheet now sits in a bounds box inset ~12px off EVERY edge — top: calc(env(safe-area-inset-top)+12px),
+bottom: calc(72px + env(safe-area-inset-bottom)+12px) — so the popup's MAX size is the safe usable rectangle
+minus those margins; it can never reach the notch, the tab bar, or the home indicator, and it scrolls
+internally when the list is long. Sheet is now a floating rounded card (all four corners, overflow:hidden).
+Two guard fixes so this is actually enforced: (1) the "decorative overlay" skip now inspects the element's
+OWN line instead of the whole window — the bounds box previously carried pointerEvents:"none" (since removed),
+which made the guard silently skip the entire popup; (2) is_panel now recognizes env-top-managed bounds boxes
+that span downward and requires them to reserve the bottom inset, and the inset checks are paren-agnostic so
+the env(...,0px) fallback form counts. Verified: breaking the box's bottom inset now fails the guard.
+Best-practice sizing captured in APP_RULES #17 (fill the safe rectangle and scroll; never size off the raw screen).
+
+### 173.9.260716 — one popup primitive built on the screen perimeter (no migration)
+Institutionalizes the rule: know the screen's safe usable rectangle (inside notch + nav/home indicator +
+side insets, with a margin) and POSITION every popup inside it — never size a popup by height math.
+Rebuilt the shared <BottomSheet> (components/ui.tsx) to be that one primitive: scrim + a bounds box
+positioned to the perimeter (top: env(safe-area-inset-top)+margin; bottom: 72px + env(safe-area-inset-bottom)
++margin; left/right: margin) with the card docked inside (flex:"0 1 auto"; minHeight:0) and an optional
+sticky header above a scrolling body. It knows the perimeter, so a tall popup fills the rectangle and scrolls
+— it can't cross the notch or the nav. Moved the notification sheet onto it (was hand-rolled), so there's
+one implementation, not two. APP_RULES #17 rewritten principle-first. Next: migrate the remaining hand-rolled
+popups (stat drawer, tee-time sheets, money sheets) onto <BottomSheet> for full consistency.

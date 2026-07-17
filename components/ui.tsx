@@ -111,16 +111,44 @@ export const FieldLabel = ({ children, style }: { children: React.ReactNode; sty
 // against safe-area-inset-top). Every bottom popup should use this so the last button is never hidden
 // behind the nav bar. Pass panelStyle only for genuine per-sheet tweaks (e.g. textAlign).
 export const SHEET_PANEL_BOTTOM = "calc(72px + env(safe-area-inset-bottom))"; // clears the ~56px nav + home indicator
-export function BottomSheet({ onClose, children, panelStyle }: { onClose?: () => void; children: React.ReactNode; panelStyle?: React.CSSProperties }) {
+
+/**
+ * The ONE popup primitive. It knows the on-screen PERIMETER — the safe usable rectangle: top clears the
+ * notch (env(safe-area-inset-top)), bottom clears the nav (72px) + iOS home indicator, with an equal
+ * `margin` off every edge — and docks the card at the bottom of that rectangle. The card can NEVER exceed
+ * the perimeter because it is POSITIONED to it, not sized by height math (no maxHeight/dvh/box-model
+ * guesswork — that is what kept clipping under the notch). Same primitive as the red test frame. Optional
+ * sticky `header` stays put while `children` scroll. Every popup should be built on this. APP_RULES #17.
+ */
+export function BottomSheet({ onClose, children, header, panelStyle, bodyStyle, maxWidth = 520, margin = 12, scrim = "rgba(8,26,20,.72)", dismissOnBackdrop = true }: {
+  onClose?: () => void;
+  children: React.ReactNode;
+  header?: React.ReactNode;
+  panelStyle?: React.CSSProperties;
+  bodyStyle?: React.CSSProperties;
+  maxWidth?: number;
+  margin?: number;
+  scrim?: string;
+  dismissOnBackdrop?: boolean;
+}) {
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{
-        background: C.greenLight, borderRadius: "16px 16px 0 0", width: "100%", maxWidth: 520,
-        padding: "18px 16px", paddingBottom: SHEET_PANEL_BOTTOM,
-        maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto",
-        ...panelStyle,
-      }}>{children}</div>
-    </div>
+    <>
+      <div aria-hidden onClick={dismissOnBackdrop ? onClose : undefined} style={{ position: "fixed", inset: 0, background: scrim, zIndex: 80 }} />
+      <div style={{ position: "fixed",
+        top: `calc(env(safe-area-inset-top, 0px) + ${margin}px)`,
+        bottom: `calc(72px + env(safe-area-inset-bottom, 0px) + ${margin}px)`,
+        left: margin, right: margin, zIndex: 81,
+        display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", pointerEvents: "none" }}>
+        <div onClick={(e) => e.stopPropagation()} style={{
+          pointerEvents: "auto", width: "100%", maxWidth, flex: "0 1 auto", minHeight: 0, overflow: "hidden",
+          background: C.greenLight, borderRadius: 20, boxShadow: "0 8px 40px rgba(0,0,0,.55)",
+          display: "flex", flexDirection: "column", ...panelStyle,
+        }}>
+          {header != null && <div style={{ flexShrink: 0 }}>{header}</div>}
+          <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "18px 16px", ...bodyStyle }}>{children}</div>
+        </div>
+      </div>
+    </>
   );
 }
 

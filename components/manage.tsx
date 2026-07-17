@@ -11,7 +11,7 @@ import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup
 import { logActivity } from "@/lib/activity";
 import { diagEnabled, setDiagEnabled, reproduceBug, setReproduceBug, getDiagLog, clearDiagLog } from "@/lib/debuglog";
 import { AdminFeedbackTab } from "@/components/feedback";
-import { btn, inputStyle, Eyebrow, NumPicker, Avatar } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, NumPicker, Avatar, BottomSheet } from "@/components/ui";
 import { YardageBackfill } from "@/components/yardage-backfill";
 import { AchievementsWall } from "@/components/achievements";
 import { PlayerCard, PeerCardModal, CardVisibilityToggle } from "@/components/player-card";
@@ -2211,44 +2211,43 @@ export function NotificationBell({ user, onSeeAll, onNavigate }: { user: any; on
         )}
       </button>
       {open && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(0,0,0,0.5)",
-          display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center",
-          paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}>
-          {/* scrollable sheet: backdrop does NOT dismiss on tap (rule #4) — close via ×.
-              Panel is explicitly capped smaller than the screen by (notch + 20px) via the canonical
-              dvh formula, so its top can never cross the notch; the list below scrolls (rule #17). */}
-          <div style={{ width: "100%", maxWidth: 440, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)",
-            background: C.greenMid, borderTopLeftRadius: 20, borderTopRightRadius: 20,
-            display: "flex", flexDirection: "column", boxShadow: "0 -10px 40px rgba(0,0,0,.5)",
-            paddingBottom: "calc(72px + env(safe-area-inset-bottom))" }}>
-            <div style={{ width: 40, height: 4, background: C.greenLight, borderRadius: 2, margin: "8px auto 4px", flexShrink: 0 }} />
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 14px 10px", borderBottom: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
-              <Eyebrow style={{ margin: 0 }}>NOTIFICATIONS</Eyebrow>
-              <span style={{ flex: 1 }} />
-              {unread > 0 && (
-                <button onClick={markAllRead} style={{ background: "none", border: "none", color: C.sage, fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "4px 6px" }}>Mark all read</button>
-              )}
-              <button onClick={() => setOpen(false)} aria-label="Close" style={{ background: C.greenLight, border: "none", color: C.cream, width: 30, height: 30, borderRadius: 15, fontSize: 17, fontWeight: 800, cursor: "pointer", lineHeight: 1, flexShrink: 0 }}>×</button>
+        <BottomSheet
+          onClose={() => setOpen(false)}
+          dismissOnBackdrop={false}
+          maxWidth={440}
+          scrim="rgba(0,0,0,0.5)"
+          panelStyle={{ background: C.greenMid }}
+          bodyStyle={{ padding: "2px 8px 12px" }}
+          header={
+            <>
+              <div style={{ width: 40, height: 4, background: C.greenLight, borderRadius: 2, margin: "8px auto 4px" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 14px 10px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+                <Eyebrow style={{ margin: 0 }}>NOTIFICATIONS</Eyebrow>
+                <span style={{ flex: 1 }} />
+                {unread > 0 && (
+                  <button onClick={markAllRead} style={{ background: "none", border: "none", color: C.sage, fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "4px 6px" }}>Mark all read</button>
+                )}
+                <button onClick={() => setOpen(false)} aria-label="Close" style={{ background: C.greenLight, border: "none", color: C.cream, width: 30, height: 30, borderRadius: 15, fontSize: 17, fontWeight: 800, cursor: "pointer", lineHeight: 1, flexShrink: 0 }}>×</button>
+              </div>
+            </>
+          }
+        >
+          {items.length === 0 && <div style={{ color: C.sage, fontSize: 13, padding: 18, textAlign: "center" }}>Nothing yet.</div>}
+          {items.map((n) => (
+            <div key={n.id} onClick={() => { if (!n.read) markOne(n.id); if (n.link && onNavigate) { setOpen(false); onNavigate(n.link); } }}
+              style={{ padding: "11px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", display: "flex", gap: 9, cursor: (n.link || !n.read) ? "pointer" : "default" }}>
+              <span style={{ width: 7, height: 7, borderRadius: 4, background: n.read ? "transparent" : C.gold, marginTop: 5, flexShrink: 0 }} />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ color: n.read ? "#CFC9B4" : C.cream, fontSize: 13, lineHeight: 1.4, fontWeight: n.read ? 500 : 800 }}>{n.message}</div>
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{fmtNotifTime(n.created_at)}</div>
+              </div>
+              {n.link ? <span style={{ color: C.sage, fontSize: 18, alignSelf: "center", flexShrink: 0 }}>›</span> : null}
             </div>
-            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "2px 8px 8px" }}>
-              {items.length === 0 && <div style={{ color: C.sage, fontSize: 13, padding: 18, textAlign: "center" }}>Nothing yet.</div>}
-              {items.map((n) => (
-                <div key={n.id} onClick={() => { if (!n.read) markOne(n.id); if (n.link && onNavigate) { setOpen(false); onNavigate(n.link); } }}
-                  style={{ padding: "11px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", display: "flex", gap: 9, cursor: (n.link || !n.read) ? "pointer" : "default" }}>
-                  <span style={{ width: 7, height: 7, borderRadius: 4, background: n.read ? "transparent" : C.gold, marginTop: 5, flexShrink: 0 }} />
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ color: n.read ? "#CFC9B4" : C.cream, fontSize: 13, lineHeight: 1.4, fontWeight: n.read ? 500 : 800 }}>{n.message}</div>
-                    <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{fmtNotifTime(n.created_at)}</div>
-                  </div>
-                  {n.link ? <span style={{ color: C.sage, fontSize: 18, alignSelf: "center", flexShrink: 0 }}>›</span> : null}
-                </div>
-              ))}
-              {onSeeAll && (
-                <button onClick={() => { setOpen(false); onSeeAll(); }} style={{ width: "100%", marginTop: 8, background: "none", border: "none", color: C.gold, fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "10px 0" }}>See all notifications →</button>
-              )}
-            </div>
-          </div>
-        </div>
+          ))}
+          {onSeeAll && (
+            <button onClick={() => { setOpen(false); onSeeAll(); }} style={{ width: "100%", marginTop: 8, background: "none", border: "none", color: C.gold, fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "10px 0" }}>See all notifications →</button>
+          )}
+        </BottomSheet>
       )}
     </div>
   );

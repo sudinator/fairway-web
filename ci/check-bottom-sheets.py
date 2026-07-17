@@ -23,6 +23,12 @@ def is_panel(line):
         return True
     if 'position: "fixed"' in line and re.search(r"bottom:\s*0\b", line):
         return True
+    # A fixed element that manages the top notch AND spans downward — a notch-to-bottom bounds box
+    # (top: [calc(]env(safe-area-inset-top) ... with a bottom:) or a capped sheet whose style carries a
+    # bottom. Such panels must ALSO reserve the bottom inset. A top-only banner/toast (env-top, no bottom)
+    # docks at the top and is correctly exempt.
+    if 'position: "fixed"' in line and "env(safe-area-inset-top" in line and re.search(r'\bbottom:', line):
+        return True
     return False
 
 violations = []
@@ -34,20 +40,22 @@ for f in sorted(COMPONENTS.glob("*.tsx")):
         if not is_panel(line):
             continue
         window = " ".join(lines[max(0, i - 3):i + 7])
-        # Decorative, non-interactive overlays (border frames, scrims marked aria-hidden or
-        # pointer-events:none) are not popups — they carry no controls to hide behind the nav/notch.
-        if 'pointerEvents: "none"' in window or 'aria-hidden' in line:
+        # Decorative, non-interactive overlays (border frames, scrims) are not popups — skip only when THIS
+        # element's own line is marked non-interactive (aria-hidden / pointer-events:none). We check the line,
+        # not the window, so a real panel that merely sits near a scrim still gets validated.
+        if 'pointerEvents: "none"' in line or 'aria-hidden' in line:
             continue
         # Compliant if it reserves the bottom safe inset, OR it sits ABOVE the nav (docked at bottom:navH,
         # so the always-visible nav — which already carries the safe inset — is between it and the edge).
-        if "env(safe-area-inset-bottom)" not in window and "bottom: navH" not in window and 'bottom: "100%"' not in window:
+        # Match paren-agnostically so the env(...,0px) fallback form counts.
+        if "env(safe-area-inset-bottom" not in window and "bottom: navH" not in window and 'bottom: "100%"' not in window:
             violations.append(f"{f.relative_to(ROOT)}:{i+1}  bottom sheet panel without env(safe-area-inset-bottom) (use <BottomSheet> or add it)")
         # A capped sheet MUST cap against the dynamic viewport minus the notch. ANY viewport-relative
         # maxHeight (%, vh, or dvh) that does not subtract env(safe-area-inset-top) lets the panel's top
         # ride up under the notch/status bar — this bit us twice: "82vh" (large-viewport vh) and "100%"
         # (100% of the full-screen fixed overlay). Small fixed-px caps (maxHeight: 280) are fine.
         for mh in re.findall(r'maxHeight:\s*"([^"]+)"', window):
-            if re.search(r'(?:%|d?vh)', mh) and "env(safe-area-inset-top)" not in mh:
+            if re.search(r'(?:%|d?vh)', mh) and "env(safe-area-inset-top" not in mh:
                 violations.append(f"{f.relative_to(ROOT)}:{i+1}  sheet maxHeight '{mh}' doesn't reserve the notch — use calc(100dvh - env(safe-area-inset-top) - 20px)")
                 break
 
