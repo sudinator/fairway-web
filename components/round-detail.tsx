@@ -11,7 +11,7 @@ import { aiUsesLeft, recordAiUse, AI_DAILY_LIMIT_VALUE } from "@/lib/draft";
 import { createClient } from "@/lib/supabase";
 
 const supabase = createClient();
-import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark, DifferentialSheet } from "@/components/ui";
 import { ShareRoundModal } from "@/components/share-card";
 import { badgesForRound, BADGE_BY_KEY } from "@/lib/badges";
 
@@ -31,6 +31,7 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
       .sort((x, y) => rank[x.def.tier] - rank[y.def.tier]);
   }, [priorRounds, round]);
   const [showShare, setShowShare] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
   return (
     <div>
       {/* Top row: Back on the left, title fills the rest */}
@@ -41,7 +42,7 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
             {round.course}{round.tee_name ? ` · ${round.tee_name}` : ""}
           </div>
           <div style={{ color: C.sage, fontSize: 13 }}>
-            {fmtDate(round.played_at)} · {strokesOf(round)}{!gross && played(round).length > 0 && played(round).length < 18 ? ` thru ${played(round).length}` : ""} ({toParStr(diffOf(round))})
+            {fmtDate(round.played_at)}{round.rating != null && round.slope != null ? ` · ${round.rating}/${round.slope}` : ""} · {strokesOf(round)}{!gross && played(round).length > 0 && played(round).length < 18 ? ` thru ${played(round).length}` : ""} ({toParStr(diffOf(round))})
             {gross ? ` · ${stablefordDisplay(round)} · total score only${round.course_handicap != null ? ` · CH ${round.course_handicap}` : ""}` : ` · ${stablefordDisplay(round)}${round.course_handicap != null ? ` · CH ${round.course_handicap}` : ""} · GIR ${fracPct(girStats([round]))} · FW ${fracPct(firStats([round]))} · ${puttsOf(round)} putts · ${pensOf(round)} pen`}
           </div>
         </div>
@@ -61,6 +62,18 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
 
 
       {showGhin && <GhinPanel round={round} ghinNumber={ghinNumber} playerName={playerName} />}
+
+      {roundDifferential(round) != null && (
+        <button onClick={() => setShowDiff(true)}
+          style={{ marginTop: 12, background: C.greenLight, border: `1px solid ${C.greenMid}`, borderRadius: 10, padding: "9px 13px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", width: "100%", textAlign: "left" }}>
+          <span style={{ color: C.sage, fontSize: 12.5 }}>Differential</span>
+          <span style={{ color: C.cream, fontWeight: 800, fontFamily: "Georgia, serif", fontSize: 16 }}>{roundDifferential(round)!.toFixed(1)}</span>
+          {round.rating != null && round.slope != null && <span style={{ color: C.sage, fontSize: 12 }}>· {round.rating}/{round.slope}</span>}
+          <span style={{ flex: 1 }} />
+          <span style={{ color: C.gold, fontSize: 12.5, fontWeight: 700 }}>How it’s calculated ›</span>
+        </button>
+      )}
+      {showDiff && <DifferentialSheet round={round} onClose={() => setShowDiff(false)} />}
 
       {roundBadges.length > 0 && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 14, marginTop: 14 }}>

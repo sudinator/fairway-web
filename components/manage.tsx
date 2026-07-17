@@ -11,7 +11,7 @@ import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup
 import { logActivity } from "@/lib/activity";
 import { diagEnabled, setDiagEnabled, reproduceBug, setReproduceBug, getDiagLog, clearDiagLog } from "@/lib/debuglog";
 import { AdminFeedbackTab } from "@/components/feedback";
-import { btn, inputStyle, Eyebrow, NumPicker, Avatar, BottomSheet } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, NumPicker, Avatar, BottomSheet, DifferentialSheet } from "@/components/ui";
 import { YardageBackfill } from "@/components/yardage-backfill";
 import { AchievementsWall } from "@/components/achievements";
 import { PlayerCard, PeerCardModal, CardVisibilityToggle } from "@/components/player-card";
@@ -1071,6 +1071,7 @@ export function HandicapSummary({ rounds, profile, onOpen }: { rounds: Round[]; 
   // "What your next round does" — see nextRoundOutlook in lib/golf.ts. Only shown once you have more than
   // 20 acceptable rounds (posting another rolls the oldest of the current 20 out of the window).
   const next = React.useMemo(() => nextRoundOutlook(rounds), [rounds]);
+  const [calcFor, setCalcFor] = React.useState<Round | null>(null);
 
   return (
     <div style={{ background: C.greenMid, borderRadius: 14, padding: 16, marginTop: 16 }}>
@@ -1143,7 +1144,9 @@ export function HandicapSummary({ rounds, profile, onOpen }: { rounds: Round[]; 
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 1 }}>{[r.tee_name, r.rating != null && r.slope != null ? `${r.rating}/${r.slope}` : null].filter(Boolean).join(" · ") || "—"}</div>
               </div>
               <div style={{ width: 38, textAlign: "right", color: C.cream, fontSize: 13, fontWeight: 700, fontFamily: "Georgia, serif" }}>{ag != null ? ag : "—"}</div>
-              <div style={{ width: 44, textAlign: "right", color: used ? C.cream : C.sage, fontSize: 13, fontWeight: used ? 800 : 600, fontFamily: "Georgia, serif" }}>{diff.toFixed(1)}</div>
+              <div onClick={(e) => { e.stopPropagation(); setCalcFor(r); }} role="button" tabIndex={0}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); setCalcFor(r); } }}
+                style={{ width: 44, textAlign: "right", color: used ? C.cream : C.sage, fontSize: 13, fontWeight: used ? 800 : 600, fontFamily: "Georgia, serif", cursor: "pointer", textDecoration: "underline dotted", textDecorationColor: C.sage, textUnderlineOffset: 3 }}>{diff.toFixed(1)}</div>
               {onOpen && <span aria-hidden="true" style={{ width: 14, textAlign: "right", color: C.sage, fontSize: 16, flexShrink: 0 }}>›</span>}
             </div>
           ))}
@@ -1155,8 +1158,10 @@ export function HandicapSummary({ rounds, profile, onOpen }: { rounds: Round[]; 
             <div style={{ color: C.faint, fontSize: 12 }}>Index = average of {hcp.used} lowest{hcp.adj !== 0 ? `, ${hcp.adj > 0 ? "+" : ""}${hcp.adj} adj` : ""}</div>
             <div style={{ color: C.gold, fontSize: 15, fontWeight: 800, fontFamily: "Georgia, serif" }}>{idx.toFixed(1)}</div>
           </div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 8, textAlign: "center" }}>Tap any differential to see how it’s calculated.</div>
         </>
       )}
+      {calcFor && <DifferentialSheet round={calcFor} onClose={() => setCalcFor(null)} />}
     </div>
   );
 }

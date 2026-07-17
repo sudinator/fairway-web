@@ -4073,3 +4073,14 @@ round must beat to make the counting best 8, and — if it's above the threshold
 the oldest rolls off (which can already differ from today's if the roll-off round was one of your counting
 8). Logic is a tested lib/golf.ts `nextRoundOutlook()` (not inline), with a unit test covering the roll-off
 identity, the 8th-lowest-of-19 threshold, and the resulting index. Hidden at 20 or fewer rounds.
+
+### 174.3.260716 — show rating/slope everywhere + tappable differential explainer (no migration)
+Rating/slope now appear wherever a round is listed: the round-list rows (RoundRow), the round summary
+header (RoundDetail), and the Profile handicap table (already had it). New shared DifferentialSheet
+(components/ui.tsx, built on the BottomSheet perimeter primitive) explains a round's Score Differential with
+its actual numbers substituted step by step: the formula (113 ÷ Slope) × (Adjusted Gross − Course Rating),
+the three inputs with plain-language notes (incl. how adjusted gross is capped at net double bogey / filled
+at net par / gross-only total), the substituted arithmetic, and the final rounded result. Opened by tapping
+a differential in the Profile scoring table (dotted underline + hint; taps don't trigger the row's
+scorecard-open) or the "How it's calculated ›" differential pill on the round summary. First real consumer
+of the BottomSheet primitive.

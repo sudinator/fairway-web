@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import {
-  C, Hole, Round, stablefordPts, ptsColor,
+  C, Hole, Round, stablefordPts, ptsColor, adjustedGross, roundDifferential, isGrossOnly, played, fmtDate,
 } from "@/lib/golf";
 
 // Player avatar: circular photo when one exists, otherwise a colored circle with
@@ -154,6 +154,73 @@ export function BottomSheet({ onClose, children, header, panelStyle, bodyStyle, 
 
 // Compact date field: shows a short M/D/YY date in the page font (so it matches
 // every other input) with a real native date picker layered transparently on top.
+// Tappable explainer for a round's Score Differential — shows the WHS formula with this round's actual
+// numbers substituted, step by step. Built on the BottomSheet perimeter primitive.
+export function DifferentialSheet({ round, onClose }: { round: Round; onClose: () => void }) {
+  const ag = adjustedGross(round);
+  const cr = round.rating;
+  const sl = round.slope;
+  const diff = roundDifferential(round);
+  const gross = isGrossOnly(round);
+  const playedN = played(round).length;
+  const partial = !gross && playedN > 0 && playedN < 18;
+  const canCalc = ag != null && cr != null && sl != null && diff != null;
+
+  const InputRow = ({ label, value, note }: { label: string; value: React.ReactNode; note?: string }) => (
+    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, padding: "6px 0" }}>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ color: C.cream, fontSize: 13 }}>{label}</div>
+        {note && <div style={{ color: C.sage, fontSize: 11, marginTop: 1, lineHeight: 1.4 }}>{note}</div>}
+      </div>
+      <div style={{ color: C.cream, fontSize: 16, fontWeight: 800, fontFamily: "Georgia, serif", flexShrink: 0 }}>{value}</div>
+    </div>
+  );
+
+  return (
+    <BottomSheet onClose={onClose} maxWidth={460} panelStyle={{ background: C.greenMid }}
+      header={
+        <div style={{ padding: "14px 16px 10px", borderBottom: `1px solid ${C.line}` }}>
+          <div style={{ color: C.gold, fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase", fontWeight: 700 }}>How this differential is calculated</div>
+          <div style={{ color: C.cream, fontSize: 15, fontWeight: 600, marginTop: 4 }}>{round.course}{round.tee_name ? ` · ${round.tee_name}` : ""}</div>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{fmtDate(round.played_at)}</div>
+        </div>
+      }>
+      {!canCalc ? (
+        <div style={{ color: C.sage, fontSize: 13, lineHeight: 1.6 }}>
+          This round can’t show a differential — it needs a course rating, a slope, and an adjusted gross score. Add those to the round and it’ll appear here.
+        </div>
+      ) : (
+        <>
+          <div style={{ color: C.cream, fontSize: 13.5, fontWeight: 700, textAlign: "center", fontFamily: "Georgia, serif", lineHeight: 1.5 }}>
+            Differential = (113 ÷ Slope) × (Adjusted Gross − Course Rating)
+          </div>
+
+          <div style={{ background: C.card, borderRadius: 12, padding: "8px 14px", marginTop: 14 }}>
+            <InputRow label="Adjusted gross" value={ag}
+              note={gross ? "Total score entered (no per-hole cap available)" : partial ? "Each hole capped at net double bogey; unplayed holes filled at net par" : "Each hole capped at net double bogey (par + 2 + strokes received)"} />
+            <div style={{ height: 1, background: C.line }} />
+            <InputRow label="Course rating" value={cr} note="The expected score for a scratch golfer" />
+            <div style={{ height: 1, background: C.line }} />
+            <InputRow label="Slope" value={sl} note="Difficulty for a bogey golfer (113 = standard)" />
+          </div>
+
+          <div style={{ marginTop: 14, fontFamily: "Georgia, serif", fontSize: 15, color: C.cream, lineHeight: 2 }}>
+            <div style={{ color: C.sage, fontSize: 11, fontFamily: "system-ui, sans-serif", letterSpacing: 0.4, textTransform: "uppercase", marginBottom: 2 }}>Step by step</div>
+            <div>= (113 ÷ {sl}) × ({ag} − {cr})</div>
+            <div>= {(113 / (sl as number)).toFixed(4)} × {((ag as number) - (cr as number)).toFixed(1)}</div>
+            <div>= {((113 / (sl as number)) * ((ag as number) - (cr as number))).toFixed(2)}</div>
+            <div style={{ color: C.gold, fontWeight: 800 }}>= {diff.toFixed(1)} <span style={{ color: C.sage, fontSize: 11, fontWeight: 400, fontFamily: "system-ui, sans-serif" }}>(rounded to one decimal)</span></div>
+          </div>
+
+          <div style={{ color: C.sage, fontSize: 11.5, lineHeight: 1.6, marginTop: 14 }}>
+            The differential measures your round against a standard-difficulty course, so rounds at different courses compare fairly. Your Handicap Index is the average of your lowest 8 differentials from your last 20 rounds.
+          </div>
+        </>
+      )}
+    </BottomSheet>
+  );
+}
+
 export function ShortDateInput({ value, onChange, max }: { value: string; onChange: (v: string) => void; max?: string }) {
   const fmt = (iso: string) => {
     if (!iso) return "Pick date";
