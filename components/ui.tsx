@@ -298,7 +298,7 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
   const fwBtns: [("hit" | "left" | "right"), string][] = [["hit", "✓ Hit"], ["left", "◀ Left"], ["right", "Right ▶"]];
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 300, maxWidth: "100%", maxHeight: "90vh", overflowY: "auto", background: C.card, borderRadius: 14, padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: 300, maxWidth: "100%", maxHeight: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 32px)", overflowY: "auto", background: C.card, borderRadius: 14, padding: 16 }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
           <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{title}</div>
           {recv > 0 && (

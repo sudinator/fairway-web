@@ -98,12 +98,16 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
     (missized/clipped/invisible chrome) — a known, recurring bug. Always use the shared `<ShortDateInput>`
     (components/ui.tsx) or, for a full-width field, a raw input whose style includes
     `WebkitAppearance:"none"` (and `appearance:"none"`). Enforced by `ci/check-date-inputs.py`. — manual
-17. **Bottom popups must clear the nav bar + device safe areas.** Any bottom-docked sheet/modal uses the
-    shared `<BottomSheet>` (components/ui.tsx): it reserves bottom space for the tab bar and the iOS home
-    indicator (`paddingBottom: calc(72px + env(safe-area-inset-bottom))`) and caps height against the notch
-    (`maxHeight: calc(100dvh - env(safe-area-inset-top) - 20px)`). Never dock a raw `position:fixed; inset:0`
-    sheet with a plain bottom padding — the last button ends up hidden behind the nav bar. Enforced by
-    `ci/check-bottom-sheets.py` (every bottom-docked panel must include env(safe-area-inset-bottom)).
+17. **Bottom popups must clear the nav bar + device safe areas — top AND bottom.** Any bottom-docked
+    sheet/modal uses the shared `<BottomSheet>` (components/ui.tsx): it reserves bottom space for the tab bar
+    and the iOS home indicator (`paddingBottom: calc(72px + env(safe-area-inset-bottom))`) and caps height
+    against the notch (`maxHeight: calc(100dvh - env(safe-area-inset-top) - 20px)`). The height cap MUST use
+    the **dynamic** viewport (`100dvh`) and reserve `env(safe-area-inset-top)` — a bare `NNvh` maxHeight uses
+    the LARGE viewport on iOS and pushes the sheet's top (its header + `×`) up under the status bar, clipping
+    it (the notification-sheet bug, v173). Never dock a raw `position:fixed; inset:0` sheet with a plain
+    bottom padding, and never cap a bottom sheet with a bare `vh`. Enforced by `ci/check-bottom-sheets.py`
+    (every bottom-docked panel must include `env(safe-area-inset-bottom)` AND must not use a bare `vh`
+    maxHeight). Centered modals likewise cap with `calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 32px)`.
     Standalone sheets clear the full nav bar (`calc(72px + safe)`); the nav's own overflow menu docks
     against it (`16px + safe`). New sheets should use `<BottomSheet>`. — manual
 18. **Every popup/menu needs a visible way to close it, and pop-up menus keep the nav visible.** Any

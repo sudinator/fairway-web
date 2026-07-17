@@ -890,7 +890,7 @@ export function Home({ session }: { session: any }) {
             position: "absolute", left: 0, right: 0, bottom: "100%",
             background: C.greenLight, borderTopLeftRadius: 18, borderTopRightRadius: 18,
             padding: "6px 12px 12px", boxShadow: "0 -8px 30px rgba(0,0,0,.4)",
-            maxHeight: "70vh", overflowY: "auto",
+            maxHeight: "calc(100dvh - env(safe-area-inset-top) - 96px)", overflowY: "auto",
           }}>
             <div style={{ display: "flex", alignItems: "center", padding: "2px 2px 8px" }}>
               <span style={{ flex: 1, color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 700 }}>MORE</span>

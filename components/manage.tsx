@@ -1241,7 +1241,7 @@ function StatDrawerHost() {
       <div aria-hidden style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 80,
         opacity: open ? 1 : 0, pointerEvents: open ? "auto" : "none", transition: "opacity .2s" }} />
       <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 440, margin: "0 auto", zIndex: 90,
-        background: C.greenMid, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "82vh",
+        background: C.greenMid, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)",
         display: "flex", flexDirection: "column", transform: open ? "translateY(0)" : "translateY(102%)",
         transition: "transform .24s cubic-bezier(.2,.7,.2,1)", boxShadow: "0 -10px 40px rgba(0,0,0,.5)",
         paddingBottom: "calc(72px + env(safe-area-inset-bottom))" }}>
@@ -2212,9 +2212,9 @@ export function NotificationBell({ user, onSeeAll, onNavigate }: { user: any; on
       </button>
       {open && (
         <>
-          <div onClick={() => setOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 80 }} />
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 80 }} />
           <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 440, margin: "0 auto", zIndex: 90,
-            background: C.greenMid, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "82vh",
+            background: C.greenMid, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)",
             display: "flex", flexDirection: "column", boxShadow: "0 -10px 40px rgba(0,0,0,.5)",
             paddingBottom: "calc(72px + env(safe-area-inset-bottom))" }}>
             <div style={{ width: 40, height: 4, background: C.greenLight, borderRadius: 2, margin: "8px auto 4px", flexShrink: 0 }} />

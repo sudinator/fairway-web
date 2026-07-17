@@ -550,7 +550,7 @@ function RsvpSheet({ tt, mine, spotsLeft, warn, busy, onClose, onSubmit }: {
   return (
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 60 }} />
-      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 70, background: C.green, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: "8px 0 calc(72px + env(safe-area-inset-bottom))", maxWidth: 520, margin: "0 auto" }}>
+      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 70, background: C.green, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: "8px 0 calc(72px + env(safe-area-inset-bottom))", maxWidth: 520, margin: "0 auto", maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
         <div style={{ width: 40, height: 4, background: C.greenMid, borderRadius: 2, margin: "6px auto 10px" }} />
         <div style={{ padding: "0 16px 8px" }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: C.gold, letterSpacing: 0.4 }}>TEE TIME #{tt.seq ?? "—"} · {dow(tt.play_date)} {monN(tt.play_date)} {dayN(tt.play_date)}</div>
@@ -764,7 +764,7 @@ function CaptainPicker({ candidates, current, busy, onClose, onPick }: {
   return (
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 60 }} />
-      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 70, background: C.green, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: "8px 0 calc(72px + env(safe-area-inset-bottom))", maxWidth: 520, margin: "0 auto" }}>
+      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 70, background: C.green, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: "8px 0 calc(72px + env(safe-area-inset-bottom))", maxWidth: 520, margin: "0 auto", maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
         <div style={{ width: 40, height: 4, background: C.greenMid, borderRadius: 2, margin: "6px auto 10px" }} />
         <div style={{ fontSize: 16, fontWeight: 800, color: C.cream, padding: "0 16px 10px" }}>Assign captain</div>
         {candidates.length === 0 ? (
@@ -796,7 +796,7 @@ function DutiesModal({ onClose }: { onClose: () => void }) {
   return (
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 60 }} />
-      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 70, background: C.card, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: "8px 0 calc(72px + env(safe-area-inset-bottom))", maxWidth: 520, margin: "0 auto" }}>
+      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 70, background: C.card, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: "8px 0 calc(72px + env(safe-area-inset-bottom))", maxWidth: 520, margin: "0 auto", maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
         <div style={{ width: 40, height: 4, background: C.line, borderRadius: 2, margin: "6px auto 12px" }} />
         <div style={{ fontSize: 16, fontWeight: 800, color: C.ink, padding: "0 16px 4px" }}>Captain duties</div>
         <div style={{ fontSize: 12, color: C.faint, padding: "0 16px 8px" }}>Responsibilities for the round captain.</div>

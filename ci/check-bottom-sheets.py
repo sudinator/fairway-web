@@ -38,6 +38,12 @@ for f in sorted(COMPONENTS.glob("*.tsx")):
         # so the always-visible nav — which already carries the safe inset — is between it and the edge).
         if "env(safe-area-inset-bottom)" not in window and "bottom: navH" not in window and 'bottom: "100%"' not in window:
             violations.append(f"{f.relative_to(ROOT)}:{i+1}  bottom sheet panel without env(safe-area-inset-bottom) (use <BottomSheet> or add it)")
+        # A bottom-docked panel that caps its height MUST cap against the TOP notch with the dynamic
+        # viewport (maxHeight: calc(100dvh - env(safe-area-inset-top) - ...)). A bare "NNvh" maxHeight uses
+        # the LARGE viewport on iOS, pushing the sheet's top (its header + × close) up under the status bar
+        # — the notification-sheet top-clip bug. Require dvh + safe-area-inset-top whenever maxHeight is set.
+        if re.search(r'maxHeight:\s*"\d+vh"', window):
+            violations.append(f"{f.relative_to(ROOT)}:{i+1}  bottom sheet uses bare vh maxHeight — top clips under the notch; use calc(100dvh - env(safe-area-inset-top) - 20px)")
 
 if violations:
     print("BOTTOM-SHEET CHECK FAILED - popups not clearing the nav/safe area:")
