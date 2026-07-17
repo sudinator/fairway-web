@@ -2211,10 +2211,14 @@ export function NotificationBell({ user, onSeeAll, onNavigate }: { user: any; on
         )}
       </button>
       {open && (
-        <>
-          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 80 }} />
-          <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 440, margin: "0 auto", zIndex: 90,
-            background: C.greenMid, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)",
+        <div style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(0,0,0,0.5)",
+          display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center",
+          paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}>
+          {/* scrollable sheet: backdrop does NOT dismiss on tap (rule #4) — close via ×.
+              The backdrop's paddingTop physically reserves the notch and the panel is capped at 100%
+              of that area, so the top can never cross the notch regardless of dvh support. */}
+          <div style={{ width: "100%", maxWidth: 440, maxHeight: "100%",
+            background: C.greenMid, borderTopLeftRadius: 20, borderTopRightRadius: 20,
             display: "flex", flexDirection: "column", boxShadow: "0 -10px 40px rgba(0,0,0,.5)",
             paddingBottom: "calc(72px + env(safe-area-inset-bottom))" }}>
             <div style={{ width: 40, height: 4, background: C.greenLight, borderRadius: 2, margin: "8px auto 4px", flexShrink: 0 }} />
@@ -2244,7 +2248,7 @@ export function NotificationBell({ user, onSeeAll, onNavigate }: { user: any; on
               )}
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

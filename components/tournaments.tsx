@@ -4181,7 +4181,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
                 <div style={{ color: colorFor(p), fontSize: 11, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 3 }}>{p.display_name}</div>
                 <div
                   style={{ position: "relative", background: "#FBFAF4", borderRadius: 7, height: 56, display: "flex", alignItems: "center", justifyContent: "center", cursor: (isMarker || p.user_id === user?.id) ? "pointer" : "default", outline: isMarker ? "1px solid #E6E0CC" : (p.user_id === user?.id ? "1px dashed #C9BF9B" : "none") }}
-                  onClick={(isMarker || p.user_id === user?.id) ? () => { if (isMarker && (gross == null || gross <= 0)) onSetHole(p.id, i, { strokes: m.par }); setEdit({ playerId: p.id, holeIdx: i }); } : undefined}>
+                  onClick={(isMarker || p.user_id === user?.id) ? () => { setEdit({ playerId: p.id, holeIdx: i }); } : undefined}>
                   {recv > 0 && (
                     <div style={{ position: "absolute", top: 4, left: 5, display: "flex", gap: 2 }}>
                       {Array.from({ length: Math.min(recv, 2) }).map((_, d) => (
@@ -6870,7 +6870,10 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
             <div style={{ marginTop: 6 }}>
               {result.perPlayer.slice().sort((a, b) => b.net - a.net).map((p) => (
                 <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, background: C.card, borderRadius: 10, padding: "9px 12px", marginTop: 6 }}>
-                  <div style={{ flex: 1, color: C.ink, fontWeight: 800 }}>{p.name}</div>
+                  <div style={{ flex: 1, minWidth: 0, color: C.ink, fontWeight: 800 }}>
+                    {p.name}
+                    {idToIsGuest[p.id] && (() => { const sp = nameOfUid(idToGuestOf[p.id] || ""); return <div style={{ color: C.faint, fontSize: 11, fontWeight: 700 }}>guest of {sp} · {sp} {p.net >= 0 ? "is paid this" : "pays this"}</div>; })()}
+                  </div>
                   <div style={{ color: C.faint, fontSize: 12 }}>won ${p.won.toFixed(2)}</div>
                   <div style={{ width: 80, textAlign: "right", fontWeight: 800, fontFamily: "Georgia, serif", fontSize: 15, color: p.net >= 0 ? C.green : C.birdie }}>
                     {p.net >= 0 ? "+" : "−"}${Math.abs(p.net).toFixed(2)}
@@ -6934,8 +6937,11 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
                   <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>Posts one “Bet” expense so losers owe winners in the Money tab.</div>
                   <div style={{ marginTop: 10 }}>
                     {result.perPlayer.slice().sort((a, b) => b.net - a.net).map((p) => (
-                      <div key={p.id} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", fontSize: 13 }}>
-                        <span style={{ color: C.ink }}>{p.name}{idToIsGuest[p.id] ? <span style={{ color: C.faint, fontSize: 11, fontWeight: 700 }}> · guest of {nameOfUid(idToGuestOf[p.id] || "")}</span> : ""}</span>
+                      <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, padding: "5px 0", fontSize: 13 }}>
+                        <div style={{ minWidth: 0 }}>
+                          <span style={{ color: C.ink }}>{p.name}</span>
+                          {idToIsGuest[p.id] && (() => { const sp = nameOfUid(idToGuestOf[p.id] || ""); return <div style={{ color: C.faint, fontSize: 11, fontWeight: 700 }}>guest of {sp} · {sp} {p.net >= 0 ? "is paid this" : "pays this"}</div>; })()}
+                        </div>
                         <span style={{ fontWeight: 800, fontFamily: "Georgia, serif", color: p.net >= 0 ? C.green : C.birdie }}>{p.net >= 0 ? "+" : "−"}${Math.abs(p.net).toFixed(2)}</span>
                       </div>
                     ))}

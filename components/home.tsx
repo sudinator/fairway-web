@@ -578,17 +578,17 @@ export function Home({ session }: { session: any }) {
     const gids = groups.map((g) => g.id);
     if (!gids.length) { setOwed({ cents: 0, clubs: [] }); return; }
     const [{ data: exp }, { data: setl }, { data: gg }] = await Promise.all([
-      supabase.from("expenses").select("id, group_id, payer_user_id, amount_cents").in("group_id", gids),
+      supabase.from("expenses").select("id, group_id, payer_user_id, amount_cents").in("group_id", gids).is("deleted_at", null),
       supabase.from("settlements").select("group_id, from_user_id, to_user_id, amount_cents, status").in("group_id", gids),
       supabase.from("group_guests").select("id, group_id, sponsor_user_id").in("group_id", gids),
     ]);
     const exps = (exp || []) as any[];
     const expIds = exps.map((e) => e.id);
     const { data: sh } = expIds.length
-      ? await supabase.from("expense_shares").select("expense_id, user_id, guest_id, share_cents").in("expense_id", expIds)
+      ? await supabase.from("expense_shares").select("expense_id, user_id, guest_id, sponsor_user_id, share_cents").in("expense_id", expIds)
       : { data: [] as any[] };
     const { data: py } = expIds.length
-      ? await supabase.from("expense_payers").select("expense_id, user_id, paid_cents").in("expense_id", expIds)
+      ? await supabase.from("expense_payers").select("expense_id, user_id, guest_id, sponsor_user_id, paid_cents").in("expense_id", expIds)
       : { data: [] as any[] };
     const g2 = (o: Record<string, any[]>, k: string) => (o[k] || (o[k] = []));
     const expBy: Record<string, any[]> = {}; exps.forEach((e) => g2(expBy, e.group_id).push(e));
@@ -651,8 +651,8 @@ export function Home({ session }: { session: any }) {
       <Toaster />
       <ViewportDiag />
       {testMode && (
-        <div aria-hidden="true" style={{ position: "fixed", inset: 0, border: "3px solid #DC2626", pointerEvents: "none", zIndex: 9999 }}>
-          <div style={{ position: "absolute", top: "env(safe-area-inset-top, 0px)", left: "50%", transform: "translateX(-50%)", background: "#DC2626", color: "#fff", fontSize: 11, fontWeight: 800, letterSpacing: 1, padding: "2px 10px", borderRadius: "0 0 8px 8px" }}>TEST MODE</div>
+        <div aria-hidden="true" style={{ position: "fixed", top: "env(safe-area-inset-top, 0px)", left: 0, right: 0, bottom: 0, border: "3px solid #DC2626", pointerEvents: "none", zIndex: 9999 }}>
+          <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", background: "#DC2626", color: "#fff", fontSize: 11, fontWeight: 800, letterSpacing: 1, padding: "2px 10px", borderRadius: "0 0 8px 8px" }}>TEST MODE</div>
         </div>
       )}
       <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: moreOpen ? "hidden" : "auto", overflowX: "hidden", WebkitOverflowScrolling: "touch" }}>

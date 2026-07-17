@@ -78,6 +78,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
   const [remindCopied, setRemindCopied] = useState(false);
   const [signupCopied, setSignupCopied] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [endedGameIds, setEndedGameIds] = useState<Set<string>>(new Set());
   const [dlDone, setDlDone] = useState(false);
   const [actionErr, setActionErr] = useState<string | null>(null);
 
@@ -86,6 +87,12 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
     const { data: tt } = await supabase.from("tee_times").select("*").eq("group_id", activeGroupId).order("play_date", { ascending: false });
     const list = (tt || []) as TeeTime[];
     setTees(list);
+    // A tee time linked to a FINISHED game is done regardless of its date — a finalized game supersedes.
+    const gameIds = Array.from(new Set(list.map((t) => t.game_id).filter(Boolean))) as string[];
+    if (gameIds.length) {
+      const { data: gs } = await supabase.from("games").select("id, status").in("id", gameIds).eq("status", "ended");
+      setEndedGameIds(new Set(((gs || []) as any[]).map((g) => g.id)));
+    } else setEndedGameIds(new Set());
     const ids = list.map((t) => t.id);
     if (ids.length) {
       const { data: rs } = await supabase.from("tee_time_rsvps").select("*").in("tee_time_id", ids);
@@ -131,8 +138,11 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
 
   const midnight = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
   const isPast = (t: TeeTime) => new Date(t.play_date + "T12:00:00") < midnight();
-  const upcoming = tees.filter((t) => t.status !== "cancelled" && !isPast(t)).sort((a, b) => +new Date(a.play_date) - +new Date(b.play_date));
-  const past = tees.filter((t) => t.status !== "cancelled" && isPast(t));
+  // A finalized linked game supersedes the date: the tee time is done even if the play date is future.
+  const gameEnded = (t: TeeTime) => !!(t.game_id && endedGameIds.has(t.game_id));
+  const isDone = (t: TeeTime) => isPast(t) || gameEnded(t);
+  const upcoming = tees.filter((t) => t.status !== "cancelled" && !isDone(t)).sort((a, b) => +new Date(a.play_date) - +new Date(b.play_date));
+  const past = tees.filter((t) => t.status !== "cancelled" && isDone(t));
   const cancelled = tees.filter((t) => t.status === "cancelled");
   const pending = upcoming.filter((t) => !myRsvp(t.id));
   const shown = filter === "upcoming" ? upcoming : filter === "past" ? past : cancelled;
@@ -251,7 +261,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
     const t = tees.find((x) => x.id === initialTeeId);
     if (t) {
       setSelId(t.id); setDetailTab("info"); setScreen("detail");
-      if (t.status !== "cancelled" && !isPast(t)) setRsvpOpen(true);
+      if (t.status !== "cancelled" && !isDone(t)) setRsvpOpen(true);
     }
     setDlDone(true);
     onConsumedDeepLink?.();
@@ -279,7 +289,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
     if (sel.max_spots != null) ins.forEach((r) => { cum += 1 + (r.guest_names?.length || 0); if (cum > sel.max_spots!) { wc++; waitSet.add(r.user_id); waitPos.set(r.user_id, wc); } });
     const canOrganizeTee = canManage || sel.created_by === user.id; // admin OR the tee-time creator
     const isCaptain = sel.captain_user_id === user.id;
-    const frozen = isPast(sel) && !canOrganizeTee;
+    const frozen = isDone(sel) && !canOrganizeTee;
     const hasGameBtn = sel.status !== "cancelled" && (!!sel.game_id || (ins.length > 0 && (canOrganizeTee || isCaptain)));
     const fieldIns = ins.filter((r) => !waitSet.has(r.user_id));
     const spawnGame = () => onSpawnGame?.({ teeTimeId: sel.id, course: sel.course, playDate: sel.play_date, memberIds: fieldIns.map((r) => r.user_id), guests: fieldIns.flatMap((r) => (r.guest_names || []).map((name) => ({ name, sponsorUserId: r.user_id }))) });
@@ -370,10 +380,10 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
               <div style={{ fontSize: 12, color: C.faint }}>Captain</div>
               <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{sel.captain_user_id ? (memberOf(sel.captain_user_id)?.display_name || "Assigned") : "Not assigned"}</div>
             </div>
-            {(canOrganizeTee || isCaptain) && !isPast(sel) && sel.status !== "cancelled" && <button onClick={() => setCaptainPickerOpen(true)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>{sel.captain_user_id ? "Change" : "Assign"}</button>}
+            {(canOrganizeTee || isCaptain) && !isDone(sel) && sel.status !== "cancelled" && <button onClick={() => setCaptainPickerOpen(true)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>{sel.captain_user_id ? "Change" : "Assign"}</button>}
             <button onClick={() => setDutiesOpen(true)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Duties</button>
           </div>
-          {sel.status !== "cancelled" && !isPast(sel) && (
+          {sel.status !== "cancelled" && !isDone(sel) && (
             sel.game_id ? (
               (canOrganizeTee || isCaptain) ? <button onClick={() => onOpenGame?.(sel.game_id!)} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 13 }}>Open linked game ›</button> : null
             ) : ins.length === 0 ? (
@@ -398,10 +408,10 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
             )
           )}
           <button onClick={() => copyExport(sel)} style={{ ...btn(!hasGameBtn), width: "100%", marginTop: hasGameBtn ? 8 : 10, fontSize: 13 }}>{copied ? "Copied ✓" : "Copy for WhatsApp"}</button>
-          {canOrganizeTee && sel.status !== "cancelled" && !isPast(sel) && (
+          {canOrganizeTee && sel.status !== "cancelled" && !isDone(sel) && (
             <button onClick={() => copyReminder(sel)} style={{ ...btn(false), width: "100%", marginTop: 8, fontSize: 13 }}>{remindCopied ? "Reminder copied ✓" : "Copy reminder for WhatsApp"}</button>
           )}
-          {canOrganizeTee && sel.status !== "cancelled" && !isPast(sel) && (
+          {canOrganizeTee && sel.status !== "cancelled" && !isDone(sel) && (
             <button onClick={() => copySignupLink(sel)} disabled={busy} style={{ ...btn(false), width: "100%", marginTop: 8, fontSize: 13, opacity: busy ? 0.6 : 1 }}>{signupCopied ? "Sign-up link copied ✓" : "Copy sign-up link (new players)"}</button>
           )}
           </>

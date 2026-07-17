@@ -3945,3 +3945,51 @@ Feedback batch off the first live Bucket testing:
 - **Copy:** the top Balances tile is now "Aggregate Club-level Balances" (net across all Buckets, tap for
   the per-Bucket breakdown); "Expenses by event" → "Expenses by Bucket".
 No new migration this build. 0121 must already be applied.
+
+### 173.3.260716 — settled-bucket UI, notch (attempt 3, robust), tee-time/game flow, phantom-score fix (no migration)
+Four fixes from live testing:
+- **Settled Bucket no longer shows a $ on top.** A settled island showed the gold total, which read like an
+  outstanding balance. Now a settled island shows "✓ Settled" up top (unsettled still shows total spend).
+- **Notification popup notch — definitive fix.** Stopped relying on `maxHeight: calc(100dvh - safe-top …)`
+  (a dvh-resolution quirk in the installed PWA was dropping the cap). The sheet is now a full-screen flex
+  backdrop with `paddingTop: calc(env(safe-area-inset-top)+12px)` and the panel capped at `maxHeight:100%`
+  of that padded area — so the top physically cannot cross the notch, independent of dvh support.
+- **A finalized game now supersedes the tee-time date.** Tee times linked to a game with status='ended' are
+  treated as done (moved to Past, edit/RSVP frozen) even if the play date is future — tee-times now loads the
+  linked games' ended status and folds it into the upcoming/past split.
+- **Phantom hole scores fixed.** Tapping an empty hole cell as the group marker pre-persisted `strokes=par`
+  BEFORE the editor opened, so merely opening (or navigating past) a hole wrote a phantom par — which then
+  showed up in the six-hole segments (e.g. a hole-7 score with none entered). Removed the pre-persist;
+  par is still one tap inside the editor. NOTE: existing phantom scores already in a game must be cleared by
+  hand (open that hole and clear it) — the fix only prevents new ones.
+No migration. 0121 remains the last migration.
+
+### 173.3.260716 — owe-banner matches the Money screen (no migration)
+The top "You owe $X in <club>" banner persisted after everything was settled. Root cause: its balance
+query (home.tsx loadOwed) didn't match the Money screen's inputs, so its computeBalances diverged:
+- expense_payers was selected as (expense_id, user_id, paid_cents) — MISSING guest_id/sponsor_user_id — so
+  a GUEST payer's winnings (e.g. a member's guest winning a bet) resolved to nobody and were dropped,
+  leaving the sponsor "owing" what their guest actually won.
+- expense_shares was missing sponsor_user_id (per-expense sponsor).
+- the expenses query didn't exclude soft-deleted rows, so voided expenses still counted.
+Fixed the banner's queries to mirror the Money screen (guest_id + sponsor_user_id on payers/shares;
+deleted_at IS NULL on expenses). The banner already refreshes on settle (onChanged=loadOwed), so it now
+reads $0 when the club is square. Display/query only.
+
+### 173.4.260716 — expense detail spells out guest → sponsor settlement (no migration)
+In the expense/bet detail view, guest rows didn't make clear that the guest doesn't settle directly — the
+sponsoring member does. Now each guest row shows "guest of <sponsor>" with the direction: in Paid by,
+"<sponsor> is paid this" (a guest's winnings go to the sponsor); in Split, "<sponsor> pays this" (a guest's
+share is owed by the sponsor). Plus a one-line footnote when any guest is in the expense. Display only.
+
+### 173.5.260716 — guest→sponsor clarity in the bet views too (no migration)
+Extends 173.4 everywhere guests appear in a money context. The game's NET RESULT list and the "Confirm bet
+winnings" modal now show, under each guest row, "guest of <sponsor> · <sponsor> is paid this" (guest won)
+or "<sponsor> pays this" (guest lost) — so it's explicit that the sponsoring member settles the guest's
+balance. Matches the expense-detail wording from 173.4. Display only.
+
+### 173.6.260716 — test-mode frame respects the notch (no migration)
+The red TEST-MODE border frame was position:fixed inset:0, so its top edge ran behind the notch/status
+bar (the bottom looked fine, tucked behind the nav). Inset the frame's top by env(safe-area-inset-top) so
+the top border sits just below the notch; the "TEST MODE" tab now hangs from that edge (top:0 within the
+frame). Bottom unchanged. Same safe-area-top principle the bottom sheets use to cap their height. Display only.

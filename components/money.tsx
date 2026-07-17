@@ -1151,9 +1151,6 @@ function ExpenseDetail({ expense, shares, payers, memberById, guestById, version
   const [openVer, setOpenVer] = useState<number | null>(null);
   const prs = payers.filter((p) => p.expense_id === expense.id);
   const parts = shares.filter((s) => s.expense_id === expense.id);
-  const paidRows = prs.length
-    ? prs.map((p) => ({ name: p.user_id ? (memberById[p.user_id]?.display_name || "?") : (guestById[p.guest_id || ""]?.name || "guest"), cents: p.paid_cents }))
-    : [{ name: memberById[expense.payer_user_id]?.display_name || "?", cents: expense.amount_cents }];
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px", paddingBottom: "calc(72px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 520, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
@@ -1183,15 +1180,43 @@ function ExpenseDetail({ expense, shares, payers, memberById, guestById, version
         )}
 
         <Eyebrow>Paid by</Eyebrow>
-        {paidRows.map((r, i) => (
-          <div key={i} style={{ display: "flex", color: C.cream, fontSize: 13.5, padding: "3px 0" }}><span style={{ flex: 1 }}>{r.name}</span><span style={{ color: C.gold }}>{fmtUSD(r.cents)}</span></div>
-        ))}
+        {prs.length ? prs.map((p, i) => {
+          const isGuest = !p.user_id && !!p.guest_id;
+          const nm = p.user_id ? (memberById[p.user_id]?.display_name || "?") : (guestById[p.guest_id || ""]?.name || "guest");
+          const sid = isGuest ? (p.sponsor_user_id || guestById[p.guest_id || ""]?.sponsor_user_id || null) : null;
+          const sponsor = sid ? (memberById[sid]?.display_name || "their sponsor") : null;
+          return (
+            <div key={i} style={{ display: "flex", alignItems: "baseline", color: C.cream, fontSize: 13.5, padding: "3px 0" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span>{nm}</span>
+                {isGuest && sponsor && <div style={{ color: C.sage, fontSize: 11 }}>guest of {sponsor} · {sponsor} is paid this</div>}
+              </div>
+              <span style={{ color: C.gold }}>{fmtUSD(p.paid_cents)}</span>
+            </div>
+          );
+        }) : (
+          <div style={{ display: "flex", color: C.cream, fontSize: 13.5, padding: "3px 0" }}><span style={{ flex: 1 }}>{memberById[expense.payer_user_id]?.display_name || "?"}</span><span style={{ color: C.gold }}>{fmtUSD(expense.amount_cents)}</span></div>
+        )}
 
         <Eyebrow>Split · {parts.length} {parts.length === 1 ? "person" : "people"}</Eyebrow>
         {parts.map((s, i) => {
-          const nm = s.user_id ? (memberById[s.user_id]?.display_name || "?") : ((guestById[s.guest_id || ""]?.name || "guest") + " (guest)");
-          return <div key={s.id || i} style={{ display: "flex", color: C.cream, fontSize: 13.5, padding: "3px 0" }}><span style={{ flex: 1 }}>{nm}</span><span style={{ color: C.sage }}>{fmtUSD(s.share_cents)}</span></div>;
+          const isGuest = !s.user_id && !!s.guest_id;
+          const nm = s.user_id ? (memberById[s.user_id]?.display_name || "?") : (guestById[s.guest_id || ""]?.name || "guest");
+          const sid = isGuest ? (s.sponsor_user_id || guestById[s.guest_id || ""]?.sponsor_user_id || null) : null;
+          const sponsor = sid ? (memberById[sid]?.display_name || "their sponsor") : null;
+          return (
+            <div key={s.id || i} style={{ display: "flex", alignItems: "baseline", color: C.cream, fontSize: 13.5, padding: "3px 0" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span>{nm}{isGuest ? " (guest)" : ""}</span>
+                {isGuest && sponsor && <div style={{ color: C.sage, fontSize: 11 }}>guest of {sponsor} · {sponsor} pays this</div>}
+              </div>
+              <span style={{ color: C.sage }}>{fmtUSD(s.share_cents)}</span>
+            </div>
+          );
         })}
+        {parts.some((s) => !s.user_id && s.guest_id) && (
+          <div style={{ color: C.faint, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>Guests don’t settle directly — a guest’s share is paid, and a guest’s winnings received, by their sponsoring member.</div>
+        )}
 
         {versions.length > 0 && (<>
           <Eyebrow>History · {versions.length} {versions.length === 1 ? "change" : "changes"}</Eyebrow>
@@ -1354,7 +1379,9 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
     const net = eventNet(ev.id, expenses as any, shares as any, guests as any, payers as any);
     const list = byEv[ev.id] || [];
     const created = ev.created_at ? new Date(ev.created_at).toLocaleDateString([], { month: "short", day: "numeric" }) : null;
-    const perMember = [...net.perMember].sort((a, b) => (memberById[a.member_id]?.display_name || "").localeCompare(memberById[b.member_id]?.display_name || ""));
+    const bal = bucketBalances(ev.id, expenses as any, shares as any, settlements as any, guests as any, payers as any);
+    const brows = Object.entries(bal).sort((a, b) => (memberById[a[0]]?.display_name || "").localeCompare(memberById[b[0]]?.display_name || ""));
+    const settled = brows.length === 0;
     return (
       <div key={ev.id} style={{ background: C.greenLight, borderRadius: 14, padding: "12px 13px", marginBottom: 12, border: ev.event_type === "game" ? "1px solid #2c7d5f" : undefined }}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
@@ -1365,17 +1392,17 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
             <div style={{ color: C.sage, fontSize: 11.5, marginTop: 1 }}>{[created ? "created " + created : null, `${list.length} ${list.length === 1 ? "expense" : "expenses"}`].filter(Boolean).join(" · ")}</div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>{fmtUSD(net.total)}</div>
+            {settled
+              ? <div style={{ color: "#7fd6a3", fontSize: 13, fontWeight: 800 }}>✓ Settled</div>
+              : <><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>{fmtUSD(net.total)}</div><div style={{ color: C.faint, fontSize: 11 }}>total spend</div></>}
           </div>
         </div>
         {(() => {
           // Per-Bucket settled balance — a mini version of the aggregate Club tile, scoped to THIS Bucket.
           // Shows who owes what within the Bucket after its own settlements; "cleared" when net-square.
-          const bal = bucketBalances(ev.id, expenses as any, shares as any, settlements as any, guests as any, payers as any);
-          const brows = Object.entries(bal).sort((a, b) => (memberById[a[0]]?.display_name || "").localeCompare(memberById[b[0]]?.display_name || ""));
           return (
             <div style={{ marginTop: 10, borderTop: `1px solid ${C.greenMid}`, paddingTop: 8 }}>
-              {brows.length === 0 ? (
+              {settled ? (
                 <div style={{ color: "#7fd6a3", fontSize: 13, fontWeight: 700, textAlign: "center", padding: "3px 0" }}>✓ All balances cleared for this Bucket</div>
               ) : brows.map(([mid, v]) => (
                 <div key={mid} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, padding: "3px 0", color: C.cream }}>

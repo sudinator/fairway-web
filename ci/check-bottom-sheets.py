@@ -34,6 +34,10 @@ for f in sorted(COMPONENTS.glob("*.tsx")):
         if not is_panel(line):
             continue
         window = " ".join(lines[max(0, i - 3):i + 7])
+        # Decorative, non-interactive overlays (border frames, scrims marked aria-hidden or
+        # pointer-events:none) are not popups — they carry no controls to hide behind the nav/notch.
+        if 'pointerEvents: "none"' in window or 'aria-hidden' in line:
+            continue
         # Compliant if it reserves the bottom safe inset, OR it sits ABOVE the nav (docked at bottom:navH,
         # so the always-visible nav — which already carries the safe inset — is between it and the edge).
         if "env(safe-area-inset-bottom)" not in window and "bottom: navH" not in window and 'bottom: "100%"' not in window:
