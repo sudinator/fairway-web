@@ -21,6 +21,8 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npm test
+      - name: UI guards (font size, safe areas, popups, borders)
+        run: npm run guards
       - run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co

@@ -126,7 +126,21 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
 Cumulative `.zip` → unzip to `C:\dev\fairway-web` → GitHub Desktop commit → Vercel auto-deploy →
 run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
 17. **Charts must fit their data to the space.** Before shipping any chart, look at the actual values and set the axis to the best fit — never leave a chart cramped or dominated by one bar. For trend/line charts fit the y-axis to the data range (use `niceDomain` in dashboard.tsx, or AdaptiveTrend which now self-fits when no `domain` is passed); pct stats clamp 0–100. For count bar charts the bars start at 0 but the chart must be tall enough that small bars read as bars, not slivers (min ~150px) — if the fit is still poor, make the chart larger rather than leaving it. Guard flat series (span 0). This is a default, not a per-chart request — don't wait to be told a chart looks wrong. — manual
-19. **Money settles at the CLUB level only, via the "Fewest payments" (simplified) view.** Event islands
-    have no Settle button (they show settled-state from allocations). "As entered" is a read-only reference
-    view. Club payments allocate down to events (audit trail). An expense CANNOT be moved in/out of an event
-    that has recorded payments — unmark first (guard in moveExpenseEvent). — manual
+19. **Money settles per BUCKET, each a self-contained world; the Club is a read-only rollup (v173).**
+    A Bucket (the renamed "event", table still `group_events`) nets its own expenses among its members and
+    is settled via the "Fewest payments" view WITHIN that Bucket — `bucketTransfers`/`bucketSettled`, and
+    every settlement carries its Bucket's `event_id` (NOT NULL). Nothing reroutes across Buckets. "Settled"
+    means net-square within the Bucket (no `$X of $Y` figure). The Club scoreboard shows each member's net
+    across all Buckets (`clubRollup`, == `computeBalances`) plus the per-Bucket breakdown, even at net-zero.
+    Guests always resolve to their sponsoring member within each Bucket. Superseded the club-level-only
+    model that shipped in 172.x. — manual
+20. **Fixed, full-viewport frames/borders must respect the top safe area (the notch).** A `position:fixed`
+    element anchored to the top edge (`inset:0` or `top:0`) that draws a visible `border` will paint that
+    border edge-to-edge behind the notch/status bar — the bottom looks fine (it tucks behind the nav), so
+    the bug hides in plain sight. This has recurred (the TEST-MODE frame). Anchor the top with
+    `env(safe-area-inset-top)` instead of pinning to 0 (e.g. `top: "env(safe-area-inset-top, 0px)", left:0,
+    right:0, bottom:0`), and let any label/tab hang from that edge. Full-screen scrims (background only, no
+    border) are exempt — they SHOULD cover the whole screen, notch included. Same `env(safe-area-inset-top)`
+    principle bottom sheets use to cap their height (#17). Enforced by `ci/check-safe-area-frames.py`; all
+    UI guards now run in CI via `npm run guards` (font size, global rules, chart overflow, date inputs,
+    bottom sheets, safe-area frames). — manual

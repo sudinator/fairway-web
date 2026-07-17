@@ -3993,3 +3993,15 @@ The red TEST-MODE border frame was position:fixed inset:0, so its top edge ran b
 bar (the bottom looked fine, tucked behind the nav). Inset the frame's top by env(safe-area-inset-top) so
 the top border sits just below the notch; the "TEST MODE" tab now hangs from that edge (top:0 within the
 frame). Bottom unchanged. Same safe-area-top principle the bottom sheets use to cap their height. Display only.
+
+**Institutionalized (so this class of bug can't recur):** new CI guard `ci/check-safe-area-frames.py` fails any fixed, top-anchored (inset:0/top:0) element that draws a border without env(safe-area-inset-top). Added APP_RULES #20 documenting it, and corrected the now-stale #19 to the per-Bucket settlement model. Wired ALL six UI guards into CI (new `npm run guards` step in .github/workflows/robustness.yml) — previously they only ran locally, which is how the notch border slipped through. Guards: min font size, global rules, chart overflow, date inputs, bottom sheets, safe-area frames.
+
+### 173.7.260716 — notification popup respects the notch + guard now catches it (no migration)
+The NotificationBell sheet capped its panel at maxHeight:"100%" and relied on the backdrop's paddingTop to
+hold it below the notch. That indirection didn't hold on iOS (100% resolves against the full-screen fixed
+overlay), so the panel top still rode under the notch. Switched it to the canonical cap the money sheets
+use — maxHeight: calc(100dvh - env(safe-area-inset-top) - 20px) — so the panel is explicitly smaller than
+the screen by (notch + 20px); the list below already scrolls (flex:1; minHeight:0; overflowY:auto).
+Institutionalized: check-bottom-sheets.py now flags ANY viewport-relative maxHeight (%, vh, or dvh) that
+doesn't subtract env(safe-area-inset-top) — previously it only caught bare "NNvh", which is why "100%"
+slipped through. Verified it now fails the 100% pattern.

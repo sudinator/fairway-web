@@ -2215,9 +2215,9 @@ export function NotificationBell({ user, onSeeAll, onNavigate }: { user: any; on
           display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center",
           paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}>
           {/* scrollable sheet: backdrop does NOT dismiss on tap (rule #4) — close via ×.
-              The backdrop's paddingTop physically reserves the notch and the panel is capped at 100%
-              of that area, so the top can never cross the notch regardless of dvh support. */}
-          <div style={{ width: "100%", maxWidth: 440, maxHeight: "100%",
+              Panel is explicitly capped smaller than the screen by (notch + 20px) via the canonical
+              dvh formula, so its top can never cross the notch; the list below scrolls (rule #17). */}
+          <div style={{ width: "100%", maxWidth: 440, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)",
             background: C.greenMid, borderTopLeftRadius: 20, borderTopRightRadius: 20,
             display: "flex", flexDirection: "column", boxShadow: "0 -10px 40px rgba(0,0,0,.5)",
             paddingBottom: "calc(72px + env(safe-area-inset-bottom))" }}>
