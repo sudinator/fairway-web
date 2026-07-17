@@ -825,7 +825,7 @@ export function Home({ session }: { session: any }) {
         ) : tab === "notifications" ? (
           <NotificationsScreen user={user} onNavigate={navigateFromNotif} />
         ) : tab === "profile" ? (
-          <ProfilePanel profile={profile} user={user} onSaved={loadProfile} badgeRefresh={badgeSync} rounds={rounds} />
+          <ProfilePanel profile={profile} user={user} onSaved={loadProfile} badgeRefresh={badgeSync} rounds={rounds} onOpen={setViewing} />
         ) : tab === "teetimes" && activeGroup ? (
           <TeeTimes user={user} activeGroupId={activeGroup.id} activeGroupName={activeGroup.name} canManage={activeGroup.role === "admin"} initialTeeId={deepReady ? deepTeeId : null} onConsumedDeepLink={() => setDeepTeeId(null)} onSpawnGame={(s) => { setOpenGameId(null); setGameSeed(s); setTab("games"); }} onOpenGame={(gid) => { setGameSeed(null); setOpenGameId(gid); setTab("games"); }} />
         ) : tab === "money" && activeGroup ? (

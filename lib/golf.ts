@@ -462,6 +462,28 @@ export function runningHandicap(rounds: Round[]): { index: number | null; used: 
   return { index, used: row.best, total, usedDiffs: best, allDiffs: recent, adj: row.adj, recentDetail };
 }
 
+// Preview what your NEXT posted round does, once you already have more than 20 acceptable rounds: posting
+// another rolls the OLDEST of the current 20 out of the window. `rollOff` is that oldest round; `threshold`
+// is the differential the next round must beat (be under) to make the counting best 8; `indexIfHigher` is
+// the index if the next round's differential lands at/above the threshold (i.e. the best 8 of the 19 that
+// stay — which can already differ from `current` if the round rolling off was one of the counting 8).
+// Returns null at 20 or fewer acceptable rounds (nothing rolls off yet).
+export function nextRoundOutlook(rounds: Round[]): { rollOff: Round; threshold: number; indexIfHigher: number; current: number } | null {
+  const hcp = runningHandicap(handicapRounds(rounds));
+  if (hcp.total <= 20 || hcp.index == null) return null;
+  const window20 = handicapRounds(rounds)
+    .filter((r) => roundDifferential(r) != null)
+    .sort((a, b) => +new Date(b.played_at) - +new Date(a.played_at))
+    .slice(0, 20);
+  if (window20.length < 20) return null;
+  const rollOff = window20[window20.length - 1]; // oldest of the current 20
+  const carried = window20.slice(0, 19).map((r) => roundDifferential(r) as number).sort((a, b) => a - b);
+  if (carried.length < 8) return null;
+  const threshold = carried[7]; // 8th lowest of the 19 that stay
+  const indexIfHigher = Math.round((carried.slice(0, 8).reduce((s, x) => s + x, 0) / 8) * 10) / 10;
+  return { rollOff, threshold, indexIfHigher, current: hcp.index };
+}
+
 // Average number of three-or-more-putt holes per round (only counts rounds with putts recorded).
 export function threePuttsPerRound(rounds: Round[]): number | null {
   const withPutts = rounds.filter((r) => played(r).some((h) => h.putts != null));

@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { HScroll } from "@/components/hscroll";
 import { createClient } from "@/lib/supabase";
 import { pushGate, subscribeToPush, unsubscribeFromPush, currentPermission, syncPushSubscription } from "@/lib/push";
-import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID, effectiveGroupId, runningHandicap, handicapRounds, adjustedGross, roundDifferential } from "@/lib/golf";
+import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID, effectiveGroupId, runningHandicap, handicapRounds, adjustedGross, roundDifferential, nextRoundOutlook } from "@/lib/golf";
 import capabilities from "@/lib/capabilities.json";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LabelList } from "recharts";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
@@ -1048,7 +1048,7 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
 // Profile-tab handicap summary. Reads the SAME rounds prop + SAME engine as the dashboard
 // (runningHandicap over handicapRounds), so the index can never diverge between tabs, and it
 // recalculates automatically whenever a round is added/deleted (deletes refresh the rounds state).
-export function HandicapSummary({ rounds, profile }: { rounds: Round[]; profile: any }) {
+export function HandicapSummary({ rounds, profile, onOpen }: { rounds: Round[]; profile: any; onOpen?: (r: Round) => void }) {
   const hcp = React.useMemo(() => runningHandicap(handicapRounds(rounds)), [rounds]);
   const rows = React.useMemo(() => {
     const eligible = handicapRounds(rounds)
@@ -1067,6 +1067,10 @@ export function HandicapSummary({ rounds, profile }: { rounds: Round[]; profile:
   const official = profile?.handicap_index != null ? Number(profile.handicap_index) : null;
   const idx = hcp.index;
   const delta = idx != null && official != null ? Math.round(Math.abs(idx - official) * 10) / 10 : null;
+
+  // "What your next round does" — see nextRoundOutlook in lib/golf.ts. Only shown once you have more than
+  // 20 acceptable rounds (posting another rolls the oldest of the current 20 out of the window).
+  const next = React.useMemo(() => nextRoundOutlook(rounds), [rounds]);
 
   return (
     <div style={{ background: C.greenMid, borderRadius: 14, padding: 16, marginTop: 16 }}>
@@ -1093,6 +1097,23 @@ export function HandicapSummary({ rounds, profile }: { rounds: Round[]; profile:
         This is an app calculation for reference. Your official GHIN Handicap Index is the system of record and supersedes it.
       </div>
 
+      {next && (
+        <div style={{ background: C.card, border: `1px solid ${C.greenLight}`, borderRadius: 12, padding: "11px 13px", marginTop: 10 }}>
+          <div style={{ color: C.gold, fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase", fontWeight: 700 }}>Your next round</div>
+          <div style={{ color: C.cream, fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
+            Counts toward your index if its differential is under <span style={{ fontWeight: 800, fontFamily: "Georgia, serif" }}>{next.threshold.toFixed(1)}</span>.
+          </div>
+          <div style={{ color: C.sage, fontSize: 11.5, marginTop: 5, lineHeight: 1.5 }}>
+            {next.indexIfHigher === next.current
+              ? `If it's higher, your index stays ${next.current.toFixed(1)}.`
+              : `If it's higher, your index moves to ${next.indexIfHigher.toFixed(1)} (from ${next.current.toFixed(1)}) as your oldest round rolls off.`}
+          </div>
+          <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>
+            Rolling off: <span style={{ color: C.sage }}>{new Date(next.rollOff.played_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {next.rollOff.course || "—"} · {(roundDifferential(next.rollOff) as number).toFixed(1)}</span>
+          </div>
+        </div>
+      )}
+
       {idx == null ? (
         <div style={{ color: C.sage, fontSize: 12, marginTop: 12 }}>
           Need at least 3 rounds with a course rating and slope to estimate an index. You have {hcp.total}.
@@ -1108,10 +1129,13 @@ export function HandicapSummary({ rounds, profile }: { rounds: Round[]; profile:
             <div style={{ width: 48, flexShrink: 0, color: C.faint, fontSize: 11 }}>Date</div>
             <div style={{ flex: 1, color: C.faint, fontSize: 11 }}>Course · tee (CR/slope)</div>
             <div style={{ width: 38, textAlign: "right", color: C.faint, fontSize: 11 }}>Adj</div>
-            <div style={{ width: 46, textAlign: "right", color: C.faint, fontSize: 11 }}>Diff</div>
+            <div style={{ width: 44, textAlign: "right", color: C.faint, fontSize: 11 }}>Diff</div>
+            {onOpen && <div style={{ width: 14, flexShrink: 0 }} />}
           </div>
           {rows.map(({ r, date, ag, diff, used }) => (
-            <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 4px", borderBottom: `1px solid ${C.line}`, opacity: used ? 1 : 0.66, background: used ? "rgba(228,207,134,0.06)" : "transparent" }}>
+            <div key={r.id} onClick={onOpen ? () => onOpen(r) : undefined} role={onOpen ? "button" : undefined} tabIndex={onOpen ? 0 : undefined}
+              onKeyDown={onOpen ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(r); } } : undefined}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 4px", borderBottom: `1px solid ${C.line}`, opacity: used ? 1 : 0.66, background: used ? "rgba(228,207,134,0.06)" : "transparent", cursor: onOpen ? "pointer" : "default" }}>
               <div style={{ width: 7, height: 7, borderRadius: 4, background: used ? C.gold : "transparent", flexShrink: 0 }} />
               <div style={{ width: 48, flexShrink: 0, color: C.faint, fontSize: 11 }}>{date}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -1119,7 +1143,8 @@ export function HandicapSummary({ rounds, profile }: { rounds: Round[]; profile:
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 1 }}>{[r.tee_name, r.rating != null && r.slope != null ? `${r.rating}/${r.slope}` : null].filter(Boolean).join(" · ") || "—"}</div>
               </div>
               <div style={{ width: 38, textAlign: "right", color: C.cream, fontSize: 13, fontWeight: 700, fontFamily: "Georgia, serif" }}>{ag != null ? ag : "—"}</div>
-              <div style={{ width: 46, textAlign: "right", color: used ? C.cream : C.sage, fontSize: 13, fontWeight: used ? 800 : 600, fontFamily: "Georgia, serif" }}>{diff.toFixed(1)}</div>
+              <div style={{ width: 44, textAlign: "right", color: used ? C.cream : C.sage, fontSize: 13, fontWeight: used ? 800 : 600, fontFamily: "Georgia, serif" }}>{diff.toFixed(1)}</div>
+              {onOpen && <span aria-hidden="true" style={{ width: 14, textAlign: "right", color: C.sage, fontSize: 16, flexShrink: 0 }}>›</span>}
             </div>
           ))}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, padding: "0 4px" }}>
@@ -1136,7 +1161,7 @@ export function HandicapSummary({ rounds, profile }: { rounds: Round[]; profile:
   );
 }
 
-export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds = [] }: { profile: any; user: any; onSaved: () => void; badgeRefresh?: number; rounds?: Round[] }) {
+export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds = [], onOpen }: { profile: any; user: any; onSaved: () => void; badgeRefresh?: number; rounds?: Round[]; onOpen?: (r: Round) => void }) {
   const [name, setName] = useState(profile?.display_name || "");
   const [ghin, setGhin] = useState(profile?.ghin_number || "");
   const [phone, setPhone] = useState(profile?.phone || "");
@@ -1287,7 +1312,7 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
         {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
       </div>
 
-      <HandicapSummary rounds={rounds} profile={profile} />
+      <HandicapSummary rounds={rounds} profile={profile} onOpen={onOpen} />
 
       <AchievementsWall user={user} rounds={rounds} refreshKey={badgeRefresh} />
 

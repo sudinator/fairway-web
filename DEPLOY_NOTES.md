@@ -4059,3 +4059,17 @@ Also extracted lib/golf.ts `adjustedGross()` (refactored roundDifferential to re
 unchanged, verified by the existing golf/card/badges suites) so the "Adj" column shows exactly the AGS that
 produced each differential. New tests cover the net-double-bogey cap and handicapRounds. GHIN score-history
 import/reconcile intentionally deferred (see BACKLOG) — no credential scraping.
+
+### 174.1.260716 — tap a round in the handicap summary to open its scorecard (no migration)
+Each round row in the Profile handicap summary is now tappable and opens that round's scorecard, using the
+same setViewing/RoundDetail path the dashboard uses (threaded onOpen through ProfilePanel → HandicapSummary).
+Rows show a chevron, use pointer cursor, and are keyboard-activatable (Enter/Space, role=button). Back
+returns to the Profile tab.
+
+### 174.2.260716 — handicap summary: "your next round" roll-off preview (no migration)
+When you have MORE than 20 acceptable rounds, the Profile handicap card now previews what your next posted
+round does: it shows the round rolling off (oldest of the current 20), the differential threshold your next
+round must beat to make the counting best 8, and — if it's above the threshold — the index you'd land on as
+the oldest rolls off (which can already differ from today's if the roll-off round was one of your counting
+8). Logic is a tested lib/golf.ts `nextRoundOutlook()` (not inline), with a unit test covering the roll-off
+identity, the 8th-lowest-of-19 threshold, and the resulting index. Hidden at 20 or fewer rounds.

@@ -1,5 +1,5 @@
 // Unit tests for computeBetting in lib/golf.ts — run with `npm test`.
-import { computeBetting, DEFAULT_BET_SPLIT, roundDifferential, partialHandicapInfo, strokesReceived, adjustedGross, handicapRounds } from "./golf";
+import { computeBetting, DEFAULT_BET_SPLIT, roundDifferential, partialHandicapInfo, strokesReceived, adjustedGross, handicapRounds, nextRoundOutlook } from "./golf";
 import type { BetPlayer, Round, Hole } from "./golf";
 
 let pass = 0, fail = 0; const fails: string[] = [];
@@ -168,6 +168,24 @@ const P = (id: string, total: number, seg: [number, number, number]): BetPlayer 
   const keep = handicapRounds([r, grossOnly, empty]);
   check("handicapRounds keeps played + gross-only, drops empty", keep.length, 2);
   ok("handicapRounds excludes the empty round", !keep.some((x) => x.id === "e"));
+}
+
+{
+  // nextRoundOutlook: 21 gross-only rounds, slope 113 so differential = gross - rating exactly.
+  // Dates day1..day21 (day21 newest). Window = last 20 (day2..day21); day2 rolls off next.
+  const mkGross = (day: number, diff: number): Round => ({
+    id: "n" + day, course: "GC" + day, played_at: `2026-02-${String(day).padStart(2, "0")}`,
+    rating: 72, slope: 113, holes: [], gross_score: 72 + diff, status: "final",
+  } as unknown as Round);
+  const diffs: Record<number, number> = { 1: 100, 2: 3, 3: 5, 4: 6, 5: 7, 6: 8, 7: 9, 8: 10, 9: 11, 10: 12, 11: 13, 12: 14, 13: 15, 14: 16, 15: 17, 16: 18, 17: 19, 18: 20, 19: 21, 20: 22, 21: 23 };
+  const rs: Round[] = Object.keys(diffs).map((k) => mkGross(Number(k), diffs[Number(k)]));
+  const out = nextRoundOutlook(rs)!;
+  ok("nextRoundOutlook returns a preview above 20 rounds", out != null);
+  check("rollOff is the oldest of the last 20 (day2)", out.rollOff.id, "n2");
+  near("threshold = 8th lowest of the 19 that stay", out.threshold, 12);
+  near("index if next round doesn't count (best 8 of the 19)", out.indexIfHigher, 8.5);
+  near("current index (best 8 of the 20, incl. the low roll-off)", out.current, 7.4);
+  ok("no preview at 20 or fewer rounds", nextRoundOutlook(rs.slice(0, 20)) == null);
 }
 
 console.log(`golf/computeBetting tests: PASS ${pass}  FAIL ${fail}`);
