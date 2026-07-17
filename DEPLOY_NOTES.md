@@ -4094,3 +4094,44 @@ surface colours must come from the same light/dark family — light surfaces (C.
 (ink/faint); dark surfaces (green*) use light text (cream/sage), gold as accent. New ci/check-contrast.py
 (added to `npm run guards`) fails any single element that sets a background and same-family text; verified
 clean across the app (the parent/child cases it can't judge statically are covered by the rule).
+
+### 174.5.260716 — popups always have a × (baked into the primitive) + guard (no migration)
+The differential sheet shipped without a close × — violating APP_RULES #18 — because no guard checked it and
+I relied on memory. Two fixes: (1) the shared <BottomSheet> now ALWAYS renders a top-right × (translucent
+chip, contrasts on any dark panel) whenever given onClose, so every popup built on it complies by
+construction; removed the notification sheet's now-duplicate hand-rolled ×. (2) New ci/check-popup-close.py
+(added to `npm run guards`, 8 guards total) fails any <BottomSheet> missing onClose. Rule #18 updated to note
+the primitive provides the × and the guard enforces it. Process gap owned: rules without a guard weren't being
+cross-checked; the durable fix is baking rules into the shared primitive (perimeter/notch, contrast, and now
+the × are all automatic there) plus a guard per rule. Remaining hand-rolled popups (stat drawer, tee-time
+sheets, money sheets) still carry their own × and should migrate to <BottomSheet> for full consistency.
+
+### 175.0.260717 — badge fixes: collapse score ladder, repeatable counts, tappable "how earned" (no migration)
+Four fixes to round badges (all visible on the round summary):
+1. Score ladder collapses to the best earned — breaking 90 no longer also shows Broke 100; broke_par
+   supersedes the whole ladder. New collapseRoundAwards() in lib/badges.ts, applied in round-detail's
+   roundBadges (display only — lifetime "rounds under 100" counts are unaffected).
+2. Repeatable counts now show ×N. Birdie ×2, eagles, par-3 birdies, bounce-backs, etc. render a gold ×N
+   bubble on the badge when value > 1 (the award already carried the value; the tile just never showed it).
+3. Net bogey-free streaks count each SEPARATE run. evaluateRound now counts distinct net-par-or-better runs
+   (≥3 for bogey_free_3, ≥5 for bogey_free_5) instead of only the longest, so 3 separate 3+ streaks show ×3.
+   (Changes those lifetime counts to sum-of-streaks — more granular; recomputed on backfill.)
+4. Every badge is tappable → a sheet explaining exactly how it was earned, with the specific holes
+   highlighted (e.g. bounce-back: "Birdie right after a bogey — hole 3"). Uses the existing badgeEvidence();
+   fixed a real bug there: the net bogey-free evidence was computed on GROSS, now on NET to match the award,
+   and it lists ALL qualifying runs. Sheet is built on BottomSheet (dark theme + baked-in × + perimeter fit).
+Tests added for streak counting, birdie count, and ladder collapse (badges suite 64 passed).
+
+### 175.1.260717 — popup migration: all bottom sheets now use the BottomSheet primitive (no migration)
+Migrated every hand-rolled bottom sheet onto the shared <BottomSheet>, so they all inherit the three
+guarantees automatically — perimeter/notch fit (#17), dark-theme contrast (#21), and the top-right × (#18):
+• money.tsx (7): Zelle pay, confirm-on-return, pay-method chooser, settle preview, snapshot detail,
+  expense detail, per-member balance breakdown. Several also had C.faint on dark green (a #21 issue) — fixed
+  to sage while migrating. All seven gained the × they were missing.
+• tee-times.tsx (3): "Your response" RSVP, captain picker, captain duties. DutiesModal was a leftover LIGHT
+  (C.card/ink) sheet while the other two were dark — converted it to the dark palette so the sheets match.
+• manage.tsx (1): the admin stat drill-down drawer (StatDrawerHost) — dropped its bespoke slide animation and
+  hand-rolled ×; now a conditional <BottomSheet>.
+The confirm-on-return sheet keeps dismissOnBackdrop=false (must decide) but its × acts as "not yet".
+Not migrated (different pattern, left as-is): centered modals (player card, finish-round confirm), the
+share-card image modals, the hole score-entry editor, the photo lightbox, and the "More" dropdown menu.

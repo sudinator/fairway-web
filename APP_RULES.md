@@ -120,7 +120,7 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
     overlay must offer an explicit close control (a `×`, a "Close"/"Done" button) — backdrop-tap alone is
     not enough (it's undiscoverable). Menus that extend the bottom nav (e.g. the "More" sheet) dock ABOVE
     the nav (`bottom: navH`, the measured nav height) so the nav stays visible and usable underneath; they
-    don't cover it. Full-screen detail sheets may cover the screen but must have a visible Close. — manual
+    don't cover it. Full-screen detail sheets may cover the screen but must have a visible Close. Popups are built on `<BottomSheet>`, which ALWAYS renders a top-right × when given `onClose` — so pass `onClose` and don't hand-roll a popup without it. Enforced by `ci/check-popup-close.py` (every `<BottomSheet>` must pass `onClose`). — manual
 14. **Every migration's full SQL is printed inline in chat** for copy-paste into the Supabase SQL editor,
     and tracked in `MIGRATIONS.md` (tick when run). — manual
 15. **Repo docs stay in sync each bundle:** DEPLOY_NOTES.md, SCHEMA.md, BACKLOG.md, README.md,

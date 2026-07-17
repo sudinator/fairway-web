@@ -1359,23 +1359,15 @@ function StatDrawerHost() {
     if (good.includes(t)) return { bg: C.gold, fg: C.green };
     return { bg: C.greenLight, fg: C.sage };
   };
-  return (
-    <>
-      <div aria-hidden style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 80,
-        opacity: open ? 1 : 0, pointerEvents: open ? "auto" : "none", transition: "opacity .2s" }} />
-      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, maxWidth: 440, margin: "0 auto", zIndex: 90,
-        background: C.greenMid, borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)",
-        display: "flex", flexDirection: "column", transform: open ? "translateY(0)" : "translateY(102%)",
-        transition: "transform .24s cubic-bezier(.2,.7,.2,1)", boxShadow: "0 -10px 40px rgba(0,0,0,.5)",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom))" }}>
-        <div style={{ width: 42, height: 5, borderRadius: 3, background: "rgba(255,255,255,.25)", margin: "9px auto 4px" }} />
-        <div style={{ padding: "6px 16px 12px", borderBottom: `1px solid ${C.greenLight}`, position: "relative" }}>
-          <button onClick={close} style={{ position: "absolute", right: 12, top: 4, background: "none", border: "none", color: C.sage, fontSize: 22, cursor: "pointer", lineHeight: 1 }}>×</button>
-          <div style={{ fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 800, color: C.cream, paddingRight: 28 }}>{payload?.title || ""}</div>
+  return open ? (
+    <BottomSheet onClose={close} maxWidth={440} panelStyle={{ background: C.greenMid }} bodyStyle={{ padding: "6px 10px 12px" }}
+      header={
+        <div style={{ padding: "14px 44px 12px 16px", borderBottom: `1px solid ${C.greenLight}` }}>
+          <div style={{ fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 800, color: C.cream }}>{payload?.title || ""}</div>
           {payload?.cap ? <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{payload.cap}</div> : null}
-          {rows ? <div style={{ color: C.faint, fontSize: 11, marginTop: 4 }}>{rows.length} {rows.length === 1 ? "user" : "users"}</div> : null}
+          {rows ? <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>{rows.length} {rows.length === 1 ? "user" : "users"}</div> : null}
         </div>
-        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "6px 10px 22px" }}>
+      }>
           {err ? <div style={{ color: C.sage, fontSize: 12, padding: 12 }}>Couldn't load: {err}</div> :
            !rows ? <div style={{ color: C.sage, fontSize: 12, padding: 12 }}>Loading…</div> :
            rows.length === 0 ? <div style={{ color: C.sage, fontSize: 12, padding: 12 }}>No users for this metric.</div> :
@@ -1392,10 +1384,8 @@ function StatDrawerHost() {
                </div>
              );
            })}
-        </div>
-      </div>
-    </>
-  );
+    </BottomSheet>
+  ) : null;
 }
 
 // ★ Admin analytics — utilization, feature popularity, health. Reads one JSON
@@ -2344,13 +2334,12 @@ export function NotificationBell({ user, onSeeAll, onNavigate }: { user: any; on
           header={
             <>
               <div style={{ width: 40, height: 4, background: C.greenLight, borderRadius: 2, margin: "8px auto 4px" }} />
-              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 14px 10px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 44px 10px 14px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
                 <Eyebrow style={{ margin: 0 }}>NOTIFICATIONS</Eyebrow>
                 <span style={{ flex: 1 }} />
                 {unread > 0 && (
                   <button onClick={markAllRead} style={{ background: "none", border: "none", color: C.sage, fontSize: 13, fontWeight: 700, cursor: "pointer", padding: "4px 6px" }}>Mark all read</button>
                 )}
-                <button onClick={() => setOpen(false)} aria-label="Close" style={{ background: C.greenLight, border: "none", color: C.cream, width: 30, height: 30, borderRadius: 15, fontSize: 17, fontWeight: 800, cursor: "pointer", lineHeight: 1, flexShrink: 0 }}>×</button>
               </div>
             </>
           }

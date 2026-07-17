@@ -11,9 +11,9 @@ import { aiUsesLeft, recordAiUse, AI_DAILY_LIMIT_VALUE } from "@/lib/draft";
 import { createClient } from "@/lib/supabase";
 
 const supabase = createClient();
-import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark, DifferentialSheet } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark, DifferentialSheet, BottomSheet } from "@/components/ui";
 import { ShareRoundModal } from "@/components/share-card";
-import { badgesForRound, BADGE_BY_KEY } from "@/lib/badges";
+import { badgesForRound, BADGE_BY_KEY, badgeEvidence, collapseRoundAwards, type Award } from "@/lib/badges";
 
 const ROUND_TIER_COLOR: Record<string, string> = { common: C.sage, rare: "#7FB8FF", elite: C.gold };
 
@@ -25,11 +25,12 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
   const roundBadges = useMemo(() => {
     const full = [...(priorRounds || []), round];
     const rank: Record<string, number> = { elite: 0, rare: 1, common: 2 };
-    return badgesForRound(full, round.id)
+    return collapseRoundAwards(badgesForRound(full, round.id))
       .map((a) => ({ a, def: BADGE_BY_KEY[a.key] }))
       .filter((x) => x.def)
       .sort((x, y) => rank[x.def.tier] - rank[y.def.tier]);
   }, [priorRounds, round]);
+  const [badgeInfo, setBadgeInfo] = useState<{ a: Award; def: typeof BADGE_BY_KEY[string] } | null>(null);
   const [showShare, setShowShare] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
   return (
@@ -80,15 +81,49 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
           <Eyebrow>BADGES EARNED THIS ROUND</Eyebrow>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 10 }}>
             {roundBadges.map(({ a, def }) => (
-              <div key={a.key} style={{ width: 74, textAlign: "center" }}>
-                <div style={{ width: 46, height: 46, margin: "0 auto", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, background: "radial-gradient(circle at 50% 32%, #20624a, #0e3a2c)", border: `2px solid ${ROUND_TIER_COLOR[def.tier]}`, boxShadow: def.tier !== "common" ? `0 0 12px -4px ${ROUND_TIER_COLOR[def.tier]}` : "none" }}>{def.icon}</div>
+              <button key={a.key} onClick={() => setBadgeInfo({ a, def })} aria-label={`${def.label} — how it was earned`}
+                style={{ width: 74, textAlign: "center", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+                <div style={{ position: "relative", width: 46, height: 46, margin: "0 auto" }}>
+                  <div style={{ width: 46, height: 46, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, background: "radial-gradient(circle at 50% 32%, #20624a, #0e3a2c)", border: `2px solid ${ROUND_TIER_COLOR[def.tier]}`, boxShadow: def.tier !== "common" ? `0 0 12px -4px ${ROUND_TIER_COLOR[def.tier]}` : "none" }}>{def.icon}</div>
+                  {a.kind === "count" && (a.value ?? 1) > 1 && (
+                    <div style={{ position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, padding: "0 4px", borderRadius: 9, background: C.gold, color: "#1B140A", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,.4)" }}>×{a.value}</div>
+                  )}
+                </div>
                 <div style={{ fontSize: 11, color: C.cream, marginTop: 5, lineHeight: 1.2, fontWeight: 700 }}>{def.label}</div>
                 {a.kind === "best" && a.isRecord && <div style={{ fontSize: 11, color: C.gold, fontWeight: 800, marginTop: 1 }}>new record</div>}
-              </div>
+              </button>
             ))}
           </div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>Tap a badge to see how you earned it.</div>
         </div>
       )}
+
+      {badgeInfo && (() => {
+        const ev = badgeEvidence(badgeInfo.a.key, round);
+        const count = badgeInfo.a.kind === "count" ? (badgeInfo.a.value ?? 1) : 0;
+        return (
+          <BottomSheet onClose={() => setBadgeInfo(null)} maxWidth={420} panelStyle={{ background: C.greenMid }}
+            header={
+              <div style={{ padding: "16px 44px 12px 16px", borderBottom: "1px solid rgba(255,255,255,0.10)", display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ width: 44, height: 44, flexShrink: 0, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, background: "radial-gradient(circle at 50% 32%, #20624a, #0e3a2c)", border: `2px solid ${ROUND_TIER_COLOR[badgeInfo.def.tier]}` }}>{badgeInfo.def.icon}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ color: C.cream, fontSize: 16, fontWeight: 800 }}>{badgeInfo.def.label}{count > 1 ? ` ×${count}` : ""}</div>
+                  <div style={{ color: C.sage, fontSize: 11, textTransform: "capitalize" }}>{badgeInfo.def.tier} · {badgeInfo.def.category}</div>
+                </div>
+              </div>
+            }>
+            <div style={{ color: C.cream, fontSize: 14, lineHeight: 1.6 }}>{ev.text}</div>
+            {ev.holes && ev.holes.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 12 }}>
+                {ev.holes.map((h) => (
+                  <span key={h} style={{ background: C.greenLight, color: C.cream, fontSize: 12, fontWeight: 700, borderRadius: 8, padding: "4px 9px" }}>#{h}</span>
+                ))}
+              </div>
+            )}
+            <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.6, marginTop: 14, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)" }}>{badgeInfo.def.desc}</div>
+          </BottomSheet>
+        );
+      })()}
 
       {gross ? (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 20, marginTop: 14 }}>

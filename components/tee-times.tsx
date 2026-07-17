@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { C, courseHandicap, effectiveGroupId } from "@/lib/golf";
-import { Avatar, btn, inputStyle, Eyebrow, FieldLabel } from "@/components/ui";
+import { Avatar, btn, inputStyle, Eyebrow, FieldLabel, BottomSheet } from "@/components/ui";
 import { loadFormDraft, saveFormDraft, clearFormDraft, draftAgeLabel } from "@/lib/form-draft";
 
 const supabase = createClient();
@@ -558,10 +558,7 @@ function RsvpSheet({ tt, mine, spotsLeft, warn, busy, onClose, onSubmit }: {
   const setName = (i: number, v: string) => setGNames((p) => { const n = [...p]; n[i] = v; return n; });
 
   return (
-    <>
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 60 }} />
-      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 70, background: C.green, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: "8px 0 calc(72px + env(safe-area-inset-bottom))", maxWidth: 520, margin: "0 auto", maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
-        <div style={{ width: 40, height: 4, background: C.greenMid, borderRadius: 2, margin: "6px auto 10px" }} />
+    <BottomSheet onClose={onClose} maxWidth={520} panelStyle={{ background: C.green }} bodyStyle={{ padding: "8px 0 0" }}>
         <div style={{ padding: "0 16px 8px" }}>
           <div style={{ fontSize: 11, fontWeight: 800, color: C.gold, letterSpacing: 0.4 }}>TEE TIME #{tt.seq ?? "—"} · {dow(tt.play_date)} {monN(tt.play_date)} {dayN(tt.play_date)}</div>
           <div style={{ fontSize: 19, fontWeight: 800, color: C.cream, marginTop: 2 }}>Your response</div>
@@ -595,8 +592,7 @@ function RsvpSheet({ tt, mine, spotsLeft, warn, busy, onClose, onSubmit }: {
           <button onClick={onClose} disabled={busy} style={{ ...btn(false), flex: 1, fontSize: 13 }}>Cancel</button>
           <button onClick={() => onSubmit(choice, gNames.slice(0, gCount).filter(Boolean))} disabled={busy} style={{ ...btn(true), flex: 1, fontSize: 13 }}>{busy ? "Saving…" : "Confirm"}</button>
         </div>
-      </div>
-    </>
+    </BottomSheet>
   );
 }
 
@@ -772,10 +768,7 @@ function CaptainPicker({ candidates, current, busy, onClose, onPick }: {
   candidates: Member[]; current: string | null; busy: boolean; onClose: () => void; onPick: (id: string | null) => void;
 }) {
   return (
-    <>
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 60 }} />
-      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 70, background: C.green, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: "8px 0 calc(72px + env(safe-area-inset-bottom))", maxWidth: 520, margin: "0 auto", maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
-        <div style={{ width: 40, height: 4, background: C.greenMid, borderRadius: 2, margin: "6px auto 10px" }} />
+    <BottomSheet onClose={onClose} maxWidth={520} panelStyle={{ background: C.green }} bodyStyle={{ padding: "8px 0 0" }}>
         <div style={{ fontSize: 16, fontWeight: 800, color: C.cream, padding: "0 16px 10px" }}>Assign captain</div>
         {candidates.length === 0 ? (
           <div style={{ padding: "0 16px 12px", fontSize: 13, color: C.sage }}>No one is signed up as "In" yet.</div>
@@ -790,8 +783,7 @@ function CaptainPicker({ candidates, current, busy, onClose, onPick }: {
           {current && <button onClick={() => onPick(null)} disabled={busy} style={{ ...btn(false), flex: 1, fontSize: 13, color: C.birdie, borderColor: C.birdie }}>Clear</button>}
           <button onClick={onClose} disabled={busy} style={{ ...btn(false), flex: 1, fontSize: 13 }}>Close</button>
         </div>
-      </div>
-    </>
+    </BottomSheet>
   );
 }
 
@@ -804,21 +796,17 @@ const DEFAULT_DUTIES: [string, string][] = [
 ];
 function DutiesModal({ onClose }: { onClose: () => void }) {
   return (
-    <>
-      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 60 }} />
-      <div style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 70, background: C.card, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: "8px 0 calc(72px + env(safe-area-inset-bottom))", maxWidth: 520, margin: "0 auto", maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
-        <div style={{ width: 40, height: 4, background: C.line, borderRadius: 2, margin: "6px auto 12px" }} />
-        <div style={{ fontSize: 16, fontWeight: 800, color: C.ink, padding: "0 16px 4px" }}>Captain duties</div>
-        <div style={{ fontSize: 12, color: C.faint, padding: "0 16px 8px" }}>Responsibilities for the round captain.</div>
+    <BottomSheet onClose={onClose} maxWidth={520} bodyStyle={{ padding: "8px 0 0" }}>
+        <div style={{ fontSize: 16, fontWeight: 800, color: C.cream, padding: "0 16px 4px" }}>Captain duties</div>
+        <div style={{ fontSize: 12, color: C.sage, padding: "0 16px 8px" }}>Responsibilities for the round captain.</div>
         {DEFAULT_DUTIES.map(([t, d], i) => (
-          <div key={t} style={{ display: "flex", gap: 12, padding: "12px 16px", borderTop: `1px solid ${C.line}` }}>
+          <div key={t} style={{ display: "flex", gap: 12, padding: "12px 16px", borderTop: `1px solid rgba(255,255,255,0.08)` }}>
             <div style={{ width: 26, height: 26, borderRadius: "50%", background: C.green, color: C.cream, fontSize: 13, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>{i + 1}</div>
-            <div><div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{t}</div><div style={{ fontSize: 12, color: C.faint, marginTop: 2, lineHeight: 1.4 }}>{d}</div></div>
+            <div><div style={{ fontSize: 14, fontWeight: 700, color: C.cream }}>{t}</div><div style={{ fontSize: 12, color: C.sage, marginTop: 2, lineHeight: 1.4 }}>{d}</div></div>
           </div>
         ))}
         <div style={{ padding: 16 }}><button onClick={onClose} style={{ ...btn(true), width: "100%", fontSize: 13 }}>Got it</button></div>
-      </div>
-    </>
+    </BottomSheet>
   );
 }
 

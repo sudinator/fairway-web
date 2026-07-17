@@ -1,6 +1,6 @@
 {
   "name": "fairway-card",
-  "version": "174.4.260715",
+  "version": "175.1.260715",
   "private": true,
   "scripts": {
     "prebuild": "node scripts/write-version.mjs",
@@ -9,7 +9,7 @@
     "start": "next start",
     "test": "rm -rf .testout && tsc lib/game-shape.test.ts lib/game-shape.ts lib/golf.ts lib/golf.test.ts lib/money.test.ts lib/money-scenarios.test.ts lib/bucket-model.test.ts lib/money.ts lib/legs.test.ts lib/legs.ts lib/grouping.ts lib/grouping.test.ts lib/sync-cols.ts lib/sync.test.ts lib/badges.ts lib/badges.test.ts lib/card.ts lib/card.test.ts --module commonjs --target es2020 --esModuleInterop --skipLibCheck --outDir .testout --rootDir lib && node .testout/game-shape.test.js && node .testout/golf.test.js && node .testout/money.test.js && node .testout/money-scenarios.test.js && node .testout/bucket-model.test.js && node .testout/legs.test.js && node .testout/grouping.test.js && node .testout/sync.test.js && node .testout/badges.test.js && node .testout/card.test.js",
     "gen:onepagers": "python3 marketing/make_onepagers.py",
-    "guards": "python3 ci/check-min-fontsize.py && python3 ci/check-global-rules.py && python3 ci/check-chart-overflow.py && python3 ci/check-date-inputs.py && python3 ci/check-bottom-sheets.py && python3 ci/check-safe-area-frames.py && python3 ci/check-contrast.py"
+    "guards": "python3 ci/check-min-fontsize.py && python3 ci/check-global-rules.py && python3 ci/check-chart-overflow.py && python3 ci/check-date-inputs.py && python3 ci/check-bottom-sheets.py && python3 ci/check-safe-area-frames.py && python3 ci/check-contrast.py && python3 ci/check-popup-close.py"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

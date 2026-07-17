@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
-import { Avatar, btn, inputStyle, Eyebrow, FieldLabel } from "@/components/ui";
+import { Avatar, btn, inputStyle, Eyebrow, FieldLabel, BottomSheet } from "@/components/ui";
 import {
   computeBalances, evenShares, validateCustomTotal, guestCoverageBySponsor,
   fmtUSD, payLink, nudgeSms, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, allocateSettlement, expenseImpact,
@@ -424,9 +424,8 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
       )}
 
       {zelleInfo && (
-        <div onClick={() => setZelleInfo(null)} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px", paddingBottom: "calc(72px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 520, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
-            <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>Pay {nameOf(zelleInfo.to)} with Zelle</div>
+        <BottomSheet onClose={() => setZelleInfo(null)} maxWidth={520}>
+            <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800, paddingRight: 32 }}>Pay {nameOf(zelleInfo.to)} with Zelle</div>
             <div style={{ color: C.sage, fontSize: 12, marginTop: 4, lineHeight: 1.5 }}>Zelle happens inside your bank app. Open it, send to the contact below, then mark it settled here.</div>
             <div style={{ background: "#123528", borderRadius: 12, padding: 14, marginTop: 12 }}>
               <FieldLabel>Zelle contact</FieldLabel>
@@ -438,29 +437,25 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
               <button disabled={busy} onClick={() => { const z = zelleInfo; setZelleInfo(null); recordSettlement(z.from, z.to, z.amt, "zelle", z.bucketId); }} style={{ ...btn(true), flex: 1, background: "#7fd6a3", color: C.green }}>✓ I&apos;ve paid, mark settled</button>
               <button onClick={() => setZelleInfo(null)} style={{ ...btn(false), flex: 1 }}>Cancel</button>
             </div>
-          </div>
-        </div>
+        </BottomSheet>
       )}
 
       {/* confirm-on-return sheet */}
       {askReturn && (myPending.length > 0 || pending) && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.66)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
-          <div style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "22px 18px", paddingBottom: "calc(72px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 520, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto", textAlign: "center" }}>
+        <BottomSheet onClose={() => { setAskReturn(false); if (!myPending.length) setPending(null); }} dismissOnBackdrop={false} maxWidth={520} bodyStyle={{ textAlign: "center" }}>
             <div style={{ color: C.cream, fontWeight: 800, fontSize: 17 }}>Back from paying — did it go through?</div>
             <div style={{ color: C.sage, fontSize: 13, margin: "8px 0 4px" }}>You were settling <b style={{ color: C.gold }}>{fmtUSD(myPending.length > 0 ? myPending.reduce((s, p) => s + p.amount_cents, 0) : (pending?.amt || 0))}</b></div>
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
               <button disabled={busy} onClick={() => { if (myPending.length > 0) confirmPending(); else if (pending) recordSettlement(pending.from, pending.to, pending.amt, "venmo", pending.bucketId); }} style={{ ...btn(true), flex: 1, background: "#7fd6a3", color: C.green }}>✓ Yes, mark settled</button>
               <button onClick={() => { setAskReturn(false); if (!myPending.length) setPending(null); }} style={{ ...btn(false), flex: 1 }}>Not yet</button>
             </div>
-          </div>
-        </div>
+        </BottomSheet>
       )}
 
       {/* pay-method chooser for an armed event settle */}
       {payChoose && (
-        <div onClick={() => setPayChoose(null)} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.66)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "20px 18px", paddingBottom: "calc(72px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 520, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
-            <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>Pay {nameOf(payChoose.to)} {fmtUSD(payChoose.amt)}</div>
+        <BottomSheet onClose={() => setPayChoose(null)} maxWidth={520}>
+            <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800, paddingRight: 32 }}>Pay {nameOf(payChoose.to)} {fmtUSD(payChoose.amt)}</div>
             <div style={{ color: C.sage, fontSize: 12.5, marginTop: 4, lineHeight: 1.5 }}>Send it, then come back and confirm — we'll ask when you return.{payChoose.count > 1 ? ` (${payChoose.count} people to pay for this settle; open each below.)` : ""}</div>
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
               {memberById[payChoose.to]?.venmo_handle && <button onClick={() => { const u = payLink("venmo", memberById[payChoose.to]!.venmo_handle!, payChoose.amt, `${activeGroup.name} golf`); if (typeof window !== "undefined") window.location.href = u; }} style={{ ...btn(true), flex: 1, background: "#3d95ce", color: "#fff" }}>Venmo</button>}
@@ -479,8 +474,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
               <button disabled={busy} onClick={confirmPending} style={{ ...btn(true), flex: 1, background: "#7fd6a3", color: C.green }}>Paid — mark settled</button>
               <button disabled={busy} onClick={discardPending} style={{ ...btn(false), flex: 0, padding: "10px 16px" }}>Cancel</button>
             </div>
-          </div>
-        </div>
+        </BottomSheet>
       )}
     </div>
   );
@@ -798,20 +792,19 @@ function ImpactModal({ title, subtitle, impact, balancesBefore, nameOf, busy, co
   const fmtBal = (v: number) => Math.abs(v) < 1 ? "settled up" : v > 0 ? `owed ${fmtUSD(v)}` : `owes ${fmtUSD(-v)}`;
   const balColor = (v: number) => Math.abs(v) < 1 ? C.sage : v > 0 ? "#7fd6a3" : "#ef9d90";
   return (
-    <div onClick={onCancel} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.66)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 90 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px", paddingBottom: "calc(20px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 520, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
-        <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>{title}</div>
+    <BottomSheet onClose={onCancel} maxWidth={520}>
+        <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800, paddingRight: 32 }}>{title}</div>
         {subtitle && <div style={{ color: C.sage, fontSize: 12.5, marginTop: 4, lineHeight: 1.5 }}>{subtitle}</div>}
         <div style={{ marginTop: 12 }}>
-          {rows.length === 0 && <div style={{ color: C.faint, fontSize: 12.5 }}>No change to anyone&rsquo;s balance.</div>}
+          {rows.length === 0 && <div style={{ color: C.sage, fontSize: 12.5 }}>No change to anyone&rsquo;s balance.</div>}
           {haveBal ? rows.map(([id, delta]) => {
             const before = bb[id] || 0; const after = before + delta;
             return (
               <div key={id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: `1px solid #123528`, gap: 10 }}>
                 <span style={{ color: C.cream, fontSize: 13, flexShrink: 0 }}>{nameOf(id)}</span>
                 <span style={{ fontSize: 12.5, textAlign: "right", minWidth: 0 }}>
-                  <span style={{ color: C.faint }}>{fmtBal(before)}</span>
-                  <span style={{ color: C.faint }}> &rarr; </span>
+                  <span style={{ color: C.sage }}>{fmtBal(before)}</span>
+                  <span style={{ color: C.sage }}> &rarr; </span>
                   <span style={{ color: balColor(after), fontWeight: 800, fontFamily: "Georgia, serif" }}>{fmtBal(after)}</span>
                 </span>
               </div>
@@ -823,13 +816,12 @@ function ImpactModal({ title, subtitle, impact, balancesBefore, nameOf, busy, co
             </div>
           ))}
         </div>
-        {rows.length > 0 && <div style={{ color: C.faint, fontSize: 11, marginTop: 8, lineHeight: 1.5 }}>{haveBal ? "Each person\u2019s club balance after this. \u201cowed\u201d = the club owes them \u00b7 \u201cowes\u201d = they owe the club." : "+ their balance rises (owed more / owes less) \u00b7 \u2212 their balance falls. Always nets to $0 across the club."}</div>}
+        {rows.length > 0 && <div style={{ color: C.sage, fontSize: 11, marginTop: 8, lineHeight: 1.5 }}>{haveBal ? "Each person\u2019s club balance after this. \u201cowed\u201d = the club owes them \u00b7 \u201cowes\u201d = they owe the club." : "+ their balance rises (owed more / owes less) \u00b7 \u2212 their balance falls. Always nets to $0 across the club."}</div>}
         <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
           <button disabled={busy} onClick={onConfirm} style={{ ...btn(true), flex: 1, background: danger ? "#d98b80" : "#7fd6a3", color: danger ? "#3a1712" : C.green }}>{confirmLabel}</button>
           <button disabled={busy} onClick={onCancel} style={{ ...btn(false), flex: 0, padding: "10px 18px" }}>Cancel</button>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   );
 }
 
@@ -1123,21 +1115,19 @@ function SnapshotBody({ snap }: { snap: AuditSnapshot }) {
 // entirely from the frozen money_audit snapshot, so the full allocation survives.
 function SnapshotDetail({ snap, at, onClose }: { snap: AuditSnapshot; at?: string; onClose: () => void }) {
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px", paddingBottom: "calc(72px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 520, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+    <BottomSheet onClose={onClose} maxWidth={520}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, paddingRight: 32 }}>
           <div style={{ flex: 1, color: C.cream, fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 800 }}>{snap.description || "Expense"}</div>
           <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800 }}>{fmtUSD(snap.amount_cents || 0)}</div>
         </div>
         <div style={{ display: "inline-block", background: "#5a2d2d", color: "#ffd9d9", fontSize: 11, fontWeight: 800, padding: "2px 8px", borderRadius: 10, marginTop: 6 }}>VOIDED{at ? " · " + fmtWhen(at) : ""}</div>
         <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>entered by {snap.created_by_name || "someone"}</div>
         <SnapshotBody snap={snap} />
-        <div style={{ color: C.faint, fontSize: 11, marginTop: 12, lineHeight: 1.5 }}>This expense was voided. The allocation above is the record as it stood when it was voided — kept for the club's audit trail and can't be edited.</div>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 12, lineHeight: 1.5 }}>This expense was voided. The allocation above is the record as it stood when it was voided — kept for the club's audit trail and can't be edited.</div>
         <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
           <button onClick={onClose} style={{ ...btn(false), flex: 1 }}>Close</button>
         </div>
-      </div>
-    </div>
+    </BottomSheet>
   );
 }
 
@@ -1152,16 +1142,15 @@ function ExpenseDetail({ expense, shares, payers, memberById, guestById, version
   const prs = payers.filter((p) => p.expense_id === expense.id);
   const parts = shares.filter((s) => s.expense_id === expense.id);
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px", paddingBottom: "calc(72px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 520, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+    <BottomSheet onClose={onClose} maxWidth={520}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, paddingRight: 32 }}>
           <div style={{ flex: 1, color: C.cream, fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 800 }}>{expense.description || "Expense"}</div>
           <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800 }}>{fmtUSD(expense.amount_cents)}</div>
         </div>
         <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{new Date(expense.created_at).toLocaleDateString()}</div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-          <span style={{ color: C.faint, fontSize: 12 }}>Event:</span>
+          <span style={{ color: C.sage, fontSize: 12 }}>Event:</span>
           <span style={{ color: C.cream, fontSize: 12.5, fontWeight: 700, flex: 1 }}>
             {currentEvent ? currentEvent.name : "Ungrouped"}{currentEvent?.status === "closed" ? " · closed" : ""}
           </span>
@@ -1215,7 +1204,7 @@ function ExpenseDetail({ expense, shares, payers, memberById, guestById, version
           );
         })}
         {parts.some((s) => !s.user_id && s.guest_id) && (
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>Guests don’t settle directly — a guest’s share is paid, and a guest’s winnings received, by their sponsoring member.</div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>Guests don’t settle directly — a guest’s share is paid, and a guest’s winnings received, by their sponsoring member.</div>
         )}
 
         {versions.length > 0 && (<>
@@ -1231,7 +1220,7 @@ function ExpenseDetail({ expense, shares, payers, memberById, guestById, version
                   <span style={{ color: C.gold, fontSize: 13, width: 16, textAlign: "center" }}>{v.action === "created" ? "+" : v.action === "deleted" ? "✕" : "✎"}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ color: C.cream, fontSize: 12.5 }}>{verbFor(v.action)} by {who}</div>
-                    <div style={{ color: C.faint, fontSize: 11 }}>{fmtWhen(v.at)}{v.snapshot?.amount_cents != null ? " · " + fmtUSD(v.snapshot.amount_cents) : ""}</div>
+                    <div style={{ color: C.sage, fontSize: 11 }}>{fmtWhen(v.at)}{v.snapshot?.amount_cents != null ? " · " + fmtUSD(v.snapshot.amount_cents) : ""}</div>
                   </div>
                   {expandable && <span style={{ color: C.sage, fontSize: 13 }}>{isOpen ? "▾" : "›"}</span>}
                 </div>
@@ -1249,9 +1238,8 @@ function ExpenseDetail({ expense, shares, payers, memberById, guestById, version
           {canEdit && <button onClick={onEdit} style={{ ...btn(true), flex: 1 }}>Edit</button>}
           <button onClick={onClose} style={{ ...btn(false), flex: 1 }}>Close</button>
         </div>
-        {!canEdit && <div style={{ color: C.faint, fontSize: 11, marginTop: 8, textAlign: "center" }}>View only — only the person who entered this or a club admin can edit it.</div>}
-      </div>
-    </div>
+        {!canEdit && <div style={{ color: C.sage, fontSize: 11, marginTop: 8, textAlign: "center" }}>View only — only the person who entered this or a club admin can edit it.</div>}
+    </BottomSheet>
   );
 }
 
@@ -1306,15 +1294,14 @@ function PersonLedgerModal({ memberId, me, name, net, expenses, shares, settleme
   }
   const who = memberId === me ? "You" : name;
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(8,26,20,.72)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 80 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, borderRadius: "16px 16px 0 0", padding: "18px 16px", paddingBottom: "calc(72px + env(safe-area-inset-bottom))", width: "100%", maxWidth: 520, maxHeight: "calc(100dvh - env(safe-area-inset-top) - 20px)", overflowY: "auto" }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+    <BottomSheet onClose={onClose} maxWidth={520}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, paddingRight: 32 }}>
           <div style={{ flex: 1, color: C.cream, fontFamily: "Georgia, serif", fontSize: 19, fontWeight: 800 }}>{name}{memberId === me ? " (you)" : ""}</div>
           <div style={{ color: net > 0 ? "#7fd6a3" : net < 0 ? "#ef9d90" : C.sage, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>
             {net > 0 ? "owed " + fmtUSD(net) : net < 0 ? "owes " + fmtUSD(-net) : "settled"}
           </div>
         </div>
-        <div style={{ color: C.faint, fontSize: 11.5, marginTop: 4, lineHeight: 1.5 }}>How this number is built, item by item. This is the raw list — who ultimately pays whom is decided separately on the Settle tab.</div>
+        <div style={{ color: C.sage, fontSize: 11.5, marginTop: 4, lineHeight: 1.5 }}>How this number is built, item by item. This is the raw list — who ultimately pays whom is decided separately on the Settle tab.</div>
 
         {lines.length === 0 && <div style={{ color: C.sage, fontSize: 13, padding: "12px 2px" }}>No expenses or payments yet.</div>}
         {buckets.map((b) => (
@@ -1334,8 +1321,7 @@ function PersonLedgerModal({ memberId, me, name, net, expenses, shares, settleme
           <span style={{ color: net > 0 ? "#7fd6a3" : net < 0 ? "#ef9d90" : C.sage, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 15 }}>{net > 0 ? "+" : net < 0 ? "\u2212" : ""}{fmtUSD(Math.abs(net))}</span>
         </div>
         <button onClick={onClose} style={{ ...btn(false), width: "100%", marginTop: 16 }}>Close</button>
-      </div>
-    </div>
+    </BottomSheet>
   );
 }
 

@@ -1,5 +1,5 @@
 // Unit tests for evaluateRound in lib/badges.ts — run with `npm test`.
-import { evaluateRound, computeBadgeState, badgeEvidence, badgesForRound, PriorBadges } from "./badges";
+import { evaluateRound, computeBadgeState, badgeEvidence, badgesForRound, collapseRoundAwards, PriorBadges } from "./badges";
 import type { Round, Hole } from "./golf";
 
 let pass = 0, fail = 0; const fails: string[] = [];
@@ -228,5 +228,39 @@ const parRound = () => mkRound(Array(18).fill([4, 4, 2, "hit"]) as HS[]);
   ok("round 1 has no eagle", !a1.includes("eagle"));
 }
 
+// ---- Repeatable counts: 3 separate net-bogey-free 3+ runs => value 3 ----
+{
+  // ch 0 so net == gross. Three runs of 3 pars, each separated by a bogey, then bogeys to 18.
+  const spec: HS[] = [
+    [4, 4], [4, 4], [4, 4], [4, 5],           // run of 3, then bogey
+    [4, 4], [4, 4], [4, 4], [4, 5],           // run of 3, then bogey
+    [4, 4], [4, 4], [4, 4],                    // run of 3
+    [4, 5], [4, 5], [4, 5], [4, 5], [4, 5], [4, 5], [4, 5], // bogeys to 18
+  ];
+  const aw = evaluateRound(mkRound(spec, { course_handicap: 0 }), emptyPrior());
+  ok("three net-bogey-free 3+ runs -> bogey_free_3 value 3", val(aw, "bogey_free_3") === 3);
+  ok("none of them reach 5 -> no bogey_free_5", !has(aw, "bogey_free_5"));
+}
+
+// ---- Repeatable counts: 2 birdies => birdie value 2 ----
+{
+  const spec: HS[] = [[4, 3], [4, 3], ...Array(16).fill([4, 4])] as HS[];
+  const aw = evaluateRound(mkRound(spec, { course_handicap: 0 }), emptyPrior());
+  ok("two birdies -> birdie value 2", val(aw, "birdie") === 2);
+}
+
+// ---- Score ladder collapses to the best one for a round's display ----
+{
+  const collapsed = collapseRoundAwards([
+    { key: "broke_100", kind: "count" }, { key: "broke_90", kind: "count" }, { key: "birdie", kind: "count", value: 2 },
+  ]).map((a) => a.key);
+  ok("broke 90 hides broke 100", collapsed.includes("broke_90") && !collapsed.includes("broke_100"));
+  ok("collapse keeps non-ladder badges", collapsed.includes("birdie"));
+  const withPar = collapseRoundAwards([
+    { key: "broke_100", kind: "count" }, { key: "broke_90", kind: "count" }, { key: "broke_80", kind: "count" }, { key: "broke_par", kind: "count" },
+  ]).map((a) => a.key);
+  ok("broke par supersedes the whole ladder", withPar.length === 1 && withPar[0] === "broke_par");
+}
+
 console.log(`badges: ${pass} passed, ${fail} failed`);
-if (fail) { console.error(fails.join("\n")); process.exit(1); }
+if (fail) { console.error(fails.join("\n")); process.exit(1); }

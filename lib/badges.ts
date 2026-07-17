@@ -137,19 +137,23 @@ export function evaluateRound(r: Round, prior: PriorBadges): Award[] {
     const netToPar = holes.map((h) => (h.strokes != null ? h.strokes - h.par - (recv[h.hole_number] || 0) : null));
     const netFree = (h: Hole) => h.strokes != null && (h.strokes - h.par - (recv[h.hole_number] || 0)) <= 0;
 
-    let curBF = 0, maxBF = 0, curPar = 0, maxPar = 0, bounce = 0, blowup = false;
+    let curBF = 0, curPar = 0, maxPar = 0, bounce = 0, blowup = false;
+    let runsBF3 = 0, runsBF5 = 0;
+    const closeRun = (len: number) => { if (len >= 5) runsBF5++; if (len >= 3) runsBF3++; };
     for (let i = 0; i < holes.length; i++) {
       const tp = toPar[i];
       const ntp = netToPar[i];
-      if (ntp != null && ntp <= 0) { curBF++; if (curBF > maxBF) maxBF = curBF; } else curBF = 0;
+      if (ntp != null && ntp <= 0) { curBF++; } else { closeRun(curBF); curBF = 0; }
       if (tp == null) { curPar = 0; continue; }
       if (tp === 0) { curPar++; if (curPar > maxPar) maxPar = curPar; } else curPar = 0;
       if (tp >= 2) blowup = true;
       const prev = toPar[i - 1];
       if (i > 0 && prev != null && prev >= 1 && tp <= -1) bounce++;
     }
-    if (maxBF >= 3) add("bogey_free_3", "count");
-    if (maxBF >= 5) add("bogey_free_5", "count");
+    closeRun(curBF); // close a run that reaches the last hole
+    // Count each distinct qualifying streak (a 3+ run shows ×N for N separate runs; a 5+ run counts in both).
+    if (runsBF3 > 0) add("bogey_free_3", "count", runsBF3);
+    if (runsBF5 > 0) add("bogey_free_5", "count", runsBF5);
     if (maxPar >= 4) add("par_train", "count");
     if (bounce > 0) add("bounce_back", "count", bounce);
 
@@ -248,6 +252,17 @@ export function badgesForRound(finished: Round[], roundId: string): Award[] {
   return [];
 }
 
+// For ONE round's badge display: the gross-threshold ladder is cumulative (breaking 90 implies breaking
+// 100), so show only the best one earned — and broke_par supersedes them all. Keeps every other award.
+const SCORE_LADDER = ["broke_100", "broke_90", "broke_85", "broke_80", "broke_par"];
+export function collapseRoundAwards(awards: Award[]): Award[] {
+  const present = new Set(awards.map((a) => a.key));
+  const best = [...SCORE_LADDER].reverse().find((k) => present.has(k)); // hardest earned
+  if (!best) return awards;
+  const drop = new Set(SCORE_LADDER.filter((k) => k !== best));
+  return awards.filter((a) => !drop.has(a.key));
+}
+
 // Human-readable evidence for how a badge was earned in a given round, recomputed
 // from the round's holes. `holes` (when present) is the qualifying stretch to
 // highlight. Pure — the wall/card fetch the round and call this on tap.
@@ -273,18 +288,37 @@ export function badgeEvidence(key: string, r: Round): Evidence {
   const list = (a: number[]) => a.join(", ");
   const s = (a: number[]) => (a.length > 1 ? "s" : "");
 
+  // Net bogey-free uses the player's allocated handicap strokes (same as the award), not gross.
+  let ch = r.course_handicap;
+  if (ch == null && r.handicap_index != null && r.rating != null && r.slope != null && r.course_par != null)
+    ch = courseHandicap(r.handicap_index, r.slope, r.rating, r.course_par);
+  const recv = allocateStrokes(hs, ch);
+  const netFree = (h: Hole) => h.strokes != null && (h.strokes - h.par - (recv[h.hole_number] || 0)) <= 0;
+  const allRuns = (minLen: number, pred: (h: Hole) => boolean): number[][] => {
+    const runs: number[][] = []; let cur: number[] = [];
+    for (const h of hs) {
+      if (h.strokes != null && pred(h)) cur.push(h.hole_number);
+      else { if (cur.length >= minLen) runs.push(cur); cur = []; }
+    }
+    if (cur.length >= minLen) runs.push(cur);
+    return runs;
+  };
+  const rangeStr = (run: number[]) => (run.length ? `${run[0]}\u2013${run[run.length - 1]}` : "");
+
   switch (key) {
-    case "bogey_free_round": return { text: "All 18 holes at par or better — no bogeys.", holes: nums(hs) };
+    case "bogey_free_round": return { text: "All 18 holes at net par or better — no net bogeys.", holes: nums(hs) };
     case "bogey_free_9": {
-      const clean = (x: Hole[]) => x.length >= 9 && x.every((h) => h.strokes != null && h.strokes - h.par <= 0);
-      if (clean(front)) return { text: "Front nine — no bogeys.", holes: nums(front) };
-      if (clean(back)) return { text: "Back nine — no bogeys.", holes: nums(back) };
-      return { text: "A full nine with no bogeys." };
+      if (front.length >= 9 && front.every(netFree)) return { text: "Front nine — no net bogeys.", holes: nums(front) };
+      if (back.length >= 9 && back.every(netFree)) return { text: "Back nine — no net bogeys.", holes: nums(back) };
+      return { text: "A full nine at net par or better." };
     }
     case "bogey_free_5":
     case "bogey_free_3": {
-      const run = longestRun((h) => (h.strokes as number) - h.par <= 0);
-      return run.length ? { text: `Holes ${run[0]}–${run[run.length - 1]} — ${run.length} in a row without a bogey.`, holes: run } : { text: "A bogey-free stretch." };
+      const minLen = key === "bogey_free_5" ? 5 : 3;
+      const runs = allRuns(minLen, netFree);
+      if (!runs.length) return { text: "A run at net par or better." };
+      if (runs.length === 1) return { text: `Holes ${rangeStr(runs[0])} — ${runs[0].length} in a row at net par or better (your handicap strokes count).`, holes: runs[0] };
+      return { text: `${runs.length} separate runs at net par or better: ${runs.map(rangeStr).join(", ")}.`, holes: runs.flat() };
     }
     case "par_train": {
       const run = longestRun((h) => (h.strokes as number) - h.par === 0);

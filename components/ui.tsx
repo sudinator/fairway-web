@@ -118,7 +118,8 @@ export const SHEET_PANEL_BOTTOM = "calc(72px + env(safe-area-inset-bottom))"; //
  * `margin` off every edge — and docks the card at the bottom of that rectangle. The card can NEVER exceed
  * the perimeter because it is POSITIONED to it, not sized by height math (no maxHeight/dvh/box-model
  * guesswork — that is what kept clipping under the notch). Same primitive as the red test frame. Optional
- * sticky `header` stays put while `children` scroll. Every popup should be built on this. APP_RULES #17.
+ * sticky `header` stays put while `children` scroll. Every popup should be built on this. It ALWAYS renders a
+ * top-right × close control (APP_RULES #18) — do not add your own ×. APP_RULES #17.
  */
 export function BottomSheet({ onClose, children, header, panelStyle, bodyStyle, maxWidth = 520, margin = 12, scrim = "rgba(8,26,20,.72)", dismissOnBackdrop = true }: {
   onClose?: () => void;
@@ -140,10 +141,13 @@ export function BottomSheet({ onClose, children, header, panelStyle, bodyStyle, 
         left: margin, right: margin, zIndex: 81,
         display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", pointerEvents: "none" }}>
         <div onClick={(e) => e.stopPropagation()} style={{
-          pointerEvents: "auto", width: "100%", maxWidth, flex: "0 1 auto", minHeight: 0, overflow: "hidden",
+          pointerEvents: "auto", position: "relative", width: "100%", maxWidth, flex: "0 1 auto", minHeight: 0, overflow: "hidden",
           background: C.greenLight, borderRadius: 20, boxShadow: "0 8px 40px rgba(0,0,0,.55)",
           display: "flex", flexDirection: "column", ...panelStyle,
         }}>
+          {onClose && (
+            <button onClick={onClose} aria-label="Close" style={{ position: "absolute", top: 10, right: 10, zIndex: 3, background: "rgba(255,255,255,0.14)", border: "none", color: C.cream, width: 30, height: 30, borderRadius: 15, fontSize: 17, fontWeight: 800, lineHeight: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+          )}
           {header != null && <div style={{ flexShrink: 0 }}>{header}</div>}
           <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "18px 16px", ...bodyStyle }}>{children}</div>
         </div>
@@ -179,7 +183,7 @@ export function DifferentialSheet({ round, onClose }: { round: Round; onClose: (
   return (
     <BottomSheet onClose={onClose} maxWidth={460} panelStyle={{ background: C.greenMid }}
       header={
-        <div style={{ padding: "14px 16px 10px", borderBottom: `1px solid rgba(255,255,255,0.12)` }}>
+        <div style={{ padding: "14px 44px 10px 16px", borderBottom: `1px solid rgba(255,255,255,0.12)` }}>
           <div style={{ color: C.gold, fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase", fontWeight: 700 }}>How this differential is calculated</div>
           <div style={{ color: C.cream, fontSize: 15, fontWeight: 600, marginTop: 4 }}>{round.course}{round.tee_name ? ` · ${round.tee_name}` : ""}</div>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{fmtDate(round.played_at)}</div>
