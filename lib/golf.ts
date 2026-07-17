@@ -362,12 +362,10 @@ export function adjustedHoleScore(h: Hole): number | null {
 
 // WHS-style score differential for one round (needs full 18 with rating & slope):
 //   (113 / slope) * (adjusted gross - course rating)
-export function roundDifferential(r: Round): number | null {
+export function adjustedGross(r: Round): number | null {
   if (r.rating == null || r.slope == null) return null;
-  // Gross-only round: use the recorded total directly (no per-hole adjustment available).
-  if (isGrossOnly(r)) {
-    return (113 / r.slope) * ((r.gross_score || 0) - r.rating);
-  }
+  // Gross-only round: the recorded total is the adjusted gross (no per-hole cap available).
+  if (isGrossOnly(r)) return r.gross_score ?? null;
   const holes = played(r);
   if (holes.length < 9) return null; // WHS: at least 9 holes played to be acceptable
   let adjusted = 0;
@@ -390,7 +388,13 @@ export function roundDifferential(r: Round): number | null {
     if (unplayedPar < 0 || unplayedRecv < 0) return null; // inconsistent data -> don't count
     adjusted += unplayedPar + unplayedRecv;
   }
-  return (113 / r.slope) * (adjusted - r.rating);
+  return adjusted;
+}
+
+export function roundDifferential(r: Round): number | null {
+  const ag = adjustedGross(r);
+  if (ag == null || r.rating == null || r.slope == null) return null;
+  return (113 / r.slope) * (ag - r.rating);
 }
 
 // For a 9-17 hole round that counts toward the handicap, describe the net-par fill for the UI.
@@ -425,6 +429,13 @@ const WHS_TABLE: { upTo: number; best: number; adj: number }[] = [
   { upTo: 19, best: 7, adj: 0 },
   { upTo: 20, best: 8, adj: 0 },
 ];
+
+// The exact set of rounds that feed the handicap/differential views — any round with
+// hole detail OR a gross-only total. Dashboard and Profile MUST share this so their
+// index can never diverge from each other.
+export function handicapRounds(rounds: Round[]): Round[] {
+  return rounds.filter((r) => played(r).length > 0 || isGrossOnly(r));
+}
 
 // rounds should be newest-first or any order; we sort by date inside.
 export function runningHandicap(rounds: Round[]): { index: number | null; used: number; total: number; usedDiffs: number[]; allDiffs: number[]; adj: number; recentDetail: { d: number; used: boolean }[] } {

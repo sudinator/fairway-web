@@ -8,7 +8,7 @@ import {
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, isGrossOnly, hasHoleDetail,
-  girStats, firStats, scrambleStats, sandSaveStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay, stablefordEstimable,
+  girStats, firStats, scrambleStats, sandSaveStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, handicapRounds, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay, stablefordEstimable,
 } from "@/lib/golf";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
 import { RoundRow } from "@/components/rounds-list";
@@ -118,7 +118,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   onViewAchievements?: () => void;
 }) {
   const [win, setWin] = useState<"5" | "20" | "season" | "all">("all");
-  const allDone = rounds.filter((r) => played(r).length > 0 || isGrossOnly(r));
+  const allDone = handicapRounds(rounds);
   const nowYear = new Date().getFullYear();
   const byRecent = [...allDone].sort((a, b) => +new Date(b.played_at) - +new Date(a.played_at));
   const done = win === "5" ? byRecent.slice(0, 5)
@@ -145,7 +145,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
 
   // Index trajectory: the running index recomputed after each round (full history, WHS).
   const idxTrail = useMemo(() => {
-    const chron = rounds.filter((r) => played(r).length > 0 || isGrossOnly(r))
+    const chron = handicapRounds(rounds)
       .sort((a, b) => +new Date(a.played_at) - +new Date(b.played_at));
     const pts: number[] = [];
     for (let i = 0; i < chron.length; i++) {

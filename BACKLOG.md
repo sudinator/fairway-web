@@ -266,3 +266,9 @@ Living list. `[x]` = built & verified in code (file noted). `[~]` = partially do
   revoke/demote are owner-only. System admins keep full system powers but cannot change the admin roster.
   Guard so the owner cannot be demoted and there is always exactly one owner. Surface in the Users tab with
   add/remove controls visible ONLY to the owner; audit-log every change. RPCs that gate on is_admin() stay unchanged.
+
+- **GHIN reconcile (manual import).** Let a golfer paste/upload their GHIN score history (date/course/score)
+  and diff it against BNN's rounds to flag missing/unrecorded ones, feeding the Profile handicap summary's
+  sync check. NOT via GHIN username/password — no official self-serve API (partnership-gated), and the
+  unofficial credential-scraping route is against GHIN ToS + a security liability. Official USGA/state-assoc
+  API access is the only clean auto-sync path, viable only if BNN formalizes.

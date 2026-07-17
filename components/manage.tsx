@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { HScroll } from "@/components/hscroll";
 import { createClient } from "@/lib/supabase";
 import { pushGate, subscribeToPush, unsubscribeFromPush, currentPermission, syncPushSubscription } from "@/lib/push";
-import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID, effectiveGroupId } from "@/lib/golf";
+import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID, effectiveGroupId, runningHandicap, handicapRounds, adjustedGross, roundDifferential } from "@/lib/golf";
 import capabilities from "@/lib/capabilities.json";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LabelList } from "recharts";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
@@ -1045,6 +1045,97 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
 }
 
 // ================= Profile panel (+ admin) =================
+// Profile-tab handicap summary. Reads the SAME rounds prop + SAME engine as the dashboard
+// (runningHandicap over handicapRounds), so the index can never diverge between tabs, and it
+// recalculates automatically whenever a round is added/deleted (deletes refresh the rounds state).
+export function HandicapSummary({ rounds, profile }: { rounds: Round[]; profile: any }) {
+  const hcp = React.useMemo(() => runningHandicap(handicapRounds(rounds)), [rounds]);
+  const rows = React.useMemo(() => {
+    const eligible = handicapRounds(rounds)
+      .filter((r) => roundDifferential(r) != null)
+      .sort((a, b) => +new Date(b.played_at) - +new Date(a.played_at))
+      .slice(0, 20);
+    return eligible.map((r, i) => ({
+      r,
+      date: new Date(r.played_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+      ag: adjustedGross(r),
+      diff: roundDifferential(r) as number,
+      used: hcp.recentDetail[i]?.used ?? false,
+    }));
+  }, [rounds, hcp.recentDetail]);
+
+  const official = profile?.handicap_index != null ? Number(profile.handicap_index) : null;
+  const idx = hcp.index;
+  const delta = idx != null && official != null ? Math.round(Math.abs(idx - official) * 10) / 10 : null;
+
+  return (
+    <div style={{ background: C.greenMid, borderRadius: 14, padding: 16, marginTop: 16 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+        <div>
+          <Eyebrow style={{ margin: 0 }}>Handicap index</Eyebrow>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>App estimate{idx != null ? ` · best ${hcp.used} of last ${rows.length}` : ""}</div>
+        </div>
+        <div style={{ color: C.cream, fontSize: 36, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{idx != null ? idx.toFixed(1) : "—"}</div>
+      </div>
+
+      {official != null && (
+        <div style={{ background: C.card, borderRadius: 10, padding: "9px 12px", marginTop: 10 }}>
+          <div style={{ color: C.faint, fontSize: 12 }}>Your entered index <span style={{ color: C.cream, fontWeight: 700 }}>{official.toFixed(1)}</span></div>
+          {delta != null && (
+            <div style={{ color: delta >= 1 ? C.birdie : C.sage, fontSize: 11, marginTop: 2 }}>
+              {delta >= 1 ? `Differs from the app estimate by ${delta.toFixed(1)} — check your rounds are in sync with GHIN` : "In line with the app estimate"}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{ color: C.sage, fontSize: 11, lineHeight: 1.5, marginTop: 8 }}>
+        This is an app calculation for reference. Your official GHIN Handicap Index is the system of record and supersedes it.
+      </div>
+
+      {idx == null ? (
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 12 }}>
+          Need at least 3 rounds with a course rating and slope to estimate an index. You have {hcp.total}.
+        </div>
+      ) : (
+        <>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "14px 0 6px" }}>
+            <Eyebrow style={{ margin: 0 }}>Scoring record</Eyebrow>
+            <div style={{ color: C.sage, fontSize: 11 }}>Best {hcp.used} of last {rows.length}</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", borderBottom: `1px solid ${C.line}` }}>
+            <div style={{ width: 7, flexShrink: 0 }} />
+            <div style={{ width: 48, flexShrink: 0, color: C.faint, fontSize: 11 }}>Date</div>
+            <div style={{ flex: 1, color: C.faint, fontSize: 11 }}>Course · tee (CR/slope)</div>
+            <div style={{ width: 38, textAlign: "right", color: C.faint, fontSize: 11 }}>Adj</div>
+            <div style={{ width: 46, textAlign: "right", color: C.faint, fontSize: 11 }}>Diff</div>
+          </div>
+          {rows.map(({ r, date, ag, diff, used }) => (
+            <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 4px", borderBottom: `1px solid ${C.line}`, opacity: used ? 1 : 0.66, background: used ? "rgba(228,207,134,0.06)" : "transparent" }}>
+              <div style={{ width: 7, height: 7, borderRadius: 4, background: used ? C.gold : "transparent", flexShrink: 0 }} />
+              <div style={{ width: 48, flexShrink: 0, color: C.faint, fontSize: 11 }}>{date}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: C.cream, fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.course || "—"}</div>
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 1 }}>{[r.tee_name, r.rating != null && r.slope != null ? `${r.rating}/${r.slope}` : null].filter(Boolean).join(" · ") || "—"}</div>
+              </div>
+              <div style={{ width: 38, textAlign: "right", color: C.cream, fontSize: 13, fontWeight: 700, fontFamily: "Georgia, serif" }}>{ag != null ? ag : "—"}</div>
+              <div style={{ width: 46, textAlign: "right", color: used ? C.cream : C.sage, fontSize: 13, fontWeight: used ? 800 : 600, fontFamily: "Georgia, serif" }}>{diff.toFixed(1)}</div>
+            </div>
+          ))}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, padding: "0 4px" }}>
+            <div style={{ width: 7, height: 7, borderRadius: 4, background: C.gold, flexShrink: 0 }} />
+            <div style={{ color: C.sage, fontSize: 11, flex: 1 }}>Counts toward index ({hcp.used} lowest differentials)</div>
+          </div>
+          <div style={{ background: C.card, borderRadius: 10, padding: "9px 12px", marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ color: C.faint, fontSize: 12 }}>Index = average of {hcp.used} lowest{hcp.adj !== 0 ? `, ${hcp.adj > 0 ? "+" : ""}${hcp.adj} adj` : ""}</div>
+            <div style={{ color: C.gold, fontSize: 15, fontWeight: 800, fontFamily: "Georgia, serif" }}>{idx.toFixed(1)}</div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds = [] }: { profile: any; user: any; onSaved: () => void; badgeRefresh?: number; rounds?: Round[] }) {
   const [name, setName] = useState(profile?.display_name || "");
   const [ghin, setGhin] = useState(profile?.ghin_number || "");
@@ -1195,6 +1286,8 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
         <button style={{ ...btn(true), marginTop: 18, opacity: saving ? 0.5 : 1 }} disabled={saving} onClick={save}>{saving ? "Saving…" : "Save profile"}</button>
         {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
       </div>
+
+      <HandicapSummary rounds={rounds} profile={profile} />
 
       <AchievementsWall user={user} rounds={rounds} refreshKey={badgeRefresh} />
 

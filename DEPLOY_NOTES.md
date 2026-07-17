@@ -4041,3 +4041,21 @@ sticky header above a scrolling body. It knows the perimeter, so a tall popup fi
 — it can't cross the notch or the nav. Moved the notification sheet onto it (was hand-rolled), so there's
 one implementation, not two. APP_RULES #17 rewritten principle-first. Next: migrate the remaining hand-rolled
 popups (stat drawer, tee-time sheets, money sheets) onto <BottomSheet> for full consistency.
+
+### 174.0.260716 — Profile-tab handicap summary (WHS scoring record) (no migration)
+New HandicapSummary card on the Profile tab (components/manage.tsx): app-estimated WHS Handicap Index with
+the scoring record it's built from — Date, Course · tee (CR/slope), Adj (adjusted gross, capped at net
+double bogey per hole), and Differential — for the last 20 eligible rounds, with the counting best-N marked
+(gold dot) and the index shown as the average of those. If a manual/official index is entered it's shown as
+the system of record with the delta, noting the official GHIN index supersedes the app estimate.
+Sync guarantees (both requested):
+- Reads the SAME rounds prop and SAME engine as the dashboard. Extracted lib/golf.ts `handicapRounds()`
+  (the shared "played or gross-only" filter) and pointed the dashboard at it, so the two indices are
+  computed from an identical set and cannot diverge. runningHandicap() is unchanged (already correct WHS:
+  best 8 of 20, proper fewer-than-20 handling, no 0.96).
+- Recalculates automatically on add/delete: the card is a pure function of the rounds state, and a delete
+  soft-sets deleted_at then reloads rounds (excluding it), which re-renders both tabs.
+Also extracted lib/golf.ts `adjustedGross()` (refactored roundDifferential to reuse it — differential values
+unchanged, verified by the existing golf/card/badges suites) so the "Adj" column shows exactly the AGS that
+produced each differential. New tests cover the net-double-bogey cap and handicapRounds. GHIN score-history
+import/reconcile intentionally deferred (see BACKLOG) — no credential scraping.

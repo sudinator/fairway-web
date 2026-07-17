@@ -1,5 +1,5 @@
 // Unit tests for computeBetting in lib/golf.ts — run with `npm test`.
-import { computeBetting, DEFAULT_BET_SPLIT, roundDifferential, partialHandicapInfo, strokesReceived } from "./golf";
+import { computeBetting, DEFAULT_BET_SPLIT, roundDifferential, partialHandicapInfo, strokesReceived, adjustedGross, handicapRounds } from "./golf";
 import type { BetPlayer, Round, Hole } from "./golf";
 
 let pass = 0, fail = 0; const fails: string[] = [];
@@ -150,5 +150,25 @@ const P = (id: string, total: number, seg: [number, number, number]): BetPlayer 
   ok("9-hole round produces a differential", typeof roundDifferential({ ...r, holes: holes.slice(0, 9) } as unknown as Round) === "number");
 }
 
+{
+  // adjustedGross caps each hole at net double bogey (par + 2 + strokes received).
+  const holes: Hole[] = Array.from({ length: 18 }, (_, i) => ({
+    hole_number: i + 1, par: 4, stroke_index: i + 1,
+    strokes: i === 0 ? 10 : 4, // one blow-up hole (10) on a par 4, scratch -> cap 6
+    recv: 0, putts: null, fairway: null, penalties: null, sand: null, yardage: null,
+  }) as unknown as Hole);
+  const r = { id: "ag", course: "Cap GC", played_at: "2026-07-01", rating: 72, slope: 113,
+    course_par: 72, course_handicap: 0, handicap_index: 0, gross_score: 78, holes, status: "final" } as unknown as Round;
+  check("adjustedGross caps blow-up hole at net double bogey", adjustedGross(r), 74); // 6 + 17*4, not 78
+  ok("gross-only round yields an adjustedGross", adjustedGross({ id: "g", played_at: "2026-06-01", rating: 70, slope: 120, holes: [], gross_score: 90, status: "final" } as unknown as Round) === 90);
+
+  // handicapRounds keeps hole-detail + gross-only rounds, drops empties.
+  const grossOnly = { id: "g2", played_at: "2026-05-01", rating: 70, slope: 120, holes: [], gross_score: 88, status: "final" } as unknown as Round;
+  const empty = { id: "e", played_at: "2026-04-01", rating: 70, slope: 120, holes: [], gross_score: null, status: "final" } as unknown as Round;
+  const keep = handicapRounds([r, grossOnly, empty]);
+  check("handicapRounds keeps played + gross-only, drops empty", keep.length, 2);
+  ok("handicapRounds excludes the empty round", !keep.some((x) => x.id === "e"));
+}
+
 console.log(`golf/computeBetting tests: PASS ${pass}  FAIL ${fail}`);
-if (fail) { console.log(fails.join("\n")); process.exit(1); }
+if (fail) { console.log(fails.join("\n")); process.exit(1); }
