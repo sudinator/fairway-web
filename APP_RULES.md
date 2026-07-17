@@ -150,3 +150,14 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
     principle bottom sheets use to cap their height (#17). Enforced by `ci/check-safe-area-frames.py`; all
     UI guards now run in CI via `npm run guards` (font size, global rules, chart overflow, date inputs,
     bottom sheets, safe-area frames). — manual
+21. **Text and surface colours come from the SAME light/dark family — never mix them.** The palette is two
+    families. LIGHT surfaces — `C.card` (#FFFDF6), `C.cream` — carry DARK text: `C.ink`, `C.faint`. DARK
+    surfaces — `C.green` / `C.greenMid` / `C.greenLight` — carry LIGHT text: `C.cream`, `C.sage`; `C.gold` is
+    an accent usable on either. Never put light text on a light surface (`C.cream`/`C.sage` on `C.card` — the
+    washed-out "how this differential is calculated" sheet) or dark text on a dark surface (`C.faint`/`C.ink`
+    on green). **All popups/sheets are DARK:** panel `C.greenMid`, nested boxes `C.greenLight` (or `C.green`),
+    text `C.cream`/`C.sage`/`C.gold`, dividers `rgba(255,255,255,.08–.12)` (NOT `C.line`, which is a
+    light-surface divider). Do NOT drop a `C.card` box inside a dark sheet. Match the app's existing sheets
+    (notification sheet, handicap card) rather than inventing a new look. Enforced for same-element mistakes
+    by `ci/check-contrast.py` (part of `npm run guards`); parent/child pairings are on you to get right — copy
+    an existing dark sheet. — manual

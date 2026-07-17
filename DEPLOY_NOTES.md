@@ -4084,3 +4084,13 @@ at net par / gross-only total), the substituted arithmetic, and the final rounde
 a differential in the Profile scoring table (dotted underline + hint; taps don't trigger the row's
 scorecard-open) or the "How it's calculated ›" differential pill on the round summary. First real consumer
 of the BottomSheet primitive.
+
+### 174.4.260716 — consistent dark-theme colours + contrast rule/guard (no migration)
+Fixed the "how this differential is calculated" sheet (and the handicap card's nested boxes), which used the
+LIGHT-surface colour C.card (#FFFDF6, ~white) with LIGHT text (cream/sage/gold) — unreadable, off-theme.
+Recoloured to the app's dark-sheet convention: greenMid panel, greenLight nested boxes, cream/sage/gold text,
+subtle rgba(255,255,255,.08–.12) dividers (not C.line). Made it a global rule (APP_RULES #21): text and
+surface colours must come from the same light/dark family — light surfaces (C.card/cream) use dark text
+(ink/faint); dark surfaces (green*) use light text (cream/sage), gold as accent. New ci/check-contrast.py
+(added to `npm run guards`) fails any single element that sets a background and same-family text; verified
+clean across the app (the parent/child cases it can't judge statically are covered by the rule).

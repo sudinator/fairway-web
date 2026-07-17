@@ -1084,8 +1084,8 @@ export function HandicapSummary({ rounds, profile, onOpen }: { rounds: Round[]; 
       </div>
 
       {official != null && (
-        <div style={{ background: C.card, borderRadius: 10, padding: "9px 12px", marginTop: 10 }}>
-          <div style={{ color: C.faint, fontSize: 12 }}>Your entered index <span style={{ color: C.cream, fontWeight: 700 }}>{official.toFixed(1)}</span></div>
+        <div style={{ background: C.greenLight, borderRadius: 10, padding: "9px 12px", marginTop: 10 }}>
+          <div style={{ color: C.sage, fontSize: 12 }}>Your entered index <span style={{ color: C.cream, fontWeight: 700 }}>{official.toFixed(1)}</span></div>
           {delta != null && (
             <div style={{ color: delta >= 1 ? C.birdie : C.sage, fontSize: 11, marginTop: 2 }}>
               {delta >= 1 ? `Differs from the app estimate by ${delta.toFixed(1)} — check your rounds are in sync with GHIN` : "In line with the app estimate"}
@@ -1099,7 +1099,7 @@ export function HandicapSummary({ rounds, profile, onOpen }: { rounds: Round[]; 
       </div>
 
       {next && (
-        <div style={{ background: C.card, border: `1px solid ${C.greenLight}`, borderRadius: 12, padding: "11px 13px", marginTop: 10 }}>
+        <div style={{ background: C.greenLight, border: `1px solid rgba(201,162,39,0.35)`, borderRadius: 12, padding: "11px 13px", marginTop: 10 }}>
           <div style={{ color: C.gold, fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase", fontWeight: 700 }}>Your next round</div>
           <div style={{ color: C.cream, fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>
             Counts toward your index if its differential is under <span style={{ fontWeight: 800, fontFamily: "Georgia, serif" }}>{next.threshold.toFixed(1)}</span>.
@@ -1109,7 +1109,7 @@ export function HandicapSummary({ rounds, profile, onOpen }: { rounds: Round[]; 
               ? `If it's higher, your index stays ${next.current.toFixed(1)}.`
               : `If it's higher, your index moves to ${next.indexIfHigher.toFixed(1)} (from ${next.current.toFixed(1)}) as your oldest round rolls off.`}
           </div>
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
             Rolling off: <span style={{ color: C.sage }}>{new Date(next.rollOff.played_at).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {next.rollOff.course || "—"} · {(roundDifferential(next.rollOff) as number).toFixed(1)}</span>
           </div>
         </div>
@@ -1125,20 +1125,20 @@ export function HandicapSummary({ rounds, profile, onOpen }: { rounds: Round[]; 
             <Eyebrow style={{ margin: 0 }}>Scoring record</Eyebrow>
             <div style={{ color: C.sage, fontSize: 11 }}>Best {hcp.used} of last {rows.length}</div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", borderBottom: `1px solid ${C.line}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 4px", borderBottom: `1px solid rgba(255,255,255,0.10)` }}>
             <div style={{ width: 7, flexShrink: 0 }} />
-            <div style={{ width: 48, flexShrink: 0, color: C.faint, fontSize: 11 }}>Date</div>
-            <div style={{ flex: 1, color: C.faint, fontSize: 11 }}>Course · tee (CR/slope)</div>
-            <div style={{ width: 38, textAlign: "right", color: C.faint, fontSize: 11 }}>Adj</div>
-            <div style={{ width: 44, textAlign: "right", color: C.faint, fontSize: 11 }}>Diff</div>
+            <div style={{ width: 48, flexShrink: 0, color: C.sage, fontSize: 11 }}>Date</div>
+            <div style={{ flex: 1, color: C.sage, fontSize: 11 }}>Course · tee (CR/slope)</div>
+            <div style={{ width: 38, textAlign: "right", color: C.sage, fontSize: 11 }}>Adj</div>
+            <div style={{ width: 44, textAlign: "right", color: C.sage, fontSize: 11 }}>Diff</div>
             {onOpen && <div style={{ width: 14, flexShrink: 0 }} />}
           </div>
           {rows.map(({ r, date, ag, diff, used }) => (
             <div key={r.id} onClick={onOpen ? () => onOpen(r) : undefined} role={onOpen ? "button" : undefined} tabIndex={onOpen ? 0 : undefined}
               onKeyDown={onOpen ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(r); } } : undefined}
-              style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 4px", borderBottom: `1px solid ${C.line}`, opacity: used ? 1 : 0.66, background: used ? "rgba(228,207,134,0.06)" : "transparent", cursor: onOpen ? "pointer" : "default" }}>
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 4px", borderBottom: `1px solid rgba(255,255,255,0.10)`, opacity: used ? 1 : 0.66, background: used ? "rgba(228,207,134,0.06)" : "transparent", cursor: onOpen ? "pointer" : "default" }}>
               <div style={{ width: 7, height: 7, borderRadius: 4, background: used ? C.gold : "transparent", flexShrink: 0 }} />
-              <div style={{ width: 48, flexShrink: 0, color: C.faint, fontSize: 11 }}>{date}</div>
+              <div style={{ width: 48, flexShrink: 0, color: C.sage, fontSize: 11 }}>{date}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: C.cream, fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.course || "—"}</div>
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 1 }}>{[r.tee_name, r.rating != null && r.slope != null ? `${r.rating}/${r.slope}` : null].filter(Boolean).join(" · ") || "—"}</div>
@@ -1154,8 +1154,8 @@ export function HandicapSummary({ rounds, profile, onOpen }: { rounds: Round[]; 
             <div style={{ width: 7, height: 7, borderRadius: 4, background: C.gold, flexShrink: 0 }} />
             <div style={{ color: C.sage, fontSize: 11, flex: 1 }}>Counts toward index ({hcp.used} lowest differentials)</div>
           </div>
-          <div style={{ background: C.card, borderRadius: 10, padding: "9px 12px", marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ color: C.faint, fontSize: 12 }}>Index = average of {hcp.used} lowest{hcp.adj !== 0 ? `, ${hcp.adj > 0 ? "+" : ""}${hcp.adj} adj` : ""}</div>
+          <div style={{ background: C.greenLight, borderRadius: 10, padding: "9px 12px", marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ color: C.sage, fontSize: 12 }}>Index = average of {hcp.used} lowest{hcp.adj !== 0 ? `, ${hcp.adj > 0 ? "+" : ""}${hcp.adj} adj` : ""}</div>
             <div style={{ color: C.gold, fontSize: 15, fontWeight: 800, fontFamily: "Georgia, serif" }}>{idx.toFixed(1)}</div>
           </div>
           <div style={{ color: C.sage, fontSize: 11, marginTop: 8, textAlign: "center" }}>Tap any differential to see how it’s calculated.</div>

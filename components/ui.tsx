@@ -179,7 +179,7 @@ export function DifferentialSheet({ round, onClose }: { round: Round; onClose: (
   return (
     <BottomSheet onClose={onClose} maxWidth={460} panelStyle={{ background: C.greenMid }}
       header={
-        <div style={{ padding: "14px 16px 10px", borderBottom: `1px solid ${C.line}` }}>
+        <div style={{ padding: "14px 16px 10px", borderBottom: `1px solid rgba(255,255,255,0.12)` }}>
           <div style={{ color: C.gold, fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase", fontWeight: 700 }}>How this differential is calculated</div>
           <div style={{ color: C.cream, fontSize: 15, fontWeight: 600, marginTop: 4 }}>{round.course}{round.tee_name ? ` · ${round.tee_name}` : ""}</div>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{fmtDate(round.played_at)}</div>
@@ -195,12 +195,12 @@ export function DifferentialSheet({ round, onClose }: { round: Round; onClose: (
             Differential = (113 ÷ Slope) × (Adjusted Gross − Course Rating)
           </div>
 
-          <div style={{ background: C.card, borderRadius: 12, padding: "8px 14px", marginTop: 14 }}>
+          <div style={{ background: C.greenLight, borderRadius: 12, padding: "8px 14px", marginTop: 14 }}>
             <InputRow label="Adjusted gross" value={ag}
               note={gross ? "Total score entered (no per-hole cap available)" : partial ? "Each hole capped at net double bogey; unplayed holes filled at net par" : "Each hole capped at net double bogey (par + 2 + strokes received)"} />
-            <div style={{ height: 1, background: C.line }} />
+            <div style={{ height: 1, background: "rgba(255,255,255,0.10)" }} />
             <InputRow label="Course rating" value={cr} note="The expected score for a scratch golfer" />
-            <div style={{ height: 1, background: C.line }} />
+            <div style={{ height: 1, background: "rgba(255,255,255,0.10)" }} />
             <InputRow label="Slope" value={sl} note="Difficulty for a bogey golfer (113 = standard)" />
           </div>
 
