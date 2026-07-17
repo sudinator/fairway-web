@@ -6533,10 +6533,13 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
   // a betting guest can be booked as their own ledger line. Tagged with source_game_id so
   // it's a per-appearance throwaway (hidden from the deliberate add-a-guest picker / Retire
   // list) and re-posting the same game reuses it rather than duplicating.
-  async function findOrCreateGuestId(name: string): Promise<string | null> {
+  async function findOrCreateGuestId(name: string, sponsor: string): Promise<string | null> {
     const { data: existing } = await supabase.from("group_guests").select("id").eq("group_id", game.group_id).eq("name", name).eq("source_game_id", game.id).limit(1);
     if (existing && existing.length) return (existing[0] as any).id;
-    const { data, error } = await supabase.from("group_guests").insert({ group_id: game.group_id, name, sponsor_user_id: null, archived: false, source_game_id: game.id, created_by: user.id }).select("id").single();
+    // Persist the guest WITH the sponsoring member it already carries from the tee time / game roster
+    // (game_players.guest_of). A game guest always belongs to a member — this is what betting requires,
+    // and what the money_guests_insert RLS policy enforces.
+    const { data, error } = await supabase.from("group_guests").insert({ group_id: game.group_id, name, sponsor_user_id: sponsor, archived: false, source_game_id: game.id, created_by: user.id }).select("id").single();
     if (!error && data) return (data as any).id;
     // Insert failed — most often a uniqueness collision because a guest with this name already
     // exists in the group (e.g. carried in from the tee time). Reuse that record so posting still
@@ -6554,7 +6557,7 @@ function BettingPanel({ players, playerPoints, playerHoles, ended, game, user, c
       if (uid) { out.push({ user_id: uid, name: pp.name, net: pp.net }); continue; }
       const sponsor = idToGuestOf[pp.id];
       if (!sponsor) return { ok: false, reason: `Assign a sponsor for ${pp.name} first.` };
-      const gid = await findOrCreateGuestId(pp.name);
+      const gid = await findOrCreateGuestId(pp.name, sponsor);
       if (!gid) return { ok: false, reason: `Couldn't create a guest record for ${pp.name} — please try again.` };
       out.push({ user_id: null, guest_id: gid, sponsor_user_id: sponsor, name: pp.name, net: pp.net });
     }

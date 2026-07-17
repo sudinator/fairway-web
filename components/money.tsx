@@ -7,7 +7,7 @@ import { Avatar, btn, inputStyle, Eyebrow, FieldLabel } from "@/components/ui";
 import {
   computeBalances, evenShares, validateCustomTotal, guestCoverageBySponsor,
   fmtUSD, payLink, nudgeSms, auditVersionsByExpense, eventNet, expensesByEvent, personLedger, allocateSettlement, expenseImpact,
-  bucketTransfers, bucketSettled,
+  bucketBalances, bucketTransfers, bucketSettled,
   type Expense, type Share, type Settlement, type Guest, type Payer,
   type AuditRow, type AuditVersion, type AuditSnapshot, type EventRow, type LedgerLine,
 } from "@/lib/money";
@@ -550,8 +550,8 @@ function BalancesScreen({ members, guests, shares, payers, balances, me, onNudge
   const coverage = guestCoverageBySponsor(shares, gById, payers); // memberId -> { guestId -> net cents }, per-expense sponsor (wins + losses)
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: "14px 13px" }}>
-      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Balances</div>
-      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 6 }}>Net across all unsettled expenses · tap a name for the breakdown</div>
+      <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Aggregate Club-level Balances</div>
+      <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 6 }}>Everyone’s net across all Buckets · tap a name for the per-Bucket breakdown</div>
       {rows.map(({ m, v }) => {
         const owes = v < 0, owed = v > 0;
         const cov = coverage[m.id] || {};
@@ -1368,22 +1368,29 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
             <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>{fmtUSD(net.total)}</div>
           </div>
         </div>
-        {perMember.length > 0 && (
-          <div style={{ marginTop: 10, borderTop: `1px solid ${C.greenMid}`, paddingTop: 8 }}>
-            {perMember.map((m) => (
-              <div key={m.member_id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, padding: "3px 0", color: C.cream }}>
-                <span style={{ flex: 1 }}>{memberById[m.member_id]?.display_name || "Player"}</span>
-                <span style={{ color: C.sage, width: 92, textAlign: "right" }}>paid {fmtUSD(m.paid)}</span>
-                <span style={{ width: 68, textAlign: "right", fontWeight: 800, color: m.net > 0 ? "#8fd6b0" : m.net < 0 ? "#f0b4ab" : C.faint }}>{m.net > 0 ? "+" : m.net < 0 ? "\u2212" : ""}{fmtUSD(Math.abs(m.net))}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {(() => {
+          // Per-Bucket settled balance — a mini version of the aggregate Club tile, scoped to THIS Bucket.
+          // Shows who owes what within the Bucket after its own settlements; "cleared" when net-square.
+          const bal = bucketBalances(ev.id, expenses as any, shares as any, settlements as any, guests as any, payers as any);
+          const brows = Object.entries(bal).sort((a, b) => (memberById[a[0]]?.display_name || "").localeCompare(memberById[b[0]]?.display_name || ""));
+          return (
+            <div style={{ marginTop: 10, borderTop: `1px solid ${C.greenMid}`, paddingTop: 8 }}>
+              {brows.length === 0 ? (
+                <div style={{ color: "#7fd6a3", fontSize: 13, fontWeight: 700, textAlign: "center", padding: "3px 0" }}>✓ All balances cleared for this Bucket</div>
+              ) : brows.map(([mid, v]) => (
+                <div key={mid} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, padding: "3px 0", color: C.cream }}>
+                  <span style={{ flex: 1 }}>{memberById[mid]?.display_name || "Player"}{mid === me ? " (you)" : ""}</span>
+                  <span style={{ fontWeight: 800, color: v > 0 ? "#8fd6b0" : "#f0b4ab" }}>{v > 0 ? "is owed " + fmtUSD(v) : "owes " + fmtUSD(-v)}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
         {list.length > 0 && <div style={{ marginTop: 8, borderTop: `1px dashed ${C.greenMid}`, paddingTop: 4 }}>{list.map(row)}</div>}
         {ev.event_type === "game" && <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Name &amp; date come from the game.</div>}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, background: "#0f3529", borderRadius: 9, padding: "8px 10px" }}>
-          <span style={{ flex: 1, color: C.sage, fontSize: 11.5, lineHeight: 1.4 }}>Settle up in the <strong style={{ color: C.cream }}>Settle</strong> tab — payments cover the whole club.</span>
-          {isAdmin && <button onClick={() => onCloseEvent(ev, true)} style={{ border: `1px solid ${C.greenMid}`, background: "transparent", color: C.sage, fontSize: 11, fontWeight: 800, padding: "6px 12px", borderRadius: 8, cursor: "pointer", whiteSpace: "nowrap" }}>Archive event</button>}
+          <span style={{ flex: 1, color: C.sage, fontSize: 11.5, lineHeight: 1.4 }}>Settle this Bucket in the <strong style={{ color: C.cream }}>Settle</strong> tab — each Bucket squares on its own.</span>
+          {isAdmin && <button onClick={() => onCloseEvent(ev, true)} style={{ border: `1px solid ${C.greenMid}`, background: "transparent", color: C.sage, fontSize: 11, fontWeight: 800, padding: "6px 12px", borderRadius: 8, cursor: "pointer", whiteSpace: "nowrap" }}>Archive Bucket</button>}
         </div>
       </div>
     );
@@ -1391,7 +1398,7 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
 
   return (
     <div style={{ marginTop: 16 }}>
-      <Eyebrow>Expenses by event</Eyebrow>
+      <Eyebrow>Expenses by Bucket</Eyebrow>
       {expenses.length === 0 && <div style={{ color: C.sage, fontSize: 13, padding: "8px 2px" }}>No expenses yet. Add one to start the ledger.</div>}
 
       {openEvents.map(island)}

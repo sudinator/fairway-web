@@ -3924,3 +3924,24 @@ to the canonical cap and closed the guard gap:
 - Guard hardened: `check-bottom-sheets.py` now also fails any bottom-docked panel that caps with a bare
   `NNvh` maxHeight; rule #17 updated to spell out the top-cap requirement. Money sheets were already compliant.
 No schema change; still ships migration 0121 (from 173.0) as the only migration — run it once after deploy.
+
+### 173.2.260716 — Bucket-island balances + guest-post fix + notch fix (no migration)
+Feedback batch off the first live Bucket testing:
+- **Guest bets couldn't be posted — the sponsor was being dropped.** A game guest carries its
+  sponsoring member from the tee time (game_players.guest_of), but findOrCreateGuestId materialized the
+  money guest record with sponsor_user_id=null, which the 0116 money_guests_insert policy correctly
+  rejects (every game guest must belong to a member). Fixed the code to persist the guest WITH its known
+  sponsor. No migration, no RLS change — the rule stands.
+- **Notification popup still clipped under the notch — real fix.** The maxHeight cap in 173.1 was necessary
+  but not sufficient: the sheet is a flex column with a separate scrolling list, and that list lacked
+  `flex:1; minHeight:0`, so it couldn't shrink to the cap — the whole stack overflowed upward past the
+  notch. Added `flex:1; minHeight:0` to the notification list and the stat-drawer list. Now the header/×
+  pin below the notch and the list scrolls.
+- **Bucket islands are now mini aggregate tiles (item 6).** Each open Bucket island shows its own settled
+  balance — "✓ All balances cleared for this Bucket" when net-square, otherwise who owes / is owed within
+  that Bucket (computed with `bucketBalances`, i.e. after that Bucket's own settlements). Replaces the raw
+  paid/net split. Footer updated: "Settle this Bucket … each Bucket squares on its own"; "Archive event" →
+  "Archive Bucket".
+- **Copy:** the top Balances tile is now "Aggregate Club-level Balances" (net across all Buckets, tap for
+  the per-Bucket breakdown); "Expenses by event" → "Expenses by Bucket".
+No new migration this build. 0121 must already be applied.

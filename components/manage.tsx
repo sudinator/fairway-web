@@ -1252,7 +1252,7 @@ function StatDrawerHost() {
           {payload?.cap ? <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{payload.cap}</div> : null}
           {rows ? <div style={{ color: C.faint, fontSize: 11, marginTop: 4 }}>{rows.length} {rows.length === 1 ? "user" : "users"}</div> : null}
         </div>
-        <div style={{ overflowY: "auto", padding: "6px 10px 22px" }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "6px 10px 22px" }}>
           {err ? <div style={{ color: C.sage, fontSize: 12, padding: 12 }}>Couldn't load: {err}</div> :
            !rows ? <div style={{ color: C.sage, fontSize: 12, padding: 12 }}>Loading…</div> :
            rows.length === 0 ? <div style={{ color: C.sage, fontSize: 12, padding: 12 }}>No users for this metric.</div> :
@@ -2226,7 +2226,7 @@ export function NotificationBell({ user, onSeeAll, onNavigate }: { user: any; on
               )}
               <button onClick={() => setOpen(false)} aria-label="Close" style={{ background: C.greenLight, border: "none", color: C.cream, width: 30, height: 30, borderRadius: 15, fontSize: 17, fontWeight: 800, cursor: "pointer", lineHeight: 1, flexShrink: 0 }}>×</button>
             </div>
-            <div style={{ overflowY: "auto", padding: "2px 8px 8px" }}>
+            <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "2px 8px 8px" }}>
               {items.length === 0 && <div style={{ color: C.sage, fontSize: 13, padding: 18, textAlign: "center" }}>Nothing yet.</div>}
               {items.map((n) => (
                 <div key={n.id} onClick={() => { if (!n.read) markOne(n.id); if (n.link && onNavigate) { setOpen(false); onNavigate(n.link); } }}
