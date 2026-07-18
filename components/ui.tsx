@@ -421,9 +421,9 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button onClick={() => onPatch({ strokes: clampG((strokes || par) - 1) })} style={{ width: 38, height: 38, borderRadius: 8, border: `0.5px solid ${C.line}`, background: C.card, color: C.ink, fontSize: 20, cursor: "pointer" }}>−</button>
           <div style={{ flex: 1, textAlign: "center" }}>
-            <span style={{ fontSize: 26, fontWeight: 800, color: net == null ? C.faint : net < par ? "#1B7A4B" : net === par ? "#1E5B8A" : "#C0392B" }}>{strokes && strokes > 0 ? strokes : "–"}</span>
+            <span style={{ fontSize: 26, fontWeight: 800, color: net == null ? "#C7C2B0" : net < par ? "#1B7A4B" : net === par ? "#1E5B8A" : "#C0392B" }}>{strokes && strokes > 0 ? strokes : par}</span>
             {net != null && <span style={{ color: C.faint, fontSize: 12 }}> · net {net}</span>}
-            {strokes != null && strokes > 0 && <span style={{ color: "#0E3B2E", fontSize: 12, fontWeight: 800, background: "#E7EFE9", borderRadius: 6, padding: "1px 7px", marginLeft: 6 }}>{sfPts ?? 0} pts</span>}
+            {strokes != null && strokes > 0 ? <span style={{ color: "#0E3B2E", fontSize: 12, fontWeight: 800, background: "#E7EFE9", borderRadius: 6, padding: "1px 7px", marginLeft: 6 }}>{sfPts ?? 0} pts</span> : <span style={{ color: C.faint, fontSize: 11, marginLeft: 6 }}>· grey = par, tap to record</span>}
           </div>
           <button onClick={() => onPatch({ strokes: clampG((strokes || par) + 1) })} style={{ width: 38, height: 38, borderRadius: 8, border: "none", background: strokes != null && strokes >= par + 8 ? "#9BB8AC" : C.green, color: "#fff", fontSize: 20, cursor: "pointer" }}>+</button>
         </div>
@@ -504,7 +504,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   // mount forces the dropdowns to re-render so they show their saved value.
   const [hydrated, setHydrated] = React.useState(false);
   const [edit, setEdit] = React.useState<number | null>(null); // hole index whose editor popup is open
-  const openEdit = (i: number) => { const h = holes[i]; if (!scoreLocked && h && (h.strokes == null || h.strokes <= 0)) onSet(i, { strokes: h.par }); setEdit(i); };
+  const openEdit = (i: number) => { setEdit(i); };
   const nextHole = () => { if (edit == null) return; const ni = edit + 1; if (ni < holes.length) openEdit(ni); else setEdit(null); };
   React.useEffect(() => {
     const r = requestAnimationFrame(() => setHydrated(true));
@@ -589,7 +589,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
                 <div key="sc" style={{ textAlign: "center" }}>
                   {h.strokes
                     ? <ScoreMark hole={h as any} />
-                    : <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 36, height: 30, border: `1px solid ${C.green}`, borderRadius: 8, background: "#EFF5EE", color: C.green, fontWeight: 800, fontSize: 18, lineHeight: 1 }}>+</span>}
+                    : <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 36, height: 30, border: `1px dashed ${C.line}`, borderRadius: 8, color: "#C7C2B0", fontWeight: 700, fontSize: 16, lineHeight: 1 }}>{h.par}</span>}
                 </div>,
                 ...(showFairway ? [
                   <div key="fw" style={{ textAlign: "center" }}>
@@ -690,7 +690,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "flex-end", padding: "5px 4px 6px", gap: 3 }}>
-          {mCell("Score", h.strokes ? <div style={{ height: 34, display: "flex", alignItems: "center", justifyContent: "center" }}><ScoreMark hole={h as any} /></div> : <div style={{ height: 34, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 34, height: 30, border: `1px solid ${C.green}`, borderRadius: 8, background: "#EFF5EE", color: C.green, fontWeight: 800, fontSize: 18, lineHeight: 1 }}>+</span></div>)}
+          {mCell("Score", h.strokes ? <div style={{ height: 34, display: "flex", alignItems: "center", justifyContent: "center" }}><ScoreMark hole={h as any} /></div> : <div style={{ height: 34, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 34, height: 30, border: `1px dashed ${C.line}`, borderRadius: 8, color: "#C7C2B0", fontWeight: 700, fontSize: 16, lineHeight: 1 }}>{h.par}</span></div>)}
           {mCell("FW", valBox(h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "left" ? "L" : h.fairway === "right" ? "R" : h.fairway === "miss" ? "✗" : "·", h.fairway === "hit" ? "#0F7A45" : (h.fairway === "left" || h.fairway === "right" || h.fairway === "miss") ? C.birdie : C.faint, 14))}
           {mCell("GIR", valBox(h.putts == null ? "·" : ((h.strokes != null && (h.strokes - h.putts) <= (h.par - 2)) ? "✓" : "✗"), h.putts == null ? C.faint : ((h.strokes != null && (h.strokes - h.putts) <= (h.par - 2)) ? C.greenMid : C.birdie), 14))}
           {mCell("Putt", valBox(h.putts ?? "·", C.faint, 15))}

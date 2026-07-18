@@ -4196,7 +4196,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
                       ))}
                     </div>
                   )}
-                  <span style={{ fontSize: 26, fontWeight: 800, color: netColor(gross, recv, m.par) }}>{gross != null && gross > 0 ? gross : "·"}</span>
+                  <span style={{ fontSize: 26, fontWeight: 800, color: gross != null && gross > 0 ? netColor(gross, recv, m.par) : "#C7C2B0" }}>{gross != null && gross > 0 ? gross : m.par}</span>
                   {gross != null && gross > 0 && (relBasis ? (
                     <>
                       <span style={{ position: "absolute", top: 3, right: 3, minWidth: 16, height: 16, padding: "0 2px", border: "1.5px solid #E8730C", borderRadius: 5, background: "#FBEEE2", color: "#E8730C", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{oPts ?? 0}</span>
@@ -4393,17 +4393,14 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
         const order = playerOrder;
         const scoreLocked = !isMarker && !!p.user_id && p.user_id === user?.id; // non-marker editing my own row → stats only
         const goNext = () => {
-          // Save the player we're leaving (default to par if untouched).
-          const curG = p.scores?.[edit.holeIdx] ?? null;
-          if (curG == null || curG <= 0) onSetHole(p.id, edit.holeIdx, { strokes: m.par });
           // Move to the next player on THIS hole who still needs a score (wrap around the
-          // row, skip no-shows). When everyone on the hole is scored, the card closes.
+          // row, skip no-shows). Nothing is auto-scored — a score is only recorded when the
+          // scorer taps a selection, so untouched players stay a grey par placeholder.
           const needs = (pl: Player) => !pl.no_show && pl.id !== edit.playerId && ((pl.scores?.[edit.holeIdx] ?? null) == null || (pl.scores?.[edit.holeIdx] ?? 0) <= 0);
           const idx = order.findIndex((x) => x.id === edit.playerId);
           for (let k = 1; k <= order.length; k++) {
             const cand = order[(idx + k) % order.length];
             if (needs(cand)) {
-              onSetHole(cand.id, edit.holeIdx, { strokes: m.par });
               setEdit({ playerId: cand.id, holeIdx: edit.holeIdx });
               return;
             }

@@ -4135,3 +4135,12 @@ guarantees automatically — perimeter/notch fit (#17), dark-theme contrast (#21
 The confirm-on-return sheet keeps dismissOnBackdrop=false (must decide) but its × acts as "not yet".
 Not migrated (different pattern, left as-is): centered modals (player card, finish-round confirm), the
 share-card image modals, the hole score-entry editor, the photo lightbox, and the "More" dropdown menu.
+
+### 175.2.260717 — score box shows a greyed par placeholder instead of "no score" (no migration)
+On both the individual and group scorecards, an unscored hole now shows the hole's par greyed out (dashed
+box) instead of a "+"/"·" — consistent with how the putts field shows a grey default. The hole editor
+likewise shows par greyed with a "grey = par, tap to record" hint. A score is now recorded ONLY when the
+scorer taps a selection: removed the two places that silently auto-committed par — the individual card's
+open-hole handler (openEdit) and the group card's "Next" advance (goNext). This makes group and individual
+behave identically and prevents accidental par entries. Editor +/-, quick-picks, and pickup still register
+on tap as before.
