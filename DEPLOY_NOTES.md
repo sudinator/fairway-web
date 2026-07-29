@@ -4179,3 +4179,15 @@ to this hole ("🎯 Closest to pin — best 6'3\" (Priya)"), with an inline Log 
 nested sheet) defaulting to self; a scorer can attribute to another player or guest. Styled for the light
 modal. Individual round editor passes no slot, so it's unaffected. Completes the side-contests spec (setup +
 Contests view + hole chip); requires migration 0122.
+
+### 176.3.260728 — fix: app updated without confirmation (PWA regression)
+Root cause: the "App version & updates" card (UpdateChecker in manage.tsx) ran check() on mount and posted
+SKIP_WAITING to any waiting/installing service worker UNCONDITIONALLY — the autoReload flag only guarded the
+version-json reload branch, not the SW activation. Activating the worker fires controllerchange in
+register-sw.tsx → window.location.reload(). So simply opening the Manage/Admin screen silently applied a
+pending update and reloaded, bypassing register-sw.tsx's "A new version is available — [Update]" banner. It
+surfaced now because today's several back-to-back deploys mean clients frequently have a worker waiting when
+they open that screen. Fix: check(apply) now only ACTIVATES/reloads when apply=true (the explicit "Update to X"
+tap). On mount and "Check for updates" (apply=false) it detects only — reports status and surfaces the Update
+button, never posting SKIP_WAITING and never reloading. sw.js and register-sw.tsx unchanged (both already
+user-driven). Confirm-before-update is restored.

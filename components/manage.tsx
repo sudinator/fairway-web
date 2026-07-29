@@ -3713,7 +3713,11 @@ function UpdateChecker() {
   const [latest, setLatest] = React.useState<string | null>(null);
   const [latestBuild, setLatestBuild] = React.useState<string | null>(null);
 
-  const check = async (autoReload = false) => {
+  // apply = false → passive check: DETECT ONLY. Never activate a waiting worker
+  // and never reload. This is what runs on mount and on "Check for updates", so
+  // opening this screen can't silently update the app out from under the user.
+  // apply = true → the user tapped "Update to X": now we activate/reload.
+  const check = async (apply = false) => {
     setStatus("Checking…");
     try {
       let waiting: ServiceWorker | null = null;
@@ -3723,12 +3727,17 @@ function UpdateChecker() {
           await reg.update().catch(() => {});
           await new Promise((r) => setTimeout(r, 1200));
           waiting = reg.waiting;
+          // Only chase an installing worker to activation when APPLYING. On a
+          // passive check we just note that a download is in flight.
           if (!waiting && reg.installing) {
-            setStatus("Downloading the new version… it'll apply in a moment.");
-            reg.installing.addEventListener("statechange", () => {
-              if (reg.waiting) reg.waiting.postMessage("SKIP_WAITING");
-            });
-            return;
+            if (apply) {
+              setStatus("Downloading the new version… it'll apply in a moment.");
+              reg.installing.addEventListener("statechange", () => {
+                if (reg.waiting) reg.waiting.postMessage("SKIP_WAITING");
+              });
+              return;
+            }
+            setStatus("A new version is downloading — tap Update when it's ready.");
           }
         }
       }
@@ -3743,12 +3752,27 @@ function UpdateChecker() {
       setLatest(serverVersion);
       setLatestBuild(serverBuild);
 
+      const isNewer = !!waiting || (!!serverVersion && serverVersion !== APP_VERSION);
+
+      if (!apply) {
+        // Report only — surface the "Update to X" button via hasNewer; don't touch the worker.
+        setStatus(
+          isNewer
+            ? `New version available${serverVersion ? `: ${serverVersion}` : ""}. Tap Update to install.`
+            : serverVersion
+              ? "You're on the latest version."
+              : "Couldn't confirm the current version — try again in a moment.",
+        );
+        return;
+      }
+
+      // Apply path — user explicitly tapped Update.
       if (waiting) {
-        setStatus("New version found — updating…");
-        waiting.postMessage("SKIP_WAITING");
+        setStatus("Updating…");
+        waiting.postMessage("SKIP_WAITING"); // controllerchange (register-sw) reloads
       } else if (serverVersion && serverVersion !== APP_VERSION) {
-        setStatus(`New version available: ${serverVersion}.`);
-        if (autoReload) window.location.reload();
+        setStatus(`Updating to ${serverVersion}…`);
+        window.location.reload();
       } else if (serverVersion) {
         setStatus("You're on the latest version.");
       } else {
@@ -3759,6 +3783,7 @@ function UpdateChecker() {
     }
   };
 
+  // Passive detection on mount — safe now that check(false) never activates.
   React.useEffect(() => { check(false); }, []);
 
   const hasNewer = latest && latest !== APP_VERSION;
