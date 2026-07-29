@@ -4171,3 +4171,11 @@ engine + RPCs:
 - Live: subscribes to game_contests / game_contest_entries realtime so leaders update as groups post.
 Dogfoods the rules — both sheets are BottomSheet (dark theme, perimeter fit, baked-in ×). Requires migration
 0122 (shipped 176.0) to be run first, or the card shows a load error.
+
+### 176.2.260728 — side contests: contextual hole chip (no migration; needs 0122)
+The score-entry modal now nudges at the hole. HoleScoreModal gained an optional belowPicker slot; the group
+score modal fills it with a new ContestHoleChip (components/contests-view.tsx) that shows any contest applying
+to this hole ("🎯 Closest to pin — best 6'3\" (Priya)"), with an inline Log form (feet+inches / yards, no
+nested sheet) defaulting to self; a scorer can attribute to another player or guest. Styled for the light
+modal. Individual round editor passes no slot, so it's unaffected. Completes the side-contests spec (setup +
+Contests view + hole chip); requires migration 0122.

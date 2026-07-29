@@ -369,7 +369,7 @@ export type EntryHole = {
 // Reused by the group scorecard, the personal score-entry card, the solo round
 // editor and the match card. Writes each change live via onPatch; the optional
 // onNext advances (next player on the group card, next hole on a personal card).
-export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairway, penalties, sand, recv, showFairway = true, showPutts = true, showPenalties = true, scoreLocked = false, lockedByName, onPatch, onNext, onClose }: {
+export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairway, penalties, sand, recv, showFairway = true, showPutts = true, showPenalties = true, scoreLocked = false, lockedByName, onPatch, onNext, onClose, belowPicker }: {
   title: string;
   par: number;
   si: number | null;
@@ -388,6 +388,7 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
   onPatch: (patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null }) => void;
   onNext?: () => void;
   onClose: () => void;
+  belowPicker?: React.ReactNode;
 }) {
   const net = strokes != null && strokes > 0 ? strokes - recv : null;
   const netDouble = par + 2 + recv;
@@ -466,6 +467,8 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
             ))}
           </div>
         </>)}
+
+        {belowPicker}
 
         <div style={{ display: "flex", gap: 6, marginTop: 16 }}>
           <button onClick={() => onPatch({ strokes: null, putts: null, fairway: null, penalties: 0, sand: false })} style={{ flex: 1, background: C.greenLight, color: C.cream, border: "none", borderRadius: 8, padding: "11px 4px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>Clear</button>

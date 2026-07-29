@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
-import { ContestsSection } from "@/components/contests-view";
+import { ContestsSection, ContestHoleChip } from "@/components/contests-view";
 import { betResultToPost } from "@/lib/money";
 import type { BetNet, BetPost } from "@/lib/money";
 import { ShareScorecardModal, ShareGameModal } from "@/components/share-card";
@@ -4440,6 +4440,7 @@ function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver,
             onPatch={(patch) => { if (scoreLocked) { const { strokes: _s, ...statsOnly } = patch; onSetHole(p.id, edit.holeIdx, statsOnly); } else { onSetHole(p.id, edit.holeIdx, patch); } }}
             onNext={scoreLocked ? () => { const ni = edit.holeIdx + 1; if (ni < meta.length) setEdit({ playerId: p.id, holeIdx: ni }); else setEdit(null); } : goNext}
             onClose={() => setEdit(null)}
+            belowPicker={<ContestHoleChip gameId={game.id} hole={m.n} players={players} userId={user.id} myName={players.find((x: Player) => x.user_id === user.id)?.display_name || "Me"} canLogOthers={!!isMarker} />}
           />
         );
       })()}

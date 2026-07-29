@@ -329,3 +329,102 @@ const inp: React.CSSProperties = {
   width: "100%", boxSizing: "border-box", background: C.greenLight, border: "1px solid rgba(255,255,255,0.15)",
   borderRadius: 10, color: C.cream, fontSize: 16, padding: "10px 12px", outline: "none",
 };
+
+// ---- contextual chip shown inside the (light) hole score-entry modal ----
+// Self-contained: fetches this game's contests that apply to `hole`, shows the current leader, and logs
+// inline (no nested sheet). Styled for the light modal (dark text on a soft tint).
+export function ContestHoleChip({ gameId, hole, players, userId, myName, canLogOthers }: {
+  gameId: string; hole: number; players: P[]; userId: string; myName: string; canLogOthers: boolean;
+}) {
+  const [rows, setRows] = useState<{ contest: Contest; entries: ContestEntry[] }[]>([]);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const load = async () => {
+    const { data: cs } = await supabase.from("game_contests").select("*").eq("game_id", gameId);
+    const apply = ((cs || []) as Contest[]).filter((c) => c.holes.includes(hole));
+    if (!apply.length) { setRows([]); return; }
+    const { data: es } = await supabase.from("game_contest_entries").select("*").in("contest_id", apply.map((c) => c.id));
+    const all = (es || []) as ContestEntry[];
+    setRows(apply.map((c) => ({ contest: c, entries: all.filter((e) => e.contest_id === c.id) })));
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [gameId, hole]);
+
+  if (rows.length === 0) return null;
+
+  return (
+    <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 8 }}>
+      {rows.map(({ contest, entries }) => {
+        const board = contestLeaderboard(contest, entries).find((w) => w.hole === hole);
+        const best = board?.best || null;
+        const open = openId === contest.id;
+        return (
+          <div key={contest.id} style={{ background: "#EAF3EC", border: "1px solid #CFE3D4", borderRadius: 12, padding: "10px 12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 16 }}>{KIND_ICON[contest.kind] || "🏁"}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ color: "#14351f", fontWeight: 800, fontSize: 13 }}>{contest.label}</div>
+                <div style={{ color: "#4a6b54", fontSize: 11.5 }}>
+                  {best ? <>best <b style={{ fontFamily: "Georgia, serif" }}>{fmtContestValue(contest.unit, best.value)}</b> — {best.player_name}</> : "no entries yet — be the first"}
+                </div>
+              </div>
+              <button onClick={() => setOpenId(open ? null : contest.id)}
+                style={{ background: "#14351f", color: "#EAF3EC", border: "none", borderRadius: 8, padding: "6px 11px", fontWeight: 800, fontSize: 12, cursor: "pointer" }}>
+                {open ? "Close" : "Log ›"}
+              </button>
+            </div>
+            {open && <InlineLog contest={contest} hole={hole} players={players} userId={userId} myName={myName} canLogOthers={canLogOthers}
+              onSaved={async () => { setOpenId(null); await load(); }} />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function InlineLog({ contest, hole, players, userId, myName, canLogOthers, onSaved }: {
+  contest: Contest; hole: number; players: P[]; userId: string; myName: string; canLogOthers: boolean; onSaved: () => void;
+}) {
+  const isFtIn = contest.unit === "ft_in";
+  const [feet, setFeet] = useState(""); const [inches, setInches] = useState(""); const [num, setNum] = useState("");
+  const [who, setWho] = useState("me"); const [busy, setBusy] = useState(false); const [err, setErr] = useState<string | null>(null);
+  const guests = players.filter((p) => !p.user_id);
+  const members = players.filter((p) => p.user_id && p.user_id !== userId);
+  const li: React.CSSProperties = { width: "100%", boxSizing: "border-box", background: "#fff", border: "1px solid #CFE3D4", borderRadius: 8, color: "#14351f", fontSize: 16, padding: "8px 10px", outline: "none" };
+
+  const save = async () => {
+    const value = isFtIn ? ftInToInches(Number(feet) || 0, Number(inches) || 0) : Number(num);
+    if (isFtIn ? (!feet && !inches) : (!num || Number.isNaN(value))) { setErr("Enter a value."); return; }
+    let p_player: string | null = userId, p_guest: string | null = null, p_name = myName;
+    if (who !== "me") {
+      if (who.startsWith("guest:")) { p_player = null; p_guest = null; p_name = guests[Number(who.slice(6))]?.display_name || "Guest"; }
+      else { p_player = who; p_name = members.find((m) => m.user_id === who)?.display_name || "Player"; }
+    }
+    setBusy(true); setErr(null);
+    const { error } = await supabase.rpc("log_contest_entry", { p_contest: contest.id, p_hole: hole, p_player, p_guest, p_player_name: p_name, p_value: value });
+    setBusy(false);
+    if (error) { setErr(error.message); return; }
+    onSaved();
+  };
+
+  return (
+    <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+      {isFtIn ? (
+        <div style={{ display: "flex", gap: 8 }}>
+          <input inputMode="numeric" value={feet} onChange={(e) => setFeet(e.target.value.replace(/[^0-9]/g, ""))} placeholder="feet" style={li} />
+          <input inputMode="numeric" value={inches} onChange={(e) => setInches(e.target.value.replace(/[^0-9]/g, ""))} placeholder="inches" style={li} />
+        </div>
+      ) : (
+        <input inputMode="numeric" value={num} onChange={(e) => setNum(e.target.value.replace(/[^0-9]/g, ""))} placeholder={contest.unit === "yards" ? "yards" : "feet from center"} style={li} />
+      )}
+      {canLogOthers && (members.length > 0 || guests.length > 0) && (
+        <select value={who} onChange={(e) => setWho(e.target.value)} style={li}>
+          <option value="me">Me ({myName})</option>
+          {members.map((m) => <option key={m.user_id!} value={m.user_id!}>{m.display_name}</option>)}
+          {guests.map((g, i) => <option key={`g${i}`} value={`guest:${i}`}>{g.display_name} (guest)</option>)}
+        </select>
+      )}
+      {err && <div style={{ color: "#b3382c", fontSize: 12 }}>{err}</div>}
+      <button disabled={busy} onClick={save} style={{ background: "#14351f", color: "#EAF3EC", border: "none", borderRadius: 8, padding: "9px 4px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>{busy ? "Saving…" : "Log it"}</button>
+    </div>
+  );
+}
