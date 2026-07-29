@@ -4157,3 +4157,17 @@ contextual hole chip). Ships:
   overall-leader tally, par-3 detection, value format/parse. 26 unit tests (order-independence, ties,
   voids, per-hole CTP, formatting) wired into `npm test`.
 Nothing user-visible changes until the UI lands; the migration is safe to run now (additive, idempotent).
+
+### 176.1.260728 — side contests UI (no migration; needs 0122 from 176.0)
+The Contests view is live in the game room's play tab (new components/contests-view.tsx), built on the 176.0
+engine + RPCs:
+- Everyone in the event sees a "SIDE CONTESTS" card with each contest's per-hole leader (CTP shows a row per
+  par-3; longest/straightest show their hole). Tap "N attempts" to expand the full list.
+- Organizer (+ Add): pick closest-to-pin (auto-fills all par-3s), longest drive, or straightest (pick the
+  hole); remove a contest (× ). Editable during the event, not just at setup.
+- Logging: "Log" on any hole opens a sheet — feet+inches for CTP/straightest, yards for longest. Defaults to
+  the current player (self-entry, any member); a scorer/organizer can pick another member or a guest.
+- Void: expand a hole's attempts; the organizer or the person who recorded an entry can void a bad one.
+- Live: subscribes to game_contests / game_contest_entries realtime so leaders update as groups post.
+Dogfoods the rules — both sheets are BottomSheet (dark theme, perimeter fit, baked-in ×). Requires migration
+0122 (shipped 176.0) to be run first, or the card shows a load error.

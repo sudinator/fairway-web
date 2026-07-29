@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
+import { ContestsSection } from "@/components/contests-view";
 import { betResultToPost } from "@/lib/money";
 import type { BetNet, BetPost } from "@/lib/money";
 import { ShareScorecardModal, ShareGameModal } from "@/components/share-card";
@@ -3524,6 +3525,18 @@ function GameRoom({
 
       {((roomTab === "play") || (roomTab === "setup" && setupTab === "matchups")) && (
         <StrokesSummary game={game} players={players} collapsible={roomTab === "play"} meKey={myRow ? pkey(myRow) : undefined} />
+      )}
+
+      {roomTab === "play" && (
+        <ContestsSection
+          gameId={game.id}
+          holesMeta={(game.holes_meta || []).map((h: any) => ({ n: h.n, par: h.par }))}
+          players={players}
+          userId={user.id}
+          myName={myRow?.display_name || "Me"}
+          isOrganizer={isOrganizer}
+          isEnded={isEnded}
+        />
       )}
 
       {roomTab === "play" && (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta") && (
