@@ -119,3 +119,5 @@ Total: 107 migrations. Unchecked = not yet confirmed applied.
 - [ ] 0119_expenses_soft_delete.sql
 - [ ] 0120_teetimes_realtime.sql
 - [ ] 0121_money_clean_slate.sql
+
+- 0122_side_contests.sql — side contests (CTP/long drive/straightest): game_contests + append-only game_contest_entries + RLS (participant read; writes via SECURITY DEFINER RPCs) + can_see_game/is_game_organizer/create|update|delete_game_contest/log_contest_entry/void_contest_entry. Run after 0121.

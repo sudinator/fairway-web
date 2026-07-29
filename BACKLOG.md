@@ -272,3 +272,119 @@ Living list. `[x]` = built & verified in code (file noted). `[~]` = partially do
   sync check. NOT via GHIN username/password — no official self-serve API (partnership-gated), and the
   unofficial credential-scraping route is against GHIN ToS + a security liability. Official USGA/state-assoc
   API access is the only clean auto-sync path, viable only if BNN formalizes.
+
+## Team formats — Scramble & Shamble (+ team leaderboard) — REQUESTED Jul 2026
+Amit wants two team formats built around a leaderboard that holds up at 20–30 teams (outing scale).
+BNN today has stableford / stroke / singles match / four-ball / skins / trifecta — all individual or
+small-team; there is no true team-vs-many-teams leaderboard yet. That leaderboard is the centerpiece.
+
+- **[ ] Variant A — True Scramble** (one team ball, one gross per hole for the whole team).
+  Everyone plays every shot from the best-selected ball; the team records ONE score per hole.
+  Entry: NEW team-level score entry — one card scores the team per hole (not per player). No per-player
+  putts/FW needed (optionally track which drive was used for a "drives used" rule; see modified scramble).
+  Handicap (USGA Appendix C, applied to ranked Course Handicaps, then summed → one team handicap):
+  4-player 25/20/15/10% · 3-player 30/20/10% · 2-player 35/15% (low→high). Organizer-adjustable.
+  Leaderboard: net = team gross − team course handicap; stroke-play across teams.
+
+- **[ ] Variant B — Shamble** (best tee shot, then play your own ball in, team takes the best score).
+  Team picks the best drive; each player finishes the hole with their OWN ball; team hole score = best
+  net of the members (design toggle: best-1, or "best 2 of 4" for a more stable number in big fields).
+  Entry: REUSES per-player score entry (same as four-ball) + a team best-N rollup — no new entry card.
+  Handicap: each player keeps their own strokes at a reduced allowance (USGA: 2-person ~40% combined,
+  4-person ~25–30% combined; a per-player % is the simplest implementation). Organizer-adjustable.
+
+- **[ ] Team leaderboard engine (the key deliverable, shared by every team format).**
+  Sortable, live, built for 20–30 teams: Rank · Team · Thru · Gross · To-par · Net (default sort net),
+  updating as each group posts holes. Frozen header + scroll (reuse HScroll). Tie-break: count-back
+  (last 9 / 6 / 3 / 1 net), matching-card style. Must page/scroll cleanly at 30 rows on a phone.
+  Design note: Scramble is the only format needing a NEW one-score-per-team entry card; Shamble,
+  best-ball-stroke, 2-of-4, and team-Stableford all reuse per-player entry + a "team best-N" rollup, so
+  building the rollup + leaderboard once unlocks all of them. Allowance % must be an organizer field with
+  the USGA default pre-filled per format/size.
+  Sources: USGA Rules of Handicapping Appendix C (handicap allowances); format definitions per USGA/SCGA.
+
+- **[ ] Optional scramble add-on — "drives used" rule** (a.k.a. Texas/modified scramble): require each
+  player's tee shot to be used a minimum number of times (e.g. ≥3 or ≥4 over 18). Track which member's
+  drive was selected each hole; show a per-player "drives used" tally so the team can manage it. A toggle
+  on Variant A, not a separate format.
+
+### Candidate future team formats (recommendation — not yet approved)
+- **[ ] Best-Ball Stroke / Four-Ball Stroke Play** — each plays own ball, team = best 1 net/hole summed
+  (85% WHS). Stroke counterpart to the existing four-ball MATCH; THE staple big-field team format.
+- **[ ] Aggregate "2 best balls of 4"** — sum of best 2 net/hole. Classic charity/corporate outing format.
+- **[ ] Team Stableford (best-N points/hole)** — most forgiving for large mixed-ability fields; extends
+  existing Stableford scoring; keeps everyone playing in.
+- **[ ] Alternate Shot / Foursomes** — 2-player, one ball, alternate (50% combined). Match or stroke.
+- **[ ] Greensomes / Chapman (Pinehurst)** — both drive, then select/alternate; step up from foursomes.
+- **[ ] Team Nassau** — front / back / overall as three team matches.
+
+## Side contests — closest-to-pin / longest drive / straightest (large events 80+) — REQUESTED Jul 2026
+Track on-course side contests during big events (shotgun outings, 80+ players): closest-to-pin on par-3s,
+longest drive on chosen hole(s), straightest drive / closest-to-line on chosen hole(s), plus room for more.
+Sits alongside the team-formats work and shares the "big event, one live leaderboard" backbone. Most players
+won't log, but a sparse log still yields a correct leader — that's the whole point of the design below.
+
+### Core design — ONE generic "measured contest" primitive (build once, all three fall out)
+**STATUS (Jul 2026): data layer + engine SHIPPED — migration 0122 (game_contests + append-only game_contest_entries + RLS + RPCs) and lib/contests.ts (reduction/format, 26 unit tests). UI next: Contests view (create/edit/void + leaderboard + self/scorer entry), then the contextual hole chip.**
+CTP, longest drive, and straightest are the SAME thing: one measured number per player at a hole, reduced to
+a winner by min or max. Don't build three features — build one primitive + config.
+- **contest** (belongs to the EVENT, not the scoring format): kind (ctp | long_drive | straightest | custom),
+  holes[] it applies to (CTP defaults to all par-3s; others pick hole(s)), unit (ft-in | yards | ft-from-center),
+  direction better = low (CTP, straightest) | high (long drive), label. Independent of format — can ride with a
+  scramble/Stableford/nothing, or run a contests-only event.
+- **contest_entry (APPEND-ONLY log)**: contest_id, hole, player_id OR guest ref, value, recorded_by, created_at,
+  optional photo_url, voided bool. NEVER store "current leader" as a mutable field.
+- **Leaderboard is computed, never stored**: for each (contest, hole) take the best non-voided value by the
+  contest's direction. CTP-all = one winner per par-3; long/straight = one winner on the chosen hole.
+
+### Why append-only (this is the key call for on-the-fly at 80+)
+The hard problem is concurrency: groups reach the same par-3 minutes apart, signal is spotty, no single
+organizer can enter everything. An append-only log reduced by min/max is CONFLICT-FREE — order of arrival /
+offline sync doesn't matter, the winner is deterministic (reduction is commutative). Entries queue offline in
+the PWA and sync later with zero merge conflicts. A single mutable "leader" field would let two offline phones
+clobber each other. So: everyone records their own attempt, app keeps the best, nothing conflicts.
+
+### [ ] 1. Setup — where contests are created
+In the game/event setup flow (same screen as format + 6-digit code), a new "Side contests" section: toggles
+for Closest-to-pin (default all par-3s, narrow to specific holes), Longest drive (pick hole[s]), Straightest
+(pick hole[s]). Attaches to the EVENT. MUST be editable after the event starts too (someone adds long-drive on
+7 from the 3rd tee) — so "Side contests" also appears as an organizer-editable card inside the running event.
+
+### [ ] 2. Recording — where + how a player knows to enter
+Trigger is contextual (contest is pinned to its hole):
+- **Hole chip (primary):** opening a hole that has a contest (group card OR own scorecard) shows a chip in that
+  hole's entry sheet — "CTP — best 6'3\" (Priya) · Log yours >". Showing the current target answers "when do I
+  know" and cuts noise, but anyone may still log an attempt.
+- **Contests view (catch-all):** a view inside the event listing every contest with current leader + Enter, for
+  logging after the fact or off-hole.
+- **Par-3 nudge (optional):** when a par-3 is scored, a gentle chip "this hole has a CTP — log it" (warn, never
+  block; same approach as the completeness popup).
+Leaderboard display is TINY even at 80 players — it only shows winners (one row per par-3 for CTP-all; a single
+winner for long/straight), tap to expand the full attempt list. Scale lives in the entry log, not the display.
+
+### [ ] 3. Who can enter (two paths, both supported by the append-only log)
+Contest entry is a LIGHTER, separate permission from score-keeping.
+- **Group scorer** can log a contest result for anyone in their group from the hole chip (they're already there
+  entering strokes).
+- **Individual self-entry:** any participant who JOINED the event by code can log their OWN contest attempt from
+  their scorecard hole or the Contests view — even if they keep no scores and never touch anyone's strokes.
+  Self-entry is scoped to side contests ONLY (not actual scoring).
+- Both logging the same attempt, or arriving out of order offline, is fine — reduction stays deterministic.
+- **Guests** (entered by a scorer, no app of their own) can't self-enter; the scorer logs on their behalf and
+  the entry records both the guest and recorded_by (consistent with how guests work for money).
+- Organizer gets void/override on any entry (the digital replacement for the CTP stake); optional marker photo
+  per entry for disputes — DEFER photos to v2 (the append-only log already gives an audit trail).
+
+### Decisions locked (Jul 2026)
+- Measurement is MANUAL entry (pace/eyeball + type). NOT GPS auto-measure: consumer phone GPS is ~±10-15 ft,
+  worse than pacing for an inches contest, and would need stored pin + centerline geometry. GPS = far-later
+  stretch, if ever.
+- CTP scope = per-par-3 winners (each par-3 its own contest-hole); an "overall CTP champion" aggregation can
+  come later.
+- Entry open to all participants + organizer void (not organizer-only — doesn't scale to 80; not captain-only —
+  avoids a new role).
+
+### Build sequencing
+Share the big-event backbone with the team-formats/leaderboard work. Build order: the contest primitive +
+append-only entry log + min/max reduction first (data + engine), then the setup section, then the two entry
+surfaces (hole chip + Contests view), then the par-3 nudge. Photos + overall-CTP aggregation are v2.

@@ -4144,3 +4144,16 @@ scorer taps a selection: removed the two places that silently auto-committed par
 open-hole handler (openEdit) and the group card's "Next" advance (goNext). This makes group and individual
 behave identically and prevents accidental par entries. Editor +/-, quick-picks, and pickup still register
 on tap as before.
+
+### 176.0.260728 — side contests foundation: schema + engine (migration 0122 — MUST RUN)
+Data layer + reduction engine for CTP / longest-drive / straightest side contests (large events). No UI yet
+— that's the next increment (Contests view: create/edit/void + leaderboard + self/scorer entry, then a
+contextual hole chip). Ships:
+- migration 0122_side_contests.sql — game_contests + APPEND-ONLY game_contest_entries + RLS (participants
+  read via can_see_game; ALL writes via SECURITY DEFINER RPCs) + create/update/delete_game_contest,
+  log_contest_entry (self-entry any member; for-others = organizer or a scorer/marker), void_contest_entry
+  (organizer or the recorder). RUN THIS IN THE SUPABASE SQL EDITOR (after 0121) — full SQL printed inline.
+- lib/contests.ts — the order-independent per-hole min/max reduction (the append-only sync guarantee),
+  overall-leader tally, par-3 detection, value format/parse. 26 unit tests (order-independence, ties,
+  voids, per-hole CTP, formatting) wired into `npm test`.
+Nothing user-visible changes until the UI lands; the migration is safe to run now (additive, idempotent).
