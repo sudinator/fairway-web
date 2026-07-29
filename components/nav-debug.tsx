@@ -74,7 +74,7 @@ export function NavDebug({ show }: { show: boolean }) {
     <div data-debug-self style={{
       position: "fixed", top: "calc(env(safe-area-inset-top) + 4px)", left: 6, right: 6, zIndex: 999999,
       background: "rgba(0,0,0,0.88)", color: "#8FE0B0", fontFamily: "ui-monospace, Menlo, monospace",
-      fontSize: 10.5, lineHeight: 1.45, padding: "8px 10px", borderRadius: 8, whiteSpace: "pre-wrap",
+      fontSize: 11, lineHeight: 1.45, padding: "8px 10px", borderRadius: 8, whiteSpace: "pre-wrap",
       border: "1px solid #4ADE80", boxShadow: "0 6px 20px -8px #000",
     }}>
       <div>{txt}</div>
