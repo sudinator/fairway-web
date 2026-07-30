@@ -4229,3 +4229,18 @@ Also fixed a safety-net gap the move exposed: 5 CI guards used a non-recursive g
 skipped components/game/*; switched them to rglob so subdir components stay covered. No migration.
 
 BEHAVIOR CHANGES: none (relocation only).
+
+### 176.7.260729 — refactor stage 1b: move the game panels, under a real test protocol (no behavior change)
+Moved the four larger, side-effect-bearing panels out of tournaments.tsx:
+- components/game/scorecard-views.tsx — GroupScorecard, GroupsBuilder, ShareControl.
+- components/game/organizer-panel.tsx — OrganizerPanel, BettingPanel.
+tournaments.tsx: 5,645 -> 4,011 lines (7,272 -> 4,011 across the whole refactor, -45%).
+
+Verified under TEST_PLAN.md (new):
+- Tier A automated equivalence: ci/verify-relocation.py (new) proved all four components are BYTE-IDENTICAL
+  to their pre-move source (hashes the component body, normalizing only the added `export`); tsc clean;
+  next build compiles; npm test green; all 8 guards green.
+- Because these do ~23 Supabase writes, TEST_PLAN.md includes a Tier C manual QA click-through (post/unpost/
+  repost a bet, set/randomize tee groups, claim/take-over/release a group, format switch + structure restore,
+  share toggle, end game) to run on the "App Testing" club after deploy — the only way to exercise the writes.
+No migration. BEHAVIOR CHANGES: none (relocation only; byte-identity proven).
