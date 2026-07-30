@@ -4210,3 +4210,9 @@ BEHAVIOR CHANGES (per standing rule — anything that alters existing behavior i
 
 NOT changed in this batch (tracked as follow-ups): tee-specific par/SI storage (finding 4), the raise-vs-
 return consistency across older admin RPCs (finding 14), migration-directory consolidation (finding 12).
+
+### 176.5.260729 — refactor groundwork: extract shared game types (no behavior change)
+Modularity stage 0. Moved the Game and Player type definitions out of components/tournaments.tsx into
+lib/game-types.ts and imported them back. Types only — no runtime code — so this cannot change behavior;
+tsc + build confirm. This unblocks moving the many self-contained components currently trapped in the
+7,272-line tournaments.tsx into their own files (stage 1, next). No migration.

@@ -388,3 +388,27 @@ Contest entry is a LIGHTER, separate permission from score-keeping.
 Share the big-event backbone with the team-formats/leaderboard work. Build order: the contest primitive +
 append-only entry log + min/max reduction first (data + engine), then the setup section, then the two entry
 surfaces (hole chip + Contests view), then the par-3 nudge. Photos + overall-CTP aggregation are v2.
+
+## Wishlist — tee-specific par & stroke index (women's / mixed tees)
+From the external code review (finding 4). Course import (app/api/courses/route.ts normalizeCourse) stores
+yardages per-tee but collapses PAR and STROKE INDEX into one course-wide array. Par is ~always identical
+across tees; the real gap is stroke index, which can differ between men's and women's tees — so per-hole
+stroke ALLOCATION (net-per-hole, Stableford distribution, match/skins outcomes) can be wrong for a player on
+a tee whose SI differs from the captured one. Total strokes received is unaffected (that's rating/slope,
+already per-tee). Deferred (Jul 2026) — only bites mixed men's/women's-tee play, which this group doesn't
+currently do. Fix when needed: move par+SI into each tee (import + tee editor + scoring reads), key scoring
+off the player's selected tee, not the course-level array. Add the "men's vs women's tee correctness" test.
+
+## Refactor — break up the mega-components (modularity, in progress)
+From the review (finding 5 + modularity section). Staged, behavior-preserving, verified at each step:
+- STAGE 0 (DONE, v176.5): extract shared Game/Player types to lib/game-types.ts so components can leave
+  tournaments.tsx without re-declaring types.
+- STAGE 1: move self-contained leaf components out of tournaments.tsx into components/game/*.tsx (SkinsView,
+  MatchView, FourballView + Sweep* banners, StrokesSummary, SegmentBoard, GroupSegmentSummary, LegConfigEditor,
+  ScoreHistory, ShareControl, GameDatePicker, MyStatsLine). Mechanical; tsc/build verify each move.
+- STAGE 2: extract pure scoring/leg/betting logic from GameRoom/CreateGame into lib modules with unit tests.
+- STAGE 3: repository layer for the ~94 inline supabase calls → one place for error handling (also closes the
+  silent-error finding for critical writes).
+- STAGE 4 (last, careful): decompose GameRoom (~2,470 lines) and CreateGame (~1,057) into sub-views + hooks,
+  with the stage-2/3 tests as the safety net.
+Same approach applies to manage.tsx (3,812) split by admin capability.
