@@ -4191,3 +4191,22 @@ they open that screen. Fix: check(apply) now only ACTIVATES/reloads when apply=t
 tap). On mount and "Check for updates" (apply=false) it detects only — reports status and surfaces the Update
 button, never posting SKIP_WAITING and never reloading. sw.js and register-sw.tsx unchanged (both already
 user-driven). Confirm-before-update is restored.
+
+### 176.4.260729 — security batch (external review, "before next deploy" items) — migration 0123 MUST RUN
+Addresses the highest-priority findings from the code review:
+- /api/analyze-round now REQUIRES an authenticated Supabase session; enforces a DB-backed atomic daily
+  limit (per-user + global via bump_ai_usage) instead of a bypassable in-memory counter; rejects bodies
+  >24KB, clamps history to 40 rounds; adds fetch timeouts (5s model discovery, 25s generation).
+- /api/courses now REQUIRES auth; enforces min query length 3, strict numeric id validation, an 8s upstream
+  timeout, and a 60s per-instance cache for identical searches.
+- record_migration execute revoked from authenticated/anon/public (owner/service role only).
+- New helper lib/supabase-route.ts (server client bound to request cookies for route auth).
+
+BEHAVIOR CHANGES (per standing rule — anything that alters existing behavior is called out):
+- AI analysis and course search now return 401 if called without a signed-in session. Both are only used
+  from inside the logged-in app, so no user-facing flow should break; noting it explicitly.
+- The AI per-user cap is now enforced server-side (2/day, env GEMINI_USER_DAILY_LIMIT), so it can no longer
+  be bypassed by clearing client state. Global cap stays env GEMINI_DAILY_LIMIT (default 200).
+
+NOT changed in this batch (tracked as follow-ups): tee-specific par/SI storage (finding 4), the raise-vs-
+return consistency across older admin RPCs (finding 14), migration-directory consolidation (finding 12).

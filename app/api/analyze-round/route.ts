@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createRouteClient } from "@/lib/supabase-route";
 
 // Runs on the server so the Gemini API key stays secret. Takes a compact summary
 // of the current round plus prior rounds and returns a short coaching analysis.
@@ -12,12 +13,20 @@ import { NextResponse } from "next/server";
 //     the key on the FREE TIER with NO billing account attached, so exceeding
 //     quota returns errors instead of charges.
 
-// In-memory counter; resets on server restart (frequent on serverless). Coarse
-// safety valve, not exact accounting — real bill-proofing is the no-billing setting.
-let dayKey = "";
-let dayCount = 0;
+// Daily caps are enforced in the database (bump_ai_usage, migration 0123) against the
+// AUTHENTICATED caller — atomic per-user and global counters that survive serverless cold
+// starts and can't be bypassed by hitting a fresh instance. The free-tier/no-billing Gemini
+// key remains the ultimate bill-proof backstop.
+const USER_DAILY_LIMIT = parseInt(process.env.GEMINI_USER_DAILY_LIMIT || "2", 10);
 const GLOBAL_DAILY_LIMIT = parseInt(process.env.GEMINI_DAILY_LIMIT || "200", 10);
-const todayStr = () => new Date().toISOString().slice(0, 10);
+
+// Payload caps — reject oversized/abusive bodies before they reach the model.
+const MAX_BODY_BYTES = 24 * 1024; // 24 KB is ample for a round + recent history summary
+const MAX_HISTORY = 40;           // only the most recent N prior rounds are ever needed
+
+// Timeouts for upstream calls so a slow provider can't tie up the function.
+const MODEL_DISCOVERY_TIMEOUT_MS = 5000;
+const GEMINI_TIMEOUT_MS = 25000;
 
 // Hardcoded fallback if the live model list can't be fetched. Ordered newest-first.
 const FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-latest"];
@@ -39,7 +48,7 @@ async function pickModels(key: string): Promise<string[]> {
     return [...cachedModels, ...FALLBACK_MODELS];
   }
   try {
-    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`, { signal: AbortSignal.timeout(MODEL_DISCOVERY_TIMEOUT_MS) });
     if (!resp.ok) return FALLBACK_MODELS;
     const data = await resp.json();
     const all: any[] = data?.models || [];
@@ -69,20 +78,35 @@ export async function POST(request: Request) {
     );
   }
 
-  const t = todayStr();
-  if (dayKey !== t) { dayKey = t; dayCount = 0; }
-  if (dayCount >= GLOBAL_DAILY_LIMIT) {
-    return NextResponse.json(
-      { error: "AI analysis has reached today's limit. It'll be available again tomorrow." },
-      { status: 429 },
-    );
-  }
+  // Require an authenticated caller — this is a rate-limited, cost-bearing resource, not public.
+  const supabase = createRouteClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Please sign in to use AI analysis." }, { status: 401 });
 
+  // Reject oversized bodies before parsing anything.
+  const raw = await request.text();
+  if (raw.length > MAX_BODY_BYTES) return NextResponse.json({ error: "Request too large." }, { status: 413 });
   let body: any;
-  try { body = await request.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
-  const { current, history, mode, aggregate } = body || {};
+  try { body = JSON.parse(raw || "{}"); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
+  let { current, history, mode, aggregate } = body || {};
   if (mode !== "dashboard" && !current) return NextResponse.json({ error: "No round data provided." }, { status: 400 });
   if (mode === "dashboard" && !aggregate) return NextResponse.json({ error: "No stats provided." }, { status: 400 });
+  // Clamp history to the most recent N rounds so a caller can't inflate the prompt.
+  if (Array.isArray(history) && history.length > MAX_HISTORY) history = history.slice(0, MAX_HISTORY);
+
+  // DB-backed daily limit against THIS user (atomic; per-user + global). Soft cost-guard on top
+  // of the free-tier/no-billing backstop; replaces the old bypassable in-memory counter.
+  const op = mode === "dashboard" ? "dashboard" : "round";
+  const { data: gate, error: gateErr } = await supabase.rpc("bump_ai_usage", {
+    p_op: op, p_user_limit: USER_DAILY_LIMIT, p_global_limit: GLOBAL_DAILY_LIMIT,
+  });
+  if (gateErr) return NextResponse.json({ error: "Couldn't verify your usage limit — try again in a moment." }, { status: 503 });
+  if (gate && (gate as any).allowed === false) {
+    const msg = (gate as any).reason === "user"
+      ? "You've reached today's AI analysis limit. It resets tomorrow."
+      : "AI analysis has reached today's overall limit. It'll be available again tomorrow.";
+    return NextResponse.json({ error: msg }, { status: 429 });
+  }
 
   const roundPrompt = `You are a friendly, encouraging golf coach analyzing an amateur golfer's round. Be specific, positive, practical, and concise.
 
@@ -128,6 +152,7 @@ Use realistic amateur-golf benchmarks for the stated handicap (e.g. a ~10 handic
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { maxOutputTokens: 1200, temperature: 0.7 },
         }),
+        signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
       });
       if (resp.ok) {
         const data = await resp.json();
@@ -145,7 +170,6 @@ Use realistic amateur-golf benchmarks for the stated handicap (e.g. a ~10 handic
           lastStatus = 502;
           continue;
         }
-        dayCount++;
         return NextResponse.json({ analysis: text });
       }
       lastDetail = (await resp.text()).slice(0, 400);

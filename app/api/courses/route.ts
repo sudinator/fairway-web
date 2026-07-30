@@ -1,4 +1,11 @@
 import { NextResponse } from "next/server";
+import { createRouteClient } from "@/lib/supabase-route";
+
+const COURSE_TIMEOUT_MS = 8000;
+const MIN_QUERY_LEN = 3;
+// Tiny in-process cache for identical searches (cuts repeated upstream calls; best-effort, per instance).
+const searchCache = new Map<string, { at: number; body: any }>();
+const SEARCH_CACHE_MS = 60_000;
 
 // This runs on the server (not the browser), so the API key stays secret.
 // It talks to golfcourseapi.com — a free database of ~30,000 courses.
@@ -21,6 +28,11 @@ export async function GET(request: Request) {
   const q = searchParams.get("q");
   const id = searchParams.get("id");
 
+  // Require an authenticated caller so this proxied key can't be consumed anonymously.
+  const supabase = createRouteClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+
   const headers = authHeaders();
   if (!headers) {
     return NextResponse.json(
@@ -32,15 +44,22 @@ export async function GET(request: Request) {
   try {
     // ---- Detail mode ----
     if (id) {
-      const res = await fetch(`${BASE}/courses/${encodeURIComponent(id)}`, { headers });
+      if (!/^\d{1,12}$/.test(id)) return NextResponse.json({ error: "Invalid course id." }, { status: 400 });
+      const res = await fetch(`${BASE}/courses/${id}`, { headers, signal: AbortSignal.timeout(COURSE_TIMEOUT_MS) });
       if (!res.ok) throw new Error(`Course lookup failed (${res.status})`);
       const data = await res.json();
       return NextResponse.json({ course: normalizeCourse(data.course || data) });
     }
 
     // ---- Search mode ----
-    if (q && q.trim().length) {
-      const res = await fetch(`${BASE}/search?search_query=${encodeURIComponent(q.trim())}`, { headers });
+    const query = (q || "").trim();
+    if (query.length) {
+      if (query.length < MIN_QUERY_LEN) return NextResponse.json({ courses: [] });
+      const cacheKey = query.toLowerCase();
+      const hit = searchCache.get(cacheKey);
+      if (hit && Date.now() - hit.at < SEARCH_CACHE_MS) return NextResponse.json(hit.body);
+
+      const res = await fetch(`${BASE}/search?search_query=${encodeURIComponent(query)}`, { headers, signal: AbortSignal.timeout(COURSE_TIMEOUT_MS) });
       if (!res.ok) throw new Error(`Search failed (${res.status})`);
       const data = await res.json();
       const courses = (data.courses || []).slice(0, 15).map((c: any) => ({
@@ -49,12 +68,15 @@ export async function GET(request: Request) {
         name: c.course_name || c.club_name,
         location: courseLocation(c),
       }));
-      return NextResponse.json({ courses });
+      const payload = { courses };
+      searchCache.set(cacheKey, { at: Date.now(), body: payload });
+      return NextResponse.json(payload);
     }
 
     return NextResponse.json({ courses: [] });
   } catch (e: any) {
-    return NextResponse.json({ error: e.message || "Course service error" }, { status: 502 });
+    const aborted = e?.name === "TimeoutError" || e?.name === "AbortError";
+    return NextResponse.json({ error: aborted ? "Course service timed out." : (e.message || "Course service error") }, { status: aborted ? 504 : 502 });
   }
 }
 
