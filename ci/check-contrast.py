@@ -27,7 +27,7 @@ def tok(s: str) -> str:
     return s.strip().strip('"').strip("`").strip()
 
 violations = []
-for f in sorted(COMP.glob("*.tsx")):
+for f in sorted(COMP.rglob("*.tsx")):
     text = f.read_text(encoding="utf-8", errors="replace")
     for m in re.finditer(r'style=\{\{(.*?)\}\}', text, re.S):
         obj = m.group(1)

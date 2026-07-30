@@ -12,7 +12,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 COMP = ROOT / "components"
 
 violations = []
-for f in sorted(COMP.glob("*.tsx")):
+for f in sorted(COMP.rglob("*.tsx")):
     text = f.read_text(encoding="utf-8", errors="replace")
     for m in re.finditer(r'<BottomSheet\b', text):
         i = m.end()

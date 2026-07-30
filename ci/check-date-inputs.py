@@ -19,7 +19,7 @@ COMPONENTS = ROOT / "components"
 EXEMPT = {"ui.tsx"}
 
 violations = []
-for f in sorted(COMPONENTS.glob("*.tsx")):
+for f in sorted(COMPONENTS.rglob("*.tsx")):
     if f.name in EXEMPT:
         continue
     text = f.read_text(encoding="utf-8", errors="replace")

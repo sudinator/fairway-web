@@ -24,7 +24,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 COMPONENTS = ROOT / "components"
 
 violations = []
-for f in sorted(COMPONENTS.glob("*.tsx")):
+for f in sorted(COMPONENTS.rglob("*.tsx")):
     for i, line in enumerate(f.read_text(encoding="utf-8", errors="replace").splitlines()):
         if 'position: "fixed"' not in line:
             continue

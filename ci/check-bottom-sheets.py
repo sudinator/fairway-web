@@ -32,7 +32,7 @@ def is_panel(line):
     return False
 
 violations = []
-for f in sorted(COMPONENTS.glob("*.tsx")):
+for f in sorted(COMPONENTS.rglob("*.tsx")):
     if f.name in EXEMPT:
         continue
     lines = f.read_text(encoding="utf-8", errors="replace").splitlines()

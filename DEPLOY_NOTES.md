@@ -4216,3 +4216,16 @@ Modularity stage 0. Moved the Game and Player type definitions out of components
 lib/game-types.ts and imported them back. Types only — no runtime code — so this cannot change behavior;
 tsc + build confirm. This unblocks moving the many self-contained components currently trapped in the
 7,272-line tournaments.tsx into their own files (stage 1, next). No migration.
+
+### 176.6.260729 — refactor stage 1: split leaf components out of tournaments.tsx (no behavior change)
+Moved two contiguous, self-contained blocks out of the 7,272-line tournaments.tsx into their own files:
+- components/game/scoring-views.tsx — ScoreHistory, SkinsView, MatchView, FourballView, StrokesSummary +
+  the sweep banners (SweepBroom, CleanSweepBanner, SweepTrophy, SweepAchievedBanner, TeamClinchLine).
+- components/game/segment-views.tsx — LegConfigEditor, SegmentBoard, GroupSegmentSummary.
+Shared helpers they used were extracted to reusable modules: lib/game-colors.ts (teamAccent +
+TEAM_COLOR_BY_NAME) and lib/game-types.ts (Game/Player, from stage 0). tournaments.tsx: 7,272 -> 5,645 lines.
+Behavior-preserving: pure relocation, no logic changed; tsc + build + tests + 8 guards all green.
+Also fixed a safety-net gap the move exposed: 5 CI guards used a non-recursive glob("*.tsx") that would have
+skipped components/game/*; switched them to rglob so subdir components stay covered. No migration.
+
+BEHAVIOR CHANGES: none (relocation only).
