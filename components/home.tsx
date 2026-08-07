@@ -7,7 +7,7 @@ import { computeBalances, fmtUSD } from "@/lib/money";
 import { logActivity } from "@/lib/activity";
 import { Toaster, notifyInfo } from "@/components/toast";
 import { loadDraft, draftHasScores } from "@/lib/draft";
-import { loadActiveGame, saveAppBootCache, loadAppBootCache, loadEditorDraft } from "@/lib/draft";
+import { loadActiveGame, saveAppBootCache, loadAppBootCache, loadEditorDraft, loadActiveCourseEdit } from "@/lib/draft";
 import { btn, Wordmark, inputStyle, Eyebrow } from "@/components/ui";
 import Tournaments, { type GameSeed } from "@/components/tournaments";
 import { CoursesLibrary, ProfilePanel, NotificationBell, NotificationsScreen, PlayersTab, AdminHome, HelpPage } from "@/components/manage";
@@ -283,6 +283,14 @@ export function Home({ session }: { session: any }) {
       setResumeChecked(true);
       setStage("setup");
       setTab("dashboard");
+      return;
+    }
+    // Mid course-library edit: reopen the Courses tab so CoursesLibrary reopens the editor
+    // (its form-draft then restores the edits), instead of dropping the user on the dashboard.
+    if (loadActiveCourseEdit()) {
+      setResumeChecked(true);
+      setStage(null);
+      setTab("courses");
       return;
     }
     // No local draft — wait until rounds have loaded, then check the server.

@@ -4335,3 +4335,19 @@ still cleared on create/cancel/discard, so this only fires after an involuntary 
 
 BEHAVIOR CHANGE: after a lock/background while editing a course in round setup, the app now reopens into the
 course editor with your edits restored, instead of the dashboard.
+
+### 176.14.260806 — reopen INTO the Manage course editor + sticky FRONT/BACK NINE header
+Fix 1 (the real "course tab" bug): editing a course via Manage → Courses is a SEPARATE editor (CourseEditor/
+CourseForm) from round setup. Its edits were already persisted (form-draft), but on reopen the app landed on
+the dashboard, so the restore never showed. Added a resume: openEditor saves an active-course-edit marker
+(lib/draft saveActiveCourseEdit); home boot routes to the Courses tab when the marker exists; CoursesLibrary
+reopens the editor on mount; the marker clears on cancel/save. The editor's existing form-draft then restores
+the edited rating/slope/yardage. So editing a course on the Courses tab now survives a lock and reopens into
+the editor. (Note: the Manage editor already keeps edits recoverable via its form-draft, so no separate
+warn-on-cancel popup was added there — offer if you want it for consistency.)
+
+Fix 2 (sticky scorecard header): the FRONT NINE / BACK NINE label now sticks WITH the column header as one
+clean pinned bar (components/ui.tsx ScoreEntryCard), instead of the columns pinning alone at the very top.
+
+BEHAVIOR CHANGE: after a lock/background while editing a course on the Courses tab, the app reopens into that
+course editor. No migration.

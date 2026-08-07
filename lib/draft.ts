@@ -87,6 +87,28 @@ export function clearEditorDraft(key: string): void {
   try { if (typeof window === "undefined") return; window.localStorage.removeItem("bnn_edit_" + key); } catch {}
 }
 
+// --- Active course edit (Manage → Courses) resume marker ---
+// Remembers that the user was editing a course in the library (and which one) so a lock/
+// refresh reopens the app INTO that editor instead of the dashboard. The edited data itself
+// is persisted separately by the editor's form-draft; this just restores the navigation.
+const CEKEY = "bnn_active_course_edit_v1";
+export function saveActiveCourseEdit(v: unknown): void {
+  try { if (typeof window === "undefined") return; window.localStorage.setItem(CEKEY, JSON.stringify({ at: Date.now(), v })); } catch {}
+}
+export function loadActiveCourseEdit<T = any>(maxAgeMs = 12 * 60 * 60 * 1000): T | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem(CEKEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (typeof p?.at === "number" && Date.now() - p.at > maxAgeMs) return null;
+    return p && "v" in p ? (p.v as T) : null;
+  } catch { return null; }
+}
+export function clearActiveCourseEdit(): void {
+  try { if (typeof window === "undefined") return; window.localStorage.removeItem(CEKEY); } catch {}
+}
+
 // True if the draft has at least one hole with a score entered.
 export function draftHasScores(round: Round | null | undefined): boolean {
   if (!round?.holes?.length) return false;

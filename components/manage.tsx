@@ -19,6 +19,7 @@ import { resizeToAvatar } from "@/lib/image";
 import { APP_VERSION } from "@/lib/app-version";
 import { courseChangeLines, buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
 import { loadFormDraft, saveFormDraft, clearFormDraft, draftAgeLabel } from "@/lib/form-draft";
+import { saveActiveCourseEdit, loadActiveCourseEdit, clearActiveCourseEdit } from "@/lib/draft";
 import { HelpSearch } from "@/components/help-search";
 import { FeedbackForm, type FeedbackPrefill } from "@/components/feedback";
 
@@ -134,6 +135,10 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   const [groupCourses, setGroupCourses] = useState<LibCourse[] | null>(null);
   const [allCourses, setAllCourses] = useState<LibCourse[] | null>(null);
   const [editing, setEditing] = useState<null | "new" | { id: string; data: Course; user_id: string }>(null);
+  // Persist which course is being edited so a lock/refresh reopens INTO the editor (the edited
+  // data itself is restored by the form-draft). Cleared on cancel/save.
+  const openEditor = (v: "new" | { id: string; data: Course; user_id: string }) => { saveActiveCourseEdit(v); setEditing(v); };
+  React.useEffect(() => { const v = loadActiveCourseEdit<"new" | { id: string; data: Course; user_id: string }>(); if (v) setEditing(v); /* eslint-disable-next-line */ }, []);
   const [isAdmin, setIsAdmin] = useState(false);
   const [tab, setTab] = useState<CourseTab>("group");
   const [search, setSearch] = useState("");
@@ -378,8 +383,8 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
       activeGroupId={activeGroupId}
       initial={editing === "new" ? null : editing.data}
       existingId={editing === "new" ? null : editing.id}
-      onCancel={() => setEditing(null)}
-      onSaved={async () => { setEditing(null); await load(); setTab("group"); }}
+      onCancel={() => { clearActiveCourseEdit(); setEditing(null); }}
+      onSaved={async () => { clearActiveCourseEdit(); setEditing(null); await load(); setTab("group"); }}
     />;
   }
 
@@ -394,7 +399,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
             {c.vetted ? "★" : "☆"}
           </button>
         )}
-        <button onClick={() => setEditing({ id: c.id, data: c.data, user_id: c.user_id })}
+        <button onClick={() => openEditor({ id: c.id, data: c.data, user_id: c.user_id })}
           style={{ flex: 1, textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: "13px 16px" }}>
           <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>
             {courseCardTitle(c)}
@@ -423,7 +428,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <Eyebrow>COURSE LIBRARY</Eyebrow>
         <div style={{ flex: 1 }} />
-        <button style={btn(true)} onClick={() => setEditing("new")}>＋ Add New Course</button>
+        <button style={btn(true)} onClick={() => openEditor("new")}>＋ Add New Course</button>
       </div>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
         Browse every course saved in Birdie Num Num, then add the ones your group plays to your club library. Your group library is what appears in New Round and Create Game.

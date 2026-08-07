@@ -595,11 +595,12 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     // interactive scoring cells get their own full-width row beneath.
     const cols = `0.8fr${showOpp ? " 0.9fr" : ""}${hasDots ? " 0.7fr" : ""} 1.35fr${showFairway ? " 0.85fr" : ""}${showPutts ? " 0.8fr 1.15fr" : ""}${showPenalties ? " 1fr" : ""} 0.75fr${showRun ? " 0.95fr" : ""}`;
     const GridRow = (cells: React.ReactNode[], opts?: { header?: boolean }) => (
-      <div style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4, padding: opts?.header ? "6px 2px 6px" : "3px 2px 0", ...(opts?.header ? { position: "sticky" as const, top: 0, zIndex: 2, background: C.card, boxShadow: "0 5px 8px -6px rgba(0,0,0,0.35)" } : {}) }}>{cells}</div>
+      <div style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4, padding: opts?.header ? "0 2px 4px" : "3px 2px 0" }}>{cells}</div>
     );
     return (
       <div style={{ background: C.card, borderRadius: 12, padding: 10, flex: 1, minWidth: 300 }}>
-        <div style={{ color: C.green, fontSize: 11, letterSpacing: 2, fontWeight: 800, marginBottom: 8 }}>{label}</div>
+        <div style={{ position: "sticky", top: 0, zIndex: 3, background: C.card, marginBottom: 4, paddingBottom: 4, paddingTop: 2, boxShadow: "0 7px 9px -8px rgba(0,0,0,0.5)" }}>
+        <div style={{ color: C.green, fontSize: 11, letterSpacing: 2, fontWeight: 800, marginBottom: 6 }}>{label}</div>
         {GridRow([
           <div key="p" style={{ ...headStyle, textAlign: "center" }}>Par</div>,
           ...(showOpp ? [<div key="op" style={{ ...headStyle, textAlign: "center", color: C.gold }}>{oppLabel || "Opp"}</div>] : []),
@@ -612,6 +613,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           <div key="pt" style={{ ...headStyle, textAlign: "center" }}>Pts</div>,
           ...(showRun ? [<div key="ms" style={{ ...headStyle, textAlign: "center", color: C.gold }}>Match</div>] : []),
         ], { header: true })}
+        </div>
         {seg.map((h, j) => {
           const i = from + j;
           const maxStrokes = uncap ? h.par + 8 : hasHandicap ? h.par + 2 + h.recv : h.par * 2;
