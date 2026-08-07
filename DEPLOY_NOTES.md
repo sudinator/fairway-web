@@ -4388,3 +4388,9 @@ earlier copy, re-running is safe (idempotent — it re-creates the function).
 
 BEHAVIOR CHANGE: picking a saved course with upstream changes now flags admins (prompt + notification) and gives
 non-admins fresh yardages for the round. Handicap-affecting rating/slope only change via admin approval.
+
+### 176.18.260806 — scorecard sticky header: keep the card's rounded top corners when pinned
+The pinned FRONT/BACK NINE bar was inset from the card's border by 1px, so when the card's rounded top scrolled
+away the straight side borders met the header's inset corners and the top read as square. Aligned the sticky
+header to the card's OUTER edge (margin -11 vs -10) so its rounded corners + border ARE the card's top corners,
+and stay rounded while scrolling. (components/ui.tsx ScoreEntryCard.) No migration.
