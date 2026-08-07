@@ -9,8 +9,9 @@ import {
 } from "@/lib/golf";
 import { buildCustomCourse, Course, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
-import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark, ShortDateInput, useUnsavedGuard, UnsavedChangesSheet } from "@/components/ui";
-import { buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
+import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark, ShortDateInput, useUnsavedGuard, UnsavedChangesSheet, BottomSheet } from "@/components/ui";
+import { buildCourseChangeSummary, hasMaterialCourseChanges, applyFreshness } from "@/lib/course-diff";
+import { checkCourseFreshness, type FreshnessResult } from "@/lib/course-freshness";
 import { loadEditorDraft, saveEditorDraft, clearEditorDraft } from "@/lib/draft";
 
 const supabase = createClient();
@@ -42,6 +43,10 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   // Unsaved course edits (rating/slope/yardage/par/SI changed from the original).
   const courseDirty = !!picked && !!originalPicked && hasMaterialCourseChanges(originalPicked, picked);
   useUnsavedGuard(courseDirty);
+  const dismissFreshness = async () => {
+    if (loadedFavId) await supabase.rpc("set_course_freshness_status", { p_course_id: loadedFavId, p_status: "dismissed" }).then(() => {}, () => {});
+    setFreshness(null);
+  };
   const [teeIdx, setTeeIdx] = useState<number>(() => restored?.teeIdx ?? 0);
   const [idxStr, setIdxStr] = useState<string>(() => restored?.idxStr ?? (index != null ? String(index) : ""));
   const [showCustom, setShowCustom] = useState<boolean>(() => restored?.showCustom ?? false);
@@ -312,6 +317,53 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
       clearEditorDraft("round-setup");
     }
   }, [picked, originalPicked, teeIdx, idxStr, showCustom, playDate, grossMode, grossStr, courseReason, editingTee, loadedFavId, cName, cLoc, cPar, cRating, cSlope]);
+  // --- Course freshness: flag upstream (API) rating/slope/yardage changes on a saved course ---
+  const [isGroupAdmin, setIsGroupAdmin] = useState<boolean | null>(null);
+  const [freshness, setFreshness] = useState<FreshnessResult | null>(null);
+  const freshCheckedRef = useRef<string | null>(null);
+  const playWithFresh = (apiCourse: Course, includeRatingSlope: boolean) => {
+    setPicked((p) => {
+      if (!p) return p;
+      const f = applyFreshness(p, apiCourse, includeRatingSlope);
+      setOriginalPicked(JSON.parse(JSON.stringify(f))); // keep baseline in sync so this isn't seen as an edit
+      return f;
+    });
+  };
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (cancelled || !user) return;
+      const { data } = await supabase.from("group_members").select("role").eq("group_id", activeGroupId).eq("user_id", user.id).maybeSingle();
+      if (!cancelled) setIsGroupAdmin(data?.role === "admin");
+    })();
+    return () => { cancelled = true; };
+  }, [activeGroupId]);
+  useEffect(() => {
+    const extId = picked?.externalId ? String(picked.externalId) : "";
+    if (!loadedFavId || !extId) return;
+    if (freshCheckedRef.current === loadedFavId) return;
+    freshCheckedRef.current = loadedFavId;
+    (async () => {
+      const r = await checkCourseFreshness(supabase, { courseId: loadedFavId, externalId: extId, stored: picked!, groupId: activeGroupId });
+      if (r.hasChanges && r.apiCourse && r.status === "pending") setFreshness(r);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadedFavId]);
+  useEffect(() => {
+    if (freshness?.hasChanges && freshness.apiCourse && isGroupAdmin === false) {
+      playWithFresh(freshness.apiCourse, false); // non-admin: silently play with fresh yardages
+      setFreshness(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [freshness, isGroupAdmin]);
+  const applyFreshToLibrary = async () => {
+    if (!freshness?.apiCourse || !loadedFavId) return;
+    await supabase.from("favorite_courses").update({ data: freshness.apiCourse }).eq("id", loadedFavId);
+    await supabase.rpc("set_course_freshness_status", { p_course_id: loadedFavId, p_status: "applied" }).then(() => {}, () => {});
+    playWithFresh(freshness.apiCourse, true);
+    setFreshness(null);
+  };
 
   const makeCustom = () => {
     const c = buildCustomCourse(
@@ -745,6 +797,33 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
         onDiscard={() => { setShowLeaveGuard(false); clearEditorDraft("round-setup"); onCancel(); }}
         onKeepEditing={() => setShowLeaveGuard(false)}
       />
+      {freshness?.hasChanges && freshness.diff && isGroupAdmin === true && (
+        <BottomSheet onClose={() => setFreshness(null)} maxWidth={460} panelStyle={{ background: C.greenMid }}
+          header={<div style={{ padding: "14px 44px 10px 16px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+            <div style={{ color: C.cream, fontSize: 16, fontWeight: 800 }}>Course data changed at the source</div>
+          </div>}>
+          <div style={{ color: C.sage, fontSize: 13, lineHeight: 1.5, marginBottom: 12 }}>
+            The golf course database now has different data for <b style={{ color: C.cream }}>{picked?.name}</b> than what&apos;s stored. Review the changes:
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14, maxHeight: 260, overflowY: "auto" }}>
+            {freshness.diff.tees.map((t) => (
+              <div key={t.name} style={{ background: C.green, borderRadius: 10, padding: "8px 10px" }}>
+                <div style={{ color: C.gold, fontWeight: 800, fontSize: 12, letterSpacing: 1, marginBottom: 4 }}>{t.name}</div>
+                {t.ratingChanged && <div style={{ color: C.cream, fontSize: 12.5 }}>Rating: {t.ratingFrom ?? "—"} → <b>{t.ratingTo ?? "—"}</b></div>}
+                {t.slopeChanged && <div style={{ color: C.cream, fontSize: 12.5 }}>Slope: {t.slopeFrom ?? "—"} → <b>{t.slopeTo ?? "—"}</b></div>}
+                {t.yardageChanges.map((y) => (
+                  <div key={y.hole} style={{ color: C.sage, fontSize: 12.5 }}>Hole {y.hole}: {y.from ?? "—"} → <b style={{ color: C.cream }}>{y.to ?? "—"}</b> yds</div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <button onClick={() => { if (freshness.apiCourse) playWithFresh(freshness.apiCourse, true); setFreshness(null); }} style={{ ...btn(true), width: "100%" }}>Play this round with the updated data</button>
+            <button onClick={applyFreshToLibrary} style={{ ...btn(false), width: "100%" }}>Update the stored course (applies for everyone)</button>
+            <button onClick={dismissFreshness} style={{ ...btn(false), width: "100%", color: C.sage }}>Keep current — ignore for now</button>
+          </div>
+        </BottomSheet>
+      )}
     </div>
   );
 }

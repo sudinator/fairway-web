@@ -4372,3 +4372,19 @@ yet — sets up the pieces the next increment wires into round-setup:
   group admins when a change is newly detected; preserves dismissed/applied decisions).
 NEXT (increment 2): on course select in round-setup, daily-throttled check → cache → admin-only prompt (play
 with updated / keep / submit for review) and silent fresh-yardages for non-admins.
+
+### 176.17.260806 — course-freshness feature: the visible half (round-setup) — migration 0124 (updated)
+Wires the freshness check into round setup. When you pick a SAVED library course that has an API id:
+- Daily-throttled check: reads the course_freshness cache; only if stale (>24h) does it hit the API, diff via
+  buildFreshnessDiff, and record the result (which flags admins on a newly-detected change). First person
+  triggers it; everyone else that day reads the cache.
+- ADMIN (group role='admin'): a sheet shows the per-hole yardage changes + any rating/slope change, with
+  "Play this round with the updated data" / "Update the stored course (applies for everyone)" / "Keep current".
+  "Update stored course" writes favorite_courses.data and clears the flag; "Keep current" marks it dismissed.
+- NON-ADMIN: no prompt — silently plays the round with the fresh yardages (rating/slope untouched, so handicap
+  math is unaffected until an admin approves).
+Migration 0124 now also includes set_course_freshness_status (dismiss/apply). RUN 0124 (updated) if you ran the
+earlier copy, re-running is safe (idempotent — it re-creates the function).
+
+BEHAVIOR CHANGE: picking a saved course with upstream changes now flags admins (prompt + notification) and gives
+non-admins fresh yardages for the round. Handicap-affecting rating/slope only change via admin approval.

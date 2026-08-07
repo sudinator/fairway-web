@@ -58,3 +58,13 @@ begin
 end $$;
 revoke all on function public.record_course_freshness(uuid, uuid, jsonb, jsonb, boolean) from public;
 grant execute on function public.record_course_freshness(uuid, uuid, jsonb, jsonb, boolean) to authenticated;
+
+-- Admin decision on a flagged course: 'dismissed' (ignore for now) or 'applied' (updated the library).
+create or replace function public.set_course_freshness_status(p_course_id uuid, p_status text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'authentication required' using errcode = '42501'; end if;
+  update course_freshness set status = p_status, updated_at = now() where course_id = p_course_id;
+end $$;
+revoke all on function public.set_course_freshness_status(uuid, text) from public;
+grant execute on function public.set_course_freshness_status(uuid, text) to authenticated;
