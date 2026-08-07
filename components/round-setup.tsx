@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
@@ -11,6 +11,7 @@ import { buildCustomCourse, Course, courseLabel, loadCoursesForGroup, linkCourse
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark, ShortDateInput, useUnsavedGuard, UnsavedChangesSheet } from "@/components/ui";
 import { buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
+import { loadEditorDraft, saveEditorDraft, clearEditorDraft } from "@/lib/draft";
 
 const supabase = createClient();
 
@@ -29,30 +30,32 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   onReady: (r: Round) => void;
   onCancel: () => void;
 }) {
+  // Restore any in-progress setup saved before a phone lock / background (12h TTL).
+  const [restored] = useState<any>(() => loadEditorDraft("round-setup"));
   const [q, setQ] = useState("");
-  const [picked, setPicked] = useState<Course | null>(null);
+  const [picked, setPicked] = useState<Course | null>(() => restored?.picked ?? null);
   // Snapshot of the course as selected/loaded, so we only ask for a correction
   // reason when the user actually edits course info (rating/slope/par/SI) — not
   // when merely picking a course or entering hole scores.
-  const [originalPicked, setOriginalPicked] = useState<Course | null>(null);
+  const [originalPicked, setOriginalPicked] = useState<Course | null>(() => restored?.originalPicked ?? null);
   const [showLeaveGuard, setShowLeaveGuard] = useState(false);
   // Unsaved course edits (rating/slope/yardage/par/SI changed from the original).
   const courseDirty = !!picked && !!originalPicked && hasMaterialCourseChanges(originalPicked, picked);
   useUnsavedGuard(courseDirty);
-  const [teeIdx, setTeeIdx] = useState(0);
-  const [idxStr, setIdxStr] = useState(index != null ? String(index) : "");
-  const [showCustom, setShowCustom] = useState(false);
-  const [playDate, setPlayDate] = useState(todayLocal());
-  const [grossMode, setGrossMode] = useState(false);
-  const [grossStr, setGrossStr] = useState("");
+  const [teeIdx, setTeeIdx] = useState<number>(() => restored?.teeIdx ?? 0);
+  const [idxStr, setIdxStr] = useState<string>(() => restored?.idxStr ?? (index != null ? String(index) : ""));
+  const [showCustom, setShowCustom] = useState<boolean>(() => restored?.showCustom ?? false);
+  const [playDate, setPlayDate] = useState<string>(() => restored?.playDate ?? todayLocal());
+  const [grossMode, setGrossMode] = useState<boolean>(() => restored?.grossMode ?? false);
+  const [grossStr, setGrossStr] = useState<string>(() => restored?.grossStr ?? "");
   // favorites
   const [favorites, setFavorites] = useState<{ id: string; name: string; location: string; data: Course }[]>([]);
   const [favSaving, setFavSaving] = useState(false);
   const [favMsg, setFavMsg] = useState<string | null>(null);
-  const [courseReason, setCourseReason] = useState("");
+  const [courseReason, setCourseReason] = useState<string>(() => restored?.courseReason ?? "");
   // tee override
-  const [editingTee, setEditingTee] = useState(false);
-  const [loadedFavId, setLoadedFavId] = useState<string | null>(null);
+  const [editingTee, setEditingTee] = useState<boolean>(() => restored?.editingTee ?? false);
+  const [loadedFavId, setLoadedFavId] = useState<string | null>(() => restored?.loadedFavId ?? null);
   const [ratingText, setRatingText] = useState("");
   // live search state
   const [searching, setSearching] = useState(false);
@@ -60,11 +63,11 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   const [results, setResults] = useState<{ id: number; club?: string; name: string; location: string }[] | null>(null);
   const [searchErr, setSearchErr] = useState<string | null>(null);
   // custom course fields
-  const [cName, setCName] = useState("");
-  const [cLoc, setCLoc] = useState("");
-  const [cPar, setCPar] = useState("72");
-  const [cRating, setCRating] = useState("");
-  const [cSlope, setCSlope] = useState("");
+  const [cName, setCName] = useState<string>(() => restored?.cName ?? "");
+  const [cLoc, setCLoc] = useState<string>(() => restored?.cLoc ?? "");
+  const [cPar, setCPar] = useState<string>(() => restored?.cPar ?? "72");
+  const [cRating, setCRating] = useState<string>(() => restored?.cRating ?? "");
+  const [cSlope, setCSlope] = useState<string>(() => restored?.cSlope ?? "");
 
   // Load this group's courses (via the group_courses link table — shared records).
   const loadFavorites = async () => {
@@ -90,7 +93,9 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   useEffect(() => { loadFavorites(); }, [activeGroupId]);
   // Re-snapshot the original only when a DIFFERENT course is selected/loaded
   // (keyed on identity), so later inline edits are detectable as changes.
+  const skipSnapshotRef = useRef(!!restored?.picked);
   useEffect(() => {
+    if (skipSnapshotRef.current) { skipSnapshotRef.current = false; return; } // restored draft: keep the saved original
     setOriginalPicked(picked ? JSON.parse(JSON.stringify(picked)) : null);
   }, [picked?.id, loadedFavId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -298,6 +303,16 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
     if (tee) setRatingText(tee.rating != null && !isNaN(tee.rating) ? String(tee.rating) : "");
   }, [teeIdx, editingTee, picked?.id]);
 
+  // Persist the in-progress setup so a phone lock / background doesn't lose edits.
+  // Cleared on create or an intentional leave, so it only survives an involuntary interruption.
+  useEffect(() => {
+    if (picked || showCustom || idxStr.trim() || grossStr.trim()) {
+      saveEditorDraft("round-setup", { picked, originalPicked, teeIdx, idxStr, showCustom, playDate, grossMode, grossStr, courseReason, editingTee, loadedFavId, cName, cLoc, cPar, cRating, cSlope });
+    } else {
+      clearEditorDraft("round-setup");
+    }
+  }, [picked, originalPicked, teeIdx, idxStr, showCustom, playDate, grossMode, grossStr, courseReason, editingTee, loadedFavId, cName, cLoc, cPar, cRating, cSlope]);
+
   const makeCustom = () => {
     const c = buildCustomCourse(
       cName.trim() || "My course", cLoc.trim(),
@@ -359,6 +374,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
       yardage: tee?.yardages?.[i] ?? null,
       recv: alloc[h.n] || 0,
     }));
+    clearEditorDraft("round-setup");
     onReady({
       id: "", group_id: activeGroupId, group_name: activeGroupName, course: courseLabel(picked), tee_name: tee.name,
       rating: tee.rating, slope: tee.slope, course_par: coursePar,
@@ -388,6 +404,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
     setGrossSaving(false);
     if (error) { setGrossErr("Couldn't save: " + error.message); return; }
     await logActivity(supabase, { actor_id: u.user!.id, actor_name: u.user?.email || "A player", action: "round_completed", group_id: activeGroupId, summary: `Logged a round at ${courseLabel(picked)} (${g})` });
+    clearEditorDraft("round-setup");
     onCancel(); // back to home; dashboard reloads
   };
 
@@ -718,14 +735,14 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
       )}
 
       <div style={{ marginTop: 18 }}>
-        <button style={btn(false)} onClick={() => { if (courseDirty) setShowLeaveGuard(true); else onCancel(); }}>Cancel</button>
+        <button style={btn(false)} onClick={() => { if (courseDirty) setShowLeaveGuard(true); else { clearEditorDraft("round-setup"); onCancel(); } }}>Cancel</button>
       </div>
       <UnsavedChangesSheet
         open={showLeaveGuard}
         saving={favSaving}
         message="You've edited this course's rating, slope or yardages but haven't saved the correction. Leaving now discards those edits."
         onSave={() => { setShowLeaveGuard(false); saveFavorite(); }}
-        onDiscard={() => { setShowLeaveGuard(false); onCancel(); }}
+        onDiscard={() => { setShowLeaveGuard(false); clearEditorDraft("round-setup"); onCancel(); }}
         onKeepEditing={() => setShowLeaveGuard(false)}
       />
     </div>

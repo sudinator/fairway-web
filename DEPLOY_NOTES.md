@@ -4288,3 +4288,24 @@ on lock, so only persistence fixes the lock case; the guard fixes accidental in-
 
 BEHAVIOR CHANGE: tapping Cancel in round setup with unsaved course edits now warns instead of discarding.
 Manual QA: edit a course's rating/slope in setup, tap Cancel → sheet appears; Keep editing / Discard / Save all behave.
+
+### 176.11.260806 — round-setup edits survive a phone lock/background (Piece 2, part 2 — persistence)
+Wires the 176.10 editor-draft store into the round-setup flow so an involuntary interruption no longer wipes
+in-progress edits (the case beforeunload can't catch on mobile):
+- On change, the setup's meaningful fields (picked course incl. edited tees, originalPicked baseline, teeIdx,
+  handicap index, play date, custom-course fields, gross entry, course-correction reason, editingTee,
+  loadedFavId) are saved under key "round-setup" (12h TTL).
+- On mount the state is SEEDED from that draft via lazy initializers (not post-mount setters), so it doesn't
+  fight the existing effects. The one hazard — the effect that re-snapshots originalPicked from picked on mount
+  — is suppressed for the first render when restoring (skipSnapshotRef), so "edited vs original" (and thus the
+  correction-reason prompt + the unsaved-changes guard) survive the restore.
+- The draft is cleared on create (onReady), on gross-round save, and on any intentional Cancel/Discard — so it
+  ONLY persists across an involuntary lock/background, never after you deliberately leave. Fresh opens with no
+  draft behave exactly as before.
+
+BEHAVIOR CHANGE: opening round setup after a lock/background now restores your in-progress course edits and
+setup instead of a blank form.
+HIGH-VALUE MANUAL QA (critical flow — please run): (1) pick a course, edit a tee's rating/slope/yardage, lock
+the phone, reopen → edits are back AND the course-correction reason prompt still shows. (2) Create a round →
+reopen setup is blank (draft cleared). (3) Cancel with edits → Discard clears; reopen is blank. (4) Fresh open
+with no prior draft → normal empty form. (5) Gross-only round save → leaves clean, no stale draft.
