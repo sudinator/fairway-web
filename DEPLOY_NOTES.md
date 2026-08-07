@@ -4319,3 +4319,19 @@ the incomplete hole 3) and the scroll hid the hole number behind the sticky head
   same, default 72px), so the hole number stays visible instead of being covered.
 Applies to both the group card (scorecard-views.tsx) and the solo editor (round-editor.tsx + ScoreEntryCard).
 The old edit-based stored-hole persistence is no longer used for targeting (kept, harmless). No migration.
+
+### 176.13.260806 — two fixes: sticky per-section scorecard header + reopen INTO the course editor
+Fix 1 (individual scorecard header): the solo scorecard renders front 9 and back 9 as two cards, each with a
+column header (Par/Score/FW/GIR/Putt/Pts). Each card's header is now position:sticky so it stays pinned while
+you scroll that section, and the back-9 header takes over when you reach it (components/ui.tsx ScoreEntryCard
+GridRow header branch).
+
+Fix 2 (course-edit resume — the real bug behind "changes lost"): 176.11 persisted round-setup edits, but on
+reopen the app landed on the DASHBOARD, never back in the editor, so the restore never showed and edits looked
+lost. home.tsx's reopen-resume now checks for a pending round-setup draft (loadEditorDraft("round-setup")) and,
+if present, reopens the setup screen — where 176.11's field restore then repopulates the course + edits.
+Priority sits after the active-game and in-progress-round resumes, before the server round check. The draft is
+still cleared on create/cancel/discard, so this only fires after an involuntary interruption. No migration.
+
+BEHAVIOR CHANGE: after a lock/background while editing a course in round setup, the app now reopens into the
+course editor with your edits restored, instead of the dashboard.

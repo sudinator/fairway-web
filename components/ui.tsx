@@ -595,7 +595,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     // interactive scoring cells get their own full-width row beneath.
     const cols = `0.8fr${showOpp ? " 0.9fr" : ""}${hasDots ? " 0.7fr" : ""} 1.35fr${showFairway ? " 0.85fr" : ""}${showPutts ? " 0.8fr 1.15fr" : ""}${showPenalties ? " 1fr" : ""} 0.75fr${showRun ? " 0.95fr" : ""}`;
     const GridRow = (cells: React.ReactNode[], opts?: { header?: boolean }) => (
-      <div style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4, padding: opts?.header ? "0 2px 6px" : "3px 2px 0" }}>{cells}</div>
+      <div style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4, padding: opts?.header ? "6px 2px 6px" : "3px 2px 0", ...(opts?.header ? { position: "sticky" as const, top: 0, zIndex: 2, background: C.card, boxShadow: "0 5px 8px -6px rgba(0,0,0,0.35)" } : {}) }}>{cells}</div>
     );
     return (
       <div style={{ background: C.card, borderRadius: 12, padding: 10, flex: 1, minWidth: 300 }}>

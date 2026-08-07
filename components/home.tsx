@@ -7,7 +7,7 @@ import { computeBalances, fmtUSD } from "@/lib/money";
 import { logActivity } from "@/lib/activity";
 import { Toaster, notifyInfo } from "@/components/toast";
 import { loadDraft, draftHasScores } from "@/lib/draft";
-import { loadActiveGame, saveAppBootCache, loadAppBootCache } from "@/lib/draft";
+import { loadActiveGame, saveAppBootCache, loadAppBootCache, loadEditorDraft } from "@/lib/draft";
 import { btn, Wordmark, inputStyle, Eyebrow } from "@/components/ui";
 import Tournaments, { type GameSeed } from "@/components/tournaments";
 import { CoursesLibrary, ProfilePanel, NotificationBell, NotificationsScreen, PlayersTab, AdminHome, HelpPage } from "@/components/manage";
@@ -275,6 +275,14 @@ export function Home({ session }: { session: any }) {
     if (d && draftHasScores(d.round)) {
       setResumeChecked(true);
       setStage({ round: d.round });
+      return;
+    }
+    // Mid round-setup / course edit: reopen the setup screen so the persisted edits (176.11)
+    // restore, instead of dropping the user on the dashboard with their changes seemingly gone.
+    if (loadEditorDraft("round-setup")) {
+      setResumeChecked(true);
+      setStage("setup");
+      setTab("dashboard");
       return;
     }
     // No local draft — wait until rounds have loaded, then check the server.
