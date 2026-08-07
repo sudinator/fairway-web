@@ -64,6 +64,29 @@ export function loadDraftHole(roundKey: string): number | null {
   } catch { return null; }
 }
 
+// --- Generic in-progress EDIT draft (forms: course rating/slope/yardage, round setup, …) ---
+// Persist a form's serializable state under a key so a phone lock / background / refresh
+// doesn't lose unsaved edits. Restore on mount, clear on save or explicit discard. The
+// synchronous localStorage write is what survives an involuntary background (no warning is
+// possible then — beforeunload doesn't fire on mobile lock).
+export function saveEditorDraft(key: string, data: unknown): void {
+  try { if (typeof window === "undefined") return; window.localStorage.setItem("bnn_edit_" + key, JSON.stringify({ at: Date.now(), data })); } catch {}
+}
+export function loadEditorDraft<T = any>(key: string, maxAgeMs = 12 * 60 * 60 * 1000): T | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const raw = window.localStorage.getItem("bnn_edit_" + key);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (!p || !("data" in p)) return null;
+    if (typeof p.at === "number" && Date.now() - p.at > maxAgeMs) return null; // stale — ignore
+    return p.data as T;
+  } catch { return null; }
+}
+export function clearEditorDraft(key: string): void {
+  try { if (typeof window === "undefined") return; window.localStorage.removeItem("bnn_edit_" + key); } catch {}
+}
+
 // True if the draft has at least one hole with a score entered.
 export function draftHasScores(round: Round | null | undefined): boolean {
   if (!round?.holes?.length) return false;

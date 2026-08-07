@@ -4269,3 +4269,22 @@ components/round-editor.tsx computes the option-3 target once at mount (the hole
 else the next hole needing a score) and passes both. Scores were already draft-safe; this restores view
 position. BEHAVIOR CHANGE: opening the solo editor with a saved position scrolls to that hole instead of the
 top. No migration.
+
+### 176.10.260806 — unsaved-changes machinery + guard on the course editor (Piece 2, part 1)
+Reusable core for "don't lose my edits":
+- lib/draft.ts: saveEditorDraft/loadEditorDraft/clearEditorDraft — generic keyed form-draft persistence
+  (12h TTL). This is the piece that will let edits survive a phone lock/background (persistence still to be
+  wired per-form — see below).
+- components/ui.tsx: useUnsavedGuard(dirty) (beforeunload on desktop refresh/close) + <UnsavedChangesSheet>
+  (shared Save / Discard & leave / Keep editing confirm, built on BottomSheet).
+First consumer — round-setup course editor: Cancel now checks hasMaterialCourseChanges(originalPicked, picked)
+and, if you've edited rating/slope/yardage/par/SI without saving, shows the sheet instead of discarding
+silently. Save runs the existing course-correction save; Discard leaves; Keep editing returns.
+
+HONEST SCOPE: this is the WARNING half (intentional navigation). The persistence half — auto-restoring
+in-progress edits after a phone lock/background — is NOT yet wired into round-setup; it's the delicate part
+(seeding a 15-field critical flow) and gets its own pass with manual QA. On mobile, beforeunload does not fire
+on lock, so only persistence fixes the lock case; the guard fixes accidental in-app Cancel.
+
+BEHAVIOR CHANGE: tapping Cancel in round setup with unsaved course edits now warns instead of discarding.
+Manual QA: edit a course's rating/slope in setup, tap Cancel → sheet appears; Keep editing / Discard / Save all behave.

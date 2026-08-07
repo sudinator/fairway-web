@@ -121,6 +121,46 @@ export const SHEET_PANEL_BOTTOM = "calc(72px + env(safe-area-inset-bottom))"; //
  * sticky `header` stays put while `children` scroll. Every popup should be built on this. It ALWAYS renders a
  * top-right × close control (APP_RULES #18) — do not add your own ×. APP_RULES #17.
  */
+// Warn before losing unsaved edits on an intentional exit. beforeunload covers a browser
+// refresh / tab-close / desktop reload; the shared UnsavedChangesSheet below covers an in-app
+// back/cancel. (Mobile lock/background doesn't fire beforeunload — persistence via
+// saveEditorDraft is what protects that case.)
+export function useUnsavedGuard(dirty: boolean): void {
+  React.useEffect(() => {
+    if (!dirty) return;
+    const h = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, [dirty]);
+}
+
+// Confirm sheet shown when the user tries to leave a form with unsaved changes.
+export function UnsavedChangesSheet({ open, saving, message, onSave, onDiscard, onKeepEditing }: {
+  open: boolean;
+  saving?: boolean;
+  message?: string;
+  onSave?: () => void;            // omit to offer only Discard / Keep editing
+  onDiscard: () => void;
+  onKeepEditing: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <BottomSheet onClose={onKeepEditing} maxWidth={420} panelStyle={{ background: C.greenMid }}
+      header={<div style={{ padding: "14px 44px 10px 16px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+        <div style={{ color: C.cream, fontSize: 16, fontWeight: 800 }}>Unsaved changes</div>
+      </div>}>
+      <div style={{ color: C.sage, fontSize: 13.5, lineHeight: 1.5, marginBottom: 14 }}>
+        {message || "You have edits that haven't been saved. Leaving now will lose them."}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {onSave && <button disabled={saving} onClick={onSave} style={{ ...btn(true), width: "100%" }}>{saving ? "Saving…" : "Save changes"}</button>}
+        <button onClick={onDiscard} style={{ ...btn(false), width: "100%", color: "#ef9d90" }}>Discard &amp; leave</button>
+        <button onClick={onKeepEditing} style={{ ...btn(false), width: "100%" }}>Keep editing</button>
+      </div>
+    </BottomSheet>
+  );
+}
+
 export function BottomSheet({ onClose, children, header, panelStyle, bodyStyle, maxWidth = 520, margin = 12, scrim = "rgba(8,26,20,.72)", dismissOnBackdrop = true }: {
   onClose?: () => void;
   children: React.ReactNode;

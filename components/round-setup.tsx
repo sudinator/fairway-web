@@ -9,7 +9,7 @@ import {
 } from "@/lib/golf";
 import { buildCustomCourse, Course, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
-import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark, ShortDateInput } from "@/components/ui";
+import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark, ShortDateInput, useUnsavedGuard, UnsavedChangesSheet } from "@/components/ui";
 import { buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
 
 const supabase = createClient();
@@ -35,6 +35,10 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   // reason when the user actually edits course info (rating/slope/par/SI) — not
   // when merely picking a course or entering hole scores.
   const [originalPicked, setOriginalPicked] = useState<Course | null>(null);
+  const [showLeaveGuard, setShowLeaveGuard] = useState(false);
+  // Unsaved course edits (rating/slope/yardage/par/SI changed from the original).
+  const courseDirty = !!picked && !!originalPicked && hasMaterialCourseChanges(originalPicked, picked);
+  useUnsavedGuard(courseDirty);
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState(index != null ? String(index) : "");
   const [showCustom, setShowCustom] = useState(false);
@@ -714,8 +718,16 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
       )}
 
       <div style={{ marginTop: 18 }}>
-        <button style={btn(false)} onClick={onCancel}>Cancel</button>
+        <button style={btn(false)} onClick={() => { if (courseDirty) setShowLeaveGuard(true); else onCancel(); }}>Cancel</button>
       </div>
+      <UnsavedChangesSheet
+        open={showLeaveGuard}
+        saving={favSaving}
+        message="You've edited this course's rating, slope or yardages but haven't saved the correction. Leaving now discards those edits."
+        onSave={() => { setShowLeaveGuard(false); saveFavorite(); }}
+        onDiscard={() => { setShowLeaveGuard(false); onCancel(); }}
+        onKeepEditing={() => setShowLeaveGuard(false)}
+      />
     </div>
   );
 }
