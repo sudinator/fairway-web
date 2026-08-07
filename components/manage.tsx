@@ -529,18 +529,26 @@ function CourseEditor({ user, activeGroupId, initial, existingId, onCancel, onSa
   const [results, setResults] = useState<{ id: number; name: string; location: string }[] | null>(null);
   const [loadingId, setLoadingId] = useState<number | null>(null);
 
-  // ---- Resume an interrupted NEW course (device-local draft) ----
+  // ---- Resume an interrupted course edit (device-local draft), for NEW and EXISTING courses ----
   const isNewCourse = !existingId;
-  const courseDraftKey = `bnn_course_draft:${activeGroupId}`;
+  const courseDraftKey = `bnn_course_draft:${activeGroupId}:${existingId || "new"}`;
   const [courseDraft, setCourseDraft] = useState<{ savedAt: number; data: Course } | null>(null);
   const [courseDraftDismissed, setCourseDraftDismissed] = useState(false);
   const courseHydratedRef = React.useRef(false);
 
   useEffect(() => {
-    if (!isNewCourse) { courseHydratedRef.current = true; return; }
     const d = loadFormDraft<Course>(courseDraftKey);
-    if (d && d.data && (d.data.name || "").trim()) setCourseDraft(d);
-    else courseHydratedRef.current = true;
+    if (d && d.data && (d.data.name || "").trim()) {
+      if (isNewCourse) {
+        setCourseDraft(d); // new course: offer to restore via the prompt
+      } else {
+        // existing course: a draft only survives an interruption (cleared on save/cancel),
+        // so auto-restore the edits — that's what "bring me back to my changes" means.
+        setCourse(d.data); setMode("form"); courseHydratedRef.current = true;
+      }
+    } else {
+      courseHydratedRef.current = true;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -551,10 +559,12 @@ function CourseEditor({ user, activeGroupId, initial, existingId, onCancel, onSa
   const startFreshCourse = () => {
     clearFormDraft(courseDraftKey); setCourseDraft(null); setCourseDraftDismissed(true); courseHydratedRef.current = true;
   };
+  // Cancel discards the draft so a cancelled edit doesn't resurface on the next open.
+  const handleCancel = () => { clearFormDraft(courseDraftKey); onCancel(); };
 
-  // Save the in-progress course once we're editing it (new courses only).
+  // Save the in-progress course once we're editing it (new OR existing).
   useEffect(() => {
-    if (!isNewCourse || !courseHydratedRef.current) return;
+    if (!courseHydratedRef.current) return;
     if (mode === "form" && course && (course.name || "").trim()) saveFormDraft(courseDraftKey, course);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [course, mode]);
@@ -624,7 +634,7 @@ function CourseEditor({ user, activeGroupId, initial, existingId, onCancel, onSa
         ))}
         {results && results.length === 0 && !err && <div style={{ color: C.sage, fontSize: 13, marginTop: 8 }}>No matches.</div>}
         <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-          <button style={btn(false)} onClick={onCancel}>Cancel</button>
+          <button style={btn(false)} onClick={handleCancel}>Cancel</button>
           <button style={btn(false)} onClick={startManual}>Enter manually instead</button>
         </div>
       </div>
@@ -632,7 +642,7 @@ function CourseEditor({ user, activeGroupId, initial, existingId, onCancel, onSa
   }
 
   if (!course) return null;
-  return <CourseForm user={user} activeGroupId={activeGroupId} course={course} setCourse={setCourse} existingId={existingId} saving={saving} setSaving={setSaving} err={err} setErr={setErr} onCancel={onCancel} onSaved={() => { clearFormDraft(courseDraftKey); onSaved(); }} />;
+  return <CourseForm user={user} activeGroupId={activeGroupId} course={course} setCourse={setCourse} existingId={existingId} saving={saving} setSaving={setSaving} err={err} setErr={setErr} onCancel={handleCancel} onSaved={() => { clearFormDraft(courseDraftKey); onSaved(); }} />;
 }
 
 function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving, setSaving, err, setErr, onCancel, onSaved }: {

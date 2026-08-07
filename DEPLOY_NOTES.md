@@ -4351,3 +4351,15 @@ clean pinned bar (components/ui.tsx ScoreEntryCard), instead of the columns pinn
 
 BEHAVIOR CHANGE: after a lock/background while editing a course on the Courses tab, the app reopens into that
 course editor. No migration.
+
+### 176.15.260806 — two fixes: existing-course edits now persist/restore; sticky header keeps card top
+Fix 1 (course edits not saved — the real cause): the course form-draft only saved/loaded for NEW courses
+(isNewCourse gate). Editing an EXISTING course persisted nothing, so the reopen had nothing to restore. Now the
+draft is keyed per course (bnn_course_draft:group:id) and saves + restores for existing edits too — on reopen it
+auto-restores your rating/slope/yardage changes. Cancel now clears the draft (handleCancel) so a cancelled edit
+doesn't resurface. (manage.tsx CourseEditor.)
+Fix 2 (sticky header polish): the pinned FRONT/BACK NINE bar now keeps the card's rounded top corners + a top
+border (and the card gained a light border), so it reads as the card's top staying put rather than a flat bar.
+
+BEHAVIOR CHANGE: editing an existing course now persists across a lock/refresh and auto-restores on reopen;
+Cancel discards the in-progress course draft. No migration.

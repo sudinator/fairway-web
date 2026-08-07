@@ -598,8 +598,8 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
       <div style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4, padding: opts?.header ? "0 2px 4px" : "3px 2px 0" }}>{cells}</div>
     );
     return (
-      <div style={{ background: C.card, borderRadius: 12, padding: 10, flex: 1, minWidth: 300 }}>
-        <div style={{ position: "sticky", top: 0, zIndex: 3, background: C.card, marginBottom: 4, paddingBottom: 4, paddingTop: 2, boxShadow: "0 7px 9px -8px rgba(0,0,0,0.5)" }}>
+      <div style={{ background: C.card, borderRadius: 12, padding: 10, flex: 1, minWidth: 300, border: `1px solid ${C.line}` }}>
+        <div style={{ position: "sticky", top: 0, zIndex: 3, background: C.card, margin: "-10px -10px 4px -10px", padding: "9px 11px 5px 11px", borderTopLeftRadius: 12, borderTopRightRadius: 12, borderTop: `1px solid ${C.line}`, borderLeft: `1px solid ${C.line}`, borderRight: `1px solid ${C.line}`, boxShadow: "0 7px 9px -9px rgba(0,0,0,0.5)" }}>
         <div style={{ color: C.green, fontSize: 11, letterSpacing: 2, fontWeight: 800, marginBottom: 6 }}>{label}</div>
         {GridRow([
           <div key="p" style={{ ...headStyle, textAlign: "center" }}>Par</div>,
