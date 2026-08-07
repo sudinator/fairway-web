@@ -599,7 +599,8 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     );
     return (
       <div style={{ background: C.card, borderRadius: 12, padding: 10, flex: 1, minWidth: 300, border: `1px solid ${C.line}` }}>
-        <div style={{ position: "sticky", top: 0, zIndex: 3, background: C.card, margin: "-11px -11px 4px -11px", padding: "10px 11px 5px 11px", borderTopLeftRadius: 12, borderTopRightRadius: 12, borderTop: `1px solid ${C.line}`, borderLeft: `1px solid ${C.line}`, borderRight: `1px solid ${C.line}`, boxShadow: "0 7px 9px -9px rgba(0,0,0,0.5)" }}>
+        <div style={{ position: "sticky", top: 0, zIndex: 3, background: C.green, margin: "-11px -11px 4px -11px" }}>
+        <div style={{ background: C.card, padding: "10px 11px 5px 11px", borderTopLeftRadius: 12, borderTopRightRadius: 12, borderTop: `1px solid ${C.line}`, borderLeft: `1px solid ${C.line}`, borderRight: `1px solid ${C.line}`, boxShadow: "0 7px 9px -9px rgba(0,0,0,0.5)" }}>
         <div style={{ color: C.green, fontSize: 11, letterSpacing: 2, fontWeight: 800, marginBottom: 6 }}>{label}</div>
         {GridRow([
           <div key="p" style={{ ...headStyle, textAlign: "center" }}>Par</div>,
@@ -613,6 +614,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           <div key="pt" style={{ ...headStyle, textAlign: "center" }}>Pts</div>,
           ...(showRun ? [<div key="ms" style={{ ...headStyle, textAlign: "center", color: C.gold }}>Match</div>] : []),
         ], { header: true })}
+        </div>
         </div>
         {seg.map((h, j) => {
           const i = from + j;

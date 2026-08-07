@@ -4394,3 +4394,9 @@ The pinned FRONT/BACK NINE bar was inset from the card's border by 1px, so when 
 away the straight side borders met the header's inset corners and the top read as square. Aligned the sticky
 header to the card's OUTER edge (margin -11 vs -10) so its rounded corners + border ARE the card's top corners,
 and stay rounded while scrolling. (components/ui.tsx ScoreEntryCard.) No migration.
+
+### 176.19.260806 — scorecard sticky header: rounded corners fold into the green (approved mockup)
+Per the approved mockup: the pinned FRONT/BACK NINE header is now a two-layer bar — a square GREEN backing
+(matches the page) behind a cream bar with rounded top corners + border. The green shows through the bar's
+rounded corner notches, so the header folds into the background instead of showing square cream corners.
+(components/ui.tsx ScoreEntryCard.) No migration.
