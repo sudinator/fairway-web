@@ -4363,3 +4363,12 @@ border (and the card gained a light border), so it reads as the card's top stayi
 
 BEHAVIOR CHANGE: editing an existing course now persists across a lock/refresh and auto-restores on reopen;
 Cancel discards the in-progress course draft. No migration.
+
+### 176.16.260806 — course-freshness feature: foundation (diff helper + data layer) — migration 0124
+First piece of the "flag upstream course changes" feature (design locked with Amit). No user-facing behavior
+yet — sets up the pieces the next increment wires into round-setup:
+- lib/course-diff.ts: buildFreshnessDiff (stored vs API: per-tee rating/slope + per-hole yardages) + applyFreshness.
+- migration 0124: course_freshness cache table + record_course_freshness RPC (daily throttle cache; notifies
+  group admins when a change is newly detected; preserves dismissed/applied decisions).
+NEXT (increment 2): on course select in round-setup, daily-throttled check → cache → admin-only prompt (play
+with updated / keep / submit for review) and silent fresh-yardages for non-admins.

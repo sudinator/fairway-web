@@ -334,3 +334,8 @@ Product model: any member creates a tee time; the creator organizes it; a captai
 - **ai_usage_daily** (`user_id`, `usage_date`, `operation_type`, `count`; pk all three) + **ai_usage_global** (`usage_date` pk, `count`). RLS on, no policies — written only by the SECURITY DEFINER `bump_ai_usage`.
 - **bump_ai_usage(op, user_limit, global_limit) → jsonb** — atomic check-and-increment against `auth.uid()`; returns `{allowed, reason, used, limit}`. Replaces the old in-memory serverless counter for `/api/analyze-round`.
 - **record_migration(text)** — execute REVOKED from public/anon/authenticated (owner/service role only); members can no longer falsify the migration ledger.
+
+### Migration 0124 — course freshness cache
+- **course_freshness** (course_id pk → favorite_courses; group_id, checked_at, api_data jsonb, diff jsonb, has_changes, status none|pending|dismissed|applied). RLS: authenticated read; writes via RPC only.
+- **record_course_freshness(course_id, group_id, api_data, diff, has_changes)** — upserts the daily check; preserves an admin's dismissed/applied decision; notifies group admins when a change is newly detected.
+- lib/course-diff.ts: **buildFreshnessDiff(stored, api)** (per-tee rating/slope + per-hole yardage diff) and **applyFreshness(stored, api, includeRatingSlope)** (fresh course to play the round with).

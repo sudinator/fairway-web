@@ -123,3 +123,5 @@ Total: 107 migrations. Unchecked = not yet confirmed applied.
 - 0122_side_contests.sql — side contests (CTP/long drive/straightest): game_contests + append-only game_contest_entries + RLS (participant read; writes via SECURITY DEFINER RPCs) + can_see_game/is_game_organizer/create|update|delete_game_contest/log_contest_entry/void_contest_entry. Run after 0121.
 
 - 0123_api_hardening.sql — DB-backed AI usage caps (ai_usage_daily/global + bump_ai_usage) for the now-authenticated /api/analyze-round; revoke record_migration from authenticated. Run after 0122.
+
+- 0124_course_freshness.sql — course_freshness cache + record_course_freshness RPC (daily API freshness check, admin flag). Run after 0123.

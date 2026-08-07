@@ -185,3 +185,58 @@ export function hasMaterialCourseChanges(current: Course | null | undefined, pro
 export function buildCourseChangeSummary(current: Course | null | undefined, proposed: Course | null | undefined): string {
   return courseChangeLines(current, proposed).join("\n").slice(0, 4000);
 }
+
+// ---- Course-freshness diff: stored library course vs the live API course ----
+// Compares each stored tee (matched by name) against the API's tee: rating, slope, and
+// per-hole yardages. Used by the daily freshness check to flag upstream changes to admins.
+export type TeeFreshness = {
+  name: string;
+  ratingFrom: number | null; ratingTo: number | null; ratingChanged: boolean;
+  slopeFrom: number | null; slopeTo: number | null; slopeChanged: boolean;
+  yardageChanges: { hole: number; from: number | null; to: number | null }[];
+};
+export type FreshnessDiff = { hasChanges: boolean; tees: TeeFreshness[] };
+
+export function buildFreshnessDiff(stored: Course, api: Course): FreshnessDiff {
+  const out: TeeFreshness[] = [];
+  let hasChanges = false;
+  for (const st of stored.tees || []) {
+    const at = (api.tees || []).find((t) => normalizeText(t.name).toLowerCase() === normalizeText(st.name).toLowerCase());
+    if (!at) continue; // no matching tee in the API payload — nothing to compare
+    const ratingChanged = !sameValue(st.rating, at.rating);
+    const slopeChanged = !sameValue(st.slope, at.slope);
+    const yardageChanges: { hole: number; from: number | null; to: number | null }[] = [];
+    const n = Math.max(st.yardages?.length || 0, at.yardages?.length || 0);
+    for (let i = 0; i < n; i++) {
+      const from = st.yardages?.[i] ?? null;
+      const to = at.yardages?.[i] ?? null;
+      if (!sameValue(from, to)) yardageChanges.push({ hole: i + 1, from, to });
+    }
+    if (ratingChanged || slopeChanged || yardageChanges.length) {
+      hasChanges = true;
+      out.push({
+        name: st.name,
+        ratingFrom: st.rating ?? null, ratingTo: at.rating ?? null, ratingChanged,
+        slopeFrom: st.slope ?? null, slopeTo: at.slope ?? null, slopeChanged,
+        yardageChanges,
+      });
+    }
+  }
+  return { hasChanges, tees: out };
+}
+
+// Apply the API's fresh yardages (and, if asked, rating/slope) onto a stored course, returning a
+// new course to PLAY this round with. Yardages are display-only; rating/slope affect handicap, so
+// they're only applied when includeRatingSlope is true (admin "play with updated data").
+export function applyFreshness(stored: Course, api: Course, includeRatingSlope: boolean): Course {
+  const tees = (stored.tees || []).map((st) => {
+    const at = (api.tees || []).find((t) => normalizeText(t.name).toLowerCase() === normalizeText(st.name).toLowerCase());
+    if (!at) return st;
+    return {
+      ...st,
+      yardages: at.yardages ?? st.yardages,
+      ...(includeRatingSlope ? { rating: at.rating ?? st.rating, slope: at.slope ?? st.slope } : {}),
+    };
+  });
+  return { ...stored, tees };
+}
