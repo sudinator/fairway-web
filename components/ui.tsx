@@ -556,7 +556,11 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     if (restoredRef.current || resumeHole == null || resumeHole <= 0 || !holes.length) return;
     restoredRef.current = true;
     requestAnimationFrame(() => setTimeout(() => {
-      document.getElementById(`sehole-${resumeHole}`)?.scrollIntoView({ block: "start", behavior: "auto" });
+      const el = document.getElementById(`sehole-${resumeHole}`);
+      if (!el) return;
+      const hdr = document.getElementById("scorecard-sticky");
+      el.style.scrollMarginTop = `${(hdr?.offsetHeight ?? 72) + 10}px`;
+      el.scrollIntoView({ block: "start", behavior: "auto" });
     }, 60));
   }, [resumeHole, holes.length]);
   React.useEffect(() => {

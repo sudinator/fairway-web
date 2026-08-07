@@ -183,20 +183,25 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [edit?.holeIdx]);
 
-  // On first mount with players loaded, jump to the hole to resume (option 3: the hole
-  // the user was on if it's still incomplete, else the next hole that needs scores).
+  // On first mount with players loaded, scroll to the LAST hole that has any score — the hole
+  // the scorer was working on. This shows their most recent entries (so an incomplete hole is
+  // visible, not skipped) with the next holes just below. Offset by the sticky header's height
+  // so the hole number stays visible instead of hiding behind it.
   const restoredRef = useRef(false);
   useEffect(() => {
     if (restoredRef.current || !playerOrder.length) return;
     restoredRef.current = true;
-    const holeDone = (i: number) => playerOrder.every((p) => p.no_show || ((p.scores?.[i] ?? 0) > 0));
-    const nextUnscored = () => { for (let i = 0; i < meta.length; i++) if (!holeDone(i)) return i; return meta.length - 1; };
-    const stored = loadActiveGame();
-    const storedHole = stored?.gameId === game.id && typeof stored.holeIdx === "number" ? stored.holeIdx : null;
-    const target = storedHole != null && storedHole < meta.length && !holeDone(storedHole) ? storedHole : nextUnscored();
+    let target = -1;
+    for (let i = meta.length - 1; i >= 0; i--) {
+      if (playerOrder.some((p) => (p.scores?.[i] ?? 0) > 0)) { target = i; break; }
+    }
     if (target > 0) {
       requestAnimationFrame(() => setTimeout(() => {
-        document.getElementById(`grphole-${target}`)?.scrollIntoView({ block: "start", behavior: "auto" });
+        const el = document.getElementById(`grphole-${target}`);
+        if (!el) return;
+        const hdr = document.getElementById("scorecard-sticky");
+        el.style.scrollMarginTop = `${(hdr?.offsetHeight ?? 90) + 10}px`;
+        el.scrollIntoView({ block: "start", behavior: "auto" });
       }, 60));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -350,7 +355,7 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
             </>
           : <span style={{ color: "#E8730C", fontSize: 11 }}>● gets a stroke · corner = Stableford</span>}
       </div>
-      <div style={{ position: "sticky", top: 0, zIndex: 5, background: C.green, paddingTop: 8, paddingBottom: 10, marginBottom: 4, boxShadow: "0 6px 10px -8px rgba(0,0,0,0.55)" }}>
+      <div id="scorecard-sticky" style={{ position: "sticky", top: 0, zIndex: 5, background: C.green, paddingTop: 8, paddingBottom: 10, marginBottom: 4, boxShadow: "0 6px 10px -8px rgba(0,0,0,0.55)" }}>
         {(() => {
           const starts = players.map((p) => p.clock_start).filter(Boolean) as string[];
           if (!starts.length) return null;

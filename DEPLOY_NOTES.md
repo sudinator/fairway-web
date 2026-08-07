@@ -4309,3 +4309,13 @@ HIGH-VALUE MANUAL QA (critical flow — please run): (1) pick a course, edit a t
 the phone, reopen → edits are back AND the course-correction reason prompt still shows. (2) Create a round →
 reopen setup is blank (draft cleared). (3) Cancel with edits → Discard clears; reopen is blank. (4) Fresh open
 with no prior draft → normal empty form. (5) Gross-only round save → leaves clean, no stale draft.
+
+### 176.12.260806 — fix resume-hole: land on the last SCORED hole, keep the hole number visible
+Feedback on 176.8/176.9: after scoring 2 holes + 3 of 4 players on hole 3, reopen landed on hole 4 (skipping
+the incomplete hole 3) and the scroll hid the hole number behind the sticky header. Fixes both:
+- Target is now the LAST hole that has ANY score (data-derived), not "next unscored". So you land on the hole
+  you were working on — an incomplete hole is shown, not skipped — with the next holes just below.
+- Scroll now offsets by the sticky header's measured height (tagged id="scorecard-sticky"; solo editor uses the
+  same, default 72px), so the hole number stays visible instead of being covered.
+Applies to both the group card (scorecard-views.tsx) and the solo editor (round-editor.tsx + ScoreEntryCard).
+The old edit-based stored-hole persistence is no longer used for targeting (kept, harmless). No migration.

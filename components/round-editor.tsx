@@ -35,15 +35,12 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     return fromProp;
   }, []); // mount only
   const [holes, setHoles] = useState<Hole[]>(initialHoles);
-  // Resume where the user was scoring (option 3): the hole they were on if it's still
-  // incomplete, otherwise the next hole without a score. Computed once from the hole
-  // state at mount (which already reflects the restored draft).
+  // Resume to the LAST hole that has a score — the hole the user was working on — so their
+  // most recent entry (and any incomplete hole) is on screen, not skipped. Computed once at mount.
   const resumeHoleTarget = React.useMemo(() => {
-    const stored = loadDraftHole(round.id);
-    const done = (i: number) => { const s = holes[i]?.strokes; return s != null && s > 0; };
-    if (stored != null && stored < holes.length && !done(stored)) return stored;
-    for (let i = 0; i < holes.length; i++) if (!done(i)) return i;
-    return holes.length - 1;
+    let last = -1;
+    for (let i = holes.length - 1; i >= 0; i--) { const s = holes[i]?.strokes; if (s != null && s > 0) { last = i; break; } }
+    return last;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // Editable play date — defaults to the round's stored date (falls back to today).
