@@ -46,7 +46,22 @@ export function clearDraft(): void {
   try {
     if (typeof window === "undefined") return;
     window.localStorage.removeItem(KEY);
+    window.localStorage.removeItem(DHKEY);
   } catch {}
+}
+
+// Remembers the hole the user was last on in the individual round editor, keyed by
+// round id so a lock/refresh returns them to it (same option-3 restore as the group card).
+const DHKEY = "bnn_draft_hole_v1";
+export function saveDraftHole(roundKey: string, holeIdx: number): void {
+  try { if (typeof window === "undefined") return; window.localStorage.setItem(DHKEY, JSON.stringify({ roundKey, holeIdx })); } catch {}
+}
+export function loadDraftHole(roundKey: string): number | null {
+  try {
+    if (typeof window === "undefined") return null;
+    const p = JSON.parse(window.localStorage.getItem(DHKEY) || "null");
+    return p?.roundKey === roundKey && typeof p.holeIdx === "number" ? p.holeIdx : null;
+  } catch { return null; }
 }
 
 // True if the draft has at least one hole with a score entered.
@@ -63,18 +78,34 @@ const GKEY = "bnn_active_game_v1";
 export function saveActiveGame(gameId: string, tab: "play" | "setup"): void {
   try {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(GKEY, JSON.stringify({ gameId, tab, at: Date.now() }));
+    // Preserve a previously-saved holeIdx for the SAME game so re-entering the room
+    // (which calls this) doesn't wipe where the user was scoring.
+    let holeIdx: number | undefined;
+    try { const p = JSON.parse(window.localStorage.getItem(GKEY) || "null"); if (p?.gameId === gameId && typeof p.holeIdx === "number") holeIdx = p.holeIdx; } catch {}
+    window.localStorage.setItem(GKEY, JSON.stringify({ gameId, tab, holeIdx, at: Date.now() }));
   } catch {}
 }
 
-export function loadActiveGame(): { gameId: string; tab: "play" | "setup" } | null {
+// Remember the hole the user was last scoring in this game, so a lock/refresh returns
+// them to it (see GroupScorecard restore). Merges into the active-game record without
+// clobbering the tab; a different/absent game defaults the tab to "play".
+export function saveActiveHole(gameId: string, holeIdx: number): void {
+  try {
+    if (typeof window === "undefined") return;
+    let tab: "play" | "setup" = "play";
+    try { const p = JSON.parse(window.localStorage.getItem(GKEY) || "null"); if (p?.gameId === gameId && p.tab === "setup") tab = "setup"; } catch {}
+    window.localStorage.setItem(GKEY, JSON.stringify({ gameId, tab, holeIdx, at: Date.now() }));
+  } catch {}
+}
+
+export function loadActiveGame(): { gameId: string; tab: "play" | "setup"; holeIdx?: number } | null {
   try {
     if (typeof window === "undefined") return null;
     const raw = window.localStorage.getItem(GKEY);
     if (!raw) return null;
     const p = JSON.parse(raw);
     if (!p?.gameId) return null;
-    return { gameId: p.gameId, tab: p.tab === "setup" ? "setup" : "play" };
+    return { gameId: p.gameId, tab: p.tab === "setup" ? "setup" : "play", holeIdx: typeof p.holeIdx === "number" ? p.holeIdx : undefined };
   } catch { return null; }
 }
 

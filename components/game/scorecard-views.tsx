@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 import { ContestsSection, ContestHoleChip } from "@/components/contests-view";
 import { betResultToPost } from "@/lib/money";
@@ -55,7 +55,7 @@ import { autoSplitFlights, flightForIndex, flightRangeLabel, type FlightBand } f
 // once caused a NOT-NULL violation on `bets`; these columns carry the same risk.
 const GP_STATE_DEFAULTS = { penalties: [] as unknown[], sand: [] as unknown[], is_marker: false, group_locked: false };
 import { logActivity } from "@/lib/activity";
-import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot, saveSyncedWatermark, loadSyncedWatermark, clearSyncedWatermark, rowPendingHoles } from "@/lib/draft";
+import { saveActiveGame, loadActiveGame, saveActiveHole, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot, saveSyncedWatermark, loadSyncedWatermark, clearSyncedWatermark, rowPendingHoles } from "@/lib/draft";
 import { changedCols, pickCols } from "@/lib/sync-cols";
 import {
   btn,
@@ -176,10 +176,36 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
     return { g, mPts, cPts };
   };
 
+  // --- Resume where the user was scoring (survives a phone lock / app refresh) ---
+  // Persist the hole whenever a cell is opened or advanced to.
+  useEffect(() => {
+    if (edit) saveActiveHole(game.id, edit.holeIdx);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [edit?.holeIdx]);
+
+  // On first mount with players loaded, jump to the hole to resume (option 3: the hole
+  // the user was on if it's still incomplete, else the next hole that needs scores).
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (restoredRef.current || !playerOrder.length) return;
+    restoredRef.current = true;
+    const holeDone = (i: number) => playerOrder.every((p) => p.no_show || ((p.scores?.[i] ?? 0) > 0));
+    const nextUnscored = () => { for (let i = 0; i < meta.length; i++) if (!holeDone(i)) return i; return meta.length - 1; };
+    const stored = loadActiveGame();
+    const storedHole = stored?.gameId === game.id && typeof stored.holeIdx === "number" ? stored.holeIdx : null;
+    const target = storedHole != null && storedHole < meta.length && !holeDone(storedHole) ? storedHole : nextUnscored();
+    if (target > 0) {
+      requestAnimationFrame(() => setTimeout(() => {
+        document.getElementById(`grphole-${target}`)?.scrollIntoView({ block: "start", behavior: "auto" });
+      }, 60));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerOrder.length]);
+
   const holeCard = (i: number) => {
     const m = meta[i];
     return (
-      <div key={`hc${i}`} style={{ background: "#13352A", border: "1px solid #2E6B55", borderRadius: 10, padding: 8, marginBottom: 8 }}>
+      <div key={`hc${i}`} id={`grphole-${i}`} style={{ background: "#13352A", border: "1px solid #2E6B55", borderRadius: 10, padding: 8, marginBottom: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
           <span style={{ color: C.cream, fontSize: 18, fontWeight: 800, lineHeight: 1 }}>Hole {m.n}</span>
           <span style={{ color: "#CFE3D8", fontSize: 13 }}>Par <b style={{ color: C.cream }}>{m.par}</b>{(() => { const y = ydsAt(i, m.yards); return y ? <> · <b style={{ color: C.cream }}>{y}</b> yds</> : null; })()} · SI <b style={{ color: C.cream }}>{m.si ?? "–"}</b></span>

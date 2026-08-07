@@ -481,7 +481,7 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
   );
 }
 
-export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false, strokeSixes = false, uncap = false, showIndivDots = false, scoreLocked = false, lockedByName }: {
+export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false, strokeSixes = false, uncap = false, showIndivDots = false, scoreLocked = false, lockedByName, onActiveHole, resumeHole }: {
   holes: EntryHole[];
   hasHandicap: boolean;
   onSet: (i: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null }) => void;
@@ -499,6 +499,8 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   showIndivDots?: boolean;      // relative games (match/four-ball/trifecta): also show blue individual (full-handicap) dots
   scoreLocked?: boolean;        // group scoring: someone else owns my gross score — view-only, stats still editable
   lockedByName?: string | null; // who keeps the score, for the "kept by X" note
+  onActiveHole?: (i: number) => void; // fires when a hole's editor opens, so the parent can persist the resume point
+  resumeHole?: number | null;         // on mount, scroll this hole into view (lock/refresh resume)
 }) {
   const showOpp = Array.isArray(opp);
   const showRun = Array.isArray(matchRun);
@@ -507,8 +509,16 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   // mount forces the dropdowns to re-render so they show their saved value.
   const [hydrated, setHydrated] = React.useState(false);
   const [edit, setEdit] = React.useState<number | null>(null); // hole index whose editor popup is open
-  const openEdit = (i: number) => { setEdit(i); };
+  const openEdit = (i: number) => { setEdit(i); onActiveHole?.(i); };
   const nextHole = () => { if (edit == null) return; const ni = edit + 1; if (ni < holes.length) openEdit(ni); else setEdit(null); };
+  const restoredRef = React.useRef(false);
+  React.useEffect(() => {
+    if (restoredRef.current || resumeHole == null || resumeHole <= 0 || !holes.length) return;
+    restoredRef.current = true;
+    requestAnimationFrame(() => setTimeout(() => {
+      document.getElementById(`sehole-${resumeHole}`)?.scrollIntoView({ block: "start", behavior: "auto" });
+    }, 60));
+  }, [resumeHole, holes.length]);
   React.useEffect(() => {
     const r = requestAnimationFrame(() => setHydrated(true));
     return () => cancelAnimationFrame(r);
@@ -564,7 +574,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           const maxPutts = h.strokes != null && h.strokes > 0 ? Math.min(h.strokes, 6) : 6;
           const pts = stablefordPts(h.strokes, h.par, sfRecv(h));
           return (
-            <div key={i} onClick={() => openEdit(i)} style={{ borderBottom: `1px solid ${C.line}`, paddingBottom: 5, marginTop: j === 0 ? 0 : 4, borderRadius: 8, background: edit === i ? "#EDF3EE" : "transparent", cursor: "pointer" }}>
+            <div key={i} id={`sehole-${i}`} onClick={() => openEdit(i)} style={{ borderBottom: `1px solid ${C.line}`, paddingBottom: 5, marginTop: j === 0 ? 0 : 4, borderRadius: 8, background: edit === i ? "#EDF3EE" : "transparent", cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 2px", flexWrap: "wrap" }}>
                 <span style={{ color: C.ink, fontWeight: 800, fontSize: 14 }}>Hole {h.n}</span>
                 <span style={{ color: C.faint, fontSize: 11, fontWeight: 600 }}>{h.yards ? <>· <b style={{ color: C.green }}>{h.yards}</b> yds </> : null}· S.I. {h.si ?? "–"}</span>
@@ -684,7 +694,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     const runCol = run === "" ? C.faint : run === "AS" ? C.ink : (run.includes("UP") || run.includes("↑")) ? C.greenMid : C.birdie;
     const yds = h.yards ?? null;
     return (
-      <div key={h.n} onClick={() => openEdit(i)} style={{ background: C.card, border: `1px solid ${edit === i ? C.gold : C.line}`, borderRadius: 13, overflow: "hidden", cursor: "pointer" }}>
+      <div key={h.n} id={`sehole-${i}`} onClick={() => openEdit(i)} style={{ background: C.card, border: `1px solid ${edit === i ? C.gold : C.line}`, borderRadius: 13, overflow: "hidden", cursor: "pointer" }}>
         <div style={{ background: C.green, color: C.cream, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 12px" }}>
           <span style={{ fontSize: 16, fontWeight: 800 }}>{h.n}</span>
           <span style={{ fontSize: 12, color: C.sage, fontWeight: 600, flex: 1, marginLeft: 10 }}>Par <b style={{ color: "#EDE7D4" }}>{h.par}</b>{yds ? <> · <b style={{ color: "#EDE7D4" }}>{yds}</b> yds</> : null} · S.I. <b style={{ color: "#EDE7D4" }}>{h.si ?? "–"}</b></span>

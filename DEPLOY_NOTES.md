@@ -4244,3 +4244,28 @@ Verified under TEST_PLAN.md (new):
   repost a bet, set/randomize tee groups, claim/take-over/release a group, format switch + structure restore,
   share toggle, end game) to run on the "App Testing" club after deploy — the only way to exercise the writes.
 No migration. BEHAVIOR CHANGES: none (relocation only; byte-identity proven).
+
+### 176.8.260806 — resume scoring at the right hole after a lock/refresh (group card)
+When a phone locks or the PWA is evicted and reopens, the game-level resume already returned you to the game,
+but the group scorecard reset to the top (hole 1). Now it returns you to where you were scoring:
+- lib/draft.ts: the active-game resume record gained an optional holeIdx; new saveActiveHole(gameId, holeIdx)
+  merges it without clobbering the tab; loadActiveGame() returns it.
+- components/game/scorecard-views.tsx (GroupScorecard): persists the hole whenever a cell is opened/advanced;
+  on first mount with players loaded, scrolls to the resume hole using OPTION 3 — the hole you were on if it's
+  still incomplete, otherwise the next hole that still needs scores. Fresh games (no stored hole, nothing
+  scored) stay at the top, so nothing changes for a new round.
+Scores were always safe (autosave); this restores VIEW position only. Group card only for now — the individual
+round editor is a fast-follow if wanted.
+
+BEHAVIOR CHANGE (per standing rule): on opening a group scorecard that has a saved position, the card now
+auto-scrolls to the resume hole instead of starting at hole 1. It never changes data and never opens a sheet.
+Manual QA: score holes 1–5, lock the phone mid-round, reopen → lands on hole 5 (if incomplete) or 6 (if 5 done).
+
+### 176.9.260806 — resume-hole on the individual round editor (Piece 1 of the "come back to where I was" work)
+Extends 176.8's group-card resume to the solo scorecard. lib/draft.ts: saveDraftHole/loadDraftHole (keyed by
+round id; cleared with the draft). components/ui.tsx ScoreEntryCard gained onActiveHole (fires when a hole's
+editor opens) + resumeHole (scrolls that hole into view on mount, via new sehole-N anchors).
+components/round-editor.tsx computes the option-3 target once at mount (the hole you were on if incomplete,
+else the next hole needing a score) and passes both. Scores were already draft-safe; this restores view
+position. BEHAVIOR CHANGE: opening the solo editor with a saved position scrolls to that hole instead of the
+top. No migration.

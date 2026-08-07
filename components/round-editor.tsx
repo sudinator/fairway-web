@@ -9,7 +9,7 @@ import {
   girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay,
 } from "@/lib/golf";
 import { buildCustomCourse, linkCourseToGroup, loadCoursesForGroup } from "@/lib/courses";
-import { saveDraft, loadDraft, clearDraft, draftHasScores } from "@/lib/draft";
+import { saveDraft, loadDraft, clearDraft, draftHasScores, saveDraftHole, loadDraftHole } from "@/lib/draft";
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark, ShortDateInput } from "@/components/ui";
 import { buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
@@ -35,6 +35,17 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     return fromProp;
   }, []); // mount only
   const [holes, setHoles] = useState<Hole[]>(initialHoles);
+  // Resume where the user was scoring (option 3): the hole they were on if it's still
+  // incomplete, otherwise the next hole without a score. Computed once from the hole
+  // state at mount (which already reflects the restored draft).
+  const resumeHoleTarget = React.useMemo(() => {
+    const stored = loadDraftHole(round.id);
+    const done = (i: number) => { const s = holes[i]?.strokes; return s != null && s > 0; };
+    if (stored != null && stored < holes.length && !done(stored)) return stored;
+    for (let i = 0; i < holes.length; i++) if (!done(i)) return i;
+    return holes.length - 1;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Editable play date — defaults to the round's stored date (falls back to today).
   const todayLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
   const [playDate, setPlayDate] = useState<string>(() => (round.played_at ? String(round.played_at).slice(0, 10) : todayLocal()));
@@ -522,6 +533,8 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
           if (patch.sand !== undefined) p.sand = patch.sand;
           setHole(i, p);
         }}
+        onActiveHole={(i) => saveDraftHole(round.id, i)}
+        resumeHole={resumeHoleTarget}
       />
       {err && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{err}</div>}
       {bgSaveFailed && <div style={{ color: C.gold, fontSize: 12, marginTop: 10, lineHeight: 1.45 }}>Saved on this device. Couldn&apos;t back up to the server yet — it&apos;ll keep retrying as you enter, and &ldquo;Finish round&rdquo; saves everything.</div>}
