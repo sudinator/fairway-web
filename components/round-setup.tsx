@@ -345,7 +345,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
     if (freshCheckedRef.current === loadedFavId) return;
     freshCheckedRef.current = loadedFavId;
     (async () => {
-      const r = await checkCourseFreshness(supabase, { courseId: loadedFavId, externalId: extId, stored: picked!, groupId: activeGroupId });
+      const r = await checkCourseFreshness(supabase, { courseId: loadedFavId, externalId: extId, stored: picked! });
       if (r.hasChanges && r.apiCourse && r.status === "pending") setFreshness(r);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

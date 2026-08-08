@@ -339,3 +339,10 @@ Product model: any member creates a tee time; the creator organizes it; a captai
 - **course_freshness** (course_id pk → favorite_courses; group_id, checked_at, api_data jsonb, diff jsonb, has_changes, status none|pending|dismissed|applied). RLS: authenticated read; writes via RPC only.
 - **record_course_freshness(course_id, group_id, api_data, diff, has_changes)** — upserts the daily check; preserves an admin's dismissed/applied decision; notifies group admins when a change is newly detected.
 - lib/course-diff.ts: **buildFreshnessDiff(stored, api)** (per-tee rating/slope + per-hole yardage diff) and **applyFreshness(stored, api, includeRatingSlope)** (fresh course to play the round with).
+
+### Migration 0125 — course-freshness authorization (security review fixes)
+- `course_freshness.status` now has a CHECK (none|pending|dismissed|applied).
+- **record_course_freshness(course_id, api_data, diff, has_changes)** — p_group_id REMOVED; owning
+  group derived server-side from favorite_courses; caller must be a member of that group.
+- **set_course_freshness_status(course_id, status)** — now requires ADMIN of the owning group;
+  status value validated. Old signatures dropped.

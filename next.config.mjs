@@ -7,6 +7,18 @@ const nextConfig = {
   async headers() {
     return [
       {
+        // Baseline browser security headers, app-wide (security review, Aug 2026).
+        // A full CSP is deliberately NOT included here — with the app's inline styles it needs
+        // its own carefully tested pass (tracked in BACKLOG) rather than a drive-by.
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+        ],
+      },
+      {
         // The service worker must never be HTTP-cached, or the browser won't
         // notice new versions — which breaks the update prompt. Force revalidation.
         source: "/sw.js",

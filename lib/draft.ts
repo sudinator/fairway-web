@@ -384,3 +384,18 @@ export function rowPendingHoles(
   }
   return c;
 }
+
+// Clear ALL locally persisted app state (drafts, caches, resume markers) — called at sign-out so
+// nothing about the previous user's session lingers in browser storage on a shared device.
+// Sweeps by prefix so keys added later (bnn_edit_*, bnn_course_draft:*) are covered automatically.
+export function clearAllLocalState(): void {
+  try {
+    if (typeof window === "undefined") return;
+    const doomed: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      if (k && (k.startsWith("bnn_") || k.startsWith("bnn-"))) doomed.push(k);
+    }
+    doomed.forEach((k) => window.localStorage.removeItem(k));
+  } catch {}
+}

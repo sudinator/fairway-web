@@ -125,3 +125,5 @@ Total: 107 migrations. Unchecked = not yet confirmed applied.
 - 0123_api_hardening.sql — DB-backed AI usage caps (ai_usage_daily/global + bump_ai_usage) for the now-authenticated /api/analyze-round; revoke record_migration from authenticated. Run after 0122.
 
 - 0124_course_freshness.sql — course_freshness cache + record_course_freshness RPC (daily API freshness check, admin flag). Run after 0123.
+
+- 0125_course_freshness_authorization.sql — authorization fixes for the 0124 RPCs + status CHECK (external security review). Run after 0124. REQUIRED with v176.30+ (client calls the new signature).

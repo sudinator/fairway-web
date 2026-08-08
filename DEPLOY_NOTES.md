@@ -4509,3 +4509,30 @@ id (measured behavior fine in testing); GP_STATE_DEFAULTS spreads shared empty-a
 (pre-existing, harmless for inserts since values are serialized, flagged as a mutation footgun for later);
 "update stored course" replaces data wholesale but the corrected flag survives via the row column fallback.
 No migration.
+
+### 176.30.260808 — security batch 1 (external review response) + the prevention standard — MIGRATION 0125 REQUIRED
+Response to the Aug 2026 external security review. PREVENTION (the lesson, made mechanical):
+- SECURITY_CHECKLIST.md — same status as REFACTOR_VERIFICATION.md; gates any new SECURITY DEFINER fn,
+  broad EXECUTE grant, API route, or client-supplied id crossing into privileged code.
+- ci/check_migration_authorization.py — new guard (in npm run guards + npm run ci): migrations >= 0125
+  containing SECURITY DEFINER / broad grants MUST carry an "-- AUTHORIZATION:" header. Self-tested
+  (passes with header, fails without).
+- npm run ci — single command: tsc + guards + tests + build.
+FIXES:
+- Migration 0125 (REQUIRED — the client now calls the new signature): record_course_freshness derives
+  the owning group SERVER-SIDE from favorite_courses and requires group membership (p_group_id removed
+  from the signature and the client); set_course_freshness_status requires ADMIN of the owning group and
+  validates the status; course_freshness.status gets a DB CHECK. Threat model: worst an arbitrary
+  authenticated token can now do is record a freshness check for a course in a group it belongs to —
+  notifications can only ever go to that same group's admins; status changes require that group's admin.
+- Push (app/api/push): success now RESETS fail_count (transient blips can no longer accumulate into a
+  permanent disable); missing configuration returns 503 (loud) instead of 200 (silent drop).
+- Auth callback: exchangeCodeForSession failure now redirects to /?auth_error=1 instead of proceeding
+  as if signed in.
+- API error hygiene: analyze-round + courses log provider error detail server-side and return generic
+  messages to clients (no upstream internals in responses).
+- Baseline security headers app-wide (nosniff, frame DENY, referrer policy, permissions policy). CSP
+  deliberately deferred to its own tested pass (BACKLOG).
+- Sign-out now sweeps ALL bnn_* localStorage (drafts, caches, resume markers) so nothing lingers on a
+  shared device.
+Review findings assessed as overstated/deferred are recorded in BACKLOG (Next 15 upgrade = batch 2).

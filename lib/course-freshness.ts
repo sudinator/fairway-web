@@ -18,9 +18,9 @@ const NONE: FreshnessResult = { hasChanges: false, diff: null, apiCourse: null, 
 // this never blocks starting a round.
 export async function checkCourseFreshness(
   supabase: any,
-  opts: { courseId: string; externalId: string; stored: Course; groupId: string },
+  opts: { courseId: string; externalId: string; stored: Course },
 ): Promise<FreshnessResult> {
-  const { courseId, externalId, stored, groupId } = opts;
+  const { courseId, externalId, stored } = opts;
   try {
     const { data: row } = await supabase
       .from("course_freshness")
@@ -40,8 +40,10 @@ export async function checkCourseFreshness(
     if (!apiCourse) return NONE;
 
     const diff = buildFreshnessDiff(stored, apiCourse);
+    // Group ownership is derived SERVER-SIDE by the RPC from the course row (0125) — the client
+    // no longer passes a group id anywhere privileged.
     await supabase.rpc("record_course_freshness", {
-      p_course_id: courseId, p_group_id: groupId, p_api_data: apiCourse, p_diff: diff, p_has_changes: diff.hasChanges,
+      p_course_id: courseId, p_api_data: apiCourse, p_diff: diff, p_has_changes: diff.hasChanges,
     }).then(() => {}, () => {});
 
     // The RPC PRESERVES an admin's prior dismissed/applied decision — read the resulting status

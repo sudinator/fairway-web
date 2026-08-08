@@ -76,7 +76,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ courses: [] });
   } catch (e: any) {
     const aborted = e?.name === "TimeoutError" || e?.name === "AbortError";
-    return NextResponse.json({ error: aborted ? "Course service timed out." : (e.message || "Course service error") }, { status: aborted ? 504 : 502 });
+    console.error("courses upstream failure:", e?.message);
+    return NextResponse.json({ error: aborted ? "Course service timed out." : "Course service error" }, { status: aborted ? 504 : 502 });
   }
 }
 

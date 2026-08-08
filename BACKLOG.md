@@ -412,3 +412,11 @@ From the review (finding 5 + modularity section). Staged, behavior-preserving, v
 - STAGE 4 (last, careful): decompose GameRoom (~2,470 lines) and CreateGame (~1,057) into sub-views + hooks,
   with the stage-2/3 tests as the safety net.
 Same approach applies to manage.tsx (3,812) split by admin capability.
+
+## Security review follow-ups (Aug 2026 — batch 2/3)
+- **Next.js 14 → 15 upgrade** (14.x unsupported; July 2026 SSRF advisory — mitigated on Vercel by host pinning, but unsupported major = compounding risk). Its own pass + full regression sweep.
+- Content-Security-Policy (baseline headers shipped in 176.30; CSP needs its own tested pass given inline styles).
+- Per-user daily quota on /api/courses (auth + validation + cache exist; quota like the AI endpoint's would complete it).
+- AI endpoint: strict request schema + structured output validation (output-integrity, low urgency).
+- Consolidate migrations/ + supabase/migrations/ into one canonical dir + CI ledger check.
+- Audit react-hooks/exhaustive-deps suppressions + `any` at API boundaries (fold into Stage 3/4 pass).

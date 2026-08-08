@@ -173,16 +173,19 @@ Use realistic amateur-golf benchmarks for the stated handicap (e.g. a ~10 handic
         return NextResponse.json({ analysis: text });
       }
       lastDetail = (await resp.text()).slice(0, 400);
+      console.error(`analyze-round provider error ${resp.status}:`, lastDetail);
       lastStatus = resp.status;
       // Only fall through on model-availability / quota issues; otherwise stop.
       if (resp.status !== 429 && resp.status !== 404) break;
     }
     // All models failed — surface Google's actual reason so it can be diagnosed.
     return NextResponse.json(
-      { error: `AI service error (${lastStatus}). ${lastDetail || "No detail returned."}` },
+      // Provider internals stay in server logs; clients get a stable, generic message.
+      { error: "The AI service is unavailable right now. Please try again shortly." },
       { status: lastStatus === 429 ? 429 : 502 },
     );
   } catch (e: any) {
-    return NextResponse.json({ error: "Couldn't reach the AI service.", detail: e?.message }, { status: 502 });
+    console.error("analyze-round upstream failure:", e?.message);
+    return NextResponse.json({ error: "Couldn't reach the AI service." }, { status: 502 });
   }
 }

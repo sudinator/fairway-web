@@ -6,7 +6,7 @@ import { C, titleCaseName, Round, Hole, allocateStrokes, dedupeHoles, TGC_GROUP_
 import { computeBalances, fmtUSD } from "@/lib/money";
 import { logActivity } from "@/lib/activity";
 import { Toaster, notifyInfo } from "@/components/toast";
-import { loadDraft, draftHasScores } from "@/lib/draft";
+import { loadDraft, draftHasScores, clearAllLocalState } from "@/lib/draft";
 import { loadActiveGame, saveAppBootCache, loadAppBootCache, loadEditorDraft, loadActiveCourseEdit } from "@/lib/draft";
 import { btn, Wordmark, inputStyle, Eyebrow } from "@/components/ui";
 import Tournaments, { type GameSeed } from "@/components/tournaments";
@@ -650,7 +650,7 @@ export function Home({ session }: { session: any }) {
         <div style={{ color: C.sage, fontSize: 14, marginTop: 10, lineHeight: 1.6 }}>
           An administrator has deactivated your account. Your history is saved. If you think this is a mistake, please reach out to your group admin.
         </div>
-        <button style={{ ...btn(false), marginTop: 20 }} onClick={() => supabase.auth.signOut()}>Sign out</button>
+        <button style={{ ...btn(false), marginTop: 20 }} onClick={() => { clearAllLocalState(); supabase.auth.signOut(); }}>Sign out</button>
       </div>
     );
   }

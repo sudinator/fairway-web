@@ -27,7 +27,12 @@ export async function GET(request: Request) {
         },
       }
     );
-    await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    if (error) {
+      // Expired/replayed/invalid code: do NOT proceed as if signed in — bounce to a clear
+      // error state on the sign-in screen. (Security review, Aug 2026.)
+      return NextResponse.redirect(`${origin}/?auth_error=1`);
+    }
   }
 
   return NextResponse.redirect(`${origin}${safeNext}`);

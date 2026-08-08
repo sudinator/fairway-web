@@ -49,7 +49,9 @@ export async function POST(req: NextRequest) {
   const vapidPub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   const vapidPriv = process.env.VAPID_PRIVATE_KEY;
   if (!url || !serviceKey || !vapidPub || !vapidPriv) {
-    return NextResponse.json({ error: "push not configured" }, { status: 200 });
+    // Misconfiguration must be LOUD (5xx) so webhook senders retry/alert instead of
+    // treating a silently dropped notification as delivered. (Security review, Aug 2026.)
+    return NextResponse.json({ error: "push not configured" }, { status: 503 });
   }
 
   let body: any;
@@ -95,6 +97,11 @@ export async function POST(req: NextRequest) {
         payload,
       );
       sent++;
+      // A success proves the subscription is healthy — clear accumulated transient failures so
+      // occasional network blips can never add up to a permanent disable.
+      if (typeof s.fail_count === "number" && s.fail_count > 0) {
+        await admin.from("push_subscriptions").update({ fail_count: 0 }).eq("id", s.id);
+      }
     } catch (err: any) {
       const code = err?.statusCode;
       if (code === 404 || code === 410) {
