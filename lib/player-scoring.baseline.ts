@@ -75,3 +75,20 @@ export function rankVal(p: Player, game: Game): number {
   const isStroke = game.game_type === "stroke";
   return isStroke ? (playerThru(p) === 0 ? Infinity : strokeTotal(p, game)) : ouVal(p, game);
 }
+
+// ---- Leaderboard ordering (baseline: transcribed from the original GameRoom; game non-null,
+// isStroke was a closure over game.game_type) ----
+export function sortLeaderboard(players: Player[], game: Game): Player[] {
+  const isStroke = game.game_type === "stroke";
+  return [...players].sort((a, b) => {
+    const d = rankVal(a, game) - rankVal(b, game);
+    if (d !== 0) return d;
+    return isStroke ? 0 : playerPoints(b, game) - playerPoints(a, game);
+  });
+}
+export function posWithin(p: Player, pool: Player[], game: Game): number {
+  return pool.filter((x) => rankVal(x, game) < rankVal(p, game)).length + 1;
+}
+export function tiedWithin(p: Player, pool: Player[], game: Game): boolean {
+  return pool.filter((x) => rankVal(x, game) === rankVal(p, game)).length > 1;
+}

@@ -84,6 +84,7 @@ import { LegConfigEditor, SegmentBoard, GroupSegmentSummary } from "@/components
 import { GameList } from "@/components/game/game-list";
 import * as PS from "@/lib/player-scoring";
 import * as FG from "@/lib/finish-gaps";
+import * as SEG from "@/lib/segments";
 import type { FinishGap } from "@/lib/finish-gaps";
 import { GroupScorecard, GroupsBuilder } from "@/components/game/scorecard-views";
 import { OrganizerPanel, BettingPanel } from "@/components/game/organizer-panel";
@@ -2651,18 +2652,14 @@ function GameRoom({
   const strokeNet = game.stroke_basis !== "gross"; // default to net
   const strokeTot = (p: Player) => PS.strokeTotal(p, game);
   const rankVal = (p: Player) => PS.rankVal(p, game);
-  const leaderboard = [...players].sort((a, b) => {
-    const d = rankVal(a) - rankVal(b);
-    if (d !== 0) return d;
-    return isStroke ? 0 : playerPoints(b) - playerPoints(a);
-  });
+  const leaderboard = PS.sortLeaderboard(players, game);
   // Flights: one-off handicap-band divisions (stroke/Stableford only). When active, the
   // standings can be viewed segmented by band (each with its own winner) or as one list.
   const flightDefs: { key: string; name: string; hi: number | null }[] = Array.isArray((game as any).flights) ? ((game as any).flights as any[]) : [];
   const hasFlights = (game as any).flight_mode === "oneoff" && flightDefs.length > 0 && (isStroke || game.game_type === "stableford");
   const flightTagColor = (key: string) => (key === "A" ? "#5AA9E6" : key === "B" ? C.gold : key === "C" ? "#8FE0B0" : key === "D" ? "#E0915B" : C.sage);
-  const posWithin = (p: Player, pool: Player[]) => pool.filter((x) => rankVal(x) < rankVal(p)).length + 1;
-  const tiedWithin = (p: Player, pool: Player[]) => pool.filter((x) => rankVal(x) === rankVal(p)).length > 1;
+  const posWithin = (p: Player, pool: Player[]) => PS.posWithin(p, pool, game);
+  const tiedWithin = (p: Player, pool: Player[]) => PS.tiedWithin(p, pool, game);
   const renderLeaderRow = (p: Player, pos: number, tied: boolean, showTag: boolean) => {
     const pts = playerPoints(p);
     const thru = playerThru(p);
@@ -2718,42 +2715,9 @@ function GameRoom({
   // lead legitimately flip-flops as holes come in. Once every bettor has all six holes in,
   // everyone's on the same par pace, so this collapses to simply who won the six.
   // The card still DISPLAYS raw points/net · thru the leader's holes (over/under is easy to read off that).
-  const segLabels = ["Holes 1–6", "Holes 7–12", "Holes 13–18"];
-  const segOf = (p: Player) => (isStroke ? netBySix(playerHoles(p)) : stablefordBySix(playerHoles(p)));
+  const segOf = (p: Player) => SEG.segOf(p, game);
   const segTotals = players.map((p) => ({ p, seg: segOf(p) }));
-  const segLeadersFrom = (rows: { p: Player; seg: [number, number, number] }[]) =>
-    [0, 1, 2].map((si) => {
-      let bestPace = isStroke ? Infinity : -Infinity; // stroke: fewest strokes vs par (lower=better); stableford: most pts vs par-pace (higher=better)
-      let who: string[] = [];
-      let leaderRaw: number | null = null; // the leader's raw points (stableford) / net strokes (stroke), for display
-      let leaderPlayed = 0;               // the leader's holes played in this six, for the "thru" display
-      let started = false, maxPlayed = 0, allDone = true, anyActive = false;
-      rows.forEach(({ p, seg }) => {
-        const hs = playerHoles(p);
-        if (!hs.some((h) => h.strokes)) return;
-        anyActive = true;
-        const segHoles = hs.slice(si * 6, si * 6 + 6);
-        const played = segHoles.filter((h) => h.strokes).length;
-        if (played < 6) allDone = false;
-        if (played > 0) started = true;
-        maxPlayed = Math.max(maxPlayed, played);
-        if (played < 1) return;
-        if (isStroke) {
-          const parPlayed = segHoles.reduce((s, h) => s + (h.strokes && h.strokes > 0 ? (h.par || 0) : 0), 0);
-          const pace = seg[si] - parPlayed; // net strokes relative to par of holes played; lower = more under
-          if (pace < bestPace) { bestPace = pace; who = [p.display_name]; leaderRaw = seg[si]; leaderPlayed = played; }
-          else if (pace === bestPace) { who.push(p.display_name); leaderPlayed = Math.max(leaderPlayed, played); }
-        } else {
-          const pace = seg[si] - 2 * played; // stableford points relative to par pace (2/hole); higher = more under
-          if (pace > bestPace) { bestPace = pace; who = [p.display_name]; leaderRaw = seg[si]; leaderPlayed = played; }
-          else if (pace === bestPace) { who.push(p.display_name); leaderPlayed = Math.max(leaderPlayed, played); }
-        }
-      });
-      const complete = anyActive && allDone && started;
-      const thruHole = si * 6 + maxPlayed;       // deepest player — kept for the clean-sweep "holes remaining" math
-      const leaderThru = si * 6 + leaderPlayed;  // the leader's own progress — what the card shows
-      return { label: segLabels[si], complete, started, val: started ? leaderRaw : null, who, thruHole, leaderThru, maxPlayed };
-    });
+  const segLeadersFrom = (rows: { p: Player; seg: [number, number, number] }[]) => SEG.segLeadersFrom(rows, game);
   const segWinners = segLeadersFrom(segTotals);
 
   // Bettor-only segment leaders for the money banners (clean-sweep watch/achieved):

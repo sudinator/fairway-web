@@ -4444,3 +4444,22 @@ thin wrappers; isStroke/strokeNet stay local (used elsewhere too). Verification 
 player-scoring unit 45 -> 54, differential 32,463 -> 44,471 comparisons, 0 mismatches (baseline transcribed
 independently from the original; fuzz now varies game_type + stroke_basis to hit every ranking branch). tsc
 clean, build compiles, guards pass. No behavior change; no migration. tournaments.tsx now ~3,754 lines.
+
+### 176.25.260806 — extract six-hole segment helpers (segOf/segLeadersFrom), differentially verified
+Fourth Stage-2 extraction. lib/segments.ts: segOf + segLeadersFrom + SEG_LABELS + SegLeader type — REUSE
+playerHoles (lib/player-scoring) and netBySix/stablefordBySix (lib/golf). GameRoom keeps thin wrappers; the
+local segLabels const is gone (now SEG_LABELS in the module). Verification per REFACTOR_VERIFICATION.md:
+lib/segments.test.ts (20 unit assertions — stableford/stroke segOf, single leader, ties, partial-segment
+started/complete/thru flags, empty rows) + lib/segments.diff.test.ts vs an independently transcribed baseline
+(13,867 comparisons across 4,000 fuzzed multi-player games, 0 mismatches). tsc clean, build compiles, guards
+pass, full suite green. No behavior change; no migration. tournaments.tsx ~3,730 lines.
+
+### 176.26.260806 — extract leaderboard ordering (sortLeaderboard/posWithin/tiedWithin), differentially verified
+Fifth Stage-2 extraction. Added sortLeaderboard / posWithin / tiedWithin to lib/player-scoring.ts — REUSE
+rankVal + playerPoints (stableford tiebreak: same rank value, more raw points first; stroke: stable order).
+GameRoom keeps thin wrappers; renderLeaderRow (JSX) stays put. Verification: unit 54 -> 63 (order, no input
+mutation, positions, ties, the points tiebreaker with a corrected expectation — the first version of the new
+test had a wrong expected value, caught by the suite itself and fixed to genuinely exercise the tiebreak path;
+two-Infinity stable order documented) + differential 44,471 -> 60,429 comparisons, 0 mismatches (board fuzz:
+2,000 multi-player leaderboards with forced ties + not-started players). tsc clean, build compiles, guards pass.
+No behavior change; no migration.

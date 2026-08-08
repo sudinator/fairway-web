@@ -84,3 +84,22 @@ export function rankVal(p: Player, game: Game | null): number {
   const isStroke = game?.game_type === "stroke";
   return isStroke ? (playerThru(p) === 0 ? Infinity : strokeTotal(p, game)) : ouVal(p, game);
 }
+
+// ---- Leaderboard ordering (reuses rankVal / playerPoints) ----
+// Sorted standings: by rank value (lower better); non-stroke ties broken by raw points (higher first).
+export function sortLeaderboard(players: Player[], game: Game | null): Player[] {
+  const isStroke = game?.game_type === "stroke";
+  return [...players].sort((a, b) => {
+    const d = rankVal(a, game) - rankVal(b, game);
+    if (d !== 0) return d;
+    return isStroke ? 0 : playerPoints(b, game) - playerPoints(a, game);
+  });
+}
+// Position of p within a pool (1-based; players with a strictly better rank value count ahead).
+export function posWithin(p: Player, pool: Player[], game: Game | null): number {
+  return pool.filter((x) => rankVal(x, game) < rankVal(p, game)).length + 1;
+}
+// Whether p shares its rank value with anyone else in the pool.
+export function tiedWithin(p: Player, pool: Player[], game: Game | null): boolean {
+  return pool.filter((x) => rankVal(x, game) === rankVal(p, game)).length > 1;
+}

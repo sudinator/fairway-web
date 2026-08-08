@@ -27,6 +27,13 @@ function compareAll(p: Player, game: Game | null, ctx: string) {
     same("rankVal", OLD.rankVal(p, game), NEW.rankVal(p, game), ctx);
   }
 }
+function compareBoard(scope: Player[], game: Game, ctx: string) {
+  same("sortLeaderboard", OLD.sortLeaderboard(scope, game).map((p) => p.id), NEW.sortLeaderboard(scope, game).map((p) => p.id), ctx);
+  for (const p of scope) {
+    same("posWithin", OLD.posWithin(p, scope, game), NEW.posWithin(p, scope, game), ctx);
+    same("tiedWithin", OLD.tiedWithin(p, scope, game), NEW.tiedWithin(p, scope, game), ctx);
+  }
+}
 
 // deterministic PRNG (mulberry32) so runs are reproducible
 function rng(seed: number) { return () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -86,6 +93,16 @@ for (let i = 0; i < 4000; i++) {
   const g = genGame();
   compareAll(genPlayer(g.holes_meta.length), g, `fuzz#${i}`);
   if (R() < 0.05) compareAll(genPlayer(g.holes_meta.length), null, `fuzz#${i} null`);
+}
+
+// ---- leaderboard ordering fuzz: multi-player boards incl. duplicate ranks + not-started ----
+for (let i = 0; i < 2000; i++) {
+  const g = genGame();
+  const n = ri(1, 6);
+  const scope = Array.from({ length: n }, (_, k) => { const p = genPlayer(g.holes_meta.length); (p as any).id = "P" + k; return p; });
+  if (R() < 0.3 && n > 1) { (scope[1] as any).scores = [...(scope[0].scores || [])]; (scope[1] as any).course_handicap = scope[0].course_handicap; } // force ties
+  if (R() < 0.3) (scope[0] as any).scores = []; // force a not-started
+  compareBoard(scope, g, `board#${i}`);
 }
 
 // ---- leaderName fuzz (random strings incl. spaces / long / unicode-ish) ----

@@ -1,6 +1,6 @@
 import {
   playerHoles, playerPoints, playerThru, playerGross, playerNet, relToParStr, parThru, leaderName,
-  ouVal, strokeTotal, rankVal,
+  ouVal, strokeTotal, rankVal, sortLeaderboard, posWithin, tiedWithin,
 } from "./player-scoring";
 import type { Game, Player } from "./game-types";
 
@@ -129,6 +129,33 @@ eq("name: trims whitespace", leaderName("  Bob  "), "Bob");
   eq("rankVal: stroke+gross -> gross total", rankVal(mkPlayer([5, 5], { course_handicap: 0 }), mkGame({ game_type: "stroke", stroke_basis: "gross" })), 10);
   eq("rankVal: stroke thru0 -> Infinity", rankVal(mkPlayer([], { course_handicap: 0 }), mkGame({ game_type: "stroke" })) === Infinity, true);
   eq("rankVal: stableford -> ouVal", rankVal(mkPlayer([4], { course_handicap: 0 }), mkGame({ game_type: "stableford" })), 0);
+}
+
+// ---- leaderboard ordering: sortLeaderboard / posWithin / tiedWithin ----
+{
+  const g = mkGame();
+  const A = mkPlayer([4], { id: "A", display_name: "A" });          // par -> ou 0
+  const B = mkPlayer([3], { id: "B", display_name: "B" });          // birdie -> ou -1
+  const C = mkPlayer([5], { id: "C", display_name: "C" });          // bogey -> ou +1
+  const N = mkPlayer([], { id: "N", display_name: "N" });           // not started -> Infinity
+  const lb = sortLeaderboard([A, C, B, N], g);
+  eq("sort: order B,A,C,N", lb.map((p) => p.id), ["B", "A", "C", "N"]);
+  eq("sort: input not mutated", [A, C, B, N].map((p) => p.id), ["A", "C", "B", "N"]);
+  eq("pos: B first", posWithin(B, [A, B, C], g), 1);
+  eq("pos: C third", posWithin(C, [A, B, C], g), 3);
+  eq("tie: A vs A2", tiedWithin(A, [A, mkPlayer([4], { id: "A2" }), B], g), true);
+  eq("tie: B alone", tiedWithin(B, [A, B, C], g), false);
+  // stableford tiebreaker: same ouVal (-1), different raw points — D (5 pts thru 2) before B (3 pts thru 1)
+  const D = mkPlayer([3, 4], { id: "D" });                          // birdie+par: 5 pts, ou 4-5 = -1
+  const lb2 = sortLeaderboard([B, D], g);
+  eq("sort: stbl tiebreak by points", lb2.map((p) => p.id), ["D", "B"]);
+  // stroke: no points tiebreak (order preserved among equals)
+  const gs = mkGame({ game_type: "stroke" });
+  const E = mkPlayer([4], { id: "E" }), F = mkPlayer([4], { id: "F" });
+  eq("sort: stroke equal keeps order", sortLeaderboard([E, F], gs).map((p) => p.id), ["E", "F"]);
+  // two not-started players: both Infinity (comparator NaN) — document stable order
+  const N2 = mkPlayer([], { id: "N2" });
+  eq("sort: two Infinity stable", sortLeaderboard([N, N2], g).map((p) => p.id), ["N", "N2"]);
 }
 
 console.log(`player-scoring: ${pass} passed, ${fail} failed`);
