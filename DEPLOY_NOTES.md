@@ -4654,3 +4654,13 @@ Finishes the follow-up review's non-HIGH items.
 Deferred (honestly, lower value): #9 AI output structured-schema (endpoint already checks non-empty + requests
 labels; strict validation risks rejecting valid output); #7 migration-deploy automation; a broad revoke-from-public
 hygiene sweep on all older privileged functions; CSP. tsc/guards/tests/build green; guard passes on 0127+0128.
+
+### 177.7.260808 — Stage 3 pass 1: extract flightTagColor (extraction-verification standard) — no migration
+First god-component decomposition pass under the new EXTRACTION_VERIFICATION.md standard. Extracted the pure
+flightTagColor(key)->color helper out of GameRoom into lib/flights.ts (reused at 2 call sites, both unchanged).
+Four gates all shown/met: (1) body char-for-char identical; (2) free-variable ledger balances — the only input
+is `key` (param, same identifiers at both call sites); `C` is a module import, not closure state; (3) tsc clean,
+typed, no `any` at the seam; (4) no reactive/effect seams (pure). Because it's pure it also gets the strongest
+proof: lib/flights-tagcolor.diff.test.ts vs an independently transcribed baseline — 5,012 comparisons, 0
+mismatches. GameRoom -1 line of inline logic; the point is the process, proven on the safest possible block
+first. tsc/guards/tests/build green.

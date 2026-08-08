@@ -51,3 +51,10 @@ export function flightRangeLabel(bands: FlightBand[], i: number): string {
   if (lo != null && b.hi != null) return `${lo.toFixed(1)}–${b.hi.toFixed(1)}`;
   return "all handicaps";
 }
+
+// The badge color for a flight key (A/B/C/D, else a neutral fallback). Pure — depends only on the
+// key and the shared palette. Moved verbatim from GameRoom (Stage 3, extraction-verification standard).
+import { C } from "./golf";
+export function flightTagColor(key: string): string {
+  return key === "A" ? "#5AA9E6" : key === "B" ? C.gold : key === "C" ? "#8FE0B0" : key === "D" ? "#E0915B" : C.sage;
+}

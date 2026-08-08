@@ -49,7 +49,7 @@ import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG }
 import type { LegConfig, Leg } from "@/lib/legs";
 import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
 import { loadSetupDraft, saveSetupDraft, clearSetupDraft, draftHasProgress, draftAgeLabel, type SetupDraft } from "@/lib/setup-draft";
-import { autoSplitFlights, flightForIndex, flightRangeLabel, type FlightBand } from "@/lib/flights";
+import { autoSplitFlights, flightForIndex, flightRangeLabel, flightTagColor, type FlightBand } from "@/lib/flights";
 
 // Every game_players INSERT must set these NOT-NULL columns explicitly rather than
 // leaning on the DB default. A drifted default (0059's `if not exists` skipped it)
@@ -2525,7 +2525,6 @@ function GameRoom({
   // standings can be viewed segmented by band (each with its own winner) or as one list.
   const flightDefs: { key: string; name: string; hi: number | null }[] = Array.isArray((game as any).flights) ? ((game as any).flights as any[]) : [];
   const hasFlights = (game as any).flight_mode === "oneoff" && flightDefs.length > 0 && (isStroke || game.game_type === "stableford");
-  const flightTagColor = (key: string) => (key === "A" ? "#5AA9E6" : key === "B" ? C.gold : key === "C" ? "#8FE0B0" : key === "D" ? "#E0915B" : C.sage);
   const posWithin = (p: Player, pool: Player[]) => PS.posWithin(p, pool, game);
   const tiedWithin = (p: Player, pool: Player[]) => PS.tiedWithin(p, pool, game);
   const renderLeaderRow = (p: Player, pos: number, tied: boolean, showTag: boolean) => {
