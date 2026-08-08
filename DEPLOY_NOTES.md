@@ -4559,3 +4559,30 @@ MONITORING (so the next EOL is scheduled, not discovered): scripts/check-deps.mj
 behind (runs at the top of npm run ci; TypeScript held at 5.x since Next rejects TS>=7). Primary admin alert =
 GitHub Dependabot — ENABLE IT: repo Settings → Code security → Dependabot alerts + security updates.
 No migration.
+
+### 177.1.260808 — recharts 2 → 3 upgrade (its own pass, as planned)
+Now that the framework churn is done, moved recharts 2.15.4 → 3.10.1 deliberately. Assessed the 3.0
+breaking changes against BNN's actual usage (dashboard.tsx + manage.tsx: Line/Bar/ComposedChart, custom
+Tooltip content, ReferenceLine, LabelList, Cell): nothing blocking. tsc clean (our custom ChartTip is
+loosely typed so the TooltipContentProps label-type change doesn't bite; all imports still export), Next 16
+build succeeds, 0 vulnerabilities, all tests pass.
+Notes for QA / future:
+- Cell (used for per-bar conditional colors, dashboard L383/L490) is DEPRECATED in recharts 3.x but still
+  works; it's removed in 4.0. Kept as-is this pass; migrate to the shape/content prop when we go to 4.0.
+- recharts 3.x renders XAxis/YAxis axis lines even without ticks, and enables accessibilityLayer by default —
+  minor visual/behavior changes to eyeball on the chart screens.
+- Legend is imported in dashboard but never rendered, so the 3.x z-index-by-render-order change is moot.
+VERIFICATION BOUNDARY: compiles/builds/tests clean, but chart RENDERING is visual — only a look at the
+Dashboard + Manage charts confirms trends/bars draw, tooltips show correct values on hover, bar colors apply,
+and axes look right. Small, isolated QA surface (two screens). Rollback = redeploy 177.0. No migration.
+
+### 177.2.260808 — recharts: migrate Cell → shape (4.0-ready; functionality identical)
+recharts 4.0 is NOT released yet (latest published = 3.10.1, which we're on), so there was no "4" to move to —
+but we did the one 4.0-prep item now so there's nothing to revisit later: replaced the two deprecated <Cell>
+usages (per-bar conditional colors in dashboard.tsx) with the Bar `shape` prop rendering <Rectangle>, preserving
+the EXACT coloring logic (chart 1: at/under form-avg = green #4ADE80 else red #FB7185; chart 2: barColor(val)).
+Cell is now gone entirely (import + both call sites), so the 3.x deprecation console warning is cleared and the
+future 4.0 Cell removal can't affect us. Same radius [3,3,0,0], same maxBarSize, same fills — bars render
+identically. tsc clean, Next 16 build succeeds, tests pass, 0 vulnerabilities.
+QA: same small visual surface as 177.1 — glance at the Dashboard differential bar chart and the per-stat detail
+bar chart; green/red bar colors should look exactly as before. Rollback = 177.1. No migration.

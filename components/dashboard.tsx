@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  ReferenceLine, BarChart, Bar, Cell, ComposedChart, Legend,
+  ReferenceLine, BarChart, Bar, Rectangle, ComposedChart, Legend,
 } from "recharts";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
@@ -379,9 +379,11 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
                 <YAxis domain={diffFormDomain} allowDecimals={false} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
                 <Tooltip wrapperStyle={{ pointerEvents: "auto" }} cursor={{ fill: "rgba(255,255,255,0.06)" }} content={<ChartTip nameMap={{ diff: "Differential", roll: "5-rd avg" }} fmt={(v: any) => (typeof v === "number" ? v.toFixed(1) : v)} />} />
                 {diffFormAvg != null && <ReferenceLine y={Math.round(diffFormAvg * 10) / 10} stroke={C.sage} strokeDasharray="3 4" />}
-                <Bar dataKey="diff" radius={[3, 3, 0, 0]} maxBarSize={26}>
-                  {diffTrend.map((t, i) => <Cell key={i} fill={diffFormAvg != null && t.diff <= diffFormAvg ? "#4ADE80" : "#FB7185"} />)}
-                </Bar>
+                <Bar dataKey="diff" radius={[3, 3, 0, 0]} maxBarSize={26} shape={(props: any) => {
+                  // Per-bar conditional color (replaces the deprecated <Cell>): at/under form avg = green, over = red.
+                  const good = diffFormAvg != null && props.payload && props.payload.diff <= diffFormAvg;
+                  return <Rectangle x={props.x} y={props.y} width={props.width} height={props.height} radius={[3, 3, 0, 0]} fill={good ? "#4ADE80" : "#FB7185"} />;
+                }} />
                 <Line type="monotone" dataKey="roll" stroke={C.cream} strokeWidth={2.5} dot={{ fill: C.cream, r: 3 }} />
               </ComposedChart>
             </ResponsiveContainer>
@@ -486,9 +488,10 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
                       <XAxis dataKey="i" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} />
                       <YAxis allowDecimals={!pctStat} tickFormatter={pctStat ? (v: any) => `${Math.round(v)}%` : undefined} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={pctStat ? 34 : 30} domain={valDomain} />
                       <Tooltip wrapperStyle={{ pointerEvents: "auto" }} cursor={{ fill: "rgba(255,255,255,0.06)" }} content={<ChartTip nameMap={{ val: detailLabels[key], roll5: "5-rd avg", roll10: "10-rd avg" }} fmt={(v: any) => (typeof v === "number" ? (pctStat ? Math.round(v) + "%" : String(v)) : v)} />} />
-                      <Bar dataKey="val" radius={[3, 3, 0, 0]} maxBarSize={26}>
-                        {data.map((d, i) => <Cell key={i} fill={barColor(d.val)} />)}
-                      </Bar>
+                      <Bar dataKey="val" radius={[3, 3, 0, 0]} maxBarSize={26} shape={(props: any) => (
+                        // Per-bar conditional color (replaces the deprecated <Cell>): barColor(val).
+                        <Rectangle x={props.x} y={props.y} width={props.width} height={props.height} radius={[3, 3, 0, 0]} fill={props.payload ? barColor(props.payload.val) : "#FB7185"} />
+                      )} />
                       <Line type="monotone" dataKey="roll5" stroke={C.cream} strokeWidth={2.5} dot={false} connectNulls />
                       {series.length >= 10 && <Line type="monotone" dataKey="roll10" stroke={C.gold} strokeWidth={2.5} dot={false} connectNulls />}
                     </ComposedChart>
