@@ -22,7 +22,7 @@ SNAP_DIR = ROOT / ".move-snapshots"
 
 # Components whose relocation we want to guard. Add names as stages proceed.
 TRACKED = [
-    "GroupScorecard", "GroupsBuilder", "OrganizerPanel", "BettingPanel", "ShareControl",
+    "GameList", "GroupScorecard", "GroupsBuilder", "OrganizerPanel", "BettingPanel", "ShareControl",
     # already moved (kept here so a future edit that resurrects/alters them is caught):
     "SkinsView", "MatchView", "FourballView", "StrokesSummary", "ScoreHistory",
     "SegmentBoard", "GroupSegmentSummary", "LegConfigEditor",

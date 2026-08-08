@@ -59,3 +59,6 @@ export type Player = {
   clock_start?: string | null; // when this player first entered a score (round clock)
   clock_end?: string | null; // when this player finished the last hole (round clock)
 };
+
+// A tee-time handoff seeding a new game (players + guests to prefill in CreateGame).
+export type GameSeed = { teeTimeId: string; course: string | null; playDate: string; memberIds: string[]; guests: { name: string; sponsorUserId: string }[] };

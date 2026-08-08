@@ -4400,3 +4400,10 @@ Per the approved mockup: the pinned FRONT/BACK NINE header is now a two-layer ba
 (matches the page) behind a cream bar with rounded top corners + border. The green shows through the bar's
 rounded corner notches, so the header folds into the background instead of showing square cream corners.
 (components/ui.tsx ScoreEntryCard.) No migration.
+
+### 176.20.260806 — refactor: move GameList out of tournaments.tsx (no behavior change)
+Moved GameList (the games list) into components/game/game-list.tsx. The shared GameSeed type (a tee-time
+handoff seed used by CreateGame + home) that physically sat after GameList moved to lib/game-types.ts and is
+re-exported from tournaments so home's import is unchanged. tournaments.tsx: 4,011 -> 3,807 lines. GameList's
+function body is byte-identical; tsc + build + tests + guards all green. What remains in tournaments.tsx is now
+essentially just the two god-components (CreateGame ~1,050, GameRoom ~2,470) + small helpers. No migration.
