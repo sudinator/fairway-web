@@ -4586,3 +4586,15 @@ future 4.0 Cell removal can't affect us. Same radius [3,3,0,0], same maxBarSize,
 identically. tsc clean, Next 16 build succeeds, tests pass, 0 vulnerabilities.
 QA: same small visual surface as 177.1 — glance at the Dashboard differential bar chart and the per-stat detail
 bar chart; green/red bar colors should look exactly as before. Rollback = 177.1. No migration.
+
+### 177.3.260808 — FIX: recharts shape color regression (recent-form bars showed one color)
+177.2's Cell→shape migration read props.payload[key] to pick each bar's color — but recharts builds a bar's
+shape props as { ...entry, value: value[1], payload: entry }, so props.payload is a WRAPPER (no .diff/.val);
+props.payload.diff resolved to undefined → the conditional was always false → every bar got the "else" color.
+The Profiles "recent form" differential chart (and the per-stat detail chart) lost their green/red trend
+coloring. Fix: new tested helper lib/chart-helpers.ts barShapeValue(props, key) reads props.value (the numeric
+bar value recharts reliably sets), falling back through the payload nesting; both dashboard bar shapes use it.
+lib/chart-helpers.test.ts (10 assertions) pins the behavior against the ACTUAL recharts prop shape so this
+can't silently regress again. tsc/guards/build/tests all green. Coloring logic itself unchanged (at/under form
+avg = green, over = red; barColor(val)). No migration. (Only affects the ≤30-round bar path; the >30-round
+AdaptiveTrend gradient path was never involved.)
