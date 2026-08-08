@@ -4463,3 +4463,31 @@ test had a wrong expected value, caught by the suite itself and fixed to genuine
 two-Infinity stable order documented) + differential 44,471 -> 60,429 comparisons, 0 mismatches (board fuzz:
 2,000 multi-player leaderboards with forced ties + not-started players). tsc clean, build compiles, guards pass.
 No behavior change; no migration.
+
+### 176.27.260806 — extract game-setup utilities (game-utils), differentially verified
+Sixth Stage-2 extraction: lib/game-utils.ts = makeCode, defaultTeeIdx, todayLocalStr,
+normalizeFavoriteCourse, GP_STATE_DEFAULTS, refTee, blankCard — moved verbatim from tournaments.tsx
+(module-level helpers + the GameRoom refTee/blankCard closures, now wrappers). Verification per
+REFACTOR_VERIFICATION.md: unit 21 assertions (code format, tee-default branches incl. member-name and
+closest-to-6400, date format, course normalization branches, refTee fallbacks, blankCard sizing) +
+differential vs an independently transcribed baseline: 12,003 comparisons, 0 mismatches. makeCode is
+compared under a stubbed deterministic Math.random (identical streams -> identical codes). NOTE: the first
+diff run reported 333 mismatches — a bug in the TEST HARNESS (different `smart` args drawn for old vs new),
+not in the extraction; fixed so both sides receive identical inputs, then clean. tsc clean, build compiles,
+guards pass. No behavior change; no migration. tournaments.tsx 3,723 -> 3,678 lines.
+
+### 176.28.260806 — extract game-creation logic (game-create), differentially verified — STAGE 2 COMPLETE
+Seventh and final Stage-2 extraction: lib/game-create.ts = buildGamePayload (the full games-insert object
+with every team/foursome/score-mode/flight branch), buildPlayerRows (creator+members+guests rows with course
+handicaps, flight assignment via lib/flights flightForIndex, and the <=4 tee-group default), splitSkinsTooBig,
+and gameTypeLabel. CreateGame's create() now calls these; all supabase side-effects stay in the component.
+REUSES courseHandicap (golf), flightForIndex (flights), GP_STATE_DEFAULTS (game-utils). Verification: 38 unit
+assertions across the branch matrix + differential vs an independently transcribed baseline: 9,000 comparisons
+(4,000 payload option combos, 2,000 skins checks, 3,000 roster/guest row sets), 0 mismatches. (One in-progress
+diff-harness line that would have passed different args to old/new was caught in review and removed before the
+run.) tsc clean, build compiles, guards pass. tournaments.tsx 3,678 -> ~3,580 lines. No migration.
+
+STAGE 2 IS COMPLETE: all pure logic in GameRoom + CreateGame now lives in tested lib modules
+(player-scoring, finish-gaps, segments, game-utils, game-create + reused golf/flights/game-shape). Cumulative
+differential proof this stage: ~103,000 old-vs-new comparisons, 0 mismatches. Remaining god-component mass is
+stateful sync + render trees = Stage 3/4 (hooks + view decomposition), a separate careful campaign.

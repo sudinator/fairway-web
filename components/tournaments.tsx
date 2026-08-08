@@ -54,7 +54,6 @@ import { autoSplitFlights, flightForIndex, flightRangeLabel, type FlightBand } f
 // Every game_players INSERT must set these NOT-NULL columns explicitly rather than
 // leaning on the DB default. A drifted default (0059's `if not exists` skipped it)
 // once caused a NOT-NULL violation on `bets`; these columns carry the same risk.
-const GP_STATE_DEFAULTS = { penalties: [] as unknown[], sand: [] as unknown[], is_marker: false, group_locked: false };
 import { logActivity } from "@/lib/activity";
 import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot, saveSyncedWatermark, loadSyncedWatermark, clearSyncedWatermark, rowPendingHoles } from "@/lib/draft";
 import { changedCols, pickCols } from "@/lib/sync-cols";
@@ -72,10 +71,6 @@ import {
 const supabase = createClient();
 
 // A 6-digit numeric join code (100000–999999).
-function makeCode() {
-  return String(Math.floor(100000 + Math.random() * 900000));
-}
-
 import type { Game, Player, GameSeed } from "@/lib/game-types";
 export type { GameSeed } from "@/lib/game-types";
 import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
@@ -85,6 +80,9 @@ import { GameList } from "@/components/game/game-list";
 import * as PS from "@/lib/player-scoring";
 import * as FG from "@/lib/finish-gaps";
 import * as SEG from "@/lib/segments";
+import * as GU from "@/lib/game-utils";
+import { makeCode, defaultTeeIdx, todayLocalStr, normalizeFavoriteCourse, GP_STATE_DEFAULTS } from "@/lib/game-utils";
+import * as GC from "@/lib/game-create";
 import type { FinishGap } from "@/lib/finish-gaps";
 import { GroupScorecard, GroupsBuilder } from "@/components/game/scorecard-views";
 import { OrganizerPanel, BettingPanel } from "@/components/game/organizer-panel";
@@ -103,24 +101,6 @@ import { OrganizerPanel, BettingPanel } from "@/components/game/organizer-panel"
 
 // Team accent colour + TEAM_COLOR_BY_NAME now live in lib/game-colors.ts (imported above).
 
-
-function normalizeFavoriteCourse(row: any) {
-  const d = { ...(row?.data || row || {}) };
-  if ((!d.holes || !d.holes.length) && Array.isArray(d.tees)) {
-    const t = d.tees.find((x: any) => x.holes && x.holes.length);
-    if (t) {
-      d.holes = t.holes;
-      d.tees = d.tees.map((x: any) => ({
-        name: x.name,
-        rating: x.rating,
-        slope: x.slope,
-        par: x.par,
-        yardages: x.yardages,
-      }));
-    }
-  }
-  return d;
-}
 
 // ---------------- Root tournament tab ----------------
 export default function Tournaments({
@@ -215,19 +195,6 @@ export default function Tournaments({
 }
 
 // ---------------- List + join ----------------
-function defaultTeeIdx(tees: any[], smart: boolean): number {
-  if (!Array.isArray(tees) || tees.length === 0) return 0;
-  if (!smart) return 0;
-  const mi = tees.findIndex((t) => /member/i.test(t?.name || ""));
-  if (mi >= 0) return mi;
-  let best = -1, bestDiff = Infinity;
-  tees.forEach((t, i) => {
-    const yds = Array.isArray(t?.yardages) ? t.yardages.reduce((s: number, v: any) => s + (Number(v) || 0), 0) : 0;
-    if (yds > 0) { const d = Math.abs(yds - 6400); if (d < bestDiff) { bestDiff = d; best = i; } }
-  });
-  return best >= 0 ? best : 0;
-}
-
 function CreateGame({
   user,
   displayName,
@@ -519,45 +486,15 @@ function CreateGame({
     setBusy(true);
     setErr(null);
     try {
-      const code = makeCode();
-      const typeLabel = gameType === "match" ? "Match Play" : gameType === "fourball" ? "Four-Ball" : gameType === "skins" ? "Skins" : gameType === "trifecta" ? "Trifecta" : gameType === "stroke" ? "Stroke Play" : "Stableford";
-      // TZ-safe date label for the auto-generated name (noon avoids offset rollover).
-      const dateLabel = new Date(matchDate + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-      const autoName = `${typeLabel} / ${pickedFav.name} / ${dateLabel}`;
-      const holesMeta = pickedFav.holes.map((h: any, i: number) => ({
-        n: h.n,
-        par: h.par,
-        si: h.si,
-        yards: tee?.yardages?.[i] ?? null,
-      }));
+      const payload = GC.buildGamePayload({
+        code: makeCode(), activeGroupId, name, courseName: pickedFav.name, courseHoles: pickedFav.holes,
+        teeYardages: tee?.yardages, coursePar, matchDate, allowancePct, gameType, teamMode, team1, team2,
+        skinsTeamStyle, teamScoreMode, trifectaScoring, strokeBasis, skinsMode, flightsSupported, flightMode, flightBands,
+      });
+      const holesMeta = payload.holes_meta;
       const { data: game, error } = await supabase
         .from("games")
-        .insert({
-          code,
-          group_id: activeGroupId,
-          name: name.trim() || autoName,
-          course: pickedFav.name,
-          course_par: coursePar,
-          played_at: matchDate,
-          allowance_pct: allowancePct,
-          holes_meta: holesMeta,
-          game_type: gameType,
-          pairings: [],
-          teams:
-            ((gameType === "match" || gameType === "skins" || gameType === "fourball") && teamMode) || gameType === "trifecta"
-              ? [
-                  { key: "A", name: team1.trim() || "Team 1" },
-                  { key: "B", name: team2.trim() || "Team 2" },
-                ]
-              : null,
-          foursomes: gameType === "fourball" || gameType === "trifecta" || (gameType === "skins" && teamMode && skinsTeamStyle === "best_ball") ? [] : null,
-          team_score_mode: gameType === "trifecta" || gameType === "fourball" || (gameType === "skins" && teamMode && skinsTeamStyle === "best_ball") ? teamScoreMode : "best_ball",
-          trifecta_scoring: gameType === "trifecta" ? trifectaScoring : null,
-          stroke_basis: gameType === "stroke" ? strokeBasis : null,
-          skins_mode: gameType === "skins" ? skinsMode : null,
-          flight_mode: flightsSupported ? flightMode : "off",
-          flights: flightMode === "oneoff" && flightsSupported ? flightBands : null,
-        })
+        .insert(payload)
         .select()
         .single();
       if (error || !game) throw error || new Error("Could not create game");
@@ -576,73 +513,15 @@ function CreateGame({
       // Add creator plus any selected group members immediately, so group games do not require join codes.
       // Split skins stays simple only in a small field. Beyond 4, steer to teams or 1:1.
       const skinsFieldCount = groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length;
-      if (gameType === "skins" && !teamMode && skinsMode === "split" && skinsFieldCount > 4) {
+      if (GC.splitSkinsTooBig(gameType, teamMode, skinsMode, skinsFieldCount)) {
         setErr("Split skins is best for up to 4 players. For a bigger group, use Team skins or 1:1 matchups, or switch Skins to carryover.");
         setBusy(false);
         return;
       }
-      const selectedIds = new Set([
-        user.id,
-        ...Object.keys(selectedPlayers).filter((id) => selectedPlayers[id]),
-      ]);
-      const selectedRoster = groupRoster.filter((p) => selectedIds.has(p.id));
-      if (!selectedRoster.some((p) => p.id === user.id)) {
-        selectedRoster.unshift({
-          id: user.id,
-          display_name: displayName,
-          avatar_url: null,
-          handicap_index: idxVal,
-        });
-      }
-      // Each selected player already carries avatar_url from the group roster,
-      // so we denormalize it straight onto the game_player row.
-      const rosterRows = selectedRoster.map((p) => {
-        const playerIndex = p.id === user.id ? idxVal : (hcpOverrides[p.id] ?? p.handicap_index);
-        const playerCourseHandicap =
-          playerIndex != null && coursePar != null
-            ? courseHandicap(playerIndex, tee.slope, tee.rating, coursePar)
-            : null;
-        return {
-          game_id: game.id,
-          user_id: p.id,
-          is_guest: false,
-          bets: true, // members default into the TGC money game (never rely on the DB default)
-          ...GP_STATE_DEFAULTS,
-          display_name: p.display_name || "Player",
-          avatar_url: (p as any).avatar_url ?? null,
-          handicap_index: playerIndex,
-          rating: tee.rating,
-          slope: tee.slope,
-          tee_name: tee.name,
-          course_handicap: playerCourseHandicap,
-          flight: flightMode === "oneoff" && flightsSupported && flightBands ? flightForIndex(playerIndex, flightBands) : null,
-          scores: Array(holesMeta.length).fill(null),
-          putts: Array(holesMeta.length).fill(null),
-          fairways: Array(holesMeta.length).fill(null),
-        };
+      const rows = GC.buildPlayerRows({
+        gameId: game.id, userId: user.id, displayName, idxVal, selectedPlayers, groupRoster, guestPlayers,
+        hcpOverrides, tee, coursePar, holesCount: holesMeta.length, flightsSupported, flightMode, flightBands,
       });
-      const guestRows = guestPlayers.map((p) => ({
-        game_id: game.id,
-        user_id: null,
-        is_guest: true,
-        guest_of: p.guest_of || null,
-        bets: false,
-        ...GP_STATE_DEFAULTS,
-        display_name: p.display_name,
-        handicap_index: p.handicap_index,
-        rating: tee.rating,
-        slope: tee.slope,
-        tee_name: tee.name,
-        course_handicap: p.handicap_index != null && coursePar != null ? courseHandicap(p.handicap_index, tee.slope, tee.rating, coursePar) : null,
-        flight: flightMode === "oneoff" && flightsSupported && flightBands ? flightForIndex(p.handicap_index, flightBands) : null,
-        scores: Array(holesMeta.length).fill(null),
-        putts: Array(holesMeta.length).fill(null),
-        fairways: Array(holesMeta.length).fill(null),
-      }));
-      const rows = [...rosterRows, ...guestRows];
-      // 4 or fewer players tee off together — default everyone to one group (organizer
-      // can still split them manually). Bigger rosters start ungrouped for assignment.
-      if (rows.length <= 4) rows.forEach((r) => { (r as any).tee_group = 1; });
       const { error: e2 } = await supabase.from("game_players").insert(rows);
       if (e2) throw e2;
       await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_created", group_id: activeGroupId, summary: `Created the game "${game.name}" at ${pickedFav.name}` });
@@ -1285,11 +1164,6 @@ function CreateGame({
 // ---------------- Game room: score entry + leaderboard ----------------
 
 // Local YYYY-MM-DD (module-level so both the create form's clone and GameRoom can use it).
-function todayLocalStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 // Organizer-only control to correct a whole game's date. Local draft state; the Save button appears
 // only when the date is changed. Past-date confirmation is handled by the onSave handler.
 function GameDatePicker({ current, onSave }: { current: string | null; onSave: (d: string) => Promise<void> }) {
@@ -2115,14 +1989,8 @@ function GameRoom({
   }, [game?.group_id, players]);
 
   // New players inherit the tee already in use (mirrors how a code-join borrows the tee).
-  const refTee = () => {
-    const ref = players.find((p) => p.rating != null && p.slope != null && p.tee_name) || players[0];
-    return { rating: ref?.rating ?? null, slope: ref?.slope ?? null, tee_name: ref?.tee_name ?? null };
-  };
-  const blankCard = () => {
-    const n = game?.holes_meta?.length ?? 18;
-    return { scores: Array(n).fill(null), putts: Array(n).fill(null), fairways: Array(n).fill(null), ...GP_STATE_DEFAULTS };
-  };
+  const refTee = () => GU.refTee(players);
+  const blankCard = () => GU.blankCard(game);
   const addGuestToGame = async (name: string, idx: number, sponsor: string) => {
     if (!game || !name.trim() || Number.isNaN(idx)) return;
     const t = refTee();
