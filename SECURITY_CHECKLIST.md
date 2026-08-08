@@ -42,3 +42,19 @@ threat model.
 ## Review cadence
 After each major arc: one functional cold-eyes pass (does it behave right?) AND one adversarial pass
 (what can a hostile JWT do?). They find different bug classes; both are required.
+
+## Dependency currency (added with the Next 16 / React 19 upgrade, Aug 2026)
+Framework/major-version drift is a security posture problem (an EOL major stops receiving patches).
+Two backstops:
+1. **Mechanical (in-repo):** `npm run deps:check` (also runs at the top of `npm run ci`) compares the
+   installed major of next/react/react-dom/@supabase/*/typescript against the npm registry and prints
+   a loud ALERT when any watched package is a major behind. Non-blocking. TypeScript is deliberately
+   held at 5.x (Next rejects TS >= 7) and is exempt from the alert.
+2. **PRIMARY, admin-facing (GitHub):** enable **Dependabot** on the repo so the ADMIN is alerted
+   directly, without waiting for a build: GitHub → repo Settings → Code security → turn on
+   "Dependabot alerts" and "Dependabot security updates". This opens PRs/alerts automatically when a
+   dependency has a known CVE or a new version. This is the alert channel that would have surfaced the
+   Next SSRF advisory the day it published rather than at external-review time.
+
+Cadence: framework major upgrades are their own dedicated pass with a full manual QA sweep — there is
+NO differential test that can prove a framework upgrade preserved behavior (unlike logic extractions).

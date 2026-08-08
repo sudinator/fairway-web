@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   const id = searchParams.get("id");
 
   // Require an authenticated caller so this proxied key can't be consumed anonymously.
-  const supabase = createRouteClient();
+  const supabase = await createRouteClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
 

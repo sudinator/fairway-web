@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { Avatar } from "@/components/ui";
 import {
@@ -172,8 +173,10 @@ function statusFor(p: LivePlayer, game: LiveGame, pairings: LiveData["pairings"]
   return "";
 }
 
-export default function LiveScorecardPage({ params }: { params: { token: string } }) {
-  const token = String(params.token || "");
+export default function LiveScorecardPage() {
+  // Next 16: the params prop is async; useParams() returns it synchronously in a client component.
+  const params = useParams();
+  const token = String((params as any)?.token || "");
   const [data, setData] = useState<LiveData | null>(null);
   const [state, setState] = useState<"loading" | "ok" | "missing" | "error">("loading");
 

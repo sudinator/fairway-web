@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
@@ -14,9 +15,11 @@ const supabase = createClient();
 
 type JoinState = "loading" | "login" | "joining" | "success" | "error";
 
-export default function JoinGroupPage({ params }: { params: { code: string } }) {
+export default function JoinGroupPage() {
+  // Next 16: the params prop is async; the client useParams() hook returns it synchronously.
+  const params = useParams();
   const router = useRouter();
-  const code = useMemo(() => String(params.code || "").replace(/\D/g, "").slice(0, 6), [params.code]);
+  const code = useMemo(() => String((params as any)?.code || "").replace(/\D/g, "").slice(0, 6), [params]);
   const [state, setState] = useState<JoinState>("loading");
   const [message, setMessage] = useState("Checking your invite…");
 

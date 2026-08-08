@@ -79,7 +79,7 @@ export async function POST(request: Request) {
   }
 
   // Require an authenticated caller — this is a rate-limited, cost-bearing resource, not public.
-  const supabase = createRouteClient();
+  const supabase = await createRouteClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Please sign in to use AI analysis." }, { status: 401 });
 

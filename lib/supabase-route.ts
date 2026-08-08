@@ -5,8 +5,9 @@ import { cookies } from "next/headers";
 // handlers. Read-only on cookies (API routes don't refresh/set the session), so
 // getAll() is wired and setAll() is a no-op. Use `await supabase.auth.getUser()`
 // to obtain the authenticated caller; a null user means "not signed in".
-export function createRouteClient() {
-  const cookieStore = cookies();
+export async function createRouteClient() {
+  // Next 15+: cookies() is async.
+  const cookieStore = await cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

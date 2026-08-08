@@ -4536,3 +4536,26 @@ FIXES:
 - Sign-out now sweeps ALL bnn_* localStorage (drafts, caches, resume markers) so nothing lingers on a
   shared device.
 Review findings assessed as overstated/deferred are recorded in BACKLOG (Next 15 upgrade = batch 2).
+
+### 177.0.260808 — Next.js 16 + React 19 upgrade (framework majors; QA REQUIRED before relying on it)
+Off the EOL Next 14 line onto Next 16.3.0 (Active LTS) + React 19.2.8, in one pass (skipping 15, which
+itself EOLs Oct 2026). recharts pinned to 2.15.4 (React-19-compatible; deliberately NOT the 3.x major, to
+keep QA surface minimal). 0 npm vulnerabilities; Node pinned >=20.9 (Next 16 min) via engines + .nvmrc.
+CODE CHANGES (all the async-migration Next 15+ requires — blast radius was small, BNN being a client-heavy
+single-page app):
+- cookies() is async → lib/supabase-route.ts createRouteClient() is now async; its two callers
+  (/api/courses, /api/analyze-round) await it; app/auth/callback awaits cookies().
+- dynamic-route params is async → /join/[code], /live/[token], /organize/[gameId] now read the code/token/
+  gameId via the client useParams() hook (was a sync params prop — a runtime bug tsc could NOT catch because
+  the old type lied about being sync). /organize already used useParams.
+- one React-19 ref typing fix (useRef<T>(null) now RefObject<T|null>) in the share-card export helper.
+VERIFICATION BOUNDARY: tsc clean, full Next 16 build succeeds (all 9 routes generate), all unit + 5
+differential suites pass (103k comparisons, 0 mismatches — logic untouched), 0 vulnerabilities. This proves it
+COMPILES and pure logic is intact; it does NOT prove the running app (auth, realtime, PWA/service worker,
+charts, image export, all interactivity under React 19) is correct — a framework major has no differential
+proof. TEST_PLAN_177.0_NEXT16.md is the required manual sweep; rollback = redeploy 176.30 (0125 is
+backward-compatible, no DB rollback needed).
+MONITORING (so the next EOL is scheduled, not discovered): scripts/check-deps.mjs flags any watched major
+behind (runs at the top of npm run ci; TypeScript held at 5.x since Next rejects TS>=7). Primary admin alert =
+GitHub Dependabot — ENABLE IT: repo Settings → Code security → Dependabot alerts + security updates.
+No migration.

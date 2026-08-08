@@ -414,7 +414,7 @@ From the review (finding 5 + modularity section). Staged, behavior-preserving, v
 Same approach applies to manage.tsx (3,812) split by admin capability.
 
 ## Security review follow-ups (Aug 2026 — batch 2/3)
-- **Next.js 14 → 15 upgrade** (14.x unsupported; July 2026 SSRF advisory — mitigated on Vercel by host pinning, but unsupported major = compounding risk). Its own pass + full regression sweep.
+- ~~Next.js upgrade~~ DONE in 177.0: went 14 → **16** (Active LTS) + **React 19** + recharts 2.15.4, in one pass. Async cookies()/params migrated; back on a supported track. (QA: TEST_PLAN_177.0_NEXT16.md.)
 - Content-Security-Policy (baseline headers shipped in 176.30; CSP needs its own tested pass given inline styles).
 - Per-user daily quota on /api/courses (auth + validation + cache exist; quota like the AI endpoint's would complete it).
 - AI endpoint: strict request schema + structured output validation (output-integrity, low urgency).

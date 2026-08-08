@@ -16,7 +16,7 @@ const FMT_LABEL: Record<string, string> = {
 // Shared presentation + share/copy logic for both the game card and the solo-round
 // card. Renders an on-screen preview (so the player sees exactly what's shared),
 // exports a PNG to the share sheet, with download + copy-text fallbacks.
-function useCardExport(cardRef: React.RefObject<HTMLDivElement>, fileBase: string, title: string, buildText: () => string) {
+function useCardExport(cardRef: React.RefObject<HTMLDivElement | null>, fileBase: string, title: string, buildText: () => string) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const shareImage = async () => {
