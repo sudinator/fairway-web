@@ -82,6 +82,7 @@ import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
 import { ScoreHistory, SkinsView, MatchView, FourballView, StrokesSummary, SweepBroom, CleanSweepBanner, SweepTrophy, SweepAchievedBanner, TeamClinchLine } from "@/components/game/scoring-views";
 import { LegConfigEditor, SegmentBoard, GroupSegmentSummary } from "@/components/game/segment-views";
 import { GameList } from "@/components/game/game-list";
+import * as PS from "@/lib/player-scoring";
 import { GroupScorecard, GroupsBuilder } from "@/components/game/scorecard-views";
 import { OrganizerPanel, BettingPanel } from "@/components/game/organizer-panel";
 
@@ -1808,51 +1809,17 @@ function GameRoom({
   useEffect(() => { recomputePending(); }, [players, recomputePending]);
 
   // Build a player's per-hole Hole[] (with strokes received) for scoring math.
-  const playerHoles = (p: Player): Hole[] => {
-    if (!game) return [];
-    const alloc = allocateStrokes(
-      game.holes_meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })),
-      applyAllowance(chBasis(p, game.course_par), game.allowance_pct ?? 100),
-    );
-    return game.holes_meta.map((m, i) => ({
-      hole_number: m.n,
-      par: m.par,
-      stroke_index: m.si,
-      strokes: p.scores?.[i] ?? null,
-      putts: p.putts?.[i] ?? null,
-      fairway: p.fairways?.[i] ?? null,
-      penalties: 0,
-      recv: alloc[m.n] || 0,
-    }));
-  };
-
-  const playerPoints = (p: Player) =>
-    playerHoles(p).reduce(
-      (s, h) => s + (stablefordPts(h.strokes, h.par, h.recv || 0) || 0),
-      0,
-    );
-
-  const playerThru = (p: Player) =>
-    (p.scores || []).filter((s) => s != null && s > 0).length;
-
+  const playerHoles = (p: Player): Hole[] => PS.playerHoles(p, game);
+  const playerPoints = (p: Player) => PS.playerPoints(p, game);
+  const playerThru = (p: Player) => PS.playerThru(p);
   // Gross = total strokes on holes played. Net = gross minus strokes received on those holes.
-  const playerGross = (p: Player) =>
-    playerHoles(p).reduce((s, h) => s + (h.strokes && h.strokes > 0 ? h.strokes : 0), 0);
-  const playerNet = (p: Player) =>
-    playerHoles(p).reduce(
-      (s, h) => s + (h.strokes && h.strokes > 0 ? h.strokes - (h.recv || 0) : 0),
-      0,
-    );
-
+  const playerGross = (p: Player) => PS.playerGross(p, game);
+  const playerNet = (p: Player) => PS.playerNet(p, game);
   // Net score relative to par, derived from Stableford: par = 2 pts/hole, so rel = 2*thru − points.
-  // Negative = under par. Returned as a display string like "-1", "E", "+2".
-  const relToParStr = (p: Player) => {
-    const rel = 2 * playerThru(p) - playerPoints(p);
-    return rel === 0 ? "E" : rel > 0 ? `+${rel}` : `${rel}`;
-  };
+  const relToParStr = (p: Player) => PS.relToParStr(p, game);
   // Par of the holes played so far (for true stroke over/under par, uncapped).
-  const parThru = (p: Player) => playerHoles(p).reduce((s2, h) => s2 + (h.strokes && h.strokes > 0 ? (h.par || 0) : 0), 0);
-  const leaderName = (full: string) => { const n = (full || "").trim(); if (n.length <= 15) return n; const parts = n.split(/\s+/); if (parts.length > 1) { const c = parts[0] + " " + parts[parts.length - 1][0]; return c.length <= 15 ? c : parts[0].slice(0, 15); } return n.slice(0, 15); };
+  const parThru = (p: Player) => PS.parThru(p, game);
+  const leaderName = (full: string) => PS.leaderName(full);
 
   // Save one hole's data (strokes / putts / fairway) for me.
   // Push a score row to the server with visible status + safe retries. The local backup

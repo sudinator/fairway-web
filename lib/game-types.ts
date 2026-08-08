@@ -3,7 +3,7 @@
 // canonical definition instead of re-declaring or depending on the mega-file. Types
 // only — no runtime code — so moving them here cannot change behavior.
 
-import type { LegConfig } from "@/lib/legs";
+import type { LegConfig } from "./legs";
 
 export type Game = {
   id: string;

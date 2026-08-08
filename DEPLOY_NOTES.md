@@ -4407,3 +4407,17 @@ handoff seed used by CreateGame + home) that physically sat after GameList moved
 re-exported from tournaments so home's import is unchanged. tournaments.tsx: 4,011 -> 3,807 lines. GameList's
 function body is byte-identical; tsc + build + tests + guards all green. What remains in tournaments.tsx is now
 essentially just the two god-components (CreateGame ~1,050, GameRoom ~2,470) + small helpers. No migration.
+
+### 176.21.260806 — Stage 2 begins: extract player-scoring logic to a tested lib module (no behavior change)
+First pure-logic extraction out of the GameRoom god-component, done tests-first per the plan:
+- lib/player-scoring.ts: playerHoles / playerPoints / playerThru / playerGross / playerNet / relToParStr /
+  parThru / leaderName — moved VERBATIM from GameRoom, now pure functions of (player, game).
+- GameRoom keeps thin wrappers that delegate to the lib functions, so every call site is unchanged.
+- lib/player-scoring.test.ts: 45 assertions covering every path — null game; stroke allocation at ch 0/2/10(+50%
+  allowance)/20; partial/full/empty/null/zero scores; Stableford par/birdie/eagle/bogey/double + net-par-via-stroke;
+  net with/without received strokes incl. strokes on unplayed holes; rel-to-par under/even/over; parThru on mixed
+  pars; and leaderName across all branches. Wired into `npm test`.
+- Also made lib/game-types.ts import LegConfig via a relative path (./legs) so the bare test compiler resolves it.
+Verification: 45/45 new tests pass, full suite green, tsc clean, build compiles, 8 guards pass. Behavior is
+preserved by construction (verbatim move + unchanged call sites) and proven by the exhaustive tests.
+tournaments.tsx: 3,807 -> 3,774. No migration.
