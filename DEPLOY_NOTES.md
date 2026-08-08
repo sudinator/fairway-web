@@ -4613,3 +4613,26 @@ gradient flip at offset 0.66, both colors present). tsc/build/guards/tests green
 NOTE: this is custom SVG untouched by my recharts changes; the single-color logic predates this arc, so it
 wasn't a regression I introduced here — but I initially fixed the wrong (recharts) charts by assuming which
 component "recent form" referred to. Lesson: locate the exact component before claiming a fix.
+
+### 177.5.260808 — security follow-up review: FIX removed-member auth bypass (HIGH) + harden the guard — MIGRATION 0126 REQUIRED
+Second external review found 0125 hand-rolled its membership/admin checks (group_members by user_id + role)
+WITHOUT status='active'. Since removed members keep a status='removed' row (the app updates status, doesn't
+delete), a removed member could still call record_course_freshness and a removed admin could still call
+set_course_freshness_status + receive notifications. HIGH (real authorization bypass, narrow blast radius).
+- Migration 0126 (REQUIRED, run after 0125; same function signatures so NO client change): both RPCs now
+  delegate to the canonical helpers public.is_group_member / public.is_group_admin (0034), which enforce
+  status='active' AND not-banned; the admin-notification query now filters status='active' + excludes banned.
+  Also adds revoke ... from anon alongside from public.
+- Guard hardened (finding #3: the v1 guard checked for an -- AUTHORIZATION: comment, not the actual auth):
+  ci/check_migration_authorization.py now mechanically flags, for migrations >= 0126: granting EXECUTE to an
+  app role without REVOKE-from-public; a SECURITY DEFINER granted to an app role with no auth.uid()/helper;
+  and (the exact 0125 bug) a direct group_members role='admin'/user_id auth check lacking status='active' and
+  not using the canonical helpers. Self-tested: 0126 passes, a 0125-style migration fails with the right msgs.
+- SECURITY_CHECKLIST updated: prefer canonical helpers over reimplementing auth predicates.
+DELIBERATELY DEFERRED to security batch 3 (reviewer MEDIUM/LOW, honest triage — none is a HIGH):
+system-maintenance SECURITY DEFINER fns still executable by authenticated + missing input validation
+(expire_support_sessions negative p_max_hours, finish_stale_rounds, sweep_friction, purge_old_notifications,
+send_tee_reminders) → one audit migration locking them to service/owner + validating inputs; standardize
+revoke-from-public on older privileged fns; DB source-of-truth doc clarity (SCHEMA.md = docs only, not
+authoritative); AI endpoint runtime input schema + structured output; /api/courses per-user quota; migration
+deployment automation (PR→CI→staged). tsc/guards/tests/build green.

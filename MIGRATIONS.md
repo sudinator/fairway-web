@@ -127,3 +127,5 @@ Total: 107 migrations. Unchecked = not yet confirmed applied.
 - 0124_course_freshness.sql — course_freshness cache + record_course_freshness RPC (daily API freshness check, admin flag). Run after 0123.
 
 - 0125_course_freshness_authorization.sql — authorization fixes for the 0124 RPCs + status CHECK (external security review). Run after 0124. REQUIRED with v176.30+ (client calls the new signature).
+
+- 0126_course_freshness_use_canonical_auth.sql — switches the freshness RPCs to is_group_member/is_group_admin (enforces active + non-banned; fixes removed-member bypass) + status-filters the notification query. Run after 0125. REQUIRED (supersedes 0125 function bodies; same signatures, no client change).

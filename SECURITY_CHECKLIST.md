@@ -58,3 +58,14 @@ Two backstops:
 
 Cadence: framework major upgrades are their own dedicated pass with a full manual QA sweep — there is
 NO differential test that can prove a framework upgrade preserved behavior (unlike logic extractions).
+
+## Prefer canonical helpers over hand-rolled authorization (added Aug 2026, 2nd review)
+A follow-up review found 0125 checked group_members for user_id + role but not status='active' — so
+removed members (whose row becomes status='removed', not deleted) kept access. The fix was to use the
+existing helpers. RULE: never write an inline group_members membership/admin predicate in a new function.
+Use public.is_group_member(group, auth.uid()) and public.is_group_admin(group, auth.uid()) (migrations/
+0034) — they enforce status='active' AND not-banned. Recipient/notification queries that filter by role
+must also carry status='active' and exclude banned users. ci/check_migration_authorization.py now flags
+direct group_members role='admin'/user_id auth checks that lack status='active' and don't use the helpers,
+plus missing REVOKE-from-public and missing auth predicates. The deeper lesson (repeat of an earlier one):
+reuse centralized security infrastructure; every reimplementation is a chance to drift from it.
