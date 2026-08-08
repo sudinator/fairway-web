@@ -4636,3 +4636,21 @@ send_tee_reminders) → one audit migration locking them to service/owner + vali
 revoke-from-public on older privileged fns; DB source-of-truth doc clarity (SCHEMA.md = docs only, not
 authoritative); AI endpoint runtime input schema + structured output; /api/courses per-user quota; migration
 deployment automation (PR→CI→staged). tsc/guards/tests/build green.
+
+### 177.6.260808 — security batch 3 (follow-up review #4/#5/#6/#8/#10) — MIGRATIONS 0127 + 0128 REQUIRED
+Finishes the follow-up review's non-HIGH items.
+- 0127 (system function lockdown): expire_support_sessions now requires is_admin() AND validates p_max_hours
+  in [1,8760] (a negative value inverted the interval and deleted ACTIVE support sessions); pg_cron-only
+  reapers (purge_old_notifications, send_tee_reminders) revoked from all app roles (cron runs as owner, so
+  unaffected); finish_stale_rounds kept for authenticated (self-healing by design) but PUBLIC/anon revoked;
+  sweep_friction (already is_admin-gated) tightened. Verified callers first so nothing legitimate breaks.
+- 0128 (rate limit): generic per-user limiter — api_rate_limits table (RLS-locked, no policies) + bump_rate_limit
+  RPC (identity = auth.uid() server-side; bucket allowlisted). /api/courses now capped at 120 lookups/hour/user
+  (fails open on limiter error). Reusable for future endpoints.
+- AI input hardening (#8): lib/ai-sanitize.ts (11 tests) — deep-clones current/history/aggregate keeping numbers,
+  truncating strings to 80 chars, flattening newlines, capping array/keys/depth, before they're embedded in the
+  Gemini prompt, so user free-text can't act as instructions. Output-integrity (Gemini has no tools).
+- Docs (#6): SCHEMA.md relabeled "documentation only, not authoritative" — the migration ledger is canonical.
+Deferred (honestly, lower value): #9 AI output structured-schema (endpoint already checks non-empty + requests
+labels; strict validation risks rejecting valid output); #7 migration-deploy automation; a broad revoke-from-public
+hygiene sweep on all older privileged functions; CSP. tsc/guards/tests/build green; guard passes on 0127+0128.

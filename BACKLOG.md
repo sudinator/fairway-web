@@ -415,8 +415,16 @@ Same approach applies to manage.tsx (3,812) split by admin capability.
 
 ## Security review follow-ups (Aug 2026 — batch 2/3)
 - ~~Next.js upgrade~~ DONE in 177.0: went 14 → **16** (Active LTS) + **React 19** + recharts 2.15.4, in one pass. Async cookies()/params migrated; back on a supported track. (QA: TEST_PLAN_177.0_NEXT16.md.)
-- Content-Security-Policy (baseline headers shipped in 176.30; CSP needs its own tested pass given inline styles).
-- Per-user daily quota on /api/courses (auth + validation + cache exist; quota like the AI endpoint's would complete it).
-- AI endpoint: strict request schema + structured output validation (output-integrity, low urgency).
+~~Content-Security-Policy (baseline headers shipped in 176.30; CSP needs its own tested pass given inline styles).~~ (see below)
+~~Per-user daily quota on /api/courses (auth + validation + cache exist; quota like the AI endpoint's would complete it).~~ (see below)
+~~AI endpoint: strict request schema + structured output validation (output-integrity, low urgency).~~ (see below)
 - Consolidate migrations/ + supabase/migrations/ into one canonical dir + CI ledger check.
 - Audit react-hooks/exhaustive-deps suppressions + `any` at API boundaries (fold into Stage 3/4 pass).
+
+## Security batch 3 — DONE in 177.6 (follow-up review #4/#5/#6/#8/#10)
+- DONE: system-maintenance SECURITY DEFINER functions locked down (0127) — expire_support_sessions admin-gated + input-validated; cron reapers revoked from app roles; deny-by-default revokes.
+- DONE: /api/courses per-user quota (0128) — generic bump_rate_limit RPC, 120/hr/user.
+- DONE: AI endpoint input sanitizer (lib/ai-sanitize.ts, tested) — stats flattened/truncated so free-text can't act as prompt instructions.
+- DONE: SCHEMA.md relabeled documentation-only (migration ledger is authoritative).
+Still open (lower priority, honestly assessed):
+- CSP (own tested pass; inline styles). AI output structured-schema (#9, UX/correctness — endpoint checks non-empty + requests labels; deferred as low-value/high-false-reject-risk). Migration deployment automation (#7, operational). Standardize revoke-from-public on ALL older privileged fns (broad hygiene sweep). Stage 3/4 component decomposition + exhaustive-deps/`any` audit.

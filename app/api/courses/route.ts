@@ -33,6 +33,16 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
 
+  // Per-user volume cap on this metered upstream proxy (security review #10): 120 lookups/hour/user.
+  // Identity is server-derived (auth.uid()) inside the RPC — a client can't limit as someone else.
+  try {
+    const { data: rl } = await supabase.rpc("bump_rate_limit", { p_bucket: "courses", p_limit: 120, p_window_seconds: 3600 });
+    if (rl && (rl as any).allowed === false) {
+      return NextResponse.json({ error: "Too many course lookups in a short time — please try again shortly." }, { status: 429 });
+    }
+  } catch { /* limiter unavailable -> fail open (don't block legitimate use on a limiter hiccup) */ }
+
+
   const headers = authHeaders();
   if (!headers) {
     return NextResponse.json(

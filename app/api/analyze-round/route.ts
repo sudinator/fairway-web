@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sanitizeForPrompt } from "@/lib/ai-sanitize";
 import { createRouteClient } from "@/lib/supabase-route";
 
 // Runs on the server so the Gemini API key stays secret. Takes a compact summary
@@ -108,13 +109,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: msg }, { status: 429 });
   }
 
+  // Sanitize user-supplied stats before embedding: numbers pass, free-text is truncated/flattened
+  // so it can't act as prompt instructions. (Security review #8.)
+  const sCurrent = sanitizeForPrompt(current);
+  const sHistory = sanitizeForPrompt(history || []);
+  const sAggregate = sanitizeForPrompt(aggregate);
+
   const roundPrompt = `You are a friendly, encouraging golf coach analyzing an amateur golfer's round. Be specific, positive, practical, and concise.
 
 CURRENT ROUND (includes the golfer's handicap index if known):
-${JSON.stringify(current)}
+${JSON.stringify(sCurrent)}
 
 PRIOR ROUNDS (most recent first, may be empty):
-${JSON.stringify(history || [])}
+${JSON.stringify(sHistory)}
 
 Write a short analysis with exactly these labels, each on its own line:
 "What went well:" - 1-2 specific positives from this round. Compare to the golfer's own prior rounds where possible (e.g. fewer 3-putts, better GIR, lower score).
@@ -127,7 +134,7 @@ Rules: Base everything ONLY on the numbers given plus standard golf benchmarks f
   const dashboardPrompt = `You are a friendly, expert golf coach reviewing an amateur golfer's CAREER stats accumulated across many rounds. Zoom out and find the big patterns. Be specific, encouraging, and practical.
 
 ACCUMULATED STATS (across all the golfer's logged rounds):
-${JSON.stringify(aggregate)}
+${JSON.stringify(sAggregate)}
 
 Write a coaching summary with exactly these labels, each on its own line:
 "Your game right now:" - 1-2 sentences on the overall picture (handicap level, scoring average, biggest tendencies).

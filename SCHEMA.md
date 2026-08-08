@@ -1,13 +1,15 @@
 # Birdie Num Num — Database Schema & Conventions
 
-Single source of truth (in the repo) for the database. **This version has been
-verified against a live Supabase export** (information_schema, pg_policies,
-pg_indexes) — it reflects the real database, not a guess.
+**Documentation only — NOT the authoritative schema.** The authoritative, canonical schema is the
+migration ledger on disk: `supabase/migrations/0001–0013` are the historical baseline, and
+`migrations/0014+` are the forward migration ledger (run in order). This file is a human-readable
+summary that can lag the latest migrations; when they disagree, the migration files win. Do not try to
+reconstruct the database from this document or from either directory alone.
 
 ---
 
 ## Migration convention
-- Schema changes live in `supabase/migrations/` as numbered files (`0001_baseline.sql`, `0002_…`).
+- Historical baseline: `supabase/migrations/0001_baseline.sql … 0013`. Forward ledger: `migrations/0014+`.
 - Files are idempotent (`if not exists`) so re-running is safe.
 - Each DB change ships as a new numbered file committed with the code; run it in Supabase, then commit. Never edit a committed migration.
 

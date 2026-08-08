@@ -129,3 +129,6 @@ Total: 107 migrations. Unchecked = not yet confirmed applied.
 - 0125_course_freshness_authorization.sql — authorization fixes for the 0124 RPCs + status CHECK (external security review). Run after 0124. REQUIRED with v176.30+ (client calls the new signature).
 
 - 0126_course_freshness_use_canonical_auth.sql — switches the freshness RPCs to is_group_member/is_group_admin (enforces active + non-banned; fixes removed-member bypass) + status-filters the notification query. Run after 0125. REQUIRED (supersedes 0125 function bodies; same signatures, no client change).
+
+- 0127_system_function_lockdown.sql — admin-gates + input-validates expire_support_sessions; revokes app-role EXECUTE on the pg_cron reapers (purge_old_notifications, send_tee_reminders); tightens finish_stale_rounds/sweep_friction grants. Run after 0126.
+- 0128_rate_limit.sql — generic per-user rate limiter (api_rate_limits + bump_rate_limit RPC, RLS-locked); wires /api/courses to 120 lookups/hour/user. Run after 0127.
