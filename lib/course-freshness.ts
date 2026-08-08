@@ -44,7 +44,15 @@ export async function checkCourseFreshness(
       p_course_id: courseId, p_group_id: groupId, p_api_data: apiCourse, p_diff: diff, p_has_changes: diff.hasChanges,
     }).then(() => {}, () => {});
 
-    return { hasChanges: diff.hasChanges, diff: diff.hasChanges ? diff : null, apiCourse, status: diff.hasChanges ? "pending" : "none" };
+    // The RPC PRESERVES an admin's prior dismissed/applied decision — read the resulting status
+    // back rather than assuming "pending", so a dismissal survives the daily re-check.
+    let status = diff.hasChanges ? "pending" : "none";
+    try {
+      const { data: after } = await supabase.from("course_freshness").select("status").eq("course_id", courseId).maybeSingle();
+      if (after?.status) status = after.status;
+    } catch { /* keep the computed fallback */ }
+
+    return { hasChanges: diff.hasChanges, diff: diff.hasChanges ? diff : null, apiCourse, status };
   } catch {
     return NONE;
   }

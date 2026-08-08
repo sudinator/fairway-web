@@ -139,6 +139,10 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   // data itself is restored by the form-draft). Cleared on cancel/save.
   const openEditor = (v: "new" | { id: string; data: Course; user_id: string }) => { saveActiveCourseEdit(v); setEditing(v); };
   React.useEffect(() => { const v = loadActiveCourseEdit<"new" | { id: string; data: Course; user_id: string }>(); if (v) setEditing(v); /* eslint-disable-next-line */ }, []);
+  // Deliberately navigating away (tab switch / group switch) UNMOUNTS this library — clear the
+  // marker so an abandoned editor doesn't hijack the next app reopen. A lock/refresh doesn't
+  // unmount, so the marker still survives real interruptions (that's the resume case).
+  React.useEffect(() => () => clearActiveCourseEdit(), []);
   const [isAdmin, setIsAdmin] = useState(false);
   const [tab, setTab] = useState<CourseTab>("group");
   const [search, setSearch] = useState("");

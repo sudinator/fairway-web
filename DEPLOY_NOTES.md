@@ -4491,3 +4491,21 @@ STAGE 2 IS COMPLETE: all pure logic in GameRoom + CreateGame now lives in tested
 (player-scoring, finish-gaps, segments, game-utils, game-create + reused golf/flights/game-shape). Cumulative
 differential proof this stage: ~103,000 old-vs-new comparisons, 0 mismatches. Remaining god-component mass is
 stateful sync + render trees = Stage 3/4 (hooks + view decomposition), a separate careful campaign.
+
+### 176.29.260806 — cold-eyes code review of the recent arc: two real bugs fixed
+Fresh-eyes review of everything shipped in the 176.x arc. Two REAL bugs found and fixed:
+1. Course freshness: a DISMISSED (or applied) change re-prompted after the 24h cache expired — the client
+   returned status "pending" after any fresh re-check, ignoring the dismissed/applied status the RPC
+   deliberately preserves. Now reads the resulting status back after recording (lib/course-freshness.ts).
+   (Slipped past testing because C4 re-picked within the cache window.)
+2. Courses-tab resume: the reopen marker was only cleared on Cancel/Save, so deliberately TABBING AWAY from an
+   open course editor left it set — the next app open (within 12h) dropped you back into the abandoned editor.
+   CoursesLibrary now clears the marker on unmount (deliberate navigation unmounts; a lock/refresh doesn't, so
+   real interruptions still resume). (manage.tsx)
+Reviewed and intentionally NOT changed (noted for the record): playWithFresh sets originalPicked inside a state
+updater (works correctly in production; refactoring it risks more than it fixes — candidate for the Stage-3
+hooks pass); the solo-editor resume scroll uses a 72px fallback because the per-section pinned header carries no
+id (measured behavior fine in testing); GP_STATE_DEFAULTS spreads shared empty-array references into new rows
+(pre-existing, harmless for inserts since values are serialized, flagged as a mutation footgun for later);
+"update stored course" replaces data wholesale but the corrected flag survives via the row column fallback.
+No migration.
