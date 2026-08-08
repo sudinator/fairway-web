@@ -83,6 +83,8 @@ import { ScoreHistory, SkinsView, MatchView, FourballView, StrokesSummary, Sweep
 import { LegConfigEditor, SegmentBoard, GroupSegmentSummary } from "@/components/game/segment-views";
 import { GameList } from "@/components/game/game-list";
 import * as PS from "@/lib/player-scoring";
+import * as FG from "@/lib/finish-gaps";
+import type { FinishGap } from "@/lib/finish-gaps";
 import { GroupScorecard, GroupsBuilder } from "@/components/game/scorecard-views";
 import { OrganizerPanel, BettingPanel } from "@/components/game/organizer-panel";
 
@@ -1474,7 +1476,6 @@ function GameRoom({
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState("");
   const [courseTees, setCourseTees] = useState<CourseTee[]>([]);
-  type FinishGap = { name: string; noScores: boolean; missScores: number[]; missPutts: number[]; missFw: number[] };
   const [finishPrompt, setFinishPrompt] = useState<{ kind: "group" | "game"; teeGroup?: number; gaps: FinishGap[] } | null>(null);
   const [shareCard, setShareCard] = useState(false);
   const [shareGame, setShareGame] = useState(false);
@@ -2395,24 +2396,8 @@ function GameRoom({
   };
 
   // Pre-conclusion completeness: list what's missing for the players being locked.
-  const finishListFmt = (a: number[]) => (a.length > 8 ? `${a.length} holes` : a.join(", "));
-  const computeFinishGaps = (scope: Player[]): FinishGap[] => {
-    const meta = game?.holes_meta || [];
-    const out: FinishGap[] = [];
-    for (const pl of scope) {
-      if (pl.no_show) continue;
-      const sc = pl.scores || []; const pu = pl.putts || []; const fw = pl.fairways || [];
-      const cells = meta.map((m, i) => ({ i, par: m.par, n: m.n, s: sc[i] }));
-      const entered = cells.filter((c) => c.s != null && (c.s as number) > 0);
-      if (entered.length === 0) { out.push({ name: pl.display_name, noScores: true, missScores: [], missPutts: [], missFw: [] }); continue; }
-      const missScores = cells.filter((c) => c.s == null || (c.s as number) <= 0).map((c) => c.n);
-      const tracks = pu.some((v) => v != null) || fw.some((v) => v != null);
-      const missPutts = tracks ? entered.filter((c) => pu[c.i] == null).map((c) => c.n) : [];
-      const missFw = tracks ? entered.filter((c) => c.par >= 4 && fw[c.i] == null).map((c) => c.n) : [];
-      if (missScores.length || missPutts.length || missFw.length) out.push({ name: pl.display_name, noScores: false, missScores, missPutts, missFw });
-    }
-    return out;
-  };
+  const finishListFmt = (a: number[]) => FG.finishListFmt(a);
+  const computeFinishGaps = (scope: Player[]): FinishGap[] => FG.computeFinishGaps(scope, game?.holes_meta || []);
   const requestEndGame = async () => {
     if (!game) return;
     setFinishPrompt({ kind: "game", gaps: computeFinishGaps(players) });
@@ -2661,11 +2646,11 @@ function GameRoom({
   // Rank by over/under (net Stableford vs par pace): most under (lowest 2*thru-pts)
   // leads, so a hot start can top a longer-but-flatter round. Not-yet-started
   // players sort to the bottom; ties broken by more points.
-  const ouVal = (p: Player) => (playerThru(p) === 0 ? Infinity : 2 * playerThru(p) - playerPoints(p));
+  const ouVal = (p: Player) => PS.ouVal(p, game);
   const isStroke = game.game_type === "stroke";
   const strokeNet = game.stroke_basis !== "gross"; // default to net
-  const strokeTot = (p: Player) => (strokeNet ? playerNet(p) : playerGross(p));
-  const rankVal = (p: Player) => (isStroke ? (playerThru(p) === 0 ? Infinity : strokeTot(p)) : ouVal(p));
+  const strokeTot = (p: Player) => PS.strokeTotal(p, game);
+  const rankVal = (p: Player) => PS.rankVal(p, game);
   const leaderboard = [...players].sort((a, b) => {
     const d = rankVal(a) - rankVal(b);
     if (d !== 0) return d;

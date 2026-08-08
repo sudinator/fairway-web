@@ -1,5 +1,6 @@
 import {
   playerHoles, playerPoints, playerThru, playerGross, playerNet, relToParStr, parThru, leaderName,
+  ouVal, strokeTotal, rankVal,
 } from "./player-scoring";
 import type { Game, Player } from "./game-types";
 
@@ -115,6 +116,20 @@ eq("name: long two-part -> First L", leaderName("Jonathan Livingston"), "Jonatha
 eq("name: three parts -> First + last initial", leaderName("First Middle Lastname"), "First L");
 eq("name: long single word sliced to 15", leaderName("Supercalifragilistic"), "Supercalifragil");
 eq("name: trims whitespace", leaderName("  Bob  "), "Bob");
+
+// ---- ranking: ouVal / strokeTotal / rankVal (reuse the scoring fns) ----
+{
+  const g = mkGame();
+  eq("ouVal: thru0 -> Infinity", ouVal(mkPlayer([], { course_handicap: 0 }), g) === Infinity, true);
+  eq("ouVal: par -> 0", ouVal(mkPlayer([4], { course_handicap: 0 }), g), 0);
+  eq("ouVal: birdie -> -1", ouVal(mkPlayer([3], { course_handicap: 0 }), g), -1);
+  eq("strokeTotal: gross basis", strokeTotal(mkPlayer([5, 5], { course_handicap: 2 }), mkGame({ stroke_basis: "gross" })), 10);
+  eq("strokeTotal: net basis", strokeTotal(mkPlayer([5, 5], { course_handicap: 2 }), mkGame({ stroke_basis: "net" })), 8);
+  eq("strokeTotal: default null -> net", strokeTotal(mkPlayer([5, 5], { course_handicap: 2 }), mkGame({ stroke_basis: null as unknown as "net" })), 8);
+  eq("rankVal: stroke+gross -> gross total", rankVal(mkPlayer([5, 5], { course_handicap: 0 }), mkGame({ game_type: "stroke", stroke_basis: "gross" })), 10);
+  eq("rankVal: stroke thru0 -> Infinity", rankVal(mkPlayer([], { course_handicap: 0 }), mkGame({ game_type: "stroke" })) === Infinity, true);
+  eq("rankVal: stableford -> ouVal", rankVal(mkPlayer([4], { course_handicap: 0 }), mkGame({ game_type: "stableford" })), 0);
+}
 
 console.log(`player-scoring: ${pass} passed, ${fail} failed`);
 if (fail) { console.error(fails.join("\n")); process.exit(1); }

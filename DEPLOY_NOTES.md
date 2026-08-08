@@ -4421,3 +4421,26 @@ First pure-logic extraction out of the GameRoom god-component, done tests-first 
 Verification: 45/45 new tests pass, full suite green, tsc clean, build compiles, 8 guards pass. Behavior is
 preserved by construction (verbatim move + unchanged call sites) and proven by the exhaustive tests.
 tournaments.tsx: 3,807 -> 3,774. No migration.
+
+### 176.22.260806 — differential verification of the player-scoring extraction (test infra only)
+Per the new standard (REFACTOR_VERIFICATION.md): added lib/player-scoring.baseline.ts (the ORIGINAL inline
+logic, verbatim) and lib/player-scoring.diff.test.ts, which runs the structured edge cases + a 7,000-case
+deterministic fuzz through BOTH old and new and asserts identical outputs. Result: 32,463 comparisons, 0
+mismatches — the 176.21 extraction is proven behavior-identical to the pre-change code. Test-only files; no app
+change. This differential (old-vs-new) method is now the standard for every future logic extraction.
+
+### 176.23.260806 — extract finish-gap logic (differentially verified)
+Second Stage-2 extraction, following REFACTOR_VERIFICATION.md. Moved computeFinishGaps + finishListFmt +
+FinishGap type out of GameRoom into lib/finish-gaps.ts (pure, given players + holes_meta); GameRoom keeps thin
+wrappers so call sites are unchanged. Verification: lib/finish-gaps.test.ts (18 unit assertions across every
+path — no-show, no scores, missing scores, putts/fairways tracking on/off, par-3 fairway exclusion, combined,
+multi-player) + lib/finish-gaps.diff.test.ts vs a verbatim baseline (7,490 comparisons, 0 mismatches). tsc clean,
+build compiles, guards pass. No behavior change; no migration.
+
+### 176.24.260806 — extract ranking values (ouVal/strokeTotal/rankVal), differentially verified
+Third Stage-2 extraction. Added ouVal / strokeTotal / rankVal to lib/player-scoring.ts — they REUSE the
+already-extracted playerThru/playerPoints/playerNet/playerGross (the point of the modular path). GameRoom keeps
+thin wrappers; isStroke/strokeNet stay local (used elsewhere too). Verification extended the existing suite:
+player-scoring unit 45 -> 54, differential 32,463 -> 44,471 comparisons, 0 mismatches (baseline transcribed
+independently from the original; fuzz now varies game_type + stroke_basis to hit every ranking branch). tsc
+clean, build compiles, guards pass. No behavior change; no migration. tournaments.tsx now ~3,754 lines.
