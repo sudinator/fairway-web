@@ -4598,3 +4598,18 @@ lib/chart-helpers.test.ts (10 assertions) pins the behavior against the ACTUAL r
 can't silently regress again. tsc/guards/build/tests all green. Coloring logic itself unchanged (at/under form
 avg = green, over = red; barColor(val)). No migration. (Only affects the ≤30-round bar path; the >30-round
 AdaptiveTrend gradient path was never involved.)
+
+### 177.4.260808 — FIX (the real one): Profiles "Recent form" chart now colors green/red vs average
+The chart the user actually reported is FormChart in components/player-card.tsx — a HAND-DRAWN SVG, not
+recharts, so the 177.1–177.3 recharts work never touched it (177.3 fixed the dashboard's recharts bar charts,
+a different, also-real bug — but not this card). FormChart was drawing the whole series in ONE color derived
+only from first-vs-last point (green because the user is improving overall). Replaced with an average-relative
+scheme: a vertical SVG linearGradient that flips at the avg line's y — red above the average (worse; higher
+differential), green at/below (better) — applied to the line and the area fill, with each dot + the end value
+colored per-point via colorFor(v)= v<=avg?green:red. Uses useId() for a stable unique gradient id (SSR-safe).
+Matches the gold "avg" line on the card and the dashboard trend chart's documented green/under-red/over behavior.
+Verified the coloring on the reported data (avg 15.32 -> dots green/red/green/green/red/green/red/red/green/green;
+gradient flip at offset 0.66, both colors present). tsc/build/guards/tests green. No migration.
+NOTE: this is custom SVG untouched by my recharts changes; the single-color logic predates this arc, so it
+wasn't a regression I introduced here — but I initially fixed the wrong (recharts) charts by assuming which
+component "recent form" referred to. Lesson: locate the exact component before claiming a fix.

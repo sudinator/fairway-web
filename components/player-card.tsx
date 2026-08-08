@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
 import type { Round } from "@/lib/golf";
@@ -74,11 +74,26 @@ function FormChart({ data }: { data: number[] }) {
   const y = (v: number) => top + ((max - v) / span) * (bot - top); // max at top, min at bottom
   const pts = data.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
   const area = `${x(0)},${bot} ${pts} ${x(data.length - 1)},${bot}`;
-  const improving = data[data.length - 1] <= data[0];
-  const stroke = improving ? "#8FE0B0" : "#FB7185";
   const last = data[data.length - 1];
+  // Colour relative to the player's average (the gold line): at/under average = green (better,
+  // since lower differential is better), over = red. A vertical gradient flips at the avg's y so
+  // the line/area are green below the avg line and red above it; dots + the end value are coloured
+  // per-point. (Matches the dashboard trend chart's stated behaviour.)
+  const GREEN = "#8FE0B0", RED = "#FB7185";
+  const colorFor = (v: number) => (v <= avg ? GREEN : RED);
+  const gid = "formgrad-" + useId().replace(/[^a-zA-Z0-9]/g, "");
+  const avgY = y(avg);
+  const off = Math.max(0.0001, Math.min(0.9999, (avgY - top) / (bot - top)));
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: "block", overflow: "visible" }}>
+      <defs>
+        <linearGradient id={gid} gradientUnits="userSpaceOnUse" x1={0} y1={top} x2={0} y2={bot}>
+          <stop offset={0} stopColor={RED} />
+          <stop offset={off} stopColor={RED} />
+          <stop offset={off} stopColor={GREEN} />
+          <stop offset={1} stopColor={GREEN} />
+        </linearGradient>
+      </defs>
       {/* scale gridlines + labels (worst at top, best at bottom) */}
       {[max, min].map((v, k) => {
         const yy = y(v);
@@ -92,12 +107,12 @@ function FormChart({ data }: { data: number[] }) {
       {/* average baseline */}
       <line x1={LG} y1={y(avg)} x2={W - RG} y2={y(avg)} stroke="#C9A227" strokeOpacity={0.35} strokeWidth={1} />
       <text x={W - RG + 3} y={y(avg) + 3} fontSize="8" fill="#C9A227" opacity={0.8}>avg</text>
-      {/* series */}
-      <polygon points={area} fill={stroke} opacity={0.12} />
-      <polyline points={pts} fill="none" stroke={stroke} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-      {data.map((v, i) => <circle key={i} cx={x(i)} cy={y(v)} r={i === data.length - 1 ? 3.5 : 2} fill={stroke} />)}
+      {/* series — gradient flips green/red at the avg line; dots coloured per-point */}
+      <polygon points={area} fill={`url(#${gid})`} opacity={0.12} />
+      <polyline points={pts} fill="none" stroke={`url(#${gid})`} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      {data.map((v, i) => <circle key={i} cx={x(i)} cy={y(v)} r={i === data.length - 1 ? 3.5 : 2} fill={colorFor(v)} />)}
       {/* current value + x caption */}
-      <text x={x(data.length - 1) + 6} y={y(last) + 3} fontSize="11" fontWeight="800" fill={stroke}>{last.toFixed(1)}</text>
+      <text x={x(data.length - 1) + 6} y={y(last) + 3} fontSize="11" fontWeight="800" fill={colorFor(last)}>{last.toFixed(1)}</text>
       <text x={LG} y={H - 4} fontSize="9" fill="#8B8775">{data.length} rounds ago</text>
       <text x={W - RG} y={H - 4} textAnchor="end" fontSize="9" fill="#8B8775">now</text>
     </svg>
