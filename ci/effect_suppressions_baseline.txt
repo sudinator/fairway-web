@@ -1,0 +1,23 @@
+# Reviewed legacy exhaustive-deps suppressions as of v177.14. New suppressions fail CI.
+components/contests-view.tsx|// eslint-disable-next-line react-hooks/exhaustive-deps
+components/contests-view.tsx|useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [gameId, hole]);
+components/feedback.tsx|// eslint-disable-next-line react-hooks/exhaustive-deps
+components/game/organizer-panel.tsx|useEffect(() => { onBetStale?.(needsUpdate); }, [needsUpdate]); // eslint-disable-line react-hooks/exhaustive-deps
+components/game/scorecard-views.tsx|// eslint-disable-next-line react-hooks/exhaustive-deps
+components/game/scorecard-views.tsx|// eslint-disable-next-line react-hooks/exhaustive-deps
+components/home.tsx|}, [deepTeeId, groupsLoading, groups]); // eslint-disable-line react-hooks/exhaustive-deps
+components/manage/courses.tsx|// eslint-disable-next-line react-hooks/exhaustive-deps
+components/manage/courses.tsx|// eslint-disable-next-line react-hooks/exhaustive-deps
+components/round-editor.tsx|// eslint-disable-next-line react-hooks/exhaustive-deps
+components/round-editor.tsx|// eslint-disable-next-line react-hooks/exhaustive-deps
+components/round-editor.tsx|// eslint-disable-next-line react-hooks/exhaustive-deps
+components/round-setup.tsx|}, [picked?.id, loadedFavId]); // eslint-disable-line react-hooks/exhaustive-deps
+components/round-setup.tsx|// eslint-disable-next-line react-hooks/exhaustive-deps
+components/round-setup.tsx|// eslint-disable-next-line react-hooks/exhaustive-deps
+components/tee-times.tsx|}, [loading, dlDone, initialTeeId, tees]); // eslint-disable-line react-hooks/exhaustive-deps
+components/tee-times.tsx|// eslint-disable-next-line react-hooks/exhaustive-deps
+components/tee-times.tsx|// eslint-disable-next-line react-hooks/exhaustive-deps
+components/tournaments.tsx|// eslint-disable-next-line react-hooks/exhaustive-deps
+components/tournaments.tsx|// eslint-disable-next-line react-hooks/exhaustive-deps
+components/tournaments.tsx|// eslint-disable-next-line react-hooks/exhaustive-deps
+components/tournaments.tsx|// eslint-disable-next-line react-hooks/exhaustive-deps

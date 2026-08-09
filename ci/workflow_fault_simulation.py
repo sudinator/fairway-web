@@ -42,6 +42,15 @@ assert_eq(ok, True, "expense success commits")
 assert_eq(sum(out["shares"]), out["amount"], "expense shares exact")
 assert_eq(sum(out["payers"].values()), out["amount"], "expense payers exact")
 
+# Bet repost: deleting the old posting + inserting corrected splits is one unit.
+bet0={"expense":{"id":"old","amount":1000},"payers":[1000],"shares":[1000]}
+bet_steps=[lambda s:s.update(expense=None),lambda s:s.update(expense={"id":"new","amount":1200}),lambda s:s.update(payers=[1200]),lambda s:s.update(shares=[600,600])]
+for fail in range(len(bet_steps)):
+    out,ok=tx(bet0,bet_steps,fail)
+    assert_eq(out,bet0,f"bet repost failure {fail} preserves original posting")
+out,ok=tx(bet0,bet_steps)
+assert_eq(out["expense"]["amount"],1200,"bet repost success commits corrected amount")
+
 # Game finish: ended state and posted rounds are one unit.
 game0 = {"status":"active","rounds":{},"clock_end":None}
 def end(s): s["status"]="ended"

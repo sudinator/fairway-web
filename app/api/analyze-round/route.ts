@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sanitizeForPrompt } from "@/lib/ai-sanitize";
 import { createRouteClient } from "@/lib/supabase-route";
+import { formatModelAnalysis, parseAiRequest, parseModelJson, responseSchema } from "@/lib/ai-contract";
 
 // Runs on the server so the Gemini API key stays secret. Takes a compact summary
 // of the current round plus prior rounds and returns a short coaching analysis.
@@ -87,13 +88,14 @@ export async function POST(request: Request) {
   // Reject oversized bodies before parsing anything.
   const raw = await request.text();
   if (raw.length > MAX_BODY_BYTES) return NextResponse.json({ error: "Request too large." }, { status: 413 });
-  let body: any;
+  let body: unknown;
   try { body = JSON.parse(raw || "{}"); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
-  let { current, history, mode, aggregate } = body || {};
-  if (mode !== "dashboard" && !current) return NextResponse.json({ error: "No round data provided." }, { status: 400 });
-  if (mode === "dashboard" && !aggregate) return NextResponse.json({ error: "No stats provided." }, { status: 400 });
-  // Clamp history to the most recent N rounds so a caller can't inflate the prompt.
-  if (Array.isArray(history) && history.length > MAX_HISTORY) history = history.slice(0, MAX_HISTORY);
+  const parsed = parseAiRequest(body, MAX_HISTORY);
+  if (!parsed) return NextResponse.json({ error: "Invalid analysis data." }, { status: 400 });
+  const mode = parsed.mode;
+  const current = mode === "round" ? parsed.current : undefined;
+  const history = mode === "round" ? parsed.history : [];
+  const aggregate = mode === "dashboard" ? parsed.aggregate : undefined;
 
   // DB-backed daily limit against THIS user (atomic; per-user + global). Soft cost-guard on top
   // of the free-tier/no-billing backstop; replaces the old bypassable in-memory counter.
@@ -123,11 +125,11 @@ ${JSON.stringify(sCurrent)}
 PRIOR ROUNDS (most recent first, may be empty):
 ${JSON.stringify(sHistory)}
 
-Write a short analysis with exactly these labels, each on its own line:
-"What went well:" - 1-2 specific positives from this round. Compare to the golfer's own prior rounds where possible (e.g. fewer 3-putts, better GIR, lower score).
-"Vs. your level:" - Compare this round's key stats to what a TYPICAL golfer with this handicap index would normally produce, and say where they're ahead of or behind that benchmark. Use realistic, well-known rules of thumb for amateur golf, e.g.: a ~10 handicap typically hits roughly 6-8 greens in regulation and ~6-8 fairways per round and averages close to 2 putts per green (around 32-34 putts), with very few doubles; a ~20 handicap typically hits ~3-5 GIR, more bogeys and several doubles, and 34-36 putts; scratch-ish players hit 10+ GIR. Scale sensibly to the golfer's actual handicap. If no handicap is given, skip this section.
-"Focus areas:" - 1-2 specific, actionable things to work on, grounded in the stats and the comparison above.
-"Next time:" - one concrete, achievable goal for the next round.
+Return JSON with exactly these string fields:
+whatWentWell - 1-2 specific positives from this round. Compare to prior rounds where possible.
+vsYourLevel - compare key stats to a typical golfer with this handicap. If no handicap is given, return an empty string.
+focusAreas - 1-2 specific actionable things to work on.
+nextTime - one concrete achievable goal for the next round.
 
 Rules: Base everything ONLY on the numbers given plus standard golf benchmarks for the stated handicap. Do not invent the golfer's own stats. Keep the whole thing under 150 words. Warm but honest.`;
 
@@ -136,11 +138,11 @@ Rules: Base everything ONLY on the numbers given plus standard golf benchmarks f
 ACCUMULATED STATS (across all the golfer's logged rounds):
 ${JSON.stringify(sAggregate)}
 
-Write a coaching summary with exactly these labels, each on its own line:
-"Your game right now:" - 1-2 sentences on the overall picture (handicap level, scoring average, biggest tendencies).
-"Strengths:" - 2-3 specific strengths, grounded in the stats and benchmarked against what a typical golfer at this handicap produces.
-"Biggest opportunities:" - 2-3 specific weaknesses that are costing the most strokes, with WHY (e.g. "3-putts are costing ~X shots a round").
-"What to work on to shoot lower:" - a short prioritized plan (the 1-2 things that would lower scores fastest, and a concrete practice focus for each).
+Return JSON with exactly these string fields:
+yourGameRightNow - 1-2 sentences on the overall picture.
+strengths - 2-3 specific strengths grounded in the stats and benchmarked appropriately.
+biggestOpportunities - 2-3 weaknesses costing the most strokes, with why.
+whatToWorkOn - a short prioritized practice plan.
 
 Use realistic amateur-golf benchmarks for the stated handicap (e.g. a ~10 handicap hits ~6-8 GIR and ~32-34 putts; a ~20 handicap hits ~3-5 GIR, more doubles, 34-36 putts; scratch hits 10+ GIR). Base everything ONLY on the numbers given plus these benchmarks; do not invent stats. Keep it under 200 words. Warm, honest, motivating.`;
 
@@ -157,7 +159,12 @@ Use realistic amateur-golf benchmarks for the stated handicap (e.g. a ~10 handic
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 1200, temperature: 0.7 },
+          generationConfig: {
+            maxOutputTokens: 1200,
+            temperature: 0.7,
+            responseMimeType: "application/json",
+            responseSchema: responseSchema(mode),
+          },
         }),
         signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
       });
@@ -177,7 +184,13 @@ Use realistic amateur-golf benchmarks for the stated handicap (e.g. a ~10 handic
           lastStatus = 502;
           continue;
         }
-        return NextResponse.json({ analysis: text });
+        const structured = parseModelJson(mode, text);
+        if (!structured) {
+          lastDetail = "Model returned invalid structured output.";
+          lastStatus = 502;
+          continue;
+        }
+        return NextResponse.json({ analysis: formatModelAnalysis(mode, structured) });
       }
       lastDetail = (await resp.text()).slice(0, 400);
       console.error(`analyze-round provider error ${resp.status}:`, lastDetail);

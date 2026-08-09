@@ -4741,3 +4741,15 @@ Post-fix verification pass. Added model-based fault injection across transaction
 - Live DB compatibility was checked from supplied schema output: `group_course_overrides` and `course_change_requests` both exist with the columns required by the RPCs; `group_course_overrides` has the required UNIQUE `(group_id, course_id)` constraint.
 - Existing product decision preserved: every active club member may read that club's course corrections and overrides.
 - Verification: repository guards green; schema-contract guard green; workflow fault simulation green, including 50,000 randomized RSVP operations. Real PostgreSQL/Supabase staging execution remains the final deployment gate.
+
+### 177.14.260808 — automated staging integration + reliability gates — MIGRATION 0133 REQUIRED
+Builds the pre-deployment proving ground requested after the 177.13 hardening release.
+- Adds `npm run test:staging`: a destructive-but-self-cleaning staging Supabase integration suite. It creates disposable auth users/groups/course/game/tee-time fixtures, exercises real authenticated RLS/RPC behavior, verifies course-correction visibility and direct-write denial, proves correction retry idempotency, injects an expense replacement failure and verifies rollback, races parallel tee-time RSVPs, injects a bet re-post failure and verifies the original posting survives, and verifies safe group deletion behavior. It refuses to run unless `BNN_STAGING_ALLOW_MUTATION=YES` is explicitly set.
+- Adds `npm run ci:staging`, which runs the normal compile/guards/unit/build pipeline and then the real staging integration suite. This is the release-candidate gate; `npm run ci` remains suitable for environments without staging credentials.
+- AI analysis now validates request shape/field bounds before consuming quota and asks Gemini for schema-constrained JSON; model output is parsed/validated before being converted back to the existing user-facing coaching text.
+- Course search now uses a bounded 300-entry TTL/LRU cache instead of an unbounded process Map.
+- Adds an effect-suppression baseline guard: the 22 reviewed legacy `react-hooks/exhaustive-deps` suppressions are frozen; any new suppression fails CI and requires explicit review.
+- 0133_testing_and_money_atomicity.sql reconciles the `group_courses(group_id,course_id)` conflict key required by course-correction RPCs and makes TGC bet post/re-post/un-post transactional. A failed corrected bet re-post now leaves the previous posting intact instead of ending cleanly-but-unposted.
+- Baseline schema now includes `UNIQUE(group_id,course_id)` on `group_courses` so fresh environments match the RPC contract.
+- No user-facing redesign; this is reliability/test infrastructure plus one betting-Money atomicity fix discovered while building the real integration suite.
+- Adds GitHub Actions: normal CI on PR/main, plus a protected manual `Staging integration` workflow that runs the real Supabase test harness with staging-only secrets.

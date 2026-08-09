@@ -35,6 +35,10 @@ require(forward, "drop policy if exists course_change_requests_insert_member", "
 require(forward, "drop policy if exists course_change_requests_update_admin", "remove request direct update")
 require(forward, "public.is_group_member(group_id, auth.uid())", "member-visible policies")
 
+require(baseline, "unique (group_id, course_id)", "baseline group/course conflict key")
+forward133 = (ROOT / "migrations/0133_testing_and_money_atomicity.sql").read_text()
+require(forward133, "group_courses_group_id_course_id_key", "forward group_courses conflict-key reconciliation")
+
 # Direct client reads are allowed; direct client mutations are not.
 for table in ["group_course_overrides", "course_change_requests"]:
     pat = rf'\.from\(["\']{table}["\']\)\s*\.\s*(insert|update|upsert|delete)\s*\('

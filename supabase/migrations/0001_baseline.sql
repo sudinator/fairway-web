@@ -89,7 +89,8 @@ create table if not exists group_courses (
   group_id uuid not null,
   course_id uuid not null,
   added_by uuid,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (group_id, course_id)
 );
 
 

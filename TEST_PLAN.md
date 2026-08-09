@@ -71,3 +71,15 @@ Do each action and confirm the described result. Any deviation = stop and report
 - [ ] With a guest in the game, confirm the guest is attributed to their sponsor in the money split.
 
 If Tier A is green and Tier C shows no deviation, the move is verified.
+
+## Tier D — real staging Supabase integration (v177.14+)
+Run `npm run test:staging` only against a disposable/staging Supabase project. Required environment variables:
+- `BNN_STAGING_SUPABASE_URL`
+- `BNN_STAGING_SUPABASE_ANON_KEY`
+- `BNN_STAGING_SUPABASE_SERVICE_ROLE_KEY`
+- `BNN_STAGING_ALLOW_MUTATION=YES`
+
+The suite creates temporary users and fixtures, tests authenticated RPC/RLS behavior through normal anon-key clients, uses the service-role client only for fixture setup/assertion/cleanup, and deletes its fixtures at the end. Current coverage includes course correction RLS/retry/review, Money rollback under a real uniqueness failure, parallel RSVP ordering, TGC bet re-post rollback, and safe group deletion. `npm run ci:staging` is the intended release-candidate gate after ordinary `npm run ci`.
+
+### GitHub Actions wiring
+`.github/workflows/ci.yml` runs the normal `npm run ci` gate on pull requests and pushes to main. `.github/workflows/staging-integration.yml` is an explicit/manual staging gate because it creates disposable users/data. Configure the three `BNN_STAGING_SUPABASE_*` values as secrets in a protected GitHub `staging` environment; the workflow supplies the mutation-confirmation switch only inside that protected job.

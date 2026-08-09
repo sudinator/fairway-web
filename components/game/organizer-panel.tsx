@@ -762,6 +762,10 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
   const payerRows = (post: BetPost, expId: string) => post.payers.map((py) => ({ expense_id: expId, user_id: py.user_id, guest_id: py.guest_id, sponsor_user_id: py.sponsor_user_id, paid_cents: py.paid_cents }));
   const shareRows = (post: BetPost, expId: string) => post.shares.map((sh) => ({ expense_id: expId, user_id: sh.user_id, guest_id: sh.guest_id, sponsor_user_id: sh.sponsor_user_id, share_cents: sh.share_cents }));
   const primaryPayer = (post: BetPost) => post.payers.map((p) => p.user_id || p.sponsor_user_id).find(Boolean) || null;
+  const rpcBetRows = (post: BetPost) => ({
+    p_payers: post.payers.map((py) => ({ user_id: py.user_id ?? null, guest_id: py.guest_id ?? null, sponsor_user_id: py.sponsor_user_id ?? null, paid_cents: py.paid_cents })),
+    p_shares: post.shares.map((sh) => ({ user_id: sh.user_id ?? null, guest_id: sh.guest_id ?? null, sponsor_user_id: sh.sponsor_user_id ?? null, share_cents: sh.share_cents })),
+  });
 
   async function doPost() {
     setBusy(true); setPostMsg(null);
@@ -770,24 +774,21 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
       if (!built.ok) { setPostMsg(built.reason); setBusy(false); return; }
       const post = betResultToPost(built.nets);
       if (!post.ok) { setPostMsg(post.reason || "Couldn't balance the bet."); setBusy(false); return; }
-      const pp = primaryPayer(post);
-      if (!pp) { setPostMsg("Couldn't post — no member to record as payer."); setBusy(false); return; }
+      if (!primaryPayer(post)) { setPostMsg("Couldn't post — no member to record as payer."); setBusy(false); return; }
       const desc = `TGC bet — ${game.name || game.course || "game"}`;
-      const { data: betEventId } = await supabase.rpc("ensure_game_event", { p_game: game.id });
-      const { data: exp, error: e1 } = await supabase.from("expenses").insert({
-        group_id: game.group_id, created_by: user.id,
-        payer_user_id: pp,
-        amount_cents: post.amount_cents, description: desc, category: "bet", split_type: "custom",
-        source_game_id: game.id, source_kind: "tgc_bet", event_id: betEventId ?? null,
-      }).select("id, created_at").single();
-      if (e1 || !exp) { setPostMsg("Couldn't post — please try again."); setBusy(false); return; }
-      const { error: e2 } = await supabase.from("expense_payers").insert(payerRows(post, exp.id));
-      const { error: e3 } = await supabase.from("expense_shares").insert(shareRows(post, exp.id));
-      if (e2 || e3) { console.error("[bet post] split insert failed", { payers: e2, shares: e3 }); await supabase.from("expenses").delete().eq("id", exp.id); setPostMsg(("Couldn't post the splits — rolled back. " + ((e2 || e3)?.message || "")).trim()); setBusy(false); return; }
+      const { data: betEventId, error: eventErr } = await supabase.rpc("ensure_game_event", { p_game: game.id });
+      if (eventErr) { setPostMsg("Couldn't create the Money event — please try again."); setBusy(false); return; }
+      const rows = rpcBetRows(post);
+      const { data, error } = await supabase.rpc("save_bet_expense_atomic", {
+        p_replace_expense: null, p_group: game.group_id, p_game: game.id, p_event: betEventId ?? null,
+        p_description: desc, p_amount_cents: post.amount_cents, ...rows,
+      });
+      const exp = Array.isArray(data) ? data[0] : data;
+      if (error || !exp?.id) { console.error("[bet post] atomic save failed", error); setPostMsg("Couldn't post — nothing was changed. Please try again."); setBusy(false); return; }
       await supabase.from("group_activity").insert({ group_id: game.group_id, actor_user_id: user.id, action: "bet_posted", summary: `posted bet winnings — pot $${(post.amount_cents / 100).toFixed(0)}`, meta: { game_id: game.id, expense_id: exp.id, amount_cents: post.amount_cents } });
       setPostedExpense({ id: exp.id, created_at: exp.created_at }); setConfirming(false);
       setPostMsg("Posted to Money.");
-    } catch { setPostMsg("Something went wrong posting to Money."); }
+    } catch { setPostMsg("Something went wrong posting to Money — nothing was partially saved."); }
     setBusy(false);
   }
 
@@ -805,8 +806,8 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
         summary: relevant.length ? `un-posted bet — reverse these recorded payments: ${reversals.join("; ")}` : "un-posted bet winnings",
         meta: { game_id: game.id, expense_id: postedExpense.id, reversals },
       });
-      const { error } = await supabase.from("expenses").delete().eq("id", postedExpense.id);
-      if (error) { setPostMsg("Couldn't un-post — please try again."); setBusy(false); return; }
+      const { error } = await supabase.rpc("delete_bet_expense_atomic", { p_expense: postedExpense.id, p_game: game.id });
+      if (error) { setPostMsg("Couldn't un-post — nothing was changed. Please try again."); setBusy(false); return; }
       setPostedExpense(null); setConfirming(false);
       setPostMsg(relevant.length ? `Un-posted. ${relevant.length} recorded payment(s) logged in group activity for reversal.` : "Un-posted from Money.");
     } catch { setPostMsg("Something went wrong un-posting."); }
@@ -860,33 +861,18 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
       if (!built.ok) { setPostMsg(built.reason); setBusy(false); return; }
       const post = betResultToPost(built.nets);
       if (!post.ok) { setPostMsg(post.reason || "Couldn't balance the corrected bet."); setBusy(false); return; }
-      const pp = primaryPayer(post);
-      if (!pp) { setPostMsg("Couldn't re-post — no member to record as payer."); setBusy(false); return; }
+      if (!primaryPayer(post)) { setPostMsg("Couldn't re-post — no member to record as payer."); setBusy(false); return; }
       const oldSnapshot = postedNets;
-      // Delete the old linked expense (cascades its payers/shares). Settlements are
-      // group-level and untouched, so net balances reconcile automatically — anyone
-      // who overpaid the old amount now shows as "owed back" in the Money tab.
-      const { error: ed } = await supabase.from("expenses").delete().eq("id", postedExpense.id);
-      if (ed) { setPostMsg("Couldn't update — please try again."); setBusy(false); return; }
       const desc = `TGC bet — ${game.name || game.course || "game"}`;
-      const { data: betEventId2 } = await supabase.rpc("ensure_game_event", { p_game: game.id });
-      const { data: exp, error: e1 } = await supabase.from("expenses").insert({
-        group_id: game.group_id, created_by: user.id, payer_user_id: pp,
-        amount_cents: post.amount_cents, description: desc, category: "bet", split_type: "custom",
-        source_game_id: game.id, source_kind: "tgc_bet", event_id: betEventId2 ?? null,
-      }).select("id, created_at").single();
-      if (e1 || !exp) { setPostedExpense(null); setPostedNets(null); setPostMsg("Removed the old winnings but couldn't re-post — tap Post winnings again."); setBusy(false); return; }
-      const { error: e2 } = await supabase.from("expense_payers").insert(payerRows(post, exp.id));
-      const { error: e3 } = await supabase.from("expense_shares").insert(shareRows(post, exp.id));
-      if (e2 || e3) {
-        // Roll back so we never leave a bet expense with missing/partial splits
-        // (which would compute wrong balances). End up cleanly un-posted instead.
-        console.error("[bet re-post] split insert failed", { payers: e2, shares: e3 });
-        await supabase.from("expenses").delete().eq("id", exp.id);
-        setPostedExpense(null); setPostedNets(null);
-        setPostMsg(("Couldn't save the corrected splits — the bet is now un-posted. Tap Post winnings to try again. " + ((e2 || e3)?.message || "")).trim());
-        setBusy(false); return;
-      }
+      const { data: betEventId2, error: eventErr } = await supabase.rpc("ensure_game_event", { p_game: game.id });
+      if (eventErr) { setPostMsg("Couldn't create the Money event — nothing was changed."); setBusy(false); return; }
+      const rows = rpcBetRows(post);
+      const { data, error } = await supabase.rpc("save_bet_expense_atomic", {
+        p_replace_expense: postedExpense.id, p_group: game.group_id, p_game: game.id, p_event: betEventId2 ?? null,
+        p_description: desc, p_amount_cents: post.amount_cents, ...rows,
+      });
+      const exp = Array.isArray(data) ? data[0] : data;
+      if (error || !exp?.id) { console.error("[bet re-post] atomic save failed", error); setPostMsg("Couldn't update the winnings — the original posting is unchanged."); setBusy(false); return; }
       await supabase.from("group_activity").insert({
         group_id: game.group_id, actor_user_id: user.id, action: "bet_reposted",
         summary: `re-posted corrected bet winnings — pot $${(post.amount_cents / 100).toFixed(0)}. Recorded payments stay in place; anyone who overpaid now shows as owed back in Money.`,
@@ -896,7 +882,7 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
       setPostedNets(liveNetsCents);
       setConfirming(false);
       setPostMsg("Winnings corrected in Money.");
-    } catch { setPostMsg("Something went wrong re-posting."); }
+    } catch { setPostMsg("Something went wrong re-posting — the original posting is unchanged."); }
     setBusy(false);
   }
 

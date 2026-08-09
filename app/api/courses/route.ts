@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { createRouteClient } from "@/lib/supabase-route";
+import { BoundedTtlCache } from "@/lib/ttl-cache";
 
 const COURSE_TIMEOUT_MS = 8000;
 const MIN_QUERY_LEN = 3;
 // Tiny in-process cache for identical searches (cuts repeated upstream calls; best-effort, per instance).
-const searchCache = new Map<string, { at: number; body: any }>();
 const SEARCH_CACHE_MS = 60_000;
+const searchCache = new BoundedTtlCache<{ courses: Array<{ id: unknown; club: string; name: string; location: string }> }>(300, SEARCH_CACHE_MS);
 
 // This runs on the server (not the browser), so the API key stays secret.
 // It talks to golfcourseapi.com — a free database of ~30,000 courses.
@@ -70,7 +71,7 @@ export async function GET(request: Request) {
       if (query.length < MIN_QUERY_LEN) return NextResponse.json({ courses: [] });
       const cacheKey = query.toLowerCase();
       const hit = searchCache.get(cacheKey);
-      if (hit && Date.now() - hit.at < SEARCH_CACHE_MS) return NextResponse.json(hit.body);
+      if (hit) return NextResponse.json(hit);
 
       const res = await fetch(`${BASE}/search?search_query=${encodeURIComponent(query)}`, { headers, signal: AbortSignal.timeout(COURSE_TIMEOUT_MS) });
       if (!res.ok) throw new Error(`Search failed (${res.status})`);
@@ -82,7 +83,7 @@ export async function GET(request: Request) {
         location: courseLocation(c),
       }));
       const payload = { courses };
-      searchCache.set(cacheKey, { at: Date.now(), body: payload });
+      searchCache.set(cacheKey, payload);
       return NextResponse.json(payload);
     }
 

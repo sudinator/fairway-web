@@ -135,6 +135,8 @@ Total: 107 migrations. Unchecked = not yet confirmed applied.
 
 - **0129 — intentionally skipped/reserved.** There is no `0129_workflow_atomicity.sql` in v177.13. Do not create or apply a 0129 migration for this release. The workflow hardening sequence begins at 0130 to avoid collision with a separately-used production 0129 identifier.
 
-- [ ] **0130_workflow_atomicity.sql** — atomic Money/game/group/course workflows + collision-safe tee-time RSVP order. REQUIRED before v177.13.
-- [ ] **0131_workflow_retry_and_review_atomicity.sql** — retry-safe course corrections + atomic admin review. REQUIRED after 0130.
-- [ ] **0132_course_schema_reconciliation_and_privilege_hardening.sql** — reconciles course-correction schema, ensures the override upsert key, preserves member-readable SELECT policies, and removes direct browser-role mutation privileges. REQUIRED after 0131.
+- [x] **0130_workflow_atomicity.sql** — atomic Money/game/group/course workflows + collision-safe tee-time RSVP order. REQUIRED before v177.13.
+- [x] **0131_workflow_retry_and_review_atomicity.sql** — retry-safe course corrections + atomic admin review. REQUIRED after 0130.
+- [x] **0132_course_schema_reconciliation_and_privilege_hardening.sql** — reconciles course-correction schema, ensures the override upsert key, preserves member-readable SELECT policies, and removes direct browser-role mutation privileges. REQUIRED after 0131.
+
+- [ ] **0133_testing_and_money_atomicity.sql** — v177.14 reliability migration. Ensures `group_courses(group_id, course_id)` has the unique conflict key required by course-correction RPCs; aborts clearly instead of silently deduping if historical duplicates exist. Adds organizer/admin-gated atomic TGC bet post/re-post/un-post RPCs. REQUIRED before v177.14.
