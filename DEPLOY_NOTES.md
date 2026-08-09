@@ -4763,3 +4763,9 @@ Corrective release after the new v177.14 real staging gate found a PostgreSQL ru
 - The bet atomicity static guard now requires the 0134 ambiguity fix, preventing a future release from dropping the corrective migration.
 - Real GitHub Actions staging integration passed after the hotfix, including course correction RLS/retry/review, Money rollback, concurrent RSVP ordering, atomic TGC bet post/re-post rollback, safe group delete, and cleanup.
 - Deployment order from an existing v177.14 production DB: apply **0134**, verify the migration ledger, then deploy v177.15. Fresh environments apply 0130 → 0131 → 0132 → 0133 → 0134; 0129 remains intentionally skipped/reserved.
+### 177.16.260809 — production promotion CI hardening
+
+- Fixed the pull-request CI workflow so the Next.js build receives the staging Supabase public URL and anon key.
+- PR verification now uses the protected GitHub `staging` environment.
+- Added branch protection for `main`: changes require a pull request and the `verify` status check must pass before merge.
+- No application behavior, database schema, or production data changes.
