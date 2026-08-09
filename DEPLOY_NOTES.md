@@ -4664,3 +4664,15 @@ typed, no `any` at the seam; (4) no reactive/effect seams (pure). Because it's p
 proof: lib/flights-tagcolor.diff.test.ts vs an independently transcribed baseline — 5,012 comparisons, 0
 mismatches. GameRoom -1 line of inline logic; the point is the process, proven on the safest possible block
 first. tsc/guards/tests/build green.
+
+### 177.8.260808 — Stage 3 pass 2: extract LeaderRow from GameRoom (extraction-verification standard) — no migration
+Moved the ~46-line leaderboard-row JSX out of GameRoom into components/game/leader-row.tsx as <LeaderRow>.
+GameRoom keeps a thin renderLeaderRow wrapper so the 3 call sites are UNCHANGED. Four gates shown/met:
+(1) body char-for-char identical (verified programmatically); (2) free-variable ledger balances — 10 closure
+vars (user, isStroke, strokeNet, playerPoints/Thru/Net/Gross, parThru, relToParStr, leaderName) each became a
+typed prop the wrapper passes by the same identifier; C/Avatar/flightTagColor are module imports, not closure
+state; (3) tsc clean, no `any` at the seam (user prop typed {id:string}, stricter than GameRoom's any — removed
+an any rather than propagating it); (4) reactive seams: renderLeaderRow now returns a <LeaderRow/> boundary vs
+inline JSX — LeaderRow is stateless/effect-free so output-identical, key moved to the element for list
+reconciliation; no effect timing, so the ledger fully closes it. No differential test (JSX, nothing to fuzz).
+tournaments.tsx 3591->3549. tsc/guards/tests/build green.

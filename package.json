@@ -1,6 +1,6 @@
 {
   "name": "fairway-card",
-  "version": "177.7.260715",
+  "version": "177.8.260715",
   "private": true,
   "scripts": {
     "prebuild": "node scripts/write-version.mjs",

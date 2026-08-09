@@ -80,6 +80,7 @@ import { GameList } from "@/components/game/game-list";
 import * as PS from "@/lib/player-scoring";
 import * as FG from "@/lib/finish-gaps";
 import * as SEG from "@/lib/segments";
+import { LeaderRow } from "@/components/game/leader-row";
 import * as GU from "@/lib/game-utils";
 import { makeCode, defaultTeeIdx, todayLocalStr, normalizeFavoriteCourse, GP_STATE_DEFAULTS } from "@/lib/game-utils";
 import * as GC from "@/lib/game-create";
@@ -2527,54 +2528,12 @@ function GameRoom({
   const hasFlights = (game as any).flight_mode === "oneoff" && flightDefs.length > 0 && (isStroke || game.game_type === "stableford");
   const posWithin = (p: Player, pool: Player[]) => PS.posWithin(p, pool, game);
   const tiedWithin = (p: Player, pool: Player[]) => PS.tiedWithin(p, pool, game);
-  const renderLeaderRow = (p: Player, pos: number, tied: boolean, showTag: boolean) => {
-    const pts = playerPoints(p);
-    const thru = playerThru(p);
-    const fkey = (p as any).flight as string | null;
-    return (
-      <div key={p.id} style={{
-        background: p.user_id === user.id ? C.cream : C.card,
-        borderRadius: 12, padding: "10px 16px", marginTop: 8,
-        display: "flex", alignItems: "center",
-      }}>
-        <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700, width: 20, fontSize: 15 }}>
-          {tied ? "T" : ""}{pos}
-        </div>
-        <Avatar src={p.avatar_url} name={p.display_name} size={32} />
-        <div style={{ flex: 1, minWidth: 0, marginLeft: 8 }}>
-          <div style={{ color: C.ink, fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {leaderName(p.display_name)}{p.user_id === user.id ? " (you)" : ""}
-            {showTag && fkey ? <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, borderRadius: 5, padding: "1px 6px", background: flightTagColor(fkey), color: "#06251A" }}>{fkey}</span> : null}
-          </div>
-          <div style={{ color: C.faint, fontSize: 11 }}>
-            {p.course_handicap != null ? `CH ${p.course_handicap}` : "no hcp"}
-            {p.bets === false ? <span style={{ color: C.gold, fontWeight: 800 }}> · no bet</span> : ""}
-          </div>
-        </div>
-        {isStroke ? (() => {
-          const relV = (strokeNet ? playerNet(p) : playerGross(p)) - parThru(p);
-          const relS = !thru ? "–" : relV === 0 ? "E" : relV > 0 ? `+${relV}` : `${relV}`;
-          const relCol = !thru ? C.faint : relV < 0 ? "#1F8F54" : relV > 0 ? C.birdie : "#6B6857";
-          return (<>
-            <div style={{ width: 40, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru || "–"}</div>
-            <div style={{ width: 48, textAlign: "center", color: C.ink, fontWeight: strokeNet ? 700 : 800, fontSize: strokeNet ? 15 : 18, fontFamily: strokeNet ? undefined : "Georgia, serif" }}>{thru ? playerGross(p) : "–"}</div>
-            <div style={{ width: 48, textAlign: "center", color: relCol, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{relS}</div>
-            <div style={{ width: 50, textAlign: "center", color: strokeNet ? C.green : C.ink, fontWeight: strokeNet ? 800 : 700, fontSize: strokeNet ? 19 : 15, fontFamily: strokeNet ? "Georgia, serif" : undefined }}>{thru ? playerNet(p) : "–"}</div>
-          </>);
-        })() : (<>
-          <div style={{ width: 44, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru || "–"}</div>
-          <div style={{ width: 48, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru ? playerGross(p) : "–"}</div>
-          {(() => {
-            if (!thru) return <div style={{ width: 44, textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 16, fontFamily: "Georgia, serif" }}>–</div>;
-            const rel = 2 * thru - pts;
-            const col = rel < 0 ? "#1F8F54" : rel > 0 ? C.birdie : "#6B6857";
-            return <div style={{ width: 44, textAlign: "center", color: col, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{relToParStr(p)}</div>;
-          })()}
-          <div style={{ width: 40, textAlign: "center", color: C.green, fontWeight: 800, fontSize: 19, fontFamily: "Georgia, serif" }}>{pts}</div>
-        </>)}
-      </div>
-    );
-  };
+  const renderLeaderRow = (p: Player, pos: number, tied: boolean, showTag: boolean) => (
+    <LeaderRow key={p.id} p={p} pos={pos} tied={tied} showTag={showTag}
+      user={user} isStroke={isStroke} strokeNet={strokeNet}
+      playerPoints={playerPoints} playerThru={playerThru} playerNet={playerNet}
+      playerGross={playerGross} parThru={parThru} relToParStr={relToParStr} leaderName={leaderName} />
+  );
 
   // Segment winners (three sixes). While a six is IN PROGRESS the "leader" is whoever is
   // most under par for the holes they've actually played (pace) — matching the main
