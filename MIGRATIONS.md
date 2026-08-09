@@ -140,3 +140,6 @@ Total: 107 migrations. Unchecked = not yet confirmed applied.
 - [x] **0132_course_schema_reconciliation_and_privilege_hardening.sql** — reconciles course-correction schema, ensures the override upsert key, preserves member-readable SELECT policies, and removes direct browser-role mutation privileges. REQUIRED after 0131.
 
 - [ ] **0133_testing_and_money_atomicity.sql** — v177.14 reliability migration. Ensures `group_courses(group_id, course_id)` has the unique conflict key required by course-correction RPCs; aborts clearly instead of silently deduping if historical duplicates exist. Adds organizer/admin-gated atomic TGC bet post/re-post/un-post RPCs. REQUIRED before v177.14.
+
+- [ ] **0133_testing_and_money_atomicity.sql** — adds the `group_courses(group_id,course_id)` conflict key when needed and transactional TGC bet post/re-post/un-post RPCs. REQUIRED before v177.14. Note: its original `save_bet_expense_atomic` body has a runtime ambiguity fixed by 0134; always apply 0134 after 0133.
+- [ ] **0134_fix_bet_rpc_ambiguous_id.sql** — staging-proven runtime correction for `save_bet_expense_atomic`; qualifies table `id`/`created_at` references that collide with `RETURNS TABLE(id, created_at)` PL/pgSQL output variables. No schema/data changes. REQUIRED before v177.15.
