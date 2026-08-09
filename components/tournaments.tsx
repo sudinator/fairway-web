@@ -81,6 +81,7 @@ import * as PS from "@/lib/player-scoring";
 import * as FG from "@/lib/finish-gaps";
 import * as SEG from "@/lib/segments";
 import { LeaderRow } from "@/components/game/leader-row";
+import { roundStats } from "@/lib/round-stats";
 import * as GU from "@/lib/game-utils";
 import { makeCode, defaultTeeIdx, todayLocalStr, normalizeFavoriteCourse, GP_STATE_DEFAULTS } from "@/lib/game-utils";
 import * as GC from "@/lib/game-create";
@@ -3520,14 +3521,8 @@ function GameRoom({
 
 function MyStatsLine({ me, holes }: { me: Player; holes: Hole[] }) {
   const withPutts = holes.filter((h) => h.putts != null);
-  const totalPutts = withPutts.reduce((s, h) => s + (h.putts || 0), 0);
-  const girHit = withPutts.filter(
-    (h) => h.strokes != null && h.strokes - (h.putts || 0) <= h.par - 2,
-  ).length;
   const fwHoles = holes.filter((h) => h.par >= 4 && h.fairway != null);
-  const fwHit = fwHoles.filter((h) => h.fairway === "hit").length;
-  const fwLeft = fwHoles.filter((h) => h.fairway === "left").length;
-  const fwRight = fwHoles.filter((h) => h.fairway === "right").length;
+  const { totalPutts, girHit, fwHit, fwLeft, fwRight } = roundStats(holes);
   return (
     <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
       Your round: {totalPutts} putts

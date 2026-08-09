@@ -4676,3 +4676,13 @@ an any rather than propagating it); (4) reactive seams: renderLeaderRow now retu
 inline JSX — LeaderRow is stateless/effect-free so output-identical, key moved to the element for list
 reconciliation; no effect timing, so the ledger fully closes it. No differential test (JSX, nothing to fuzz).
 tournaments.tsx 3591->3549. tsc/guards/tests/build green.
+
+### 177.9.260808 — Stage 3 pass 3: extract roundStats (pure, tested, reused) — no migration
+The putt/GIR/fairway math was inline in MyStatsLine AND duplicated across ~4 spots in components/ui.tsx.
+Extracted to lib/round-stats.ts: roundStats(holes) (+ an isGIR(hole) predicate for the ui.tsx dedup next),
+pure and differentially tested — lib/round-stats.diff.test.ts vs an independently transcribed baseline: 6,000
+comparisons, 0 mismatches (strongest proof, since it's pure). MyStatsLine now destructures the 5 derived counts
+from roundStats; its withPutts/fwHoles arrays are kept so the JSX (`withPutts.length`, `fwHoles.length`) is
+byte-identical — the render is untouched, only the stat computation moved. tsc clean, no `any` at the seam, no
+reactive seams (pure). This pass is about REUSE + test coverage (the modular-path rule), not GameRoom line count;
+follow-up: point the 4 ui.tsx GIR sites at isGIR to finish the dedup. ci green.
