@@ -4686,3 +4686,16 @@ from roundStats; its withPutts/fwHoles arrays are kept so the JSX (`withPutts.le
 byte-identical — the render is untouched, only the stat computation moved. tsc clean, no `any` at the seam, no
 reactive seams (pure). This pass is about REUSE + test coverage (the modular-path rule), not GameRoom line count;
 follow-up: point the 4 ui.tsx GIR sites at isGIR to finish the dedup. ci green.
+
+### 177.10.260808 — Stage 3 batch: split the Courses cluster out of manage.tsx (891 lines) — no migration
+Larger batch now that the extraction methodology is proven. Moved the entire course-library cluster —
+CourseChangeSummary, CoursesLibrary, CourseEditor, CourseForm + their helpers (normalize, courseCardTitle,
+formatDateTime) and types (LibCourse, CourseEditRequest, CourseTab) — VERBATIM out of components/manage.tsx
+into a new self-contained components/manage/courses.tsx. Verified: (1) bodies byte-identical (sliced directly;
+the only change is `function`->`export function` on the 3 non-exported components — the export mechanism, not
+a body edit); (2) ledger — the cluster is fully self-contained (its only cross-refs are to each other; confirmed
+it uses no manage-local helper that stays behind), courses.tsx carries its own `const supabase = createClient()`
+and the cluster's import surface; home.tsx repointed to import CoursesLibrary from the new path; tsc 0 errors
+confirms every wire resolves; (3) build compiles (module boundaries + use-client OK); (4) no reactive seams —
+whole components moved intact, their internal effects/state unchanged and unmoved relative to their own bodies.
+No differential test (JSX components). manage.tsx 3831 -> 2941 lines. ci green.
