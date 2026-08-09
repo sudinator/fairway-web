@@ -114,7 +114,7 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current version: 177.14.260808.** Migrations **0130, 0131, and 0132** are the already-applied v177.13 prerequisite set; apply **0133_testing_and_money_atomicity.sql** before deploying v177.14. **Migration number 0129 remains intentionally skipped/reserved.** (Version scheme `FEATURE.EDIT.YYMMDD` — see APP_RULES #13.)
+**Current version: 177.15.260808.** Migrations **0130, 0131, 0132, and 0133** precede this corrective release; apply **0134_fix_bet_rpc_ambiguous_id.sql** before deploying v177.15. **Migration number 0129 remains intentionally skipped/reserved.** (Version scheme `FEATURE.EDIT.YYMMDD` — see APP_RULES #13.)
 - **Two migrations are PENDING** — run in the Supabase SQL editor in order (full SQL printed inline at
   delivery, and in the files):
   - **`0111_money_audit.sql`** — durable Money audit trail + triggers, child-write lock, $100k cap.
@@ -564,3 +564,10 @@ where r.game_id is not null
 ## v177.14 automated pre-deploy gate
 Current release target: **177.14.260808**. Migration sequence assumes 0130/0131/0132 are already live from v177.13; apply **0133_testing_and_money_atomicity.sql** before deploying v177.14.
 For release candidates, run `npm run ci:staging` against a disposable/staging Supabase project with `BNN_STAGING_SUPABASE_URL`, `BNN_STAGING_SUPABASE_ANON_KEY`, `BNN_STAGING_SUPABASE_SERVICE_ROLE_KEY`, and the explicit safety switch `BNN_STAGING_ALLOW_MUTATION=YES`. The suite creates and removes test users/data; never point it at production.
+
+
+## v177.15 corrective release
+- Production path: if v177.14/0133 is already live, apply only `0134_fix_bet_rpc_ambiguous_id.sql`, confirm the ledger row, then deploy v177.15.
+- Fresh path: 0129 remains intentionally skipped/reserved; apply 0130 → 0131 → 0132 → 0133 → 0134.
+- 0134 was generated from a failure caught by the real GitHub/Supabase staging integration gate and then validated by a fully green staging run.
+- Do not copy production data or production outbound webhooks into staging; schema/RPC parity plus disposable test fixtures is the intended model.

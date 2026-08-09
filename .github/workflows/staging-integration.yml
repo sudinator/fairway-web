@@ -16,18 +16,14 @@ jobs:
       BNN_STAGING_SUPABASE_ANON_KEY: ${{ secrets.BNN_STAGING_SUPABASE_ANON_KEY }}
       BNN_STAGING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BNN_STAGING_SUPABASE_SERVICE_ROLE_KEY }}
       BNN_STAGING_ALLOW_MUTATION: YES
-
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.BNN_STAGING_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.BNN_STAGING_SUPABASE_ANON_KEY }}
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-
       - run: npm ci
-
       - run: npm run ci:staging

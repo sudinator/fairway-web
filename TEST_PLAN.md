@@ -83,3 +83,7 @@ The suite creates temporary users and fixtures, tests authenticated RPC/RLS beha
 
 ### GitHub Actions wiring
 `.github/workflows/ci.yml` runs the normal `npm run ci` gate on pull requests and pushes to main. `.github/workflows/staging-integration.yml` is an explicit/manual staging gate because it creates disposable users/data. Configure the three `BNN_STAGING_SUPABASE_*` values as secrets in a protected GitHub `staging` environment; the workflow supplies the mutation-confirmation switch only inside that protected job.
+
+
+## v177.15 corrective staging result
+The first real staging execution of the v177.14 suite caught a PL/pgSQL runtime ambiguity in `save_bet_expense_atomic` that static/model checks had not surfaced. After applying the 0134-qualified-column fix, the full GitHub `Staging integration` workflow passed. This validates the release process itself: static/unit/build gates remain useful, but a real staging PostgreSQL/RLS/RPC run is required before future production database releases.

@@ -4753,3 +4753,13 @@ Builds the pre-deployment proving ground requested after the 177.13 hardening re
 - Baseline schema now includes `UNIQUE(group_id,course_id)` on `group_courses` so fresh environments match the RPC contract.
 - No user-facing redesign; this is reliability/test infrastructure plus one betting-Money atomicity fix discovered while building the real integration suite.
 - Adds GitHub Actions: normal CI on PR/main, plus a protected manual `Staging integration` workflow that runs the real Supabase test harness with staging-only secrets.
+
+
+### 177.15.260808 — staging-proven bet RPC runtime hotfix — MIGRATION 0134 REQUIRED
+Corrective release after the new v177.14 real staging gate found a PostgreSQL runtime ambiguity in the TGC bet RPC.
+- Real staging integration exposed `column reference "id" is ambiguous` on the first call to `save_bet_expense_atomic` from 0133. The function returns `TABLE(id, created_at)`, making those output names PL/pgSQL variables; 0133 also used bare `id` table references, which PostgreSQL correctly rejected at runtime.
+- 0134 replaces only `save_bet_expense_atomic` with the same signature/authorization/transaction semantics while qualifying collision-prone table columns (`g.id`, `ge.id`, `gg.id`, `e.id`, `e.created_at`). No application data or table shape changes.
+- The staging workflow now exposes the staging URL/anon key to the normal Next.js build as `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`, while retaining the dedicated `BNN_STAGING_*` variables for destructive integration fixtures.
+- The bet atomicity static guard now requires the 0134 ambiguity fix, preventing a future release from dropping the corrective migration.
+- Real GitHub Actions staging integration passed after the hotfix, including course correction RLS/retry/review, Money rollback, concurrent RSVP ordering, atomic TGC bet post/re-post rollback, safe group delete, and cleanup.
+- Deployment order from an existing v177.14 production DB: apply **0134**, verify the migration ledger, then deploy v177.15. Fresh environments apply 0130 → 0131 → 0132 → 0133 → 0134; 0129 remains intentionally skipped/reserved.
