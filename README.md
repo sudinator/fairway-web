@@ -10,10 +10,10 @@ walked you through (GitHub → Google sign-in setup → Vercel).
 
 ## What each part does (for the curious — optional)
 
-- `app/page.tsx` — the whole app screen: login, scorecard entry, stats
+- `app/page.tsx` — top-level app entry/composition; feature screens live under `components/`
 - `app/auth/callback/route.ts` — handles the moment Google sends a user back after sign-in
 - `lib/golf.ts` — the golf math (handicap, Stableford, GIR/fairway/putt stats)
-- `lib/courses.ts` — starter list of well-known courses + "add your own course"
+- `lib/courses.ts` — course normalization, identity, group-library, and custom-course helpers
 - `lib/supabase.ts` — the connection to your database
 - `components/ui.tsx` — shared visual pieces (the scorecard, stat tiles)
 
@@ -39,7 +39,7 @@ members can correct a course's pars/rating/stroke index and save the fix.
 ## Running it on your own PC first (optional)
 
 If you ever want to preview locally before deploying:
-1. Install Node.js 18+
+1. Install Node.js 20.9+
 2. `npm install`
 3. Copy `.env.example` to `.env.local` and fill in your two Supabase values
 4. `npm run dev`, then open http://localhost:3000
@@ -47,4 +47,4 @@ If you ever want to preview locally before deploying:
 ## UI conventions
 - Six-hole segment breakdown reuses the Group Results grid format (Player / Thru / segment columns / Total) for consistency.
 
-- **Minimum font size: 10px.** Never use a `fontSize` below 10 anywhere in the app (readability floor). Bump to 10 rather than going smaller; if space is tight, shorten the label instead of shrinking the type.
+- **Minimum font size: 11px.** Never use a `fontSize` below 11 anywhere in the app (readability floor). If space is tight, shorten the label instead of shrinking the type.

@@ -159,8 +159,6 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
 
   const deleteGroup = async () => {
     if (!active || !isAdmin) return;
-    // Only allow deleting an "empty" group — one where the admin is the only
-    // active member left. Guard on the loaded member list.
     const activeOthers = (members || []).filter((m) => m.status === "active" && m.user_id !== user.id);
     if (activeOthers.length > 0) {
       setMsg(`Can't delete: ${activeOthers.length} other active member${activeOthers.length === 1 ? "" : "s"} still in this club. Remove them first.`);
@@ -169,39 +167,15 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
     if (!confirm(`Delete the club "${active.name}"? This permanently removes the club and its membership. Rounds you logged are kept on your account. This cannot be undone.`)) return;
     setBusy(true); setMsg(null);
     try {
-      // Clear the group from anyone whose active group points at it.
-      await supabase.from("profiles").update({ active_group_id: null }).eq("active_group_id", active.id);
-      // Tables whose group_id FK is "no action" (rounds, games, favorites,
-      // notifications) would block the group delete while pointing at it. Null
-      // their group_id first so the rows are preserved but no longer reference the
-      // group. (group_members / group_invites / group_courses cascade automatically.)
-      await supabase.from("rounds").update({ group_id: null }).eq("group_id", active.id);
-      await supabase.from("favorite_courses").update({ group_id: null }).eq("group_id", active.id);
-      await supabase.from("games").update({ group_id: null }).eq("group_id", active.id);
-      await supabase.from("notifications").update({ group_id: null }).eq("group_id", active.id);
-      // IMPORTANT ORDER: delete the GROUP row FIRST, while we are still its admin.
-      // is_group_admin() checks the group_members table, so if we deleted our own
-      // membership first, the group-delete permission check would then fail and
-      // silently remove nothing. Delete the group, verify it went, then clean up
-      // the now-orphaned dependent rows.
-      const { data: deleted, error } = await supabase
-        .from("groups").delete().eq("id", active.id).select("id");
+      const { error } = await supabase.rpc("delete_group_safely", { p_group: active.id });
       if (error) throw error;
-      if (!deleted || deleted.length === 0) {
-        setMsg("Couldn't delete this club — your account may not have permission (nothing was changed).");
-        setBusy(false);
-        return;
-      }
-      // Group is gone; remove its dependent rows.
-      await supabase.from("group_members").delete().eq("group_id", active.id);
-      await supabase.from("group_invites").delete().eq("group_id", active.id);
-      await supabase.from("group_courses").delete().eq("group_id", active.id);
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Group admin", action: "group_deleted", summary: `Deleted group "${active.name}"` });
       setMsg("Club deleted.");
       if (onGroupDeleted) await onGroupDeleted();
       else await onGroupsChanged();
     } catch (e: any) {
-      setMsg("Couldn't delete club: " + (e.message || "error"));
+      const m = String(e?.message || "error");
+      setMsg(m.includes("other active") ? "Can't delete this club while another active member is still in it." : "Couldn't delete club: " + m);
     } finally { setBusy(false); }
   };
 

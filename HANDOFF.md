@@ -114,7 +114,7 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current version: 168.2.260715 (this zip). Migration 0115 is the outstanding DB step (0111-0114 already applied per the ledger).** (New version scheme `FEATURE.EDIT.YYMMDD` — see APP_RULES #13.)
+**Current version: 177.13.260808.** Deployment migrations for this release are **0130, 0131, then 0132**. **Migration number 0129 is intentionally skipped/reserved and is not included in this release.** Do not look for or apply `0129_workflow_atomicity.sql`; the workflow-atomicity migration is `0130_workflow_atomicity.sql`. (Version scheme `FEATURE.EDIT.YYMMDD` — see APP_RULES #13.)
 - **Two migrations are PENDING** — run in the Supabase SQL editor in order (full SQL printed inline at
   delivery, and in the files):
   - **`0111_money_audit.sql`** — durable Money audit trail + triggers, child-write lock, $100k cap.

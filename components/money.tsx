@@ -901,39 +901,29 @@ function AddExpense({ user, gid, members, guests, balances, busy, setBusy, requi
     if (!requireOnline() || !canSave) return;
     setPendingConfirm(null);
     setBusy(true);
-    const primaryPayer = paidPayers[0];
-    const payload = { payer_user_id: primaryPayer, description: desc.trim(), amount_cents: amtCents, split_type: mode, event_id: eventId };
-    let expId = editing?.id;
-    if (editing) {
-      const { error } = await supabase.from("expenses").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", editing.id);
-      if (error) { setBusy(false); alert("Couldn't update the expense."); return; }
-      await supabase.from("expense_shares").delete().eq("expense_id", editing.id);
-    } else {
-      const { data: exp, error } = await supabase.from("expenses").insert({ group_id: gid, created_by: user.id, ...payload }).select("id").single();
-      if (error || !exp) { setBusy(false); alert("Couldn't save the expense."); return; }
-      expId = exp.id;
-    }
     const rows = selected.map((p) => ({
-      expense_id: expId,
       user_id: p.kind === "member" ? p.id : null,
       guest_id: p.kind === "guest" ? p.id : null,
       sponsor_user_id: p.kind === "guest" ? (guestSponsors[p.id] || null) : null,
       share_cents: shareOf(p),
     }));
-    const shErr = (await supabase.from("expense_shares").insert(rows)).error;
-    await supabase.from("expense_payers").delete().eq("expense_id", expId);
-    const pyErr = (await supabase.from("expense_payers").insert(paidPayers.map((uid) => ({ expense_id: expId, user_id: uid, paid_cents: multiPayer ? centsOf(payerAmt[uid]) : amtCents })))).error;
-    if (shErr || pyErr) {
-      // Never leave a broken expense (payer credited but no shares => wrong balances).
-      // New expense: remove it entirely (shares/payers cascade). Edit: surface so they can re-enter.
-      if (!editing && expId) await supabase.from("expenses").delete().eq("id", expId);
+    const payers = paidPayers.map((uid) => ({ user_id: uid, paid_cents: multiPayer ? centsOf(payerAmt[uid]) : amtCents }));
+    const { data: savedId, error: saveErr } = await supabase.rpc("save_expense_atomic", {
+      p_expense: editing?.id || null,
+      p_group: gid,
+      p_description: desc.trim(),
+      p_amount_cents: amtCents,
+      p_split_type: mode,
+      p_event: eventId,
+      p_shares: rows,
+      p_payers: payers,
+    });
+    if (saveErr || !savedId) {
       setBusy(false);
-      alert(editing
-        ? "The amount saved but the split didn't record — please reopen this expense and re-enter the split."
-        : "Couldn't save the split, so nothing was saved. Check your connection and try again."
-          + (pyErr && !shErr ? " (If this persists, the payers migration 0049 may not be applied yet.)" : ""));
+      alert("Couldn't save the expense. Nothing was changed — please try again.");
       return;
     }
+    const expId = String(savedId);
     await onLog?.(editing ? "expense_edited" : "expense_created", (editing ? "edited “" : "added “") + (desc.trim() || "expense") + "” — " + fmtUSD(amtCents), { expense_id: expId, amount_cents: amtCents });
     setBusy(false);
     await onSaved();

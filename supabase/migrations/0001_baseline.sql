@@ -92,6 +92,39 @@ create table if not exists group_courses (
   created_at timestamptz not null default now()
 );
 
+
+-- ---------- course correction / group-local override workflow ----------
+-- These tables exist in the live DB and are required by the course library. They were historically
+-- created out-of-band; keeping them in the baseline makes fresh environments reproducible.
+create table if not exists group_course_overrides (
+  id uuid primary key default gen_random_uuid(),
+  group_id uuid not null references groups(id) on delete cascade,
+  course_id uuid not null references favorite_courses(id) on delete cascade,
+  name text not null,
+  location text,
+  data jsonb not null,
+  updated_by uuid references auth.users(id) on delete set null,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  unique (group_id, course_id)
+);
+
+create table if not exists course_change_requests (
+  id uuid primary key default gen_random_uuid(),
+  course_id uuid not null references favorite_courses(id) on delete cascade,
+  group_id uuid not null references groups(id) on delete cascade,
+  submitted_by uuid references auth.users(id) on delete set null,
+  proposed_name text not null,
+  proposed_location text,
+  proposed_data jsonb not null,
+  status text not null default 'pending',
+  reviewed_by uuid references auth.users(id) on delete set null,
+  reviewed_at timestamptz,
+  created_at timestamptz not null default now(),
+  reason text,
+  change_summary text
+);
+
 -- ---------- rounds ----------
 create table if not exists rounds (
   id uuid primary key default gen_random_uuid(),

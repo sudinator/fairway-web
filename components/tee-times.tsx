@@ -157,12 +157,9 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
 
   async function submitRsvp(tt: TeeTime, choice: "in" | "out" | "maybe", guestNames: string[]) {
     setBusy(true); setActionErr(null);
-    const existing = myRsvp(tt.id);
-    const order = existing?.signup_order ?? rsvpsFor(tt.id).length + 1;
-    const { error } = await supabase.from("tee_time_rsvps").upsert(
-      { tee_time_id: tt.id, user_id: user.id, choice, guest_names: choice === "in" ? guestNames : [], signup_order: order, responded_at: new Date().toISOString() },
-      { onConflict: "tee_time_id,user_id" },
-    );
+    const { error } = await supabase.rpc("upsert_tee_time_rsvp", {
+      p_tee_time: tt.id, p_user: user.id, p_choice: choice, p_guest_names: choice === "in" ? guestNames : [],
+    });
     if (error) { setBusy(false); if (typeof window !== "undefined") window.alert("Couldn't save your RSVP — please try again."); return; }
     const gtxt = choice === "in" && guestNames.length ? ` (+${guestNames.length} guest${guestNames.length > 1 ? "s" : ""})` : "";
     await logTee("tt_rsvp", `responded ${CHOICE[choice].label}${gtxt} for tee time #${tt.seq ?? "?"}`, { tee_time_id: tt.id, seq: tt.seq, choice, guests: choice === "in" ? guestNames.length : 0 });
@@ -171,14 +168,10 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
   async function orgSetRsvp(tt: TeeTime, memberId: string, choice: "in" | "out" | "maybe") {
     setBusy(true); setActionErr(null);
     const existing = rsvpsFor(tt.id).find((r) => r.user_id === memberId);
-    const order = existing?.signup_order ?? rsvpsFor(tt.id).length + 1;
-    // Guests only ride along on an IN response. When marking a member out/maybe,
-    // clear their guests too (matches what a member's own RSVP does) so guests
-    // don't linger on the row or reappear if they're later marked back in.
-    const { error } = await supabase.from("tee_time_rsvps").upsert(
-      { tee_time_id: tt.id, user_id: memberId, choice, guest_names: choice === "in" ? (existing?.guest_names || []) : [], signup_order: order, responded_at: new Date().toISOString() },
-      { onConflict: "tee_time_id,user_id" },
-    );
+    // Server assigns a collision-safe signup order for first-time RSVPs; edits retain the original order.
+    const { error } = await supabase.rpc("upsert_tee_time_rsvp", {
+      p_tee_time: tt.id, p_user: memberId, p_choice: choice, p_guest_names: choice === "in" ? (existing?.guest_names || []) : [],
+    });
     if (error) { setBusy(false); setActionErr("Couldn't update that RSVP — please try again."); return; }
     await logTee("tt_rsvp_org", `marked ${shortName(memberOf(memberId)?.display_name || "a member")} ${CHOICE[choice].label} for tee time #${tt.seq ?? "?"}`, { tee_time_id: tt.id, seq: tt.seq, choice, target_user_id: memberId });
     setBusy(false); await load();
@@ -688,7 +681,7 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
     }
     setBusy(true); setErr(null);
     if (editing) {
-      const { error } = await supabase.from("tee_times").update({ kind, title: title.trim() || null, course: course || null, play_date: date, tee_off_times: parsedTimes, signup_deadline: deadline ? new Date(deadline + "T12:00:00").toISOString() : null, max_spots: cap, notes: notes.trim() || null, updated_at: new Date().toISOString() }).eq("id", editing.id);
+      const { error } = await supabase.from("tee_times").update({ kind, title: title.trim() || null, course: course || null, play_date: date, tee_off_times: parsedTimes, signup_deadline: deadline ? new Date(deadline + "T23:59:59.999").toISOString() : null, max_spots: cap, notes: notes.trim() || null, updated_at: new Date().toISOString() }).eq("id", editing.id);
       setBusy(false);
       if (error) { setErr("Couldn't save — please try again."); return; }
       onCreated(); return;
@@ -699,7 +692,7 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
       course: course || null,
       play_date: date,
       tee_off_times: parsedTimes,
-      signup_deadline: deadline ? new Date(deadline + "T12:00:00").toISOString() : null,
+      signup_deadline: deadline ? new Date(deadline + "T23:59:59.999").toISOString() : null,
       max_spots: cap,
       notes: notes.trim() || null,
       status: "upcoming",

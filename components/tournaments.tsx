@@ -300,10 +300,9 @@ function CreateGame({
 
   useEffect(() => {
     loadCoursesForGroup(supabase, (effectiveGroupId(activeGroupId) as string)).then((data) => {
-      if (data)
-        setFavorites(
-          data.map((f: any) => normalizeFavoriteCourse(f)),
-        );
+      setFavorites(data.map((f: any) => normalizeFavoriteCourse(f)));
+    }).catch(() => {
+      // Keep the last good library rather than turning a refresh failure into an empty picker.
     });
 
     (async () => {
@@ -1337,13 +1336,8 @@ function GameRoom({
     await drainOutbox();
     const left = countPending();
     if (left > 0) { recomputePending(); alert(left + (left === 1 ? " hole hasn't" : " holes haven't") + " uploaded yet. Tap \"Sync now\", wait until it reaches 0, then finish so the recorded round is complete."); return; }
-    await supabase.rpc("finish_tee_group", { p_game: game.id });
-    // Post a round for EVERY player in this tee group — in group scoring the keeper
-    // holds everyone's scores, so finishing the group should write all of them, not
-    // just the keeper's. recordMyGameRound() still runs as a guaranteed fallback for
-    // my own round (in case the group RPC isn't deployed yet); both are idempotent.
-    await supabase.rpc("post_group_rounds", { p_game: game.id, p_tee_group: myRow.tee_group });
-    await recordMyGameRound();
+    const { error } = await supabase.rpc("finish_tee_group_and_post", { p_game: game.id });
+    if (error) { alert("Couldn't finish this group — " + error.message); return; }
     await load();
   };
   // Non-organizers only ever see the scorecard.
@@ -1461,7 +1455,7 @@ function GameRoom({
     let alive = true;
     loadCoursesForGroup(supabase, game.group_id).then((rows) => {
       if (!alive) return;
-      const courses = (rows || []).map((r: any) => normalizeFavoriteCourse(r));
+      const courses = rows.map((r: any) => normalizeFavoriteCourse(r));
       const found = courses.find((c: any) => c.name === game.course || courseLabel(c) === game.course);
       const tees = Array.isArray(found?.tees) ? found.tees : [];
       if (tees.length) {
@@ -1472,18 +1466,13 @@ function GameRoom({
         const snap = loadGameSnapshot(gameId);
         setCourseTees(snap?.courseTees && snap.courseTees.length ? (snap.courseTees as any) : tees);
       }
+    }).catch(() => {
+      if (!alive) return;
+      const snap = loadGameSnapshot(gameId);
+      if (snap?.courseTees?.length) setCourseTees(snap.courseTees as any);
     });
     return () => { alive = false; };
   }, [game?.group_id, game?.course]);
-
-  // Once an ended game and my player row are both loaded, ensure my scorecard is
-  // recorded as a round in my history. Idempotent (skips if already recorded).
-  useEffect(() => {
-    if ((game?.status === "ended" || myRow?.group_locked) && me && me.user_id) {
-      recordMyGameRound();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game?.status, me?.id, myRow?.group_locked]);
 
   // Auto-refresh every minute so players see each other's scores without manual refresh.
   // Pauses while actively entering a score (a save in the last 25s, or one in progress).
@@ -2251,17 +2240,10 @@ function GameRoom({
     await drainOutbox();
     const left = countPending();
     if (left > 0) { recomputePending(); alert(left + (left === 1 ? " hole hasn't" : " holes haven't") + " uploaded yet. Tap \"Sync now\", wait until it reaches 0, then end the game so every recorded round is complete."); return; }
-    const { error: finErr } = await supabase.rpc("finish_game", { p_game: game.id });
+    // One database transaction: end the game, post every player's round, and freeze running clocks.
+    // If round posting fails, the game remains active rather than entering a split-brain "ended but not posted" state.
+    const { error: finErr } = await supabase.rpc("finish_game_and_post_rounds", { p_game: game.id });
     if (finErr) { alert("Couldn't end the game — " + finErr.message); return; }
-    // Post every player's scorecard to their Rounds history right now (server-side),
-    // so it no longer waits for each player to reopen the ended game on their device.
-    await supabase.rpc("post_game_rounds", { p_game: game.id });
-    // Freeze the round clock for anyone still running (started but no end yet).
-    const nowIso = new Date().toISOString();
-    await Promise.all(players
-      .filter((p) => p.clock_start != null && p.clock_end == null)
-      .map((p) => supabase.from("game_players").update({ clock_end: nowIso }).eq("id", p.id)));
-    await recordMyGameRound();
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_ended", group_id: (game as any).group_id || null, summary: `Ended the game "${game.name}"` });
     await load();
   };
@@ -2279,76 +2261,6 @@ function GameRoom({
     setFinishPrompt({ kind: "group", teeGroup: myRow.tee_group ?? undefined, gaps: computeFinishGaps(scope) });
   };
 
-  // When a game is ended, each player records THEIR OWN scorecard into their rounds
-  // history (so it counts toward their stats/handicap/dashboard), like a solo round.
-  // Done per-user (not by the organizer for everyone) so it respects row-level
-  // security — every player writes only their own round. Tagged with the game id
-  // so it's only ever created once, even if the game is reopened and re-ended, or
-  // the player opens the ended game on multiple devices.
-  const recordMyGameRound = async () => {
-    if (!game || !me || !me.user_id) return;
-    try {
-      const scores: (number | null)[] = me.scores || [];
-      const entered = scores.filter((s) => s != null && s > 0).length;
-      if (entered === 0) return; // didn't play / nothing entered
-
-      // Test group: sandboxed — its games never post to individual Rounds / handicaps / stats.
-      const { data: grp } = await supabase.from("groups").select("is_test").eq("id", (game as any).group_id).maybeSingle();
-      if (grp?.is_test) return;
-
-      const gross = scores.reduce((s: number, v) => s + (v && v > 0 ? v : 0), 0);
-      const roundFields = {
-        user_id: me.user_id,
-        course: game.course,
-        tee_name: me.tee_name ?? null,
-        rating: me.rating ?? null,
-        slope: me.slope ?? null,
-        course_par: game.course_par ?? null,
-        handicap_index: me.handicap_index ?? null,
-        course_handicap: me.course_handicap ?? null,
-        group_id: (game as any).group_id || null,
-        played_at: (game as any).played_at || (game as any).created_at || new Date().toISOString(),
-        status: "final" as const,
-        gross_score: gross,
-        game_id: game.id,
-      };
-
-      // If a round was already posted for this game (e.g. the game was ended,
-      // reopened, edited, and re-ended), UPDATE it in place so the corrected
-      // scores flow through to the player's history, differentials, and dashboard
-      // stats — rather than leaving a stale frozen round.
-      const { data: existing } = await supabase
-        .from("rounds").select("id").eq("game_id", game.id).eq("user_id", me.user_id).limit(1);
-
-      let roundId: string | null = existing && existing.length ? existing[0].id : null;
-      if (roundId) {
-        const { error: uErr } = await supabase.from("rounds").update(roundFields).eq("id", roundId);
-        if (uErr) return;
-        // Replace the hole detail so edits, additions, and removals all take.
-        await supabase.from("holes").delete().eq("round_id", roundId);
-      } else {
-        const { data: roundRow, error: rErr } = await supabase.from("rounds").insert(roundFields).select("id").single();
-        if (rErr || !roundRow) return;
-        roundId = roundRow.id;
-      }
-
-      const holeRows = (game.holes_meta || []).map((m, i) => ({
-        round_id: roundId,
-        hole_number: m.n,
-        par: m.par,
-        stroke_index: m.si,
-        strokes: scores[i] ?? null,
-        putts: me.putts?.[i] ?? null,
-        fairway: me.fairways?.[i] ?? null,
-        penalties: me.penalties?.[i] ?? null,
-        sand: me.sand?.[i] ?? false,
-        yardage: courseTees.find((t) => t.name === me.tee_name)?.yardages?.[i] ?? m.yards ?? null,
-      })).filter((h) => h.strokes != null);
-      if (holeRows.length) await supabase.from("holes").insert(holeRows);
-    } catch {
-      // Non-fatal.
-    }
-  };
 
   // Organizer: reopen an ended game if it was ended by mistake.
   const reopenGame = async () => {

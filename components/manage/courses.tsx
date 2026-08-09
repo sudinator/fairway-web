@@ -7,7 +7,7 @@ import { pushGate, subscribeToPush, unsubscribeFromPush, currentPermission, sync
 import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID, effectiveGroupId, runningHandicap, handicapRounds, adjustedGross, roundDifferential, nextRoundOutlook } from "@/lib/golf";
 import capabilities from "@/lib/capabilities.json";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LabelList } from "recharts";
-import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
+import { buildCustomCourse, Course, CourseHole, courseLabel, findExistingCourseId, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { diagEnabled, setDiagEnabled, reproduceBug, setReproduceBug, getDiagLog, clearDiagLog } from "@/lib/debuglog";
 import { AdminFeedbackTab } from "@/components/feedback";
@@ -159,15 +159,24 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
 
   const load = useCallback(async () => {
     // Your group courses are a subset of the global app library, linked by group_courses.
-    const linked = await loadCoursesForGroup(supabase, activeGroupId);
-    const groupList = sortCourses(linked.map(toLibCourse));
-    setGroupCourses(groupList);
+    try {
+      const linked = await loadCoursesForGroup(supabase, activeGroupId);
+      const groupList = sortCourses(linked.map(toLibCourse));
+      setGroupCourses(groupList);
+    } catch (e) {
+      // Keep the last good list; a refresh error is not an empty library.
+      console.error("course library refresh failed", e);
+    }
 
     // Global app library: every non-deleted course saved in Birdie Num Num.
     // Any user can browse this list and add a course to their current group library.
-    const { data: all } = await supabase.from("favorite_courses").select("*").order("name");
-    const allList = sortCourses((all || []).filter((f: any) => !f.deleted).map(toLibCourse));
-    setAllCourses(allList);
+    const { data: all, error: allErr } = await supabase.from("favorite_courses").select("*").order("name");
+    if (!allErr) {
+      const allList = sortCourses((all || []).filter((f: any) => !f.deleted).map(toLibCourse));
+      setAllCourses(allList);
+    } else {
+      console.error("global course library refresh failed", allErr);
+    }
 
     const { data: prof } = await supabase.from("profiles").select("is_admin, display_name").eq("id", user.id).maybeSingle();
     const admin = !!prof?.is_admin;
@@ -298,21 +307,9 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
     if (!isAdmin) return;
     setBusyId(req.id); setMsg(null);
     try {
-      const proposed = { ...req.proposed_data, name: req.proposed_name, location: req.proposed_location || "", corrected: true };
-      const { error } = await supabase.from("favorite_courses")
-        .update({ name: req.proposed_name, location: req.proposed_location || "", data: proposed, vetted: true })
-        .eq("id", req.course_id);
+      const { error } = await supabase.rpc("review_course_correction", { p_request: req.id, p_action: "approved" });
       if (error) throw error;
-      await supabase.from("course_change_requests")
-        .update({ status: "approved", reviewed_by: user.id, reviewed_at: new Date().toISOString() })
-        .eq("id", req.id);
-      // Once the global record matches the proposal, the submitting group's local
-      // override is no longer needed. Removing it prevents duplicate/confusing state.
-      await supabase.from("group_course_overrides")
-        .delete()
-        .eq("group_id", req.group_id)
-        .eq("course_id", req.course_id);
-      await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_edit_approved_global", group_id: req.group_id, summary: `Approved global course edit for "${courseLabel(proposed)}"` });
+      await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_edit_approved_global", group_id: req.group_id, summary: `Approved global course edit for "${courseLabel({ ...(req.proposed_data || {}), name: req.proposed_name })}"` });
       setMsg("Course edit approved globally. The local club override was cleared because the global record now matches it.");
       await load();
     } catch (e: any) {
@@ -326,9 +323,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
     if (!isAdmin) return;
     setBusyId(req.id); setMsg(null);
     try {
-      const { error } = await supabase.from("course_change_requests")
-        .update({ status: "group_only", reviewed_by: user.id, reviewed_at: new Date().toISOString() })
-        .eq("id", req.id);
+      const { error } = await supabase.rpc("review_course_correction", { p_request: req.id, p_action: "group_only" });
       if (error) throw error;
       await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_edit_kept_group_only", group_id: req.group_id, summary: `Kept course edit for "${req.proposed_name}" in the submitting group only` });
       setMsg("Course edit kept for the submitting club only. The global course record was not changed.");
@@ -345,14 +340,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
     if (!confirm(`Reject this course edit and remove the local override for ${req.group_name || "the submitting group"}?\n\nThe club will revert to the current global course data.`)) return;
     setBusyId(req.id); setMsg(null);
     try {
-      const { error: delErr } = await supabase.from("group_course_overrides")
-        .delete()
-        .eq("group_id", req.group_id)
-        .eq("course_id", req.course_id);
-      if (delErr) throw delErr;
-      const { error } = await supabase.from("course_change_requests")
-        .update({ status: "rejected_removed", reviewed_by: user.id, reviewed_at: new Date().toISOString() })
-        .eq("id", req.id);
+      const { error } = await supabase.rpc("review_course_correction", { p_request: req.id, p_action: "rejected_removed" });
       if (error) throw error;
       await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_edit_rejected_removed", group_id: req.group_id, summary: `Rejected course edit for "${req.proposed_name}" and removed the club override` });
       setMsg("Course edit rejected and the submitting club's override was removed.");
@@ -363,17 +351,6 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
       setBusyId(null);
     }
   };
-
-  if (editing) {
-    return <CourseEditor
-      user={user}
-      activeGroupId={activeGroupId}
-      initial={editing === "new" ? null : editing.data}
-      existingId={editing === "new" ? null : editing.id}
-      onCancel={() => { clearActiveCourseEdit(); setEditing(null); }}
-      onSaved={async () => { clearActiveCourseEdit(); setEditing(null); await load(); setTab("group"); }}
-    />;
-  }
 
   const CourseRow = ({ c, source }: { c: LibCourse; source: "group" | "all" }) => {
     const inGroup = groupCourseIds.has(c.id);
@@ -690,49 +667,27 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
         // reason and do not create a global-review request.
         const proposedBase = { ...course, name, location: course.location || "" };
         const hasChanges = hasMaterialCourseChanges(initialCourseRef.current, proposedBase);
-        await linkCourseToGroup(supabase, activeGroupId, existingId, user.id);
         if (!hasChanges) {
+          await linkCourseToGroup(supabase, activeGroupId, existingId, user.id);
           await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Someone", action: "course_linked", group_id: activeGroupId, summary: `Saved course "${name}" to this club library with no course-data changes` });
           onSaved();
           return;
         }
         if (!reason.trim()) { setErr("Please explain why this course change is needed so an admin can review it."); setSaving(false); return; }
 
-        // Editing an existing global course creates a GROUP-SPECIFIC override immediately
-        // and submits a pending global change request for app-admin review. It does not
-        // overwrite the global record for every group.
         const proposed = { ...proposedBase, corrected: true };
-        const { error: overrideErr } = await supabase.from("group_course_overrides").upsert({
-          group_id: activeGroupId,
-          course_id: existingId,
-          name,
-          location: course.location || "",
-          data: proposed,
-          updated_by: user.id,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "group_id,course_id" });
-        if (overrideErr) throw overrideErr;
-
         const { data: currentRow } = await supabase.from("favorite_courses").select("data").eq("id", existingId).maybeSingle();
-        await supabase.from("course_change_requests").insert({
-          course_id: existingId,
-          group_id: activeGroupId,
-          submitted_by: user.id,
-          proposed_name: name,
-          proposed_location: course.location || "",
-          proposed_data: proposed,
-          reason: reason.trim(),
-          change_summary: buildCourseChangeSummary((currentRow?.data as any) || initialCourseRef.current, proposed),
-          status: "pending",
+        const { error: corrErr } = await supabase.rpc("submit_course_correction", {
+          p_group: activeGroupId, p_course: existingId, p_name: name, p_location: course.location || "", p_data: proposed,
+          p_reason: reason.trim(), p_change_summary: buildCourseChangeSummary((currentRow?.data as any) || initialCourseRef.current, proposed),
         });
+        if (corrErr) throw corrErr;
         await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Someone", action: "course_edit_submitted", group_id: activeGroupId, summary: `Edited course "${name}" for this club and submitted it for global review` });
       } else {
         // New course: if a canonical record with this name already exists, link it and
         // store this group's version as an override; otherwise create the global record.
-        const { data: existsByName } = await supabase.from("favorite_courses").select("id").eq("name", name).maybeSingle();
-        let courseId = existsByName?.id as string | undefined;
+        let courseId = await findExistingCourseId(supabase, { externalId: course.externalId, club: course.club, name, location: course.location || "" });
         if (courseId) {
-          await linkCourseToGroup(supabase, activeGroupId, courseId, user.id);
           const { data: currentRow } = await supabase.from("favorite_courses").select("data").eq("id", courseId).maybeSingle();
           const proposedBase = { ...course, name, location: course.location || "" };
           const currentData = (currentRow?.data as any) || proposedBase;
@@ -740,16 +695,13 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
           if (hasChanges) {
             if (!reason.trim()) { setErr("Please explain why this course change is needed so an admin can review it."); setSaving(false); return; }
             const proposed = { ...proposedBase, corrected: true };
-            const { error: overrideErr } = await supabase.from("group_course_overrides").upsert({
-              group_id: activeGroupId, course_id: courseId, name, location: course.location || "", data: proposed, updated_by: user.id, updated_at: new Date().toISOString(),
-            }, { onConflict: "group_id,course_id" });
-            if (overrideErr) throw overrideErr;
-            await supabase.from("course_change_requests").insert({
-              course_id: courseId, group_id: activeGroupId, submitted_by: user.id, proposed_name: name, proposed_location: course.location || "", proposed_data: proposed,
-              reason: reason.trim(),
-              change_summary: buildCourseChangeSummary(currentData, proposed),
-              status: "pending",
+            const { error: corrErr } = await supabase.rpc("submit_course_correction", {
+              p_group: activeGroupId, p_course: courseId, p_name: name, p_location: course.location || "", p_data: proposed,
+              p_reason: reason.trim(), p_change_summary: buildCourseChangeSummary(currentData, proposed),
             });
+            if (corrErr) throw corrErr;
+          } else {
+            await linkCourseToGroup(supabase, activeGroupId, courseId, user.id);
           }
         } else {
           const createdCourse = { ...course, name, location: course.location || "" };

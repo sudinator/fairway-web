@@ -84,21 +84,24 @@ export function buildCustomCourse(name: string, location: string, par: number, r
 // Group ↔ course is many-to-many via the group_courses link table.
 // Returns the favorite_courses rows linked to a given group (one shared record per course).
 export async function loadCoursesForGroup(supabase: any, groupId: string): Promise<any[]> {
-  const { data: links } = await supabase.from("group_courses").select("course_id").eq("group_id", groupId);
+  const { data: links, error: linksError } = await supabase.from("group_courses").select("course_id").eq("group_id", groupId);
+  if (linksError) throw linksError;
   const ids = (links || []).map((l: any) => l.course_id).filter(Boolean);
   if (!ids.length) return [];
 
-  const { data } = await supabase.from("favorite_courses").select("*").in("id", ids);
+  const { data, error: coursesError } = await supabase.from("favorite_courses").select("*").in("id", ids);
+  if (coursesError) throw coursesError;
   const rows = (data || []).filter((f: any) => !f.deleted);
 
   // Group-specific course corrections override the global course record inside
   // that group only. This lets one group fix tees/pars/stroke indexes immediately
   // without changing what every other group sees until an app admin approves it.
-  const { data: overrides } = await supabase
+  const { data: overrides, error: overridesError } = await supabase
     .from("group_course_overrides")
     .select("course_id, name, location, data, updated_at")
     .eq("group_id", groupId)
     .in("course_id", ids);
+  if (overridesError) throw overridesError;
   const byCourse = Object.fromEntries((overrides || []).map((o: any) => [o.course_id, o]));
 
   return rows.map((f: any) => {
@@ -117,8 +120,43 @@ export async function loadCoursesForGroup(supabase: any, groupId: string): Promi
 
 // Ensure a course (by id) is linked to a group. Safe to call repeatedly.
 export async function linkCourseToGroup(supabase: any, groupId: string, courseId: string, addedBy: string | null): Promise<void> {
-  await supabase.from("group_courses").upsert(
+  const { error } = await supabase.from("group_courses").upsert(
     { group_id: groupId, course_id: courseId, added_by: addedBy },
     { onConflict: "group_id,course_id", ignoreDuplicates: true }
   );
+  if (error) throw error;
+}
+
+// Resolve a canonical course without collapsing distinct facilities/layouts that happen to share a name.
+// External API id is authoritative. Manual courses require a matching name plus facility (when known)
+// and location (when known); name alone is deliberately NOT treated as globally unique.
+export async function findExistingCourseId(
+  supabase: any,
+  c: { externalId?: string | number | null; club?: string | null; name: string; location?: string | null },
+): Promise<string | undefined> {
+  if (c.externalId != null && String(c.externalId).trim()) {
+    const { data, error } = await supabase.from("favorite_courses").select("id").eq("external_id", String(c.externalId)).eq("deleted", false).maybeSingle();
+    if (error) throw error;
+    if (data?.id) return data.id as string;
+  }
+  const name = (c.name || "").trim();
+  if (!name) return undefined;
+  const { data: rows, error } = await supabase
+    .from("favorite_courses")
+    .select("id,name,facility,location")
+    .ilike("name", name)
+    .eq("deleted", false)
+    .limit(25);
+  if (error) throw error;
+  const norm = (v: unknown) => String(v || "").trim().toLocaleLowerCase();
+  const club = norm(c.club);
+  const location = norm(c.location);
+  const matches = (rows || []).filter((r: any) => {
+    if (norm(r.name) !== norm(name)) return false;
+    if (club && norm(r.facility) !== club) return false;
+    if (location && norm(r.location) !== location) return false;
+    // If we know neither facility nor location, a name-only match is ambiguous by definition.
+    return !!(club || location);
+  });
+  return matches.length === 1 ? matches[0].id as string : undefined;
 }

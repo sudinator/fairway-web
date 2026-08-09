@@ -72,13 +72,19 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     (async () => {
       let fav: any = null;
       if (round.group_id) {
-        const groupCourses = await loadCoursesForGroup(supabase, round.group_id);
-        fav = groupCourses.find((c: any) => c.name === round.course || c.data?.name === round.course) || null;
+        try {
+          const groupCourses = await loadCoursesForGroup(supabase, round.group_id);
+          fav = groupCourses.find((c: any) => c.name === round.course || c.data?.name === round.course) || null;
+        } catch {
+          // A failed library read is not evidence that the course is unknown. Do not synthesize a
+          // generic layout on a transient error; allow a later reopen/retry to load authoritative data.
+          synthesizedRef.current = false;
+          setErr("Couldn't load this course's hole details. Your round was not changed — please try again.");
+          return;
+        }
       }
-      if (!fav) {
-        const { data } = await supabase.from("favorite_courses").select("data").eq("name", round.course).maybeSingle();
-        fav = data;
-      }
+      // Do not fall back to a global name-only lookup: course names are not globally unique.
+      // If the round's group library cannot identify it, use the safe generic layout below.
       // Re-check after the await — if holes arrived meanwhile, do NOT overwrite them.
       if (holesRef.current.length > 0) return;
       const courseHoles = (fav?.data?.holes || []) as { n: number; par: number; si: number | null }[];
@@ -248,11 +254,10 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     const siErr = validateStrokeIndexes(newHoles.map((h) => ({ n: h.n, si: h.si })));
     if (siErr) { setFavMsg("Can't save — " + siErr); return; }
     try {
-      // Find the existing record (by name) and keep its canonical id, facility,
-      // location, and tee list — we're only correcting pars/SI (and the tee's
-      // rating/slope for the tee actually played), not redefining the course.
-      const { data: existing } = await supabase
-        .from("favorite_courses").select("id, external_id, facility, location, data").eq("name", round.course).maybeSingle();
+      // Resolve only within this round's group library. Name alone is not a global identity.
+      const groupCourses = round.group_id ? await loadCoursesForGroup(supabase, round.group_id) : [];
+      const matches = groupCourses.filter((c: any) => c.name === round.course || c.data?.name === round.course);
+      const existing = matches.length === 1 ? matches[0] : null;
 
       const prevData = (existing?.data as any) || {};
       const prevExternalId = existing?.external_id || prevData.externalId || prevData.id || null;
@@ -291,8 +296,8 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
       if (courseId && round.group_id) {
         const currentData = prevData || course;
         const hasChanges = hasMaterialCourseChanges(currentData, course);
-        await linkCourseToGroup(supabase, round.group_id, courseId, null);
         if (!hasChanges) {
+          await linkCourseToGroup(supabase, round.group_id, courseId, null);
           setFavMsg("Course saved to this club's library ★");
           return;
         }
@@ -300,26 +305,11 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
           setFavMsg("Please add a reason for this course correction so an admin can review it.");
           return;
         }
-        // Save this correction for the current group immediately, then submit it
-        // for app-admin review before it changes the global course for everyone.
-        const { error: overrideErr } = await supabase.from("group_course_overrides").upsert({
-          group_id: round.group_id,
-          course_id: courseId,
-          name: round.course,
-          location: course.location,
-          data: course,
-          updated_by: null,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "group_id,course_id" });
-        if (overrideErr) throw overrideErr;
-        const { data: authUser } = await supabase.auth.getUser();
-        await supabase.from("course_change_requests").insert({
-          course_id: courseId, group_id: round.group_id, submitted_by: authUser.user?.id || null,
-          proposed_name: round.course, proposed_location: course.location, proposed_data: course,
-          reason: courseCorrectionReason.trim(),
-          change_summary: buildCourseChangeSummary(currentData, course),
-          status: "pending",
+        const { error: corrErr } = await supabase.rpc("submit_course_correction", {
+          p_group: round.group_id, p_course: courseId, p_name: round.course, p_location: course.location,
+          p_data: course, p_reason: courseCorrectionReason.trim(), p_change_summary: buildCourseChangeSummary(currentData, course),
         });
+        if (corrErr) throw corrErr;
         setFavMsg("Course updated for this group ★ (global review pending)");
       } else {
         const { data: created, error } = await supabase.from("favorite_courses")

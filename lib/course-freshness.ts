@@ -8,9 +8,10 @@ export type FreshnessResult = {
   diff: FreshnessDiff | null;
   apiCourse: Course | null;
   status: string; // none | pending | dismissed | applied
+  checkState: "ok" | "failed";
 };
 
-const NONE: FreshnessResult = { hasChanges: false, diff: null, apiCourse: null, status: "none" };
+const FAILED: FreshnessResult = { hasChanges: false, diff: null, apiCourse: null, status: "none", checkState: "failed" };
 
 // Daily-throttled upstream freshness check for ONE saved library course. Reads the cached result
 // first; only if it's stale (>24h) or absent does it hit the API, diff, and record the result
@@ -30,14 +31,14 @@ export async function checkCourseFreshness(
 
     const cached = row?.checked_at && Date.now() - new Date(row.checked_at).getTime() < DAY_MS;
     if (cached) {
-      return { hasChanges: !!row.has_changes, diff: row.diff || null, apiCourse: row.api_data || null, status: row.status || "none" };
+      return { hasChanges: !!row.has_changes, diff: row.diff || null, apiCourse: row.api_data || null, status: row.status || "none", checkState: "ok" };
     }
 
     const res = await fetch(`/api/courses?id=${encodeURIComponent(externalId)}`);
-    if (!res.ok) return NONE;
+    if (!res.ok) return FAILED;
     const data = await res.json();
     const apiCourse: Course | null = data.course || null;
-    if (!apiCourse) return NONE;
+    if (!apiCourse) return FAILED;
 
     const diff = buildFreshnessDiff(stored, apiCourse);
     // Group ownership is derived SERVER-SIDE by the RPC from the course row (0125) — the client
@@ -54,8 +55,8 @@ export async function checkCourseFreshness(
       if (after?.status) status = after.status;
     } catch { /* keep the computed fallback */ }
 
-    return { hasChanges: diff.hasChanges, diff: diff.hasChanges ? diff : null, apiCourse, status };
+    return { hasChanges: diff.hasChanges, diff: diff.hasChanges ? diff : null, apiCourse, status, checkState: "ok" };
   } catch {
-    return NONE;
+    return FAILED;
   }
 }

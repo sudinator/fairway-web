@@ -4699,3 +4699,45 @@ and the cluster's import surface; home.tsx repointed to import CoursesLibrary fr
 confirms every wire resolves; (3) build compiles (module boundaries + use-client OK); (4) no reactive seams —
 whole components moved intact, their internal effects/state unchanged and unmoved relative to their own bodies.
 No differential test (JSX components). manage.tsx 3831 -> 2941 lines. ci green.
+
+### 177.11.260808 — workflow atomicity + simulated-failure hardening — SUPERSEDED / NOT FOR DEPLOYMENT
+Historical note only: this unreleased working build originally referred to migration 0129. The production-ready v177.13 sequence intentionally skips 0129 and renumbers this workflow migration to 0130.
+Fresh end-to-end workflow review focused on partial failures and cross-screen state consistency rather than
+carrying forward prior audit findings.
+- 0129 adds transactional RPCs for Money expense create/edit, whole-game end+round posting+clock freeze,
+  safe club deletion, course correction submission, and tee-time RSVP ordering.
+- Money edits can no longer update the expense and then lose its split/payers on a later write failure.
+- End Game is now one DB transaction: if posting rounds fails, the game does not remain ended with missing history;
+  the End Game button no longer performs the destructive client-side round rewrite afterward.
+- Club deletion moved from a chain of client mutations to a single admin-gated DB transaction.
+- Course corrections now link + override + create the review request atomically; validation happens before writes.
+- Course identity matching no longer treats a course name as globally unique; API id wins, manual matching requires
+  facility/location context, and the round editor no longer falls back to unsafe global name-only lookups.
+- Course-library helpers now throw on query/link errors so callers cannot report false success or convert a refresh
+  failure into an empty library; key course screens preserve their last good state on refresh failure.
+- Tee-time RSVP signup order is allocated under a DB advisory lock, removing concurrent `length + 1` collisions.
+- Signup deadline dates now mean end-of-day rather than noon.
+- Course API limit remains 120/hour for normal users but gives global admins 1000/hour for the explicit bulk refresh tool.
+- Course freshness results now distinguish a successful no-change check from a failed/unavailable check internally.
+- Static UI/security guard suite remains green after the changes.
+
+
+### 177.12.260808 — fault-injection verification + course-review atomicity — SUPERSEDED / NOT FOR DEPLOYMENT
+Historical note only: v177.13 uses the final deployment sequence 0130 → 0131 → 0132; migration 0129 is intentionally skipped/reserved.
+Post-fix verification pass. Added model-based fault injection across transactional workflows and corrected two gaps found by the tests.
+- Course-library reads now propagate query errors instead of silently converting failed reads into empty libraries.
+- Repeated/retried course-correction submissions reuse the existing pending request for that course+group.
+- Global approval / group-only / reject+remove review actions now run through one admin-gated DB transaction.
+- 131 workflow simulation/source-contract checks passed, including rollback injection at each expense stage, game-post rollback, club-delete rollback, correction submit/review rollback, duplicate retry handling, double-review rejection, and 50,000 randomized RSVP edits/order checks.
+- Static repository guard suite remains green.
+- PostgreSQL runtime execution still requires staging verification because this review environment has no PostgreSQL/Supabase service.
+
+
+### 177.13.260808 — production workflow hardening + schema reconciliation — MIGRATIONS 0130, 0131, 0132 REQUIRED
+**Important migration numbering note:** migration **0129 is intentionally skipped/reserved** in this release. There is no `0129_workflow_atomicity.sql` in the v177.13 bundle. This is deliberate to avoid a numbering collision with a separately-used production 0129 identifier. **Deploy exactly 0130 → 0131 → 0132, then deploy v177.13.**
+- 0130_workflow_atomicity.sql: transactional Money expense saves/edits, game finish+round posting, tee-group finish+posting, safe club deletion, atomic course-correction submission, and collision-safe RSVP ordering.
+- 0131_workflow_retry_and_review_atomicity.sql: retry-safe/idempotent pending course-correction submissions and atomic admin review.
+- 0132_course_schema_reconciliation_and_privilege_hardening.sql: reconciles the two course-correction tables for fresh/partial environments, ensures the `(group_id, course_id)` unique key, enables RLS, preserves member-readable SELECT access, and revokes direct browser-role mutation privileges so writes flow through SECURITY DEFINER RPCs.
+- Live DB compatibility was checked from supplied schema output: `group_course_overrides` and `course_change_requests` both exist with the columns required by the RPCs; `group_course_overrides` has the required UNIQUE `(group_id, course_id)` constraint.
+- Existing product decision preserved: every active club member may read that club's course corrections and overrides.
+- Verification: repository guards green; schema-contract guard green; workflow fault simulation green, including 50,000 randomized RSVP operations. Real PostgreSQL/Supabase staging execution remains the final deployment gate.
