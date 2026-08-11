@@ -4786,3 +4786,9 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - CI now runs on every push to `staging` as well as pull requests and `main`, so `npx tsc --noEmit`, guards, tests, and the production build must pass before a staging candidate can be considered clean.
 - Retains 177.17 behavior: player-level tee selection remains visible in Manage Game → Players, does not depend on yardage, recalculates course handicap from the selected tee's rating/slope, and does not borrow another player's rating/slope.
 - No database migration.
+### 177.16.260809 — production promotion CI hardening
+
+- Fixed the pull-request CI workflow so the Next.js build receives the staging Supabase public URL and anon key.
+- PR verification now uses the protected GitHub `staging` environment.
+- Added branch protection for `main`: changes require a pull request and the `verify` status check must pass before merge.
+- No application behavior, database schema, or production data changes.
