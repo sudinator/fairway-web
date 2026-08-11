@@ -4779,3 +4779,10 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Existing `setPlayerTee` input/output contract is preserved: selecting a tee writes that player's `tee_name`, `rating`, `slope`, and recalculated `course_handicap`.
 - Added a blocking source-contract guard covering always-visible player tee selection, yardage independence, no cross-player tee borrowing, fallback course lookup, and per-player course-handicap recalculation.
 - No database migration required.
+
+
+### 177.18.260811 — staging compile gate + tee restore type-safety fix
+- Fixes the 177.17 staging/Vercel TypeScript failure in the course-tee fallback loader by capturing the validated `group_id` and course name before entering the async closure. Runtime behavior is unchanged from the intended 177.17 tee-selection fix; this is a type-safety correction.
+- CI now runs on every push to `staging` as well as pull requests and `main`, so `npx tsc --noEmit`, guards, tests, and the production build must pass before a staging candidate can be considered clean.
+- Retains 177.17 behavior: player-level tee selection remains visible in Manage Game → Players, does not depend on yardage, recalculates course handicap from the selected tee's rating/slope, and does not borrow another player's rating/slope.
+- No database migration.

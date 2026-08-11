@@ -1452,13 +1452,18 @@ function GameRoom({
       setCourseTees(snap?.courseTees && snap.courseTees.length ? (snap.courseTees as any) : []);
       return;
     }
+    // Capture the already-validated identifiers before entering the async closure.
+    // React state may change while the request is in flight, and TypeScript correctly
+    // does not preserve property narrowing across that boundary.
+    const groupId = game.group_id;
+    const courseName = game.course;
     let alive = true;
     (async () => {
       try {
-        const rows = await loadCoursesForGroup(supabase, game.group_id);
+        const rows = await loadCoursesForGroup(supabase, groupId);
         if (!alive) return;
         const courses = rows.map((r: any) => normalizeFavoriteCourse(r));
-        let found = courses.find((c: any) => c.name === game.course || courseLabel(c) === game.course);
+        let found = courses.find((c: any) => c.name === courseName || courseLabel(c) === courseName);
 
         // A stale/missing group_courses link must not hide player-level tee choice.
         // Games store the course name, so fall back to the global course library by
@@ -1468,11 +1473,11 @@ function GameRoom({
             .from("favorite_courses")
             .select("*")
             .eq("deleted", false)
-            .eq("name", game.course)
+            .eq("name", courseName)
             .limit(10);
           if (!globalError) {
             const globalCourses = (globalRows || []).map((r: any) => normalizeFavoriteCourse(r));
-            found = globalCourses.find((c: any) => c.name === game.course || courseLabel(c) === game.course);
+            found = globalCourses.find((c: any) => c.name === courseName || courseLabel(c) === courseName);
           }
         }
 

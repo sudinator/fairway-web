@@ -12,6 +12,7 @@ checks = [
     ("handicap override uses the player tee only", 'const rating = p.rating ?? null;' in tournaments and 'const slope = p.slope ?? null;' in tournaments),
     ("handicap override does not borrow another player tee", 'players.find((x) => x.rating != null && x.slope != null)' not in tournaments[tournaments.find('const overridePlayerHandicap'):tournaments.find('const setPlayerTeam')]),
     ("course lookup has global fallback", '.from("favorite_courses")' in tournaments[tournaments.find('if (!found)'):tournaments.find('const tees = Array.isArray(found?.tees)')]),
+    ("async course lookup captures narrowed identifiers", 'const groupId = game.group_id;' in tournaments and 'const courseName = game.course;' in tournaments and 'loadCoursesForGroup(supabase, groupId)' in tournaments and '.eq("name", courseName)' in tournaments),
     ("tee change still recalculates course handicap", 'courseHandicap(p.handicap_index, tee.slope, tee.rating, game.course_par)' in tournaments[tournaments.find('const setPlayerTee = async'):tournaments.find('// Organizer: mark/unmark')]),
     ("tee change still persists player tee snapshot", 'tee_name: tee.name' in tournaments[tournaments.find('const setPlayerTee = async'):tournaments.find('// Organizer: mark/unmark')]),
 ]
