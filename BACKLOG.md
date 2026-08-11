@@ -428,3 +428,9 @@ Same approach applies to manage.tsx (3,812) split by admin capability.
 - DONE: SCHEMA.md relabeled documentation-only (migration ledger is authoritative).
 Still open (lower priority, honestly assessed):
 - CSP (own tested pass; inline styles). AI output structured-schema (#9, UX/correctness — endpoint checks non-empty + requests labels; deferred as low-value/high-false-reject-risk). Migration deployment automation (#7, operational). Standardize revoke-from-public on ALL older privileged fns (broad hygiene sweep). Stage 3/4 component decomposition + exhaustive-deps/`any` audit.
+
+## Game setup — per-player tee selection regression — FIXED in 177.17
+- Organizer → Manage Game → Players always exposes a tee selector in individual and team formats.
+- Tee selection is independent of yardage availability; rating/slope drive course handicap.
+- Handicap overrides no longer borrow another player's rating/slope.
+- Course lookup has a global-library fallback plus saved player-tee fallback when group linkage is stale.

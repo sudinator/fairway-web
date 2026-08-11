@@ -4763,6 +4763,29 @@ Corrective release after the new v177.14 real staging gate found a PostgreSQL ru
 - The bet atomicity static guard now requires the 0134 ambiguity fix, preventing a future release from dropping the corrective migration.
 - Real GitHub Actions staging integration passed after the hotfix, including course correction RLS/retry/review, Money rollback, concurrent RSVP ordering, atomic TGC bet post/re-post rollback, safe group delete, and cleanup.
 - Deployment order from an existing v177.14 production DB: apply **0134**, verify the migration ledger, then deploy v177.15. Fresh environments apply 0130 → 0131 → 0132 → 0133 → 0134; 0129 remains intentionally skipped/reserved.
+
+### 177.16.260809 — production promotion CI hardening
+- Fixed the pull-request CI workflow so the Next.js build receives the staging Supabase public URL and anon key.
+- PR verification uses the protected GitHub `staging` environment.
+- Added branch protection for `main`: changes require a pull request and the `verify` status check must pass before merge.
+- No application behavior, database schema, or production data changes.
+
+### 177.17.260811 — restore durable per-player tee setup
+Restores and hardens player-level tee selection in Organizer → Manage Game without changing the underlying `game_players` data contract.
+- The Players step now always renders a tee selector for every player, in individual and team formats. If the full course tee list cannot be resolved, saved player tee snapshots remain selectable instead of silently degrading to read-only text.
+- Tee availability no longer depends on yardage. Yardages remain optional display metadata; tee name/rating/slope drive course-handicap calculation.
+- Game-room course resolution now falls back to the global `favorite_courses` record by exact game course name when the group-course link is stale or missing, while preserving the last saved tee snapshot if the lookup still fails.
+- Handicap overrides now use only the selected player's own rating/slope. The previous fallback that could borrow another player's tee values was removed to prevent valid-looking but incorrect course handicaps.
+- Existing `setPlayerTee` input/output contract is preserved: selecting a tee writes that player's `tee_name`, `rating`, `slope`, and recalculated `course_handicap`.
+- Added a blocking source-contract guard covering always-visible player tee selection, yardage independence, no cross-player tee borrowing, fallback course lookup, and per-player course-handicap recalculation.
+- No database migration required.
+
+
+### 177.18.260811 — staging compile gate + tee restore type-safety fix
+- Fixes the 177.17 staging/Vercel TypeScript failure in the course-tee fallback loader by capturing the validated `group_id` and course name before entering the async closure. Runtime behavior is unchanged from the intended 177.17 tee-selection fix; this is a type-safety correction.
+- CI now runs on every push to `staging` as well as pull requests and `main`, so `npx tsc --noEmit`, guards, tests, and the production build must pass before a staging candidate can be considered clean.
+- Retains 177.17 behavior: player-level tee selection remains visible in Manage Game → Players, does not depend on yardage, recalculates course handicap from the selected tee's rating/slope, and does not borrow another player's rating/slope.
+- No database migration.
 ### 177.16.260809 — production promotion CI hardening
 
 - Fixed the pull-request CI workflow so the Next.js build receives the staging Supabase public URL and anon key.

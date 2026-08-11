@@ -1452,25 +1452,53 @@ function GameRoom({
       setCourseTees(snap?.courseTees && snap.courseTees.length ? (snap.courseTees as any) : []);
       return;
     }
+    // Capture the already-validated identifiers before entering the async closure.
+    // React state may change while the request is in flight, and TypeScript correctly
+    // does not preserve property narrowing across that boundary.
+    const groupId = game.group_id;
+    const courseName = game.course;
     let alive = true;
-    loadCoursesForGroup(supabase, game.group_id).then((rows) => {
-      if (!alive) return;
-      const courses = rows.map((r: any) => normalizeFavoriteCourse(r));
-      const found = courses.find((c: any) => c.name === game.course || courseLabel(c) === game.course);
-      const tees = Array.isArray(found?.tees) ? found.tees : [];
-      if (tees.length) {
-        setCourseTees(tees);
-        saveGameSnapshot(gameId, { courseTees: tees });
-      } else {
-        // Offline / not found: keep the snapshot's tees rather than blanking yardages.
+    (async () => {
+      try {
+        const rows = await loadCoursesForGroup(supabase, groupId);
+        if (!alive) return;
+        const courses = rows.map((r: any) => normalizeFavoriteCourse(r));
+        let found = courses.find((c: any) => c.name === courseName || courseLabel(c) === courseName);
+
+        // A stale/missing group_courses link must not hide player-level tee choice.
+        // Games store the course name, so fall back to the global course library by
+        // exact name. Yardages may be absent; rating/slope are enough for handicap math.
+        if (!found) {
+          const { data: globalRows, error: globalError } = await supabase
+            .from("favorite_courses")
+            .select("*")
+            .eq("deleted", false)
+            .eq("name", courseName)
+            .limit(10);
+          if (!globalError) {
+            const globalCourses = (globalRows || []).map((r: any) => normalizeFavoriteCourse(r));
+            found = globalCourses.find((c: any) => c.name === courseName || courseLabel(c) === courseName);
+          }
+        }
+
+        const tees = Array.isArray(found?.tees) ? found.tees : [];
+        if (tees.length) {
+          setCourseTees(tees);
+          saveGameSnapshot(gameId, { courseTees: tees });
+          return;
+        }
+
+        // Keep saved tee snapshots rather than blanking the selector when course data
+        // is temporarily unavailable. The OrganizerPanel also merges game-player tee
+        // snapshots so existing player-level tee choices remain usable.
         const snap = loadGameSnapshot(gameId);
-        setCourseTees(snap?.courseTees && snap.courseTees.length ? (snap.courseTees as any) : tees);
+        setCourseTees(snap?.courseTees && snap.courseTees.length ? (snap.courseTees as any) : []);
+      } catch {
+        if (!alive) return;
+        const snap = loadGameSnapshot(gameId);
+        if (snap?.courseTees?.length) setCourseTees(snap.courseTees as any);
       }
-    }).catch(() => {
-      if (!alive) return;
-      const snap = loadGameSnapshot(gameId);
-      if (snap?.courseTees?.length) setCourseTees(snap.courseTees as any);
-    });
+    })();
     return () => { alive = false; };
   }, [game?.group_id, game?.course]);
 
@@ -1877,13 +1905,10 @@ function GameRoom({
   // Organizer: override any player's handicap index for this game (recomputes course handicap).
   const overridePlayerHandicap = async (p: Player, idxVal: number | null) => {
     if (!game) return;
-    // Use the player's rating/slope, else the organizer's row.
-    const ref =
-      p.rating != null && p.slope != null
-        ? p
-        : players.find((x) => x.rating != null && x.slope != null);
-    const rating = ref?.rating ?? null,
-      slope = ref?.slope ?? null;
+    // Handicap overrides must use THIS player's selected tee snapshot. Never borrow
+    // another player's rating/slope: that can produce a valid-looking but wrong CH.
+    const rating = p.rating ?? null;
+    const slope = p.slope ?? null;
     const ch =
       idxVal != null &&
       rating != null &&
@@ -1895,8 +1920,6 @@ function GameRoom({
       .from("game_players")
       .update({
         handicap_index: idxVal,
-        rating,
-        slope,
         course_handicap: ch,
       })
       .eq("id", p.id);
