@@ -146,6 +146,26 @@ export function OrganizerPanel({
   const allSet = players.length > 0 && withHcp === players.length;
 
   const teams = Array.isArray(game.teams) ? game.teams : [];
+  // Tee choice is a player-level setting and must not depend on yardage availability.
+  // Merge the course library tees with tee snapshots already stored on game_players so
+  // the organizer keeps a usable selector even if the course link/library lookup is stale.
+  const teeOptions = useMemo(() => {
+    const byName = new Map<string, CourseTee>();
+    for (const t of courseTees || []) {
+      if (!t?.name) continue;
+      byName.set(t.name, t);
+    }
+    for (const p of players) {
+      if (!p.tee_name || p.rating == null || p.slope == null || byName.has(p.tee_name)) continue;
+      byName.set(p.tee_name, {
+        name: p.tee_name,
+        rating: p.rating,
+        slope: p.slope,
+        par: game.course_par ?? 0,
+      });
+    }
+    return Array.from(byName.values());
+  }, [courseTees, players, game.course_par]);
   const groupOptions = Array.from({ length: Math.max(1, Math.ceil(players.length / 4) + 1) }, (_, i) => i + 1);
   const teeGroups = Array.from(new Set(players.map((p) => p.tee_group).filter((g): g is number => g != null))).sort((a, b) => a - b);
   const teamLabel = (key: string | null | undefined) => teams.find((t) => t.key === key)?.name || "No team";
@@ -277,24 +297,24 @@ export function OrganizerPanel({
 
                   <div>
                     <label style={{ color: C.sage, fontSize: 11 }}>Tee</label>
-                    {courseTees.length ? (
-                      <select
-                        value={p.tee_name || ""}
-                        onChange={(e) => onSetTee(p, e.target.value)}
-                        style={{ ...inputStyle, padding: "6px 8px", marginTop: 2, width: "100%" }}
-                      >
-                        <option value="" disabled>Select tee</option>
-                        {courseTees.map((t) => (
-                          <option key={`${t.name}-${t.rating}-${t.slope}`} value={t.name}>
-                            {t.name} · {t.rating}/{t.slope}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div style={{ color: C.ink, fontWeight: 700, fontSize: 13, marginTop: 8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {p.tee_name || "—"}
+                    <select
+                      value={p.tee_name || ""}
+                      onChange={(e) => onSetTee(p, e.target.value)}
+                      disabled={teeOptions.length === 0}
+                      style={{ ...inputStyle, padding: "6px 8px", marginTop: 2, width: "100%", opacity: teeOptions.length ? 1 : 0.65 }}
+                    >
+                      <option value="" disabled>{teeOptions.length ? "Select tee" : "No tee data available"}</option>
+                      {teeOptions.map((t) => (
+                        <option key={`${t.name}-${t.rating}-${t.slope}`} value={t.name}>
+                          {t.name} · {t.rating != null && t.slope != null ? `${t.rating}/${t.slope}` : "rating/slope missing"}
+                        </option>
+                      ))}
+                    </select>
+                    {teeOptions.length === 0 ? (
+                      <div style={{ color: C.gold, fontSize: 11, marginTop: 4 }}>
+                        Tee choices are unavailable for this course. Yardage is optional; rating and slope are required to calculate a course handicap.
                       </div>
-                    )}
+                    ) : null}
                   </div>
                   </div>
 
