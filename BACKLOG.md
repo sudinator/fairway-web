@@ -434,3 +434,9 @@ Still open (lower priority, honestly assessed):
 - Tee selection is independent of yardage availability; rating/slope drive course handicap.
 - Handicap overrides no longer borrow another player's rating/slope.
 - Course lookup has a global-library fallback plus saved player-tee fallback when group linkage is stale.
+
+## Refactor integrity follow-ups
+- [x] Restore CoursesLibrary -> CourseEditor reachability (Add New Course, edit existing, resume interrupted edit).
+- [x] Add permanent extraction reachability + orphan-state + import-debt CI guards.
+- [ ] Incrementally reduce inherited unused-import debt in extracted modules; ratchet may decrease but never increase.
+- [ ] Add deeper component-level characterization harness for side-effect-heavy OrganizerPanel, BettingPanel, GroupScorecard and GroupsBuilder when the test environment supports it.

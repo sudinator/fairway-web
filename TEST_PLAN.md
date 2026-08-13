@@ -87,3 +87,11 @@ The suite creates temporary users and fixtures, tests authenticated RPC/RLS beha
 
 ## v177.15 corrective staging result
 The first real staging execution of the v177.14 suite caught a PL/pgSQL runtime ambiguity in `save_bet_expense_atomic` that static/model checks had not surfaced. After applying the 0134-qualified-column fix, the full GitHub `Staging integration` workflow passed. This validates the release process itself: static/unit/build gates remain useful, but a real staging PostgreSQL/RLS/RPC run is required before future production database releases.
+
+## Tier E — permanent extraction integrity (v177.19+)
+- `check_extraction_reachability.py`: verifies critical entry -> state -> extracted render/call -> callback/downstream chains remain present.
+- `check_extracted_state_hygiene.py`: fails fully orphaned React state in extracted components.
+- `check_extracted_import_debt.py`: ratchets inherited import debt so it can decrease but cannot silently grow.
+- Stateful extractions require scenario tests for normal flow, cancel/exit, retry/re-entry, failure paths and relevant adjacent workflows.
+- Pure extractions retain old-vs-new differential tests where practical.
+- Before a candidate is built, verify the input tree is the current clean synchronized `staging` branch. After applying the candidate, differential-review every changed file and confirm unrelated CI/workflow files remain unchanged unless intentionally modified.

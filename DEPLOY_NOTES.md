@@ -4792,3 +4792,12 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - PR verification now uses the protected GitHub `staging` environment.
 - Added branch protection for `main`: changes require a pull request and the `verify` status check must pass before merge.
 - No application behavior, database schema, or production data changes.
+
+### 177.19.260813 — refactor integrity hardening + Courses editor reachability
+- Restores the missing `CoursesLibrary -> CourseEditor` render bridge, fixing Add New Course, editing an existing course, and resuming an interrupted course edit.
+- Preserves the current canonical/duplicate-course identity logic; no fallback to older name-only duplicate detection.
+- Adds explicit `OrganizerPanelProps` and `satisfies OrganizerPanelProps` at the parent spread-prop boundary; removes stale unused tee-group prop wiring and orphan `addMemberId` state.
+- Adds permanent extraction reachability, orphan-state hygiene, and import-debt-ratchet guards to `npm run guards`.
+- Process hardening: byte-identical moves are no longer sufficient; stateful extraction verification now covers entry/reachability, inputs/outputs, downstream side effects, effect timing, exit paths, and permanent CI characterization.
+- Candidate-baseline hardening: every release candidate must be built from the latest clean synchronized `staging/main` baseline to prevent stale ZIPs from reverting later CI/config changes.
+- No database migration.

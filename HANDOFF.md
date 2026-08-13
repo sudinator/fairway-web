@@ -571,3 +571,8 @@ For release candidates, run `npm run ci:staging` against a disposable/staging Su
 - Fresh path: 0129 remains intentionally skipped/reserved; apply 0130 → 0131 → 0132 → 0133 → 0134.
 - 0134 was generated from a failure caught by the real GitHub/Supabase staging integration gate and then validated by a fully green staging run.
 - Do not copy production data or production outbound webhooks into staging; schema/RPC parity plus disposable test fixtures is the intended model.
+
+## v177.19+ refactor integrity rule
+A modular refactor is not verified by byte identity alone. Preserve and permanently characterize the full entry -> inputs/state -> extracted code -> outputs/callbacks -> downstream dependency/DB side effects -> refresh/cancel/exit chain, including effect timing. Use explicit prop contracts, `satisfies` for spread props, reachability/state/dependency CI guards, differential tests for pure logic, and scenario tests for stateful flows. Treat unused props/state/imports as boundary-drift signals.
+
+Release candidates must be constructed from the latest clean synchronized `staging` baseline (`main` synced back after production), never from an older uploaded release ZIP.
