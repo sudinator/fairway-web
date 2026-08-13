@@ -87,7 +87,7 @@ import { makeCode, defaultTeeIdx, todayLocalStr, normalizeFavoriteCourse, GP_STA
 import * as GC from "@/lib/game-create";
 import type { FinishGap } from "@/lib/finish-gaps";
 import { GroupScorecard, GroupsBuilder } from "@/components/game/scorecard-views";
-import { OrganizerPanel, BettingPanel } from "@/components/game/organizer-panel";
+import { OrganizerPanel, BettingPanel, type OrganizerPanelProps } from "@/components/game/organizer-panel";
 
 // Stable match identity for a player. Real players key on user_id (so nothing
 // about existing matches changes); guests have no account, so they key on their
@@ -2758,11 +2758,11 @@ function GameRoom({
           game, players, user,
           onOverride: overridePlayerHandicap, courseTees, onSetTee: setPlayerTee,
           onRemove: removePlayer, onToggleNoShow: toggleNoShow, onSetTeam: setPlayerTeam,
-          onSetTeeGroup: setPlayerTeeGroup, onRename: renameGame, onDelete: deleteGame,
+          onRename: renameGame, onDelete: deleteGame,
           onEnd: requestEndGame, onReopen: reopenGame, onReset: resetScores, onShare: setShare,
           eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,
           onSetAllowance: setAllowance, onSetFormat: setFormat, onSetTeamScoreMode: setTeamScoreMode, onSetSkinsMode: updateSkinsMode, onSetSkinsStyle: setSkinsStyle, onSetMatchTeam: setMatchTeam, anyScores,
-        };
+        } satisfies OrganizerPanelProps;
         // --- per-step completion drives the stepper status + the "what's next" line ---
         const total = players.length;
         const pairings = Array.isArray(game.pairings) ? game.pairings : [];

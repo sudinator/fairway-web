@@ -28,3 +28,8 @@ The diff test proves the extraction matches the OLD behavior exactly (no regress
 The unit test pins the behavior with independent expected values (so a future intentional change is
 made deliberately, with the test updated, rather than drifting silently). The baseline file can be
 deleted once an extraction is well past — but keeping it is cheap and documents the "before".
+
+## v177.19 refactor-integrity hardening
+The Courses regression proved relocation byte-identity is necessary but insufficient: editor state survived while the state->render bridge did not. Future verification therefore combines differential/byte-equivalence with permanent reachability contracts, explicit props boundaries, state/dependency hygiene and scenario testing for stateful flows. New CI guards: `check_extraction_reachability.py`, `check_extracted_state_hygiene.py`, and `check_extracted_import_debt.py`.
+
+Candidate construction must also preserve the latest synchronized branch baseline. A release ZIP created from an older snapshot can silently revert later CI/configuration fixes even when the app version appears current, so every release starts from a freshly verified `staging == main` tree.

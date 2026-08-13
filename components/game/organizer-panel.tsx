@@ -73,35 +73,7 @@ import { ShareControl } from "@/components/game/scorecard-views";
 
 const supabase = createClient();
 
-export function OrganizerPanel({
-  game,
-  players,
-  user,
-  onOverride,
-  courseTees,
-  onSetTee,
-  onRemove,
-  onToggleNoShow,
-  onSetTeam,
-  onSetTeeGroup,
-  onRename,
-  onDelete,
-  onEnd,
-  onReopen,
-  onReset,
-  onShare,
-  section = "players",
-  eligibleMembers = [],
-  onAddMember,
-  onAddGuest,
-  onSetAllowance,
-  onSetFormat,
-  onSetTeamScoreMode,
-  onSetSkinsMode,
-  onSetSkinsStyle,
-  onSetMatchTeam,
-  anyScores = false,
-}: {
+export type OrganizerPanelProps = {
   game: Game;
   players: Player[];
   user: any;
@@ -111,7 +83,6 @@ export function OrganizerPanel({
   onRemove: (p: Player) => Promise<void>;
   onToggleNoShow: (p: Player) => Promise<void>;
   onSetTeam: (p: Player, team: string | null) => Promise<void>;
-  onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
   onRename: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
   onEnd: () => Promise<void>;
@@ -129,12 +100,40 @@ export function OrganizerPanel({
   onSetSkinsStyle?: (s: "individual" | "team_11" | "team_2v2") => Promise<void>;
   onSetMatchTeam?: (on: boolean) => Promise<void>;
   anyScores?: boolean;
-}) {
+};
+
+export function OrganizerPanel({
+  game,
+  players,
+  user,
+  onOverride,
+  courseTees,
+  onSetTee,
+  onRemove,
+  onToggleNoShow,
+  onSetTeam,
+  onRename,
+  onDelete,
+  onEnd,
+  onReopen,
+  onReset,
+  onShare,
+  section = "players",
+  eligibleMembers = [],
+  onAddMember,
+  onAddGuest,
+  onSetAllowance,
+  onSetFormat,
+  onSetTeamScoreMode,
+  onSetSkinsMode,
+  onSetSkinsStyle,
+  onSetMatchTeam,
+  anyScores = false,
+}: OrganizerPanelProps) {
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [open, setOpen] = useState(true);
   const [nameEdit, setNameEdit] = useState(game.name);
-  const [addMemberId, setAddMemberId] = useState("");
   const [addGuestName, setAddGuestName] = useState("");
   const [addGuestHcp, setAddGuestHcp] = useState("");
   const [addGuestSponsor, setAddGuestSponsor] = useState(""); // sponsor user id; "" -> current user

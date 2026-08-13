@@ -161,3 +161,7 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
     (notification sheet, handicap card) rather than inventing a new look. Enforced for same-element mistakes
     by `ci/check-contrast.py` (part of `npm run guards`); parent/child pairings are on you to get right — copy
     an existing dark sheet. — manual
+
+## Refactor reachability / boundary integrity (v177.19+)
+22. **Byte-identical moves are not enough.** Every stateful extraction must preserve and permanently verify the full chain: entry action/effect -> state/props/parameters/refs/context -> extracted render/call -> outputs/callbacks/state updates -> downstream helpers/APIs/RPCs/database writes -> refresh/cancel/retry/exit. Reactive/effect timing is part of the contract. Use explicit exported prop types and `satisfies` for constructed spread-prop objects. CI must include permanent reachability/characterization checks plus orphan-state/dependency hygiene checks. Unused props/state/imports are boundary-drift warnings. Do not continue modularization while a known reachability defect is unresolved. Pure logic still requires old-vs-new differential testing where practical.
+23. **Release candidates start from the current synchronized baseline.** Before applying a new candidate, `main` and `staging` must be synchronized and the candidate must be built from that exact clean `staging` tree, not from an older release ZIP. Differential review must confirm unrelated current branch changes (especially CI/workflow configuration) are preserved.

@@ -50,3 +50,13 @@ it fits. Pure helpers are extracted FIRST each pass, before any stateful/JSX rel
 - [ ] npm run ci green; DEPLOY_NOTES records the ledger summary
 Miss any line → that is the flag to halt. Meet all → the process is known-correct without running it
 (modulo gate-4 reactive seams, which name their own residual risk for reviewer QA).
+
+## Gate 5 — permanent reachability/control-flow integrity (required, v177.19+)
+Byte identity proves only that the moved body did not change at move time. It does not prove the application still reaches that body in later releases. Every stateful extraction now inventories:
+1. Entry actions/effects and all incoming state/props/parameters/refs/context.
+2. The extracted render/call and explicit typed prop boundary.
+3. Returns, callbacks, state updates and side effects.
+4. Downstream imports/helpers/APIs/RPCs/database writes.
+5. Refresh, retry, cancel, cleanup and exit paths, including effect timing.
+Critical links must be permanently characterized in CI. Constructed spread props use `satisfies <Props>`. Unused props/state/imports are reviewed as boundary drift; no further modularization while known reachability defects remain.
+6. Release-candidate application is differential against the latest clean synchronized `staging` baseline; stale release ZIPs are not valid baselines.

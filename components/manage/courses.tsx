@@ -387,6 +387,19 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
     );
   };
 
+  if (editing) {
+    return (
+      <CourseEditor
+        user={user}
+        activeGroupId={activeGroupId}
+        initial={editing === "new" ? null : editing.data}
+        existingId={editing === "new" ? null : editing.id}
+        onCancel={() => { clearActiveCourseEdit(); setEditing(null); }}
+        onSaved={() => { clearActiveCourseEdit(); setEditing(null); void load(); }}
+      />
+    );
+  }
+
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
