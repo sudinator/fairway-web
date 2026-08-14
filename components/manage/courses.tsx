@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { HScroll } from "@/components/hscroll";
 import { createClient } from "@/lib/supabase";
 import { pushGate, subscribeToPush, unsubscribeFromPush, currentPermission, syncPushSubscription } from "@/lib/push";
 import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID, effectiveGroupId, runningHandicap, handicapRounds, adjustedGross, roundDifferential, nextRoundOutlook } from "@/lib/golf";
 import capabilities from "@/lib/capabilities.json";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LabelList } from "recharts";
 import { buildCustomCourse, Course, CourseHole, courseLabel, findExistingCourseId, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
+import { normalizeCourseProviderId } from "@/lib/course-provider-id";
 import { logActivity } from "@/lib/activity";
 import { diagEnabled, setDiagEnabled, reproduceBug, setReproduceBug, getDiagLog, clearDiagLog } from "@/lib/debuglog";
 import { AdminFeedbackTab } from "@/components/feedback";
@@ -268,13 +268,14 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
     let updated = 0, skipped = 0, failed = 0;
     for (const c of all) {
       const ext = c.data?.externalId;
-      if (!ext || !/^\d+$/.test(String(ext))) { skipped++; continue; }
+      const providerId = normalizeCourseProviderId(ext);
+      if (!providerId) { skipped++; continue; }
       try {
-        const res = await fetch(`/api/courses?id=${encodeURIComponent(String(ext))}`);
+        const res = await fetch(`/api/courses?id=${encodeURIComponent(providerId)}`);
         const j = await res.json();
         const fetched = j.course;
         if (!fetched || !fetched.club) { failed++; continue; }
-        const newData = { ...c.data, club: fetched.club, externalId: String(ext) };
+        const newData = { ...c.data, club: fetched.club, externalId: providerId };
         const { error } = await supabase.from("favorite_courses")
           .update({ facility: fetched.club, data: newData }).eq("id", c.id);
         if (error) { failed++; continue; }
@@ -503,8 +504,8 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
   // search
   const [q, setQ] = useState("");
   const [searching, setSearching] = useState(false);
-  const [results, setResults] = useState<{ id: number; name: string; location: string }[] | null>(null);
-  const [loadingId, setLoadingId] = useState<number | null>(null);
+  const [results, setResults] = useState<{ id: string; name: string; location: string }[] | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
 
   // ---- Resume an interrupted course edit (device-local draft), for NEW and EXISTING courses ----
   const isNewCourse = !existingId;
@@ -557,11 +558,11 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
     } catch (e: any) { setErr(e.message); setResults([]); }
     finally { setSearching(false); }
   };
-  const pick = async (id: number, fallbackLoc?: string) => {
+  const pick = async (id: string, fallbackLoc?: string) => {
     if (!courseHydratedRef.current) { courseHydratedRef.current = true; setCourseDraftDismissed(true); } // choosing a course = start fresh
     setLoadingId(id); setErr(null);
     try {
-      const res = await fetch(`/api/courses?id=${id}`);
+      const res = await fetch(`/api/courses?id=${encodeURIComponent(id)}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Load failed");
       const c = data.course;
@@ -719,7 +720,15 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
         } else {
           const createdCourse = { ...course, name, location: course.location || "" };
           const { data: created, error } = await supabase.from("favorite_courses")
-            .insert({ group_id: activeGroupId, name, location: course.location || "", data: createdCourse, user_id: user.id })
+            .insert({
+              group_id: activeGroupId,
+              name,
+              facility: course.club || null,
+              external_id: normalizeCourseProviderId(course.externalId),
+              location: course.location || "",
+              data: createdCourse,
+              user_id: user.id,
+            })
             .select("id").single();
           if (error || !created) throw error || new Error("Could not create course");
           courseId = created.id;

@@ -2880,7 +2880,7 @@ function UpdateChecker() {
       setLatest(serverVersion);
       setLatestBuild(serverBuild);
 
-      const isNewer = !!waiting || (!!serverVersion && serverVersion !== APP_VERSION);
+      const isNewer = !!serverVersion && serverVersion !== APP_VERSION;
 
       if (!apply) {
         // Report only — surface the "Update to X" button via hasNewer; don't touch the worker.
@@ -2919,7 +2919,7 @@ function UpdateChecker() {
     <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 700 }}>App version &amp; updates</div>
       <div style={{ color: C.sage, fontSize: 13, marginTop: 8, lineHeight: 1.55 }}>
-        Installed as an app? This compares your installed build with the latest deployed build and reloads if needed.
+        Installed as an app? This compares your installed release with the latest deployed release. Updates apply only after you tap Update.
       </div>
       <div style={{ color: C.cream, fontSize: 13, marginTop: 10, lineHeight: 1.7 }}>
         <div><b>Current version:</b> {APP_VERSION}</div>

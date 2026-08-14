@@ -1,19 +1,20 @@
 import { NextResponse } from "next/server";
 import { createRouteClient } from "@/lib/supabase-route";
 import { BoundedTtlCache } from "@/lib/ttl-cache";
+import { normalizeCourseProviderId } from "@/lib/course-provider-id";
 
 const COURSE_TIMEOUT_MS = 8000;
 const MIN_QUERY_LEN = 3;
 // Tiny in-process cache for identical searches (cuts repeated upstream calls; best-effort, per instance).
 const SEARCH_CACHE_MS = 60_000;
-const searchCache = new BoundedTtlCache<{ courses: Array<{ id: unknown; club: string; name: string; location: string }> }>(300, SEARCH_CACHE_MS);
+const searchCache = new BoundedTtlCache<{ courses: Array<{ id: string; club: string; name: string; location: string }> }>(300, SEARCH_CACHE_MS);
 
 // This runs on the server (not the browser), so the API key stays secret.
 // It talks to golfcourseapi.com — a free database of ~30,000 courses.
 //
 // Two modes:
 //   /api/courses?q=bethpage        -> search, returns a list of matches
-//   /api/courses?id=1234           -> full detail for one course (tees + holes)
+//   /api/courses?id=5wng1nrq       -> full detail for one course (tees + holes)
 
 const BASE = "https://api.golfcourseapi.com/v1";
 
@@ -58,8 +59,9 @@ export async function GET(request: Request) {
   try {
     // ---- Detail mode ----
     if (id) {
-      if (!/^\d{1,12}$/.test(id)) return NextResponse.json({ error: "Invalid course id." }, { status: 400 });
-      const res = await fetch(`${BASE}/courses/${id}`, { headers, signal: AbortSignal.timeout(COURSE_TIMEOUT_MS) });
+      const providerId = normalizeCourseProviderId(id);
+      if (!providerId) return NextResponse.json({ error: "Invalid course id." }, { status: 400 });
+      const res = await fetch(`${BASE}/courses/${encodeURIComponent(providerId)}`, { headers, signal: AbortSignal.timeout(COURSE_TIMEOUT_MS) });
       if (!res.ok) throw new Error(`Course lookup failed (${res.status})`);
       const data = await res.json();
       return NextResponse.json({ course: normalizeCourse(data.course || data) });
@@ -76,12 +78,16 @@ export async function GET(request: Request) {
       const res = await fetch(`${BASE}/search?search_query=${encodeURIComponent(query)}`, { headers, signal: AbortSignal.timeout(COURSE_TIMEOUT_MS) });
       if (!res.ok) throw new Error(`Search failed (${res.status})`);
       const data = await res.json();
-      const courses = (data.courses || []).slice(0, 15).map((c: any) => ({
-        id: c.id,
-        club: c.club_name,
-        name: c.course_name || c.club_name,
-        location: courseLocation(c),
-      }));
+      const courses = (data.courses || []).slice(0, 15).flatMap((c: any) => {
+        const providerId = normalizeCourseProviderId(c.id);
+        if (!providerId) return [];
+        return [{
+          id: providerId,
+          club: c.club_name,
+          name: c.course_name || c.club_name,
+          location: courseLocation(c),
+        }];
+      });
       const payload = { courses };
       searchCache.set(cacheKey, payload);
       return NextResponse.json(payload);

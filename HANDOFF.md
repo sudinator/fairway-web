@@ -576,3 +576,9 @@ For release candidates, run `npm run ci:staging` against a disposable/staging Su
 A modular refactor is not verified by byte identity alone. Preserve and permanently characterize the full entry -> inputs/state -> extracted code -> outputs/callbacks -> downstream dependency/DB side effects -> refresh/cancel/exit chain, including effect timing. Use explicit prop contracts, `satisfies` for spread props, reachability/state/dependency CI guards, differential tests for pure logic, and scenario tests for stateful flows. Treat unused props/state/imports as boundary-drift signals.
 
 Release candidates must be constructed from the latest clean synchronized `staging` baseline (`main` synced back after production), never from an older uploaded release ZIP.
+
+## External provider contract rule (177.20+)
+- External API identifiers are opaque provider-owned tokens. Do not assume numeric/string formats from historical data unless the provider explicitly guarantees them.
+- GolfCourseAPI has a scheduled golden-fixture contract monitor in `.github/workflows/external-api-contracts.yml`; it checks search/detail availability, exact reviewed course identities, ids, metadata, and required detail fields and opens/updates a GitHub issue on drift.
+- Before changing BNN in response to an external-data failure, compare live provider responses with the golden fixtures and determine whether the provider contract or BNN code changed.
+- Preserve BNN internal UUIDs/history across provider migrations; reconcile provider-owned ids/metadata separately.

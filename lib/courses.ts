@@ -1,6 +1,7 @@
 // A small starter set of well-known courses so the app is useful immediately,
 // plus helpers to build a standard course when someone enters their own.
 // Stroke index follows the common allocation (odd holes front nine, even back).
+import { normalizeCourseProviderId } from "@/lib/course-provider-id";
 //
 // NOTE: ratings/slopes here are representative published values; players should
 // confirm against the physical scorecard, which is the authoritative source.
@@ -134,8 +135,9 @@ export async function findExistingCourseId(
   supabase: any,
   c: { externalId?: string | number | null; club?: string | null; name: string; location?: string | null },
 ): Promise<string | undefined> {
-  if (c.externalId != null && String(c.externalId).trim()) {
-    const { data, error } = await supabase.from("favorite_courses").select("id").eq("external_id", String(c.externalId)).eq("deleted", false).maybeSingle();
+  const providerId = normalizeCourseProviderId(c.externalId);
+  if (providerId) {
+    const { data, error } = await supabase.from("favorite_courses").select("id").eq("external_id", providerId).eq("deleted", false).maybeSingle();
     if (error) throw error;
     if (data?.id) return data.id as string;
   }

@@ -71,7 +71,7 @@ export function YardageBackfill() {
   const [saving, setSaving] = useState(false);
   // lookup sub-state
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<{ id: number; club: string; name: string; location: string }[] | null>(null);
+  const [results, setResults] = useState<{ id: string; club: string; name: string; location: string }[] | null>(null);
   const [apiCourse, setApiCourse] = useState<Course | null>(null);
   const [looking, setLooking] = useState(false);
 
@@ -181,7 +181,7 @@ export function YardageBackfill() {
     setLooking(false);
   }
 
-  async function pickResult(id: number) {
+  async function pickResult(id: string) {
     setLooking(true); setEMsg(null);
     const c = await fetchApiCourse(String(id));
     setApiCourse(c);
