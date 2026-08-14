@@ -29,3 +29,12 @@ export function buildCourseSourceView<T extends CourseWithTees>(mode: CourseSour
     ratingTexts: buildCourseRatingTexts(cloned),
   };
 }
+
+export function shouldShowCourseCorrectionReason(args: {
+  existingId: string | null;
+  hasStoredProviderSource: boolean;
+  sourceMode: CourseSourceMode;
+  hasMaterialChanges: boolean;
+}): boolean {
+  return Boolean(args.existingId) || (args.hasStoredProviderSource && args.sourceMode === "provider" && args.hasMaterialChanges);
+}

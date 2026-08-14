@@ -7,7 +7,7 @@ import capabilities from "@/lib/capabilities.json";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LabelList } from "recharts";
 import { buildCustomCourse, Course, CourseHole, courseLabel, findExistingCourseId, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { normalizeCourseProviderId } from "@/lib/course-provider-id";
-import { buildCourseRatingTexts, buildCourseSourceView, type CourseSourceMode } from "@/lib/course-source-review";
+import { buildCourseRatingTexts, buildCourseSourceView, shouldShowCourseCorrectionReason, type CourseSourceMode } from "@/lib/course-source-review";
 import { logActivity } from "@/lib/activity";
 import { diagEnabled, setDiagEnabled, reproduceBug, setReproduceBug, getDiagLog, clearDiagLog } from "@/lib/debuglog";
 import { AdminFeedbackTab } from "@/components/feedback";
@@ -691,6 +691,13 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
   const updateHole = (i: number, patch: Partial<CourseHole>) => setCourse({ ...course, holes: course.holes.map((h, j) => j === i ? { ...h, ...patch } : h) });
   const [yardTee, setYardTee] = useState<number | null>(null); // which tee's per-hole yardages are open
   const sourceMode: CourseSourceMode = providerSource?.selectedSource || (providerSource?.stored ? "stored" : "provider");
+  const providerReviewHasChanges = Boolean(providerSource?.stored && sourceMode === "provider" && hasMaterialCourseChanges(providerSource.stored, course));
+  const showCorrectionReason = shouldShowCourseCorrectionReason({
+    existingId,
+    hasStoredProviderSource: Boolean(providerSource?.stored),
+    sourceMode,
+    hasMaterialChanges: providerReviewHasChanges,
+  });
   const switchCourseSource = (mode: CourseSourceMode, sourceCourse: Course) => {
     const next = buildCourseSourceView(mode, sourceCourse);
     setCourse(next.course);
@@ -953,9 +960,9 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
 
       {err && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{err}</div>}
 
-      {existingId && (
+      {showCorrectionReason && (
         <div style={{ marginTop: 16 }}>
-          <label style={{ color: C.sage, fontSize: 12 }}>Reason for change <span style={{ color: C.gold }}>(required only if you changed course data)</span></label>
+          <label style={{ color: C.sage, fontSize: 12 }}>Reason for change <span style={{ color: C.gold }}>(required to submit changed course data for approval)</span></label>
           <textarea
             style={{ ...inputStyle, marginTop: 4, minHeight: 74, resize: "vertical" }}
             value={reason}
@@ -963,11 +970,16 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
             onChange={(e) => setReason(e.target.value)}
           />
           <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>This reason is shown to app admins when they review the global course change.</div>
+          {providerReviewHasChanges && (
+            <div style={{ color: C.ink, fontSize: 12, marginTop: 6, lineHeight: 1.45 }}>
+              Submitting will create a course correction for approval. Stored BNN data will not be silently overwritten.
+            </div>
+          )}
         </div>
       )}
       <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
         <button style={btn(false)} onClick={onCancel}>Cancel</button>
-        <button style={{ ...btn(true), opacity: saving ? 0.5 : 1 }} disabled={saving} onClick={save}>{saving ? "Saving…" : "Save to library"}</button>
+        <button style={{ ...btn(true), opacity: saving ? 0.5 : 1 }} disabled={saving} onClick={save}>{saving ? "Saving…" : (providerReviewHasChanges ? "Submit for approval" : "Save to library")}</button>
       </div>
     </div>
   );

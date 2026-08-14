@@ -4821,3 +4821,10 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Adds executable course-source transition tests plus stronger source-contract guards.
 - Permanently tightens the engineering process: stateful UI changes must verify observable state propagation and distinguish MODELLED, EXECUTED, and BROWSER-VALIDATED evidence.
 - Supersedes unreleased 177.21; no database migration.
+
+
+### 177.23.260814 — provider correction submission completion
+- Fixes the existing-course provider-review path so the required correction reason input is visible when fresh provider data materially differs from stored BNN data.
+- Changes the primary CTA to `Submit for approval` while reviewing changed provider data and explains that stored BNN data is not silently overwritten.
+- Adds executable regression coverage for when the correction-reason UI must appear and extends the permanent observable-outcome contract through the terminal submission path.
+- No database migration.

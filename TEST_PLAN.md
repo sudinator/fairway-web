@@ -120,3 +120,8 @@ Evidence labels are mandatory:
 - BROWSER-VALIDATED: manual or automated browser observation of the real rendered workflow.
 
 Mode/source switches require A -> B -> A round-trip coverage. A modelled scenario cannot be promoted to an executed PASS.
+
+
+## Correction workflow terminal-path rule (177.23+)
+- When a stateful flow can enter a validation-required terminal action, the UI must expose every required input before submission and the primary CTA must describe the actual terminal action.
+- For course provider review, Stored BNN -> Provider review -> reason entry -> Submit for approval -> pending/review outcome is part of the observable-outcome contract; the reverse/cancel path must remain reachable.
