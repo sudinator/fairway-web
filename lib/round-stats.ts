@@ -32,3 +32,52 @@ export function roundStats(holes: Hole[]): RoundStats {
     fwRight: fwHoles.filter((h) => h.fairway === "right").length,
   };
 }
+
+export type RoundStatCompleteness = {
+  playedHoles: number;
+  puttHoles: number;
+  missingPutts: number[];
+  eligibleFairwayHoles: number;
+  fairwayHoles: number;
+  missingFairways: number[];
+  puttsRoundEligible: boolean;
+  shouldNudgePutts: boolean;
+  shouldNudgeFairways: boolean;
+};
+
+// Shared post-round completeness contract. Whole-round putting metrics require a fully played 18-hole
+// round with putts recorded on all 18 holes. Completion nudges are intentionally conservative: they
+// only appear when the golfer clearly tracked almost the entire stat set, so abandoned stat tracking
+// does not create nagging UI.
+export function roundStatCompleteness(holes: Hole[]): RoundStatCompleteness {
+  const playedHoles = holes.filter((h) => h.strokes != null);
+  const missingPutts = playedHoles.filter((h) => h.putts == null).map((h) => h.hole_number);
+  const puttHoles = playedHoles.length - missingPutts.length;
+
+  const fairwayEligible = playedHoles.filter((h) => h.par >= 4);
+  const missingFairways = fairwayEligible.filter((h) => h.fairway == null).map((h) => h.hole_number);
+  const fairwayHoles = fairwayEligible.length - missingFairways.length;
+
+  const puttsRoundEligible = playedHoles.length === 18 && puttHoles === 18;
+  const shouldNudgePutts = playedHoles.length === 18 && puttHoles >= 15 && puttHoles < 18;
+  const shouldNudgeFairways = fairwayEligible.length > 0
+    && fairwayHoles >= Math.max(1, fairwayEligible.length - 3)
+    && fairwayHoles < fairwayEligible.length;
+
+  return {
+    playedHoles: playedHoles.length,
+    puttHoles,
+    missingPutts,
+    eligibleFairwayHoles: fairwayEligible.length,
+    fairwayHoles,
+    missingFairways,
+    puttsRoundEligible,
+    shouldNudgePutts,
+    shouldNudgeFairways,
+  };
+}
+
+export function statHoleList(holes: number[]): string {
+  return holes.join(', ');
+}
+
