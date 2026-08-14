@@ -4813,3 +4813,11 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Adds permanent CI guards for the staging environment marker and course-source transparency contract.
 - 177.21 is intentionally the first real transition test of the 177.20 PWA hold-until-Update contract: a Production browser on 177.20 must remain on 177.20 after 177.21 deploys until the user presses Update.
 - No database migration.
+
+### 177.22.260814 — provider-review state propagation hardening
+- Fixes the 177.21 staging defect where `Load provider data for review` replaced the underlying course object but left independent rating text buffers and provenance UI stale.
+- Provider review is now an explicit source mode: stored BNN -> provider review -> stored BNN, with all editable rating fields synchronized on each transition and a clear return action.
+- Draft persistence retains the selected source mode.
+- Adds executable course-source transition tests plus stronger source-contract guards.
+- Permanently tightens the engineering process: stateful UI changes must verify observable state propagation and distinguish MODELLED, EXECUTED, and BROWSER-VALIDATED evidence.
+- Supersedes unreleased 177.21; no database migration.

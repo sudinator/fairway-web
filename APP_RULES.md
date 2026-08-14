@@ -175,3 +175,11 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
 ## Environment/source transparency
 24. **Staging must be visually unmistakable.** The Vercel `staging` branch renders a persistent yellow safe-area-aware border plus a STAGING marker. Production/main must never render that marker. Keep this contract guarded in CI.
 25. **External course data never silently overrides BNN canonical data.** When a provider result resolves to an existing `favorite_courses` record, show stored BNN data as primary and label its source. Keep the fresh provider payload separate, show material differences, and require an explicit user action before loading provider values for review. Existing correction/approval rules remain the write path for material changes.
+
+## Stateful UI observable-outcome contract
+- For every new or changed interaction, verify the full chain: user action -> handler -> all directly changed state -> all derived/parallel display state -> visible UI -> callbacks/side effects -> cancel/reverse/re-entry behavior.
+- Reachability alone is not sufficient. If a state transition changes the underlying model but leaves independent display state stale, the change is incomplete.
+- Inventory independent local display state (for example editable text buffers, selection mode, open/closed state, cached labels) whenever the source model can be replaced or switched.
+- Every mode/source switch must have a round-trip test where applicable (A -> B -> A) and prove visible values restore correctly.
+- Test evidence must be labeled as MODELLED, EXECUTED, or BROWSER-VALIDATED. A modelled scenario must never be reported simply as PASS for real UI behavior.
+- Stateful release verification must include an observable-outcome evidence table for each changed interaction.

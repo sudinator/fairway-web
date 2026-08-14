@@ -33,3 +33,6 @@ deleted once an extraction is well past — but keeping it is cheap and document
 The Courses regression proved relocation byte-identity is necessary but insufficient: editor state survived while the state->render bridge did not. Future verification therefore combines differential/byte-equivalence with permanent reachability contracts, explicit props boundaries, state/dependency hygiene and scenario testing for stateful flows. New CI guards: `check_extraction_reachability.py`, `check_extracted_state_hygiene.py`, and `check_extracted_import_debt.py`.
 
 Candidate construction must also preserve the latest synchronized branch baseline. A release ZIP created from an older snapshot can silently revert later CI/configuration fixes even when the app version appears current, so every release starts from a freshly verified `staging == main` tree.
+
+## Observable state propagation gate
+Stateful extraction/refactor verification must include all parallel and derived UI state, not just the primary state object. For each entry action, trace the state transition through every visible control/text buffer and prove the rendered outcome plus reverse/re-entry behavior. Treat stale local display state after a model replacement as a contract failure.

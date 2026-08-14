@@ -587,3 +587,6 @@ Release candidates must be constructed from the latest clean synchronized `stagi
 - Staging is visually marked by a yellow safe-area-aware border and STAGING badge based on `VERCEL_GIT_COMMIT_REF === "staging"`; Production must not display it.
 - Add New Course now distinguishes canonical BNN data from fresh GolfCourseAPI data at selection time. Existing canonical rows remain primary; provider data is comparison-only until the user explicitly chooses to review it.
 - 177.21 Production deployment is the required live transition test for the 177.20 PWA update contract: the installed 177.20 shell must remain active until Update is pressed.
+
+### Stateful UI evidence rule
+For changed interactions, do not equate handler reachability with working behavior. Verify action -> complete state propagation -> observable UI -> downstream effects -> reverse/cancel/re-entry. Label evidence MODELLED, EXECUTED, or BROWSER-VALIDATED; never report modelled behavior as an executed PASS. Mode/source switches require round-trip A -> B -> A verification.

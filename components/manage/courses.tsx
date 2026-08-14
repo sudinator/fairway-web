@@ -2,12 +2,12 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
-import { pushGate, subscribeToPush, unsubscribeFromPush, currentPermission, syncPushSubscription } from "@/lib/push";
 import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID, effectiveGroupId, runningHandicap, handicapRounds, adjustedGross, roundDifferential, nextRoundOutlook } from "@/lib/golf";
 import capabilities from "@/lib/capabilities.json";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LabelList } from "recharts";
 import { buildCustomCourse, Course, CourseHole, courseLabel, findExistingCourseId, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { normalizeCourseProviderId } from "@/lib/course-provider-id";
+import { buildCourseRatingTexts, buildCourseSourceView, type CourseSourceMode } from "@/lib/course-source-review";
 import { logActivity } from "@/lib/activity";
 import { diagEnabled, setDiagEnabled, reproduceBug, setReproduceBug, getDiagLog, clearDiagLog } from "@/lib/debuglog";
 import { AdminFeedbackTab } from "@/components/feedback";
@@ -61,7 +61,7 @@ type CourseEditRequest = {
   submitter_email?: string | null;
 };
 type CourseTab = "group" | "all";
-type CourseProviderSource = { provider: Course; stored: Course | null; existingId: string | null };
+type CourseProviderSource = { provider: Course; stored: Course | null; existingId: string | null; selectedSource?: CourseSourceMode };
 
 function courseCardTitle(c: LibCourse) {
   return courseLabel(c.data || ({ name: c.name } as any));
@@ -548,7 +548,7 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
     if (!courseHydratedRef.current) return;
     if (mode === "form" && course && (course.name || "").trim()) saveFormDraft(courseDraftKey, { course, providerSource });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [course, mode]);
+  }, [course, mode, providerSource]);
 
   const runSearch = async () => {
     if (!q.trim()) return;
@@ -596,14 +596,14 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
             name: row.name || storedBase.name || provider.name,
             location: row.location || storedBase.location || provider.location || fallbackLoc || "",
           };
-          setProviderSource({ provider, stored, existingId: canonicalId });
+          setProviderSource({ provider, stored, existingId: canonicalId, selectedSource: "stored" });
           setCourse(stored);
           setMode("form");
           return;
         }
       }
 
-      setProviderSource({ provider, stored: null, existingId: null });
+      setProviderSource({ provider, stored: null, existingId: null, selectedSource: "provider" });
       setCourse(provider); setMode("form");
     } catch (e: any) { setErr(e.message); }
     finally { setLoadingId(null); }
@@ -656,23 +656,19 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
   }
 
   if (!course) return null;
-  return <CourseForm user={user} activeGroupId={activeGroupId} course={course} setCourse={setCourse} existingId={existingId} providerSource={providerSource} saving={saving} setSaving={setSaving} err={err} setErr={setErr} onCancel={handleCancel} onSaved={() => { clearFormDraft(courseDraftKey); onSaved(); }} />;
+  return <CourseForm user={user} activeGroupId={activeGroupId} course={course} setCourse={setCourse} existingId={existingId} providerSource={providerSource} setProviderSource={setProviderSource} saving={saving} setSaving={setSaving} err={err} setErr={setErr} onCancel={handleCancel} onSaved={() => { clearFormDraft(courseDraftKey); onSaved(); }} />;
 }
 
-export function CourseForm({ user, activeGroupId, course, setCourse, existingId, providerSource, saving, setSaving, err, setErr, onCancel, onSaved }: {
+export function CourseForm({ user, activeGroupId, course, setCourse, existingId, providerSource, setProviderSource, saving, setSaving, err, setErr, onCancel, onSaved }: {
   user: any; activeGroupId: string; course: Course; setCourse: (c: Course) => void; existingId: string | null;
-  providerSource?: CourseProviderSource | null;
+  providerSource?: CourseProviderSource | null; setProviderSource: (source: CourseProviderSource | null) => void;
   saving: boolean; setSaving: (b: boolean) => void; err: string | null; setErr: (s: string | null) => void;
   onCancel: () => void; onSaved: () => void;
 }) {
   const coursePar = course.holes.reduce((s, h) => s + (h.par || 0), 0);
 
   // Keep rating fields as raw text while editing so a typed decimal point survives.
-  const [ratingTexts, setRatingTexts] = useState<Record<number, string>>(() => {
-    const m: Record<number, string> = {};
-    course.tees.forEach((t, i) => { m[i] = t.rating != null && !isNaN(t.rating) ? String(t.rating) : ""; });
-    return m;
-  });
+  const [ratingTexts, setRatingTexts] = useState<Record<number, string>>(() => buildCourseRatingTexts(course));
 
   const [reason, setReason] = useState("");
   const initialCourseRef = React.useRef<Course>(JSON.parse(JSON.stringify(course)));
@@ -694,6 +690,14 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
   const removeTee = (i: number) => setCourse({ ...course, tees: course.tees.filter((_, j) => j !== i) });
   const updateHole = (i: number, patch: Partial<CourseHole>) => setCourse({ ...course, holes: course.holes.map((h, j) => j === i ? { ...h, ...patch } : h) });
   const [yardTee, setYardTee] = useState<number | null>(null); // which tee's per-hole yardages are open
+  const sourceMode: CourseSourceMode = providerSource?.selectedSource || (providerSource?.stored ? "stored" : "provider");
+  const switchCourseSource = (mode: CourseSourceMode, sourceCourse: Course) => {
+    const next = buildCourseSourceView(mode, sourceCourse);
+    setCourse(next.course);
+    setRatingTexts(next.ratingTexts);
+    setYardTee(null);
+    if (providerSource) setProviderSource({ ...providerSource, selectedSource: mode });
+  };
   const updateTeeYardage = (ti: number, hi: number, val: string) => {
     const n = course.holes.length;
     const cur = course.tees[ti].yardages || [];
@@ -788,21 +792,31 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
       {!existingId && providerSource && (
         <div style={{ marginTop: 10, border: `1px solid ${providerSource.stored ? C.gold : C.line}`, borderRadius: 10, padding: 10, background: providerSource.stored ? "#FFF8E1" : C.cream }}>
           <div style={{ color: providerSource.stored ? C.green : C.sage, fontSize: 11, fontWeight: 900, letterSpacing: 1.2 }}>
-            {providerSource.stored ? "ALREADY IN BNN" : "NEW COURSE FROM GOLFCOURSEAPI"}
+            {providerSource.stored ? (sourceMode === "provider" ? "REVIEWING GOLFCOURSEAPI DATA" : "ALREADY IN BNN") : "NEW COURSE FROM GOLFCOURSEAPI"}
           </div>
           {providerSource.stored ? (
             <>
               <div style={{ color: C.ink, fontSize: 13, marginTop: 5, lineHeight: 1.45 }}>
-                You are viewing the <b>stored BNN course data</b>. The latest provider data was fetched separately and will not overwrite BNN automatically.
+                {sourceMode === "provider" ? (
+                  <>You are reviewing the <b>latest GolfCourseAPI data</b>. Nothing will overwrite stored BNN data unless you explicitly save a reviewed correction.</>
+                ) : (
+                  <>You are viewing the <b>stored BNN course data</b>. The latest provider data was fetched separately and will not overwrite BNN automatically.</>
+                )}
               </div>
               {hasMaterialCourseChanges(providerSource.stored, providerSource.provider) ? (
                 <div style={{ marginTop: 8 }}>
                   <div style={{ color: C.faint, fontSize: 12, lineHeight: 1.45 }}>
                     Provider differences detected: {courseChangeLines(providerSource.stored, providerSource.provider).slice(0, 4).join("; ")}
                   </div>
-                  <button type="button" style={{ ...btn(false), marginTop: 8, fontSize: 12 }} onClick={() => setCourse(JSON.parse(JSON.stringify(providerSource.provider)))}>
-                    Load provider data for review
-                  </button>
+                  {sourceMode === "stored" ? (
+                    <button type="button" style={{ ...btn(false), marginTop: 8, fontSize: 12 }} onClick={() => switchCourseSource("provider", providerSource.provider)}>
+                      Load provider data for review
+                    </button>
+                  ) : (
+                    <button type="button" style={{ ...btn(false), marginTop: 8, fontSize: 12 }} onClick={() => switchCourseSource("stored", providerSource.stored!)}>
+                      Return to stored BNN data
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div style={{ color: C.faint, fontSize: 12, marginTop: 6 }}>The provider data currently matches the stored BNN course.</div>

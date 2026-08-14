@@ -110,3 +110,13 @@ The first real staging execution of the v177.14 suite caught a PL/pgSQL runtime 
 - Canonical duplicate safety: selecting an existing course must reuse the existing BNN canonical UUID, never create a duplicate.
 - Re-entry: after selecting an existing provider course, leave and resume the draft; the stored-vs-provider source context must be preserved.
 - PWA transition test (Production): start with installed 177.20, deploy 177.21, verify Current remains 177.20 and Latest becomes 177.21 until Update is pressed; after Update, Current=Latest=177.21 and the prompt disappears.
+
+## Stateful UI observable-outcome testing
+For each changed interaction, record evidence for: handler reachability, underlying state mutation, synchronization of every derived/parallel UI state, visible rendered outcome, downstream side effects, reverse/cancel path, retry/re-entry, and browser validation where required.
+
+Evidence labels are mandatory:
+- MODELLED: logical/scenario reasoning only; not executable proof.
+- EXECUTED: source guard, unit test, component test, integration test, or other executable verification actually run.
+- BROWSER-VALIDATED: manual or automated browser observation of the real rendered workflow.
+
+Mode/source switches require A -> B -> A round-trip coverage. A modelled scenario cannot be promoted to an executed PASS.
