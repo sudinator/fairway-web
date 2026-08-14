@@ -4786,13 +4786,6 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - CI now runs on every push to `staging` as well as pull requests and `main`, so `npx tsc --noEmit`, guards, tests, and the production build must pass before a staging candidate can be considered clean.
 - Retains 177.17 behavior: player-level tee selection remains visible in Manage Game → Players, does not depend on yardage, recalculates course handicap from the selected tee's rating/slope, and does not borrow another player's rating/slope.
 - No database migration.
-### 177.16.260809 — production promotion CI hardening
-
-- Fixed the pull-request CI workflow so the Next.js build receives the staging Supabase public URL and anon key.
-- PR verification now uses the protected GitHub `staging` environment.
-- Added branch protection for `main`: changes require a pull request and the `verify` status check must pass before merge.
-- No application behavior, database schema, or production data changes.
-
 ### 177.19.260813 — refactor integrity hardening + Courses editor reachability
 - Restores the missing `CoursesLibrary -> CourseEditor` render bridge, fixing Add New Course, editing an existing course, and resuming an interrupted course edit.
 - Preserves the current canonical/duplicate-course identity logic; no fallback to older name-only duplicate detection.
@@ -4801,3 +4794,13 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Process hardening: byte-identical moves are no longer sufficient; stateful extraction verification now covers entry/reachability, inputs/outputs, downstream side effects, effect timing, exit paths, and permanent CI characterization.
 - Candidate-baseline hardening: every release candidate must be built from the latest clean synchronized `staging/main` baseline to prevent stale ZIPs from reverting later CI/config changes.
 - No database migration.
+
+### 177.20.260813 — GolfCourseAPI contract migration + explicit PWA updates
+- GolfCourseAPI ids are now treated as opaque provider-owned strings. Search and detail routes share the same bounded safe-token validator; legacy numeric ids and the provider's current alphanumeric ids are both valid.
+- Fixes Add Course, Round Setup, Yardage Backfill, course freshness, and admin facility refresh for the provider's 2026 id migration. Search results normalize ids to strings and every detail caller URL-encodes them.
+- Adds 18 real current provider ids as permanent regression fixtures, including Francis Byrne (`5wng1nrq`), plus unsafe-id rejection tests.
+- Adds a weekly GitHub `External API Contracts` workflow. It verifies all 18 known courses across search/detail endpoints and opens/updates an admin GitHub issue if ids, metadata, required detail fields, availability, or response shape drift. Requires repository secret `GOLF_API_KEY`.
+- PWA updates are release-version driven rather than service-worker-build driven. The active worker now pins the installed app shell cache-first until the user explicitly taps Update; same-version rebuilds no longer create user-visible update prompts. Live API/auth/Supabase traffic remains network-only.
+- Help's Current/Latest display no longer reports a waiting same-version worker as a newer release.
+- Cleans the duplicate 177.16 release-note block left from the prior merge-conflict resolution.
+- No database migration. Production course ids/metadata were reconciled separately before this code release; the app change prevents recurrence.

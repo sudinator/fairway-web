@@ -64,8 +64,8 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   const [ratingText, setRatingText] = useState("");
   // live search state
   const [searching, setSearching] = useState(false);
-  const [loadingId, setLoadingId] = useState<number | null>(null);
-  const [results, setResults] = useState<{ id: number; club?: string; name: string; location: string }[] | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [results, setResults] = useState<{ id: string; club?: string; name: string; location: string }[] | null>(null);
   const [searchErr, setSearchErr] = useState<string | null>(null);
   // custom course fields
   const [cName, setCName] = useState<string>(() => restored?.cName ?? "");
@@ -252,10 +252,10 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   };
 
   // When a search result is tapped, pull its full tee + hole data.
-  const pickFromApi = async (id: number) => {
+  const pickFromApi = async (id: string) => {
     setLoadingId(id); setSearchErr(null);
     try {
-      const res = await fetch(`/api/courses?id=${id}`);
+      const res = await fetch(`/api/courses?id=${encodeURIComponent(id)}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Course load failed");
       const c = data.course;

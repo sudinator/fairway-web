@@ -95,3 +95,8 @@ The first real staging execution of the v177.14 suite caught a PL/pgSQL runtime 
 - Stateful extractions require scenario tests for normal flow, cancel/exit, retry/re-entry, failure paths and relevant adjacent workflows.
 - Pure extractions retain old-vs-new differential tests where practical.
 - Before a candidate is built, verify the input tree is the current clean synchronized `staging` branch. After applying the candidate, differential-review every changed file and confirm unrelated CI/workflow files remain unchanged unless intentionally modified.
+
+## External API contract gate
+- GolfCourseAPI: `node ci/external/golfcourseapi-contract.mjs` runs weekly in GitHub Actions using `GOLF_API_KEY` and 18 reviewed Production fixtures. A failure opens/updates an admin GitHub issue.
+- Release tests must include provider-id contract tests: ids returned by search normalization must be accepted by detail validation; current opaque ids and legacy numeric ids are accepted; path/query/control-character ids are rejected.
+- PWA release test: old installed release -> deploy new release -> old app remains active -> update prompt appears -> Current remains old / Latest is new -> explicit Update activates/reloads -> Current=Latest. Same-version rebuilds must not produce a user-visible update prompt.

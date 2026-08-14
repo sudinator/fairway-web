@@ -49,7 +49,7 @@ write(
 
 const swPath = join(root, 'public/sw.js');
 let sw = readFileSync(swPath, 'utf8');
-const swVersion = `${appVersion}-${buildId}`;
+const swVersion = appVersion;
 const replacement = `const SW_VERSION = ${JSON.stringify(swVersion)};\nconst CACHE = \`bnn-shell-\${SW_VERSION}\`;`;
 if (/const SW_VERSION = [^;]+;\s*\nconst CACHE = `bnn-shell-\$\{SW_VERSION\}`;/.test(sw)) {
   sw = sw.replace(/const SW_VERSION = [^;]+;\s*\nconst CACHE = `bnn-shell-\$\{SW_VERSION\}`;/, replacement);

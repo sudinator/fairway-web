@@ -1,22 +1,28 @@
 // Birdie Num Num service worker.
-// Goal: let the installed app open even on poor/no signal (cache the app shell),
-// WITHOUT ever serving stale data. So: never touch Supabase, our API routes, or
-// auth — those always go straight to the network. Everything else is
-// network-first with a cache fallback, so users get fresh code when online and a
-// working shell when offline.
+// Goal: keep the installed app on its CURRENT code version until the user explicitly
+// taps Update, while never serving stale live data. Supabase/API/auth requests always
+// bypass the worker. App-shell requests are cache-first for the lifetime of the active
+// worker; activating a new version creates a new cache and reloads into the new shell.
 
-const SW_VERSION = "177.19.260813-local-20260813211856";
+const SW_VERSION = "177.20.260813";
 const CACHE = `bnn-shell-${SW_VERSION}`;
 
 self.addEventListener("install", (event) => {
-  // Do NOT skipWaiting here. On a first install there's no active worker to wait
-  // behind, so the worker activates on its own. On an UPDATE, staying in the
-  // "waiting" state is what lets the page detect it and show the "Update
-  // available" prompt — the user's tap (SKIP_WAITING below) is what activates it.
+  // Do NOT skipWaiting here. On UPDATE the worker stays waiting until the user taps
+  // Update. Pre-cache the root shell for this worker so activation has a coherent
+  // starting document even if connectivity is poor.
+  event.waitUntil((async () => {
+    try {
+      const fresh = await fetch("/", { cache: "no-store" });
+      if (fresh && fresh.status === 200) {
+        const cache = await caches.open(CACHE);
+        await cache.put("/", fresh.clone());
+      }
+    } catch { /* first navigation will populate the cache */ }
+  })());
 });
 
-// The page tells a waiting worker to activate now — fired when the user taps
-// "Update". This is the ONLY place we skip waiting, so updates are user-driven.
+// The page tells a waiting worker to activate now — fired only after the user taps Update.
 self.addEventListener("message", (event) => {
   if (event.data === "SKIP_WAITING") self.skipWaiting();
 });
@@ -24,7 +30,6 @@ self.addEventListener("message", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
-      // Drop old shell caches on version bump.
       const keys = await caches.keys();
       await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)));
       await self.clients.claim();
@@ -33,7 +38,6 @@ self.addEventListener("activate", (event) => {
 });
 
 function shouldBypass(url) {
-  // Never intercept anything that must be live: data, auth, AI, external APIs.
   return (
     url.hostname.endsWith("supabase.co") ||
     url.hostname.includes("supabase") ||
@@ -48,27 +52,28 @@ function shouldBypass(url) {
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
-  if (req.method !== "GET") return; // only cache GETs
+  if (req.method !== "GET") return;
   const url = new URL(req.url);
 
-  if (url.origin !== self.location.origin) return; // let cross-origin go straight through
-  if (shouldBypass(url)) return; // live data — don't touch
+  if (url.origin !== self.location.origin) return;
+  if (shouldBypass(url)) return;
 
-  // Network-first: try the network, fall back to cache when offline.
+  // Cache-first is deliberate: the ACTIVE worker pins the installed app shell to
+  // its current release. A new deployment can download a waiting worker, but the
+  // old code stays in use until the user explicitly activates that worker.
   event.respondWith(
     (async () => {
+      const cached = await caches.match(req);
+      if (cached) return cached;
       try {
         const fresh = await fetch(req);
-        // Cache a copy of successful same-origin responses for offline use.
         if (fresh && fresh.status === 200 && fresh.type === "basic") {
           const cache = await caches.open(CACHE);
-          cache.put(req, fresh.clone());
+          await cache.put(req, fresh.clone());
         }
         return fresh;
       } catch {
-        const cached = await caches.match(req);
-        if (cached) return cached;
-        // For navigations with nothing cached, try the cached root as a last resort.
+        // For an uncached navigation with no network, fall back to the cached root.
         if (req.mode === "navigate") {
           const root = await caches.match("/");
           if (root) return root;
