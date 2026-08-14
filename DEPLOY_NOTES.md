@@ -4804,3 +4804,12 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Help's Current/Latest display no longer reports a waiting same-version worker as a newer release.
 - Cleans the duplicate 177.16 release-note block left from the prior merge-conflict resolution.
 - No database migration. Production course ids/metadata were reconciled separately before this code release; the app change prevents recurrence.
+
+### 177.21.260814 — staging marker + course source transparency
+- Adds a persistent yellow viewport border and STAGING badge only when Vercel builds the `staging` branch, so staging is visually distinct from Production without changing production styling.
+- Add New Course now resolves a selected provider course against the BNN canonical course library immediately. If the course already exists, stored BNN data is shown as the primary data source and the UI explicitly labels it `ALREADY IN BNN`.
+- Fresh GolfCourseAPI data is retained separately for comparison. Provider differences are shown without silently overwriting stored BNN values; the golfer can explicitly load provider data for review, after which the existing correction/reason workflow applies on save.
+- New provider-only courses are explicitly labeled `NEW COURSE FROM GOLFCOURSEAPI`.
+- Adds permanent CI guards for the staging environment marker and course-source transparency contract.
+- 177.21 is intentionally the first real transition test of the 177.20 PWA hold-until-Update contract: a Production browser on 177.20 must remain on 177.20 after 177.21 deploys until the user presses Update.
+- No database migration.

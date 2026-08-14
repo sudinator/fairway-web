@@ -582,3 +582,8 @@ Release candidates must be constructed from the latest clean synchronized `stagi
 - GolfCourseAPI has a scheduled golden-fixture contract monitor in `.github/workflows/external-api-contracts.yml`; it checks search/detail availability, exact reviewed course identities, ids, metadata, and required detail fields and opens/updates a GitHub issue on drift.
 - Before changing BNN in response to an external-data failure, compare live provider responses with the golden fixtures and determine whether the provider contract or BNN code changed.
 - Preserve BNN internal UUIDs/history across provider migrations; reconcile provider-owned ids/metadata separately.
+
+## 177.21 source/environment contracts
+- Staging is visually marked by a yellow safe-area-aware border and STAGING badge based on `VERCEL_GIT_COMMIT_REF === "staging"`; Production must not display it.
+- Add New Course now distinguishes canonical BNN data from fresh GolfCourseAPI data at selection time. Existing canonical rows remain primary; provider data is comparison-only until the user explicitly chooses to review it.
+- 177.21 Production deployment is the required live transition test for the 177.20 PWA update contract: the installed 177.20 shell must remain active until Update is pressed.

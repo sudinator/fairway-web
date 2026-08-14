@@ -440,3 +440,7 @@ Still open (lower priority, honestly assessed):
 - [x] Add permanent extraction reachability + orphan-state + import-debt CI guards.
 - [ ] Incrementally reduce inherited unused-import debt in extracted modules; ratchet may decrease but never increase.
 - [ ] Add deeper component-level characterization harness for side-effect-heavy OrganizerPanel, BettingPanel, GroupScorecard and GroupsBuilder when the test environment supports it.
+
+## Environment clarity / course provenance
+- [x] 177.21 candidate: staging-only persistent yellow safe-area-aware border + STAGING badge; pending full release gate/live validation.
+- [x] 177.21 candidate: Add New Course identifies an existing canonical BNN course at provider selection time, shows stored BNN data as primary, and exposes fresh provider data separately for explicit review; pending Production validation.

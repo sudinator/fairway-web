@@ -61,6 +61,7 @@ type CourseEditRequest = {
   submitter_email?: string | null;
 };
 type CourseTab = "group" | "all";
+type CourseProviderSource = { provider: Course; stored: Course | null; existingId: string | null };
 
 function courseCardTitle(c: LibCourse) {
   return courseLabel(c.data || ({ name: c.name } as any));
@@ -506,23 +507,25 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<{ id: string; name: string; location: string }[] | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [providerSource, setProviderSource] = useState<CourseProviderSource | null>(null);
 
   // ---- Resume an interrupted course edit (device-local draft), for NEW and EXISTING courses ----
   const isNewCourse = !existingId;
   const courseDraftKey = `bnn_course_draft:${activeGroupId}:${existingId || "new"}`;
-  const [courseDraft, setCourseDraft] = useState<{ savedAt: number; data: Course } | null>(null);
+  const [courseDraft, setCourseDraft] = useState<{ savedAt: number; data: Course; providerSource: CourseProviderSource | null } | null>(null);
   const [courseDraftDismissed, setCourseDraftDismissed] = useState(false);
   const courseHydratedRef = React.useRef(false);
 
   useEffect(() => {
-    const d = loadFormDraft<Course>(courseDraftKey);
-    if (d && d.data && (d.data.name || "").trim()) {
+    const d = loadFormDraft<Course | { course: Course; providerSource?: CourseProviderSource | null }>(courseDraftKey);
+    const payload = d?.data && "course" in d.data ? d.data : d?.data ? { course: d.data as Course, providerSource: null } : null;
+    if (d && payload?.course && (payload.course.name || "").trim()) {
       if (isNewCourse) {
-        setCourseDraft(d); // new course: offer to restore via the prompt
+        setCourseDraft({ savedAt: d.savedAt, data: payload.course, providerSource: payload.providerSource || null }); // new course: offer to restore via the prompt
       } else {
         // existing course: a draft only survives an interruption (cleared on save/cancel),
         // so auto-restore the edits — that's what "bring me back to my changes" means.
-        setCourse(d.data); setMode("form"); courseHydratedRef.current = true;
+        setCourse(payload.course); setProviderSource(payload.providerSource || null); setMode("form"); courseHydratedRef.current = true;
       }
     } else {
       courseHydratedRef.current = true;
@@ -530,8 +533,8 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const applyCourseDraft = (data: Course) => {
-    setCourse(data); setMode("form");
+  const applyCourseDraft = (data: Course, source: CourseProviderSource | null) => {
+    setCourse(data); setProviderSource(source); setMode("form");
     setCourseDraft(null); setCourseDraftDismissed(true); courseHydratedRef.current = true;
   };
   const startFreshCourse = () => {
@@ -543,7 +546,7 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
   // Save the in-progress course once we're editing it (new OR existing).
   useEffect(() => {
     if (!courseHydratedRef.current) return;
-    if (mode === "form" && course && (course.name || "").trim()) saveFormDraft(courseDraftKey, course);
+    if (mode === "form" && course && (course.name || "").trim()) saveFormDraft(courseDraftKey, { course, providerSource });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [course, mode]);
 
@@ -565,10 +568,43 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
       const res = await fetch(`/api/courses?id=${encodeURIComponent(id)}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Load failed");
-      const c = data.course;
+      const provider = data.course as Course;
       // If the detail payload didn't include a location, keep the one shown in search.
-      if (c && !c.location && fallbackLoc) c.location = fallbackLoc;
-      setCourse(c); setMode("form");
+      if (provider && !provider.location && fallbackLoc) provider.location = fallbackLoc;
+
+      const canonicalId = await findExistingCourseId(supabase, {
+        externalId: provider.externalId || id,
+        club: provider.club,
+        name: provider.name,
+        location: provider.location || fallbackLoc || "",
+      });
+
+      if (canonicalId) {
+        const { data: row, error: rowError } = await supabase
+          .from("favorite_courses")
+          .select("id,name,facility,location,external_id,data")
+          .eq("id", canonicalId)
+          .maybeSingle();
+        if (rowError) throw rowError;
+        if (row) {
+          const storedBase = normalize(row.data || {});
+          const stored: Course = {
+            ...storedBase,
+            id: storedBase.id || row.id,
+            externalId: normalizeCourseProviderId(row.external_id) || normalizeCourseProviderId(storedBase.externalId) || normalizeCourseProviderId(provider.externalId) || id,
+            club: row.facility || storedBase.club || provider.club,
+            name: row.name || storedBase.name || provider.name,
+            location: row.location || storedBase.location || provider.location || fallbackLoc || "",
+          };
+          setProviderSource({ provider, stored, existingId: canonicalId });
+          setCourse(stored);
+          setMode("form");
+          return;
+        }
+      }
+
+      setProviderSource({ provider, stored: null, existingId: null });
+      setCourse(provider); setMode("form");
     } catch (e: any) { setErr(e.message); }
     finally { setLoadingId(null); }
   };
@@ -589,7 +625,7 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
               You left {courseDraft.data.name ? `"${courseDraft.data.name}"` : "a course"} unfinished {draftAgeLabel(courseDraft.savedAt)}. Pick up where you left off, or start fresh.
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-              <button onClick={() => applyCourseDraft(courseDraft.data)} style={{ ...btn(true), fontSize: 13 }}>Resume</button>
+              <button onClick={() => applyCourseDraft(courseDraft.data, courseDraft.providerSource)} style={{ ...btn(true), fontSize: 13 }}>Resume</button>
               <button onClick={startFreshCourse} style={{ ...btn(false), fontSize: 13 }}>Start fresh</button>
             </div>
           </div>
@@ -620,11 +656,12 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
   }
 
   if (!course) return null;
-  return <CourseForm user={user} activeGroupId={activeGroupId} course={course} setCourse={setCourse} existingId={existingId} saving={saving} setSaving={setSaving} err={err} setErr={setErr} onCancel={handleCancel} onSaved={() => { clearFormDraft(courseDraftKey); onSaved(); }} />;
+  return <CourseForm user={user} activeGroupId={activeGroupId} course={course} setCourse={setCourse} existingId={existingId} providerSource={providerSource} saving={saving} setSaving={setSaving} err={err} setErr={setErr} onCancel={handleCancel} onSaved={() => { clearFormDraft(courseDraftKey); onSaved(); }} />;
 }
 
-export function CourseForm({ user, activeGroupId, course, setCourse, existingId, saving, setSaving, err, setErr, onCancel, onSaved }: {
+export function CourseForm({ user, activeGroupId, course, setCourse, existingId, providerSource, saving, setSaving, err, setErr, onCancel, onSaved }: {
   user: any; activeGroupId: string; course: Course; setCourse: (c: Course) => void; existingId: string | null;
+  providerSource?: CourseProviderSource | null;
   saving: boolean; setSaving: (b: boolean) => void; err: string | null; setErr: (s: string | null) => void;
   onCancel: () => void; onSaved: () => void;
 }) {
@@ -746,6 +783,34 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
       {existingId && (
         <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
           Changes save immediately for this group and are submitted to an app admin for global approval before other groups see them.
+        </div>
+      )}
+      {!existingId && providerSource && (
+        <div style={{ marginTop: 10, border: `1px solid ${providerSource.stored ? C.gold : C.line}`, borderRadius: 10, padding: 10, background: providerSource.stored ? "#FFF8E1" : C.cream }}>
+          <div style={{ color: providerSource.stored ? C.green : C.sage, fontSize: 11, fontWeight: 900, letterSpacing: 1.2 }}>
+            {providerSource.stored ? "ALREADY IN BNN" : "NEW COURSE FROM GOLFCOURSEAPI"}
+          </div>
+          {providerSource.stored ? (
+            <>
+              <div style={{ color: C.ink, fontSize: 13, marginTop: 5, lineHeight: 1.45 }}>
+                You are viewing the <b>stored BNN course data</b>. The latest provider data was fetched separately and will not overwrite BNN automatically.
+              </div>
+              {hasMaterialCourseChanges(providerSource.stored, providerSource.provider) ? (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ color: C.faint, fontSize: 12, lineHeight: 1.45 }}>
+                    Provider differences detected: {courseChangeLines(providerSource.stored, providerSource.provider).slice(0, 4).join("; ")}
+                  </div>
+                  <button type="button" style={{ ...btn(false), marginTop: 8, fontSize: 12 }} onClick={() => setCourse(JSON.parse(JSON.stringify(providerSource.provider)))}>
+                    Load provider data for review
+                  </button>
+                </div>
+              ) : (
+                <div style={{ color: C.faint, fontSize: 12, marginTop: 6 }}>The provider data currently matches the stored BNN course.</div>
+              )}
+            </>
+          ) : (
+            <div style={{ color: C.ink, fontSize: 13, marginTop: 5 }}>This provider course is not currently stored in BNN.</div>
+          )}
         </div>
       )}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>

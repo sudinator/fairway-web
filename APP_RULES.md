@@ -171,3 +171,7 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
 - For every external API BNN depends on, keep a small set of golden real-world fixtures and a non-destructive scheduled contract check covering endpoint availability, schema/required fields, identifier behavior, and response compatibility.
 - Provider contract drift must fail visibly and alert the admin before application code is changed. Diagnose provider drift versus application regression from evidence first.
 - When a provider changes identifiers, preserve BNN's internal canonical UUIDs/history and reconcile only the provider-owned identifier/metadata after reviewed matching.
+
+## Environment/source transparency
+24. **Staging must be visually unmistakable.** The Vercel `staging` branch renders a persistent yellow safe-area-aware border plus a STAGING marker. Production/main must never render that marker. Keep this contract guarded in CI.
+25. **External course data never silently overrides BNN canonical data.** When a provider result resolves to an existing `favorite_courses` record, show stored BNN data as primary and label its source. Keep the fresh provider payload separate, show material differences, and require an explicit user action before loading provider values for review. Existing correction/approval rules remain the write path for material changes.

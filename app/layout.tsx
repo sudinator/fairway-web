@@ -31,9 +31,17 @@ export const viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const isStaging = process.env.VERCEL_GIT_COMMIT_REF === "staging";
+
   return (
     <html lang="en">
       <body>
+        {isStaging && (
+          <>
+            <div aria-hidden="true" style={{ position: "fixed", top: "env(safe-area-inset-top, 0px)", left: 0, right: 0, bottom: 0, border: "6px solid #FFD400", pointerEvents: "none", zIndex: 2147483646 }} />
+            <div aria-hidden="true" style={{ position: "fixed", top: "calc(env(safe-area-inset-top, 0px) + 6px)", right: 10, background: "#FFD400", color: "#111", fontSize: 11, fontWeight: 900, letterSpacing: 1.4, padding: "4px 8px", borderRadius: "0 0 6px 6px", pointerEvents: "none", zIndex: 2147483647 }}>STAGING</div>
+          </>
+        )}
         <RegisterSW />
         <ViewportSync />
         {children}
