@@ -20,6 +20,11 @@ required = [
     'NEW COURSE FROM GOLFCOURSEAPI',
     'saveFormDraft(courseDraftKey, { course, providerSource })',
     'applyCourseDraft(courseDraft.data, courseDraft.providerSource)',
+    'shouldShowCourseCorrectionReason',
+    'const showCorrectionReason = shouldShowCourseCorrectionReason({',
+    '{showCorrectionReason && (',
+    'Submit for approval',
+    'Stored BNN data will not be silently overwritten',
 ]
 missing = [x for x in required if x not in src]
 if missing:

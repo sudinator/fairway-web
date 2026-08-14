@@ -1,4 +1,4 @@
-import { buildCourseSourceView } from "./course-source-review";
+import { buildCourseSourceView, shouldShowCourseCorrectionReason } from "./course-source-review";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -40,3 +40,28 @@ assert(storedView.course.tees[0].rating === 68.1, "return transition should rest
 assert(storedView.ratingTexts[0] === "68.1", "return transition should restore stored rating text");
 
 console.log("course source review transition: PASS");
+
+assert(shouldShowCourseCorrectionReason({
+  existingId: null,
+  hasStoredProviderSource: true,
+  sourceMode: "provider",
+  hasMaterialChanges: true,
+}), "provider review correction should expose reason input");
+assert(!shouldShowCourseCorrectionReason({
+  existingId: null,
+  hasStoredProviderSource: true,
+  sourceMode: "stored",
+  hasMaterialChanges: true,
+}), "stored-source view should not require a correction reason before a correction is being reviewed");
+assert(!shouldShowCourseCorrectionReason({
+  existingId: null,
+  hasStoredProviderSource: false,
+  sourceMode: "provider",
+  hasMaterialChanges: true,
+}), "brand-new provider course should not show the existing-course correction reason UI");
+assert(shouldShowCourseCorrectionReason({
+  existingId: "existing-course",
+  hasStoredProviderSource: false,
+  sourceMode: "stored",
+  hasMaterialChanges: false,
+}), "direct existing-course edits should preserve the existing reason control");

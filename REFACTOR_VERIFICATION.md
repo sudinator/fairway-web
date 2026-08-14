@@ -36,3 +36,8 @@ Candidate construction must also preserve the latest synchronized branch baselin
 
 ## Observable state propagation gate
 Stateful extraction/refactor verification must include all parallel and derived UI state, not just the primary state object. For each entry action, trace the state transition through every visible control/text buffer and prove the rendered outcome plus reverse/re-entry behavior. Treat stale local display state after a model replacement as a contract failure.
+
+
+## Correction workflow terminal-path rule (177.23+)
+- When a stateful flow can enter a validation-required terminal action, the UI must expose every required input before submission and the primary CTA must describe the actual terminal action.
+- For course provider review, Stored BNN -> Provider review -> reason entry -> Submit for approval -> pending/review outcome is part of the observable-outcome contract; the reverse/cancel path must remain reachable.

@@ -183,3 +183,8 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
 - Every mode/source switch must have a round-trip test where applicable (A -> B -> A) and prove visible values restore correctly.
 - Test evidence must be labeled as MODELLED, EXECUTED, or BROWSER-VALIDATED. A modelled scenario must never be reported simply as PASS for real UI behavior.
 - Stateful release verification must include an observable-outcome evidence table for each changed interaction.
+
+
+## Correction workflow terminal-path rule (177.23+)
+- When a stateful flow can enter a validation-required terminal action, the UI must expose every required input before submission and the primary CTA must describe the actual terminal action.
+- For course provider review, Stored BNN -> Provider review -> reason entry -> Submit for approval -> pending/review outcome is part of the observable-outcome contract; the reverse/cancel path must remain reachable.

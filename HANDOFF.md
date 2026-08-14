@@ -590,3 +590,8 @@ Release candidates must be constructed from the latest clean synchronized `stagi
 
 ### Stateful UI evidence rule
 For changed interactions, do not equate handler reachability with working behavior. Verify action -> complete state propagation -> observable UI -> downstream effects -> reverse/cancel/re-entry. Label evidence MODELLED, EXECUTED, or BROWSER-VALIDATED; never report modelled behavior as an executed PASS. Mode/source switches require round-trip A -> B -> A verification.
+
+
+## Correction workflow terminal-path rule (177.23+)
+- When a stateful flow can enter a validation-required terminal action, the UI must expose every required input before submission and the primary CTA must describe the actual terminal action.
+- For course provider review, Stored BNN -> Provider review -> reason entry -> Submit for approval -> pending/review outcome is part of the observable-outcome contract; the reverse/cancel path must remain reachable.
