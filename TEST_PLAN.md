@@ -100,3 +100,23 @@ The first real staging execution of the v177.14 suite caught a PL/pgSQL runtime 
 - GolfCourseAPI: `node ci/external/golfcourseapi-contract.mjs` runs weekly in GitHub Actions using `GOLF_API_KEY` and 18 reviewed Production fixtures. A failure opens/updates an admin GitHub issue.
 - Release tests must include provider-id contract tests: ids returned by search normalization must be accepted by detail validation; current opaque ids and legacy numeric ids are accepted; path/query/control-character ids are rejected.
 - PWA release test: old installed release -> deploy new release -> old app remains active -> update prompt appears -> Current remains old / Latest is new -> explicit Update activates/reloads -> Current=Latest. Same-version rebuilds must not produce a user-visible update prompt.
+
+## 177.21 targeted release tests
+- Staging environment marker: Vercel `staging` preview shows a persistent yellow safe-area-aware border and STAGING badge; Production/main does not.
+- Existing provider course selection: search Francis Byrne in Production; selecting it immediately shows `ALREADY IN BNN` and displays the stored BNN rating/slope/tee data as primary.
+- Provider drift visibility: when fresh GolfCourseAPI data differs from stored BNN data, show a clear differences summary; do not overwrite stored BNN values automatically.
+- Explicit provider review: `Load provider data for review` swaps the editable form to the fresh provider payload; saving changed provider data follows the existing correction/reason path rather than silently replacing the canonical record.
+- New provider course: a course absent from `favorite_courses` is labeled `NEW COURSE FROM GOLFCOURSEAPI` and retains the existing create/link flow.
+- Canonical duplicate safety: selecting an existing course must reuse the existing BNN canonical UUID, never create a duplicate.
+- Re-entry: after selecting an existing provider course, leave and resume the draft; the stored-vs-provider source context must be preserved.
+- PWA transition test (Production): start with installed 177.20, deploy 177.21, verify Current remains 177.20 and Latest becomes 177.21 until Update is pressed; after Update, Current=Latest=177.21 and the prompt disappears.
+
+## Stateful UI observable-outcome testing
+For each changed interaction, record evidence for: handler reachability, underlying state mutation, synchronization of every derived/parallel UI state, visible rendered outcome, downstream side effects, reverse/cancel path, retry/re-entry, and browser validation where required.
+
+Evidence labels are mandatory:
+- MODELLED: logical/scenario reasoning only; not executable proof.
+- EXECUTED: source guard, unit test, component test, integration test, or other executable verification actually run.
+- BROWSER-VALIDATED: manual or automated browser observation of the real rendered workflow.
+
+Mode/source switches require A -> B -> A round-trip coverage. A modelled scenario cannot be promoted to an executed PASS.
