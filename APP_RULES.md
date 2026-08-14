@@ -121,18 +121,18 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
     not enough (it's undiscoverable). Menus that extend the bottom nav (e.g. the "More" sheet) dock ABOVE
     the nav (`bottom: navH`, the measured nav height) so the nav stays visible and usable underneath; they
     don't cover it. Full-screen detail sheets may cover the screen but must have a visible Close. Popups are built on `<BottomSheet>`, which ALWAYS renders a top-right × when given `onClose` — so pass `onClose` and don't hand-roll a popup without it. Enforced by `ci/check-popup-close.py` (every `<BottomSheet>` must pass `onClose`). — manual
-14. **Every migration's full SQL is printed inline in chat** for copy-paste into the Supabase SQL editor,
+19. **Every migration's full SQL is printed inline in chat** for copy-paste into the Supabase SQL editor,
     and tracked in `MIGRATIONS.md` (tick when run). — manual
-15. **Repo docs stay in sync each bundle:** DEPLOY_NOTES.md, SCHEMA.md, BACKLOG.md, README.md,
+20. **Repo docs stay in sync each bundle:** DEPLOY_NOTES.md, SCHEMA.md, BACKLOG.md, README.md,
     MIGRATIONS.md, and this file. — manual
-16. **Line endings:** repo text is CRLF, except everything under `ci/` and `.github/` and
+21. **Line endings:** repo text is CRLF, except everything under `ci/` and `.github/` and
     `marketing/onepager-content.txt`, which are LF. — manual (build normalizes)
 
 ## Deploy flow
 Cumulative `.zip` → unzip to `C:\dev\fairway-web` → GitHub Desktop commit → Vercel auto-deploy →
 run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
-17. **Charts must fit their data to the space.** Before shipping any chart, look at the actual values and set the axis to the best fit — never leave a chart cramped or dominated by one bar. For trend/line charts fit the y-axis to the data range (use `niceDomain` in dashboard.tsx, or AdaptiveTrend which now self-fits when no `domain` is passed); pct stats clamp 0–100. For count bar charts the bars start at 0 but the chart must be tall enough that small bars read as bars, not slivers (min ~150px) — if the fit is still poor, make the chart larger rather than leaving it. Guard flat series (span 0). This is a default, not a per-chart request — don't wait to be told a chart looks wrong. — manual
-19. **Money settles per BUCKET, each a self-contained world; the Club is a read-only rollup (v173).**
+22. **Charts must fit their data to the space.** Before shipping any chart, look at the actual values and set the axis to the best fit — never leave a chart cramped or dominated by one bar. For trend/line charts fit the y-axis to the data range (use `niceDomain` in dashboard.tsx, or AdaptiveTrend which now self-fits when no `domain` is passed); pct stats clamp 0–100. For count bar charts the bars start at 0 but the chart must be tall enough that small bars read as bars, not slivers (min ~150px) — if the fit is still poor, make the chart larger rather than leaving it. Guard flat series (span 0). This is a default, not a per-chart request — don't wait to be told a chart looks wrong. — manual
+23. **Money settles per BUCKET, each a self-contained world; the Club is a read-only rollup (v173).**
     A Bucket (the renamed "event", table still `group_events`) nets its own expenses among its members and
     is settled via the "Fewest payments" view WITHIN that Bucket — `bucketTransfers`/`bucketSettled`, and
     every settlement carries its Bucket's `event_id` (NOT NULL). Nothing reroutes across Buckets. "Settled"
@@ -140,7 +140,7 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
     across all Buckets (`clubRollup`, == `computeBalances`) plus the per-Bucket breakdown, even at net-zero.
     Guests always resolve to their sponsoring member within each Bucket. Superseded the club-level-only
     model that shipped in 172.x. — manual
-20. **Fixed, full-viewport frames/borders must respect the top safe area (the notch).** A `position:fixed`
+24. **Fixed, full-viewport frames/borders must respect the top safe area (the notch).** A `position:fixed`
     element anchored to the top edge (`inset:0` or `top:0`) that draws a visible `border` will paint that
     border edge-to-edge behind the notch/status bar — the bottom looks fine (it tucks behind the nav), so
     the bug hides in plain sight. This has recurred (the TEST-MODE frame). Anchor the top with
@@ -150,7 +150,7 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
     principle bottom sheets use to cap their height (#17). Enforced by `ci/check-safe-area-frames.py`; all
     UI guards now run in CI via `npm run guards` (font size, global rules, chart overflow, date inputs,
     bottom sheets, safe-area frames). — manual
-21. **Text and surface colours come from the SAME light/dark family — never mix them.** The palette is two
+25. **Text and surface colours come from the SAME light/dark family — never mix them.** The palette is two
     families. LIGHT surfaces — `C.card` (#FFFDF6), `C.cream` — carry DARK text: `C.ink`, `C.faint`. DARK
     surfaces — `C.green` / `C.greenMid` / `C.greenLight` — carry LIGHT text: `C.cream`, `C.sage`; `C.gold` is
     an accent usable on either. Never put light text on a light surface (`C.cream`/`C.sage` on `C.card` — the
@@ -163,21 +163,21 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
     an existing dark sheet. — manual
 
 ## Refactor reachability / boundary integrity (v177.19+)
-22. **Byte-identical moves are not enough.** Every stateful extraction must preserve and permanently verify the full chain: entry action/effect -> state/props/parameters/refs/context -> extracted render/call -> outputs/callbacks/state updates -> downstream helpers/APIs/RPCs/database writes -> refresh/cancel/retry/exit. Reactive/effect timing is part of the contract. Use explicit exported prop types and `satisfies` for constructed spread-prop objects. CI must include permanent reachability/characterization checks plus orphan-state/dependency hygiene checks. Unused props/state/imports are boundary-drift warnings. Do not continue modularization while a known reachability defect is unresolved. Pure logic still requires old-vs-new differential testing where practical.
-23. **Release candidates start from the current synchronized baseline.** Before applying a new candidate, `main` and `staging` must be synchronized and the candidate must be built from that exact clean `staging` tree, not from an older release ZIP. Differential review must confirm unrelated current branch changes (especially CI/workflow configuration) are preserved.
+26. **Byte-identical moves are not enough.** Every stateful extraction must preserve and permanently verify the full chain: entry action/effect -> state/props/parameters/refs/context -> extracted render/call -> outputs/callbacks/state updates -> downstream helpers/APIs/RPCs/database writes -> refresh/cancel/retry/exit. Reactive/effect timing is part of the contract. Use explicit exported prop types and `satisfies` for constructed spread-prop objects. CI must include permanent reachability/characterization checks plus orphan-state/dependency hygiene checks. Unused props/state/imports are boundary-drift warnings. Do not continue modularization while a known reachability defect is unresolved. Pure logic still requires old-vs-new differential testing where practical.
+27. **Release candidates start from the current synchronized baseline.** Before applying a new candidate, `main` and `staging` must be synchronized and the candidate must be built from that exact clean `staging` tree, not from an older release ZIP. Differential review must confirm unrelated current branch changes (especially CI/workflow configuration) are preserved.
 
 ## External dependency contract monitoring
-- Treat every external provider identifier as opaque unless the provider explicitly guarantees a format. Never infer numeric/string structure from historical samples alone.
+28. **External providers are contract-tested dependencies.** Treat every external provider identifier as opaque unless the provider explicitly guarantees a format. Never infer numeric/string structure from historical samples alone.
 - For every external API BNN depends on, keep a small set of golden real-world fixtures and a non-destructive scheduled contract check covering endpoint availability, schema/required fields, identifier behavior, and response compatibility.
 - Provider contract drift must fail visibly and alert the admin before application code is changed. Diagnose provider drift versus application regression from evidence first.
 - When a provider changes identifiers, preserve BNN's internal canonical UUIDs/history and reconcile only the provider-owned identifier/metadata after reviewed matching.
 
 ## Environment/source transparency
-24. **Staging must be visually unmistakable.** The Vercel `staging` branch renders a persistent yellow safe-area-aware border plus a STAGING marker. Production/main must never render that marker. Keep this contract guarded in CI.
-25. **External course data never silently overrides BNN canonical data.** When a provider result resolves to an existing `favorite_courses` record, show stored BNN data as primary and label its source. Keep the fresh provider payload separate, show material differences, and require an explicit user action before loading provider values for review. Existing correction/approval rules remain the write path for material changes.
+29. **Staging must be visually unmistakable.** The Vercel `staging` branch renders a persistent yellow safe-area-aware border plus a STAGING marker. Production/main must never render that marker. Keep this contract guarded in CI.
+30. **External course data never silently overrides BNN canonical data.** When a provider result resolves to an existing `favorite_courses` record, show stored BNN data as primary and label its source. Keep the fresh provider payload separate, show material differences, and require an explicit user action before loading provider values for review. Existing correction/approval rules remain the write path for material changes.
 
 ## Stateful UI observable-outcome contract
-- For every new or changed interaction, verify the full chain: user action -> handler -> all directly changed state -> all derived/parallel display state -> visible UI -> callbacks/side effects -> cancel/reverse/re-entry behavior.
+31. **Stateful interactions are verified through observable outcomes.** For every new or changed interaction, verify the full chain: user action -> handler -> all directly changed state -> all derived/parallel display state -> visible UI -> callbacks/side effects -> cancel/reverse/re-entry behavior.
 - Reachability alone is not sufficient. If a state transition changes the underlying model but leaves independent display state stale, the change is incomplete.
 - Inventory independent local display state (for example editable text buffers, selection mode, open/closed state, cached labels) whenever the source model can be replaced or switched.
 - Every mode/source switch must have a round-trip test where applicable (A -> B -> A) and prove visible values restore correctly.
@@ -186,5 +186,10 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
 
 
 ## Correction workflow terminal-path rule (177.23+)
-- When a stateful flow can enter a validation-required terminal action, the UI must expose every required input before submission and the primary CTA must describe the actual terminal action.
+32. **Validation-required terminal actions expose their complete path.** When a stateful flow can enter a validation-required terminal action, the UI must expose every required input before submission and the primary CTA must describe the actual terminal action.
 - For course provider review, Stored BNN -> Provider review -> reason entry -> Submit for approval -> pending/review outcome is part of the observable-outcome contract; the reverse/cancel path must remain reachable.
+
+## Database reproducibility / security baseline (177.25+)
+33. **Production database security must be reproducible from source.** Production being correct is not sufficient: committed migrations must be able to reconstruct the expected schema security contract from a fresh database. Core table RLS flags, policies, grants, and policy helper dependencies must be source-controlled and machine-checked against an authoritative Production export.
+- Database migrations are executed as database owner/postgres in the Supabase SQL editor. Application roles (`anon`, `authenticated`, and browser/service clients) must never be relied upon to record or apply schema migrations; `record_migration(text)` is intentionally unavailable to ordinary app roles after 0123.
+- Migration ledger checks are semantic, not grep-based: every migration from 0113 onward records its exact filename stem as its final executable statement, and every numbering gap in the committed sequence must be documented.

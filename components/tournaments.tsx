@@ -74,6 +74,7 @@ const supabase = createClient();
 import type { Game, Player, GameSeed } from "@/lib/game-types";
 export type { GameSeed } from "@/lib/game-types";
 import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
+import { useNowTick } from "@/lib/use-now-tick";
 import { ScoreHistory, SkinsView, MatchView, FourballView, StrokesSummary, SweepBroom, CleanSweepBanner, SweepTrophy, SweepAchievedBanner, TeamClinchLine } from "@/components/game/scoring-views";
 import { LegConfigEditor, SegmentBoard, GroupSegmentSummary } from "@/components/game/segment-views";
 import { GameList } from "@/components/game/game-list";
@@ -1201,6 +1202,7 @@ function GameRoom({
   onBack: () => void;
 }) {
   const [game, setGame] = useState<Game | null>(null);
+  const paceNow = useNowTick();
   const [players, setPlayers] = useState<Player[]>([]);
   const [me, setMe] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
@@ -2894,7 +2896,7 @@ function GameRoom({
         const startMs = Math.min(...starts.map((s) => new Date(s).getTime()));
         const ends = subset.map((p) => p.clock_end).filter(Boolean) as string[];
         const allEnded = subset.length > 0 && ends.length === subset.length;
-        const endMs = allEnded ? Math.max(...ends.map((s) => new Date(s).getTime())) : Date.now();
+        const endMs = allEnded ? Math.max(...ends.map((s) => new Date(s).getTime())) : paceNow;
         const mins = Math.max(0, Math.round((endMs - startMs) / 60000));
         const label = teeGroupsInUse && myRow?.tee_group != null ? ` · Group ${myRow.tee_group}` : "";
         // Pace: target minutes/hole scales with the group's size (6 + 2*players,

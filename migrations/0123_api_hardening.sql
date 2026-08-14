@@ -60,3 +60,5 @@ grant execute on function public.bump_ai_usage(text, int, int) to authenticated;
 revoke execute on function public.record_migration(text) from public;
 revoke execute on function public.record_migration(text) from anon;
 revoke execute on function public.record_migration(text) from authenticated;
+
+select public.record_migration('0123_api_hardening');

@@ -15,30 +15,31 @@ Fails otherwise. components/ui.tsx is exempt (ShortDateInput's transparent overl
 import re, sys, pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-COMPONENTS = ROOT / "components"
+UI_ROOTS = [ROOT / "components", ROOT / "app"]
 EXEMPT = {"ui.tsx"}
 
 violations = []
-for f in sorted(COMPONENTS.rglob("*.tsx")):
-    if f.name in EXEMPT:
-        continue
-    text = f.read_text(encoding="utf-8", errors="replace")
-    lines = text.splitlines()
-    compliant_vars = set(
-        m.group(1) for m in re.finditer(r"(?:const|let)\s+(\w+)\s*(?::[^=]+)?=\s*\{[^\n]*WebkitAppearance", text)
-    )
-    for i, line in enumerate(lines):
-        if 'type="date"' not in line:
-            continue
-        window = " ".join(lines[i:i + 4])
-        ok = "WebkitAppearance" in window
-        if not ok:
-            for ref in re.findall(r"style=\{(\w+)\}", window):
-                if ref in compliant_vars:
-                    ok = True
-                    break
-        if not ok:
-            violations.append(f"{f.relative_to(ROOT)}:{i+1}  raw type=\"date\" without the iOS appearance workaround (use <ShortDateInput> or a style with WebkitAppearance:'none')")
+for base in UI_ROOTS:
+  for f in sorted(base.rglob("*.tsx")):
+      if f.name in EXEMPT:
+          continue
+      text = f.read_text(encoding="utf-8", errors="replace")
+      lines = text.splitlines()
+      compliant_vars = set(
+          m.group(1) for m in re.finditer(r"(?:const|let)\s+(\w+)\s*(?::[^=]+)?=\s*\{[^\n]*WebkitAppearance", text)
+      )
+      for i, line in enumerate(lines):
+          if 'type="date"' not in line:
+              continue
+          window = " ".join(lines[i:i + 4])
+          ok = "WebkitAppearance" in window
+          if not ok:
+              for ref in re.findall(r"style=\{(\w+)\}", window):
+                  if ref in compliant_vars:
+                      ok = True
+                      break
+          if not ok:
+              violations.append(f"{f.relative_to(ROOT)}:{i+1}  raw type=\"date\" without the iOS appearance workaround (use <ShortDateInput> or a style with WebkitAppearance:'none')")
 
 if violations:
     print("DATE-INPUT CHECK FAILED - iOS-unsafe date field(s):")

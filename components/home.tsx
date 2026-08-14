@@ -819,7 +819,11 @@ export function Home({ session }: { session: any }) {
             userEmail={user?.email || null}
             onBack={() => setViewing(null)}
             onEdit={() => { setStage({ round: viewing }); setViewing(null); }}
-            onDelete={async () => { await deleteRound(viewing.id); setViewing(null); }} />
+            onDelete={async () => { await deleteRound(viewing.id); setViewing(null); }}
+            onRoundUpdated={(nextRound) => {
+              setViewing(nextRound);
+              setRounds((current) => current.map((r) => r.id === nextRound.id ? nextRound : r));
+            }} />
         ) : tab === "courses" && activeGroup ? (
           <CoursesLibrary user={user} activeGroupId={activeGroup.id} />
         ) : tab === "players" && activeGroup ? (

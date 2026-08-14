@@ -21,7 +21,7 @@ single most important habit — it has caught countless bugs.
   it may come up in the same chat.
 
 ## 2. Stack + infrastructure
-- **Next.js 14** (App Router) + React + TypeScript.
+- **Next.js 16.3** (App Router) + React 19 + TypeScript.
 - **Supabase** (Postgres + Auth + Row-Level Security). Project ref `epmbsmykyrnoiccwnoxq`. **FREE tier** —
   mind quotas.
 - **Vercel** hosting. Repo: `sudinator/fairway-web`. Live: `birdienumnum.vercel.app`.
@@ -29,49 +29,35 @@ single most important habit — it has caught countless bugs.
 - Sister app "Fairway Card" (separate repo, `fairway-web-eosin.vercel.app`) is occasionally referenced —
   not this project.
 
-## 3. Deploy flow (Amit does this by hand)
-1. You produce a cumulative `.zip`.
-2. Amit unzips to `C:\dev\fairway-web`.
-3. GitHub Desktop commit + push.
-4. Vercel auto-deploys.
-5. Amit runs any new migration **manually** in the Supabase SQL editor (he pastes the SQL you printed inline).
+## 3. Deploy flow (staging first)
+1. Start from a clean `staging` branch synchronized from `main`.
+2. Apply the reviewed candidate/overlay to `staging`; inspect the exact changed-file set before commit.
+3. Push `staging`; GitHub CI/guards and the Vercel Preview deployment must pass.
+4. Run required staging/browser validation where the staging data/environment can exercise the feature.
+5. Open `staging -> main`; required PR checks must pass before merge.
+6. Confirm Vercel Production is Ready, then run a small non-destructive Production smoke test.
+7. Merge/sync the new `main` state back into `staging` before the next release.
+8. Database migrations are pasted/run manually in the Supabase SQL editor as database owner/postgres, with staging first for destructive/integration validation.
 
-Because Amit is non-technical: **always print migration SQL inline for copy-paste**, and give plain,
-numbered instructions.
+Because Amit is non-technical: **always print migration SQL inline for copy-paste**, and give plain, numbered instructions.
 
-## 4. Pre-ship pipeline — run EVERY release, in order
-(Work tree at repo root. A placeholder `.env.local` is required for the build to run — create dummy
-values, never real secrets.)
+## 4. Pre-ship pipeline — run EVERY release
+The release is not deployable until every required gate is green.
 
-1. **Type-check:** `npx tsc --noEmit` → must be **rc 0**. (A piped `grep` can hide the real return code —
-   check it. If generated types seem stale, `rm -rf .next` and retry.)
-2. **Bump version** in `package.json`. Format `FEATURE.EDIT.YYMMDD` (e.g. `166.3.260715`): **FEATURE**
-   bumps on a new feature; **EDIT** counts refinements/fixes within that feature and resets to 0 on a
-   FEATURE bump. **The YYMMDD date is auto-stamped from the Eastern date at build time** (`write-version.mjs`)
-   — you only set FEATURE.EDIT; the date in package.json is a placeholder the build overwrites, so it's
-   always the true ship date. Bump EDIT on every ship. (Versions ≤ `1.165.0` used old `1.MINOR.PATCH`.)
-3. **Unit tests:** `npm test` → all must pass. (Compiles + runs `lib/*.test.ts`: game-shape, golf, money,
-   legs, grouping, sync, badges, card.)
-4. **Build:** `npm run build` → **rc 0**. `prebuild` (`scripts/write-version.mjs`) stamps
-   `lib/app-version.ts`, `public/app-version.json`, and `public/sw.js` from the package version.
-5. **Guards:**
-   - `python3 ci/check-min-fontsize.py` — no rendered text < 11px. **Blocking.**
-   - `python3 ci/check-global-rules.py` — global invariants (e.g. scrollRef clamp). **Blocking.**
-   - `python3 ci/check-chart-overflow.py` — flex bar-columns must have `minWidth:0`. **Blocking.**
-   - `python3 ci/check-bottom-sheets.py` — every bottom-docked popup includes env(safe-area-inset-bottom). **Blocking.**
-   - `python3 ci/check-date-inputs.py` — every `type="date"` is iOS-safe (ShortDateInput or the
-     WebkitAppearance workaround). **Blocking.** (Known iPhone bug with bare date inputs.)
-   - `python3 ci/check-jsx-escapes.py` — flags literal `\uXXXX` in JSX text. **Advisory (rc=1).** Only
-     known false positive: `tee-times.tsx:284`. Any NEW hit must be fixed (use real glyphs).
-6. **If you added a migration:** regenerate the ledger — `python3 ci/gen-migrations-checklist.py` (updates
-   `MIGRATIONS.md`).
-7. **Line endings:** normalize all text files to **CRLF**, EXCEPT everything under `ci/` and `.github/`,
-   and `marketing/onepager-content.txt`, which stay **LF**.
-8. **Assemble cumulative `.zip`.** Exclude: `node_modules`, `.next`, `.git`, `.testout`, `mockups`,
-   `test-results`, `playwright-report`, `.playwright`, any `.env*`, `tsconfig.tsbuildinfo`.
-9. **Leak-scan the zip:** confirm no real secrets. Secrets live ONLY in `.env.local` (excluded) and in
-   Vercel/Supabase env settings — never hardcode them, never include `.env*` in the zip.
-10. **`present_files`** the zip. Keep the post-share message short.
+1. **Consistency / source-contract review:** inspect the actual changed code, inputs, outputs, side effects, dependencies, and reverse/re-entry paths.
+2. **Type-check:** `npx tsc --noEmit` -> rc 0.
+3. **Unit + differential tests:** `npm test` -> rc 0.
+4. **Guards:** `npm run guards` -> rc 0. This includes migration/security, UI, refactor reachability/state/dependency, external-provider, PWA, and feature-specific contracts.
+5. **Build:** `npm run build` -> rc 0. `prebuild` verifies VAPID-key consistency when the environment key is present and stamps the app version.
+6. **One-command local/CI gate:** `npm run ci` runs hook lint, typecheck, guards, tests, and build.
+7. **Simulated testing:** run normal, edge, invalid-input, state-transition, retry/re-entry, failure/rollback, and adjacent-flow scenarios. Label evidence MODELLED, EXECUTED, or BROWSER-VALIDATED.
+8. **Version/docs:** bump `FEATURE.EDIT.YYMMDD`; update DEPLOY_NOTES, release verification, workflow simulation report, APP_RULES/HANDOFF/MIGRATIONS/SCHEMA/BACKLOG as applicable.
+9. **Migration ledger:** if migrations changed, run `python3 ci/gen-migrations-checklist.py` twice and require byte-identical second output. Every migration >=0113 self-records semantically.
+10. **Packaging:** preserve repository line endings; exclude `.git`, `node_modules`, `.next`, `.testout`, generated reports and all `.env*` secrets. Leak-scan before handoff.
+11. **Staging GitHub/Vercel gates:** CI and relevant Robustness jobs green; Vercel Preview Ready.
+12. **PR -> Production:** required PR verification green, merge to main, Production Ready, non-destructive smoke test, then `main -> staging` resync.
+
+If a required gate cannot run in the current environment, mark it **NOT EXECUTED/BLOCKED** and do not call the release deployable.
 
 ## 5. Global ground rules (authoritative list: `APP_RULES.md` in the zip)
 Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
@@ -114,25 +100,15 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current version: 177.15.260808.** Migrations **0130, 0131, 0132, and 0133** precede this corrective release; apply **0134_fix_bet_rpc_ambiguous_id.sql** before deploying v177.15. **Migration number 0129 remains intentionally skipped/reserved.** (Version scheme `FEATURE.EDIT.YYMMDD` — see APP_RULES #13.)
-- **Two migrations are PENDING** — run in the Supabase SQL editor in order (full SQL printed inline at
-  delivery, and in the files):
-  - **`0111_money_audit.sql`** — durable Money audit trail + triggers, child-write lock, $100k cap.
-  - **`0112_events.sql`** — `group_events` + `expenses.event_id`, freeze-enforcement triggers, and the
-    `set_event_closed` / `move_expense_event` / `ensure_game_event` RPCs.
-  Code is safe to deploy ahead of both (the audit + events UI simply show nothing until the tables
-  exist), but neither feature works until its migration is applied.
-- To confirm whether a migration is live, the **source of truth is the ledger** (added in 0113):
-  `select id, applied_at from public.schema_migrations order by id;`. Every migration from 0113 onward
-  ends with `select record_migration('NNNN_filename');`, so it records itself when run. The manual
-  MIGRATIONS.md checklist is a convenience only — never assert applied-state from it alone. (For anything
-  before 0113, or to spot-check, probe the object directly, e.g.
-  `select to_regclass('public.money_audit'), to_regclass('public.group_events');`.)
-- All migrations **through 0110** were previously confirmed applied.
-- After running: create an event, attach an expense, close it (admin) → its expenses should seal; a game
-  bet-post should auto-create a "from game" event.
-- Optional Money follow-ups still open: settlement counterparty-confirm / dispute flags (Tier 2/3 from
-  the audit work).
+**Current working candidate: 177.25.260814 (repository integrity / reproducibility hardening).**
+- 177.25 includes the 177.24 dashboard Putts/round + targeted stats-completion work in its baseline.
+- New migrations under review: `0135_ledger_backfill.sql`, `0136_core_rls_helpers.sql`, and `0137_core_rls_baseline.sql`. None should be applied to Production until the 177.25 database/reconstruction gates are complete.
+- `0135` backfills missing migration-ledger rows only when sentinel evidence proves each historical migration is actually present. Run migrations as DB owner/postgres; application roles cannot record migrations after 0123.
+- `0136` recreates the six Production SECURITY DEFINER helpers referenced by the core RLS policies from the authoritative pg_proc export. `0137` then reconstructs the 12 legacy core-table RLS policy/grant contract from the authoritative Production metadata export. CI checks helper definition parity, source closure, and the exact 60-policy baseline.
+- `ci/core_rls_production_baseline.json` is the machine-readable 2026-08-14 Production RLS baseline (12 tables / 60 policies). `ci/core_rls_helpers_production_baseline.json` captures the six helper definitions. `ci/assert-core-rls-live.sql` is the read-only live drift guard.
+- Fresh-database reconstruction is now part of required `CI / verify`: a pinned Supabase CLI creates a disposable database, applies both migration trees from empty state, and asserts the checked-in RLS baseline. This step still requires its first GitHub execution before 177.25 can ship.
+- The schema migration ledger (`public.schema_migrations`) is the source of truth for applied state from 0113 onward. `MIGRATIONS.md` is a human checklist and must not be treated as authoritative applied-state evidence.
+- Release remains **NOT DEPLOYABLE** until the RLS helper closure, dependency-backed CI/type/test/build, migration staging validation, and normal release gates pass.
 
 ## 9. Recent major thread — "date of play" (context you'll need)
 The recent work overhauled how a round's date is recorded:
@@ -595,3 +571,8 @@ For changed interactions, do not equate handler reachability with working behavi
 ## Correction workflow terminal-path rule (177.23+)
 - When a stateful flow can enter a validation-required terminal action, the UI must expose every required input before submission and the primary CTA must describe the actual terminal action.
 - For course provider review, Stored BNN -> Provider review -> reason entry -> Submit for approval -> pending/review outcome is part of the observable-outcome contract; the reverse/cancel path must remain reachable.
+
+## 177.25 integrity hardening status
+- Current working candidate: `177.25.260814`.
+- Do not ship until the Production RLS export for the 12 legacy core tables has been captured and converted into an executable idempotent baseline migration, then verified by a fresh-database reconstruction test.
+- Migration 0135 is an evidence-based ledger backfill for 0122-0128; it must be executed as database owner/postgres, not through an application Supabase client.

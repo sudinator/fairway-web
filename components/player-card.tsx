@@ -65,6 +65,7 @@ function buildBadges(rows: EarnedLite[]): BadgeItem[] {
 // differential in the window), a faint average baseline, a dot per round, and the
 // current value called out. Lower differential = lower on screen (down is better).
 function FormChart({ data }: { data: number[] }) {
+  const gid = "formgrad-" + useId().replace(/[^a-zA-Z0-9]/g, "");
   if (data.length < 2) return null;
   const W = 300, H = 88, LG = 30, RG = 34, top = 10, bot = H - 20; // left gutter for labels, right for end value
   const min = Math.min(...data), max = Math.max(...data);
@@ -81,7 +82,6 @@ function FormChart({ data }: { data: number[] }) {
   // per-point. (Matches the dashboard trend chart's stated behaviour.)
   const GREEN = "#8FE0B0", RED = "#FB7185";
   const colorFor = (v: number) => (v <= avg ? GREEN : RED);
-  const gid = "formgrad-" + useId().replace(/[^a-zA-Z0-9]/g, "");
   const avgY = y(avg);
   const off = Math.max(0.0001, Math.min(0.9999, (avgY - top) / (bot - top)));
   return (

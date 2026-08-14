@@ -1,14 +1,14 @@
 # Migrations run-ledger
 
-Migrations are applied **by hand** in the Supabase SQL editor, in filename order. There is no
-auto-tracking, so this file is the record: **tick a box after you run that migration.**
+Migrations are applied **by hand** in the Supabase SQL editor, in filename order. From migration 0113 onward, `public.schema_migrations` is the database source of truth; this file remains the human checklist and release notes.
 
-Regenerate after shipping (adds new files, keeps your ticks):
+Regenerate after shipping (adds new files, keeps ticks and the notes block):
 `python3 ci/gen-migrations-checklist.py`
 
-Each release's DEPLOY_NOTES also flags any migration that must be run for that version.
+Confirm database-applied state with:
+`select id, applied_at from public.schema_migrations order by id;`
 
-Total: 107 migrations. Unchecked = not yet confirmed applied.
+Total: 122 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -119,6 +119,25 @@ Total: 107 migrations. Unchecked = not yet confirmed applied.
 - [ ] 0119_expenses_soft_delete.sql
 - [ ] 0120_teetimes_realtime.sql
 - [ ] 0121_money_clean_slate.sql
+- [ ] 0122_side_contests.sql
+- [ ] 0123_api_hardening.sql
+- [ ] 0124_course_freshness.sql
+- [ ] 0125_course_freshness_authorization.sql
+- [ ] 0126_course_freshness_use_canonical_auth.sql
+- [ ] 0127_system_function_lockdown.sql
+- [ ] 0128_rate_limit.sql
+- [x] 0130_workflow_atomicity.sql
+- [x] 0131_workflow_retry_and_review_atomicity.sql
+- [x] 0132_course_schema_reconciliation_and_privilege_hardening.sql
+- [ ] 0133_testing_and_money_atomicity.sql
+- [ ] 0134_fix_bet_rpc_ambiguous_id.sql
+- [ ] 0135_ledger_backfill.sql
+- [ ] 0136_core_rls_helpers.sql
+- [ ] 0137_core_rls_baseline.sql
+
+<!-- NOTES:START -->
+
+- **0064 — intentionally documented numbering gap.** No `0064_*.sql` migration exists in the repository history. Do not invent or apply a synthetic 0064 migration; the sequence continues from 0063 to 0065.
 
 - 0122_side_contests.sql — side contests (CTP/long drive/straightest): game_contests + append-only game_contest_entries + RLS (participant read; writes via SECURITY DEFINER RPCs) + can_see_game/is_game_organizer/create|update|delete_game_contest/log_contest_entry/void_contest_entry. Run after 0121.
 
@@ -139,7 +158,6 @@ Total: 107 migrations. Unchecked = not yet confirmed applied.
 - [x] **0131_workflow_retry_and_review_atomicity.sql** — retry-safe course corrections + atomic admin review. REQUIRED after 0130.
 - [x] **0132_course_schema_reconciliation_and_privilege_hardening.sql** — reconciles course-correction schema, ensures the override upsert key, preserves member-readable SELECT policies, and removes direct browser-role mutation privileges. REQUIRED after 0131.
 
-- [ ] **0133_testing_and_money_atomicity.sql** — v177.14 reliability migration. Ensures `group_courses(group_id, course_id)` has the unique conflict key required by course-correction RPCs; aborts clearly instead of silently deduping if historical duplicates exist. Adds organizer/admin-gated atomic TGC bet post/re-post/un-post RPCs. REQUIRED before v177.14.
-
-- [ ] **0133_testing_and_money_atomicity.sql** — adds the `group_courses(group_id,course_id)` conflict key when needed and transactional TGC bet post/re-post/un-post RPCs. REQUIRED before v177.14. Note: its original `save_bet_expense_atomic` body has a runtime ambiguity fixed by 0134; always apply 0134 after 0133.
+- [ ] **0133_testing_and_money_atomicity.sql** — v177.14 reliability migration. Ensures `group_courses(group_id, course_id)` has the unique conflict key required by course-correction RPCs; aborts clearly instead of silently deduping if historical duplicates exist. Adds organizer/admin-gated atomic TGC bet post/re-post/un-post RPCs. Its original `save_bet_expense_atomic` body has a runtime ambiguity fixed by 0134; always apply 0134 after 0133. REQUIRED before v177.14.
 - [ ] **0134_fix_bet_rpc_ambiguous_id.sql** — staging-proven runtime correction for `save_bet_expense_atomic`; qualifies table `id`/`created_at` references that collide with `RETURNS TABLE(id, created_at)` PL/pgSQL output variables. No schema/data changes. REQUIRED before v177.15.
+<!-- NOTES:END -->

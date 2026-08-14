@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Safe-area frame guard (APP_RULES #19).
+Safe-area frame guard (APP_RULES #24).
 
 A `position:fixed` element that is anchored to the top edge (`inset: 0` or `top: 0`) AND draws a visible
 border will paint that top border edge-to-edge BEHIND the notch / status bar. This has bitten us more than
@@ -21,22 +21,23 @@ child elements nested inside a fixed container (their border isn't on the fixed 
 import re, sys, pathlib
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-COMPONENTS = ROOT / "components"
+UI_ROOTS = [ROOT / "components", ROOT / "app"]
 
 violations = []
-for f in sorted(COMPONENTS.rglob("*.tsx")):
-    for i, line in enumerate(f.read_text(encoding="utf-8", errors="replace").splitlines()):
-        if 'position: "fixed"' not in line:
-            continue
-        # a real, visible border on the SAME element (not border:"none", not borderRadius)
-        if not re.search(r'\bborder:\s*"(?!none)', line) and 'borderTop:' not in line:
-            continue
-        top_anchored = bool(re.search(r'\binset:\s*0\b', line) or re.search(r'\btop:\s*0\b', line) or 'top: "0"' in line)
-        if not top_anchored:
-            continue
-        if "env(safe-area-inset-top)" in line:
-            continue
-        violations.append(f"{f.relative_to(ROOT)}:{i+1}  fixed bordered frame pinned to the top edge — its top border clips under the notch; anchor the top with env(safe-area-inset-top) instead of inset:0/top:0")
+for base in UI_ROOTS:
+  for f in sorted(base.rglob("*.tsx")):
+      for i, line in enumerate(f.read_text(encoding="utf-8", errors="replace").splitlines()):
+          if 'position: "fixed"' not in line:
+              continue
+          # a real, visible border on the SAME element (not border:"none", not borderRadius)
+          if not re.search(r'\bborder:\s*"(?!none)', line) and 'borderTop:' not in line:
+              continue
+          top_anchored = bool(re.search(r'\binset:\s*0\b', line) or re.search(r'\btop:\s*0\b', line) or 'top: "0"' in line)
+          if not top_anchored:
+              continue
+          if "env(safe-area-inset-top)" in line:
+              continue
+          violations.append(f"{f.relative_to(ROOT)}:{i+1}  fixed bordered frame pinned to the top edge — its top border clips under the notch; anchor the top with env(safe-area-inset-top) instead of inset:0/top:0")
 
 if violations:
     print("SAFE-AREA FRAME CHECK FAILED - fixed borders running under the notch:")

@@ -4838,3 +4838,19 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Adds executable boundary tests for 18/18, 17/18, 15/18, 14/18, 9/18, 0/18, partial 15-hole rounds, and par-3 fairway exclusion.
 - No database migration.
 
+
+### 177.25.260814 — repository integrity / reproducibility hardening (IN PROGRESS)
+- Fixes the `FormChart` React hook-order defect by calling `useId()` before the conditional early return.
+- Repairs the migration-checklist generator so emphasized checked entries and hand-written notes survive regeneration; repeated generation is byte-identical.
+- Adds executable self-record calls to legacy migrations 0122-0128 and migration 0135 for evidence-based ledger backfill. 0135 must run as DB owner/postgres because 0123 intentionally revoked `record_migration` from app roles.
+- Adds a permanent semantic migration-ledger guard and documents the historical 0064/0129 numbering gaps.
+- Extends bottom-sheet, contrast, date-input, popup-close, and safe-area guards across both `components/` and `app/` UI roots.
+- Hardens `.gitignore` for `.env`/`.env.*`, documents all referenced environment variables in `.env.example`, and adds an environment-hygiene guard.
+- Removes the unused Courses `HelpSearch` import. The two verified but inert tracked orphan files are documented for a later delete-capable cleanup rather than requiring manual deletion during this overlay release.
+- Replaces direct `round.ai_analysis` prop mutation with an explicit immutable parent update callback.
+- Adds zero-tolerance React hook lint wiring and makes the non-blocking dependency check explicit with `|| true`.
+- Captures the authoritative live Production database security contract in source: `0136_core_rls_helpers.sql` recreates the six exact SECURITY DEFINER policy helpers; `0137_core_rls_baseline.sql` recreates RLS state, all 60 core policies, and the exported table grants for the 12 legacy core tables.
+- Adds exact helper/policy manifests, source-closure guards, and a disposable Supabase fresh-database reconstruction step inside required `CI / verify`.
+- Replaces the old total-import cap with an actual TypeScript unused-symbol per-file ratchet (512 grandfathered diagnostics / 27 files; no increases or headroom).
+- Makes pace-of-play clocks reactive, prevents direct round prop mutation after AI analysis, adds VAPID key drift protection, and pins the build/runtime contract to Node 22 across CI and Vercel package metadata.
+- **BLOCKED before release:** the new fresh-database reconstruction must execute successfully in GitHub CI, 0135-0137 must pass staging database validation, and the normal dependency-backed type/test/build/release gates must pass.

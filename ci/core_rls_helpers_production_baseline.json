@@ -1,0 +1,48 @@
+{
+  "captured_at": "2026-08-14",
+  "source": "Production pg_proc + pg_get_functiondef read-only export",
+  "functions": {
+    "is_admin": {
+      "identity_arguments": "",
+      "security_definer": true,
+      "volatility": "stable",
+      "search_path": "public",
+      "body": "select coalesce((select is_admin and not coalesce(banned, false) from profiles where id = auth.uid()), false);"
+    },
+    "is_game_member": {
+      "identity_arguments": "g uuid",
+      "security_definer": true,
+      "volatility": "stable",
+      "search_path": "public",
+      "body": "select exists (select 1 from game_players where game_id = g and user_id = auth.uid());"
+    },
+    "is_group_admin": {
+      "identity_arguments": "group_uuid uuid, user_uuid uuid",
+      "security_definer": true,
+      "volatility": "stable",
+      "search_path": "public",
+      "body": "select exists ( select 1 from public.group_members gm where gm.group_id = group_uuid and gm.user_id = user_uuid and gm.status = 'active' and gm.role = 'admin' ) and not coalesce((select banned from profiles where id = user_uuid), false);"
+    },
+    "is_group_member": {
+      "identity_arguments": "group_uuid uuid, user_uuid uuid",
+      "security_definer": true,
+      "volatility": "stable",
+      "search_path": "public",
+      "body": "select exists ( select 1 from public.group_members gm where gm.group_id = group_uuid and gm.user_id = user_uuid and gm.status = 'active' ) and not coalesce((select banned from profiles where id = user_uuid), false);"
+    },
+    "is_tee_group_marker": {
+      "identity_arguments": "p_game uuid, p_group smallint",
+      "security_definer": true,
+      "volatility": "stable",
+      "search_path": "public",
+      "body": "select exists ( select 1 from game_players w where w.game_id = p_game and w.user_id = auth.uid() and w.is_marker = true and w.tee_group is not null and w.tee_group = p_group );"
+    },
+    "shares_active_club": {
+      "identity_arguments": "other uuid",
+      "security_definer": true,
+      "volatility": "stable",
+      "search_path": "public",
+      "body": "select exists ( select 1 from group_members me join group_members them on them.group_id = me.group_id where me.user_id = auth.uid() and me.status = 'active' and them.user_id = other and them.status = 'active' );"
+    }
+  }
+}

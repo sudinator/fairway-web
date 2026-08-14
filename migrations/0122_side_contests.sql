@@ -153,3 +153,5 @@ begin
   update game_contest_entries set voided = coalesce(p_void, true) where id = p_entry;
 end $$;
 grant execute on function public.void_contest_entry(uuid, boolean) to authenticated;
+
+select public.record_migration('0122_side_contests');

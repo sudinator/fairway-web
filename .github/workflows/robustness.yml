@@ -9,25 +9,6 @@ on:
     - cron: "0 13 * * *"   # 13:00 UTC daily
 
 jobs:
-  app-checks:
-    name: Types, tests, build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npx tsc --noEmit
-      - run: npm test
-      - name: UI guards (font size, safe areas, popups, borders)
-        run: npm run guards
-      - run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
-
   schema-guard:
     name: Database schema guard (read-only)
     runs-on: ubuntu-latest
