@@ -6,6 +6,7 @@ import {
   ReferenceLine, BarChart, Bar, Rectangle, ComposedChart, Legend,
 } from "recharts";
 import { barShapeValue } from "@/lib/chart-helpers";
+import { roundStatCompleteness } from "@/lib/round-stats";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, isGrossOnly, hasHoleDetail,
@@ -130,8 +131,14 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   const avgDiff = done.length ? done.reduce((s, r) => s + diffOf(r), 0) / done.length : null;
   const best = done.length ? Math.min(...done.map(diffOf)) : null;
   const allHoles = done.flatMap(played);
+  // Per-hole putting remains valid on partial tracking because both numerator and denominator are known.
+  // Whole-round putting below is intentionally stricter and never infers missing holes.
   const withPutts = allHoles.filter((h) => h.putts != null);
-  const avgPutts = withPutts.length ? withPutts.reduce((s, h) => s + (h.putts || 0), 0) / withPutts.length : null;
+  const avgPuttsPerHole = withPutts.length ? withPutts.reduce((s, h) => s + (h.putts || 0), 0) / withPutts.length : null;
+  const completePuttRounds = done.filter((r) => roundStatCompleteness(r.holes).puttsRoundEligible);
+  const avgPuttsPerRound = completePuttRounds.length
+    ? completePuttRounds.reduce((s, r) => s + puttsOf(r), 0) / completePuttRounds.length
+    : null;
   const gir = girStats(done), fir = firStats(done), scramble = scrambleStats(done), sand = sandSaveStats(done);
   const pens = done.reduce((s, r) => s + pensOf(r), 0);
   const fulls = done.filter((r) => played(r).length >= 14 || isGrossOnly(r));
@@ -159,7 +166,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
     ? { first: idxTrail[0], cur: idxTrail[idxTrail.length - 1], delta: idxTrail[idxTrail.length - 1] - idxTrail[0] }
     : null;
   const threePutts = threePuttsPerRound(done);
-  const puttsPerRound = avgPutts == null ? null : Math.round(avgPutts * 18 * 10) / 10;
+  const puttsPerRound = avgPuttsPerRound == null ? null : Math.round(avgPuttsPerRound * 10) / 10;
   // Shared aspire goal (drives BOTH the synthesis and the "How you compare" card).
   const [goalHcp, setGoalHcp] = useState<number | null>(null);
   const idxForGoal = hcp.index ?? currentIndex;
@@ -175,7 +182,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
     avgScoreVsPar: avgDiff == null ? null : Math.round(avgDiff * 10) / 10,
     bestVsPar: best,
     avgDifferential: avgDifferential == null ? null : Math.round(avgDifferential * 10) / 10,
-    avgPuttsPerHole: avgPutts == null ? null : Math.round(avgPutts * 100) / 100,
+    avgPuttsPerHole: avgPuttsPerHole == null ? null : Math.round(avgPuttsPerHole * 100) / 100,
     threePuttsPerRound: threePutts == null ? null : Math.round(threePutts * 10) / 10,
     girPct: gir.total ? Math.round((100 * gir.hit) / gir.total) : null,
     fairwayPct: fir.total ? Math.round((100 * fir.hit) / fir.total) : null,
@@ -256,7 +263,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
       case "scramble": { const sc = scrambleStats([r]); return sc.total ? 100 * sc.hit / sc.total : null; }
       case "sandsave": { const ss = sandSaveStats([r]); return ss.total ? 100 * ss.hit / ss.total : null; }
       case "fir": { const f = firStats([r]); return f.total ? 100 * f.hit / f.total : null; }
-      case "putts": { const pp = hs.filter((h) => h.putts != null); return pp.length ? puttsOf(r) / pp.length : null; }
+      case "putts": return roundStatCompleteness(r.holes).puttsRoundEligible ? puttsOf(r) : null;
       case "threeputt": { const pp = hs.filter((h) => h.putts != null); return pp.length ? hs.filter((h) => (h.putts || 0) >= 3).length : null; }
       case "pen": return pensOf(r);
     }
@@ -265,7 +272,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
   const detailLabels: Record<StatKey, string> = {
     rounds: "Score", avgpar: "vs par", best: "vs par", diff: "Differential",
     par3: "Avg par 3", par4: "Avg par 4", par5: "Avg par 5", pts: "Stableford",
-    gir: "GIR", fir: "Fairways", scramble: "Scrambling", sandsave: "Sand saves", putts: "Putts", threeputt: "3+ putts", pen: "Penalties",
+    gir: "GIR", fir: "Fairways", scramble: "Scrambling", sandsave: "Sand saves", putts: "Putts / round", threeputt: "3+ putts", pen: "Penalties",
   };
 
   return (
@@ -441,7 +448,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
           {sectionHead("SHORT GAME & PUTTING", expandBtn(moreShort, () => setMoreShort((v) => !v)))}
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <Clk k="scramble" d={detail} set={setDetail}><StatCard label="Scrambling" value={fracPct(scramble)} sub={scramble.total ? "par+ after missing green" : "needs putts"} /></Clk>
-            <Clk k="putts" d={detail} set={setDetail}><StatCard label="Putts / hole" value={avgPutts == null ? "—" : avgPutts.toFixed(2)} /></Clk>
+            <Clk k="putts" d={detail} set={setDetail}><StatCard label="Putts / round" value={avgPuttsPerRound == null ? "—" : avgPuttsPerRound.toFixed(1)} sub={completePuttRounds.length ? `${completePuttRounds.length} complete 18-hole round${completePuttRounds.length === 1 ? "" : "s"}` : "needs putts on all 18 holes"} /></Clk>
           </div>
           {moreShort && (
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
@@ -476,7 +483,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
             const vals = data.map((d) => d.val);
             const valDomain: [number, number] = pctStat
               ? [Math.max(0, Math.floor(Math.min(...vals) - 3)), Math.min(100, Math.ceil(Math.max(...vals) + 3))]
-              : niceDomain(vals, key === "putts" ? 0.3 : 1);
+              : niceDomain(vals, 1);
             const isBetter = dirLower.has(key) ? (v: number) => v <= seriesAvg : (v: number) => v >= seriesAvg;
             const barColor = (v: number) => (isBetter(v) ? "#4ADE80" : "#FB7185");
             return (

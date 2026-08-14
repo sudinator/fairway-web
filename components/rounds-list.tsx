@@ -7,6 +7,7 @@ import {
   girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay, partialHandicapInfo,
 } from "@/lib/golf";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark } from "@/components/ui";
+import { roundStatCompleteness, statHoleList } from "@/lib/round-stats";
 
 export function RoundsList({ rounds, onOpen }: { rounds: Round[]; onOpen: (r: Round) => void }) {
   if (!rounds.length)
@@ -20,6 +21,10 @@ export function RoundsList({ rounds, onOpen }: { rounds: Round[]; onOpen: (r: Ro
 }
 
 export function RoundRow({ r, onOpen }: { r: Round; onOpen: (r: Round) => void }) {
+  const completeness = roundStatCompleteness(r.holes);
+  const puttNudge = completeness.shouldNudgePutts;
+  const fwNudge = completeness.shouldNudgeFairways;
+  const hasNudge = puttNudge || fwNudge;
   return (
     <div onClick={() => onOpen(r)}
       style={{ background: C.card, borderRadius: 12, padding: "13px 16px", marginTop: 10, display: "flex", alignItems: "center", cursor: "pointer", gap: 10, flexWrap: "wrap" }}>
@@ -31,6 +36,14 @@ export function RoundRow({ r, onOpen }: { r: Round; onOpen: (r: Round) => void }
         <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
           {r.group_name ? `${r.group_name} · ` : ""}{fmtDate(r.played_at)}{r.rating != null && r.slope != null ? ` · ${r.rating}/${r.slope}` : ""} · {played(r).length}/{r.holes.length} holes{(() => { const i = partialHandicapInfo(r); return i ? ` · ${i.filled} net par for hcp` : ""; })()} · GIR {pct(girStats([r]))} · FW {pct(firStats([r]))} · {puttsOf(r)} putts{pensOf(r) ? ` · ${pensOf(r)} pen` : ""}
         </div>
+        {hasNudge && (
+          <div style={{ color: C.gold, fontSize: 12, fontWeight: 700, marginTop: 7, lineHeight: 1.45 }}>
+            {puttNudge && <>Putts not recorded on {completeness.missingPutts.length === 1 ? "hole" : "holes"} {statHoleList(completeness.missingPutts)}. </>}
+            {fwNudge && <>Fairways not recorded on {completeness.missingFairways.length === 1 ? "hole" : "holes"} {statHoleList(completeness.missingFairways)}. </>}
+            {puttNudge && <>Complete these stats so this round can be included in your Putts / round dashboard trend.</>}
+            {!puttNudge && fwNudge && <>Complete the missing stats while the round is still fresh.</>}
+          </div>
+        )}
       </div>
       <div style={{ textAlign: "right" }}>
         <span style={{ color: C.ink, fontSize: 20, fontWeight: 800, fontFamily: "Georgia, serif" }}>{strokesOf(r)}</span>

@@ -4828,3 +4828,13 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Changes the primary CTA to `Submit for approval` while reviewing changed provider data and explains that stored BNN data is not silently overwritten.
 - Adds executable regression coverage for when the correction-reason UI must appear and extends the permanent observable-outcome contract through the terminal submission path.
 - No database migration.
+
+### 177.24.260814 — complete-round putting trend + targeted stats nudges
+- Replaces Dashboard `Putts / hole` with `Putts / round`. Only 18-hole rounds with putts recorded on all 18 holes are eligible for the whole-round putting metric and trend; no missing putts are inferred or scaled.
+- Preserves partial-hole data for other metrics where numerator and denominator are known; the stricter completeness rule applies specifically to the total-round putting metric.
+- Adds shared round-stat completeness logic reused by Dashboard, Rounds, and the existing post-round stats reminder.
+- Rounds now nudges only near-complete stat tracking: putts recorded on 15–17 of 18 holes show exact missing hole numbers and explain that completion makes the round eligible for the dashboard putting trend. Abandoned/low-coverage stat tracking is not nagged.
+- Fairway completeness remains par-3 aware and uses the same conservative near-complete nudge principle.
+- Adds executable boundary tests for 18/18, 17/18, 15/18, 14/18, 9/18, 0/18, partial 15-hole rounds, and par-3 fairway exclusion.
+- No database migration.
+

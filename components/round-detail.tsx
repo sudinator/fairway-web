@@ -14,6 +14,7 @@ const supabase = createClient();
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark, DifferentialSheet, BottomSheet } from "@/components/ui";
 import { ShareRoundModal } from "@/components/share-card";
 import { badgesForRound, BADGE_BY_KEY, badgeEvidence, collapseRoundAwards, type Award } from "@/lib/badges";
+import { roundStatCompleteness, statHoleList } from "@/lib/round-stats";
 
 const ROUND_TIER_COLOR: Record<string, string> = { common: C.sage, rare: "#7FB8FF", elite: C.gold };
 
@@ -175,21 +176,21 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
 // left blank. Only shows for players who track stats at all (never nags the rest);
 // par 3s are excluded from the fairway check.
 function StatsReminder({ round, onEdit }: { round: Round; onEdit: () => void }) {
-  const holes = played(round);
-  const tracks = holes.some((h) => h.putts != null || h.fairway != null);
+  const info = roundStatCompleteness(round.holes);
+  const tracks = info.puttHoles > 0 || info.fairwayHoles > 0;
   if (!tracks) return null;
-  const noPutts = holes.filter((h) => h.strokes != null && h.putts == null).map((h) => h.hole_number);
-  const noFw = holes.filter((h) => h.par >= 4 && h.strokes != null && h.fairway == null).map((h) => h.hole_number);
+  const noPutts = info.missingPutts;
+  const noFw = info.missingFairways;
   if (noPutts.length === 0 && noFw.length === 0) return null;
-  const list = (a: number[]) => (a.length > 8 ? `${a.length} holes` : a.join(", "));
+  const list = (a: number[]) => (a.length > 8 ? `${a.length} holes` : statHoleList(a));
   return (
     <div style={{ background: C.greenLight, border: `1px solid ${C.gold}`, borderRadius: 14, padding: "14px 16px", marginTop: 14 }}>
       <div style={{ color: C.gold, fontWeight: 800, fontSize: 13, letterSpacing: ".04em", textTransform: "uppercase" }}>A few stats are blank</div>
       <div style={{ color: C.sage, fontSize: 13, marginTop: 8, lineHeight: 1.5 }}>
         You tracked stats this round but left some holes empty:
         <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>
-          {noPutts.length > 0 && <li style={{ marginBottom: 3 }}>Putts on {list(noPutts)}</li>}
-          {noFw.length > 0 && <li>Fairways on {list(noFw)} (par 3s don&apos;t count)</li>}
+          {noPutts.length > 0 && <li style={{ marginBottom: 3 }}>Putts not recorded on {noPutts.length === 1 ? "hole" : "holes"} {list(noPutts)}</li>}
+          {noFw.length > 0 && <li>Fairways not recorded on {noFw.length === 1 ? "hole" : "holes"} {list(noFw)} (par 3s don&apos;t count)</li>}
         </ul>
       </div>
       <div style={{ color: C.faint, fontSize: 12, marginTop: 8, lineHeight: 1.45 }}>
