@@ -627,3 +627,12 @@ For changed interactions, do not equate handler reachability with working behavi
 - Metadata (table/policy key, permissive mode, roles, command), RLS state, and grants remain exact comparisons. `CORE_RLS_RENDERING` is informational only; `CORE_RLS_DIFF` remains a hard failure.
 - The verifier includes executable negative canaries for removed admin checks, ownership checks, guest checks, active-membership checks, AND->OR mutation, and organizer-condition mutation, plus one equivalent-format convergence canary. It also logs the PostgreSQL server version.
 - Do not apply 0135-0137 to real staging or Production and do not promote to main until GitHub's disposable fresh-DB run proves the canonical gate/canaries and the complete release gate is green.
+
+
+### 177.34.260815 — split RLS structural / semantic / behavior verification
+- Replaces the flawed 177.33 pg_temp deparser-canonicalization approach. PostgreSQL deparsed text is no longer treated as a stable security semantic contract.
+- `ci/assert-core-rls-live.sql` is again production-safe/read-only and hard-gates stable runtime structure only: 12 RLS table states, exact 60 policy identities/permissive modes/roles/commands, and exported grants.
+- New fresh-DB-only `ci/assert-core-rls-behavior.sql` exercises authenticated owner-vs-other authorization for notifications, rounds, and holes, including allowed writes and denied cross-user writes. All fixtures and trigger-disable changes roll back.
+- `ci/test_fresh_db_rebuild.sh` now requires structural and behavior RLS gates after the full migration replay; `ci/check_fresh_db_ci_contract.py` permanently guards that architecture and rejects a return to pg_temp expression canonicalization.
+- No application code, RLS policy, grant, helper, migration, staging database, or Production database behavior is changed.
+- **NOT DEPLOYABLE:** PostgreSQL execution of the new structural/behavior gates, full dependency-backed CI/type/test/build, Vercel staging, staging regression validation, PR verify, Production Ready and smoke remain mandatory.

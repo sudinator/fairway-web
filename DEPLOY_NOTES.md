@@ -4916,3 +4916,12 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Adds PostgreSQL version diagnostics and executable semantic canaries proving equivalent formatting converges while removed admin/ownership/guest/active-member predicates, AND-to-OR changes, and organizer-condition changes remain distinguishable.
 - No RLS policy, grant, helper, migration, application behavior, real staging database, or Production database change.
 - **STAGING-DIAGNOSTIC ONLY / NOT DEPLOYABLE:** GitHub disposable fresh-DB execution must prove `CORE_RLS_CANARY_PASS` and zero `CORE_RLS_DIFF` before any further database or release action.
+
+
+### 177.34.260815 — split RLS structural / semantic / behavior verification
+- Replaces the flawed 177.33 pg_temp deparser-canonicalization approach. PostgreSQL deparsed text is no longer treated as a stable security semantic contract.
+- `ci/assert-core-rls-live.sql` is again production-safe/read-only and hard-gates stable runtime structure only: 12 RLS table states, exact 60 policy identities/permissive modes/roles/commands, and exported grants.
+- New fresh-DB-only `ci/assert-core-rls-behavior.sql` exercises authenticated owner-vs-other authorization for notifications, rounds, and holes, including allowed writes and denied cross-user writes. All fixtures and trigger-disable changes roll back.
+- `ci/test_fresh_db_rebuild.sh` now requires structural and behavior RLS gates after the full migration replay; `ci/check_fresh_db_ci_contract.py` permanently guards that architecture and rejects a return to pg_temp expression canonicalization.
+- No application code, RLS policy, grant, helper, migration, staging database, or Production database behavior is changed.
+- **NOT DEPLOYABLE:** PostgreSQL execution of the new structural/behavior gates, full dependency-backed CI/type/test/build, Vercel staging, staging regression validation, PR verify, Production Ready and smoke remain mandatory.
