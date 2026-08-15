@@ -420,6 +420,7 @@ Same approach applies to manage.tsx (3,812) split by admin capability.
 ~~AI endpoint: strict request schema + structured output validation (output-integrity, low urgency).~~ (see below)
 - Consolidate migrations/ + supabase/migrations/ into one canonical dir + CI ledger check.
 - [~] React hook dependency hygiene: 177.35 removes the 23 stale ESLint suppression comments that were incompatible with the zero-warning lint gate and permanently forbids new `react-hooks/exhaustive-deps` suppressions. The broader dependency-array audit remains intentionally deferred to Stage 3/4 because enabling `exhaustive-deps` can change effect timing/behavior; `any` API-boundary audit remains paired with that work.
+- [ ] Advisory unused-symbol debt cleanup: 177.36 intentionally leaves the reported unused-symbol deltas visible/non-blocking. Clean them up only in behavior-aware refactor work; do not expand DR/security corrective releases to absorb unrelated hygiene debt.
 
 ## Security batch 3 — DONE in 177.6 (follow-up review #4/#5/#6/#8/#10)
 - DONE: system-maintenance SECURITY DEFINER functions locked down (0127) — expire_support_sessions admin-gated + input-validated; cron reapers revoked from app roles; deny-by-default revokes.

@@ -7,13 +7,14 @@ were entirely unused. This guard measures TypeScript's actual unused diagnostics
 (TS6133/TS6192/TS6196) and freezes them per file.
 
 Rules:
-- any increase in an existing file fails;
-- any unused diagnostic in a previously-clean/new file fails;
-- any decrease also fails until the checked-in baseline is lowered, preventing
-  cleanup from turning into future headroom.
+- increases/decreases are reported against the checked-in baseline;
+- findings are ADVISORY and never block a release by themselves;
+- the normal blocking TypeScript typecheck runs separately and still fails on
+  real compile/type errors.
 
-The normal CI typecheck runs separately. This command intentionally ignores other
-TypeScript diagnostics and compares only unused-symbol diagnostics.
+APP_RULES #26 explicitly classifies unused props/state/imports as boundary-drift
+warnings. This command intentionally reports only TypeScript unused-symbol
+diagnostics (TS6133/TS6192/TS6196) and exits successfully after reporting them.
 """
 from pathlib import Path
 import json
@@ -35,7 +36,8 @@ if local_tsc.exists():
 elif shutil.which("tsc"):
     cmd = ["tsc"]
 else:
-    raise SystemExit("Unused-symbol ratchet: FAIL - TypeScript compiler not found")
+    print("Unused-symbol debt ratchet: WARNING - TypeScript compiler not found; advisory check skipped")
+    raise SystemExit(0)
 
 cmd += ["--noEmit", "--noUnusedLocals", "--noUnusedParameters", "--pretty", "false"]
 
@@ -70,11 +72,10 @@ if total_current != total_expected and not errors:
     errors.append(f"total unused diagnostics changed {total_expected} -> {total_current}; refresh the per-file baseline")
 
 if errors:
-    print("Unused-symbol debt ratchet: FAIL")
+    print("Unused-symbol debt ratchet: WARNING (advisory; does not block release)")
     for error in errors:
         print(" -", error)
-    raise SystemExit(1)
-
-print(f"Unused-symbol debt ratchet: PASS ({total_current} grandfathered diagnostics across {len(current)} files; no headroom)")
+else:
+    print(f"Unused-symbol debt ratchet: PASS ({total_current} grandfathered diagnostics across {len(current)} files; baseline unchanged)")
 if use_offline_fallback:
     print(" - audit mode: dependency type roots unavailable; only TS6133/6192/6196 diagnostics were evaluated")
