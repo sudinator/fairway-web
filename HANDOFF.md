@@ -100,7 +100,7 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current working candidate: 177.26.260814 (repository integrity / reproducibility hardening corrective).**
+**Current working candidate: 177.31.260814 (RLS parity diagnostics corrective).**
 - 177.26 supersedes the unreleased 177.25 candidate after its first GitHub execution exposed verification-harness ordering/sequencing defects; it still includes the 177.24 dashboard Putts/round + targeted stats-completion baseline.
 - New migrations under review: `0135_ledger_backfill.sql`, `0136_core_rls_helpers.sql`, and `0137_core_rls_baseline.sql`. None should be applied to Production until the 177.25 database/reconstruction gates are complete.
 - `0135` backfills missing migration-ledger rows only when sentinel evidence proves each historical migration is actually present. Run migrations as DB owner/postgres; application roles cannot record migrations after 0123.
@@ -604,3 +604,11 @@ For changed interactions, do not equate handler reachability with working behavi
 - Fresh DB CI now asserts those nine columns after the full migration chain, including type/nullability/default expectations.
 - Static migration dependency analysis now includes executable column dependencies and is negative-tested against the exact 0043 game_id failure pattern.
 - Continue to treat disposable fresh-database execution as authoritative. Do not apply 0135-0137 to staging until the fresh replay is green through the entire stream and final RLS/security assertions.
+
+
+## 177.31 RLS parity diagnostics
+- CI #40 completed the full migration stream through `0137_core_rls_baseline.sql` and passed the historical nine-column compatibility assertion, then failed only at the final exact RLS policy comparison.
+- The old verifier reported `30 differing row(s)` without policy/field detail, which is insufficient evidence for modifying security policy definitions.
+- `ci/assert-core-rls-live.sql` now emits `CORE_RLS_DIFF` diagnostics keyed by table/policy, including differing fields and raw expected/actual `permissive`, roles, command, USING expression, and WITH CHECK expression.
+- Whitespace-only expression flags are diagnostic only; exact raw parity remains mandatory until differences are classified.
+- Do not apply 0135-0137 to staging or Production until the fresh rebuild's policy differences are fully explained and the final security contract gate passes.

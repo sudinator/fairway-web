@@ -24,12 +24,24 @@ begin
   end if;
 end $$;
 
-do $$
-declare
-  policy_diff_count integer;
-begin
-  with expected(tablename, policyname, permissive, roles, cmd, qual, with_check) as (
-    values
+-- Materialize the expected Production policy contract and the actual rebuilt/live
+-- policy state so CI can print exact row/field diagnostics before failing.
+-- Keep raw pg_policies text here: until a difference is reviewed, formatting and
+-- semantic drift are both treated as hard failures.
+create temporary table _core_rls_expected (
+  tablename text not null,
+  policyname text not null,
+  permissive text not null,
+  roles text not null,
+  cmd text not null,
+  qual text,
+  with_check text,
+  primary key (tablename, policyname)
+) on commit drop;
+
+insert into _core_rls_expected
+  (tablename, policyname, permissive, roles, cmd, qual, with_check)
+values
       ('activity_log'::text, 'admins read activity'::text, 'PERMISSIVE'::text, 'public'::text, 'SELECT'::text, '(EXISTS ( SELECT 1
      FROM profiles p
     WHERE ((p.id = auth.uid()) AND (p.is_admin = true))))'::text, null::text),
@@ -132,26 +144,99 @@ begin
       ('rounds'::text, 'rounds_group_member_insert'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'INSERT'::text, null::text, '((user_id = auth.uid()) AND is_group_member(group_id, auth.uid()))'::text),
       ('rounds'::text, 'rounds_group_member_select'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'SELECT'::text, '((user_id = auth.uid()) OR is_group_member(group_id, auth.uid()))'::text, null::text),
       ('rounds'::text, 'rounds_group_owner_delete'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'DELETE'::text, '((user_id = auth.uid()) OR is_group_admin(group_id, auth.uid()))'::text, null::text),
-      ('rounds'::text, 'rounds_group_owner_update'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'UPDATE'::text, '((user_id = auth.uid()) OR is_group_admin(group_id, auth.uid()))'::text, '((user_id = auth.uid()) OR is_group_admin(group_id, auth.uid()))'::text)
-  ), actual as (
-    select
-      tablename::text,
-      policyname::text,
-      permissive::text,
-      array_to_string(roles, ',')::text as roles,
-      cmd::text,
-      qual::text,
-      with_check::text
-    from pg_policies
-    where schemaname='public' and tablename in ('activity_log'::text, 'favorite_courses'::text, 'game_players'::text, 'games'::text, 'group_courses'::text, 'group_invites'::text, 'group_members'::text, 'groups'::text, 'holes'::text, 'notifications'::text, 'profiles'::text, 'rounds'::text)
-  ), diff as (
-    (select * from expected except select * from actual)
-    union all
-    (select * from actual except select * from expected)
+      ('rounds'::text, 'rounds_group_owner_update'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'UPDATE'::text, '((user_id = auth.uid()) OR is_group_admin(group_id, auth.uid()))'::text, '((user_id = auth.uid()) OR is_group_admin(group_id, auth.uid()))'::text);
+
+create temporary table _core_rls_actual on commit drop as
+select
+  tablename::text,
+  policyname::text,
+  permissive::text,
+  array_to_string(roles, ',')::text as roles,
+  cmd::text,
+  qual::text,
+  with_check::text
+from pg_policies
+where schemaname='public'
+  and tablename in ('activity_log'::text, 'favorite_courses'::text, 'game_players'::text, 'games'::text, 'group_courses'::text, 'group_invites'::text, 'group_members'::text, 'groups'::text, 'holes'::text, 'notifications'::text, 'profiles'::text, 'rounds'::text);
+
+-- Diagnostic output is intentionally emitted as a normal SELECT so GitHub logs show
+-- the exact policy and field values before the final hard-gate exception. The
+-- whitespace_only columns are diagnostic only; exact raw parity remains required.
+with paired as (
+  select
+    coalesce(e.tablename, a.tablename) as tablename,
+    coalesce(e.policyname, a.policyname) as policyname,
+    e.tablename is null as unexpected_actual,
+    a.tablename is null as missing_expected,
+    e.permissive as expected_permissive, a.permissive as actual_permissive,
+    e.roles as expected_roles, a.roles as actual_roles,
+    e.cmd as expected_cmd, a.cmd as actual_cmd,
+    e.qual as expected_qual, a.qual as actual_qual,
+    e.with_check as expected_with_check, a.with_check as actual_with_check
+  from _core_rls_expected e
+  full outer join _core_rls_actual a using (tablename, policyname)
+), differences as (
+  select *,
+    concat_ws(', ',
+      case when missing_expected then 'missing_expected' end,
+      case when unexpected_actual then 'unexpected_actual' end,
+      case when expected_permissive is distinct from actual_permissive then 'permissive' end,
+      case when expected_roles is distinct from actual_roles then 'roles' end,
+      case when expected_cmd is distinct from actual_cmd then 'cmd' end,
+      case when expected_qual is distinct from actual_qual then 'qual' end,
+      case when expected_with_check is distinct from actual_with_check then 'with_check' end
+    ) as differing_fields,
+    (
+      expected_qual is not null and actual_qual is not null
+      and regexp_replace(btrim(expected_qual), '[[:space:]]+', ' ', 'g')
+          = regexp_replace(btrim(actual_qual), '[[:space:]]+', ' ', 'g')
+    ) as qual_whitespace_only,
+    (
+      expected_with_check is not null and actual_with_check is not null
+      and regexp_replace(btrim(expected_with_check), '[[:space:]]+', ' ', 'g')
+          = regexp_replace(btrim(actual_with_check), '[[:space:]]+', ' ', 'g')
+    ) as with_check_whitespace_only
+  from paired
+  where missing_expected
+     or unexpected_actual
+     or expected_permissive is distinct from actual_permissive
+     or expected_roles is distinct from actual_roles
+     or expected_cmd is distinct from actual_cmd
+     or expected_qual is distinct from actual_qual
+     or expected_with_check is distinct from actual_with_check
+)
+select
+  'CORE_RLS_DIFF' as marker,
+  tablename, policyname, differing_fields,
+  expected_permissive, actual_permissive,
+  expected_roles, actual_roles,
+  expected_cmd, actual_cmd,
+  expected_qual, actual_qual, qual_whitespace_only,
+  expected_with_check, actual_with_check, with_check_whitespace_only
+from differences
+order by tablename, policyname;
+
+do $$
+declare
+  policy_diff_count integer;
+begin
+  with diff_keys as (
+    select coalesce(e.tablename, a.tablename) as tablename,
+           coalesce(e.policyname, a.policyname) as policyname
+    from _core_rls_expected e
+    full outer join _core_rls_actual a using (tablename, policyname)
+    where e.tablename is null
+       or a.tablename is null
+       or e.permissive is distinct from a.permissive
+       or e.roles is distinct from a.roles
+       or e.cmd is distinct from a.cmd
+       or e.qual is distinct from a.qual
+       or e.with_check is distinct from a.with_check
   )
-  select count(*) into policy_diff_count from diff;
+  select count(*) into policy_diff_count from diff_keys;
+
   if policy_diff_count <> 0 then
-    raise exception 'Core RLS policy definitions differ from ci/core_rls_production_baseline.json (% differing row(s))', policy_diff_count;
+    raise exception 'Core RLS policy definitions differ from ci/core_rls_production_baseline.json (% policy key(s)); see CORE_RLS_DIFF rows above', policy_diff_count;
   end if;
 end $$;
 

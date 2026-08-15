@@ -4891,3 +4891,12 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Strengthened `check_legacy_migration_prereqs.py` to check executable column dependencies including simple CREATE INDEX column lists and fully-qualified table.column references, in addition to relation/function/policy/type/ALTER-column closure.
 - Negative-tested the 0043 failure pattern: removing `rounds.game_id` from the baseline makes the static guard fail on `0043_round_game_unique.sql` before CI reaches PostgreSQL.
 - No live database migration has been applied. 0135-0137 remain blocked until disposable fresh-db replay passes the complete migration stream.
+
+
+### 177.31.260814 — diagnostic RLS parity gate
+- Fresh-database replay now reaches the end of the 135-migration stream and passes the historical nine-column compatibility assertion, but the final exact RLS comparison reports policy drift without identifying the affected policies.
+- Reworks `ci/assert-core-rls-live.sql` to materialize expected vs actual policy state, emit one `CORE_RLS_DIFF` row per affected policy with field-level expected/actual values, then fail the hard gate.
+- Adds diagnostic-only whitespace comparison flags for policy expressions; exact raw Production parity remains the release requirement until each difference is reviewed.
+- Strengthens `ci/check_fresh_db_ci_contract.py` so future RLS parity failures must remain actionable rather than count-only.
+- No RLS policy, grant, helper, application behavior, staging database, or Production database change in this diagnostic corrective candidate.
+- **BLOCKED before release:** rerun disposable fresh-DB CI, inspect all emitted `CORE_RLS_DIFF` rows, classify true semantic drift vs PostgreSQL rendering differences, and correct only evidence-backed mismatches.

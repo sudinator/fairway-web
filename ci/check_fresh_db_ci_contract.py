@@ -8,6 +8,8 @@ script = script_path.read_text(encoding='utf-8') if script_path.exists() else ''
 ordering_path = ROOT / 'ci' / 'list_ordered_migrations.py'
 ordering = ordering_path.read_text(encoding='utf-8') if ordering_path.exists() else ''
 schema_check = (ROOT / 'ci' / 'schema-check.sh').read_text(encoding='utf-8')
+rls_assert_path = ROOT / 'ci' / 'assert-core-rls-live.sql'
+rls_assert = rls_assert_path.read_text(encoding='utf-8') if rls_assert_path.exists() else ''
 bootstrap_path = ROOT / 'ci' / 'fresh_db_bootstrap.sql'
 bootstrap = bootstrap_path.read_text(encoding='utf-8') if bootstrap_path.exists() else ''
 extension_guard_path = ROOT / 'ci' / 'check_db_extension_prereqs.py'
@@ -31,6 +33,9 @@ checks = {
     'fresh rebuild applies migrations with stop-on-error': 'ON_ERROR_STOP=1 -f "$migration"' in script,
     'fresh rebuild verifies historical compatibility columns': 'assert-historical-baseline-columns.sql' in script,
     'fresh rebuild asserts live RLS baseline': 'assert-core-rls-live.sql' in script,
+    'RLS verifier emits per-policy diagnostic rows before failing': 'CORE_RLS_DIFF' in rls_assert and 'differing_fields' in rls_assert,
+    'RLS verifier reports expected and actual policy expressions': 'expected_qual' in rls_assert and 'actual_qual' in rls_assert and 'expected_with_check' in rls_assert and 'actual_with_check' in rls_assert,
+    'RLS verifier reports whitespace-only expression diagnostics without weakening exact parity': 'qual_whitespace_only' in rls_assert and 'with_check_whitespace_only' in rls_assert and 'is distinct from a.qual' in rls_assert,
     'fresh rebuild verifies RLS helper presence': 'public.is_game_member(uuid)' in script and 'public.shares_active_club(uuid)' in script,
     'live schema guard waits for RLS baseline migration sentinel': "0137_core_rls_baseline" in schema_check and 'schema_migrations' in schema_check,
 }
