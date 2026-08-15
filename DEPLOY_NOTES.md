@@ -4854,3 +4854,10 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Replaces the old total-import cap with an actual TypeScript unused-symbol per-file ratchet (512 grandfathered diagnostics / 27 files; no increases or headroom).
 - Makes pace-of-play clocks reactive, prevents direct round prop mutation after AI analysis, adds VAPID key drift protection, and pins the build/runtime contract to Node 22 across CI and Vercel package metadata.
 - **BLOCKED before release:** the new fresh-database reconstruction must execute successfully in GitHub CI, 0135-0137 must pass staging database validation, and the normal dependency-backed type/test/build/release gates must pass.
+
+### 177.26.260814 — fresh-DB ordering + staged RLS gate sequencing
+- Corrects the first 177.25 GitHub execution of the new database-reproducibility gate. The original harness sorted full paths across `migrations/` and `supabase/migrations/`, which could execute `0014_round_clock.sql` before `0001_baseline.sql`; migration ordering is now parsed globally from the numeric filename prefix, with duplicate-number rejection and an executable monotonic-order contract.
+- Separates pre-migration reproducibility proof from post-migration live-environment equality. `ci/schema-check.sh` always runs the existing live schema/default checks, but the exact Production-derived core-RLS equality gate becomes mandatory only after `0137_core_rls_baseline` is recorded in that environment's `schema_migrations` ledger.
+- Before 0137 is applied, source-contract guards plus disposable fresh-database reconstruction are the hard pre-migration proof. After 0137 is applied to staging/Production, the live RLS equality check automatically becomes a hard gate.
+- This resolves the circular release gate exposed by staging: CI must approve the migration before staging is changed, while live staging cannot equal the new baseline until that migration is deliberately applied.
+- No application behavior or Production database change in this corrective candidate. Migrations 0135-0137 remain unapplied pending a successful disposable fresh-database rebuild.

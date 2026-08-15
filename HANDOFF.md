@@ -100,15 +100,15 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current working candidate: 177.25.260814 (repository integrity / reproducibility hardening).**
-- 177.25 includes the 177.24 dashboard Putts/round + targeted stats-completion work in its baseline.
+**Current working candidate: 177.26.260814 (repository integrity / reproducibility hardening corrective).**
+- 177.26 supersedes the unreleased 177.25 candidate after its first GitHub execution exposed verification-harness ordering/sequencing defects; it still includes the 177.24 dashboard Putts/round + targeted stats-completion baseline.
 - New migrations under review: `0135_ledger_backfill.sql`, `0136_core_rls_helpers.sql`, and `0137_core_rls_baseline.sql`. None should be applied to Production until the 177.25 database/reconstruction gates are complete.
 - `0135` backfills missing migration-ledger rows only when sentinel evidence proves each historical migration is actually present. Run migrations as DB owner/postgres; application roles cannot record migrations after 0123.
 - `0136` recreates the six Production SECURITY DEFINER helpers referenced by the core RLS policies from the authoritative pg_proc export. `0137` then reconstructs the 12 legacy core-table RLS policy/grant contract from the authoritative Production metadata export. CI checks helper definition parity, source closure, and the exact 60-policy baseline.
 - `ci/core_rls_production_baseline.json` is the machine-readable 2026-08-14 Production RLS baseline (12 tables / 60 policies). `ci/core_rls_helpers_production_baseline.json` captures the six helper definitions. `ci/assert-core-rls-live.sql` is the read-only live drift guard.
-- Fresh-database reconstruction is now part of required `CI / verify`: a pinned Supabase CLI creates a disposable database, applies both migration trees from empty state, and asserts the checked-in RLS baseline. This step still requires its first GitHub execution before 177.25 can ship.
+- Fresh-database reconstruction is now part of required `CI / verify`: a pinned Supabase CLI creates a disposable database, applies both migration trees from empty state, and asserts the checked-in RLS baseline. The first GitHub execution correctly exposed a full-path ordering bug; 177.26 fixes ordering by numeric migration prefix and requires a corrected GitHub fresh-DB PASS before ship.
 - The schema migration ledger (`public.schema_migrations`) is the source of truth for applied state from 0113 onward. `MIGRATIONS.md` is a human checklist and must not be treated as authoritative applied-state evidence.
-- Release remains **NOT DEPLOYABLE** until the RLS helper closure, dependency-backed CI/type/test/build, migration staging validation, and normal release gates pass.
+- Release remains **NOT DEPLOYABLE** until corrected disposable fresh-DB reconstruction, dependency-backed CI/type/test/build, staging-only 0135 -> 0136 -> 0137 application, live RLS equality, and normal release gates pass.
 
 ## 9. Recent major thread — "date of play" (context you'll need)
 The recent work overhauled how a round's date is recorded:

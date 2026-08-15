@@ -22,12 +22,14 @@ supabase db start
 
 DB_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
-# The repository intentionally keeps 0001-0013 under supabase/migrations and
-# 0014+ under migrations/. Combine them by filename/version and execute each
-# file against the otherwise-empty user schema. ON_ERROR_STOP makes the first
-# ordering, dependency, syntax, or authorization failure fail CI.
+# The repository intentionally keeps early migrations under supabase/migrations
+# and later migrations under migrations/. Never sort full paths: directory names
+# would place migrations/0014 before supabase/migrations/0001. The helper below
+# parses the numeric filename prefix across both trees, rejects duplicate numbers,
+# and emits one globally ordered stream. ON_ERROR_STOP makes the first dependency,
+# syntax, authorization, or reconstruction failure fail CI.
 mapfile -t MIGRATIONS < <(
-  find "$ROOT/supabase/migrations" "$ROOT/migrations" -maxdepth 1 -type f -name '*.sql' -print | sort
+  python3 "$ROOT/ci/list_ordered_migrations.py" "$ROOT"
 )
 
 if [ "${#MIGRATIONS[@]}" -eq 0 ]; then
