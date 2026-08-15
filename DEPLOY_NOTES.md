@@ -4868,3 +4868,11 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Added `ci/check_db_extension_prereqs.py`, which walks the actual globally ordered migration stream and fails when a known extension-owned SQL surface is used before that extension is bootstrap-installed or declared by an earlier migration.
 - `pg_cron` remains declared by migration `0074` before its first `cron.*` use, so it does not need to be promoted into the pre-0001 bootstrap today.
 - Fresh-database reconstruction remains a required GitHub gate. No staging or Production database migrations should be run until that disposable rebuild passes.
+
+
+### 177.28.260814 — fresh-database historical RLS compatibility
+- Completes a full static audit of non-idempotent historical migration prerequisites after the disposable rebuild reached migration 0017.
+- Recreates the pre-0017 `create notifications` INSERT policy in the baseline so `0017_notifications_lockdown.sql` can tighten that policy exactly as it did in the original live database.
+- Adds a semantic historical-prerequisite guard covering ALTER POLICY, ALTER FUNCTION, GRANT/REVOKE EXECUTE ON FUNCTION, and non-idempotent DROP FUNCTION dependencies across the globally ordered migration stream.
+- Audit found no other unresolved pre-existing object dependency of those classes; future additions fail CI if they introduce one.
+- No Production or staging database changes are to be applied until the disposable fresh-database rebuild passes the complete migration stream.

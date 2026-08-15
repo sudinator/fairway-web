@@ -10,8 +10,9 @@
 --
 -- Everything here is SAFE / IDEMPOTENT (`if not exists`), so running it against
 -- the existing database only fills in anything missing; it never drops data.
--- RLS policies are documented in SCHEMA.md (they already exist in the live DB
--- and are not recreated here).
+-- Most RLS policies are reconstructed by the later authoritative core-RLS baseline.
+-- A minimal historical compatibility policy is recreated below only where an early
+-- migration requires that pre-existing live object in order to replay safely.
 -- ============================================================================
 
 -- ---------- profiles (id = auth.users.id) ----------
@@ -215,6 +216,15 @@ create table if not exists notifications (
   group_id uuid,
   created_at timestamptz default now()
 );
+
+-- Historical compatibility prerequisite for migration 0017. The original live
+-- database already had this INSERT policy before the migration stream was
+-- source-controlled; 0017 tightens its WITH CHECK clause in place. Recreate only
+-- the pre-0017 policy contract here so a fresh database can replay history.
+drop policy if exists "create notifications" on public.notifications;
+create policy "create notifications" on public.notifications
+  for insert
+  with check (auth.uid() is not null);
 
 -- ============================================================================
 -- Helper functions used by RLS (exist in live DB; export bodies via CLI to

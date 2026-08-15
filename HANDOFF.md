@@ -583,3 +583,10 @@ For changed interactions, do not equate handler reachability with working behavi
 - `pg_cron` remains self-declared by migration 0074 before its first `cron.*` use.
 - `ci/check_db_extension_prereqs.py` permanently validates extension availability against the real globally ordered migration stream.
 - Do not apply migrations 0135-0137 to staging or Production until the disposable fresh-database GitHub gate passes end-to-end.
+
+
+## 177.28 fresh-database reconstruction status
+- Disposable rebuild now has explicit extension prerequisites and globally ordered migrations.
+- CI 177.27 reached `0017_notifications_lockdown.sql` and exposed the baseline omission of the historical `create notifications` policy.
+- 177.28 restores only that pre-0017 compatibility policy in `0001_baseline.sql` and adds `ci/check_legacy_migration_prereqs.py` so non-idempotent historical object dependencies are audited semantically.
+- Do not apply 0135-0137 to staging or Production until the full disposable rebuild reaches the end and passes the core-RLS verification.
