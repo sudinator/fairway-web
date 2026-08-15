@@ -44,6 +44,7 @@ export type Round = {
   gross_score?: number | null; // for gross-only historical rounds (no per-hole detail)
   ai_analysis?: string | null; // saved AI coach summary, persists once generated
   game_id?: string | null; // set when this round was recorded from a finished game/match
+  status?: string | null; // DB lifecycle state; final when omitted in legacy/historical objects
   holes: Hole[];
 };
 
@@ -60,6 +61,27 @@ export function courseHandicap(index: number, slope: number, rating: number, par
 export function courseHandicapExact(index: number, slope: number, rating: number, par: number): number | null {
   if ([index, slope, rating, par].some((v) => v == null || isNaN(v as number))) return null;
   return index * (slope / 113) + (rating - par);
+}
+
+// Rebuild a recorded round's handicap-dependent state after correcting the historical
+// rating/slope snapshot. This deliberately uses the handicap index stored ON THAT ROUND,
+// never today's profile index, and refreshes per-hole recv values so adjusted-gross /
+// partial-round calculations reflect the corrected course handicap immediately.
+export function withHistoricalRatingSlopeCorrection(r: Round, rating: number | null, slope: number | null): Round {
+  const ch = r.handicap_index != null && r.course_par != null && rating != null && slope != null
+    ? courseHandicap(r.handicap_index, slope, rating, r.course_par)
+    : null;
+  const alloc = allocateStrokes(
+    r.holes.map((h) => ({ hole_number: h.hole_number, stroke_index: h.stroke_index })),
+    ch,
+  );
+  return {
+    ...r,
+    rating,
+    slope,
+    course_handicap: ch,
+    holes: r.holes.map((h) => ({ ...h, recv: alloc[h.hole_number] || 0 })),
+  };
 }
 
 export function strokesReceived(si: number | null, ch: number | null): number {

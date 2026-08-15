@@ -4943,18 +4943,14 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - **NOT DEPLOYABLE:** complete GitHub CI/fresh-database execution, Vercel staging, targeted/adjacent staging validation, PR verify, Production Ready and smoke remain mandatory.
 
 
-### 177.37.260815 — staging integration release-gate safety
-- Runs the real Supabase staging integration suite inside the already-required `CI / verify` job for exact `staging -> main` pull requests, so no second branch-protection setting is needed and the full CI pipeline is not duplicated; manual runs remain available through `workflow_dispatch`.
-- Manual destructive runs now require an explicit `confirm_mutation=YES` choice instead of a permanently hardcoded mutation switch. PR-gate runs authorize mutation only for the exact `staging -> main` path.
-- Adds a hard runtime refusal if the staging Supabase URL resolves to the known Production project ref `epmbsmykyrnoiccwnoxq`.
-- Fixes the proven staging-fixture leak in append-only `money_audit`: cleanup deletes audit rows only after expense deletion has emitted its final audit record, then verifies zero rows remain for each disposable group.
-- Strengthens `ci/check_integration_contract.py` so CI permanently requires the required-verify staging gate, protected environment, explicit manual authorization, Production kill switch, and verified audit cleanup.
-- No application behavior, migration, RLS policy, grant, schema, or Production database change.
-- **NOT DEPLOYABLE until blocking release gates pass:** full CI/type/tests/build, staging integration against the real staging project, PR verify, Vercel staging, Production Ready, and smoke test.
+### 177.37.260815 — staging integration safety
+- Makes the real staging Supabase integration part of the required staging-to-main PR verification path, blocks the known Production Supabase project, requires explicit manual mutation confirmation, and cleans/verifies staging `money_audit` fixtures. No migration or app behavior change.
 
+### 177.38.260815 — staging integration URL constructor corrective
+- Corrects the staging harness variable shadowing Node's global `URL` constructor (`URL` -> `STAGING_URL`) and adds regression protection. No migration or app behavior change.
 
-### 177.38.260815 — staging integration URL-constructor corrective
-- Fixes the 177.37 required PR-gate failure `TypeError: URL is not a constructor`. The harness stored `BNN_STAGING_SUPABASE_URL` in a local constant named `URL`, which shadowed Node's global `URL` constructor used by the Production-project kill switch.
-- Renames the local binding to `STAGING_URL` and updates only its direct references. No integration-test scenario, database mutation behavior, cleanup, migration, RLS policy, grant, application behavior, or workflow trigger changes.
-- Adds a permanent integration source-contract guard requiring `STAGING_URL` and rejecting the shadowing pattern.
-- **NOT DEPLOYABLE until blocking gates pass:** corrected real staging integration on the `staging -> main` PR, full CI/type/tests/build, Vercel staging/Production, Production CI/Robustness, smoke test, and branch resynchronization.
+### 177.39.260815 — historical round rating/slope correction
+- Round Editor now lets an already-recorded round correct its historical Course rating and Slope snapshot. The app recalculates that round's course handicap from the handicap index stored on the round, refreshes per-hole stroke allocation for differential math, and the existing round reload recalculates the app-estimated handicap history.
+- Gross-only rounds preserve their stored total during a metadata-only correction. Game-linked personal rounds do not rewrite game results. Course-library data is not silently changed.
+- Adds targeted pure-logic tests and a permanent source contract for the correction/save/cancel boundaries.
+- No database migration.
