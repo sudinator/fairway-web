@@ -100,7 +100,7 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current working candidate: 177.33.260815 (PostgreSQL-native RLS parity corrective).**
+**Current working candidate: 177.35.260815 (hook-lint gate reconciliation corrective).**
 - 177.26 supersedes the unreleased 177.25 candidate after its first GitHub execution exposed verification-harness ordering/sequencing defects; it still includes the 177.24 dashboard Putts/round + targeted stats-completion baseline.
 - New migrations under review: `0135_ledger_backfill.sql`, `0136_core_rls_helpers.sql`, and `0137_core_rls_baseline.sql`. None should be applied to Production until the 177.25 database/reconstruction gates are complete.
 - `0135` backfills missing migration-ledger rows only when sentinel evidence proves each historical migration is actually present. Run migrations as DB owner/postgres; application roles cannot record migrations after 0123.
@@ -636,3 +636,11 @@ For changed interactions, do not equate handler reachability with working behavi
 - `ci/test_fresh_db_rebuild.sh` now requires structural and behavior RLS gates after the full migration replay; `ci/check_fresh_db_ci_contract.py` permanently guards that architecture and rejects a return to pg_temp expression canonicalization.
 - No application code, RLS policy, grant, helper, migration, staging database, or Production database behavior is changed.
 - **NOT DEPLOYABLE:** PostgreSQL execution of the new structural/behavior gates, full dependency-backed CI/type/test/build, Vercel staging, staging regression validation, PR verify, Production Ready and smoke remain mandatory.
+
+## 177.35 hook-lint gate reconciliation
+- CI on 177.34 reached the dependency-backed `npm run ci` chain and stopped at its first stage because ESLint reported 23 unused disable directives with `--max-warnings=0`.
+- Exact current staging source contains 22 reviewed `react-hooks/exhaustive-deps` suppressions plus one generic inline `eslint-disable-next-line`; `eslint.config.mjs` enables only `react-hooks/rules-of-hooks`, so all 23 directives are stale and have no runtime effect.
+- 177.35 removes only those 23 comments. No effect bodies, dependency arrays, props, state, callbacks, imports, APIs, RPCs, database writes, or UI behavior are changed.
+- `ci/check_effect_suppressions.py` now enforces a permanent zero-suppression contract for `react-hooks/exhaustive-deps`; the old 22-line legacy baseline is retired. The broader exhaustive-deps dependency audit remains backlog work and the rule itself is not enabled by this corrective.
+- Local dependency installation timed out in this execution environment, so dependency-backed ESLint/TypeScript/unit/build remain GitHub-authoritative gates. Do not call 177.35 deployable until the complete GitHub CI chain, fresh-database reconstruction/RLS behavior gate, Vercel staging build, and relevant staging regression checks are green.
+

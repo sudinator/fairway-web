@@ -37,7 +37,6 @@ export function FeedbackForm({
       setSent(false);
       onConsumePrefill?.();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill]);
 
   const submit = async () => {

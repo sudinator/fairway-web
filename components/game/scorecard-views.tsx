@@ -182,7 +182,6 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
   // Persist the hole whenever a cell is opened or advanced to.
   useEffect(() => {
     if (edit) saveActiveHole(game.id, edit.holeIdx);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [edit?.holeIdx]);
 
   // On first mount with players loaded, scroll to the LAST hole that has any score — the hole
@@ -206,7 +205,6 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
         el.scrollIntoView({ block: "start", behavior: "auto" });
       }, 60));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerOrder.length]);
 
   const holeCard = (i: number) => {

@@ -1,23 +1,32 @@
 #!/usr/bin/env python3
-"""Prevent unreviewed growth in react-hooks/exhaustive-deps suppressions.
-The current debt is baselined by file + exact source line. Moving/changing one forces review.
+"""Block react-hooks/exhaustive-deps suppressions.
+
+The reviewed legacy suppression baseline was retired in 177.35 after the project
+moved to a zero-warning hook-lint gate while exhaustive-deps itself remained
+disabled. Suppressions for a disabled rule are stale by definition and can mask
+future lint/configuration drift, so the permanent contract is now zero.
 """
 from pathlib import Path
 import sys
-ROOT=Path(__file__).resolve().parents[1]
-BASE=ROOT/'ci/effect_suppressions_baseline.txt'
-current=[]
-for p in sorted((ROOT/'components').rglob('*.tsx')):
-    for line in p.read_text(errors='ignore').splitlines():
-        if 'react-hooks/exhaustive-deps' in line:
-            current.append(f"{p.relative_to(ROOT)}|{line.strip()}")
-expected=[x.strip() for x in BASE.read_text().splitlines() if x.strip() and not x.startswith('#')]
-new=sorted(set(current)-set(expected)); missing=sorted(set(expected)-set(current))
-if new:
-    print('EFFECT SUPPRESSION GUARD: FAIL — unreviewed suppressions')
-    for x in new: print(' +',x)
+
+ROOT = Path(__file__).resolve().parents[1]
+SEARCH_ROOTS = (ROOT / 'app', ROOT / 'components', ROOT / 'lib')
+SUFFIXES = {'.ts', '.tsx', '.js', '.jsx'}
+TOKEN = 'react-hooks/exhaustive-deps'
+
+hits = []
+for base in SEARCH_ROOTS:
+    if not base.exists():
+        continue
+    for path in sorted(p for p in base.rglob('*') if p.is_file() and p.suffix in SUFFIXES):
+        for lineno, line in enumerate(path.read_text(errors='ignore').splitlines(), start=1):
+            if TOKEN in line and 'eslint-' in line:
+                hits.append((path.relative_to(ROOT), lineno, line.strip()))
+
+if hits:
+    print('EFFECT SUPPRESSION GUARD: FAIL - react-hooks/exhaustive-deps suppressions are not allowed')
+    for path, lineno, line in hits:
+        print(f' + {path}:{lineno}: {line}')
     sys.exit(1)
-if missing:
-    print(f'EFFECT SUPPRESSION GUARD: PASS ({len(current)} current; {len(missing)} legacy suppressions removed/changed — update baseline after review)')
-else:
-    print(f'EFFECT SUPPRESSION GUARD: PASS ({len(current)} reviewed legacy suppressions; no new suppressions)')
+
+print('EFFECT SUPPRESSION GUARD: PASS (0 react-hooks/exhaustive-deps suppressions)')

@@ -4925,3 +4925,11 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - `ci/test_fresh_db_rebuild.sh` now requires structural and behavior RLS gates after the full migration replay; `ci/check_fresh_db_ci_contract.py` permanently guards that architecture and rejects a return to pg_temp expression canonicalization.
 - No application code, RLS policy, grant, helper, migration, staging database, or Production database behavior is changed.
 - **NOT DEPLOYABLE:** PostgreSQL execution of the new structural/behavior gates, full dependency-backed CI/type/test/build, Vercel staging, staging regression validation, PR verify, Production Ready and smoke remain mandatory.
+
+### 177.35.260815 — hook-lint gate reconciliation
+- Root cause of the 177.34 `npm run ci` failure: the repository had 23 stale ESLint disable directives while `lint:hooks` runs with `--max-warnings=0`. Twenty-two referenced `react-hooks/exhaustive-deps`; one was a generic inline disable. The active ESLint config enables only `react-hooks/rules-of-hooks`, so the directives suppress no active rule and ESLint correctly reports them as unused.
+- Removes exactly those 23 comments and makes no executable TS/TSX change: no effect body, dependency array, state, prop, callback, import, API/RPC, database write, or render logic is changed.
+- Retires the 22-entry legacy suppression baseline and changes `ci/check_effect_suppressions.py` to a zero-suppression invariant for `react-hooks/exhaustive-deps`. The rule itself remains disabled; the broader exhaustive-deps dependency audit stays deferred because enabling it is a behavior-sensitive refactor, not part of this corrective.
+- No migration or database change. 177.34 RLS structural/behavior verifier architecture is preserved unchanged.
+- **NOT DEPLOYABLE until validation completes:** local `npm ci` timed out in this environment, so dependency-backed hook lint, TypeScript, unit/differential tests, full build, disposable fresh-DB/RLS behavior checks, Vercel staging and adjacent workflow validation must pass in GitHub/staging before promotion.
+

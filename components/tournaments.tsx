@@ -150,7 +150,6 @@ export default function Tournaments({
       }
     })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // Switching the active group while this tab stays mounted: drop any open game or
   // create view back to the (group-filtered) list.
@@ -402,7 +401,6 @@ function CreateGame({
     const d = loadSetupDraft(activeGroupId, teeTimeId);
     if (d && draftHasProgress(d, user.id)) setDraftAvailable(d);
     else hydratedRef.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const applyDraft = (d: SetupDraft) => {
@@ -442,7 +440,6 @@ function CreateGame({
       skinsMode, team1, team2, selectedPlayers, guestPlayers, flightMode, flightCount,
     };
     if (draftHasProgress(snap, user.id)) saveSetupDraft(activeGroupId, teeTimeId, snap);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, flightMode, flightCount]);
 
   const tee = pickedFav?.tees?.[teeIdx];
@@ -1531,7 +1528,6 @@ function GameRoom({
       .on("postgres_changes", { event: "*", schema: "public", table: "games", filter: `id=eq.${gameId}` }, refresh)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId]);
 
   // Lock-time safety: when the page hides (screen lock / app background), force the

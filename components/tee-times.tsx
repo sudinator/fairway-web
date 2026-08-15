@@ -258,7 +258,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
     }
     setDlDone(true);
     onConsumedDeepLink?.();
-  }, [loading, dlDone, initialTeeId, tees]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loading, dlDone, initialTeeId, tees]);
 
   // ---------------- CREATE ----------------
   if (screen === "create") return <CreateForm user={user} groupId={activeGroupId} editing={editId ? tees.find((t) => t.id === editId) || null : null} existingSeqs={tees.map((t) => t.seq).filter((n): n is number => n != null)} onCancel={() => { setEditId(null); setScreen("list"); }} onCreated={async () => { setEditId(null); setScreen("list"); await load(); }} />;
@@ -640,7 +640,6 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
     const d = loadFormDraft<TeeDraftData>(teeDraftKey);
     if (d && teeHasProgress(d.data)) setTeeDraft(d);
     else teeHydratedRef.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const applyTeeDraft = (data: TeeDraftData) => {
@@ -657,7 +656,6 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
     if (!isNew || !teeHydratedRef.current) return;
     const data: TeeDraftData = { kind, title, date, times, course, maxSpots, deadline, notes };
     if (teeHasProgress(data)) saveFormDraft(teeDraftKey, data);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kind, title, date, times, course, maxSpots, deadline, notes]);
 
   // Display preview only — the database assigns the authoritative number on insert

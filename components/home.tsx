@@ -254,7 +254,7 @@ export function Home({ session }: { session: any }) {
     })();
     return () => { cancelled = true; };
     // activeGroupId intentionally omitted: we set it here and don't want to re-run on our own change
-  }, [deepTeeId, groupsLoading, groups]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [deepTeeId, groupsLoading, groups]);
   // Only pass the deep link to TeeTimes once its group is the active one (or we've
   // given up resolving), so TeeTimes can't prematurely "consume" it against the wrong group.
   const deepReady = !!deepTeeId && deepTeeGroupId !== undefined && (deepTeeGroupId === null || activeGroupId === deepTeeGroupId);
