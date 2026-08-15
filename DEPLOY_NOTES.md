@@ -4951,3 +4951,10 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Strengthens `ci/check_integration_contract.py` so CI permanently requires the required-verify staging gate, protected environment, explicit manual authorization, Production kill switch, and verified audit cleanup.
 - No application behavior, migration, RLS policy, grant, schema, or Production database change.
 - **NOT DEPLOYABLE until blocking release gates pass:** full CI/type/tests/build, staging integration against the real staging project, PR verify, Vercel staging, Production Ready, and smoke test.
+
+
+### 177.38.260815 — staging integration URL-constructor corrective
+- Fixes the 177.37 required PR-gate failure `TypeError: URL is not a constructor`. The harness stored `BNN_STAGING_SUPABASE_URL` in a local constant named `URL`, which shadowed Node's global `URL` constructor used by the Production-project kill switch.
+- Renames the local binding to `STAGING_URL` and updates only its direct references. No integration-test scenario, database mutation behavior, cleanup, migration, RLS policy, grant, application behavior, or workflow trigger changes.
+- Adds a permanent integration source-contract guard requiring `STAGING_URL` and rejecting the shadowing pattern.
+- **NOT DEPLOYABLE until blocking gates pass:** corrected real staging integration on the `staging -> main` PR, full CI/type/tests/build, Vercel staging/Production, Production CI/Robustness, smoke test, and branch resynchronization.

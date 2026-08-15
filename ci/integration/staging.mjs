@@ -1,20 +1,20 @@
 import { createClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
 
-const URL = process.env.BNN_STAGING_SUPABASE_URL;
+const STAGING_URL = process.env.BNN_STAGING_SUPABASE_URL;
 const ANON = process.env.BNN_STAGING_SUPABASE_ANON_KEY;
 const SERVICE = process.env.BNN_STAGING_SUPABASE_SERVICE_ROLE_KEY;
 const CONFIRM = process.env.BNN_STAGING_ALLOW_MUTATION;
 const PRODUCTION_PROJECT_REF = process.env.BNN_PRODUCTION_SUPABASE_PROJECT_REF || "epmbsmykyrnoiccwnoxq";
-if (!URL || !ANON || !SERVICE) throw new Error("Set BNN_STAGING_SUPABASE_URL, BNN_STAGING_SUPABASE_ANON_KEY, and BNN_STAGING_SUPABASE_SERVICE_ROLE_KEY.");
+if (!STAGING_URL || !ANON || !SERVICE) throw new Error("Set BNN_STAGING_SUPABASE_URL, BNN_STAGING_SUPABASE_ANON_KEY, and BNN_STAGING_SUPABASE_SERVICE_ROLE_KEY.");
 if (CONFIRM !== "YES") throw new Error("Refusing to mutate a database. Set BNN_STAGING_ALLOW_MUTATION=YES only for a disposable/staging Supabase project.");
-if (!/^https:\/\//.test(URL)) throw new Error("Staging Supabase URL must use https.");
-const stagingHost = new URL(URL).hostname.toLowerCase();
+if (!/^https:\/\//.test(STAGING_URL)) throw new Error("Staging Supabase URL must use https.");
+const stagingHost = new URL(STAGING_URL).hostname.toLowerCase();
 if (stagingHost === `${PRODUCTION_PROJECT_REF.toLowerCase()}.supabase.co` || stagingHost.startsWith(`${PRODUCTION_PROJECT_REF.toLowerCase()}.`)) {
   throw new Error(`Refusing destructive staging integration against Production Supabase project ${PRODUCTION_PROJECT_REF}.`);
 }
 
-const service = createClient(URL, SERVICE, { auth: { persistSession: false, autoRefreshToken: false } });
+const service = createClient(STAGING_URL, SERVICE, { auth: { persistSession: false, autoRefreshToken: false } });
 const suffix = `${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
 const password = `BnnTest!${crypto.randomBytes(12).toString("base64url")}`;
 const createdUserIds = [];
@@ -37,7 +37,7 @@ async function createUser(label, isAdmin = false) {
   if (error || !data.user) throw new Error(`Could not create ${label}: ${error?.message}`);
   createdUserIds.push(data.user.id);
   await service.from("profiles").upsert({ id: data.user.id, email, display_name: `BNN ${label} ${suffix}`, is_admin: isAdmin });
-  const client = createClient(URL, ANON, { auth: { persistSession: false, autoRefreshToken: false } });
+  const client = createClient(STAGING_URL, ANON, { auth: { persistSession: false, autoRefreshToken: false } });
   const signed = await client.auth.signInWithPassword({ email, password });
   if (signed.error) throw new Error(`Could not sign in ${label}: ${signed.error.message}`);
   return { id: data.user.id, email, client };

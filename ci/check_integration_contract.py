@@ -23,6 +23,16 @@ needles={
  'cleanup':'auth.admin.deleteUser',
 }
 errors=[f"missing {label}" for label,n in needles.items() if n not in text]
+
+# Regression guard for the 177.37 URL-constructor shadowing bug: the staging
+# Supabase URL variable must never be named URL, because that shadows Node's
+# global URL constructor and makes `new URL(...)` fail before the safety check.
+if 'const STAGING_URL = process.env.BNN_STAGING_SUPABASE_URL;' not in text:
+    errors.append('staging harness must bind BNN_STAGING_SUPABASE_URL as STAGING_URL')
+if 'const URL = process.env.BNN_STAGING_SUPABASE_URL;' in text:
+    errors.append('staging harness shadows the global URL constructor')
+if 'new URL(STAGING_URL)' not in text:
+    errors.append('staging harness must parse STAGING_URL with the global URL constructor')
 manual_needles={
  'manual mutation input':'confirm_mutation:',
  'manual input wiring':'BNN_STAGING_ALLOW_MUTATION: ${{ inputs.confirm_mutation }}',

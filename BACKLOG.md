@@ -448,6 +448,7 @@ Still open (lower priority, honestly assessed):
 
 
 ## Staging release-gate safety — 177.37
+- [x] 177.38 corrective: rename the staging URL binding so it does not shadow Node's global `URL` constructor; add a permanent contract guard for this exact regression.
 - [x] Refuse destructive staging integration when the configured Supabase URL is the known Production project.
 - [x] Replace the permanently hardcoded mutation switch with explicit manual authorization; exact `staging -> main` PR gate remains automatically authorized inside the protected staging environment.
 - [x] Run real staging integration inside the already-required CI verify check on `staging -> main` pull requests.

@@ -100,7 +100,7 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current working candidate: 177.37.260815 (staging integration release-gate safety).**
+**Current working candidate: 177.38.260815 (staging integration URL-constructor corrective).**
 - 177.26 supersedes the unreleased 177.25 candidate after its first GitHub execution exposed verification-harness ordering/sequencing defects; it still includes the 177.24 dashboard Putts/round + targeted stats-completion baseline.
 - New migrations under review: `0135_ledger_backfill.sql`, `0136_core_rls_helpers.sql`, and `0137_core_rls_baseline.sql`. None should be applied to Production until the 177.25 database/reconstruction gates are complete.
 - `0135` backfills missing migration-ledger rows only when sentinel evidence proves each historical migration is actually present. Run migrations as DB owner/postgres; application roles cannot record migrations after 0123.
@@ -661,3 +661,10 @@ For changed interactions, do not equate handler reachability with working behavi
 - Cleanup now removes and verifies the harness's `money_audit` rows after deleting expenses, because expense deletion itself emits a final audit record.
 - Keep this scope narrow: no general staging cleanup redesign, runtime schema handshake, rollback framework, or additional DR/RLS hardening is part of 177.37.
 - Release remains NOT DEPLOYABLE until the normal blocking gates and the real staging integration PR gate pass.
+
+
+## 177.38 staging integration URL-constructor corrective
+- Corrects the 177.37 PR-gate runtime failure `TypeError: URL is not a constructor`. Root cause: `ci/integration/staging.mjs` bound the staging URL string to a local constant named `URL`, shadowing Node's global `URL` constructor used by the Production-project safety check.
+- Renames only that local binding to `STAGING_URL` and updates its references. No integration scenario, cleanup behavior, auth/RLS/RPC logic, workflow trigger, migration, application code, or database contract changes.
+- `ci/check_integration_contract.py` now permanently rejects reintroducing the `const URL = ...` shadowing pattern and requires `new URL(STAGING_URL)`.
+- Release remains NOT DEPLOYABLE until the corrected real staging integration gate passes on the `staging -> main` PR, followed by the normal Production release gates.
