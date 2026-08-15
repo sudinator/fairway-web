@@ -6,7 +6,7 @@ import { dbg, newSid, reproduceBug } from "@/lib/debuglog";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
   played, strokesOf, diffOf, puttsOf, pensOf, ptsOf, toParStr, fmtDate, isGrossOnly, hasHoleDetail,
-  girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay,
+  girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay, withHistoricalRatingSlopeCorrection,
 } from "@/lib/golf";
 import { buildCustomCourse, linkCourseToGroup, loadCoursesForGroup } from "@/lib/courses";
 import { saveDraft, loadDraft, clearDraft, draftHasScores, saveDraftHole, loadDraftHole } from "@/lib/draft";
@@ -45,6 +45,27 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   // Editable play date — defaults to the round's stored date (falls back to today).
   const todayLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
   const [playDate, setPlayDate] = useState<string>(() => (round.played_at ? String(round.played_at).slice(0, 10) : todayLocal()));
+  // Historical course values are editable only on an already-recorded round. They are
+  // intentionally separate from the course library: correcting this snapshot changes this
+  // round's differential/handicap history, not future rounds or the original game result.
+  const isRecordedFinal = !!round.id && (round.status ?? "final") !== "in_progress";
+  const initialRatingText = round.rating == null ? "" : String(round.rating);
+  const initialSlopeText = round.slope == null ? "" : String(round.slope);
+  const [ratingText, setRatingText] = useState(initialRatingText);
+  const [slopeText, setSlopeText] = useState(initialSlopeText);
+  const ratingSlopeEdited = isRecordedFinal && (ratingText !== initialRatingText || slopeText !== initialSlopeText);
+  const ratingTrim = ratingText.trim();
+  const slopeTrim = slopeText.trim();
+  const parsedRating = ratingTrim === "" ? null : Number(ratingTrim);
+  const parsedSlope = slopeTrim === "" ? null : Number(slopeTrim);
+  const ratingSlopeError = (() => {
+    if (!ratingSlopeEdited) return null;
+    if ((ratingTrim === "") !== (slopeTrim === "")) return "Enter both course rating and slope, or leave both blank.";
+    if (ratingTrim === "" && slopeTrim === "") return null;
+    if (!Number.isFinite(parsedRating) || (parsedRating as number) <= 0) return "Course rating must be a positive number.";
+    if (!Number.isFinite(parsedSlope) || (parsedSlope as number) <= 0 || !Number.isInteger(parsedSlope)) return "Slope must be a positive whole number.";
+    return null;
+  })();
   // Backdating is deliberate but easy to fumble — confirm when the play date is before today.
   const confirmPastDate = (): boolean => {
     const today = todayLocal();
@@ -376,11 +397,20 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     };
   }, [round]);
 
-  const live: Round = { ...round, holes };
+  const baseLive: Round = { ...round, holes };
+  const live: Round = ratingSlopeEdited && !ratingSlopeError
+    ? withHistoricalRatingSlopeCorrection(baseLive, parsedRating, parsedSlope)
+    : baseLive;
+  const effectiveRating = ratingSlopeEdited && !ratingSlopeError ? parsedRating : round.rating;
+  const effectiveSlope = ratingSlopeEdited && !ratingSlopeError ? parsedSlope : round.slope;
+  const effectiveCourseHandicap = ratingSlopeEdited && !ratingSlopeError ? live.course_handicap : round.course_handicap;
   const anyPlayed = holes.some((h) => h.strokes);
+  const metadataOnlyGrossEdit = isRecordedFinal && isGrossOnly(round) && !anyPlayed && ratingSlopeEdited;
+  const canSave = anyPlayed || metadataOnlyGrossEdit;
   const gir = girStats([live]), fir = firStats([live]);
 
   const save = async () => {
+    if (ratingSlopeEdited && ratingSlopeError) { setErr(ratingSlopeError); return; }
     if (!confirmPastDate()) return;
     setSaving(true); setErr(null);
     try {
@@ -393,22 +423,36 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         // finalization — not on every later edit/re-save.
         const { data: prev } = await supabase.from("rounds").select("status").eq("id", roundId).maybeSingle();
         wasFinal = prev?.status === "final";
-        // Make sure every hole row exists, then write current values and mark it final.
-        const { data: existing } = await supabase.from("holes").select("hole_number").eq("round_id", roundId);
-        const have = new Set((existing || []).map((x: any) => x.hole_number));
-        const missing = holes.filter((h) => !have.has(h.hole_number));
-        if (missing.length) {
-          await supabase.from("holes").insert(missing.map((h) => ({
-            round_id: roundId, hole_number: h.hole_number, par: h.par,
-            stroke_index: h.stroke_index, yardage: h.yardage ?? null, strokes: null, putts: null, fairway: null, penalties: 0,
-          })));
+        // A gross-only historical round can receive a rating/slope correction without
+        // inventing hole detail or erasing its recorded gross total. If hole scores are
+        // present, preserve the existing edit behavior and convert the round to detailed.
+        const metadataOnly = isRecordedFinal && isGrossOnly(round) && !anyPlayed;
+        if (!metadataOnly) {
+          const { data: existing } = await supabase.from("holes").select("hole_number").eq("round_id", roundId);
+          const have = new Set((existing || []).map((x: any) => x.hole_number));
+          const missing = holes.filter((h) => !have.has(h.hole_number));
+          if (missing.length) {
+            await supabase.from("holes").insert(missing.map((h) => ({
+              round_id: roundId, hole_number: h.hole_number, par: h.par,
+              stroke_index: h.stroke_index, yardage: h.yardage ?? null, strokes: null, putts: null, fairway: null, penalties: 0,
+            })));
+          }
+          for (const h of holes) {
+            await supabase.from("holes").update({
+              strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties || 0, sand: h.sand ?? false,
+            }).eq("round_id", roundId).eq("hole_number", h.hole_number);
+          }
         }
-        for (const h of holes) {
-          await supabase.from("holes").update({
-            strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties || 0, sand: h.sand ?? false,
-          }).eq("round_id", roundId).eq("hole_number", h.hole_number);
-        }
-        await supabase.from("rounds").update({ course_par: round.course_par, gross_score: null, status: "final", played_at: playDate }).eq("id", roundId);
+        const { error: roundUpdateError } = await supabase.from("rounds").update({
+          course_par: round.course_par,
+          gross_score: metadataOnly ? (round.gross_score ?? null) : null,
+          status: "final",
+          played_at: playDate,
+          rating: effectiveRating,
+          slope: effectiveSlope,
+          course_handicap: effectiveCourseHandicap,
+        }).eq("id", roundId);
+        if (roundUpdateError) throw roundUpdateError;
       } else {
         const { data: u } = await supabase.auth.getUser();
         const { data: r, error: e1 } = await supabase.from("rounds").insert({
@@ -448,6 +492,9 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   };
 
   const cancel = async () => {
+    // Editing an already-recorded round is non-destructive: Cancel must leave the
+    // historical row exactly as it was. Only an in-progress round uses the discard path.
+    if (isRecordedFinal) { onCancel(); return; }
     if (draftHasScores({ ...round, holes }) && !confirm("Discard this in-progress round? Your entered scores will be cleared.")) return;
     // Stop any pending/queued background save so it can't re-create the row after we delete.
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -488,26 +535,66 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   return (
     <div>
       <div style={{ color: C.sage, fontSize: 13, marginBottom: 10 }}>
-        {round.course}{round.tee_name ? ` · ${round.tee_name} tees (${round.rating}/${round.slope})` : ""}
-        {round.course_handicap != null ? ` · course handicap ${round.course_handicap}` : " · no handicap — Stableford scored gross"}
+        {round.course}{round.tee_name ? ` · ${round.tee_name} tees${effectiveRating != null && effectiveSlope != null ? ` (${effectiveRating}/${effectiveSlope})` : ""}` : ""}
+        {effectiveCourseHandicap != null ? ` · course handicap ${effectiveCourseHandicap}` : " · no course handicap"}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <span style={{ color: C.sage, fontSize: 12 }}>Play date</span>
         <ShortDateInput value={playDate} onChange={(v) => setPlayDate(v || todayLocal())} />
       </div>
+      {isRecordedFinal && (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginBottom: 12 }}>
+          <Eyebrow style={{ margin: 0 }}>Historical rating / slope</Eyebrow>
+          <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.45, marginTop: 6 }}>
+            Correct these only if the values recorded for this tee were wrong when you played. This changes this recorded round and recalculates its differential/app-estimated handicap; it does not change the course library or the game result.
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10, marginTop: 10 }}>
+            <label style={{ color: C.sage, fontSize: 12, minWidth: 0 }}>
+              Course rating
+              <input
+                style={{ ...inputStyle, marginTop: 4, minWidth: 0, width: "100%" }}
+                inputMode="decimal"
+                value={ratingText}
+                placeholder="72.1"
+                onChange={(e) => setRatingText(e.target.value)}
+              />
+            </label>
+            <label style={{ color: C.sage, fontSize: 12, minWidth: 0 }}>
+              Slope
+              <input
+                style={{ ...inputStyle, marginTop: 4, minWidth: 0, width: "100%" }}
+                inputMode="numeric"
+                value={slopeText}
+                placeholder="130"
+                onChange={(e) => setSlopeText(e.target.value)}
+              />
+            </label>
+          </div>
+          {ratingSlopeError ? (
+            <div style={{ color: "#E8A199", fontSize: 12, marginTop: 8 }}>{ratingSlopeError}</div>
+          ) : ratingSlopeEdited ? (
+            <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>
+              Preview: {effectiveCourseHandicap != null ? `course handicap ${effectiveCourseHandicap}` : "no course handicap"}
+              {roundDifferential(live) != null ? ` · differential ${roundDifferential(live)!.toFixed(1)}` : " · differential unavailable"}
+            </div>
+          ) : null}
+        </div>
+      )}
       <div style={{ color: C.gold, fontSize: 12, marginBottom: 10 }}>
-        Scores save to this device as you tap — lock your phone or close the app and you'll come right back to this scorecard. Tap "Finish round" when you're done to record it.
+        {isRecordedFinal
+          ? "Edit the round below, then tap Save changes. Historical rating/slope corrections affect only this recorded round."
+          : "Scores save to this device as you tap — lock your phone or close the app and you'll come right back to this scorecard. Tap Finish round when you're done to record it."}
       </div>
       <ScoreEntryCard
         holes={(() => {
-          const alloc = allocateStrokes(holes.map((h) => ({ hole_number: h.hole_number, stroke_index: h.stroke_index })), round.course_handicap);
+          const alloc = allocateStrokes(holes.map((h) => ({ hole_number: h.hole_number, stroke_index: h.stroke_index })), effectiveCourseHandicap);
           return holes.map((h) => ({
             n: h.hole_number, par: h.par, si: h.stroke_index, yards: h.yardage ?? null,
             strokes: h.strokes, putts: h.putts, fairway: h.fairway, penalties: h.penalties, sand: h.sand,
             recv: alloc[h.hole_number] || 0,
           }));
         })()}
-        hasHandicap={round.course_handicap != null}
+        hasHandicap={effectiveCourseHandicap != null}
         onSet={(i, patch) => {
           const p: Partial<Hole> = {};
           if (patch.strokes !== undefined) p.strokes = patch.strokes;
@@ -545,9 +632,9 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         )}
         <div style={{ flex: 1 }} />
         <button style={btn(false)} onClick={saveCorrectedFavorite}>★ Save course</button>
-        <button style={btn(false)} onClick={cancel}>{isResumed ? "Discard" : "Cancel"}</button>
-        <button style={{ ...btn(true), opacity: anyPlayed && !saving ? 1 : 0.5 }} disabled={!anyPlayed || saving} onClick={save}>
-          {saving ? "Saving…" : "Finish round"}
+        <button style={btn(false)} onClick={cancel}>{isRecordedFinal ? "Cancel" : isResumed ? "Discard" : "Cancel"}</button>
+        <button style={{ ...btn(true), opacity: canSave && !saving ? 1 : 0.5 }} disabled={!canSave || saving || !!ratingSlopeError} onClick={save}>
+          {saving ? "Saving…" : isRecordedFinal ? "Save changes" : "Finish round"}
         </button>
       </div>
       {favMsg && <div style={{ color: C.gold, fontSize: 12, marginTop: 8, textAlign: "right" }}>{favMsg}</div>}

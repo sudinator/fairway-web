@@ -40,6 +40,7 @@ Living list. `[x]` = built & verified in code (file noted). `[~]` = partially do
 `[ ]` = open. Check items off here as they ship.
 
 ### Features
+- [x] Historical round rating/slope correction (177.39): existing recorded rounds can edit the stored tee rating/slope; the round's course handicap is recalculated from that round's stored handicap index and course par, then differential/app-estimated handicap refresh from the existing round-history engine. Gross-only rounds preserve their total score; game-linked personal rounds do not rewrite game results; course-library data is not changed unless the separate Save course flow is used. No migration.
 - [~] Dashboard rework (from the audit) — shipping in pieces:
   - [x] Time-window toggle (v1.116.0): Last 5 / Last 20 / Season / All scopes every stat, chart, and average on the dashboard; the WHS index hero stays on full history (best-8-of-20). Caption shows what's in view.
   - [x] Index-over-time trajectory sparkline in the hero (v1.117.0): running WHS index after each round, gold line + first→current delta.
@@ -445,12 +446,3 @@ Still open (lower priority, honestly assessed):
 ## Environment clarity / course provenance
 - [x] 177.21 candidate: staging-only persistent yellow safe-area-aware border + STAGING badge; pending full release gate/live validation.
 - [x] 177.21 candidate: Add New Course identifies an existing canonical BNN course at provider selection time, shows stored BNN data as primary, and exposes fresh provider data separately for explicit review; pending Production validation.
-
-
-## Staging release-gate safety — 177.37
-- [x] 177.38 corrective: rename the staging URL binding so it does not shadow Node's global `URL` constructor; add a permanent contract guard for this exact regression.
-- [x] Refuse destructive staging integration when the configured Supabase URL is the known Production project.
-- [x] Replace the permanently hardcoded mutation switch with explicit manual authorization; exact `staging -> main` PR gate remains automatically authorized inside the protected staging environment.
-- [x] Run real staging integration inside the already-required CI verify check on `staging -> main` pull requests.
-- [x] Remove and verify disposable `money_audit` rows during harness cleanup.
-- [ ] Lower-priority deployment/process ideas remain deferred unless their incremental risk reduction justifies the work: runtime schema handshake, migration rollback framework, generic fixture sweeper, SMOKE_TEST.sql automation.

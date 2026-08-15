@@ -1,5 +1,5 @@
 // Unit tests for computeBetting in lib/golf.ts — run with `npm test`.
-import { computeBetting, DEFAULT_BET_SPLIT, roundDifferential, partialHandicapInfo, strokesReceived, adjustedGross, handicapRounds, nextRoundOutlook } from "./golf";
+import { computeBetting, DEFAULT_BET_SPLIT, roundDifferential, partialHandicapInfo, strokesReceived, adjustedGross, handicapRounds, nextRoundOutlook, withHistoricalRatingSlopeCorrection } from "./golf";
 import type { BetPlayer, Round, Hole } from "./golf";
 
 let pass = 0, fail = 0; const fails: string[] = [];
@@ -188,5 +188,34 @@ const P = (id: string, total: number, seg: [number, number, number]): BetPlayer 
   ok("no preview at 20 or fewer rounds", nextRoundOutlook(rs.slice(0, 20)) == null);
 }
 
+// ---- Historical rating/slope correction ----
+{
+  const holes: Hole[] = Array.from({ length: 18 }, (_, i) => ({
+    hole_number: i + 1, par: 4, stroke_index: i + 1, strokes: i === 0 ? 10 : 4,
+    recv: 0, putts: null, fairway: null, penalties: 0, sand: false, yardage: null,
+  }));
+  const base = {
+    id: "hist", course: "History GC", tee_name: "Blue", played_at: "2026-08-01",
+    rating: 72, slope: 113, course_par: 72, handicap_index: 10, course_handicap: 10,
+    holes, game_id: "game-1",
+  } as Round;
+  const corrected = withHistoricalRatingSlopeCorrection(base, 73, 130);
+  check("historical correction recalculates CH from stored index", corrected.course_handicap, 13);
+  check("historical correction refreshes strokes received", corrected.holes[0].recv, 1);
+  ok("historical correction changes differential", roundDifferential(corrected)! !== roundDifferential(base)!);
+  check("historical correction preserves game linkage", corrected.game_id, "game-1");
+
+  const noIndex = withHistoricalRatingSlopeCorrection({ ...base, handicap_index: null, course_handicap: 10 }, 73, 130);
+  check("historical correction never borrows a current index", noIndex.course_handicap, null);
+
+  const grossOnly = { ...base, holes: [], gross_score: 85 } as Round;
+  const correctedGross = withHistoricalRatingSlopeCorrection(grossOnly, 71, 125);
+  ok("gross-only correction recalculates differential", roundDifferential(correctedGross) !== roundDifferential(grossOnly));
+
+  const partial = { ...base, holes: holes.slice(0, 15) } as Round;
+  const correctedPartial = withHistoricalRatingSlopeCorrection(partial, 73, 130);
+  ok("partial-round correction remains differential-eligible", roundDifferential(correctedPartial) != null);
+}
+
 console.log(`golf/computeBetting tests: PASS ${pass}  FAIL ${fail}`);
-if (fail) { console.log(fails.join("\n")); process.exit(1); }
+if (fail) { console.log(fails.join("\n")); process.exit(1); }
