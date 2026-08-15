@@ -445,3 +445,11 @@ Still open (lower priority, honestly assessed):
 ## Environment clarity / course provenance
 - [x] 177.21 candidate: staging-only persistent yellow safe-area-aware border + STAGING badge; pending full release gate/live validation.
 - [x] 177.21 candidate: Add New Course identifies an existing canonical BNN course at provider selection time, shows stored BNN data as primary, and exposes fresh provider data separately for explicit review; pending Production validation.
+
+
+## Staging release-gate safety — 177.37
+- [x] Refuse destructive staging integration when the configured Supabase URL is the known Production project.
+- [x] Replace the permanently hardcoded mutation switch with explicit manual authorization; exact `staging -> main` PR gate remains automatically authorized inside the protected staging environment.
+- [x] Run real staging integration inside the already-required CI verify check on `staging -> main` pull requests.
+- [x] Remove and verify disposable `money_audit` rows during harness cleanup.
+- [ ] Lower-priority deployment/process ideas remain deferred unless their incremental risk reduction justifies the work: runtime schema handshake, migration rollback framework, generic fixture sweeper, SMOKE_TEST.sql automation.

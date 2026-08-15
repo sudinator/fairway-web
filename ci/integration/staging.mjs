@@ -5,9 +5,14 @@ const URL = process.env.BNN_STAGING_SUPABASE_URL;
 const ANON = process.env.BNN_STAGING_SUPABASE_ANON_KEY;
 const SERVICE = process.env.BNN_STAGING_SUPABASE_SERVICE_ROLE_KEY;
 const CONFIRM = process.env.BNN_STAGING_ALLOW_MUTATION;
+const PRODUCTION_PROJECT_REF = process.env.BNN_PRODUCTION_SUPABASE_PROJECT_REF || "epmbsmykyrnoiccwnoxq";
 if (!URL || !ANON || !SERVICE) throw new Error("Set BNN_STAGING_SUPABASE_URL, BNN_STAGING_SUPABASE_ANON_KEY, and BNN_STAGING_SUPABASE_SERVICE_ROLE_KEY.");
 if (CONFIRM !== "YES") throw new Error("Refusing to mutate a database. Set BNN_STAGING_ALLOW_MUTATION=YES only for a disposable/staging Supabase project.");
 if (!/^https:\/\//.test(URL)) throw new Error("Staging Supabase URL must use https.");
+const stagingHost = new URL(URL).hostname.toLowerCase();
+if (stagingHost === `${PRODUCTION_PROJECT_REF.toLowerCase()}.supabase.co` || stagingHost.startsWith(`${PRODUCTION_PROJECT_REF.toLowerCase()}.`)) {
+  throw new Error(`Refusing destructive staging integration against Production Supabase project ${PRODUCTION_PROJECT_REF}.`);
+}
 
 const service = createClient(URL, SERVICE, { auth: { persistSession: false, autoRefreshToken: false } });
 const suffix = `${Date.now()}-${crypto.randomBytes(3).toString("hex")}`;
@@ -48,6 +53,12 @@ async function cleanup() {
     await service.from("group_course_overrides").delete().eq("group_id", gid);
     await service.from("group_courses").delete().eq("group_id", gid);
     await service.from("expenses").delete().eq("group_id", gid);
+    // Expense deletion itself writes a final immutable audit record, so purge harness audit rows afterwards.
+    const auditDelete = await service.from("money_audit").delete().eq("group_id", gid);
+    if (auditDelete.error) throw new Error(`Cleanup could not remove money_audit fixtures for ${gid}: ${auditDelete.error.message}`);
+    const auditRemaining = await service.from("money_audit").select("id", { count: "exact", head: true }).eq("group_id", gid);
+    if (auditRemaining.error) throw new Error(`Cleanup could not verify money_audit fixtures for ${gid}: ${auditRemaining.error.message}`);
+    if ((auditRemaining.count || 0) !== 0) throw new Error(`Cleanup left ${(auditRemaining.count || 0)} money_audit fixture row(s) for ${gid}.`);
     await service.from("tee_times").delete().eq("group_id", gid);
     await service.from("group_events").delete().eq("group_id", gid);
     await service.from("group_guests").delete().eq("group_id", gid);

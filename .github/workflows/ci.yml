@@ -38,3 +38,13 @@ jobs:
         run: bash ci/test_fresh_db_rebuild.sh
 
       - run: npm run ci
+
+      - name: Real staging integration gate
+        if: github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'staging'
+        env:
+          BNN_STAGING_SUPABASE_URL: ${{ secrets.BNN_STAGING_SUPABASE_URL }}
+          BNN_STAGING_SUPABASE_ANON_KEY: ${{ secrets.BNN_STAGING_SUPABASE_ANON_KEY }}
+          BNN_STAGING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BNN_STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+          BNN_STAGING_ALLOW_MUTATION: YES
+          BNN_PRODUCTION_SUPABASE_PROJECT_REF: epmbsmykyrnoiccwnoxq
+        run: npm run test:staging

@@ -4941,3 +4941,13 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Formalizes BLOCKING vs ADVISORY release-gate semantics in APP_RULES/HANDOFF. Security/RLS, disaster-recovery migration reconstruction, secrets, TypeScript correctness, unit/differential behavior, build, reachability/source contracts, and feature correctness remain blocking.
 - No application code cleanup, migration, RLS, grant, helper, schema/data, or runtime behavior change.
 - **NOT DEPLOYABLE:** complete GitHub CI/fresh-database execution, Vercel staging, targeted/adjacent staging validation, PR verify, Production Ready and smoke remain mandatory.
+
+
+### 177.37.260815 — staging integration release-gate safety
+- Runs the real Supabase staging integration suite inside the already-required `CI / verify` job for exact `staging -> main` pull requests, so no second branch-protection setting is needed and the full CI pipeline is not duplicated; manual runs remain available through `workflow_dispatch`.
+- Manual destructive runs now require an explicit `confirm_mutation=YES` choice instead of a permanently hardcoded mutation switch. PR-gate runs authorize mutation only for the exact `staging -> main` path.
+- Adds a hard runtime refusal if the staging Supabase URL resolves to the known Production project ref `epmbsmykyrnoiccwnoxq`.
+- Fixes the proven staging-fixture leak in append-only `money_audit`: cleanup deletes audit rows only after expense deletion has emitted its final audit record, then verifies zero rows remain for each disposable group.
+- Strengthens `ci/check_integration_contract.py` so CI permanently requires the required-verify staging gate, protected environment, explicit manual authorization, Production kill switch, and verified audit cleanup.
+- No application behavior, migration, RLS policy, grant, schema, or Production database change.
+- **NOT DEPLOYABLE until blocking release gates pass:** full CI/type/tests/build, staging integration against the real staging project, PR verify, Vercel staging, Production Ready, and smoke test.

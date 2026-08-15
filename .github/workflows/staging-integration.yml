@@ -2,6 +2,15 @@ name: Staging integration
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm_mutation:
+        description: "Type YES to authorize destructive staging fixtures"
+        required: true
+        default: "NO"
+        type: choice
+        options:
+          - "NO"
+          - "YES"
 
 permissions:
   contents: read
@@ -15,7 +24,8 @@ jobs:
       BNN_STAGING_SUPABASE_URL: ${{ secrets.BNN_STAGING_SUPABASE_URL }}
       BNN_STAGING_SUPABASE_ANON_KEY: ${{ secrets.BNN_STAGING_SUPABASE_ANON_KEY }}
       BNN_STAGING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BNN_STAGING_SUPABASE_SERVICE_ROLE_KEY }}
-      BNN_STAGING_ALLOW_MUTATION: YES
+      BNN_STAGING_ALLOW_MUTATION: ${{ inputs.confirm_mutation }}
+      BNN_PRODUCTION_SUPABASE_PROJECT_REF: epmbsmykyrnoiccwnoxq
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.BNN_STAGING_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.BNN_STAGING_SUPABASE_ANON_KEY }}
 
