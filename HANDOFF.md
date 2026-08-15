@@ -100,7 +100,7 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current working candidate: 177.36.260815 (CI severity alignment corrective).**
+**Current working candidate: 177.38.260815 (staging integration URL-constructor corrective).**
 - 177.26 supersedes the unreleased 177.25 candidate after its first GitHub execution exposed verification-harness ordering/sequencing defects; it still includes the 177.24 dashboard Putts/round + targeted stats-completion baseline.
 - New migrations under review: `0135_ledger_backfill.sql`, `0136_core_rls_helpers.sql`, and `0137_core_rls_baseline.sql`. None should be applied to Production until the 177.25 database/reconstruction gates are complete.
 - `0135` backfills missing migration-ledger rows only when sentinel evidence proves each historical migration is actually present. Run migrations as DB owner/postgres; application roles cannot record migrations after 0123.
@@ -652,3 +652,19 @@ For changed interactions, do not equate handler reachability with working behavi
 - Blocking gates remain blocking: fresh-database reconstruction, RLS/security structure and behavior, migration/source closure, secrets/environment safety, TypeScript correctness, unit/differential behavior, production build, reachability/source-contract defects, and feature correctness.
 - No application logic, migration, RLS policy, grant, helper, or database behavior changes. The purpose is severity alignment, not suppression of evidence.
 - Release remains **NOT DEPLOYABLE** until all blocking GitHub/fresh-DB/type/test/build/staging gates pass. Advisory findings must be carried in release verification/backlog rather than silently discarded.
+
+
+## 177.37 staging integration release-gate safety
+- The real Supabase integration harness now runs inside the already-required `CI / verify` job on the exact `staging -> main` PR path, using the protected GitHub `staging` environment. This avoids a second branch-protection setting and avoids duplicating the full CI pipeline. Manual dispatch remains available.
+- Manual destructive runs require explicit `confirm_mutation=YES`; the workflow no longer hardcodes the mutation switch.
+- The harness hard-refuses the known Production Supabase project ref before constructing a service-role client.
+- Cleanup now removes and verifies the harness's `money_audit` rows after deleting expenses, because expense deletion itself emits a final audit record.
+- Keep this scope narrow: no general staging cleanup redesign, runtime schema handshake, rollback framework, or additional DR/RLS hardening is part of 177.37.
+- Release remains NOT DEPLOYABLE until the normal blocking gates and the real staging integration PR gate pass.
+
+
+## 177.38 staging integration URL-constructor corrective
+- Corrects the 177.37 PR-gate runtime failure `TypeError: URL is not a constructor`. Root cause: `ci/integration/staging.mjs` bound the staging URL string to a local constant named `URL`, shadowing Node's global `URL` constructor used by the Production-project safety check.
+- Renames only that local binding to `STAGING_URL` and updates its references. No integration scenario, cleanup behavior, auth/RLS/RPC logic, workflow trigger, migration, application code, or database contract changes.
+- `ci/check_integration_contract.py` now permanently rejects reintroducing the `const URL = ...` shadowing pattern and requires `new URL(STAGING_URL)`.
+- Release remains NOT DEPLOYABLE until the corrected real staging integration gate passes on the `staging -> main` PR, followed by the normal Production release gates.
