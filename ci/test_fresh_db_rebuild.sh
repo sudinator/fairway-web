@@ -22,6 +22,11 @@ supabase db start
 
 DB_URL="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
+# Install source-controlled prerequisites needed before migration 0001. This is
+# intentionally separate from the numbered migration stream because the live
+# historical baseline already assumes citext exists.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/fresh_db_bootstrap.sql" >/dev/null
+
 # The repository intentionally keeps early migrations under supabase/migrations
 # and later migrations under migrations/. Never sort full paths: directory names
 # would place migrations/0014 before supabase/migrations/0001. The helper below

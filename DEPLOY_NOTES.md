@@ -4861,3 +4861,10 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Before 0137 is applied, source-contract guards plus disposable fresh-database reconstruction are the hard pre-migration proof. After 0137 is applied to staging/Production, the live RLS equality check automatically becomes a hard gate.
 - This resolves the circular release gate exposed by staging: CI must approve the migration before staging is changed, while live staging cannot equal the new baseline until that migration is deliberately applied.
 - No application behavior or Production database change in this corrective candidate. Migrations 0135-0137 remain unapplied pending a successful disposable fresh-database rebuild.
+
+### 177.27.260814 — declare fresh-database extension prerequisites
+- Fresh-database CI exposed a real reconstruction gap: `0001_baseline.sql` uses the PostgreSQL `citext` type before historical migration `0038` declares that extension.
+- Added `ci/fresh_db_bootstrap.sql` as the source-controlled prerequisite stage before migration `0001`; it installs `citext` idempotently without rewriting historical migration files.
+- Added `ci/check_db_extension_prereqs.py`, which walks the actual globally ordered migration stream and fails when a known extension-owned SQL surface is used before that extension is bootstrap-installed or declared by an earlier migration.
+- `pg_cron` remains declared by migration `0074` before its first `cron.*` use, so it does not need to be promoted into the pre-0001 bootstrap today.
+- Fresh-database reconstruction remains a required GitHub gate. No staging or Production database migrations should be run until that disposable rebuild passes.

@@ -8,6 +8,10 @@ script = script_path.read_text(encoding='utf-8') if script_path.exists() else ''
 ordering_path = ROOT / 'ci' / 'list_ordered_migrations.py'
 ordering = ordering_path.read_text(encoding='utf-8') if ordering_path.exists() else ''
 schema_check = (ROOT / 'ci' / 'schema-check.sh').read_text(encoding='utf-8')
+bootstrap_path = ROOT / 'ci' / 'fresh_db_bootstrap.sql'
+bootstrap = bootstrap_path.read_text(encoding='utf-8') if bootstrap_path.exists() else ''
+extension_guard_path = ROOT / 'ci' / 'check_db_extension_prereqs.py'
+extension_guard = extension_guard_path.read_text(encoding='utf-8') if extension_guard_path.exists() else ''
 errors = []
 
 checks = {
@@ -15,6 +19,9 @@ checks = {
     'CI installs psql client': 'postgresql-client' in ci,
     'CI runs fresh database reconstruction': 'bash ci/test_fresh_db_rebuild.sh' in ci,
     'fresh rebuild starts a clean Supabase Postgres database': 'supabase db start' in script,
+    'fresh rebuild installs source-controlled database prerequisites': 'fresh_db_bootstrap.sql' in script,
+    'fresh bootstrap declares citext before migration 0001': 'create extension if not exists citext' in bootstrap.lower(),
+    'extension prerequisite guard exists': 'DB extension prerequisite contract' in extension_guard,
     'fresh rebuild delegates cross-tree ordering to semantic helper': 'list_ordered_migrations.py' in script,
     'ordering helper scans supabase migration tree': "ROOT / 'supabase' / 'migrations'" in ordering,
     'ordering helper scans application migration tree': "ROOT / 'migrations'" in ordering,

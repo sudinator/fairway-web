@@ -576,3 +576,10 @@ For changed interactions, do not equate handler reachability with working behavi
 - Current working candidate: `177.25.260814`.
 - Do not ship until the Production RLS export for the 12 legacy core tables has been captured and converted into an executable idempotent baseline migration, then verified by a fresh-database reconstruction test.
 - Migration 0135 is an evidence-based ledger backfill for 0122-0128; it must be executed as database owner/postgres, not through an application Supabase client.
+
+### 177.27 fresh-database prerequisite correction
+- Fresh-DB CI now installs source-controlled PostgreSQL prerequisites before migration 0001.
+- Current pre-0001 prerequisite: `citext`, because `0001_baseline.sql` uses the type while historical migration 0038 only declares the extension later.
+- `pg_cron` remains self-declared by migration 0074 before its first `cron.*` use.
+- `ci/check_db_extension_prereqs.py` permanently validates extension availability against the real globally ordered migration stream.
+- Do not apply migrations 0135-0137 to staging or Production until the disposable fresh-database GitHub gate passes end-to-end.
