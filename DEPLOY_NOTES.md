@@ -4883,3 +4883,11 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - The audit now checks ordinary function calls inside SQL bodies, not only ALTER/GRANT/REVOKE/DROP operations; this closes the gap that allowed `0025_group_roster.sql` to reach CI with a missing `is_group_member(uuid,uuid)` prerequisite.
 - Negative-tested the guard by temporarily removing the baseline `is_group_member` helper: the audit failed at migration 0025 as intended, then passed after restoration.
 - No Production or staging database migration has been applied as part of this source correction. Disposable fresh-database replay remains required before 0135-0137 may be applied to staging.
+
+### 177.30.260814 — historical baseline column closure + stronger column dependency audit
+- Fresh-database CI #39 proved migration ordering/extension/function/policy prerequisites through migration 0042, then exposed a genuine historical baseline gap at 0043: `rounds.game_id` existed in the live historical schema but was never recreated by committed migrations.
+- Reconciled the Production-derived 177.14 schema bootstrap against baseline-created tables and restored nine historical out-of-band compatibility columns to `supabase/migrations/0001_baseline.sql`: `profiles.deactivated`, `profiles.dashboard_ai`, `favorite_courses.external_id`, `favorite_courses.facility`, `favorite_courses.corrected`, `rounds.ai_analysis`, `rounds.game_id`, `games.score_epoch`, and `game_players.no_show`.
+- Added `ci/assert-historical-baseline-columns.sql` and execute it in every disposable fresh-database rebuild so silent schema omissions fail even when PostgreSQL defers validation inside PL/pgSQL bodies.
+- Strengthened `check_legacy_migration_prereqs.py` to check executable column dependencies including simple CREATE INDEX column lists and fully-qualified table.column references, in addition to relation/function/policy/type/ALTER-column closure.
+- Negative-tested the 0043 failure pattern: removing `rounds.game_id` from the baseline makes the static guard fail on `0043_round_game_unique.sql` before CI reaches PostgreSQL.
+- No live database migration has been applied. 0135-0137 remain blocked until disposable fresh-db replay passes the complete migration stream.

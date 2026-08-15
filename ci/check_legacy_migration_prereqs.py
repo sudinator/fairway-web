@@ -38,6 +38,16 @@ ADD_COLUMN = re.compile(r'\badd\s+column\s+(?:if\s+not\s+exists\s+)?"?([A-Za-z_]
 ALTER_COLUMN = re.compile(r'\balter\s+column\s+"?([A-Za-z_]\w*)"?', re.I)
 DROP_COLUMN = re.compile(r'\bdrop\s+column\s+(?:if\s+exists\s+)?"?([A-Za-z_]\w*)"?', re.I)
 
+CREATE_INDEX_COLUMNS = re.compile(
+    r'\bcreate\s+(?:unique\s+)?index(?:\s+if\s+not\s+exists)?\s+[^;]*?\bon\s+(?:public\.)?"?([A-Za-z_]\w*)"?\s*\((.*?)\)',
+    re.I | re.S,
+)
+FROM_ALIAS = re.compile(
+    r'\b(?:from|join)\s+(?:public\.)?"?([A-Za-z_]\w*)"?(?:\s+(?:as\s+)?([A-Za-z_]\w*))?',
+    re.I,
+)
+QUALIFIED_COLUMN = re.compile(r'\b([A-Za-z_]\w*)\."?([A-Za-z_]\w*)"?')
+
 KNOWN_SQL_CALLS = {
     'abs','array_agg','array_append','array_remove','array_to_string','avg','btrim','ceil','coalesce','concat','concat_ws','count','date_part','date_trunc','decode','digest','encode','exists','extract','floor','format','gen_random_uuid','greatest','json_agg','json_build_object','json_object_agg','jsonb_agg','jsonb_array_elements','jsonb_array_elements_text','jsonb_build_object','jsonb_object_agg','jsonb_set','jsonb_typeof','least','left','length','lower','lpad','make_interval','max','min','nextval','now','nullif','pg_get_functiondef','pg_get_function_identity_arguments','pg_get_userbyid','random','regexp_replace','replace','right','round','row_number','set_config','split_part','substring','sum','to_char','to_json','to_jsonb','to_regclass','to_regprocedure','trim','upper','uuid_generate_v4',
 }
@@ -219,6 +229,35 @@ def main():
                     if table in created_relations and col not in columns[table] and 'if exists' not in stmt.lower(): issues.append(f'{path.name}:{line}: DROP COLUMN references column not yet present: {table}.{col}')
                     columns[table].discard(col)
 
+            # Column dependencies used by executable SQL, not only ALTER COLUMN. This
+            # specifically covers the class that fresh replay exposed at 0043: a column
+            # can be referenced by SELECT/WHERE/INDEX long before any ALTER COLUMN event.
+            idx = CREATE_INDEX_COLUMNS.search(stmt)
+            if idx:
+                table = idx.group(1).lower()
+                if table in created_relations:
+                    # Only simple leading column identifiers are treated as direct
+                    # dependencies here. Expression indexes (coalesce(...), casts,
+                    # operators) are runtime-proved by the disposable DB replay.
+                    for part in idx.group(2).split(','):
+                        mm = re.match(r'\s*"?([A-Za-z_]\w*)"?(?:\s+(?:asc|desc))?(?:\s+nulls\s+(?:first|last))?\s*$', part, re.I)
+                        if not mm:
+                            continue
+                        c = mm.group(1).lower()
+                        counts['column_dependencies'] += 1
+                        if c not in columns[table]:
+                            issues.append(f'{path.name}:{line}: CREATE INDEX references column not yet present: {table}.{c}')
+
+            # Fully-qualified table.column references are safe to resolve without
+            # guessing SQL alias scope. Alias-heavy function bodies remain covered by
+            # the executable fresh-database replay and the historical baseline contract.
+            for mm in QUALIFIED_COLUMN.finditer(stmt):
+                table, col = mm.group(1).lower(), mm.group(2).lower()
+                if table in created_relations and table in columns:
+                    counts['column_dependencies'] += 1
+                    if col not in columns[table]:
+                        issues.append(f'{path.name}:{line}: qualified column reference requires missing prior column {table}.{col}')
+
             # Scan ordinary function references. Remove DDL signature prefixes so a DROP
             # or GRANT signature is not counted as a runtime call. Calls inside function
             # bodies remain, which is exactly where SQL-language create-time dependencies live.
@@ -250,6 +289,18 @@ def main():
         'create or replace function public.is_admin()',
         'create or replace function public.is_group_member(group_uuid uuid, user_uuid uuid)',
         'create or replace function public.is_group_admin(group_uuid uuid, user_uuid uuid)',
+        # Historical live columns that pre-dated complete migration capture. These are
+        # required both for replay dependencies (for example rounds.game_id at 0043)
+        # and for final fresh-environment schema parity.
+        'deactivated boolean not null default false',
+        'dashboard_ai jsonb',
+        'external_id text',
+        'facility text',
+        'corrected boolean not null default false',
+        'ai_analysis text',
+        'game_id uuid',
+        'score_epoch integer not null default 0',
+        'no_show boolean not null default false',
     ]
     for token in required:
         if token.lower() not in baseline.lower(): issues.append(f'0001_baseline.sql missing historical compatibility prerequisite: {token}')
@@ -264,8 +315,9 @@ def main():
     print(f' - function dependencies checked: {counts["function_dependencies"]} across {len(repo_functions)} repo-created functions')
     print(f' - policy dependency operations checked: {counts["policy_dependencies"]}')
     print(f' - explicit column-state operations checked: {counts["column_events"]}')
+    print(f' - executable column dependencies checked: {counts["column_dependencies"]}')
     print(f' - custom type dependencies checked: {counts["type_dependencies"]} across {len(repo_types)} repo-created types')
-    print(' - historical pre-0034 auth helpers and pre-0017 notification policy are reconstructed in 0001')
+    print(' - historical pre-0034 auth helpers, pre-0017 notification policy, and out-of-band baseline columns are reconstructed in 0001')
     print(' - extension ordering is independently enforced by check_db_extension_prereqs.py')
     print(' - disposable fresh-database execution remains the authoritative final proof')
 

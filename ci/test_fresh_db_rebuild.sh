@@ -47,6 +47,11 @@ for migration in "${MIGRATIONS[@]}"; do
   psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
 done
 
+# Prove historical out-of-band columns are now reproducible too. This catches
+# silent schema drift that may not fail migration creation (for example columns
+# referenced only inside PL/pgSQL bodies).
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-historical-baseline-columns.sql"
+
 # Compare the rebuilt database with the exact Production-derived core RLS
 # contract. This is the reverse/reproducibility check missing from the old
 # Production-only schema guard.

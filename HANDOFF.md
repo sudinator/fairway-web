@@ -597,3 +597,10 @@ For changed interactions, do not equate handler reachability with working behavi
 - `ci/check_legacy_migration_prereqs.py` now checks relation ordering, all repo-defined function calls/use-before-create, policy prerequisites, explicit column-state operations, custom types, and unresolved `public.*` function references. Extension ordering remains separately guarded.
 - Current static closure result: PASS across 135 migrations; negative mutation test also PASS (guard fails when the historical helper is removed).
 - Do not apply 0135-0137 to staging or Production until GitHub's disposable fresh-database replay passes end-to-end.
+
+## 177.30 historical baseline column closure
+- CI #39 advanced clean-database replay through migration 0042 and failed at 0043 because `rounds.game_id` was absent from the committed baseline. Production/staging live databases were not changed.
+- The Production-derived 177.14 bootstrap was used as historical evidence to identify baseline-table columns that existed outside the numbered migration stream. Nine such compatibility columns are now source-controlled in `supabase/migrations/0001_baseline.sql`.
+- Fresh DB CI now asserts those nine columns after the full migration chain, including type/nullability/default expectations.
+- Static migration dependency analysis now includes executable column dependencies and is negative-tested against the exact 0043 game_id failure pattern.
+- Continue to treat disposable fresh-database execution as authoritative. Do not apply 0135-0137 to staging until the fresh replay is green through the entire stream and final RLS/security assertions.

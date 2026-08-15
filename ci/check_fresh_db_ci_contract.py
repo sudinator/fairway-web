@@ -29,6 +29,7 @@ checks = {
     'ordering helper rejects duplicate migration numbers': 'duplicate migration number' in ordering,
     'ordering helper requires 0001 first': "entries[0][0] != 1" in ordering,
     'fresh rebuild applies migrations with stop-on-error': 'ON_ERROR_STOP=1 -f "$migration"' in script,
+    'fresh rebuild verifies historical compatibility columns': 'assert-historical-baseline-columns.sql' in script,
     'fresh rebuild asserts live RLS baseline': 'assert-core-rls-live.sql' in script,
     'fresh rebuild verifies RLS helper presence': 'public.is_game_member(uuid)' in script and 'public.shares_active_club(uuid)' in script,
     'live schema guard waits for RLS baseline migration sentinel': "0137_core_rls_baseline" in schema_check and 'schema_migrations' in schema_check,
