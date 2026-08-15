@@ -4907,3 +4907,12 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Strengthens the fresh-DB source contract to require the transaction to begin before the temporary diagnostic tables and commit only after the final PASS path.
 - No RLS policy, grant, helper, migration, application behavior, staging database, or Production database change.
 - **STAGING-DIAGNOSTIC ONLY:** package this correction only to run the disposable fresh-database GitHub gate. It is not a deployable release. Production and the real staging database remain untouched until executable matching and deliberately mismatched PostgreSQL scenarios pass and the final RLS/security gate is green.
+
+
+### 177.33.260815 — PostgreSQL-native RLS expression canonicalization
+- CI 177.32 successfully completed all 135 migrations and the RLS diagnostic, isolating 15 policy keys whose roles/commands/predicates were logically unchanged but whose `pg_policies` expression text was re-rendered by the disposable PostgreSQL instance.
+- The live RLS gate no longer compares raw Production deparser text directly. It parses the checked-in expected expressions on session-local shadow tables in the SAME PostgreSQL engine, then compares that runtime-canonical `USING`/`WITH CHECK` output to the real public policies. Policy keys, permissive mode, roles, commands, RLS table state, and grants remain exact hard gates.
+- Raw Production export text is still emitted beside runtime-canonical/actual values. Harmless deparser-only differences are labelled `CORE_RLS_RENDERING`; genuine contract mismatches remain `CORE_RLS_DIFF` and hard-fail.
+- Adds PostgreSQL version diagnostics and executable semantic canaries proving equivalent formatting converges while removed admin/ownership/guest/active-member predicates, AND-to-OR changes, and organizer-condition changes remain distinguishable.
+- No RLS policy, grant, helper, migration, application behavior, real staging database, or Production database change.
+- **STAGING-DIAGNOSTIC ONLY / NOT DEPLOYABLE:** GitHub disposable fresh-DB execution must prove `CORE_RLS_CANARY_PASS` and zero `CORE_RLS_DIFF` before any further database or release action.

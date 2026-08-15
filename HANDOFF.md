@@ -100,7 +100,7 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current working candidate: 177.32.260815 (RLS diagnostic transaction-lifetime corrective).**
+**Current working candidate: 177.33.260815 (PostgreSQL-native RLS parity corrective).**
 - 177.26 supersedes the unreleased 177.25 candidate after its first GitHub execution exposed verification-harness ordering/sequencing defects; it still includes the 177.24 dashboard Putts/round + targeted stats-completion baseline.
 - New migrations under review: `0135_ledger_backfill.sql`, `0136_core_rls_helpers.sql`, and `0137_core_rls_baseline.sql`. None should be applied to Production until the 177.25 database/reconstruction gates are complete.
 - `0135` backfills missing migration-ledger rows only when sentinel evidence proves each historical migration is actually present. Run migrations as DB owner/postgres; application roles cannot record migrations after 0123.
@@ -619,3 +619,11 @@ For changed interactions, do not equate handler reachability with working behavi
 - Working correction adds an explicit `BEGIN` before the verifier work and `COMMIT` only after the PASS result.
 - Source-contract guard now checks that ordering.
 - 177.32 may be packaged only as a staging-diagnostic overlay so GitHub can execute the disposable PostgreSQL gate. Do not treat it as deployable, apply 0135-0137 to staging/Production, or promote to `main` until (a) matching fixtures => PASS and (b) deliberate mismatch => emitted `CORE_RLS_DIFF` row(s) followed by hard failure, followed by the complete release gate.
+
+
+## 177.33 RLS runtime-canonical parity gate
+- CI 177.32 proved the diagnostic transaction fix and reduced the former 30 count-only rows to 15 named policy keys. Review of all 15 showed the same class: PostgreSQL `pg_policies` parse/deparse rendering differences on subquery expressions, with no role/command/predicate-semantic drift visible.
+- 177.33 preserves the Production raw baseline but canonicalizes `qual`/`with_check` by creating session-local shadow tables/policies and letting the SAME running PostgreSQL engine parse/deparse the expected expressions. The real public policies are then compared against that runtime-canonical form.
+- Metadata (table/policy key, permissive mode, roles, command), RLS state, and grants remain exact comparisons. `CORE_RLS_RENDERING` is informational only; `CORE_RLS_DIFF` remains a hard failure.
+- The verifier includes executable negative canaries for removed admin checks, ownership checks, guest checks, active-membership checks, AND->OR mutation, and organizer-condition mutation, plus one equivalent-format convergence canary. It also logs the PostgreSQL server version.
+- Do not apply 0135-0137 to real staging or Production and do not promote to main until GitHub's disposable fresh-DB run proves the canonical gate/canaries and the complete release gate is green.
