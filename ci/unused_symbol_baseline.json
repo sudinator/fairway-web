@@ -1,0 +1,33 @@
+{
+  "generated_from": "tsc --noUnusedLocals --noUnusedParameters on 177.25.260814 working tree",
+  "total": 512,
+  "files": {
+    "components/auth.tsx": 1,
+    "components/contests-view.tsx": 2,
+    "components/dashboard.tsx": 19,
+    "components/game/game-list.tsx": 57,
+    "components/game/organizer-panel.tsx": 54,
+    "components/game/scorecard-views.tsx": 73,
+    "components/game/scoring-views.tsx": 45,
+    "components/game/segment-views.tsx": 61,
+    "components/manage.tsx": 10,
+    "components/manage/courses.tsx": 32,
+    "components/money.tsx": 4,
+    "components/organizer.tsx": 1,
+    "components/round-detail.tsx": 16,
+    "components/round-editor.tsx": 24,
+    "components/round-setup.tsx": 30,
+    "components/rounds-list.tsx": 20,
+    "components/tee-times.tsx": 1,
+    "components/tournaments.tsx": 40,
+    "components/ui.tsx": 11,
+    "lib/badges.test.ts": 1,
+    "lib/game-create.baseline.ts": 1,
+    "lib/golf.test.ts": 1,
+    "lib/golf.ts": 1,
+    "lib/grouping.test.ts": 1,
+    "lib/legs.test.ts": 1,
+    "lib/money-scenarios.test.ts": 3,
+    "scripts/ledger-trace.ts": 2
+  }
+}

@@ -74,6 +74,7 @@ const supabase = createClient();
 import type { Game, Player, GameSeed } from "@/lib/game-types";
 export type { GameSeed } from "@/lib/game-types";
 import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
+import { useNowTick } from "@/lib/use-now-tick";
 import { ScoreHistory, SkinsView, MatchView, FourballView, StrokesSummary, SweepBroom, CleanSweepBanner, SweepTrophy, SweepAchievedBanner, TeamClinchLine } from "@/components/game/scoring-views";
 import { LegConfigEditor, SegmentBoard, GroupSegmentSummary } from "@/components/game/segment-views";
 import { GameList } from "@/components/game/game-list";
@@ -149,7 +150,6 @@ export default function Tournaments({
       }
     })();
     return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // Switching the active group while this tab stays mounted: drop any open game or
   // create view back to the (group-filtered) list.
@@ -401,7 +401,6 @@ function CreateGame({
     const d = loadSetupDraft(activeGroupId, teeTimeId);
     if (d && draftHasProgress(d, user.id)) setDraftAvailable(d);
     else hydratedRef.current = true;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const applyDraft = (d: SetupDraft) => {
@@ -441,7 +440,6 @@ function CreateGame({
       skinsMode, team1, team2, selectedPlayers, guestPlayers, flightMode, flightCount,
     };
     if (draftHasProgress(snap, user.id)) saveSetupDraft(activeGroupId, teeTimeId, snap);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, flightMode, flightCount]);
 
   const tee = pickedFav?.tees?.[teeIdx];
@@ -1201,6 +1199,7 @@ function GameRoom({
   onBack: () => void;
 }) {
   const [game, setGame] = useState<Game | null>(null);
+  const paceNow = useNowTick();
   const [players, setPlayers] = useState<Player[]>([]);
   const [me, setMe] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1529,7 +1528,6 @@ function GameRoom({
       .on("postgres_changes", { event: "*", schema: "public", table: "games", filter: `id=eq.${gameId}` }, refresh)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId]);
 
   // Lock-time safety: when the page hides (screen lock / app background), force the
@@ -2894,7 +2892,7 @@ function GameRoom({
         const startMs = Math.min(...starts.map((s) => new Date(s).getTime()));
         const ends = subset.map((p) => p.clock_end).filter(Boolean) as string[];
         const allEnded = subset.length > 0 && ends.length === subset.length;
-        const endMs = allEnded ? Math.max(...ends.map((s) => new Date(s).getTime())) : Date.now();
+        const endMs = allEnded ? Math.max(...ends.map((s) => new Date(s).getTime())) : paceNow;
         const mins = Math.max(0, Math.round((endMs - startMs) / 60000));
         const label = teeGroupsInUse && myRow?.tee_group != null ? ` · Group ${myRow.tee_group}` : "";
         // Pace: target minutes/hole scales with the group's size (6 + 2*players,

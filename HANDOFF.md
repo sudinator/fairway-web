@@ -21,7 +21,7 @@ single most important habit — it has caught countless bugs.
   it may come up in the same chat.
 
 ## 2. Stack + infrastructure
-- **Next.js 14** (App Router) + React + TypeScript.
+- **Next.js 16.3** (App Router) + React 19 + TypeScript.
 - **Supabase** (Postgres + Auth + Row-Level Security). Project ref `epmbsmykyrnoiccwnoxq`. **FREE tier** —
   mind quotas.
 - **Vercel** hosting. Repo: `sudinator/fairway-web`. Live: `birdienumnum.vercel.app`.
@@ -29,49 +29,35 @@ single most important habit — it has caught countless bugs.
 - Sister app "Fairway Card" (separate repo, `fairway-web-eosin.vercel.app`) is occasionally referenced —
   not this project.
 
-## 3. Deploy flow (Amit does this by hand)
-1. You produce a cumulative `.zip`.
-2. Amit unzips to `C:\dev\fairway-web`.
-3. GitHub Desktop commit + push.
-4. Vercel auto-deploys.
-5. Amit runs any new migration **manually** in the Supabase SQL editor (he pastes the SQL you printed inline).
+## 3. Deploy flow (staging first)
+1. Start from a clean `staging` branch synchronized from `main`.
+2. Apply the reviewed candidate/overlay to `staging`; inspect the exact changed-file set before commit.
+3. Push `staging`; GitHub CI/guards and the Vercel Preview deployment must pass.
+4. Run required staging/browser validation where the staging data/environment can exercise the feature.
+5. Open `staging -> main`; required PR checks must pass before merge.
+6. Confirm Vercel Production is Ready, then run a small non-destructive Production smoke test.
+7. Merge/sync the new `main` state back into `staging` before the next release.
+8. Database migrations are pasted/run manually in the Supabase SQL editor as database owner/postgres, with staging first for destructive/integration validation.
 
-Because Amit is non-technical: **always print migration SQL inline for copy-paste**, and give plain,
-numbered instructions.
+Because Amit is non-technical: **always print migration SQL inline for copy-paste**, and give plain, numbered instructions.
 
-## 4. Pre-ship pipeline — run EVERY release, in order
-(Work tree at repo root. A placeholder `.env.local` is required for the build to run — create dummy
-values, never real secrets.)
+## 4. Pre-ship pipeline — run EVERY release
+The release is not deployable until every **BLOCKING** required gate is green. **ADVISORY** checks must execute and be documented, but advisory findings alone do not block deployment.
 
-1. **Type-check:** `npx tsc --noEmit` → must be **rc 0**. (A piped `grep` can hide the real return code —
-   check it. If generated types seem stale, `rm -rf .next` and retry.)
-2. **Bump version** in `package.json`. Format `FEATURE.EDIT.YYMMDD` (e.g. `166.3.260715`): **FEATURE**
-   bumps on a new feature; **EDIT** counts refinements/fixes within that feature and resets to 0 on a
-   FEATURE bump. **The YYMMDD date is auto-stamped from the Eastern date at build time** (`write-version.mjs`)
-   — you only set FEATURE.EDIT; the date in package.json is a placeholder the build overwrites, so it's
-   always the true ship date. Bump EDIT on every ship. (Versions ≤ `1.165.0` used old `1.MINOR.PATCH`.)
-3. **Unit tests:** `npm test` → all must pass. (Compiles + runs `lib/*.test.ts`: game-shape, golf, money,
-   legs, grouping, sync, badges, card.)
-4. **Build:** `npm run build` → **rc 0**. `prebuild` (`scripts/write-version.mjs`) stamps
-   `lib/app-version.ts`, `public/app-version.json`, and `public/sw.js` from the package version.
-5. **Guards:**
-   - `python3 ci/check-min-fontsize.py` — no rendered text < 11px. **Blocking.**
-   - `python3 ci/check-global-rules.py` — global invariants (e.g. scrollRef clamp). **Blocking.**
-   - `python3 ci/check-chart-overflow.py` — flex bar-columns must have `minWidth:0`. **Blocking.**
-   - `python3 ci/check-bottom-sheets.py` — every bottom-docked popup includes env(safe-area-inset-bottom). **Blocking.**
-   - `python3 ci/check-date-inputs.py` — every `type="date"` is iOS-safe (ShortDateInput or the
-     WebkitAppearance workaround). **Blocking.** (Known iPhone bug with bare date inputs.)
-   - `python3 ci/check-jsx-escapes.py` — flags literal `\uXXXX` in JSX text. **Advisory (rc=1).** Only
-     known false positive: `tee-times.tsx:284`. Any NEW hit must be fixed (use real glyphs).
-6. **If you added a migration:** regenerate the ledger — `python3 ci/gen-migrations-checklist.py` (updates
-   `MIGRATIONS.md`).
-7. **Line endings:** normalize all text files to **CRLF**, EXCEPT everything under `ci/` and `.github/`,
-   and `marketing/onepager-content.txt`, which stay **LF**.
-8. **Assemble cumulative `.zip`.** Exclude: `node_modules`, `.next`, `.git`, `.testout`, `mockups`,
-   `test-results`, `playwright-report`, `.playwright`, any `.env*`, `tsconfig.tsbuildinfo`.
-9. **Leak-scan the zip:** confirm no real secrets. Secrets live ONLY in `.env.local` (excluded) and in
-   Vercel/Supabase env settings — never hardcode them, never include `.env*` in the zip.
-10. **`present_files`** the zip. Keep the post-share message short.
+1. **Consistency / source-contract review:** inspect the actual changed code, inputs, outputs, side effects, dependencies, and reverse/re-entry paths.
+2. **Type-check:** `npx tsc --noEmit` -> rc 0.
+3. **Unit + differential tests:** `npm test` -> rc 0.
+4. **Guards:** `npm run guards` -> rc 0. This includes migration/security, UI, refactor reachability/state/dependency, external-provider, PWA, and feature-specific contracts. Individual explicitly-advisory debt checks may report findings while returning rc 0; their findings must be documented.
+5. **Build:** `npm run build` -> rc 0. `prebuild` verifies VAPID-key consistency when the environment key is present and stamps the app version.
+6. **One-command local/CI gate:** `npm run ci` runs hook lint, typecheck, guards, tests, and build.
+7. **Simulated testing:** run normal, edge, invalid-input, state-transition, retry/re-entry, failure/rollback, and adjacent-flow scenarios. Label evidence MODELLED, EXECUTED, or BROWSER-VALIDATED.
+8. **Version/docs:** bump `FEATURE.EDIT.YYMMDD`; update DEPLOY_NOTES, release verification, workflow simulation report, APP_RULES/HANDOFF/MIGRATIONS/SCHEMA/BACKLOG as applicable.
+9. **Migration ledger:** if migrations changed, run `python3 ci/gen-migrations-checklist.py` twice and require byte-identical second output. Every migration >=0113 self-records semantically.
+10. **Packaging:** preserve repository line endings; exclude `.git`, `node_modules`, `.next`, `.testout`, generated reports and all `.env*` secrets. Leak-scan before handoff.
+11. **Staging GitHub/Vercel gates:** CI and relevant Robustness jobs green; Vercel Preview Ready.
+12. **PR -> Production:** required PR verification green, merge to main, Production Ready, non-destructive smoke test, then `main -> staging` resync.
+
+If a required gate cannot run in the current environment, mark it **NOT EXECUTED/BLOCKED** and do not call the release deployable.
 
 ## 5. Global ground rules (authoritative list: `APP_RULES.md` in the zip)
 Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
@@ -114,25 +100,15 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current version: 177.15.260808.** Migrations **0130, 0131, 0132, and 0133** precede this corrective release; apply **0134_fix_bet_rpc_ambiguous_id.sql** before deploying v177.15. **Migration number 0129 remains intentionally skipped/reserved.** (Version scheme `FEATURE.EDIT.YYMMDD` — see APP_RULES #13.)
-- **Two migrations are PENDING** — run in the Supabase SQL editor in order (full SQL printed inline at
-  delivery, and in the files):
-  - **`0111_money_audit.sql`** — durable Money audit trail + triggers, child-write lock, $100k cap.
-  - **`0112_events.sql`** — `group_events` + `expenses.event_id`, freeze-enforcement triggers, and the
-    `set_event_closed` / `move_expense_event` / `ensure_game_event` RPCs.
-  Code is safe to deploy ahead of both (the audit + events UI simply show nothing until the tables
-  exist), but neither feature works until its migration is applied.
-- To confirm whether a migration is live, the **source of truth is the ledger** (added in 0113):
-  `select id, applied_at from public.schema_migrations order by id;`. Every migration from 0113 onward
-  ends with `select record_migration('NNNN_filename');`, so it records itself when run. The manual
-  MIGRATIONS.md checklist is a convenience only — never assert applied-state from it alone. (For anything
-  before 0113, or to spot-check, probe the object directly, e.g.
-  `select to_regclass('public.money_audit'), to_regclass('public.group_events');`.)
-- All migrations **through 0110** were previously confirmed applied.
-- After running: create an event, attach an expense, close it (admin) → its expenses should seal; a game
-  bet-post should auto-create a "from game" event.
-- Optional Money follow-ups still open: settlement counterparty-confirm / dispute flags (Tier 2/3 from
-  the audit work).
+**Current working candidate: 177.36.260815 (CI severity alignment corrective).**
+- 177.26 supersedes the unreleased 177.25 candidate after its first GitHub execution exposed verification-harness ordering/sequencing defects; it still includes the 177.24 dashboard Putts/round + targeted stats-completion baseline.
+- New migrations under review: `0135_ledger_backfill.sql`, `0136_core_rls_helpers.sql`, and `0137_core_rls_baseline.sql`. None should be applied to Production until the 177.25 database/reconstruction gates are complete.
+- `0135` backfills missing migration-ledger rows only when sentinel evidence proves each historical migration is actually present. Run migrations as DB owner/postgres; application roles cannot record migrations after 0123.
+- `0136` recreates the six Production SECURITY DEFINER helpers referenced by the core RLS policies from the authoritative pg_proc export. `0137` then reconstructs the 12 legacy core-table RLS policy/grant contract from the authoritative Production metadata export. CI checks helper definition parity, source closure, and the exact 60-policy baseline.
+- `ci/core_rls_production_baseline.json` is the machine-readable 2026-08-14 Production RLS baseline (12 tables / 60 policies). `ci/core_rls_helpers_production_baseline.json` captures the six helper definitions. `ci/assert-core-rls-live.sql` is the read-only live drift guard.
+- Fresh-database reconstruction is now part of required `CI / verify`: a pinned Supabase CLI creates a disposable database, applies both migration trees from empty state, and asserts the checked-in RLS baseline. The first GitHub execution correctly exposed a full-path ordering bug; 177.26 fixes ordering by numeric migration prefix and requires a corrected GitHub fresh-DB PASS before ship.
+- The schema migration ledger (`public.schema_migrations`) is the source of truth for applied state from 0113 onward. `MIGRATIONS.md` is a human checklist and must not be treated as authoritative applied-state evidence.
+- Release remains **NOT DEPLOYABLE** until corrected disposable fresh-DB reconstruction, dependency-backed CI/type/test/build, staging-only 0135 -> 0136 -> 0137 application, live RLS equality, and normal release gates pass.
 
 ## 9. Recent major thread — "date of play" (context you'll need)
 The recent work overhauled how a round's date is recorded:
@@ -595,3 +571,84 @@ For changed interactions, do not equate handler reachability with working behavi
 ## Correction workflow terminal-path rule (177.23+)
 - When a stateful flow can enter a validation-required terminal action, the UI must expose every required input before submission and the primary CTA must describe the actual terminal action.
 - For course provider review, Stored BNN -> Provider review -> reason entry -> Submit for approval -> pending/review outcome is part of the observable-outcome contract; the reverse/cancel path must remain reachable.
+
+## 177.25 integrity hardening status
+- Current working candidate: `177.25.260814`.
+- Do not ship until the Production RLS export for the 12 legacy core tables has been captured and converted into an executable idempotent baseline migration, then verified by a fresh-database reconstruction test.
+- Migration 0135 is an evidence-based ledger backfill for 0122-0128; it must be executed as database owner/postgres, not through an application Supabase client.
+
+### 177.27 fresh-database prerequisite correction
+- Fresh-DB CI now installs source-controlled PostgreSQL prerequisites before migration 0001.
+- Current pre-0001 prerequisite: `citext`, because `0001_baseline.sql` uses the type while historical migration 0038 only declares the extension later.
+- `pg_cron` remains self-declared by migration 0074 before its first `cron.*` use.
+- `ci/check_db_extension_prereqs.py` permanently validates extension availability against the real globally ordered migration stream.
+- Do not apply migrations 0135-0137 to staging or Production until the disposable fresh-database GitHub gate passes end-to-end.
+
+
+## 177.28 fresh-database reconstruction status
+- Disposable rebuild now has explicit extension prerequisites and globally ordered migrations.
+- CI 177.27 reached `0017_notifications_lockdown.sql` and exposed the baseline omission of the historical `create notifications` policy.
+- 177.28 restores only that pre-0017 compatibility policy in `0001_baseline.sql` and adds `ci/check_legacy_migration_prereqs.py` so non-idempotent historical object dependencies are audited semantically.
+- Do not apply 0135-0137 to staging or Production until the full disposable rebuild reaches the end and passes the core-RLS verification.
+
+## 177.29 comprehensive migration dependency audit
+- After fresh replay exposed a missing `is_group_member(uuid,uuid)` dependency at migration 0025, the audit was expanded across the entire 135-migration ordered stream rather than iterating one CI failure at a time.
+- `0001_baseline.sql` now reconstructs the historical pre-0034 versions of `is_admin`, `is_group_member`, and `is_group_admin`; 0034 remains the point where banned-user enforcement is added.
+- `ci/check_legacy_migration_prereqs.py` now checks relation ordering, all repo-defined function calls/use-before-create, policy prerequisites, explicit column-state operations, custom types, and unresolved `public.*` function references. Extension ordering remains separately guarded.
+- Current static closure result: PASS across 135 migrations; negative mutation test also PASS (guard fails when the historical helper is removed).
+- Do not apply 0135-0137 to staging or Production until GitHub's disposable fresh-database replay passes end-to-end.
+
+## 177.30 historical baseline column closure
+- CI #39 advanced clean-database replay through migration 0042 and failed at 0043 because `rounds.game_id` was absent from the committed baseline. Production/staging live databases were not changed.
+- The Production-derived 177.14 bootstrap was used as historical evidence to identify baseline-table columns that existed outside the numbered migration stream. Nine such compatibility columns are now source-controlled in `supabase/migrations/0001_baseline.sql`.
+- Fresh DB CI now asserts those nine columns after the full migration chain, including type/nullability/default expectations.
+- Static migration dependency analysis now includes executable column dependencies and is negative-tested against the exact 0043 game_id failure pattern.
+- Continue to treat disposable fresh-database execution as authoritative. Do not apply 0135-0137 to staging until the fresh replay is green through the entire stream and final RLS/security assertions.
+
+
+## 177.31 RLS parity diagnostics
+- CI #40 completed the full migration stream through `0137_core_rls_baseline.sql` and passed the historical nine-column compatibility assertion, then failed only at the final exact RLS policy comparison.
+- The old verifier reported `30 differing row(s)` without policy/field detail, which is insufficient evidence for modifying security policy definitions.
+- `ci/assert-core-rls-live.sql` now emits `CORE_RLS_DIFF` diagnostics keyed by table/policy, including differing fields and raw expected/actual `permissive`, roles, command, USING expression, and WITH CHECK expression.
+- Whitespace-only expression flags are diagnostic only; exact raw parity remains mandatory until differences are classified.
+- Do not apply 0135-0137 to staging or Production until the fresh rebuild's policy differences are fully explained and the final security contract gate passes.
+
+
+## 177.32 RLS diagnostic transaction lifetime
+- Root cause of the 177.31 verifier execution failure is confirmed: `_core_rls_expected` used `ON COMMIT DROP` while the script ran under psql autocommit with no enclosing transaction. The table was dropped immediately after CREATE TABLE, so the following INSERT failed before any policy diagnostics could run.
+- Working correction adds an explicit `BEGIN` before the verifier work and `COMMIT` only after the PASS result.
+- Source-contract guard now checks that ordering.
+- 177.32 may be packaged only as a staging-diagnostic overlay so GitHub can execute the disposable PostgreSQL gate. Do not treat it as deployable, apply 0135-0137 to staging/Production, or promote to `main` until (a) matching fixtures => PASS and (b) deliberate mismatch => emitted `CORE_RLS_DIFF` row(s) followed by hard failure, followed by the complete release gate.
+
+
+## 177.33 RLS runtime-canonical parity gate
+- CI 177.32 proved the diagnostic transaction fix and reduced the former 30 count-only rows to 15 named policy keys. Review of all 15 showed the same class: PostgreSQL `pg_policies` parse/deparse rendering differences on subquery expressions, with no role/command/predicate-semantic drift visible.
+- 177.33 preserves the Production raw baseline but canonicalizes `qual`/`with_check` by creating session-local shadow tables/policies and letting the SAME running PostgreSQL engine parse/deparse the expected expressions. The real public policies are then compared against that runtime-canonical form.
+- Metadata (table/policy key, permissive mode, roles, command), RLS state, and grants remain exact comparisons. `CORE_RLS_RENDERING` is informational only; `CORE_RLS_DIFF` remains a hard failure.
+- The verifier includes executable negative canaries for removed admin checks, ownership checks, guest checks, active-membership checks, AND->OR mutation, and organizer-condition mutation, plus one equivalent-format convergence canary. It also logs the PostgreSQL server version.
+- Do not apply 0135-0137 to real staging or Production and do not promote to main until GitHub's disposable fresh-DB run proves the canonical gate/canaries and the complete release gate is green.
+
+
+### 177.34.260815 — split RLS structural / semantic / behavior verification
+- Replaces the flawed 177.33 pg_temp deparser-canonicalization approach. PostgreSQL deparsed text is no longer treated as a stable security semantic contract.
+- `ci/assert-core-rls-live.sql` is again production-safe/read-only and hard-gates stable runtime structure only: 12 RLS table states, exact 60 policy identities/permissive modes/roles/commands, and exported grants.
+- New fresh-DB-only `ci/assert-core-rls-behavior.sql` exercises authenticated owner-vs-other authorization for notifications, rounds, and holes, including allowed writes and denied cross-user writes. All fixtures and trigger-disable changes roll back.
+- `ci/test_fresh_db_rebuild.sh` now requires structural and behavior RLS gates after the full migration replay; `ci/check_fresh_db_ci_contract.py` permanently guards that architecture and rejects a return to pg_temp expression canonicalization.
+- No application code, RLS policy, grant, helper, migration, staging database, or Production database behavior is changed.
+- **NOT DEPLOYABLE:** PostgreSQL execution of the new structural/behavior gates, full dependency-backed CI/type/test/build, Vercel staging, staging regression validation, PR verify, Production Ready and smoke remain mandatory.
+
+## 177.35 hook-lint gate reconciliation
+- CI on 177.34 reached the dependency-backed `npm run ci` chain and stopped at its first stage because ESLint reported 23 unused disable directives with `--max-warnings=0`.
+- Exact current staging source contains 22 reviewed `react-hooks/exhaustive-deps` suppressions plus one generic inline `eslint-disable-next-line`; `eslint.config.mjs` enables only `react-hooks/rules-of-hooks`, so all 23 directives are stale and have no runtime effect.
+- 177.35 removes only those 23 comments. No effect bodies, dependency arrays, props, state, callbacks, imports, APIs, RPCs, database writes, or UI behavior are changed.
+- `ci/check_effect_suppressions.py` now enforces a permanent zero-suppression contract for `react-hooks/exhaustive-deps`; the old 22-line legacy baseline is retired. The broader exhaustive-deps dependency audit remains backlog work and the rule itself is not enabled by this corrective.
+- Local dependency installation timed out in this execution environment, so dependency-backed ESLint/TypeScript/unit/build remain GitHub-authoritative gates. Do not call 177.35 deployable until the complete GitHub CI chain, fresh-database reconstruction/RLS behavior gate, Vercel staging build, and relevant staging regression checks are green.
+
+
+
+## 177.36 CI severity alignment
+- GitHub 177.35 progressed past hook lint and reached the guard suite, then stopped because `ci/check_extracted_import_debt.py` returned exit 1 for unused-symbol debt changes. APP_RULES #26 already defines unused props/state/imports as boundary-drift **warnings**, so the implemented severity contradicted the documented policy.
+- 177.36 keeps the unused-symbol measurement and full per-file report but makes it explicitly **ADVISORY** (exit 0). The baseline is not reset and no reported application code is cleaned up in this corrective.
+- Blocking gates remain blocking: fresh-database reconstruction, RLS/security structure and behavior, migration/source closure, secrets/environment safety, TypeScript correctness, unit/differential behavior, production build, reachability/source-contract defects, and feature correctness.
+- No application logic, migration, RLS policy, grant, helper, or database behavior changes. The purpose is severity alignment, not suppression of evidence.
+- Release remains **NOT DEPLOYABLE** until all blocking GitHub/fresh-DB/type/test/build/staging gates pass. Advisory findings must be carried in release verification/backlog rather than silently discarded.

@@ -348,3 +348,14 @@ Product model: any member creates a tee time; the creator organizes it; a captai
   group derived server-side from favorite_courses; caller must be a member of that group.
 - **set_course_freshness_status(course_id, status)** — now requires ADMIN of the owning group;
   status value validated. Old signatures dropped.
+
+## Reproducible core RLS baseline (177.25+)
+
+The 12 legacy core tables (`profiles`, `rounds`, `holes`, `games`, `game_players`, `groups`, `group_members`, `group_invites`, `group_courses`, `favorite_courses`, `notifications`, `activity_log`) are no longer documented-only security state. The authoritative 2026-08-14 Production export is source-controlled and reconstructed by:
+
+- `0136_core_rls_helpers.sql` — exact Production definitions for the six SECURITY DEFINER helper predicates used by core policies.
+- `0137_core_rls_baseline.sql` — RLS enabled/NO FORCE state, 60 Production policy definitions, and the exported `anon`/`authenticated` table grant set.
+- `ci/core_rls_helpers_production_baseline.json` / `ci/core_rls_production_baseline.json` — machine-readable evidence baselines.
+- `ci/test_fresh_db_rebuild.sh` — disposable fresh-Supabase migration-chain reconstruction used by required CI.
+
+The baseline intentionally reproduces current Production behavior. Any later privilege minimization (for example changing broad table grants) is a separate security behavior change and must be tested independently rather than hidden inside the reconstruction migration.

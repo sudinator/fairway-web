@@ -18,8 +18,8 @@ import { roundStatCompleteness, statHoleList } from "@/lib/round-stats";
 
 const ROUND_TIER_COLOR: Record<string, string> = { common: C.sage, rare: "#7FB8FF", elite: C.gold };
 
-export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEmail, onBack, onEdit, onDelete }: {
-  round: Round; ghinNumber?: string | null; playerName?: string; priorRounds?: Round[]; userEmail?: string | null; onBack: () => void; onEdit: () => void; onDelete: () => void;
+export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEmail, onBack, onEdit, onDelete, onRoundUpdated }: {
+  round: Round; ghinNumber?: string | null; playerName?: string; priorRounds?: Round[]; userEmail?: string | null; onBack: () => void; onEdit: () => void; onDelete: () => void; onRoundUpdated?: (round: Round) => void;
 }) {
   const gross = isGrossOnly(round);
   const [showGhin, setShowGhin] = useState(false);
@@ -163,7 +163,7 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
             );
           })()}
           <RoundStats round={round} />
-          <AiAnalysis round={round} priorRounds={priorRounds || []} userEmail={userEmail} />
+          <AiAnalysis round={round} priorRounds={priorRounds || []} userEmail={userEmail} onRoundUpdated={onRoundUpdated} />
           <div style={{ marginTop: 14 }}><ScoreViewCard round={round} /></div>
         </>
       )}
@@ -433,7 +433,7 @@ function roundSummary(r: Round) {
 
 // AI coach: analyzes this round vs. prior rounds. Calls our server route, which
 // keeps the API key secret. Opt-in (button) so it only runs when the user wants it.
-function AiAnalysis({ round, priorRounds, userEmail }: { round: Round; priorRounds: Round[]; userEmail?: string | null }) {
+function AiAnalysis({ round, priorRounds, userEmail, onRoundUpdated }: { round: Round; priorRounds: Round[]; userEmail?: string | null; onRoundUpdated?: (round: Round) => void }) {
   // The app owner's account is exempt from the daily cap (for testing).
   const UNLIMITED_EMAIL = "amitsud@gmail.com";
   const unlimited = (userEmail || "").trim().toLowerCase() === UNLIMITED_EMAIL;
@@ -466,7 +466,7 @@ function AiAnalysis({ round, priorRounds, userEmail }: { round: Round; priorRoun
       // Persist on the round so it survives navigating away / reopening / other devices.
       if (analysis && round.id) {
         supabase.from("rounds").update({ ai_analysis: analysis }).eq("id", round.id).then(() => {});
-        round.ai_analysis = analysis; // keep the in-memory object in sync this session
+        onRoundUpdated?.({ ...round, ai_analysis: analysis }); // immutable parent/session synchronization
       }
     } catch {
       setErr("Couldn't reach the analysis service. Check your connection and try again.");

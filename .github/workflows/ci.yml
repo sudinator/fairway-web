@@ -22,9 +22,19 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version-file: '.nvmrc'
           cache: npm
 
       - run: npm ci
+
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.101.0
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Rebuild a fresh Supabase database from committed migrations
+        run: bash ci/test_fresh_db_rebuild.sh
 
       - run: npm run ci

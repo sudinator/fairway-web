@@ -69,6 +69,7 @@ import {
 } from "@/components/ui";
 import type { Game, Player } from "@/lib/game-types";
 import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
+import { useNowTick } from "@/lib/use-now-tick";
 
 const supabase = createClient();
 
@@ -84,6 +85,7 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
   offline?: boolean;
 }) {
   const [edit, setEdit] = useState<{ playerId: string; holeIdx: number } | null>(null);
+  const paceNow = useNowTick();
   const allowance = game.allowance_pct ?? 100;
   const meta = game.holes_meta;
   const GREEN = "#1B7A4B", BLUE = "#1E5B8A", RED = "#C0392B";
@@ -180,7 +182,6 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
   // Persist the hole whenever a cell is opened or advanced to.
   useEffect(() => {
     if (edit) saveActiveHole(game.id, edit.holeIdx);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [edit?.holeIdx]);
 
   // On first mount with players loaded, scroll to the LAST hole that has any score — the hole
@@ -204,7 +205,6 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
         el.scrollIntoView({ block: "start", behavior: "auto" });
       }, 60));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playerOrder.length]);
 
   const holeCard = (i: number) => {
@@ -362,7 +362,7 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
           const startMs = Math.min(...starts.map((s) => new Date(s).getTime()));
           const ends = players.map((p) => p.clock_end).filter(Boolean) as string[];
           const allEnded = players.length > 0 && ends.length === players.length;
-          const endMs = allEnded ? Math.max(...ends.map((s) => new Date(s).getTime())) : Date.now();
+          const endMs = allEnded ? Math.max(...ends.map((s) => new Date(s).getTime())) : paceNow;
           const mins = Math.max(0, Math.round((endMs - startMs) / 60000));
           const groupSize = Math.max(1, players.length);
           const targetPerHole = 6 + 2 * groupSize;

@@ -20,7 +20,6 @@ import { APP_VERSION } from "@/lib/app-version";
 import { courseChangeLines, buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
 import { loadFormDraft, saveFormDraft, clearFormDraft, draftAgeLabel } from "@/lib/form-draft";
 import { saveActiveCourseEdit, loadActiveCourseEdit, clearActiveCourseEdit, clearAllLocalState } from "@/lib/draft";
-import { HelpSearch } from "@/components/help-search";
 import { FeedbackForm, type FeedbackPrefill } from "@/components/feedback";
 
 const supabase = createClient();
@@ -122,7 +121,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   // Persist which course is being edited so a lock/refresh reopens INTO the editor (the edited
   // data itself is restored by the form-draft). Cleared on cancel/save.
   const openEditor = (v: "new" | { id: string; data: Course; user_id: string }) => { saveActiveCourseEdit(v); setEditing(v); };
-  React.useEffect(() => { const v = loadActiveCourseEdit<"new" | { id: string; data: Course; user_id: string }>(); if (v) setEditing(v); /* eslint-disable-next-line */ }, []);
+  React.useEffect(() => { const v = loadActiveCourseEdit<"new" | { id: string; data: Course; user_id: string }>(); if (v) setEditing(v); }, []);
   // Deliberately navigating away (tab switch / group switch) UNMOUNTS this library — clear the
   // marker so an abandoned editor doesn't hijack the next app reopen. A lock/refresh doesn't
   // unmount, so the marker still survives real interruptions (that's the resume case).
@@ -530,7 +529,6 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
     } else {
       courseHydratedRef.current = true;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const applyCourseDraft = (data: Course, source: CourseProviderSource | null) => {
@@ -547,7 +545,6 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
   useEffect(() => {
     if (!courseHydratedRef.current) return;
     if (mode === "form" && course && (course.name || "").trim()) saveFormDraft(courseDraftKey, { course, providerSource });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [course, mode, providerSource]);
 
   const runSearch = async () => {

@@ -59,7 +59,6 @@ export function ContestsSection({
       .on("postgres_changes", { event: "*", schema: "public", table: "game_contests", filter: `game_id=eq.${gameId}` }, load)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId]);
 
   const createContest = async (kind: ContestKind, holes: number[]) => {
@@ -347,7 +346,7 @@ export function ContestHoleChip({ gameId, hole, players, userId, myName, canLogO
     const all = (es || []) as ContestEntry[];
     setRows(apply.map((c) => ({ contest: c, entries: all.filter((e) => e.contest_id === c.id) })));
   };
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [gameId, hole]);
+  useEffect(() => { load(); }, [gameId, hole]);
 
   if (rows.length === 0) return null;
 

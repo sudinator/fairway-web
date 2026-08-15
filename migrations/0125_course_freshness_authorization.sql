@@ -110,3 +110,5 @@ begin
 end $$;
 revoke all on function public.set_course_freshness_status(uuid, text) from public;
 grant execute on function public.set_course_freshness_status(uuid, text) to authenticated;
+
+select public.record_migration('0125_course_freshness_authorization');

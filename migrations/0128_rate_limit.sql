@@ -55,3 +55,5 @@ end $$;
 revoke all on function public.bump_rate_limit(text, int, int) from public;
 revoke all on function public.bump_rate_limit(text, int, int) from anon;
 grant execute on function public.bump_rate_limit(text, int, int) to authenticated;
+
+select public.record_migration('0128_rate_limit');

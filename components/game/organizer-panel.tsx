@@ -861,7 +861,7 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
     for (const k of keys) { if ((postedNets[k] || 0) !== (liveNetsCents[k] || 0)) return true; }
     return false;
   })();
-  useEffect(() => { onBetStale?.(needsUpdate); }, [needsUpdate]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { onBetStale?.(needsUpdate); }, [needsUpdate]);
   const nameOfUid = (uid: string) => players.find((p) => p.user_id === uid)?.display_name || "someone";
   // Per-bettor old -> new change, for the re-post preview.
   const repostDeltas = (() => {

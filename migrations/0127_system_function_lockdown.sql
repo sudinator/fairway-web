@@ -64,3 +64,5 @@ grant execute on function public.finish_stale_rounds() to authenticated;
 revoke all on function public.sweep_friction(boolean) from public;
 revoke all on function public.sweep_friction(boolean) from anon;
 grant execute on function public.sweep_friction(boolean) to authenticated;
+
+select public.record_migration('0127_system_function_lockdown');

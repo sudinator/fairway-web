@@ -1,0 +1,798 @@
+{
+  "captured_on": "2026-08-14",
+  "source": "Production pg_policies/pg_class/role_table_grants export",
+  "tables": {
+    "activity_log": {
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ]
+      },
+      "policies": [
+        {
+          "cmd": "SELECT",
+          "permissive": "PERMISSIVE",
+          "policyname": "admins read activity",
+          "qual": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.is_admin = true))))",
+          "roles": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "INSERT",
+          "permissive": "PERMISSIVE",
+          "policyname": "insert own activity",
+          "qual": null,
+          "roles": "public",
+          "with_check": "(actor_id = auth.uid())"
+        }
+      ],
+      "rls_enabled": true,
+      "rls_forced": false
+    },
+    "favorite_courses": {
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ]
+      },
+      "policies": [
+        {
+          "cmd": "UPDATE",
+          "permissive": "PERMISSIVE",
+          "policyname": "admin sets vetted",
+          "qual": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.is_admin = true))))",
+          "roles": "public",
+          "with_check": "true"
+        },
+        {
+          "cmd": "SELECT",
+          "permissive": "PERMISSIVE",
+          "policyname": "anyone reads courses",
+          "qual": "(auth.uid() IS NOT NULL)",
+          "roles": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "INSERT",
+          "permissive": "PERMISSIVE",
+          "policyname": "authenticated_adds_global_courses",
+          "qual": null,
+          "roles": "authenticated",
+          "with_check": "(auth.uid() IS NOT NULL)"
+        },
+        {
+          "cmd": "UPDATE",
+          "permissive": "PERMISSIVE",
+          "policyname": "course_admin_updates_global_courses",
+          "qual": "is_admin()",
+          "roles": "authenticated",
+          "with_check": "is_admin()"
+        },
+        {
+          "cmd": "DELETE",
+          "permissive": "PERMISSIVE",
+          "policyname": "creator or admin deletes",
+          "qual": "((user_id = auth.uid()) OR is_admin())",
+          "roles": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "ALL",
+          "permissive": "PERMISSIVE",
+          "policyname": "favorite_courses_group_member_all",
+          "qual": "is_group_member(group_id, auth.uid())",
+          "roles": "authenticated",
+          "with_check": "is_group_member(group_id, auth.uid())"
+        },
+        {
+          "cmd": "SELECT",
+          "permissive": "PERMISSIVE",
+          "policyname": "favorite_courses_select_global_non_deleted",
+          "qual": "(COALESCE(deleted, false) = false)",
+          "roles": "authenticated",
+          "with_check": null
+        },
+        {
+          "cmd": "SELECT",
+          "permissive": "PERMISSIVE",
+          "policyname": "read vetted courses",
+          "qual": "((vetted = true) AND (auth.uid() IS NOT NULL))",
+          "roles": "public",
+          "with_check": null
+        }
+      ],
+      "rls_enabled": true,
+      "rls_forced": false
+    },
+    "game_players": {
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ]
+      },
+      "policies": [
+        {
+          "cmd": "UPDATE",
+          "permissive": "PERMISSIVE",
+          "policyname": "edit own scores",
+          "qual": "(auth.uid() = user_id)",
+          "roles": "public",
+          "with_check": "(auth.uid() = user_id)"
+        },
+        {
+          "cmd": "INSERT",
+          "permissive": "PERMISSIVE",
+          "policyname": "join as self",
+          "qual": null,
+          "roles": "public",
+          "with_check": "((auth.uid() = user_id) AND is_group_member(( SELECT g.group_id\n   FROM games g\n  WHERE (g.id = game_players.game_id)), auth.uid()))"
+        },
+        {
+          "cmd": "UPDATE",
+          "permissive": "PERMISSIVE",
+          "policyname": "marker_can_update_group_scores",
+          "qual": "(EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_players.game_id) AND (g.marker_user_id = auth.uid()))))",
+          "roles": "authenticated",
+          "with_check": "(EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_players.game_id) AND (g.marker_user_id = auth.uid()))))"
+        },
+        {
+          "cmd": "INSERT",
+          "permissive": "PERMISSIVE",
+          "policyname": "members_add_guests",
+          "qual": null,
+          "roles": "authenticated",
+          "with_check": "((is_guest = true) AND (user_id IS NULL) AND (EXISTS ( SELECT 1\n   FROM (games g\n     JOIN group_members gm ON ((gm.group_id = g.group_id)))\n  WHERE ((g.id = game_players.game_id) AND (gm.user_id = auth.uid())))))"
+        },
+        {
+          "cmd": "DELETE",
+          "permissive": "PERMISSIVE",
+          "policyname": "members_delete_guests",
+          "qual": "((is_guest = true) AND (EXISTS ( SELECT 1\n   FROM (games g\n     JOIN group_members gm ON ((gm.group_id = g.group_id)))\n  WHERE ((g.id = game_players.game_id) AND (gm.user_id = auth.uid())))))",
+          "roles": "authenticated",
+          "with_check": null
+        },
+        {
+          "cmd": "SELECT",
+          "permissive": "PERMISSIVE",
+          "policyname": "members_select_guests",
+          "qual": "((is_guest = true) AND (user_id IS NULL) AND (EXISTS ( SELECT 1\n   FROM (games g\n     JOIN group_members gm ON ((gm.group_id = g.group_id)))\n  WHERE ((g.id = game_players.game_id) AND (gm.user_id = auth.uid())))))",
+          "roles": "authenticated",
+          "with_check": null
+        },
+        {
+          "cmd": "UPDATE",
+          "permissive": "PERMISSIVE",
+          "policyname": "members_update_guests",
+          "qual": "((is_guest = true) AND (EXISTS ( SELECT 1\n   FROM (games g\n     JOIN group_members gm ON ((gm.group_id = g.group_id)))\n  WHERE ((g.id = game_players.game_id) AND (gm.user_id = auth.uid())))))",
+          "roles": "authenticated",
+          "with_check": "((is_guest = true) AND (EXISTS ( SELECT 1\n   FROM (games g\n     JOIN group_members gm ON ((gm.group_id = g.group_id)))\n  WHERE ((g.id = game_players.game_id) AND (gm.user_id = auth.uid())))))"
+        },
+        {
+          "cmd": "INSERT",
+          "permissive": "PERMISSIVE",
+          "policyname": "organizer adds players",
+          "qual": null,
+          "roles": "public",
+          "with_check": "((auth.uid() = user_id) OR (EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_players.game_id) AND (g.created_by = auth.uid())))))"
+        },
+        {
+          "cmd": "UPDATE",
+          "permissive": "PERMISSIVE",
+          "policyname": "organizer manages players",
+          "qual": "(EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_players.game_id) AND (g.created_by = auth.uid()))))",
+          "roles": "public",
+          "with_check": "(EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_players.game_id) AND (g.created_by = auth.uid()))))"
+        },
+        {
+          "cmd": "DELETE",
+          "permissive": "PERMISSIVE",
+          "policyname": "organizer removes players",
+          "qual": "((auth.uid() = user_id) OR (EXISTS ( SELECT 1\n   FROM games g\n  WHERE ((g.id = game_players.game_id) AND (g.created_by = auth.uid())))))",
+          "roles": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "SELECT",
+          "permissive": "PERMISSIVE",
+          "policyname": "see co-players",
+          "qual": "is_game_member(game_id)",
+          "roles": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "UPDATE",
+          "permissive": "PERMISSIVE",
+          "policyname": "tee_group_marker_can_update",
+          "qual": "is_tee_group_marker(game_id, tee_group)",
+          "roles": "authenticated",
+          "with_check": "is_tee_group_marker(game_id, tee_group)"
+        }
+      ],
+      "rls_enabled": true,
+      "rls_forced": false
+    },
+    "games": {
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ]
+      },
+      "policies": [
+        {
+          "cmd": "INSERT",
+          "permissive": "PERMISSIVE",
+          "policyname": "create games",
+          "qual": null,
+          "roles": "public",
+          "with_check": "(auth.uid() = created_by)"
+        },
+        {
+          "cmd": "SELECT",
+          "permissive": "PERMISSIVE",
+          "policyname": "find or member games",
+          "qual": "(is_game_member(id) OR is_group_member(group_id, auth.uid()) OR (created_by = auth.uid()) OR is_admin())",
+          "roles": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "ALL",
+          "permissive": "PERMISSIVE",
+          "policyname": "games_group_member_all",
+          "qual": "is_group_member(group_id, auth.uid())",
+          "roles": "authenticated",
+          "with_check": "is_group_member(group_id, auth.uid())"
+        },
+        {
+          "cmd": "DELETE",
+          "permissive": "PERMISSIVE",
+          "policyname": "organizer deletes game",
+          "qual": "(created_by = auth.uid())",
+          "roles": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "UPDATE",
+          "permissive": "PERMISSIVE",
+          "policyname": "update own games",
+          "qual": "(auth.uid() = created_by)",
+          "roles": "public",
+          "with_check": "(auth.uid() = created_by)"
+        }
+      ],
+      "rls_enabled": true,
+      "rls_forced": false
+    },
+    "group_courses": {
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ]
+      },
+      "policies": [
+        {
+          "cmd": "INSERT",
+          "permissive": "PERMISSIVE",
+          "policyname": "add group_courses",
+          "qual": null,
+          "roles": "public",
+          "with_check": "(EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = group_courses.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))"
+        },
+        {
+          "cmd": "DELETE",
+          "permissive": "PERMISSIVE",
+          "policyname": "ga delete group_courses",
+          "qual": "(is_group_admin(group_id, auth.uid()) OR is_admin())",
+          "roles": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "SELECT",
+          "permissive": "PERMISSIVE",
+          "policyname": "read group_courses",
+          "qual": "(auth.role() = 'authenticated'::text)",
+          "roles": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "DELETE",
+          "permissive": "PERMISSIVE",
+          "policyname": "remove group_courses",
+          "qual": "(EXISTS ( SELECT 1\n   FROM group_members gm\n  WHERE ((gm.group_id = group_courses.group_id) AND (gm.user_id = auth.uid()) AND (gm.status = 'active'::text))))",
+          "roles": "public",
+          "with_check": null
+        }
+      ],
+      "rls_enabled": true,
+      "rls_forced": false
+    },
+    "group_invites": {
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ]
+      },
+      "policies": [
+        {
+          "cmd": "DELETE",
+          "permissive": "PERMISSIVE",
+          "policyname": "ga delete invites",
+          "qual": "(is_group_admin(group_id, auth.uid()) OR is_admin())",
+          "roles": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "DELETE",
+          "permissive": "PERMISSIVE",
+          "policyname": "group_invites_admin_delete",
+          "qual": "is_group_admin(group_id, auth.uid())",
+          "roles": "authenticated",
+          "with_check": null
+        },
+        {
+          "cmd": "SELECT",
+          "permissive": "PERMISSIVE",
+          "policyname": "group_invites_admin_select",
+          "qual": "is_group_admin(group_id, auth.uid())",
+          "roles": "authenticated",
+          "with_check": null
+        },
+        {
+          "cmd": "UPDATE",
+          "permissive": "PERMISSIVE",
+          "policyname": "group_invites_admin_update",
+          "qual": "is_group_admin(group_id, auth.uid())",
+          "roles": "authenticated",
+          "with_check": "is_group_admin(group_id, auth.uid())"
+        }
+      ],
+      "rls_enabled": true,
+      "rls_forced": false
+    },
+    "group_members": {
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ]
+      },
+      "policies": [
+        {
+          "cmd": "DELETE",
+          "permissive": "PERMISSIVE",
+          "policyname": "ga delete memberships",
+          "qual": "(is_group_admin(group_id, auth.uid()) OR is_admin())",
+          "roles": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "INSERT",
+          "permissive": "PERMISSIVE",
+          "policyname": "group_members_insert_admin_or_self",
+          "qual": null,
+          "roles": "authenticated",
+          "with_check": "(is_group_admin(group_id, auth.uid()) OR ((user_id = auth.uid()) AND (role = 'admin'::text) AND (status = 'active'::text)))"
+        },
+        {
+          "cmd": "SELECT",
+          "permissive": "PERMISSIVE",
+          "policyname": "group_members_select_visible",
+          "qual": "(is_group_member(group_id, auth.uid()) OR (user_id = auth.uid()) OR (lower((email)::text) = lower(COALESCE((auth.jwt() ->> 'email'::text), ''::text))))",
+          "roles": "authenticated",
+          "with_check": null
+        },
+        {
+          "cmd": "UPDATE",
+          "permissive": "PERMISSIVE",
+          "policyname": "group_members_update_admin_or_self_invite",
+          "qual": "(is_group_admin(group_id, auth.uid()) OR (lower((email)::text) = lower(COALESCE((auth.jwt() ->> 'email'::text), ''::text))))",
+          "roles": "authenticated",
+          "with_check": "(is_group_admin(group_id, auth.uid()) OR (user_id = auth.uid()))"
+        }
+      ],
+      "rls_enabled": true,
+      "rls_forced": false
+    },
+    "groups": {
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ]
+      },
+      "policies": [
+        {
+          "cmd": "UPDATE",
+          "permissive": "PERMISSIVE",
+          "policyname": "admin updates groups",
+          "qual": "(EXISTS ( SELECT 1\n   FROM profiles p\n  WHERE ((p.id = auth.uid()) AND (p.is_admin = true))))",
+          "roles": "public",
+          "with_check": "true"
+        },
+        {
+          "cmd": "DELETE",
+          "permissive": "PERMISSIVE",
+          "policyname": "group admin can delete group",
+          "qual": "(is_group_admin(id, auth.uid()) OR is_admin())",
+          "roles": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "INSERT",
+          "permissive": "PERMISSIVE",
+          "policyname": "groups_insert_authenticated",
+          "qual": null,
+          "roles": "authenticated",
+          "with_check": "(created_by = auth.uid())"
+        },
+        {
+          "cmd": "SELECT",
+          "permissive": "PERMISSIVE",
+          "policyname": "groups_select_member",
+          "qual": "(is_group_member(id, auth.uid()) OR (created_by = auth.uid()))",
+          "roles": "authenticated",
+          "with_check": null
+        },
+        {
+          "cmd": "UPDATE",
+          "permissive": "PERMISSIVE",
+          "policyname": "groups_update_admin",
+          "qual": "is_group_admin(id, auth.uid())",
+          "roles": "authenticated",
+          "with_check": "is_group_admin(id, auth.uid())"
+        }
+      ],
+      "rls_enabled": true,
+      "rls_forced": false
+    },
+    "holes": {
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ]
+      },
+      "policies": [
+        {
+          "cmd": "SELECT",
+          "permissive": "PERMISSIVE",
+          "policyname": "admin reads all holes",
+          "qual": "is_admin()",
+          "roles": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "UPDATE",
+          "permissive": "PERMISSIVE",
+          "policyname": "admin updates all holes",
+          "qual": "is_admin()",
+          "roles": "public",
+          "with_check": "is_admin()"
+        },
+        {
+          "cmd": "ALL",
+          "permissive": "PERMISSIVE",
+          "policyname": "own holes",
+          "qual": "(EXISTS ( SELECT 1\n   FROM rounds\n  WHERE ((rounds.id = holes.round_id) AND (rounds.user_id = auth.uid()))))",
+          "roles": "public",
+          "with_check": "(EXISTS ( SELECT 1\n   FROM rounds\n  WHERE ((rounds.id = holes.round_id) AND (rounds.user_id = auth.uid()))))"
+        }
+      ],
+      "rls_enabled": true,
+      "rls_forced": false
+    },
+    "notifications": {
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ]
+      },
+      "policies": [
+        {
+          "cmd": "INSERT",
+          "permissive": "PERMISSIVE",
+          "policyname": "create notifications",
+          "qual": null,
+          "roles": "public",
+          "with_check": "(user_id = auth.uid())"
+        },
+        {
+          "cmd": "SELECT",
+          "permissive": "PERMISSIVE",
+          "policyname": "read own notifications",
+          "qual": "(user_id = auth.uid())",
+          "roles": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "UPDATE",
+          "permissive": "PERMISSIVE",
+          "policyname": "update own notifications",
+          "qual": "(user_id = auth.uid())",
+          "roles": "public",
+          "with_check": null
+        }
+      ],
+      "rls_enabled": true,
+      "rls_forced": false
+    },
+    "profiles": {
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ]
+      },
+      "policies": [
+        {
+          "cmd": "INSERT",
+          "permissive": "PERMISSIVE",
+          "policyname": "insert own profile",
+          "qual": null,
+          "roles": "public",
+          "with_check": "(id = auth.uid())"
+        },
+        {
+          "cmd": "SELECT",
+          "permissive": "PERMISSIVE",
+          "policyname": "read own, co-members, or admin",
+          "qual": "((id = auth.uid()) OR is_admin() OR shares_active_club(id))",
+          "roles": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "UPDATE",
+          "permissive": "PERMISSIVE",
+          "policyname": "update own or admin all",
+          "qual": "((id = auth.uid()) OR is_admin())",
+          "roles": "public",
+          "with_check": "((id = auth.uid()) OR is_admin())"
+        }
+      ],
+      "rls_enabled": true,
+      "rls_forced": false
+    },
+    "rounds": {
+      "grants": {
+        "anon": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ],
+        "authenticated": [
+          "DELETE",
+          "INSERT",
+          "REFERENCES",
+          "SELECT",
+          "TRIGGER",
+          "TRUNCATE",
+          "UPDATE"
+        ]
+      },
+      "policies": [
+        {
+          "cmd": "SELECT",
+          "permissive": "PERMISSIVE",
+          "policyname": "admin reads all rounds",
+          "qual": "is_admin()",
+          "roles": "public",
+          "with_check": null
+        },
+        {
+          "cmd": "UPDATE",
+          "permissive": "PERMISSIVE",
+          "policyname": "admin updates all rounds",
+          "qual": "is_admin()",
+          "roles": "public",
+          "with_check": "is_admin()"
+        },
+        {
+          "cmd": "ALL",
+          "permissive": "PERMISSIVE",
+          "policyname": "own rounds",
+          "qual": "(auth.uid() = user_id)",
+          "roles": "public",
+          "with_check": "(auth.uid() = user_id)"
+        },
+        {
+          "cmd": "INSERT",
+          "permissive": "PERMISSIVE",
+          "policyname": "rounds_group_member_insert",
+          "qual": null,
+          "roles": "authenticated",
+          "with_check": "((user_id = auth.uid()) AND is_group_member(group_id, auth.uid()))"
+        },
+        {
+          "cmd": "SELECT",
+          "permissive": "PERMISSIVE",
+          "policyname": "rounds_group_member_select",
+          "qual": "((user_id = auth.uid()) OR is_group_member(group_id, auth.uid()))",
+          "roles": "authenticated",
+          "with_check": null
+        },
+        {
+          "cmd": "DELETE",
+          "permissive": "PERMISSIVE",
+          "policyname": "rounds_group_owner_delete",
+          "qual": "((user_id = auth.uid()) OR is_group_admin(group_id, auth.uid()))",
+          "roles": "authenticated",
+          "with_check": null
+        },
+        {
+          "cmd": "UPDATE",
+          "permissive": "PERMISSIVE",
+          "policyname": "rounds_group_owner_update",
+          "qual": "((user_id = auth.uid()) OR is_group_admin(group_id, auth.uid()))",
+          "roles": "authenticated",
+          "with_check": "((user_id = auth.uid()) OR is_group_admin(group_id, auth.uid()))"
+        }
+      ],
+      "rls_enabled": true,
+      "rls_forced": false
+    }
+  }
+}

@@ -41,7 +41,6 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     let last = -1;
     for (let i = holes.length - 1; i >= 0; i--) { const s = holes[i]?.strokes; if (s != null && s > 0) { last = i; break; } }
     return last;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // Editable play date — defaults to the round's stored date (falls back to today).
   const todayLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -119,7 +118,6 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   const sidRef = React.useRef<string>(newSid());
   React.useEffect(() => {
     dbg("mount", sidRef.current, { seededId: round.id || "", hasDbId: !!dbIdRef.current });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const saveTimerRef = React.useRef<any>(null);
   // Always-current refs so saves never use a stale snapshot.
@@ -376,7 +374,6 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
       window.removeEventListener("beforeunload", onBeforeUnload);
       window.removeEventListener("blur", onBlur);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round]);
 
   const live: Round = { ...round, holes };

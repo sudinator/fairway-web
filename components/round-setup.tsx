@@ -106,7 +106,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   useEffect(() => {
     if (skipSnapshotRef.current) { skipSnapshotRef.current = false; return; } // restored draft: keep the saved original
     setOriginalPicked(picked ? JSON.parse(JSON.stringify(picked)) : null);
-  }, [picked?.id, loadedFavId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [picked?.id, loadedFavId]);
 
   // Save the currently-picked course; if one with the same name exists, update it instead of duplicating.
   const saveFavorite = async () => {
@@ -321,14 +321,12 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
       const r = await checkCourseFreshness(supabase, { courseId: loadedFavId, externalId: extId, stored: picked! });
       if (r.hasChanges && r.apiCourse && r.status === "pending") setFreshness(r);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadedFavId]);
   useEffect(() => {
     if (freshness?.hasChanges && freshness.apiCourse && isGroupAdmin === false) {
       playWithFresh(freshness.apiCourse, false); // non-admin: silently play with fresh yardages
       setFreshness(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [freshness, isGroupAdmin]);
   const applyFreshToLibrary = async () => {
     if (!freshness?.apiCourse || !loadedFavId) return;

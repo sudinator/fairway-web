@@ -10,8 +10,11 @@
 --
 -- Everything here is SAFE / IDEMPOTENT (`if not exists`), so running it against
 -- the existing database only fills in anything missing; it never drops data.
--- RLS policies are documented in SCHEMA.md (they already exist in the live DB
--- and are not recreated here).
+-- Historical live columns that pre-dated complete migration capture are also
+-- reconstructed here so the numbered migration stream can replay from a blank DB.
+-- Most RLS policies are reconstructed by the later authoritative core-RLS baseline.
+-- A minimal historical compatibility policy is recreated below only where an early
+-- migration requires that pre-existing live object in order to replay safely.
 -- ============================================================================
 
 -- ---------- profiles (id = auth.users.id) ----------
@@ -25,11 +28,12 @@ create table if not exists profiles (
   is_admin boolean not null default false,
   active_group_id uuid,
   last_active timestamptz,
-  updated_at timestamptz default now()
+  updated_at timestamptz default now(),
+  deactivated boolean not null default false,
+  dashboard_ai jsonb
 );
--- NOTE: the live DB has no `deactivated` column. If you want the admin
--- "deactivate player" feature to persist, add it:
---   alter table profiles add column if not exists deactivated boolean not null default false;
+-- Historical live compatibility columns deactivated/dashboard_ai are included
+-- because later migrations referenced them before the repository captured their creation.
 
 -- ---------- groups ----------
 create table if not exists groups (
@@ -78,7 +82,10 @@ create table if not exists favorite_courses (
   deleted boolean not null default false,
   deleted_by uuid,
   deleted_at timestamptz,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  external_id text,
+  facility text,
+  corrected boolean not null default false
 );
 -- Per-group name uniqueness (live DB uses group-scoped, not global):
 create unique index if not exists favorite_courses_group_name_unique on favorite_courses (group_id, name);
@@ -139,7 +146,9 @@ create table if not exists rounds (
   course_handicap int,
   group_id uuid,
   played_at timestamptz default now(),
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  ai_analysis text,
+  game_id uuid
 );
 -- Columns the app expects that were missing from the live DB (added now):
 alter table rounds add column if not exists status text not null default 'final';     -- 'final' | 'in_progress'
@@ -173,7 +182,8 @@ create table if not exists games (
   teams jsonb,
   foursomes jsonb,
   created_by uuid not null default auth.uid(),
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  score_epoch integer not null default 0
 );
 
 -- ---------- game_players ----------
@@ -191,7 +201,8 @@ create table if not exists game_players (
   putts jsonb not null default '[]'::jsonb,
   fairways jsonb not null default '[]'::jsonb,
   team text,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  no_show boolean not null default false
 );
 
 -- ---------- activity_log ----------
@@ -216,11 +227,66 @@ create table if not exists notifications (
   created_at timestamptz default now()
 );
 
+-- Historical compatibility prerequisite for migration 0017. The original live
+-- database already had this INSERT policy before the migration stream was
+-- source-controlled; 0017 tightens its WITH CHECK clause in place. Recreate only
+-- the pre-0017 policy contract here so a fresh database can replay history.
+drop policy if exists "create notifications" on public.notifications;
+create policy "create notifications" on public.notifications
+  for insert
+  with check (auth.uid() is not null);
+
 -- ============================================================================
--- Helper functions used by RLS (exist in live DB; export bodies via CLI to
--- recreate from scratch): is_admin(), is_group_member(gid,uid),
--- is_group_admin(gid,uid), is_game_member(gid).
--- RPCs: create_group_invite(...) -> text code; redeem_group_invite(code) -> uuid.
+-- Historical helper prerequisites. These helpers existed in the original live
+-- database before this migration stream became source-controlled. Later migration
+-- 0034 replaces the first three definitions to add banned-user enforcement. The
+-- pre-0034 definitions below intentionally omit that later behavior so a fresh
+-- replay follows the same historical transition instead of jumping ahead.
+-- ============================================================================
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable security definer
+set search_path to 'public'
+as $$
+  select coalesce((select is_admin from public.profiles where id = auth.uid()), false);
+$$;
+
+create or replace function public.is_group_member(group_uuid uuid, user_uuid uuid)
+returns boolean
+language sql
+stable security definer
+set search_path to 'public'
+as $$
+  select exists (
+    select 1
+    from public.group_members gm
+    where gm.group_id = group_uuid
+      and gm.user_id = user_uuid
+      and gm.status = 'active'
+  );
+$$;
+
+create or replace function public.is_group_admin(group_uuid uuid, user_uuid uuid)
+returns boolean
+language sql
+stable security definer
+set search_path to 'public'
+as $$
+  select exists (
+    select 1
+    from public.group_members gm
+    where gm.group_id = group_uuid
+      and gm.user_id = user_uuid
+      and gm.status = 'active'
+      and gm.role = 'admin'
+  );
+$$;
+
+-- is_game_member() is not required by the historical migration stream before the
+-- authoritative 0136 helper baseline, so it remains defined there.
+-- RPCs create_group_invite/redeem_group_invite are likewise not referenced by the
+-- committed replay before their current definitions and therefore need no bootstrap.
 -- ============================================================================
 
 -- Indexes present in the live DB:
