@@ -590,3 +590,10 @@ For changed interactions, do not equate handler reachability with working behavi
 - CI 177.27 reached `0017_notifications_lockdown.sql` and exposed the baseline omission of the historical `create notifications` policy.
 - 177.28 restores only that pre-0017 compatibility policy in `0001_baseline.sql` and adds `ci/check_legacy_migration_prereqs.py` so non-idempotent historical object dependencies are audited semantically.
 - Do not apply 0135-0137 to staging or Production until the full disposable rebuild reaches the end and passes the core-RLS verification.
+
+## 177.29 comprehensive migration dependency audit
+- After fresh replay exposed a missing `is_group_member(uuid,uuid)` dependency at migration 0025, the audit was expanded across the entire 135-migration ordered stream rather than iterating one CI failure at a time.
+- `0001_baseline.sql` now reconstructs the historical pre-0034 versions of `is_admin`, `is_group_member`, and `is_group_admin`; 0034 remains the point where banned-user enforcement is added.
+- `ci/check_legacy_migration_prereqs.py` now checks relation ordering, all repo-defined function calls/use-before-create, policy prerequisites, explicit column-state operations, custom types, and unresolved `public.*` function references. Extension ordering remains separately guarded.
+- Current static closure result: PASS across 135 migrations; negative mutation test also PASS (guard fails when the historical helper is removed).
+- Do not apply 0135-0137 to staging or Production until GitHub's disposable fresh-database replay passes end-to-end.

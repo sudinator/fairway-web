@@ -227,10 +227,56 @@ create policy "create notifications" on public.notifications
   with check (auth.uid() is not null);
 
 -- ============================================================================
--- Helper functions used by RLS (exist in live DB; export bodies via CLI to
--- recreate from scratch): is_admin(), is_group_member(gid,uid),
--- is_group_admin(gid,uid), is_game_member(gid).
--- RPCs: create_group_invite(...) -> text code; redeem_group_invite(code) -> uuid.
+-- Historical helper prerequisites. These helpers existed in the original live
+-- database before this migration stream became source-controlled. Later migration
+-- 0034 replaces the first three definitions to add banned-user enforcement. The
+-- pre-0034 definitions below intentionally omit that later behavior so a fresh
+-- replay follows the same historical transition instead of jumping ahead.
+-- ============================================================================
+create or replace function public.is_admin()
+returns boolean
+language sql
+stable security definer
+set search_path to 'public'
+as $$
+  select coalesce((select is_admin from public.profiles where id = auth.uid()), false);
+$$;
+
+create or replace function public.is_group_member(group_uuid uuid, user_uuid uuid)
+returns boolean
+language sql
+stable security definer
+set search_path to 'public'
+as $$
+  select exists (
+    select 1
+    from public.group_members gm
+    where gm.group_id = group_uuid
+      and gm.user_id = user_uuid
+      and gm.status = 'active'
+  );
+$$;
+
+create or replace function public.is_group_admin(group_uuid uuid, user_uuid uuid)
+returns boolean
+language sql
+stable security definer
+set search_path to 'public'
+as $$
+  select exists (
+    select 1
+    from public.group_members gm
+    where gm.group_id = group_uuid
+      and gm.user_id = user_uuid
+      and gm.status = 'active'
+      and gm.role = 'admin'
+  );
+$$;
+
+-- is_game_member() is not required by the historical migration stream before the
+-- authoritative 0136 helper baseline, so it remains defined there.
+-- RPCs create_group_invite/redeem_group_invite are likewise not referenced by the
+-- committed replay before their current definitions and therefore need no bootstrap.
 -- ============================================================================
 
 -- Indexes present in the live DB:

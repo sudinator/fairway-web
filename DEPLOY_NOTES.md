@@ -4876,3 +4876,10 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Adds a semantic historical-prerequisite guard covering ALTER POLICY, ALTER FUNCTION, GRANT/REVOKE EXECUTE ON FUNCTION, and non-idempotent DROP FUNCTION dependencies across the globally ordered migration stream.
 - Audit found no other unresolved pre-existing object dependency of those classes; future additions fail CI if they introduce one.
 - No Production or staging database changes are to be applied until the disposable fresh-database rebuild passes the complete migration stream.
+
+### 177.29.260814 — comprehensive historical migration dependency closure
+- Expanded the historical migration prerequisite audit from DDL-only checks to the complete globally ordered migration stream: 135 migrations, 43 repo-created relations, 134 repo-created functions, 1,086 relation dependencies, 462 function dependencies, 148 policy dependency operations, and 98 explicit column-state operations.
+- Restored the three pre-0034 auth helper definitions (`is_admin`, `is_group_member`, `is_group_admin`) in `0001_baseline.sql`. Migration 0034 still performs the historical behavior change that adds banned-user enforcement.
+- The audit now checks ordinary function calls inside SQL bodies, not only ALTER/GRANT/REVOKE/DROP operations; this closes the gap that allowed `0025_group_roster.sql` to reach CI with a missing `is_group_member(uuid,uuid)` prerequisite.
+- Negative-tested the guard by temporarily removing the baseline `is_group_member` helper: the audit failed at migration 0025 as intended, then passed after restoration.
+- No Production or staging database migration has been applied as part of this source correction. Disposable fresh-database replay remains required before 0135-0137 may be applied to staging.
