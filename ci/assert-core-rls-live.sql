@@ -1,6 +1,8 @@
 -- READ ONLY hard gate: live core RLS must match the checked-in Production baseline.
 -- Generated from ci/core_rls_production_baseline.json captured 2026-08-14.
 
+begin;
+
 do $$
 declare
   bad_count integer;
@@ -261,3 +263,5 @@ begin
 end $$;
 
 select 'core RLS live contract PASS: 12 tables / 60 policies / grants match checked-in baseline' as result;
+
+commit;

@@ -100,7 +100,7 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current working candidate: 177.31.260814 (RLS parity diagnostics corrective).**
+**Current working candidate: 177.32.260815 (RLS diagnostic transaction-lifetime corrective).**
 - 177.26 supersedes the unreleased 177.25 candidate after its first GitHub execution exposed verification-harness ordering/sequencing defects; it still includes the 177.24 dashboard Putts/round + targeted stats-completion baseline.
 - New migrations under review: `0135_ledger_backfill.sql`, `0136_core_rls_helpers.sql`, and `0137_core_rls_baseline.sql`. None should be applied to Production until the 177.25 database/reconstruction gates are complete.
 - `0135` backfills missing migration-ledger rows only when sentinel evidence proves each historical migration is actually present. Run migrations as DB owner/postgres; application roles cannot record migrations after 0123.
@@ -612,3 +612,10 @@ For changed interactions, do not equate handler reachability with working behavi
 - `ci/assert-core-rls-live.sql` now emits `CORE_RLS_DIFF` diagnostics keyed by table/policy, including differing fields and raw expected/actual `permissive`, roles, command, USING expression, and WITH CHECK expression.
 - Whitespace-only expression flags are diagnostic only; exact raw parity remains mandatory until differences are classified.
 - Do not apply 0135-0137 to staging or Production until the fresh rebuild's policy differences are fully explained and the final security contract gate passes.
+
+
+## 177.32 RLS diagnostic transaction lifetime
+- Root cause of the 177.31 verifier execution failure is confirmed: `_core_rls_expected` used `ON COMMIT DROP` while the script ran under psql autocommit with no enclosing transaction. The table was dropped immediately after CREATE TABLE, so the following INSERT failed before any policy diagnostics could run.
+- Working correction adds an explicit `BEGIN` before the verifier work and `COMMIT` only after the PASS result.
+- Source-contract guard now checks that ordering.
+- 177.32 may be packaged only as a staging-diagnostic overlay so GitHub can execute the disposable PostgreSQL gate. Do not treat it as deployable, apply 0135-0137 to staging/Production, or promote to `main` until (a) matching fixtures => PASS and (b) deliberate mismatch => emitted `CORE_RLS_DIFF` row(s) followed by hard failure, followed by the complete release gate.

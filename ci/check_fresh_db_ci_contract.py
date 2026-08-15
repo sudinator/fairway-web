@@ -16,6 +16,17 @@ extension_guard_path = ROOT / 'ci' / 'check_db_extension_prereqs.py'
 extension_guard = extension_guard_path.read_text(encoding='utf-8') if extension_guard_path.exists() else ''
 errors = []
 
+outer_tx_begin = rls_assert.find('\nbegin;\n')
+first_do = rls_assert.find('\ndo $$')
+pass_result = rls_assert.find("select 'core RLS live contract PASS")
+final_commit = rls_assert.rfind('\ncommit;')
+rls_transaction_ok = (
+    0 <= outer_tx_begin < first_do
+    and pass_result >= 0
+    and final_commit > pass_result
+    and rls_assert[final_commit:].strip() == 'commit;'
+)
+
 checks = {
     'CI installs pinned Supabase CLI': 'supabase/setup-cli@v3' in ci and 'version: 2.101.0' in ci,
     'CI installs psql client': 'postgresql-client' in ci,
@@ -36,6 +47,7 @@ checks = {
     'RLS verifier emits per-policy diagnostic rows before failing': 'CORE_RLS_DIFF' in rls_assert and 'differing_fields' in rls_assert,
     'RLS verifier reports expected and actual policy expressions': 'expected_qual' in rls_assert and 'actual_qual' in rls_assert and 'expected_with_check' in rls_assert and 'actual_with_check' in rls_assert,
     'RLS verifier reports whitespace-only expression diagnostics without weakening exact parity': 'qual_whitespace_only' in rls_assert and 'with_check_whitespace_only' in rls_assert and 'is distinct from a.qual' in rls_assert,
+    'RLS verifier encloses ON COMMIT DROP diagnostics in one top-level transaction': rls_transaction_ok,
     'fresh rebuild verifies RLS helper presence': 'public.is_game_member(uuid)' in script and 'public.shares_active_club(uuid)' in script,
     'live schema guard waits for RLS baseline migration sentinel': "0137_core_rls_baseline" in schema_check and 'schema_migrations' in schema_check,
 }

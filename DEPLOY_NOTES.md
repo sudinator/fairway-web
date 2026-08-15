@@ -4900,3 +4900,10 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Strengthens `ci/check_fresh_db_ci_contract.py` so future RLS parity failures must remain actionable rather than count-only.
 - No RLS policy, grant, helper, application behavior, staging database, or Production database change in this diagnostic corrective candidate.
 - **BLOCKED before release:** rerun disposable fresh-DB CI, inspect all emitted `CORE_RLS_DIFF` rows, classify true semantic drift vs PostgreSQL rendering differences, and correct only evidence-backed mismatches.
+
+
+### 177.32.260815 — RLS diagnostic transaction lifetime correction
+- Encloses the complete read-only core-RLS verifier in an explicit transaction so `_core_rls_expected` and `_core_rls_actual` temporary tables declared `ON COMMIT DROP` survive through diagnostic SELECTs and the final hard gate under psql autocommit.
+- Strengthens the fresh-DB source contract to require the transaction to begin before the temporary diagnostic tables and commit only after the final PASS path.
+- No RLS policy, grant, helper, migration, application behavior, staging database, or Production database change.
+- **STAGING-DIAGNOSTIC ONLY:** package this correction only to run the disposable fresh-database GitHub gate. It is not a deployable release. Production and the real staging database remain untouched until executable matching and deliberately mismatched PostgreSQL scenarios pass and the final RLS/security gate is green.
