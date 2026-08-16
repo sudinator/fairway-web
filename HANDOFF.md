@@ -666,3 +666,11 @@ For changed interactions, do not equate handler reachability with working behavi
 - `GameRoom` constructs `OrganizerPanelProps` and `GameSetupWorkspace` props with `satisfies` so callback/boundary drift fails TypeScript.
 - Permanent `ci/check_game_setup_workspace_contract.py` verifies step visibility/fallback, Players/Teams/Groups reachability, tee/handicap/add-player/group callback bridges, Matchups reachability, and forbids DB ownership in the extracted workspace.
 - Next product stage after this refactor is validated: persistent Game Control Center UX that lets organizers revisit Game/Players/Format/Teams & Groups/Review, followed by a centralized before/after-scoring transition policy.
+
+## 177.49 Create Game convergence staging train
+- Production intentionally remains on the last completed release while 177.47+ accumulate on `staging`; do not open staging->main PRs for intermediate convergence checkpoints.
+- 177.47: canonical Create Game draft/state inventory foundation.
+- 177.48: pure game-structure mutations with differential characterization.
+- 177.49 Stage 3A: shared Create Game navigation workspace (**Game -> Players -> Format -> Teams & groups -> Review**) using existing parent state/handlers. No persistence ownership moved; no migration.
+- Before Stage 3 is complete, add the agreed tee-resolution hierarchy (**individual override -> flight tee -> game default tee**) and move the existing team/matchup/foursome/tee-group structure into pre-create draft state without discarding structure work.
+- Stage 4 remains the atomic core Create transaction after the draft UI is fully characterized and browser-validated.

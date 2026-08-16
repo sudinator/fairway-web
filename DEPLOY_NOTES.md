@@ -5010,3 +5010,11 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Differential characterization freezes the 177.47 implementations in `lib/game-structure.test.ts` and compares the extracted helpers across a fixed transition matrix plus 40,000 randomized pairing/foursome assertions.
 - Adds `ci/check_game_structure_contract.py` to require every existing runtime mutation path to reach the pure helpers and to prohibit Supabase/browser side effects inside the structure module.
 - Stage 2 remains part of the staging-only Create Game convergence train. Production remains on the pre-convergence release until the complete flow passes end-to-end release validation.
+
+## 177.49.260816 — Create Game convergence Stage 3A: shared section workspace
+- **Staging-only convergence checkpoint. No migration.** Introduces the shared Create Game navigation shell with the target section model: **Game → Players → Format → Teams & groups → Review**.
+- Reuses the existing Create Game state and handlers rather than moving persistence ownership. Game/course/default-tee fields, roster/guest controls, and format/flight controls are the same existing controls, now organized into the shared section flow.
+- Renames the creation-time tee concept to **Default tee for the field**, matching actual existing behavior: the selected tee is still applied to all initial player rows by the unchanged `buildPlayerRows()` path.
+- Review now provides a pre-create summary and is the only section that exposes the final Create game action. The underlying `create()` function, Supabase writes, tee-time linkage, notifications, draft persistence, player-row payloads, and post-create routing are unchanged.
+- Structural formats deliberately retain today's behavior in this checkpoint: detailed team/matchup/foursome assignment still occurs immediately after creation. Stage 3B will move those existing structural rules into draft mode and add flight/player tee overrides before this convergence train is eligible for Production.
+- Adds a permanent Create Game workspace contract guard proving five-section reachability and that the shared workspace owns no Supabase/RPC/local persistence.

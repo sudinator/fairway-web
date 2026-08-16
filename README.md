@@ -12,6 +12,11 @@ walked you through (GitHub → Google sign-in setup → Vercel).
 
 The organizer Game Control Center uses one central transition policy for changes after scoring starts. Safe metadata stays editable; score reinterpretations require an explicit confirmation; structural changes that would rewrite who played whom or delete played golf are blocked. Scored-player tee/handicap edits are treated as whole-round corrections and preserve gross scores.
 
+
+## Create Game convergence (staging development)
+
+Create Game is being converged onto the same five-section mental model as Manage Game: Game → Players → Format → Teams & Groups → Review. The work is staged on the staging branch so the existing production Create Game path remains stable until the full flow is complete and end-to-end validated.
+
 ## What each part does (for the curious — optional)
 
 - `app/page.tsx` — top-level app entry/composition; feature screens live under `components/`

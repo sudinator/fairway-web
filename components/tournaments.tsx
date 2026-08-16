@@ -92,6 +92,7 @@ import type { FinishGap } from "@/lib/finish-gaps";
 import { GroupScorecard } from "@/components/game/scorecard-views";
 import { BettingPanel, type OrganizerPanelProps } from "@/components/game/organizer-panel";
 import { GameSetupWorkspace, type SetupTab } from "@/components/game/setup/game-setup-workspace";
+import { CreateGameWorkspace, type CreateGameSection } from "@/components/game/setup/create-game-workspace";
 import { buildFormatPatch, buildSkinsStylePatch, buildMatchTeamPatch } from "@/lib/game-structure";
 
 // Stable match identity for a player. Real players key on user_id (so nothing
@@ -257,6 +258,7 @@ function CreateGame({
   const [team1, setTeam1] = useState("Team 1");
   const [team2, setTeam2] = useState("Team 2");
   const [busy, setBusy] = useState(false);
+  const [createSection, setCreateSection] = useState<CreateGameSection>("game");
   const [err, setErr] = useState<string | null>(null);
   const [groupRoster, setGroupRoster] = useState<
     { id: string; display_name: string; avatar_url: string | null; handicap_index: number | null }[]
@@ -572,6 +574,19 @@ function CreateGame({
           </div>
         </div>
       )}
+      <CreateGameWorkspace
+        activeSection={createSection}
+        onSectionChange={setCreateSection}
+        sections={[
+          { key: "game", label: "Game", done: !!pickedFav && !!tee },
+          { key: "players", label: "Players", done: (groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length) > 0 },
+          { key: "format", label: "Format", done: !!gameType },
+          { key: "structure", label: "Teams & groups", done: gameType === "stableford" || gameType === "stroke" },
+          { key: "review", label: "Review", done: !!pickedFav && !!tee && !flightBlocked },
+        ]}
+      >
+        {createSection === "game" && (
+          <div>
       <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 190 }}>
           <label style={{ color: C.sage, fontSize: 12 }}>Game name</label>
@@ -588,6 +603,118 @@ function CreateGame({
         </div>
       </div>
 
+      <div style={{ marginTop: 14 }}>
+        <label style={{ color: C.sage, fontSize: 12 }}>
+          Course (from your favorites — so par &amp; stroke index are correct)
+        </label>
+        {favorites.length === 0 && (
+          <div
+            style={{
+              color: C.sage,
+              fontSize: 13,
+              marginTop: 8,
+              background: C.greenLight,
+              borderRadius: 10,
+              padding: 12,
+            }}
+          >
+            You have no favorite courses yet. Go to a New round, pick a course,
+            fix its data, and save it as a favorite first — then it'll appear
+            here.
+          </div>
+        )}
+        {favorites.map((f, i) => {
+          const selected = pickedFav?.id != null ? pickedFav.id === f.id : pickedFav?.name === f.name;
+          return (
+          <button
+            key={i}
+            onClick={() => {
+              setPickedFav(f);
+              setTeeIdx(defaultTeeIdx(f.tees, effectiveGroupId(activeGroupId) === TGC_GROUP_ID));
+            }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              width: "100%",
+              textAlign: "left",
+              marginTop: 8,
+              cursor: "pointer",
+              background: selected ? C.cream : C.card,
+              border: `${selected ? 2 : 1}px solid ${selected ? C.gold : C.line}`,
+              borderRadius: 10,
+              padding: "10px 14px",
+            }}
+          >
+            <span style={{ width: 20, height: 20, borderRadius: 999, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: selected ? C.green : "transparent", border: selected ? "none" : `1.5px solid ${C.line}`, color: C.cream, fontSize: 12, fontWeight: 800 }}>{selected ? "✓" : ""}</span>
+            <span style={{ flex: 1 }}>
+              <span style={{ color: C.ink, fontWeight: 700 }}>{f.name}</span>
+              {f.location ? (
+                <span style={{ color: C.faint, fontSize: 13 }}>{" "}· {f.location}</span>
+              ) : null}
+            </span>
+            {selected && <span style={{ color: C.green, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>SELECTED</span>}
+          </button>
+          );
+        })}
+      </div>
+
+      {pickedFav && (
+        <div
+          style={{
+            background: C.greenLight,
+            borderRadius: 14,
+            padding: 16,
+            marginTop: 14,
+          }}
+        >
+          <label style={{ color: C.sage, fontSize: 12 }}>Default tee for the field</label>
+          <div
+            style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}
+          >
+            {pickedFav.tees.map((t: any, i: number) => {
+              const yd = (t.yardages || []).reduce((s: number, v: any) => s + (v || 0), 0);
+              return (
+              <button
+                key={i}
+                onClick={() => setTeeIdx(i)}
+                style={{ ...btn(i === teeIdx), padding: "8px 12px", fontSize: 13, textAlign: "left", lineHeight: 1.25 }}
+              >
+                <div style={{ fontWeight: 800 }}>{t.name}</div>
+                <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{yd > 0 ? `${yd.toLocaleString()} yds · ` : ""}CR {t.rating} / SL {t.slope}</div>
+              </button>
+              );
+            })}
+          </div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Applied to all selected players when the game is created.</div>
+          <div style={{ marginTop: 12 }}>
+            <label style={{ color: C.sage, fontSize: 12 }}>
+              Your handicap index
+            </label>
+            <input
+              style={{ ...inputStyle, marginTop: 6, maxWidth: 140 }}
+              inputMode="decimal"
+              placeholder="14.2"
+              value={idxStr}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "" || /^\d*\.?\d*$/.test(v)) setIdxStr(v);
+              }}
+            />
+          </div>
+          {ch != null && (
+            <div style={{ color: C.gold, fontWeight: 800, marginTop: 10 }}>
+              Your course handicap: {ch}
+            </div>
+          )}
+        </div>
+      )}
+
+          </div>
+        )}
+
+        {createSection === "players" && (
+          <div>
       <div style={{ marginTop: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <label style={{ color: C.sage, fontSize: 12, flex: 1 }}>
@@ -745,112 +872,14 @@ function CreateGame({
         </div>
       </div>
 
-      <div style={{ marginTop: 14 }}>
-        <label style={{ color: C.sage, fontSize: 12 }}>
-          Course (from your favorites — so par &amp; stroke index are correct)
-        </label>
-        {favorites.length === 0 && (
-          <div
-            style={{
-              color: C.sage,
-              fontSize: 13,
-              marginTop: 8,
-              background: C.greenLight,
-              borderRadius: 10,
-              padding: 12,
-            }}
-          >
-            You have no favorite courses yet. Go to a New round, pick a course,
-            fix its data, and save it as a favorite first — then it'll appear
-            here.
+            {pickedFav && tee ? (
+              <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>Current field default: <b style={{ color: C.cream }}>{tee.name}</b>.</div>
+            ) : null}
           </div>
         )}
-        {favorites.map((f, i) => {
-          const selected = pickedFav?.id != null ? pickedFav.id === f.id : pickedFav?.name === f.name;
-          return (
-          <button
-            key={i}
-            onClick={() => {
-              setPickedFav(f);
-              setTeeIdx(defaultTeeIdx(f.tees, effectiveGroupId(activeGroupId) === TGC_GROUP_ID));
-            }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              width: "100%",
-              textAlign: "left",
-              marginTop: 8,
-              cursor: "pointer",
-              background: selected ? C.cream : C.card,
-              border: `${selected ? 2 : 1}px solid ${selected ? C.gold : C.line}`,
-              borderRadius: 10,
-              padding: "10px 14px",
-            }}
-          >
-            <span style={{ width: 20, height: 20, borderRadius: 999, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: selected ? C.green : "transparent", border: selected ? "none" : `1.5px solid ${C.line}`, color: C.cream, fontSize: 12, fontWeight: 800 }}>{selected ? "✓" : ""}</span>
-            <span style={{ flex: 1 }}>
-              <span style={{ color: C.ink, fontWeight: 700 }}>{f.name}</span>
-              {f.location ? (
-                <span style={{ color: C.faint, fontSize: 13 }}>{" "}· {f.location}</span>
-              ) : null}
-            </span>
-            {selected && <span style={{ color: C.green, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>SELECTED</span>}
-          </button>
-          );
-        })}
-      </div>
 
-      {pickedFav && (
-        <div
-          style={{
-            background: C.greenLight,
-            borderRadius: 14,
-            padding: 16,
-            marginTop: 14,
-          }}
-        >
-          <label style={{ color: C.sage, fontSize: 12 }}>Your tee</label>
-          <div
-            style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}
-          >
-            {pickedFav.tees.map((t: any, i: number) => {
-              const yd = (t.yardages || []).reduce((s: number, v: any) => s + (v || 0), 0);
-              return (
-              <button
-                key={i}
-                onClick={() => setTeeIdx(i)}
-                style={{ ...btn(i === teeIdx), padding: "8px 12px", fontSize: 13, textAlign: "left", lineHeight: 1.25 }}
-              >
-                <div style={{ fontWeight: 800 }}>{t.name}</div>
-                <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{yd > 0 ? `${yd.toLocaleString()} yds · ` : ""}CR {t.rating} / SL {t.slope}</div>
-              </button>
-              );
-            })}
-          </div>
-          <div style={{ marginTop: 12 }}>
-            <label style={{ color: C.sage, fontSize: 12 }}>
-              Your handicap index
-            </label>
-            <input
-              style={{ ...inputStyle, marginTop: 6, maxWidth: 140 }}
-              inputMode="decimal"
-              placeholder="14.2"
-              value={idxStr}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "" || /^\d*\.?\d*$/.test(v)) setIdxStr(v);
-              }}
-            />
-          </div>
-          {ch != null && (
-            <div style={{ color: C.gold, fontWeight: 800, marginTop: 10 }}>
-              Your course handicap: {ch}
-            </div>
-          )}
-        </div>
-      )}
-
+        {createSection === "format" && (
+          <div>
       <div style={{ marginTop: 14 }}>
         <label style={{ color: C.sage, fontSize: 12 }}>Format</label>
         {/* Two-family guided chooser: pick a family, then a format. */}
@@ -1143,25 +1172,68 @@ function CreateGame({
         )}
       </div>
 
+          </div>
+        )}
+
+        {createSection === "structure" && (
+          <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, border: `1px solid ${C.greenMid}` }}>
+            <div style={{ color: C.cream, fontWeight: 800, fontFamily: "Georgia, serif", fontSize: 15 }}>Teams & groups</div>
+            {gameType === "stableford" || gameType === "stroke" ? (
+              <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 7 }}>No competitive team structure is required for this format. Tee groups can still be organized after creation.</div>
+            ) : (
+              <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 7 }}>Team, matchup and foursome assignments are completed immediately after the game is created.</div>
+            )}
+          </div>
+        )}
+
+        {createSection === "review" && (
+          <div>
+            <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, border: `1px solid ${C.greenMid}` }}>
+              {[
+                [!!pickedFav, "Course", pickedFav?.name || "Select a course"],
+                [!!tee, "Default tee", tee?.name || "Select a tee"],
+                [(groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length) > 0, "Players", `${groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length} selected`],
+                [!!gameType, "Format", gameType === "fourball" ? "Four-ball" : gameType.charAt(0).toUpperCase() + gameType.slice(1)],
+                [!flightBlocked, "Flights", flightMode === "oneoff" ? `${flightCount} flights ready` : "Off"],
+              ].map(([ok, label, value], i) => (
+                <div key={String(label)} style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 0", borderBottom: i < 4 ? "1px solid rgba(255,255,255,.08)" : "none" }}>
+                  <span style={{ color: ok ? "#5BD08A" : C.gold, fontWeight: 900 }}>{ok ? "✓" : "!"}</span>
+                  <span style={{ color: C.sage, fontSize: 12, minWidth: 76 }}>{label}</span>
+                  <span style={{ color: C.cream, fontSize: 12.5, fontWeight: 700, marginLeft: "auto", textAlign: "right" }}>{value}</span>
+                </div>
+              ))}
+            </div>
+            {gameType !== "stableford" && gameType !== "stroke" ? (
+              <div style={{ color: C.sage, fontSize: 11.5, lineHeight: 1.45, marginTop: 9 }}>Detailed teams, matchups and foursomes are completed immediately after the game is created.</div>
+            ) : null}
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button style={btn(false)} onClick={onCancel}>Cancel</button>
+              <button
+                style={{ ...btn(true), opacity: pickedFav && tee && !busy && !flightBlocked ? 1 : 0.5 }}
+                disabled={!pickedFav || !tee || busy || flightBlocked}
+                onClick={create}
+              >
+                {busy ? "Creating…" : "Create game"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {createSection !== "review" && (
+          <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+            {createSection !== "game" ? <button style={btn(false)} onClick={() => setCreateSection(createSection === "players" ? "game" : createSection === "format" ? "players" : "format")}>Back</button> : <button style={btn(false)} onClick={onCancel}>Cancel</button>}
+            <button style={{ ...btn(true), marginLeft: "auto" }} onClick={() => setCreateSection(createSection === "game" ? "players" : createSection === "players" ? "format" : createSection === "format" ? "structure" : "review")}>Continue</button>
+          </div>
+        )}
+      </CreateGameWorkspace>
       {err && (
         <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>
           {err}
         </div>
       )}
-      <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-        <button style={btn(false)} onClick={onCancel}>
-          Cancel
-        </button>
-        <button
-          style={{ ...btn(true), opacity: pickedFav && !busy ? 1 : 0.5 }}
-          disabled={!pickedFav || busy}
-          onClick={create}
-        >
-          {busy ? "Creating…" : "Create game"}
-        </button>
-      </div>
     </div>
   );
+
 }
 
 // ---------------- Game room: score entry + leaderboard ----------------

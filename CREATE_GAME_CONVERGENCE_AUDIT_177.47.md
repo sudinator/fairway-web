@@ -54,3 +54,8 @@ Likewise, unfinished text buffers (`flightHcpDraft`, guest entry fields, `guestI
 
 ## Next stage
 Extract pure structure mutations (teams, pairings, foursomes, tee groups, structure stash/restore) while keeping existing Manage Game persistence adapters intact. Differential tests must prove old and extracted mutations produce identical structures before Create Game begins consuming them.
+
+## Stage 3A checkpoint — 177.49
+The first UI convergence step reorganizes the existing Create Game controls under a shared five-section workspace: Game, Players, Format, Teams & groups, Review. This checkpoint intentionally does not move structural assignments into draft state and does not add tee inheritance overrides yet. All current persistence/state ownership stays in `CreateGame`; the shared workspace is presentation/navigation only.
+
+The remaining Stage 3 work is deliberately separated because it changes domain draft behavior rather than only navigation: (1) player override -> flight tee -> game default tee resolution, and (2) pre-create teams/pairings/foursomes/tee groups using the Stage 2 pure structure helpers. Those must be characterized separately before Stage 4 atomic creation.
