@@ -125,7 +125,7 @@ export default function Tournaments({
   seed?: GameSeed | null;
   openGameId?: string | null;
 }) {
-  const [view, setView] = useState<"list" | "create" | { gameId: string; tab?: "play" | "setup" }>(
+  const [view, setView] = useState<"list" | "create" | { gameId: string; tab?: "play" | "setup"; setupTab?: SetupTab }>(
     seed ? "create" : openGameId ? { gameId: openGameId } : "list",
   );
   // Resume the game room the user was in (survives lock/refresh) — but ONLY if it
@@ -178,7 +178,7 @@ export default function Tournaments({
         activeGroupId={activeGroupId}
         seed={seed}
         onCancel={() => setView("list")}
-        onCreated={(gameId, tab) => setView({ gameId, tab })}
+        onCreated={(gameId, tab, setupTab) => setView({ gameId, tab, setupTab })}
       />
     );
   if (typeof view === "object")
@@ -186,6 +186,7 @@ export default function Tournaments({
       <GameRoom
         gameId={view.gameId}
         initialTab={view.tab}
+        initialSetupTab={view.setupTab}
         user={user}
         displayName={displayName}
         isAdmin={!!isAdmin}
@@ -216,7 +217,7 @@ function CreateGame({
   activeGroupId: string;
   seed?: GameSeed | null;
   onCancel: () => void;
-  onCreated: (id: string, tab?: "play" | "setup") => void;
+  onCreated: (id: string, tab?: "play" | "setup", setupTab?: SetupTab) => void;
 }) {
   const [name, setName] = useState("");
   // Match date — defaults to today (local). Stored structured on the game so we
@@ -425,7 +426,8 @@ function CreateGame({
     setFlightCount(d.flightCount && d.flightCount >= 2 && d.flightCount <= 4 ? d.flightCount : 3);
     setTeeAssignments({ player: d.playerTeeOverrides || {}, flight: d.flightTeeIdx || {} });
     setHcpOverrides(d.hcpOverrides || {});
-    if (d.createSection && ["game", "players", "format", "structure", "review"].includes(d.createSection)) setCreateSection(d.createSection as CreateGameSection);
+    if (d.createSection === "structure") setCreateSection("review");
+    else if (d.createSection && ["game", "players", "format", "review"].includes(d.createSection)) setCreateSection(d.createSection as CreateGameSection);
     setSelectedPlayers(d.selectedPlayers || {}); setGuestPlayers(d.guestPlayers || []);
     setPendingFavName(d.favName);
     setDraftAvailable(null); setDraftDismissed(true); hydratedRef.current = true;
@@ -529,6 +531,13 @@ function CreateGame({
         : `${flightNeedsHcp.length} player${flightNeedsHcp.length === 1 ? "" : "s"} need a handicap index before this event can be flighted — set them under Flights, or turn flights off.`);
       return;
     }
+    // Validate the full setup before the first database write. A rejected setup must never
+    // leave an orphan games row behind.
+    const skinsFieldCount = groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length;
+    if (GC.splitSkinsTooBig(gameType, teamMode, skinsMode, skinsFieldCount)) {
+      setErr("Split skins is best for up to 4 players. For a bigger group, use Team skins or 1:1 matchups, or switch Skins to carryover.");
+      return;
+    }
     setBusy(true);
     setErr(null);
     try {
@@ -557,13 +566,6 @@ function CreateGame({
         }
       }
       // Add creator plus any selected group members immediately, so group games do not require join codes.
-      // Split skins stays simple only in a small field. Beyond 4, steer to teams or 1:1.
-      const skinsFieldCount = groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length;
-      if (GC.splitSkinsTooBig(gameType, teamMode, skinsMode, skinsFieldCount)) {
-        setErr("Split skins is best for up to 4 players. For a bigger group, use Team skins or 1:1 matchups, or switch Skins to carryover.");
-        setBusy(false);
-        return;
-      }
       const rows = GC.buildPlayerRows({
         gameId: game.id, userId: user.id, displayName, idxVal, selectedPlayers, groupRoster, guestPlayers,
         hcpOverrides, tee, tees: pickedFav.tees, defaultTeeIdx: teeIdx, playerTeeOverrides: teeAssignments.player,
@@ -592,10 +594,11 @@ function CreateGame({
           } catch {}
         }
       }
-      // Field games (Stableford / Stroke) are ready to play once players are in;
-      // every other format still needs teams / matchups / handicaps, so open Setup.
+      // Lean Create owns the core game only. Persisted structure stays authoritative in
+      // Manage Game, so formats that need teams/matchups/foursomes hand off there.
+      const destination = GC.postCreateDestination(gameType, teamMode);
       clearSetupDraft(activeGroupId, teeTimeId); // setup finished — drop the local draft
-      onCreated(game.id, gameType === "stableford" || gameType === "stroke" ? "play" : "setup");
+      onCreated(game.id, destination.roomTab, destination.setupTab as SetupTab | undefined);
     } catch (e: any) {
       setErr(e.message || "Failed to create game.");
       setBusy(false);
@@ -624,7 +627,6 @@ function CreateGame({
           { key: "game", label: "Game", done: !!pickedFav && !!tee },
           { key: "players", label: "Players", done: (groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length) > 0 },
           { key: "format", label: "Format", done: !!gameType },
-          { key: "structure", label: "Teams & groups", done: gameType === "stableford" || gameType === "stroke" },
           { key: "review", label: "Review", done: !!pickedFav && !!tee && !flightBlocked },
         ]}
       >
@@ -1285,17 +1287,6 @@ function CreateGame({
           </div>
         )}
 
-        {createSection === "structure" && (
-          <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, border: `1px solid ${C.greenMid}` }}>
-            <div style={{ color: C.cream, fontWeight: 800, fontFamily: "Georgia, serif", fontSize: 15 }}>Teams & groups</div>
-            {gameType === "stableford" || gameType === "stroke" ? (
-              <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 7 }}>No competitive team structure is required for this format. Tee groups can still be organized after creation.</div>
-            ) : (
-              <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 7 }}>Team, matchup and foursome assignments are completed immediately after the game is created.</div>
-            )}
-          </div>
-        )}
-
         {createSection === "review" && (
           <div>
             <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, border: `1px solid ${C.greenMid}` }}>
@@ -1314,7 +1305,7 @@ function CreateGame({
               ))}
             </div>
             {gameType !== "stableford" && gameType !== "stroke" ? (
-              <div style={{ color: C.sage, fontSize: 11.5, lineHeight: 1.45, marginTop: 9 }}>Detailed teams, matchups and foursomes are completed immediately after the game is created.</div>
+              <div style={{ color: C.sage, fontSize: 11.5, lineHeight: 1.45, marginTop: 9 }}>Additional setup is required after creation. BNN will take you directly to Manage Game to complete teams, matchups, foursomes or tee groups as needed.</div>
             ) : null}
             <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
               <button style={btn(false)} onClick={onCancel}>Cancel</button>
@@ -1331,8 +1322,8 @@ function CreateGame({
 
         {createSection !== "review" && (
           <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-            {createSection !== "game" ? <button style={btn(false)} onClick={() => setCreateSection(createSection === "players" ? "game" : createSection === "format" ? "players" : "format")}>Back</button> : <button style={btn(false)} onClick={onCancel}>Cancel</button>}
-            <button style={{ ...btn(true), marginLeft: "auto" }} onClick={() => setCreateSection(createSection === "game" ? "players" : createSection === "players" ? "format" : createSection === "format" ? "structure" : "review")}>Continue</button>
+            {createSection !== "game" ? <button style={btn(false)} onClick={() => setCreateSection(createSection === "players" ? "game" : "players")}>Back</button> : <button style={btn(false)} onClick={onCancel}>Cancel</button>}
+            <button style={{ ...btn(true), marginLeft: "auto" }} onClick={() => setCreateSection(createSection === "game" ? "players" : createSection === "players" ? "format" : "review")}>Continue</button>
           </div>
         )}
       </CreateGameWorkspace>
@@ -1353,6 +1344,7 @@ function CreateGame({
 function GameRoom({
   gameId,
   initialTab,
+  initialSetupTab,
   user,
   displayName,
   isAdmin,
@@ -1360,6 +1352,7 @@ function GameRoom({
 }: {
   gameId: string;
   initialTab?: "play" | "setup";
+  initialSetupTab?: SetupTab;
   user: any;
   displayName: string;
   isAdmin?: boolean;
@@ -1440,7 +1433,7 @@ function GameRoom({
     })();
   }, [betStale, game, players, user.id]);
   // Which step of the setup flow is showing: players & tees, teams, matchups, groups.
-  const [setupTab, setSetupTab] = useState<SetupTab>("overview");
+  const [setupTab, setSetupTab] = useState<SetupTab>(() => initialSetupTab || "overview");
   const [cardView, setCardView] = useState(false); // show the whole-group vertical scorecard
   const [flightView, setFlightView] = useState<"flight" | "overall">("flight"); // flighted standings: segmented vs one list
 

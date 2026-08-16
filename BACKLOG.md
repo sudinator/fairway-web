@@ -3,7 +3,7 @@
 Running list of things to build or tighten. Newest ideas near the top of each section.
 
 ## Create Game convergence — staging release train
-- [~] 177.47–177.51: canonical draft, pure structure helpers, shared five-section workspace, tee inheritance, and corrective resume/TGC-scope hardening are staged. Production remains on the pre-convergence release until the complete Create Game rewrite passes cumulative CI + browser validation.
+- [~] 177.47–177.52: Create Game convergence is staged on a **Lean Create** architecture: canonical draft, shared structure helpers, Game → Players → Format → Review workspace, default/flight/player tee inheritance, durable Resume Setup, and TGC-scope hardening. Advanced teams/matchups/foursomes/tee groups remain authoritative in Manage Game after creation; Production remains on the pre-convergence release until cumulative CI + browser validation pass.
 - [ ] Next: Stage 3C draft teams/matchups/foursomes/tee-groups, preserving structure stash/restore and all existing setup work.
 
 ## Batched for next release (small)

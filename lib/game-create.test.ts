@@ -1,4 +1,4 @@
-import { buildGamePayload, buildPlayerRows, splitSkinsTooBig, gameTypeLabel, type GamePayloadOpts } from "./game-create";
+import { buildGamePayload, buildPlayerRows, splitSkinsTooBig, postCreateDestination, gameTypeLabel, type GamePayloadOpts } from "./game-create";
 
 let pass = 0, fail = 0; const fails: string[] = [];
 function eq<T>(name: string, got: T, want: T) { const g = JSON.stringify(got), w = JSON.stringify(want); if (g === w) pass++; else { fail++; fails.push(`${name} (got ${g}, want ${w})`); } }
@@ -48,6 +48,15 @@ eq("split skins 4 ok", splitSkinsTooBig("skins", false, "split", 4), false);
 eq("team skins ok", splitSkinsTooBig("skins", true, "split", 9), false);
 eq("carryover ok", splitSkinsTooBig("skins", false, "carryover", 9), false);
 eq("non-skins ok", splitSkinsTooBig("stableford", false, "split", 9), false);
+eq("stableford creates straight to play", postCreateDestination("stableford", false), { roomTab: "play" });
+eq("stroke creates straight to play", postCreateDestination("stroke", false), { roomTab: "play" });
+eq("individual match hands off to matchups", postCreateDestination("match", false), { roomTab: "setup", setupTab: "matchups" });
+eq("team match hands off to teams", postCreateDestination("match", true), { roomTab: "setup", setupTab: "teams" });
+eq("plain fourball hands off to matchups", postCreateDestination("fourball", false), { roomTab: "setup", setupTab: "matchups" });
+eq("team fourball hands off to teams", postCreateDestination("fourball", true), { roomTab: "setup", setupTab: "teams" });
+eq("trifecta hands off to teams", postCreateDestination("trifecta", false), { roomTab: "setup", setupTab: "teams" });
+eq("individual skins hands off to groups", postCreateDestination("skins", false), { roomTab: "setup", setupTab: "groups" });
+eq("team skins hands off to teams", postCreateDestination("skins", true), { roomTab: "setup", setupTab: "teams" });
 
 // buildPlayerRows
 const tee = { name: "Blue", rating: 71.0, slope: 130 };

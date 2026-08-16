@@ -3,7 +3,7 @@
 import React from "react";
 import { C } from "@/lib/golf";
 
-export type CreateGameSection = "game" | "players" | "format" | "structure" | "review";
+export type CreateGameSection = "game" | "players" | "format" | "review";
 
 export type CreateGameSectionStatus = {
   key: CreateGameSection;

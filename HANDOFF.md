@@ -675,3 +675,6 @@ For changed interactions, do not equate handler reachability with working behavi
 - 177.50 Stage 3B: creation-time tee inheritance is now **individual override -> one-off flight tee -> game default tee**. The maps persist in Resume Setup, old drafts remain compatible, and Create resolves inheritance into explicit player tee/rating/slope/course-handicap snapshots. No migration.
 - Before Stage 3 is complete, move the existing team/matchup/foursome/tee-group structure into pre-create draft state without discarding structure work.
 - Stage 4 remains the atomic core Create transaction after the draft UI is fully characterized and browser-validated.
+
+## Current staging convergence checkpoint — 177.52 Lean Create
+Create Game is intentionally **lean**: Game → Players → Format → Review. Default/flight/player tee inheritance and Resume Setup remain in Create; persisted structural work (teams, matchups, foursomes, tee groups) is completed in Manage Game, which remains the single source of truth for transition policy and structural edits. Stableford/Stroke create into Play; structural formats create into the relevant Manage Game setup section. No migration. Production should not receive the convergence train until cumulative validation is complete.

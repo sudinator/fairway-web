@@ -5037,3 +5037,12 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - **CI correction:** `game-tee-assignment.test.ts` now explicitly types the randomized override maps as `Record<string, number>`, fixing TS2322 caused by TypeScript inferring optional `undefined` properties from `{...} : {}` test branches. Runtime tee logic is unchanged by this typing correction.
 - Adds `ci/check_create_game_resume_and_betting_scope.py` and extends the Create Game state inventory to the new latest-draft ref.
 - Local executed validation: 5,011 tee-assignment assertions; 43 game-create assertions; 2,007 setup-draft assertions; full `npm run guards` including 50,087 workflow/fault simulations. Dependency-backed `tsc/build` remains a GitHub CI gate in this source environment.
+
+## 177.52.260816 — Lean Create pivot: core setup first, structure in Manage Game
+- **Staging-only convergence checkpoint. No migration.** Simplifies Create Game to **Game → Players → Format → Review**. The abandoned Stage 3C pre-create structure draft was not deployed and is not part of this release.
+- Create Game retains the high-value convergence work: canonical draft/resume behavior, roster/guests, default tee → flight tee → individual tee override, format/scoring choices, and core validation.
+- Teams, matchups, foursomes, tee groups, structure stash/restore, and transition-policy enforcement remain owned by persisted **Manage Game** instead of being duplicated into a second draft-state system.
+- Review explicitly tells the organizer when additional setup is required. After Create, Stableford/Stroke go directly to Play; formats requiring structure open Manage Game at the relevant section (Teams, Matchups, or Groups).
+- Split-Skins field-size validation now runs **before the first database write**, preventing an invalid >4-player split-Skins attempt from leaving an orphan game row.
+- Backward compatibility: a saved 177.49–177.51 draft whose workspace section was `structure` resumes safely at Review rather than being discarded.
+- Validation: dedicated game-create helper compile PASS; game-create tests 52/52 PASS in the local dependency-light harness; full source guards and workflow simulation are required below/GitHub before this staging candidate advances.

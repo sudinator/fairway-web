@@ -83,6 +83,22 @@ export function splitSkinsTooBig(gameType: GameTypeOpt, teamMode: boolean, skins
   return gameType === "skins" && !teamMode && skinsMode === "split" && fieldCount > 4;
 }
 
+export type PostCreateDestination = {
+  roomTab: "play" | "setup";
+  setupTab?: "overview" | "details" | "players" | "format" | "teams" | "matchups" | "groups" | "review";
+};
+
+// Lean Create owns only the core game. Formats that need persisted structure hand off
+// directly to the relevant Manage Game section after the game/player rows exist.
+export function postCreateDestination(gameType: GameTypeOpt, teamMode: boolean): PostCreateDestination {
+  if (gameType === "stableford" || gameType === "stroke") return { roomTab: "play" };
+  if (gameType === "trifecta" || ((gameType === "match" || gameType === "fourball" || gameType === "skins") && teamMode)) {
+    return { roomTab: "setup", setupTab: "teams" };
+  }
+  if (gameType === "match" || gameType === "fourball") return { roomTab: "setup", setupTab: "matchups" };
+  return { roomTab: "setup", setupTab: "groups" };
+}
+
 export type RosterMember = { id: string; display_name: string | null; avatar_url?: string | null; handicap_index: number | null };
 export type GuestEntry = { id?: string; display_name: string; handicap_index: number | null; guest_of?: string | null };
 export type PlayerRowsOpts = {

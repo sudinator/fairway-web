@@ -1,6 +1,6 @@
 {
   "name": "fairway-card",
-  "version": "177.51.260816",
+  "version": "177.52.260816",
   "private": true,
   "scripts": {
     "prebuild": "node scripts/check-vapid-key.mjs && node scripts/write-version.mjs",
