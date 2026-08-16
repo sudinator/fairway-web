@@ -497,9 +497,10 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
 }
 
 // Organizer/admin score-change history for a game (reads migration 0042's audit log).
-export function GroupsBuilder({ game, players, onSetTeeGroup, onRandomize, canRandomize = false, randomizeReason = "", randomizing = false, overflowIds = [] }: {
+export function GroupsBuilder({ game, players, onSetTeeGroup, getTeeGroupPolicy, onRandomize, canRandomize = false, randomizeReason = "", randomizing = false, overflowIds = [] }: {
   game: Game; players: Player[];
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
+  getTeeGroupPolicy?: (p: Player, group: number | null) => { blocked: boolean; reason?: string };
   onRandomize?: () => Promise<void>;
   canRandomize?: boolean; randomizeReason?: string; randomizing?: boolean; overflowIds?: string[];
 }) {
@@ -546,6 +547,11 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onRandomize, canRa
           ? "Put the matches that tee off together in the same group — usually two matches make a foursome."
           : "Split players into the groups that tee off together (foursomes, 3-balls, or 2-balls). One scorer per group keeps the cards, or players score themselves."}
       </div>
+      {players.some((p) => (p.scores || []).some((x) => x != null) || p.group_locked) && (
+        <div style={{ background: "rgba(201,162,39,.12)", border: `1px solid ${C.gold}`, borderRadius: 10, padding: "9px 11px", color: C.cream, fontSize: 11.5, lineHeight: 1.45, marginTop: 10 }}>
+          Scoring is in progress. Players who have scored, and finished/locked groups, cannot be moved. An unscored player may join an active group with confirmation.
+        </div>
+      )}
 
       {onRandomize && !foursomes.length && !pairings.length && (
         <div style={{ marginTop: 12 }}>
@@ -576,11 +582,16 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onRandomize, canRa
               <div style={{ color: C.ink, fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis" }}>{u.label}</div>
               <div style={{ color: C.faint, fontSize: 11 }}>{u.members.length} player{u.members.length === 1 ? "" : "s"}</div>
             </div>
-            <select value={g ?? ""} onChange={(e) => assign(u, e.target.value ? parseInt(e.target.value, 10) : null)}
-              style={{ ...inputStyle, padding: "6px 8px", minWidth: 110 }}>
+            {(() => {
+              const unitBlocked = u.members.some((m) => getTeeGroupPolicy?.(m, g).blocked);
+              const unitReason = u.members.map((m) => getTeeGroupPolicy?.(m, g).reason).find(Boolean);
+              return <select value={g ?? ""} onChange={(e) => assign(u, e.target.value ? parseInt(e.target.value, 10) : null)}
+                disabled={unitBlocked} title={unitReason}
+                style={{ ...inputStyle, padding: "6px 8px", minWidth: 110, opacity: unitBlocked ? .5 : 1 }}>
               <option value="">No group</option>
               {groupOptions.map((n) => <option key={n} value={n}>Group {n}</option>)}
-            </select>
+            </select>;
+            })()}
           </div>
         );
       })}

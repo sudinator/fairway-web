@@ -8,6 +8,10 @@ You don't need to read or edit any of this code. The files below are here so
 the app can be deployed. Your job is just the click-through steps your guide
 walked you through (GitHub → Google sign-in setup → Vercel).
 
+## Current game-management behavior
+
+The organizer Game Control Center uses one central transition policy for changes after scoring starts. Safe metadata stays editable; score reinterpretations require an explicit confirmation; structural changes that would rewrite who played whom or delete played golf are blocked. Scored-player tee/handicap edits are treated as whole-round corrections and preserve gross scores.
+
 ## What each part does (for the curious — optional)
 
 - `app/page.tsx` — top-level app entry/composition; feature screens live under `components/`
