@@ -137,8 +137,15 @@ export function OrganizerPanel({
   const [addGuestName, setAddGuestName] = useState("");
   const [addGuestHcp, setAddGuestHcp] = useState("");
   const [addGuestSponsor, setAddGuestSponsor] = useState(""); // sponsor user id; "" -> current user
+  // Setup rosters use a deliberate, stable alphabetical order. Never rely on PostgreSQL
+  // return order: updating a row can change its physical tuple position and otherwise make
+  // that player appear to jump in the UI after a tee/handicap/team edit.
+  const orderedPlayers = useMemo(() => [...players].sort((a, b) =>
+    (a.display_name || "").localeCompare(b.display_name || "", undefined, { sensitivity: "base" }) ||
+    a.id.localeCompare(b.id),
+  ), [players]);
   // Members already in this game can sponsor a walk-up guest (keeps them together when grouping).
-  const gameMembers = players.filter((p) => !p.is_guest && p.user_id).map((p) => ({ id: p.user_id as string, name: p.display_name }));
+  const gameMembers = orderedPlayers.filter((p) => !p.is_guest && p.user_id).map((p) => ({ id: p.user_id as string, name: p.display_name }));
 
 
   const withHcp = players.filter((p) => p.course_handicap != null).length;
@@ -237,7 +244,7 @@ export function OrganizerPanel({
                 {section === "teams" ? "Tap a team to assign each player." : "Set each player's handicap and tee."}
               </span>
             </div>
-            {players.map((p) => {
+            {orderedPlayers.map((p) => {
               const raw = edits[p.id] ?? (p.handicap_index != null ? String(p.handicap_index) : "");
               return (
                 <div
@@ -374,7 +381,7 @@ export function OrganizerPanel({
           {section === "teams" && teams.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginTop: 12 }}>
               {teams.map((t, ti) => {
-                const mem = players.filter((p) => p.team === t.key);
+                const mem = orderedPlayers.filter((p) => p.team === t.key);
                 const accent = teamAccent(t.name, ti);
                 return (
                   <div key={t.key} style={{ background: C.card, borderRadius: 10, padding: 12, border: `1px solid ${accent}` }}>
