@@ -32,6 +32,8 @@ const base: GameSetupDraftInput = {
   team2: "Gold",
   flightMode: "off",
   flightCount: 3,
+  flightTeeIdx: { A: 0, B: 1 },
+  playerTeeOverrides: { p2: 2 },
 };
 
 const legacyExpected = {
@@ -54,6 +56,8 @@ const legacyExpected = {
   team2: base.team2,
   flightMode: base.flightMode,
   flightCount: base.flightCount,
+  flightTeeIdx: base.flightTeeIdx,
+  playerTeeOverrides: base.playerTeeOverrides,
   selectedPlayers: base.selectedPlayers,
   guestPlayers: base.guestPlayers,
 };
@@ -64,6 +68,11 @@ eq(buildGameSetupDraft(base).players.handicapOverrides, { p2: 11.3 }, "live hand
 const legacy: SetupDraft = { v: 1, savedAt: 123, ...legacyExpected };
 eq(toLegacySetupData(fromLegacySetupDraft(legacy)), legacyExpected, "legacy resume round-trip stays identical");
 eq(fromLegacySetupDraft(legacy).players.handicapOverrides, {}, "legacy draft does not invent non-persisted overrides");
+const oldLegacyWithoutTeeMaps: SetupDraft = { ...legacy };
+delete (oldLegacyWithoutTeeMaps as any).flightTeeIdx;
+delete (oldLegacyWithoutTeeMaps as any).playerTeeOverrides;
+eq(fromLegacySetupDraft(oldLegacyWithoutTeeMaps).flights.teeIdxByFlight, {}, "pre-177.50 draft resumes with no invented flight tees");
+eq(fromLegacySetupDraft(oldLegacyWithoutTeeMaps).tees.playerOverrides, {}, "pre-177.50 draft resumes with no invented player tee overrides");
 
 const gameTypes = ["stableford", "stroke", "match", "fourball", "skins", "trifecta"] as const;
 for (let i = 0; i < 2000; i++) {
@@ -82,6 +91,8 @@ for (let i = 0; i < 2000; i++) {
     selectedPlayers: { me: true, [`p${i % 9}`]: i % 2 === 0 },
     guestPlayers: i % 4 ? [] : [{ id: `g${i}`, display_name: `Guest ${i}`, handicap_index: i % 3 ? i / 100 : null, guest_of: "me" }],
     hcpOverrides: i % 7 ? {} : { [`p${i % 9}`]: i / 100 },
+    flightTeeIdx: i % 3 ? {} : { A: i % 5, B: (i + 1) % 5 },
+    playerTeeOverrides: i % 4 ? {} : { [`p${i % 9}`]: i % 5 },
   };
   const d = buildGameSetupDraft(input);
   const expected = {
@@ -90,6 +101,7 @@ for (let i = 0; i < 2000; i++) {
     trifectaScoring: input.trifectaScoring, strokeBasis: input.strokeBasis, fmtFamily: input.fmtFamily,
     matchKind: input.matchKind, teamMode: input.teamMode, skinsTeamStyle: input.skinsTeamStyle, skinsMode: input.skinsMode,
     team1: input.team1, team2: input.team2, flightMode: input.flightMode, flightCount: input.flightCount,
+    flightTeeIdx: input.flightTeeIdx, playerTeeOverrides: input.playerTeeOverrides,
     selectedPlayers: input.selectedPlayers, guestPlayers: input.guestPlayers,
   };
   eq(toLegacySetupData(d), expected, `differential legacy shape ${i}`);

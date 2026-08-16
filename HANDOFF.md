@@ -672,5 +672,6 @@ For changed interactions, do not equate handler reachability with working behavi
 - 177.47: canonical Create Game draft/state inventory foundation.
 - 177.48: pure game-structure mutations with differential characterization.
 - 177.49 Stage 3A: shared Create Game navigation workspace (**Game -> Players -> Format -> Teams & groups -> Review**) using existing parent state/handlers. No persistence ownership moved; no migration.
-- Before Stage 3 is complete, add the agreed tee-resolution hierarchy (**individual override -> flight tee -> game default tee**) and move the existing team/matchup/foursome/tee-group structure into pre-create draft state without discarding structure work.
+- 177.50 Stage 3B: creation-time tee inheritance is now **individual override -> one-off flight tee -> game default tee**. The maps persist in Resume Setup, old drafts remain compatible, and Create resolves inheritance into explicit player tee/rating/slope/course-handicap snapshots. No migration.
+- Before Stage 3 is complete, move the existing team/matchup/foursome/tee-group structure into pre-create draft state without discarding structure work.
 - Stage 4 remains the atomic core Create transaction after the draft UI is fully characterized and browser-validated.

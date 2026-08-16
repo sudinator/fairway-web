@@ -43,6 +43,10 @@ export type GameSetupDraft = {
   flights: {
     mode: "off" | "oneoff";
     count: number;
+    teeIdxByFlight: Record<string, number>;
+  };
+  tees: {
+    playerOverrides: Record<string, number>;
   };
 };
 
@@ -69,6 +73,8 @@ export type GameSetupDraftInput = {
   team2: string;
   flightMode: "off" | "oneoff";
   flightCount: number;
+  flightTeeIdx: Record<string, number>;
+  playerTeeOverrides: Record<string, number>;
 };
 
 export function buildGameSetupDraft(i: GameSetupDraftInput): GameSetupDraft {
@@ -99,14 +105,15 @@ export function buildGameSetupDraft(i: GameSetupDraftInput): GameSetupDraft {
       skinsMode: i.skinsMode,
     },
     structure: { team1: i.team1, team2: i.team2 },
-    flights: { mode: i.flightMode, count: i.flightCount },
+    flights: { mode: i.flightMode, count: i.flightCount, teeIdxByFlight: i.flightTeeIdx },
+    tees: { playerOverrides: i.playerTeeOverrides },
   };
 }
 
 export type LegacySetupData = Omit<SetupDraft, "v" | "savedAt">;
 
-// Compatibility adapter for the existing device-local setup draft. Keeping this
-// byte-for-byte shape stable is Stage 1's core behavior-preservation guarantee.
+// Compatibility adapter for the device-local setup draft. Stage 3 extends the saved shape only
+// with optional tee-inheritance maps; all pre-177.50 drafts remain valid and resume with empty maps.
 export function toLegacySetupData(d: GameSetupDraft): LegacySetupData {
   return {
     name: d.game.name,
@@ -128,6 +135,8 @@ export function toLegacySetupData(d: GameSetupDraft): LegacySetupData {
     team2: d.structure.team2,
     flightMode: d.flights.mode,
     flightCount: d.flights.count,
+    flightTeeIdx: d.flights.teeIdxByFlight,
+    playerTeeOverrides: d.tees.playerOverrides,
     selectedPlayers: d.players.selectedPlayers,
     guestPlayers: d.players.guestPlayers,
   };
@@ -157,5 +166,7 @@ export function fromLegacySetupDraft(d: SetupDraft): GameSetupDraft {
     team2: d.team2,
     flightMode: d.flightMode === "oneoff" ? "oneoff" : "off",
     flightCount: d.flightCount && d.flightCount >= 2 && d.flightCount <= 4 ? d.flightCount : 3,
+    flightTeeIdx: d.flightTeeIdx || {},
+    playerTeeOverrides: d.playerTeeOverrides || {},
   });
 }

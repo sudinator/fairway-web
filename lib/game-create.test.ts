@@ -92,5 +92,24 @@ const rosterBase = {
   eq("flight assigned", rows[0].flight, "A");
 }
 
+{
+  const tees = [tee, { name: "White", rating: 69.0, slope: 120 }, { name: "Red", rating: 67.0, slope: 112 }];
+  const bands = [{ key: "A", name: "Flight A", hi: 12 }, { key: "B", name: "Flight B", hi: null }] as any;
+  const roster = [
+    { id: "me", display_name: "Me", avatar_url: null, handicap_index: 10 },
+    { id: "p2", display_name: "Bob", avatar_url: null, handicap_index: 18 },
+  ];
+  const rows = buildPlayerRows({ ...rosterBase, groupRoster: roster, selectedPlayers: { p2: true }, tees, defaultTeeIdx: 0,
+    flightMode: "oneoff", flightBands: bands, flightTeeIdx: { B: 1 }, playerTeeOverrides: { me: 2 } });
+  eq("player tee override wins", rows.find((r) => r.user_id === "me")?.tee_name, "Red");
+  eq("flight tee wins over default", rows.find((r) => r.user_id === "p2")?.tee_name, "White");
+  eq("override CH uses override tee", rows.find((r) => r.user_id === "me")?.course_handicap, Math.round(10 * (112 / 113) + (67 - 72)));
+}
+{
+  const tees = [tee, { name: "White", rating: 69.0, slope: 120 }];
+  const rows = buildPlayerRows({ ...rosterBase, tees, defaultTeeIdx: 0, guestPlayers: [{ id: "guest-1", display_name: "G", handicap_index: 12, guest_of: "me" }], playerTeeOverrides: { "guest-1": 1 } });
+  eq("guest override persisted", rows.find((r) => r.is_guest)?.tee_name, "White");
+}
+
 console.log(`game-create: ${pass} passed, ${fail} failed`);
 if (fail) { console.error(fails.join("\n")); process.exit(1); }

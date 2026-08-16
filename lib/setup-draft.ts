@@ -26,6 +26,9 @@ export type SetupDraft = {
   team2: string;
   flightMode?: string;
   flightCount?: number;
+  // Create Game tee inheritance (177.50+). Optional so all older saved drafts still load.
+  flightTeeIdx?: Record<string, number>;
+  playerTeeOverrides?: Record<string, number>;
   selectedPlayers: Record<string, boolean>;
   guestPlayers: { id: string; display_name: string; handicap_index: number | null; guest_of: string }[];
 };

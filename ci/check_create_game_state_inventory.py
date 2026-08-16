@@ -14,7 +14,7 @@ actual_refs = set(re.findall(r'const\s+([A-Za-z0-9_]+)\s*=\s*React\.useRef', blo
 domain = {
   'name','matchDate','pickedFav','teeIdx','idxStr','gameType','allowancePct','flightMode','flightCount',
   'hcpOverrides','teamScoreMode','trifectaScoring','strokeBasis','fmtFamily','matchKind','teamMode',
-  'skinsTeamStyle','skinsMode','team1','team2','selectedPlayers','guestPlayers',
+  'skinsTeamStyle','skinsMode','team1','team2','selectedPlayers','guestPlayers','teeAssignments',
 }
 context = {'favorites','profileIdx','groupRoster'}
 transient = {'flightHcpDraft','guestName','guestHcp','guestSponsor','guestIdxEdits'}

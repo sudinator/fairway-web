@@ -5018,3 +5018,13 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Review now provides a pre-create summary and is the only section that exposes the final Create game action. The underlying `create()` function, Supabase writes, tee-time linkage, notifications, draft persistence, player-row payloads, and post-create routing are unchanged.
 - Structural formats deliberately retain today's behavior in this checkpoint: detailed team/matchup/foursome assignment still occurs immediately after creation. Stage 3B will move those existing structural rules into draft mode and add flight/player tee overrides before this convergence train is eligible for Production.
 - Adds a permanent Create Game workspace contract guard proving five-section reachability and that the shared workspace owns no Supabase/RPC/local persistence.
+
+## 177.50.260816 — Create Game convergence Stage 3B: tee inheritance
+- **Staging-only convergence checkpoint. No migration.** Adds the agreed creation-time tee hierarchy: **individual player override → one-off flight tee → game default tee**.
+- The Game section still sets one convenient default tee for the field. Players can now override exceptions individually, and one-off Flights can choose a tee for each flight. Explicit player overrides always win over flight/default choices.
+- Changing the field default updates only inherited players; it does not erase flight or player overrides. Changing course clears all tee-index overrides because those indexes belong to the prior course.
+- Resume Setup persists the new optional player/flight tee maps while remaining backward-compatible with pre-177.50 drafts, which resume with empty maps.
+- `buildPlayerRows()` resolves the effective tee once at Create and writes explicit per-player `tee_name`, `rating`, `slope`, and `course_handicap` snapshots. There is no post-create inheritance. Existing callers that omit the new optional inputs remain differentially identical to 177.49 behavior.
+- New pure `lib/game-tee-assignment.ts` centralizes resolution and is protected by `ci/check_create_game_tee_inheritance.py`. Dedicated tests cover 5,011 precedence/sanitization assertions; draft compatibility has 2,006 assertions; existing `game-create` baseline differential remains 9,000/9,000 identical when hierarchy inputs are absent.
+- Detailed teams/matchups/foursomes/tee-groups are still post-create in this checkpoint. Stage 3C will move those existing structural editors into draft mode before Stage 4 atomic creation.
+
