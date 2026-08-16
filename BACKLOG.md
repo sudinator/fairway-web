@@ -3,7 +3,7 @@
 Running list of things to build or tighten. Newest ideas near the top of each section.
 
 ## Create Game convergence — staging release train
-- [~] 177.47–177.55: Create Game convergence uses the **Lean Create** architecture: canonical draft, shared structure helpers, Game → Players → Format → Review workspace, default/flight/player tee inheritance, durable Resume Setup, TGC-scope hardening, and the restored guided Stroke / Match Play format hierarchy with clarified team naming. Advanced teams/matchups/foursomes/tee groups remain authoritative in Manage Game after creation; Production remains on the pre-convergence release until cumulative CI + browser validation pass.
+- [~] 177.47–177.56: Create Game convergence uses the **Lean Create** architecture: canonical draft, shared structure helpers, Game → Players → Format → Review workspace, default/flight/player tee inheritance, durable Resume Setup, TGC-scope hardening, and the restored guided Stroke / Match Play format hierarchy with clarified team naming, Production-faithful selector styling, and corrected custom handicap-allowance editing. Advanced teams/matchups/foursomes/tee groups remain authoritative in Manage Game after creation; Production remains on the pre-convergence release until cumulative CI + browser validation pass.
 - [x] Full pre-create structural draft rejected by design: it duplicated Manage Game state and added risk without meaningful capability. Lean Create hands structural formats to Manage Game after the core game exists.
 - [ ] Before Production: de novo 177.46 Production → final staging line-by-line contract comparison, complete format-selection matrix browser QA, adjacent Create → Manage → Play scenarios, full release gate, then one cumulative staging → main PR.
 

@@ -96,6 +96,7 @@ import { CreateGameWorkspace, type CreateGameSection } from "@/components/game/s
 import { buildFormatPatch, buildSkinsStylePatch, buildMatchTeamPatch } from "@/lib/game-structure";
 import { resolveCreateGameTee, teeSourceLabel } from "@/lib/game-tee-assignment";
 import { formatReviewLabel } from "@/lib/create-game-format";
+import { commitAllowance, editAllowance } from "@/lib/handicap-allowance";
 import { FormatFamilySelector } from "@/components/game/setup/format-family-selector";
 
 // Stable match identity for a player. Real players key on user_id (so nothing
@@ -241,6 +242,10 @@ function CreateGame({
   // Default 85 for four-ball, 100 otherwise. Resets to the standard when the
   // format changes; editable any time.
   const [allowancePct, setAllowancePct] = useState(100);
+  // Keep the custom allowance editor as text while the user is typing so deleting
+  // the value can leave a genuinely blank field. Blank means no custom override
+  // and resolves to the default 100% domain value.
+  const [allowanceInput, setAllowanceInput] = useState("100");
   // Flights (Stage 1: one-off per-event). "off" | "oneoff". Season "league" is Stage 2.
   const [flightMode, setFlightMode] = useState<"off" | "oneoff">("off");
   const [flightCount, setFlightCount] = useState(3);
@@ -250,7 +255,12 @@ function CreateGame({
   // In-progress text for each missing-handicap field, so a row stays put while typing and
   // only commits (leaving the "needs" list) when the organizer taps Set.
   const [flightHcpDraft, setFlightHcpDraft] = useState<Record<string, string>>({});
-  useEffect(() => { setAllowancePct(gameType === "fourball" || gameType === "trifecta" ? 85 : 100); }, [gameType]);
+  const selectGameType = (nextType: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => {
+    setGameType(nextType);
+    const nextAllowance = nextType === "fourball" || nextType === "trifecta" ? 85 : 100;
+    setAllowancePct(nextAllowance);
+    setAllowanceInput(String(nextAllowance));
+  };
   const [teamScoreMode, setTeamScoreMode] = useState<"best_ball" | "aggregate">("best_ball");
   const [trifectaScoring, setTrifectaScoring] = useState<"per_hole" | "match">("per_hole");
   const [strokeBasis, setStrokeBasis] = useState<"gross" | "net">("net");
@@ -421,7 +431,7 @@ function CreateGame({
     resumedRef.current = true;
     guestsSeeded.current = true; // don't re-seed tee-time guests over the restored ones
     setName(d.name); setMatchDate(d.matchDate); setTeeIdx(d.teeIdx); setIdxStr(d.idxStr);
-    setGameType(d.gameType as any); setAllowancePct(d.allowancePct); setTeamScoreMode(d.teamScoreMode as any);
+    setGameType(d.gameType as any); setAllowancePct(d.allowancePct); setAllowanceInput(String(d.allowancePct ?? 100)); setTeamScoreMode(d.teamScoreMode as any);
     setTrifectaScoring(d.trifectaScoring as any); setStrokeBasis(d.strokeBasis as any); setFmtFamily(d.fmtFamily as any);
     setMatchKind(d.matchKind as any); setTeamMode(d.teamMode); setSkinsTeamStyle(d.skinsTeamStyle as any);
     setSkinsMode(d.skinsMode as any); setTeam1(d.team1); setTeam2(d.team2);
@@ -980,36 +990,36 @@ function CreateGame({
           onChange={(family) => {
             if (family === "stroke") {
               setFmtFamily("stroke");
-              if (gameType === "match" || gameType === "fourball" || gameType === "trifecta") setGameType("stableford");
+              if (gameType === "match" || gameType === "fourball" || gameType === "trifecta") selectGameType("stableford");
               else if (gameType === "skins") { setTeamMode(false); setSkinsTeamStyle("head_to_head"); }
             } else {
               setFmtFamily("match");
               const bb = gameType === "skins" && teamMode && skinsTeamStyle === "best_ball";
-              if (!bb && (gameType === "stableford" || gameType === "stroke" || gameType === "skins")) setGameType(matchKind === "team" ? "fourball" : "match");
+              if (!bb && (gameType === "stableford" || gameType === "stroke" || gameType === "skins")) selectGameType(matchKind === "team" ? "fourball" : "match");
             }
           }}
         />
         {fmtFamily === "stroke" ? (
           <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-            <button onClick={() => setGameType("stableford")} style={{ ...btn(gameType === "stableford"), flex: 1, minWidth: 100, fontSize: 13 }}>Stableford</button>
-            <button onClick={() => setGameType("stroke")} style={{ ...btn(gameType === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Stroke play</button>
-            <button onClick={() => { setGameType("skins"); setTeamMode(false); setSkinsTeamStyle("head_to_head"); }} style={{ ...btn(gameType === "skins" && fmtFamily === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Skins</button>
+            <button onClick={() => selectGameType("stableford")} style={{ ...btn(gameType === "stableford"), flex: 1, minWidth: 100, fontSize: 13 }}>Stableford</button>
+            <button onClick={() => selectGameType("stroke")} style={{ ...btn(gameType === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Stroke play</button>
+            <button onClick={() => { selectGameType("skins"); setTeamMode(false); setSkinsTeamStyle("head_to_head"); }} style={{ ...btn(gameType === "skins" && fmtFamily === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Skins</button>
           </div>
         ) : (
           <>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button onClick={() => { setMatchKind("ind"); setGameType("match"); }} style={{ ...btn(matchKind === "ind"), flex: 1, fontSize: 13 }}>Individual</button>
-              <button onClick={() => { setMatchKind("team"); if (gameType !== "fourball" && gameType !== "trifecta") setGameType("fourball"); }} style={{ ...btn(matchKind === "team"), flex: 1, fontSize: 13 }}>Team</button>
+              <button onClick={() => { setMatchKind("ind"); selectGameType("match"); }} style={{ ...btn(matchKind === "ind"), flex: 1, fontSize: 13 }}>Individual</button>
+              <button onClick={() => { setMatchKind("team"); if (gameType !== "fourball" && gameType !== "trifecta") selectGameType("fourball"); }} style={{ ...btn(matchKind === "team"), flex: 1, fontSize: 13 }}>Team</button>
             </div>
             {matchKind === "ind" ? (
               <div style={{ marginTop: 8 }}>
-                <button onClick={() => setGameType("match")} style={{ ...btn(gameType === "match"), width: "100%", fontSize: 13 }}>Singles match</button>
+                <button onClick={() => selectGameType("match")} style={{ ...btn(gameType === "match"), width: "100%", fontSize: 13 }}>Singles match</button>
               </div>
             ) : (
               <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                <button onClick={() => setGameType("fourball")} style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 104, fontSize: 13 }}>Four-ball</button>
-                <button onClick={() => setGameType("trifecta")} style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 104, fontSize: 13 }}>Trifecta</button>
-                <button onClick={() => { setGameType("skins"); setTeamMode(true); setSkinsTeamStyle("best_ball"); }} style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 104, fontSize: 13 }}>Skins</button>
+                <button onClick={() => selectGameType("fourball")} style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 104, fontSize: 13 }}>Four-ball</button>
+                <button onClick={() => selectGameType("trifecta")} style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 104, fontSize: 13 }}>Trifecta</button>
+                <button onClick={() => { selectGameType("skins"); setTeamMode(true); setSkinsTeamStyle("best_ball"); }} style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 104, fontSize: 13 }}>Skins</button>
               </div>
             )}
           </>
@@ -1166,13 +1176,22 @@ function CreateGame({
           <label style={{ color: C.sage, fontSize: 12 }}>Handicap allowance</label>
           <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
             {[100, 90, 85].map((amt) => (
-              <button key={amt} onClick={() => setAllowancePct(amt)} style={{ ...btn(allowancePct === amt), fontSize: 13, padding: "8px 14px" }}>{amt}%</button>
+              <button key={amt} onClick={() => { setAllowancePct(amt); setAllowanceInput(String(amt)); }} style={{ ...btn(allowancePct === amt), fontSize: 13, padding: "8px 14px" }}>{amt}%</button>
             ))}
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <input
                 type="number"
-                value={allowancePct}
-                onChange={(e) => setAllowancePct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                value={allowanceInput}
+                onChange={(e) => {
+                  const next = editAllowance(e.target.value);
+                  setAllowanceInput(next.text);
+                  setAllowancePct(next.pct);
+                }}
+                onBlur={() => {
+                  const next = commitAllowance(allowanceInput);
+                  setAllowanceInput(next.text);
+                  setAllowancePct(next.pct);
+                }}
                 style={{ ...inputStyle, width: 64, padding: "8px 10px", fontSize: 13, textAlign: "center" }}
               />
               <span style={{ color: C.sage, fontSize: 13 }}>%</span>

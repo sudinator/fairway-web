@@ -1,3 +1,10 @@
+## 177.56.260816 — Format UI Fidelity + Handicap Input Polish
+- Locks the shared Stroke / Match Play selector to the proven Production BNN geometry, icons, colors, typography, spacing, and selected-state treatment used by Create Game; Manage Game continues to consume the same shared selector.
+- Fixes the Create Game custom handicap-allowance editor so deleting the value leaves a genuinely blank field instead of forcing `0`. While blank, the domain value safely falls back to the default `100%`; leaving the field restores the visible value to `100`.
+- Replaces the broad allowance reset effect with explicit format-selection defaults so a resumed custom allowance (for example 92%) is not overwritten merely because the saved game type is restored.
+- Adds pure allowance-edit/commit tests plus permanent source-contract checks for the blank/default behavior and Production selector styling.
+- No scoring, database, setup-policy, or persistence schema behavior changed. No migration.
+
 ## 177.55.260816 — Cumulative Guided Format Restore + Shared Create/Manage Selector
 - Create Game Four-ball wording: **Create named teams** is now **Create Team Names (Red vs Blue)**. Underlying `teamMode` and team-name persistence are unchanged.
 - Manage Game → Format now uses the same shared Stroke / Match Play family cards and icons as Create Game. The family cards only filter which format choices are shown; the persisted game changes only when a specific format is selected, so the existing setup-policy ALLOW/CONFIRM/BLOCK gate remains authoritative.

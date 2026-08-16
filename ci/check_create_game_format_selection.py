@@ -12,11 +12,14 @@ checks = {
     "stroke formats preserved": '>Stableford<' in create_src and '>Stroke play<' in create_src and '>Skins<' in create_src,
     "match hierarchy preserved": '>Individual<' in create_src and '>Team<' in create_src and '>Singles match<' in create_src and '>Four-ball<' in create_src and '>Trifecta<' in create_src,
     "fourball team-name label clarified": 'Create Team Names (Red vs Blue)' in create_src and 'Create named teams (e.g. Red vs Blue)' not in create_src and 'Team four-ball (Red vs Blue)' not in create_src,
-    "custom handicap allowance restored": 'type="number"' in create_src and 'setAllowancePct(Math.max(0, Math.min(100' in create_src and '[100, 90, 85].map' in create_src,
+    "custom handicap allowance restored": 'type="number"' in create_src and 'value={allowanceInput}' in create_src and 'editAllowance(e.target.value)' in create_src and 'commitAllowance(allowanceInput)' in create_src and '[100, 90, 85].map' in create_src,
+    "custom allowance resume is not overwritten": 'setGameType(d.gameType as any); setAllowancePct(d.allowancePct); setAllowanceInput(String(d.allowancePct ?? 100))' in create_src and 'const selectGameType =' in create_src and 'useEffect(() => { setAllowancePct' not in create_src,
     "manage format keeps policy gate": 'policy({ type: "set_format", target: key })' in manage_src and 'd.decision !== "block"' in manage_src,
     "manage family cards are presentation only": 'The family cards only filter the choices; the game changes when you select a format.' in manage_src,
     "review keeps detailed shape": 'formatReviewLabel({ gameType, teamMode, skinsTeamStyle, teamScoreMode, trifectaScoring, strokeBasis, skinsMode })' in create_src,
     "pure mapping helper retained": 'export function formatReviewLabel' in helper and 'export function reachableFormatKeys' in helper,
+    "production selector geometry retained": 'borderRadius: 12' in shared and 'padding: 11' in shared and 'width: 34, height: 34' in shared and 'fontFamily: "Georgia, serif"' in shared,
+    "production selected-state treatment retained": 'background: active ? C.green : C.greenLight' in shared and 'C.gold : "transparent"' in shared,
 }
 failed = [name for name, ok in checks.items() if not ok]
 if failed:

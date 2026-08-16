@@ -17,7 +17,7 @@ domain = {
   'skinsTeamStyle','skinsMode','team1','team2','selectedPlayers','guestPlayers','teeAssignments',
 }
 context = {'favorites','profileIdx','groupRoster'}
-transient = {'flightHcpDraft','guestName','guestHcp','guestSponsor','guestIdxEdits'}
+transient = {'flightHcpDraft','guestName','guestHcp','guestSponsor','guestIdxEdits','allowanceInput'}
 runtime = {'busy','err','draftAvailable','draftDismissed','pendingFavName','createSection'}
 expected_state = domain | context | transient | runtime
 expected_refs = {'hydratedRef','resumedRef','guestsSeeded','latestDraftRef'}
