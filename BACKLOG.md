@@ -41,10 +41,9 @@ Living list. `[x]` = built & verified in code (file noted). `[~]` = partially do
 
 ### Setup / Manage Game redesign
 - [x] 177.40 preparatory extraction: move the existing post-create setup render/navigation boundary into `components/game/setup/game-setup-workspace.tsx` with zero intended behavior change. Database writes and mutation handlers remain in `GameRoom`; permanent reachability/source-contract guards protect the boundary.
-- [x] 177.41 Persistent Game Control Center UX: replace the one-way post-create setup stepper with revisitable Game / Players / Format / Teams & Groups / Review sections, including access back to the saved game details before scoring. 177.45 adds atomic pre-score course replacement: course/par/hole metadata change together, old player tee/rating/slope/course-handicap snapshots are cleared, and deliberate new tee selection is required.
+- [x] 177.41 Persistent Game Control Center UX: replace the one-way post-create setup stepper with revisitable Game / Players / Format / Teams & Groups / Review sections, including access back to the saved game details before scoring. Course replacement remains a separate semantic change because it must coordinate holes/tees/player snapshots safely.
 - [x] 177.42 setup roster ordering fix: Players and team-assignment rosters are now alphabetized with a stable id tie-breaker, so a tee/handicap/team save followed by `load()` cannot move the edited player merely because PostgreSQL returned rows in a different physical order.
 - [x] 177.44 Policy test-fixture correction: add the required `Game.code` field to the dedicated transition-policy test fixture so dependency-backed TypeScript/CI can compile the suite; no runtime behavior change.
-- [x] 177.45 Game section + atomic pre-score course correction: rename Details to Game; move live link, End/Reopen, Reset and Delete to game-level controls with a Danger Zone; keep Format competition-only; allow organizer course replacement only before scoring through migration 0138, clearing old tee/rating/slope/course-handicap snapshots and requiring deliberate new tee selection.
 - [x] 177.43 Central setup transition policy: one pure ALLOW / CONFIRM / BLOCK policy now governs organizer edits. Structural identity freezes at the first score; individual scorecard reinterpretations remain available with confirmation; scored-player removal/team/group moves are blocked; tee/handicap corrections are explicit whole-round corrections. Course replacement remains a separate pre-score-only implementation.
 
 ### Features
@@ -454,3 +453,8 @@ Still open (lower priority, honestly assessed):
 ## Environment clarity / course provenance
 - [x] 177.21 candidate: staging-only persistent yellow safe-area-aware border + STAGING badge; pending full release gate/live validation.
 - [x] 177.21 candidate: Add New Course identifies an existing canonical BNN course at provider selection time, shows stored BNN data as primary, and exposes fresh provider data separately for explicit review; pending Production validation.
+
+
+## Game Control Center polish — completed in 177.46
+- [x] Rename Danger Zone to **Destructive Actions** with explicit **These actions cannot be undone.** warning.
+- [x] Correct Match overview structure summary so matched-player progress is not mislabeled as team assignments.

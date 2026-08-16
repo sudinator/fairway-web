@@ -1,13 +1,5 @@
 # Birdie Num Num — Deploy & Migration Notes
 
-## 177.45.260816 — Game section + atomic pre-score course correction
-- Rename Control Center Details to Game.
-- Move live sharing, End/Reopen, Reset Scores, and Delete into Game; Reset/Delete live in a Danger Zone.
-- Keep Format focused on scoring/competition settings.
-- Add migration 0138 and `change_game_course_before_scoring`: organizer-only, active-game, zero-score atomic course replacement.
-- Course change replaces course/par/hole metadata, clears every player tee/rating/slope/course handicap, resizes blank per-hole state, and preserves roster/structure.
-- No cross-course tee inference; organizer must deliberately reselect tees.
-
 ## Convention
 - Every database migration's full SQL is pasted **inline in the chat** at delivery
   time (not just shipped in the bundle), so it can be run without opening files.
@@ -4995,3 +4987,11 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Ended games show `FINAL` in the Control Center. Competition edits require reopen first; reopening does not bypass score-state rules. Rename/share remain safe metadata actions; game-date correction remains available with confirmation because the existing RPC moves posted rounds together.
 - Adds 41 executable policy assertions plus a permanent source-contract guard proving UI and write handlers both consume the same pure policy module.
 - **No database migration.** Course replacement remains intentionally out of scope: it is allowed conceptually only before any score, but still requires a separate coordinated course/hole/player-tee implementation.
+
+
+## 177.46.260816 — Game Control Center terminology and summary polish
+- Renames the Game section's destructive-control heading from **Danger Zone** to **Destructive Actions** and adds the explicit warning **These actions cannot be undone.**
+- Keeps Reset Scores and Delete This Game visually separated from routine game controls; no mutation handlers or confirmation behavior change.
+- Corrects the Control Center overview summary for individual Match games so it reports matched players rather than team assignments. Team formats continue to report team assignments; non-team/non-match formats report tee-group placement.
+- Presentation-only release: no scoring, setup-policy, database-write, RPC, migration, or schema behavior changes.
+- Version 177.46.260816. No migration.

@@ -98,11 +98,17 @@ export function GameSetupWorkspace({
     else onSetupTabChange(key);
   };
 
+  const structureSummary = usesTeams
+    ? `${cWithTeam}/${total} team assignments · ${cGrouped}/${total} grouped`
+    : usesMatchups
+      ? `${cPlaced}/${total} matched · ${cGrouped}/${total} grouped`
+      : `${cGrouped}/${total} grouped`;
+
   const summary = [
     { key: "details" as const, title: "Game", sub: `${game.course}${(game as any).played_at ? ` · ${String((game as any).played_at).slice(0, 10)}` : ""}`, done: true },
     { key: "players" as const, title: "Players", sub: `${total} player${total === 1 ? "" : "s"} · ${cWithHcp}/${total} handicaps set`, done: playersDone },
     { key: "format" as const, title: "Format", sub: `${game.game_type.replace("fourball", "Four-ball")} · ${game.allowance_pct ?? 100}%`, done: true },
-    { key: "structure" as const, title: "Teams & groups", sub: usesTeams || usesMatchups ? `${cWithTeam}/${total} team assignments · ${cGrouped}/${total} grouped` : `${cGrouped}/${total} grouped`, done: structureDone },
+    { key: "structure" as const, title: "Teams & groups", sub: structureSummary, done: structureDone },
     { key: "review" as const, title: "Review", sub: allDone ? "Setup looks good" : "Setup items remain", done: allDone },
   ];
 
@@ -210,8 +216,9 @@ export function GameSetupWorkspace({
           </div>
 
           <div style={{ ...cardStyle, marginTop: 10, border: "1px solid rgba(214,96,83,.55)" }}>
-            <div style={{ color: "#F0B0A8", fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>DANGER ZONE</div>
-            <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Reset clears all scoring and clocks but keeps players and game structure.</div>
+            <div style={{ color: "#F0B0A8", fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>DESTRUCTIVE ACTIONS</div>
+            <div style={{ color: "#F0B0A8", fontSize: 11.5, fontWeight: 700, marginTop: 6 }}>These actions cannot be undone.</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>Reset clears all scoring and clocks but keeps players and game structure.</div>
             <button style={{ background: "#3F3414", color: "#E4CF86", border: `0.5px solid ${C.gold}`, borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 13, display: "block" }} onClick={organizerPanelProps.onReset}>↺ Reset scores</button>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 12 }}>Delete permanently removes this game.</div>
             <button style={{ background: "#5A1E1E", color: "#F6DEDB", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 13, display: "block" }} onClick={organizerPanelProps.onDelete}>Delete this game</button>
