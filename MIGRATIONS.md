@@ -134,7 +134,7 @@ Total: 122 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [x] 0135_ledger_backfill.sql
 - [x] 0136_core_rls_helpers.sql
 - [x] 0137_core_rls_baseline.sql
-- [ ] 0138_change_game_course_before_scoring.sql — 177.45 atomic pre-score course replacement; apply to staging before browser validation, then Production before/with release promotion.
+- [x] 0138_change_game_course_before_scoring.sql — 177.45 atomic pre-score course replacement. Confirmed applied in staging and Production on 2026-08-16; the schema_migrations ledger remains authoritative.
 
 <!-- VERIFIED_LEDGER_17740 -->
 - **Production/staging ledger reconciliation (177.40, 2026-08-15 US/Eastern):** `schema_migrations` was checked directly. Production records `baseline_through_0110`, every migration 0111-0128, 0130-0137; 0129 is an intentional reserved numbering gap. Staging and Production both applied/verified 0135 -> 0136 -> 0137, with the 12 core RLS tables exposing the expected 60 policies. The real staging integration harness passed after application and the Production smoke test passed. `schema_migrations` remains authoritative; these checkboxes are the human mirror only.

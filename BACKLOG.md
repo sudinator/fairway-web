@@ -3,7 +3,7 @@
 Running list of things to build or tighten. Newest ideas near the top of each section.
 
 ## Create Game convergence — staging release train
-- [~] 177.47–177.56: Create Game convergence uses the **Lean Create** architecture: canonical draft, shared structure helpers, Game → Players → Format → Review workspace, default/flight/player tee inheritance, durable Resume Setup, TGC-scope hardening, and the restored guided Stroke / Match Play format hierarchy with clarified team naming, Production-faithful selector styling, and corrected custom handicap-allowance editing. Advanced teams/matchups/foursomes/tee groups remain authoritative in Manage Game after creation; Production remains on the pre-convergence release until cumulative CI + browser validation pass.
+- [~] 177.47–177.58: Create Game convergence uses the **Lean Create** architecture: canonical draft, shared structure helpers, Game → Players → Format → Review workspace, default/flight/player tee inheritance, durable Resume Setup, TGC-scope hardening, and the restored guided Stroke / Match Play format hierarchy with clarified team naming, Production-faithful selector styling, and corrected custom handicap-allowance editing. Advanced teams/matchups/foursomes/tee groups remain authoritative in Manage Game after creation; Production remains on the pre-convergence release until cumulative CI + browser validation pass.
 - [x] Full pre-create structural draft rejected by design: it duplicated Manage Game state and added risk without meaningful capability. Lean Create hands structural formats to Manage Game after the core game exists.
 - [ ] Before Production: de novo 177.46 Production → final staging line-by-line contract comparison, complete format-selection matrix browser QA, adjacent Create → Manage → Play scenarios, full release gate, then one cumulative staging → main PR.
 
@@ -472,7 +472,7 @@ Still open (lower priority, honestly assessed):
 - [ ] Later draft-schema enhancement: persist committed flight handicap overrides across interrupted Create Game setup without breaking existing v1 local drafts.
 
 
-### Create Game convergence — v177.57 staging checkpoint
+### Create Game convergence — v177.58 audit-closeout staging checkpoint
 - [x] Replace stale flat-format helper semantics with authoritative helpers matching the restored Production guided hierarchy; live Create Game selectors now delegate to the helpers and characterization tests cover key round trips.
 - [x] Review uses the same post-create destination helper as runtime and tells the organizer the exact next step (Play / Manage Game → Teams / Matchups / Groups).
 - [ ] Final cumulative Production release remains blocked on the full 177.46→final de novo audit closeout, dependency-backed CI/build, browser matrix, adjacent Manage Game testing, and Production release gate.

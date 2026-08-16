@@ -1,3 +1,10 @@
+## 177.58.260816 — Create Game convergence audit closeout
+- **NO migration. Runtime behavior unchanged from 177.57.** Final staging-only audit/packaging checkpoint before the cumulative Production PR.
+- Added `DE_NOVO_CREATE_GAME_AUDIT_CLOSEOUT_177.58.md`, consolidating the fresh 177.46 Production -> final staging responsibility/contract comparison. The audit found no missing legacy Create Game capability and documents the intentional Lean Create ownership boundary plus the inherited non-atomic create risk.
+- Removed an accidentally generated `tsconfig.tsbuildinfo` working artifact so it cannot enter the release bundle.
+- Corrected the human `MIGRATIONS.md` mirror to mark 0138 as applied in staging + Production (the database ledger remains authoritative).
+- Version/docs only; all dependency-backed CI, Vercel staging, targeted browser checks, PR verify, Production Ready and Production smoke gates remain mandatory before calling the cumulative convergence release deployable.
+
 ## 177.56.260816 — Format UI Fidelity + Handicap Input Polish
 - Locks the shared Stroke / Match Play selector to the proven Production BNN geometry, icons, colors, typography, spacing, and selected-state treatment used by Create Game; Manage Game continues to consume the same shared selector.
 - Fixes the Create Game custom handicap-allowance editor so deleting the value leaves a genuinely blank field instead of forcing `0`. While blank, the domain value safely falls back to the default `100%`; leaving the field restores the visible value to `100`.
