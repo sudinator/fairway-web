@@ -5,7 +5,7 @@ import type { Game, Player } from "./game-types";
 const teams = [{ key: "A", name: "Team 1" }, { key: "B", name: "Team 2" }];
 const foursomes = [{ id: "f1", name: "F1", a: ["p1", "p2"], b: ["p3", "p4"] }];
 const baseGame = (): Game => ({
-  id: "g", group_id: "grp", name: "Test", course: "Course", course_par: 72, holes_meta: [],
+  id: "g", group_id: "grp", code: "TEST", name: "Test", course: "Course", course_par: 72, holes_meta: [],
   game_type: "stableford", status: "active", allowance_pct: 100, pairings: [], teams: null, foursomes: null,
   created_by: "u1", created_at: "2026-08-16T00:00:00Z",
 } as Game);

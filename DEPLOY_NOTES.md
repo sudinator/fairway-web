@@ -4971,6 +4971,12 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - No migration.
 
 
+## 177.44.260816 — policy test fixture typecheck correction
+- Corrective release for the 177.43 PR CI failure.
+- Root cause: `lib/game-setup-policy.test.ts` constructed a typed `Game` fixture without the required `code` field, so dependency-backed TypeScript correctly rejected the test before the policy suite/build could run.
+- Fix: add the required `code` field to the fixture; no runtime behavior or policy logic changes.
+- No migration.
+
 ## 177.43.260816 — centralized Game Control Center transition policy
 - Adds `lib/game-setup-policy.ts` as the single source of truth for organizer setup edits once play has started. Every covered mutation now resolves to **ALLOW / CONFIRM / BLOCK** before any write.
 - Locks the agreed competition-integrity rule: once scoring starts, structural identity freezes. Scored players cannot be removed, moved to another team, or moved to another tee group; individual/team conversions and skins structure conversions are blocked.

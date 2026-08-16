@@ -100,8 +100,8 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current setup candidate:** 177.43.260816 centralizes Manage Game setup changes behind one pure ALLOW / CONFIRM / BLOCK transition policy; no migration. 177.42 stabilized alphabetical setup ordering and 177.41 introduced the persistent Game Control Center.
-**Current working candidate: 177.43.260816 (Game Control Center transition-policy hardening).**
+**Current setup candidate:** 177.44.260816 is the corrective candidate for the 177.43 transition-policy PR: it adds the required `Game.code` field to the dedicated policy test fixture so dependency-backed TypeScript/CI can compile; runtime policy behavior is unchanged and there is no migration.
+**Current working candidate: 177.44.260816 (transition-policy test-fixture typecheck correction).**
 - 177.26 supersedes the unreleased 177.25 candidate after its first GitHub execution exposed verification-harness ordering/sequencing defects; it still includes the 177.24 dashboard Putts/round + targeted stats-completion baseline.
 - Migrations `0135_ledger_backfill.sql`, `0136_core_rls_helpers.sql`, and `0137_core_rls_baseline.sql` are now **applied and verified in both staging and Production**. Production/staging ledgers are reconciled through 0137 (0129 is the intentional reserved gap); both environments expose the expected 60 core RLS policies across 12 tables.
 - `0135` evidence-backfilled 0122-0128 into both ledgers; `0136` installed/verified the six Production SECURITY DEFINER RLS helpers; `0137` installed the source-controlled core RLS policy/grant baseline. The real staging integration harness passed afterward and Production passed a non-destructive smoke test.
