@@ -95,7 +95,8 @@ import { GameSetupWorkspace, type SetupTab } from "@/components/game/setup/game-
 import { CreateGameWorkspace, type CreateGameSection } from "@/components/game/setup/create-game-workspace";
 import { buildFormatPatch, buildSkinsStylePatch, buildMatchTeamPatch } from "@/lib/game-structure";
 import { resolveCreateGameTee, teeSourceLabel } from "@/lib/game-tee-assignment";
-import { formatReviewLabel, selectBaseFormat, selectFourballCompetition, selectMatchPlayers, selectSkinsStyle, skinsStyleFromState, type CreateFormatPatch } from "@/lib/create-game-format";
+import { formatReviewLabel } from "@/lib/create-game-format";
+import { FormatFamilySelector } from "@/components/game/setup/format-family-selector";
 
 // Stable match identity for a player. Real players key on user_id (so nothing
 // about existing matches changes); guests have no account, so they key on their
@@ -260,17 +261,7 @@ function CreateGame({
   const [skinsMode, setSkinsMode] = useState<"carryover" | "split">("carryover");
   const [team1, setTeam1] = useState("Team 1");
   const [team2, setTeam2] = useState("Team 2");
-  const applyCreateFormatPatch = (patch: CreateFormatPatch) => {
-    if (patch.gameType !== undefined) setGameType(patch.gameType);
-    if (patch.teamMode !== undefined) setTeamMode(patch.teamMode);
-    if (patch.skinsTeamStyle !== undefined) setSkinsTeamStyle(patch.skinsTeamStyle);
-    if (patch.teamScoreMode !== undefined) setTeamScoreMode(patch.teamScoreMode);
-    if (patch.trifectaScoring !== undefined) setTrifectaScoring(patch.trifectaScoring);
-    if (patch.strokeBasis !== undefined) setStrokeBasis(patch.strokeBasis);
-    if (patch.skinsMode !== undefined) setSkinsMode(patch.skinsMode);
-    if (patch.fmtFamily !== undefined) setFmtFamily(patch.fmtFamily);
-    if (patch.matchKind !== undefined) setMatchKind(patch.matchKind);
-  };
+
   // Draft-time tee inheritance only: player override > flight tee > game default.
   // Creation resolves inheritance into explicit game_players tee/rating/slope snapshots.
   const [teeAssignments, setTeeAssignments] = useState<{ player: Record<string, number>; flight: Record<string, number> }>({ player: {}, flight: {} });
@@ -983,87 +974,63 @@ function CreateGame({
           <div>
       <div style={{ marginTop: 14 }}>
         <label style={{ color: C.sage, fontSize: 12 }}>Format</label>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8, marginTop: 6 }}>
-          {([
-            ["stableford", "Stableford"],
-            ["stroke", "Stroke Play"],
-            ["match", "Match Play"],
-            ["fourball", "Four-ball"],
-            ["trifecta", "Trifecta"],
-            ["skins", "Skins"],
-          ] as const).map(([value, label]) => (
-            <button key={value} onClick={() => applyCreateFormatPatch(selectBaseFormat(value))} style={{ ...btn(gameType === value), minWidth: 0, fontSize: 13 }}>{label}</button>
-          ))}
-        </div>
+        {/* Two-family guided chooser: shared with Manage Game so both flows use the same visual language. */}
+        <FormatFamilySelector
+          value={fmtFamily}
+          onChange={(family) => {
+            if (family === "stroke") {
+              setFmtFamily("stroke");
+              if (gameType === "match" || gameType === "fourball" || gameType === "trifecta") setGameType("stableford");
+              else if (gameType === "skins") { setTeamMode(false); setSkinsTeamStyle("head_to_head"); }
+            } else {
+              setFmtFamily("match");
+              const bb = gameType === "skins" && teamMode && skinsTeamStyle === "best_ball";
+              if (!bb && (gameType === "stableford" || gameType === "stroke" || gameType === "skins")) setGameType(matchKind === "team" ? "fourball" : "match");
+            }
+          }}
+        />
+        {fmtFamily === "stroke" ? (
+          <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+            <button onClick={() => setGameType("stableford")} style={{ ...btn(gameType === "stableford"), flex: 1, minWidth: 100, fontSize: 13 }}>Stableford</button>
+            <button onClick={() => setGameType("stroke")} style={{ ...btn(gameType === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Stroke play</button>
+            <button onClick={() => { setGameType("skins"); setTeamMode(false); setSkinsTeamStyle("head_to_head"); }} style={{ ...btn(gameType === "skins" && fmtFamily === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Skins</button>
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <button onClick={() => { setMatchKind("ind"); setGameType("match"); }} style={{ ...btn(matchKind === "ind"), flex: 1, fontSize: 13 }}>Individual</button>
+              <button onClick={() => { setMatchKind("team"); if (gameType !== "fourball" && gameType !== "trifecta") setGameType("fourball"); }} style={{ ...btn(matchKind === "team"), flex: 1, fontSize: 13 }}>Team</button>
+            </div>
+            {matchKind === "ind" ? (
+              <div style={{ marginTop: 8 }}>
+                <button onClick={() => setGameType("match")} style={{ ...btn(gameType === "match"), width: "100%", fontSize: 13 }}>Singles match</button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                <button onClick={() => setGameType("fourball")} style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 104, fontSize: 13 }}>Four-ball</button>
+                <button onClick={() => setGameType("trifecta")} style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 104, fontSize: 13 }}>Trifecta</button>
+                <button onClick={() => { setGameType("skins"); setTeamMode(true); setSkinsTeamStyle("best_ball"); }} style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 104, fontSize: 13 }}>Skins</button>
+              </div>
+            )}
+          </>
+        )}
         <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
           {gameType === "stableford"
             ? "Everyone competes on one net-Stableford leaderboard."
-            : gameType === "stroke"
-            ? "Everyone plays their own ball; lowest total wins. Choose net or gross below."
-            : gameType === "match"
-            ? "Head-to-head match play. Choose individual matches or an overall team competition."
             : gameType === "fourball"
-            ? "Two partners play against two partners. Choose a stand-alone 2 v 2 match or an overall Team vs Team competition."
+            ? "2-player teams play better-net-ball match play. Big groups split into foursomes (2 v 2) — set them up after creating. Great for 12–16 players in 3–4 foursomes."
+            : gameType === "skins"
+            ? "Skins follows match-play structure: singles can be 1:1, team 1:1 rolls skins into team totals, or team best-ball can be played in foursomes. Halved holes carry forward."
             : gameType === "trifecta"
-            ? "Each 2 v 2 foursome plays two singles plus one team point. Build the foursomes after creating."
-            : "Choose individual skins, 1:1 team skins, or 2 v 2 best-ball skins directly."}
+            ? "Each 2-v-2 foursome plays for three points per hole: the two singles (each player vs their opposite number) plus a team point. Three points per hole riding on every group — set up the foursomes after creating."
+            : gameType === "stroke"
+            ? "Everyone plays their own ball; lowest total wins. Pick gross or net below — every stroke counts, with no Stableford safety net."
+            : "Players are paired 1-on-1. After friends join, you'll set the matchups. Lower handicap plays off scratch; opponent gets the difference."}
         </div>
-
-        {gameType === "stroke" && (
-          <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
-            <div style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>Scored by</div>
-            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-              <button onClick={() => setStrokeBasis("net")} style={{ ...btn(strokeBasis === "net"), fontSize: 12, padding: "7px 10px" }}>Net</button>
-              <button onClick={() => setStrokeBasis("gross")} style={{ ...btn(strokeBasis === "gross"), fontSize: 12, padding: "7px 10px" }}>Gross</button>
-            </div>
-            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{strokeBasis === "gross" ? "Gross — raw strokes, no handicap. Lowest total wins." : "Net — total strokes minus each player's handicap. Lowest net total wins."}</div>
-          </div>
-        )}
-
-        {gameType === "match" && (
-          <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
-            <div style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>Players</div>
-            <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-              <button onClick={() => applyCreateFormatPatch(selectMatchPlayers("individual"))} style={{ ...btn(!teamMode), flex: 1, fontSize: 12 }}>Individual</button>
-              <button onClick={() => applyCreateFormatPatch(selectMatchPlayers("team"))} style={{ ...btn(teamMode), flex: 1, fontSize: 12 }}>Team</button>
-            </div>
-            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{teamMode ? "Team — each 1-on-1 match contributes a point to the overall Team A vs Team B result." : "Individual — each 1-on-1 match stands on its own."}</div>
-            {teamMode && (
-              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
-                <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
-              </div>
-            )}
-          </div>
-        )}
-
-        {gameType === "fourball" && (
-          <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
-            <div style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>Competition</div>
-            <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-              <button onClick={() => applyCreateFormatPatch(selectFourballCompetition("2v2"))} style={{ ...btn(!teamMode), flex: 1, fontSize: 12 }}>2 v 2 Match</button>
-              <button onClick={() => applyCreateFormatPatch(selectFourballCompetition("team"))} style={{ ...btn(teamMode), flex: 1, fontSize: 12 }}>Team vs Team</button>
-            </div>
-            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{teamMode ? "Team vs Team — each 2 v 2 foursome contributes to the overall two-team result." : "2 v 2 Match — each foursome plays its own separate two-partner match."}</div>
-            {teamMode && (
-              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
-                <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
-              </div>
-            )}
-            <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>Team score</div>
-            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-              <button onClick={() => setTeamScoreMode("best_ball")} style={{ ...btn(teamScoreMode === "best_ball"), fontSize: 12, padding: "7px 10px" }}>Best ball</button>
-              <button onClick={() => setTeamScoreMode("aggregate")} style={{ ...btn(teamScoreMode === "aggregate"), fontSize: 12, padding: "7px 10px" }}>Shootout (aggregate)</button>
-            </div>
-            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{teamScoreMode === "aggregate" ? "Shootout — both partners' net scores are added for the team's hole score." : "Best ball — the team's hole score is the better net of the two partners."}</div>
-          </div>
-        )}
-
         {gameType === "trifecta" && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>Two teams</div>
-            <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Name the two sides, then build the 2 v 2 foursomes after creating.</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Name the two sides, then build the 2-v-2 foursomes after creating. Each foursome plays for three points a hole.</div>
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
               <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
               <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
@@ -1073,58 +1040,128 @@ function CreateGame({
               <button onClick={() => setTeamScoreMode("best_ball")} style={{ ...btn(teamScoreMode === "best_ball"), fontSize: 12, padding: "7px 10px" }}>Best ball</button>
               <button onClick={() => setTeamScoreMode("aggregate")} style={{ ...btn(teamScoreMode === "aggregate"), fontSize: 12, padding: "7px 10px" }}>Shootout (aggregate)</button>
             </div>
-            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{teamScoreMode === "aggregate" ? "Shootout — both partners' net scores count toward the team point." : "Best ball — the better partner net score determines the team point."}</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+              {teamScoreMode === "aggregate"
+                ? "Shootout — both partners' net scores count. The team's hole score is the two nets added together, not just the better one, so a blow-up by either player hurts."
+                : "Best ball — the team's hole score is the better net of the two partners."}
+            </div>
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>Scoring</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-              <button onClick={() => setTrifectaScoring("per_hole")} style={{ ...btn(trifectaScoring === "per_hole"), fontSize: 12, padding: "7px 10px" }}>Per hole</button>
-              <button onClick={() => setTrifectaScoring("match")} style={{ ...btn(trifectaScoring === "match"), fontSize: 12, padding: "7px 10px" }}>Ryder Cup</button>
+              <button onClick={() => setTrifectaScoring("per_hole")} style={{ ...btn(trifectaScoring === "per_hole"), fontSize: 12, padding: "7px 10px" }}>1 hole = 1 pt</button>
+              <button onClick={() => setTrifectaScoring("match")} style={{ ...btn(trifectaScoring === "match"), fontSize: 12, padding: "7px 10px" }}>1 match = 1 pt (Ryder Cup)</button>
             </div>
-            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{trifectaScoring === "match" ? "Ryder Cup — each of the two singles plus the team match is worth one point over 18 holes." : "Per hole — all three matches score on every hole."}</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+              {trifectaScoring === "match"
+                ? "Ryder Cup — each foursome's 2 singles + 1 team match are worth 1 point each over 18 (½ each if halved). 3 points per foursome."
+                : "Per-hole — every hole of all three matches scores. 3 points on every hole."}
+            </div>
           </div>
         )}
-
-        {gameType === "skins" && (() => {
-          const skinStyle = skinsStyleFromState({ teamMode, skinsTeamStyle });
+        {gameType === "stroke" && (
+          <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
+            <div style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>Scored by</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+              <button onClick={() => setStrokeBasis("net")} style={{ ...btn(strokeBasis === "net"), fontSize: 12, padding: "7px 10px" }}>Net</button>
+              <button onClick={() => setStrokeBasis("gross")} style={{ ...btn(strokeBasis === "gross"), fontSize: 12, padding: "7px 10px" }}>Gross</button>
+            </div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+              {strokeBasis === "gross"
+                ? "Gross — raw strokes, no handicap. Lowest total wins."
+                : "Net — total strokes minus each player's handicap. Lowest net total wins."}
+            </div>
+          </div>
+        )}
+        {gameType === "fourball" && (
+          <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
+            <div style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>Team score</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+              <button onClick={() => setTeamScoreMode("best_ball")} style={{ ...btn(teamScoreMode === "best_ball"), fontSize: 12, padding: "7px 10px" }}>Best ball</button>
+              <button onClick={() => setTeamScoreMode("aggregate")} style={{ ...btn(teamScoreMode === "aggregate"), fontSize: 12, padding: "7px 10px" }}>Shootout (aggregate)</button>
+            </div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+              {teamScoreMode === "aggregate"
+                ? "Shootout — both partners' net scores are added for the team's hole score, so a blow-up by either hurts."
+                : "Best ball — the team's hole score is the better net of the two partners."}
+            </div>
+          </div>
+        )}
+        {fmtFamily === "stroke" && gameType === "skins" && !teamMode && (() => {
           const fieldCount = groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length;
-          const tooMany = skinStyle === "individual" && skinsMode === "split" && fieldCount > 4;
+          const tooMany = skinsMode === "split" && fieldCount > 4;
           return (
             <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
-              <div style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>Skins style</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8, marginTop: 6 }}>
-                <button onClick={() => applyCreateFormatPatch(selectSkinsStyle("individual"))} style={{ ...btn(skinStyle === "individual"), minWidth: 0, fontSize: 12 }}>Individual</button>
-                <button onClick={() => applyCreateFormatPatch(selectSkinsStyle("team_11"))} style={{ ...btn(skinStyle === "team_11"), minWidth: 0, fontSize: 12 }}>1:1 Teams</button>
-                <button onClick={() => applyCreateFormatPatch(selectSkinsStyle("team_2v2"))} style={{ ...btn(skinStyle === "team_2v2"), minWidth: 0, fontSize: 12 }}>2 v 2 Best-ball</button>
-              </div>
-              <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{skinStyle === "individual" ? "Individual — every player competes for each skin." : skinStyle === "team_11" ? "1:1 Teams — paired head-to-head skins roll into an overall two-team total." : "2 v 2 Best-ball — each side's better net score competes for the skin in its foursome."}</div>
-              {skinStyle !== "individual" && (
-                <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                  <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
-                  <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
-                </div>
-              )}
-              {skinStyle === "team_2v2" && (
-                <>
-                  <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>Team score</div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                    <button onClick={() => setTeamScoreMode("best_ball")} style={{ ...btn(teamScoreMode === "best_ball"), fontSize: 12, padding: "7px 10px" }}>Best ball</button>
-                    <button onClick={() => setTeamScoreMode("aggregate")} style={{ ...btn(teamScoreMode === "aggregate"), fontSize: 12, padding: "7px 10px" }}>Aggregate</button>
-                  </div>
-                </>
-              )}
-              <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>When a hole ties</div>
+              <div style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>When a hole ties</div>
               <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
                 <button onClick={() => setSkinsMode("carryover")} style={{ ...btn(skinsMode === "carryover"), fontSize: 12, padding: "7px 10px" }}>Carry over</button>
-                <button onClick={() => setSkinsMode("split")} style={{ ...btn(skinsMode === "split"), fontSize: 12, padding: "7px 10px" }}>{skinStyle === "individual" ? "Split" : "Halved"}</button>
+                <button onClick={() => setSkinsMode("split")} style={{ ...btn(skinsMode === "split"), fontSize: 12, padding: "7px 10px" }}>Split</button>
               </div>
-              <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{skinsMode === "split" ? (skinStyle === "individual" ? "Split — tied players share that hole's skin evenly." : "Halved — a tied hole is split between the two sides with no carryover.") : "Carry over — a tied hole pushes its skin to the next hole."}</div>
+              <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+                {skinsMode === "split"
+                  ? "Split \u2014 each hole is its own prize and a tie shares it evenly. Stays lively, best for up to 4 players."
+                  : "Carry over \u2014 a tied hole pushes its skin to the next, building the pot. Scales to any field."}
+              </div>
               {tooMany && (
                 <div style={{ background: "#4a1d16", border: `1px solid ${C.birdie}`, borderRadius: 9, padding: "8px 10px", marginTop: 8, color: "#f0c5bd", fontSize: 11.5, lineHeight: 1.45 }}>
-                  {fieldCount} players is too many for split individual skins. Use <b>1:1 Teams</b>, <b>2 v 2 Best-ball</b>, or switch to <b>Carry over</b>.
+                  {fieldCount} players is too many for split skins. Use <b>Team skins</b> or <b>1:1 matchups</b>, or switch to <b>Carry over</b>.
                 </div>
               )}
             </div>
           );
         })()}
+        {((gameType === "match" || gameType === "fourball") || (fmtFamily === "stroke" && gameType === "skins")) && (
+          <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input type="checkbox" checked={teamMode} onChange={(e) => setTeamMode(e.target.checked)} />
+              <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>{gameType === "skins" ? "Team skins" : gameType === "fourball" ? "Create Team Names (Red vs Blue)" : "Team match (e.g. 4 v 4)"}</span>
+            </label>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
+              {gameType === "skins"
+                ? "Two teams, 1:1 pairings \u2014 skins roll into each team's total. A halved hole carries the pot forward. (For 2-v-2 better-ball, use Match \u00b7 Team \u00b7 Best-ball skins.)"
+                : gameType === "fourball"
+                ? "Two teams. Each 2-v-2 foursome is worth a point; the team total is the sum across foursomes (a halved foursome = ½ each), Ryder-Cup style. You'll assign players to teams after creating."
+                : "Two teams. Each 1-on-1 pairing is worth a point; the team total is the sum (halved matches = ½ each). You'll assign players to teams after creating."}
+            </div>
+            {teamMode && (
+              <>
+                <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                  <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
+                  <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {gameType === "skins" && fmtFamily === "match" && (
+          <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
+            <div style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>Two teams · skins</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Each hole is a skin between the two sides. Name the sides, then build the 2-v-2 foursomes after creating.</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
+              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
+            </div>
+            <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>Team score</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+              <button onClick={() => setTeamScoreMode("best_ball")} style={{ ...btn(teamScoreMode === "best_ball"), fontSize: 12, padding: "7px 10px" }}>Best ball</button>
+              <button onClick={() => setTeamScoreMode("aggregate")} style={{ ...btn(teamScoreMode === "aggregate"), fontSize: 12, padding: "7px 10px" }}>Aggregate</button>
+            </div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+              {teamScoreMode === "aggregate"
+                ? "Aggregate — both partners' net scores are added for the side's hole score."
+                : "Best ball — the side's hole score is the better net of the two partners."}
+            </div>
+            <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>When a hole ties</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+              <button onClick={() => setSkinsMode("carryover")} style={{ ...btn(skinsMode === "carryover"), fontSize: 12, padding: "7px 10px" }}>Carry over</button>
+              <button onClick={() => setSkinsMode("split")} style={{ ...btn(skinsMode === "split"), fontSize: 12, padding: "7px 10px" }}>Halved</button>
+            </div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
+              {skinsMode === "split"
+                ? "Halved — a tied hole is split, half a skin to each side, with no carryover."
+                : "Carry over — a tied hole pushes its skin to the next, building the pot."}
+            </div>
+          </div>
+        )}
         <div style={{ marginTop: 14 }}>
           <label style={{ color: C.sage, fontSize: 12 }}>Handicap allowance</label>
           <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>

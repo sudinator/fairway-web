@@ -1,3 +1,19 @@
+## 177.55.260816 — Cumulative Guided Format Restore + Shared Create/Manage Selector
+- Create Game Four-ball wording: **Create named teams** is now **Create Team Names (Red vs Blue)**. Underlying `teamMode` and team-name persistence are unchanged.
+- Manage Game → Format now uses the same shared Stroke / Match Play family cards and icons as Create Game. The family cards only filter which format choices are shown; the persisted game changes only when a specific format is selected, so the existing setup-policy ALLOW/CONFIRM/BLOCK gate remains authoritative.
+- Extracted the duplicated family-card markup into `components/game/setup/format-family-selector.tsx`, used by both Create Game and Manage Game.
+- No scoring, database, setup-policy, or persistence behavior changed. No migration.
+
+## 177.54.260816 — Guided Format Selection Restore & Polish
+
+- Restores the proven Stroke / Match Play guided format hierarchy and original format-family icons after the 177.53 flat-selector experiment.
+- Preserves the Lean Create architecture, modular game-create/draft/tee logic, Resume Setup, and Manage Game structural handoff.
+- Restores the handicap allowance shortcuts plus custom 0–100% numeric input.
+- Preserves Stroke → Stableford / Stroke Play / Skins and Match Play → Individual / Team → Singles / Four-ball / Trifecta / Skins selection paths.
+- Clarifies Four-ball overall-team creation as “Create named teams (e.g. Red vs Blue)” without changing persisted team-mode semantics.
+- Retains the detailed Review format summary introduced in 177.53.
+- No database migration.
+
 # Birdie Num Num — Deploy & Migration Notes
 
 ## Convention
