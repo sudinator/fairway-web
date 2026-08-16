@@ -29,7 +29,7 @@ checks = [
     ("components/game/setup/game-setup-workspace.tsx", '<OrganizerPanel section="teams" {...organizerPanelProps} />', "Teams setup step must reach OrganizerPanel"),
     ("components/game/setup/game-setup-workspace.tsx", '<GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup}', "tee-group writes must remain wired to GroupsBuilder"),
     ("components/game/organizer-panel.tsx", 'onSetTee(p, e.target.value)', "per-player tee selector must consume its callback"),
-    ("components/game/organizer-panel.tsx", 'onClick={() => onAddMember(m)}', "member add UI must consume its callback"),
+    ("components/game/organizer-panel.tsx", 'onClick={() => { if (!blocked({ type: "add_player" })) onAddMember(m); }}', "member add UI must consume its callback"),
     ("components/game/organizer-panel.tsx", 'await onAddGuest(addGuestName, parseFloat(addGuestHcp), addGuestSponsor || user.id)', "guest add UI must consume its callback"),
 ]
 

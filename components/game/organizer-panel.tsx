@@ -42,6 +42,7 @@ import {
   mergeBackupRow,
 } from "@/lib/golf";
 import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
+import { decideSetupChange, type SetupAction } from "@/lib/game-setup-policy";
 import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
@@ -176,21 +177,11 @@ export function OrganizerPanel({
   const teeGroups = Array.from(new Set(players.map((p) => p.tee_group).filter((g): g is number => g != null))).sort((a, b) => a - b);
   const teamLabel = (key: string | null | undefined) => teams.find((t) => t.key === key)?.name || "No team";
 
-  // Which formats can this game switch to right now. Once scores exist, only
-  // moves that don't need new matchups are allowed: Stableford/Skins are always
-  // safe (no structure), Match needs pairings already in place, Four-ball needs
-  // foursomes. Before any score, anything is allowed (still setup).
-  const hasPairings = Array.isArray(game.pairings) && game.pairings.length > 0;
-  const hasFoursomes = Array.isArray(game.foursomes) && game.foursomes.length > 0;
-  const canSwitchTo = (target: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => {
-    if (target === game.game_type) return false;
-    if (!anyScores) return true;
-    if (target === "stableford" || target === "skins" || target === "stroke") return true;
-    if (target === "match") return hasPairings;
-    if (target === "fourball") return hasFoursomes;
-    if (target === "trifecta") return hasFoursomes;
-    return false;
-  };
+  // One policy owns every setup transition. UI state mirrors the same decision
+  // the mutation handler will enforce, so disabled controls and writes cannot drift.
+  const policy = (action: SetupAction) => decideSetupChange({ game, players, action });
+  const blocked = (action: SetupAction) => policy(action).decision === "block";
+  const reasonFor = (action: SetupAction) => { const d = policy(action); return d.decision === "block" ? d.reason : undefined; };
 
   const save = async (p: Player) => {
     const raw = edits[p.id];
@@ -236,6 +227,13 @@ export function OrganizerPanel({
       {open && (
         <div style={{ marginTop: 10 }}>
           {/* Unified player setup */}
+          {anyScores && section !== "format" && (
+            <div style={{ background: "rgba(201,162,39,.12)", border: `1px solid ${C.gold}`, borderRadius: 10, padding: "9px 11px", color: C.cream, fontSize: 11.5, lineHeight: 1.45, marginTop: 10 }}>
+              {section === "teams"
+                ? "Scoring is in progress. A player who already has a score is locked to their current team."
+                : "Scoring is in progress. Handicap and tee corrections are allowed with confirmation; scored players cannot be removed from the game."}
+            </div>
+          )}
           <div style={{ marginTop: 12, display: section === "format" ? "none" : undefined }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
               <Eyebrow>{section === "teams" ? "ASSIGN TEAMS" : "PLAYERS · HANDICAPS · TEES"}</Eyebrow>
@@ -293,7 +291,8 @@ export function OrganizerPanel({
                       />
                       <button
                         style={{ ...btn(true), padding: "6px 8px", fontSize: 11, opacity: savingId === p.id ? 0.5 : 1 }}
-                        disabled={savingId === p.id}
+                        disabled={savingId === p.id || blocked({ type: "set_handicap", player: p })}
+                        title={reasonFor({ type: "set_handicap", player: p })}
                         onClick={() => save(p)}
                       >
                         Set
@@ -306,8 +305,9 @@ export function OrganizerPanel({
                     <select
                       value={p.tee_name || ""}
                       onChange={(e) => onSetTee(p, e.target.value)}
-                      disabled={teeOptions.length === 0}
-                      style={{ ...inputStyle, padding: "6px 8px", marginTop: 2, width: "100%", opacity: teeOptions.length ? 1 : 0.65 }}
+                      disabled={teeOptions.length === 0 || blocked({ type: "set_tee", player: p, teeName: p.tee_name || "selected tee" })}
+                      title={reasonFor({ type: "set_tee", player: p, teeName: p.tee_name || "selected tee" })}
+                      style={{ ...inputStyle, padding: "6px 8px", marginTop: 2, width: "100%", opacity: teeOptions.length && !blocked({ type: "set_tee", player: p, teeName: p.tee_name || "selected tee" }) ? 1 : 0.65 }}
                     >
                       <option value="" disabled>{teeOptions.length ? "Select tee" : "No tee data available"}</option>
                       {teeOptions.map((t) => (
@@ -327,7 +327,6 @@ export function OrganizerPanel({
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap", marginTop: 12 }}>
                     {(
                       <button
-                        title="Mark out / no-show"
                         style={{
                           background: p.no_show ? C.gold : "none",
                           border: `1px solid ${p.no_show ? C.gold : C.line}`,
@@ -338,6 +337,8 @@ export function OrganizerPanel({
                           padding: "6px 8px",
                           fontSize: 12,
                         }}
+                        disabled={blocked({ type: "toggle_no_show", player: p, next: !p.no_show })}
+                        title={reasonFor({ type: "toggle_no_show", player: p, next: !p.no_show }) || "Mark out / no-show"}
                         onClick={() => onToggleNoShow(p)}
                       >
                         {p.no_show ? "No-show ✓" : "No-show"}
@@ -345,13 +346,10 @@ export function OrganizerPanel({
                     )}
                     {p.user_id !== game.created_by && (
                       <button
-                        title="Remove player"
                         style={{ background: "none", border: `1px solid ${C.line}`, borderRadius: 6, color: C.birdie, fontWeight: 800, cursor: "pointer", padding: "6px 8px", fontSize: 12 }}
-                        onClick={() => {
-                          const holesPlayed = (p.scores || []).filter((s) => s != null).length;
-                          if (holesPlayed > 0 && !confirm(`${p.display_name} has scores on ${holesPlayed} hole${holesPlayed === 1 ? "" : "s"}. Removing them deletes that scorecard from this game. Remove anyway?\n\nIf they started but had to leave, use "No-show" instead to keep their played holes.`)) return;
-                          onRemove(p);
-                        }}
+                        disabled={blocked({ type: "remove_player", player: p })}
+                        title={reasonFor({ type: "remove_player", player: p }) || "Remove player"}
+                        onClick={() => onRemove(p)}
                       >
                         Remove
                       </button>
@@ -365,7 +363,9 @@ export function OrganizerPanel({
                       const col = teamAccent(t.name, ti);
                       return (
                         <button key={t.key} onClick={() => onSetTeam(p, on ? null : t.key)}
-                          style={{ borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", background: on ? col : "transparent", border: `1.5px solid ${on ? col : C.line}`, color: on ? "#0E241B" : C.sage }}>
+                          disabled={blocked({ type: "set_team", player: p, team: on ? null : t.key })}
+                          title={reasonFor({ type: "set_team", player: p, team: on ? null : t.key })}
+                          style={{ borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: blocked({ type: "set_team", player: p, team: on ? null : t.key }) ? "not-allowed" : "pointer", opacity: blocked({ type: "set_team", player: p, team: on ? null : t.key }) ? .45 : 1, background: on ? col : "transparent", border: `1.5px solid ${on ? col : C.line}`, color: on ? "#0E241B" : C.sage }}>
                           {t.name}
                         </button>
                       );
@@ -403,8 +403,9 @@ export function OrganizerPanel({
                   <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2, fontWeight: 700 }}>ADD FROM YOUR CLUB</div>
                   <div style={{ marginTop: 8 }}>
                     {eligibleMembers.map((m) => (
-                      <div key={m.id} onClick={() => onAddMember(m)}
-                        style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 8px", cursor: "pointer", borderBottom: `1px solid ${C.greenMid}`, borderRadius: 8 }}>
+                      <div key={m.id} onClick={() => { if (!blocked({ type: "add_player" })) onAddMember(m); }}
+                        title={reasonFor({ type: "add_player" })}
+                        style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 8px", cursor: blocked({ type: "add_player" }) ? "not-allowed" : "pointer", opacity: blocked({ type: "add_player" }) ? .5 : 1, borderBottom: `1px solid ${C.greenMid}`, borderRadius: 8 }}>
                         <span style={{ width: 22, height: 22, borderRadius: 5, border: `1.5px solid ${C.sage}`, flex: "0 0 auto" }} />
                         <span style={{ flex: 1, color: C.cream, fontWeight: 700, fontSize: 15 }}>{m.display_name}</span>
                         <span style={{ color: C.sage, fontSize: 12 }}>{m.handicap_index != null ? `HCP ${m.handicap_index}` : "no handicap"}</span>
@@ -427,7 +428,8 @@ export function OrganizerPanel({
                       </select>
                     )}
                     <button
-                      disabled={!addGuestName.trim() || addGuestHcp === ""}
+                      disabled={!addGuestName.trim() || addGuestHcp === "" || blocked({ type: "add_player", guest: true })}
+                      title={reasonFor({ type: "add_player", guest: true })}
                       onClick={async () => {
                         if (onAddGuest) { await onAddGuest(addGuestName, parseFloat(addGuestHcp), addGuestSponsor || user.id); setAddGuestName(""); setAddGuestHcp(""); setAddGuestSponsor(""); }
                       }}
@@ -500,7 +502,7 @@ export function OrganizerPanel({
                 <div style={{ color: C.sage, fontSize: 12 }}>Handicap allowance</div>
                 <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
                   {[100, 90, 85].map((amt) => (
-                    <button key={amt} onClick={() => onSetAllowance(amt)} style={{ ...btn((game.allowance_pct ?? 100) === amt), fontSize: 13, padding: "7px 12px" }}>{amt}%</button>
+                    <button key={amt} onClick={() => onSetAllowance(amt)} disabled={blocked({ type: "set_allowance", pct: amt })} title={reasonFor({ type: "set_allowance", pct: amt })} style={{ ...btn((game.allowance_pct ?? 100) === amt), fontSize: 13, padding: "7px 12px", opacity: blocked({ type: "set_allowance", pct: amt }) ? .45 : 1 }}>{amt}%</button>
                   ))}
                   <span style={{ color: C.sage, fontSize: 12 }}>now {game.allowance_pct ?? 100}%</span>
                 </div>
@@ -514,15 +516,17 @@ export function OrganizerPanel({
                 <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
                   {([["stableford", "Stableford"], ["stroke", "Stroke play"], ["match", "Match"], ["fourball", "Four-ball"], ["skins", "Skins"], ["trifecta", "Trifecta"]] as const).map(([key, label]) => {
                     const isCur = game.game_type === key;
-                    const allowed = isCur || canSwitchTo(key);
+                    const d = policy({ type: "set_format", target: key });
+                    const allowed = isCur || d.decision !== "block";
                     return (
                       <button key={key} disabled={!allowed}
-                        onClick={() => { if (!isCur && allowed && confirm(`Switch to ${label}? Every scorecard is kept and standings recompute. Allowance moves to the ${label} default — adjust it above if you need to.`)) onSetFormat(key); }}
+                        title={d.decision === "block" ? d.reason : undefined}
+                        onClick={() => { if (!isCur && allowed) onSetFormat(key); }}
                         style={{ ...btn(isCur), fontSize: 13, padding: "7px 12px", opacity: allowed ? 1 : 0.4, cursor: allowed ? "pointer" : "not-allowed" }}>{label}</button>
                     );
                   })}
                 </div>
-                {anyScores && <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Scores are in — you can switch to Stableford or Skins anytime. Match needs pairings already set, Four-ball needs foursomes.</div>}
+                {anyScores && <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Scores are in — individual Stableford / Stroke / Individual Skins may be reinterpreted with confirmation. Structural individual/team changes are locked.</div>}
               </div>
             )}
 
@@ -532,9 +536,9 @@ export function OrganizerPanel({
                 <div style={{ marginTop: 12 }}>
                   <div style={{ color: C.sage, fontSize: 12 }}>Skins style</div>
                   <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                    <button onClick={() => onSetSkinsStyle("individual")} style={{ ...btn(style === "individual"), fontSize: 13, padding: "7px 12px" }}>Individual</button>
-                    <button onClick={() => onSetSkinsStyle("team_11")} style={{ ...btn(style === "team_11"), fontSize: 13, padding: "7px 12px" }}>1:1 Teams</button>
-                    <button onClick={() => onSetSkinsStyle("team_2v2")} style={{ ...btn(style === "team_2v2"), fontSize: 13, padding: "7px 12px" }}>2v2 Best-ball</button>
+                    <button onClick={() => onSetSkinsStyle("individual")} disabled={blocked({ type: "set_skins_style", style: "individual" })} title={reasonFor({ type: "set_skins_style", style: "individual" })} style={{ ...btn(style === "individual"), fontSize: 13, padding: "7px 12px", opacity: blocked({ type: "set_skins_style", style: "individual" }) ? .45 : 1 }}>Individual</button>
+                    <button onClick={() => onSetSkinsStyle("team_11")} disabled={blocked({ type: "set_skins_style", style: "team_11" })} title={reasonFor({ type: "set_skins_style", style: "team_11" })} style={{ ...btn(style === "team_11"), fontSize: 13, padding: "7px 12px", opacity: blocked({ type: "set_skins_style", style: "team_11" }) ? .45 : 1 }}>1:1 Teams</button>
+                    <button onClick={() => onSetSkinsStyle("team_2v2")} disabled={blocked({ type: "set_skins_style", style: "team_2v2" })} title={reasonFor({ type: "set_skins_style", style: "team_2v2" })} style={{ ...btn(style === "team_2v2"), fontSize: 13, padding: "7px 12px", opacity: blocked({ type: "set_skins_style", style: "team_2v2" }) ? .45 : 1 }}>2v2 Best-ball</button>
                   </div>
                   <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
                     {style === "individual"
@@ -542,7 +546,7 @@ export function OrganizerPanel({
                       : style === "team_11"
                       ? "1:1 Teams — pair players across two teams in Matchups; won skins roll into each team's total."
                       : "2v2 Best-ball — build foursomes in Matchups; each side's better net ball contests the hole."}
-                    {anyScores ? " Scores are kept when you switch." : ""}
+                    {anyScores ? " Structure is locked once scoring begins." : ""}
                   </div>
                 </div>
               );
@@ -553,8 +557,8 @@ export function OrganizerPanel({
                 <div style={{ marginTop: 12 }}>
                   <div style={{ color: C.sage, fontSize: 12 }}>Players</div>
                   <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                    <button onClick={() => onSetMatchTeam(false)} style={{ ...btn(!isTeam), fontSize: 13, padding: "7px 12px" }}>Individual</button>
-                    <button onClick={() => onSetMatchTeam(true)} style={{ ...btn(isTeam), fontSize: 13, padding: "7px 12px" }}>Team (e.g. 4 v 4)</button>
+                    <button onClick={() => onSetMatchTeam(false)} disabled={blocked({ type: "set_match_team", on: false })} title={reasonFor({ type: "set_match_team", on: false })} style={{ ...btn(!isTeam), fontSize: 13, padding: "7px 12px", opacity: blocked({ type: "set_match_team", on: false }) ? .45 : 1 }}>Individual</button>
+                    <button onClick={() => onSetMatchTeam(true)} disabled={blocked({ type: "set_match_team", on: true })} title={reasonFor({ type: "set_match_team", on: true })} style={{ ...btn(isTeam), fontSize: 13, padding: "7px 12px", opacity: blocked({ type: "set_match_team", on: true }) ? .45 : 1 }}>Team (e.g. 4 v 4)</button>
                   </div>
                   <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
                     {isTeam ? "Team match — assign two teams, then pair players 1:1 across them in Matchups." : "Individual — 1:1 pairings, each match stands alone."}
@@ -566,8 +570,8 @@ export function OrganizerPanel({
               <div style={{ marginTop: 12 }}>
                 <div style={{ color: C.sage, fontSize: 12 }}>{game.game_type === "skins" ? "Team score" : "Team point"}</div>
                 <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                  <button onClick={() => onSetTeamScoreMode("best_ball")} style={{ ...btn((game.team_score_mode ?? "best_ball") === "best_ball"), fontSize: 13, padding: "7px 12px" }}>Best ball</button>
-                  <button onClick={() => onSetTeamScoreMode("aggregate")} style={{ ...btn(game.team_score_mode === "aggregate"), fontSize: 13, padding: "7px 12px" }}>{game.game_type === "skins" ? "Aggregate" : "Shootout"}</button>
+                  <button onClick={() => onSetTeamScoreMode("best_ball")} disabled={blocked({ type: "set_team_score_mode", mode: "best_ball" })} title={reasonFor({ type: "set_team_score_mode", mode: "best_ball" })} style={{ ...btn((game.team_score_mode ?? "best_ball") === "best_ball"), fontSize: 13, padding: "7px 12px" }}>Best ball</button>
+                  <button onClick={() => onSetTeamScoreMode("aggregate")} disabled={blocked({ type: "set_team_score_mode", mode: "aggregate" })} title={reasonFor({ type: "set_team_score_mode", mode: "aggregate" })} style={{ ...btn(game.team_score_mode === "aggregate"), fontSize: 13, padding: "7px 12px" }}>{game.game_type === "skins" ? "Aggregate" : "Shootout"}</button>
                 </div>
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
                   {game.team_score_mode === "aggregate"
@@ -583,8 +587,8 @@ export function OrganizerPanel({
                 <div style={{ marginTop: 12 }}>
                   <div style={{ color: C.sage, fontSize: 12 }}>When a hole ties</div>
                   <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                    <button onClick={() => onSetSkinsMode("carryover")} style={{ ...btn((game.skins_mode ?? "carryover") === "carryover"), fontSize: 13, padding: "7px 12px" }}>Carry over</button>
-                    <button onClick={() => { if (splitBlocked) return; onSetSkinsMode("split"); }} style={{ ...btn(game.skins_mode === "split"), fontSize: 13, padding: "7px 12px", opacity: splitBlocked ? 0.4 : 1 }}>Halved</button>
+                    <button onClick={() => onSetSkinsMode("carryover")} disabled={blocked({ type: "set_skins_mode", mode: "carryover" })} title={reasonFor({ type: "set_skins_mode", mode: "carryover" })} style={{ ...btn((game.skins_mode ?? "carryover") === "carryover"), fontSize: 13, padding: "7px 12px", opacity: blocked({ type: "set_skins_mode", mode: "carryover" }) ? .45 : 1 }}>Carry over</button>
+                    <button onClick={() => { if (splitBlocked) return; onSetSkinsMode("split"); }} disabled={splitBlocked || blocked({ type: "set_skins_mode", mode: "split" })} title={splitBlocked ? "Halved skins is unavailable with more than four individual players." : reasonFor({ type: "set_skins_mode", mode: "split" })} style={{ ...btn(game.skins_mode === "split"), fontSize: 13, padding: "7px 12px", opacity: splitBlocked || blocked({ type: "set_skins_mode", mode: "split" }) ? 0.4 : 1 }}>Halved</button>
                   </div>
                   <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
                     {splitBlocked

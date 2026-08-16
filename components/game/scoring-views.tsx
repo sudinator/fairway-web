@@ -42,6 +42,7 @@ import {
   mergeBackupRow,
 } from "@/lib/golf";
 import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
+import { decideSetupChange, type SetupAction } from "@/lib/game-setup-policy";
 import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
@@ -380,8 +381,18 @@ export function MatchView({
   const paired = new Set(game.pairings.flatMap((pr) => [pr.a, pr.b]));
   const unpaired = players.filter((p) => !paired.has(pkey(p)));
   const inMatchCount = (uid: string) => game.pairings.filter((pr) => pr.a === uid || pr.b === uid).length;
+  const setupPolicy = (action: SetupAction) => decideSetupChange({ game, players, action });
+  const matchupDecision = setupPolicy({ type: "set_pairings" });
+  const matchupsBlocked = matchupDecision.decision === "block";
+  const allowSetupMutation = (action: SetupAction) => {
+    const decision = setupPolicy(action);
+    if (decision.decision === "block") { alert(decision.reason); return false; }
+    if (decision.decision === "confirm") return confirm(`${decision.title}\n\n${decision.message}`);
+    return true;
+  };
 
   const addPairing = async () => {
+    if (!allowSetupMutation({ type: "set_pairings" })) return;
     if (!aSel || !bSel || aSel === bSel) return;
     const dup = game.pairings.some((pr) => (pr.a === aSel && pr.b === bSel) || (pr.a === bSel && pr.b === aSel));
     if (dup) return; // that exact match already exists
@@ -394,6 +405,7 @@ export function MatchView({
     onChanged();
   };
   const removePairing = async (idx: number) => {
+    if (!allowSetupMutation({ type: "set_pairings" })) return;
     const pairings = game.pairings.filter((_, i) => i !== idx);
     await supabase.from("games").update({ pairings }).eq("id", game.id);
     onChanged();
@@ -408,6 +420,7 @@ export function MatchView({
   const useTeamPick = !!(teamA && teamB);
 
   const assignTeam = async (p: Player, key: string | null) => {
+    if (!allowSetupMutation({ type: "set_team", player: p, team: key })) return;
     await supabase.from("game_players").update({ team: key }).eq("id", p.id);
     onChanged();
   };
@@ -475,13 +488,21 @@ export function MatchView({
         <div style={{ flex: 1 }} />
         {mode === "setup" && isCreator && (
           <button
-            style={{ ...btn(false), fontSize: 12 }}
+            style={{ ...btn(false), fontSize: 12, opacity: matchupsBlocked ? 0.55 : 1 }}
+            disabled={matchupsBlocked}
+            title={matchupsBlocked && matchupDecision.decision === "block" ? matchupDecision.reason : undefined}
             onClick={() => setEditing((v) => !v)}
           >
             {editing ? "Done" : "✎ Add / edit"}
           </button>
         )}
       </div>
+
+      {mode === "setup" && isCreator && matchupsBlocked && matchupDecision.decision === "block" && (
+        <div style={{ background: "#4a1d16", border: `1px solid ${C.birdie}`, borderRadius: 10, padding: "9px 11px", color: "#f0c5bd", fontSize: 11.5, lineHeight: 1.45, marginTop: 10 }}>
+          {matchupDecision.reason}
+        </div>
+      )}
 
       {mode === "setup" && editing && isCreator && (
         <div
@@ -505,8 +526,9 @@ export function MatchView({
           >
             <select
               value={aSel}
+              disabled={matchupsBlocked}
               onChange={(e) => setASel(e.target.value)}
-              style={{ ...inputStyle, width: "auto", minWidth: 130 }}
+              style={{ ...inputStyle, width: "auto", minWidth: 130, opacity: matchupsBlocked ? 0.55 : 1 }}
             >
               <option value="">{useTeamPick ? `${teamA!.name}…` : "Player A…"}</option>
               {(useTeamPick ? players.filter((p) => p.team === teamA!.key) : players).map((p) => (
@@ -518,8 +540,9 @@ export function MatchView({
             <span style={{ color: C.sage }}>vs</span>
             <select
               value={bSel}
+              disabled={matchupsBlocked}
               onChange={(e) => setBSel(e.target.value)}
-              style={{ ...inputStyle, width: "auto", minWidth: 130 }}
+              style={{ ...inputStyle, width: "auto", minWidth: 130, opacity: matchupsBlocked ? 0.55 : 1 }}
             >
               <option value="">{useTeamPick ? `${teamB!.name}…` : "Player B…"}</option>
               {(useTeamPick ? players.filter((p) => p.team === teamB!.key) : players.filter((p) => pkey(p) !== aSel)).map((p) => (
@@ -533,7 +556,7 @@ export function MatchView({
                 ...btn(true),
                 opacity: aSel && bSel && aSel !== bSel ? 1 : 0.5,
               }}
-              disabled={!aSel || !bSel || aSel === bSel || busy}
+              disabled={matchupsBlocked || !aSel || !bSel || aSel === bSel || busy}
               onClick={addPairing}
             >
               Add
@@ -633,6 +656,8 @@ export function MatchView({
               </div>
               {isCreator && editing && (
                 <button
+                  disabled={matchupsBlocked}
+                  title={matchupsBlocked && matchupDecision.decision === "block" ? matchupDecision.reason : undefined}
                   onClick={() => removePairing(idx)}
                   style={{
                     background: "none",
@@ -779,6 +804,15 @@ export function FourballView({
   const nameOf = (uid: string) => playerOf(uid)?.display_name || "—";
   const firstName = (uid: string) => (playerOf(uid)?.display_name || "—").split(" ")[0];
   const teamName = (key: string | null | undefined) => teams?.find((t) => t.key === key)?.name || "—";
+  const setupPolicy = (action: SetupAction) => decideSetupChange({ game, players, action });
+  const foursomeDecision = setupPolicy({ type: "set_foursomes" });
+  const foursomesBlocked = foursomeDecision.decision === "block";
+  const allowFoursomeMutation = () => {
+    const decision = setupPolicy({ type: "set_foursomes" });
+    if (decision.decision === "block") { alert(decision.reason); return false; }
+    if (decision.decision === "confirm") return confirm(`${decision.title}\n\n${decision.message}`);
+    return true;
+  };
 
   // Which contest line is expanded (one at a time): key is `${foursomeId}-${ci}`.
   const [openKey, setOpenKey] = useState<string | null>(null);
@@ -814,6 +848,7 @@ export function FourballView({
   };
 
   const saveFoursomes = async (next: typeof foursomes) => {
+    if (!allowFoursomeMutation()) return;
     await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
     // Each foursome is also its tee group (1-based), so group scoring/markers line up
     // with the foursomes and there's no separate "Groups" step for four-ball.
@@ -935,8 +970,13 @@ export function FourballView({
         <div style={{ display: "flex", alignItems: "center" }}>
           <Eyebrow>FOURSOMES (2 v 2)</Eyebrow>
           <div style={{ flex: 1 }} />
-          {isCreator && <button style={{ ...btn(true), fontSize: 12 }} onClick={addFoursome}>+ Add foursome</button>}
+          {isCreator && <button style={{ ...btn(true), fontSize: 12, opacity: foursomesBlocked ? 0.55 : 1 }} disabled={foursomesBlocked} title={foursomesBlocked && foursomeDecision.decision === "block" ? foursomeDecision.reason : undefined} onClick={addFoursome}>+ Add foursome</button>}
         </div>
+        {isCreator && foursomesBlocked && foursomeDecision.decision === "block" && (
+          <div style={{ background: "#4a1d16", border: `1px solid ${C.birdie}`, borderRadius: 10, padding: "9px 11px", color: "#f0c5bd", fontSize: 11.5, lineHeight: 1.45, marginTop: 10 }}>
+            {foursomeDecision.reason}
+          </div>
+        )}
         <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
           {isTeam
             ? `Each foursome is ${teams![0].name} vs ${teams![1].name} (2-v-2 better-net-ball). Each side only lists its own team's players, so the team total stays correct.`
@@ -952,9 +992,9 @@ export function FourballView({
         {foursomes.map((f) => (
           <div key={f.id} style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 12 }}>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <input value={f.name} onChange={(e) => renameFoursome(f.id, e.target.value)} disabled={!isCreator}
+              <input value={f.name} onChange={(e) => renameFoursome(f.id, e.target.value)} disabled={!isCreator || foursomesBlocked}
                 style={{ ...inputStyle, flex: 1, fontWeight: 700 }} />
-              {isCreator && <button style={{ ...btn(false), fontSize: 11, color: C.birdie }} onClick={() => removeFoursome(f.id)}>Remove</button>}
+              {isCreator && <button style={{ ...btn(false), fontSize: 11, color: C.birdie, opacity: foursomesBlocked ? 0.55 : 1 }} disabled={foursomesBlocked} onClick={() => removeFoursome(f.id)}>Remove</button>}
             </div>
             {(["a", "b"] as const).map((team) => (
               <div key={team} style={{ marginTop: 10 }}>
@@ -962,12 +1002,12 @@ export function FourballView({
                 {f[team].map((uid) => (
                   <div key={uid} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" }}>
                     <span style={{ flex: 1, color: C.cream, fontSize: 14 }}>{nameOf(uid)}</span>
-                    {isCreator && <button style={{ ...btn(false), fontSize: 11, padding: "3px 8px" }} onClick={() => unassign(f.id, team, uid)}>Remove</button>}
+                    {isCreator && <button style={{ ...btn(false), fontSize: 11, padding: "3px 8px", opacity: foursomesBlocked ? 0.55 : 1 }} disabled={foursomesBlocked} onClick={() => unassign(f.id, team, uid)}>Remove</button>}
                   </div>
                 ))}
                 {isCreator && f[team].length < 2 && (
-                  <select defaultValue="" onChange={(e) => { if (e.target.value) { assign(f.id, team, e.target.value); e.target.value = ""; } }}
-                    style={{ ...inputStyle, padding: "6px 8px", fontSize: 12, marginTop: 4 }}>
+                  <select defaultValue="" disabled={foursomesBlocked} onChange={(e) => { if (e.target.value) { assign(f.id, team, e.target.value); e.target.value = ""; } }}
+                    style={{ ...inputStyle, padding: "6px 8px", fontSize: 12, marginTop: 4, opacity: foursomesBlocked ? 0.55 : 1 }}>
                     <option value="">+ Add player…</option>
                     {unplaced.filter((p) => !isTeam || p.team === (team === "a" ? teams![0].key : teams![1].key)).map((p) => <option key={p.id} value={pkey(p)}>{p.display_name}</option>)}
                   </select>
@@ -983,7 +1023,7 @@ export function FourballView({
                     : `${firstName(f.a[0])} v ${firstName(f.b[1])} · ${firstName(f.a[1])} v ${firstName(f.b[0])}`}
                 </div>
                 {isCreator && (
-                  <button style={{ ...btn(false), fontSize: 12, marginTop: 6 }} onClick={() => setSwap(f.id, !f.swap)}>Swap who plays whom</button>
+                  <button style={{ ...btn(false), fontSize: 12, marginTop: 6, opacity: foursomesBlocked ? 0.55 : 1 }} disabled={foursomesBlocked} onClick={() => setSwap(f.id, !f.swap)}>Swap who plays whom</button>
                 )}
               </div>
             )}

@@ -18,6 +18,7 @@ export type GameSetupWorkspaceProps = {
   organizerPanelProps: OrganizerPanelProps;
   onSetGameDate: (date: string) => Promise<void>;
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
+  getTeeGroupPolicy: (p: Player, group: number | null) => { blocked: boolean; reason?: string };
   onRandomizeGroups: () => Promise<void>;
   canRandomize: boolean;
   randomizeReason: string;
@@ -40,6 +41,7 @@ export function GameSetupWorkspace({
   organizerPanelProps,
   onSetGameDate,
   onSetTeeGroup,
+  getTeeGroupPolicy,
   onRandomizeGroups,
   canRandomize,
   randomizeReason,
@@ -104,7 +106,7 @@ export function GameSetupWorkspace({
           <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>{game.name}</div>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>{game.course} · {game.game_type === "fourball" ? "Four-ball" : game.game_type}</div>
           <span style={{ display: "inline-block", marginTop: 7, padding: "3px 9px", borderRadius: 999, background: anyScores ? "#5BD08A" : C.gold, color: anyScores ? "#0E241B" : "#23303A", fontSize: 11, fontWeight: 800 }}>
-            {anyScores ? "SCORING" : "SETUP"}
+            {game.status === "ended" ? "FINAL" : anyScores ? "SCORING" : "SETUP"}
           </span>
         </div>
         {summary.map((s) => (
@@ -172,7 +174,7 @@ export function GameSetupWorkspace({
             {!usesFoursomes && <button onClick={() => onSetupTabChange("groups")} style={{ ...btn(setupTab === "groups"), flex: 1, fontSize: 12 }}>Tee groups</button>}
           </div>
           {setupTab === "teams" && <OrganizerPanel section="teams" {...organizerPanelProps} />}
-          {setupTab === "groups" && <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup} onRandomize={onRandomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} overflowIds={groupOverflow} />}
+          {setupTab === "groups" && <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup} getTeeGroupPolicy={getTeeGroupPolicy} onRandomize={onRandomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} overflowIds={groupOverflow} />}
           {setupTab === "matchups" && <div style={{ ...cardStyle, color: C.sage, fontSize: 12 }}>Build and review matchups below. The existing matchup editor is unchanged.</div>}
         </>
       )}

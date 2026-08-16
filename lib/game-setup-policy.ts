@@ -1,0 +1,223 @@
+import { shapeOf, type GameType } from "./game-shape";
+import type { Game, Player } from "./game-types";
+
+export type SetupDecision =
+  | { decision: "allow" }
+  | { decision: "confirm"; title: string; message: string }
+  | { decision: "block"; reason: string };
+
+export type SetupAction =
+  | { type: "rename_game" }
+  | { type: "share_live" }
+  | { type: "set_game_date" }
+  | { type: "add_player"; guest?: boolean }
+  | { type: "remove_player"; player: Player }
+  | { type: "toggle_no_show"; player: Player; next: boolean }
+  | { type: "set_handicap"; player: Player }
+  | { type: "set_tee"; player: Player; teeName: string }
+  | { type: "set_team"; player: Player; team: string | null }
+  | { type: "set_tee_group"; player: Player; group: number | null }
+  | { type: "randomize_groups" }
+  | { type: "set_format"; target: GameType }
+  | { type: "set_allowance"; pct: number }
+  | { type: "set_team_score_mode"; mode: "best_ball" | "aggregate" }
+  | { type: "set_skins_mode"; mode: "carryover" | "split" }
+  | { type: "set_skins_style"; style: "individual" | "team_11" | "team_2v2" }
+  | { type: "set_match_team"; on: boolean }
+  | { type: "set_trifecta_scoring"; mode: "per_hole" | "match" }
+  | { type: "set_leg_config" }
+  | { type: "set_pairings" }
+  | { type: "set_foursomes" };
+
+export type SetupPolicyContext = {
+  game: Game;
+  players: Player[];
+  action: SetupAction;
+};
+
+export const playerHasScores = (p: Player): boolean => (p.scores || []).some((s) => s != null);
+export const gameHasScores = (players: Player[]): boolean => players.some(playerHasScores);
+
+const allow = (): SetupDecision => ({ decision: "allow" });
+const requireConfirm = (title: string, message: string): SetupDecision => ({ decision: "confirm", title, message });
+const block = (reason: string): SetupDecision => ({ decision: "block", reason });
+
+const endedBlock = (): SetupDecision => block("This game has ended. Reopen it before editing this setting.");
+
+const individualReinterpretation = (game: Game, target: GameType): boolean => {
+  const current = shapeOf(game).view;
+  const targetShape = shapeOf({ ...game, game_type: target }).view;
+  const individual = new Set(["stableford", "stroke", "skins_individual"]);
+  return individual.has(current) && individual.has(targetShape);
+};
+
+const sameFoursomeFamily = (game: Game, target: GameType): boolean => {
+  const current = shapeOf(game).view;
+  const targetShape = shapeOf({ ...game, game_type: target }).view;
+  const family = new Set(["fourball", "trifecta"]);
+  return family.has(current) && family.has(targetShape) && Array.isArray(game.foursomes) && game.foursomes.length > 0;
+};
+
+export function decideSetupChange({ game, players, action }: SetupPolicyContext): SetupDecision {
+  const anyScores = gameHasScores(players);
+
+  // Metadata/visibility remain safe even after the competition has ended.
+  if (action.type === "rename_game" || action.type === "share_live") return allow();
+
+  if (action.type === "set_game_date") {
+    if (!anyScores) return allow();
+    return requireConfirm(
+      "Change the game date?",
+      "Scores already exist. This moves the game date and any posted player rounds together; scores and results do not change.",
+    );
+  }
+
+  if (game.status === "ended") return endedBlock();
+
+  switch (action.type) {
+    case "add_player": {
+      if (!anyScores) return allow();
+      const view = shapeOf(game).view;
+      if (view === "stableford" || view === "stroke" || view === "skins_individual") {
+        return requireConfirm(
+          action.guest ? "Add this guest mid-round?" : "Add this player mid-round?",
+          "Scoring is already underway. The new player starts with no historical holes; existing scorecards and standings are kept.",
+        );
+      }
+      return block("Players cannot be added after scoring starts in a match or team contest because that would change the competitive structure.");
+    }
+    case "remove_player": {
+      if (playerHasScores(action.player)) {
+        return block(`${action.player.display_name} already has scores. Mark them No-show / Out instead so their played holes stay in the game.`);
+      }
+      return requireConfirm(
+        `Remove ${action.player.display_name}?`,
+        "This removes the player from the game and clears their team, matchup and group placement. They have no recorded scores.",
+      );
+    }
+    case "toggle_no_show": {
+      if (!anyScores) return allow();
+      const effect =
+        game.game_type === "fourball" || game.game_type === "trifecta"
+          ? "Unplayed holes score net double bogey for their team."
+          : game.game_type === "match"
+          ? "Their match stands on the holes already played."
+          : "Their unplayed holes score nothing.";
+      return requireConfirm(
+        action.next ? `Mark ${action.player.display_name} out?` : `Return ${action.player.display_name} to play?`,
+        action.next
+          ? `Played holes remain. ${effect}`
+          : "This changes how the current format treats this player from this point forward; existing raw scores remain unchanged.",
+      );
+    }
+    case "set_handicap": {
+      if (!playerHasScores(action.player)) return allow();
+      return requireConfirm(
+        `Correct ${action.player.display_name}'s handicap?`,
+        "This recalculates received strokes and net results for the entire game, including holes already scored. Gross scores are not changed.",
+      );
+    }
+    case "set_tee": {
+      if (!playerHasScores(action.player)) return allow();
+      return requireConfirm(
+        `Correct ${action.player.display_name}'s tee to ${action.teeName}?`,
+        `This treats ${action.player.display_name}'s entire round as having been played from ${action.teeName} and recalculates rating, slope, course handicap and net results. Gross scores are not changed. Do not use this if the player physically changed tees during the round.`,
+      );
+    }
+    case "set_team": {
+      if (playerHasScores(action.player)) {
+        return block(`${action.player.display_name} already has scores. Team membership is frozen once that player's scoring begins.`);
+      }
+      return allow();
+    }
+    case "set_tee_group": {
+      if (playerHasScores(action.player) || action.player.group_locked) {
+        return block(`${action.player.display_name}'s tee group is frozen because scoring has started for that player/group.`);
+      }
+      const targetLocked = action.group != null && players.some((p) => p.tee_group === action.group && p.group_locked);
+      if (targetLocked) return block(`Group ${action.group} has already been finished/locked. Add the player to an active group instead.`);
+      if (anyScores) {
+        return requireConfirm(
+          `Move ${action.player.display_name} to ${action.group == null ? "no tee group" : `Group ${action.group}`}?`,
+          "Scoring is already underway. This is allowed only because this player has no scores and the target group is still active.",
+        );
+      }
+      return allow();
+    }
+    case "randomize_groups": {
+      if (players.some((p) => p.group_locked)) return block("A tee group has already been finished/locked. Groups are frozen for the round.");
+      if (anyScores) return block("Scores are already in. Tee groups are frozen for the round.");
+      return allow();
+    }
+    case "set_format": {
+      if (action.target === game.game_type) return allow();
+      if (!anyScores) return allow();
+      if (individualReinterpretation(game, action.target)) {
+        return requireConfirm(
+          `Change format to ${action.target}?`,
+          "Existing gross scorecards are kept. Standings and results will be recalculated using the new individual format, and the handicap allowance moves to that format's default.",
+        );
+      }
+      if (sameFoursomeFamily(game, action.target)) {
+        return requireConfirm(
+          `Change format to ${action.target}?`,
+          "The existing foursomes and gross scorecards are kept. Team results will be recalculated using the new scoring format.",
+        );
+      }
+      return block("This format change would alter the competitive structure after scoring has started. Individual/team identity, pairings and foursomes are frozen at the first score.");
+    }
+    case "set_allowance": {
+      if (!anyScores) return allow();
+      return requireConfirm(
+        `Change the handicap allowance to ${action.pct}%?`,
+        "This recalculates received strokes and net standings for holes already scored. Gross scores are not changed.",
+      );
+    }
+    case "set_team_score_mode": {
+      if (!anyScores) return allow();
+      return requireConfirm(
+        "Change team scoring?",
+        "Teams, foursomes and gross scorecards stay the same, but team standings will be recalculated under the new scoring rule.",
+      );
+    }
+    case "set_skins_mode": {
+      if (!anyScores) return allow();
+      return requireConfirm(
+        "Change skins tie handling?",
+        "Existing scorecards stay the same, but skins already played will be recalculated using the new tie rule.",
+      );
+    }
+    case "set_skins_style": {
+      const current = shapeOf(game).skinsStyle ?? "individual";
+      if (current === action.style || !anyScores) return allow();
+      return block("Skins structure is frozen once scoring starts. Individual, 1:1 team and 2v2 team skins cannot be converted into one another mid-round.");
+    }
+    case "set_match_team": {
+      const current = shapeOf(game).usesTeams;
+      if (current === action.on || !anyScores) return allow();
+      return block("Match structure is frozen once scoring starts. An individual match cannot become a team match, or vice versa, mid-round.");
+    }
+    case "set_trifecta_scoring": {
+      if (!anyScores) return allow();
+      return requireConfirm(
+        "Change Trifecta scoring?",
+        "The same foursomes and gross scorecards are kept, but points already played will be recalculated under the new Trifecta scoring rule.",
+      );
+    }
+    case "set_leg_config": {
+      if (!anyScores) return allow();
+      return requireConfirm(
+        "Change side-game leg settings?",
+        "Existing scorecards stay the same, but leg and side-game standings will be recalculated using the new settings.",
+      );
+    }
+    case "set_pairings": {
+      if (!anyScores) return allow();
+      return block("Matchups are frozen once scoring starts. Existing scores must stay attached to the opponents they were played against.");
+    }
+    case "set_foursomes": {
+      if (!anyScores) return allow();
+      return block("Foursomes are frozen once scoring starts. Existing scores must stay attached to the teams and foursomes that played them.");
+    }
+  }
+}

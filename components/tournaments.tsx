@@ -43,6 +43,7 @@ import {
   mergeBackupRow,
 } from "@/lib/golf";
 import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
+import { decideSetupChange, type SetupAction, type SetupDecision } from "@/lib/game-setup-policy";
 import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
@@ -1882,9 +1883,20 @@ function GameRoom({
     await load();
   };
 
+  const setupDecision = (action: SetupAction): SetupDecision => {
+    if (!game) return { decision: "block", reason: "Game is not loaded." };
+    return decideSetupChange({ game, players, action });
+  };
+  const allowSetupChange = (action: SetupAction): boolean => {
+    const d = setupDecision(action);
+    if (d.decision === "block") { alert(d.reason); return false; }
+    if (d.decision === "confirm") return confirm(`${d.title}\n\n${d.message}`);
+    return true;
+  };
+
   // Organizer: override any player's handicap index for this game (recomputes course handicap).
   const overridePlayerHandicap = async (p: Player, idxVal: number | null) => {
-    if (!game) return;
+    if (!game || !allowSetupChange({ type: "set_handicap", player: p })) return;
     // Handicap overrides must use THIS player's selected tee snapshot. Never borrow
     // another player's rating/slope: that can produce a valid-looking but wrong CH.
     const rating = p.rating ?? null;
@@ -1917,12 +1929,14 @@ function GameRoom({
 
   // Organizer: update a player's team assignment from the unified setup roster.
   const setPlayerTeam = async (p: Player, team: string | null) => {
+    if (!allowSetupChange({ type: "set_team", player: p, team })) return;
     await supabase.from("game_players").update({ team }).eq("id", p.id);
     await load();
   };
 
   // Organizer: update a player's tee group from the unified setup roster.
   const setPlayerTeeGroup = async (p: Player, group: number | null) => {
+    if (!allowSetupChange({ type: "set_tee_group", player: p, group })) return;
     const { error } = await supabase.rpc("set_tee_group", { p_player: p.id, p_group: group });
     if (error) notifyError("Couldn't update that player's group — please try again.");
     await load();
@@ -1933,12 +1947,11 @@ function GameRoom({
   // left unassigned for manual placement. Pre-round only — see canRandomize below.
   const [randomizing, setRandomizing] = useState(false);
   const [groupOverflow, setGroupOverflow] = useState<string[]>([]); // player ids left unassigned by the shuffle
-  const groupsLocked = players.some((p) => p.group_locked);
-  const anyScoresNow = players.some((p) => (p.scores || []).some((s) => s != null));
-  const canRandomize = !gameEnded && !anyScoresNow && !groupsLocked;
-  const randomizeReason = gameEnded ? "The game has ended." : anyScoresNow ? "Scores are already in — groups are set for the round." : groupsLocked ? "A group has started scoring — groups are set for the round." : "";
+  const randomizeDecision = game ? setupDecision({ type: "randomize_groups" }) : { decision: "block", reason: "Game is not loaded." } as SetupDecision;
+  const canRandomize = randomizeDecision.decision !== "block";
+  const randomizeReason = randomizeDecision.decision === "block" ? randomizeDecision.reason : "";
   const randomizeGroups = async () => {
-    if (!game || !canRandomize) return;
+    if (!game || !canRandomize || !allowSetupChange({ type: "randomize_groups" })) return;
     const field: GPlayer[] = players
       .filter((p) => !p.no_show)
       .map((p) => ({ id: p.id, userId: p.user_id ?? null, isGuest: !!p.is_guest, guestOf: p.guest_of ?? null }));
@@ -1986,7 +1999,7 @@ function GameRoom({
   const refTee = () => GU.refTee(players);
   const blankCard = () => GU.blankCard(game);
   const addGuestToGame = async (name: string, idx: number, sponsor: string) => {
-    if (!game || !name.trim() || Number.isNaN(idx)) return;
+    if (!game || !name.trim() || Number.isNaN(idx) || !allowSetupChange({ type: "add_player", guest: true })) return;
     const t = refTee();
     const ch = (t.slope != null && t.rating != null && game.course_par != null)
       ? courseHandicap(idx, t.slope, t.rating, game.course_par) : null;
@@ -2001,7 +2014,7 @@ function GameRoom({
     await load();
   };
   const addMemberToGame = async (m: { id: string; display_name: string; handicap_index: number | null }) => {
-    if (!game) return;
+    if (!game || !allowSetupChange({ type: "add_player" })) return;
     const t = refTee();
     const ch = (m.handicap_index != null && t.slope != null && t.rating != null && game.course_par != null)
       ? courseHandicap(m.handicap_index, t.slope, t.rating, game.course_par) : null;
@@ -2017,7 +2030,7 @@ function GameRoom({
   // Organizer: update a player's tee from the unified setup roster. This recalculates
   // course handicap from that player's handicap index using the selected tee rating/slope.
   const setPlayerTee = async (p: Player, teeName: string) => {
-    if (!game) return;
+    if (!game || !allowSetupChange({ type: "set_tee", player: p, teeName })) return;
     const tee = courseTees.find((t) => t.name === teeName);
     if (!tee) return;
     const ch =
@@ -2068,23 +2081,13 @@ function GameRoom({
   const toggleNoShow = async (p: Player) => {
     if (!game) return;
     const next = !p.no_show;
-    const effect =
-      (game.game_type === "fourball" || game.game_type === "trifecta") ? "any holes they didn't play score net double bogey for their team"
-      : game.game_type === "match" ? "the match stands on the holes already played"
-      : "their unplayed holes score nothing";
-    if (next && !confirm(`Mark ${p.display_name} as out? The holes they've already played still count; ${effect}.`)) return;
+    if (!allowSetupChange({ type: "toggle_no_show", player: p, next })) return;
     await supabase.from("game_players").update({ no_show: next }).eq("id", p.id);
     await load();
   };
 
   const removePlayer = async (p: Player) => {
-    if (!game || p.user_id === game.created_by) return;
-    if (
-      !confirm(
-        `Remove ${p.display_name} from "${game.name}"? Their scores in this game will be deleted.`,
-      )
-    )
-      return;
+    if (!game || p.user_id === game.created_by || !allowSetupChange({ type: "remove_player", player: p })) return;
     const removedKey = pkey(p);
     const updates: Partial<Game> = {};
     const nextPairings = (game.pairings || []).filter((pr) => pr.a !== removedKey && pr.b !== removedKey);
@@ -2113,7 +2116,7 @@ function GameRoom({
 
   // Organizer: rename the game.
   const renameGame = async (newName: string) => {
-    if (!game || !newName.trim()) return;
+    if (!game || !newName.trim() || !allowSetupChange({ type: "rename_game" })) return;
     await supabase
       .from("games")
       .update({ name: newName.trim() })
@@ -2123,7 +2126,7 @@ function GameRoom({
 
   // Organizer corrects a whole game's date; all players' rounds move together (server RPC).
   const setGameDate = async (newDate: string) => {
-    if (!game || !newDate) return;
+    if (!game || !newDate || !allowSetupChange({ type: "set_game_date" })) return;
     const today = todayLocalStr();
     if (newDate < today) {
       const days = Math.round((+new Date(today + "T00:00:00") - +new Date(newDate + "T00:00:00")) / 86400000);
@@ -2139,6 +2142,7 @@ function GameRoom({
   const setAllowance = async (pct: number) => {
     if (!game) return;
     const v = Math.max(0, Math.min(100, Math.round(pct)));
+    if ((game.allowance_pct ?? 100) === v || !allowSetupChange({ type: "set_allowance", pct: v })) return;
     await supabase.from("games").update({ allowance_pct: v }).eq("id", game.id);
     await load();
   };
@@ -2149,12 +2153,12 @@ function GameRoom({
   // common-practice number but the organizer can override after.
   const anyScores = players.some((p) => (p.scores || []).some((s) => s != null));
   const changeTrifectaScoring = async (next: "per_hole" | "match") => {
-    if (!game || game.status === "ended") return;
+    if (!game || (game.trifecta_scoring ?? "per_hole") === next || !allowSetupChange({ type: "set_trifecta_scoring", mode: next })) return;
     await supabase.from("games").update({ trifecta_scoring: next }).eq("id", game.id);
     await load();
   };
   const setFormat = async (next: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => {
-    if (!game || next === game.game_type) return;
+    if (!game || next === game.game_type || !allowSetupChange({ type: "set_format", target: next })) return;
     const suggested = next === "fourball" || next === "trifecta" ? 85 : 100;
     const patch: Record<string, unknown> = { game_type: next, allowance_pct: suggested };
     if (next === "trifecta" && !game.team_score_mode) patch.team_score_mode = "best_ball";
@@ -2170,20 +2174,20 @@ function GameRoom({
   };
 
   const setTeamScoreMode = async (mode: "best_ball" | "aggregate") => {
-    if (!game) return;
+    if (!game || (game.team_score_mode ?? "best_ball") === mode || !allowSetupChange({ type: "set_team_score_mode", mode })) return;
     const { error } = await supabase.from("games").update({ team_score_mode: mode }).eq("id", game.id);
     if (error) { alert("Couldn't change the team scoring — " + error.message); return; }
     await load();
   };
 
   const setLegConfig = async (cfg: LegConfig) => {
-    if (!game) return;
+    if (!game || !allowSetupChange({ type: "set_leg_config" })) return;
     const { error } = await supabase.from("games").update({ leg_config: cfg }).eq("id", game.id);
     if (error) { alert("Couldn't save the leg settings — " + error.message); return; }
     await load();
   };
   const updateSkinsMode = async (mode: "carryover" | "split") => {
-    if (!game) return;
+    if (!game || (game.skins_mode ?? "carryover") === mode || !allowSetupChange({ type: "set_skins_mode", mode })) return;
     const { error } = await supabase.from("games").update({ skins_mode: mode }).eq("id", game.id);
     if (error) { alert("Couldn't change the tie handling — " + error.message); return; }
     await load();
@@ -2192,7 +2196,7 @@ function GameRoom({
   // Scores are never touched — only the team structure changes, and the skins
   // recompute. Team styles leave the side assignment to the Matchups step.
   const setSkinsStyle = async (style: "individual" | "team_11" | "team_2v2") => {
-    if (!game) return;
+    if (!game || (shapeOf(game).skinsStyle ?? "individual") === style || !allowSetupChange({ type: "set_skins_style", style })) return;
     const g = game as any;
     const liveTeams = Array.isArray(g.teams) && g.teams.length === 2 ? g.teams : null;
     const liveFour = Array.isArray(g.foursomes) ? g.foursomes : null;
@@ -2204,9 +2208,7 @@ function GameRoom({
       foursomes: liveFour ?? prev.foursomes ?? null,
       pairings: (livePair.length ? livePair : prev.pairings) ?? [],
     };
-    if (anyScores && style === "individual" && !!liveTeams) {
-      if (!confirm("Switch to individual skins? The team setup is hidden but kept — switch back and your matchups return. Every score so far stays.")) return;
-    }
+    // Mid-round structural conversions are rejected centrally by game-setup-policy.
     const defTeams = [{ key: "A", name: "Team 1" }, { key: "B", name: "Team 2" }];
     let teams: any = null, foursomes: any = null, pairings: any = [];
     if (style === "team_11") { teams = stash.teams ?? defTeams; foursomes = null; pairings = stash.pairings ?? []; }
@@ -2224,7 +2226,7 @@ function GameRoom({
   // Singles match <-> team match (e.g. 4 v 4). Only flips the team structure;
   // pairings are assigned in Matchups. Scores untouched.
   const setMatchTeam = async (on: boolean) => {
-    if (!game) return;
+    if (!game || shapeOf(game).usesTeams === on || !allowSetupChange({ type: "set_match_team", on })) return;
     const g = game as any;
     const liveTeams = Array.isArray(g.teams) && g.teams.length === 2 ? g.teams : null;
     const prev = g.structure_stash || {};
@@ -2276,7 +2278,7 @@ function GameRoom({
   // (revoke it). Goes through an organizer-gated SECURITY DEFINER function so the
   // games table itself stays private.
   const setShare = async (on: boolean) => {
-    if (!game) return;
+    if (!game || !allowSetupChange({ type: "share_live" })) return;
     const { data, error } = await supabase.rpc("set_game_share", { p_game: game.id, p_on: on });
     if (!error) setGame({ ...game, share_token: (data as string | null) ?? null });
   };
@@ -2731,7 +2733,7 @@ function GameRoom({
         } satisfies OrganizerPanelProps;
         const workspaceProps = {
           game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate,
-          onSetTeeGroup: setPlayerTeeGroup, onRandomizeGroups: randomizeGroups, canRandomize, randomizeReason,
+          onSetTeeGroup: setPlayerTeeGroup, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, canRandomize, randomizeReason,
           randomizing, groupOverflow,
         } satisfies React.ComponentProps<typeof GameSetupWorkspace>;
         return <GameSetupWorkspace {...workspaceProps} />;

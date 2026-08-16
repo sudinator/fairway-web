@@ -4970,3 +4970,20 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Extends the permanent Game Control Center contract guard to require the alphabetical sort, stable tie-breaker, and use of the canonical roster in the player editor.
 - No migration.
 
+
+## 177.44.260816 — policy test fixture typecheck correction
+- Corrective release for the 177.43 PR CI failure.
+- Root cause: `lib/game-setup-policy.test.ts` constructed a typed `Game` fixture without the required `code` field, so dependency-backed TypeScript correctly rejected the test before the policy suite/build could run.
+- Fix: add the required `code` field to the fixture; no runtime behavior or policy logic changes.
+- No migration.
+
+## 177.43.260816 — centralized Game Control Center transition policy
+- Adds `lib/game-setup-policy.ts` as the single source of truth for organizer setup edits once play has started. Every covered mutation now resolves to **ALLOW / CONFIRM / BLOCK** before any write.
+- Locks the agreed competition-integrity rule: once scoring starts, structural identity freezes. Scored players cannot be removed, moved to another team, or moved to another tee group; individual/team conversions and skins structure conversions are blocked.
+- Preserves flexibility where raw scorecards remain valid: Stableford ↔ Stroke ↔ Individual Skins may be reinterpreted with confirmation; Four-ball ↔ Trifecta may be reinterpreted with confirmation when the same foursomes remain in place; handicap allowance, team-score mode, skins tie handling, Trifecta scoring and leg settings may be changed with explicit consequence warnings.
+- Tee and handicap corrections remain possible after that player has scored, but require confirmation and explicitly preserve gross scores. A tee correction means the entire round was recorded against the wrong tee; BNN still does not support a player physically changing tees partway through one round.
+- Remove is now blocked for a player with scores and directs the organizer to No-show / Out instead so played holes remain. Mid-round additions are allowed with confirmation only for individual Stableford/Stroke/Individual Skins; match/team contests block them once scoring starts.
+- Tee-group randomization remains pre-round only. Manual tee-group edits now obey the same policy: scored/locked players cannot move; an unscored player may join an active group with confirmation. Legacy Match pairing and Four-ball/Trifecta foursome editors are also policy-gated, so direct structural writers cannot bypass the Control Center rule.
+- Ended games show `FINAL` in the Control Center. Competition edits require reopen first; reopening does not bypass score-state rules. Rename/share remain safe metadata actions; game-date correction remains available with confirmation because the existing RPC moves posted rounds together.
+- Adds 41 executable policy assertions plus a permanent source-contract guard proving UI and write handlers both consume the same pure policy module.
+- **No database migration.** Course replacement remains intentionally out of scope: it is allowed conceptually only before any score, but still requires a separate coordinated course/hole/player-tee implementation.
