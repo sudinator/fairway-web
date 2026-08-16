@@ -5081,3 +5081,10 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Review now prints the full selected interpretation (for example `Four-ball · 2 v 2 Match · Best ball`) rather than only the base game type.
 - New pure `lib/create-game-format.ts` maps user-facing selectors onto the existing persisted state fields and resets irrelevant top-level team state when changing base formats. A permanent CI source contract prevents the ambiguous legacy selector labels from returning.
 - Executed locally: new format mapping 35/35 PASS; game-create 52/52 PASS; historical game-create differential 9,000 comparisons / 0 mismatches; setup-draft 2,007/2,007 PASS; tee inheritance 5,011/5,011 PASS; full `npm run guards` including 50,087 workflow/fault simulations PASS. Full dependency-backed app type/build remains the GitHub staging gate.
+
+
+## 177.57.260816 — Authoritative guided-format helpers + exact next-step guidance
+- **Staging-only convergence checkpoint. No migration.** Replaces the stale flat-format helper semantics from 177.53 with pure helpers that characterize the restored Production-style guided Create Game actions: family selection, Stroke-format selection, Individual/Team branch selection, team-format selection, and team-mode toggle.
+- The live Create Game buttons now delegate to those helpers through one patch applier. The helper tests freeze the exact 177.56 working handler behavior, including Stroke → Match → Stroke round trips, before runtime delegation.
+- Review now derives its **Next:** message from the same `postCreateDestination()` result used after Create, via `postCreateDestinationLabel()`, so guidance and actual navigation cannot drift.
+- No scoring logic, persisted game fields, Manage Game policy, database schema, or migration behavior changes.

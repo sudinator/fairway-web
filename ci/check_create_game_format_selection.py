@@ -17,7 +17,9 @@ checks = {
     "manage format keeps policy gate": 'policy({ type: "set_format", target: key })' in manage_src and 'd.decision !== "block"' in manage_src,
     "manage family cards are presentation only": 'The family cards only filter the choices; the game changes when you select a format.' in manage_src,
     "review keeps detailed shape": 'formatReviewLabel({ gameType, teamMode, skinsTeamStyle, teamScoreMode, trifectaScoring, strokeBasis, skinsMode })' in create_src,
-    "pure mapping helper retained": 'export function formatReviewLabel' in helper and 'export function reachableFormatKeys' in helper,
+    "guided helpers model runtime actions": all(token in helper for token in ['export function selectGuidedFamily', 'export function selectGuidedStrokeFormat', 'export function selectGuidedMatchKind', 'export function selectGuidedTeamFormat', 'export function setGuidedTeamMode']),
+    "create runtime delegates to guided helpers": all(token in create_src for token in ['applyGuidedFormatPatch(selectGuidedFamily', 'applyGuidedFormatPatch(selectGuidedStrokeFormat', 'applyGuidedFormatPatch(selectGuidedMatchKind', 'applyGuidedFormatPatch(selectGuidedTeamFormat', 'applyGuidedFormatPatch(setGuidedTeamMode']),
+    "review next step uses runtime destination helper": 'GC.postCreateDestinationLabel(GC.postCreateDestination(gameType, teamMode))' in create_src,
     "production selector geometry retained": 'borderRadius: 12' in shared and 'padding: 11' in shared and 'width: 34, height: 34' in shared and 'fontFamily: "Georgia, serif"' in shared,
     "production selected-state treatment retained": 'background: active ? C.green : C.greenLight' in shared and 'C.gold : "transparent"' in shared,
 }

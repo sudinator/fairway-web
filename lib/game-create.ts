@@ -99,6 +99,17 @@ export function postCreateDestination(gameType: GameTypeOpt, teamMode: boolean):
   return { roomTab: "setup", setupTab: "groups" };
 }
 
+export function postCreateDestinationLabel(destination: PostCreateDestination): string {
+  if (destination.roomTab === "play") return "Play";
+  if (destination.setupTab === "teams") return "Manage Game → Teams";
+  if (destination.setupTab === "matchups") return "Manage Game → Matchups";
+  if (destination.setupTab === "groups") return "Manage Game → Groups";
+  if (destination.setupTab === "players") return "Manage Game → Players";
+  if (destination.setupTab === "format") return "Manage Game → Format";
+  if (destination.setupTab === "review") return "Manage Game → Review";
+  return "Manage Game";
+}
+
 export type RosterMember = { id: string; display_name: string | null; avatar_url?: string | null; handicap_index: number | null };
 export type GuestEntry = { id?: string; display_name: string; handicap_index: number | null; guest_of?: string | null };
 export type PlayerRowsOpts = {

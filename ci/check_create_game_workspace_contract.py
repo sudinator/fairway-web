@@ -17,7 +17,7 @@ checks = {
     "workspace has no rpc": ".rpc(" not in w,
     "workspace has no persistence": all(x not in w for x in ('.from("games")', '.from("game_players")', 'localStorage')),
     "default tee wording": "Default tee for the field" in create,
-    "review explains manage handoff": "Additional setup is required after creation" in create and "Manage Game" in create,
+    "review gives exact next destination": "Next:" in create and "GC.postCreateDestinationLabel(GC.postCreateDestination(gameType, teamMode))" in create,
     "post-create destination centralized": "GC.postCreateDestination(gameType, teamMode)" in create,
     "split skins validated before game insert": create.find("GC.splitSkinsTooBig") < create.find('.from("games")'),
 }

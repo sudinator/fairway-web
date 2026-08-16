@@ -95,7 +95,7 @@ import { GameSetupWorkspace, type SetupTab } from "@/components/game/setup/game-
 import { CreateGameWorkspace, type CreateGameSection } from "@/components/game/setup/create-game-workspace";
 import { buildFormatPatch, buildSkinsStylePatch, buildMatchTeamPatch } from "@/lib/game-structure";
 import { resolveCreateGameTee, teeSourceLabel } from "@/lib/game-tee-assignment";
-import { formatReviewLabel } from "@/lib/create-game-format";
+import { formatReviewLabel, selectGuidedFamily, selectGuidedMatchKind, selectGuidedStrokeFormat, selectGuidedTeamFormat, setGuidedTeamMode, type CreateFormatPatch, type GuidedFormatState } from "@/lib/create-game-format";
 import { commitAllowance, editAllowance } from "@/lib/handicap-allowance";
 import { FormatFamilySelector } from "@/components/game/setup/format-family-selector";
 
@@ -271,6 +271,23 @@ function CreateGame({
   const [skinsMode, setSkinsMode] = useState<"carryover" | "split">("carryover");
   const [team1, setTeam1] = useState("Team 1");
   const [team2, setTeam2] = useState("Team 2");
+
+  const guidedFormatState = (): GuidedFormatState => ({
+    gameType, teamMode, skinsTeamStyle, teamScoreMode, trifectaScoring, strokeBasis, skinsMode, fmtFamily, matchKind,
+  });
+  const applyGuidedFormatPatch = (patch: CreateFormatPatch) => {
+    // Calling selectGameType whenever the helper returns gameType deliberately preserves
+    // the existing click behavior, including format-default allowance reset on reselect.
+    if (patch.gameType) selectGameType(patch.gameType);
+    if (patch.fmtFamily) setFmtFamily(patch.fmtFamily);
+    if (patch.matchKind) setMatchKind(patch.matchKind);
+    if (patch.teamMode !== undefined) setTeamMode(patch.teamMode);
+    if (patch.skinsTeamStyle) setSkinsTeamStyle(patch.skinsTeamStyle);
+    if (patch.teamScoreMode) setTeamScoreMode(patch.teamScoreMode);
+    if (patch.trifectaScoring) setTrifectaScoring(patch.trifectaScoring);
+    if (patch.strokeBasis) setStrokeBasis(patch.strokeBasis);
+    if (patch.skinsMode) setSkinsMode(patch.skinsMode);
+  };
 
   // Draft-time tee inheritance only: player override > flight tee > game default.
   // Creation resolves inheritance into explicit game_players tee/rating/slope snapshots.
@@ -987,39 +1004,29 @@ function CreateGame({
         {/* Two-family guided chooser: shared with Manage Game so both flows use the same visual language. */}
         <FormatFamilySelector
           value={fmtFamily}
-          onChange={(family) => {
-            if (family === "stroke") {
-              setFmtFamily("stroke");
-              if (gameType === "match" || gameType === "fourball" || gameType === "trifecta") selectGameType("stableford");
-              else if (gameType === "skins") { setTeamMode(false); setSkinsTeamStyle("head_to_head"); }
-            } else {
-              setFmtFamily("match");
-              const bb = gameType === "skins" && teamMode && skinsTeamStyle === "best_ball";
-              if (!bb && (gameType === "stableford" || gameType === "stroke" || gameType === "skins")) selectGameType(matchKind === "team" ? "fourball" : "match");
-            }
-          }}
+          onChange={(family) => applyGuidedFormatPatch(selectGuidedFamily(guidedFormatState(), family))}
         />
         {fmtFamily === "stroke" ? (
           <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-            <button onClick={() => selectGameType("stableford")} style={{ ...btn(gameType === "stableford"), flex: 1, minWidth: 100, fontSize: 13 }}>Stableford</button>
-            <button onClick={() => selectGameType("stroke")} style={{ ...btn(gameType === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Stroke play</button>
-            <button onClick={() => { selectGameType("skins"); setTeamMode(false); setSkinsTeamStyle("head_to_head"); }} style={{ ...btn(gameType === "skins" && fmtFamily === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Skins</button>
+            <button onClick={() => applyGuidedFormatPatch(selectGuidedStrokeFormat("stableford"))} style={{ ...btn(gameType === "stableford"), flex: 1, minWidth: 100, fontSize: 13 }}>Stableford</button>
+            <button onClick={() => applyGuidedFormatPatch(selectGuidedStrokeFormat("stroke"))} style={{ ...btn(gameType === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Stroke play</button>
+            <button onClick={() => applyGuidedFormatPatch(selectGuidedStrokeFormat("skins"))} style={{ ...btn(gameType === "skins" && fmtFamily === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Skins</button>
           </div>
         ) : (
           <>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button onClick={() => { setMatchKind("ind"); selectGameType("match"); }} style={{ ...btn(matchKind === "ind"), flex: 1, fontSize: 13 }}>Individual</button>
-              <button onClick={() => { setMatchKind("team"); if (gameType !== "fourball" && gameType !== "trifecta") selectGameType("fourball"); }} style={{ ...btn(matchKind === "team"), flex: 1, fontSize: 13 }}>Team</button>
+              <button onClick={() => applyGuidedFormatPatch(selectGuidedMatchKind(guidedFormatState(), "ind"))} style={{ ...btn(matchKind === "ind"), flex: 1, fontSize: 13 }}>Individual</button>
+              <button onClick={() => applyGuidedFormatPatch(selectGuidedMatchKind(guidedFormatState(), "team"))} style={{ ...btn(matchKind === "team"), flex: 1, fontSize: 13 }}>Team</button>
             </div>
             {matchKind === "ind" ? (
               <div style={{ marginTop: 8 }}>
-                <button onClick={() => selectGameType("match")} style={{ ...btn(gameType === "match"), width: "100%", fontSize: 13 }}>Singles match</button>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedMatchKind(guidedFormatState(), "ind"))} style={{ ...btn(gameType === "match"), width: "100%", fontSize: 13 }}>Singles match</button>
               </div>
             ) : (
               <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                <button onClick={() => selectGameType("fourball")} style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 104, fontSize: 13 }}>Four-ball</button>
-                <button onClick={() => selectGameType("trifecta")} style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 104, fontSize: 13 }}>Trifecta</button>
-                <button onClick={() => { selectGameType("skins"); setTeamMode(true); setSkinsTeamStyle("best_ball"); }} style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 104, fontSize: 13 }}>Skins</button>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("fourball"))} style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 104, fontSize: 13 }}>Four-ball</button>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("trifecta"))} style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 104, fontSize: 13 }}>Trifecta</button>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("skins"))} style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 104, fontSize: 13 }}>Skins</button>
               </div>
             )}
           </>
@@ -1121,7 +1128,7 @@ function CreateGame({
         {((gameType === "match" || gameType === "fourball") || (fmtFamily === "stroke" && gameType === "skins")) && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <input type="checkbox" checked={teamMode} onChange={(e) => setTeamMode(e.target.checked)} />
+              <input type="checkbox" checked={teamMode} onChange={(e) => applyGuidedFormatPatch(setGuidedTeamMode(e.target.checked))} />
               <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>{gameType === "skins" ? "Team skins" : gameType === "fourball" ? "Create Team Names (Red vs Blue)" : "Team match (e.g. 4 v 4)"}</span>
             </label>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
@@ -1310,9 +1317,9 @@ function CreateGame({
                 </div>
               ))}
             </div>
-            {gameType !== "stableford" && gameType !== "stroke" ? (
-              <div style={{ color: C.sage, fontSize: 11.5, lineHeight: 1.45, marginTop: 9 }}>Additional setup is required after creation. BNN will take you directly to Manage Game to complete teams, matchups, foursomes or tee groups as needed.</div>
-            ) : null}
+            <div style={{ color: C.sage, fontSize: 11.5, lineHeight: 1.45, marginTop: 9 }}>
+              Next: <b style={{ color: C.cream }}>{GC.postCreateDestinationLabel(GC.postCreateDestination(gameType, teamMode))}</b>
+            </div>
             <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
               <button style={btn(false)} onClick={onCancel}>Cancel</button>
               <button

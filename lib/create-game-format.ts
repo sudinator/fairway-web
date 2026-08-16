@@ -1,9 +1,5 @@
 import type { GameTypeOpt } from "./game-create";
 
-export type SkinsStyle = "individual" | "team_11" | "team_2v2";
-export type FourballCompetition = "2v2" | "team";
-export type MatchPlayers = "individual" | "team";
-
 export type CreateFormatState = {
   gameType: GameTypeOpt;
   teamMode: boolean;
@@ -14,39 +10,57 @@ export type CreateFormatState = {
   skinsMode: "carryover" | "split";
 };
 
-export type CreateFormatPatch = Partial<CreateFormatState> & {
-  fmtFamily?: "stroke" | "match";
-  matchKind?: "ind" | "team";
+export type GuidedFormatState = CreateFormatState & {
+  fmtFamily: "stroke" | "match";
+  matchKind: "ind" | "team";
 };
 
-export function selectBaseFormat(gameType: GameTypeOpt): CreateFormatPatch {
-  switch (gameType) {
-    case "stableford": return { gameType, teamMode: false, fmtFamily: "stroke", matchKind: "ind" };
-    case "stroke": return { gameType, teamMode: false, fmtFamily: "stroke", matchKind: "ind" };
-    case "match": return { gameType, teamMode: false, fmtFamily: "match", matchKind: "ind" };
-    case "fourball": return { gameType, teamMode: false, fmtFamily: "match", matchKind: "team" };
-    case "trifecta": return { gameType, teamMode: false, fmtFamily: "match", matchKind: "team" };
-    case "skins": return { gameType, teamMode: false, skinsTeamStyle: "head_to_head", fmtFamily: "stroke", matchKind: "ind" };
+export type CreateFormatPatch = Partial<GuidedFormatState>;
+
+// These helpers model the actual restored Production-style Create Game controls.
+// They intentionally describe user actions in the guided hierarchy rather than
+// inventing a second flat format model. The React caller owns state setters and
+// allowance defaults; these helpers own which format-state fields each click changes.
+export function selectGuidedFamily(state: GuidedFormatState, family: "stroke" | "match"): CreateFormatPatch {
+  if (family === "stroke") {
+    if (state.gameType === "match" || state.gameType === "fourball" || state.gameType === "trifecta") {
+      return { fmtFamily: "stroke", gameType: "stableford" };
+    }
+    if (state.gameType === "skins") {
+      return { fmtFamily: "stroke", teamMode: false, skinsTeamStyle: "head_to_head" };
+    }
+    return { fmtFamily: "stroke" };
   }
+
+  const isBestBallSkins = state.gameType === "skins" && state.teamMode && state.skinsTeamStyle === "best_ball";
+  if (!isBestBallSkins && (state.gameType === "stableford" || state.gameType === "stroke" || state.gameType === "skins")) {
+    return { fmtFamily: "match", gameType: state.matchKind === "team" ? "fourball" : "match" };
+  }
+  return { fmtFamily: "match" };
 }
 
-export function selectMatchPlayers(mode: MatchPlayers): CreateFormatPatch {
-  return mode === "team"
-    ? { gameType: "match", teamMode: true, fmtFamily: "match", matchKind: "team" }
-    : { gameType: "match", teamMode: false, fmtFamily: "match", matchKind: "ind" };
+export function selectGuidedStrokeFormat(gameType: "stableford" | "stroke" | "skins"): CreateFormatPatch {
+  if (gameType === "skins") return { gameType, teamMode: false, skinsTeamStyle: "head_to_head" };
+  return { gameType };
 }
 
-export function selectFourballCompetition(mode: FourballCompetition): CreateFormatPatch {
-  return { gameType: "fourball", teamMode: mode === "team", fmtFamily: "match", matchKind: "team" };
+export function selectGuidedMatchKind(state: GuidedFormatState, kind: "ind" | "team"): CreateFormatPatch {
+  if (kind === "ind") return { matchKind: "ind", gameType: "match" };
+  return state.gameType === "fourball" || state.gameType === "trifecta"
+    ? { matchKind: "team" }
+    : { matchKind: "team", gameType: "fourball" };
 }
 
-export function selectSkinsStyle(style: SkinsStyle): CreateFormatPatch {
-  if (style === "team_11") return { gameType: "skins", teamMode: true, skinsTeamStyle: "head_to_head", fmtFamily: "stroke", matchKind: "team" };
-  if (style === "team_2v2") return { gameType: "skins", teamMode: true, skinsTeamStyle: "best_ball", fmtFamily: "match", matchKind: "team" };
-  return { gameType: "skins", teamMode: false, skinsTeamStyle: "head_to_head", fmtFamily: "stroke", matchKind: "ind" };
+export function selectGuidedTeamFormat(gameType: "fourball" | "trifecta" | "skins"): CreateFormatPatch {
+  if (gameType === "skins") return { gameType, teamMode: true, skinsTeamStyle: "best_ball" };
+  return { gameType };
 }
 
-export function skinsStyleFromState(state: Pick<CreateFormatState, "teamMode" | "skinsTeamStyle">): SkinsStyle {
+export function setGuidedTeamMode(enabled: boolean): CreateFormatPatch {
+  return { teamMode: enabled };
+}
+
+export function skinsStyleFromState(state: Pick<CreateFormatState, "teamMode" | "skinsTeamStyle">): "individual" | "team_11" | "team_2v2" {
   if (!state.teamMode) return "individual";
   return state.skinsTeamStyle === "best_ball" ? "team_2v2" : "team_11";
 }

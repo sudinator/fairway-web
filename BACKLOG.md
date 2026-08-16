@@ -470,3 +470,9 @@ Still open (lower priority, honestly assessed):
 - [~] **Stage 3 — shared setup UI + tee inheritance:** 177.49 Stage 3A introduced the shared Game → Players → Format → Teams & Groups → Review workspace. 177.50 Stage 3B adds draft-time tee priority = individual override → flight tee → game default tee, persists those optional maps across Resume, and resolves them into explicit player snapshots at Create. Remaining before Stage 3 is complete: move existing teams/matchups/foursomes/tee-groups into pre-create draft state without discarding structure work.
 - [ ] **Stage 4 — atomic core Create:** transactionally create game + players + structural setup after Review; keep notifications/activity/tee-time linkage as post-commit side effects where appropriate.
 - [ ] Later draft-schema enhancement: persist committed flight handicap overrides across interrupted Create Game setup without breaking existing v1 local drafts.
+
+
+### Create Game convergence — v177.57 staging checkpoint
+- [x] Replace stale flat-format helper semantics with authoritative helpers matching the restored Production guided hierarchy; live Create Game selectors now delegate to the helpers and characterization tests cover key round trips.
+- [x] Review uses the same post-create destination helper as runtime and tells the organizer the exact next step (Play / Manage Game → Teams / Matchups / Groups).
+- [ ] Final cumulative Production release remains blocked on the full 177.46→final de novo audit closeout, dependency-backed CI/build, browser matrix, adjacent Manage Game testing, and Production release gate.

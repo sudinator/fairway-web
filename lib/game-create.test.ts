@@ -1,4 +1,4 @@
-import { buildGamePayload, buildPlayerRows, splitSkinsTooBig, postCreateDestination, gameTypeLabel, type GamePayloadOpts } from "./game-create";
+import { buildGamePayload, buildPlayerRows, splitSkinsTooBig, postCreateDestination, postCreateDestinationLabel, gameTypeLabel, type GamePayloadOpts } from "./game-create";
 
 let pass = 0, fail = 0; const fails: string[] = [];
 function eq<T>(name: string, got: T, want: T) { const g = JSON.stringify(got), w = JSON.stringify(want); if (g === w) pass++; else { fail++; fails.push(`${name} (got ${g}, want ${w})`); } }
@@ -57,6 +57,11 @@ eq("team fourball hands off to teams", postCreateDestination("fourball", true), 
 eq("trifecta hands off to teams", postCreateDestination("trifecta", false), { roomTab: "setup", setupTab: "teams" });
 eq("individual skins hands off to groups", postCreateDestination("skins", false), { roomTab: "setup", setupTab: "groups" });
 eq("team skins hands off to teams", postCreateDestination("skins", true), { roomTab: "setup", setupTab: "teams" });
+
+eq("play destination label", postCreateDestinationLabel(postCreateDestination("stableford", false)), "Play");
+eq("teams destination label", postCreateDestinationLabel(postCreateDestination("trifecta", false)), "Manage Game → Teams");
+eq("matchups destination label", postCreateDestinationLabel(postCreateDestination("match", false)), "Manage Game → Matchups");
+eq("groups destination label", postCreateDestinationLabel(postCreateDestination("skins", false)), "Manage Game → Groups");
 
 // buildPlayerRows
 const tee = { name: "Blue", rating: 71.0, slope: 130 };
