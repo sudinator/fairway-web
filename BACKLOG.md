@@ -458,3 +458,10 @@ Still open (lower priority, honestly assessed):
 ## Game Control Center polish — completed in 177.46
 - [x] Rename Danger Zone to **Destructive Actions** with explicit **These actions cannot be undone.** warning.
 - [x] Correct Match overview structure summary so matched-player progress is not mislabeled as team assignments.
+
+## Create Game convergence
+- [x] **Stage 1 — canonical draft/state contract (177.47):** typed `GameSetupDraft`, backward-compatible legacy draft adapter, complete 35-state/3-ref inventory guard, and 2,004 differential/round-trip assertions. No UI or database behavior change.
+- [ ] **Stage 2 — pure structure mutations:** extract teams/pairings/foursomes/tee-groups/structure-stash calculations from persisted writers; preserve Manage Game behavior with differential tests.
+- [ ] **Stage 3 — shared setup UI + tee inheritance:** converge Create Game onto Game → Players → Format → Teams & Groups → Review; tee priority = individual override → flight tee → game default tee; preserve explicit overrides.
+- [ ] **Stage 4 — atomic core Create:** transactionally create game + players + structural setup after Review; keep notifications/activity/tee-time linkage as post-commit side effects where appropriate.
+- [ ] Later draft-schema enhancement: persist committed flight handicap overrides across interrupted Create Game setup without breaking existing v1 local drafts.

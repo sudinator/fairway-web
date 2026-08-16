@@ -4995,3 +4995,9 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Corrects the Control Center overview summary for individual Match games so it reports matched players rather than team assignments. Team formats continue to report team assignments; non-team/non-match formats report tee-group placement.
 - Presentation-only release: no scoring, setup-policy, database-write, RPC, migration, or schema behavior changes.
 - Version 177.46.260816. No migration.
+
+## 177.47.260816 — Create Game convergence Stage 1: canonical draft contract
+- **NO migration. No intended user-visible behavior change.** Introduces `lib/game-setup-draft.ts`, a typed canonical model for the meaningful Create Game setup state, while leaving the existing component state, UI, `create()` transaction, game/player payloads and post-create routing unchanged.
+- The existing device-local `SetupDraft` storage shape remains backward-compatible. CreateGame now maps its state into `GameSetupDraft`, then adapts it back through `toLegacySetupData()` before the existing `saveSetupDraft()` call. 2,004 assertions verify the serialized legacy shape and old-draft round-trip.
+- Adds a permanent state-inventory guard: all 35 CreateGame `useState` cells and 3 refs are explicitly classified as domain, loaded context, transient editor, runtime, or control refs. New state cannot silently cross the future extraction boundary.
+- Audit finding recorded but deliberately not fixed here: live `hcpOverrides` are not persisted by the legacy local setup draft, so an interrupted flight-handicap override can be lost. Fixing that requires an intentional draft-schema version later; Stage 1 preserves current behavior.

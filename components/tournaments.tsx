@@ -50,6 +50,7 @@ import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG }
 import type { LegConfig, Leg } from "@/lib/legs";
 import { loadCoursesForGroup, courseLabel, type Course, type CourseTee } from "@/lib/courses";
 import { loadSetupDraft, saveSetupDraft, clearSetupDraft, draftHasProgress, draftAgeLabel, type SetupDraft } from "@/lib/setup-draft";
+import { buildGameSetupDraft, toLegacySetupData } from "@/lib/game-setup-draft";
 import { autoSplitFlights, flightForIndex, flightRangeLabel, flightTagColor, type FlightBand } from "@/lib/flights";
 
 // Every game_players INSERT must set these NOT-NULL columns explicitly rather than
@@ -436,13 +437,13 @@ function CreateGame({
   // resume-vs-fresh, so we never overwrite an offered draft before the user chooses).
   useEffect(() => {
     if (!hydratedRef.current) return;
-    const snap = {
+    const snap = toLegacySetupData(buildGameSetupDraft({
       name, matchDate, favName: pickedFav?.name ?? null, teeIdx, idxStr, gameType, allowancePct,
       teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle,
-      skinsMode, team1, team2, selectedPlayers, guestPlayers, flightMode, flightCount,
-    };
+      skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount,
+    }));
     if (draftHasProgress(snap, user.id)) saveSetupDraft(activeGroupId, teeTimeId, snap);
-  }, [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, flightMode, flightCount]);
+  }, [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount]);
 
   const tee = pickedFav?.tees?.[teeIdx];
   const coursePar = pickedFav
