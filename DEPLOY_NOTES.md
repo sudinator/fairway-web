@@ -5046,3 +5046,15 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Split-Skins field-size validation now runs **before the first database write**, preventing an invalid >4-player split-Skins attempt from leaving an orphan game row.
 - Backward compatibility: a saved 177.49–177.51 draft whose workspace section was `structure` resumes safely at Review rather than being discarded.
 - Validation: dedicated game-create helper compile PASS; game-create tests 52/52 PASS in the local dependency-light harness; full source guards and workflow simulation are required below/GitHub before this staging candidate advances.
+
+
+## 177.53.260816 — Format Selection Convergence: clearer Create Game choices, same game model
+- **Staging-only convergence checkpoint. No migration.** Redesigns only the Create Game format selector; scoring algorithms, games/game_players schema, Manage Game writers, and post-create structure ownership are unchanged.
+- Replaces the old Stroke-vs-Match family tree and duplicate Team toggles with six direct formats: Stableford, Stroke Play, Match Play, Four-ball, Trifecta, Skins.
+- Match Play now asks one clear structural question: **Players — Individual / Team**. The old contradictory secondary `Team match` checkbox is removed.
+- Four-ball now asks **Competition — 2 v 2 Match / Team vs Team**, followed independently by **Team score — Best ball / Shootout (aggregate)**. This preserves ordinary independent foursomes and Ryder-Cup-style overall teams without labeling both decisions `Team`.
+- Skins now exposes the three existing structures directly: **Individual / 1:1 Teams / 2 v 2 Best-ball**, with Carry over/Halved and the existing 2v2 Best ball/Aggregate option. No skins scoring behavior changed.
+- Trifecta retains Best ball/Shootout and Per-hole/Ryder-Cup scoring; Stroke retains Net/Gross; allowance and flights remain unchanged.
+- Review now prints the full selected interpretation (for example `Four-ball · 2 v 2 Match · Best ball`) rather than only the base game type.
+- New pure `lib/create-game-format.ts` maps user-facing selectors onto the existing persisted state fields and resets irrelevant top-level team state when changing base formats. A permanent CI source contract prevents the ambiguous legacy selector labels from returning.
+- Executed locally: new format mapping 35/35 PASS; game-create 52/52 PASS; historical game-create differential 9,000 comparisons / 0 mismatches; setup-draft 2,007/2,007 PASS; tee inheritance 5,011/5,011 PASS; full `npm run guards` including 50,087 workflow/fault simulations PASS. Full dependency-backed app type/build remains the GitHub staging gate.

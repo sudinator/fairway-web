@@ -3,8 +3,9 @@
 Running list of things to build or tighten. Newest ideas near the top of each section.
 
 ## Create Game convergence — staging release train
-- [~] 177.47–177.52: Create Game convergence is staged on a **Lean Create** architecture: canonical draft, shared structure helpers, Game → Players → Format → Review workspace, default/flight/player tee inheritance, durable Resume Setup, and TGC-scope hardening. Advanced teams/matchups/foursomes/tee groups remain authoritative in Manage Game after creation; Production remains on the pre-convergence release until cumulative CI + browser validation pass.
-- [ ] Next: Stage 3C draft teams/matchups/foursomes/tee-groups, preserving structure stash/restore and all existing setup work.
+- [~] 177.47–177.53: Create Game convergence uses the **Lean Create** architecture: canonical draft, shared structure helpers, Game → Players → Format → Review workspace, default/flight/player tee inheritance, durable Resume Setup, TGC-scope hardening, and a direct format selector aligned to Manage Game terminology. Advanced teams/matchups/foursomes/tee groups remain authoritative in Manage Game after creation; Production remains on the pre-convergence release until cumulative CI + browser validation pass.
+- [x] Full pre-create structural draft rejected by design: it duplicated Manage Game state and added risk without meaningful capability. Lean Create hands structural formats to Manage Game after the core game exists.
+- [ ] Before Production: de novo 177.46 Production → final staging line-by-line contract comparison, complete format-selection matrix browser QA, adjacent Create → Manage → Play scenarios, full release gate, then one cumulative staging → main PR.
 
 ## Batched for next release (small)
 - **Remove the "Built: <date>" line** in the version display — `components/manage.tsx:3659`

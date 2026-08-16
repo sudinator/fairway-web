@@ -53,6 +53,10 @@ If you ever want to preview locally before deploying:
 3. Copy `.env.example` to `.env.local` and fill in your two Supabase values
 4. `npm run dev`, then open http://localhost:3000
 
+## Create Game setup
+
+Create Game uses the Lean Create flow: **Game → Players → Format → Review**. Advanced teams, matchups, foursomes and tee groups are completed in Manage Game after the core game is created. The Create Game format selector uses the same concepts as Manage Game: Match = Individual/Team, Four-ball = 2 v 2 Match/Team vs Team, and Skins = Individual/1:1 Teams/2 v 2 Best-ball.
+
 ## UI conventions
 - Six-hole segment breakdown reuses the Group Results grid format (Player / Thru / segment columns / Total) for consistency.
 
