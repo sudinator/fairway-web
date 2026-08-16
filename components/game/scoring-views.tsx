@@ -70,6 +70,7 @@ import {
 } from "@/components/ui";
 import type { Game, Player } from "@/lib/game-types";
 import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
+import { addPairing as nextPairingAdd, removePairing as nextPairingRemove, addFoursome as nextFoursomeAdd, removeFoursome as nextFoursomeRemove, renameFoursome as nextFoursomeRename, assignFoursomePlayer, unassignFoursomePlayer, deriveTeeGroupsFromFoursomes } from "@/lib/game-structure";
 
 const supabase = createClient();
 
@@ -394,10 +395,9 @@ export function MatchView({
   const addPairing = async () => {
     if (!allowSetupMutation({ type: "set_pairings" })) return;
     if (!aSel || !bSel || aSel === bSel) return;
-    const dup = game.pairings.some((pr) => (pr.a === aSel && pr.b === bSel) || (pr.a === bSel && pr.b === aSel));
-    if (dup) return; // that exact match already exists
+    const pairings = nextPairingAdd(game.pairings, aSel, bSel);
+    if (pairings === game.pairings) return; // invalid or exact match already exists
     setBusy(true);
-    const pairings = [...game.pairings, { a: aSel, b: bSel }];
     await supabase.from("games").update({ pairings }).eq("id", game.id);
     setASel("");
     setBSel("");
@@ -406,7 +406,7 @@ export function MatchView({
   };
   const removePairing = async (idx: number) => {
     if (!allowSetupMutation({ type: "set_pairings" })) return;
-    const pairings = game.pairings.filter((_, i) => i !== idx);
+    const pairings = nextPairingRemove(game.pairings, idx);
     await supabase.from("games").update({ pairings }).eq("id", game.id);
     onChanged();
   };
@@ -852,8 +852,7 @@ export function FourballView({
     await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
     // Each foursome is also its tee group (1-based), so group scoring/markers line up
     // with the foursomes and there's no separate "Groups" step for four-ball.
-    const groupOf: Record<string, number> = {};
-    next.forEach((f, i) => { [...f.a, ...f.b].forEach((uid) => { groupOf[uid] = i + 1; }); });
+    const groupOf = deriveTeeGroupsFromFoursomes(next);
     await Promise.all(players.map((p) => {
       const g = groupOf[pkey(p)] ?? null;
       return (p.tee_group ?? null) !== g
@@ -864,29 +863,22 @@ export function FourballView({
   };
 
   const addFoursome = () => {
-    const next = [...foursomes, { id: Math.random().toString(36).slice(2, 8), name: `Foursome ${foursomes.length + 1}`, a: [], b: [] }];
+    const next = nextFoursomeAdd(foursomes, Math.random().toString(36).slice(2, 8));
     saveFoursomes(next);
   };
   const removeFoursome = (id: string) => {
     if (!confirm("Remove this foursome?")) return;
-    saveFoursomes(foursomes.filter((f) => f.id !== id));
+    saveFoursomes(nextFoursomeRemove(foursomes, id));
   };
   const renameFoursome = (id: string, name: string) => {
-    saveFoursomes(foursomes.map((f) => (f.id === id ? { ...f, name } : f)));
+    saveFoursomes(nextFoursomeRename(foursomes, id, name));
   };
   // Assign a player to a slot (team "a" or "b") in a foursome, removing them from any other slot/foursome first.
   const assign = (fId: string, team: "a" | "b", uid: string) => {
-    const cleared = foursomes.map((f) => ({ ...f, a: f.a.filter((x) => x !== uid), b: f.b.filter((x) => x !== uid) }));
-    const next = cleared.map((f) => {
-      if (f.id !== fId) return f;
-      const side = f[team];
-      if (side.length >= 2) return f; // pair is full
-      return { ...f, [team]: [...side, uid] };
-    });
-    saveFoursomes(next);
+    saveFoursomes(assignFoursomePlayer(foursomes, fId, team, uid));
   };
   const unassign = (fId: string, team: "a" | "b", uid: string) => {
-    saveFoursomes(foursomes.map((f) => (f.id === fId ? { ...f, [team]: f[team].filter((x) => x !== uid) } : f)));
+    saveFoursomes(unassignFoursomePlayer(foursomes, fId, team, uid));
   };
 
   // Players not yet placed in any foursome.

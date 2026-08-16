@@ -92,6 +92,7 @@ import type { FinishGap } from "@/lib/finish-gaps";
 import { GroupScorecard } from "@/components/game/scorecard-views";
 import { BettingPanel, type OrganizerPanelProps } from "@/components/game/organizer-panel";
 import { GameSetupWorkspace, type SetupTab } from "@/components/game/setup/game-setup-workspace";
+import { buildFormatPatch, buildSkinsStylePatch, buildMatchTeamPatch } from "@/lib/game-structure";
 
 // Stable match identity for a player. Real players key on user_id (so nothing
 // about existing matches changes); guests have no account, so they key on their
@@ -2180,11 +2181,7 @@ function GameRoom({
   };
   const setFormat = async (next: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => {
     if (!game || next === game.game_type || !allowSetupChange({ type: "set_format", target: next })) return;
-    const suggested = next === "fourball" || next === "trifecta" ? 85 : 100;
-    const patch: Record<string, unknown> = { game_type: next, allowance_pct: suggested };
-    if (next === "trifecta" && !game.team_score_mode) patch.team_score_mode = "best_ball";
-    if (next === "trifecta" && !game.trifecta_scoring) patch.trifecta_scoring = "per_hole";
-    if (next === "stroke" && !game.stroke_basis) patch.stroke_basis = "net";
+    const patch = buildFormatPatch(game, next);
     // NOTE: we deliberately do NOT clear pairings/foursomes/teams when switching
     // format. A player's setup work is preserved so switching back restores it;
     // formats that don't use a given structure simply ignore it (see the
@@ -2218,27 +2215,11 @@ function GameRoom({
   // recompute. Team styles leave the side assignment to the Matchups step.
   const setSkinsStyle = async (style: "individual" | "team_11" | "team_2v2") => {
     if (!game || (shapeOf(game).skinsStyle ?? "individual") === style || !allowSetupChange({ type: "set_skins_style", style })) return;
-    const g = game as any;
-    const liveTeams = Array.isArray(g.teams) && g.teams.length === 2 ? g.teams : null;
-    const liveFour = Array.isArray(g.foursomes) ? g.foursomes : null;
-    const livePair = Array.isArray(g.pairings) ? g.pairings : [];
-    const prev = g.structure_stash || {};
-    // Keep the latest team structure so any later switch can restore it intact.
-    const stash = {
-      teams: liveTeams ?? prev.teams ?? null,
-      foursomes: liveFour ?? prev.foursomes ?? null,
-      pairings: (livePair.length ? livePair : prev.pairings) ?? [],
-    };
-    // Mid-round structural conversions are rejected centrally by game-setup-policy.
-    const defTeams = [{ key: "A", name: "Team 1" }, { key: "B", name: "Team 2" }];
-    let teams: any = null, foursomes: any = null, pairings: any = [];
-    if (style === "team_11") { teams = stash.teams ?? defTeams; foursomes = null; pairings = stash.pairings ?? []; }
-    else if (style === "team_2v2") { teams = stash.teams ?? defTeams; foursomes = stash.foursomes ?? []; pairings = stash.pairings ?? []; }
-    const patch: Record<string, unknown> = { game_type: "skins", teams, foursomes, pairings, structure_stash: stash };
-    let flippedSplit = false;
-    if (style === "individual" && g.skins_mode === "split" && players.filter((p) => !p.no_show).length > 4) {
-      patch.skins_mode = "carryover"; flippedSplit = true;
-    }
+    const { patch, flippedSplit } = buildSkinsStylePatch(
+      game,
+      players.filter((p) => !p.no_show).length,
+      style,
+    );
     const { error } = await supabase.from("games").update(patch).eq("id", game.id);
     if (error) { alert("Couldn't change the skins style — " + error.message); return; }
     await load();
@@ -2248,12 +2229,8 @@ function GameRoom({
   // pairings are assigned in Matchups. Scores untouched.
   const setMatchTeam = async (on: boolean) => {
     if (!game || shapeOf(game).usesTeams === on || !allowSetupChange({ type: "set_match_team", on })) return;
-    const g = game as any;
-    const liveTeams = Array.isArray(g.teams) && g.teams.length === 2 ? g.teams : null;
-    const prev = g.structure_stash || {};
-    const stash = { ...prev, teams: liveTeams ?? prev.teams ?? null };
-    const teams = on ? (stash.teams ?? [{ key: "A", name: "Team 1" }, { key: "B", name: "Team 2" }]) : null;
-    const { error } = await supabase.from("games").update({ teams, structure_stash: stash }).eq("id", game.id);
+    const patch = buildMatchTeamPatch(game, on);
+    const { error } = await supabase.from("games").update(patch).eq("id", game.id);
     if (error) { alert("Couldn't change the match type — " + error.message); return; }
     await load();
   };

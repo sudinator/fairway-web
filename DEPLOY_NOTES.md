@@ -5001,3 +5001,12 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - The existing device-local `SetupDraft` storage shape remains backward-compatible. CreateGame now maps its state into `GameSetupDraft`, then adapts it back through `toLegacySetupData()` before the existing `saveSetupDraft()` call. 2,004 assertions verify the serialized legacy shape and old-draft round-trip.
 - Adds a permanent state-inventory guard: all 35 CreateGame `useState` cells and 3 refs are explicitly classified as domain, loaded context, transient editor, runtime, or control refs. New state cannot silently cross the future extraction boundary.
 - Audit finding recorded but deliberately not fixed here: live `hcpOverrides` are not persisted by the legacy local setup draft, so an interrupted flight-handicap override can be lost. Fixing that requires an intentional draft-schema version later; Stage 1 preserves current behavior.
+
+
+## 177.48.260816 — Create Game convergence Stage 2: pure structure mutations
+- **NO migration. No intended user-visible behavior change.** Extracts the structural calculations currently embedded in Manage Game into `lib/game-structure.ts`, while leaving the existing Supabase writers, setup policy checks, alerts/confirms, refresh callbacks and UI in place.
+- Shared pure helpers now calculate: format transition patches; skins structure stash/restore; Match individual/team stash/restore; pairing add/remove; foursome add/remove/rename/assign/unassign; and the existing rule that each saved foursome maps to its 1-based tee group.
+- `components/tournaments.tsx` continues to own persisted format/skins/match writes. `components/game/scoring-views.tsx` continues to own persisted pairing/foursome/player tee-group writes. The extraction changes only how the next structure value is calculated.
+- Differential characterization freezes the 177.47 implementations in `lib/game-structure.test.ts` and compares the extracted helpers across a fixed transition matrix plus 40,000 randomized pairing/foursome assertions.
+- Adds `ci/check_game_structure_contract.py` to require every existing runtime mutation path to reach the pure helpers and to prohibit Supabase/browser side effects inside the structure module.
+- Stage 2 remains part of the staging-only Create Game convergence train. Production remains on the pre-convergence release until the complete flow passes end-to-end release validation.

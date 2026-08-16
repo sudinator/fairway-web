@@ -461,7 +461,7 @@ Still open (lower priority, honestly assessed):
 
 ## Create Game convergence
 - [x] **Stage 1 — canonical draft/state contract (177.47):** typed `GameSetupDraft`, backward-compatible legacy draft adapter, complete 35-state/3-ref inventory guard, and 2,004 differential/round-trip assertions. No UI or database behavior change.
-- [ ] **Stage 2 — pure structure mutations:** extract teams/pairings/foursomes/tee-groups/structure-stash calculations from persisted writers; preserve Manage Game behavior with differential tests.
+- [x] **Stage 2 — pure structure mutations (177.48):** extracted format/skins/match structure patches, pairings, foursome mutations, and foursome-derived tee groups into `lib/game-structure.ts`; existing Manage Game Supabase writers remain in place and 40,000 randomized differential assertions preserve 177.47 behavior.
 - [ ] **Stage 3 — shared setup UI + tee inheritance:** converge Create Game onto Game → Players → Format → Teams & Groups → Review; tee priority = individual override → flight tee → game default tee; preserve explicit overrides.
 - [ ] **Stage 4 — atomic core Create:** transactionally create game + players + structural setup after Review; keep notifications/activity/tee-time linkage as post-commit side effects where appropriate.
 - [ ] Later draft-schema enhancement: persist committed flight handicap overrides across interrupted Create Game setup without breaking existing v1 local drafts.
