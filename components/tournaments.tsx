@@ -48,7 +48,7 @@ import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
 import type { LegConfig, Leg } from "@/lib/legs";
-import { loadCoursesForGroup, courseLabel, type CourseTee } from "@/lib/courses";
+import { loadCoursesForGroup, courseLabel, type Course, type CourseTee } from "@/lib/courses";
 import { loadSetupDraft, saveSetupDraft, clearSetupDraft, draftHasProgress, draftAgeLabel, type SetupDraft } from "@/lib/setup-draft";
 import { autoSplitFlights, flightForIndex, flightRangeLabel, flightTagColor, type FlightBand } from "@/lib/flights";
 
@@ -1329,6 +1329,7 @@ function GameRoom({
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState("");
   const [courseTees, setCourseTees] = useState<CourseTee[]>([]);
+  const [courseOptions, setCourseOptions] = useState<Course[]>([]);
   const [finishPrompt, setFinishPrompt] = useState<{ kind: "group" | "game"; teeGroup?: number; gaps: FinishGap[] } | null>(null);
   const [shareCard, setShareCard] = useState(false);
   const [shareGame, setShareGame] = useState(false);
@@ -1427,6 +1428,7 @@ function GameRoom({
   useEffect(() => {
     if (!game?.group_id || !game?.course) {
       setCourseTees([]);
+      setCourseOptions([]);
       return;
     }
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
@@ -1444,7 +1446,8 @@ function GameRoom({
       try {
         const rows = await loadCoursesForGroup(supabase, groupId);
         if (!alive) return;
-        const courses = rows.map((r: any) => normalizeFavoriteCourse(r));
+        const courses = rows.map((r: any) => ({ ...normalizeFavoriteCourse(r), id: r.id } as Course));
+        setCourseOptions(courses);
         let found = courses.find((c: any) => c.name === courseName || courseLabel(c) === courseName);
 
         // A stale/missing group_courses link must not hide player-level tee choice.
@@ -2125,6 +2128,23 @@ function GameRoom({
   };
 
   // Organizer corrects a whole game's date; all players' rounds move together (server RPC).
+  const changeGameCourse = async (course: Course) => {
+    if (!game || !course?.name || !Array.isArray(course.holes) || !course.holes.length) return;
+    if (!allowSetupChange({ type: "change_course" })) return;
+    const par = course.holes.reduce((sum, h) => sum + Number(h.par || 0), 0);
+    const holesMeta = course.holes.map((h) => ({ n: h.n, par: h.par, si: h.si ?? null }));
+    const ok = confirm(`Change this game's course to "${courseLabel(course)}"?\n\nPlayer tee selections will be cleared because tees, ratings and slopes belong to the previous course. No scores have been entered, so no played golf will be changed.`);
+    if (!ok) return;
+    const { error } = await supabase.rpc("change_game_course_before_scoring", {
+      p_game: game.id, p_course: course.name, p_course_par: par, p_holes_meta: holesMeta,
+    });
+    if (error) { alert("Couldn't change the course: " + error.message); return; }
+    clearAllGameScores(game.id);
+    setCourseTees(Array.isArray(course.tees) ? course.tees : []);
+    await load();
+    setSetupTab("players");
+  };
+
   const setGameDate = async (newDate: string) => {
     if (!game || !newDate || !allowSetupChange({ type: "set_game_date" })) return;
     const today = todayLocalStr();
@@ -2732,7 +2752,7 @@ function GameRoom({
           onSetAllowance: setAllowance, onSetFormat: setFormat, onSetTeamScoreMode: setTeamScoreMode, onSetSkinsMode: updateSkinsMode, onSetSkinsStyle: setSkinsStyle, onSetMatchTeam: setMatchTeam, anyScores,
         } satisfies OrganizerPanelProps;
         const workspaceProps = {
-          game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate,
+          game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate, courseOptions, onChangeCourse: changeGameCourse,
           onSetTeeGroup: setPlayerTeeGroup, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, canRandomize, randomizeReason,
           randomizing, groupOverflow,
         } satisfies React.ComponentProps<typeof GameSetupWorkspace>;

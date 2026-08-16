@@ -64,7 +64,9 @@ check("pairings pre-score allowed", decision({ ...baseGame(), game_type: "match"
 check("pairings scored blocked", decision({ ...baseGame(), game_type: "match", pairings: [{ a: "p1", b: "p2" }] }, [scored, blank], { type: "set_pairings" }), "block");
 check("foursomes pre-score allowed", decision({ ...baseGame(), game_type: "fourball", teams, foursomes }, [blank], { type: "set_foursomes" }), "allow");
 check("foursomes scored blocked", decision({ ...baseGame(), game_type: "fourball", teams, foursomes }, [scored], { type: "set_foursomes" }), "block");
-check("course loophole represented by no action", true, true);
+check("course pre-score allowed", decision(baseGame(), [blank], { type: "change_course" }), "allow");
+check("course scored blocked", decision(baseGame(), [scored], { type: "change_course" }), "block");
+check("course ended blocked", decision({ ...baseGame(), status: "ended" }, [blank], { type: "change_course" }), "block");
 
 console.log(`\n=== game-setup-policy.test ===\nPASS ${pass}  FAIL ${fail}`);
 if (failures.length) { console.log(failures.join("\n")); process.exit(1); }

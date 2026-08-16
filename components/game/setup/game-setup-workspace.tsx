@@ -4,6 +4,8 @@ import React from "react";
 import { C } from "@/lib/golf";
 import { pkey, shapeOf } from "@/lib/game-shape";
 import type { Game, Player } from "@/lib/game-types";
+import { courseLabel, type Course } from "@/lib/courses";
+import { ShareControl } from "@/components/game/scorecard-views";
 import { OrganizerPanel, type OrganizerPanelProps } from "@/components/game/organizer-panel";
 import { GroupsBuilder } from "@/components/game/scorecard-views";
 import { btn, inputStyle, ShortDateInput } from "@/components/ui";
@@ -17,6 +19,8 @@ export type GameSetupWorkspaceProps = {
   onSetupTabChange: (tab: SetupTab) => void;
   organizerPanelProps: OrganizerPanelProps;
   onSetGameDate: (date: string) => Promise<void>;
+  courseOptions: Course[];
+  onChangeCourse: (course: Course) => Promise<void>;
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
   getTeeGroupPolicy: (p: Player, group: number | null) => { blocked: boolean; reason?: string };
   onRandomizeGroups: () => Promise<void>;
@@ -40,6 +44,8 @@ export function GameSetupWorkspace({
   onSetupTabChange,
   organizerPanelProps,
   onSetGameDate,
+  courseOptions,
+  onChangeCourse,
   onSetTeeGroup,
   getTeeGroupPolicy,
   onRandomizeGroups,
@@ -75,11 +81,12 @@ export function GameSetupWorkspace({
   const [nameEdit, setNameEdit] = React.useState(game.name);
   const [dateEdit, setDateEdit] = React.useState(String((game as any).played_at || "").slice(0, 10));
   const [dateBusy, setDateBusy] = React.useState(false);
+  const [courseBusy, setCourseBusy] = React.useState(false);
   React.useEffect(() => setNameEdit(game.name), [game.name]);
   React.useEffect(() => setDateEdit(String((game as any).played_at || "").slice(0, 10)), [(game as any).played_at]);
 
   const stepDefs = [
-    { key: "details", label: "Details", done: !!game.name && !!game.course },
+    { key: "details", label: "Game", done: !!game.name && !!game.course },
     { key: "players", label: "Players", done: playersDone },
     { key: "format", label: "Format", done: !!game.game_type },
     { key: "structure", label: "Teams", done: structureDone },
@@ -92,7 +99,7 @@ export function GameSetupWorkspace({
   };
 
   const summary = [
-    { key: "details" as const, title: "Game details", sub: `${game.course}${(game as any).played_at ? ` · ${String((game as any).played_at).slice(0, 10)}` : ""}`, done: true },
+    { key: "details" as const, title: "Game", sub: `${game.course}${(game as any).played_at ? ` · ${String((game as any).played_at).slice(0, 10)}` : ""}`, done: true },
     { key: "players" as const, title: "Players", sub: `${total} player${total === 1 ? "" : "s"} · ${cWithHcp}/${total} handicaps set`, done: playersDone },
     { key: "format" as const, title: "Format", sub: `${game.game_type.replace("fourball", "Four-ball")} · ${game.allowance_pct ?? 100}%`, done: true },
     { key: "structure" as const, title: "Teams & groups", sub: usesTeams || usesMatchups ? `${cWithTeam}/${total} team assignments · ${cGrouped}/${total} grouped` : `${cGrouped}/${total} grouped`, done: structureDone },
@@ -129,7 +136,7 @@ export function GameSetupWorkspace({
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <button style={{ ...btn(false), padding: "7px 10px", fontSize: 12 }} onClick={() => onSetupTabChange("overview")}>‹ Control center</button>
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 17 }}>
-          {section === "details" ? "Game details" : section === "players" ? "Players" : section === "format" ? "Format" : section === "structure" ? "Teams & groups" : "Review"}
+          {section === "details" ? "Game" : section === "players" ? "Players" : section === "format" ? "Format" : section === "structure" ? "Teams & groups" : "Review"}
         </div>
       </div>
 
@@ -146,19 +153,68 @@ export function GameSetupWorkspace({
       </div>
 
       {section === "details" && (
-        <div style={cardStyle}>
-          <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>GAME NAME</div>
-          <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-            <input value={nameEdit} onChange={(e) => setNameEdit(e.target.value)} style={{ ...inputStyle, flex: 1, minWidth: 180 }} />
-            <button style={{ ...btn(false), opacity: nameEdit.trim() && nameEdit.trim() !== game.name ? 1 : .5 }} disabled={!nameEdit.trim() || nameEdit.trim() === game.name} onClick={() => organizerPanelProps.onRename(nameEdit.trim())}>Save name</button>
+        <div>
+          <div style={cardStyle}>
+            <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>GAME INFORMATION</div>
+            <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 12 }}>GAME NAME</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+              <input value={nameEdit} onChange={(e) => setNameEdit(e.target.value)} style={{ ...inputStyle, flex: 1, minWidth: 180 }} />
+              <button style={{ ...btn(false), opacity: nameEdit.trim() && nameEdit.trim() !== game.name ? 1 : .5 }} disabled={!nameEdit.trim() || nameEdit.trim() === game.name} onClick={() => organizerPanelProps.onRename(nameEdit.trim())}>Save name</button>
+            </div>
+
+            <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 14 }}>COURSE</div>
+            <div style={{ ...inputStyle, marginTop: 6 }}>{game.course}</div>
+            {anyScores || game.status === "ended" ? (
+              <div style={{ color: C.sage, fontSize: 11, marginTop: 5 }}>{game.status === "ended" ? "The course cannot be changed on an ended game." : "Course is locked once scoring begins."}</div>
+            ) : (
+              <>
+                <select
+                  defaultValue=""
+                  disabled={courseBusy || courseOptions.length === 0}
+                  onChange={async (e) => {
+                    const c = courseOptions.find((x) => x.id === e.target.value);
+                    e.currentTarget.value = "";
+                    if (!c || c.name === game.course) return;
+                    setCourseBusy(true);
+                    try { await onChangeCourse(c); } finally { setCourseBusy(false); }
+                  }}
+                  style={{ ...inputStyle, marginTop: 7, width: "100%" }}
+                >
+                  <option value="">{courseBusy ? "Changing course…" : "Change course…"}</option>
+                  {courseOptions.filter((c) => c.name !== game.course).map((c) => <option key={c.id} value={c.id}>{courseLabel(c)}</option>)}
+                </select>
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 5 }}>Available only before scoring. Changing course clears every player's tee so the correct new rating and slope can be selected.</div>
+              </>
+            )}
+
+            <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 14 }}>PLAY DATE</div>
+            <div style={{ display: "flex", gap: 8, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
+              <ShortDateInput value={dateEdit} onChange={setDateEdit} />
+              <button disabled={!dateEdit || dateBusy || dateEdit === String((game as any).played_at || "").slice(0,10)} onClick={async () => { setDateBusy(true); try { await onSetGameDate(dateEdit); } finally { setDateBusy(false); } }} style={{ ...btn(false), opacity: dateEdit && dateEdit !== String((game as any).played_at || "").slice(0,10) ? 1 : .5 }}>{dateBusy ? "Saving…" : "Save date"}</button>
+            </div>
           </div>
-          <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 14 }}>COURSE</div>
-          <div style={{ ...inputStyle, marginTop: 6 }}>{game.course}</div>
-          <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Course remains the game’s recorded course in this release. Individual tees are managed on Players.</div>
-          <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 14 }}>PLAY DATE</div>
-          <div style={{ display: "flex", gap: 8, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
-            <ShortDateInput value={dateEdit} onChange={setDateEdit} />
-            <button disabled={!dateEdit || dateBusy || dateEdit === String((game as any).played_at || "").slice(0,10)} onClick={async () => { setDateBusy(true); try { await onSetGameDate(dateEdit); } finally { setDateBusy(false); } }} style={{ ...btn(false), opacity: dateEdit && dateEdit !== String((game as any).played_at || "").slice(0,10) ? 1 : .5 }}>{dateBusy ? "Saving…" : "Save date"}</button>
+
+          <div style={{ ...cardStyle, marginTop: 10 }}>
+            <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>SHARING</div>
+            <ShareControl game={game} onShare={organizerPanelProps.onShare} />
+          </div>
+
+          <div style={{ ...cardStyle, marginTop: 10 }}>
+            <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>GAME STATUS</div>
+            <div style={{ color: C.cream, fontSize: 13, marginTop: 8 }}>{game.status === "ended" ? "Final results are locked." : anyScores ? "Scoring is in progress." : "Game is active and ready for scoring."}</div>
+            {game.status === "ended" ? (
+              <button style={{ ...btn(false), marginTop: 10 }} onClick={organizerPanelProps.onReopen}>↺ Reopen game</button>
+            ) : (
+              <button style={{ ...btn(true), marginTop: 10 }} onClick={organizerPanelProps.onEnd}>🏁 End game (lock final results)</button>
+            )}
+          </div>
+
+          <div style={{ ...cardStyle, marginTop: 10, border: "1px solid rgba(214,96,83,.55)" }}>
+            <div style={{ color: "#F0B0A8", fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>DANGER ZONE</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Reset clears all scoring and clocks but keeps players and game structure.</div>
+            <button style={{ background: "#3F3414", color: "#E4CF86", border: `0.5px solid ${C.gold}`, borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 13, display: "block" }} onClick={organizerPanelProps.onReset}>↺ Reset scores</button>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 12 }}>Delete permanently removes this game.</div>
+            <button style={{ background: "#5A1E1E", color: "#F6DEDB", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 13, display: "block" }} onClick={organizerPanelProps.onDelete}>Delete this game</button>
           </div>
         </div>
       )}
@@ -183,7 +239,7 @@ export function GameSetupWorkspace({
         <div>
           <div style={cardStyle}>
             {[
-              [playersDone, "All players have handicaps set"],
+              [playersDone, "All players have tees and handicaps set"],
               [teamsDone, usesTeams ? "Team assignments are complete" : "Teams are not required"],
               [matchupsDone, usesMatchups ? "Matchups are complete" : "Matchups are not required"],
               [groupsDone, usesFoursomes ? "Foursomes define the playing groups" : "Tee groups are set"],

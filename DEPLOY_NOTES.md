@@ -1,5 +1,13 @@
 # Birdie Num Num — Deploy & Migration Notes
 
+## 177.45.260816 — Game section + atomic pre-score course correction
+- Rename Control Center Details to Game.
+- Move live sharing, End/Reopen, Reset Scores, and Delete into Game; Reset/Delete live in a Danger Zone.
+- Keep Format focused on scoring/competition settings.
+- Add migration 0138 and `change_game_course_before_scoring`: organizer-only, active-game, zero-score atomic course replacement.
+- Course change replaces course/par/hole metadata, clears every player tee/rating/slope/course handicap, resizes blank per-hole state, and preserves roster/structure.
+- No cross-course tee inference; organizer must deliberately reselect tees.
+
 ## Convention
 - Every database migration's full SQL is pasted **inline in the chat** at delivery
   time (not just shipped in the bundle), so it can be run without opening files.

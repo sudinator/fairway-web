@@ -10,6 +10,7 @@ export type SetupAction =
   | { type: "rename_game" }
   | { type: "share_live" }
   | { type: "set_game_date" }
+  | { type: "change_course" }
   | { type: "add_player"; guest?: boolean }
   | { type: "remove_player"; player: Player }
   | { type: "toggle_no_show"; player: Player; next: boolean }
@@ -73,6 +74,10 @@ export function decideSetupChange({ game, players, action }: SetupPolicyContext)
   }
 
   if (game.status === "ended") return endedBlock();
+
+  if (action.type === "change_course") {
+    return anyScores ? block("The course is locked once scoring begins.") : allow();
+  }
 
   switch (action.type) {
     case "add_player": {
