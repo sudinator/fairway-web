@@ -89,7 +89,7 @@ export type OrganizerPanelProps = {
   onReopen: () => Promise<void>;
   onReset: () => Promise<void>;
   onShare: (on: boolean) => Promise<void>;
-  section?: "players" | "teams";
+  section?: "players" | "teams" | "format";
   eligibleMembers?: { id: string; display_name: string; handicap_index: number | null }[];
   onAddMember?: (m: { id: string; display_name: string; handicap_index: number | null }) => Promise<void>;
   onAddGuest?: (name: string, hcp: number, sponsor: string) => Promise<void>;
@@ -229,7 +229,7 @@ export function OrganizerPanel({
       {open && (
         <div style={{ marginTop: 10 }}>
           {/* Unified player setup */}
-          <div style={{ marginTop: 12 }}>
+          <div style={{ marginTop: 12, display: section === "format" ? "none" : undefined }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
               <Eyebrow>{section === "teams" ? "ASSIGN TEAMS" : "PLAYERS · HANDICAPS · TEES"}</Eyebrow>
               <div style={{ flex: 1 }} />
@@ -437,7 +437,7 @@ export function OrganizerPanel({
             Tees default to the course tee. Set teams and groups on the next steps.
           </div>
           )}
-          {section === "players" && (
+          {section === "format" && (
           <div
             style={{
               borderTop: `1px solid ${C.greenMid}`,

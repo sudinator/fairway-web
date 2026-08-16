@@ -16,23 +16,31 @@ def require(rel: str, needle: str, why: str) -> bool:
 
 ok = True
 workspace = "components/game/setup/game-setup-workspace.tsx"
+organizer = "components/game/organizer-panel.tsx"
 tournaments = "components/tournaments.tsx"
 
 checks = [
-    (workspace, 'export type SetupTab = "players" | "teams" | "matchups" | "groups";', "setup navigation domain must remain explicit"),
+    (workspace, 'export type SetupTab = "overview" | "details" | "players" | "format" | "teams" | "matchups" | "groups" | "review";', "control-center navigation domain must remain explicit"),
     (workspace, "organizerPanelProps: OrganizerPanelProps;", "workspace must receive the existing organizer mutation contract rather than recreating it"),
-    (workspace, 'const { usesTeams, usesMatchups, usesFoursomes } = shapeOf(game);', "step visibility must remain driven by current game shape"),
-    (workspace, '{ key: "players", label: "Players" }', "Players must remain the first setup step"),
-    (workspace, '...(usesTeams ? [{ key: "teams" as const, label: "Teams" }] : [])', "Teams visibility must remain format-dependent"),
-    (workspace, '...(usesMatchups ? [{ key: "matchups" as const, label: "Matchups" }] : [])', "Matchups visibility must remain format-dependent"),
-    (workspace, '...(!usesFoursomes ? [{ key: "groups" as const, label: "Groups" }] : [])', "Groups visibility must preserve foursome behavior"),
-    (workspace, 'const activeStep = steps.some((s) => s.key === setupTab) ? setupTab : "players";', "hidden stale tabs must still fall back to Players without deleting state"),
-    (workspace, '<OrganizerPanel section="players" {...organizerPanelProps} />', "Players step must reach the existing OrganizerPanel"),
-    (workspace, '<OrganizerPanel section="teams" {...organizerPanelProps} />', "Teams step must reach the existing OrganizerPanel"),
-    (workspace, '<GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup}', "Groups step must preserve tee-group callback wiring"),
+    (workspace, 'const { usesTeams, usesMatchups, usesFoursomes } = shapeOf(game);', "structure visibility must remain driven by current game shape"),
+    (workspace, 'title: "Game details"', "overview must expose Game details"),
+    (workspace, 'title: "Players"', "overview must expose Players"),
+    (workspace, 'title: "Format"', "overview must expose Format"),
+    (workspace, 'title: "Teams & groups"', "overview must expose Teams & groups"),
+    (workspace, 'title: "Review"', "overview must expose Review"),
+    (workspace, '<OrganizerPanel section="players" {...organizerPanelProps} />', "Players section must reach the existing OrganizerPanel"),
+    (workspace, '<OrganizerPanel section="format" {...organizerPanelProps} />', "Format section must reuse existing format mutation handlers"),
+    (workspace, '<OrganizerPanel section="teams" {...organizerPanelProps} />', "Teams structure section must reach the existing OrganizerPanel"),
+    (workspace, '<GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup}', "Groups structure section must preserve tee-group callback wiring"),
+    (workspace, 'setupTab === "matchups"', "Matchups must remain a distinct reachable sub-state"),
+    (workspace, 'onSetGameDate: (date: string) => Promise<void>;', "Game details must receive the existing organizer date writer"),
+    (organizer, 'section?: "players" | "teams" | "format";', "OrganizerPanel must expose the separated Format surface"),
+    (organizer, 'display: section === "format" ? "none" : undefined', "Format surface must not duplicate the player editor"),
+    (organizer, '{section === "format" && (', "existing game-setting mutations must be reachable from Format"),
     (tournaments, '} satisfies OrganizerPanelProps;', "GameRoom must keep compile-time checking of the organizer mutation contract"),
     (tournaments, '} satisfies React.ComponentProps<typeof GameSetupWorkspace>;', "GameRoom must keep compile-time checking of the setup workspace boundary"),
     (tournaments, 'return <GameSetupWorkspace {...workspaceProps} />;', "GameRoom setup render must reach the extracted workspace"),
+    (tournaments, 'onSetGameDate: setGameDate,', "existing game-date writer must cross the workspace boundary"),
     (tournaments, 'onSetTeeGroup: setPlayerTeeGroup, onRandomizeGroups: randomizeGroups, canRandomize, randomizeReason,', "tee-group/randomize behavior must remain wired through the boundary"),
     (tournaments, 'onOverride: overridePlayerHandicap, courseTees, onSetTee: setPlayerTee,', "per-player handicap and tee callbacks must remain wired"),
     (tournaments, 'eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,', "member/guest add callbacks must remain wired"),
@@ -43,12 +51,11 @@ for args in checks:
 body = text(workspace)
 for forbidden in ["createClient(", "supabase.", '.from("', ".rpc("]:
     if forbidden in body:
-        print(f"FAIL {workspace}: extracted render workspace must not own database side effects\n  forbidden: {forbidden}")
+        print(f"FAIL {workspace}: control-center workspace must not own database side effects\n  forbidden: {forbidden}")
         ok = False
 
-# Matchups intentionally remains outside this first extraction because StrokesSummary
-# consumes setupTab in GameRoom. Keep that observable bridge until the UX redesign.
-ok = require(tournaments, 'roomTab === "setup" && setupTab === "matchups"', "Matchups setup must remain connected to the existing StrokesSummary render path") and ok
+# Matchups remain rendered by the established StrokesSummary/match components in GameRoom.
+ok = require(tournaments, 'roomTab === "setup" && setupTab === "matchups"', "Matchups setup must remain connected to the existing downstream render path") and ok
 
 if not ok:
     sys.exit(1)
