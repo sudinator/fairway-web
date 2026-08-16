@@ -70,7 +70,6 @@ import {
 } from "@/components/ui";
 import type { Game, Player } from "@/lib/game-types";
 import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
-import { ShareControl } from "@/components/game/scorecard-views";
 
 const supabase = createClient();
 
@@ -113,12 +112,6 @@ export function OrganizerPanel({
   onRemove,
   onToggleNoShow,
   onSetTeam,
-  onRename,
-  onDelete,
-  onEnd,
-  onReopen,
-  onReset,
-  onShare,
   section = "players",
   eligibleMembers = [],
   onAddMember,
@@ -134,7 +127,6 @@ export function OrganizerPanel({
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [open, setOpen] = useState(true);
-  const [nameEdit, setNameEdit] = useState(game.name);
   const [addGuestName, setAddGuestName] = useState("");
   const [addGuestHcp, setAddGuestHcp] = useState("");
   const [addGuestSponsor, setAddGuestSponsor] = useState(""); // sponsor user id; "" -> current user
@@ -464,39 +456,6 @@ export function OrganizerPanel({
             >
               GAME SETTINGS
             </div>
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                marginTop: 8,
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <input
-                value={nameEdit}
-                onChange={(e) => setNameEdit(e.target.value)}
-                style={{
-                  ...inputStyle,
-                  padding: "8px 10px",
-                  flex: 1,
-                  minWidth: 160,
-                }}
-                placeholder="Game name"
-              />
-              <button
-                style={{
-                  ...btn(false),
-                  fontSize: 13,
-                  opacity: nameEdit.trim() && nameEdit !== game.name ? 1 : 0.5,
-                }}
-                disabled={!nameEdit.trim() || nameEdit === game.name}
-                onClick={() => onRename(nameEdit)}
-              >
-                Rename
-              </button>
-            </div>
-
             {game.status !== "ended" && onSetAllowance && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ color: C.sage, fontSize: 12 }}>Handicap allowance</div>
@@ -600,45 +559,7 @@ export function OrganizerPanel({
                 </div>
               );
             })()}
-            {game.status === "ended" ? (
-              <button
-                style={{ ...btn(false), marginTop: 10, fontSize: 13 }}
-                onClick={onReopen}
-              >
-                ↺ Reopen game
-              </button>
-            ) : (
-              <button
-                style={{ ...btn(true), marginTop: 10, fontSize: 13, display: "block" }}
-                onClick={onEnd}
-              >
-                🏁 End game (lock final results)
-              </button>
-            )}
-            <ShareControl game={game} onShare={onShare} />
-            <button
-              style={{ background: "#3F3414", color: "#E4CF86", border: `0.5px solid ${C.gold}`, borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", marginTop: 10, fontSize: 13, display: "block" }}
-              onClick={onReset}
-            >
-              ↺ Reset scores (clears scores &amp; clock — keeps players, teams, matchups)
-            </button>
-            <button
-              style={{
-                background: "#5A1E1E",
-                color: "#F6DEDB",
-                border: "none",
-                borderRadius: 8,
-                padding: "9px 14px",
-                fontWeight: 700,
-                cursor: "pointer",
-                marginTop: 10,
-                fontSize: 13,
-                display: "block",
-              }}
-              onClick={onDelete}
-            >
-              Delete this game
-            </button>
+
           </div>
           )}
         </div>
