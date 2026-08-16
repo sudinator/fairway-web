@@ -2,6 +2,10 @@
 
 Running list of things to build or tighten. Newest ideas near the top of each section.
 
+## Create Game convergence — staging release train
+- [~] 177.47–177.51: canonical draft, pure structure helpers, shared five-section workspace, tee inheritance, and corrective resume/TGC-scope hardening are staged. Production remains on the pre-convergence release until the complete Create Game rewrite passes cumulative CI + browser validation.
+- [ ] Next: Stage 3C draft teams/matchups/foursomes/tee-groups, preserving structure stash/restore and all existing setup work.
+
 ## Batched for next release (small)
 - **Remove the "Built: <date>" line** in the version display — `components/manage.tsx:3659`
   (the `{APP_BUILT_AT ? <div ...>Built: …</div> : null}` line). Redundant now that the release date is

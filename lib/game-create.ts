@@ -106,6 +106,9 @@ export type PlayerRowsOpts = {
   flightsSupported: boolean;
   flightMode: string;
   flightBands: FlightBand[] | null;
+  // TGC-only money-game semantics. Defaults true for backward-compatible pure callers;
+  // CreateGame passes the actual effective-group gate explicitly.
+  tgcBettingEnabled?: boolean;
 };
 
 // The initial game_players rows for creation: creator + selected members + guests, with course
@@ -169,7 +172,7 @@ export function buildPlayerRows(o: PlayerRowsOpts) {
     user_id: null,
     is_guest: true,
     guest_of: p.guest_of || null,
-    bets: false,
+    bets: o.tgcBettingEnabled === false ? true : false,
     ...GP_STATE_DEFAULTS,
     display_name: p.display_name,
     handicap_index: p.handicap_index,

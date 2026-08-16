@@ -13,7 +13,7 @@ checks = [
     ("structure fields mapped", all(x in m for x in ['team1', 'team2'])),
     ("flight fields mapped", all(x in m for x in ['mode:', 'count:'])),
     ("legacy compatibility adapter exists", 'export function toLegacySetupData' in m and 'export function fromLegacySetupDraft' in m),
-    ("CreateGame save uses compatibility adapter", 'const snap = toLegacySetupData(buildGameSetupDraft({' in t),
+    ("CreateGame save uses compatibility adapter", '...toLegacySetupData(buildGameSetupDraft({' in t and 'const draftSnapshot = useMemo(() => ({' in t),
 ]
 failed = [name for name, ok in checks if not ok]
 if failed:

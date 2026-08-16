@@ -424,6 +424,8 @@ function CreateGame({
     setFlightMode((d.flightMode as any) === "oneoff" ? "oneoff" : "off");
     setFlightCount(d.flightCount && d.flightCount >= 2 && d.flightCount <= 4 ? d.flightCount : 3);
     setTeeAssignments({ player: d.playerTeeOverrides || {}, flight: d.flightTeeIdx || {} });
+    setHcpOverrides(d.hcpOverrides || {});
+    if (d.createSection && ["game", "players", "format", "structure", "review"].includes(d.createSection)) setCreateSection(d.createSection as CreateGameSection);
     setSelectedPlayers(d.selectedPlayers || {}); setGuestPlayers(d.guestPlayers || []);
     setPendingFavName(d.favName);
     setDraftAvailable(null); setDraftDismissed(true); hydratedRef.current = true;
@@ -441,18 +443,43 @@ function CreateGame({
     setPendingFavName(null);
   }, [pendingFavName, favorites]);
 
-  // Save the in-progress setup on every meaningful change (once we've decided
-  // resume-vs-fresh, so we never overwrite an offered draft before the user chooses).
-  useEffect(() => {
-    if (!hydratedRef.current) return;
-    const snap = toLegacySetupData(buildGameSetupDraft({
+  // Canonical snapshot for autosave and for the synchronous exit checkpoint below.
+  // The explicit pagehide/visibility save restores the pre-workspace guarantee that
+  // leaving/killing the app mid-setup cannot lose the latest rendered setup state.
+  const draftSnapshot = useMemo(() => ({
+    ...toLegacySetupData(buildGameSetupDraft({
       name, matchDate, favName: pickedFav?.name ?? null, teeIdx, idxStr, gameType, allowancePct,
       teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle,
       skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount,
       flightTeeIdx: teeAssignments.flight, playerTeeOverrides: teeAssignments.player,
-    }));
-    if (draftHasProgress(snap, user.id)) saveSetupDraft(activeGroupId, teeTimeId, snap);
-  }, [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount, teeAssignments]);
+    })),
+    createSection,
+  }), [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount, teeAssignments, createSection]);
+  const latestDraftRef = React.useRef(draftSnapshot);
+  latestDraftRef.current = draftSnapshot;
+
+  // Save the in-progress setup on every meaningful change (once we've decided
+  // resume-vs-fresh, so we never overwrite an offered draft before the user chooses).
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    if (draftHasProgress(draftSnapshot, user.id)) saveSetupDraft(activeGroupId, teeTimeId, draftSnapshot);
+  }, [draftSnapshot, activeGroupId, teeTimeId, user.id]);
+
+  useEffect(() => {
+    const checkpoint = () => {
+      if (!hydratedRef.current) return;
+      const snap = latestDraftRef.current;
+      if (draftHasProgress(snap, user.id)) saveSetupDraft(activeGroupId, teeTimeId, snap);
+    };
+    const onVisibility = () => { if (document.visibilityState === "hidden") checkpoint(); };
+    window.addEventListener("pagehide", checkpoint);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      checkpoint();
+      window.removeEventListener("pagehide", checkpoint);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [activeGroupId, teeTimeId, user.id]);
 
   const tee = pickedFav?.tees?.[teeIdx];
   const coursePar = pickedFav
@@ -541,6 +568,7 @@ function CreateGame({
         gameId: game.id, userId: user.id, displayName, idxVal, selectedPlayers, groupRoster, guestPlayers,
         hcpOverrides, tee, tees: pickedFav.tees, defaultTeeIdx: teeIdx, playerTeeOverrides: teeAssignments.player,
         flightTeeIdx: teeAssignments.flight, coursePar, holesCount: holesMeta.length, flightsSupported, flightMode, flightBands,
+        tgcBettingEnabled: effectiveGroupId(activeGroupId) === TGC_GROUP_ID,
       });
       const { error: e2 } = await supabase.from("game_players").insert(rows);
       if (e2) throw e2;
@@ -2163,7 +2191,7 @@ function GameRoom({
     const ch = (t.slope != null && t.rating != null && game.course_par != null)
       ? courseHandicap(idx, t.slope, t.rating, game.course_par) : null;
     const { error } = await supabase.from("game_players").insert({
-      game_id: game.id, user_id: null, is_guest: true, guest_of: sponsor || null, bets: false, display_name: name.trim(),
+      game_id: game.id, user_id: null, is_guest: true, guest_of: sponsor || null, bets: effectiveGroupId(game.group_id) === TGC_GROUP_ID ? false : true, display_name: name.trim(),
       handicap_index: idx, rating: t.rating, slope: t.slope, tee_name: t.tee_name,
       course_handicap: ch, ...blankCard(),
     });
@@ -2599,7 +2627,7 @@ function GameRoom({
   const posWithin = (p: Player, pool: Player[]) => PS.posWithin(p, pool, game);
   const tiedWithin = (p: Player, pool: Player[]) => PS.tiedWithin(p, pool, game);
   const renderLeaderRow = (p: Player, pos: number, tied: boolean, showTag: boolean) => (
-    <LeaderRow key={p.id} p={p} pos={pos} tied={tied} showTag={showTag}
+    <LeaderRow key={p.id} p={p} pos={pos} tied={tied} showTag={showTag} showBetStatus={effectiveGroupId((game as any)?.group_id) === TGC_GROUP_ID}
       user={user} isStroke={isStroke} strokeNet={strokeNet}
       playerPoints={playerPoints} playerThru={playerThru} playerNet={playerNet}
       playerGross={playerGross} parThru={parThru} relToParStr={relToParStr} leaderName={leaderName} />

@@ -137,6 +137,7 @@ export function toLegacySetupData(d: GameSetupDraft): LegacySetupData {
     flightCount: d.flights.count,
     flightTeeIdx: d.flights.teeIdxByFlight,
     playerTeeOverrides: d.tees.playerOverrides,
+    hcpOverrides: d.players.handicapOverrides,
     selectedPlayers: d.players.selectedPlayers,
     guestPlayers: d.players.guestPlayers,
   };
@@ -151,7 +152,7 @@ export function fromLegacySetupDraft(d: SetupDraft): GameSetupDraft {
     idxStr: d.idxStr,
     selectedPlayers: d.selectedPlayers || {},
     guestPlayers: d.guestPlayers || [],
-    hcpOverrides: {},
+    hcpOverrides: d.hcpOverrides || {},
     gameType: d.gameType as GameTypeOpt,
     allowancePct: d.allowancePct,
     teamScoreMode: d.teamScoreMode as "best_ball" | "aggregate",

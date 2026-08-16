@@ -80,6 +80,11 @@ const rosterBase = {
   eq("guest ch", rows[3].course_handicap, Math.round(12 * (130 / 113) + (71.0 - 72)));
   eq("<=4 grouped", rows.every((r) => (r as any).tee_group === 1), true);
 }
+
+{
+  const rows = buildPlayerRows({ ...rosterBase, tgcBettingEnabled: false, guestPlayers: [{ display_name: "G", handicap_index: 12.0, guest_of: "me" }] });
+  eq("non-TGC guest does not inherit TGC no-bet default", rows.find((r) => r.is_guest)?.bets, true);
+}
 {
   const roster = Array.from({ length: 5 }, (_, i) => ({ id: "p" + i, display_name: "P" + i, avatar_url: null, handicap_index: 10 }));
   const sel: Record<string, boolean> = {}; roster.forEach((r) => (sel[r.id] = true));

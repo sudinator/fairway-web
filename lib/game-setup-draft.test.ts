@@ -58,6 +58,7 @@ const legacyExpected = {
   flightCount: base.flightCount,
   flightTeeIdx: base.flightTeeIdx,
   playerTeeOverrides: base.playerTeeOverrides,
+  hcpOverrides: base.hcpOverrides,
   selectedPlayers: base.selectedPlayers,
   guestPlayers: base.guestPlayers,
 };
@@ -67,12 +68,14 @@ eq(buildGameSetupDraft(base).players.handicapOverrides, { p2: 11.3 }, "live hand
 
 const legacy: SetupDraft = { v: 1, savedAt: 123, ...legacyExpected };
 eq(toLegacySetupData(fromLegacySetupDraft(legacy)), legacyExpected, "legacy resume round-trip stays identical");
-eq(fromLegacySetupDraft(legacy).players.handicapOverrides, {}, "legacy draft does not invent non-persisted overrides");
+eq(fromLegacySetupDraft(legacy).players.handicapOverrides, { p2: 11.3 }, "resume restores persisted handicap overrides");
 const oldLegacyWithoutTeeMaps: SetupDraft = { ...legacy };
 delete (oldLegacyWithoutTeeMaps as any).flightTeeIdx;
 delete (oldLegacyWithoutTeeMaps as any).playerTeeOverrides;
+delete (oldLegacyWithoutTeeMaps as any).hcpOverrides;
 eq(fromLegacySetupDraft(oldLegacyWithoutTeeMaps).flights.teeIdxByFlight, {}, "pre-177.50 draft resumes with no invented flight tees");
 eq(fromLegacySetupDraft(oldLegacyWithoutTeeMaps).tees.playerOverrides, {}, "pre-177.50 draft resumes with no invented player tee overrides");
+eq(fromLegacySetupDraft(oldLegacyWithoutTeeMaps).players.handicapOverrides, {}, "older draft resumes with no invented handicap overrides");
 
 const gameTypes = ["stableford", "stroke", "match", "fourball", "skins", "trifecta"] as const;
 for (let i = 0; i < 2000; i++) {
@@ -101,7 +104,7 @@ for (let i = 0; i < 2000; i++) {
     trifectaScoring: input.trifectaScoring, strokeBasis: input.strokeBasis, fmtFamily: input.fmtFamily,
     matchKind: input.matchKind, teamMode: input.teamMode, skinsTeamStyle: input.skinsTeamStyle, skinsMode: input.skinsMode,
     team1: input.team1, team2: input.team2, flightMode: input.flightMode, flightCount: input.flightCount,
-    flightTeeIdx: input.flightTeeIdx, playerTeeOverrides: input.playerTeeOverrides,
+    flightTeeIdx: input.flightTeeIdx, playerTeeOverrides: input.playerTeeOverrides, hcpOverrides: input.hcpOverrides,
     selectedPlayers: input.selectedPlayers, guestPlayers: input.guestPlayers,
   };
   eq(toLegacySetupData(d), expected, `differential legacy shape ${i}`);

@@ -5028,3 +5028,12 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - New pure `lib/game-tee-assignment.ts` centralizes resolution and is protected by `ci/check_create_game_tee_inheritance.py`. Dedicated tests cover 5,011 precedence/sanitization assertions; draft compatibility has 2,006 assertions; existing `game-create` baseline differential remains 9,000/9,000 identical when hierarchy inputs are absent.
 - Detailed teams/matchups/foursomes/tee-groups are still post-create in this checkpoint. Stage 3C will move those existing structural editors into draft mode before Stage 4 atomic creation.
 
+
+
+## 177.51.260816 — Stage 3 corrective: resume durability + TGC betting scope + CI fixture typing
+- **Staging-only convergence checkpoint. No migration.** Corrects two browser regressions found during 177.49/177.50 staging QA and the 177.50 GitHub TypeScript failure.
+- **Resume Setup durability:** Create Game now checkpoints the latest draft on normal state changes, `pagehide`, visibility-hidden, and unmount. Resume restores the five-section workspace location, player/flight tee overrides, and live handicap overrides. Older drafts remain valid. The progress detector now recognizes meaningful format/structure/tee work, not only course/name/roster changes.
+- **TGC betting scope:** the `· no bet` leaderboard label is shown only when the effective group is TGC. New guest rows use the guest-default-out betting semantic only for TGC; ordinary groups such as staging Main receive the neutral/default `bets=true` value. The same gate is applied to guests added after game creation. BettingPanel itself remains TGC-gated as before.
+- **CI correction:** `game-tee-assignment.test.ts` now explicitly types the randomized override maps as `Record<string, number>`, fixing TS2322 caused by TypeScript inferring optional `undefined` properties from `{...} : {}` test branches. Runtime tee logic is unchanged by this typing correction.
+- Adds `ci/check_create_game_resume_and_betting_scope.py` and extends the Create Game state inventory to the new latest-draft ref.
+- Local executed validation: 5,011 tee-assignment assertions; 43 game-create assertions; 2,007 setup-draft assertions; full `npm run guards` including 50,087 workflow/fault simulations. Dependency-backed `tsc/build` remains a GitHub CI gate in this source environment.

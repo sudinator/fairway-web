@@ -30,8 +30,8 @@ eq("sanitize", sanitizeTeeIndexMap({ a: 0, b: 3, c: -1, d: 2 }, 3), { a: 0, d: 2
 for (let i = 0; i < 5000; i++) {
   const idx = i % 31;
   const flight = idx <= 10 ? "A" : "B";
-  const playerOverride = i % 4 === 0 ? { p: 2 } : {};
-  const flightMap = i % 3 === 0 ? { A: 1, B: 1 } : {};
+  const playerOverride: Record<string, number> = i % 4 === 0 ? { p: 2 } : {};
+  const flightMap: Record<string, number> = i % 3 === 0 ? { A: 1, B: 1 } : {};
   const got = resolveCreateGameTee({ participantKey: "p", handicapIndex: idx, tees, defaultTeeIdx: 0, playerTeeOverrides: playerOverride, flightMode: "oneoff", flightBands: bands, flightTeeIdx: flightMap });
   const want = playerOverride.p != null ? 2 : flightMap[flight as "A" | "B"] != null ? 1 : 0;
   eq(`precedence ${i}`, got?.teeIdx, want);
