@@ -41,8 +41,8 @@ Living list. `[x]` = built & verified in code (file noted). `[~]` = partially do
 
 ### Setup / Manage Game redesign
 - [x] 177.40 preparatory extraction: move the existing post-create setup render/navigation boundary into `components/game/setup/game-setup-workspace.tsx` with zero intended behavior change. Database writes and mutation handlers remain in `GameRoom`; permanent reachability/source-contract guards protect the boundary.
-- [x] 177.41 Game Control Center navigation: replace the one-way post-create setup stepper with a persistent BNN-styled overview and revisitable Game details / Players / Format / Teams & groups / Review sections. Existing GameRoom mutation handlers remain authoritative; Matchups keep their existing downstream render path. Course replacement and the central post-scoring transition policy remain follow-on work.
-- [ ] Persistent Game Control Center UX: replace the one-way post-create setup stepper with revisitable Game / Players / Format / Teams & Groups / Review sections, including access back to the original creation settings before scoring.
+- [x] 177.41 Persistent Game Control Center UX: replace the one-way post-create setup stepper with revisitable Game / Players / Format / Teams & Groups / Review sections, including access back to the saved game details before scoring. Course replacement remains a separate semantic change because it must coordinate holes/tees/player snapshots safely.
+- [x] 177.42 setup roster ordering fix: Players and team-assignment rosters are now alphabetized with a stable id tie-breaker, so a tee/handicap/team save followed by `load()` cannot move the edited player merely because PostgreSQL returned rows in a different physical order.
 - [ ] Central setup transition policy: after scoring starts, allow administrative changes that do not reinterpret entered play and block/confirm tee, handicap, team/format and other score-semantic changes using an explicit transition matrix.
 
 ### Features
