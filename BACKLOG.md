@@ -39,6 +39,11 @@ Still open from the original spec:
 Living list. `[x]` = built & verified in code (file noted). `[~]` = partially done.
 `[ ]` = open. Check items off here as they ship.
 
+### Setup / Manage Game redesign
+- [x] 177.40 preparatory extraction: move the existing post-create setup render/navigation boundary into `components/game/setup/game-setup-workspace.tsx` with zero intended behavior change. Database writes and mutation handlers remain in `GameRoom`; permanent reachability/source-contract guards protect the boundary.
+- [ ] Persistent Game Control Center UX: replace the one-way post-create setup stepper with revisitable Game / Players / Format / Teams & Groups / Review sections, including access back to the original creation settings before scoring.
+- [ ] Central setup transition policy: after scoring starts, allow administrative changes that do not reinterpret entered play and block/confirm tee, handicap, team/format and other score-semantic changes using an explicit transition matrix.
+
 ### Features
 - [x] Historical round rating/slope correction (177.39): existing recorded rounds can edit the stored tee rating/slope; the round's course handicap is recalculated from that round's stored handicap index and course par, then differential/app-estimated handicap refresh from the existing round-history engine. Gross-only rounds preserve their total score; game-linked personal rounds do not rewrite game results; course-library data is not changed unless the separate Save course flow is used. No migration.
 - [~] Dashboard rework (from the audit) — shipping in pieces:

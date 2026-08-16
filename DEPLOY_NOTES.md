@@ -4954,3 +4954,12 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Gross-only rounds preserve their stored total during a metadata-only correction. Game-linked personal rounds do not rewrite game results. Course-library data is not silently changed.
 - Adds targeted pure-logic tests and a permanent source contract for the correction/save/cancel boundaries.
 - No database migration.
+
+
+### 177.40.260815 — Game setup workspace extraction (behavior-preserving)
+- **NO migration.** Preparatory modularization only; no intended user-visible behavior change.
+- Extracts the existing organizer setup stepper/progress/render boundary from `GameRoom` into `components/game/setup/game-setup-workspace.tsx`.
+- All Supabase writes, mutation handlers, reload behavior, structure stash/restore, scoring logic, Matchups/StrokesSummary path, and existing setup navigation state remain owned by `GameRoom`.
+- The parent keeps explicit typed contracts for both `OrganizerPanelProps` and `GameSetupWorkspace` props; a permanent source guard verifies Players/Teams/Groups reachability, tee/handicap/member/guest/group callback wiring, Matchups reachability, and that the workspace owns no database side effects.
+- `MIGRATIONS.md` is reconciled to the directly verified Production ledger through 0137. Staging and Production both have 0135-0137 applied; the 12 core RLS tables expose the expected 60 policies; staging integration and Production smoke validation passed.
+- This release intentionally does **not** introduce the new persistent Game Control Center UX or post-scoring transition rules. Those follow only after this extraction proves behavior-identical through staging.
