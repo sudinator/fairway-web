@@ -100,14 +100,14 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current working candidate: 177.40.260815 (behavior-preserving Game setup workspace extraction).**
+**Current working candidate: 177.41.260816 (persistent Game Control Center navigation).**
 - 177.26 supersedes the unreleased 177.25 candidate after its first GitHub execution exposed verification-harness ordering/sequencing defects; it still includes the 177.24 dashboard Putts/round + targeted stats-completion baseline.
 - Migrations `0135_ledger_backfill.sql`, `0136_core_rls_helpers.sql`, and `0137_core_rls_baseline.sql` are now **applied and verified in both staging and Production**. Production/staging ledgers are reconciled through 0137 (0129 is the intentional reserved gap); both environments expose the expected 60 core RLS policies across 12 tables.
 - `0135` evidence-backfilled 0122-0128 into both ledgers; `0136` installed/verified the six Production SECURITY DEFINER RLS helpers; `0137` installed the source-controlled core RLS policy/grant baseline. The real staging integration harness passed afterward and Production passed a non-destructive smoke test.
 - `ci/core_rls_production_baseline.json` is the machine-readable 2026-08-14 Production RLS baseline (12 tables / 60 policies). `ci/core_rls_helpers_production_baseline.json` captures the six helper definitions. `ci/assert-core-rls-live.sql` is the read-only live drift guard.
 - Fresh-database reconstruction is now part of required `CI / verify`: a pinned Supabase CLI creates a disposable database, applies both migration trees from empty state, and asserts the checked-in RLS baseline. The first GitHub execution correctly exposed a full-path ordering bug; 177.26 fixes ordering by numeric migration prefix and requires a corrected GitHub fresh-DB PASS before ship.
 - The schema migration ledger (`public.schema_migrations`) is the source of truth for applied state from 0113 onward. `MIGRATIONS.md` is a human checklist and must not be treated as authoritative applied-state evidence.
-- 177.39 completed the historical round rating/slope feature. 177.40 is a refactor-only candidate and remains **NOT DEPLOYABLE** until its own dependency-backed CI/type/test/build, characterization/guard suite, staging validation, PR verify, Production Ready, and smoke gates pass.
+- 177.40 completed the behavior-preserving setup-workspace extraction. 177.41 builds the persistent Game Control Center navigation on that boundary and remains **NOT DEPLOYABLE** until dependency-backed CI/type/test/build, characterization/guard suite, staging validation, PR verify, Production Ready, and smoke gates pass.
 
 ## 9. Recent major thread — "date of play" (context you'll need)
 The recent work overhauled how a round's date is recorded:
@@ -665,3 +665,11 @@ For changed interactions, do not equate handler reachability with working behavi
 - `GameRoom` constructs `OrganizerPanelProps` and `GameSetupWorkspace` props with `satisfies` so callback/boundary drift fails TypeScript.
 - Permanent `ci/check_game_setup_workspace_contract.py` verifies step visibility/fallback, Players/Teams/Groups reachability, tee/handicap/add-player/group callback bridges, Matchups reachability, and forbids DB ownership in the extracted workspace.
 - Next product stage after this refactor is validated: persistent Game Control Center UX that lets organizers revisit Game/Players/Format/Teams & Groups/Review, followed by a centralized before/after-scoring transition policy.
+
+## 177.41 Persistent Game Control Center navigation
+- BNN-styled overview with revisitable Game details / Players / Format / Teams & groups / Review sections.
+- Existing GameRoom state, database mutations, refresh behavior, scoring logic, structure stash, and match renderers stay authoritative.
+- Game details reuses the existing rename and organizer play-date writers; individual tee selection stays on Players. Course replacement is not added in 177.41 because it requires a separate semantic contract for holes_meta/course_par and every player's tee snapshot.
+- Format controls move out of the Players surface into their own Control Center section without changing the underlying callbacks.
+- Manage game and setup-warning entry points reopen the overview.
+- No migration. Next semantic step: explicit allowed/confirm/blocked transition policy after scoring starts, including course/tee/handicap/team/format rules.

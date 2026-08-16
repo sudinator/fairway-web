@@ -1163,26 +1163,7 @@ function CreateGame({
 
 // ---------------- Game room: score entry + leaderboard ----------------
 
-// Local YYYY-MM-DD (module-level so both the create form's clone and GameRoom can use it).
-// Organizer-only control to correct a whole game's date. Local draft state; the Save button appears
-// only when the date is changed. Past-date confirmation is handled by the onSave handler.
-function GameDatePicker({ current, onSave }: { current: string | null; onSave: (d: string) => Promise<void> }) {
-  const initial = current ? String(current).slice(0, 10) : todayLocalStr();
-  const [d, setD] = React.useState<string>(initial);
-  const [busy, setBusy] = React.useState(false);
-  React.useEffect(() => { setD(current ? String(current).slice(0, 10) : todayLocalStr()); }, [current]);
-  const dirty = !!d && d !== initial;
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", background: C.greenMid, border: `1px solid ${C.greenLight}`, borderRadius: 10, padding: "8px 12px", marginTop: 10 }}>
-      <span style={{ color: C.sage, fontSize: 12 }}>Play date</span>
-      <ShortDateInput value={d} onChange={(v) => setD(v || todayLocalStr())} />
-      {dirty && (
-        <button disabled={busy} onClick={async () => { setBusy(true); try { await onSave(d); } finally { setBusy(false); } }}
-          style={{ ...btn(true), fontSize: 12, padding: "6px 12px" }}>{busy ? "Saving…" : "Save date"}</button>
-      )}
-    </div>
-  );
-}
+// ---------------- Game room: score entry + leaderboard ----------------
 
 function GameRoom({
   gameId,
@@ -1274,7 +1255,7 @@ function GameRoom({
     })();
   }, [betStale, game, players, user.id]);
   // Which step of the setup flow is showing: players & tees, teams, matchups, groups.
-  const [setupTab, setSetupTab] = useState<SetupTab>("players");
+  const [setupTab, setSetupTab] = useState<SetupTab>("overview");
   const [cardView, setCardView] = useState(false); // show the whole-group vertical scorecard
   const [flightView, setFlightView] = useState<"flight" | "overall">("flight"); // flighted standings: segmented vs one list
 
@@ -2592,9 +2573,9 @@ function GameRoom({
           ⛳ Scorecard
         </button>
         {isOrganizer && (
-          <button onClick={() => setRoomTab("setup")}
+          <button onClick={() => { setSetupTab("overview"); setRoomTab("setup"); }}
             style={{ ...btn(roomTab === "setup"), flex: 1, fontSize: 14 }}>
-            ⚙ Game setup
+            ⚙ Manage game
           </button>
         )}
       </div>
@@ -2602,9 +2583,6 @@ function GameRoom({
         <a href={`/organize/${game.id}`} style={{ display: "block", marginTop: 10, textAlign: "center", color: C.gold, fontSize: 13, fontWeight: 700, textDecoration: "none", border: `1px solid ${C.gold}`, borderRadius: 9, padding: "9px 0" }}>
           Set up flights &amp; matchups in the desktop organizer →
         </a>
-      )}
-      {isOrganizer && (
-        <GameDatePicker current={(game as any).played_at ?? null} onSave={setGameDate} />
       )}
 
       {roomTab === "play" && cleanSweepDone && effectiveGroupId((game as any)?.group_id) === TGC_GROUP_ID && (game.game_type === "stableford" || game.game_type === "stroke") && (
@@ -2688,7 +2666,7 @@ function GameRoom({
               <li key={i}>{m}</li>
             ))}
           </ul>
-          <button style={{ ...btn(true), marginTop: 12 }} onClick={() => setRoomTab("setup")}>Open setup</button>
+          <button style={{ ...btn(true), marginTop: 12 }} onClick={() => { setSetupTab("overview"); setRoomTab("setup"); }}>Open setup</button>
         </div>
       )}
 
@@ -2752,7 +2730,7 @@ function GameRoom({
           onSetAllowance: setAllowance, onSetFormat: setFormat, onSetTeamScoreMode: setTeamScoreMode, onSetSkinsMode: updateSkinsMode, onSetSkinsStyle: setSkinsStyle, onSetMatchTeam: setMatchTeam, anyScores,
         } satisfies OrganizerPanelProps;
         const workspaceProps = {
-          game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps,
+          game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate,
           onSetTeeGroup: setPlayerTeeGroup, onRandomizeGroups: randomizeGroups, canRandomize, randomizeReason,
           randomizing, groupOverflow,
         } satisfies React.ComponentProps<typeof GameSetupWorkspace>;
@@ -2774,11 +2752,11 @@ function GameRoom({
       </div>
       )}
 
-      {roomTab === "setup" && isOrganizer && !isEnded && (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta") && (
+      {roomTab === "setup" && setupTab === "format" && isOrganizer && !isEnded && (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta") && (
         <LegConfigEditor game={game} onSave={setLegConfig} />
       )}
 
-      {roomTab === "setup" && isOrganizer && game.game_type === "trifecta" && !isEnded && (
+      {roomTab === "setup" && setupTab === "format" && isOrganizer && game.game_type === "trifecta" && !isEnded && (
         <div style={{ marginTop: 12, background: C.greenLight, borderRadius: 12, padding: 14 }}>
           <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase" }}>Trifecta scoring</div>
           <div style={{ display: "flex", gap: 6, marginTop: 10 }}>

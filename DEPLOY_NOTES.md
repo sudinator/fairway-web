@@ -4963,3 +4963,11 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - The parent keeps explicit typed contracts for both `OrganizerPanelProps` and `GameSetupWorkspace` props; a permanent source guard verifies Players/Teams/Groups reachability, tee/handicap/member/guest/group callback wiring, Matchups reachability, and that the workspace owns no database side effects.
 - `MIGRATIONS.md` is reconciled to the directly verified Production ledger through 0137. Staging and Production both have 0135-0137 applied; the 12 core RLS tables expose the expected 60 policies; staging integration and Production smoke validation passed.
 - This release intentionally does **not** introduce the new persistent Game Control Center UX or post-scoring transition rules. Those follow only after this extraction proves behavior-identical through staging.
+
+### 177.41.260816 — Persistent Game Control Center navigation
+- Replaces the one-way post-create setup stepper with a persistent BNN-styled Game Control Center overview.
+- Organizers can revisit Game details, Players, Format, Teams & groups, and Review from one setup workspace.
+- Reuses the existing GameRoom mutation handlers for rename, play date, player handicap/tee, roster, format, teams, matchups, and tee groups; the workspace still owns no Supabase client or RPC calls.
+- Existing matchups remain rendered through the established StrokesSummary/match components; the Control Center routes to that same state rather than rewriting it.
+- The Manage game entry now opens the Control Center overview consistently.
+- No database migration. Course replacement and the centralized after-scoring transition policy are deliberately deferred to the next semantic release.

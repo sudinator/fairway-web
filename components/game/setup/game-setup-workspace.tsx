@@ -6,8 +6,9 @@ import { pkey, shapeOf } from "@/lib/game-shape";
 import type { Game, Player } from "@/lib/game-types";
 import { OrganizerPanel, type OrganizerPanelProps } from "@/components/game/organizer-panel";
 import { GroupsBuilder } from "@/components/game/scorecard-views";
+import { btn, inputStyle, ShortDateInput } from "@/components/ui";
 
-export type SetupTab = "players" | "teams" | "matchups" | "groups";
+export type SetupTab = "overview" | "details" | "players" | "format" | "teams" | "matchups" | "groups" | "review";
 
 export type GameSetupWorkspaceProps = {
   game: Game;
@@ -15,6 +16,7 @@ export type GameSetupWorkspaceProps = {
   setupTab: SetupTab;
   onSetupTabChange: (tab: SetupTab) => void;
   organizerPanelProps: OrganizerPanelProps;
+  onSetGameDate: (date: string) => Promise<void>;
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
   onRandomizeGroups: () => Promise<void>;
   canRandomize: boolean;
@@ -23,12 +25,20 @@ export type GameSetupWorkspaceProps = {
   groupOverflow: string[];
 };
 
+const cardStyle: React.CSSProperties = {
+  background: C.greenLight,
+  borderRadius: 12,
+  padding: "12px 13px",
+  border: `1px solid ${C.greenMid}`,
+};
+
 export function GameSetupWorkspace({
   game,
   players,
   setupTab,
   onSetupTabChange,
   organizerPanelProps,
+  onSetGameDate,
   onSetTeeGroup,
   onRandomizeGroups,
   canRandomize,
@@ -36,19 +46,7 @@ export function GameSetupWorkspace({
   randomizing,
   groupOverflow,
 }: GameSetupWorkspaceProps) {
-  // Gate setup steps by the CURRENT format (via shapeOf). Stale teams/foursomes
-  // from a previous format are ignored without being deleted — switching back
-  // restores the work.
   const { usesTeams, usesMatchups, usesFoursomes } = shapeOf(game);
-  const steps: { key: SetupTab; label: string }[] = [
-    { key: "players", label: "Players" },
-    ...(usesTeams ? [{ key: "teams" as const, label: "Teams" }] : []),
-    ...(usesMatchups ? [{ key: "matchups" as const, label: "Matchups" }] : []),
-    ...(!usesFoursomes ? [{ key: "groups" as const, label: "Groups" }] : []),
-  ];
-  const activeStep = steps.some((s) => s.key === setupTab) ? setupTab : "players";
-
-  // --- per-step completion drives the stepper status + the "what's next" line ---
   const total = players.length;
   const pairings = Array.isArray(game.pairings) ? game.pairings : [];
   const foursomes = Array.isArray(game.foursomes) ? game.foursomes : [];
@@ -60,70 +58,139 @@ export function GameSetupWorkspace({
   const cWithTeam = players.filter((p) => p.team).length;
   const cPlaced = players.filter((p) => placedKeys.has(pkey(p))).length;
   const cGrouped = players.filter((p) => p.tee_group != null).length;
-  const stepDone = (key: string) =>
-    total > 0 && (
-      key === "players" ? cWithHcp === total
-      : key === "teams" ? cWithTeam === total
-      : key === "matchups" ? cPlaced === total
-      : key === "groups" ? cGrouped === total
-      : false);
-  const allDone = steps.every((s) => stepDone(s.key));
-  const isStableford = game.game_type === "stableford" || game.game_type === "stroke";
-  const hint = (() => {
-    if (activeStep === "players")
-      return isStableford
-        ? "Add players, or share the code so they can join anytime — even across tee times. Stableford rolls everyone into one leaderboard."
-        : "Add everyone here before matchups — players don't have to join themselves (you can still share the code so they self-score).";
-    if (activeStep === "teams")
-      return cWithTeam < total ? "Tap a team on each player. Both teams need players before matchups." : "Teams set — next, build the matchups.";
-    if (activeStep === "matchups") {
-      if (usesTeams && cWithTeam === 0) return "Assign players to teams first — open the Teams step, then come back.";
-      return usesFoursomes
-        ? "Build each foursome — it doubles as its own tee group, so one person can keep that foursome's card on the course."
-        : "Set who plays whom, then group the matches that tee off together on the next step.";
-    }
-    if (usesMatchups && pairings.length === 0 && foursomes.length === 0)
-      return "Build the matchups first, then group the ones that tee off together here.";
-    return isStableford
-      ? "Split players into the groups that tee off together so one person can keep each group's card."
-      : "Group the matches that tee off together — usually two per foursome.";
-  })();
+  const playersDone = total > 0 && cWithHcp === total;
+  const teamsDone = !usesTeams || (total > 0 && cWithTeam === total);
+  const matchupsDone = !usesMatchups || (total > 0 && cPlaced === total);
+  const groupsDone = usesFoursomes || (total > 0 && cGrouped === total);
+  const structureDone = teamsDone && matchupsDone && groupsDone;
+  const allDone = playersDone && structureDone;
+  const anyScores = players.some((p) => (p.scores || []).some((s) => s != null));
+
+  const section = setupTab === "teams" || setupTab === "matchups" || setupTab === "groups" ? "structure" : setupTab;
+  const structureDefault: SetupTab = usesTeams ? "teams" : usesMatchups ? "matchups" : "groups";
+  const gotoStructure = () => onSetupTabChange(structureDefault);
+
+  const [nameEdit, setNameEdit] = React.useState(game.name);
+  const [dateEdit, setDateEdit] = React.useState(String((game as any).played_at || "").slice(0, 10));
+  const [dateBusy, setDateBusy] = React.useState(false);
+  React.useEffect(() => setNameEdit(game.name), [game.name]);
+  React.useEffect(() => setDateEdit(String((game as any).played_at || "").slice(0, 10)), [(game as any).played_at]);
+
+  const stepDefs = [
+    { key: "details", label: "Details", done: !!game.name && !!game.course },
+    { key: "players", label: "Players", done: playersDone },
+    { key: "format", label: "Format", done: !!game.game_type },
+    { key: "structure", label: "Teams", done: structureDone },
+    { key: "review", label: "Review", done: allDone },
+  ] as const;
+
+  const openSection = (key: typeof stepDefs[number]["key"]) => {
+    if (key === "structure") gotoStructure();
+    else onSetupTabChange(key);
+  };
+
+  const summary = [
+    { key: "details" as const, title: "Game details", sub: `${game.course}${(game as any).played_at ? ` · ${String((game as any).played_at).slice(0, 10)}` : ""}`, done: true },
+    { key: "players" as const, title: "Players", sub: `${total} player${total === 1 ? "" : "s"} · ${cWithHcp}/${total} handicaps set`, done: playersDone },
+    { key: "format" as const, title: "Format", sub: `${game.game_type.replace("fourball", "Four-ball")} · ${game.allowance_pct ?? 100}%`, done: true },
+    { key: "structure" as const, title: "Teams & groups", sub: usesTeams || usesMatchups ? `${cWithTeam}/${total} team assignments · ${cGrouped}/${total} grouped` : `${cGrouped}/${total} grouped`, done: structureDone },
+    { key: "review" as const, title: "Review", sub: allDone ? "Setup looks good" : "Setup items remain", done: allDone },
+  ];
+
+  if (section === "overview") {
+    return (
+      <div style={{ marginTop: 16 }}>
+        <div style={{ ...cardStyle, padding: 14, marginBottom: 10 }}>
+          <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>{game.name}</div>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>{game.course} · {game.game_type === "fourball" ? "Four-ball" : game.game_type}</div>
+          <span style={{ display: "inline-block", marginTop: 7, padding: "3px 9px", borderRadius: 999, background: anyScores ? "#5BD08A" : C.gold, color: anyScores ? "#0E241B" : "#23303A", fontSize: 11, fontWeight: 800 }}>
+            {anyScores ? "SCORING" : "SETUP"}
+          </span>
+        </div>
+        {summary.map((s) => (
+          <button key={s.key} onClick={() => openSection(s.key)} style={{ ...cardStyle, width: "100%", marginBottom: 8, color: C.cream, textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: "Georgia, serif", fontSize: 15, fontWeight: 800 }}>{s.title}</div>
+              <div style={{ color: C.sage, fontSize: 11.5, marginTop: 2 }}>{s.sub}</div>
+            </div>
+            <div style={{ width: 24, height: 24, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", background: s.done ? "#5BD08A" : C.gold, color: "#0E241B", fontWeight: 900, fontSize: 13 }}>{s.done ? "✓" : "!"}</div>
+            <span style={{ color: C.sage, fontSize: 18 }}>›</span>
+          </button>
+        ))}
+        <button style={{ ...btn(true), width: "100%", marginTop: 4 }} onClick={() => onSetupTabChange("review")}>{anyScores ? "Review game setup" : "Review & start"}</button>
+      </div>
+    );
+  }
 
   return (
     <div style={{ marginTop: 16 }}>
-      {/* Stepper: navigation and progress in one control */}
-      <div style={{ display: "flex", alignItems: "center" }}>
-        {steps.map((s, i) => {
-          const done = stepDone(s.key);
-          const active = activeStep === s.key;
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <button style={{ ...btn(false), padding: "7px 10px", fontSize: 12 }} onClick={() => onSetupTabChange("overview")}>‹ Control center</button>
+        <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 17 }}>
+          {section === "details" ? "Game details" : section === "players" ? "Players" : section === "format" ? "Format" : section === "structure" ? "Teams & groups" : "Review"}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 3, marginBottom: 12 }}>
+        {stepDefs.map((s, i) => {
+          const active = section === s.key;
           return (
-            <div key={s.key} style={{ flex: 1, display: "flex", alignItems: "center" }}>
-              {i > 0 && <div style={{ flex: "0 0 12px", height: 1, background: "rgba(255,255,255,0.18)" }} />}
-              <button onClick={() => onSetupTabChange(s.key)} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "center" }}>
-                <div style={{
-                  width: active ? 30 : 26, height: active ? 30 : 26, lineHeight: active ? "30px" : "26px",
-                  margin: "0 auto", borderRadius: 999, fontWeight: 800, fontSize: 13,
-                  background: done ? "#5BD08A" : active ? C.gold : "transparent",
-                  color: done ? "#0E241B" : active ? "#23303A" : C.sage,
-                  border: done || active ? "none" : "1px solid rgba(255,255,255,0.25)",
-                  boxShadow: active ? "0 0 0 3px rgba(216,178,74,0.25)" : "none",
-                }}>{done ? "✓" : i + 1}</div>
-                <div style={{ color: active ? C.cream : C.sage, fontSize: 11, marginTop: 3, fontWeight: active ? 700 : 400 }}>{s.label}</div>
-              </button>
-            </div>
+            <button key={s.key} onClick={() => openSection(s.key)} style={{ flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "center" }}>
+              <div style={{ width: active ? 30 : 26, height: active ? 30 : 26, lineHeight: active ? "30px" : "26px", margin: "0 auto", borderRadius: 999, fontWeight: 800, fontSize: 12, background: s.done ? "#5BD08A" : active ? C.gold : "transparent", color: s.done ? "#0E241B" : active ? "#23303A" : C.sage, border: s.done || active ? "none" : "1px solid rgba(255,255,255,.25)", boxShadow: active ? "0 0 0 3px rgba(201,162,39,.2)" : "none" }}>{s.done ? "✓" : i + 1}</div>
+              <div style={{ color: active ? C.cream : C.sage, fontSize: 11, marginTop: 3, fontWeight: active ? 700 : 400 }}>{s.label}</div>
+            </button>
           );
         })}
       </div>
-      <div style={{ background: allDone ? C.green : "#16302A", borderRadius: 8, padding: "9px 11px", marginTop: 12, color: allDone ? C.cream : C.gold, fontSize: 12, lineHeight: 1.45 }}>
-        {allDone ? "✓ Everyone's set — switch to Scorecard to start the round." : hint}
-      </div>
 
-      {activeStep === "players" && <OrganizerPanel section="players" {...organizerPanelProps} />}
-      {activeStep === "teams" && <OrganizerPanel section="teams" {...organizerPanelProps} />}
-      {activeStep === "groups" && (
-        <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup}
-          onRandomize={onRandomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason}
-          randomizing={randomizing} overflowIds={groupOverflow} />
+      {section === "details" && (
+        <div style={cardStyle}>
+          <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>GAME NAME</div>
+          <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+            <input value={nameEdit} onChange={(e) => setNameEdit(e.target.value)} style={{ ...inputStyle, flex: 1, minWidth: 180 }} />
+            <button style={{ ...btn(false), opacity: nameEdit.trim() && nameEdit.trim() !== game.name ? 1 : .5 }} disabled={!nameEdit.trim() || nameEdit.trim() === game.name} onClick={() => organizerPanelProps.onRename(nameEdit.trim())}>Save name</button>
+          </div>
+          <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 14 }}>COURSE</div>
+          <div style={{ ...inputStyle, marginTop: 6 }}>{game.course}</div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Course remains the game’s recorded course in this release. Individual tees are managed on Players.</div>
+          <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginTop: 14 }}>PLAY DATE</div>
+          <div style={{ display: "flex", gap: 8, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <ShortDateInput value={dateEdit} onChange={setDateEdit} />
+            <button disabled={!dateEdit || dateBusy || dateEdit === String((game as any).played_at || "").slice(0,10)} onClick={async () => { setDateBusy(true); try { await onSetGameDate(dateEdit); } finally { setDateBusy(false); } }} style={{ ...btn(false), opacity: dateEdit && dateEdit !== String((game as any).played_at || "").slice(0,10) ? 1 : .5 }}>{dateBusy ? "Saving…" : "Save date"}</button>
+          </div>
+        </div>
+      )}
+
+      {section === "players" && <OrganizerPanel section="players" {...organizerPanelProps} />}
+      {section === "format" && <OrganizerPanel section="format" {...organizerPanelProps} />}
+
+      {section === "structure" && (
+        <>
+          <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+            {usesTeams && <button onClick={() => onSetupTabChange("teams")} style={{ ...btn(setupTab === "teams"), flex: 1, fontSize: 12 }}>Teams</button>}
+            {usesMatchups && <button onClick={() => onSetupTabChange("matchups")} style={{ ...btn(setupTab === "matchups"), flex: 1, fontSize: 12 }}>Matchups</button>}
+            {!usesFoursomes && <button onClick={() => onSetupTabChange("groups")} style={{ ...btn(setupTab === "groups"), flex: 1, fontSize: 12 }}>Tee groups</button>}
+          </div>
+          {setupTab === "teams" && <OrganizerPanel section="teams" {...organizerPanelProps} />}
+          {setupTab === "groups" && <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup} onRandomize={onRandomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} overflowIds={groupOverflow} />}
+          {setupTab === "matchups" && <div style={{ ...cardStyle, color: C.sage, fontSize: 12 }}>Build and review matchups below. The existing matchup editor is unchanged.</div>}
+        </>
+      )}
+
+      {section === "review" && (
+        <div>
+          <div style={cardStyle}>
+            {[
+              [playersDone, "All players have handicaps set"],
+              [teamsDone, usesTeams ? "Team assignments are complete" : "Teams are not required"],
+              [matchupsDone, usesMatchups ? "Matchups are complete" : "Matchups are not required"],
+              [groupsDone, usesFoursomes ? "Foursomes define the playing groups" : "Tee groups are set"],
+            ].map(([ok, text], i) => <div key={i} style={{ display: "flex", gap: 9, alignItems: "center", padding: "8px 0", borderBottom: i < 3 ? "1px solid rgba(255,255,255,.08)" : "none", color: C.cream, fontSize: 12.5 }}><span style={{ color: ok ? "#5BD08A" : C.gold, fontWeight: 900 }}>{ok ? "✓" : "!"}</span><span>{text}</span></div>)}
+          </div>
+          <div style={{ background: allDone ? "rgba(91,208,138,.12)" : "rgba(201,162,39,.12)", border: `1px solid ${allDone ? "#5BD08A" : C.gold}`, borderRadius: 12, padding: 12, marginTop: 10, color: C.cream, fontSize: 12.5, lineHeight: 1.45 }}>
+            {allDone ? "Setup looks good. Return to the scorecard when you are ready to play." : "Setup is still usable — complete the highlighted items or return to any section to make changes."}
+          </div>
+        </div>
       )}
     </div>
   );
