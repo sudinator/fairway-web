@@ -86,8 +86,8 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 `MONEY_FEATURE_PLAN.md`, `SCHEDULING_PLAN.md` — feature plans.)
 
 ## 7. Orientation — where things live
-- `components/tournaments.tsx` — games/tournaments; the big one (game room, setup stepper, live scoring,
-  betting, matchups, tee-groups, organizer controls).
+- `components/tournaments.tsx` — games/tournaments; the big one (game room state/side effects, live scoring,
+  betting, matchups, tee-groups, organizer controls). The post-create setup render boundary now lives in `components/game/setup/game-setup-workspace.tsx`.
 - `components/round-setup.tsx` — new solo round entry (hole-by-hole + gross).
 - `components/round-editor.tsx` — edit an existing round (scores + **editable play date**).
 - `components/round-detail.tsx` — read-only round view + hole strip.
@@ -100,15 +100,14 @@ Highlights — read `APP_RULES.md` for the numbered set + CI mapping:
 - `migrations/` — all SQL migrations (numbered). `MIGRATIONS.md` is the run-checklist.
 
 ## 8. Current state — immediate to-dos
-**Current working candidate: 177.39.260815 (historical round rating/slope correction).**
+**Current working candidate: 177.40.260815 (behavior-preserving Game setup workspace extraction).**
 - 177.26 supersedes the unreleased 177.25 candidate after its first GitHub execution exposed verification-harness ordering/sequencing defects; it still includes the 177.24 dashboard Putts/round + targeted stats-completion baseline.
-- New migrations under review: `0135_ledger_backfill.sql`, `0136_core_rls_helpers.sql`, and `0137_core_rls_baseline.sql`. None should be applied to Production until the 177.25 database/reconstruction gates are complete.
-- `0135` backfills missing migration-ledger rows only when sentinel evidence proves each historical migration is actually present. Run migrations as DB owner/postgres; application roles cannot record migrations after 0123.
-- `0136` recreates the six Production SECURITY DEFINER helpers referenced by the core RLS policies from the authoritative pg_proc export. `0137` then reconstructs the 12 legacy core-table RLS policy/grant contract from the authoritative Production metadata export. CI checks helper definition parity, source closure, and the exact 60-policy baseline.
+- Migrations `0135_ledger_backfill.sql`, `0136_core_rls_helpers.sql`, and `0137_core_rls_baseline.sql` are now **applied and verified in both staging and Production**. Production/staging ledgers are reconciled through 0137 (0129 is the intentional reserved gap); both environments expose the expected 60 core RLS policies across 12 tables.
+- `0135` evidence-backfilled 0122-0128 into both ledgers; `0136` installed/verified the six Production SECURITY DEFINER RLS helpers; `0137` installed the source-controlled core RLS policy/grant baseline. The real staging integration harness passed afterward and Production passed a non-destructive smoke test.
 - `ci/core_rls_production_baseline.json` is the machine-readable 2026-08-14 Production RLS baseline (12 tables / 60 policies). `ci/core_rls_helpers_production_baseline.json` captures the six helper definitions. `ci/assert-core-rls-live.sql` is the read-only live drift guard.
 - Fresh-database reconstruction is now part of required `CI / verify`: a pinned Supabase CLI creates a disposable database, applies both migration trees from empty state, and asserts the checked-in RLS baseline. The first GitHub execution correctly exposed a full-path ordering bug; 177.26 fixes ordering by numeric migration prefix and requires a corrected GitHub fresh-DB PASS before ship.
 - The schema migration ledger (`public.schema_migrations`) is the source of truth for applied state from 0113 onward. `MIGRATIONS.md` is a human checklist and must not be treated as authoritative applied-state evidence.
-- Release remains **NOT DEPLOYABLE** until corrected disposable fresh-DB reconstruction, dependency-backed CI/type/test/build, staging-only 0135 -> 0136 -> 0137 application, live RLS equality, and normal release gates pass.
+- 177.39 completed the historical round rating/slope feature. 177.40 is a refactor-only candidate and remains **NOT DEPLOYABLE** until its own dependency-backed CI/type/test/build, characterization/guard suite, staging validation, PR verify, Production Ready, and smoke gates pass.
 
 ## 9. Recent major thread — "date of play" (context you'll need)
 The recent work overhauled how a round's date is recorded:
@@ -658,3 +657,11 @@ For changed interactions, do not equate handler reachability with working behavi
 - Blocking gates remain blocking: fresh-database reconstruction, RLS/security structure and behavior, migration/source closure, secrets/environment safety, TypeScript correctness, unit/differential behavior, production build, reachability/source-contract defects, and feature correctness.
 - No application logic, migration, RLS policy, grant, helper, or database behavior changes. The purpose is severity alignment, not suppression of evidence.
 - Release remains **NOT DEPLOYABLE** until all blocking GitHub/fresh-DB/type/test/build/staging gates pass. Advisory findings must be carried in release verification/backlog rather than silently discarded.
+
+
+## 177.40 Game setup workspace extraction
+- Scope is deliberately narrow: extract only the existing organizer setup stepper/progress/render calculations into `components/game/setup/game-setup-workspace.tsx`; no UX redesign and no transition-policy behavior yet.
+- `GameRoom` keeps setup state, every mutation handler, every Supabase/RPC write, `load()`/refresh chains, structure stash/restore, scoring ownership, and Matchups/StrokesSummary rendering.
+- `GameRoom` constructs `OrganizerPanelProps` and `GameSetupWorkspace` props with `satisfies` so callback/boundary drift fails TypeScript.
+- Permanent `ci/check_game_setup_workspace_contract.py` verifies step visibility/fallback, Players/Teams/Groups reachability, tee/handicap/add-player/group callback bridges, Matchups reachability, and forbids DB ownership in the extracted workspace.
+- Next product stage after this refactor is validated: persistent Game Control Center UX that lets organizers revisit Game/Players/Format/Teams & Groups/Review, followed by a centralized before/after-scoring transition policy.

@@ -108,32 +108,35 @@ Total: 122 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [x] 0108_admin_stat_users_avatars.sql
 - [x] 0109_play_date_when_scored.sql
 - [x] 0110_games_always_scored_date.sql
-- [ ] 0111_money_audit.sql
-- [ ] 0112_events.sql
-- [ ] 0113_migration_ledger.sql
-- [ ] 0114_settlement_events.sql
-- [ ] 0115_settlement_frozen_event.sql
-- [ ] 0116_money_permissions.sql
-- [ ] 0117_settlement_dedup.sql
-- [ ] 0118_settlement_allocations.sql
-- [ ] 0119_expenses_soft_delete.sql
-- [ ] 0120_teetimes_realtime.sql
-- [ ] 0121_money_clean_slate.sql
-- [ ] 0122_side_contests.sql
-- [ ] 0123_api_hardening.sql
-- [ ] 0124_course_freshness.sql
-- [ ] 0125_course_freshness_authorization.sql
-- [ ] 0126_course_freshness_use_canonical_auth.sql
-- [ ] 0127_system_function_lockdown.sql
-- [ ] 0128_rate_limit.sql
+- [x] 0111_money_audit.sql
+- [x] 0112_events.sql
+- [x] 0113_migration_ledger.sql
+- [x] 0114_settlement_events.sql
+- [x] 0115_settlement_frozen_event.sql
+- [x] 0116_money_permissions.sql
+- [x] 0117_settlement_dedup.sql
+- [x] 0118_settlement_allocations.sql
+- [x] 0119_expenses_soft_delete.sql
+- [x] 0120_teetimes_realtime.sql
+- [x] 0121_money_clean_slate.sql
+- [x] 0122_side_contests.sql
+- [x] 0123_api_hardening.sql
+- [x] 0124_course_freshness.sql
+- [x] 0125_course_freshness_authorization.sql
+- [x] 0126_course_freshness_use_canonical_auth.sql
+- [x] 0127_system_function_lockdown.sql
+- [x] 0128_rate_limit.sql
 - [x] 0130_workflow_atomicity.sql
 - [x] 0131_workflow_retry_and_review_atomicity.sql
 - [x] 0132_course_schema_reconciliation_and_privilege_hardening.sql
-- [ ] 0133_testing_and_money_atomicity.sql
-- [ ] 0134_fix_bet_rpc_ambiguous_id.sql
-- [ ] 0135_ledger_backfill.sql
-- [ ] 0136_core_rls_helpers.sql
-- [ ] 0137_core_rls_baseline.sql
+- [x] 0133_testing_and_money_atomicity.sql
+- [x] 0134_fix_bet_rpc_ambiguous_id.sql
+- [x] 0135_ledger_backfill.sql
+- [x] 0136_core_rls_helpers.sql
+- [x] 0137_core_rls_baseline.sql
+
+<!-- VERIFIED_LEDGER_17740 -->
+- **Production/staging ledger reconciliation (177.40, 2026-08-15 US/Eastern):** `schema_migrations` was checked directly. Production records `baseline_through_0110`, every migration 0111-0128, 0130-0137; 0129 is an intentional reserved numbering gap. Staging and Production both applied/verified 0135 -> 0136 -> 0137, with the 12 core RLS tables exposing the expected 60 policies. The real staging integration harness passed after application and the Production smoke test passed. `schema_migrations` remains authoritative; these checkboxes are the human mirror only.
 
 <!-- NOTES:START -->
 
