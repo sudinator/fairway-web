@@ -1,4 +1,4 @@
-import { buildGamePayload, buildPlayerRows, splitSkinsTooBig, gameTypeLabel, type GamePayloadOpts } from "./game-create";
+import { buildGamePayload, buildPlayerRows, splitSkinsTooBig, postCreateDestination, postCreateDestinationLabel, gameTypeLabel, type GamePayloadOpts } from "./game-create";
 
 let pass = 0, fail = 0; const fails: string[] = [];
 function eq<T>(name: string, got: T, want: T) { const g = JSON.stringify(got), w = JSON.stringify(want); if (g === w) pass++; else { fail++; fails.push(`${name} (got ${g}, want ${w})`); } }
@@ -48,6 +48,20 @@ eq("split skins 4 ok", splitSkinsTooBig("skins", false, "split", 4), false);
 eq("team skins ok", splitSkinsTooBig("skins", true, "split", 9), false);
 eq("carryover ok", splitSkinsTooBig("skins", false, "carryover", 9), false);
 eq("non-skins ok", splitSkinsTooBig("stableford", false, "split", 9), false);
+eq("stableford creates straight to play", postCreateDestination("stableford", false), { roomTab: "play" });
+eq("stroke creates straight to play", postCreateDestination("stroke", false), { roomTab: "play" });
+eq("individual match hands off to matchups", postCreateDestination("match", false), { roomTab: "setup", setupTab: "matchups" });
+eq("team match hands off to teams", postCreateDestination("match", true), { roomTab: "setup", setupTab: "teams" });
+eq("plain fourball hands off to matchups", postCreateDestination("fourball", false), { roomTab: "setup", setupTab: "matchups" });
+eq("team fourball hands off to teams", postCreateDestination("fourball", true), { roomTab: "setup", setupTab: "teams" });
+eq("trifecta hands off to teams", postCreateDestination("trifecta", false), { roomTab: "setup", setupTab: "teams" });
+eq("individual skins hands off to groups", postCreateDestination("skins", false), { roomTab: "setup", setupTab: "groups" });
+eq("team skins hands off to teams", postCreateDestination("skins", true), { roomTab: "setup", setupTab: "teams" });
+
+eq("play destination label", postCreateDestinationLabel(postCreateDestination("stableford", false)), "Play");
+eq("teams destination label", postCreateDestinationLabel(postCreateDestination("trifecta", false)), "Manage Game → Teams");
+eq("matchups destination label", postCreateDestinationLabel(postCreateDestination("match", false)), "Manage Game → Matchups");
+eq("groups destination label", postCreateDestinationLabel(postCreateDestination("skins", false)), "Manage Game → Groups");
 
 // buildPlayerRows
 const tee = { name: "Blue", rating: 71.0, slope: 130 };
@@ -80,6 +94,11 @@ const rosterBase = {
   eq("guest ch", rows[3].course_handicap, Math.round(12 * (130 / 113) + (71.0 - 72)));
   eq("<=4 grouped", rows.every((r) => (r as any).tee_group === 1), true);
 }
+
+{
+  const rows = buildPlayerRows({ ...rosterBase, tgcBettingEnabled: false, guestPlayers: [{ display_name: "G", handicap_index: 12.0, guest_of: "me" }] });
+  eq("non-TGC guest does not inherit TGC no-bet default", rows.find((r) => r.is_guest)?.bets, true);
+}
 {
   const roster = Array.from({ length: 5 }, (_, i) => ({ id: "p" + i, display_name: "P" + i, avatar_url: null, handicap_index: 10 }));
   const sel: Record<string, boolean> = {}; roster.forEach((r) => (sel[r.id] = true));
@@ -90,6 +109,25 @@ const rosterBase = {
   const bands = [{ key: "A", name: "A", hi: 12 }, { key: "B", name: "B", hi: null }] as any;
   const rows = buildPlayerRows({ ...rosterBase, flightMode: "oneoff", flightBands: bands });
   eq("flight assigned", rows[0].flight, "A");
+}
+
+{
+  const tees = [tee, { name: "White", rating: 69.0, slope: 120 }, { name: "Red", rating: 67.0, slope: 112 }];
+  const bands = [{ key: "A", name: "Flight A", hi: 12 }, { key: "B", name: "Flight B", hi: null }] as any;
+  const roster = [
+    { id: "me", display_name: "Me", avatar_url: null, handicap_index: 10 },
+    { id: "p2", display_name: "Bob", avatar_url: null, handicap_index: 18 },
+  ];
+  const rows = buildPlayerRows({ ...rosterBase, groupRoster: roster, selectedPlayers: { p2: true }, tees, defaultTeeIdx: 0,
+    flightMode: "oneoff", flightBands: bands, flightTeeIdx: { B: 1 }, playerTeeOverrides: { me: 2 } });
+  eq("player tee override wins", rows.find((r) => r.user_id === "me")?.tee_name, "Red");
+  eq("flight tee wins over default", rows.find((r) => r.user_id === "p2")?.tee_name, "White");
+  eq("override CH uses override tee", rows.find((r) => r.user_id === "me")?.course_handicap, Math.round(10 * (112 / 113) + (67 - 72)));
+}
+{
+  const tees = [tee, { name: "White", rating: 69.0, slope: 120 }];
+  const rows = buildPlayerRows({ ...rosterBase, tees, defaultTeeIdx: 0, guestPlayers: [{ id: "guest-1", display_name: "G", handicap_index: 12, guest_of: "me" }], playerTeeOverrides: { "guest-1": 1 } });
+  eq("guest override persisted", rows.find((r) => r.is_guest)?.tee_name, "White");
 }
 
 console.log(`game-create: ${pass} passed, ${fail} failed`);

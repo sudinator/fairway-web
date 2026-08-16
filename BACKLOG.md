@@ -2,6 +2,11 @@
 
 Running list of things to build or tighten. Newest ideas near the top of each section.
 
+## Create Game convergence — staging release train
+- [~] 177.47–177.58: Create Game convergence uses the **Lean Create** architecture: canonical draft, shared structure helpers, Game → Players → Format → Review workspace, default/flight/player tee inheritance, durable Resume Setup, TGC-scope hardening, and the restored guided Stroke / Match Play format hierarchy with clarified team naming, Production-faithful selector styling, and corrected custom handicap-allowance editing. Advanced teams/matchups/foursomes/tee groups remain authoritative in Manage Game after creation; Production remains on the pre-convergence release until cumulative CI + browser validation pass.
+- [x] Full pre-create structural draft rejected by design: it duplicated Manage Game state and added risk without meaningful capability. Lean Create hands structural formats to Manage Game after the core game exists.
+- [ ] Before Production: de novo 177.46 Production → final staging line-by-line contract comparison, complete format-selection matrix browser QA, adjacent Create → Manage → Play scenarios, full release gate, then one cumulative staging → main PR.
+
 ## Batched for next release (small)
 - **Remove the "Built: <date>" line** in the version display — `components/manage.tsx:3659`
   (the `{APP_BUILT_AT ? <div ...>Built: …</div> : null}` line). Redundant now that the release date is
@@ -458,3 +463,16 @@ Still open (lower priority, honestly assessed):
 ## Game Control Center polish — completed in 177.46
 - [x] Rename Danger Zone to **Destructive Actions** with explicit **These actions cannot be undone.** warning.
 - [x] Correct Match overview structure summary so matched-player progress is not mislabeled as team assignments.
+
+## Create Game convergence
+- [x] **Stage 1 — canonical draft/state contract (177.47):** typed `GameSetupDraft`, backward-compatible legacy draft adapter, complete 35-state/3-ref inventory guard, and 2,004 differential/round-trip assertions. No UI or database behavior change.
+- [x] **Stage 2 — pure structure mutations (177.48):** extracted format/skins/match structure patches, pairings, foursome mutations, and foursome-derived tee groups into `lib/game-structure.ts`; existing Manage Game Supabase writers remain in place and 40,000 randomized differential assertions preserve 177.47 behavior.
+- [~] **Stage 3 — shared setup UI + tee inheritance:** 177.49 Stage 3A introduced the shared Game → Players → Format → Teams & Groups → Review workspace. 177.50 Stage 3B adds draft-time tee priority = individual override → flight tee → game default tee, persists those optional maps across Resume, and resolves them into explicit player snapshots at Create. Remaining before Stage 3 is complete: move existing teams/matchups/foursomes/tee-groups into pre-create draft state without discarding structure work.
+- [ ] **Stage 4 — atomic core Create:** transactionally create game + players + structural setup after Review; keep notifications/activity/tee-time linkage as post-commit side effects where appropriate.
+- [ ] Later draft-schema enhancement: persist committed flight handicap overrides across interrupted Create Game setup without breaking existing v1 local drafts.
+
+
+### Create Game convergence — v177.58 audit-closeout staging checkpoint
+- [x] Replace stale flat-format helper semantics with authoritative helpers matching the restored Production guided hierarchy; live Create Game selectors now delegate to the helpers and characterization tests cover key round trips.
+- [x] Review uses the same post-create destination helper as runtime and tells the organizer the exact next step (Play / Manage Game → Teams / Matchups / Groups).
+- [ ] Final cumulative Production release remains blocked on the full 177.46→final de novo audit closeout, dependency-backed CI/build, browser matrix, adjacent Manage Game testing, and Production release gate.

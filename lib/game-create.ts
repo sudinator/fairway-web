@@ -1,6 +1,7 @@
 import { courseHandicap } from "./golf";
 import { flightForIndex, type FlightBand } from "./flights";
 import { GP_STATE_DEFAULTS } from "./game-utils";
+import { resolveCreateGameTee, type TeeOption } from "./game-tee-assignment";
 
 // Pure game-creation logic extracted verbatim from CreateGame (tournaments.tsx). Builds the games
 // insert payload, the initial game_players rows, and the split-skins field-size check — all pure
@@ -82,8 +83,35 @@ export function splitSkinsTooBig(gameType: GameTypeOpt, teamMode: boolean, skins
   return gameType === "skins" && !teamMode && skinsMode === "split" && fieldCount > 4;
 }
 
+export type PostCreateDestination = {
+  roomTab: "play" | "setup";
+  setupTab?: "overview" | "details" | "players" | "format" | "teams" | "matchups" | "groups" | "review";
+};
+
+// Lean Create owns only the core game. Formats that need persisted structure hand off
+// directly to the relevant Manage Game section after the game/player rows exist.
+export function postCreateDestination(gameType: GameTypeOpt, teamMode: boolean): PostCreateDestination {
+  if (gameType === "stableford" || gameType === "stroke") return { roomTab: "play" };
+  if (gameType === "trifecta" || ((gameType === "match" || gameType === "fourball" || gameType === "skins") && teamMode)) {
+    return { roomTab: "setup", setupTab: "teams" };
+  }
+  if (gameType === "match" || gameType === "fourball") return { roomTab: "setup", setupTab: "matchups" };
+  return { roomTab: "setup", setupTab: "groups" };
+}
+
+export function postCreateDestinationLabel(destination: PostCreateDestination): string {
+  if (destination.roomTab === "play") return "Play";
+  if (destination.setupTab === "teams") return "Manage Game → Teams";
+  if (destination.setupTab === "matchups") return "Manage Game → Matchups";
+  if (destination.setupTab === "groups") return "Manage Game → Groups";
+  if (destination.setupTab === "players") return "Manage Game → Players";
+  if (destination.setupTab === "format") return "Manage Game → Format";
+  if (destination.setupTab === "review") return "Manage Game → Review";
+  return "Manage Game";
+}
+
 export type RosterMember = { id: string; display_name: string | null; avatar_url?: string | null; handicap_index: number | null };
-export type GuestEntry = { display_name: string; handicap_index: number | null; guest_of?: string | null };
+export type GuestEntry = { id?: string; display_name: string; handicap_index: number | null; guest_of?: string | null };
 export type PlayerRowsOpts = {
   gameId: string;
   userId: string;
@@ -94,11 +122,20 @@ export type PlayerRowsOpts = {
   guestPlayers: GuestEntry[];
   hcpOverrides: Record<string, number | null>;
   tee: { name: string; rating: number; slope: number };
+  // Optional Stage 3 tee-inheritance inputs. When omitted, buildPlayerRows is byte-compatible
+  // with the historical single-field-tee behavior.
+  tees?: TeeOption[];
+  defaultTeeIdx?: number;
+  playerTeeOverrides?: Record<string, number>;
+  flightTeeIdx?: Record<string, number>;
   coursePar: number | null;
   holesCount: number;                // holesMeta.length
   flightsSupported: boolean;
   flightMode: string;
   flightBands: FlightBand[] | null;
+  // TGC-only money-game semantics. Defaults true for backward-compatible pure callers;
+  // CreateGame passes the actual effective-group gate explicitly.
+  tgcBettingEnabled?: boolean;
 };
 
 // The initial game_players rows for creation: creator + selected members + guests, with course
@@ -119,9 +156,16 @@ export function buildPlayerRows(o: PlayerRowsOpts) {
   }
   const rosterRows = selectedRoster.map((p) => {
     const playerIndex = p.id === o.userId ? o.idxVal : (o.hcpOverrides[p.id] ?? p.handicap_index);
+    const resolved = o.tees?.length
+      ? resolveCreateGameTee({
+          participantKey: p.id, handicapIndex: playerIndex, tees: o.tees, defaultTeeIdx: o.defaultTeeIdx ?? 0,
+          playerTeeOverrides: o.playerTeeOverrides, flightMode: o.flightMode, flightBands: o.flightBands, flightTeeIdx: o.flightTeeIdx,
+        })
+      : null;
+    const playerTee = resolved?.tee ?? o.tee;
     const playerCourseHandicap =
       playerIndex != null && o.coursePar != null
-        ? courseHandicap(playerIndex, o.tee.slope, o.tee.rating, o.coursePar)
+        ? courseHandicap(playerIndex, playerTee.slope, playerTee.rating, o.coursePar)
         : null;
     return {
       game_id: o.gameId,
@@ -132,9 +176,9 @@ export function buildPlayerRows(o: PlayerRowsOpts) {
       display_name: p.display_name || "Player",
       avatar_url: (p as any).avatar_url ?? null,
       handicap_index: playerIndex,
-      rating: o.tee.rating,
-      slope: o.tee.slope,
-      tee_name: o.tee.name,
+      rating: playerTee.rating,
+      slope: playerTee.slope,
+      tee_name: playerTee.name,
       course_handicap: playerCourseHandicap,
       flight: o.flightMode === "oneoff" && o.flightsSupported && o.flightBands ? flightForIndex(playerIndex, o.flightBands) : null,
       scores: Array(o.holesCount).fill(null),
@@ -142,24 +186,33 @@ export function buildPlayerRows(o: PlayerRowsOpts) {
       fairways: Array(o.holesCount).fill(null),
     };
   });
-  const guestRows = o.guestPlayers.map((p) => ({
+  const guestRows = o.guestPlayers.map((p, guestIndex) => {
+    const resolved = o.tees?.length
+      ? resolveCreateGameTee({
+          participantKey: p.id || `guest:${guestIndex}`, handicapIndex: p.handicap_index, tees: o.tees, defaultTeeIdx: o.defaultTeeIdx ?? 0,
+          playerTeeOverrides: o.playerTeeOverrides, flightMode: o.flightMode, flightBands: o.flightBands, flightTeeIdx: o.flightTeeIdx,
+        })
+      : null;
+    const playerTee = resolved?.tee ?? o.tee;
+    return ({
     game_id: o.gameId,
     user_id: null,
     is_guest: true,
     guest_of: p.guest_of || null,
-    bets: false,
+    bets: o.tgcBettingEnabled === false ? true : false,
     ...GP_STATE_DEFAULTS,
     display_name: p.display_name,
     handicap_index: p.handicap_index,
-    rating: o.tee.rating,
-    slope: o.tee.slope,
-    tee_name: o.tee.name,
-    course_handicap: p.handicap_index != null && o.coursePar != null ? courseHandicap(p.handicap_index, o.tee.slope, o.tee.rating, o.coursePar) : null,
+    rating: playerTee.rating,
+    slope: playerTee.slope,
+    tee_name: playerTee.name,
+    course_handicap: p.handicap_index != null && o.coursePar != null ? courseHandicap(p.handicap_index, playerTee.slope, playerTee.rating, o.coursePar) : null,
     flight: o.flightMode === "oneoff" && o.flightsSupported && o.flightBands ? flightForIndex(p.handicap_index, o.flightBands) : null,
     scores: Array(o.holesCount).fill(null),
     putts: Array(o.holesCount).fill(null),
     fairways: Array(o.holesCount).fill(null),
-  }));
+  });
+  });
   const rows = [...rosterRows, ...guestRows];
   // 4 or fewer players tee off together — default everyone to one group (organizer
   // can still split them manually). Bigger rosters start ungrouped for assignment.

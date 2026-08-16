@@ -10,7 +10,7 @@ import { flightTagColor } from "@/lib/flights";
 // Every value the body used to read from GameRoom's scope is now an explicit, typed prop (the free-variable
 // ledger); C / Avatar / flightTagColor are module imports, not closure state. Pure render, no state/effects.
 type LeaderRowProps = {
-  p: Player; pos: number; tied: boolean; showTag: boolean;
+  p: Player; pos: number; tied: boolean; showTag: boolean; showBetStatus: boolean;
   user: { id: string };
   isStroke: boolean; strokeNet: boolean;
   playerPoints: (p: Player) => number;
@@ -22,7 +22,7 @@ type LeaderRowProps = {
   leaderName: (full: string) => string;
 };
 
-export function LeaderRow({ p, pos, tied, showTag, user, isStroke, strokeNet, playerPoints, playerThru, playerNet, playerGross, parThru, relToParStr, leaderName }: LeaderRowProps) {
+export function LeaderRow({ p, pos, tied, showTag, showBetStatus, user, isStroke, strokeNet, playerPoints, playerThru, playerNet, playerGross, parThru, relToParStr, leaderName }: LeaderRowProps) {
     const pts = playerPoints(p);
     const thru = playerThru(p);
     const fkey = (p as any).flight as string | null;
@@ -43,7 +43,7 @@ export function LeaderRow({ p, pos, tied, showTag, user, isStroke, strokeNet, pl
           </div>
           <div style={{ color: C.faint, fontSize: 11 }}>
             {p.course_handicap != null ? `CH ${p.course_handicap}` : "no hcp"}
-            {p.bets === false ? <span style={{ color: C.gold, fontWeight: 800 }}> · no bet</span> : ""}
+            {showBetStatus && p.bets === false ? <span style={{ color: C.gold, fontWeight: 800 }}> · no bet</span> : ""}
           </div>
         </div>
         {isStroke ? (() => {

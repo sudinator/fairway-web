@@ -12,6 +12,11 @@ walked you through (GitHub → Google sign-in setup → Vercel).
 
 The organizer Game Control Center uses one central transition policy for changes after scoring starts. Safe metadata stays editable; score reinterpretations require an explicit confirmation; structural changes that would rewrite who played whom or delete played golf are blocked. Scored-player tee/handicap edits are treated as whole-round corrections and preserve gross scores.
 
+
+## Create Game convergence (staging development)
+
+Create Game is being converged onto the same five-section mental model as Manage Game: Game → Players → Format → Teams & Groups → Review. The work is staged on the staging branch so the existing production Create Game path remains stable until the full flow is complete and end-to-end validated. Stage 3 now supports draft-time tee inheritance: individual override → flight tee → game default tee, resolved into explicit player tee/rating/slope snapshots at creation.
+
 ## What each part does (for the curious — optional)
 
 - `app/page.tsx` — top-level app entry/composition; feature screens live under `components/`
@@ -47,6 +52,10 @@ If you ever want to preview locally before deploying:
 2. `npm install`
 3. Copy `.env.example` to `.env.local` and fill in your two Supabase values
 4. `npm run dev`, then open http://localhost:3000
+
+## Create Game setup
+
+Create Game uses the Lean Create flow: **Game → Players → Format → Review**. Advanced teams, matchups, foursomes and tee groups are completed in Manage Game after the core game is created. The Create Game format selector uses the same concepts as Manage Game: Match = Individual/Team, Four-ball = 2 v 2 Match/Team vs Team, and Skins = Individual/1:1 Teams/2 v 2 Best-ball.
 
 ## UI conventions
 - Six-hole segment breakdown reuses the Group Results grid format (Player / Thru / segment columns / Total) for consistency.

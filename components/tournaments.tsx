@@ -50,6 +50,7 @@ import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG }
 import type { LegConfig, Leg } from "@/lib/legs";
 import { loadCoursesForGroup, courseLabel, type Course, type CourseTee } from "@/lib/courses";
 import { loadSetupDraft, saveSetupDraft, clearSetupDraft, draftHasProgress, draftAgeLabel, type SetupDraft } from "@/lib/setup-draft";
+import { buildGameSetupDraft, toLegacySetupData } from "@/lib/game-setup-draft";
 import { autoSplitFlights, flightForIndex, flightRangeLabel, flightTagColor, type FlightBand } from "@/lib/flights";
 
 // Every game_players INSERT must set these NOT-NULL columns explicitly rather than
@@ -91,6 +92,12 @@ import type { FinishGap } from "@/lib/finish-gaps";
 import { GroupScorecard } from "@/components/game/scorecard-views";
 import { BettingPanel, type OrganizerPanelProps } from "@/components/game/organizer-panel";
 import { GameSetupWorkspace, type SetupTab } from "@/components/game/setup/game-setup-workspace";
+import { CreateGameWorkspace, type CreateGameSection } from "@/components/game/setup/create-game-workspace";
+import { buildFormatPatch, buildSkinsStylePatch, buildMatchTeamPatch } from "@/lib/game-structure";
+import { resolveCreateGameTee, teeSourceLabel } from "@/lib/game-tee-assignment";
+import { formatReviewLabel, selectGuidedFamily, selectGuidedMatchKind, selectGuidedStrokeFormat, selectGuidedTeamFormat, setGuidedTeamMode, type CreateFormatPatch, type GuidedFormatState } from "@/lib/create-game-format";
+import { commitAllowance, editAllowance } from "@/lib/handicap-allowance";
+import { FormatFamilySelector } from "@/components/game/setup/format-family-selector";
 
 // Stable match identity for a player. Real players key on user_id (so nothing
 // about existing matches changes); guests have no account, so they key on their
@@ -121,7 +128,7 @@ export default function Tournaments({
   seed?: GameSeed | null;
   openGameId?: string | null;
 }) {
-  const [view, setView] = useState<"list" | "create" | { gameId: string; tab?: "play" | "setup" }>(
+  const [view, setView] = useState<"list" | "create" | { gameId: string; tab?: "play" | "setup"; setupTab?: SetupTab }>(
     seed ? "create" : openGameId ? { gameId: openGameId } : "list",
   );
   // Resume the game room the user was in (survives lock/refresh) — but ONLY if it
@@ -174,7 +181,7 @@ export default function Tournaments({
         activeGroupId={activeGroupId}
         seed={seed}
         onCancel={() => setView("list")}
-        onCreated={(gameId, tab) => setView({ gameId, tab })}
+        onCreated={(gameId, tab, setupTab) => setView({ gameId, tab, setupTab })}
       />
     );
   if (typeof view === "object")
@@ -182,6 +189,7 @@ export default function Tournaments({
       <GameRoom
         gameId={view.gameId}
         initialTab={view.tab}
+        initialSetupTab={view.setupTab}
         user={user}
         displayName={displayName}
         isAdmin={!!isAdmin}
@@ -212,7 +220,7 @@ function CreateGame({
   activeGroupId: string;
   seed?: GameSeed | null;
   onCancel: () => void;
-  onCreated: (id: string, tab?: "play" | "setup") => void;
+  onCreated: (id: string, tab?: "play" | "setup", setupTab?: SetupTab) => void;
 }) {
   const [name, setName] = useState("");
   // Match date — defaults to today (local). Stored structured on the game so we
@@ -234,6 +242,10 @@ function CreateGame({
   // Default 85 for four-ball, 100 otherwise. Resets to the standard when the
   // format changes; editable any time.
   const [allowancePct, setAllowancePct] = useState(100);
+  // Keep the custom allowance editor as text while the user is typing so deleting
+  // the value can leave a genuinely blank field. Blank means no custom override
+  // and resolves to the default 100% domain value.
+  const [allowanceInput, setAllowanceInput] = useState("100");
   // Flights (Stage 1: one-off per-event). "off" | "oneoff". Season "league" is Stage 2.
   const [flightMode, setFlightMode] = useState<"off" | "oneoff">("off");
   const [flightCount, setFlightCount] = useState(3);
@@ -243,7 +255,12 @@ function CreateGame({
   // In-progress text for each missing-handicap field, so a row stays put while typing and
   // only commits (leaving the "needs" list) when the organizer taps Set.
   const [flightHcpDraft, setFlightHcpDraft] = useState<Record<string, string>>({});
-  useEffect(() => { setAllowancePct(gameType === "fourball" || gameType === "trifecta" ? 85 : 100); }, [gameType]);
+  const selectGameType = (nextType: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => {
+    setGameType(nextType);
+    const nextAllowance = nextType === "fourball" || nextType === "trifecta" ? 85 : 100;
+    setAllowancePct(nextAllowance);
+    setAllowanceInput(String(nextAllowance));
+  };
   const [teamScoreMode, setTeamScoreMode] = useState<"best_ball" | "aggregate">("best_ball");
   const [trifectaScoring, setTrifectaScoring] = useState<"per_hole" | "match">("per_hole");
   const [strokeBasis, setStrokeBasis] = useState<"gross" | "net">("net");
@@ -254,7 +271,29 @@ function CreateGame({
   const [skinsMode, setSkinsMode] = useState<"carryover" | "split">("carryover");
   const [team1, setTeam1] = useState("Team 1");
   const [team2, setTeam2] = useState("Team 2");
+
+  const guidedFormatState = (): GuidedFormatState => ({
+    gameType, teamMode, skinsTeamStyle, teamScoreMode, trifectaScoring, strokeBasis, skinsMode, fmtFamily, matchKind,
+  });
+  const applyGuidedFormatPatch = (patch: CreateFormatPatch) => {
+    // Calling selectGameType whenever the helper returns gameType deliberately preserves
+    // the existing click behavior, including format-default allowance reset on reselect.
+    if (patch.gameType) selectGameType(patch.gameType);
+    if (patch.fmtFamily) setFmtFamily(patch.fmtFamily);
+    if (patch.matchKind) setMatchKind(patch.matchKind);
+    if (patch.teamMode !== undefined) setTeamMode(patch.teamMode);
+    if (patch.skinsTeamStyle) setSkinsTeamStyle(patch.skinsTeamStyle);
+    if (patch.teamScoreMode) setTeamScoreMode(patch.teamScoreMode);
+    if (patch.trifectaScoring) setTrifectaScoring(patch.trifectaScoring);
+    if (patch.strokeBasis) setStrokeBasis(patch.strokeBasis);
+    if (patch.skinsMode) setSkinsMode(patch.skinsMode);
+  };
+
+  // Draft-time tee inheritance only: player override > flight tee > game default.
+  // Creation resolves inheritance into explicit game_players tee/rating/slope snapshots.
+  const [teeAssignments, setTeeAssignments] = useState<{ player: Record<string, number>; flight: Record<string, number> }>({ player: {}, flight: {} });
   const [busy, setBusy] = useState(false);
+  const [createSection, setCreateSection] = useState<CreateGameSection>("game");
   const [err, setErr] = useState<string | null>(null);
   const [groupRoster, setGroupRoster] = useState<
     { id: string; display_name: string; avatar_url: string | null; handicap_index: number | null }[]
@@ -409,12 +448,16 @@ function CreateGame({
     resumedRef.current = true;
     guestsSeeded.current = true; // don't re-seed tee-time guests over the restored ones
     setName(d.name); setMatchDate(d.matchDate); setTeeIdx(d.teeIdx); setIdxStr(d.idxStr);
-    setGameType(d.gameType as any); setAllowancePct(d.allowancePct); setTeamScoreMode(d.teamScoreMode as any);
+    setGameType(d.gameType as any); setAllowancePct(d.allowancePct); setAllowanceInput(String(d.allowancePct ?? 100)); setTeamScoreMode(d.teamScoreMode as any);
     setTrifectaScoring(d.trifectaScoring as any); setStrokeBasis(d.strokeBasis as any); setFmtFamily(d.fmtFamily as any);
     setMatchKind(d.matchKind as any); setTeamMode(d.teamMode); setSkinsTeamStyle(d.skinsTeamStyle as any);
     setSkinsMode(d.skinsMode as any); setTeam1(d.team1); setTeam2(d.team2);
     setFlightMode((d.flightMode as any) === "oneoff" ? "oneoff" : "off");
     setFlightCount(d.flightCount && d.flightCount >= 2 && d.flightCount <= 4 ? d.flightCount : 3);
+    setTeeAssignments({ player: d.playerTeeOverrides || {}, flight: d.flightTeeIdx || {} });
+    setHcpOverrides(d.hcpOverrides || {});
+    if (d.createSection === "structure") setCreateSection("review");
+    else if (d.createSection && ["game", "players", "format", "review"].includes(d.createSection)) setCreateSection(d.createSection as CreateGameSection);
     setSelectedPlayers(d.selectedPlayers || {}); setGuestPlayers(d.guestPlayers || []);
     setPendingFavName(d.favName);
     setDraftAvailable(null); setDraftDismissed(true); hydratedRef.current = true;
@@ -432,17 +475,43 @@ function CreateGame({
     setPendingFavName(null);
   }, [pendingFavName, favorites]);
 
+  // Canonical snapshot for autosave and for the synchronous exit checkpoint below.
+  // The explicit pagehide/visibility save restores the pre-workspace guarantee that
+  // leaving/killing the app mid-setup cannot lose the latest rendered setup state.
+  const draftSnapshot = useMemo(() => ({
+    ...toLegacySetupData(buildGameSetupDraft({
+      name, matchDate, favName: pickedFav?.name ?? null, teeIdx, idxStr, gameType, allowancePct,
+      teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle,
+      skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount,
+      flightTeeIdx: teeAssignments.flight, playerTeeOverrides: teeAssignments.player,
+    })),
+    createSection,
+  }), [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount, teeAssignments, createSection]);
+  const latestDraftRef = React.useRef(draftSnapshot);
+  latestDraftRef.current = draftSnapshot;
+
   // Save the in-progress setup on every meaningful change (once we've decided
   // resume-vs-fresh, so we never overwrite an offered draft before the user chooses).
   useEffect(() => {
     if (!hydratedRef.current) return;
-    const snap = {
-      name, matchDate, favName: pickedFav?.name ?? null, teeIdx, idxStr, gameType, allowancePct,
-      teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle,
-      skinsMode, team1, team2, selectedPlayers, guestPlayers, flightMode, flightCount,
+    if (draftHasProgress(draftSnapshot, user.id)) saveSetupDraft(activeGroupId, teeTimeId, draftSnapshot);
+  }, [draftSnapshot, activeGroupId, teeTimeId, user.id]);
+
+  useEffect(() => {
+    const checkpoint = () => {
+      if (!hydratedRef.current) return;
+      const snap = latestDraftRef.current;
+      if (draftHasProgress(snap, user.id)) saveSetupDraft(activeGroupId, teeTimeId, snap);
     };
-    if (draftHasProgress(snap, user.id)) saveSetupDraft(activeGroupId, teeTimeId, snap);
-  }, [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, flightMode, flightCount]);
+    const onVisibility = () => { if (document.visibilityState === "hidden") checkpoint(); };
+    window.addEventListener("pagehide", checkpoint);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      checkpoint();
+      window.removeEventListener("pagehide", checkpoint);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [activeGroupId, teeTimeId, user.id]);
 
   const tee = pickedFav?.tees?.[teeIdx];
   const coursePar = pickedFav
@@ -468,9 +537,17 @@ function CreateGame({
       : []),
     [flightMode, flightsSupported, groupRoster, selectedPlayers, hcpOverrides, user.id]);
   const flightBlocked = flightMode === "oneoff" && flightsSupported && (idxVal == null || flightNeedsHcp.length > 0);
+  const resolveDraftTee = useCallback((participantKey: string, handicapIndex: number | null) => {
+    if (!pickedFav?.tees?.length) return null;
+    return resolveCreateGameTee({
+      participantKey, handicapIndex, tees: pickedFav.tees, defaultTeeIdx: teeIdx,
+      playerTeeOverrides: teeAssignments.player, flightMode, flightBands, flightTeeIdx: teeAssignments.flight,
+    });
+  }, [pickedFav, teeIdx, teeAssignments, flightMode, flightBands]);
+  const creatorResolvedTee = resolveDraftTee(user.id, idxVal);
   const ch =
-    tee && idxVal != null && coursePar
-      ? courseHandicap(idxVal, tee.slope, tee.rating, coursePar)
+    creatorResolvedTee?.tee && idxVal != null && coursePar
+      ? courseHandicap(idxVal, creatorResolvedTee.tee.slope, creatorResolvedTee.tee.rating, coursePar)
       : null;
 
   const create = async () => {
@@ -482,6 +559,13 @@ function CreateGame({
       setErr(idxVal == null
         ? "Enter your own handicap index before flighting this event."
         : `${flightNeedsHcp.length} player${flightNeedsHcp.length === 1 ? "" : "s"} need a handicap index before this event can be flighted — set them under Flights, or turn flights off.`);
+      return;
+    }
+    // Validate the full setup before the first database write. A rejected setup must never
+    // leave an orphan games row behind.
+    const skinsFieldCount = groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length;
+    if (GC.splitSkinsTooBig(gameType, teamMode, skinsMode, skinsFieldCount)) {
+      setErr("Split skins is best for up to 4 players. For a bigger group, use Team skins or 1:1 matchups, or switch Skins to carryover.");
       return;
     }
     setBusy(true);
@@ -512,16 +596,11 @@ function CreateGame({
         }
       }
       // Add creator plus any selected group members immediately, so group games do not require join codes.
-      // Split skins stays simple only in a small field. Beyond 4, steer to teams or 1:1.
-      const skinsFieldCount = groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length;
-      if (GC.splitSkinsTooBig(gameType, teamMode, skinsMode, skinsFieldCount)) {
-        setErr("Split skins is best for up to 4 players. For a bigger group, use Team skins or 1:1 matchups, or switch Skins to carryover.");
-        setBusy(false);
-        return;
-      }
       const rows = GC.buildPlayerRows({
         gameId: game.id, userId: user.id, displayName, idxVal, selectedPlayers, groupRoster, guestPlayers,
-        hcpOverrides, tee, coursePar, holesCount: holesMeta.length, flightsSupported, flightMode, flightBands,
+        hcpOverrides, tee, tees: pickedFav.tees, defaultTeeIdx: teeIdx, playerTeeOverrides: teeAssignments.player,
+        flightTeeIdx: teeAssignments.flight, coursePar, holesCount: holesMeta.length, flightsSupported, flightMode, flightBands,
+        tgcBettingEnabled: effectiveGroupId(activeGroupId) === TGC_GROUP_ID,
       });
       const { error: e2 } = await supabase.from("game_players").insert(rows);
       if (e2) throw e2;
@@ -545,10 +624,11 @@ function CreateGame({
           } catch {}
         }
       }
-      // Field games (Stableford / Stroke) are ready to play once players are in;
-      // every other format still needs teams / matchups / handicaps, so open Setup.
+      // Lean Create owns the core game only. Persisted structure stays authoritative in
+      // Manage Game, so formats that need teams/matchups/foursomes hand off there.
+      const destination = GC.postCreateDestination(gameType, teamMode);
       clearSetupDraft(activeGroupId, teeTimeId); // setup finished — drop the local draft
-      onCreated(game.id, gameType === "stableford" || gameType === "stroke" ? "play" : "setup");
+      onCreated(game.id, destination.roomTab, destination.setupTab as SetupTab | undefined);
     } catch (e: any) {
       setErr(e.message || "Failed to create game.");
       setBusy(false);
@@ -570,6 +650,18 @@ function CreateGame({
           </div>
         </div>
       )}
+      <CreateGameWorkspace
+        activeSection={createSection}
+        onSectionChange={setCreateSection}
+        sections={[
+          { key: "game", label: "Game", done: !!pickedFav && !!tee },
+          { key: "players", label: "Players", done: (groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length) > 0 },
+          { key: "format", label: "Format", done: !!gameType },
+          { key: "review", label: "Review", done: !!pickedFav && !!tee && !flightBlocked },
+        ]}
+      >
+        {createSection === "game" && (
+          <div>
       <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 190 }}>
           <label style={{ color: C.sage, fontSize: 12 }}>Game name</label>
@@ -586,6 +678,119 @@ function CreateGame({
         </div>
       </div>
 
+      <div style={{ marginTop: 14 }}>
+        <label style={{ color: C.sage, fontSize: 12 }}>
+          Course (from your favorites — so par &amp; stroke index are correct)
+        </label>
+        {favorites.length === 0 && (
+          <div
+            style={{
+              color: C.sage,
+              fontSize: 13,
+              marginTop: 8,
+              background: C.greenLight,
+              borderRadius: 10,
+              padding: 12,
+            }}
+          >
+            You have no favorite courses yet. Go to a New round, pick a course,
+            fix its data, and save it as a favorite first — then it'll appear
+            here.
+          </div>
+        )}
+        {favorites.map((f, i) => {
+          const selected = pickedFav?.id != null ? pickedFav.id === f.id : pickedFav?.name === f.name;
+          return (
+          <button
+            key={i}
+            onClick={() => {
+              setPickedFav(f);
+              setTeeIdx(defaultTeeIdx(f.tees, effectiveGroupId(activeGroupId) === TGC_GROUP_ID));
+              setTeeAssignments({ player: {}, flight: {} });
+            }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              width: "100%",
+              textAlign: "left",
+              marginTop: 8,
+              cursor: "pointer",
+              background: selected ? C.cream : C.card,
+              border: `${selected ? 2 : 1}px solid ${selected ? C.gold : C.line}`,
+              borderRadius: 10,
+              padding: "10px 14px",
+            }}
+          >
+            <span style={{ width: 20, height: 20, borderRadius: 999, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: selected ? C.green : "transparent", border: selected ? "none" : `1.5px solid ${C.line}`, color: C.cream, fontSize: 12, fontWeight: 800 }}>{selected ? "✓" : ""}</span>
+            <span style={{ flex: 1 }}>
+              <span style={{ color: C.ink, fontWeight: 700 }}>{f.name}</span>
+              {f.location ? (
+                <span style={{ color: C.faint, fontSize: 13 }}>{" "}· {f.location}</span>
+              ) : null}
+            </span>
+            {selected && <span style={{ color: C.green, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>SELECTED</span>}
+          </button>
+          );
+        })}
+      </div>
+
+      {pickedFav && (
+        <div
+          style={{
+            background: C.greenLight,
+            borderRadius: 14,
+            padding: 16,
+            marginTop: 14,
+          }}
+        >
+          <label style={{ color: C.sage, fontSize: 12 }}>Default tee for the field</label>
+          <div
+            style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}
+          >
+            {pickedFav.tees.map((t: any, i: number) => {
+              const yd = (t.yardages || []).reduce((s: number, v: any) => s + (v || 0), 0);
+              return (
+              <button
+                key={i}
+                onClick={() => setTeeIdx(i)}
+                style={{ ...btn(i === teeIdx), padding: "8px 12px", fontSize: 13, textAlign: "left", lineHeight: 1.25 }}
+              >
+                <div style={{ fontWeight: 800 }}>{t.name}</div>
+                <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{yd > 0 ? `${yd.toLocaleString()} yds · ` : ""}CR {t.rating} / SL {t.slope}</div>
+              </button>
+              );
+            })}
+          </div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Applied to everyone unless a flight or individual player has a different tee.</div>
+          <div style={{ marginTop: 12 }}>
+            <label style={{ color: C.sage, fontSize: 12 }}>
+              Your handicap index
+            </label>
+            <input
+              style={{ ...inputStyle, marginTop: 6, maxWidth: 140 }}
+              inputMode="decimal"
+              placeholder="14.2"
+              value={idxStr}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "" || /^\d*\.?\d*$/.test(v)) setIdxStr(v);
+              }}
+            />
+          </div>
+          {ch != null && (
+            <div style={{ color: C.gold, fontWeight: 800, marginTop: 10 }}>
+              Your course handicap: {ch}
+            </div>
+          )}
+        </div>
+      )}
+
+          </div>
+        )}
+
+        {createSection === "players" && (
+          <div>
       <div style={{ marginTop: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <label style={{ color: C.sage, fontSize: 12, flex: 1 }}>
@@ -616,43 +821,64 @@ function CreateGame({
           {groupRoster.map((p) => {
             const isMe = p.id === user.id;
             const checked = !!selectedPlayers[p.id] || isMe;
+            const playerIndex = isMe ? idxVal : (hcpOverrides[p.id] ?? p.handicap_index);
+            const resolved = checked ? resolveDraftTee(p.id, playerIndex) : null;
+            const overrideIdx = teeAssignments.player[p.id];
             return (
-              <label
+              <div
                 key={p.id}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  padding: "14px 12px",
-                  cursor: isMe ? "default" : "pointer",
+                  padding: "12px",
                   borderBottom: `1px solid ${C.greenMid}`,
                   borderRadius: 8,
                   background: checked ? "rgba(216,178,74,0.10)" : "transparent",
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  disabled={isMe}
-                  onChange={(e) =>
-                    setSelectedPlayers((m) => ({
-                      ...m,
-                      [p.id]: e.target.checked,
-                    }))
-                  }
-                  style={{ width: 22, height: 22, flex: "0 0 auto", accentColor: "#D8B24A", cursor: isMe ? "default" : "pointer" }}
-                />
-                <Avatar src={p.avatar_url} name={p.display_name} size={32} />
-                <span style={{ flex: 1, color: C.cream, fontWeight: 700, fontSize: 15 }}>
-                  {p.display_name}
-                  {isMe ? " (you)" : ""}
-                </span>
-                <span style={{ color: C.sage, fontSize: 12 }}>
-                  {p.handicap_index != null
-                    ? `HCP ${p.handicap_index}`
-                    : "no handicap"}
-                </span>
-              </label>
+                <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: isMe ? "default" : "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={isMe}
+                    onChange={(e) =>
+                      setSelectedPlayers((m) => ({ ...m, [p.id]: e.target.checked }))
+                    }
+                    style={{ width: 22, height: 22, flex: "0 0 auto", accentColor: "#D8B24A", cursor: isMe ? "default" : "pointer" }}
+                  />
+                  <Avatar src={p.avatar_url} name={p.display_name} size={32} />
+                  <span style={{ flex: 1, minWidth: 0, color: C.cream, fontWeight: 700, fontSize: 15 }}>
+                    {p.display_name}{isMe ? " (you)" : ""}
+                    {checked && resolved ? (
+                      <span style={{ display: "block", color: C.sage, fontSize: 11, fontWeight: 400, marginTop: 2 }}>
+                        {resolved.tee.name} · {teeSourceLabel(resolved.source, resolved.flight)}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span style={{ color: C.sage, fontSize: 12 }}>
+                    {playerIndex != null ? `HCP ${playerIndex}` : "no handicap"}
+                  </span>
+                </label>
+                {checked && pickedFav?.tees?.length ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, marginLeft: 66 }}>
+                    <label style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap" }}>Tee</label>
+                    <select
+                      value={overrideIdx != null ? String(overrideIdx) : "inherit"}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setTeeAssignments((cur) => {
+                          const player = { ...cur.player };
+                          if (value === "inherit") delete player[p.id];
+                          else player[p.id] = Number(value);
+                          return { ...cur, player };
+                        });
+                      }}
+                      style={{ ...inputStyle, flex: 1, minWidth: 0, padding: "6px 8px", fontSize: 12 }}
+                    >
+                      <option value="inherit">Use {resolved?.source === "flight" && resolved.flight ? `Flight ${resolved.flight}` : "default"} tee</option>
+                      {pickedFav.tees.map((t: any, i: number) => <option key={`${t.name}-${i}`} value={String(i)}>{t.name} · {t.rating}/{t.slope}</option>)}
+                    </select>
+                  </div>
+                ) : null}
+              </div>
             );
           })}
         </div>
@@ -668,13 +894,16 @@ function CreateGame({
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
               {guestPlayers.map((g) => {
                 const hasIdx = g.handicap_index != null && !Number.isNaN(g.handicap_index as number);
-                const ch = hasIdx && tee && coursePar != null ? courseHandicap(g.handicap_index as number, tee.slope, tee.rating, coursePar) : null;
+                const resolved = resolveDraftTee(g.id, hasIdx ? g.handicap_index as number : null);
+                const ch = hasIdx && resolved?.tee && coursePar != null ? courseHandicap(g.handicap_index as number, resolved.tee.slope, resolved.tee.rating, coursePar) : null;
+                const overrideIdx = teeAssignments.player[g.id];
                 return (
                 <div key={g.id} style={{ display: "flex", alignItems: "center", gap: 8, background: C.greenMid, borderRadius: 10, padding: "6px 10px" }}>
                   <Avatar src={(g as any).avatar_url ?? null} name={g.display_name} size={22} enlargeable={false} />
                   <span style={{ color: C.cream, fontSize: 13, flex: 1, minWidth: 0 }}>
                     {g.display_name}
                     <span style={{ color: C.sage, fontSize: 11 }}> · guest of {g.guest_of === user.id ? "me" : (groupRoster.find((m) => m.id === g.guest_of)?.display_name || "member")}</span>
+                    {resolved ? <span style={{ display: "block", color: C.sage, fontSize: 11 }}>{resolved.tee.name} · {teeSourceLabel(resolved.source, resolved.flight)}</span> : null}
                     {hasIdx ? <span style={{ color: C.sage, fontSize: 11 }}> · idx {g.handicap_index}{ch != null ? ` · ch ${ch}` : ""} <button onClick={() => { setGuestIdxEdits((m) => ({ ...m, [g.id]: String(g.handicap_index) })); setGuestPlayers((prev) => prev.map((p) => (p.id === g.id ? { ...p, handicap_index: null } : p))); }} style={{ background: "none", border: "none", color: "#f6c66b", cursor: "pointer", fontSize: 11, padding: 0, textDecoration: "underline" }}>edit</button></span> : null}
                   </span>
                   {!hasIdx && (
@@ -697,8 +926,27 @@ function CreateGame({
                       >✓</button>
                     </>
                   )}
+                  {pickedFav?.tees?.length ? (
+                    <select
+                      value={overrideIdx != null ? String(overrideIdx) : "inherit"}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setTeeAssignments((cur) => {
+                          const player = { ...cur.player };
+                          if (value === "inherit") delete player[g.id];
+                          else player[g.id] = Number(value);
+                          return { ...cur, player };
+                        });
+                      }}
+                      title="Guest tee"
+                      style={{ ...inputStyle, width: 110, minWidth: 0, padding: "5px 6px", fontSize: 11 }}
+                    >
+                      <option value="inherit">Inherited tee</option>
+                      {pickedFav.tees.map((t: any, i: number) => <option key={`${t.name}-${i}`} value={String(i)}>{t.name}</option>)}
+                    </select>
+                  ) : null}
                   <button
-                    onClick={() => { setGuestPlayers((prev) => prev.filter((p) => p.id !== g.id)); setGuestIdxEdits((m) => { const n = { ...m }; delete n[g.id]; return n; }); }}
+                    onClick={() => { setGuestPlayers((prev) => prev.filter((p) => p.id !== g.id)); setGuestIdxEdits((m) => { const n = { ...m }; delete n[g.id]; return n; }); setTeeAssignments((cur) => { const player = { ...cur.player }; delete player[g.id]; return { ...cur, player }; }); }}
                     style={{ background: "none", border: "none", color: C.birdie, cursor: "pointer", fontSize: 14, padding: 0 }}
                   >
                     ✕
@@ -743,166 +991,42 @@ function CreateGame({
         </div>
       </div>
 
-      <div style={{ marginTop: 14 }}>
-        <label style={{ color: C.sage, fontSize: 12 }}>
-          Course (from your favorites — so par &amp; stroke index are correct)
-        </label>
-        {favorites.length === 0 && (
-          <div
-            style={{
-              color: C.sage,
-              fontSize: 13,
-              marginTop: 8,
-              background: C.greenLight,
-              borderRadius: 10,
-              padding: 12,
-            }}
-          >
-            You have no favorite courses yet. Go to a New round, pick a course,
-            fix its data, and save it as a favorite first — then it'll appear
-            here.
+            {pickedFav && tee ? (
+              <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>Field default: <b style={{ color: C.cream }}>{tee.name}</b>. Flight tees and individual overrides take priority when configured.</div>
+            ) : null}
           </div>
         )}
-        {favorites.map((f, i) => {
-          const selected = pickedFav?.id != null ? pickedFav.id === f.id : pickedFav?.name === f.name;
-          return (
-          <button
-            key={i}
-            onClick={() => {
-              setPickedFav(f);
-              setTeeIdx(defaultTeeIdx(f.tees, effectiveGroupId(activeGroupId) === TGC_GROUP_ID));
-            }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              width: "100%",
-              textAlign: "left",
-              marginTop: 8,
-              cursor: "pointer",
-              background: selected ? C.cream : C.card,
-              border: `${selected ? 2 : 1}px solid ${selected ? C.gold : C.line}`,
-              borderRadius: 10,
-              padding: "10px 14px",
-            }}
-          >
-            <span style={{ width: 20, height: 20, borderRadius: 999, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: selected ? C.green : "transparent", border: selected ? "none" : `1.5px solid ${C.line}`, color: C.cream, fontSize: 12, fontWeight: 800 }}>{selected ? "✓" : ""}</span>
-            <span style={{ flex: 1 }}>
-              <span style={{ color: C.ink, fontWeight: 700 }}>{f.name}</span>
-              {f.location ? (
-                <span style={{ color: C.faint, fontSize: 13 }}>{" "}· {f.location}</span>
-              ) : null}
-            </span>
-            {selected && <span style={{ color: C.green, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>SELECTED</span>}
-          </button>
-          );
-        })}
-      </div>
 
-      {pickedFav && (
-        <div
-          style={{
-            background: C.greenLight,
-            borderRadius: 14,
-            padding: 16,
-            marginTop: 14,
-          }}
-        >
-          <label style={{ color: C.sage, fontSize: 12 }}>Your tee</label>
-          <div
-            style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}
-          >
-            {pickedFav.tees.map((t: any, i: number) => {
-              const yd = (t.yardages || []).reduce((s: number, v: any) => s + (v || 0), 0);
-              return (
-              <button
-                key={i}
-                onClick={() => setTeeIdx(i)}
-                style={{ ...btn(i === teeIdx), padding: "8px 12px", fontSize: 13, textAlign: "left", lineHeight: 1.25 }}
-              >
-                <div style={{ fontWeight: 800 }}>{t.name}</div>
-                <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{yd > 0 ? `${yd.toLocaleString()} yds · ` : ""}CR {t.rating} / SL {t.slope}</div>
-              </button>
-              );
-            })}
-          </div>
-          <div style={{ marginTop: 12 }}>
-            <label style={{ color: C.sage, fontSize: 12 }}>
-              Your handicap index
-            </label>
-            <input
-              style={{ ...inputStyle, marginTop: 6, maxWidth: 140 }}
-              inputMode="decimal"
-              placeholder="14.2"
-              value={idxStr}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === "" || /^\d*\.?\d*$/.test(v)) setIdxStr(v);
-              }}
-            />
-          </div>
-          {ch != null && (
-            <div style={{ color: C.gold, fontWeight: 800, marginTop: 10 }}>
-              Your course handicap: {ch}
-            </div>
-          )}
-        </div>
-      )}
-
+        {createSection === "format" && (
+          <div>
       <div style={{ marginTop: 14 }}>
         <label style={{ color: C.sage, fontSize: 12 }}>Format</label>
-        {/* Two-family guided chooser: pick a family, then a format. */}
-        <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
-          <button
-            onClick={() => { setFmtFamily("stroke"); if (gameType === "match" || gameType === "fourball" || gameType === "trifecta") setGameType("stableford"); else if (gameType === "skins") { setTeamMode(false); setSkinsTeamStyle("head_to_head"); } }}
-            style={{ flex: 1, textAlign: "left", background: fmtFamily === "stroke" ? C.green : C.greenLight, border: `1.5px solid ${fmtFamily === "stroke" ? C.gold : "transparent"}`, borderRadius: 12, padding: 11, cursor: "pointer" }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-              <span style={{ width: 34, height: 34, borderRadius: "50%", border: `1.5px solid ${C.gold}`, background: "#fbf6e6", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M7 21V3" stroke="#0E3B2E" strokeWidth="1.6" strokeLinecap="round"/><path d="M7 4l9 2.5L7 9.5z" fill="#B83A2E"/><circle cx="7" cy="21" r="1.6" fill="#C9A227"/></svg>
-              </span>
-              <div>
-                <div style={{ color: C.cream, fontWeight: 700, fontFamily: "Georgia, serif", fontSize: 15 }}>Stroke</div>
-                <div style={{ color: C.sage, fontSize: 11 }}>The whole field</div>
-              </div>
-            </div>
-          </button>
-          <button
-            onClick={() => { setFmtFamily("match"); const bb = gameType === "skins" && teamMode && skinsTeamStyle === "best_ball"; if (!bb && (gameType === "stableford" || gameType === "stroke" || gameType === "skins")) setGameType(matchKind === "team" ? "fourball" : "match"); }}
-            style={{ flex: 1, textAlign: "left", background: fmtFamily === "match" ? C.green : C.greenLight, border: `1.5px solid ${fmtFamily === "match" ? C.gold : "transparent"}`, borderRadius: 12, padding: 11, cursor: "pointer" }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-              <span style={{ width: 34, height: 34, borderRadius: "50%", border: `1.5px solid ${C.gold}`, background: "#fbf6e6", display: "flex", alignItems: "center", justifyContent: "center", flex: "none" }}>
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M4 6l7 6-7 6" stroke="#0E3B2E" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/><path d="M20 6l-7 6 7 6" stroke="#B83A2E" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </span>
-              <div>
-                <div style={{ color: C.cream, fontWeight: 700, fontFamily: "Georgia, serif", fontSize: 15 }}>Match play</div>
-                <div style={{ color: C.sage, fontSize: 11 }}>Head to head</div>
-              </div>
-            </div>
-          </button>
-        </div>
+        {/* Two-family guided chooser: shared with Manage Game so both flows use the same visual language. */}
+        <FormatFamilySelector
+          value={fmtFamily}
+          onChange={(family) => applyGuidedFormatPatch(selectGuidedFamily(guidedFormatState(), family))}
+        />
         {fmtFamily === "stroke" ? (
           <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-            <button onClick={() => setGameType("stableford")} style={{ ...btn(gameType === "stableford"), flex: 1, minWidth: 100, fontSize: 13 }}>Stableford</button>
-            <button onClick={() => setGameType("stroke")} style={{ ...btn(gameType === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Stroke play</button>
-            <button onClick={() => { setGameType("skins"); setTeamMode(false); setSkinsTeamStyle("head_to_head"); }} style={{ ...btn(gameType === "skins" && fmtFamily === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Skins</button>
+            <button onClick={() => applyGuidedFormatPatch(selectGuidedStrokeFormat("stableford"))} style={{ ...btn(gameType === "stableford"), flex: 1, minWidth: 100, fontSize: 13 }}>Stableford</button>
+            <button onClick={() => applyGuidedFormatPatch(selectGuidedStrokeFormat("stroke"))} style={{ ...btn(gameType === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Stroke play</button>
+            <button onClick={() => applyGuidedFormatPatch(selectGuidedStrokeFormat("skins"))} style={{ ...btn(gameType === "skins" && fmtFamily === "stroke"), flex: 1, minWidth: 100, fontSize: 13 }}>Skins</button>
           </div>
         ) : (
           <>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <button onClick={() => { setMatchKind("ind"); setGameType("match"); }} style={{ ...btn(matchKind === "ind"), flex: 1, fontSize: 13 }}>Individual</button>
-              <button onClick={() => { setMatchKind("team"); if (gameType !== "fourball" && gameType !== "trifecta") setGameType("fourball"); }} style={{ ...btn(matchKind === "team"), flex: 1, fontSize: 13 }}>Team</button>
+              <button onClick={() => applyGuidedFormatPatch(selectGuidedMatchKind(guidedFormatState(), "ind"))} style={{ ...btn(matchKind === "ind"), flex: 1, fontSize: 13 }}>Individual</button>
+              <button onClick={() => applyGuidedFormatPatch(selectGuidedMatchKind(guidedFormatState(), "team"))} style={{ ...btn(matchKind === "team"), flex: 1, fontSize: 13 }}>Team</button>
             </div>
             {matchKind === "ind" ? (
               <div style={{ marginTop: 8 }}>
-                <button onClick={() => setGameType("match")} style={{ ...btn(gameType === "match"), width: "100%", fontSize: 13 }}>Singles match</button>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedMatchKind(guidedFormatState(), "ind"))} style={{ ...btn(gameType === "match"), width: "100%", fontSize: 13 }}>Singles match</button>
               </div>
             ) : (
               <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                <button onClick={() => setGameType("fourball")} style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 104, fontSize: 13 }}>Four-ball</button>
-                <button onClick={() => setGameType("trifecta")} style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 104, fontSize: 13 }}>Trifecta</button>
-                <button onClick={() => { setGameType("skins"); setTeamMode(true); setSkinsTeamStyle("best_ball"); }} style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 104, fontSize: 13 }}>Skins</button>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("fourball"))} style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 104, fontSize: 13 }}>Four-ball</button>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("trifecta"))} style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 104, fontSize: 13 }}>Trifecta</button>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("skins"))} style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 104, fontSize: 13 }}>Skins</button>
               </div>
             )}
           </>
@@ -1004,8 +1128,8 @@ function CreateGame({
         {((gameType === "match" || gameType === "fourball") || (fmtFamily === "stroke" && gameType === "skins")) && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <input type="checkbox" checked={teamMode} onChange={(e) => setTeamMode(e.target.checked)} />
-              <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>{gameType === "skins" ? "Team skins" : gameType === "fourball" ? "Team four-ball (Red vs Blue)" : "Team match (e.g. 4 v 4)"}</span>
+              <input type="checkbox" checked={teamMode} onChange={(e) => applyGuidedFormatPatch(setGuidedTeamMode(e.target.checked))} />
+              <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>{gameType === "skins" ? "Team skins" : gameType === "fourball" ? "Create Team Names (Red vs Blue)" : "Team match (e.g. 4 v 4)"}</span>
             </label>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
               {gameType === "skins"
@@ -1059,13 +1183,22 @@ function CreateGame({
           <label style={{ color: C.sage, fontSize: 12 }}>Handicap allowance</label>
           <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
             {[100, 90, 85].map((amt) => (
-              <button key={amt} onClick={() => setAllowancePct(amt)} style={{ ...btn(allowancePct === amt), fontSize: 13, padding: "8px 14px" }}>{amt}%</button>
+              <button key={amt} onClick={() => { setAllowancePct(amt); setAllowanceInput(String(amt)); }} style={{ ...btn(allowancePct === amt), fontSize: 13, padding: "8px 14px" }}>{amt}%</button>
             ))}
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <input
                 type="number"
-                value={allowancePct}
-                onChange={(e) => setAllowancePct(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                value={allowanceInput}
+                onChange={(e) => {
+                  const next = editAllowance(e.target.value);
+                  setAllowanceInput(next.text);
+                  setAllowancePct(next.pct);
+                }}
+                onBlur={() => {
+                  const next = commitAllowance(allowanceInput);
+                  setAllowanceInput(next.text);
+                  setAllowancePct(next.pct);
+                }}
                 style={{ ...inputStyle, width: 64, padding: "8px 10px", fontSize: 13, textAlign: "center" }}
               />
               <span style={{ color: C.sage, fontSize: 13 }}>%</span>
@@ -1123,15 +1256,38 @@ function CreateGame({
                 {flightBands.map((b, i) => {
                   const cnt = fieldIndexes.filter((x) => x != null && flightForIndex(x, flightBands) === b.key).length;
                   return (
-                    <div key={b.key} style={{ display: "flex", alignItems: "center", gap: 8, background: C.greenLight, borderRadius: 10, padding: "9px 11px", marginBottom: 6 }}>
-                      <span style={{ fontWeight: 800, fontSize: 13 }}>{b.name}</span>
-                      <span style={{ color: C.sage, fontSize: 11 }}>index {flightRangeLabel(flightBands, i)}</span>
-                      <span style={{ marginLeft: "auto", fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 15, color: C.gold }}>{cnt}</span>
+                    <div key={b.key} style={{ background: C.greenLight, borderRadius: 10, padding: "9px 11px", marginBottom: 6 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontWeight: 800, fontSize: 13 }}>{b.name}</span>
+                        <span style={{ color: C.sage, fontSize: 11 }}>index {flightRangeLabel(flightBands, i)}</span>
+                        <span style={{ marginLeft: "auto", fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 15, color: C.gold }}>{cnt}</span>
+                      </div>
+                      {pickedFav?.tees?.length ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 7 }}>
+                          <label style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap" }}>Flight tee</label>
+                          <select
+                            value={teeAssignments.flight[b.key] != null ? String(teeAssignments.flight[b.key]) : "inherit"}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setTeeAssignments((cur) => {
+                                const flight = { ...cur.flight };
+                                if (value === "inherit") delete flight[b.key];
+                                else flight[b.key] = Number(value);
+                                return { ...cur, flight };
+                              });
+                            }}
+                            style={{ ...inputStyle, flex: 1, minWidth: 0, padding: "6px 8px", fontSize: 12 }}
+                          >
+                            <option value="inherit">Use game default ({tee?.name || "tee"})</option>
+                            {pickedFav.tees.map((t: any, ti: number) => <option key={`${t.name}-${ti}`} value={String(ti)}>{t.name} · {t.rating}/{t.slope}</option>)}
+                          </select>
+                        </div>
+                      ) : null}
                     </div>
                   );
                 })}
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>
-                  Even split by handicap index into {flightCount} bands, each with its own net winner. Every player needs an index. Applies to this event only.
+                  Even split by handicap index into {flightCount} bands, each with its own net winner. A flight can inherit the game default tee or use its own tee. Individual player overrides still take priority. Every player needs an index. Applies to this event only.
                 </div>
               </div>
             ) : flightMode === "off" ? (
@@ -1141,25 +1297,57 @@ function CreateGame({
         )}
       </div>
 
+          </div>
+        )}
+
+        {createSection === "review" && (
+          <div>
+            <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, border: `1px solid ${C.greenMid}` }}>
+              {[
+                [!!pickedFav, "Course", pickedFav?.name || "Select a course"],
+                [!!tee, "Default tee", tee?.name || "Select a tee"],
+                [(groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length) > 0, "Players", `${groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length} selected`],
+                [!!gameType, "Format", formatReviewLabel({ gameType, teamMode, skinsTeamStyle, teamScoreMode, trifectaScoring, strokeBasis, skinsMode })],
+                [!flightBlocked, "Flights", flightMode === "oneoff" ? `${flightCount} flights ready` : "Off"],
+              ].map(([ok, label, value], i) => (
+                <div key={String(label)} style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 0", borderBottom: i < 4 ? "1px solid rgba(255,255,255,.08)" : "none" }}>
+                  <span style={{ color: ok ? "#5BD08A" : C.gold, fontWeight: 900 }}>{ok ? "✓" : "!"}</span>
+                  <span style={{ color: C.sage, fontSize: 12, minWidth: 76 }}>{label}</span>
+                  <span style={{ color: C.cream, fontSize: 12.5, fontWeight: 700, marginLeft: "auto", textAlign: "right" }}>{value}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ color: C.sage, fontSize: 11.5, lineHeight: 1.45, marginTop: 9 }}>
+              Next: <b style={{ color: C.cream }}>{GC.postCreateDestinationLabel(GC.postCreateDestination(gameType, teamMode))}</b>
+            </div>
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button style={btn(false)} onClick={onCancel}>Cancel</button>
+              <button
+                style={{ ...btn(true), opacity: pickedFav && tee && !busy && !flightBlocked ? 1 : 0.5 }}
+                disabled={!pickedFav || !tee || busy || flightBlocked}
+                onClick={create}
+              >
+                {busy ? "Creating…" : "Create game"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {createSection !== "review" && (
+          <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+            {createSection !== "game" ? <button style={btn(false)} onClick={() => setCreateSection(createSection === "players" ? "game" : "players")}>Back</button> : <button style={btn(false)} onClick={onCancel}>Cancel</button>}
+            <button style={{ ...btn(true), marginLeft: "auto" }} onClick={() => setCreateSection(createSection === "game" ? "players" : createSection === "players" ? "format" : "review")}>Continue</button>
+          </div>
+        )}
+      </CreateGameWorkspace>
       {err && (
         <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>
           {err}
         </div>
       )}
-      <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-        <button style={btn(false)} onClick={onCancel}>
-          Cancel
-        </button>
-        <button
-          style={{ ...btn(true), opacity: pickedFav && !busy ? 1 : 0.5 }}
-          disabled={!pickedFav || busy}
-          onClick={create}
-        >
-          {busy ? "Creating…" : "Create game"}
-        </button>
-      </div>
     </div>
   );
+
 }
 
 // ---------------- Game room: score entry + leaderboard ----------------
@@ -1169,6 +1357,7 @@ function CreateGame({
 function GameRoom({
   gameId,
   initialTab,
+  initialSetupTab,
   user,
   displayName,
   isAdmin,
@@ -1176,6 +1365,7 @@ function GameRoom({
 }: {
   gameId: string;
   initialTab?: "play" | "setup";
+  initialSetupTab?: SetupTab;
   user: any;
   displayName: string;
   isAdmin?: boolean;
@@ -1256,7 +1446,7 @@ function GameRoom({
     })();
   }, [betStale, game, players, user.id]);
   // Which step of the setup flow is showing: players & tees, teams, matchups, groups.
-  const [setupTab, setSetupTab] = useState<SetupTab>("overview");
+  const [setupTab, setSetupTab] = useState<SetupTab>(() => initialSetupTab || "overview");
   const [cardView, setCardView] = useState(false); // show the whole-group vertical scorecard
   const [flightView, setFlightView] = useState<"flight" | "overall">("flight"); // flighted standings: segmented vs one list
 
@@ -2007,7 +2197,7 @@ function GameRoom({
     const ch = (t.slope != null && t.rating != null && game.course_par != null)
       ? courseHandicap(idx, t.slope, t.rating, game.course_par) : null;
     const { error } = await supabase.from("game_players").insert({
-      game_id: game.id, user_id: null, is_guest: true, guest_of: sponsor || null, bets: false, display_name: name.trim(),
+      game_id: game.id, user_id: null, is_guest: true, guest_of: sponsor || null, bets: effectiveGroupId(game.group_id) === TGC_GROUP_ID ? false : true, display_name: name.trim(),
       handicap_index: idx, rating: t.rating, slope: t.slope, tee_name: t.tee_name,
       course_handicap: ch, ...blankCard(),
     });
@@ -2179,11 +2369,7 @@ function GameRoom({
   };
   const setFormat = async (next: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => {
     if (!game || next === game.game_type || !allowSetupChange({ type: "set_format", target: next })) return;
-    const suggested = next === "fourball" || next === "trifecta" ? 85 : 100;
-    const patch: Record<string, unknown> = { game_type: next, allowance_pct: suggested };
-    if (next === "trifecta" && !game.team_score_mode) patch.team_score_mode = "best_ball";
-    if (next === "trifecta" && !game.trifecta_scoring) patch.trifecta_scoring = "per_hole";
-    if (next === "stroke" && !game.stroke_basis) patch.stroke_basis = "net";
+    const patch = buildFormatPatch(game, next);
     // NOTE: we deliberately do NOT clear pairings/foursomes/teams when switching
     // format. A player's setup work is preserved so switching back restores it;
     // formats that don't use a given structure simply ignore it (see the
@@ -2217,27 +2403,11 @@ function GameRoom({
   // recompute. Team styles leave the side assignment to the Matchups step.
   const setSkinsStyle = async (style: "individual" | "team_11" | "team_2v2") => {
     if (!game || (shapeOf(game).skinsStyle ?? "individual") === style || !allowSetupChange({ type: "set_skins_style", style })) return;
-    const g = game as any;
-    const liveTeams = Array.isArray(g.teams) && g.teams.length === 2 ? g.teams : null;
-    const liveFour = Array.isArray(g.foursomes) ? g.foursomes : null;
-    const livePair = Array.isArray(g.pairings) ? g.pairings : [];
-    const prev = g.structure_stash || {};
-    // Keep the latest team structure so any later switch can restore it intact.
-    const stash = {
-      teams: liveTeams ?? prev.teams ?? null,
-      foursomes: liveFour ?? prev.foursomes ?? null,
-      pairings: (livePair.length ? livePair : prev.pairings) ?? [],
-    };
-    // Mid-round structural conversions are rejected centrally by game-setup-policy.
-    const defTeams = [{ key: "A", name: "Team 1" }, { key: "B", name: "Team 2" }];
-    let teams: any = null, foursomes: any = null, pairings: any = [];
-    if (style === "team_11") { teams = stash.teams ?? defTeams; foursomes = null; pairings = stash.pairings ?? []; }
-    else if (style === "team_2v2") { teams = stash.teams ?? defTeams; foursomes = stash.foursomes ?? []; pairings = stash.pairings ?? []; }
-    const patch: Record<string, unknown> = { game_type: "skins", teams, foursomes, pairings, structure_stash: stash };
-    let flippedSplit = false;
-    if (style === "individual" && g.skins_mode === "split" && players.filter((p) => !p.no_show).length > 4) {
-      patch.skins_mode = "carryover"; flippedSplit = true;
-    }
+    const { patch, flippedSplit } = buildSkinsStylePatch(
+      game,
+      players.filter((p) => !p.no_show).length,
+      style,
+    );
     const { error } = await supabase.from("games").update(patch).eq("id", game.id);
     if (error) { alert("Couldn't change the skins style — " + error.message); return; }
     await load();
@@ -2247,12 +2417,8 @@ function GameRoom({
   // pairings are assigned in Matchups. Scores untouched.
   const setMatchTeam = async (on: boolean) => {
     if (!game || shapeOf(game).usesTeams === on || !allowSetupChange({ type: "set_match_team", on })) return;
-    const g = game as any;
-    const liveTeams = Array.isArray(g.teams) && g.teams.length === 2 ? g.teams : null;
-    const prev = g.structure_stash || {};
-    const stash = { ...prev, teams: liveTeams ?? prev.teams ?? null };
-    const teams = on ? (stash.teams ?? [{ key: "A", name: "Team 1" }, { key: "B", name: "Team 2" }]) : null;
-    const { error } = await supabase.from("games").update({ teams, structure_stash: stash }).eq("id", game.id);
+    const patch = buildMatchTeamPatch(game, on);
+    const { error } = await supabase.from("games").update(patch).eq("id", game.id);
     if (error) { alert("Couldn't change the match type — " + error.message); return; }
     await load();
   };
@@ -2467,7 +2633,7 @@ function GameRoom({
   const posWithin = (p: Player, pool: Player[]) => PS.posWithin(p, pool, game);
   const tiedWithin = (p: Player, pool: Player[]) => PS.tiedWithin(p, pool, game);
   const renderLeaderRow = (p: Player, pos: number, tied: boolean, showTag: boolean) => (
-    <LeaderRow key={p.id} p={p} pos={pos} tied={tied} showTag={showTag}
+    <LeaderRow key={p.id} p={p} pos={pos} tied={tied} showTag={showTag} showBetStatus={effectiveGroupId((game as any)?.group_id) === TGC_GROUP_ID}
       user={user} isStroke={isStroke} strokeNet={strokeNet}
       playerPoints={playerPoints} playerThru={playerThru} playerNet={playerNet}
       playerGross={playerGross} parThru={parThru} relToParStr={relToParStr} leaderName={leaderName} />

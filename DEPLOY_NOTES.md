@@ -1,3 +1,33 @@
+## 177.58.260816 — Create Game convergence audit closeout
+- **NO migration. Runtime behavior unchanged from 177.57.** Final staging-only audit/packaging checkpoint before the cumulative Production PR.
+- Added `DE_NOVO_CREATE_GAME_AUDIT_CLOSEOUT_177.58.md`, consolidating the fresh 177.46 Production -> final staging responsibility/contract comparison. The audit found no missing legacy Create Game capability and documents the intentional Lean Create ownership boundary plus the inherited non-atomic create risk.
+- Removed an accidentally generated `tsconfig.tsbuildinfo` working artifact so it cannot enter the release bundle.
+- Corrected the human `MIGRATIONS.md` mirror to mark 0138 as applied in staging + Production (the database ledger remains authoritative).
+- Version/docs only; all dependency-backed CI, Vercel staging, targeted browser checks, PR verify, Production Ready and Production smoke gates remain mandatory before calling the cumulative convergence release deployable.
+
+## 177.56.260816 — Format UI Fidelity + Handicap Input Polish
+- Locks the shared Stroke / Match Play selector to the proven Production BNN geometry, icons, colors, typography, spacing, and selected-state treatment used by Create Game; Manage Game continues to consume the same shared selector.
+- Fixes the Create Game custom handicap-allowance editor so deleting the value leaves a genuinely blank field instead of forcing `0`. While blank, the domain value safely falls back to the default `100%`; leaving the field restores the visible value to `100`.
+- Replaces the broad allowance reset effect with explicit format-selection defaults so a resumed custom allowance (for example 92%) is not overwritten merely because the saved game type is restored.
+- Adds pure allowance-edit/commit tests plus permanent source-contract checks for the blank/default behavior and Production selector styling.
+- No scoring, database, setup-policy, or persistence schema behavior changed. No migration.
+
+## 177.55.260816 — Cumulative Guided Format Restore + Shared Create/Manage Selector
+- Create Game Four-ball wording: **Create named teams** is now **Create Team Names (Red vs Blue)**. Underlying `teamMode` and team-name persistence are unchanged.
+- Manage Game → Format now uses the same shared Stroke / Match Play family cards and icons as Create Game. The family cards only filter which format choices are shown; the persisted game changes only when a specific format is selected, so the existing setup-policy ALLOW/CONFIRM/BLOCK gate remains authoritative.
+- Extracted the duplicated family-card markup into `components/game/setup/format-family-selector.tsx`, used by both Create Game and Manage Game.
+- No scoring, database, setup-policy, or persistence behavior changed. No migration.
+
+## 177.54.260816 — Guided Format Selection Restore & Polish
+
+- Restores the proven Stroke / Match Play guided format hierarchy and original format-family icons after the 177.53 flat-selector experiment.
+- Preserves the Lean Create architecture, modular game-create/draft/tee logic, Resume Setup, and Manage Game structural handoff.
+- Restores the handicap allowance shortcuts plus custom 0–100% numeric input.
+- Preserves Stroke → Stableford / Stroke Play / Skins and Match Play → Individual / Team → Singles / Four-ball / Trifecta / Skins selection paths.
+- Clarifies Four-ball overall-team creation as “Create named teams (e.g. Red vs Blue)” without changing persisted team-mode semantics.
+- Retains the detailed Review format summary introduced in 177.53.
+- No database migration.
+
 # Birdie Num Num — Deploy & Migration Notes
 
 ## Convention
@@ -4995,3 +5025,73 @@ Restores and hardens player-level tee selection in Organizer → Manage Game wit
 - Corrects the Control Center overview summary for individual Match games so it reports matched players rather than team assignments. Team formats continue to report team assignments; non-team/non-match formats report tee-group placement.
 - Presentation-only release: no scoring, setup-policy, database-write, RPC, migration, or schema behavior changes.
 - Version 177.46.260816. No migration.
+
+## 177.47.260816 — Create Game convergence Stage 1: canonical draft contract
+- **NO migration. No intended user-visible behavior change.** Introduces `lib/game-setup-draft.ts`, a typed canonical model for the meaningful Create Game setup state, while leaving the existing component state, UI, `create()` transaction, game/player payloads and post-create routing unchanged.
+- The existing device-local `SetupDraft` storage shape remains backward-compatible. CreateGame now maps its state into `GameSetupDraft`, then adapts it back through `toLegacySetupData()` before the existing `saveSetupDraft()` call. 2,004 assertions verify the serialized legacy shape and old-draft round-trip.
+- Adds a permanent state-inventory guard: all 35 CreateGame `useState` cells and 3 refs are explicitly classified as domain, loaded context, transient editor, runtime, or control refs. New state cannot silently cross the future extraction boundary.
+- Audit finding recorded but deliberately not fixed here: live `hcpOverrides` are not persisted by the legacy local setup draft, so an interrupted flight-handicap override can be lost. Fixing that requires an intentional draft-schema version later; Stage 1 preserves current behavior.
+
+
+## 177.48.260816 — Create Game convergence Stage 2: pure structure mutations
+- **NO migration. No intended user-visible behavior change.** Extracts the structural calculations currently embedded in Manage Game into `lib/game-structure.ts`, while leaving the existing Supabase writers, setup policy checks, alerts/confirms, refresh callbacks and UI in place.
+- Shared pure helpers now calculate: format transition patches; skins structure stash/restore; Match individual/team stash/restore; pairing add/remove; foursome add/remove/rename/assign/unassign; and the existing rule that each saved foursome maps to its 1-based tee group.
+- `components/tournaments.tsx` continues to own persisted format/skins/match writes. `components/game/scoring-views.tsx` continues to own persisted pairing/foursome/player tee-group writes. The extraction changes only how the next structure value is calculated.
+- Differential characterization freezes the 177.47 implementations in `lib/game-structure.test.ts` and compares the extracted helpers across a fixed transition matrix plus 40,000 randomized pairing/foursome assertions.
+- Adds `ci/check_game_structure_contract.py` to require every existing runtime mutation path to reach the pure helpers and to prohibit Supabase/browser side effects inside the structure module.
+- Stage 2 remains part of the staging-only Create Game convergence train. Production remains on the pre-convergence release until the complete flow passes end-to-end release validation.
+
+## 177.49.260816 — Create Game convergence Stage 3A: shared section workspace
+- **Staging-only convergence checkpoint. No migration.** Introduces the shared Create Game navigation shell with the target section model: **Game → Players → Format → Teams & groups → Review**.
+- Reuses the existing Create Game state and handlers rather than moving persistence ownership. Game/course/default-tee fields, roster/guest controls, and format/flight controls are the same existing controls, now organized into the shared section flow.
+- Renames the creation-time tee concept to **Default tee for the field**, matching actual existing behavior: the selected tee is still applied to all initial player rows by the unchanged `buildPlayerRows()` path.
+- Review now provides a pre-create summary and is the only section that exposes the final Create game action. The underlying `create()` function, Supabase writes, tee-time linkage, notifications, draft persistence, player-row payloads, and post-create routing are unchanged.
+- Structural formats deliberately retain today's behavior in this checkpoint: detailed team/matchup/foursome assignment still occurs immediately after creation. Stage 3B will move those existing structural rules into draft mode and add flight/player tee overrides before this convergence train is eligible for Production.
+- Adds a permanent Create Game workspace contract guard proving five-section reachability and that the shared workspace owns no Supabase/RPC/local persistence.
+
+## 177.50.260816 — Create Game convergence Stage 3B: tee inheritance
+- **Staging-only convergence checkpoint. No migration.** Adds the agreed creation-time tee hierarchy: **individual player override → one-off flight tee → game default tee**.
+- The Game section still sets one convenient default tee for the field. Players can now override exceptions individually, and one-off Flights can choose a tee for each flight. Explicit player overrides always win over flight/default choices.
+- Changing the field default updates only inherited players; it does not erase flight or player overrides. Changing course clears all tee-index overrides because those indexes belong to the prior course.
+- Resume Setup persists the new optional player/flight tee maps while remaining backward-compatible with pre-177.50 drafts, which resume with empty maps.
+- `buildPlayerRows()` resolves the effective tee once at Create and writes explicit per-player `tee_name`, `rating`, `slope`, and `course_handicap` snapshots. There is no post-create inheritance. Existing callers that omit the new optional inputs remain differentially identical to 177.49 behavior.
+- New pure `lib/game-tee-assignment.ts` centralizes resolution and is protected by `ci/check_create_game_tee_inheritance.py`. Dedicated tests cover 5,011 precedence/sanitization assertions; draft compatibility has 2,006 assertions; existing `game-create` baseline differential remains 9,000/9,000 identical when hierarchy inputs are absent.
+- Detailed teams/matchups/foursomes/tee-groups are still post-create in this checkpoint. Stage 3C will move those existing structural editors into draft mode before Stage 4 atomic creation.
+
+
+
+## 177.51.260816 — Stage 3 corrective: resume durability + TGC betting scope + CI fixture typing
+- **Staging-only convergence checkpoint. No migration.** Corrects two browser regressions found during 177.49/177.50 staging QA and the 177.50 GitHub TypeScript failure.
+- **Resume Setup durability:** Create Game now checkpoints the latest draft on normal state changes, `pagehide`, visibility-hidden, and unmount. Resume restores the five-section workspace location, player/flight tee overrides, and live handicap overrides. Older drafts remain valid. The progress detector now recognizes meaningful format/structure/tee work, not only course/name/roster changes.
+- **TGC betting scope:** the `· no bet` leaderboard label is shown only when the effective group is TGC. New guest rows use the guest-default-out betting semantic only for TGC; ordinary groups such as staging Main receive the neutral/default `bets=true` value. The same gate is applied to guests added after game creation. BettingPanel itself remains TGC-gated as before.
+- **CI correction:** `game-tee-assignment.test.ts` now explicitly types the randomized override maps as `Record<string, number>`, fixing TS2322 caused by TypeScript inferring optional `undefined` properties from `{...} : {}` test branches. Runtime tee logic is unchanged by this typing correction.
+- Adds `ci/check_create_game_resume_and_betting_scope.py` and extends the Create Game state inventory to the new latest-draft ref.
+- Local executed validation: 5,011 tee-assignment assertions; 43 game-create assertions; 2,007 setup-draft assertions; full `npm run guards` including 50,087 workflow/fault simulations. Dependency-backed `tsc/build` remains a GitHub CI gate in this source environment.
+
+## 177.52.260816 — Lean Create pivot: core setup first, structure in Manage Game
+- **Staging-only convergence checkpoint. No migration.** Simplifies Create Game to **Game → Players → Format → Review**. The abandoned Stage 3C pre-create structure draft was not deployed and is not part of this release.
+- Create Game retains the high-value convergence work: canonical draft/resume behavior, roster/guests, default tee → flight tee → individual tee override, format/scoring choices, and core validation.
+- Teams, matchups, foursomes, tee groups, structure stash/restore, and transition-policy enforcement remain owned by persisted **Manage Game** instead of being duplicated into a second draft-state system.
+- Review explicitly tells the organizer when additional setup is required. After Create, Stableford/Stroke go directly to Play; formats requiring structure open Manage Game at the relevant section (Teams, Matchups, or Groups).
+- Split-Skins field-size validation now runs **before the first database write**, preventing an invalid >4-player split-Skins attempt from leaving an orphan game row.
+- Backward compatibility: a saved 177.49–177.51 draft whose workspace section was `structure` resumes safely at Review rather than being discarded.
+- Validation: dedicated game-create helper compile PASS; game-create tests 52/52 PASS in the local dependency-light harness; full source guards and workflow simulation are required below/GitHub before this staging candidate advances.
+
+
+## 177.53.260816 — Format Selection Convergence: clearer Create Game choices, same game model
+- **Staging-only convergence checkpoint. No migration.** Redesigns only the Create Game format selector; scoring algorithms, games/game_players schema, Manage Game writers, and post-create structure ownership are unchanged.
+- Replaces the old Stroke-vs-Match family tree and duplicate Team toggles with six direct formats: Stableford, Stroke Play, Match Play, Four-ball, Trifecta, Skins.
+- Match Play now asks one clear structural question: **Players — Individual / Team**. The old contradictory secondary `Team match` checkbox is removed.
+- Four-ball now asks **Competition — 2 v 2 Match / Team vs Team**, followed independently by **Team score — Best ball / Shootout (aggregate)**. This preserves ordinary independent foursomes and Ryder-Cup-style overall teams without labeling both decisions `Team`.
+- Skins now exposes the three existing structures directly: **Individual / 1:1 Teams / 2 v 2 Best-ball**, with Carry over/Halved and the existing 2v2 Best ball/Aggregate option. No skins scoring behavior changed.
+- Trifecta retains Best ball/Shootout and Per-hole/Ryder-Cup scoring; Stroke retains Net/Gross; allowance and flights remain unchanged.
+- Review now prints the full selected interpretation (for example `Four-ball · 2 v 2 Match · Best ball`) rather than only the base game type.
+- New pure `lib/create-game-format.ts` maps user-facing selectors onto the existing persisted state fields and resets irrelevant top-level team state when changing base formats. A permanent CI source contract prevents the ambiguous legacy selector labels from returning.
+- Executed locally: new format mapping 35/35 PASS; game-create 52/52 PASS; historical game-create differential 9,000 comparisons / 0 mismatches; setup-draft 2,007/2,007 PASS; tee inheritance 5,011/5,011 PASS; full `npm run guards` including 50,087 workflow/fault simulations PASS. Full dependency-backed app type/build remains the GitHub staging gate.
+
+
+## 177.57.260816 — Authoritative guided-format helpers + exact next-step guidance
+- **Staging-only convergence checkpoint. No migration.** Replaces the stale flat-format helper semantics from 177.53 with pure helpers that characterize the restored Production-style guided Create Game actions: family selection, Stroke-format selection, Individual/Team branch selection, team-format selection, and team-mode toggle.
+- The live Create Game buttons now delegate to those helpers through one patch applier. The helper tests freeze the exact 177.56 working handler behavior, including Stroke → Match → Stroke round trips, before runtime delegation.
+- Review now derives its **Next:** message from the same `postCreateDestination()` result used after Create, via `postCreateDestinationLabel()`, so guidance and actual navigation cannot drift.
+- No scoring logic, persisted game fields, Manage Game policy, database schema, or migration behavior changes.

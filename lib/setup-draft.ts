@@ -26,6 +26,11 @@ export type SetupDraft = {
   team2: string;
   flightMode?: string;
   flightCount?: number;
+  // Create Game tee inheritance (177.50+). Optional so all older saved drafts still load.
+  flightTeeIdx?: Record<string, number>;
+  playerTeeOverrides?: Record<string, number>;
+  hcpOverrides?: Record<string, number>;
+  createSection?: "game" | "players" | "format" | "structure" | "review";
   selectedPlayers: Record<string, boolean>;
   guestPlayers: { id: string; display_name: string; handicap_index: number | null; guest_of: string }[];
 };
@@ -45,7 +50,17 @@ export function clearSetupDraft(groupId: string, teeTimeId?: string | null) {
 }
 
 // Worth offering to resume only if the user actually got somewhere.
-export function draftHasProgress(d: Pick<SetupDraft, "favName" | "guestPlayers" | "name" | "selectedPlayers">, selfId: string): boolean {
+export function draftHasProgress(d: SetupDraft | Omit<SetupDraft, "v" | "savedAt">, selfId: string): boolean {
   const others = Object.entries(d.selectedPlayers || {}).filter(([id, on]) => on && id !== selfId).length;
-  return !!d.favName || (d.guestPlayers?.length || 0) > 0 || (d.name || "").trim().length > 0 || others > 0;
+  const formatChanged = d.gameType !== "stableford" || d.allowancePct !== 100 || d.teamMode || d.skinsMode !== "carryover" || d.flightMode === "oneoff";
+  const structureChanged = d.team1 !== "Team 1" || d.team2 !== "Team 2";
+  const teeOverrides = Object.keys(d.playerTeeOverrides || {}).length > 0 || Object.keys(d.flightTeeIdx || {}).length > 0;
+  return !!d.favName
+    || (d.guestPlayers?.length || 0) > 0
+    || (d.name || "").trim().length > 0
+    || others > 0
+    || formatChanged
+    || structureChanged
+    || teeOverrides
+    || (d.createSection != null && d.createSection !== "game");
 }

@@ -666,3 +666,15 @@ For changed interactions, do not equate handler reachability with working behavi
 - `GameRoom` constructs `OrganizerPanelProps` and `GameSetupWorkspace` props with `satisfies` so callback/boundary drift fails TypeScript.
 - Permanent `ci/check_game_setup_workspace_contract.py` verifies step visibility/fallback, Players/Teams/Groups reachability, tee/handicap/add-player/group callback bridges, Matchups reachability, and forbids DB ownership in the extracted workspace.
 - Next product stage after this refactor is validated: persistent Game Control Center UX that lets organizers revisit Game/Players/Format/Teams & Groups/Review, followed by a centralized before/after-scoring transition policy.
+
+## 177.49 Create Game convergence staging train
+- Production intentionally remains on the last completed release while 177.47+ accumulate on `staging`; do not open staging->main PRs for intermediate convergence checkpoints.
+- 177.47: canonical Create Game draft/state inventory foundation.
+- 177.48: pure game-structure mutations with differential characterization.
+- 177.49 Stage 3A: shared Create Game navigation workspace (**Game -> Players -> Format -> Teams & groups -> Review**) using existing parent state/handlers. No persistence ownership moved; no migration.
+- 177.50 Stage 3B: creation-time tee inheritance is now **individual override -> one-off flight tee -> game default tee**. The maps persist in Resume Setup, old drafts remain compatible, and Create resolves inheritance into explicit player tee/rating/slope/course-handicap snapshots. No migration.
+- Before Stage 3 is complete, move the existing team/matchup/foursome/tee-group structure into pre-create draft state without discarding structure work.
+- Stage 4 remains the atomic core Create transaction after the draft UI is fully characterized and browser-validated.
+
+## Current staging convergence checkpoint — 177.52 Lean Create
+Create Game is intentionally **lean**: Game → Players → Format → Review. Default/flight/player tee inheritance and Resume Setup remain in Create; persisted structural work (teams, matchups, foursomes, tee groups) is completed in Manage Game, which remains the single source of truth for transition policy and structural edits. Stableford/Stroke create into Play; structural formats create into the relevant Manage Game setup section. No migration. Production should not receive the convergence train until cumulative validation is complete.

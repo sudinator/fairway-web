@@ -70,6 +70,7 @@ import {
 } from "@/components/ui";
 import type { Game, Player } from "@/lib/game-types";
 import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
+import { FormatFamilySelector, type FormatFamily } from "@/components/game/setup/format-family-selector";
 
 const supabase = createClient();
 
@@ -130,6 +131,13 @@ export function OrganizerPanel({
   const [addGuestName, setAddGuestName] = useState("");
   const [addGuestHcp, setAddGuestHcp] = useState("");
   const [addGuestSponsor, setAddGuestSponsor] = useState(""); // sponsor user id; "" -> current user
+  const currentFormatFamily: FormatFamily =
+    game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" ||
+    (game.game_type === "skins" && shapeOf(game).skinsStyle === "team_2v2")
+      ? "match"
+      : "stroke";
+  const [manageFormatFamily, setManageFormatFamily] = useState<FormatFamily>(currentFormatFamily);
+  useEffect(() => { setManageFormatFamily(currentFormatFamily); }, [currentFormatFamily]);
   // Setup rosters use a deliberate, stable alphabetical order. Never rely on PostgreSQL
   // return order: updating a row can change its physical tuple position and otherwise make
   // that player appear to jump in the UI after a tee/handicap/team edit.
@@ -472,8 +480,13 @@ export function OrganizerPanel({
             {game.status !== "ended" && onSetFormat && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ color: C.sage, fontSize: 12 }}>Format</div>
-                <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                  {([["stableford", "Stableford"], ["stroke", "Stroke play"], ["match", "Match"], ["fourball", "Four-ball"], ["skins", "Skins"], ["trifecta", "Trifecta"]] as const).map(([key, label]) => {
+                <FormatFamilySelector value={manageFormatFamily} onChange={setManageFormatFamily} />
+                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                  {(manageFormatFamily === "stroke"
+                    ? [["stableford", "Stableford"], ["stroke", "Stroke play"], ["skins", "Skins"]]
+                    : [["match", "Match"], ["fourball", "Four-ball"], ["trifecta", "Trifecta"], ["skins", "Skins"]]
+                  ).map(([rawKey, label]) => {
+                    const key = rawKey as "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta";
                     const isCur = game.game_type === key;
                     const d = policy({ type: "set_format", target: key });
                     const allowed = isCur || d.decision !== "block";
@@ -481,10 +494,11 @@ export function OrganizerPanel({
                       <button key={key} disabled={!allowed}
                         title={d.decision === "block" ? d.reason : undefined}
                         onClick={() => { if (!isCur && allowed) onSetFormat(key); }}
-                        style={{ ...btn(isCur), fontSize: 13, padding: "7px 12px", opacity: allowed ? 1 : 0.4, cursor: allowed ? "pointer" : "not-allowed" }}>{label}</button>
+                        style={{ ...btn(isCur), flex: 1, minWidth: 100, fontSize: 13, padding: "7px 12px", opacity: allowed ? 1 : 0.4, cursor: allowed ? "pointer" : "not-allowed" }}>{label}</button>
                     );
                   })}
                 </div>
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Choose a family above, then the format. The family cards only filter the choices; the game changes when you select a format.</div>
                 {anyScores && <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Scores are in — individual Stableford / Stroke / Individual Skins may be reinterpreted with confirmation. Structural individual/team changes are locked.</div>}
               </div>
             )}
