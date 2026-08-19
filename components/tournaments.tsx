@@ -3000,7 +3000,7 @@ function GameRoom({
                 <span style={{ flex: 1 }} />
                 {onPace ? (
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(91,208,138,0.15)", color: "#7FD0A0", border: "1px solid rgba(91,208,138,0.4)", borderRadius: 999, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>
-                    <span style={{ width: 7, height: 7, borderRadius: 99, background: "#5BD08A", display: "block" }} />On pace
+                    <span style={{ width: 7, height: 7, borderRadius: 999, background: "#5BD08A", display: "block" }} />On pace
                   </span>
                 ) : (
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(216,178,74,0.16)", color: "#E4CF86", border: `1px solid rgba(216,178,74,0.5)`, borderRadius: 999, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>
@@ -3097,7 +3097,7 @@ function GameRoom({
               </button>
             )}
             {isOrganizer && (
-              <button onClick={requestEndGame} style={{ ...btn(!canFinishGroup), flex: 1, minWidth: 180, fontSize: 13, padding: "10px 0", background: canFinishGroup ? "#5A1E1E" : undefined, color: canFinishGroup ? "#fff" : undefined }}>
+              <button onClick={requestEndGame} style={{ ...btn(!canFinishGroup), flex: 1, minWidth: 180, fontSize: 13, padding: "10px 0", ...(canFinishGroup ? { background: "#5A1E1E", color: "#fff" } : {}) }}>
                 🔒 End game for everyone
               </button>
             )}

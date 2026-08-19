@@ -497,7 +497,8 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
                     style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.card, border: `1px solid ${existing ? C.gold : C.line}`, borderRadius: 10, padding: "12px 14px", opacity: loadingId != null && loadingId !== c.id ? 0.5 : 1 }}>
                     <span style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{courseLabel(c)}</span>
                     {c.location ? <span style={{ color: C.faint, fontSize: 13 }}> · {c.location}</span> : null}
-                    {existing ? <span style={{ color: C.gold, fontSize: 12, fontWeight: 700 }}> · ✓ in your library</span> : null}
+                    {/* APP_RULES #25: reassurance, not attention — C.sage, same family as "vetted". */}
+                    {existing ? <span style={{ color: C.sage, fontSize: 12, fontWeight: 700 }}> · ✓ in your library</span> : null}
                     {loadingId === c.id ? <span style={{ color: C.gold, fontSize: 12 }}> · loading…</span> : null}
                     {existing?.data?.corrected ? (
                       <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>

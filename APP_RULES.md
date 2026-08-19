@@ -151,17 +151,59 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
     principle bottom sheets use to cap their height (#17). Enforced by `ci/check-safe-area-frames.py`; all
     UI guards now run in CI via `npm run guards` (font size, global rules, chart overflow, date inputs,
     bottom sheets, safe-area frames). — manual
-25. **Text and surface colours come from the SAME light/dark family — never mix them.** The palette is two
-    families. LIGHT surfaces — `C.card` (#FFFDF6), `C.cream` — carry DARK text: `C.ink`, `C.faint`. DARK
-    surfaces — `C.green` / `C.greenMid` / `C.greenLight` — carry LIGHT text: `C.cream`, `C.sage`; `C.gold` is
-    an accent usable on either. Never put light text on a light surface (`C.cream`/`C.sage` on `C.card` — the
-    washed-out "how this differential is calculated" sheet) or dark text on a dark surface (`C.faint`/`C.ink`
-    on green). **All popups/sheets are DARK:** panel `C.greenMid`, nested boxes `C.greenLight` (or `C.green`),
-    text `C.cream`/`C.sage`/`C.gold`, dividers `rgba(255,255,255,.08–.12)` (NOT `C.line`, which is a
-    light-surface divider). Do NOT drop a `C.card` box inside a dark sheet. Match the app's existing sheets
-    (notification sheet, handicap card) rather than inventing a new look. Enforced for same-element mistakes
-    by `ci/check-contrast.py` (part of `npm run guards`); parent/child pairings are on you to get right — copy
-    an existing dark sheet. — manual
+25. **Cream is the scorecard. Green is everything else.** Full spec, worked examples and the
+    manual audit checklist live in **DISPLAY_RULES.md** — read it before any visual work. Summary:
+
+    **CREAM — three cases only.** (a) Scorecards and score entry: `C.card` + `C.ink` / `C.faint` /
+    `C.line`. Reference: `components/game/scorecard-views.tsx`. (b) Editable fields: `inputStyle`
+    uses `C.cream`, not `C.card`. (c) The OUTLINE of a pick control: transparent + `1.5px solid
+    C.cream`; selected keeps its identity colour. Never FILL an unselected chip with cream — it
+    outshines the selected one.
+
+    **GREEN — everything else.** Lists, Money, Insights, Contests, Skins, nav, panels, sheets,
+    buttons, and the frame *around* a score grid. `C.green`/`greenMid`/`greenLight` + `C.cream` /
+    `C.sage` + `rgba(255,255,255,.08-.12)` dividers.
+
+    A cream grid nested in a green frame is CORRECT — that is the scorecard. The prohibition is on
+    mixing families WITHIN one element.
+
+    **Text colour belongs to a surface, not a meaning.** `C.ink`, `C.faint`, `C.line` and
+    `C.green`-as-text are cream-only. `C.cream`, `C.sage` and `rgba(255,255,255,.08-.12)` are
+    green-only. A colour keeps its name after the surface under it changes and nothing in the code
+    objects: the Games-list share code was `color: C.green` — 12.25:1 on `C.card`, 1.54:1 on
+    `C.greenLight`, i.e. invisible. Preserve the RELATIONSHIP, not the hex: `C.green` was being the
+    darkest thing in a light subtitle; on green the same job is `C.cream`, the brightest thing in a
+    sage subtitle.
+
+    **Gold means SOMEONE MUST ACT.** Not "verified", not "good news". Test: if the user does
+    nothing, is anything wrong? No -> `C.sage` metadata. Attention never earns a cream surface;
+    cream only reads as special while it stays rare.
+
+    **Scales (DISPLAY_RULES Part 5).** Radius {999, 12, 10, 6} — pill is `999`, never `99`.
+    Padding {`13px 16px`, `11px 20px`, `8px 12px`, `4px 10px`, `16px`}. Font {11, 13, 15, 17, 22,
+    30+ for display numerals}; weight 700 titles / 400 body; Georgia for numerals and screen titles
+    only. Every surface colour is a member of `C` in `lib/golf.ts`; new surfaces get a NAMED token,
+    never a literal at the call site.
+
+    Reviewed exceptions: the Stableford points pill keeps `C.cream` on green; `borderRadius: 20`
+    (x6) and `24` (x1) are real corners awaiting a per-site decision. Allowlisted non-palette
+    colours: `#DC2626` (TEST-MODE), `#003087`/`#3D95CE` (PayPal/Venmo), `#5AA9E6`/`#E8934F` (team
+    identity). — CI (`ci/check-design-scale.py`, `ci/check-palette-closure.py`,
+    `ci/check-contrast.py`) + manual (DISPLAY_RULES Part 7)
+
+26. **Every popup is a `<BottomSheet>`; every button is `btn()`; every scroller is `<HScroll>`;
+    every section header is `<Eyebrow>`.** No hand-rolled `position:"fixed"` scrim + panel —
+    `BottomSheet` owns the safe-area perimeter (#17), the standard corner close control (#4) and
+    the backdrop policy. **A scrollable sheet must pass `dismissOnBackdrop={false}`**; a scroll
+    ending on the scrim reads as a tap and closes the sheet mid-entry (recurred three times).
+
+    **Never override a style spread with `undefined`.** `{...btn(true), background: cond ? X :
+    undefined}` keeps the key set to undefined, which overrides the spread; React then applies NO
+    background and NO colour and the control falls back to the browser default button — light grey
+    with accent-blue text. This shipped on "End game for everyone" (`tournaments.tsx`) and "Copy
+    round summary" (`organizer-panel.tsx`), invisible to typecheck, lint and the build. Use a
+    conditional spread: `...(cond ? { background: X, color: Y } : {})`. — CI
+    (`ci/check-overlay-contract.py`, zero-tolerance on the undefined case)
 
 ## Refactor reachability / boundary integrity (v177.19+)
 26. **Byte-identical moves are not enough.** Every stateful extraction must preserve and permanently verify the full chain: entry action/effect -> state/props/parameters/refs/context -> extracted render/call -> outputs/callbacks/state updates -> downstream helpers/APIs/RPCs/database writes -> refresh/cancel/retry/exit. Reactive/effect timing is part of the contract. Use explicit exported prop types and `satisfies` for constructed spread-prop objects. CI must include permanent reachability/characterization checks plus orphan-state/dependency hygiene checks. Unused props/state/imports are boundary-drift warnings. Do not continue modularization while a known reachability defect is unresolved. Pure logic still requires old-vs-new differential testing where practical.

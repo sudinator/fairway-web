@@ -360,7 +360,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
         {isAdmin && (
           <button title={c.vetted ? "Vetted course — tap to unmark" : "Mark as vetted"}
             onClick={() => toggleVetted(c)} disabled={busyId === c.id}
-            style={{ background: "none", border: "none", borderRight: `1px solid ${C.line}`, color: c.vetted ? C.gold : C.faint, fontSize: 18, cursor: "pointer", padding: "0 14px" }}>
+            style={{ background: "none", border: "none", borderRight: `1px solid ${C.line}`, color: c.vetted ? C.sage : C.faint, fontSize: 18, cursor: "pointer", padding: "0 14px" }}>
             {c.vetted ? "★" : "☆"}
           </button>
         )}
@@ -368,7 +368,11 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
           style={{ flex: 1, textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: "13px 16px" }}>
           <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>
             {courseCardTitle(c)}
-            {c.vetted ? <span style={{ color: C.gold, fontSize: 12 }}> · vetted ★</span> : null}
+            {/* APP_RULES #25: gold is reserved for "someone must act". "vetted" is reassurance — the
+                calm state — so it reads as C.sage metadata. Also fixes contrast: C.gold on
+                C.card measured 2.38:1 at 12px, well under the 4.5:1 floor. */}
+            {c.vetted ? <span style={{ color: C.sage, fontSize: 12 }}> · vetted ★</span> : null}
+            {/* Stays gold on purpose: an admin genuinely has to review this one. */}
             {c.group_override ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 700 }}> · club edit pending review</span> : c.data?.corrected ? <span style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}> · ⚑ corrected</span> : null}
           </div>
           <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>

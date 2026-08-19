@@ -91,8 +91,10 @@ export const btn = (primary?: boolean): React.CSSProperties => ({
   border: "none", borderRadius: 10, padding: "11px 20px", fontSize: 14, fontWeight: 800, cursor: "pointer",
 });
 
+// APP_RULES #25: editable fields are C.cream, not C.card. A field should read as a filled-in
+// slot, not a sheet of paper — C.card is reserved for scorecards and score entry.
 export const inputStyle: React.CSSProperties = {
-  background: C.card, border: `1px solid ${C.line}`, borderRadius: 10,
+  background: C.cream, border: `1px solid ${C.line}`, borderRadius: 10,
   padding: "10px 13px", fontSize: 16, color: C.ink, width: "100%", boxSizing: "border-box",
 };
 
@@ -443,7 +445,7 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
           <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{title}</div>
           {recv > 0 && (
             <div style={{ color: "#E8730C", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4 }}>
-              {Array.from({ length: Math.min(recv, 3) }).map((_, d) => <span key={d} style={{ width: 6, height: 6, borderRadius: 99, background: "#E8730C", display: "inline-block" }} />)}
+              {Array.from({ length: Math.min(recv, 3) }).map((_, d) => <span key={d} style={{ width: 6, height: 6, borderRadius: 999, background: "#E8730C", display: "inline-block" }} />)}
               gets {recv} stroke{recv === 1 ? "" : "s"}
             </div>
           )}

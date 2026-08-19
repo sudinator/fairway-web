@@ -922,7 +922,7 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
       </div>
 
       {ended && (
-        <button onClick={copySummary} style={{ ...btn(true), width: "100%", marginTop: 12, fontSize: 14, padding: "11px 0", background: copied ? "#1F8F54" : undefined, color: copied ? "#fff" : undefined }}>
+        <button onClick={copySummary} style={{ ...btn(true), width: "100%", marginTop: 12, fontSize: 14, padding: "11px 0", ...(copied ? { background: "#1F8F54", color: "#fff" } : {}) }}>
           {copied ? "\u2713 Copied \u2014 paste into your chat" : "\u29c9 Copy round summary"}
         </button>
       )}

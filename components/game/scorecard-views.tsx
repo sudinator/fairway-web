@@ -233,14 +233,14 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
                   {recv > 0 && (
                     <div style={{ position: "absolute", top: 4, left: 5, display: "flex", gap: 2 }}>
                       {Array.from({ length: Math.min(recv, 2) }).map((_, d) => (
-                        <span key={d} style={{ width: 6, height: 6, borderRadius: 99, background: "#E8730C", display: "block" }} />
+                        <span key={d} style={{ width: 6, height: 6, borderRadius: 999, background: "#E8730C", display: "block" }} />
                       ))}
                     </div>
                   )}
                   {indRecv > 0 && (
                     <div style={{ position: "absolute", bottom: 4, left: 5, display: "flex", gap: 2 }}>
                       {Array.from({ length: Math.min(indRecv, 2) }).map((_, d) => (
-                        <span key={d} style={{ width: 6, height: 6, borderRadius: 99, background: C.indivDot, display: "block" }} />
+                        <span key={d} style={{ width: 6, height: 6, borderRadius: 999, background: C.indivDot, display: "block" }} />
                       ))}
                     </div>
                   )}
@@ -313,7 +313,7 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
           </div>
         ) : markerName ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#13352A", border: "0.5px solid #2E6B55", borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
-            <span style={{ width: 9, height: 9, borderRadius: 99, background: "#5BD08A", boxShadow: "0 0 0 3px rgba(91,208,138,0.25)" }} />
+            <span style={{ width: 9, height: 9, borderRadius: 999, background: "#5BD08A", boxShadow: "0 0 0 3px rgba(91,208,138,0.25)" }} />
             <span style={{ color: "#CFE3D8", fontSize: 12, flex: 1 }}>{groupLabel} · <strong style={{ color: C.cream }}>{markerName}</strong> is keeping score</span>
             {canClaim && onClaimGroup && <button onClick={() => { if (confirm(`Take over scoring for ${groupLabel} from ${markerName}?`)) onClaimGroup(); }} style={{ ...btn(false), fontSize: 11, padding: "5px 10px" }}>Take over</button>}
           </div>
@@ -333,7 +333,7 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
         </div>
       ) : markerName ? (
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#13352A", border: "0.5px solid #2E6B55", borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
-          <span style={{ width: 9, height: 9, borderRadius: 99, background: "#5BD08A", boxShadow: "0 0 0 3px rgba(91,208,138,0.25)" }} />
+          <span style={{ width: 9, height: 9, borderRadius: 999, background: "#5BD08A", boxShadow: "0 0 0 3px rgba(91,208,138,0.25)" }} />
           <span style={{ color: "#CFE3D8", fontSize: 12, flex: 1 }}>Live · <strong style={{ color: C.cream }}>{markerName}</strong> is keeping score</span>
           <button onClick={() => { if (confirm(`Take over scoring from ${markerName}?`)) onTakeOver(); }} style={{ ...btn(false), fontSize: 11, padding: "5px 10px" }}>Take over</button>
         </div>
@@ -378,7 +378,7 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
               {showPace && <span style={{ flex: 1 }} />}
               {showPace && (onPace ? (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(91,208,138,0.15)", color: "#7FD0A0", border: "1px solid rgba(91,208,138,0.4)", borderRadius: 999, padding: "2px 9px", fontSize: 11, fontWeight: 700 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: 99, background: "#5BD08A", display: "block" }} />On pace
+                  <span style={{ width: 6, height: 6, borderRadius: 999, background: "#5BD08A", display: "block" }} />On pace
                 </span>
               ) : (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(216,178,74,0.16)", color: "#E4CF86", border: "1px solid rgba(216,178,74,0.5)", borderRadius: 999, padding: "2px 9px", fontSize: 11, fontWeight: 700 }}>
@@ -406,7 +406,7 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
                   if (!relBasis) return <div style={{ color: C.sage, fontSize: 11 }}>hcp {matchHcp}</div>;
                   const line = (color: string, label: string, val: number) => (
                     <div style={{ color: C.sage, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, whiteSpace: "nowrap" }}>
-                      <span style={{ width: 5, height: 5, borderRadius: 99, background: color, display: "inline-block", flex: "none" }} />{label} {val}
+                      <span style={{ width: 5, height: 5, borderRadius: 999, background: color, display: "inline-block", flex: "none" }} />{label} {val}
                     </div>
                   );
                   return <>{line("#E8730C", "match hcp", matchHcp)}{line(C.indivDot, "course hcp", courseHcp)}</>;
