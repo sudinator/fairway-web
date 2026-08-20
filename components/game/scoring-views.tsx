@@ -202,11 +202,11 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
           const bNames = f.b.map(firstName).join(" & ") || "Pair 2";
           const halved = game.skins_mode === "split";
           return (
-            <div key={f.id} style={{ background: C.card, borderRadius: 12, padding: 14, marginTop: 12, border: mine ? `1px solid ${C.gold}` : "none" }}>
+            <div key={f.id} style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 12, border: mine ? `1px solid ${C.gold}` : "none" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{f.name}{mine ? " · your match" : ""}</div>
+                <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{f.name}{mine ? " · your match" : ""}</div>
                 <div style={{ flex: 1 }} />
-                <div style={{ color: C.green, fontWeight: 900, fontFamily: "Georgia, serif" }}>{fmtSkins(result.skinsBySide.a || 0)}–{fmtSkins(result.skinsBySide.b || 0)}</div>
+                <div style={{ color: C.cream, fontWeight: 900, fontFamily: "Georgia, serif" }}>{fmtSkins(result.skinsBySide.a || 0)}–{fmtSkins(result.skinsBySide.b || 0)}</div>
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                 <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
@@ -225,9 +225,9 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
                   const winnerLabel = h.winnerId === "a" ? aNames : h.winnerId === "b" ? bNames : "";
                   return (
                     <div key={h.hole} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: `1px solid ${C.line}` }}>
-                      <span style={{ width: 24, color: C.faint, fontWeight: 800, fontSize: 12 }}>{h.hole}</span>
-                      <span style={{ flex: 1, color: C.ink, fontSize: 12 }}>{won ? `${winnerLabel} wins` : tiedCarry ? (halved ? "Halved · ½ each" : "Halved — carries") : "Not played yet"}</span>
-                      {won ? <span style={{ background: C.greenLight, color: C.gold, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>{h.value} skin{h.value > 1 ? "s" : ""}</span> : tiedCarry ? <span style={{ background: "#5A3210", color: ORANGE, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>{halved ? "½ each" : "push →"}</span> : <span style={{ color: C.faint, fontSize: 11 }}>{h.value} at stake</span>}
+                      <span style={{ width: 24, color: C.sage, fontWeight: 800, fontSize: 12 }}>{h.hole}</span>
+                      <span style={{ flex: 1, color: C.cream, fontSize: 12 }}>{won ? `${winnerLabel} wins` : tiedCarry ? (halved ? "Halved · ½ each" : "Halved — carries") : "Not played yet"}</span>
+                      {won ? <span style={{ background: C.greenLight, color: C.gold, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>{h.value} skin{h.value > 1 ? "s" : ""}</span> : tiedCarry ? <span style={{ background: "#5A3210", color: ORANGE, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>{halved ? "½ each" : "push →"}</span> : <span style={{ color: C.sage, fontSize: 11 }}>{h.value} at stake</span>}
                     </div>
                   );
                 })}
@@ -295,11 +295,11 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
           })}
         </div>
         {matchCards.map(({ idx, pa, pb, result }) => (
-          <div key={idx} style={{ background: C.card, borderRadius: 12, padding: 14, marginTop: 12, border: pa.id === myKey || pb.id === myKey ? `1px solid ${C.gold}` : "none" }}>
+          <div key={idx} style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 12, border: pa.id === myKey || pb.id === myKey ? `1px solid ${C.gold}` : "none" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{pa.name}{isTeamSkins ? ` (${teamName(playerOf(pa.id)?.team)})` : ""} <span style={{ color: C.faint, fontWeight: 400 }}>vs</span> {pb.name}{isTeamSkins ? ` (${teamName(playerOf(pb.id)?.team)})` : ""}</div>
+              <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{pa.name}{isTeamSkins ? ` (${teamName(playerOf(pa.id)?.team)})` : ""} <span style={{ color: C.sage, fontWeight: 400 }}>vs</span> {pb.name}{isTeamSkins ? ` (${teamName(playerOf(pb.id)?.team)})` : ""}</div>
               <div style={{ flex: 1 }} />
-              <div style={{ color: C.green, fontWeight: 900, fontFamily: "Georgia, serif" }}>{fmtSkins(result.skinsBySide[pa.id] || 0)}–{fmtSkins(result.skinsBySide[pb.id] || 0)}</div>
+              <div style={{ color: C.cream, fontWeight: 900, fontFamily: "Georgia, serif" }}>{fmtSkins(result.skinsBySide[pa.id] || 0)}–{fmtSkins(result.skinsBySide[pb.id] || 0)}</div>
             </div>
             <div style={{ marginTop: 10 }}>
               {result.holes.map((h) => {
@@ -308,9 +308,9 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
                 const winnerLabel = h.winnerId === pa.id ? pa.name : h.winnerId === pb.id ? pb.name : "";
                 return (
                   <div key={h.hole} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0", borderTop: `1px solid ${C.line}` }}>
-                    <span style={{ width: 24, color: C.faint, fontWeight: 800, fontSize: 12 }}>{h.hole}</span>
-                    <span style={{ flex: 1, color: C.ink, fontSize: 12 }}>{won ? `${winnerLabel} wins` : tiedCarry ? "Halved — carries" : "Not played yet"}</span>
-                    {won ? <span style={{ background: C.greenLight, color: C.gold, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>{h.value} skin{h.value > 1 ? "s" : ""}</span> : tiedCarry ? <span style={{ background: "#5A3210", color: ORANGE, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>push →</span> : <span style={{ color: C.faint, fontSize: 11 }}>{h.value} at stake</span>}
+                    <span style={{ width: 24, color: C.sage, fontWeight: 800, fontSize: 12 }}>{h.hole}</span>
+                    <span style={{ flex: 1, color: C.cream, fontSize: 12 }}>{won ? `${winnerLabel} wins` : tiedCarry ? "Halved — carries" : "Not played yet"}</span>
+                    {won ? <span style={{ background: C.greenLight, color: C.gold, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>{h.value} skin{h.value > 1 ? "s" : ""}</span> : tiedCarry ? <span style={{ background: "#5A3210", color: ORANGE, fontSize: 11, padding: "3px 8px", borderRadius: 999 }}>push →</span> : <span style={{ color: C.sage, fontSize: 11 }}>{h.value} at stake</span>}
                   </div>
                 );
               })}
@@ -616,7 +616,7 @@ export function MatchView({
           <div
             key={idx}
             style={{
-              background: C.card,
+              background: C.greenLight,
               borderRadius: 12,
               padding: 14,
               marginTop: 10,
@@ -625,14 +625,14 @@ export function MatchView({
           >
             <div style={{ display: "flex", alignItems: "center" }}>
               <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", color: C.ink, fontWeight: 700, fontSize: 15 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", color: C.cream, fontWeight: 700, fontSize: 15 }}>
                   <Avatar src={pa.avatar_url} name={pa.display_name} size={24} />
                   <span>{pa.display_name}{isTeam ? <span style={{ color: C.gold, fontWeight: 400, fontSize: 12 }}> ({teamName(pa.team)})</span> : null}</span>
-                  <span style={{ color: C.faint, fontWeight: 400 }}>vs</span>
+                  <span style={{ color: C.sage, fontWeight: 400 }}>vs</span>
                   <Avatar src={pb.avatar_url} name={pb.display_name} size={24} />
                   <span>{pb.display_name}{isTeam ? <span style={{ color: C.gold, fontWeight: 400, fontSize: 12 }}> ({teamName(pb.team)})</span> : null}</span>
                 </div>
-                <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
+                <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
                   thru {st.thru} · {pa.display_name}{" "}
                   {allow.a === 0 ? "scratch" : `+${allow.a}`}, {pb.display_name}{" "}
                   {allow.b === 0 ? "scratch" : `+${allow.b}`}
@@ -649,7 +649,7 @@ export function MatchView({
                 >
                   {statusText}
                 </div>
-                <div style={{ color: C.faint, fontSize: 11 }}>
+                <div style={{ color: C.sage, fontSize: 11 }}>
                   {pa.display_name} {st.aWins}–{st.bWins} {pb.display_name}
                   {st.halves ? ` · ${st.halves} halved` : ""}
                 </div>
@@ -1081,11 +1081,11 @@ export function FourballView({
           ? tri.contests.reduce((acc: { a: number; b: number }, c) => { if (c.thru) { if (c.lead > 0) acc.a += 1; else if (c.lead < 0) acc.b += 1; else { acc.a += 0.5; acc.b += 0.5; } } return acc; }, { a: 0, b: 0 })
           : null;
         return (
-          <div key={f.id} style={{ background: C.card, borderRadius: 12, padding: 14, marginTop: 12, border: mine ? `1px solid ${C.gold}` : "none" }}>
+          <div key={f.id} style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 12, border: mine ? `1px solid ${C.gold}` : "none" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{f.name}{mine ? " · your match" : ""}</div>
+              <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{f.name}{mine ? " · your match" : ""}</div>
               <div style={{ flex: 1 }} />
-              <div style={{ color: C.green, fontWeight: 800, fontSize: 14, fontFamily: "Georgia, serif" }}>{isTrifecta ? (tri ? `${fmtPts(triTally ? triTally.a : tri.aPts)}–${fmtPts(triTally ? triTally.b : tri.bPts)}` : "—") : st ? st.result : "—"}</div>
+              <div style={{ color: C.cream, fontWeight: 800, fontSize: 14, fontFamily: "Georgia, serif" }}>{isTrifecta ? (tri ? `${fmtPts(triTally ? triTally.a : tri.aPts)}–${fmtPts(triTally ? triTally.b : tri.bPts)}` : "—") : st ? st.result : "—"}</div>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
@@ -1112,9 +1112,9 @@ export function FourballView({
                   return (
                     <React.Fragment key={ci}>
                       <div onClick={() => setOpenKey(isOpen ? null : key)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${C.line}`, cursor: "pointer" }}>
-                        <span style={{ color: C.faint, fontSize: 11, width: 12 }}>{isOpen ? "▾" : "▸"}</span>
-                        <span style={{ flex: 1, color: C.ink, fontSize: 13 }}>{label}</span>
-                        <span style={{ color: C.faint, fontSize: 11 }}>{c.thru ? `thru ${c.thru}` : "—"}</span>
+                        <span style={{ color: C.sage, fontSize: 11, width: 12 }}>{isOpen ? "▾" : "▸"}</span>
+                        <span style={{ flex: 1, color: C.cream, fontSize: 13 }}>{label}</span>
+                        <span style={{ color: C.sage, fontSize: 11 }}>{c.thru ? `thru ${c.thru}` : "—"}</span>
                         <span style={{ color: C.gold, fontWeight: 800, fontSize: 13, fontFamily: "Georgia, serif", minWidth: 46, textAlign: "right" }}>{triScoring === "match" ? (c.thru ? matchLeadLabel(c.lead) : "—") : `${fmtPts(c.aPts)}–${fmtPts(c.bPts)}`}</span>
                       </div>
                       {isOpen && <HoleDetail rows={c.perHole} aLabel={aLabel} bLabel={bLabel} aColor={aColor} bColor={bColor} runningMatch={triScoring === "match"} />}
@@ -1122,7 +1122,7 @@ export function FourballView({
                   );
                 })}
                 {isTeam && (
-                  <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>
+                  <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
                     {teamName(playerOf(f.a[0])?.team)} {fmtPts(triTally ? triTally.a : tri.aPts)} · {fmtPts(triTally ? triTally.b : tri.bPts)} {teamName(playerOf(f.b[0])?.team)}
                     {(f.a.length === 1 || f.b.length === 1) ? " · 2 v 1 — team point on best ball" : ""}
                   </div>
@@ -1136,15 +1136,15 @@ export function FourballView({
               return (
                 <div style={{ marginTop: 6 }}>
                   <div onClick={() => setOpenKey(isOpen ? null : key)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${C.line}`, cursor: "pointer" }}>
-                    <span style={{ color: C.faint, fontSize: 11, width: 12 }}>{isOpen ? "▾" : "▸"}</span>
-                    <span style={{ flex: 1, color: C.ink, fontSize: 12 }}>{leadText}</span>
-                    <span style={{ color: C.faint, fontSize: 11 }}>thru {st.thru}</span>
+                    <span style={{ color: C.sage, fontSize: 11, width: 12 }}>{isOpen ? "▾" : "▸"}</span>
+                    <span style={{ flex: 1, color: C.cream, fontSize: 12 }}>{leadText}</span>
+                    <span style={{ color: C.sage, fontSize: 11 }}>thru {st.thru}</span>
                   </div>
                   {isOpen && <HoleDetail rows={detail} aLabel={firstName(f.a[0]) + "'s"} bLabel={firstName(f.b[0]) + "'s"} aColor={C.birdie} bColor={C.bogey} />}
                 </div>
               );
             })()}
-            {!full && <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Needs players in both pairs.</div>}
+            {!full && <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Needs players in both pairs.</div>}
           </div>
         );
       })}

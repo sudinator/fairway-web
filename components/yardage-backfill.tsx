@@ -298,9 +298,9 @@ export function YardageBackfill() {
                       {results && results.length > 0 && !apiCourse && (
                         <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4, maxHeight: 160, overflowY: "auto" }}>
                           {results.map((r) => (
-                            <button key={r.id} onClick={() => pickResult(r.id)} style={{ textAlign: "left", background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 10px", cursor: "pointer" }}>
-                              <div style={{ color: C.ink, fontWeight: 700, fontSize: 13 }}>{r.name}</div>
-                              <div style={{ color: C.faint, fontSize: 11 }}>{r.club}{r.location ? ` · ${r.location}` : ""}</div>
+                            <button key={r.id} onClick={() => pickResult(r.id)} style={{ textAlign: "left", background: C.greenLight, border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 10px", cursor: "pointer" }}>
+                              <div style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>{r.name}</div>
+                              <div style={{ color: C.sage, fontSize: 11 }}>{r.club}{r.location ? ` · ${r.location}` : ""}</div>
                             </button>
                           ))}
                         </div>
@@ -318,9 +318,9 @@ export function YardageBackfill() {
 
                     {/* per-tee inputs */}
                     {(sel.data.tees || []).map((t, ti) => (
-                      <div key={ti} style={{ background: C.card, borderRadius: 10, padding: 10, marginTop: 8 }}>
+                      <div key={ti} style={{ background: C.greenLight, borderRadius: 10, padding: 10, marginTop: 8 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                          <div style={{ color: C.ink, fontWeight: 800, fontSize: 13 }}>{t.name}</div>
+                          <div style={{ color: C.cream, fontWeight: 800, fontSize: 13 }}>{t.name}</div>
                           {apiCourse && (
                             <select defaultValue={(apiCourse.tees || []).find((x) => norm(x.name) === norm(t.name))?.name || ""} onChange={(e) => fillTeeFrom(ti, e.target.value)} style={{ ...inputStyle, fontSize: 12, padding: "4px 8px" }}>
                               <option value="">map from API tee…</option>
@@ -331,8 +331,8 @@ export function YardageBackfill() {
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
                           {Array.from({ length: holesCount }, (_, hi) => (
                             <div key={hi} style={{ width: 42, textAlign: "center" }}>
-                              <div style={{ color: C.faint, fontSize: 11 }}>{hi + 1}</div>
-                              <input value={(yard[ti] || [])[hi] || ""} onChange={(e) => setCell(ti, hi, e.target.value)} inputMode="numeric" style={{ width: 42, padding: "4px 2px", textAlign: "center", fontSize: 12, border: `1px solid ${C.line}`, borderRadius: 6, color: C.ink, background: "#fff" }} />
+                              <div style={{ color: C.sage, fontSize: 11 }}>{hi + 1}</div>
+                              <input value={(yard[ti] || [])[hi] || ""} onChange={(e) => setCell(ti, hi, e.target.value)} inputMode="numeric" style={{ width: 42, padding: "4px 2px", textAlign: "center", fontSize: 12, border: `1px solid ${C.line}`, borderRadius: 6, color: C.cream, background: "#fff" }} />
                             </div>
                           ))}
                         </div>

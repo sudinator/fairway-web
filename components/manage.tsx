@@ -1259,22 +1259,22 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
 
       {profiles === null && <div style={{ color: C.sage, marginTop: 12 }}>Loading…</div>}
       {profiles?.map((p) => (
-        <div key={p.id} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div key={p.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <Avatar src={p.avatar_url} name={p.display_name || p.email || "?"} size={40} />
           <div style={{ flex: 1, minWidth: 180 }}>
-            <div style={{ color: C.ink, fontWeight: 700 }}>{p.display_name || "Golfer"}{p.id === user.id ? " (you)" : ""}{p.is_admin ? " ★" : ""}</div>
-            <div style={{ color: C.faint, fontSize: 12 }}>
+            <div style={{ color: C.cream, fontWeight: 700 }}>{p.display_name || "Golfer"}{p.id === user.id ? " (you)" : ""}{p.is_admin ? " ★" : ""}</div>
+            <div style={{ color: C.sage, fontSize: 12 }}>
               {p.email || "no email"}{p.phone ? ` · ${p.phone}` : ""}{p.ghin_number ? ` · GHIN ${p.ghin_number}` : ""}
             </div>
-            <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
+            <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
               Handicap: {p.handicap_index != null ? p.handicap_index : "—"}
             </div>
             {(() => {
               const mine = memberships.filter((m) => m.user_id === p.id);
               if (mine.length === 0) return <div style={{ color: C.birdie, fontSize: 12, marginTop: 2 }}>Clubs: none</div>;
               return (
-                <div style={{ color: C.green, fontSize: 12, marginTop: 2, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  <span style={{ color: C.faint }}>Clubs:</span>
+                <div style={{ color: C.cream, fontSize: 12, marginTop: 2, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  <span style={{ color: C.sage }}>Clubs:</span>
                   {mine.map((m) => {
                     const g = allGroups.find((x) => x.id === m.group_id);
                     return (
@@ -1286,10 +1286,10 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                 </div>
               );
             })()}
-            <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>active {timeAgo(p.last_active)}</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>active {timeAgo(p.last_active)}</div>
           </div>
           <div>
-            <label style={{ color: C.faint, fontSize: 11 }}>Handicap index</label>
+            <label style={{ color: C.sage, fontSize: 11 }}>Handicap index</label>
             <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
               <input inputMode="decimal" defaultValue={p.handicap_index != null ? String(p.handicap_index) : ""}
                 onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setEdits((m) => ({ ...m, [p.id]: v })); }}
@@ -1381,10 +1381,10 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 16, marginTop: 8, color: C.sage }}>No pending requests.</div>
         )}
         {pendingGroups.map((g) => (
-          <div key={g.id} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div key={g.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 180 }}>
-              <div style={{ color: C.ink, fontWeight: 700 }}>{g.name}</div>
-              <div style={{ color: C.faint, fontSize: 12 }}>
+              <div style={{ color: C.cream, fontWeight: 700 }}>{g.name}</div>
+              <div style={{ color: C.sage, fontSize: 12 }}>
                 from {g.requester?.display_name || g.requester?.email || "a member"}{g.request_note ? ` · "${g.request_note}"` : ""}
               </div>
             </div>
@@ -1403,10 +1403,10 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 16, marginTop: 8, color: C.sage }}>No deleted courses.</div>
         )}
         {deletedCourses.map((c) => (
-          <div key={c.id} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div key={c.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 160 }}>
-              <div style={{ color: C.ink, fontWeight: 700 }}>{c.name}</div>
-              <div style={{ color: C.faint, fontSize: 12 }}>{c.location ? c.location + " · " : ""}deleted {timeAgo(c.deleted_at)}</div>
+              <div style={{ color: C.cream, fontWeight: 700 }}>{c.name}</div>
+              <div style={{ color: C.sage, fontSize: 12 }}>{c.location ? c.location + " · " : ""}deleted {timeAgo(c.deleted_at)}</div>
             </div>
             <button style={{ ...btn(true), padding: "6px 14px", fontSize: 12 }} onClick={() => restoreCourse(c)}>Restore</button>
           </div>
@@ -1540,13 +1540,13 @@ export function NotificationsScreen({ user, onNavigate }: { user: any; onNavigat
         <>
           {items.map((n) => (
             <div key={n.id} onClick={() => { if (!n.read) markOne(n.id); if (n.link && onNavigate) onNavigate(n.link); }}
-              style={{ background: C.card, borderRadius: 12, padding: "13px 16px", marginTop: 10, display: "flex", gap: 11, cursor: (n.link || !n.read) ? "pointer" : "default" }}>
+              style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 10, display: "flex", gap: 11, cursor: (n.link || !n.read) ? "pointer" : "default" }}>
               <span style={{ width: 8, height: 8, borderRadius: 4, background: n.read ? "transparent" : C.gold, marginTop: 6, flexShrink: 0 }} />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ color: n.read ? "#6B6857" : C.ink, fontSize: 14, lineHeight: 1.4, fontWeight: n.read ? 500 : 800 }}>{n.message}</div>
-                <div style={{ color: C.faint, fontSize: 11, marginTop: 3 }}>{notifWhen(n.created_at)}</div>
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{notifWhen(n.created_at)}</div>
               </div>
-              {n.link ? <span style={{ color: C.faint, fontSize: 20, alignSelf: "center", flexShrink: 0 }}>›</span> : null}
+              {n.link ? <span style={{ color: C.sage, fontSize: 20, alignSelf: "center", flexShrink: 0 }}>›</span> : null}
             </div>
           ))}
           {hasMore && (
@@ -1652,7 +1652,7 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
                   <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, padding: "6px 2px", background: C.greenLight, borderTop: `2px solid ${C.greenMid}`, fontWeight: 800 }}>
                     <div style={{ color: C.gold, fontSize: 11 }}>{segStart === 0 ? "OUT" : "IN"}</div>
                     <div style={{ textAlign: "center", color: C.cream }}>{sPar}</div>
-                    <div style={{ textAlign: "center", color: C.green }}>{sScore || "–"}</div>
+                    <div style={{ textAlign: "center", color: C.cream }}>{sScore || "–"}</div>
                     <div style={{ textAlign: "center", color: C.sage }}>{sPutts || "–"}</div>
                   </div>
                 )}
@@ -1779,7 +1779,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
         const p = row.profiles || {};
         const self = row.user_id === user.id;
         return (
-          <div key={row.id} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 10 }}>
+          <div key={row.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 16px", marginTop: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <button
                 onClick={() => row.user_id && setCardMember(row)}
@@ -1789,24 +1789,24 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
               >
                 <Avatar src={row.avatar_url} name={p.display_name || row.email || "?"} size={48} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{p.display_name || row.email}{self ? " (you)" : ""}{row.role === "admin" ? " · admin" : ""}</div>
-                  <div style={{ color: C.faint, fontSize: 12 }}>
+                  <div style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>{p.display_name || row.email}{self ? " (you)" : ""}{row.role === "admin" ? " · admin" : ""}</div>
+                  <div style={{ color: C.sage, fontSize: 12 }}>
                     {p.handicap_index != null ? `Handicap ${p.handicap_index}` : row.status === "invited" ? "Invited" : "No handicap set"}
                     {p.ghin_number ? ` · GHIN ${p.ghin_number}` : ""}
                   </div>
                 </div>
               </button>
               {p.phone ? (
-                <a href={`tel:${p.phone}`} style={{ color: C.green, fontWeight: 700, fontSize: 14, textDecoration: "none", background: C.cream, borderRadius: 8, padding: "8px 12px" }}>{p.phone}</a>
+                <a href={`tel:${p.phone}`} style={{ color: C.cream, fontWeight: 700, fontSize: 14, textDecoration: "none", background: C.greenLight, borderRadius: 8, padding: "8px 12px" }}>{p.phone}</a>
               ) : !p.display_name ? (
-                <span style={{ color: C.faint, fontSize: 12 }}>{row.email}</span>
+                <span style={{ color: C.sage, fontSize: 12 }}>{row.email}</span>
               ) : null}
             </div>
 
             {isGroupAdmin && row.user_id && (
               <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "flex-end", flexWrap: "wrap", borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
                 <div>
-                  <label style={{ color: C.faint, fontSize: 11 }}>Handicap index</label>
+                  <label style={{ color: C.sage, fontSize: 11 }}>Handicap index</label>
                   <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
                     <input inputMode="decimal" defaultValue={p.handicap_index != null ? String(p.handicap_index) : ""}
                       onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setEdits((m) => ({ ...m, [row.id]: v })); }}
@@ -2213,16 +2213,16 @@ function AdminSandbaggers() {
         Players whose entered index differs from what their scoring in the app implies by 20% or more, once they have at least 18 posted rounds. An entered index higher than their scoring warrants (“index looks high”) is the classic sandbag — more strokes than their game deserves. The entered (GHIN) index always wins for display; this is only a flag to review. Under 18 rounds, nobody is judged.
       </div>
       {rows.length === 0 ? (
-        <div style={{ background: C.card, borderRadius: 12, padding: 16, color: C.faint, fontSize: 13 }}>No one flagged — every player with 18+ rounds has an entered index within 20% of their scoring.</div>
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: 16, color: C.sage, fontSize: 13 }}>No one flagged — every player with 18+ rounds has an entered index within 20% of their scoring.</div>
       ) : rows.map((r) => (
-        <div key={r.user_id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
+        <div key={r.user_id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: C.ink, fontWeight: 800, fontSize: 14 }}>{r.name}</div>
-            <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>Entered {Number(r.entered).toFixed(1)} · scoring says {Number(r.calc).toFixed(1)} · {r.rounds} rounds</div>
+            <div style={{ color: C.cream, fontWeight: 800, fontSize: 14 }}>{r.name}</div>
+            <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>Entered {Number(r.entered).toFixed(1)} · scoring says {Number(r.calc).toFixed(1)} · {r.rounds} rounds</div>
           </div>
           <div style={{ textAlign: "right", flexShrink: 0 }}>
             <div style={{ color: r.direction === "entered_high" ? C.birdie : C.gold, fontWeight: 800, fontSize: 15 }}>{r.diff_pct}%</div>
-            <div style={{ color: C.faint, fontSize: 11 }}>{r.direction === "entered_high" ? "index looks high" : "index looks low"}</div>
+            <div style={{ color: C.sage, fontSize: 11 }}>{r.direction === "entered_high" ? "index looks high" : "index looks low"}</div>
           </div>
         </div>
       ))}
@@ -2375,9 +2375,9 @@ export function ActivityTab() {
         </div>
       )}
       {shown.map((r) => (
-        <div key={r.id} style={{ background: C.card, borderRadius: 12, padding: "11px 14px", marginTop: 8 }}>
-          <div style={{ color: C.ink, fontSize: 14 }}>{r.summary}</div>
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 3 }}>
+        <div key={r.id} style={{ background: C.greenLight, borderRadius: 12, padding: "11px 14px", marginTop: 8 }}>
+          <div style={{ color: C.cream, fontSize: 14 }}>{r.summary}</div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>
             {r.actor_name || "Someone"} · {fmtDate(r.created_at)} at {new Date(r.created_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} · {timeAgo(r.created_at)}
           </div>
         </div>
@@ -2516,11 +2516,11 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
       {shown.map((g) => {
         const archived = g.status === "archived";
         return (
-          <div key={g.group_id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 8, opacity: archived ? 0.6 : 1 }}>
+          <div key={g.group_id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 8, opacity: archived ? 0.6 : 1 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{g.name}</div>
+              <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{g.name}</div>
               {g.is_default && <span style={{ color: C.gold, fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>★ default</span>}
-              {archived && <span style={{ color: C.faint, fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>· archived</span>}
+              {archived && <span style={{ color: C.sage, fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>· archived</span>}
               <div style={{ flex: 1 }} />
               {g.my_support ? (
                 <button disabled={busy === g.group_id}
@@ -2536,22 +2536,22 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
                 {archived ? "Restore" : "Archive"}
               </button>
             </div>
-            <div style={{ color: C.faint, fontSize: 12, marginTop: 4 }}>Admin: {g.admin_names || "—"}</div>
-            <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
+            <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>Admin: {g.admin_names || "—"}</div>
+            <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
               {g.member_count} member{g.member_count === 1 ? "" : "s"} · {g.rounds_count} round{g.rounds_count === 1 ? "" : "s"} · {g.games_count} game{g.games_count === 1 ? "" : "s"} · last activity {g.last_activity ? fmtDate(g.last_activity) : "—"}
             </div>
             <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
               <button disabled={busy === g.group_id} onClick={() => revokeInvites(g)}
-                style={{ background: "transparent", color: C.faint, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
                 Revoke invites
               </button>
               <button disabled={busy === g.group_id} onClick={() => { setMergeSrc(mergeSrc === g.group_id ? null : g.group_id); setMergeTo(""); }}
-                style={{ background: "transparent", color: C.faint, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
                 Merge…
               </button>
               {!g.is_default && (
                 <button disabled={busy === g.group_id} onClick={() => setDefault(g)}
-                  style={{ background: "transparent", color: C.faint, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                  style={{ background: "transparent", color: C.sage, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
                   Set as default
                 </button>
               )}
@@ -2677,15 +2677,15 @@ export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean 
         const banned = !!u.banned;
         const isSelf = u.id === user.id;
         return (
-          <div key={u.id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 8, opacity: banned ? 0.65 : 1 }}>
+          <div key={u.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 8, opacity: banned ? 0.65 : 1 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{u.display_name || "(no name)"}</div>
+              <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{u.display_name || "(no name)"}</div>
               {u.is_owner ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>★ owner</span>
                 : u.is_admin ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>★ system admin</span> : null}
               {banned && <span style={{ color: C.birdie, fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>· suspended</span>}
             </div>
-            <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{u.email || "—"}</div>
-            <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
+            <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>{u.email || "—"}</div>
+            <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
               {u.group_count} group{u.group_count === 1 ? "" : "s"} · {u.rounds_count} round{u.rounds_count === 1 ? "" : "s"}{u.handicap_index != null ? ` · hcp ${u.handicap_index}` : ""}
             </div>
             <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
@@ -2696,7 +2696,7 @@ export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean 
                 </button>
               )}
               <button disabled={busy === u.id} onClick={() => { setMergeKeep(mergeKeep === u.id ? null : u.id); setMergeRemove(""); setPreview(null); }}
-                style={{ background: "transparent", color: C.faint, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}>
+                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}>
                 Merge another into this…
               </button>
               <button disabled={busy === u.id || isSelf} onClick={() => setBanned(u, !banned)}

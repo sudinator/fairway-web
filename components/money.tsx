@@ -738,7 +738,7 @@ function SettleScreen({ groups, nameOf, memberById, balances, busy, me, isAdmin,
                   {isMine && to?.zelle_handle && <button disabled={busy} onClick={() => onZelle(t)} style={{ flex: "1 1 68px", border: "none", borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#6D1ED4", color: "#fff" }}>Zelle</button>}
                   {isMine && !to?.venmo_handle && !to?.paypal_handle && !to?.zelle_handle && <span style={{ flex: 1, color: C.sage, fontSize: 11 }}>no handle on file — pay cash</span>}
                   {canMark
-                    ? <button disabled={busy} onClick={() => askMark(t)} style={{ flex: "1 1 68px", border: `1px solid ${C.line}`, borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: C.cream, color: C.green }}>{isMine ? "Mark paid" : isPayee ? "Mark received" : "Mark paid (admin)"}</button>
+                    ? <button disabled={busy} onClick={() => askMark(t)} style={{ flex: "1 1 68px", border: `1px solid ${C.line}`, borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: C.greenLight, color: C.cream }}>{isMine ? "Mark paid" : isPayee ? "Mark received" : "Mark paid (admin)"}</button>
                     : <span style={{ flex: 1, color: C.sage, fontSize: 11.5, textAlign: "right" }}>Only {nameOf(t.from)} or {nameOf(t.to)} can mark this</span>}
                 </div>
               );

@@ -248,7 +248,7 @@ export function OrganizerPanel({
                 <div
                   key={p.id}
                   style={{
-                    background: C.card,
+                    background: C.greenLight,
                     borderRadius: 12,
                     padding: 12,
                     marginTop: 10,
@@ -259,13 +259,13 @@ export function OrganizerPanel({
                   <Avatar src={p.avatar_url} name={p.display_name} size={48} />
                   <div style={{ minWidth: 0, flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-                      <div style={{ color: C.ink, fontWeight: 800, fontSize: 15, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <div style={{ color: C.cream, fontWeight: 800, fontSize: 15, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
                       {p.display_name}
                       {p.user_id === game.created_by ? " (organizer)" : ""}
                       </div>
                       {p.is_guest ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>guest</span> : null}
                     </div>
-                    <div style={{ color: C.faint, fontSize: 12 }}>
+                    <div style={{ color: C.sage, fontSize: 12 }}>
                       {p.course_handicap != null
                         ? `course handicap ${p.course_handicap} · plays ${applyAllowance(chBasis(p, game.course_par), game.allowance_pct ?? 100)}${(game.allowance_pct ?? 100) !== 100 ? ` (${game.allowance_pct}%)` : ""}`
                         : "no handicap yet"}
@@ -278,7 +278,7 @@ export function OrganizerPanel({
                   <>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(132px, 1fr))", gap: 10, marginTop: 12 }}>
                     <div>
-                      <label style={{ color: C.faint, fontSize: 11 }}>Handicap</label>
+                      <label style={{ color: C.sage, fontSize: 11 }}>Handicap</label>
                     <div style={{ display: "flex", gap: 5, marginTop: 2 }}>
                       <input
                         inputMode="decimal"
@@ -301,7 +301,7 @@ export function OrganizerPanel({
                   </div>
 
                   <div>
-                    <label style={{ color: C.faint, fontSize: 11 }}>Tee</label>
+                    <label style={{ color: C.sage, fontSize: 11 }}>Tee</label>
                     <select
                       value={p.tee_name || ""}
                       onChange={(e) => onSetTee(p, e.target.value)}
@@ -370,7 +370,7 @@ export function OrganizerPanel({
                         </button>
                       );
                     })}
-                    {p.team ? <span style={{ color: C.faint, fontSize: 11 }}>tap again to clear</span> : <span style={{ color: C.faint, fontSize: 11 }}>no team yet</span>}
+                    {p.team ? <span style={{ color: C.sage, fontSize: 11 }}>tap again to clear</span> : <span style={{ color: C.sage, fontSize: 11 }}>no team yet</span>}
                   </div>
                   )}
                 </div>
@@ -384,11 +384,11 @@ export function OrganizerPanel({
                 const mem = orderedPlayers.filter((p) => p.team === t.key);
                 const accent = teamAccent(t.name, ti);
                 return (
-                  <div key={t.key} style={{ background: C.card, borderRadius: 10, padding: 12, border: `1px solid ${accent}` }}>
+                  <div key={t.key} style={{ background: C.greenLight, borderRadius: 10, padding: 12, border: `1px solid ${accent}` }}>
                     <div style={{ color: accent, fontWeight: 800, fontSize: 13 }}>{t.name}</div>
-                    <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>{mem.length} player{mem.length === 1 ? "" : "s"}</div>
-                    <div style={{ marginTop: 8, color: C.ink, fontSize: 13, lineHeight: 1.8 }}>
-                      {mem.length ? mem.map((p) => <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 7 }}><Avatar src={p.avatar_url} name={p.display_name} size={20} enlargeable={false} /><span>{p.display_name} <span style={{ color: C.faint }}>CH {p.course_handicap ?? "—"}</span></span></div>) : <span style={{ color: C.faint }}>No players assigned</span>}
+                    <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>{mem.length} player{mem.length === 1 ? "" : "s"}</div>
+                    <div style={{ marginTop: 8, color: C.cream, fontSize: 13, lineHeight: 1.8 }}>
+                      {mem.length ? mem.map((p) => <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 7 }}><Avatar src={p.avatar_url} name={p.display_name} size={20} enlargeable={false} /><span>{p.display_name} <span style={{ color: C.sage }}>CH {p.course_handicap ?? "—"}</span></span></div>) : <span style={{ color: C.sage }}>No players assigned</span>}
                     </div>
                   </div>
                 );
@@ -962,9 +962,9 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
           </div>
 
           {/* Pot + split */}
-          <div style={{ marginTop: 14, background: C.card, borderRadius: 10, padding: 12 }}>
+          <div style={{ marginTop: 14, background: C.greenLight, borderRadius: 10, padding: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>Pot: ${result.pot.toFixed(0)}</div>
+              <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>Pot: ${result.pot.toFixed(0)}</div>
               <div style={{ flex: 1 }} />
               <button onClick={() => setEditSplit((v) => !v)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>
                 {editSplit ? "Done" : "Edit split"}
@@ -974,21 +974,21 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
               <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
                 {([["segPct", "Each six-hole segment (×3)"], ["secondPct", "2nd overall"], ["firstPct", "1st overall"]] as [keyof BetSplit, string][]).map(([k, label]) => (
                   <div key={k} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ color: C.faint, fontSize: 12, flex: 1 }}>{label}</span>
+                    <span style={{ color: C.sage, fontSize: 12, flex: 1 }}>{label}</span>
                     <input type="number" value={Math.round(split[k] * 1000) / 10}
                       onChange={(e) => setSplit((s) => ({ ...s, [k]: (Number(e.target.value) || 0) / 100 }))}
                       style={{ ...inputStyle, width: 70, padding: "5px 8px", fontSize: 12 }} />
-                    <span style={{ color: C.faint, fontSize: 12 }}>%</span>
+                    <span style={{ color: C.sage, fontSize: 12 }}>%</span>
                   </div>
                 ))}
-                <div style={{ color: C.faint, fontSize: 11 }}>
+                <div style={{ color: C.sage, fontSize: 11 }}>
                   3 segments + 2nd + 1st = {pct(split.segPct * 3 + split.secondPct + split.firstPct)} of pot.
                   {Math.abs(split.segPct * 3 + split.secondPct + split.firstPct - 1) > 0.001 && " ⚠ Should total 100%."}
                 </div>
                 <button onClick={() => setSplit(DEFAULT_BET_SPLIT)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px", alignSelf: "flex-start" }}>Reset to default</button>
               </div>
             ) : (
-              <div style={{ color: C.faint, fontSize: 11, marginTop: 4 }}>
+              <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
                 {result.pot > 0
                   ? `Each six: $${Math.round(result.pot * split.segPct)} · 2nd: $${Math.round(result.pot * split.secondPct)} · 1st: $${Math.round(result.pot * split.firstPct)}`
                   : `Each six: ${pct(split.segPct)} · 2nd: ${pct(split.secondPct)} · 1st: ${pct(split.firstPct)}`}
@@ -1016,12 +1016,12 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
             <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>NET RESULT</div>
             <div style={{ marginTop: 6 }}>
               {result.perPlayer.slice().sort((a, b) => b.net - a.net).map((p) => (
-                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, background: C.card, borderRadius: 10, padding: "9px 12px", marginTop: 6 }}>
-                  <div style={{ flex: 1, minWidth: 0, color: C.ink, fontWeight: 800 }}>
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 10, background: C.greenLight, borderRadius: 10, padding: "9px 12px", marginTop: 6 }}>
+                  <div style={{ flex: 1, minWidth: 0, color: C.cream, fontWeight: 800 }}>
                     {p.name}
-                    {idToIsGuest[p.id] && (() => { const sp = nameOfUid(idToGuestOf[p.id] || ""); return <div style={{ color: C.faint, fontSize: 11, fontWeight: 700 }}>guest of {sp} · {sp} {p.net >= 0 ? "is paid this" : "pays this"}</div>; })()}
+                    {idToIsGuest[p.id] && (() => { const sp = nameOfUid(idToGuestOf[p.id] || ""); return <div style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}>guest of {sp} · {sp} {p.net >= 0 ? "is paid this" : "pays this"}</div>; })()}
                   </div>
-                  <div style={{ color: C.faint, fontSize: 12 }}>won ${p.won.toFixed(2)}</div>
+                  <div style={{ color: C.sage, fontSize: 12 }}>won ${p.won.toFixed(2)}</div>
                   <div style={{ width: 80, textAlign: "right", fontWeight: 800, fontFamily: "Georgia, serif", fontSize: 15, color: p.net >= 0 ? C.green : C.birdie }}>
                     {p.net >= 0 ? "+" : "−"}${Math.abs(p.net).toFixed(2)}
                   </div>
@@ -1047,14 +1047,14 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
                       {!reposting ? (
                         <button onClick={() => { setReposting(true); setPostMsg(null); }} disabled={busy} style={{ ...btn(true), fontSize: 12, marginTop: 8 }}>Review &amp; re-post</button>
                       ) : (
-                        <div style={{ background: C.card, borderRadius: 10, padding: 12, marginTop: 8 }}>
-                          <div style={{ color: C.ink, fontWeight: 800, fontSize: 13 }}>Corrected winnings</div>
+                        <div style={{ background: C.greenLight, borderRadius: 10, padding: 12, marginTop: 8 }}>
+                          <div style={{ color: C.cream, fontWeight: 800, fontSize: 13 }}>Corrected winnings</div>
                           <div style={{ marginTop: 8 }}>
                             {repostDeltas.map((r) => (
                               <div key={r.uid} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", fontSize: 12.5 }}>
-                                <span style={{ color: C.ink }}>{r.name}</span>
+                                <span style={{ color: C.cream }}>{r.name}</span>
                                 <span style={{ fontFamily: "Georgia, serif" }}>
-                                  <span style={{ color: C.faint, textDecoration: "line-through" }}>{centsNet(r.oldC)}</span>{"  "}
+                                  <span style={{ color: C.sage, textDecoration: "line-through" }}>{centsNet(r.oldC)}</span>{"  "}
                                   <span style={{ fontWeight: 800, color: r.newC >= 0 ? C.green : C.birdie }}>{centsNet(r.newC)}</span>
                                 </span>
                               </div>
@@ -1079,15 +1079,15 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
               ) : !confirming ? (
                 <button onClick={() => { setConfirming(true); setPostMsg(null); }} style={{ ...btn(true), width: "100%", fontSize: 14, padding: "11px 0" }}>Post winnings to Money</button>
               ) : (
-                <div style={{ background: C.card, borderRadius: 12, padding: 14 }}>
-                  <div style={{ color: C.ink, fontWeight: 800, fontSize: 14 }}>Confirm bet winnings</div>
-                  <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>Posts one “Bet” expense so losers owe winners in the Money tab.</div>
+                <div style={{ background: C.greenLight, borderRadius: 12, padding: 14 }}>
+                  <div style={{ color: C.cream, fontWeight: 800, fontSize: 14 }}>Confirm bet winnings</div>
+                  <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>Posts one “Bet” expense so losers owe winners in the Money tab.</div>
                   <div style={{ marginTop: 10 }}>
                     {result.perPlayer.slice().sort((a, b) => b.net - a.net).map((p) => (
                       <div key={p.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, padding: "5px 0", fontSize: 13 }}>
                         <div style={{ minWidth: 0 }}>
-                          <span style={{ color: C.ink }}>{p.name}</span>
-                          {idToIsGuest[p.id] && (() => { const sp = nameOfUid(idToGuestOf[p.id] || ""); return <div style={{ color: C.faint, fontSize: 11, fontWeight: 700 }}>guest of {sp} · {sp} {p.net >= 0 ? "is paid this" : "pays this"}</div>; })()}
+                          <span style={{ color: C.cream }}>{p.name}</span>
+                          {idToIsGuest[p.id] && (() => { const sp = nameOfUid(idToGuestOf[p.id] || ""); return <div style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}>guest of {sp} · {sp} {p.net >= 0 ? "is paid this" : "pays this"}</div>; })()}
                         </div>
                         <span style={{ fontWeight: 800, fontFamily: "Georgia, serif", color: p.net >= 0 ? C.green : C.birdie }}>{p.net >= 0 ? "+" : "−"}${Math.abs(p.net).toFixed(2)}</span>
                       </div>

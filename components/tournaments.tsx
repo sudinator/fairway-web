@@ -639,9 +639,9 @@ function CreateGame({
     <div style={{ maxWidth: 600 }}>
       <Eyebrow>CREATE A GAME</Eyebrow>
       {draftAvailable && !draftDismissed && (
-        <div style={{ marginTop: 12, background: "#faf6ea", border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 14px" }}>
-          <div style={{ color: C.ink, fontSize: 13, fontWeight: 700 }}>Resume your setup?</div>
-          <div style={{ color: C.faint, fontSize: 12, marginTop: 3, lineHeight: 1.45 }}>
+        <div style={{ marginTop: 12, background: C.greenLight, border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 14px" }}>
+          <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Resume your setup?</div>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 3, lineHeight: 1.45 }}>
             You left a game setup unfinished {draftAgeLabel(draftAvailable.savedAt)}. Pick up where you left off, or start fresh.
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
@@ -3047,21 +3047,21 @@ function GameRoom({
         const complete = fp.gaps.length === 0;
         return (
           <div onClick={() => setFinishPrompt(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 1000 }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ background: C.card, color: C.ink, borderRadius: 16, padding: 20, maxWidth: 460, width: "100%", maxHeight: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 32px)", overflowY: "auto" }}>
-              <div style={{ fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800, color: C.green }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, color: C.cream, borderRadius: 16, padding: 20, maxWidth: 460, width: "100%", maxHeight: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 32px)", overflowY: "auto" }}>
+              <div style={{ fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800, color: C.cream }}>
                 {fp.kind === "group" ? `Finish Group ${fp.teeGroup}'s round?` : "End the game for everyone?"}
               </div>
               {complete ? (
-                <div style={{ color: C.faint, fontSize: 14, marginTop: 10, lineHeight: 1.5 }}>Everything's entered. {lockMsg}</div>
+                <div style={{ color: C.sage, fontSize: 14, marginTop: 10, lineHeight: 1.5 }}>Everything's entered. {lockMsg}</div>
               ) : (
                 <>
-                  <div style={{ color: C.ink, fontSize: 14, marginTop: 10, lineHeight: 1.5 }}>Some things aren't filled in yet:</div>
+                  <div style={{ color: C.cream, fontSize: 14, marginTop: 10, lineHeight: 1.5 }}>Some things aren't filled in yet:</div>
                   <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
                     {fp.gaps.map((g) => (
-                      <div key={g.name} style={{ background: "#F4F0E1", borderRadius: 10, padding: "9px 12px", fontSize: 13, lineHeight: 1.45 }}>
+                      <div key={g.name} style={{ background: C.greenLight, borderRadius: 10, padding: "9px 12px", fontSize: 13, lineHeight: 1.45 }}>
                         <b>{g.name}</b>{" \u2014 "}
                         {g.noScores ? <span style={{ color: C.birdie }}>no scores entered</span> : (
-                          <span style={{ color: C.faint }}>
+                          <span style={{ color: C.sage }}>
                             {[
                               g.missScores.length ? `scores on ${finishListFmt(g.missScores)}` : null,
                               g.missPutts.length ? `putts on ${finishListFmt(g.missPutts)}` : null,
@@ -3072,7 +3072,7 @@ function GameRoom({
                       </div>
                     ))}
                   </div>
-                  <div style={{ color: C.faint, fontSize: 12.5, marginTop: 12, lineHeight: 1.5 }}>{lockMsg} You can finish anyway — missing scores just won't count.</div>
+                  <div style={{ color: C.sage, fontSize: 12.5, marginTop: 12, lineHeight: 1.5 }}>{lockMsg} You can finish anyway — missing scores just won't count.</div>
                 </>
               )}
               <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "flex-end" }}>

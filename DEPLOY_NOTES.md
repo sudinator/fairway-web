@@ -1,3 +1,37 @@
+## 177.62.260819 — Surface migration: list rows and panels go green
+- **NO migration. Cosmetic + CI only.** Builds on 177.61 (same staging base).
+- **63 surfaces flipped from cream to green**, from a per-site classification of all 118 light
+  surfaces in the app. The rule (APP_RULES #25): cream is scorecards, score entry, editable fields
+  and pick-control outlines; green is everything else. Affected: rounds list, games list, course
+  library, Manage Game player cards, tee times and RSVP rows, admin panels, contests standings, the
+  end-game confirmation, and assorted chrome.
+- **174 text colours re-picked** on those surfaces. This is the part that matters: a flipped
+  background silently leaves its text on the wrong family — `C.ink` is 1.90:1 on green, `C.faint`
+  2.24:1, and `C.green`-as-text 1.54:1. Every one was resolved by walking the JSX ancestor chain,
+  then verified by `ci/check_resolved_contrast.py`.
+- **Net contrast effect: zero regressions.** 39 sub-threshold sites before, 39 after, and no text
+  anywhere on the wrong surface family. Two intermediate states during the work were worse (68 at
+  one point) and were caught by the guard, not by review.
+- **Editable fields now read correctly.** `C.field` (#EBE3CC) was introduced in 177.61 but sat on
+  near-white cards, so two light tones competed. On green the field reads as a filled-in slot,
+  which is what the token was for.
+- **Deferred 177.61 changes are now correct**, three of them applied automatically by the
+  resolver: `vetted ★` and `✓ in your library` -> `C.sage`; Games-list share code -> `C.cream`
+  (7.29:1 on green). The course-library star toggle -> `C.gold` when set, `C.sage` outline when
+  not; it is a control you act on, so gold belongs there, and `C.line` at 1.49:1 had made the
+  empty state nearly invisible.
+- **NEW component test harness** — `lib/test-dom.ts`, `lib/test-render.ts`,
+  `lib/component-render.test.tsx` (17 assertions). jsdom + React 19 `createRoot` inside `act()`,
+  following the repo's existing compile-then-run convention rather than adding a framework. Before
+  this, no component in this repo had ever been executed in a test.
+- **Correction to an earlier claim:** the conditional `useId()` fixed at 177.59 was described in
+  prior notes as a runtime crash. The harness proves it is not — React 19 neither throws nor warns
+  in either hook-count direction. It remains a rules-of-hooks violation worth fixing, but it was
+  never an outage risk and should not have been characterised as one.
+- **Still deferred:** the geometry scales (161 paddings, 21 radii, 20 font sizes, 174 ad-hoc
+  buttons) remain ratcheted but not collapsed. 39 sub-threshold sites remain, mostly near-miss reds
+  on green (3.8-4.1:1) needing a lighter red token.
+
 ## 177.61.260819 — Colour correctness: measured contrast across the whole app
 - **NO migration. Cosmetic + CI only.** Supersedes the 177.59/177.60 candidates, which were never
   merged to main; this is built from the same staging base.

@@ -55,7 +55,7 @@ function FeatureMirrorControl({ groups, activeGroupId }: { groups: AppGroup[]; a
         ))}
         <option value="__self__">Off — App Testing behaves as itself</option>
       </select>
-      <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Per-device setting; changing it reloads the app. No data is copied or changed.</div>
+      <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Per-device setting; changing it reloads the app. No data is copied or changed.</div>
     </div>
   );
 }
@@ -318,10 +318,10 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
                 {copyMsg && <span style={{ color: C.gold, fontSize: 12 }}>{copyMsg}</span>}
               </div>
               {inviteLink && (
-                <div style={{ background: C.card, borderRadius: 10, padding: 12, marginTop: 10 }}>
-                  <div style={{ color: C.faint, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>SHARE THIS LINK</div>
-                  <div style={{ color: C.green, fontSize: 13, marginTop: 6, wordBreak: "break-all", fontWeight: 800 }}>{inviteLink}</div>
-                  <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Expires in 30 days and can only be used once.</div>
+                <div style={{ background: C.greenLight, borderRadius: 10, padding: 12, marginTop: 10 }}>
+                  <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>SHARE THIS LINK</div>
+                  <div style={{ color: C.cream, fontSize: 13, marginTop: 6, wordBreak: "break-all", fontWeight: 800 }}>{inviteLink}</div>
+                  <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Expires in 30 days and can only be used once.</div>
                 </div>
               )}
             </div>
@@ -336,11 +336,11 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
               const name = m.profiles?.display_name || m.email;
               const self = m.user_id === user.id;
               return (
-                <div key={m.id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div key={m.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <Avatar src={m.profiles?.avatar_url} name={name} size={40} />
                   <div style={{ flex: 1, minWidth: 190 }}>
-                    <div style={{ color: C.ink, fontWeight: 800 }}>{name}{self ? " (you)" : ""}</div>
-                    <div style={{ color: C.faint, fontSize: 12 }}>{m.status}{m.role === "admin" ? " · admin" : ""}</div>
+                    <div style={{ color: C.cream, fontWeight: 800 }}>{name}{self ? " (you)" : ""}</div>
+                    <div style={{ color: C.sage, fontSize: 12 }}>{m.status}{m.role === "admin" ? " · admin" : ""}</div>
                   </div>
                   {isAdmin && !self && m.status !== "removed" && (
                     <>

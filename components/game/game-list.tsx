@@ -250,21 +250,18 @@ export function GameList({
           key={g.id}
           onClick={() => onOpen(g.id)}
           style={{
-            background: C.card,
+            background: C.greenLight,
             borderRadius: 12,
             padding: "14px 16px",
             marginTop: 10,
             cursor: "pointer",
           }}
         >
-          <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>
+          <div style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>
             {g.name}
             {g.status === "ended" ? <span style={{ color: "#1A1A1A", background: C.gold, borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 800, marginLeft: 8 }}>FINAL</span> : null}
           </div>
-          <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
-            {/* APP_RULES #25: C.green is cream-surface text only. Its job here was being the DARKEST
-                thing in a light subtitle; on a green row the equivalent is the BRIGHTEST thing
-                in a sage subtitle. C.green on C.greenLight is 1.54:1. */}
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
             {g.course} · code <b style={{ color: C.cream }}>{g.code}</b>
           </div>
         </div>

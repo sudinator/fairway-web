@@ -567,7 +567,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, getTeeGroupPolicy,
               : randomizeReason}
           </div>
           {overflowIds.length > 0 && (
-            <div style={{ marginTop: 8, background: "#fff6e6", border: `1px solid ${C.gold}`, borderRadius: 8, padding: "9px 11px", color: "#8a5a12", fontSize: 12, lineHeight: 1.45 }}>
+            <div style={{ marginTop: 8, background: C.greenLight, border: `1px solid ${C.gold}`, borderRadius: 8, padding: "9px 11px", color: "#8a5a12", fontSize: 12, lineHeight: 1.45 }}>
               {overflowIds.length} guest{overflowIds.length === 1 ? "" : "s"} couldn&apos;t be auto-placed (a member brought more than three): {overflowIds.map((id) => players.find((p) => p.id === id)?.display_name || "guest").join(", ")}. Assign {overflowIds.length === 1 ? "them" : "each"} to a group below.
             </div>
           )}
@@ -577,10 +577,10 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, getTeeGroupPolicy,
       {units.map((u) => {
         const g = unitGroup(u);
         return (
-          <div key={u.id} style={{ background: C.card, borderRadius: 10, padding: 12, marginTop: 10, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div key={u.id} style={{ background: C.greenLight, borderRadius: 10, padding: 12, marginTop: 10, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: C.ink, fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis" }}>{u.label}</div>
-              <div style={{ color: C.faint, fontSize: 11 }}>{u.members.length} player{u.members.length === 1 ? "" : "s"}</div>
+              <div style={{ color: C.cream, fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis" }}>{u.label}</div>
+              <div style={{ color: C.sage, fontSize: 11 }}>{u.members.length} player{u.members.length === 1 ? "" : "s"}</div>
             </div>
             {(() => {
               const unitBlocked = u.members.some((m) => getTeeGroupPolicy?.(m, g).blocked);
@@ -601,16 +601,16 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, getTeeGroupPolicy,
           {teeGroups.map((gn) => {
             const mem = players.filter((p) => p.tee_group === gn);
             return (
-              <div key={gn} style={{ background: C.card, borderRadius: 10, padding: 12, border: `1px solid ${C.gold}` }}>
+              <div key={gn} style={{ background: C.greenLight, borderRadius: 10, padding: 12, border: `1px solid ${C.gold}` }}>
                 <div style={{ color: C.gold, fontWeight: 800, fontSize: 13 }}>Group {gn}{gn === firstGroup ? " · off first" : ""}</div>
-                <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>{mem.length} player{mem.length === 1 ? "" : "s"}</div>
-                <div style={{ marginTop: 8, color: C.ink, fontSize: 13, lineHeight: 1.7 }}>
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>{mem.length} player{mem.length === 1 ? "" : "s"}</div>
+                <div style={{ marginTop: 8, color: C.cream, fontSize: 13, lineHeight: 1.7 }}>
                   {mem.map((p) => {
                     const sponsor = p.is_guest && p.guest_of ? (players.find((m) => m.user_id === p.guest_of)?.display_name || null) : null;
-                    return <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 7 }}><Avatar src={p.avatar_url} name={p.display_name} size={20} enlargeable={false} /><span>{p.display_name}{sponsor ? <span style={{ color: C.faint, fontSize: 11 }}> · guest of {sponsor}</span> : null}</span></div>;
+                    return <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 7 }}><Avatar src={p.avatar_url} name={p.display_name} size={20} enlargeable={false} /><span>{p.display_name}{sponsor ? <span style={{ color: C.sage, fontSize: 11 }}> · guest of {sponsor}</span> : null}</span></div>;
                   })}
                 </div>
-                <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Scorer: chosen on the course</div>
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Scorer: chosen on the course</div>
               </div>
             );
           })}

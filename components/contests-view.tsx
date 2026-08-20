@@ -357,7 +357,7 @@ export function ContestHoleChip({ gameId, hole, players, userId, myName, canLogO
         const best = board?.best || null;
         const open = openId === contest.id;
         return (
-          <div key={contest.id} style={{ background: "#EAF3EC", border: "1px solid #CFE3D4", borderRadius: 12, padding: "10px 12px" }}>
+          <div key={contest.id} style={{ background: C.greenLight, border: "1px solid #CFE3D4", borderRadius: 12, padding: "10px 12px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 16 }}>{KIND_ICON[contest.kind] || "🏁"}</span>
               <div style={{ flex: 1, minWidth: 0 }}>

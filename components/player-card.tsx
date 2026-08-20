@@ -297,8 +297,8 @@ function ContactBar({ recipientId, groupId, name, phone }: { recipientId: string
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {phone && (
           <>
-            <a href={`tel:${phone}`} style={{ flex: 1, minWidth: 96, textAlign: "center", background: C.cream, color: C.green, fontWeight: 800, fontSize: 13, textDecoration: "none", borderRadius: 9, padding: "10px 12px" }}>Call</a>
-            <a href={`sms:${phone}`} style={{ flex: 1, minWidth: 96, textAlign: "center", background: C.cream, color: C.green, fontWeight: 800, fontSize: 13, textDecoration: "none", borderRadius: 9, padding: "10px 12px" }}>Text</a>
+            <a href={`tel:${phone}`} style={{ flex: 1, minWidth: 96, textAlign: "center", background: C.greenLight, color: C.cream, fontWeight: 800, fontSize: 13, textDecoration: "none", borderRadius: 9, padding: "10px 12px" }}>Call</a>
+            <a href={`sms:${phone}`} style={{ flex: 1, minWidth: 96, textAlign: "center", background: C.greenLight, color: C.cream, fontWeight: 800, fontSize: 13, textDecoration: "none", borderRadius: 9, padding: "10px 12px" }}>Text</a>
           </>
         )}
         <button onClick={() => { setOpenMsg((v) => !v); setStatus(null); }} style={{ flex: 1, minWidth: 96, background: C.gold, color: "#1c1c15", fontWeight: 800, fontSize: 13, border: "none", borderRadius: 9, padding: "10px 12px", cursor: "pointer" }}>

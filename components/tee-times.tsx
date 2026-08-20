@@ -304,7 +304,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
             {canOrganizeTee && r.guest_names?.length ? (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 4 }}>
                 {r.guest_names.map((gn, gi) => (
-                  <span key={gi} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "#eef3ee", border: `1px solid ${C.line}`, borderRadius: 999, padding: "2px 6px 2px 9px", fontSize: 11, color: C.ink }}>
+                  <span key={gi} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: C.greenLight, border: `1px solid ${C.line}`, borderRadius: 999, padding: "2px 6px 2px 9px", fontSize: 11, color: C.cream }}>
                     {gn || "Guest"}
                     <button onClick={() => dropGuest(sel, r.user_id, gi)} disabled={busy} aria-label={`Remove guest ${gn || ""}`} title="Remove guest (frees a spot)" style={{ background: "none", border: "none", color: C.birdie, cursor: "pointer", fontSize: 12, padding: 0, lineHeight: 1 }}>✕</button>
                   </span>
@@ -312,7 +312,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
               </div>
             ) : null}
           </div>
-          {wait ? <span style={{ fontSize: 11, fontWeight: 800, background: "#fbe9cf", color: "#9a6a12", borderRadius: 20, padding: "3px 9px" }}>Waitlist{waitPos.get(r.user_id) ? ` #${waitPos.get(r.user_id)}` : ""}</span> : null}
+          {wait ? <span style={{ fontSize: 11, fontWeight: 800, background: C.greenLight, color: "#9a6a12", borderRadius: 20, padding: "3px 9px" }}>Waitlist{waitPos.get(r.user_id) ? ` #${waitPos.get(r.user_id)}` : ""}</span> : null}
           {wait && canOrganizeTee ? <button onClick={() => promote(sel, r.user_id)} disabled={busy} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Move up</button> : null}
           {showOrg && canOrganizeTee ? (
             <button onClick={() => orgSetRsvp(sel, r.user_id, r.choice === "in" ? "out" : "in")} disabled={busy}
@@ -360,18 +360,18 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
 
         {detailTab === "info" ? (
           <>
-          <div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>
+          <div style={{ background: C.greenLight, borderRadius: 14, overflow: "hidden" }}>
             {[["Tee time", "#" + (sel.seq ?? "—")], ["Date", fmtFull(sel.play_date)], ["Tee-off", sel.tee_off_times?.length ? sel.tee_off_times.join("/") : "—"], ["Course", sel.course || "—"], ["Type", kindOf(sel.kind).label], ["Spots", sel.max_spots != null ? `${used} / ${sel.max_spots}` : `${used}`], ["Notes", sel.notes || "—"]].map(([l, v], i, arr) => (
               <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "11px 14px", borderBottom: i < arr.length - 1 ? `1px solid ${C.line}` : "none" }}>
-                <div style={{ fontSize: 12, color: C.faint }}>{l}</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: C.ink, textAlign: "right", maxWidth: "62%" }}>{v}</div>
+                <div style={{ fontSize: 12, color: C.sage }}>{l}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.cream, textAlign: "right", maxWidth: "62%" }}>{v}</div>
               </div>
             ))}
           </div>
-          <div style={{ background: C.card, borderRadius: 14, padding: "11px 14px", marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ background: C.greenLight, borderRadius: 14, padding: "11px 14px", marginTop: 10, display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, color: C.faint }}>Captain</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{sel.captain_user_id ? (memberOf(sel.captain_user_id)?.display_name || "Assigned") : "Not assigned"}</div>
+              <div style={{ fontSize: 12, color: C.sage }}>Captain</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.cream }}>{sel.captain_user_id ? (memberOf(sel.captain_user_id)?.display_name || "Assigned") : "Not assigned"}</div>
             </div>
             {(canOrganizeTee || isCaptain) && !isDone(sel) && sel.status !== "cancelled" && <button onClick={() => setCaptainPickerOpen(true)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>{sel.captain_user_id ? "Change" : "Assign"}</button>}
             <button onClick={() => setDutiesOpen(true)} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Duties</button>
@@ -410,24 +410,24 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
           </>
         ) : detailTab === "signups" ? (
           <div>
-            <div style={{ background: C.card, borderRadius: 14, overflow: "hidden", display: "flex", marginBottom: 10 }}>
+            <div style={{ background: C.greenLight, borderRadius: 14, overflow: "hidden", display: "flex", marginBottom: 10 }}>
               {[["In", ins.reduce((s, r) => s + 1 + (r.guest_names?.length || 0), 0), "#1a7a3a"], ["Maybe", maybes.length, "#C9821F"], ["Out", outs.length, C.birdie], ["Left", spotsLeft ?? "—", C.green]].map(([l, n, col], i) => (
                 <div key={l as string} style={{ flex: 1, textAlign: "center", padding: "12px 0", borderRight: i < 3 ? `1px solid ${C.line}` : "none" }}>
                   <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "Georgia, serif", color: col as string }}>{n as any}</div>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, color: C.faint, textTransform: "uppercase" }}>{l}</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, color: C.sage, textTransform: "uppercase" }}>{l}</div>
                 </div>
               ))}
             </div>
-            {ins.length > 0 && <><Eyebrow>{`In — ${ins.reduce((s, r) => s + 1 + (r.guest_names?.length || 0), 0)}${sel.max_spots != null ? ` of ${sel.max_spots} spots` : ""}`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{ins.map((r) => memberRow(r, true, waitSet.has(r.user_id)))}</div></>}
-            {maybes.length > 0 && <><Eyebrow>{`Maybe (${maybes.length})`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{maybes.map((r) => memberRow(r, true))}</div></>}
-            {outs.length > 0 && <><Eyebrow>{`Out (${outs.length})`}</Eyebrow><div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>{outs.map((r) => memberRow(r, true))}</div></>}
+            {ins.length > 0 && <><Eyebrow>{`In — ${ins.reduce((s, r) => s + 1 + (r.guest_names?.length || 0), 0)}${sel.max_spots != null ? ` of ${sel.max_spots} spots` : ""}`}</Eyebrow><div style={{ background: C.greenLight, borderRadius: 14, overflow: "hidden" }}>{ins.map((r) => memberRow(r, true, waitSet.has(r.user_id)))}</div></>}
+            {maybes.length > 0 && <><Eyebrow>{`Maybe (${maybes.length})`}</Eyebrow><div style={{ background: C.greenLight, borderRadius: 14, overflow: "hidden" }}>{maybes.map((r) => memberRow(r, true))}</div></>}
+            {outs.length > 0 && <><Eyebrow>{`Out (${outs.length})`}</Eyebrow><div style={{ background: C.greenLight, borderRadius: 14, overflow: "hidden" }}>{outs.map((r) => memberRow(r, true))}</div></>}
             {canOrganizeTee && notResponded.length > 0 && (
               <><Eyebrow>{`Not responded (${notResponded.length})`}</Eyebrow>
-                <div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>
+                <div style={{ background: C.greenLight, borderRadius: 14, overflow: "hidden" }}>
                   {notResponded.map((m) => (
                     <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: `1px solid ${C.line}` }}>
                       <Avatar src={m.avatar_url || undefined} name={m.display_name} size={34} />
-                      <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, color: C.ink }}>{m.display_name}</div>
+                      <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, color: C.cream }}>{m.display_name}</div>
                       <button onClick={() => orgSetRsvp(sel, m.id, "in")} disabled={busy} style={{ ...btn(true), fontSize: 11, padding: "5px 9px" }}>In</button>
                       <button onClick={() => orgSetRsvp(sel, m.id, "out")} disabled={busy} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Out</button>
                     </div>
@@ -439,16 +439,16 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
           <div>
             {(() => {
               const rows = activity.filter((a) => a?.meta?.tee_time_id === sel.id);
-              if (rows.length === 0) return <div style={{ background: C.card, borderRadius: 14, padding: 24, textAlign: "center", color: C.faint, fontSize: 13 }}>No activity yet.</div>;
+              if (rows.length === 0) return <div style={{ background: C.greenLight, borderRadius: 14, padding: 24, textAlign: "center", color: C.sage, fontSize: 13 }}>No activity yet.</div>;
               return (
-                <div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>
+                <div style={{ background: C.greenLight, borderRadius: 14, overflow: "hidden" }}>
                   {rows.map((a) => {
                     const who = shortName(memberOf(a.actor_user_id)?.display_name || "Someone");
                     const when = new Date(a.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
                     return (
                       <div key={a.id} style={{ padding: "10px 14px", borderBottom: `1px solid ${C.line}` }}>
-                        <div style={{ fontSize: 13, color: C.ink }}><b>{who}</b> {a.summary}</div>
-                        <div style={{ fontSize: 11, color: C.faint, marginTop: 2 }}>{when}</div>
+                        <div style={{ fontSize: 13, color: C.cream }}><b>{who}</b> {a.summary}</div>
+                        <div style={{ fontSize: 11, color: C.sage, marginTop: 2 }}>{when}</div>
                       </div>
                     );
                   })}
@@ -491,14 +491,14 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
           {filter === "upcoming" && pending.length > 0 && (
             <>
               <Eyebrow>{`Needs your response (${pending.length})`}</Eyebrow>
-              <div style={{ background: C.card, borderRadius: 14, overflow: "hidden", border: `1.5px solid ${C.gold}`, marginBottom: 10 }}>
+              <div style={{ background: C.greenLight, borderRadius: 14, overflow: "hidden", border: `1.5px solid ${C.gold}`, marginBottom: 10 }}>
                 {pending.map((t) => (
                   <div key={t.id} onClick={() => open(t.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: "pointer", borderBottom: `1px solid ${C.line}` }}>
                     <DateBadge d={t.play_date} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: C.green }}>TEE TIME #{t.seq ?? "—"}</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>{teeName(t)}</div>
-                      <div style={{ fontSize: 12, color: C.faint }}>{[t.course, (t.tee_off_times || []).join("/")].filter(Boolean).join(" · ")}</div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: C.cream }}>TEE TIME #{t.seq ?? "—"}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: C.cream }}>{teeName(t)}</div>
+                      <div style={{ fontSize: 12, color: C.sage }}>{[t.course, (t.tee_off_times || []).join("/")].filter(Boolean).join(" · ")}</div>
                     </div>
                     <button onClick={(e) => { e.stopPropagation(); open(t.id); }} style={{ ...btn(true), fontSize: 12, padding: "7px 12px" }}>RSVP</button>
                   </div>
@@ -509,9 +509,9 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
 
           <Eyebrow>{filter === "upcoming" ? "All upcoming" : filter === "past" ? "Past" : "Cancelled"}</Eyebrow>
           {shown.length === 0 ? (
-            <div style={{ background: C.card, borderRadius: 14, padding: 24, textAlign: "center", color: C.faint, fontSize: 13 }}>Nothing here yet.</div>
+            <div style={{ background: C.greenLight, borderRadius: 14, padding: 24, textAlign: "center", color: C.sage, fontSize: 13 }}>Nothing here yet.</div>
           ) : (
-            <div style={{ background: C.card, borderRadius: 14, overflow: "hidden" }}>
+            <div style={{ background: C.greenLight, borderRadius: 14, overflow: "hidden" }}>
               {shown.map((t, i) => {
                 const mine = myRsvp(t.id);
                 const k = kindOf(t.kind);
@@ -521,14 +521,14 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
                   <div key={t.id} onClick={() => open(t.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: "pointer", borderBottom: i < shown.length - 1 ? `1px solid ${C.line}` : "none" }}>
                     <DateBadge d={t.play_date} />
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 11, fontWeight: 800, color: C.green }}>TEE TIME #{t.seq ?? "—"}</div>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: C.ink, textDecoration: t.status === "cancelled" ? "line-through" : "none" }}>{teeName(t)}</div>
+                      <div style={{ fontSize: 11, fontWeight: 800, color: C.cream }}>TEE TIME #{t.seq ?? "—"}</div>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: C.cream, textDecoration: t.status === "cancelled" ? "line-through" : "none" }}>{teeName(t)}</div>
                       <div style={{ display: "flex", gap: 6, marginTop: 5, flexWrap: "wrap", alignItems: "center" }}>
                         <span style={{ fontSize: 11, fontWeight: 800, borderRadius: 6, padding: "2px 7px", background: k.bg, color: k.fg }}>{k.label}</span>
-                        {t.max_spots != null && <span style={{ fontSize: 11, color: C.faint }}>{used} / {t.max_spots} spots{over ? ` · waitlist ${used - t.max_spots}` : ""}</span>}
+                        {t.max_spots != null && <span style={{ fontSize: 11, color: C.sage }}>{used} / {t.max_spots} spots{over ? ` · waitlist ${used - t.max_spots}` : ""}</span>}
                       </div>
                     </div>
-                    {mine ? <span style={{ fontSize: 11, fontWeight: 800, borderRadius: 20, padding: "3px 9px", background: CHOICE[mine.choice].c + "22", color: CHOICE[mine.choice].c }}>{CHOICE[mine.choice].label.toUpperCase()}</span> : <span style={{ color: C.faint, fontSize: 18 }}>›</span>}
+                    {mine ? <span style={{ fontSize: 11, fontWeight: 800, borderRadius: 20, padding: "3px 9px", background: CHOICE[mine.choice].c + "22", color: CHOICE[mine.choice].c }}>{CHOICE[mine.choice].label.toUpperCase()}</span> : <span style={{ color: C.sage, fontSize: 18 }}>›</span>}
                   </div>
                 );
               })}

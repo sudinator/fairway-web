@@ -81,9 +81,9 @@ export function CourseChangeSummary({ req }: { req: CourseEditRequest }) {
 
   return (
     <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
-      <div style={{ background: "#F7F3E8", borderRadius: 10, padding: 10, border: `1px solid ${C.line}` }}>
-        <div style={{ color: C.green, fontSize: 11, letterSpacing: 1.5, fontWeight: 800, marginBottom: 6 }}>SUBMISSION DETAILS</div>
-        <div style={{ color: C.ink, fontSize: 13, lineHeight: 1.6 }}>
+      <div style={{ background: C.greenLight, borderRadius: 10, padding: 10, border: `1px solid ${C.line}` }}>
+        <div style={{ color: C.cream, fontSize: 11, letterSpacing: 1.5, fontWeight: 800, marginBottom: 6 }}>SUBMISSION DETAILS</div>
+        <div style={{ color: C.cream, fontSize: 13, lineHeight: 1.6 }}>
           <div><b>Submitted by:</b> {submitter}</div>
           <div><b>Club:</b> {req.group_name || "Unknown club"}</div>
           <div><b>Submitted at:</b> {formatDateTime(req.created_at)}</div>
@@ -91,23 +91,23 @@ export function CourseChangeSummary({ req }: { req: CourseEditRequest }) {
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
-        <div style={{ background: C.cream, borderRadius: 10, padding: 10, border: `1px solid ${C.line}` }}>
-          <div style={{ color: C.faint, fontSize: 11, letterSpacing: 1.5, fontWeight: 800 }}>CURRENT GLOBAL</div>
-          <div style={{ color: C.ink, fontWeight: 800, marginTop: 5 }}>{current ? courseLabel(current) : "Unknown course"}</div>
-          <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{current?.location || "No location"}</div>
-          <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{current?.tees?.length || 0} tee{(current?.tees?.length || 0) === 1 ? "" : "s"} · {current?.holes?.length || 0} holes</div>
+        <div style={{ background: C.greenLight, borderRadius: 10, padding: 10, border: `1px solid ${C.line}` }}>
+          <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1.5, fontWeight: 800 }}>CURRENT GLOBAL</div>
+          <div style={{ color: C.cream, fontWeight: 800, marginTop: 5 }}>{current ? courseLabel(current) : "Unknown course"}</div>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>{current?.location || "No location"}</div>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>{current?.tees?.length || 0} tee{(current?.tees?.length || 0) === 1 ? "" : "s"} · {current?.holes?.length || 0} holes</div>
         </div>
-        <div style={{ background: C.cream, borderRadius: 10, padding: 10, border: `1px solid ${C.gold}` }}>
+        <div style={{ background: C.greenLight, borderRadius: 10, padding: 10, border: `1px solid ${C.gold}` }}>
           <div style={{ color: C.gold, fontSize: 11, letterSpacing: 1.5, fontWeight: 800 }}>PROPOSED GLOBAL</div>
-          <div style={{ color: C.ink, fontWeight: 800, marginTop: 5 }}>{proposed ? courseLabel(proposed) : req.proposed_name}</div>
-          <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{proposed?.location || req.proposed_location || "No location"}</div>
-          <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{proposed?.tees?.length || 0} tee{(proposed?.tees?.length || 0) === 1 ? "" : "s"} · {proposed?.holes?.length || 0} holes</div>
+          <div style={{ color: C.cream, fontWeight: 800, marginTop: 5 }}>{proposed ? courseLabel(proposed) : req.proposed_name}</div>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>{proposed?.location || req.proposed_location || "No location"}</div>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>{proposed?.tees?.length || 0} tee{(proposed?.tees?.length || 0) === 1 ? "" : "s"} · {proposed?.holes?.length || 0} holes</div>
         </div>
       </div>
-      <div style={{ background: "#FFF8E1", border: `1px solid ${C.gold}`, borderRadius: 10, padding: 10 }}>
-        <div style={{ color: C.green, fontSize: 11, letterSpacing: 1.5, fontWeight: 800, marginBottom: 6 }}>WHAT CHANGED ({lines.length})</div>
+      <div style={{ background: C.greenLight, border: `1px solid ${C.gold}`, borderRadius: 10, padding: 10 }}>
+        <div style={{ color: C.cream, fontSize: 11, letterSpacing: 1.5, fontWeight: 800, marginBottom: 6 }}>WHAT CHANGED ({lines.length})</div>
         {visible.map((line, i) => (
-          <div key={i} style={{ color: C.ink, fontSize: 12, padding: "3px 0", borderTop: i === 0 ? "none" : `1px solid ${C.line}` }}>{line}</div>
+          <div key={i} style={{ color: C.cream, fontSize: 12, padding: "3px 0", borderTop: i === 0 ? "none" : `1px solid ${C.line}` }}>{line}</div>
         ))}
       </div>
     </div>
@@ -356,26 +356,26 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   const CourseRow = ({ c, source }: { c: LibCourse; source: "group" | "all" }) => {
     const inGroup = groupCourseIds.has(c.id);
     return (
-      <div key={c.id} style={{ display: "flex", alignItems: "stretch", marginTop: 10, background: C.card, borderRadius: 12, overflow: "hidden" }}>
+      <div key={c.id} style={{ display: "flex", alignItems: "stretch", marginTop: 10, background: C.greenLight, borderRadius: 12, overflow: "hidden" }}>
         {isAdmin && (
           <button title={c.vetted ? "Vetted course — tap to unmark" : "Mark as vetted"}
             onClick={() => toggleVetted(c)} disabled={busyId === c.id}
-            style={{ background: "none", border: "none", borderRight: `1px solid ${C.line}`, color: c.vetted ? C.faint : C.line, fontSize: 18, cursor: "pointer", padding: "0 14px" }}>
+            style={{ background: "none", border: "none", borderRight: "1px solid rgba(255,255,255,0.12)", color: c.vetted ? C.gold : C.sage, fontSize: 18, cursor: "pointer", padding: "0 14px" }}>
             {c.vetted ? "★" : "☆"}
           </button>
         )}
         <button onClick={() => openEditor({ id: c.id, data: c.data, user_id: c.user_id })}
           style={{ flex: 1, textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: "13px 16px" }}>
-          <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>
+          <div style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>
             {courseCardTitle(c)}
             {/* APP_RULES #25: gold means "someone must act"; "vetted" is reassurance, so it is
                 secondary metadata. This row is CREAM, so the secondary token is C.faint
                 (5.98:1) — NOT C.sage, which is green-surface text and measures 1.83:1
                 here. Change to C.sage in the same release that turns this row green. */}
-            {c.vetted ? <span style={{ color: C.faint, fontSize: 12 }}> · vetted ★</span> : null}
-            {c.group_override ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 700 }}> · club edit pending review</span> : c.data?.corrected ? <span style={{ color: C.faint, fontSize: 11, fontWeight: 700 }}> · ⚑ corrected</span> : null}
+            {c.vetted ? <span style={{ color: C.sage, fontSize: 12 }}> · vetted ★</span> : null}
+            {c.group_override ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 700 }}> · club edit pending review</span> : c.data?.corrected ? <span style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}> · ⚑ corrected</span> : null}
           </div>
-          <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
             {c.location ? c.location + " · " : ""}{c.data.tees?.length || 0} tee{(c.data.tees?.length || 0) === 1 ? "" : "s"} · tap to view/edit{c.group_override ? " · this club sees a local correction" : ""}
           </div>
         </button>
@@ -384,7 +384,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
             onClick={() => { if (confirm(`Remove "${courseCardTitle(c)}" from this club's library?\n\nThe course remains in the global app library and can be added back later.`)) remove(c.id, courseCardTitle(c)); }}
             style={{ background: "none", border: "none", borderLeft: `1px solid ${C.line}`, color: C.birdie, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>✕</button>
         ) : inGroup ? (
-          <div style={{ display: "flex", alignItems: "center", borderLeft: `1px solid ${C.line}`, padding: "0 14px", color: C.green, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>In Club ✓</div>
+          <div style={{ display: "flex", alignItems: "center", borderLeft: `1px solid ${C.line}`, padding: "0 14px", color: C.cream, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>In Club ✓</div>
         ) : (
           <button style={{ ...btn(true), borderRadius: 0, padding: "0 14px", fontSize: 12, opacity: busyId === c.id ? 0.5 : 1 }} disabled={busyId === c.id} onClick={() => addToMyGroup(c)}>＋ Add to Club</button>
         )}
@@ -443,9 +443,9 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
             Members can correct a course for their own group immediately. Choose whether to promote the correction globally, keep it only for that group, or reject it and remove the group override.
           </div>
           {pendingEdits.map((r) => (
-            <div key={r.id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
-              <div style={{ color: C.ink, fontWeight: 800 }}>{courseLabel(r.proposed_data || ({ name: r.proposed_name } as any))}</div>
-              <div style={{ color: C.faint, fontSize: 12, marginTop: 3, lineHeight: 1.5 }}>
+            <div key={r.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
+              <div style={{ color: C.cream, fontWeight: 800 }}>{courseLabel(r.proposed_data || ({ name: r.proposed_name } as any))}</div>
+              <div style={{ color: C.sage, fontSize: 12, marginTop: 3, lineHeight: 1.5 }}>
                 Submitted {formatDateTime(r.created_at)}
                 {r.group_name ? ` · Group: ${r.group_name}` : ""}
                 {r.submitter_name || r.submitter_email ? ` · By: ${r.submitter_name || r.submitter_email}` : ""}
@@ -620,9 +620,9 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
       <div style={{ maxWidth: 600 }}>
         <Eyebrow>ADD A COURSE</Eyebrow>
         {courseDraft && !courseDraftDismissed && isNewCourse && (
-          <div style={{ marginTop: 12, background: "#faf6ea", border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 14px" }}>
-            <div style={{ color: C.ink, fontSize: 13, fontWeight: 700 }}>Resume your course?</div>
-            <div style={{ color: C.faint, fontSize: 12, marginTop: 3, lineHeight: 1.45 }}>
+          <div style={{ marginTop: 12, background: C.greenLight, border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 14px" }}>
+            <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Resume your course?</div>
+            <div style={{ color: C.sage, fontSize: 12, marginTop: 3, lineHeight: 1.45 }}>
               You left {courseDraft.data.name ? `"${courseDraft.data.name}"` : "a course"} unfinished {draftAgeLabel(courseDraft.savedAt)}. Pick up where you left off, or start fresh.
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
@@ -641,9 +641,9 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
         {err && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 8 }}>{err}</div>}
         {results?.map((r) => (
           <button key={r.id} onClick={() => pick(r.id, r.location)} disabled={loadingId != null}
-            style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 14px" }}>
-            <span style={{ color: C.ink, fontWeight: 700 }}>{r.name}</span>
-            {r.location ? <span style={{ color: C.faint, fontSize: 13 }}> · {r.location}</span> : null}
+            style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.greenLight, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 14px" }}>
+            <span style={{ color: C.cream, fontWeight: 700 }}>{r.name}</span>
+            {r.location ? <span style={{ color: C.sage, fontSize: 13 }}> · {r.location}</span> : null}
             {loadingId === r.id ? <span style={{ color: C.gold, fontSize: 12 }}> · loading…</span> : null}
           </button>
         ))}

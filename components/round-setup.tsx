@@ -494,14 +494,14 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
                       else pickFromApi(c.id);
                     }}
                     disabled={loadingId != null}
-                    style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.card, border: `1px solid ${existing ? C.gold : C.line}`, borderRadius: 10, padding: "12px 14px", opacity: loadingId != null && loadingId !== c.id ? 0.5 : 1 }}>
-                    <span style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{courseLabel(c)}</span>
-                    {c.location ? <span style={{ color: C.faint, fontSize: 13 }}> · {c.location}</span> : null}
+                    style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.greenLight, border: `1px solid ${existing ? C.gold : C.line}`, borderRadius: 10, padding: "12px 14px", opacity: loadingId != null && loadingId !== c.id ? 0.5 : 1 }}>
+                    <span style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>{courseLabel(c)}</span>
+                    {c.location ? <span style={{ color: C.sage, fontSize: 13 }}> · {c.location}</span> : null}
                     {/* APP_RULES #25: reassurance, not attention. Cream row, so C.faint. */}
-                    {existing ? <span style={{ color: C.faint, fontSize: 12, fontWeight: 700 }}> · ✓ in your library</span> : null}
+                    {existing ? <span style={{ color: C.sage, fontSize: 12, fontWeight: 700 }}> · ✓ in your library</span> : null}
                     {loadingId === c.id ? <span style={{ color: C.gold, fontSize: 12 }}> · loading…</span> : null}
                     {existing?.data?.corrected ? (
-                      <div style={{ color: C.faint, fontSize: 11, marginTop: 4 }}>
+                      <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
                         ⚑ Your group already has this course, with member-verified pars/stroke index. Tap to use that version — don't re-add it.
                       </div>
                     ) : null}
@@ -521,9 +521,9 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
               <Eyebrow>{results ? "OR PICK FROM BUILT-IN" : "POPULAR COURSES"}</Eyebrow>
               {starterMatches.map((c) => (
                 <button key={c.id} onClick={() => { setPicked(c); setTeeIdx(0); }}
-                  style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.card, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 14px" }}>
-                  <span style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{c.name}</span>
-                  <span style={{ color: C.faint, fontSize: 13 }}> · {c.location}</span>
+                  style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.greenLight, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 14px" }}>
+                  <span style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>{c.name}</span>
+                  <span style={{ color: C.sage, fontSize: 13 }}> · {c.location}</span>
                 </button>
               ))}
             </div>

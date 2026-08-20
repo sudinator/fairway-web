@@ -747,7 +747,7 @@ export function Home({ session }: { session: any }) {
         <div style={{ background: "#16302A", border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 14px", marginTop: 12 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             <div style={{ color: C.cream, fontSize: 13, fontWeight: 700, flex: 1 }}>✨ Finish setting up your profile</div>
-            <button onClick={dismissProfNudge} style={{ background: "none", border: "none", color: C.faint, fontSize: 12, cursor: "pointer" }}>Dismiss</button>
+            <button onClick={dismissProfNudge} style={{ background: "none", border: "none", color: C.sage, fontSize: 12, cursor: "pointer" }}>Dismiss</button>
           </div>
           <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
             {[!profile.avatar_url ? "a profile photo" : null, profile.handicap_index == null ? "your handicap index" : null].filter(Boolean).join(" and ")} {(!profile.avatar_url && profile.handicap_index == null) ? "are" : "is"} missing — adding {(!profile.avatar_url && profile.handicap_index == null) ? "them" : "it"} helps your group recognise you and keeps net scoring accurate.
