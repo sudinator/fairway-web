@@ -80,17 +80,20 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
       {roundBadges.length > 0 && (
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 14, marginTop: 14 }}>
           <Eyebrow>BADGES EARNED THIS ROUND</Eyebrow>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12,
+            alignItems: "start", marginTop: 10 }}>
             {roundBadges.map(({ a, def }) => (
               <button key={a.key} onClick={() => setBadgeInfo({ a, def })} aria-label={`${def.label} — how it was earned`}
-                style={{ width: 74, textAlign: "center", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+                style={{ width: "100%", textAlign: "center", background: "none", border: "none",
+                  padding: 0, cursor: "pointer", display: "flex", flexDirection: "column",
+                  alignItems: "center", gap: 6 }}>
                 <div style={{ position: "relative", width: 46, height: 46, margin: "0 auto" }}>
                   <div style={{ width: 46, height: 46, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, background: "radial-gradient(circle at 50% 32%, #20624a, #0e3a2c)", border: `2px solid ${ROUND_TIER_COLOR[def.tier]}`, boxShadow: def.tier !== "common" ? `0 0 12px -4px ${ROUND_TIER_COLOR[def.tier]}` : "none" }}>{def.icon}</div>
                   {a.kind === "count" && (a.value ?? 1) > 1 && (
                     <div style={{ position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, padding: "0 4px", borderRadius: 8, background: C.gold, color: "#1B140A", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,.4)" }}>×{a.value}</div>
                   )}
                 </div>
-                <div style={{ fontSize: 11, color: C.cream, marginTop: 5, lineHeight: 1.2, fontWeight: 700 }}>{def.label}</div>
+                <div style={{ fontSize: 11, color: C.cream, lineHeight: 1.25, fontWeight: 700 }}>{def.label}</div>
                 {a.kind === "best" && a.isRecord && <div style={{ fontSize: 11, color: C.gold, fontWeight: 800, marginTop: 1 }}>new record</div>}
               </button>
             ))}

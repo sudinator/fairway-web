@@ -20,9 +20,18 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Verify GolfCourseAPI contract
+        id: contract
         env:
           GOLF_API_KEY: ${{ secrets.GOLF_API_KEY }}
-        run: node ci/external/golfcourseapi-contract.mjs
+        run: |
+          set +e
+          node ci/external/golfcourseapi-contract.mjs
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          # 2 = monitor problem (missing key, rate limit, outage). 1 = real contract drift.
+          # Both fail the job, but the alert issue below reports them differently so nobody
+          # goes hunting for a provider change that never happened.
+          exit $code
 
       - name: Open or update admin alert issue
         if: failure()
@@ -37,13 +46,29 @@ jobs:
               per_page: 100,
             });
             const existing = issues.find((issue) => issue.title === title);
+            const code = '${{ steps.contract.outputs.exit_code }}';
+            const monitorProblem = code === '2';
             const body = [
-              'The scheduled GolfCourseAPI contract check failed.',
+              monitorProblem
+                ? '**The monitor could not run.** This is NOT evidence that the GolfCourseAPI contract changed.'
+                : '**The GolfCourseAPI contract drifted.** The provider response no longer matches the golden fixtures.',
+              '',
+              monitorProblem
+                ? [
+                    'Usual causes, in order:',
+                    '',
+                    '1. `GOLF_API_KEY` missing or rejected. It is a REPOSITORY secret (Settings -> Secrets and',
+                    '   variables -> Actions). This workflow declares no `environment:`, so environment-scoped',
+                    '   secrets are invisible to it. A separate copy lives in Vercel for the app itself.',
+                    '2. Rate limit (HTTP 429). The monitor makes 31 requests; the free tier limits throughput.',
+                    '3. Provider outage (HTTP 5xx).',
+                    '',
+                    'Read the step log for the exact reason. Do NOT change application code for this.',
+                  ].join('\n')
+                : 'Check provider ids, search/detail response shape, and required fields before changing application code.',
               '',
               `Workflow: ${context.workflow}`,
               `Run: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              '',
-              'Check provider ids, search/detail response shape, required fields, and endpoint availability before changing application code.',
             ].join('\n');
             if (existing) {
               await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: existing.number, body });
