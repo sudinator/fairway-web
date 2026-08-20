@@ -104,7 +104,7 @@ export function FeedbackForm({
         onChange={(e) => { setMsg(e.target.value); setSent(false); }}
       />
 
-      <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>
+      <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
         We'll automatically include your app version ({APP_VERSION}) and current group to help us track it down.
       </div>
 

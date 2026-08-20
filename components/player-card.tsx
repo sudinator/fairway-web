@@ -316,7 +316,7 @@ function ContactBar({ recipientId, groupId, name, phone }: { recipientId: string
             style={{ width: "100%", resize: "none", borderRadius: 8, border: `1px solid ${C.greenMid}`, background: "#0e3a2c", color: C.cream, fontSize: 13, padding: "8px 10px", fontFamily: "inherit" }}
           />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
-            <div style={{ fontSize: 11, color: C.faint }}>{msg.length}/140{status === "too_soon" ? " · you already reached out recently" : status === "error" ? " · couldn't send" : ""}</div>
+            <div style={{ fontSize: 11, color: C.sage }}>{msg.length}/140{status === "too_soon" ? " · you already reached out recently" : status === "error" ? " · couldn't send" : ""}</div>
             <button onClick={send} disabled={status === "sending"} style={{ background: C.green, color: C.cream, fontWeight: 800, fontSize: 13, border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", opacity: status === "sending" ? 0.6 : 1 }}>{status === "sending" ? "Sending…" : "Send"}</button>
           </div>
         </div>

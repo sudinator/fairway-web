@@ -316,7 +316,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
         )}
         {hcp.index != null && hcp.recentDetail.length > 0 && showDiffs && (
           <div style={{ marginTop: 8 }}>
-            <div style={{ color: C.faint, fontSize: 11, marginBottom: 4 }}>Newest round first.</div>
+            <div style={{ color: C.sage, fontSize: 11, marginBottom: 4 }}>Newest round first.</div>
             <div style={{ color: C.cream, fontSize: 12, lineHeight: 1.9 }}>
               {hcp.recentDetail.map((x, i) => (
                 <span key={i}>
@@ -639,7 +639,7 @@ function DashboardCoach({ aggregate, roundsUsed, userEmail, userId, saved, onSav
 
       {open && data && (
         <>
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>
             Generated {fmt(data.date)} · based on {data.rounds} round{data.rounds === 1 ? "" : "s"}
           </div>
           <div style={{ color: C.cream, fontSize: 14, marginTop: 8, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{data.text}</div>

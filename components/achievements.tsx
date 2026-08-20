@@ -175,7 +175,7 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
                       {repeat ? ` · earned ${e.count}×` : ""}
                     </div>
                   )}
-                  {!rnd && <div style={{ color: C.faint, fontSize: 11, marginTop: 10 }}>Earned {fmtDate(e.first_earned_at)}.</div>}
+                  {!rnd && <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>Earned {fmtDate(e.first_earned_at)}.</div>}
                 </div>
               );
             })()}

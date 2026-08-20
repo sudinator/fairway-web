@@ -136,7 +136,7 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
             <div>4. Open BNN from that new <b>Home-Screen icon</b>.</div>
             <div>5. Come back here and tap <b>Turn on notifications</b>.</div>
           </div>
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>An icon added from Chrome or any other browser won&apos;t work — it must be added from Safari.</div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>An icon added from Chrome or any other browser won&apos;t work — it must be added from Safari.</div>
         </div>
       ) : gate === "unsupported" ? (
         <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>This browser can't receive push notifications. Try Chrome on Android/desktop, or install to the Home Screen on iPhone via Safari.</div>
@@ -157,11 +157,11 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
       {gate !== "unconfigured" && (
         <div style={{ marginTop: 14, borderTop: `1px solid ${C.greenMid}`, paddingTop: 10 }}>
           <Eyebrow>WHAT TO NOTIFY ME ABOUT</Eyebrow>
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 3 }}>Push buzzes your phone (needs notifications on for the device); In-app just shows in the bell.</div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>Push buzzes your phone (needs notifications on for the device); In-app just shows in the bell.</div>
           {NOTIF_TYPES.map((t) => (
             <div key={t.key} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 9 }}>
               <div style={{ flex: 1, color: C.cream, fontSize: 12 }}>
-                {t.label}{!t.live && <span style={{ color: C.faint, fontSize: 11 }}> · soon</span>}
+                {t.label}{!t.live && <span style={{ color: C.sage, fontSize: 11 }}> · soon</span>}
               </div>
               {seg(t.key, t.def)}
             </div>
@@ -427,7 +427,7 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
           <label style={{ color: C.sage, fontSize: 12 }}>Zelle contact (phone or email, optional)</label>
           <input style={{ ...inputStyle, marginTop: 6 }} placeholder="phone or email you use for Zelle" value={zelle} onChange={(e) => setZelle(e.target.value)} />
         </div>
-        <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Used only to pre-fill payments when settling up in Money. Never shared elsewhere.</div>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Used only to pre-fill payments when settling up in Money. Never shared elsewhere.</div>
         <div style={{ marginTop: 14 }}>
           <label style={{ color: C.sage, fontSize: 12 }}>Handicap index (enter manually)</label>
           <input style={{ ...inputStyle, marginTop: 6, maxWidth: 160 }} inputMode="decimal" placeholder="14.2"
@@ -806,9 +806,9 @@ function AdminAnalytics() {
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
         <div style={{ display: "flex", textAlign: "center" }}>
-          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_dau", title: "Active today", cap: "Users who opened BNN today" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.dau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>Today · unique</div><div style={{ color: C.faint, fontSize: 11, marginTop: 1 }}>{ac.views_today ?? 0} views · who ›</div></div>
-          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_wau", title: "Active this week", cap: "Users active in the last 7 days" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.wau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This week · unique</div><div style={{ color: C.faint, fontSize: 11, marginTop: 1 }}>{ac.views_7d ?? 0} views · who ›</div></div>
-          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_mau", title: "Active this month", cap: "Users active in the last 30 days" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.mau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This month · unique</div><div style={{ color: C.faint, fontSize: 11, marginTop: 1 }}>{ac.views_30d ?? 0} views · who ›</div></div>
+          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_dau", title: "Active today", cap: "Users who opened BNN today" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.dau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>Today · unique</div><div style={{ color: C.sage, fontSize: 11, marginTop: 1 }}>{ac.views_today ?? 0} views · who ›</div></div>
+          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_wau", title: "Active this week", cap: "Users active in the last 7 days" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.wau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This week · unique</div><div style={{ color: C.sage, fontSize: 11, marginTop: 1 }}>{ac.views_7d ?? 0} views · who ›</div></div>
+          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_mau", title: "Active this month", cap: "Users active in the last 30 days" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.mau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This month · unique</div><div style={{ color: C.sage, fontSize: 11, marginTop: 1 }}>{ac.views_30d ?? 0} views · who ›</div></div>
         </div>
         {series.length > 0 && (
           <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 120, marginTop: 12 }}>
@@ -817,7 +817,7 @@ function AdminAnalytics() {
             {line && <path d={line} fill="none" stroke={C.gold} strokeWidth={2.5} strokeLinejoin="round" />}
           </svg>
         )}
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.faint }}><span>30 days ago</span><span>today</span></div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.sage }}><span>30 days ago</span><span>today</span></div>
         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
           {tile(ac.avg7 ?? 0, "7-day avg", undefined, C.green)}
           {tile(ac.avg30 ?? 0, "30-day avg", undefined, C.green)}
@@ -827,12 +827,12 @@ function AdminAnalytics() {
           {tile(t.rounds_per_active_user ?? 0, "Rounds / active user", undefined, C.green)}
           {tile(ac.churn_30d ?? 0, "Lapsed (30–60d, gone)", undefined, C.green, { stat: "lapsed", cap: "Active 30–60d ago, silent since" })}
         </div>
-        <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Unique = distinct users; views = total app opens. Test accounts are excluded from all figures. Days run midnight–midnight US Eastern. Trends build over time.</div>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Unique = distinct users; views = total app opens. Test accounts are excluded from all figures. Days run midnight–midnight US Eastern. Trends build over time.</div>
       </div>
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
         <div style={{ color: C.sage, fontSize: 12, fontWeight: 700 }}>Games by format</div>
-        {fmtEntries.length ? fmtEntries.map(([k, n]) => bar(fmtName[k] || k, n, fmtMax, fmtColors[k] || C.sage)) : <div style={{ color: C.faint, fontSize: 12, marginTop: 6 }}>No games yet.</div>}
+        {fmtEntries.length ? fmtEntries.map(([k, n]) => bar(fmtName[k] || k, n, fmtMax, fmtColors[k] || C.sage)) : <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>No games yet.</div>}
         <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 14 }}>Feature usage</div>
         {feat.map(([k, n]) => bar(k, n, featMax, "#5AA9E6", k === "Avatars set" ? "avatars_set" : k === "AI summaries" ? "ai_summaries" : undefined))}
       </div>
@@ -846,7 +846,7 @@ function AdminAnalytics() {
         {hrow("Signups never joined a club", `${h.never_joined_group_pct ?? 0}%`, false, { stat: "never_joined_group", cap: "Users with no active club membership" })}
         {hrow("Retention \u2014 week 1", `${h.retention_w1_pct ?? 0}%`)}
         {hrow("Retention \u2014 week 4", `${h.retention_w4_pct ?? 0}%`)}
-        <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Rounds counted only when completed; deleted rounds never count. Retention accrues over the first weeks.</div>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Rounds counted only when completed; deleted rounds never count. Retention accrues over the first weeks.</div>
       </div>
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
@@ -951,7 +951,7 @@ function OpsMetrics() {
                         {vlabel[g.verdict] || g.verdict}
                       </div>
                       {g.rounds_posted > 0 ? (
-                        <div style={{ color: C.faint, fontSize: 11, whiteSpace: "nowrap" }}>has rounds</div>
+                        <div style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap" }}>has rounds</div>
                       ) : (
                         <button
                           onClick={() => delStale(g)}
@@ -1289,7 +1289,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
             <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>active {timeAgo(p.last_active)}</div>
           </div>
           <div>
-            <label style={{ color: C.sage, fontSize: 11 }}>Handicap index</label>
+            <label style={{ color: C.faint, fontSize: 11 }}>Handicap index</label>
             <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
               <input inputMode="decimal" defaultValue={p.handicap_index != null ? String(p.handicap_index) : ""}
                 onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setEdits((m) => ({ ...m, [p.id]: v })); }}
@@ -1311,7 +1311,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                 const myGroupIds = new Set(mine.map((m) => m.group_id));
                 return (
                   <>
-                    {mine.length === 0 && <div style={{ color: C.faint, fontSize: 12, marginTop: 6 }}>Not in any club.</div>}
+                    {mine.length === 0 && <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>Not in any club.</div>}
                     {mine.map((m) => {
                       const g = allGroups.find((x) => x.id === m.group_id);
                       return (
@@ -1651,9 +1651,9 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
                 {subtotalAfter && (
                   <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, padding: "6px 2px", background: C.greenLight, borderTop: `2px solid ${C.greenMid}`, fontWeight: 800 }}>
                     <div style={{ color: C.gold, fontSize: 11 }}>{segStart === 0 ? "OUT" : "IN"}</div>
-                    <div style={{ textAlign: "center", color: C.ink }}>{sPar}</div>
+                    <div style={{ textAlign: "center", color: C.cream }}>{sPar}</div>
                     <div style={{ textAlign: "center", color: C.green }}>{sScore || "–"}</div>
-                    <div style={{ textAlign: "center", color: C.faint }}>{sPutts || "–"}</div>
+                    <div style={{ textAlign: "center", color: C.sage }}>{sPutts || "–"}</div>
                   </div>
                 )}
               </React.Fragment>
@@ -1806,7 +1806,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
             {isGroupAdmin && row.user_id && (
               <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "flex-end", flexWrap: "wrap", borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
                 <div>
-                  <label style={{ color: C.sage, fontSize: 11 }}>Handicap index</label>
+                  <label style={{ color: C.faint, fontSize: 11 }}>Handicap index</label>
                   <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
                     <input inputMode="decimal" defaultValue={p.handicap_index != null ? String(p.handicap_index) : ""}
                       onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setEdits((m) => ({ ...m, [row.id]: v })); }}
@@ -2081,13 +2081,13 @@ function FrictionItem({ it, onDone }: { it: any; onDone: () => void }) {
       </div>
       <div style={{ color: C.cream, fontSize: 12.5, margin: "8px 0 3px", lineHeight: 1.5 }}>{it.detail}</div>
       {resolved ? (
-        <div style={{ color: C.faint, fontSize: 11, marginTop: 4 }}>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
           {it.status === "auto_resolved" ? "Auto-resolved — the data was cleaned up." : `${it.status === "cleared" ? "Cleared" : "Needs action"}${it.reason ? " · " + it.reason : ""}`}
           {it.reviewed_at ? " · " + new Date(it.reviewed_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}
         </div>
       ) : (
         <>
-          <div style={{ color: C.faint, fontSize: 11, marginBottom: 8 }}>first seen {when}</div>
+          <div style={{ color: C.sage, fontSize: 11, marginBottom: 8 }}>first seen {when}</div>
           <button onClick={expand} style={{ background: C.gold, color: C.green, border: "none", borderRadius: 9, padding: "7px 14px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
             {open ? "Close" : "Review \u2192"}
           </button>
@@ -2924,7 +2924,7 @@ function UpdateChecker() {
       <div style={{ color: C.cream, fontSize: 13, marginTop: 10, lineHeight: 1.7 }}>
         <div><b>Current version:</b> {APP_VERSION}</div>
         <div><b>Latest version:</b> {latest || "Not checked yet"}</div>
-        <div style={{ color: C.faint, fontSize: 11, marginTop: 12, lineHeight: 1.6 }}>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 12, lineHeight: 1.6 }}>
           Birdie Num Num — created by Amit Sud
           <br />© 2026 Amit Sud. All rights reserved.
         </div>

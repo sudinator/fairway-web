@@ -91,10 +91,11 @@ export const btn = (primary?: boolean): React.CSSProperties => ({
   border: "none", borderRadius: 10, padding: "11px 20px", fontSize: 14, fontWeight: 800, cursor: "pointer",
 });
 
-// APP_RULES #25: editable fields are C.cream, not C.card. A field should read as a filled-in
-// slot, not a sheet of paper — C.card is reserved for scorecards and score entry.
+// APP_RULES #25: editable fields use C.field, not C.card. A field should read as a
+// filled-in slot, not a sheet of paper — C.card is reserved for scorecards and score
+// entry. C.cream was tried at 177.59 and is only 1.09:1 against C.card: invisible.
 export const inputStyle: React.CSSProperties = {
-  background: C.cream, border: `1px solid ${C.line}`, borderRadius: 10,
+  background: C.field, border: `1px solid ${C.fieldLine}`, borderRadius: 10,
   padding: "10px 13px", fontSize: 16, color: C.ink, width: "100%", boxSizing: "border-box",
 };
 
@@ -278,7 +279,7 @@ export function ShortDateInput({ value, onChange, max }: { value: string; onChan
     <div style={{ position: "relative", display: "flex", width: "fit-content", marginTop: 6 }}>
       <div style={{ ...inputStyle, width: 116, fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <span style={{ color: value ? C.ink : C.faint }}>{fmt(value)}</span>
-        <span aria-hidden style={{ color: C.sage, fontSize: 12 }}>▾</span>
+        <span aria-hidden style={{ color: C.faint, fontSize: 12 }}>▾</span>
       </div>
       <input aria-label="Pick date" type="date" value={value} max={max} onChange={(e) => onChange(e.target.value)}
         style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, border: "none", padding: 0, margin: 0, cursor: "pointer", background: "transparent" }} />
@@ -822,7 +823,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
                 <div key={sg.lbl} style={{ flex: 1, background: C.greenLight, borderRadius: 12, padding: "9px 6px", textAlign: "center" }}>
                   <div style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}>{sg.lbl}</div>
                   <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 20, marginTop: 2 }}>{sg.v}</div>
-                  <div style={{ color: C.faint, fontSize: 11 }}>holes {sg.sub}</div>
+                  <div style={{ color: C.sage, fontSize: 11 }}>holes {sg.sub}</div>
                 </div>
               ))}
             </div>
@@ -866,11 +867,11 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
       {!matchMode && has18 && (out > 0 || inn > 0) && (
         <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
           <div style={{ background: C.card, borderRadius: 10, padding: "8px 18px", textAlign: "center" }}>
-            <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2 }}>OUT</div>
+            <div style={{ color: C.faint, fontSize: 11, letterSpacing: 2 }}>OUT</div>
             <div style={{ color: C.ink, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif" }}>{out || "–"}</div>
           </div>
           <div style={{ background: C.card, borderRadius: 10, padding: "8px 18px", textAlign: "center" }}>
-            <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2 }}>IN</div>
+            <div style={{ color: C.faint, fontSize: 11, letterSpacing: 2 }}>IN</div>
             <div style={{ color: C.ink, fontWeight: 800, fontSize: 20, fontFamily: "Georgia, serif" }}>{inn || "–"}</div>
           </div>
           <div style={{ background: C.green, borderRadius: 10, padding: "8px 18px", textAlign: "center" }}>

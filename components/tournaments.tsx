@@ -3288,7 +3288,7 @@ function GameRoom({
                 >
                   <div style={{ color: C.sage, fontSize: 12 }}>{s.label}</div>
                   {!s.started ? (
-                    <div style={{ color: C.faint, fontSize: 13, marginTop: 6 }}>
+                    <div style={{ color: C.sage, fontSize: 13, marginTop: 6 }}>
                       Not started
                     </div>
                   ) : s.complete ? (

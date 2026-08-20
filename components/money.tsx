@@ -344,7 +344,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
           onNudge={(m, owe) => { const link = "https://birdienumnum.vercel.app"; if (m.phone) window.location.href = nudgeSms(m.phone, m.display_name, owe, activeGroup.name, link); }} />
         {isAdmin && (
           <button onClick={() => setScreen("untangle")} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginTop: 12, background: "#123528", border: `1px solid ${C.greenMid}`, borderRadius: 12, padding: "11px 13px", color: C.sage, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-            <span style={{ fontSize: 15 }}>&#9874;</span> Untangle payments <span style={{ marginLeft: "auto", color: C.faint, fontWeight: 500, fontSize: 11.5 }}>admin · fix an entry</span>
+            <span style={{ fontSize: 15 }}>&#9874;</span> Untangle payments <span style={{ marginLeft: "auto", color: C.sage, fontWeight: 500, fontSize: 11.5 }}>admin · fix an entry</span>
           </button>
         )}
         <GuestManager guests={guests} members={members} busy={busy} me={user.id} isAdmin={isAdmin} onRetire={retireGuest} onUnretire={unretireGuest} />
@@ -505,7 +505,7 @@ function GuestManager({ guests, members, busy, me, isAdmin, onRetire, onUnretire
             <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 600, minWidth: 0 }}>{g.name}</span>
             {(g.created_by === me || isAdmin)
               ? <button disabled={busy} onClick={() => { setOpenId(openId === g.id ? null : g.id); setBecame(""); }} style={{ background: "#173a2c", color: C.cream, border: `1px solid #37624f`, borderRadius: 8, padding: "5px 10px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>{openId === g.id ? "Cancel" : "Retire"}</button>
-              : <span style={{ color: C.faint, fontSize: 11 }}>added by {g.created_by ? nameOf(g.created_by) : "someone else"}</span>}
+              : <span style={{ color: C.sage, fontSize: 11 }}>added by {g.created_by ? nameOf(g.created_by) : "someone else"}</span>}
           </div>
           {openId === g.id && (
             <div style={{ marginTop: 8, background: "#14352b", borderRadius: 10, padding: 10 }}>
@@ -641,7 +641,7 @@ function AdminUntangle({ members, expenses, deletedExpenses, shares, payers, set
               <span style={{ color: r.delta >= 0 ? "#7fd6a3" : "#ef9d90", fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 14 }}>{r.delta >= 0 ? "+" : "\u2212"}{fmtUSD(Math.abs(r.delta))}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
-              <span style={{ color: C.faint, fontSize: 11 }}>{r.sub}</span>
+              <span style={{ color: C.sage, fontSize: 11 }}>{r.sub}</span>
               <span style={{ color: C.sage, fontSize: 11 }}>running {fmtUSD(run)}</span>
             </div>
             <div style={{ display: "flex", gap: 7, marginTop: 9, justifyContent: "flex-end" }}>
@@ -676,11 +676,11 @@ function AdminUntangle({ members, expenses, deletedExpenses, shares, payers, set
 
       <div style={{ marginTop: 16, background: "#0f2a20", border: `1px solid ${C.greenMid}`, borderRadius: 12, padding: "10px 12px" }}>
         <Eyebrow>Audit log</Eyebrow>
-        {money.length === 0 && <div style={{ color: C.faint, fontSize: 12 }}>No money changes recorded yet.</div>}
+        {money.length === 0 && <div style={{ color: C.sage, fontSize: 12 }}>No money changes recorded yet.</div>}
         {money.map((a, i) => (
           <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "5px 0", borderTop: i ? `1px solid #123528` : "none" }}>
             <span style={{ color: C.cream, fontSize: 12 }}>{a.summary || a.action}</span>
-            <span style={{ color: C.faint, fontSize: 11, whiteSpace: "nowrap" }}>{nameOf(a.actor_user_id || null)}</span>
+            <span style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap" }}>{nameOf(a.actor_user_id || null)}</span>
           </div>
         ))}
       </div>
@@ -739,7 +739,7 @@ function SettleScreen({ groups, nameOf, memberById, balances, busy, me, isAdmin,
                   {isMine && !to?.venmo_handle && !to?.paypal_handle && !to?.zelle_handle && <span style={{ flex: 1, color: C.sage, fontSize: 11 }}>no handle on file — pay cash</span>}
                   {canMark
                     ? <button disabled={busy} onClick={() => askMark(t)} style={{ flex: "1 1 68px", border: `1px solid ${C.line}`, borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: C.cream, color: C.green }}>{isMine ? "Mark paid" : isPayee ? "Mark received" : "Mark paid (admin)"}</button>
-                    : <span style={{ flex: 1, color: C.faint, fontSize: 11.5, textAlign: "right" }}>Only {nameOf(t.from)} or {nameOf(t.to)} can mark this</span>}
+                    : <span style={{ flex: 1, color: C.sage, fontSize: 11.5, textAlign: "right" }}>Only {nameOf(t.from)} or {nameOf(t.to)} can mark this</span>}
                 </div>
               );
             })()}
@@ -758,14 +758,14 @@ function SettleScreen({ groups, nameOf, memberById, balances, busy, me, isAdmin,
               <div key={s2.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 2px", borderBottom: `1px solid ${C.greenMid}` }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: C.cream, fontSize: 13 }}><b>{nameOf(s2.from_user_id)}</b> paid <b>{nameOf(s2.to_user_id)}</b> {fmtUSD(s2.amount_cents)}</div>
-                  <div style={{ color: C.faint, fontSize: 11 }}>{(s2.event_id ? eventName(s2.event_id) + " · " : "")}{s2.method || "cash"}{s2.created_at ? " · " + new Date(s2.created_at).toLocaleDateString() : ""}</div>
+                  <div style={{ color: C.sage, fontSize: 11 }}>{(s2.event_id ? eventName(s2.event_id) + " · " : "")}{s2.method || "cash"}{s2.created_at ? " · " + new Date(s2.created_at).toLocaleDateString() : ""}</div>
                 </div>
                 {canUndo && !inClosed && <button disabled={busy} onClick={() => askUnmark(s2)} style={{ border: `1px solid ${C.line}`, background: "transparent", color: C.sage, borderRadius: 8, padding: "6px 10px", fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>Unmark</button>}
-                {canUndo && inClosed && <span style={{ color: C.faint, fontSize: 11, whiteSpace: "nowrap" }}>{"\uD83D\uDD12"} closed</span>}
+                {canUndo && inClosed && <span style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap" }}>{"\uD83D\uDD12"} closed</span>}
               </div>
             );
           })}
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Unmark reverses a payment and recomputes balances. Admins can unmark any; you can unmark ones you recorded.</div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Unmark reverses a payment and recomputes balances. Admins can unmark any; you can unmark ones you recorded.</div>
         </>
       )}
       {confirm && (
@@ -989,7 +989,7 @@ function AddExpense({ user, gid, members, guests, balances, busy, setBusy, requi
               if (id) { setEventId(id); setNewEventOpen(false); setNewEventName(""); }
             }} style={{ ...btn(true), flex: 0, padding: "8px 18px", opacity: (busy || !newEventName.trim()) ? 0.5 : 1 }}>Create Bucket</button>
           </div>
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Date is optional. Anyone can add expenses to this event until an admin closes it.</div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Date is optional. Anyone can add expenses to this event until an admin closes it.</div>
         </div>
       )}
 
@@ -1043,7 +1043,7 @@ function AddExpense({ user, gid, members, guests, balances, busy, setBusy, requi
           <div style={{ background: "#173a2c", borderRadius: 10, padding: 10, marginTop: 10 }}>
             <Eyebrow>Guest name</Eyebrow>
             <input value={gName} onChange={(e) => setGName(e.target.value)} placeholder="e.g. Sam" style={inputStyle} />
-            <div style={{ color: C.faint, fontSize: 11, marginTop: 7, lineHeight: 1.45 }}>You'll pick who's covering them on each expense they're part of.</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 7, lineHeight: 1.45 }}>You'll pick who's covering them on each expense they're part of.</div>
             <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
               <button disabled={!gName.trim()} onClick={async () => { await onAddGuest(gName.trim()); setGName(""); setShowGuest(false); }} style={{ ...btn(true), flex: 1 }}>Add guest</button>
               <button onClick={() => setShowGuest(false)} style={{ ...btn(false), flex: 1 }}>Cancel</button>
@@ -1251,7 +1251,7 @@ function ActivityLog({ activity, memberById, onOpenExpense, canOpen }: { activit
             <span style={{ fontSize: 14, width: 18, textAlign: "center", color: C.gold }}>{ACT_ICON[a.action] || "•"}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: C.cream, fontSize: 13 }}><b>{who}</b> {a.summary}</div>
-              <div style={{ color: C.faint, fontSize: 11 }}>{new Date(a.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}{a.action === "expense_deleted" && openable ? " · tap to see the voided detail" : ""}</div>
+              <div style={{ color: C.sage, fontSize: 11 }}>{new Date(a.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}{a.action === "expense_deleted" && openable ? " · tap to see the voided detail" : ""}</div>
             </div>
             {openable && <span style={{ color: C.sage, fontSize: 16 }}>&#8250;</span>}
           </div>
@@ -1370,7 +1370,7 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
           <div style={{ textAlign: "right" }}>
             {settled
               ? <div style={{ color: "#7fd6a3", fontSize: 13, fontWeight: 800 }}>✓ Settled</div>
-              : <><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>{fmtUSD(net.total)}</div><div style={{ color: C.faint, fontSize: 11 }}>total spend</div></>}
+              : <><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>{fmtUSD(net.total)}</div><div style={{ color: C.sage, fontSize: 11 }}>total spend</div></>}
           </div>
         </div>
         {(() => {
@@ -1390,7 +1390,7 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
           );
         })()}
         {list.length > 0 && <div style={{ marginTop: 8, borderTop: `1px dashed ${C.greenMid}`, paddingTop: 4 }}>{list.map(row)}</div>}
-        {ev.event_type === "game" && <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Name &amp; date come from the game.</div>}
+        {ev.event_type === "game" && <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Name &amp; date come from the game.</div>}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, background: "#0f3529", borderRadius: 9, padding: "8px 10px" }}>
           <span style={{ flex: 1, color: C.sage, fontSize: 11.5, lineHeight: 1.4 }}>Settle this Bucket in the <strong style={{ color: C.cream }}>Settle</strong> tab — each Bucket squares on its own.</span>
           {isAdmin && <button onClick={() => onCloseEvent(ev, true)} style={{ border: `1px solid ${C.greenMid}`, background: "transparent", color: C.sage, fontSize: 11, fontWeight: 800, padding: "6px 12px", borderRadius: 8, cursor: "pointer", whiteSpace: "nowrap" }}>Archive Bucket</button>}
@@ -1448,7 +1448,7 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
                 </div>
               )}
               <div style={{ marginTop: 8, borderTop: `1px dashed ${C.greenMid}`, paddingTop: 4 }}>{list.map(row)}</div>
-              <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Archived — view only.</div>
+              <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Archived — view only.</div>
               {isAdmin && <button onClick={() => onCloseEvent(ev, false)} style={{ marginTop: 8, border: `1px solid ${C.greenMid}`, background: "transparent", color: C.sage, fontSize: 11.5, fontWeight: 800, padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>Reopen event</button>}
             </div>
           );

@@ -258,7 +258,7 @@ export function YardageBackfill() {
                     <span style={{ color: statusColor(p.status), fontWeight: 800, fontSize: 12, textTransform: "uppercase" }}>{p.status}</span>
                     <span style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>{p.name}</span>
                   </div>
-                  {p.note && <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>{p.note}</div>}
+                  {p.note && <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>{p.note}</div>}
                   {p.tees.map((t, i) => (<div key={i} style={{ color: t.reason ? C.faint : C.sage, fontSize: 11 }}>{t.tee}: {t.reason ? t.reason : `${t.fill} hole${t.fill === 1 ? "" : "s"} to fill`}</div>))}
                 </div>
               ))}

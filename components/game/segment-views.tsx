@@ -330,7 +330,7 @@ export function GroupSegmentSummary({ game, players }: { game: Game; players: Pl
                   {li.complete ? wonNote : leadNote}
                   {li.complete
                     ? li.res.winnerTeams.map((tk) => (
-                        <span key={tk} style={{ display: "inline-block", background: teamColor(tk), color: C.ink, borderRadius: 6, padding: "1px 7px", fontSize: 11, fontWeight: 800, marginLeft: 5 }}>{teamName(tk)} wins {fmtPt(li.pts)}</span>
+                        <span key={tk} style={{ display: "inline-block", background: teamColor(tk), color: C.cream, borderRadius: 6, padding: "1px 7px", fontSize: 11, fontWeight: 800, marginLeft: 5 }}>{teamName(tk)} wins {fmtPt(li.pts)}</span>
                       ))
                     : li.res.winnerTeams.map((tk) => (
                         <span key={tk} style={{ display: "inline-block", border: `1px solid ${teamColor(tk)}`, color: teamColor(tk), borderRadius: 6, padding: "1px 7px", fontSize: 11, fontWeight: 800, marginLeft: 5 }}>{teamName(tk)} +{fmtPt(li.pts)}</span>

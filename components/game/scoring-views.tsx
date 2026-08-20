@@ -100,14 +100,14 @@ export function ScoreHistory({ gameId }: { gameId: string }) {
           {loading ? (
             <div style={{ color: C.sage, fontSize: 13 }}>Loading…</div>
           ) : !rows || rows.length === 0 ? (
-            <div style={{ color: C.faint, fontSize: 13, lineHeight: 1.5 }}>No changes recorded yet. Edits are logged from when migration 0042 is applied onward.</div>
+            <div style={{ color: C.sage, fontSize: 13, lineHeight: 1.5 }}>No changes recorded yet. Edits are logged from when migration 0042 is applied onward.</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 320, overflowY: "auto" }}>
               {rows.map((r) => (
                 <div key={r.id} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12.5, color: C.cream, borderBottom: `1px solid ${C.green}`, paddingBottom: 4 }}>
                   <span style={{ color: C.gold, fontWeight: 700, minWidth: 64, whiteSpace: "nowrap" }}>H{r.hole_index + 1} {fieldLabel[r.field] || r.field}</span>
                   <span style={{ flex: 1, minWidth: 0 }}>{r.player_name}: <b>{fmtVal(r.old_value)} → {fmtVal(r.new_value)}</b></span>
-                  <span style={{ color: C.faint, fontSize: 11, whiteSpace: "nowrap" }}>{r.changed_by_name} · {fmtWhen(r.changed_at)}</span>
+                  <span style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap" }}>{r.changed_by_name} · {fmtWhen(r.changed_at)}</span>
                 </div>
               ))}
             </div>
@@ -562,7 +562,7 @@ export function MatchView({
               Add
             </button>
           </div>
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>
             {unpaired.length > 0
               ? `Not yet paired: ${unpaired.map((p) => p.display_name).join(", ")}`
               : "Everyone's in a match."}

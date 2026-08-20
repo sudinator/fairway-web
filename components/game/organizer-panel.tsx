@@ -278,7 +278,7 @@ export function OrganizerPanel({
                   <>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(132px, 1fr))", gap: 10, marginTop: 12 }}>
                     <div>
-                      <label style={{ color: C.sage, fontSize: 11 }}>Handicap</label>
+                      <label style={{ color: C.faint, fontSize: 11 }}>Handicap</label>
                     <div style={{ display: "flex", gap: 5, marginTop: 2 }}>
                       <input
                         inputMode="decimal"
@@ -301,7 +301,7 @@ export function OrganizerPanel({
                   </div>
 
                   <div>
-                    <label style={{ color: C.sage, fontSize: 11 }}>Tee</label>
+                    <label style={{ color: C.faint, fontSize: 11 }}>Tee</label>
                     <select
                       value={p.tee_name || ""}
                       onChange={(e) => onSetTee(p, e.target.value)}
@@ -1030,7 +1030,7 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
             </div>
           </div>
 
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 12 }}>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 12 }}>
             Net = winnings minus your ${bet} ante. Payouts update live as scores come in; segments only pay once all 6 holes are entered.
           </div>
 
@@ -1039,7 +1039,7 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
               {postedExpense ? (
                 <div>
                   <div style={{ color: C.sage, fontSize: 13, fontWeight: 800 }}>Posted to Money ✓</div>
-                  <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>Losers owe winners in the Money tab. Un-posting removes that expense.</div>
+                  <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>Losers owe winners in the Money tab. Un-posting removes that expense.</div>
                   {needsUpdate ? (
                     <div style={{ marginTop: 10, background: "#5a3a10", color: "#f6d98a", borderRadius: 10, padding: "10px 12px" }}>
                       <div style={{ fontWeight: 800, fontSize: 13 }}>⚠️ Scores changed since posting</div>

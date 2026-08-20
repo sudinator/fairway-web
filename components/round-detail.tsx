@@ -193,7 +193,7 @@ function StatsReminder({ round, onEdit }: { round: Round; onEdit: () => void }) 
           {noFw.length > 0 && <li>Fairways not recorded on {noFw.length === 1 ? "hole" : "holes"} {list(noFw)} (par 3s don&apos;t count)</li>}
         </ul>
       </div>
-      <div style={{ color: C.faint, fontSize: 12, marginTop: 8, lineHeight: 1.45 }}>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.45 }}>
         If someone else kept the group&apos;s card, your score is here but your own putts and fairways won&apos;t be &mdash; add them on your own round.
       </div>
       <button style={{ ...btn(true), marginTop: 12 }} onClick={onEdit}>Add the missing stats</button>
@@ -347,7 +347,7 @@ function RoundStats({ round }: { round: Round }) {
     <div style={{ flex: "1 1 80px", background: C.greenLight, borderRadius: 10, padding: "10px 12px", minWidth: 80 }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: size, fontWeight: 800 }}>{value}</div>
       <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>{label}</div>
-      {hint ? <div style={{ color: C.faint, fontSize: 11, marginTop: 1 }}>{hint}</div> : null}
+      {hint ? <div style={{ color: C.sage, fontSize: 11, marginTop: 1 }}>{hint}</div> : null}
     </div>
   );
   return (
@@ -381,7 +381,7 @@ function RoundStats({ round }: { round: Round }) {
                 {sumRow("Stableford", cellVal(outN.played, outN.pts), cellVal(inN.played, inN.pts), cellVal(totN.played, totN.pts), C.gold, true)}
               </tbody>
             </table>
-            <div style={{ color: C.faint, fontSize: 11, marginTop: 10, lineHeight: 1.4 }}>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 10, lineHeight: 1.4 }}>
               Differential uses adjusted gross (net double bogey cap) × 113 / slope{round.rating == null || round.slope == null ? " — needs rating + slope" : ""}. Net and Stableford use your full course handicap{round.course_handicap != null ? ` (${round.course_handicap})` : ""}, allocated by stroke index.
             </div>
           </div>
@@ -505,7 +505,7 @@ function AiAnalysis({ round, priorRounds, userEmail, onRoundUpdated }: { round: 
       {state === "done" && (
         <>
           <div style={{ color: C.cream, fontSize: 14, marginTop: 10, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{text}</div>
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 10 }}>AI-generated from your round stats{unlimited ? "" : ` · ${left} analyses left today`}</div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>AI-generated from your round stats{unlimited ? "" : ` · ${left} analyses left today`}</div>
         </>
       )}
     </div>

@@ -1,0 +1,17 @@
+{
+  "components/contests-view.tsx": 2,
+  "components/dashboard.tsx": 7,
+  "components/feedback.tsx": 2,
+  "components/game/game-list.tsx": 1,
+  "components/game/organizer-panel.tsx": 1,
+  "components/game/scorecard-views.tsx": 4,
+  "components/groups.tsx": 1,
+  "components/home.tsx": 2,
+  "components/manage.tsx": 2,
+  "components/money.tsx": 4,
+  "components/round-detail.tsx": 1,
+  "components/round-editor.tsx": 1,
+  "components/round-setup.tsx": 1,
+  "components/tee-times.tsx": 2,
+  "components/ui.tsx": 8
+}

@@ -322,7 +322,7 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
             <span style={{ color: C.sage, fontSize: 12, flex: 1 }}>No one is keeping score for {groupLabel} yet.</span>
             {canClaim && onClaimGroup
               ? <button onClick={onClaimGroup} style={{ ...btn(true), fontSize: 11, padding: "5px 10px" }}>Keep score for this group</button>
-              : <span style={{ color: C.faint, fontSize: 11 }}>view only</span>}
+              : <span style={{ color: C.sage, fontSize: 11 }}>view only</span>}
           </div>
         )
       ) : isMarker ? (
@@ -610,7 +610,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, getTeeGroupPolicy,
                     return <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 7 }}><Avatar src={p.avatar_url} name={p.display_name} size={20} enlargeable={false} /><span>{p.display_name}{sponsor ? <span style={{ color: C.faint, fontSize: 11 }}> · guest of {sponsor}</span> : null}</span></div>;
                   })}
                 </div>
-                <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Scorer: chosen on the course</div>
+                <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Scorer: chosen on the course</div>
               </div>
             );
           })}

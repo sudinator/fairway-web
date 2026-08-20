@@ -151,59 +151,56 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
     principle bottom sheets use to cap their height (#17). Enforced by `ci/check-safe-area-frames.py`; all
     UI guards now run in CI via `npm run guards` (font size, global rules, chart overflow, date inputs,
     bottom sheets, safe-area frames). — manual
-25. **Cream is the scorecard. Green is everything else.** Full spec, worked examples and the
-    manual audit checklist live in **DISPLAY_RULES.md** — read it before any visual work. Summary:
+25. **Cream is the scorecard. Green is everything else.** Full spec, worked examples and the manual
+    audit checklist are in **DISPLAY_RULES.md** — read it before any visual work.
 
-    **CREAM — three cases only.** (a) Scorecards and score entry: `C.card` + `C.ink` / `C.faint` /
-    `C.line`. Reference: `components/game/scorecard-views.tsx`. (b) Editable fields: `inputStyle`
-    uses `C.cream`, not `C.card`. (c) The OUTLINE of a pick control: transparent + `1.5px solid
-    C.cream`; selected keeps its identity colour. Never FILL an unselected chip with cream — it
-    outshines the selected one.
+    **CREAM, three cases only.** (a) Scorecards and score entry: `C.card` + `C.ink`/`C.faint`/
+    `C.line`; reference `components/game/scorecard-views.tsx`. (b) Editable fields: `C.field`
+    (#EBE3CC) on `C.fieldLine` (#C4BB9E) via `inputStyle`. (c) The OUTLINE of a pick control:
+    transparent + `1.5px solid C.cream`; selected keeps its identity colour. Never FILL an
+    unselected chip with cream — it outshines the selected one.
 
-    **GREEN — everything else.** Lists, Money, Insights, Contests, Skins, nav, panels, sheets,
-    buttons, and the frame *around* a score grid. `C.green`/`greenMid`/`greenLight` + `C.cream` /
-    `C.sage` + `rgba(255,255,255,.08-.12)` dividers.
+    **GREEN, everything else.** `C.green`/`greenMid`/`greenLight` + `C.cream`/`C.sage` +
+    `rgba(255,255,255,.08-.12)` dividers. A cream grid inside a green frame is CORRECT.
 
-    A cream grid nested in a green frame is CORRECT — that is the scorecard. The prohibition is on
-    mixing families WITHIN one element.
+    **Text colour belongs to a SURFACE, not a meaning.** `C.ink`, `C.faint`, `C.line` and
+    `C.green`-as-text are cream-only. `C.cream`, `C.sage` and the rgba dividers are green-only. A
+    colour keeps its name after the surface beneath it changes and nothing in the code objects — at
+    177.58 there were 62 sites where a token sat on the wrong family, the worst at 1.83:1 and 2.24:1.
+    Preserve the RELATIONSHIP, not the hex: ask what a colour was contrasting against, then
+    reproduce that contrast in the other family.
 
-    **Text colour belongs to a surface, not a meaning.** `C.ink`, `C.faint`, `C.line` and
-    `C.green`-as-text are cream-only. `C.cream`, `C.sage` and `rgba(255,255,255,.08-.12)` are
-    green-only. A colour keeps its name after the surface under it changes and nothing in the code
-    objects: the Games-list share code was `color: C.green` — 12.25:1 on `C.card`, 1.54:1 on
-    `C.greenLight`, i.e. invisible. Preserve the RELATIONSHIP, not the hex: `C.green` was being the
-    darkest thing in a light subtitle; on green the same job is `C.cream`, the brightest thing in a
-    sage subtitle.
+    **Measure, do not eyeball.** `C.faint` and `C.sage` were both marginally under 4.5:1 on their own
+    home surfaces across 405 sites — nobody had ever measured them. Every text/background pair must
+    reach WCAG 2.1: 4.5:1 normal, 3:1 for >=18px or >=14px bold. Two cautionary cases from 177.59,
+    both of which LOOKED like improvements: moving `vetted ★` from gold (2.38:1) to `C.sage` on a
+    cream row made it 1.83:1, and moving the share code to `C.cream` on a cream row made it 1.09:1.
 
-    **Gold means SOMEONE MUST ACT.** Not "verified", not "good news". Test: if the user does
-    nothing, is anything wrong? No -> `C.sage` metadata. Attention never earns a cream surface;
-    cream only reads as special while it stays rare.
+    **Gold means SOMEONE MUST ACT.** Not "verified", not "good news". Test: if the user does nothing,
+    is anything wrong? No -> secondary metadata in the surface's own token. Attention never earns a
+    cream surface; cream reads as special only while it stays rare.
 
-    **Scales (DISPLAY_RULES Part 5).** Radius {999, 12, 10, 6} — pill is `999`, never `99`.
-    Padding {`13px 16px`, `11px 20px`, `8px 12px`, `4px 10px`, `16px`}. Font {11, 13, 15, 17, 22,
-    30+ for display numerals}; weight 700 titles / 400 body; Georgia for numerals and screen titles
-    only. Every surface colour is a member of `C` in `lib/golf.ts`; new surfaces get a NAMED token,
-    never a literal at the call site.
+    **Scales (DISPLAY_RULES Part 5).** Radius {999, 12, 10, 6} — pill is `999`, never `99`. Padding
+    {`13px 16px`, `11px 20px`, `8px 12px`, `4px 10px`, `16px`}. Font {11, 13, 15, 17, 22, 30+};
+    weight 700 titles / 400 body; Georgia for numerals and screen titles only. Every surface colour
+    is a member of `C` in `lib/golf.ts`; new surfaces get a NAMED token, never a call-site literal.
 
-    Reviewed exceptions: the Stableford points pill keeps `C.cream` on green; `borderRadius: 20`
-    (x6) and `24` (x1) are real corners awaiting a per-site decision. Allowlisted non-palette
-    colours: `#DC2626` (TEST-MODE), `#003087`/`#3D95CE` (PayPal/Venmo), `#5AA9E6`/`#E8934F` (team
-    identity). — CI (`ci/check-design-scale.py`, `ci/check-palette-closure.py`,
-    `ci/check-contrast.py`) + manual (DISPLAY_RULES Part 7)
+    Reviewed exceptions: `borderRadius: 20` (x6) and `24` (x1) are real corners awaiting a per-site
+    decision. Allowlisted non-palette colours: `#DC2626` (TEST-MODE), `#003087`/`#3D95CE`
+    (PayPal/Venmo), `#5AA9E6`/`#E8934F` (team identity). — CI (`ci/check_resolved_contrast.py`,
+    `ci/check-design-scale.py`, `ci/check-palette-closure.py`, `ci/check-contrast.py`) + manual
 
 26. **Every popup is a `<BottomSheet>`; every button is `btn()`; every scroller is `<HScroll>`;
-    every section header is `<Eyebrow>`.** No hand-rolled `position:"fixed"` scrim + panel —
-    `BottomSheet` owns the safe-area perimeter (#17), the standard corner close control (#4) and
-    the backdrop policy. **A scrollable sheet must pass `dismissOnBackdrop={false}`**; a scroll
-    ending on the scrim reads as a tap and closes the sheet mid-entry (recurred three times).
+    every section header is `<Eyebrow>`.** No hand-rolled `position:"fixed"` scrim + panel.
+    **A scrollable sheet must pass `dismissOnBackdrop={false}`** — a scroll ending on the scrim reads
+    as a tap and closes the sheet mid-entry.
 
     **Never override a style spread with `undefined`.** `{...btn(true), background: cond ? X :
-    undefined}` keeps the key set to undefined, which overrides the spread; React then applies NO
-    background and NO colour and the control falls back to the browser default button — light grey
-    with accent-blue text. This shipped on "End game for everyone" (`tournaments.tsx`) and "Copy
-    round summary" (`organizer-panel.tsx`), invisible to typecheck, lint and the build. Use a
-    conditional spread: `...(cond ? { background: X, color: Y } : {})`. — CI
-    (`ci/check-overlay-contract.py`, zero-tolerance on the undefined case)
+    undefined}` sets the key to undefined, which overrides the spread; React then applies no
+    background and no colour, and the control falls back to the browser's default button — light
+    grey with accent-blue text. Shipped on "End game for everyone" and "Copy round summary",
+    invisible to typecheck, lint and build. Use `...(cond ? { background: X, color: Y } : {})`.
+    — CI (`ci/check-overlay-contract.py`, zero-tolerance)
 
 ## Refactor reachability / boundary integrity (v177.19+)
 26. **Byte-identical moves are not enough.** Every stateful extraction must preserve and permanently verify the full chain: entry action/effect -> state/props/parameters/refs/context -> extracted render/call -> outputs/callbacks/state updates -> downstream helpers/APIs/RPCs/database writes -> refresh/cancel/retry/exit. Reactive/effect timing is part of the contract. Use explicit exported prop types and `satisfies` for constructed spread-prop objects. CI must include permanent reachability/characterization checks plus orphan-state/dependency hygiene checks. Unused props/state/imports are boundary-drift warnings. Do not continue modularization while a known reachability defect is unresolved. Pure logic still requires old-vs-new differential testing where practical.
