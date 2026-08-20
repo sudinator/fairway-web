@@ -1,3 +1,73 @@
+## 177.65.260820 — Visual states audit: opacity, SVG, borders, shadows, native controls, focus
+- **NO migration. Cosmetic + CI only.** Completes the surface migration by auditing the seven
+  categories that background and text colour alone never covered.
+- **Runtime-computed colours: 21 of 33 combinations were failing, now 0.** Helpers like
+  `ptsColor()`, `colorFor()`, `relCol` and the achievements hole chips return a fixed set of
+  values, so their range is enumerable even though a static scanner cannot read them. Every one
+  had been tuned for a cream surface and left at 1.26-2.27:1 when those surfaces flipped in
+  177.62. The achievements chips were the worst in the app at 1.26:1 — every possible state
+  unreadable. NEW `ci/computed_colour_matrix.py` checks all 33 combinations on every build.
+- **Disabled controls:** eight different opacity values (0.3-0.85) collapsed to one, 0.62. At 0.3
+  and 0.4 a control did not read as disabled, it read as broken. WCAG exempts disabled controls
+  from contrast minimums, so this is legibility rather than compliance.
+- **SVG:** `player-card` FormChart carried the OLD `C.faint` (#8B8775) and OLD `C.sage` (#A9C4B5)
+  frozen into `fill=` attributes, which no `color:` scanner reads. Axis labels measured 2.24:1 on
+  the green panel. Now `C.sage`; the series red lifted for a dark ground.
+- **Borders: 103 below 1.7:1, triaged by PURPOSE not by value.** 5 deleted as redundant (the
+  surface change already gave >=3:1), 93 raised so the edge is visible, 5 lifted to 3:1 because
+  they communicate state. Two of those five were real bugs: the SELECTED course row and
+  destructive controls were both effectively invisible at 1.34:1 and 1.42:1.
+- **Destructive actions: five treatments collapsed to one.** Two outline variants, bare red text,
+  `#7A2F28` and `#5A1E1E` all become `C.danger` with `C.cream`. The three outline-only ones did
+  not read as buttons at all. `C.dangerEdge` is added for the two that sit directly on `C.green`,
+  where the fill alone is 1.03:1.
+- **Selection rings** to full-opacity `C.gold` (1.34 -> 3.34:1). At .25 a selected item was marked
+  by a smudge.
+- **Box shadows:** black drop shadows do almost nothing on a dark page — `rgba(0,0,0,.45)` is
+  3.36:1 on white but 1.37:1 on `C.green`. The inert card shadows are removed; the raised border
+  now carries elevation. 22 distinct shadow values collapse to 3.
+- **Native controls:** `color-scheme` was never set, so iOS chose light or dark from the USER'S
+  phone setting — the same screen rendered differently for different people. Now declared light,
+  matching the cream fields. `accent-color: C.gold` globally; it had been set at exactly one of
+  two checkboxes, leaving the other iOS system blue. The one date input on a dark surface now
+  matches the other three (iOS draws the value text, so cream was never guaranteed).
+- **Focus:** nothing removed the outline, so keyboard and Switch Control users were never
+  stranded — but the browser default is system blue at 2.01:1 on a green card, and which blue
+  depends on the browser. A two-tone `:focus-visible` ring replaces it; no single colour clears
+  3:1 everywhere, so cream outer plus dark inner covers gold buttons (6.75:1) and green cards
+  (7.29:1) alike.
+- **Dashboard stat bars** had `C.cream` labels on light fills — 1.57:1 at worst. Now `C.green`.
+- **NOT done:** the share-card PNG export. `html-to-image` rasterises separately from the on-screen
+  render, so it needs verifying against a real generated image with real data rather than by
+  static analysis.
+
+## 177.64.260820 — Fix: surfaces and text 177.62 missed
+- **NO migration. Cosmetic + CI only.** Completes the 177.62 surface migration.
+- **Root cause: every scanner I wrote matched the LITERAL form and treated "no match" as "nothing
+  there".** `color: C.faint` matched; `color: cond ? C.faint : C.green` did not. `background:
+  C.card` matched; `background: sel ? C.cream : C.card` did not. In a codebase where conditional
+  styling is common this silently excluded a large fraction of reality while reporting a clean
+  pass. Three separate defects, one habit.
+- **123 conditional colour expressions** were never examined by `check_resolved_contrast.py`. One
+  of them shipped "G1 2 UP" as `C.green` on a `C.greenLight` card — 1.54:1, effectively invisible.
+  The guard now evaluates BOTH branches of a ternary.
+- **19 conditional light surfaces** were never inventoried, which is why Courses went green while
+  New Round and Create Game kept white course pickers. Now flipped: create-game course rows,
+  new-round favourites rows, leaderboard rows, scoring total cards, scoring player cards, the
+  admin provider-source panel.
+- **`round-setup.tsx` favourites row was misclassified** as the par grid on the line above it.
+- **Dark-on-green text fixed at 20+ sites** — `C.green`, `C.ink` and bespoke hexes (`#14351f`,
+  `#4a6b54`, `#8a5a12`, `#9a6a12`, `#5a4a12`, `#6B6857`) left behind by the flip because the swap
+  map only knew `C.*` tokens.
+- **Case-sensitivity, twice.** The tree mixes `#14351F` and `#14351f`; case-sensitive replacement
+  matched 2 of 9 sites, the same mistake that made the first flip script miss 14 of 63. Every
+  scanner now treats hex as case-insensitive.
+- **NEW `ci/style_audit.py`** — resolves literal AND conditional styles and, critically, PRINTS
+  every expression it could not parse instead of skipping it silently. A scanner that hides its
+  blind spots produces confident wrong answers, which is what happened three times here.
+- Guard baselines regenerated from the fixed state, not from the broken one. The 177.62 baselines
+  had frozen the defects as "known", so `npm run guards` passed over them.
+
 ## 177.63.260819 — Fix: package-lock.json missing from the 177.62 drop
 - **CI-only. No application code, no visual change, no migration.**
 - 177.62 added four devDependencies for the new component test harness (`jsdom`, `@types/jsdom`,

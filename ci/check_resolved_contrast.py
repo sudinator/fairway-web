@@ -103,7 +103,13 @@ def scan_tags(src):
 
 
 BG = re.compile(r"background(?:Color)?:\s*(C\.\w+|\"#[0-9A-Fa-f]{3,8}\")")
+# Literal colours AND conditional ones. A ternary — `color: cond ? C.birdie : C.green` — is
+# still a colour that paints on screen, and BOTH branches must survive their background. The
+# original pattern matched literals only, so 123 conditional sites were never examined at all;
+# one of them shipped "G1 2 UP" in C.green on a C.greenLight card at 1.54:1.
 COLOR = re.compile(r"color:\s*(C\.\w+|\"#[0-9A-Fa-f]{3,8}\")")
+COLOR_EXPR = re.compile(r"color:\s*([^,}]*?\?[^,}]*?:[^,}]+)")
+TOKEN_IN_EXPR = re.compile(r"C\.\w+|\"#[0-9A-Fa-f]{6}\"")
 SIZE = re.compile(r"fontSize:\s*(\d+)")
 WEIGHT = re.compile(r"fontWeight:\s*(\d+)")
 
@@ -137,9 +143,18 @@ def analyse(path):
             elif name == "BottomSheet" and 'tone="light"' not in attrs:
                 bg = TOK.get("C.greenLight")
 
+        # collect every colour this element can paint: the literal, or each ternary branch
+        candidates = []
         cm = COLOR.search(attrs)
         if cm:
-            fg_hex, fg_name = norm(cm.group(1))
+            candidates.append(cm.group(1))
+        else:
+            ce = COLOR_EXPR.search(attrs)
+            if ce:
+                candidates.extend(TOKEN_IN_EXPR.findall(ce.group(1)))
+
+        for cand in candidates:
+            fg_hex, fg_name = norm(cand)
             eff_bg = bg or next((b for _, b in reversed(stack) if b), None)
             if fg_hex and eff_bg:
                 sz = int(SIZE.search(attrs).group(1)) if SIZE.search(attrs) else 15

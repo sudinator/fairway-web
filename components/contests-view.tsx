@@ -361,8 +361,8 @@ export function ContestHoleChip({ gameId, hole, players, userId, myName, canLogO
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 16 }}>{KIND_ICON[contest.kind] || "🏁"}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: "#14351f", fontWeight: 800, fontSize: 13 }}>{contest.label}</div>
-                <div style={{ color: "#4a6b54", fontSize: 11.5 }}>
+                <div style={{ color: C.cream, fontWeight: 800, fontSize: 13 }}>{contest.label}</div>
+                <div style={{ color: C.sage, fontSize: 11.5 }}>
                   {best ? <>best <b style={{ fontFamily: "Georgia, serif" }}>{fmtContestValue(contest.unit, best.value)}</b> — {best.player_name}</> : "no entries yet — be the first"}
                 </div>
               </div>
@@ -388,7 +388,7 @@ function InlineLog({ contest, hole, players, userId, myName, canLogOthers, onSav
   const [who, setWho] = useState("me"); const [busy, setBusy] = useState(false); const [err, setErr] = useState<string | null>(null);
   const guests = players.filter((p) => !p.user_id);
   const members = players.filter((p) => p.user_id && p.user_id !== userId);
-  const li: React.CSSProperties = { width: "100%", boxSizing: "border-box", background: "#fff", border: "1px solid #CFE3D4", borderRadius: 8, color: "#14351f", fontSize: 16, padding: "8px 10px", outline: "none" };
+  const li: React.CSSProperties = { width: "100%", boxSizing: "border-box", background: "#fff", border: "1px solid #CFE3D4", borderRadius: 8, color: C.cream, fontSize: 16, padding: "8px 10px", outline: "none" };
 
   const save = async () => {
     const value = isFtIn ? ftInToInches(Number(feet) || 0, Number(inches) || 0) : Number(num);

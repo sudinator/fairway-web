@@ -293,7 +293,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
       const cdSel = courseData[sel.course || ""];
       const chSel = cdSel && m?.handicap_index != null ? courseHandicap(Number(m.handicap_index), cdSel.slope, cdSel.rating, cdSel.par) : null;
       return (
-        <div key={r.user_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: `1px solid ${C.line}` }}>
+        <div key={r.user_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: `1px solid ${C.borderCard}` }}>
           <Avatar src={m?.avatar_url || undefined} name={name} size={34} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{name}{r.user_id === user.id ? " (you)" : ""}</div>
@@ -304,7 +304,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
             {canOrganizeTee && r.guest_names?.length ? (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 4 }}>
                 {r.guest_names.map((gn, gi) => (
-                  <span key={gi} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: C.greenLight, border: `1px solid ${C.line}`, borderRadius: 999, padding: "2px 6px 2px 9px", fontSize: 11, color: C.cream }}>
+                  <span key={gi} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: C.greenLight, border: `1px solid ${C.borderCard}`, borderRadius: 999, padding: "2px 6px 2px 9px", fontSize: 11, color: C.cream }}>
                     {gn || "Guest"}
                     <button onClick={() => dropGuest(sel, r.user_id, gi)} disabled={busy} aria-label={`Remove guest ${gn || ""}`} title="Remove guest (frees a spot)" style={{ background: "none", border: "none", color: C.birdie, cursor: "pointer", fontSize: 12, padding: 0, lineHeight: 1 }}>✕</button>
                   </span>
@@ -312,7 +312,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
               </div>
             ) : null}
           </div>
-          {wait ? <span style={{ fontSize: 11, fontWeight: 800, background: C.greenLight, color: "#9a6a12", borderRadius: 20, padding: "3px 9px" }}>Waitlist{waitPos.get(r.user_id) ? ` #${waitPos.get(r.user_id)}` : ""}</span> : null}
+          {wait ? <span style={{ fontSize: 11, fontWeight: 800, background: C.greenLight, color: C.gold, borderRadius: 20, padding: "3px 9px" }}>Waitlist{waitPos.get(r.user_id) ? ` #${waitPos.get(r.user_id)}` : ""}</span> : null}
           {wait && canOrganizeTee ? <button onClick={() => promote(sel, r.user_id)} disabled={busy} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Move up</button> : null}
           {showOrg && canOrganizeTee ? (
             <button onClick={() => orgSetRsvp(sel, r.user_id, r.choice === "in" ? "out" : "in")} disabled={busy}
@@ -346,7 +346,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
         {sel.status !== "cancelled" && (
           <div style={{ background: C.sage, borderRadius: 12, margin: "10px 0", padding: "11px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ fontSize: 13, color: C.ink }}>
-              {frozen ? "This tee time has passed" : mine ? <>Your response: <b style={{ color: CHOICE[mine.choice].c }}>{CHOICE[mine.choice].label}</b>{mine.choice === "in" && sel.max_spots != null ? (waitSet.has(user.id) ? <span style={{ color: "#9a6a12", fontWeight: 700 }}> — Waitlist #{waitPos.get(user.id)}</span> : <span style={{ color: "#1a7a3a", fontWeight: 700 }}> — In the field</span>) : null}</> : "You haven't responded"}
+              {frozen ? "This tee time has passed" : mine ? <>Your response: <b style={{ color: CHOICE[mine.choice].c }}>{CHOICE[mine.choice].label}</b>{mine.choice === "in" && sel.max_spots != null ? (waitSet.has(user.id) ? <span style={{ color: C.gold, fontWeight: 700 }}> — Waitlist #{waitPos.get(user.id)}</span> : <span style={{ color: "#1a7a3a", fontWeight: 700 }}> — In the field</span>) : null}</> : "You haven't responded"}
             </div>
             {!frozen && <button onClick={() => setRsvpOpen(true)} style={{ ...btn(true), fontSize: 12, padding: "7px 12px" }}>{mine ? "Change" : "RSVP"}</button>}
           </div>
@@ -405,7 +405,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
             <button onClick={() => copyReminder(sel)} style={{ ...btn(false), width: "100%", marginTop: 8, fontSize: 13 }}>{remindCopied ? "Reminder copied ✓" : "Copy reminder for WhatsApp"}</button>
           )}
           {canOrganizeTee && sel.status !== "cancelled" && !isDone(sel) && (
-            <button onClick={() => copySignupLink(sel)} disabled={busy} style={{ ...btn(false), width: "100%", marginTop: 8, fontSize: 13, opacity: busy ? 0.6 : 1 }}>{signupCopied ? "Sign-up link copied ✓" : "Copy sign-up link (new players)"}</button>
+            <button onClick={() => copySignupLink(sel)} disabled={busy} style={{ ...btn(false), width: "100%", marginTop: 8, fontSize: 13, opacity: busy ? 0.62 : 1 }}>{signupCopied ? "Sign-up link copied ✓" : "Copy sign-up link (new players)"}</button>
           )}
           </>
         ) : detailTab === "signups" ? (
@@ -425,7 +425,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
               <><Eyebrow>{`Not responded (${notResponded.length})`}</Eyebrow>
                 <div style={{ background: C.greenLight, borderRadius: 14, overflow: "hidden" }}>
                   {notResponded.map((m) => (
-                    <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: `1px solid ${C.line}` }}>
+                    <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: `1px solid ${C.borderCard}` }}>
                       <Avatar src={m.avatar_url || undefined} name={m.display_name} size={34} />
                       <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, color: C.cream }}>{m.display_name}</div>
                       <button onClick={() => orgSetRsvp(sel, m.id, "in")} disabled={busy} style={{ ...btn(true), fontSize: 11, padding: "5px 9px" }}>In</button>
@@ -446,7 +446,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
                     const who = shortName(memberOf(a.actor_user_id)?.display_name || "Someone");
                     const when = new Date(a.created_at).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
                     return (
-                      <div key={a.id} style={{ padding: "10px 14px", borderBottom: `1px solid ${C.line}` }}>
+                      <div key={a.id} style={{ padding: "10px 14px", borderBottom: `1px solid ${C.borderCard}` }}>
                         <div style={{ fontSize: 13, color: C.cream }}><b>{who}</b> {a.summary}</div>
                         <div style={{ fontSize: 11, color: C.sage, marginTop: 2 }}>{when}</div>
                       </div>
@@ -493,7 +493,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
               <Eyebrow>{`Needs your response (${pending.length})`}</Eyebrow>
               <div style={{ background: C.greenLight, borderRadius: 14, overflow: "hidden", border: `1.5px solid ${C.gold}`, marginBottom: 10 }}>
                 {pending.map((t) => (
-                  <div key={t.id} onClick={() => open(t.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: "pointer", borderBottom: `1px solid ${C.line}` }}>
+                  <div key={t.id} onClick={() => open(t.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", cursor: "pointer", borderBottom: `1px solid ${C.borderCard}` }}>
                     <DateBadge d={t.play_date} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 11, fontWeight: 800, color: C.cream }}>TEE TIME #{t.seq ?? "—"}</div>
@@ -559,7 +559,7 @@ function RsvpSheet({ tt, mine, spotsLeft, warn, busy, onClose, onSubmit }: {
         </div>
         {warn && <div style={{ margin: "4px 16px 8px", background: "#5a3a10", color: "#f6d98a", borderRadius: 10, padding: "9px 12px", fontSize: 12, lineHeight: 1.4 }}>Signup deadline has passed — you can still respond, but a spot isn't guaranteed.</div>}
         {(["in", "maybe", "out"] as const).map((c) => (
-          <div key={c} onClick={() => setChoice(c)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 16px", cursor: "pointer", background: choice === c ? CHOICE[c].c + "1A" : "none", borderBottom: `1px solid ${C.greenMid}` }}>
+          <div key={c} onClick={() => setChoice(c)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 16px", cursor: "pointer", background: choice === c ? CHOICE[c].c + "1A" : "none", borderBottom: `1px solid ${C.borderGreen}` }}>
             <div style={{ width: 40, height: 40, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, flex: "none", background: CHOICE[c].c + "2E", color: CHOICE[c].c }}>{CHOICE[c].icon}</div>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 700, color: C.cream }}>{CHOICE[c].label}</div>
@@ -764,7 +764,7 @@ function CaptainPicker({ candidates, current, busy, onClose, onPick }: {
         {candidates.length === 0 ? (
           <div style={{ padding: "0 16px 12px", fontSize: 13, color: C.sage }}>No one is signed up as "In" yet.</div>
         ) : candidates.map((m) => (
-          <div key={m.id} onClick={() => onPick(m.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", borderBottom: `1px solid ${C.greenMid}` }}>
+          <div key={m.id} onClick={() => onPick(m.id)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", cursor: "pointer", borderBottom: `1px solid ${C.borderGreen}` }}>
             <Avatar src={m.avatar_url || undefined} name={m.display_name} size={34} />
             <div style={{ flex: 1, fontSize: 14, fontWeight: 700, color: C.cream }}>{m.display_name}</div>
             {current === m.id ? <span style={{ color: C.gold, fontSize: 18, fontWeight: 800 }}>●</span> : null}

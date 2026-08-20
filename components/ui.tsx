@@ -324,7 +324,7 @@ export function ScoreMark({ hole }: { hole: Hole }) {
 }
 
 const cardTd = (head?: boolean): React.CSSProperties => ({
-  border: `1px solid ${C.line}`, textAlign: "center", padding: "5px 4px",
+  border: `1px solid ${C.borderCard}`, textAlign: "center", padding: "5px 4px",
   fontSize: head ? 10 : 13, color: head ? C.faint : C.ink,
   fontWeight: head ? 700 : 400, letterSpacing: head ? 1 : 0, minWidth: 32,
 });
@@ -348,7 +348,7 @@ export function NumPicker({ value, from, to, onChange, width = 46, dash = true, 
       value={value ?? ""}
       onChange={(e) => onChange(e.target.value === "" ? null : parseInt(e.target.value, 10))}
       style={{
-        background: accent ? C.cream : C.card, border: `1px solid ${C.line}`, borderRadius: 8,
+        background: accent ? C.cream : C.card, border: `1px solid ${C.borderCard}`, borderRadius: 8,
         padding: "6px 2px", fontSize: 15, color: C.ink, width, textAlign: "center", textAlignLast: "center",
       } as React.CSSProperties}
     >
@@ -463,7 +463,7 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
           </div>
         ) : (<>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <button onClick={() => onPatch({ strokes: clampG((strokes || par) - 1) })} style={{ width: 38, height: 38, borderRadius: 8, border: `0.5px solid ${C.line}`, background: C.card, color: C.ink, fontSize: 20, cursor: "pointer" }}>−</button>
+          <button onClick={() => onPatch({ strokes: clampG((strokes || par) - 1) })} style={{ width: 38, height: 38, borderRadius: 8, border: `0.5px solid ${C.borderCard}`, background: C.card, color: C.ink, fontSize: 20, cursor: "pointer" }}>−</button>
           <div style={{ flex: 1, textAlign: "center" }}>
             <span style={{ fontSize: 26, fontWeight: 800, color: net == null ? "#C7C2B0" : net < par ? "#1B7A4B" : net === par ? "#1E5B8A" : "#C0392B" }}>{strokes && strokes > 0 ? strokes : par}</span>
             {net != null && <span style={{ color: C.faint, fontSize: 12 }}> · net {net}</span>}
@@ -474,7 +474,7 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
         <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
           {picks.map((v) => {
             const on = strokes === v;
-            return <button key={v} onClick={() => onPatch({ strokes: v })} style={{ flex: 1, textAlign: "center", padding: "7px 0", borderRadius: 8, border: `0.5px solid ${on ? C.green : C.line}`, background: on ? C.green : "#FBF8EE", color: on ? "#fff" : "#5C5847", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{v}</button>;
+            return <button key={v} onClick={() => onPatch({ strokes: v })} style={{ flex: 1, textAlign: "center", padding: "7px 0", borderRadius: 8, border: `0.5px solid ${on ? C.green : C.borderCard}`, background: on ? C.green : "#FBF8EE", color: on ? "#fff" : "#5C5847", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{v}</button>;
           })}
           <button onClick={() => onPatch({ strokes: netDouble })} style={{ flex: 1, textAlign: "center", padding: "7px 0", borderRadius: 8, border: `0.5px solid ${strokes === netDouble ? "#8B6A12" : "#E0CC8A"}`, background: strokes === netDouble ? "#EAD79A" : "#F6EFD8", color: "#8B6A12", fontWeight: 700, fontSize: 11, cursor: "pointer" }}>pickup</button>
         </div>
@@ -482,10 +482,10 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
 
         {showFairway && (<>
           <div style={{ color: C.ink, fontSize: 13, marginTop: 14, marginBottom: 5 }}>Fairway {par < 4 ? <span style={{ color: C.faint }}>· n/a on a par 3</span> : ""}</div>
-          <div style={{ display: "flex", gap: 6, opacity: par < 4 ? 0.4 : 1, pointerEvents: par < 4 ? "none" : "auto" }}>
+          <div style={{ display: "flex", gap: 6, opacity: par < 4 ? 0.62 : 1, pointerEvents: par < 4 ? "none" : "auto" }}>
             {fwBtns.map(([val, label]) => {
               const on = fairway === val; const isHit = val === "hit";
-              return <button key={val} onClick={() => onPatch({ fairway: fairway === val ? null : val })} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: `0.5px solid ${on ? (isHit ? "#156B47" : C.birdie) : C.line}`, background: on ? (isHit ? "#C7E6D1" : "#F2CFCB") : C.card, color: on ? (isHit ? "#0F5436" : C.birdie) : C.faint, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{label}</button>;
+              return <button key={val} onClick={() => onPatch({ fairway: fairway === val ? null : val })} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: `0.5px solid ${on ? (isHit ? "#156B47" : C.birdie) : C.borderCard}`, background: on ? (isHit ? "#C7E6D1" : "#F2CFCB") : C.card, color: on ? (isHit ? "#0F5436" : C.birdie) : C.faint, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{label}</button>;
             })}
           </div>
         </>)}
@@ -493,7 +493,7 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
         {showPutts && (<>
           <div style={{ color: C.ink, fontSize: 13, marginTop: 14, marginBottom: 5 }}>Putts {putts == null ? <span style={{ color: C.faint, fontWeight: 400 }}>· grey 2 = not recorded, tap to start</span> : ""}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <button onClick={() => onPatch({ putts: putts == null ? 2 : Math.max(0, putts - 1) })} style={{ width: 34, height: 34, borderRadius: 8, border: `0.5px solid ${C.line}`, background: C.card, color: C.ink, fontSize: 18, cursor: "pointer" }}>−</button>
+            <button onClick={() => onPatch({ putts: putts == null ? 2 : Math.max(0, putts - 1) })} style={{ width: 34, height: 34, borderRadius: 8, border: `0.5px solid ${C.borderCard}`, background: C.card, color: C.ink, fontSize: 18, cursor: "pointer" }}>−</button>
             <span onClick={() => { if (putts == null) onPatch({ putts: 2 }); }} style={{ fontSize: 18, fontWeight: 700, minWidth: 20, textAlign: "center", color: putts == null ? "#C7C2B0" : C.ink, cursor: putts == null ? "pointer" : "default" }}>{putts == null ? 2 : putts}</span>
             <button onClick={() => onPatch({ putts: putts == null ? 2 : Math.min(10, putts + 1) })} style={{ width: 34, height: 34, borderRadius: 8, border: "none", background: C.green, color: "#fff", fontSize: 18, cursor: "pointer" }}>+</button>
             {putts != null && <span onClick={() => onPatch({ putts: null })} style={{ color: "#B0AB98", fontSize: 11, textDecoration: "underline", cursor: "pointer", marginLeft: 4 }}>clear</span>}
@@ -503,10 +503,10 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
         {showPenalties && (<>
           <div style={{ color: C.ink, fontSize: 13, marginTop: 14, marginBottom: 5 }}>Sand / Penalty</div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <button onClick={() => onPatch({ sand: !sand })} style={{ border: `1px solid ${sand ? "#C9A227" : C.line}`, background: sand ? "#EFE2C0" : C.card, color: sand ? "#7A5A12" : C.faint, borderRadius: 8, padding: "8px 12px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>{sand ? "S · bunker" : "S"}</button>
+            <button onClick={() => onPatch({ sand: !sand })} style={{ border: `1px solid ${sand ? "#C9A227" : C.borderCard}`, background: sand ? "#EFE2C0" : C.card, color: sand ? "#7A5A12" : C.faint, borderRadius: 8, padding: "8px 12px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>{sand ? "S · bunker" : "S"}</button>
             <span style={{ color: C.line }}>|</span>
             {[0, 1, 2, 3].map((nn) => (
-              <button key={nn} onClick={() => onPatch({ penalties: nn })} style={{ width: 34, padding: "8px 0", textAlign: "center", border: `1px solid ${penalties === nn ? C.birdie : C.line}`, background: penalties === nn ? "#F6DEDB" : C.card, color: penalties === nn ? C.birdie : C.faint, borderRadius: 8, fontWeight: 800, fontSize: 13, cursor: "pointer" }}>{nn}</button>
+              <button key={nn} onClick={() => onPatch({ penalties: nn })} style={{ width: 34, padding: "8px 0", textAlign: "center", border: `1px solid ${penalties === nn ? C.birdie : C.borderCard}`, background: penalties === nn ? "#F6DEDB" : C.card, color: penalties === nn ? C.birdie : C.faint, borderRadius: 8, fontWeight: 800, fontSize: 13, cursor: "pointer" }}>{nn}</button>
             ))}
           </div>
         </>)}
@@ -601,9 +601,9 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
       <div style={{ display: "grid", gridTemplateColumns: cols, alignItems: "center", gap: 4, padding: opts?.header ? "0 2px 4px" : "3px 2px 0" }}>{cells}</div>
     );
     return (
-      <div style={{ background: C.card, borderRadius: 12, padding: 10, flex: 1, minWidth: 300, border: `1px solid ${C.line}` }}>
+      <div style={{ background: C.card, borderRadius: 12, padding: 10, flex: 1, minWidth: 300, border: `1px solid ${C.borderCard}` }}>
         <div style={{ position: "sticky", top: 0, zIndex: 3, background: C.green, margin: "-11px -11px 4px -11px" }}>
-        <div style={{ background: C.card, padding: "10px 11px 5px 11px", borderTopLeftRadius: 12, borderTopRightRadius: 12, borderTop: `1px solid ${C.line}`, borderLeft: `1px solid ${C.line}`, borderRight: `1px solid ${C.line}`, boxShadow: "0 7px 9px -9px rgba(0,0,0,0.5)" }}>
+        <div style={{ background: C.card, padding: "10px 11px 5px 11px", borderTopLeftRadius: 12, borderTopRightRadius: 12, borderTop: `1px solid ${C.borderCard}`, borderLeft: `1px solid ${C.borderCard}`, borderRight: `1px solid ${C.borderCard}`, boxShadow: "0 7px 9px -9px rgba(0,0,0,0.5)" }}>
         <div style={{ color: C.green, fontSize: 11, letterSpacing: 2, fontWeight: 800, marginBottom: 6 }}>{label}</div>
         {GridRow([
           <div key="p" style={{ ...headStyle, textAlign: "center" }}>Par</div>,
@@ -625,7 +625,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           const maxPutts = h.strokes != null && h.strokes > 0 ? Math.min(h.strokes, 6) : 6;
           const pts = stablefordPts(h.strokes, h.par, sfRecv(h));
           return (
-            <div key={i} id={`sehole-${i}`} onClick={() => openEdit(i)} style={{ borderBottom: `1px solid ${C.line}`, paddingBottom: 5, marginTop: j === 0 ? 0 : 4, borderRadius: 8, background: edit === i ? "#EDF3EE" : "transparent", cursor: "pointer" }}>
+            <div key={i} id={`sehole-${i}`} onClick={() => openEdit(i)} style={{ borderBottom: `1px solid ${C.borderCard}`, paddingBottom: 5, marginTop: j === 0 ? 0 : 4, borderRadius: 8, background: edit === i ? "#EDF3EE" : "transparent", cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 2px", flexWrap: "wrap" }}>
                 <span style={{ color: C.ink, fontWeight: 800, fontSize: 14 }}>Hole {h.n}</span>
                 <span style={{ color: C.faint, fontSize: 11, fontWeight: 600 }}>{h.yards ? <>· <b style={{ color: C.green }}>{h.yards}</b> yds </> : null}· S.I. {h.si ?? "–"}</span>
@@ -653,7 +653,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
                 <div key="sc" style={{ textAlign: "center" }}>
                   {h.strokes
                     ? <ScoreMark hole={h as any} />
-                    : <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 36, height: 30, border: `1px dashed ${C.line}`, borderRadius: 8, color: "#C7C2B0", fontWeight: 700, fontSize: 16, lineHeight: 1 }}>{h.par}</span>}
+                    : <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 36, height: 30, border: `1px dashed ${C.borderCard}`, borderRadius: 8, color: "#C7C2B0", fontWeight: 700, fontSize: 16, lineHeight: 1 }}>{h.par}</span>}
                 </div>,
                 ...(showFairway ? [
                   <div key="fw" style={{ textAlign: "center" }}>
@@ -745,7 +745,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     const runCol = run === "" ? C.faint : run === "AS" ? C.ink : (run.includes("UP") || run.includes("↑")) ? C.greenMid : C.birdie;
     const yds = h.yards ?? null;
     return (
-      <div key={h.n} id={`sehole-${i}`} onClick={() => openEdit(i)} style={{ background: C.card, border: `1px solid ${edit === i ? C.gold : C.line}`, borderRadius: 13, overflow: "hidden", cursor: "pointer" }}>
+      <div key={h.n} id={`sehole-${i}`} onClick={() => openEdit(i)} style={{ background: C.card, border: `1px solid ${edit === i ? C.gold : C.borderCard}`, borderRadius: 13, overflow: "hidden", cursor: "pointer" }}>
         <div style={{ background: C.green, color: C.cream, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 12px" }}>
           <span style={{ fontSize: 16, fontWeight: 800 }}>{h.n}</span>
           <span style={{ fontSize: 12, color: C.sage, fontWeight: 600, flex: 1, marginLeft: 10 }}>Par <b style={{ color: "#EDE7D4" }}>{h.par}</b>{yds ? <> · <b style={{ color: "#EDE7D4" }}>{yds}</b> yds</> : null} · S.I. <b style={{ color: "#EDE7D4" }}>{h.si ?? "–"}</b></span>
@@ -754,12 +754,12 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "flex-end", padding: "5px 4px 6px", gap: 3 }}>
-          {mCell("Score", h.strokes ? <div style={{ height: 34, display: "flex", alignItems: "center", justifyContent: "center" }}><ScoreMark hole={h as any} /></div> : <div style={{ height: 34, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 34, height: 30, border: `1px dashed ${C.line}`, borderRadius: 8, color: "#C7C2B0", fontWeight: 700, fontSize: 16, lineHeight: 1 }}>{h.par}</span></div>)}
+          {mCell("Score", h.strokes ? <div style={{ height: 34, display: "flex", alignItems: "center", justifyContent: "center" }}><ScoreMark hole={h as any} /></div> : <div style={{ height: 34, display: "flex", alignItems: "center", justifyContent: "center" }}><span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 34, height: 30, border: `1px dashed ${C.borderCard}`, borderRadius: 8, color: "#C7C2B0", fontWeight: 700, fontSize: 16, lineHeight: 1 }}>{h.par}</span></div>)}
           {mCell("FW", valBox(h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "left" ? "L" : h.fairway === "right" ? "R" : h.fairway === "miss" ? "✗" : "·", h.fairway === "hit" ? "#0F7A45" : (h.fairway === "left" || h.fairway === "right" || h.fairway === "miss") ? C.birdie : C.faint, 14))}
           {mCell("GIR", valBox(h.putts == null ? "·" : ((h.strokes != null && (h.strokes - h.putts) <= (h.par - 2)) ? "✓" : "✗"), h.putts == null ? C.faint : ((h.strokes != null && (h.strokes - h.putts) <= (h.par - 2)) ? C.greenMid : C.birdie), 14))}
           {mCell("Putt", valBox(h.putts ?? "·", C.faint, 15))}
           {mCell("S/Pen", valBox(spDisp, spActive ? C.birdie : C.faint, spDisp === "*" ? 18 : 15))}
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 3, background: "#F3EFE2", borderRadius: 8, borderLeft: `1px solid ${C.line}`, marginLeft: 3, paddingLeft: 2 }}>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 3, background: "#F3EFE2", borderRadius: 8, borderLeft: `1px solid ${C.borderCard}`, marginLeft: 3, paddingLeft: 2 }}>
             {mCell("Match", valBox(run || "·", runCol, 13))}
             {mCell("Opp", valBox(ov ?? "·", ov == null ? C.faint : C.ink))}
             {mCell("Opp str", valBox((h.gives || 0) > 0 ? "•".repeat(Math.min(h.gives || 0, 3)) : "–", C.sage, 13))}
@@ -958,7 +958,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
           const spDisp = sandOn && penN > 0 ? "*" : sandOn ? "S" : penN > 0 ? String(penN) : "·";
           const spCol = sandOn || penN > 0 ? C.birdie : C.faint;
           return (
-            <div key={j} style={{ borderBottom: `1px solid ${C.line}`, paddingBottom: 6, marginTop: j === 0 ? 0 : 4 }}>
+            <div key={j} style={{ borderBottom: `1px solid ${C.borderCard}`, paddingBottom: 6, marginTop: j === 0 ? 0 : 4 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 4px", flexWrap: "wrap" }}>
                 <span style={{ color: C.ink, fontWeight: 800, fontSize: 14 }}>Hole {h.hole_number}</span>
                 <span style={{ color: C.faint, fontSize: 11, fontWeight: 600 }}>

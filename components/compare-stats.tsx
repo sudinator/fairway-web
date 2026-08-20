@@ -31,7 +31,7 @@ const CAT_DESC: Record<StatKey, { measured: string; work: string }> = {
 // ---- Shared category-bar language (used by BOTH cards) --------------------
 // Band-relative 0–100 score: 50 = the peer average for your handicap; +/- moves
 // toward the strong/weak edge of your handicap's typical range (putts inverted).
-const SYN_GOOD = "#8FE0B0", SYN_OK = "#F0C97B", SYN_WEAK = "#FB7185";
+const SYN_GOOD = "#8FE0B0", SYN_OK = "#F0C97B", SYN_WEAK = "#FFB3BC";
 function catScore(key: StatKey, value: number, band: Band) {
   const half = (band.hi - band.lo) / 2 || 1;
   const rel = BENCH_DIR[key] * (value - band.avg) / half;

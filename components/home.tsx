@@ -693,7 +693,7 @@ export function Home({ session }: { session: any }) {
           <div style={{ color: C.sage, fontSize: 12 }}>{index != null ? `Handicap ${index}` : "Set your handicap in Profile"}</div>
         </div>
         <NotificationBell user={user} onNavigate={navigateFromNotif} onSeeAll={() => { setTab("notifications"); setReturnTab(null); setStage(null); setViewing(null); }} />
-        {tab !== "money" && <button style={{ ...btn(true), opacity: activeGroup ? 1 : 0.5 }} disabled={!activeGroup} onClick={() => {
+        {tab !== "money" && <button style={{ ...btn(true), opacity: activeGroup ? 1 : 0.62 }} disabled={!activeGroup} onClick={() => {
           if (dbInProgress) {
             if (typeof window !== "undefined") window.alert(`You have an unfinished round at ${dbInProgress.course || "a course"}. Finish it, mark it complete, or discard it before starting a new one.`);
             setStage(null); setViewing(null); setTab("dashboard");
@@ -727,7 +727,7 @@ export function Home({ session }: { session: any }) {
       {/* Unfinished-round nudge: a started round only counts once it's completed, so
           prompt to finish it (partial is fine), mark it complete as-is, or discard it. */}
       {dbInProgress && !(stage && typeof stage === "object" && "round" in stage) && (
-        <div style={{ background: C.greenLight, border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginTop: 12 }}>
+        <div style={{ background: C.greenLight, border: `1px solid ${C.borderCard}`, borderRadius: 12, padding: "12px 14px", marginTop: 12 }}>
           <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>⛳ {inProgressCount > 1 ? `You have ${inProgressCount} unfinished rounds` : "You have an unfinished round"}</div>
           <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
             {dbInProgress.course || "Your round"} · {dbInProgress.holes?.filter((h) => h.strokes != null).length || 0} holes entered. A round only counts once it's completed — finishing a 9- or 15-hole round is fine. {inProgressCount > 1 ? "Showing the most recent; discard all to clear the rest. " : ""}You'll need to resolve this before starting a new round.
@@ -871,7 +871,7 @@ export function Home({ session }: { session: any }) {
       <div style={{ position: "relative", flexShrink: 0, zIndex: 61 }}>
       <nav data-diag="nav" style={{
         flexShrink: 0, zIndex: 50,
-        background: C.green, borderTop: `1px solid ${C.greenMid}`,
+        background: C.green, borderTop: `1px solid ${C.borderGreen}`,
         display: "flex", justifyContent: "space-around", alignItems: "stretch",
         paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)",
       }}>
@@ -975,7 +975,7 @@ function NameGate({ user, onSaved }: { user: any; onSaved: () => void }) {
           value={name} onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") save(); }} />
         {err && <div style={{ color: "#E8A199", fontSize: 12, marginTop: 8 }}>{err}</div>}
-        <button style={{ ...btn(true), width: "100%", marginTop: 16, padding: "13px", opacity: saving ? 0.5 : 1 }} disabled={saving} onClick={save}>
+        <button style={{ ...btn(true), width: "100%", marginTop: 16, padding: "13px", opacity: saving ? 0.62 : 1 }} disabled={saving} onClick={save}>
           {saving ? "Saving…" : "Continue"}
         </button>
       </div>

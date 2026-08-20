@@ -209,7 +209,7 @@ export function GameList({
               onKeyDown={(e) => e.key === "Enter" && join()}
             />
             <button
-              style={{ ...btn(false), whiteSpace: "nowrap", opacity: code.trim() ? 1 : 0.5 }}
+              style={{ ...btn(false), whiteSpace: "nowrap", opacity: code.trim() ? 1 : 0.62 }}
               disabled={!code.trim() || joining}
               onClick={join}
             >

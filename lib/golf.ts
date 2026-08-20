@@ -10,6 +10,17 @@ export const C = {
   // 1.09:1 against C.card: literally invisible as a field. This reads as a filled-in
   // slot. C.line on it is only 1.18:1, so fields get their own deeper border too.
   field: "#EBE3CC", fieldLine: "#C4BB9E",
+  // Destructive actions. One fill everywhere — the app previously had five treatments
+  // (two outline variants, bare red text, #7A2F28 and #5A1E1E) for one meaning.
+  // dangerEdge is only needed when the button sits directly on C.green, where the fill
+  // is 1.03:1 and the button shape would otherwise be lost.
+  danger: "#5A1E1E", dangerEdge: "#A34438",
+  // Borders. C.greenMid on C.greenLight measured 1.15:1 — not a faint edge, no edge.
+  // C.line on C.card was 1.49:1. These are the values at which the boundary is visible.
+  borderGreen: "#3C7A63", borderGreenDeep: "#2E6B55", borderCard: "#B5AB8A",
+  // Scores on a GREEN surface. ptsColor/colorFor/relCol were tuned for cream and land
+  // at 1.26-2.27:1 once their surfaces flipped. Same hues, lifted for a dark ground.
+  underDark: "#7FD6A3", overDark: "#A3C6F5", overRedDark: "#F8BBB2",
 };
 
 // Color for a hole's Stableford points: >2 green, =2 blue, <2 red, none faint.

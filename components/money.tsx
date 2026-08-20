@@ -343,7 +343,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
           onOpenLedger={(mid) => setLedgerFor(mid)}
           onNudge={(m, owe) => { const link = "https://birdienumnum.vercel.app"; if (m.phone) window.location.href = nudgeSms(m.phone, m.display_name, owe, activeGroup.name, link); }} />
         {isAdmin && (
-          <button onClick={() => setScreen("untangle")} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginTop: 12, background: "#123528", border: `1px solid ${C.greenMid}`, borderRadius: 12, padding: "11px 13px", color: C.sage, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+          <button onClick={() => setScreen("untangle")} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginTop: 12, background: "#123528", border: `1px solid ${C.borderGreen}`, borderRadius: 12, padding: "11px 13px", color: C.sage, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
             <span style={{ fontSize: 15 }}>&#9874;</span> Untangle payments <span style={{ marginLeft: "auto", color: C.sage, fontWeight: 500, fontSize: 11.5 }}>admin · fix an entry</span>
           </button>
         )}
@@ -500,7 +500,7 @@ function GuestManager({ guests, members, busy, me, isAdmin, onRetire, onUnretire
       <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 6 }}>Retire a guest to stop offering them on new expenses. Past expenses stay untouched.</div>
       {active.length === 0 && <div style={{ color: C.sage, fontSize: 12, padding: "6px 2px" }}>No active guests. Add one from the Add screen.</div>}
       {active.map((g) => (
-        <div key={g.id} style={{ borderBottom: `1px solid ${C.greenMid}`, padding: "8px 2px" }}>
+        <div key={g.id} style={{ borderBottom: `1px solid ${C.borderGreen}`, padding: "8px 2px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 600, minWidth: 0 }}>{g.name}</span>
             {(g.created_by === me || isAdmin)
@@ -551,7 +551,7 @@ function BalancesScreen({ members, guests, shares, payers, balances, me, onNudge
         const cov = coverage[m.id] || {};
         const covNames = Object.keys(cov).map((id) => gById[id]?.name).filter(Boolean) as string[];
         return (
-          <div key={m.id} onClick={() => onOpenLedger(m.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 2px", borderBottom: `1px solid ${C.greenMid}`, cursor: "pointer" }}>
+          <div key={m.id} onClick={() => onOpenLedger(m.id)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 2px", borderBottom: `1px solid ${C.borderGreen}`, cursor: "pointer" }}>
             <Avatar src={m.avatar_url} name={m.display_name} size={30} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: C.cream, fontSize: 14, fontWeight: 700 }}>{m.display_name}{m.id === me ? " (you)" : ""}</div>
@@ -611,11 +611,11 @@ function AdminUntangle({ members, expenses, deletedExpenses, shares, payers, set
   return (
     <div style={{ maxWidth: 860, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-        <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.greenMid}`, borderRadius: 9, color: C.sage, fontSize: 12.5, padding: "6px 11px", cursor: "pointer" }}>&#8592; Back</button>
+        <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.borderGreen}`, borderRadius: 9, color: C.sage, fontSize: 12.5, padding: "6px 11px", cursor: "pointer" }}>&#8592; Back</button>
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Untangle payments</div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, background: conserves ? "#0f3529" : "#3a2320", border: `1px solid ${conserves ? C.greenMid : "#8a3b34"}`, borderRadius: 11, padding: "9px 12px", marginBottom: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, background: conserves ? "#0f3529" : "#3a2320", border: `1px solid ${conserves ? C.borderGreen : "#8a3b34"}`, borderRadius: 11, padding: "9px 12px", marginBottom: 12 }}>
         <span style={{ fontSize: 15, color: conserves ? "#7fd6a3" : "#ef9d90" }}>{conserves ? "\u2713" : "\u26A0"}</span>
         <span style={{ color: C.cream, fontSize: 12.5 }}>{conserves ? "Balances reconcile \u2014 the club nets to $0.00" : `Balances are off by ${fmtUSD(Math.abs(sum))} \u2014 investigate below`}</span>
       </div>
@@ -624,7 +624,7 @@ function AdminUntangle({ members, expenses, deletedExpenses, shares, payers, set
         {ranked.map((m) => { const v = balances[m.id] || 0; const on = m.id === sel; return (
           <button key={m.id} onClick={() => setSel(m.id)} style={{ flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2, background: on ? C.gold : "#123528", border: on ? "none" : `1px solid ${C.greenMid}`, borderRadius: 10, padding: "7px 11px", cursor: "pointer", minWidth: 92 }}>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: on ? "#2a2410" : C.cream }}>{m.display_name}</span>
-            <span style={{ fontSize: 11.5, fontWeight: 700, color: on ? "#5a4a12" : netColor(v) }}>{v === 0 ? "square" : (v > 0 ? "gets " : "owes ") + fmtUSD(Math.abs(v))}</span>
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: on ? C.sage : netColor(v) }}>{v === 0 ? "square" : (v > 0 ? "gets " : "owes ") + fmtUSD(Math.abs(v))}</span>
           </button>
         ); })}
       </div>
@@ -646,7 +646,7 @@ function AdminUntangle({ members, expenses, deletedExpenses, shares, payers, set
             </div>
             <div style={{ display: "flex", gap: 7, marginTop: 9, justifyContent: "flex-end" }}>
               {r.kind === "exp" && r.exp && (<>
-                <button disabled={busy} onClick={() => onEditExpense(r.exp!)} style={{ ...actBtn, border: `1px solid ${C.greenMid}`, background: "transparent", color: C.sage }}>Edit</button>
+                <button disabled={busy} onClick={() => onEditExpense(r.exp!)} style={{ ...actBtn, border: `1px solid ${C.borderGreen}`, background: "transparent", color: C.sage }}>Edit</button>
                 <button disabled={busy} onClick={() => { const e = r.exp!; setPending({ impact: voidImpact(e), title: "Void \u201C" + (e.description || "expense") + "\u201D?", subtitle: "Removes it from everyone's balances. Reversible \u2014 you can restore it below.", label: "Confirm void", danger: true, run: () => onVoidExpense(e) }); }} style={{ ...actBtn, border: "1px solid #8a3b34", background: "transparent", color: "#ef9d90" }}>Void</button>
               </>)}
               {r.kind === "settle" && r.s && (
@@ -665,7 +665,7 @@ function AdminUntangle({ members, expenses, deletedExpenses, shares, payers, set
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                 <span style={{ color: C.cream, fontSize: 12.5 }}>{e.description || "expense"} &middot; {fmtUSD(e.amount_cents)}</span>
                 {restoreId === e.id
-                  ? <span style={{ display: "flex", gap: 6 }}><button disabled={busy} onClick={async () => { setRestoreId(null); await onRestoreExpense(e); }} style={{ ...actBtn, background: "#7fd6a3", color: C.green, border: "none" }}>Confirm</button><button disabled={busy} onClick={() => setRestoreId(null)} style={{ ...actBtn, background: "transparent", color: C.sage, border: `1px solid ${C.greenMid}` }}>Cancel</button></span>
+                  ? <span style={{ display: "flex", gap: 6 }}><button disabled={busy} onClick={async () => { setRestoreId(null); await onRestoreExpense(e); }} style={{ ...actBtn, background: "#7fd6a3", color: C.green, border: "none" }}>Confirm</button><button disabled={busy} onClick={() => setRestoreId(null)} style={{ ...actBtn, background: "transparent", color: C.sage, border: `1px solid ${C.borderGreen}` }}>Cancel</button></span>
                   : <button disabled={busy} onClick={() => setRestoreId(e.id)} style={{ ...actBtn, background: "transparent", color: "#e6cf8a", border: "1px solid #6b5e2e" }}>Restore</button>}
               </div>
               {restoreId === e.id && <div style={{ color: "#e6cf8a", fontSize: 11, marginTop: 4 }}>Restores it to everyone's balances exactly as it was.</div>}
@@ -674,7 +674,7 @@ function AdminUntangle({ members, expenses, deletedExpenses, shares, payers, set
         </div>
       )}
 
-      <div style={{ marginTop: 16, background: "#0f2a20", border: `1px solid ${C.greenMid}`, borderRadius: 12, padding: "10px 12px" }}>
+      <div style={{ marginTop: 16, background: "#0f2a20", border: `1px solid ${C.borderGreen}`, borderRadius: 12, padding: "10px 12px" }}>
         <Eyebrow>Audit log</Eyebrow>
         {money.length === 0 && <div style={{ color: C.sage, fontSize: 12 }}>No money changes recorded yet.</div>}
         {money.map((a, i) => (
@@ -738,7 +738,7 @@ function SettleScreen({ groups, nameOf, memberById, balances, busy, me, isAdmin,
                   {isMine && to?.zelle_handle && <button disabled={busy} onClick={() => onZelle(t)} style={{ flex: "1 1 68px", border: "none", borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#6D1ED4", color: "#fff" }}>Zelle</button>}
                   {isMine && !to?.venmo_handle && !to?.paypal_handle && !to?.zelle_handle && <span style={{ flex: 1, color: C.sage, fontSize: 11 }}>no handle on file — pay cash</span>}
                   {canMark
-                    ? <button disabled={busy} onClick={() => askMark(t)} style={{ flex: "1 1 68px", border: `1px solid ${C.line}`, borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: C.greenLight, color: C.cream }}>{isMine ? "Mark paid" : isPayee ? "Mark received" : "Mark paid (admin)"}</button>
+                    ? <button disabled={busy} onClick={() => askMark(t)} style={{ flex: "1 1 68px", border: `1px solid ${C.borderCard}`, borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: C.greenLight, color: C.cream }}>{isMine ? "Mark paid" : isPayee ? "Mark received" : "Mark paid (admin)"}</button>
                     : <span style={{ flex: 1, color: C.sage, fontSize: 11.5, textAlign: "right" }}>Only {nameOf(t.from)} or {nameOf(t.to)} can mark this</span>}
                 </div>
               );
@@ -755,12 +755,12 @@ function SettleScreen({ groups, nameOf, memberById, balances, busy, me, isAdmin,
             const canUndo = isAdmin || s2.created_by === me;
             const inClosed = !!(s2.event_id && closedEventIds.has(s2.event_id));
             return (
-              <div key={s2.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 2px", borderBottom: `1px solid ${C.greenMid}` }}>
+              <div key={s2.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 2px", borderBottom: `1px solid ${C.borderGreen}` }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ color: C.cream, fontSize: 13 }}><b>{nameOf(s2.from_user_id)}</b> paid <b>{nameOf(s2.to_user_id)}</b> {fmtUSD(s2.amount_cents)}</div>
                   <div style={{ color: C.sage, fontSize: 11 }}>{(s2.event_id ? eventName(s2.event_id) + " · " : "")}{s2.method || "cash"}{s2.created_at ? " · " + new Date(s2.created_at).toLocaleDateString() : ""}</div>
                 </div>
-                {canUndo && !inClosed && <button disabled={busy} onClick={() => askUnmark(s2)} style={{ border: `1px solid ${C.line}`, background: "transparent", color: C.sage, borderRadius: 8, padding: "6px 10px", fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>Unmark</button>}
+                {canUndo && !inClosed && <button disabled={busy} onClick={() => askUnmark(s2)} style={{ border: `1px solid ${C.borderCard}`, background: "transparent", color: C.sage, borderRadius: 8, padding: "6px 10px", fontSize: 11.5, fontWeight: 800, cursor: "pointer" }}>Unmark</button>}
                 {canUndo && inClosed && <span style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap" }}>{"\uD83D\uDD12"} closed</span>}
               </div>
             );
@@ -951,7 +951,7 @@ function AddExpense({ user, gid, members, guests, balances, busy, setBusy, requi
         <>
           <div style={{ display: "flex", alignItems: "center" }}>
             {amtCents > 0 ? <div style={{ flex: 1 }}><Remaining total={amtCents} allocated={paidSum} /></div> : <span style={{ flex: 1 }} />}
-            <button onClick={splitPayersEven} disabled={!(amtCents > 0 && payerSet.size > 0)} style={{ ...linkBtn, opacity: amtCents > 0 && payerSet.size > 0 ? 1 : 0.5 }}>Split evenly</button>
+            <button onClick={splitPayersEven} disabled={!(amtCents > 0 && payerSet.size > 0)} style={{ ...linkBtn, opacity: amtCents > 0 && payerSet.size > 0 ? 1 : 0.62 }}>Split evenly</button>
           </div>
           {members.map((m) => {
             const on = payerSet.has(m.id);
@@ -987,7 +987,7 @@ function AddExpense({ user, gid, members, guests, balances, busy, setBusy, requi
             <button disabled={busy || !newEventName.trim()} onClick={async () => {
               const id = await onCreateEvent(newEventName);
               if (id) { setEventId(id); setNewEventOpen(false); setNewEventName(""); }
-            }} style={{ ...btn(true), flex: 0, padding: "8px 18px", opacity: (busy || !newEventName.trim()) ? 0.5 : 1 }}>Create Bucket</button>
+            }} style={{ ...btn(true), flex: 0, padding: "8px 18px", opacity: (busy || !newEventName.trim()) ? 0.62 : 1 }}>Create Bucket</button>
           </div>
           <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Date is optional. Anyone can add expenses to this event until an admin closes it.</div>
         </div>
@@ -1053,7 +1053,7 @@ function AddExpense({ user, gid, members, guests, balances, busy, setBusy, requi
 
       {guestsMissingSponsor && <div style={{ color: C.birdie, fontSize: 11.5, fontWeight: 700, marginTop: 8 }}>Choose a sponsor for each guest before saving.</div>}
 
-      <button disabled={!canSave} onClick={save} style={{ ...btn(true), marginTop: 14, opacity: canSave ? 1 : 0.5 }}>{editing ? "Save changes" : "Add expense"}</button>
+      <button disabled={!canSave} onClick={save} style={{ ...btn(true), marginTop: 14, opacity: canSave ? 1 : 0.62 }}>{editing ? "Save changes" : "Add expense"}</button>
       {editing && canDelete && (
         <button disabled={busy} onClick={askVoid}
           style={{ ...btn(false), marginTop: 8, color: C.birdie, borderColor: C.birdie }}>Void expense</button>
@@ -1066,7 +1066,7 @@ function AddExpense({ user, gid, members, guests, balances, busy, setBusy, requi
           onConfirm={async () => { if (pendingConfirm.mode === "void") { setPendingConfirm(null); setBusy(true); await onDelete?.(); } else { await commit(); } }} />
       )}
       {editing && (editHistory || []).length > 0 && (
-        <div style={{ marginTop: 16, borderTop: `1px solid ${C.greenMid}`, paddingTop: 12 }}>
+        <div style={{ marginTop: 16, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 12 }}>
           <Eyebrow>History</Eyebrow>
           {(editHistory || []).map((h) => (
             <div key={h.id} style={{ color: C.sage, fontSize: 11.5, padding: "3px 0" }}>
@@ -1144,7 +1144,7 @@ function ExpenseDetail({ expense, shares, payers, memberById, guestById, version
           <span style={{ color: C.cream, fontSize: 12.5, fontWeight: 700, flex: 1 }}>
             {currentEvent ? currentEvent.name : "Ungrouped"}{currentEvent?.status === "closed" ? " · closed" : ""}
           </span>
-          {canMove && !moving && <button onClick={() => setMoving(true)} style={{ border: `1px solid ${C.greenMid}`, background: "transparent", color: C.sage, fontSize: 11, fontWeight: 800, padding: "5px 10px", borderRadius: 8, cursor: "pointer" }}>Move</button>}
+          {canMove && !moving && <button onClick={() => setMoving(true)} style={{ border: `1px solid ${C.borderGreen}`, background: "transparent", color: C.sage, fontSize: 11, fontWeight: 800, padding: "5px 10px", borderRadius: 8, cursor: "pointer" }}>Move</button>}
         </div>
         {moving && (
           <div style={{ background: "#0f3529", borderRadius: 10, padding: 10, marginTop: 8 }}>
@@ -1204,7 +1204,7 @@ function ExpenseDetail({ expense, shares, payers, memberById, guestById, version
             const isOpen = openVer === i;
             const expandable = !!v.snapshot;
             return (
-              <div key={i} style={{ borderBottom: `1px solid ${C.greenMid}`, padding: "6px 0" }}>
+              <div key={i} style={{ borderBottom: `1px solid ${C.borderGreen}`, padding: "6px 0" }}>
                 <div onClick={expandable ? () => setOpenVer(isOpen ? null : i) : undefined}
                   style={{ display: "flex", alignItems: "center", gap: 8, cursor: expandable ? "pointer" : "default" }}>
                   <span style={{ color: C.gold, fontSize: 13, width: 16, textAlign: "center" }}>{v.action === "created" ? "+" : v.action === "deleted" ? "✕" : "✎"}</span>
@@ -1247,7 +1247,7 @@ function ActivityLog({ activity, memberById, onOpenExpense, canOpen }: { activit
         const openable = !!isExpenseEvent && (canOpen ? canOpen(eid) : a.action !== "expense_deleted");
         return (
           <div key={a.id} onClick={openable ? () => onOpenExpense?.(eid) : undefined}
-            style={{ display: "flex", gap: 9, padding: "9px 2px", borderBottom: `1px solid ${C.greenMid}`, cursor: openable ? "pointer" : "default", alignItems: "center" }}>
+            style={{ display: "flex", gap: 9, padding: "9px 2px", borderBottom: `1px solid ${C.borderGreen}`, cursor: openable ? "pointer" : "default", alignItems: "center" }}>
             <span style={{ fontSize: 14, width: 18, textAlign: "center", color: C.gold }}>{ACT_ICON[a.action] || "•"}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: C.cream, fontSize: 13 }}><b>{who}</b> {a.summary}</div>
@@ -1298,7 +1298,7 @@ function PersonLedgerModal({ memberId, me, name, net, expenses, shares, settleme
           <div key={b.key} style={{ marginTop: 14 }}>
             <Eyebrow>{b.title.toUpperCase()}</Eyebrow>
             {b.lines.map((l, i) => (
-              <div key={i} style={{ display: "flex", gap: 8, padding: "6px 0", borderBottom: `1px solid ${C.greenMid}`, alignItems: "center" }}>
+              <div key={i} style={{ display: "flex", gap: 8, padding: "6px 0", borderBottom: `1px solid ${C.borderGreen}`, alignItems: "center" }}>
                 <span style={{ flex: 1, color: C.cream, fontSize: 13, lineHeight: 1.4 }}>{l.label}</span>
                 <span style={{ color: l.delta > 0 ? "#7fd6a3" : "#ef9d90", fontWeight: 800, fontSize: 13, whiteSpace: "nowrap" }}>{l.delta > 0 ? "+" : "\u2212"}{fmtUSD(Math.abs(l.delta))}</span>
               </div>
@@ -1306,7 +1306,7 @@ function PersonLedgerModal({ memberId, me, name, net, expenses, shares, settleme
           </div>
         ))}
 
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16, paddingTop: 10, borderTop: `2px solid ${C.greenMid}` }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16, paddingTop: 10, borderTop: `2px solid ${C.borderGreen}` }}>
           <span style={{ color: C.cream, fontWeight: 800, fontSize: 14 }}>{who === "You" ? "Your balance" : "Balance"}</span>
           <span style={{ color: net > 0 ? "#7fd6a3" : net < 0 ? "#ef9d90" : C.sage, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 15 }}>{net > 0 ? "+" : net < 0 ? "\u2212" : ""}{fmtUSD(Math.abs(net))}</span>
         </div>
@@ -1339,7 +1339,7 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
     const who = parts.length >= partyCount ? "whole group" : parts.map((s) => s.user_id ? (memberById[s.user_id]?.display_name || "?") : (guestById[s.guest_id || ""]?.name || "guest")).join(", ");
     return (
       <div key={e.id} onClick={() => onView(e)}
-        style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 2px", borderBottom: `1px solid ${C.greenMid}`, cursor: "pointer" }}>
+        style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 2px", borderBottom: `1px solid ${C.borderGreen}`, cursor: "pointer" }}>
         <Avatar src={payer?.avatar_url} name={payer?.display_name || "?"} size={30} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ color: C.cream, fontSize: 13.5, fontWeight: 600 }}>{e.description || "Expense"}</div>
@@ -1377,7 +1377,7 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
           // Per-Bucket settled balance — a mini version of the aggregate Club tile, scoped to THIS Bucket.
           // Shows who owes what within the Bucket after its own settlements; "cleared" when net-square.
           return (
-            <div style={{ marginTop: 10, borderTop: `1px solid ${C.greenMid}`, paddingTop: 8 }}>
+            <div style={{ marginTop: 10, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 8 }}>
               {settled ? (
                 <div style={{ color: "#7fd6a3", fontSize: 13, fontWeight: 700, textAlign: "center", padding: "3px 0" }}>✓ All balances cleared for this Bucket</div>
               ) : brows.map(([mid, v]) => (
@@ -1389,11 +1389,11 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
             </div>
           );
         })()}
-        {list.length > 0 && <div style={{ marginTop: 8, borderTop: `1px dashed ${C.greenMid}`, paddingTop: 4 }}>{list.map(row)}</div>}
+        {list.length > 0 && <div style={{ marginTop: 8, borderTop: `1px dashed ${C.borderGreen}`, paddingTop: 4 }}>{list.map(row)}</div>}
         {ev.event_type === "game" && <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Name &amp; date come from the game.</div>}
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, background: "#0f3529", borderRadius: 9, padding: "8px 10px" }}>
           <span style={{ flex: 1, color: C.sage, fontSize: 11.5, lineHeight: 1.4 }}>Settle this Bucket in the <strong style={{ color: C.cream }}>Settle</strong> tab — each Bucket squares on its own.</span>
-          {isAdmin && <button onClick={() => onCloseEvent(ev, true)} style={{ border: `1px solid ${C.greenMid}`, background: "transparent", color: C.sage, fontSize: 11, fontWeight: 800, padding: "6px 12px", borderRadius: 8, cursor: "pointer", whiteSpace: "nowrap" }}>Archive Bucket</button>}
+          {isAdmin && <button onClick={() => onCloseEvent(ev, true)} style={{ border: `1px solid ${C.borderGreen}`, background: "transparent", color: C.sage, fontSize: 11, fontWeight: 800, padding: "6px 12px", borderRadius: 8, cursor: "pointer", whiteSpace: "nowrap" }}>Archive Bucket</button>}
         </div>
       </div>
     );
@@ -1413,7 +1413,7 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
             <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>{fmtUSD(ungrouped.reduce((s, e) => s + e.amount_cents, 0))}</div>
           </div>
           <div style={{ color: C.sage, fontSize: 11.5, marginTop: 1 }}>{ungrouped.length} {ungrouped.length === 1 ? "expense" : "expenses"} with no event</div>
-          <div style={{ marginTop: 8, borderTop: `1px dashed ${C.greenMid}`, paddingTop: 4 }}>{ungrouped.map(row)}</div>
+          <div style={{ marginTop: 8, borderTop: `1px dashed ${C.borderGreen}`, paddingTop: 4 }}>{ungrouped.map(row)}</div>
         </div>
       )}
 
@@ -1437,7 +1437,7 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
                 <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 800 }}>{fmtUSD(net.total)}</div>
               </div>
               {perMember.length > 0 && (
-                <div style={{ marginTop: 10, borderTop: `1px solid ${C.greenMid}`, paddingTop: 8 }}>
+                <div style={{ marginTop: 10, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 8 }}>
                   {perMember.map((m) => (
                     <div key={m.member_id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, padding: "3px 0", color: C.cream }}>
                       <span style={{ flex: 1 }}>{memberById[m.member_id]?.display_name || "Player"}</span>
@@ -1447,9 +1447,9 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
                   ))}
                 </div>
               )}
-              <div style={{ marginTop: 8, borderTop: `1px dashed ${C.greenMid}`, paddingTop: 4 }}>{list.map(row)}</div>
+              <div style={{ marginTop: 8, borderTop: `1px dashed ${C.borderGreen}`, paddingTop: 4 }}>{list.map(row)}</div>
               <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Archived — view only.</div>
-              {isAdmin && <button onClick={() => onCloseEvent(ev, false)} style={{ marginTop: 8, border: `1px solid ${C.greenMid}`, background: "transparent", color: C.sage, fontSize: 11.5, fontWeight: 800, padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>Reopen event</button>}
+              {isAdmin && <button onClick={() => onCloseEvent(ev, false)} style={{ marginTop: 8, border: `1px solid ${C.borderGreen}`, background: "transparent", color: C.sage, fontSize: 11.5, fontWeight: 800, padding: "6px 12px", borderRadius: 8, cursor: "pointer" }}>Reopen event</button>}
             </div>
           );
         })}

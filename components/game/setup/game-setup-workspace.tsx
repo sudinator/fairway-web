@@ -34,7 +34,7 @@ const cardStyle: React.CSSProperties = {
   background: C.greenLight,
   borderRadius: 12,
   padding: "12px 13px",
-  border: `1px solid ${C.greenMid}`,
+  border: `1px solid ${C.borderGreen}`,
 };
 
 export function GameSetupWorkspace({
@@ -151,7 +151,7 @@ export function GameSetupWorkspace({
           const active = section === s.key;
           return (
             <button key={s.key} onClick={() => openSection(s.key)} style={{ flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "center" }}>
-              <div style={{ width: active ? 30 : 26, height: active ? 30 : 26, lineHeight: active ? "30px" : "26px", margin: "0 auto", borderRadius: 999, fontWeight: 800, fontSize: 12, background: s.done ? "#5BD08A" : active ? C.gold : "transparent", color: s.done ? "#0E241B" : active ? "#23303A" : C.sage, border: s.done || active ? "none" : "1px solid rgba(255,255,255,.25)", boxShadow: active ? "0 0 0 3px rgba(201,162,39,.2)" : "none" }}>{s.done ? "✓" : i + 1}</div>
+              <div style={{ width: active ? 30 : 26, height: active ? 30 : 26, lineHeight: active ? "30px" : "26px", margin: "0 auto", borderRadius: 999, fontWeight: 800, fontSize: 12, background: s.done ? "#5BD08A" : active ? C.gold : "transparent", color: s.done ? "#0E241B" : active ? "#23303A" : C.sage, border: s.done || active ? "none" : "1px solid rgba(255,255,255,.25)", boxShadow: active ? `0 0 0 3px ${C.gold}` : "none" }}>{s.done ? "✓" : i + 1}</div>
               <div style={{ color: active ? C.cream : C.sage, fontSize: 11, marginTop: 3, fontWeight: active ? 700 : 400 }}>{s.label}</div>
             </button>
           );
@@ -221,7 +221,7 @@ export function GameSetupWorkspace({
             <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>Reset clears all scoring and clocks but keeps players and game structure.</div>
             <button style={{ background: "#3F3414", color: "#E4CF86", border: `0.5px solid ${C.gold}`, borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 13, display: "block" }} onClick={organizerPanelProps.onReset}>↺ Reset scores</button>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 12 }}>Delete permanently removes this game.</div>
-            <button style={{ background: "#5A1E1E", color: "#F6DEDB", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 13, display: "block" }} onClick={organizerPanelProps.onDelete}>Delete this game</button>
+            <button style={{ background: C.danger, color: "#F6DEDB", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 13, display: "block" }} onClick={organizerPanelProps.onDelete}>Delete this game</button>
           </div>
         </div>
       )}

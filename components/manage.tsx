@@ -107,7 +107,7 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
           return (
             <button key={o.v} onClick={() => setPref(key, o.v)}
               style={{ padding: "4px 9px", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                border: `1px solid ${active ? (o.v === "off" ? "#8B6A62" : C.gold) : C.line}`,
+                border: `1px solid ${active ? (o.v === "off" ? "#8B6A62" : C.gold) : C.borderCard}`,
                 background: active ? (o.v === "off" ? "#6B2F28" : C.gold) : "transparent",
                 color: active ? (o.v === "off" ? "#F6DEDB" : "#16201C") : C.sage }}>
               {o.l}
@@ -147,7 +147,7 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
           <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>
             Get a phone notification when you're added to a game, when you owe or get paid, and more — even when the app is closed.
           </div>
-          <button onClick={on ? disable : enable} disabled={busy} style={{ ...btn(!on), marginTop: 10, fontSize: 13, opacity: busy ? 0.6 : 1 }}>
+          <button onClick={on ? disable : enable} disabled={busy} style={{ ...btn(!on), marginTop: 10, fontSize: 13, opacity: busy ? 0.62 : 1 }}>
             {busy ? "…" : on ? "Turn off on this device" : "Turn on notifications"}
           </button>
         </>
@@ -155,7 +155,7 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
       {msg && <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>{msg}</div>}
 
       {gate !== "unconfigured" && (
-        <div style={{ marginTop: 14, borderTop: `1px solid ${C.greenMid}`, paddingTop: 10 }}>
+        <div style={{ marginTop: 14, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 10 }}>
           <Eyebrow>WHAT TO NOTIFY ME ABOUT</Eyebrow>
           <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>Push buzzes your phone (needs notifications on for the device); In-app just shows in the bell.</div>
           {NOTIF_TYPES.map((t) => (
@@ -264,7 +264,7 @@ export function HandicapSummary({ rounds, profile, onOpen }: { rounds: Round[]; 
           {rows.map(({ r, date, ag, diff, used }) => (
             <div key={r.id} onClick={onOpen ? () => onOpen(r) : undefined} role={onOpen ? "button" : undefined} tabIndex={onOpen ? 0 : undefined}
               onKeyDown={onOpen ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(r); } } : undefined}
-              style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 4px", borderBottom: `1px solid rgba(255,255,255,0.10)`, opacity: used ? 1 : 0.66, background: used ? "rgba(228,207,134,0.06)" : "transparent", cursor: onOpen ? "pointer" : "default" }}>
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 4px", borderBottom: `1px solid rgba(255,255,255,0.10)`, opacity: used ? 1 : 0.62, background: used ? "rgba(228,207,134,0.06)" : "transparent", cursor: onOpen ? "pointer" : "default" }}>
               <div style={{ width: 7, height: 7, borderRadius: 4, background: used ? C.gold : "transparent", flexShrink: 0 }} />
               <div style={{ width: 48, flexShrink: 0, color: C.sage, fontSize: 11 }}>{date}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -383,7 +383,7 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
       <CardVisibilityToggle user={user} initial={profile?.show_card !== false} />
       <Eyebrow>YOUR PROFILE</Eyebrow>
       <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, paddingBottom: 16, marginBottom: 16, borderBottom: `1px solid ${C.greenMid}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, paddingBottom: 16, marginBottom: 16, borderBottom: `1px solid ${C.borderGreen}` }}>
           <Avatar src={avatarUrl} name={name || profile?.display_name || "?"} size={64} />
           <div style={{ flex: 1 }}>
             <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Profile photo</div>
@@ -391,7 +391,7 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
               Helps your group recognize you on the scorecard. Any photo works — it&apos;s resized automatically.
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <label style={{ ...btn(true), fontSize: 12, padding: "7px 12px", cursor: photoBusy ? "default" : "pointer", opacity: photoBusy ? 0.6 : 1 }}>
+              <label style={{ ...btn(true), fontSize: 12, padding: "7px 12px", cursor: photoBusy ? "default" : "pointer", opacity: photoBusy ? 0.62 : 1 }}>
                 {photoBusy ? "Working…" : avatarUrl ? "Change" : "Add photo"}
                 <input type="file" accept="image/*" disabled={photoBusy} onChange={pickPhoto} style={{ display: "none" }} />
               </label>
@@ -441,7 +441,7 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
             Stored for reference. Automatic handicap import from GHIN isn't connected — enter your index manually for now.
           </div>
         </div>
-        <button style={{ ...btn(true), marginTop: 18, opacity: saving ? 0.5 : 1 }} disabled={saving} onClick={save}>{saving ? "Saving…" : "Save profile"}</button>
+        <button style={{ ...btn(true), marginTop: 18, opacity: saving ? 0.62 : 1 }} disabled={saving} onClick={save}>{saving ? "Saving…" : "Save profile"}</button>
         {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
       </div>
 
@@ -451,7 +451,7 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
 
       <PushToggle user={user} profile={profile} />
 
-      <div style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${C.greenMid}` }}>
+      <div style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${C.borderGreen}` }}>
         <button style={{ ...btn(false), fontSize: 13 }} onClick={() => { clearAllLocalState(); supabase.auth.signOut(); }}>Sign out</button>
       </div>
     </div>
@@ -704,7 +704,7 @@ function AdminPowerUsers() {
             </thead>
             <tbody>
               {sorted.map((r) => (
-                <tr key={r.user_id} style={{ borderTop: `1px solid ${C.greenMid}` }}>
+                <tr key={r.user_id} style={{ borderTop: `1px solid ${C.borderGreen}` }}>
                   <td style={{ padding: "6px 8px", position: "sticky", left: 0, zIndex: 1, background: C.greenLight, maxWidth: 160 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
                       <Avatar src={avatars[r.user_id]} name={r.display_name || "?"} size={22} enlargeable={false} />
@@ -788,7 +788,7 @@ function AdminAnalytics() {
 
   const hrow = (label: string, val: string, good?: boolean, drill?: { stat: string; cap?: string }) => (
     <div onClick={drill ? () => openStatDrill({ stat: drill.stat, title: label, cap: drill.cap }) : undefined}
-      style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "8px 0", borderTop: `1px solid ${C.greenMid}`, cursor: drill ? "pointer" : "default" }}>
+      style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "8px 0", borderTop: `1px solid ${C.borderGreen}`, cursor: drill ? "pointer" : "default" }}>
       <span style={{ color: C.cream, fontSize: 13 }}>{label}{drill ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>  who ›</span> : null}</span>
       <span style={{ fontWeight: 800, fontSize: 15, color: good === undefined ? C.cream : good ? "#5BD08A" : "#E0796B" }}>{val}</span>
     </div>
@@ -956,7 +956,7 @@ function OpsMetrics() {
                         <button
                           onClick={() => delStale(g)}
                           disabled={delId === g.game_id}
-                          style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, padding: "2px 8px", fontSize: 11, fontWeight: 700, cursor: delId === g.game_id ? "default" : "pointer", opacity: delId === g.game_id ? 0.5 : 1, whiteSpace: "nowrap" }}
+                          style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, padding: "2px 8px", fontSize: 11, fontWeight: 700, cursor: delId === g.game_id ? "default" : "pointer", opacity: delId === g.game_id ? 0.62 : 1, whiteSpace: "nowrap" }}
                         >
                           {delId === g.game_id ? "Deleting…" : "Delete"}
                         </button>
@@ -1294,7 +1294,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
               <input inputMode="decimal" defaultValue={p.handicap_index != null ? String(p.handicap_index) : ""}
                 onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setEdits((m) => ({ ...m, [p.id]: v })); }}
                 style={{ ...inputStyle, padding: "6px 8px", width: 80, textAlign: "center" }} />
-              <button style={{ ...btn(true), padding: "6px 12px", fontSize: 12, opacity: savingId === p.id ? 0.5 : 1 }} disabled={savingId === p.id} onClick={() => saveHandicap(p)}>Save</button>
+              <button style={{ ...btn(true), padding: "6px 12px", fontSize: 12, opacity: savingId === p.id ? 0.62 : 1 }} disabled={savingId === p.id} onClick={() => saveHandicap(p)}>Save</button>
             </div>
           </div>
           <button style={{ ...btn(false), padding: "6px 12px", fontSize: 12 }} onClick={() => setScoringFor(p)}>Edit scores</button>
@@ -1315,7 +1315,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                     {mine.map((m) => {
                       const g = allGroups.find((x) => x.id === m.group_id);
                       return (
-                        <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: `1px solid ${C.greenMid}` }}>
+                        <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: `1px solid ${C.borderGreen}` }}>
                           <span style={{ flex: 1, color: C.cream, fontSize: 13 }}>{g?.name || "Club"}{m.role === "admin" ? " · admin" : ""}</span>
                           <button style={{ ...btn(false), padding: "4px 10px", fontSize: 11, color: C.birdie }} onClick={() => removeFromGroup(p, m, g?.name || "this club")}>Remove</button>
                         </div>
@@ -1330,7 +1330,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                       </select>
                     </div>
 
-                    <div style={{ borderTop: `1px solid ${C.greenMid}`, marginTop: 12, paddingTop: 10 }}>
+                    <div style={{ borderTop: `1px solid ${C.borderGreen}`, marginTop: 12, paddingTop: 10 }}>
                       <Eyebrow>ANALYTICS</Eyebrow>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
                         <div style={{ flex: 1, color: C.cream, fontSize: 12 }}>
@@ -1341,7 +1341,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                       </div>
                     </div>
 
-                    <div style={{ borderTop: `1px solid ${C.greenMid}`, marginTop: 12, paddingTop: 10 }}>
+                    <div style={{ borderTop: `1px solid ${C.borderGreen}`, marginTop: 12, paddingTop: 10 }}>
                       <Eyebrow>REMOVE FROM APP</Eyebrow>
                       <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                         {p.deactivated ? (
@@ -1351,7 +1351,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                             Deactivate (keep data)
                           </button>
                         )}
-                        <button style={{ background: "#5A1E1E", color: "#F6DEDB", border: "none", borderRadius: 8, padding: "7px 12px", fontWeight: 700, cursor: "pointer", fontSize: 12 }} onClick={() => deletePlayer(p)}>
+                        <button style={{ background: C.danger, color: "#F6DEDB", border: "none", borderRadius: 8, padding: "7px 12px", fontWeight: 700, cursor: "pointer", fontSize: 12 }} onClick={() => deletePlayer(p)}>
                           Delete permanently
                         </button>
                       </div>
@@ -1367,7 +1367,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
         </div>
       ))}
       {hasMore && (
-        <button style={{ ...btn(false), marginTop: 10, fontSize: 13, opacity: loadingMore ? 0.5 : 1 }} disabled={loadingMore} onClick={loadMorePlayers}>
+        <button style={{ ...btn(false), marginTop: 10, fontSize: 13, opacity: loadingMore ? 0.62 : 1 }} disabled={loadingMore} onClick={loadMorePlayers}>
           {loadingMore ? "Loading…" : "Load more players"}
         </button>
       )}
@@ -1543,7 +1543,7 @@ export function NotificationsScreen({ user, onNavigate }: { user: any; onNavigat
               style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 10, display: "flex", gap: 11, cursor: (n.link || !n.read) ? "pointer" : "default" }}>
               <span style={{ width: 8, height: 8, borderRadius: 4, background: n.read ? "transparent" : C.gold, marginTop: 6, flexShrink: 0 }} />
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ color: n.read ? "#6B6857" : C.ink, fontSize: 14, lineHeight: 1.4, fontWeight: n.read ? 500 : 800 }}>{n.message}</div>
+                <div style={{ color: n.read ? C.sage : C.cream, fontSize: 14, lineHeight: 1.4, fontWeight: n.read ? 500 : 800 }}>{n.message}</div>
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{notifWhen(n.created_at)}</div>
               </div>
               {n.link ? <span style={{ color: C.sage, fontSize: 20, alignSelf: "center", flexShrink: 0 }}>›</span> : null}
@@ -1621,12 +1621,12 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
           <button style={btn(false)} onClick={() => setEditing(null)}>‹ Back</button>
           <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 20 }}>Admin edit · {player.display_name}</div>
         </div>
-        <div style={{ background: "#5A1E1E", color: "#F6DEDB", borderRadius: 10, padding: "8px 12px", marginTop: 10, fontSize: 12 }}>
+        <div style={{ background: C.danger, color: "#F6DEDB", borderRadius: 10, padding: "8px 12px", marginTop: 10, fontSize: 12 }}>
           ⚠ Admin mode — you are editing another player's official scores. They will be notified.
         </div>
         <div style={{ color: C.sage, fontSize: 13, marginTop: 10 }}>{editing.course}{editing.tee_name ? ` · ${editing.tee_name}` : ""} · {fmtDate(editing.played_at)}</div>
         <div style={{ background: C.card, borderRadius: 12, padding: 12, marginTop: 10 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, padding: "0 2px 6px", color: C.faint, fontSize: 11, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.line}` }}>
+          <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, padding: "0 2px 6px", color: C.faint, fontSize: 11, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.borderCard}` }}>
             <div>HOLE</div><div style={{ textAlign: "center" }}>PAR</div><div style={{ textAlign: "center" }}>SCORE</div><div style={{ textAlign: "center" }}>PUTTS</div>
           </div>
           {holes.map((h, i) => {
@@ -1638,7 +1638,7 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
             const sPutts = seg.reduce((s, x) => s + (x.putts || 0), 0);
             return (
               <React.Fragment key={i}>
-                <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, alignItems: "center", padding: "5px 2px", borderBottom: `1px solid ${C.line}` }}>
+                <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, alignItems: "center", padding: "5px 2px", borderBottom: `1px solid ${C.borderCard}` }}>
                   <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.hole_number}</div>
                   <div style={{ textAlign: "center", color: C.parBlue, fontWeight: 700 }}>{h.par}</div>
                   <div style={{ textAlign: "center" }}>
@@ -1649,7 +1649,7 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
                   </div>
                 </div>
                 {subtotalAfter && (
-                  <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, padding: "6px 2px", background: C.greenLight, borderTop: `2px solid ${C.greenMid}`, fontWeight: 800 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, padding: "6px 2px", background: C.greenLight, borderTop: `2px solid ${C.borderGreen}`, fontWeight: 800 }}>
                     <div style={{ color: C.gold, fontSize: 11 }}>{segStart === 0 ? "OUT" : "IN"}</div>
                     <div style={{ textAlign: "center", color: C.cream }}>{sPar}</div>
                     <div style={{ textAlign: "center", color: C.cream }}>{sScore || "–"}</div>
@@ -1675,7 +1675,7 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
         {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>{msg}</div>}
         <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
           <button style={btn(false)} onClick={() => setEditing(null)}>Cancel</button>
-          <button style={{ ...btn(true), opacity: saving ? 0.5 : 1 }} disabled={saving} onClick={saveRound}>{saving ? "Saving…" : "Save changes"}</button>
+          <button style={{ ...btn(true), opacity: saving ? 0.62 : 1 }} disabled={saving} onClick={saveRound}>{saving ? "Saving…" : "Save changes"}</button>
         </div>
       </div>
     );
@@ -1804,14 +1804,14 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
             </div>
 
             {isGroupAdmin && row.user_id && (
-              <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "flex-end", flexWrap: "wrap", borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
+              <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "flex-end", flexWrap: "wrap", borderTop: `1px solid ${C.borderCard}`, paddingTop: 10 }}>
                 <div>
                   <label style={{ color: C.sage, fontSize: 11 }}>Handicap index</label>
                   <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
                     <input inputMode="decimal" defaultValue={p.handicap_index != null ? String(p.handicap_index) : ""}
                       onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setEdits((m) => ({ ...m, [row.id]: v })); }}
                       style={{ ...inputStyle, padding: "6px 8px", width: 78, textAlign: "center" }} />
-                    <button style={{ ...btn(true), padding: "6px 10px", fontSize: 12, opacity: busyId === row.id ? 0.5 : 1 }} disabled={busyId === row.id} onClick={() => saveHandicap(row)}>Set</button>
+                    <button style={{ ...btn(true), padding: "6px 10px", fontSize: 12, opacity: busyId === row.id ? 0.62 : 1 }} disabled={busyId === row.id} onClick={() => saveHandicap(row)}>Set</button>
                   </div>
                 </div>
                 <div style={{ flex: 1 }} />
@@ -1996,7 +1996,7 @@ function AdminDailyReport() {
               background: sel === d.iso ? C.gold : C.greenLight, color: sel === d.iso ? C.green : C.cream }}>{d.label}</button>
         ))}
         <input type="date" value={sel} max={days[0]?.iso} onChange={(e) => setSel(e.target.value)}
-          style={{ fontSize: 11, borderRadius: 8, border: `1px solid ${C.greenMid}`, background: C.green, color: C.cream, padding: "4px 8px", WebkitAppearance: "none", appearance: "none" }} />
+          style={{ ...inputStyle, fontSize: 11, padding: "4px 8px", width: "auto", WebkitAppearance: "none", appearance: "none" }} />
       </div>
 
       <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
@@ -2092,7 +2092,7 @@ function FrictionItem({ it, onDone }: { it: any; onDone: () => void }) {
             {open ? "Close" : "Review \u2192"}
           </button>
           {open ? (
-            <div style={{ borderTop: `1px solid ${C.greenMid}`, marginTop: 10, paddingTop: 10 }}>
+            <div style={{ borderTop: `1px solid ${C.borderGreen}`, marginTop: 10, paddingTop: 10 }}>
               {isCluster ? (
                 <>
                   <div style={{ color: C.sage, fontSize: 11, marginBottom: 6 }}>{it.kind === "multi_draft" ? "Which draft to keep (if any)?" : "Which round to keep?"}</div>
@@ -2111,7 +2111,7 @@ function FrictionItem({ it, onDone }: { it: any; onDone: () => void }) {
                       );
                     })}
                     {it.kind === "multi_draft" ? (
-                      <div onClick={() => setKeep(null)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 6px", cursor: "pointer", borderTop: `1px solid ${C.greenMid}` }}>
+                      <div onClick={() => setKeep(null)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 6px", cursor: "pointer", borderTop: `1px solid ${C.borderGreen}` }}>
                         <span style={{ width: 14, height: 14, borderRadius: "50%", flex: "0 0 14px", border: `2px solid ${keep === null ? C.gold : C.sage}`, background: keep === null ? C.gold : "transparent" }} />
                         <span style={{ fontSize: 11.5, color: keep === null ? C.cream : C.sage }}>Keep none — remove all these drafts</span>
                       </div>
@@ -2120,7 +2120,7 @@ function FrictionItem({ it, onDone }: { it: any; onDone: () => void }) {
                 </>
               ) : null}
               <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Optional note (e.g. 'v1.135 in-progress inflation bug')"
-                style={{ width: "100%", background: C.green, border: `1px solid ${C.greenMid}`, borderRadius: 8, color: C.cream, fontSize: 13, padding: 8, marginBottom: 8, fontFamily: "inherit" }} />
+                style={{ width: "100%", background: C.green, border: `1px solid ${C.borderGreen}`, borderRadius: 8, color: C.cream, fontSize: 13, padding: 8, marginBottom: 8, fontFamily: "inherit" }} />
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {isCluster ? (
                   <>
@@ -2174,7 +2174,7 @@ function AdminFrictionReview() {
     <div>
       <div style={{ display: "flex", alignItems: "center", margin: "18px 0 4px" }}>
         <span style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700, color: C.cream }}>Friction review</span>
-        <button onClick={runNow} disabled={sweeping} style={{ marginLeft: "auto", background: C.greenLight, color: C.sage, border: `1px solid ${C.greenMid}`, borderRadius: 8, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+        <button onClick={runNow} disabled={sweeping} style={{ marginLeft: "auto", background: C.greenLight, color: C.sage, border: `1px solid ${C.borderGreen}`, borderRadius: 8, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
           {sweeping ? "Checking\u2026" : "Run check now"}
         </button>
       </div>
@@ -2516,7 +2516,7 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
       {shown.map((g) => {
         const archived = g.status === "archived";
         return (
-          <div key={g.group_id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 8, opacity: archived ? 0.6 : 1 }}>
+          <div key={g.group_id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 8, opacity: archived ? 0.62 : 1 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
               <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{g.name}</div>
               {g.is_default && <span style={{ color: C.gold, fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>★ default</span>}
@@ -2529,10 +2529,10 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
               ) : (
                 <button disabled={busy === g.group_id}
                   onClick={async () => { setBusy(g.group_id); try { await onEnterGroup?.({ group_id: g.group_id, name: g.name }); } finally { setBusy(null); } }}
-                  style={{ ...btn(false), fontSize: 12, padding: "5px 11px", opacity: busy === g.group_id ? 0.5 : 1 }}>Enter</button>
+                  style={{ ...btn(false), fontSize: 12, padding: "5px 11px", opacity: busy === g.group_id ? 0.62 : 1 }}>Enter</button>
               )}
               <button disabled={busy === g.group_id} onClick={() => setStatus(g, archived ? "active" : "archived")}
-                style={{ ...btn(false), fontSize: 12, padding: "5px 11px", opacity: busy === g.group_id ? 0.5 : 1 }}>
+                style={{ ...btn(false), fontSize: 12, padding: "5px 11px", opacity: busy === g.group_id ? 0.62 : 1 }}>
                 {archived ? "Restore" : "Archive"}
               </button>
             </div>
@@ -2542,26 +2542,26 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
             </div>
             <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
               <button disabled={busy === g.group_id} onClick={() => revokeInvites(g)}
-                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
                 Revoke invites
               </button>
               <button disabled={busy === g.group_id} onClick={() => { setMergeSrc(mergeSrc === g.group_id ? null : g.group_id); setMergeTo(""); }}
-                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
                 Merge…
               </button>
               {!g.is_default && (
                 <button disabled={busy === g.group_id} onClick={() => setDefault(g)}
-                  style={{ background: "transparent", color: C.sage, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                  style={{ background: "transparent", color: C.sage, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
                   Set as default
                 </button>
               )}
               <button disabled={busy === g.group_id} onClick={() => delGroup(g)}
-                style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
                 Delete group
               </button>
               {g.is_test && (
                 <button disabled={busy === g.group_id} onClick={() => wipeGroup(g)}
-                  style={{ background: "transparent", color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                  style={{ background: "transparent", color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
                   Wipe data
                 </button>
               )}
@@ -2570,14 +2570,14 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
               <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", background: C.greenLight, borderRadius: 8, padding: 8 }}>
                 <span style={{ color: C.sage, fontSize: 12 }}>Merge into:</span>
                 <select value={mergeTo} onChange={(e) => setMergeTo(e.target.value)}
-                  style={{ background: C.card, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
+                  style={{ background: C.card, color: C.ink, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
                   <option value="">Select target…</option>
                   {(rows || []).filter((r) => r.group_id !== g.group_id).map((r) => (
                     <option key={r.group_id} value={r.group_id}>{r.name}</option>
                   ))}
                 </select>
                 <button disabled={!mergeTo || busy === g.group_id} onClick={() => doMerge(g)}
-                  style={{ background: C.gold, color: C.green, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, padding: "5px 12px", cursor: "pointer", opacity: mergeTo ? 1 : 0.4 }}>Merge & delete source</button>
+                  style={{ background: C.gold, color: C.green, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, padding: "5px 12px", cursor: "pointer", opacity: mergeTo ? 1 : 0.62 }}>Merge & delete source</button>
               </div>
             )}
           </div>
@@ -2671,13 +2671,13 @@ export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean 
         Every account. Suspend a bad actor, wipe a user&apos;s data on request, or merge two accounts that are the same person (dedup). Merge and wipe are irreversible.{isOwner ? " As the owner, you can also grant or revoke system-admin access (app-wide — separate from club admin). Only you can." : ""}
       </div>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or email…"
-        style={{ width: "100%", marginTop: 12, background: C.card, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 10, padding: "9px 12px", fontSize: 14 }} />
+        style={{ width: "100%", marginTop: 12, background: C.card, color: C.ink, border: `1px solid ${C.borderCard}`, borderRadius: 10, padding: "9px 12px", fontSize: 14 }} />
       {rows === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
       {shown.map((u) => {
         const banned = !!u.banned;
         const isSelf = u.id === user.id;
         return (
-          <div key={u.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 8, opacity: banned ? 0.65 : 1 }}>
+          <div key={u.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 8, opacity: banned ? 0.62 : 1 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
               <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{u.display_name || "(no name)"}</div>
               {u.is_owner ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>★ owner</span>
@@ -2696,15 +2696,15 @@ export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean 
                 </button>
               )}
               <button disabled={busy === u.id} onClick={() => { setMergeKeep(mergeKeep === u.id ? null : u.id); setMergeRemove(""); setPreview(null); }}
-                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}>
+                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}>
                 Merge another into this…
               </button>
               <button disabled={busy === u.id || isSelf} onClick={() => setBanned(u, !banned)}
-                style={{ background: "transparent", color: banned ? C.sage : C.birdie, border: `1px solid ${banned ? C.sage : C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.3 : 1 }}>
+                style={{ background: "transparent", color: banned ? C.sage : C.birdie, border: `1px solid ${banned ? C.sage : C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.62 : 1 }}>
                 {banned ? "Restore" : "Suspend"}
               </button>
               <button disabled={busy === u.id || isSelf} onClick={() => wipe(u)}
-                style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.3 : 1 }}>
+                style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.62 : 1 }}>
                 Wipe data
               </button>
             </div>
@@ -2713,14 +2713,14 @@ export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean 
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <span style={{ color: C.sage, fontSize: 12 }}>Merge a duplicate INTO {u.display_name || u.email}:</span>
                   <select value={mergeRemove} onChange={(e) => { setMergeRemove(e.target.value); setPreview(null); }}
-                    style={{ background: C.card, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
+                    style={{ background: C.card, color: C.ink, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
                     <option value="">Select duplicate…</option>
                     {(rows || []).filter((r) => r.id !== u.id).map((r) => (
                       <option key={r.id} value={r.id}>{r.display_name || r.email}</option>
                     ))}
                   </select>
                   <button disabled={!mergeRemove} onClick={() => runPreview(u.id)}
-                    style={{ background: "transparent", color: C.cream, border: `1px solid ${C.sage}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "5px 10px", cursor: "pointer", opacity: mergeRemove ? 1 : 0.4 }}>Preview</button>
+                    style={{ background: "transparent", color: C.cream, border: `1px solid ${C.sage}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "5px 10px", cursor: "pointer", opacity: mergeRemove ? 1 : 0.62 }}>Preview</button>
                 </div>
                 {preview && (
                   <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
@@ -2781,7 +2781,7 @@ export function HelpPage({ isAdmin, user, displayName, groupId }: { isAdmin: boo
                 </div>
               ))}
               {isTGC && (
-                <div style={{ marginTop: 2, borderTop: `1px solid ${C.greenMid}`, paddingTop: 9 }}>
+                <div style={{ marginTop: 2, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 9 }}>
                   <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>★ EXCLUSIVE TO YOUR CLUB</div>
                   {exclusives.map((x, i) => (
                     <div key={i} style={{ marginTop: 7 }}>

@@ -80,7 +80,8 @@ function FormChart({ data }: { data: number[] }) {
   // since lower differential is better), over = red. A vertical gradient flips at the avg's y so
   // the line/area are green below the avg line and red above it; dots + the end value are coloured
   // per-point. (Matches the dashboard trend chart's stated behaviour.)
-  const GREEN = "#8FE0B0", RED = "#FB7185";
+  // On C.greenLight the old RED was 3.00:1. Same hue, lifted for a dark ground.
+  const GREEN = "#8FE0B0", RED = "#FFB3BC";
   const colorFor = (v: number) => (v <= avg ? GREEN : RED);
   const avgY = y(avg);
   const off = Math.max(0.0001, Math.min(0.9999, (avgY - top) / (bot - top)));
@@ -100,7 +101,7 @@ function FormChart({ data }: { data: number[] }) {
         return (
           <g key={k}>
             <line x1={LG} y1={yy} x2={W - RG} y2={yy} stroke="#ffffff" strokeOpacity={0.12} strokeWidth={1} strokeDasharray="3 3" />
-            <text x={LG - 5} y={yy + 3} textAnchor="end" fontSize="9" fill="#A9C4B5">{v.toFixed(1)}</text>
+            <text x={LG - 5} y={yy + 3} textAnchor="end" fontSize="9" fill={C.sage}>{v.toFixed(1)}</text>
           </g>
         );
       })}
@@ -113,8 +114,8 @@ function FormChart({ data }: { data: number[] }) {
       {data.map((v, i) => <circle key={i} cx={x(i)} cy={y(v)} r={i === data.length - 1 ? 3.5 : 2} fill={colorFor(v)} />)}
       {/* current value + x caption */}
       <text x={x(data.length - 1) + 6} y={y(last) + 3} fontSize="11" fontWeight="800" fill={colorFor(last)}>{last.toFixed(1)}</text>
-      <text x={LG} y={H - 4} fontSize="9" fill="#8B8775">{data.length} rounds ago</text>
-      <text x={W - RG} y={H - 4} textAnchor="end" fontSize="9" fill="#8B8775">now</text>
+      <text x={LG} y={H - 4} fontSize="9" fill={C.sage}>{data.length} rounds ago</text>
+      <text x={W - RG} y={H - 4} textAnchor="end" fontSize="9" fill={C.sage}>now</text>
     </svg>
   );
 }
@@ -123,7 +124,7 @@ function FormChart({ data }: { data: number[] }) {
 export function PlayerCardView({ view }: { view: CardView }) {
   const { name, avatarUrl, index, trend, roundsPlayed, badges, form } = view;
   return (
-    <div style={{ background: "linear-gradient(180deg,#1d5f47,#153f30)", border: `1px solid ${C.greenMid}`, borderRadius: 16, padding: 16, overflow: "hidden" }}>
+    <div style={{ background: "linear-gradient(180deg,#1d5f47,#153f30)", border: `1px solid ${C.borderGreen}`, borderRadius: 16, padding: 16, overflow: "hidden" }}>
       <div style={{ display: "flex", gap: 13, alignItems: "center" }}>
         <Avatar src={avatarUrl} name={name} size={60} accent={C.gold} />
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -293,7 +294,7 @@ function ContactBar({ recipientId, groupId, name, phone }: { recipientId: string
   };
 
   return (
-    <div style={{ marginTop: 10, background: C.greenLight, border: `1px solid ${C.greenMid}`, borderRadius: 12, padding: 12 }}>
+    <div style={{ marginTop: 10, background: C.greenLight, border: `1px solid ${C.borderGreen}`, borderRadius: 12, padding: 12 }}>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {phone && (
           <>
@@ -313,11 +314,11 @@ function ContactBar({ recipientId, groupId, name, phone }: { recipientId: string
             onChange={(e) => setMsg(e.target.value.slice(0, 140))}
             placeholder={`Optional note to ${first} — e.g. "Free for Saturday?"`}
             rows={2}
-            style={{ width: "100%", resize: "none", borderRadius: 8, border: `1px solid ${C.greenMid}`, background: "#0e3a2c", color: C.cream, fontSize: 13, padding: "8px 10px", fontFamily: "inherit" }}
+            style={{ width: "100%", resize: "none", borderRadius: 8, border: `1px solid ${C.borderGreen}`, background: "#0e3a2c", color: C.cream, fontSize: 13, padding: "8px 10px", fontFamily: "inherit" }}
           />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
             <div style={{ fontSize: 11, color: C.sage }}>{msg.length}/140{status === "too_soon" ? " · you already reached out recently" : status === "error" ? " · couldn't send" : ""}</div>
-            <button onClick={send} disabled={status === "sending"} style={{ background: C.green, color: C.cream, fontWeight: 800, fontSize: 13, border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", opacity: status === "sending" ? 0.6 : 1 }}>{status === "sending" ? "Sending…" : "Send"}</button>
+            <button onClick={send} disabled={status === "sending"} style={{ background: C.green, color: C.cream, fontWeight: 800, fontSize: 13, border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", opacity: status === "sending" ? 0.62 : 1 }}>{status === "sending" ? "Sending…" : "Send"}</button>
           </div>
         </div>
       )}
@@ -345,7 +346,7 @@ export function CardVisibilityToggle({ user, initial }: { user: any; initial: bo
           Your name, handicap, and contact are always visible to club members. This controls whether they also see your badges, career bests, and recent form.
         </div>
       </div>
-      <button onClick={toggle} disabled={busy} style={{ flex: "none", background: on ? C.gold : "transparent", color: on ? "#1c1c15" : C.cream, border: `1px solid ${on ? C.gold : C.sage}`, borderRadius: 9, padding: "8px 14px", fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap", opacity: busy ? 0.6 : 1 }}>{on ? "On" : "Off"}</button>
+      <button onClick={toggle} disabled={busy} style={{ flex: "none", background: on ? C.gold : "transparent", color: on ? "#1c1c15" : C.cream, border: `1px solid ${on ? C.gold : C.sage}`, borderRadius: 9, padding: "8px 14px", fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap", opacity: busy ? 0.62 : 1 }}>{on ? "On" : "Off"}</button>
     </div>
   );
 }

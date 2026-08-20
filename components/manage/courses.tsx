@@ -81,7 +81,7 @@ export function CourseChangeSummary({ req }: { req: CourseEditRequest }) {
 
   return (
     <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
-      <div style={{ background: C.greenLight, borderRadius: 10, padding: 10, border: `1px solid ${C.line}` }}>
+      <div style={{ background: C.greenLight, borderRadius: 10, padding: 10, border: `1px solid ${C.borderCard}` }}>
         <div style={{ color: C.cream, fontSize: 11, letterSpacing: 1.5, fontWeight: 800, marginBottom: 6 }}>SUBMISSION DETAILS</div>
         <div style={{ color: C.cream, fontSize: 13, lineHeight: 1.6 }}>
           <div><b>Submitted by:</b> {submitter}</div>
@@ -91,7 +91,7 @@ export function CourseChangeSummary({ req }: { req: CourseEditRequest }) {
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}>
-        <div style={{ background: C.greenLight, borderRadius: 10, padding: 10, border: `1px solid ${C.line}` }}>
+        <div style={{ background: C.greenLight, borderRadius: 10, padding: 10, border: `1px solid ${C.borderCard}` }}>
           <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1.5, fontWeight: 800 }}>CURRENT GLOBAL</div>
           <div style={{ color: C.cream, fontWeight: 800, marginTop: 5 }}>{current ? courseLabel(current) : "Unknown course"}</div>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>{current?.location || "No location"}</div>
@@ -382,9 +382,9 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
         {source === "group" ? (
           <button title="Remove from club library"
             onClick={() => { if (confirm(`Remove "${courseCardTitle(c)}" from this club's library?\n\nThe course remains in the global app library and can be added back later.`)) remove(c.id, courseCardTitle(c)); }}
-            style={{ background: "none", border: "none", borderLeft: `1px solid ${C.line}`, color: C.birdie, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>✕</button>
+            style={{ background: "none", border: "none", borderLeft: `1px solid ${C.borderCard}`, color: C.birdie, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>✕</button>
         ) : inGroup ? (
-          <div style={{ display: "flex", alignItems: "center", borderLeft: `1px solid ${C.line}`, padding: "0 14px", color: C.cream, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>In Club ✓</div>
+          <div style={{ display: "flex", alignItems: "center", borderLeft: `1px solid ${C.borderCard}`, padding: "0 14px", color: C.cream, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>In Club ✓</div>
         ) : (
           <button style={{ ...btn(true), borderRadius: 0, padding: "0 14px", fontSize: 12, opacity: busyId === c.id ? 0.5 : 1 }} disabled={busyId === c.id} onClick={() => addToMyGroup(c)}>＋ Add to Club</button>
         )}
@@ -454,7 +454,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
               <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                 <button style={{ ...btn(true), fontSize: 12, opacity: busyId === r.id ? 0.5 : 1 }} disabled={busyId === r.id} onClick={() => approveCourseEdit(r)}>Approve globally</button>
                 <button style={{ ...btn(false), fontSize: 12, opacity: busyId === r.id ? 0.5 : 1 }} disabled={busyId === r.id} onClick={() => keepCourseEditGroupOnly(r)}>Keep changes in club only</button>
-                <button style={{ ...btn(false), background: "#7A2F28", fontSize: 12, opacity: busyId === r.id ? 0.5 : 1 }} disabled={busyId === r.id} onClick={() => rejectAndRemoveCourseEdit(r)}>Reject and remove override</button>
+                <button style={{ ...btn(false), background: C.danger, fontSize: 12, opacity: busyId === r.id ? 0.5 : 1 }} disabled={busyId === r.id} onClick={() => rejectAndRemoveCourseEdit(r)}>Reject and remove override</button>
               </div>
             </div>
           ))}
@@ -641,7 +641,7 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
         {err && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 8 }}>{err}</div>}
         {results?.map((r) => (
           <button key={r.id} onClick={() => pick(r.id, r.location)} disabled={loadingId != null}
-            style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.greenLight, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 14px" }}>
+            style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.greenLight, border: `1px solid ${C.borderCard}`, borderRadius: 10, padding: "12px 14px" }}>
             <span style={{ color: C.cream, fontWeight: 700 }}>{r.name}</span>
             {r.location ? <span style={{ color: C.sage, fontSize: 13 }}> · {r.location}</span> : null}
             {loadingId === r.id ? <span style={{ color: C.gold, fontSize: 12 }}> · loading…</span> : null}
@@ -798,13 +798,13 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
         </div>
       )}
       {!existingId && providerSource && (
-        <div style={{ marginTop: 10, border: `1px solid ${providerSource.stored ? C.gold : C.line}`, borderRadius: 10, padding: 10, background: providerSource.stored ? "#FFF8E1" : C.cream }}>
-          <div style={{ color: providerSource.stored ? C.green : C.sage, fontSize: 11, fontWeight: 900, letterSpacing: 1.2 }}>
+        <div style={{ marginTop: 10, border: `1px solid ${providerSource.stored ? C.gold : C.borderCard}`, borderRadius: 10, padding: 10, background: providerSource.stored ? C.greenMid : C.greenLight }}>
+          <div style={{ color: providerSource.stored ? C.cream : C.sage, fontSize: 11, fontWeight: 900, letterSpacing: 1.2 }}>
             {providerSource.stored ? (sourceMode === "provider" ? "REVIEWING GOLFCOURSEAPI DATA" : "ALREADY IN BNN") : "NEW COURSE FROM GOLFCOURSEAPI"}
           </div>
           {providerSource.stored ? (
             <>
-              <div style={{ color: C.ink, fontSize: 13, marginTop: 5, lineHeight: 1.45 }}>
+              <div style={{ color: C.cream, fontSize: 13, marginTop: 5, lineHeight: 1.45 }}>
                 {sourceMode === "provider" ? (
                   <>You are reviewing the <b>latest GolfCourseAPI data</b>. Nothing will overwrite stored BNN data unless you explicitly save a reviewed correction.</>
                 ) : (
@@ -813,7 +813,7 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
               </div>
               {hasMaterialCourseChanges(providerSource.stored, providerSource.provider) ? (
                 <div style={{ marginTop: 8 }}>
-                  <div style={{ color: C.faint, fontSize: 12, lineHeight: 1.45 }}>
+                  <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.45 }}>
                     Provider differences detected: {courseChangeLines(providerSource.stored, providerSource.provider).slice(0, 4).join("; ")}
                   </div>
                   {sourceMode === "stored" ? (
@@ -827,11 +827,11 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
                   )}
                 </div>
               ) : (
-                <div style={{ color: C.faint, fontSize: 12, marginTop: 6 }}>The provider data currently matches the stored BNN course.</div>
+                <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>The provider data currently matches the stored BNN course.</div>
               )}
             </>
           ) : (
-            <div style={{ color: C.ink, fontSize: 13, marginTop: 5 }}>This provider course is not currently stored in BNN.</div>
+            <div style={{ color: C.cream, fontSize: 13, marginTop: 5 }}>This provider course is not currently stored in BNN.</div>
           )}
         </div>
       )}
@@ -923,13 +923,13 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
             return (
               <div style={{ background: C.card, borderRadius: 10, padding: 10, flex: 1, minWidth: 240 }}>
                 <div style={{ color: C.green, fontSize: 11, letterSpacing: 2, fontWeight: 800, marginBottom: 6 }}>{label}</div>
-                <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr", gap: 6, padding: "0 2px 5px", color: C.faint, fontSize: 11, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.line}` }}>
+                <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr", gap: 6, padding: "0 2px 5px", color: C.faint, fontSize: 11, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.borderCard}` }}>
                   <div>HOLE</div><div style={{ textAlign: "center" }}>PAR</div><div style={{ textAlign: "center" }}>S.I.</div>
                 </div>
                 {seg.map((h, jj) => {
                   const j = from + jj;
                   return (
-                    <div key={j} style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr", gap: 6, alignItems: "center", padding: "5px 2px", borderBottom: `1px solid ${C.line}` }}>
+                    <div key={j} style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr", gap: 6, alignItems: "center", padding: "5px 2px", borderBottom: `1px solid ${C.borderCard}` }}>
                       <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.n}</div>
                       <div style={{ textAlign: "center" }}>
                         <select value={h.par ?? 4} onChange={(e) => updateHole(j, { par: parseInt(e.target.value, 10) })}

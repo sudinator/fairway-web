@@ -41,7 +41,7 @@ function ChartTip({ active, payload, nameMap, fmt }: any) {
   const label = p0.course ? `${p0.course}${p0.name ? " · " + p0.name : ""}` : "";
   const rows = payload.filter((e: any) => e.value != null);
   return (
-    <div style={{ position: "relative", background: C.green, border: `1px solid ${C.gold}`, borderRadius: 10, padding: "9px 12px", paddingRight: 30, boxShadow: "0 8px 22px -10px rgba(0,0,0,0.7)", minWidth: 132 }}>
+    <div style={{ position: "relative", background: C.green, border: `1px solid ${C.gold}`, borderRadius: 10, padding: "9px 12px", paddingRight: 30, minWidth: 132 }}>
       <button aria-label="Close" onClick={(e) => { e.stopPropagation(); if (typeof window !== "undefined") window.dispatchEvent(new Event("bnn-chart-dismiss")); }}
         style={{ position: "absolute", top: 3, right: 3, width: 22, height: 22, borderRadius: 11, background: C.greenMid, border: "none", color: C.cream, fontSize: 14, fontWeight: 800, lineHeight: 1, cursor: "pointer", padding: 0 }}>×</button>
       {label && <div style={{ color: C.gold, fontWeight: 700, fontSize: 11.5, marginBottom: 6 }}>{label}</div>}
@@ -536,7 +536,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
               const p = distTotal ? (100 * d.v) / distTotal : 0;
               return (
                 <div key={i} title={`${d.name}: ${d.v} (${Math.round(p)}%)`}
-                  style={{ width: `${p}%`, background: d.c, display: "flex", alignItems: "center", justifyContent: "center", color: "#0E3B2E", fontSize: 11, fontWeight: 800 }}>
+                  style={{ width: `${p}%`, background: d.c, display: "flex", alignItems: "center", justifyContent: "center", color: C.green, fontSize: 11, fontWeight: 800 }}>
                   {p >= 8 ? `${Math.round(p)}%` : ""}
                 </div>
               );

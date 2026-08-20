@@ -46,3 +46,26 @@ body {
   /* Installed app: iOS gives a stable full-glass viewport. */
   .app-shell { height: 100lvh; }
 }
+
+/* Native controls are drawn by iOS, not by this stylesheet. Without color-scheme the
+   OS picks light or dark from the USER'S phone setting, so the same screen rendered
+   differently for different people. The app's fields are cream, so light is correct —
+   the point is that it is now declared rather than inherited.
+   accent-color tints checkboxes, radios and range thumbs; it was previously set at
+   exactly one of two checkboxes, leaving the other iOS system blue. */
+:root {
+  color-scheme: light;
+  accent-color: #C9A227;
+}
+
+/* Focus ring. Nothing in the app removed the browser default, so keyboard and Switch
+   Control users were never stranded — but the default is system blue at 2.01:1 on a
+   green card, and which blue depends on the browser. Two tones because no single colour
+   clears 3:1 on every surface: cream is 7.29:1 on green but only 2.18:1 on a gold
+   button, where the dark inner edge takes over at 6.75:1.
+   :focus-visible so pointer and touch users see nothing. */
+:focus-visible {
+  outline: 2px solid #F7F3E8;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px #0E241B;
+}

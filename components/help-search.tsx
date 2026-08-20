@@ -261,8 +261,8 @@ export function HelpSearch({ onSendQuestion }: { onSendQuestion?: (q: string) =>
       onClick={() => ask(q)}
       style={{
         background: faded ? "transparent" : C.green,
-        color: faded ? C.green : C.sage,
-        border: `1px solid ${C.line}`,
+        color: faded ? C.cream : C.sage,
+        border: `1px solid ${C.borderCard}`,
         borderRadius: 999,
         fontSize: 11.5,
         padding: "6px 11px",

@@ -29,7 +29,7 @@ export function GroupSelector({ groups, activeGroupId, onChange }: { groups: App
         <span style={{ color: C.cream, fontSize: 13, fontWeight: 800 }}>{active.name}{active.role === "admin" ? " ★" : ""}</span>
       ) : (
         <select value={activeGroupId || groups[0].id} onChange={(e) => onChange(e.target.value)}
-          style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, color: C.ink, fontWeight: 700, padding: "6px 8px", maxWidth: 180 }}>
+          style={{ background: C.card, border: `1px solid ${C.borderCard}`, borderRadius: 8, color: C.ink, fontWeight: 700, padding: "6px 8px", maxWidth: 180 }}>
           {groups.map((g) => <option key={g.id} value={g.id}>{g.name}{g.role === "admin" ? " ★" : ""}</option>)}
         </select>
       )}
@@ -293,7 +293,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
                 <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 24, fontWeight: 800 }}>{active.name}</div>
                 {isAdmin && <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px" }} onClick={() => setRenaming(true)}>Rename</button>}
                 {isAdmin && (members || []).filter((m) => m.status === "active" && m.user_id !== user.id).length === 0 && (
-                  <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", background: "#7A2F28" }} disabled={busy} onClick={deleteGroup}>Delete club</button>
+                  <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", background: C.danger }} disabled={busy} onClick={deleteGroup}>Delete club</button>
                 )}
               </div>
             )}

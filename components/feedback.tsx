@@ -197,14 +197,14 @@ export function AdminFeedbackTab() {
           {shown.map((r) => (
             <div key={r.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <span style={{ background: KIND_COLOR[r.kind] || C.faint, color: "#fff", fontSize: 11, fontWeight: 800, letterSpacing: ".05em", textTransform: "uppercase", padding: "3px 8px", borderRadius: 6 }}>
+                <span style={{ background: KIND_COLOR[r.kind] || C.faint, color: r.kind === "question" ? C.green : "#fff", fontSize: 11, fontWeight: 800, letterSpacing: ".05em", textTransform: "uppercase", padding: "3px 8px", borderRadius: 6 }}>
                   {KIND_LABEL[r.kind] || r.kind}
                 </span>
                 <span style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>{r.user_name || "Someone"}</span>
                 <span style={{ color: C.sage, fontSize: 11.5 }}>{fmt(r.created_at)}</span>
                 {r.app_version && <span style={{ color: C.sage, fontSize: 11 }}>· v{r.app_version}</span>}
                 {r.status !== "new" && (
-                  <span style={{ marginLeft: "auto", color: r.status === "done" ? "#1f8f54" : C.gold, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".05em" }}>{r.status}</span>
+                  <span style={{ marginLeft: "auto", color: r.status === "done" ? "#7FD6A3" : C.gold, fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".05em" }}>{r.status}</span>
                 )}
               </div>
               <div style={{ color: C.cream, fontSize: 13, lineHeight: 1.5, marginTop: 8, whiteSpace: "pre-wrap" }}>{r.message}</div>

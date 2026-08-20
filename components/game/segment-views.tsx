@@ -93,8 +93,8 @@ export function LegConfigEditor({ game, onSave }: { game: Game; onSave: (cfg: Le
     { k: "sixesNoTot", label: "Three sixes only" },
     { k: "total", label: "Total only" },
   ];
-  const chip = (on: boolean): React.CSSProperties => ({ border: `1px solid ${on ? C.gold : C.greenMid}`, background: on ? C.gold : "transparent", color: on ? "#1c1606" : C.cream, borderRadius: 999, padding: "7px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" });
-  const stepBtn: React.CSSProperties = { width: 30, height: 30, borderRadius: 8, border: `1px solid ${C.greenMid}`, background: "transparent", color: C.cream, fontSize: 16, fontWeight: 800, cursor: "pointer", lineHeight: 1 };
+  const chip = (on: boolean): React.CSSProperties => ({ border: `1px solid ${on ? C.gold : C.borderGreen}`, background: on ? C.gold : "transparent", color: on ? "#1c1606" : C.cream, borderRadius: 999, padding: "7px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer" });
+  const stepBtn: React.CSSProperties = { width: 30, height: 30, borderRadius: 8, border: `1px solid ${C.borderGreen}`, background: "transparent", color: C.cream, fontSize: 16, fontWeight: 800, cursor: "pointer", lineHeight: 1 };
   const lbl: React.CSSProperties = { color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", margin: "12px 0 6px" };
   const fmtName = game.game_type === "trifecta" ? "trifecta" : game.game_type === "fourball" ? "four-ball" : "match";
 
@@ -122,7 +122,7 @@ export function LegConfigEditor({ game, onSave }: { game: Game; onSave: (cfg: Le
           <div key={lg.k} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" }}>
             <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 700 }}>{lg.k}</span>
             <button onClick={() => bump(lg.k, -0.5)} style={stepBtn}>-</button>
-            <span style={{ fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800, color: v ? C.gold : C.faint, minWidth: 26, textAlign: "center" }}>{fmtPt(v)}</span>
+            <span style={{ fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800, color: v ? C.gold : C.sage, minWidth: 26, textAlign: "center" }}>{fmtPt(v)}</span>
             <button onClick={() => bump(lg.k, 0.5)} style={stepBtn}>+</button>
             <span style={{ color: C.sage, fontSize: 11, width: 16 }}>pt</span>
           </div>
@@ -253,7 +253,7 @@ export function GroupSegmentSummary({ game, players }: { game: Game; players: Pl
   const tB = teams[1] ? (tally[teams[1].key] || 0) : 0;
 
   const hdrBg = (lg: Leg) => (lg.tot ? "#E7F0E9" : "#EEF4EF");
-  const th: React.CSSProperties = { textAlign: "center", color: C.faint, fontSize: 11, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", padding: "6px 3px", borderBottom: `1px solid ${C.line}` };
+  const th: React.CSSProperties = { textAlign: "center", color: C.faint, fontSize: 11, fontWeight: 800, letterSpacing: 0.4, textTransform: "uppercase", padding: "6px 3px", borderBottom: `1px solid ${C.borderCard}` };
   const nmH: React.CSSProperties = { ...th, textAlign: "left", width: 100 };
   const thruH: React.CSSProperties = { ...th, width: 38 };
   const nmCell: React.CSSProperties = { textAlign: "left", width: 100, color: C.ink, fontWeight: 800, fontSize: 12.5, padding: "6px 3px" };
@@ -324,9 +324,9 @@ export function GroupSegmentSummary({ game, players }: { game: Game; players: Pl
             const wonNote = li.res.winnerPids.length === 1 ? (names + " won") : (li.res.winnerTeams.length === 1 ? (names + " tied, same team, counts once") : (names + " tied across teams, both score"));
             const leadNote = names + " leading, thru " + li.holes + " hole" + (li.holes === 1 ? "" : "s");
             return (
-              <div key={lg.k} style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: "7px 2px", borderBottom: `1px solid ${C.greenMid}` }}>
+              <div key={lg.k} style={{ display: "flex", alignItems: "flex-start", gap: 9, padding: "7px 2px", borderBottom: `1px solid ${C.borderGreen}` }}>
                 <div style={{ width: 58, flexShrink: 0, color: C.cream, fontWeight: 800, fontSize: 12.5 }}>{lg.k}</div>
-                <div style={{ flex: 1, color: li.complete ? C.sage : C.faint, fontSize: 12, lineHeight: 1.4 }}>
+                <div style={{ flex: 1, color: li.complete ? C.sage : C.sage, fontSize: 12, lineHeight: 1.4 }}>
                   {li.complete ? wonNote : leadNote}
                   {li.complete
                     ? li.res.winnerTeams.map((tk) => (

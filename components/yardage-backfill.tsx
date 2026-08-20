@@ -231,7 +231,7 @@ export function YardageBackfill() {
   };
 
   return (
-    <div style={{ background: C.greenMid, border: `1px solid ${C.line}`, borderRadius: 14, padding: 14, marginTop: 12, marginBottom: 6 }}>
+    <div style={{ background: C.greenMid, border: `1px solid ${C.borderCard}`, borderRadius: 14, padding: 14, marginTop: 12, marginBottom: 6 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <Eyebrow>YARDAGE BACKFILL · ADMIN</Eyebrow>
         <div style={{ flex: 1 }} />
@@ -259,7 +259,7 @@ export function YardageBackfill() {
                     <span style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>{p.name}</span>
                   </div>
                   {p.note && <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>{p.note}</div>}
-                  {p.tees.map((t, i) => (<div key={i} style={{ color: t.reason ? C.faint : C.sage, fontSize: 11 }}>{t.tee}: {t.reason ? t.reason : `${t.fill} hole${t.fill === 1 ? "" : "s"} to fill`}</div>))}
+                  {p.tees.map((t, i) => (<div key={i} style={{ color: t.reason ? C.sage : C.sage, fontSize: 11 }}>{t.tee}: {t.reason ? t.reason : `${t.fill} hole${t.fill === 1 ? "" : "s"} to fill`}</div>))}
                 </div>
               ))}
             </div>
@@ -271,7 +271,7 @@ export function YardageBackfill() {
           )}
 
           {/* ---------------- EDITOR ---------------- */}
-          <div style={{ borderTop: `1px solid ${C.line}`, marginTop: 16, paddingTop: 14 }}>
+          <div style={{ borderTop: `1px solid ${C.borderCard}`, marginTop: 16, paddingTop: 14 }}>
             <div style={{ color: C.cream, fontSize: 12, fontWeight: 800, letterSpacing: 0.4 }}>2 · FIX ONE COURSE (re-look-up or type by hand)</div>
             <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>
               For custom courses, or a course whose id errored (e.g. a mapping issue). Saving writes <b style={{ color: C.cream }}>only the yardages</b>.
@@ -298,7 +298,7 @@ export function YardageBackfill() {
                       {results && results.length > 0 && !apiCourse && (
                         <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4, maxHeight: 160, overflowY: "auto" }}>
                           {results.map((r) => (
-                            <button key={r.id} onClick={() => pickResult(r.id)} style={{ textAlign: "left", background: C.greenLight, border: `1px solid ${C.line}`, borderRadius: 8, padding: "6px 10px", cursor: "pointer" }}>
+                            <button key={r.id} onClick={() => pickResult(r.id)} style={{ textAlign: "left", background: C.greenLight, border: `1px solid ${C.borderCard}`, borderRadius: 8, padding: "6px 10px", cursor: "pointer" }}>
                               <div style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>{r.name}</div>
                               <div style={{ color: C.sage, fontSize: 11 }}>{r.club}{r.location ? ` · ${r.location}` : ""}</div>
                             </button>
@@ -332,7 +332,7 @@ export function YardageBackfill() {
                           {Array.from({ length: holesCount }, (_, hi) => (
                             <div key={hi} style={{ width: 42, textAlign: "center" }}>
                               <div style={{ color: C.sage, fontSize: 11 }}>{hi + 1}</div>
-                              <input value={(yard[ti] || [])[hi] || ""} onChange={(e) => setCell(ti, hi, e.target.value)} inputMode="numeric" style={{ width: 42, padding: "4px 2px", textAlign: "center", fontSize: 12, border: `1px solid ${C.line}`, borderRadius: 6, color: C.cream, background: "#fff" }} />
+                              <input value={(yard[ti] || [])[hi] || ""} onChange={(e) => setCell(ti, hi, e.target.value)} inputMode="numeric" style={{ width: 42, padding: "4px 2px", textAlign: "center", fontSize: 12, border: `1px solid ${C.borderCard}`, borderRadius: 6, color: C.cream, background: "#fff" }} />
                             </div>
                           ))}
                         </div>

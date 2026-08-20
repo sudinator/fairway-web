@@ -58,7 +58,7 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
           onClick={() => setShowShare(true)}>📤 Share</button>}
         <button style={{ ...btn(false), fontSize: 12.5, padding: "8px 8px", whiteSpace: "nowrap", flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
           onClick={onEdit}>Edit round</button>
-        <button style={{ ...btn(false), background: "#7A2F28", fontSize: 12.5, padding: "8px 8px", whiteSpace: "nowrap", flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
+        <button style={{ ...btn(false), background: C.danger, fontSize: 12.5, padding: "8px 8px", whiteSpace: "nowrap", flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
           onClick={() => { if (confirm("Delete this round? This can't be undone.")) onDelete(); }}>Delete</button>
       </div>
 
@@ -67,7 +67,7 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
 
       {roundDifferential(round) != null && (
         <button onClick={() => setShowDiff(true)}
-          style={{ marginTop: 12, background: C.greenLight, border: `1px solid ${C.greenMid}`, borderRadius: 10, padding: "9px 13px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", width: "100%", textAlign: "left" }}>
+          style={{ marginTop: 12, background: C.greenLight, border: `1px solid ${C.borderGreen}`, borderRadius: 10, padding: "9px 13px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", width: "100%", textAlign: "left" }}>
           <span style={{ color: C.sage, fontSize: 12.5 }}>Differential</span>
           <span style={{ color: C.cream, fontWeight: 800, fontFamily: "Georgia, serif", fontSize: 16 }}>{roundDifferential(round)!.toFixed(1)}</span>
           {round.rating != null && round.slope != null && <span style={{ color: C.sage, fontSize: 12 }}>· {round.rating}/{round.slope}</span>}
@@ -233,7 +233,7 @@ function GhinPanel({ round, ghinNumber, playerName }: { round: Round; ghinNumber
   ].filter(Boolean).join("\n");
 
   const field = (label: string, value: string, key: string) => (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: `1px solid ${C.line}` }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: `1px solid ${C.borderCard}` }}>
       <div style={{ color: "#5A6B62", fontSize: 13, width: 120 }}>{label}</div>
       <div style={{ color: "#16201C", fontSize: 15, fontWeight: 800, flex: 1 }}>{value}</div>
       <button style={{ ...btn(false), fontSize: 11, padding: "4px 10px" }} onClick={() => copy(key, value)}>{copied === key ? "✓ Copied" : "Copy"}</button>

@@ -443,16 +443,16 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
               <Eyebrow>★ YOUR FAVORITES</Eyebrow>
               {favorites.map((f) => (
                 <div key={f.id}
-                  style={{ display: "flex", alignItems: "stretch", marginTop: 8, background: C.card, border: `1px solid ${C.gold}`, borderRadius: 10, overflow: "hidden" }}>
+                  style={{ display: "flex", alignItems: "stretch", marginTop: 8, background: C.greenLight, border: `1px solid ${C.gold}`, borderRadius: 10, overflow: "hidden" }}>
                   <button onClick={() => { setPicked(f.data); setTeeIdx(0); setLoadedFavId(f.id); setEditingTee(false); setFavMsg(null); }}
                     style={{ flex: 1, textAlign: "left", cursor: "pointer", background: "none", border: "none", padding: "12px 14px" }}>
                     <span style={{ color: C.gold, fontWeight: 800 }}>★ </span>
-                    <span style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{courseLabel(f.data)}</span>
-                    {f.location ? <span style={{ color: C.faint, fontSize: 13 }}> · {f.location}</span> : null}
+                    <span style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>{courseLabel(f.data)}</span>
+                    {f.location ? <span style={{ color: C.sage, fontSize: 13 }}> · {f.location}</span> : null}
                   </button>
                   <button title="Remove from favorites"
                     onClick={() => { if (confirm(`Remove "${f.name}" from favorites?`)) deleteFavorite(f.id); }}
-                    style={{ background: "none", border: "none", borderLeft: `1px solid ${C.line}`, color: C.birdie, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>
+                    style={{ background: "none", border: "none", borderLeft: `1px solid ${C.borderCard}`, color: C.birdie, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>
                     ✕
                   </button>
                 </div>
@@ -494,7 +494,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
                       else pickFromApi(c.id);
                     }}
                     disabled={loadingId != null}
-                    style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.greenLight, border: `1px solid ${existing ? C.gold : C.line}`, borderRadius: 10, padding: "12px 14px", opacity: loadingId != null && loadingId !== c.id ? 0.5 : 1 }}>
+                    style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.greenLight, border: `1px solid ${existing ? C.gold : C.borderCard}`, borderRadius: 10, padding: "12px 14px", opacity: loadingId != null && loadingId !== c.id ? 0.5 : 1 }}>
                     <span style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>{courseLabel(c)}</span>
                     {c.location ? <span style={{ color: C.sage, fontSize: 13 }}> · {c.location}</span> : null}
                     {/* APP_RULES #25: reassurance, not attention. Cream row, so C.faint. */}
@@ -521,7 +521,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
               <Eyebrow>{results ? "OR PICK FROM BUILT-IN" : "POPULAR COURSES"}</Eyebrow>
               {starterMatches.map((c) => (
                 <button key={c.id} onClick={() => { setPicked(c); setTeeIdx(0); }}
-                  style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.greenLight, border: `1px solid ${C.line}`, borderRadius: 10, padding: "12px 14px" }}>
+                  style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.greenLight, border: `1px solid ${C.borderCard}`, borderRadius: 10, padding: "12px 14px" }}>
                   <span style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>{c.name}</span>
                   <span style={{ color: C.sage, fontSize: 13 }}> · {c.location}</span>
                 </button>
@@ -644,13 +644,13 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
                         return (
                           <div style={{ background: C.card, borderRadius: 10, padding: 10, flex: 1, minWidth: 240 }}>
                             <div style={{ color: C.green, fontSize: 11, letterSpacing: 2, fontWeight: 800, marginBottom: 6 }}>{label}</div>
-                            <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr", gap: 6, padding: "0 2px 5px", color: C.faint, fontSize: 11, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.line}` }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr", gap: 6, padding: "0 2px 5px", color: C.faint, fontSize: 11, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.borderCard}` }}>
                               <div>HOLE</div><div style={{ textAlign: "center" }}>PAR</div><div style={{ textAlign: "center" }}>S.I.</div>
                             </div>
                             {seg.map((h, jj) => {
                               const j = from + jj;
                               return (
-                                <div key={j} style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr", gap: 6, alignItems: "center", padding: "5px 2px", borderBottom: `1px solid ${C.line}` }}>
+                                <div key={j} style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr", gap: 6, alignItems: "center", padding: "5px 2px", borderBottom: `1px solid ${C.borderCard}` }}>
                                   <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.n}</div>
                                   <div style={{ textAlign: "center" }}>
                                     <input inputMode="numeric" value={h.par ?? ""}

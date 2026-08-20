@@ -309,7 +309,7 @@ function Scorecard({ data }: { data: LiveData }) {
                       {unclaimed > 0 ? <><b style={{ color: C.ink }}>{unclaimed}</b> {noun(unclaimed)} {tail}</> : (usePoints ? "All points played" : "All matches in")}
                     </div>
                     {(cs.clinched || cs.canTie || cs.decided) && (
-                      <div style={{ marginTop: 10, background: cs.canTie ? "#FBF1D2" : cs.decided && !cs.leader ? "#F1EFE6" : "#E2F3E8", border: `1px solid ${cs.canTie ? C.gold : cs.decided && !cs.leader ? C.line : "#5BB98A"}`, borderRadius: 10, padding: "9px 12px", textAlign: "center" }}>
+                      <div style={{ marginTop: 10, background: cs.canTie ? "#FBF1D2" : cs.decided && !cs.leader ? "#F1EFE6" : "#E2F3E8", border: `1px solid ${cs.canTie ? C.gold : cs.decided && !cs.leader ? C.borderCard : "#5BB98A"}`, borderRadius: 10, padding: "9px 12px", textAlign: "center" }}>
                         <div style={{ fontWeight: 800, fontSize: 14, color: cs.canTie ? "#7A5A12" : cs.decided && !cs.leader ? C.ink : "#1A7A3C" }}>
                           {cs.decided ? (cs.leader ? `${top.name} wins, ${fmtHalf(top.scoreNum)}–${fmtHalf(bot.scoreNum)}` : "Match tied") : cs.canTie ? `${top.name} can’t be caught` : `${top.name} has won`}
                         </div>
@@ -415,7 +415,7 @@ function PlayerDetail({ stat, meta, gameType, strokeNet }: { stat: PStat; meta: 
   if (stat.penalties != null) chips.push(["Penalties", String(stat.penalties)]);
 
   return (
-    <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 10, borderTop: `1px solid ${C.line}`, paddingTop: 6 }}>
+    <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 10, borderTop: `1px solid ${C.borderCard}`, paddingTop: 6 }}>
       {grid(0, half, "OUT")}
       {meta.length > half && grid(half, meta.length, "IN")}
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 13 }}>

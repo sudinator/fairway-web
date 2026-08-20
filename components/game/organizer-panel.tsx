@@ -252,7 +252,7 @@ export function OrganizerPanel({
                     borderRadius: 12,
                     padding: 12,
                     marginTop: 10,
-                    border: `1px solid ${C.line}`,
+                    border: `1px solid ${C.borderCard}`,
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -329,9 +329,9 @@ export function OrganizerPanel({
                       <button
                         style={{
                           background: p.no_show ? C.gold : "none",
-                          border: `1px solid ${p.no_show ? C.gold : C.line}`,
+                          border: `1px solid ${p.no_show ? C.gold : C.borderCard}`,
                           borderRadius: 6,
-                          color: p.no_show ? C.green : C.sage,
+                          color: p.no_show ? C.cream : C.sage,
                           fontWeight: 800,
                           cursor: "pointer",
                           padding: "6px 8px",
@@ -346,7 +346,7 @@ export function OrganizerPanel({
                     )}
                     {p.user_id !== game.created_by && (
                       <button
-                        style={{ background: "none", border: `1px solid ${C.line}`, borderRadius: 6, color: C.birdie, fontWeight: 800, cursor: "pointer", padding: "6px 8px", fontSize: 12 }}
+                        style={{ background: "none", border: `1px solid ${C.borderCard}`, borderRadius: 6, color: C.birdie, fontWeight: 800, cursor: "pointer", padding: "6px 8px", fontSize: 12 }}
                         disabled={blocked({ type: "remove_player", player: p })}
                         title={reasonFor({ type: "remove_player", player: p }) || "Remove player"}
                         onClick={() => onRemove(p)}
@@ -365,7 +365,7 @@ export function OrganizerPanel({
                         <button key={t.key} onClick={() => onSetTeam(p, on ? null : t.key)}
                           disabled={blocked({ type: "set_team", player: p, team: on ? null : t.key })}
                           title={reasonFor({ type: "set_team", player: p, team: on ? null : t.key })}
-                          style={{ borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: blocked({ type: "set_team", player: p, team: on ? null : t.key }) ? "not-allowed" : "pointer", opacity: blocked({ type: "set_team", player: p, team: on ? null : t.key }) ? .45 : 1, background: on ? col : "transparent", border: `1.5px solid ${on ? col : C.line}`, color: on ? "#0E241B" : C.sage }}>
+                          style={{ borderRadius: 999, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: blocked({ type: "set_team", player: p, team: on ? null : t.key }) ? "not-allowed" : "pointer", opacity: blocked({ type: "set_team", player: p, team: on ? null : t.key }) ? .45 : 1, background: on ? col : "transparent", border: `1.5px solid ${on ? col : C.borderCard}`, color: on ? "#0E241B" : C.sage }}>
                           {t.name}
                         </button>
                       );
@@ -397,7 +397,7 @@ export function OrganizerPanel({
           )}
 
           {section === "players" && (onAddMember || onAddGuest) && (
-            <div style={{ marginTop: 14, borderTop: `1px solid ${C.greenMid}`, paddingTop: 12 }}>
+            <div style={{ marginTop: 14, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 12 }}>
               {onAddMember && eligibleMembers.length > 0 && (
                 <>
                   <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2, fontWeight: 700 }}>ADD FROM YOUR CLUB</div>
@@ -405,7 +405,7 @@ export function OrganizerPanel({
                     {eligibleMembers.map((m) => (
                       <div key={m.id} onClick={() => { if (!blocked({ type: "add_player" })) onAddMember(m); }}
                         title={reasonFor({ type: "add_player" })}
-                        style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 8px", cursor: blocked({ type: "add_player" }) ? "not-allowed" : "pointer", opacity: blocked({ type: "add_player" }) ? .5 : 1, borderBottom: `1px solid ${C.greenMid}`, borderRadius: 8 }}>
+                        style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 8px", cursor: blocked({ type: "add_player" }) ? "not-allowed" : "pointer", opacity: blocked({ type: "add_player" }) ? .5 : 1, borderBottom: `1px solid ${C.borderGreen}`, borderRadius: 8 }}>
                         <span style={{ width: 22, height: 22, borderRadius: 5, border: `1.5px solid ${C.sage}`, flex: "0 0 auto" }} />
                         <span style={{ flex: 1, color: C.cream, fontWeight: 700, fontSize: 15 }}>{m.display_name}</span>
                         <span style={{ color: C.sage, fontSize: 12 }}>{m.handicap_index != null ? `HCP ${m.handicap_index}` : "no handicap"}</span>
@@ -449,7 +449,7 @@ export function OrganizerPanel({
           {section === "format" && (
           <div
             style={{
-              borderTop: `1px solid ${C.greenMid}`,
+              borderTop: `1px solid ${C.borderGreen}`,
               marginTop: 14,
               paddingTop: 14,
             }}
@@ -1022,7 +1022,7 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
                     {idToIsGuest[p.id] && (() => { const sp = nameOfUid(idToGuestOf[p.id] || ""); return <div style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}>guest of {sp} · {sp} {p.net >= 0 ? "is paid this" : "pays this"}</div>; })()}
                   </div>
                   <div style={{ color: C.sage, fontSize: 12 }}>won ${p.won.toFixed(2)}</div>
-                  <div style={{ width: 80, textAlign: "right", fontWeight: 800, fontFamily: "Georgia, serif", fontSize: 15, color: p.net >= 0 ? C.green : C.birdie }}>
+                  <div style={{ width: 80, textAlign: "right", fontWeight: 800, fontFamily: "Georgia, serif", fontSize: 15, color: p.net >= 0 ? C.cream : C.birdie }}>
                     {p.net >= 0 ? "+" : "−"}${Math.abs(p.net).toFixed(2)}
                   </div>
                 </div>
@@ -1035,7 +1035,7 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
           </div>
 
           {ended && canPost && result.pot > 0 && (
-            <div style={{ marginTop: 14, borderTop: `1px solid ${C.greenMid}`, paddingTop: 14 }}>
+            <div style={{ marginTop: 14, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 14 }}>
               {postedExpense ? (
                 <div>
                   <div style={{ color: C.sage, fontSize: 13, fontWeight: 800 }}>Posted to Money ✓</div>
@@ -1055,7 +1055,7 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
                                 <span style={{ color: C.cream }}>{r.name}</span>
                                 <span style={{ fontFamily: "Georgia, serif" }}>
                                   <span style={{ color: C.sage, textDecoration: "line-through" }}>{centsNet(r.oldC)}</span>{"  "}
-                                  <span style={{ fontWeight: 800, color: r.newC >= 0 ? C.green : C.birdie }}>{centsNet(r.newC)}</span>
+                                  <span style={{ fontWeight: 800, color: r.newC >= 0 ? C.cream : C.birdie }}>{centsNet(r.newC)}</span>
                                 </span>
                               </div>
                             ))}
@@ -1089,12 +1089,12 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
                           <span style={{ color: C.cream }}>{p.name}</span>
                           {idToIsGuest[p.id] && (() => { const sp = nameOfUid(idToGuestOf[p.id] || ""); return <div style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}>guest of {sp} · {sp} {p.net >= 0 ? "is paid this" : "pays this"}</div>; })()}
                         </div>
-                        <span style={{ fontWeight: 800, fontFamily: "Georgia, serif", color: p.net >= 0 ? C.green : C.birdie }}>{p.net >= 0 ? "+" : "−"}${Math.abs(p.net).toFixed(2)}</span>
+                        <span style={{ fontWeight: 800, fontFamily: "Georgia, serif", color: p.net >= 0 ? C.cream : C.birdie }}>{p.net >= 0 ? "+" : "−"}${Math.abs(p.net).toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
                   {result.cleanSweep && <div style={{ color: C.gold, fontSize: 12, fontWeight: 800, marginTop: 6 }}>{"\uD83E\uDDF9"} Clean sweep — pot doubled.</div>}
-                  <div style={{ fontSize: 12, marginTop: 8, fontWeight: 700, color: balanced ? C.green : C.birdie }}>{balanced ? "Balances to zero ✓" : `Off by $${netSum.toFixed(2)} — not balanced`}</div>
+                  <div style={{ fontSize: 12, marginTop: 8, fontWeight: 700, color: balanced ? C.cream : C.birdie }}>{balanced ? "Balances to zero ✓" : `Off by $${netSum.toFixed(2)} — not balanced`}</div>
                   {postMsg && <div style={{ color: C.birdie, fontSize: 12, marginTop: 6 }}>{postMsg}</div>}
                   <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                     <button onClick={() => { setConfirming(false); setPostMsg(null); }} disabled={busy} style={{ ...btn(false), flex: 1, fontSize: 13 }}>Cancel</button>

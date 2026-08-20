@@ -716,20 +716,20 @@ function CreateGame({
               textAlign: "left",
               marginTop: 8,
               cursor: "pointer",
-              background: selected ? C.cream : C.card,
-              border: `${selected ? 2 : 1}px solid ${selected ? C.gold : C.line}`,
+              background: selected ? C.greenMid : C.greenLight,
+              border: `${selected ? 2 : 1}px solid ${selected ? C.gold : "rgba(255,255,255,0.12)"}`,
               borderRadius: 10,
               padding: "10px 14px",
             }}
           >
             <span style={{ width: 20, height: 20, borderRadius: 999, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: selected ? C.green : "transparent", border: selected ? "none" : `1.5px solid ${C.line}`, color: C.cream, fontSize: 12, fontWeight: 800 }}>{selected ? "✓" : ""}</span>
             <span style={{ flex: 1 }}>
-              <span style={{ color: C.ink, fontWeight: 700 }}>{f.name}</span>
+              <span style={{ color: C.cream, fontWeight: 700 }}>{f.name}</span>
               {f.location ? (
-                <span style={{ color: C.faint, fontSize: 13 }}>{" "}· {f.location}</span>
+                <span style={{ color: C.sage, fontSize: 13 }}>{" "}· {f.location}</span>
               ) : null}
             </span>
-            {selected && <span style={{ color: C.green, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>SELECTED</span>}
+            {selected && <span style={{ color: C.cream, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>SELECTED</span>}
           </button>
           );
         })}
@@ -829,7 +829,7 @@ function CreateGame({
                 key={p.id}
                 style={{
                   padding: "12px",
-                  borderBottom: `1px solid ${C.greenMid}`,
+                  borderBottom: `1px solid ${C.borderGreen}`,
                   borderRadius: 8,
                   background: checked ? "rgba(216,178,74,0.10)" : "transparent",
                 }}
@@ -1246,7 +1246,7 @@ function CreateGame({
                             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setIt(); } }}
                             style={{ ...inputStyle, width: 72, padding: "6px 9px", fontSize: 13, textAlign: "center" }} />
                           <button onClick={setIt} disabled={!valid}
-                            style={{ ...btn(valid), fontSize: 12, padding: "6px 12px", opacity: valid ? 1 : 0.4, cursor: valid ? "pointer" : "not-allowed" }}>Set</button>
+                            style={{ ...btn(valid), fontSize: 12, padding: "6px 12px", opacity: valid ? 1 : 0.62, cursor: valid ? "pointer" : "not-allowed" }}>Set</button>
                         </div>
                       );
                     })}
@@ -1302,7 +1302,7 @@ function CreateGame({
 
         {createSection === "review" && (
           <div>
-            <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, border: `1px solid ${C.greenMid}` }}>
+            <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, border: `1px solid ${C.borderGreen}` }}>
               {[
                 [!!pickedFav, "Course", pickedFav?.name || "Select a course"],
                 [!!tee, "Default tee", tee?.name || "Select a tee"],
@@ -1323,7 +1323,7 @@ function CreateGame({
             <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
               <button style={btn(false)} onClick={onCancel}>Cancel</button>
               <button
-                style={{ ...btn(true), opacity: pickedFav && tee && !busy && !flightBlocked ? 1 : 0.5 }}
+                style={{ ...btn(true), opacity: pickedFav && tee && !busy && !flightBlocked ? 1 : 0.62 }}
                 disabled={!pickedFav || !tee || busy || flightBlocked}
                 onClick={create}
               >
@@ -2793,14 +2793,14 @@ function GameRoom({
           <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
             <span style={{ color: C.sage, fontSize: 12 }}>Reassign organizer:</span>
             <select value={reassignTo} onChange={(e) => setReassignTo(e.target.value)}
-              style={{ background: C.card, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
+              style={{ background: C.card, color: C.ink, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
               <option value="">Select player…</option>
               {players.filter((p) => p.user_id).map((p) => (
                 <option key={p.user_id} value={p.user_id as string}>{p.display_name}</option>
               ))}
             </select>
             <button disabled={!reassignTo} onClick={adminReassignOrganizer}
-              style={{ background: C.gold, color: C.green, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, padding: "6px 12px", cursor: "pointer", opacity: reassignTo ? 1 : 0.4 }}>Assign</button>
+              style={{ background: C.gold, color: C.green, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, padding: "6px 12px", cursor: "pointer", opacity: reassignTo ? 1 : 0.62 }}>Assign</button>
           </div>
         </div>
       )}
@@ -2810,7 +2810,7 @@ function GameRoom({
           <div style={{
             background: (syncState === "error" || pendingHoles > 0) ? "#3A2A12" : syncState === "synced" ? "#13412c" : "#15302a",
             color: C.cream,
-            border: `1px solid ${(syncState === "error" || pendingHoles > 0) ? C.gold : syncState === "synced" ? "#1f8f54" : C.line}`,
+            border: `1px solid ${(syncState === "error" || pendingHoles > 0) ? C.gold : syncState === "synced" ? "#1f8f54" : C.borderCard}`,
             borderRadius: 999, padding: "8px 14px", fontSize: 12.5, fontWeight: 700,
             boxShadow: "0 8px 22px rgba(0,0,0,.35)", display: "flex", alignItems: "center", gap: 10, maxWidth: "100%", pointerEvents: "auto",
           }}>
@@ -2826,7 +2826,7 @@ function GameRoom({
             </span>
             {pendingHoles > 0 && !offline && (
               <button onClick={syncNow} disabled={syncing}
-                style={{ background: C.gold, color: "#3B2A00", border: "none", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer", opacity: syncing ? 0.6 : 1, whiteSpace: "nowrap" }}>
+                style={{ background: C.gold, color: "#3B2A00", border: "none", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer", opacity: syncing ? 0.62 : 1, whiteSpace: "nowrap" }}>
                 {syncing ? "Syncing…" : "Sync now"}
               </button>
             )}
@@ -2951,7 +2951,7 @@ function GameRoom({
             {(["per_hole", "match"] as const).map((val) => {
               const on = (game.trifecta_scoring === "match" ? "match" : "per_hole") === val;
               return (
-                <button key={val} onClick={() => changeTrifectaScoring(val)} style={{ flex: 1, border: `1px solid ${on ? C.gold : C.greenMid}`, background: on ? C.gold : "transparent", borderRadius: 10, padding: "9px 8px", cursor: "pointer", textAlign: "center" }}>
+                <button key={val} onClick={() => changeTrifectaScoring(val)} style={{ flex: 1, border: `1px solid ${on ? C.gold : C.borderGreen}`, background: on ? C.gold : "transparent", borderRadius: 10, padding: "9px 8px", cursor: "pointer", textAlign: "center" }}>
                   <div style={{ fontSize: 13, fontWeight: 800, color: on ? "#1c1606" : C.cream }}>{val === "match" ? "1 match = 1 pt" : "1 hole = 1 pt"}</div>
                   <div style={{ fontSize: 11, marginTop: 2, color: on ? "#3c3208" : C.sage }}>{val === "match" ? "Ryder Cup · 3 pts/foursome" : "Per-hole · 3 pts/hole"}</div>
                 </button>
@@ -3077,7 +3077,7 @@ function GameRoom({
               )}
               <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "flex-end" }}>
                 <button onClick={() => setFinishPrompt(null)} style={{ ...btn(false), padding: "9px 16px" }}>{complete ? "Cancel" : "Go back"}</button>
-                <button onClick={async () => { const run = fp.kind === "group" ? finishMyGroup : endGame; setFinishPrompt(null); await run(); }} style={{ ...btn(true), padding: "9px 16px", background: "#5A1E1E", color: "#fff" }}>
+                <button onClick={async () => { const run = fp.kind === "group" ? finishMyGroup : endGame; setFinishPrompt(null); await run(); }} style={{ ...btn(true), padding: "9px 16px", background: C.danger, color: C.cream }}>
                   {complete ? (fp.kind === "group" ? "Finish group" : "End game") : "Finish anyway"}
                 </button>
               </div>
@@ -3097,7 +3097,7 @@ function GameRoom({
               </button>
             )}
             {isOrganizer && (
-              <button onClick={requestEndGame} style={{ ...btn(!canFinishGroup), flex: 1, minWidth: 180, fontSize: 13, padding: "10px 0", ...(canFinishGroup ? { background: "#5A1E1E", color: "#fff" } : {}) }}>
+              <button onClick={requestEndGame} style={{ ...btn(!canFinishGroup), flex: 1, minWidth: 180, fontSize: 13, padding: "10px 0", ...(canFinishGroup ? { background: C.danger, color: C.cream } : {}) }}>
                 🔒 End game for everyone
               </button>
             )}
@@ -3113,7 +3113,7 @@ function GameRoom({
       )}
       {roomTab === "setup" && (isOrganizer || isAdmin) && <ScoreHistory gameId={gameId} />}
       {roomTab === "play" && cardView && (game.marker_user_id || myGroupHasMarker) && !isEnded && (
-        <div style={{ background: "#16302A", border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
+        <div style={{ background: "#16302A", border: `1px solid ${C.borderCard}`, borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
           <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Group scoring is on</div>
           <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>
             One person is keeping the whole group's card. Anyone can switch the group back to scoring their own cards.

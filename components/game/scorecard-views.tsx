@@ -159,7 +159,7 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
       if (ti >= 0) return teamAccent(game.teams[ti].name, ti);
     }
     const idx = playerOrder.findIndex((x) => x.id === p.id);
-    return idx % 2 === 0 ? "#5B8DEF" : "#C9A227";
+    return idx % 2 === 0 ? C.overDark : "#E0C25E";
   };
   const colTmpl = `58px ${cols.map((c) => (c.type === "divider" ? "10px" : "minmax(58px, 1fr)")).join(" ")}`;
   const cell: React.CSSProperties = { position: "relative", background: "#FBFAF4", borderRadius: 5, height: 42, display: "flex", alignItems: "center", justifyContent: "center" };
@@ -480,12 +480,12 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
         );
       })()}
       {isMarker && onMarkOut && !groupLocked && (
-        <div style={{ marginTop: 14, borderTop: `0.5px solid ${C.line}`, paddingTop: 12 }}>
+        <div style={{ marginTop: 14, borderTop: `0.5px solid ${C.borderCard}`, paddingTop: 12 }}>
           <div style={{ color: C.sage, fontSize: 11, marginBottom: 7 }}>Someone leave early? Tap to mark them out. The holes they've played still count; {(game.game_type === "fourball" || game.game_type === "trifecta") ? "the holes they didn't play score net double bogey for their team" : game.game_type === "match" ? "the match stands on the holes already played" : "their unplayed holes score nothing"}.</div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {players.map((p) => (
               <button key={p.id} onClick={() => onMarkOut(p)}
-                style={{ border: `1px solid ${p.no_show ? "#E08A5B" : C.line}`, background: p.no_show ? "#5A2E22" : "transparent", color: p.no_show ? "#F2B894" : C.sage, borderRadius: 999, padding: "6px 11px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                style={{ border: `1px solid ${p.no_show ? "#E08A5B" : C.borderCard}`, background: p.no_show ? "#5A2E22" : "transparent", color: p.no_show ? "#F2B894" : C.sage, borderRadius: 999, padding: "6px 11px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                 {p.no_show ? `${p.display_name} · out ✓` : p.display_name}
               </button>
             ))}
@@ -558,7 +558,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, getTeeGroupPolicy,
           <button
             onClick={() => { if (canRandomize) onRandomize(); }}
             disabled={!canRandomize || randomizing}
-            style={{ ...btn(true), fontSize: 13, opacity: canRandomize && !randomizing ? 1 : 0.5, cursor: canRandomize && !randomizing ? "pointer" : "not-allowed" }}>
+            style={{ ...btn(true), fontSize: 13, opacity: canRandomize && !randomizing ? 1 : 0.62, cursor: canRandomize && !randomizing ? "pointer" : "not-allowed" }}>
             {randomizing ? "Shuffling…" : "🎲 Randomize groups"}
           </button>
           <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>
@@ -567,7 +567,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, getTeeGroupPolicy,
               : randomizeReason}
           </div>
           {overflowIds.length > 0 && (
-            <div style={{ marginTop: 8, background: C.greenLight, border: `1px solid ${C.gold}`, borderRadius: 8, padding: "9px 11px", color: "#8a5a12", fontSize: 12, lineHeight: 1.45 }}>
+            <div style={{ marginTop: 8, background: C.greenLight, border: `1px solid ${C.gold}`, borderRadius: 8, padding: "9px 11px", color: C.gold, fontSize: 12, lineHeight: 1.45 }}>
               {overflowIds.length} guest{overflowIds.length === 1 ? "" : "s"} couldn&apos;t be auto-placed (a member brought more than three): {overflowIds.map((id) => players.find((p) => p.id === id)?.display_name || "guest").join(", ")}. Assign {overflowIds.length === 1 ? "them" : "each"} to a group below.
             </div>
           )}
@@ -577,7 +577,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, getTeeGroupPolicy,
       {units.map((u) => {
         const g = unitGroup(u);
         return (
-          <div key={u.id} style={{ background: C.greenLight, borderRadius: 10, padding: 12, marginTop: 10, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div key={u.id} style={{ background: C.greenLight, borderRadius: 10, padding: 12, marginTop: 10, border: `1px solid ${C.borderCard}`, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ color: C.cream, fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis" }}>{u.label}</div>
               <div style={{ color: C.sage, fontSize: 11 }}>{u.members.length} player{u.members.length === 1 ? "" : "s"}</div>
@@ -587,7 +587,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, getTeeGroupPolicy,
               const unitReason = u.members.map((m) => getTeeGroupPolicy?.(m, g).reason).find(Boolean);
               return <select value={g ?? ""} onChange={(e) => assign(u, e.target.value ? parseInt(e.target.value, 10) : null)}
                 disabled={unitBlocked} title={unitReason}
-                style={{ ...inputStyle, padding: "6px 8px", minWidth: 110, opacity: unitBlocked ? .5 : 1 }}>
+                style={{ ...inputStyle, padding: "6px 8px", minWidth: 110, opacity: unitBlocked ? 0.62 : 1 }}>
               <option value="">No group</option>
               {groupOptions.map((n) => <option key={n} value={n}>Group {n}</option>)}
             </select>;
@@ -638,18 +638,18 @@ export function ShareControl({ game, onShare }: { game: Game; onShare: (on: bool
       </div>
       {!shared ? (
         <button disabled={busy} onClick={() => toggle(true)}
-          style={{ ...btn(true), marginTop: 10, fontSize: 13, display: "block", opacity: busy ? 0.6 : 1 }}>
+          style={{ ...btn(true), marginTop: 10, fontSize: 13, display: "block", opacity: busy ? 0.62 : 1 }}>
           {busy ? "Creating…" : "Create live link"}
         </button>
       ) : (
         <div style={{ marginTop: 10 }}>
           <div style={{ display: "flex", gap: 6 }}>
             <input readOnly value={link} onFocus={(e) => e.currentTarget.select()}
-              style={{ flex: 1, background: C.green, color: C.cream, border: `1px solid ${C.greenMid}`, borderRadius: 6, padding: "8px 10px", fontSize: 12 }} />
+              style={{ flex: 1, background: C.green, color: C.cream, border: `1px solid ${C.borderGreen}`, borderRadius: 6, padding: "8px 10px", fontSize: 12 }} />
             <button onClick={copy} style={{ ...btn(true), fontSize: 12, padding: "8px 12px" }}>{copied ? "Copied" : "Copy"}</button>
           </div>
           <button disabled={busy} onClick={() => toggle(false)}
-            style={{ background: "transparent", color: "#E8A199", border: `0.5px solid #7A3A34`, borderRadius: 8, padding: "7px 12px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 12, display: "block", opacity: busy ? 0.6 : 1 }}>
+            style={{ background: "transparent", color: "#E8A199", border: `0.5px solid #7A3A34`, borderRadius: 8, padding: "7px 12px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 12, display: "block", opacity: busy ? 0.62 : 1 }}>
             {busy ? "…" : "Stop sharing (revoke link)"}
           </button>
         </div>
