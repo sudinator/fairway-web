@@ -87,7 +87,7 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
                 <div style={{ position: "relative", width: 46, height: 46, margin: "0 auto" }}>
                   <div style={{ width: 46, height: 46, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, background: "radial-gradient(circle at 50% 32%, #20624a, #0e3a2c)", border: `2px solid ${ROUND_TIER_COLOR[def.tier]}`, boxShadow: def.tier !== "common" ? `0 0 12px -4px ${ROUND_TIER_COLOR[def.tier]}` : "none" }}>{def.icon}</div>
                   {a.kind === "count" && (a.value ?? 1) > 1 && (
-                    <div style={{ position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, padding: "0 4px", borderRadius: 9, background: C.gold, color: "#1B140A", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,.4)" }}>×{a.value}</div>
+                    <div style={{ position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, padding: "0 4px", borderRadius: 8, background: C.gold, color: "#1B140A", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,.4)" }}>×{a.value}</div>
                   )}
                 </div>
                 <div style={{ fontSize: 11, color: C.cream, marginTop: 5, lineHeight: 1.2, fontWeight: 700 }}>{def.label}</div>
@@ -282,7 +282,7 @@ function GhinPanel({ round, ghinNumber, playerName }: { round: Round; ghinNumber
           <HScroll>
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${holeRows.length}, 1fr)`, gap: 4, minWidth: holeRows.length * 34 }}>
               {holeRows.map((r) => <div key={r.n} style={{ color: C.cream, opacity: 0.8, fontSize: 11, textAlign: "center", fontWeight: 700 }}>{r.n}</div>)}
-              {holeRows.map((r) => <div key={r.n} style={{ color: "#16201C", background: C.cream, fontSize: 17, fontWeight: 800, textAlign: "center", borderRadius: 5, padding: "6px 0" }}>{r.gross}</div>)}
+              {holeRows.map((r) => <div key={r.n} style={{ color: "#16201C", background: C.cream, fontSize: 17, fontWeight: 800, textAlign: "center", borderRadius: 6, padding: "6px 0" }}>{r.gross}</div>)}
             </div>
           </HScroll>
           <div style={{ color: C.cream, fontSize: 11, marginTop: 6, opacity: 0.85 }}>
@@ -500,7 +500,7 @@ function AiAnalysis({ round, priorRounds, userEmail, onRoundUpdated }: { round: 
         <div style={{ color: C.gold, fontSize: 13, marginTop: 10 }}>Analyzing your round…</div>
       )}
       {state === "error" && (
-        <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{err}</div>
+        <div style={{ color: C.overRedDark, fontSize: 13, marginTop: 10 }}>{err}</div>
       )}
       {state === "done" && (
         <>

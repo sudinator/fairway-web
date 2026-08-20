@@ -128,7 +128,7 @@ export function GameSetupWorkspace({
               <div style={{ fontFamily: "Georgia, serif", fontSize: 15, fontWeight: 800 }}>{s.title}</div>
               <div style={{ color: C.sage, fontSize: 11.5, marginTop: 2 }}>{s.sub}</div>
             </div>
-            <div style={{ width: 24, height: 24, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", background: s.done ? "#5BD08A" : C.gold, color: "#0E241B", fontWeight: 900, fontSize: 13 }}>{s.done ? "✓" : "!"}</div>
+            <div style={{ width: 24, height: 24, borderRadius: 999, display: "flex", alignItems: "center", justifyContent: "center", background: s.done ? "#5BD08A" : C.gold, color: "#0E241B", fontWeight: 800, fontSize: 13 }}>{s.done ? "✓" : "!"}</div>
             <span style={{ color: C.sage, fontSize: 18 }}>›</span>
           </button>
         ))}
@@ -250,7 +250,7 @@ export function GameSetupWorkspace({
               [teamsDone, usesTeams ? "Team assignments are complete" : "Teams are not required"],
               [matchupsDone, usesMatchups ? "Matchups are complete" : "Matchups are not required"],
               [groupsDone, usesFoursomes ? "Foursomes define the playing groups" : "Tee groups are set"],
-            ].map(([ok, text], i) => <div key={i} style={{ display: "flex", gap: 9, alignItems: "center", padding: "8px 0", borderBottom: i < 3 ? "1px solid rgba(255,255,255,.08)" : "none", color: C.cream, fontSize: 12.5 }}><span style={{ color: ok ? "#5BD08A" : C.gold, fontWeight: 900 }}>{ok ? "✓" : "!"}</span><span>{text}</span></div>)}
+            ].map(([ok, text], i) => <div key={i} style={{ display: "flex", gap: 9, alignItems: "center", padding: "8px 0", borderBottom: i < 3 ? "1px solid rgba(255,255,255,.08)" : "none", color: C.cream, fontSize: 12.5 }}><span style={{ color: ok ? "#5BD08A" : C.gold, fontWeight: 800 }}>{ok ? "✓" : "!"}</span><span>{text}</span></div>)}
           </div>
           <div style={{ background: allDone ? "rgba(91,208,138,.12)" : "rgba(201,162,39,.12)", border: `1px solid ${allDone ? "#5BD08A" : C.gold}`, borderRadius: 12, padding: 12, marginTop: 10, color: C.cream, fontSize: 12.5, lineHeight: 1.45 }}>
             {allDone ? "Setup looks good. Return to the scorecard when you are ready to play." : "Setup is still usable — complete the highlighted items or return to any section to make changes."}

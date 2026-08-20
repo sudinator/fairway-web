@@ -49,7 +49,7 @@ export function Avatar({ src, name, size = 32, accent, enlargeable = true, cssSi
         src={src!}
         alt={name}
         referrerPolicy="no-referrer"
-        style={{ width: "min(80vw, 360px)", height: "min(80vw, 360px)", borderRadius: 24, objectFit: "cover", boxShadow: "0 12px 44px rgba(0,0,0,0.5)" }}
+        style={{ width: "min(80vw, 360px)", height: "min(80vw, 360px)", borderRadius: 14, objectFit: "cover", boxShadow: "0 12px 44px rgba(0,0,0,0.5)" }}
       />
       <div style={{ color: C.cream, fontSize: 18, fontWeight: 700, marginTop: 16 }}>{name}</div>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>tap anywhere to close</div>
@@ -86,10 +86,41 @@ export function Avatar({ src, name, size = 32, accent, enlargeable = true, cssSi
   return (<>{node}{lightbox}</>);
 }
 
-export const btn = (primary?: boolean): React.CSSProperties => ({
-  background: primary ? C.gold : C.greenLight, color: primary ? C.green : C.cream,
-  border: "none", borderRadius: 10, padding: "11px 20px", fontSize: 14, fontWeight: 800, cursor: "pointer",
-});
+// Button roles. The app has 172 hand-rolled buttons in 129 distinct shapes, and HALF of them are
+// "ghost" (transparent, text-only) — a role this helper never offered, so people invented one each
+// time, each with its own padding, size and colour. Adding the missing roles is what stops that
+// recurring; migrating the existing ones is separate work.
+//
+//   btn()                      secondary, standard
+//   btn(true)                  primary, standard
+//   btn("ghost")               transparent, C.sage
+//   btn("danger")              destructive
+//   btn("primary", "compact")  for buttons inline with text or inside a table row
+//
+// The boolean form is kept deliberately: 243 call sites use it and none should have to change.
+export type BtnRole = "primary" | "secondary" | "ghost" | "danger";
+export type BtnSize = "standard" | "compact";
+
+const BTN_ROLE: Record<BtnRole, { background: string; color: string }> = {
+  primary:   { background: C.gold,        color: C.green },
+  secondary: { background: C.greenLight,  color: C.cream },
+  ghost:     { background: "transparent", color: C.sage },
+  danger:    { background: C.danger,      color: C.cream },
+};
+
+const BTN_SIZE: Record<BtnSize, { borderRadius: number; padding: string; fontSize: number; fontWeight: number }> = {
+  standard: { borderRadius: 10, padding: "11px 20px", fontSize: 14, fontWeight: 800 },
+  compact:  { borderRadius: 8,  padding: "7px 12px",  fontSize: 12, fontWeight: 700 },
+};
+
+export const btn = (
+  role?: boolean | BtnRole,
+  size: BtnSize = "standard",
+): React.CSSProperties => {
+  const r: BtnRole =
+    role === true ? "primary" : role === false || role === undefined ? "secondary" : role;
+  return { ...BTN_ROLE[r], ...BTN_SIZE[size], border: "none", cursor: "pointer" };
+};
 
 // APP_RULES #25: editable fields use C.field, not C.card. A field should read as a
 // filled-in slot, not a sheet of paper — C.card is reserved for scorecards and score
@@ -157,7 +188,7 @@ export function UnsavedChangesSheet({ open, saving, message, onSave, onDiscard, 
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {onSave && <button disabled={saving} onClick={onSave} style={{ ...btn(true), width: "100%" }}>{saving ? "Saving…" : "Save changes"}</button>}
-        <button onClick={onDiscard} style={{ ...btn(false), width: "100%", color: "#ef9d90" }}>Discard &amp; leave</button>
+        <button onClick={onDiscard} style={{ ...btn(false), width: "100%", color: C.overRedDark }}>Discard &amp; leave</button>
         <button onClick={onKeepEditing} style={{ ...btn(false), width: "100%" }}>Keep editing</button>
       </div>
     </BottomSheet>
@@ -185,11 +216,11 @@ export function BottomSheet({ onClose, children, header, panelStyle, bodyStyle, 
         display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", pointerEvents: "none" }}>
         <div onClick={(e) => e.stopPropagation()} style={{
           pointerEvents: "auto", position: "relative", width: "100%", maxWidth, flex: "0 1 auto", minHeight: 0, overflow: "hidden",
-          background: C.greenLight, borderRadius: 20, boxShadow: "0 8px 40px rgba(0,0,0,.55)",
+          background: C.greenLight, borderRadius: 14, boxShadow: "0 8px 40px rgba(0,0,0,.55)",
           display: "flex", flexDirection: "column", ...panelStyle,
         }}>
           {onClose && (
-            <button onClick={onClose} aria-label="Close" style={{ position: "absolute", top: 10, right: 10, zIndex: 3, background: "rgba(255,255,255,0.14)", border: "none", color: C.cream, width: 30, height: 30, borderRadius: 15, fontSize: 17, fontWeight: 800, lineHeight: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+            <button onClick={onClose} aria-label="Close" style={{ position: "absolute", top: 10, right: 10, zIndex: 3, background: "rgba(255,255,255,0.14)", border: "none", color: C.cream, width: 30, height: 30, borderRadius: 14, fontSize: 17, fontWeight: 800, lineHeight: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
           )}
           {header != null && <div style={{ flexShrink: 0 }}>{header}</div>}
           <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "18px 16px", ...bodyStyle }}>{children}</div>
@@ -228,7 +259,7 @@ export function DifferentialSheet({ round, onClose }: { round: Round; onClose: (
       header={
         <div style={{ padding: "14px 44px 10px 16px", borderBottom: `1px solid rgba(255,255,255,0.12)` }}>
           <div style={{ color: C.gold, fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase", fontWeight: 700 }}>How this differential is calculated</div>
-          <div style={{ color: C.cream, fontSize: 15, fontWeight: 600, marginTop: 4 }}>{round.course}{round.tee_name ? ` · ${round.tee_name}` : ""}</div>
+          <div style={{ color: C.cream, fontSize: 15, fontWeight: 500, marginTop: 4 }}>{round.course}{round.tee_name ? ` · ${round.tee_name}` : ""}</div>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{fmtDate(round.played_at)}</div>
         </div>
       }>
@@ -256,7 +287,7 @@ export function DifferentialSheet({ round, onClose }: { round: Round; onClose: (
             <div>= (113 ÷ {sl}) × ({ag} − {cr})</div>
             <div>= {(113 / (sl as number)).toFixed(4)} × {((ag as number) - (cr as number)).toFixed(1)}</div>
             <div>= {((113 / (sl as number)) * ((ag as number) - (cr as number))).toFixed(2)}</div>
-            <div style={{ color: C.gold, fontWeight: 800 }}>= {diff.toFixed(1)} <span style={{ color: C.sage, fontSize: 11, fontWeight: 400, fontFamily: "system-ui, sans-serif" }}>(rounded to one decimal)</span></div>
+            <div style={{ color: C.gold, fontWeight: 800 }}>= {diff.toFixed(1)} <span style={{ color: C.sage, fontSize: 11, fontWeight: 500, fontFamily: "system-ui, sans-serif" }}>(rounded to one decimal)</span></div>
           </div>
 
           <div style={{ color: C.sage, fontSize: 11.5, lineHeight: 1.6, marginTop: 14 }}>
@@ -319,7 +350,7 @@ export function ScoreMark({ hole }: { hole: Hole }) {
   // Double bogey or worse: double square; triple+ (d>=3) adds a translucent blue fill.
   if (d >= 3) return doubleRing(C.bogey, "square", "rgba(46,90,184,0.22)");
   if (d === 2) return doubleRing(C.bogey, "square");
-  if (d === 1) return <span style={{ ...base, border: `1.5px solid ${C.bogey}`, borderRadius: 4, color: C.bogey }}>{hole.strokes}</span>;
+  if (d === 1) return <span style={{ ...base, border: `1.5px solid ${C.bogey}`, borderRadius: 6, color: C.bogey }}>{hole.strokes}</span>;
   return <span style={{ ...base, color: C.ink }}>{hole.strokes}</span>;
 }
 
@@ -491,7 +522,7 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
         </>)}
 
         {showPutts && (<>
-          <div style={{ color: C.ink, fontSize: 13, marginTop: 14, marginBottom: 5 }}>Putts {putts == null ? <span style={{ color: C.faint, fontWeight: 400 }}>· grey 2 = not recorded, tap to start</span> : ""}</div>
+          <div style={{ color: C.ink, fontSize: 13, marginTop: 14, marginBottom: 5 }}>Putts {putts == null ? <span style={{ color: C.faint, fontWeight: 500 }}>· grey 2 = not recorded, tap to start</span> : ""}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button onClick={() => onPatch({ putts: putts == null ? 2 : Math.max(0, putts - 1) })} style={{ width: 34, height: 34, borderRadius: 8, border: `0.5px solid ${C.borderCard}`, background: C.card, color: C.ink, fontSize: 18, cursor: "pointer" }}>−</button>
             <span onClick={() => { if (putts == null) onPatch({ putts: 2 }); }} style={{ fontSize: 18, fontWeight: 700, minWidth: 20, textAlign: "center", color: putts == null ? "#C7C2B0" : C.ink, cursor: putts == null ? "pointer" : "default" }}>{putts == null ? 2 : putts}</span>
@@ -628,7 +659,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
             <div key={i} id={`sehole-${i}`} onClick={() => openEdit(i)} style={{ borderBottom: `1px solid ${C.borderCard}`, paddingBottom: 5, marginTop: j === 0 ? 0 : 4, borderRadius: 8, background: edit === i ? "#EDF3EE" : "transparent", cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 2px", flexWrap: "wrap" }}>
                 <span style={{ color: C.ink, fontWeight: 800, fontSize: 14 }}>Hole {h.n}</span>
-                <span style={{ color: C.faint, fontSize: 11, fontWeight: 600 }}>{h.yards ? <>· <b style={{ color: C.green }}>{h.yards}</b> yds </> : null}· S.I. {h.si ?? "–"}</span>
+                <span style={{ color: C.faint, fontSize: 11, fontWeight: 500 }}>{h.yards ? <>· <b style={{ color: C.green }}>{h.yards}</b> yds </> : null}· S.I. {h.si ?? "–"}</span>
               </div>
               {GridRow([
                 <div key="p" style={{ textAlign: "center", color: C.parBlue, fontWeight: 700, fontSize: 14 }}>{h.par}</div>,
@@ -745,10 +776,10 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     const runCol = run === "" ? C.faint : run === "AS" ? C.ink : (run.includes("UP") || run.includes("↑")) ? C.greenMid : C.birdie;
     const yds = h.yards ?? null;
     return (
-      <div key={h.n} id={`sehole-${i}`} onClick={() => openEdit(i)} style={{ background: C.card, border: `1px solid ${edit === i ? C.gold : C.borderCard}`, borderRadius: 13, overflow: "hidden", cursor: "pointer" }}>
+      <div key={h.n} id={`sehole-${i}`} onClick={() => openEdit(i)} style={{ background: C.card, border: `1px solid ${edit === i ? C.gold : C.borderCard}`, borderRadius: 12, overflow: "hidden", cursor: "pointer" }}>
         <div style={{ background: C.green, color: C.cream, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 12px" }}>
           <span style={{ fontSize: 16, fontWeight: 800 }}>{h.n}</span>
-          <span style={{ fontSize: 12, color: C.sage, fontWeight: 600, flex: 1, marginLeft: 10 }}>Par <b style={{ color: "#EDE7D4" }}>{h.par}</b>{yds ? <> · <b style={{ color: "#EDE7D4" }}>{yds}</b> yds</> : null} · S.I. <b style={{ color: "#EDE7D4" }}>{h.si ?? "–"}</b></span>
+          <span style={{ fontSize: 12, color: C.sage, fontWeight: 500, flex: 1, marginLeft: 10 }}>Par <b style={{ color: "#EDE7D4" }}>{h.par}</b>{yds ? <> · <b style={{ color: "#EDE7D4" }}>{yds}</b> yds</> : null} · S.I. <b style={{ color: "#EDE7D4" }}>{h.si ?? "–"}</b></span>
           <span style={{ fontSize: 11, color: "#EDE7D4", fontWeight: 700, whiteSpace: "nowrap" }}>
             {h.recv > 0 ? <>you <span style={{ color: C.dot, fontSize: 13, letterSpacing: 1 }}>{"•".repeat(Math.min(h.recv, 3))}</span></> : <span style={{ color: C.sage }}>—</span>}
           </span>
@@ -779,7 +810,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
       <div style={{ textAlign: "center" }}><div style={{ fontSize: 11, color: C.sage, fontWeight: 700, textTransform: "uppercase" }}>{k}</div><div style={{ fontSize: 16, fontWeight: 800, color: col, marginTop: 1 }}>{v}</div></div>
     );
     return (
-      <div key={"sum-" + label} style={{ background: C.green, color: C.cream, borderRadius: 13, padding: "11px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div key={"sum-" + label} style={{ background: C.green, color: C.cream, borderRadius: 12, padding: "11px 14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 13, fontWeight: 800 }}>{label}</span>
         <div style={{ display: "flex", gap: 15 }}>
           {item("Score", sScore || "–")}
@@ -847,7 +878,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
         else if (totGives > 0) body = <>Opponent gets <b style={{ color: "#fff" }}>{totGives}</b> · you play scratch</>;
         else body = <>Level match — no strokes given</>;
         return (
-          <div style={{ background: C.greenLight, borderRadius: 10, padding: "8px 12px", marginTop: 10, color: "#EDE7D4", fontSize: 12.5, fontWeight: 600 }}>
+          <div style={{ background: C.greenLight, borderRadius: 10, padding: "8px 12px", marginTop: 10, color: "#EDE7D4", fontSize: 12.5, fontWeight: 500 }}>
             <span style={{ color: C.sage, fontWeight: 800, fontSize: 11, letterSpacing: 1, textTransform: "uppercase", marginRight: 8 }}>Match strokes</span>{body}
           </div>
         );
@@ -961,7 +992,7 @@ export function ScoreViewCard({ round }: { round: Round }) {
             <div key={j} style={{ borderBottom: `1px solid ${C.borderCard}`, paddingBottom: 6, marginTop: j === 0 ? 0 : 4 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 4px", flexWrap: "wrap" }}>
                 <span style={{ color: C.ink, fontWeight: 800, fontSize: 14 }}>Hole {h.hole_number}</span>
-                <span style={{ color: C.faint, fontSize: 11, fontWeight: 600 }}>
+                <span style={{ color: C.faint, fontSize: 11, fontWeight: 500 }}>
                   {h.yardage ? <>· <b style={{ color: C.green }}>{h.yardage}</b> yds </> : null}· S.I. {h.stroke_index ?? "–"}
                 </span>
               </div>

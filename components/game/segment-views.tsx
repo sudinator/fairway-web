@@ -257,7 +257,7 @@ export function GroupSegmentSummary({ game, players }: { game: Game; players: Pl
   const nmH: React.CSSProperties = { ...th, textAlign: "left", width: 100 };
   const thruH: React.CSSProperties = { ...th, width: 38 };
   const nmCell: React.CSSProperties = { textAlign: "left", width: 100, color: C.ink, fontWeight: 800, fontSize: 12.5, padding: "6px 3px" };
-  const cell: React.CSSProperties = { textAlign: "center", fontSize: 12.5, padding: "6px 3px", color: "#4b4838", fontWeight: 600 };
+  const cell: React.CSSProperties = { textAlign: "center", fontSize: 12.5, padding: "6px 3px", color: "#4b4838", fontWeight: 500 };
   const chip = (on: boolean): React.CSSProperties => ({ border: `1px solid ${on ? C.gold : "#2c5142"}`, background: on ? C.gold : "#173a2c", color: on ? "#2a2410" : C.cream, borderRadius: 999, padding: "3px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" });
   const nameOf = (pid: string) => rows.find((r) => r.pid === pid)?.name || "?";
   const scoringText = () => {
@@ -300,7 +300,7 @@ export function GroupSegmentSummary({ game, players }: { game: Game; players: Pl
               <tr key={r.pid} style={{ borderTop: ri === 0 ? "none" : "1px solid #F0EBDA" }}>
                 <td style={nmCell}><span style={{ display: "flex", alignItems: "center", gap: 5, minWidth: 0 }}>
                   <span style={{ flexShrink: 0, display: "flex" }}><Avatar src={r.avatar_url} name={r.name} size={20} /></span>
-                  {hasTeams && <span style={{ width: 6, height: 6, borderRadius: 3, background: teamColor(r.team), flexShrink: 0 }} />}
+                  {hasTeams && <span style={{ width: 6, height: 6, borderRadius: 6, background: teamColor(r.team), flexShrink: 0 }} />}
                   <span style={{ flex: 1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</span>
                 </span></td>
                 <td style={{ ...cell, color: C.faint, fontWeight: 700 }}>{r.thru}</td>

@@ -406,7 +406,7 @@ export function OrganizerPanel({
                       <div key={m.id} onClick={() => { if (!blocked({ type: "add_player" })) onAddMember(m); }}
                         title={reasonFor({ type: "add_player" })}
                         style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 8px", cursor: blocked({ type: "add_player" }) ? "not-allowed" : "pointer", opacity: blocked({ type: "add_player" }) ? .5 : 1, borderBottom: `1px solid ${C.borderGreen}`, borderRadius: 8 }}>
-                        <span style={{ width: 22, height: 22, borderRadius: 5, border: `1.5px solid ${C.sage}`, flex: "0 0 auto" }} />
+                        <span style={{ width: 22, height: 22, borderRadius: 6, border: `1.5px solid ${C.sage}`, flex: "0 0 auto" }} />
                         <span style={{ flex: 1, color: C.cream, fontWeight: 700, fontSize: 15 }}>{m.display_name}</span>
                         <span style={{ color: C.sage, fontSize: 12 }}>{m.handicap_index != null ? `HCP ${m.handicap_index}` : "no handicap"}</span>
                       </div>
@@ -922,7 +922,7 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
       </div>
 
       {ended && (
-        <button onClick={copySummary} style={{ ...btn(true), width: "100%", marginTop: 12, fontSize: 14, padding: "11px 0", ...(copied ? { background: "#1F8F54", color: "#fff" } : {}) }}>
+        <button onClick={copySummary} style={{ ...btn(true), width: "100%", marginTop: 12, fontSize: 14, padding: "11px 0", ...(copied ? { background: "#1F8F54", color: C.cream } : {}) }}>
           {copied ? "\u2713 Copied \u2014 paste into your chat" : "\u29c9 Copy round summary"}
         </button>
       )}

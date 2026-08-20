@@ -169,54 +169,58 @@ makes it work — and cream would then compete with gold and win nothing.
 
 Five scales. Nothing outside them.
 
-### Radius — 4 values
+### Radius — 6 values
 
-| Value | Use |
-|---|---|
-| `999` | pill / fully-rounded — chips, dots, badges |
-| `12` | card |
-| `10` | control — button, input, chip with a background |
-| `6` | inline tag |
+`999` pill · `14` sheet / large card · `12` card · `10` control · `8` compact control · `6` inline tag
 
-**Pill radius is `999`, never `99`.** CSS clamps a corner radius to half the box, so on a 6px dot
-both render identically — but two spellings of one intent means the guard needs a permanent
-exception and the next person copies whichever they saw first. Normalised across 8 sites at
-177.59.
+**Corrected at 177.67.** This file originally specified `{999, 12, 10, 6}` — four values chosen
+before anything was measured. The app had 20 values across 584 uses, but five already covered 78%.
+Enforcing the four-value scale would have changed 278 sites, most of them AWAY from values the app
+was already using consistently. The six above are what the code does, with the strays snapped to
+their nearest neighbour (108 sites, none moving more than 4px). `r20` and `r24` were swept to 14.
 
-> **Not yet decided:** `borderRadius: 20` (×6) and `24` (×1) are **not** clamped — they are real
-> corners on normal-sized cards, so collapsing them to `12` is a genuine visual change. These are
-> allowlisted pending a per-site decision. Do not sweep them.
+**Pill radius is `999`, never `99`.** CSS clamps a radius to half the box, so both render
+identically on a small dot — but two spellings of one intent means the guard needs a permanent
+exception and the next person copies whichever they saw first.
 
-### Padding — 5 values
+### Type
 
-| Value | Use |
-|---|---|
-| `13px 16px` | card |
-| `11px 20px` | control |
-| `8px 12px` | compact control |
-| `4px 10px` | tag |
-| `16px` | section gap |
+**Weight: 500 body / 700 emphasis / 800 title**, with 500 set as a base on `body`.
 
-From 161 distinct strings. `components/manage.tsx` alone used seven different card paddings.
+1,098 pieces of text declared a `fontSize` and no `fontWeight`, inheriting the browser default of
+400. Only 11 explicit 400s existed, so this is one CSS rule rather than a migration. 500 rather
+than 400 because light strokes optically thin out on a dark background. 800 is kept for titles
+rather than stepping to 700: the app uses it 457 times and it is what makes a title hold against
+the green.
 
-### Type — 6 steps
+Avoid intermediate weights such as 650 — valid CSS, but they only interpolate on a variable font
+and snap to 600 or 700 against a static face, so the tier is unpredictable across devices.
 
-| Size | Use |
-|---|---|
-| `11` | eyebrow, meta |
-| `13` | secondary |
-| `15` | body, card title |
-| `17` | section title |
-| `22` | screen title |
-| `30+` | display numerals only |
+**Size: no prescribed scale.** This file originally specified `{11, 13, 15, 17, 22, 30+}`, also
+written before measuring. The app leans on 12px 543 times; enforcing that scale would have changed
+759 sites, resizing body text with no component test harness to catch a layout break. 11, 12 and 13
+cover 81% of all text and read well. Ratcheted, not collapsed.
 
-**Weight:** `700` for titles, `400` for body. Not both `700` and `800` for the same job — at 177.58
-the card title split 19 files using 15/700 against 23 using 15/800, which reads as sloppiness
-rather than hierarchy.
+**Face.** Georgia for numerals and screen titles. Sans for everything else.
 
-**Face:** Georgia for numerals and screen titles. Sans for everything else. **A 15px card title is
-never Georgia.** At 177.58 `leader-row.tsx` used Georgia and `contests-view.tsx` used sans for the
-same 16px job.
+### Padding — no prescribed scale
+
+161 distinct values across 679 uses, the most common covering only 5%. There is no dominant scale
+to snap to. Unlike colour, changing padding MOVES things: a button can drop off-screen, a scorecard
+cell can wrap. Minimum 380 sites, highest risk, least visible benefit. Ratcheted, not collapsed.
+
+### Buttons — four roles, two sizes
+
+    btn()                      secondary, standard
+    btn(true)                  primary, standard
+    btn("ghost")               transparent, C.sage
+    btn("danger")              destructive
+    btn(role, "compact")       inline with text, or inside a table row
+
+`btn()` previously offered only primary and secondary. Of 172 hand-rolled buttons in 129 distinct
+shapes, **86 were ghost buttons** — a role the helper never provided, so each one was invented
+locally. The roles exist as of 177.67; migrating the call sites is separate work, and the ghost
+ones must be done in reviewable batches because uniform padding will move things.
 
 ### Colour
 

@@ -56,14 +56,14 @@ function CatBar({ name, score, sub, statKey, open, onToggle }: {
     <div style={{ marginTop: 12 }}>
       <div onClick={clickable ? onToggle : undefined} style={{ cursor: clickable ? "pointer" : "default" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-          <span style={{ color: C.cream, fontSize: 12.5, fontWeight: 600 }}>
+          <span style={{ color: C.cream, fontSize: 12.5, fontWeight: 500 }}>
             {name}
             {clickable && <span style={{ color: C.gold, fontSize: 11, marginLeft: 6, fontWeight: 700 }}>{open ? "▲" : "ⓘ"}</span>}
           </span>
           <span style={{ color: vcol, fontSize: 11, fontWeight: 700 }}>{vlabel}</span>
         </div>
-        <div style={{ position: "relative", height: 9, background: C.green, borderRadius: 5 }}>
-          <div style={{ position: "absolute", left: 0, top: 0, height: 9, width: `${Math.round(score)}%`, background: vcol, borderRadius: 5 }} />
+        <div style={{ position: "relative", height: 9, background: C.green, borderRadius: 6 }}>
+          <div style={{ position: "absolute", left: 0, top: 0, height: 9, width: `${Math.round(score)}%`, background: vcol, borderRadius: 6 }} />
           <div style={{ position: "absolute", top: -2, left: "50%", width: 2, height: 13, background: "#fff", opacity: 0.75 }} />
         </div>
         <div style={{ color: C.sage, fontSize: 11, marginTop: 4, lineHeight: 1.45 }}>{sub}</div>

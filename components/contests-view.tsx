@@ -90,7 +90,7 @@ export function ContestsSection({
   if (contests.length === 0 && !isOrganizer) return null;
 
   return (
-    <div style={{ background: C.greenMid, borderRadius: 16, padding: 14, marginTop: 14 }}>
+    <div style={{ background: C.greenMid, borderRadius: 14, padding: 14, marginTop: 14 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <Eyebrow style={{ margin: 0, flex: 1 }}>SIDE CONTESTS</Eyebrow>
         {isOrganizer && !isEnded && (
@@ -102,7 +102,7 @@ export function ContestsSection({
         )}
       </div>
 
-      {err && <div style={{ color: "#ef9d90", fontSize: 12, marginTop: 8 }}>{err}</div>}
+      {err && <div style={{ color: C.overRedDark, fontSize: 12, marginTop: 8 }}>{err}</div>}
 
       {contests.length === 0 && isOrganizer && (
         <div style={{ color: C.sage, fontSize: 12.5, marginTop: 8, lineHeight: 1.5 }}>
@@ -124,7 +124,7 @@ export function ContestsSection({
               </div>
               {isOrganizer && !isEnded && (
                 <button onClick={() => removeContest(c)} aria-label="Remove contest"
-                  style={{ background: "rgba(255,255,255,0.12)", border: "none", color: C.cream, width: 26, height: 26, borderRadius: 13, fontSize: 15, cursor: "pointer", lineHeight: 1 }}>×</button>
+                  style={{ background: "rgba(255,255,255,0.12)", border: "none", color: C.cream, width: 26, height: 26, borderRadius: 12, fontSize: 15, cursor: "pointer", lineHeight: 1 }}>×</button>
               )}
             </div>
 
@@ -161,7 +161,7 @@ export function ContestsSection({
                               <span style={{ color: C.cream, fontFamily: "Georgia, serif", minWidth: 52 }}>{fmtContestValue(c.unit, a.value)}</span>
                               <span style={{ color: C.sage, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.player_name}</span>
                               {canVoid && !isEnded && (
-                                <button onClick={() => voidEntry(a)} style={{ background: "none", border: "none", color: "#ef9d90", fontSize: 11, cursor: "pointer", padding: 2 }}>void</button>
+                                <button onClick={() => voidEntry(a)} style={{ background: "none", border: "none", color: C.overRedDark, fontSize: 11, cursor: "pointer", padding: 2 }}>void</button>
                               )}
                             </div>
                           );

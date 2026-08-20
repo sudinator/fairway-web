@@ -65,7 +65,7 @@ export function InstallHint() {
       padding: "10px 14px", display: "flex", alignItems: "center", gap: 10,
     }}>
       <div style={{
-        width: 30, height: 30, borderRadius: 7, background: "#0E3B2E",
+        width: 30, height: 30, borderRadius: 6, background: "#0E3B2E",
         border: "1px solid #C9A227", flexShrink: 0,
         display: "flex", alignItems: "center", justifyContent: "center",
         color: "#F7F3E8", fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 700,

@@ -129,7 +129,7 @@ export function OrganizerConsole({ gameId }: { gameId: string }) {
     <div style={S.chip}>
       <Avatar src={p.avatar_url} name={p.display_name} size={30} />
       <div style={{ minWidth: 0 }}>
-        <div style={S.chipName}>{p.display_name}{p.is_guest ? <span style={{ color: C.faint, fontWeight: 600 }}> · guest</span> : ""}</div>
+        <div style={S.chipName}>{p.display_name}{p.is_guest ? <span style={{ color: C.faint, fontWeight: 500 }}> · guest</span> : ""}</div>
         <div style={{ color: p.handicap_index == null ? C.birdie : C.faint, fontSize: 11 }}>
           {p.handicap_index == null ? "no index" : `idx ${p.handicap_index}`}
         </div>
@@ -222,7 +222,7 @@ export function OrganizerConsole({ gameId }: { gameId: string }) {
                       return (
                         <div key={b.key} style={S.col}>
                           <div style={S.colHdr}>
-                            <span style={{ width: 11, height: 11, borderRadius: 4, background: flightColor(b.key) }} />
+                            <span style={{ width: 11, height: 11, borderRadius: 6, background: flightColor(b.key) }} />
                             <span style={S.colTtl}>Flight {b.key}</span>
                             <span style={S.colSub}>index {flightRangeLabel(bands, i)}<br />{inFlight.length} player{inFlight.length === 1 ? "" : "s"}</span>
                           </div>
@@ -283,11 +283,11 @@ const Row = ({ k, v }: { k: string; v: string }) => (
 
 const S: Record<string, React.CSSProperties> = {
   wrap: { minHeight: "100vh", background: "#08140f", padding: 22, display: "flex", justifyContent: "center" },
-  console: { width: "100%", maxWidth: 1160, background: C.green, borderRadius: 16, overflow: "hidden", border: "1px solid rgba(255,255,255,.06)", boxShadow: "0 20px 70px rgba(0,0,0,.5)", alignSelf: "flex-start" },
+  console: { width: "100%", maxWidth: 1160, background: C.green, borderRadius: 14, overflow: "hidden", border: "1px solid rgba(255,255,255,.06)", boxShadow: "0 20px 70px rgba(0,0,0,.5)", alignSelf: "flex-start" },
   top: { display: "flex", alignItems: "center", gap: 14, padding: "14px 18px", background: "rgba(8,20,15,.5)", borderBottom: "1px solid rgba(255,255,255,.08)" },
   brand: { fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 17, color: C.cream },
   gctx: { color: C.sage, fontSize: 13 },
-  saveBtn: { fontSize: 13, fontWeight: 800, color: C.cream, background: C.greenLight, border: "1px solid rgba(255,255,255,.15)", borderRadius: 9, padding: "8px 16px", cursor: "pointer", textDecoration: "none" },
+  saveBtn: { fontSize: 13, fontWeight: 800, color: C.cream, background: C.greenLight, border: "1px solid rgba(255,255,255,.15)", borderRadius: 8, padding: "8px 16px", cursor: "pointer", textDecoration: "none" },
   steps: { display: "flex", gap: 4, padding: "10px 16px 0", background: "rgba(8,20,15,.25)" },
   step: { fontSize: 13, fontWeight: 700, color: C.sage, padding: "9px 16px", borderRadius: "10px 10px 0 0", cursor: "pointer", border: "none", background: "transparent" },
   stepOn: { color: "#06251A", background: C.cream, fontWeight: 800 },
@@ -295,7 +295,7 @@ const S: Record<string, React.CSSProperties> = {
   rail: { background: "rgba(8,20,15,.28)", borderRight: "1px solid rgba(255,255,255,.08)", padding: 14, maxHeight: "78vh", overflowY: "auto" },
   railHdr: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
   railH3: { fontSize: 11, letterSpacing: 3, fontWeight: 700, textTransform: "uppercase", color: C.gold, marginTop: 16, marginBottom: 8 },
-  chip: { display: "flex", alignItems: "center", gap: 9, background: C.card, borderRadius: 11, padding: "8px 10px", marginBottom: 8, boxShadow: "0 1px 0 rgba(0,0,0,.04)" },
+  chip: { display: "flex", alignItems: "center", gap: 9, background: C.card, borderRadius: 12, padding: "8px 10px", marginBottom: 8, boxShadow: "0 1px 0 rgba(0,0,0,.04)" },
   chipName: { color: C.ink, fontWeight: 700, fontSize: 13, lineHeight: 1.1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   tag: { fontSize: 11, fontWeight: 800, color: "#06251A", borderRadius: 6, padding: "2px 7px" },
   pill: { fontSize: 11, fontWeight: 800, borderRadius: 6, padding: "2px 7px", border: "1.5px solid", cursor: "pointer" },
@@ -303,10 +303,10 @@ const S: Record<string, React.CSSProperties> = {
   setBtn: { fontSize: 12, fontWeight: 800, background: C.gold, color: "#06251A", border: "none", borderRadius: 8, padding: "5px 12px", cursor: "pointer" },
   canvas: { padding: "16px 18px", maxHeight: "78vh", overflowY: "auto" },
   toolbar: { display: "flex", alignItems: "center", gap: 10, marginBottom: 14, flexWrap: "wrap" },
-  tbtn: { fontSize: 13, fontWeight: 700, background: C.greenLight, border: "1px solid rgba(255,255,255,.14)", color: C.cream, borderRadius: 9, padding: "8px 13px", cursor: "pointer" },
+  tbtn: { fontSize: 13, fontWeight: 700, background: C.greenLight, border: "1px solid rgba(255,255,255,.14)", color: C.cream, borderRadius: 8, padding: "8px 13px", cursor: "pointer" },
   tbtnGold: { background: C.gold, color: "#06251A", borderColor: "transparent", fontWeight: 800 },
   cols: { display: "grid", gap: 14 },
-  col: { background: "rgba(8,20,15,.22)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 13, padding: 12, minHeight: 260 },
+  col: { background: "rgba(8,20,15,.22)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12, padding: 12, minHeight: 260 },
   colHdr: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10 },
   colTtl: { fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 15, color: C.cream },
   colSub: { color: C.sage, fontSize: 11, marginLeft: "auto", textAlign: "right", lineHeight: 1.3 },

@@ -502,7 +502,7 @@ function GuestManager({ guests, members, busy, me, isAdmin, onRetire, onUnretire
       {active.map((g) => (
         <div key={g.id} style={{ borderBottom: `1px solid ${C.borderGreen}`, padding: "8px 2px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 600, minWidth: 0 }}>{g.name}</span>
+            <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 500, minWidth: 0 }}>{g.name}</span>
             {(g.created_by === me || isAdmin)
               ? <button disabled={busy} onClick={() => { setOpenId(openId === g.id ? null : g.id); setBecame(""); }} style={{ background: "#173a2c", color: C.cream, border: `1px solid #37624f`, borderRadius: 8, padding: "5px 10px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>{openId === g.id ? "Cancel" : "Retire"}</button>
               : <span style={{ color: C.sage, fontSize: 11 }}>added by {g.created_by ? nameOf(g.created_by) : "someone else"}</span>}
@@ -611,12 +611,12 @@ function AdminUntangle({ members, expenses, deletedExpenses, shares, payers, set
   return (
     <div style={{ maxWidth: 860, margin: "0 auto" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-        <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.borderGreen}`, borderRadius: 9, color: C.sage, fontSize: 12.5, padding: "6px 11px", cursor: "pointer" }}>&#8592; Back</button>
+        <button onClick={onBack} style={{ background: "transparent", border: `1px solid ${C.borderGreen}`, borderRadius: 8, color: C.sage, fontSize: 12.5, padding: "6px 11px", cursor: "pointer" }}>&#8592; Back</button>
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 17, fontWeight: 800 }}>Untangle payments</div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, background: conserves ? "#0f3529" : "#3a2320", border: `1px solid ${conserves ? C.borderGreen : "#8a3b34"}`, borderRadius: 11, padding: "9px 12px", marginBottom: 12 }}>
-        <span style={{ fontSize: 15, color: conserves ? "#7fd6a3" : "#ef9d90" }}>{conserves ? "\u2713" : "\u26A0"}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, background: conserves ? "#0f3529" : "#3a2320", border: `1px solid ${conserves ? C.borderGreen : "#8a3b34"}`, borderRadius: 12, padding: "9px 12px", marginBottom: 12 }}>
+        <span style={{ fontSize: 15, color: conserves ? "#7fd6a3" : C.overRedDark }}>{conserves ? "\u2713" : "\u26A0"}</span>
         <span style={{ color: C.cream, fontSize: 12.5 }}>{conserves ? "Balances reconcile \u2014 the club nets to $0.00" : `Balances are off by ${fmtUSD(Math.abs(sum))} \u2014 investigate below`}</span>
       </div>
 
@@ -630,7 +630,7 @@ function AdminUntangle({ members, expenses, deletedExpenses, shares, payers, set
       </div>
 
       <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 8 }}>{memberById[sel]?.display_name}&rsquo;s ledger &middot; {rows.length} entries &middot; running balance ends at {fmtUSD(balances[sel] || 0)}</div>
-      {rows.length === 0 && <div style={{ color: C.faint, fontSize: 12.5, padding: "16px 0", textAlign: "center" }}>No expenses or payments for this member.</div>}
+      {rows.length === 0 && <div style={{ color: C.sage, fontSize: 12.5, padding: "16px 0", textAlign: "center" }}>No expenses or payments for this member.</div>}
 
       {rows.map((r, i) => {
         run += r.delta;
@@ -647,10 +647,10 @@ function AdminUntangle({ members, expenses, deletedExpenses, shares, payers, set
             <div style={{ display: "flex", gap: 7, marginTop: 9, justifyContent: "flex-end" }}>
               {r.kind === "exp" && r.exp && (<>
                 <button disabled={busy} onClick={() => onEditExpense(r.exp!)} style={{ ...actBtn, border: `1px solid ${C.borderGreen}`, background: "transparent", color: C.sage }}>Edit</button>
-                <button disabled={busy} onClick={() => { const e = r.exp!; setPending({ impact: voidImpact(e), title: "Void \u201C" + (e.description || "expense") + "\u201D?", subtitle: "Removes it from everyone's balances. Reversible \u2014 you can restore it below.", label: "Confirm void", danger: true, run: () => onVoidExpense(e) }); }} style={{ ...actBtn, border: "1px solid #8a3b34", background: "transparent", color: "#ef9d90" }}>Void</button>
+                <button disabled={busy} onClick={() => { const e = r.exp!; setPending({ impact: voidImpact(e), title: "Void \u201C" + (e.description || "expense") + "\u201D?", subtitle: "Removes it from everyone's balances. Reversible \u2014 you can restore it below.", label: "Confirm void", danger: true, run: () => onVoidExpense(e) }); }} style={{ ...actBtn, border: "1px solid #8a3b34", background: "transparent", color: C.overRedDark }}>Void</button>
               </>)}
               {r.kind === "settle" && r.s && (
-                <button disabled={busy} onClick={() => { const st = r.s!; setPending({ impact: { [st.from_user_id]: -st.amount_cents, [st.to_user_id]: st.amount_cents }, title: "Unmark this payment?", subtitle: "Puts the debt back on the books.", label: "Confirm unmark", danger: true, run: () => onUnmarkSettlement(st) }); }} style={{ ...actBtn, border: "1px solid #8a3b34", background: "transparent", color: "#ef9d90" }}>Unmark</button>
+                <button disabled={busy} onClick={() => { const st = r.s!; setPending({ impact: { [st.from_user_id]: -st.amount_cents, [st.to_user_id]: st.amount_cents }, title: "Unmark this payment?", subtitle: "Puts the debt back on the books.", label: "Confirm unmark", danger: true, run: () => onUnmarkSettlement(st) }); }} style={{ ...actBtn, border: "1px solid #8a3b34", background: "transparent", color: C.overRedDark }}>Unmark</button>
               )}
             </div>
           </div>
@@ -733,12 +733,12 @@ function SettleScreen({ groups, nameOf, memberById, balances, busy, me, isAdmin,
               const canMark = isMine || isPayee || isAdmin;
               return (
                 <div style={{ display: "flex", gap: 7, marginTop: 9, alignItems: "center", flexWrap: "wrap" }}>
-                  {isMine && to?.venmo_handle && <button disabled={busy} onClick={() => onPay("venmo", t)} style={{ flex: "1 1 68px", border: "none", borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#3D95CE", color: "#fff" }}>Venmo</button>}
-                  {isMine && to?.paypal_handle && <button disabled={busy} onClick={() => onPay("paypal", t)} style={{ flex: "1 1 68px", border: "none", borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#003087", color: "#fff" }}>PayPal</button>}
-                  {isMine && to?.zelle_handle && <button disabled={busy} onClick={() => onZelle(t)} style={{ flex: "1 1 68px", border: "none", borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#6D1ED4", color: "#fff" }}>Zelle</button>}
+                  {isMine && to?.venmo_handle && <button disabled={busy} onClick={() => onPay("venmo", t)} style={{ flex: "1 1 68px", border: "none", borderRadius: 8, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#3D95CE", color: "#fff" }}>Venmo</button>}
+                  {isMine && to?.paypal_handle && <button disabled={busy} onClick={() => onPay("paypal", t)} style={{ flex: "1 1 68px", border: "none", borderRadius: 8, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#003087", color: "#fff" }}>PayPal</button>}
+                  {isMine && to?.zelle_handle && <button disabled={busy} onClick={() => onZelle(t)} style={{ flex: "1 1 68px", border: "none", borderRadius: 8, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: "#6D1ED4", color: "#fff" }}>Zelle</button>}
                   {isMine && !to?.venmo_handle && !to?.paypal_handle && !to?.zelle_handle && <span style={{ flex: 1, color: C.sage, fontSize: 11 }}>no handle on file — pay cash</span>}
                   {canMark
-                    ? <button disabled={busy} onClick={() => askMark(t)} style={{ flex: "1 1 68px", border: `1px solid ${C.borderCard}`, borderRadius: 9, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: C.greenLight, color: C.cream }}>{isMine ? "Mark paid" : isPayee ? "Mark received" : "Mark paid (admin)"}</button>
+                    ? <button disabled={busy} onClick={() => askMark(t)} style={{ flex: "1 1 68px", border: `1px solid ${C.borderCard}`, borderRadius: 8, padding: 9, fontSize: 12.5, fontWeight: 800, cursor: "pointer", background: C.greenLight, color: C.cream }}>{isMine ? "Mark paid" : isPayee ? "Mark received" : "Mark paid (admin)"}</button>
                     : <span style={{ flex: 1, color: C.sage, fontSize: 11.5, textAlign: "right" }}>Only {nameOf(t.from)} or {nameOf(t.to)} can mark this</span>}
                 </div>
               );
@@ -812,7 +812,7 @@ function ImpactModal({ title, subtitle, impact, balancesBefore, nameOf, busy, co
           }) : rows.map(([id, v]) => (
             <div key={id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderTop: `1px solid #123528` }}>
               <span style={{ color: C.cream, fontSize: 13 }}>{nameOf(id)}</span>
-              <span style={{ color: v >= 0 ? "#7fd6a3" : "#ef9d90", fontWeight: 800, fontSize: 13.5, fontFamily: "Georgia, serif" }}>{v >= 0 ? "+" : "\u2212"}{fmtUSD(Math.abs(v))}</span>
+              <span style={{ color: v >= 0 ? "#7fd6a3" : C.overRedDark, fontWeight: 800, fontSize: 13.5, fontFamily: "Georgia, serif" }}>{v >= 0 ? "+" : "\u2212"}{fmtUSD(Math.abs(v))}</span>
             </div>
           ))}
         </div>
@@ -957,9 +957,9 @@ function AddExpense({ user, gid, members, guests, balances, busy, setBusy, requi
             const on = payerSet.has(m.id);
             return (
               <div key={m.id} onClick={() => togglePayer(m.id)} style={{ display: "flex", alignItems: "center", gap: 9, background: on ? "#1c4536" : "#173a2c", border: `1.5px solid ${on ? "#3c6f59" : "transparent"}`, borderRadius: 10, padding: "8px 10px", marginTop: 6, cursor: "pointer" }}>
-                <span style={{ width: 19, height: 19, borderRadius: 5, border: `2px solid ${on ? C.gold : C.sage}`, background: on ? C.gold : "transparent", color: "#2a2410", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 12 }}>{on ? "✓" : ""}</span>
+                <span style={{ width: 19, height: 19, borderRadius: 6, border: `2px solid ${on ? C.gold : C.sage}`, background: on ? C.gold : "transparent", color: "#2a2410", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 12 }}>{on ? "✓" : ""}</span>
                 <Avatar src={m.avatar_url} name={m.display_name} size={24} />
-                <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 600, minWidth: 0 }}>{m.display_name}</span>
+                <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 500, minWidth: 0 }}>{m.display_name}</span>
                 {on && <span style={{ display: "flex", alignItems: "center", gap: 4 }} onClick={(e) => e.stopPropagation()}>
                   <input inputMode="decimal" placeholder="0.00" value={payerAmt[m.id] ?? ""} onChange={(e) => setPayerAmt((c) => ({ ...c, [m.id]: e.target.value }))} style={{ ...inputStyle, width: 68, textAlign: "right", padding: "6px 8px" }} />
                   <span style={remHint(payRemainAfter[m.id])}>/ {fmtUSD(payRemainAfter[m.id] ?? amtCents)} left</span>
@@ -1011,9 +1011,9 @@ function AddExpense({ user, gid, members, guests, balances, busy, setBusy, requi
         return (
           <div key={keyOf(p)}>
           <div onClick={() => toggle(p)} style={{ display: "flex", alignItems: "center", gap: 9, background: on ? "#1c4536" : "#173a2c", border: `1.5px solid ${on ? "#3c6f59" : "transparent"}`, borderBottom: isGuest && on ? "none" : undefined, borderRadius: isGuest && on ? "10px 10px 0 0" : 10, padding: "8px 10px", marginTop: 6, cursor: "pointer" }}>
-            <span style={{ width: 19, height: 19, borderRadius: 5, border: `2px solid ${on ? C.gold : C.sage}`, background: on ? C.gold : "transparent", color: "#2a2410", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, fontSize: 12 }}>{on ? "✓" : ""}</span>
+            <span style={{ width: 19, height: 19, borderRadius: 6, border: `2px solid ${on ? C.gold : C.sage}`, background: on ? C.gold : "transparent", color: "#2a2410", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 12 }}>{on ? "✓" : ""}</span>
             <Avatar src={p.avatar_url} name={p.name} size={24} />
-            <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 600, minWidth: 0 }}>{p.name}{isGuest ? <span style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}> · guest</span> : ""}</span>
+            <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 500, minWidth: 0 }}>{p.name}{isGuest ? <span style={{ color: C.sage, fontSize: 11, fontWeight: 700 }}> · guest</span> : ""}</span>
             {on && (mode === "even"
               ? <span style={{ color: C.cream, fontFamily: "Georgia, serif", fontWeight: 700 }}>{fmtUSD(shareOf(p))}</span>
               : <span style={{ display: "flex", alignItems: "center", gap: 4 }} onClick={(e) => e.stopPropagation()}>
@@ -1342,7 +1342,7 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
         style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 2px", borderBottom: `1px solid ${C.borderGreen}`, cursor: "pointer" }}>
         <Avatar src={payer?.avatar_url} name={payer?.display_name || "?"} size={30} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: C.cream, fontSize: 13.5, fontWeight: 600 }}>{e.description || "Expense"}</div>
+          <div style={{ color: C.cream, fontSize: 13.5, fontWeight: 500 }}>{e.description || "Expense"}</div>
           <div style={{ color: C.sage, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{paidNames} paid · {who}</div>
         </div>
         <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontWeight: 700 }}>{fmtUSD(e.amount_cents)}</div>
@@ -1363,7 +1363,7 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
         <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 800, color: C.cream }}>
-              {ev.name}{ev.event_type === "game" && <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 7px", borderRadius: 9, marginLeft: 6, background: "#0d3a2c", color: "#8fd6b0", border: "1px solid #2c7d5f" }}>from game</span>}
+              {ev.name}{ev.event_type === "game" && <span style={{ fontSize: 11, fontWeight: 800, padding: "2px 7px", borderRadius: 8, marginLeft: 6, background: "#0d3a2c", color: "#8fd6b0", border: "1px solid #2c7d5f" }}>from game</span>}
             </div>
             <div style={{ color: C.sage, fontSize: 11.5, marginTop: 1 }}>{[created ? "created " + created : null, `${list.length} ${list.length === 1 ? "expense" : "expenses"}`].filter(Boolean).join(" · ")}</div>
           </div>
@@ -1391,7 +1391,7 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
         })()}
         {list.length > 0 && <div style={{ marginTop: 8, borderTop: `1px dashed ${C.borderGreen}`, paddingTop: 4 }}>{list.map(row)}</div>}
         {ev.event_type === "game" && <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Name &amp; date come from the game.</div>}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, background: "#0f3529", borderRadius: 9, padding: "8px 10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, background: "#0f3529", borderRadius: 8, padding: "8px 10px" }}>
           <span style={{ flex: 1, color: C.sage, fontSize: 11.5, lineHeight: 1.4 }}>Settle this Bucket in the <strong style={{ color: C.cream }}>Settle</strong> tab — each Bucket squares on its own.</span>
           {isAdmin && <button onClick={() => onCloseEvent(ev, true)} style={{ border: `1px solid ${C.borderGreen}`, background: "transparent", color: C.sage, fontSize: 11, fontWeight: 800, padding: "6px 12px", borderRadius: 8, cursor: "pointer", whiteSpace: "nowrap" }}>Archive Bucket</button>}
         </div>
@@ -1431,7 +1431,7 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
             <div key={ev.id} style={{ background: "#143f31", borderRadius: 14, padding: "12px 13px", marginBottom: 12, opacity: 0.95 }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: "Georgia, serif", fontSize: 15.5, fontWeight: 800, color: C.cream }}>{ev.name} <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 9, background: "#123528", color: C.sage }}>archived</span></div>
+                  <div style={{ fontFamily: "Georgia, serif", fontSize: 15.5, fontWeight: 800, color: C.cream }}>{ev.name} <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 8, background: "#123528", color: C.sage }}>archived</span></div>
                   <div style={{ color: C.sage, fontSize: 11.5, marginTop: 1 }}>{[ev.created_at ? "created " + new Date(ev.created_at).toLocaleDateString([], { month: "short", day: "numeric" }) : null, `${list.length} ${list.length === 1 ? "expense" : "expenses"}`, ev.closed_at ? "archived " + new Date(ev.closed_at).toLocaleDateString([], { month: "short", day: "numeric" }) : null].filter(Boolean).join(" · ")}</div>
                 </div>
                 <div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 800 }}>{fmtUSD(net.total)}</div>
@@ -1455,7 +1455,7 @@ function EventGroupedExpenses({ expenses, shares, payers, guests, events, member
         })}
       </>)}
 
-      {expenses.length > 0 && <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Tap any expense to see full details.</div>}
+      {expenses.length > 0 && <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Tap any expense to see full details.</div>}
     </div>
   );
 }

@@ -680,7 +680,7 @@ export function Home({ session }: { session: any }) {
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <Wordmark width={150} />
         {activeGroup && (
-          <span style={{ background: C.greenLight, color: C.cream, fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 20 }}>
+          <span style={{ background: C.greenLight, color: C.cream, fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 14 }}>
             {activeGroup.name}
           </span>
         )}
@@ -963,7 +963,7 @@ function NameGate({ user, onSaved }: { user: any; onSaved: () => void }) {
   return (
     <div style={{ maxWidth: 440, margin: "70px auto", padding: 24, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "center" }}><Wordmark width={240} /></div>
-      <div style={{ background: C.greenLight, borderRadius: 16, padding: 26, marginTop: 26, textAlign: "left" }}>
+      <div style={{ background: C.greenLight, borderRadius: 14, padding: 26, marginTop: 26, textAlign: "left" }}>
         <Eyebrow style={{ marginTop: 0 }}>WELCOME</Eyebrow>
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, marginTop: 8 }}>
           What's your name?
@@ -974,7 +974,7 @@ function NameGate({ user, onSaved }: { user: any; onSaved: () => void }) {
         <input autoFocus style={{ ...inputStyle, marginTop: 16, fontSize: 16 }} placeholder="e.g. Amit Sharma"
           value={name} onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") save(); }} />
-        {err && <div style={{ color: "#E8A199", fontSize: 12, marginTop: 8 }}>{err}</div>}
+        {err && <div style={{ color: C.overRedDark, fontSize: 12, marginTop: 8 }}>{err}</div>}
         <button style={{ ...btn(true), width: "100%", marginTop: 16, padding: "13px", opacity: saving ? 0.62 : 1 }} disabled={saving} onClick={save}>
           {saving ? "Saving…" : "Continue"}
         </button>

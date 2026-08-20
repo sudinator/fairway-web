@@ -215,7 +215,7 @@ export default function LiveScorecardPage() {
 }
 
 function Centered({ text }: { text: string }) {
-  return <div style={{ background: C.greenLight, borderRadius: 16, padding: 28, marginTop: 40, textAlign: "center", color: C.sage, fontSize: 15, lineHeight: 1.5 }}>{text}</div>;
+  return <div style={{ background: C.greenLight, borderRadius: 14, padding: 28, marginTop: 40, textAlign: "center", color: C.sage, fontSize: 15, lineHeight: 1.5 }}>{text}</div>;
 }
 function SectionTitle({ children }: { children: string }) {
   return <div style={{ color: C.gold, fontSize: 11, letterSpacing: 2, fontWeight: 800, margin: "24px 4px 10px" }}>{children.toUpperCase()}</div>;
@@ -261,7 +261,7 @@ function Scorecard({ data }: { data: LiveData }) {
 
   return (
     <div>
-      <div style={{ background: C.greenLight, borderRadius: 16, padding: "18px 18px 16px", marginTop: 18 }}>
+      <div style={{ background: C.greenLight, borderRadius: 14, padding: "18px 18px 16px", marginTop: 18 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.5, padding: "3px 8px", borderRadius: 999, background: ended ? "#3F3414" : "#1f7a52", color: ended ? "#E4CF86" : "#CFF5E2" }}>{ended ? "FINAL" : "\u25cf LIVE"}</span>
           <span style={{ color: C.gold, fontSize: 11, letterSpacing: 1.5, fontWeight: 700 }}>{(label || game.game_type).toUpperCase()}</span>
@@ -285,7 +285,7 @@ function Scorecard({ data }: { data: LiveData }) {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 7, fontWeight: 800, fontSize: 15 }}>
-                      <span style={{ width: 11, height: 11, borderRadius: 3, background: r.color, display: "inline-block" }} />{r.name}
+                      <span style={{ width: 11, height: 11, borderRadius: 6, background: r.color, display: "inline-block" }} />{r.name}
                     </div>
                     <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{r.members.join(" · ")}</div>
                   </div>
@@ -341,7 +341,7 @@ function Scorecard({ data }: { data: LiveData }) {
         <div key={gi}>
           {g.title && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "14px 2px 4px" }}>
-              <span style={{ width: 11, height: 11, borderRadius: 3, background: g.color || C.sage, display: "inline-block" }} />
+              <span style={{ width: 11, height: 11, borderRadius: 6, background: g.color || C.sage, display: "inline-block" }} />
               <span style={{ color: C.cream, fontSize: 13, fontWeight: 800, letterSpacing: 1 }}>{g.title.toUpperCase()}</span>
             </div>
           )}
@@ -465,7 +465,7 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
   const teamNameOf = (id?: string | null) => { const k = id ? byId[id]?.team : null; return k ? (tName[k] || k) : ""; };
   const mem = (ids: (string | null)[]): FourballMember[] => ids.filter(Boolean).map((id) => { const q = byId[id as string]; return { id: id as string, gross: q?.scores || [], ch: q?.ch ?? null, noShow: !!q?.no_show }; });
   const nm = (id?: string | null) => (id ? (byId[id]?.display_name || "\u2014") : "\u2014");
-  const sq = (color: string | null) => color ? <span style={{ width: 9, height: 9, borderRadius: 3, background: color, display: "inline-block", flex: "none" }} /> : null;
+  const sq = (color: string | null) => color ? <span style={{ width: 9, height: 9, borderRadius: 6, background: color, display: "inline-block", flex: "none" }} /> : null;
   const nameStyle: React.CSSProperties = { fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
   const cardStyle: React.CSSProperties = { background: C.card, borderRadius: 14, color: C.ink, padding: "12px 14px", marginTop: 8 };
 
@@ -502,7 +502,7 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
       const lbl = teamLegLabel(st.lead, st.thru, meta.length, st.result, teamNameOf(aIds[0]), teamNameOf(bIds[0]));
       return (
         <div key={`f${i}`} style={cardStyle}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontWeight: 800, fontSize: 14 }}><span>{f.name || `Foursome ${i + 1}`}</span><span style={{ color: C.faint, fontSize: 11, fontWeight: 600 }}>{st.thru ? `thru ${st.thru}` : "not started"}</span></div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontWeight: 800, fontSize: 14 }}><span>{f.name || `Foursome ${i + 1}`}</span><span style={{ color: C.faint, fontSize: 11, fontWeight: 500 }}>{st.thru ? `thru ${st.thru}` : "not started"}</span></div>
           {Leg(`f${i}r`, true, aIds, bIds, lbl)}
         </div>
       );
@@ -518,7 +518,7 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
       const team = tri.contests.find((c) => c.kind === "team");
       return (
         <div key={`t${i}`} style={cardStyle}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontWeight: 800, fontSize: 14 }}><span>{f.name || `Foursome ${i + 1}`}</span><span style={{ color: C.faint, fontSize: 11, fontWeight: 600 }}>{tri.thru ? `thru ${tri.thru}` : "not started"}</span></div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontWeight: 800, fontSize: 14 }}><span>{f.name || `Foursome ${i + 1}`}</span><span style={{ color: C.faint, fontSize: 11, fontWeight: 500 }}>{tri.thru ? `thru ${tri.thru}` : "not started"}</span></div>
           {singles.map((c, si) => {
             const aId = c.aIds[0], bId = c.bIds[0];
             const a = byId[aId], b = byId[bId];
@@ -529,7 +529,7 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
             const lbl = teamLegLabel(team.lead, team.thru, meta.length, "", teamNameOf(aIds[0]), teamNameOf(bIds[0]));
             return (
               <div style={{ background: "#F4F0E1", borderRadius: 8, padding: "8px 10px", marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span style={{ fontSize: 12, fontWeight: 700 }}>Team point <span style={{ color: C.faint, fontWeight: 600 }}>({mode === "aggregate" ? "aggregate" : "better ball"})</span></span>
+                <span style={{ fontSize: 12, fontWeight: 700 }}>Team point <span style={{ color: C.faint, fontWeight: 500 }}>({mode === "aggregate" ? "aggregate" : "better ball"})</span></span>
                 <span style={{ fontWeight: 800, fontSize: 13, color: lbl.color }}>{lbl.text}</span>
               </div>
             );

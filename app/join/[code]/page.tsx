@@ -107,12 +107,12 @@ export default function JoinGroupPage() {
     <Shell>
       <div style={{ maxWidth: 440, margin: "80px auto", padding: 24, textAlign: "center" }}>
         <div style={{ display: "flex", justifyContent: "center" }}><Wordmark width={300} /></div>
-        <div style={{ background: C.greenLight, borderRadius: 16, padding: 28, marginTop: 30 }}>
+        <div style={{ background: C.greenLight, borderRadius: 14, padding: 28, marginTop: 30 }}>
           <div style={{ color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 800 }}>CLUB INVITE</div>
           <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 24, fontWeight: 800, marginTop: 10 }}>
             Invite code {code || "------"}
           </div>
-          <div style={{ color: state === "error" ? "#E8A199" : C.sage, fontSize: 14, marginTop: 14, lineHeight: 1.5 }}>
+          <div style={{ color: state === "error" ? C.overRedDark : C.sage, fontSize: 14, marginTop: 14, lineHeight: 1.5 }}>
             {message}
           </div>
           {state === "login" && (

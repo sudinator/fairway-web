@@ -124,7 +124,7 @@ function FormChart({ data }: { data: number[] }) {
 export function PlayerCardView({ view }: { view: CardView }) {
   const { name, avatarUrl, index, trend, roundsPlayed, badges, form } = view;
   return (
-    <div style={{ background: "linear-gradient(180deg,#1d5f47,#153f30)", border: `1px solid ${C.borderGreen}`, borderRadius: 16, padding: 16, overflow: "hidden" }}>
+    <div style={{ background: "linear-gradient(180deg,#1d5f47,#153f30)", border: `1px solid ${C.borderGreen}`, borderRadius: 14, padding: 16, overflow: "hidden" }}>
       <div style={{ display: "flex", gap: 13, alignItems: "center" }}>
         <Avatar src={avatarUrl} name={name} size={60} accent={C.gold} />
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -149,7 +149,7 @@ export function PlayerCardView({ view }: { view: CardView }) {
                 <div style={{ position: "relative", width: 46, height: 46, margin: "0 auto" }}>
                   <div style={{ width: 46, height: 46, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, background: "radial-gradient(circle at 50% 32%, #20624a, #0e3a2c)", border: `2px solid ${TIER_COLOR[b.tier]}`, boxShadow: b.tier !== "common" ? `0 0 12px -4px ${TIER_COLOR[b.tier]}` : "none" }}>{b.icon}</div>
                   {b.count != null && b.count > 1 && (
-                    <span style={{ position: "absolute", right: -4, top: -4, minWidth: 18, height: 18, padding: "0 4px", borderRadius: 9, background: C.gold, color: "#1c1c15", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #10402f" }}>{"×"}{b.count}</span>
+                    <span style={{ position: "absolute", right: -4, top: -4, minWidth: 18, height: 18, padding: "0 4px", borderRadius: 8, background: C.gold, color: "#1c1c15", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #10402f" }}>{"×"}{b.count}</span>
                   )}
                 </div>
                 <div style={{ fontSize: 11, color: C.sage, marginTop: 5, lineHeight: 1.2 }}>{b.label}</div>
@@ -254,9 +254,9 @@ export function PeerCardModal({ member, groupId, viewerUserId, onClose }: { memb
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(6,20,15,.72)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, position: "relative" }}>
-        <button onClick={onClose} aria-label="Close" style={{ position: "absolute", top: -6, right: -6, zIndex: 2, width: 30, height: 30, borderRadius: 15, border: "none", background: C.green, color: C.cream, fontSize: 17, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,.4)" }}>{"×"}</button>
+        <button onClick={onClose} aria-label="Close" style={{ position: "absolute", top: -6, right: -6, zIndex: 2, width: 30, height: 30, borderRadius: 14, border: "none", background: C.green, color: C.cream, fontSize: 17, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,.4)" }}>{"×"}</button>
         {loading ? (
-          <div style={{ background: C.greenLight, borderRadius: 16, padding: 28, textAlign: "center", color: C.sage }}>Loading…</div>
+          <div style={{ background: C.greenLight, borderRadius: 14, padding: 28, textAlign: "center", color: C.sage }}>Loading…</div>
         ) : view ? (
           <>
             <PlayerCardView view={view} />
@@ -298,11 +298,11 @@ function ContactBar({ recipientId, groupId, name, phone }: { recipientId: string
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {phone && (
           <>
-            <a href={`tel:${phone}`} style={{ flex: 1, minWidth: 96, textAlign: "center", background: C.greenLight, color: C.cream, fontWeight: 800, fontSize: 13, textDecoration: "none", borderRadius: 9, padding: "10px 12px" }}>Call</a>
-            <a href={`sms:${phone}`} style={{ flex: 1, minWidth: 96, textAlign: "center", background: C.greenLight, color: C.cream, fontWeight: 800, fontSize: 13, textDecoration: "none", borderRadius: 9, padding: "10px 12px" }}>Text</a>
+            <a href={`tel:${phone}`} style={{ flex: 1, minWidth: 96, textAlign: "center", background: C.greenLight, color: C.cream, fontWeight: 800, fontSize: 13, textDecoration: "none", borderRadius: 8, padding: "10px 12px" }}>Call</a>
+            <a href={`sms:${phone}`} style={{ flex: 1, minWidth: 96, textAlign: "center", background: C.greenLight, color: C.cream, fontWeight: 800, fontSize: 13, textDecoration: "none", borderRadius: 8, padding: "10px 12px" }}>Text</a>
           </>
         )}
-        <button onClick={() => { setOpenMsg((v) => !v); setStatus(null); }} style={{ flex: 1, minWidth: 96, background: C.gold, color: "#1c1c15", fontWeight: 800, fontSize: 13, border: "none", borderRadius: 9, padding: "10px 12px", cursor: "pointer" }}>
+        <button onClick={() => { setOpenMsg((v) => !v); setStatus(null); }} style={{ flex: 1, minWidth: 96, background: C.gold, color: "#1c1c15", fontWeight: 800, fontSize: 13, border: "none", borderRadius: 8, padding: "10px 12px", cursor: "pointer" }}>
           {status === "sent" ? "Sent 👋" : "Say hi"}
         </button>
       </div>
@@ -346,7 +346,7 @@ export function CardVisibilityToggle({ user, initial }: { user: any; initial: bo
           Your name, handicap, and contact are always visible to club members. This controls whether they also see your badges, career bests, and recent form.
         </div>
       </div>
-      <button onClick={toggle} disabled={busy} style={{ flex: "none", background: on ? C.gold : "transparent", color: on ? "#1c1c15" : C.cream, border: `1px solid ${on ? C.gold : C.sage}`, borderRadius: 9, padding: "8px 14px", fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap", opacity: busy ? 0.62 : 1 }}>{on ? "On" : "Off"}</button>
+      <button onClick={toggle} disabled={busy} style={{ flex: "none", background: on ? C.gold : "transparent", color: on ? "#1c1c15" : C.cream, border: `1px solid ${on ? C.gold : C.sage}`, borderRadius: 8, padding: "8px 14px", fontSize: 12, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap", opacity: busy ? 0.62 : 1 }}>{on ? "On" : "Off"}</button>
     </div>
   );
 }

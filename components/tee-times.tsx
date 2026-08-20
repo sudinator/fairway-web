@@ -312,7 +312,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
               </div>
             ) : null}
           </div>
-          {wait ? <span style={{ fontSize: 11, fontWeight: 800, background: C.greenLight, color: C.gold, borderRadius: 20, padding: "3px 9px" }}>Waitlist{waitPos.get(r.user_id) ? ` #${waitPos.get(r.user_id)}` : ""}</span> : null}
+          {wait ? <span style={{ fontSize: 11, fontWeight: 800, background: C.greenLight, color: C.gold, borderRadius: 14, padding: "3px 9px" }}>Waitlist{waitPos.get(r.user_id) ? ` #${waitPos.get(r.user_id)}` : ""}</span> : null}
           {wait && canOrganizeTee ? <button onClick={() => promote(sel, r.user_id)} disabled={busy} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Move up</button> : null}
           {showOrg && canOrganizeTee ? (
             <button onClick={() => orgSetRsvp(sel, r.user_id, r.choice === "in" ? "out" : "in")} disabled={busy}
@@ -364,7 +364,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
             {[["Tee time", "#" + (sel.seq ?? "—")], ["Date", fmtFull(sel.play_date)], ["Tee-off", sel.tee_off_times?.length ? sel.tee_off_times.join("/") : "—"], ["Course", sel.course || "—"], ["Type", kindOf(sel.kind).label], ["Spots", sel.max_spots != null ? `${used} / ${sel.max_spots}` : `${used}`], ["Notes", sel.notes || "—"]].map(([l, v], i, arr) => (
               <div key={l} style={{ display: "flex", justifyContent: "space-between", padding: "11px 14px", borderBottom: i < arr.length - 1 ? `1px solid ${C.line}` : "none" }}>
                 <div style={{ fontSize: 12, color: C.sage }}>{l}</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: C.cream, textAlign: "right", maxWidth: "62%" }}>{v}</div>
+                <div style={{ fontSize: 13, fontWeight: 500, color: C.cream, textAlign: "right", maxWidth: "62%" }}>{v}</div>
               </div>
             ))}
           </div>
@@ -482,7 +482,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
 
       <div style={{ display: "flex", gap: 6, margin: "6px 0 4px" }}>
         {(["upcoming", "past", "cancelled"] as const).map((f) => (
-          <button key={f} onClick={() => setFilter(f)} style={{ flex: 1, textAlign: "center", fontSize: 12, fontWeight: 700, padding: "8px 0", borderRadius: 9, border: "none", cursor: "pointer", color: filter === f ? "#1c1706" : C.sage, background: filter === f ? C.gold : C.greenMid }}>{f[0].toUpperCase() + f.slice(1)}</button>
+          <button key={f} onClick={() => setFilter(f)} style={{ flex: 1, textAlign: "center", fontSize: 12, fontWeight: 700, padding: "8px 0", borderRadius: 8, border: "none", cursor: "pointer", color: filter === f ? "#1c1706" : C.sage, background: filter === f ? C.gold : C.greenMid }}>{f[0].toUpperCase() + f.slice(1)}</button>
         ))}
       </div>
 
@@ -528,7 +528,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
                         {t.max_spots != null && <span style={{ fontSize: 11, color: C.sage }}>{used} / {t.max_spots} spots{over ? ` · waitlist ${used - t.max_spots}` : ""}</span>}
                       </div>
                     </div>
-                    {mine ? <span style={{ fontSize: 11, fontWeight: 800, borderRadius: 20, padding: "3px 9px", background: CHOICE[mine.choice].c + "22", color: CHOICE[mine.choice].c }}>{CHOICE[mine.choice].label.toUpperCase()}</span> : <span style={{ color: C.sage, fontSize: 18 }}>›</span>}
+                    {mine ? <span style={{ fontSize: 11, fontWeight: 800, borderRadius: 14, padding: "3px 9px", background: CHOICE[mine.choice].c + "22", color: CHOICE[mine.choice].c }}>{CHOICE[mine.choice].label.toUpperCase()}</span> : <span style={{ color: C.sage, fontSize: 18 }}>›</span>}
                   </div>
                 );
               })}
@@ -573,7 +573,7 @@ function RsvpSheet({ tt, mine, spotsLeft, warn, busy, onClose, onSubmit }: {
             <FieldLabel style={{ marginBottom: 8 }}>Guests</FieldLabel>
             <div style={{ display: "flex", gap: 8 }}>
               {[0, 1, 2].map((n) => (
-                <div key={n} onClick={() => setGCount(n)} style={{ flex: 1, textAlign: "center", padding: 9, borderRadius: 9, cursor: "pointer", fontWeight: 800, color: gCount === n ? "#1c1706" : C.cream, background: gCount === n ? C.gold : C.greenMid }}>{n}</div>
+                <div key={n} onClick={() => setGCount(n)} style={{ flex: 1, textAlign: "center", padding: 9, borderRadius: 8, cursor: "pointer", fontWeight: 800, color: gCount === n ? "#1c1706" : C.cream, background: gCount === n ? C.gold : C.greenMid }}>{n}</div>
               ))}
             </div>
             {Array.from({ length: gCount }, (_, i) => (

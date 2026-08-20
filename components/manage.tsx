@@ -106,7 +106,7 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
           const active = cur === o.v;
           return (
             <button key={o.v} onClick={() => setPref(key, o.v)}
-              style={{ padding: "4px 9px", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer",
+              style={{ padding: "4px 9px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
                 border: `1px solid ${active ? (o.v === "off" ? "#8B6A62" : C.gold) : C.borderCard}`,
                 background: active ? (o.v === "off" ? "#6B2F28" : C.gold) : "transparent",
                 color: active ? (o.v === "off" ? "#F6DEDB" : "#16201C") : C.sage }}>
@@ -265,10 +265,10 @@ export function HandicapSummary({ rounds, profile, onOpen }: { rounds: Round[]; 
             <div key={r.id} onClick={onOpen ? () => onOpen(r) : undefined} role={onOpen ? "button" : undefined} tabIndex={onOpen ? 0 : undefined}
               onKeyDown={onOpen ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(r); } } : undefined}
               style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 4px", borderBottom: `1px solid rgba(255,255,255,0.10)`, opacity: used ? 1 : 0.62, background: used ? "rgba(228,207,134,0.06)" : "transparent", cursor: onOpen ? "pointer" : "default" }}>
-              <div style={{ width: 7, height: 7, borderRadius: 4, background: used ? C.gold : "transparent", flexShrink: 0 }} />
+              <div style={{ width: 7, height: 7, borderRadius: 6, background: used ? C.gold : "transparent", flexShrink: 0 }} />
               <div style={{ width: 48, flexShrink: 0, color: C.sage, fontSize: 11 }}>{date}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: C.cream, fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.course || "—"}</div>
+                <div style={{ color: C.cream, fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.course || "—"}</div>
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 1 }}>{[r.tee_name, r.rating != null && r.slope != null ? `${r.rating}/${r.slope}` : null].filter(Boolean).join(" · ") || "—"}</div>
               </div>
               <div style={{ width: 38, textAlign: "right", color: C.cream, fontSize: 13, fontWeight: 700, fontFamily: "Georgia, serif" }}>{ag != null ? ag : "—"}</div>
@@ -279,7 +279,7 @@ export function HandicapSummary({ rounds, profile, onOpen }: { rounds: Round[]; 
             </div>
           ))}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, padding: "0 4px" }}>
-            <div style={{ width: 7, height: 7, borderRadius: 4, background: C.gold, flexShrink: 0 }} />
+            <div style={{ width: 7, height: 7, borderRadius: 6, background: C.gold, flexShrink: 0 }} />
             <div style={{ color: C.sage, fontSize: 11, flex: 1 }}>Counts toward index ({hcp.used} lowest differentials)</div>
           </div>
           <div style={{ background: C.greenLight, borderRadius: 10, padding: "9px 12px", marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -397,7 +397,7 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
               </label>
               {avatarUrl && !photoBusy && (
                 <button onClick={removePhoto}
-                  style={{ background: "transparent", color: "#E8A199", border: `0.5px solid #7A3A34`, borderRadius: 8, padding: "7px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                  style={{ background: "transparent", color: C.overRedDark, border: `0.5px solid #7A3A34`, borderRadius: 8, padding: "7px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
                   Remove
                 </button>
               )}
@@ -505,7 +505,7 @@ function StatDrawerHost() {
                <div key={i} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 8px", borderTop: i ? "1px solid rgba(255,255,255,.06)" : "none" }}>
                  <Avatar src={u.avatar_url} name={u.name || "?"} size={34} />
                  <div style={{ minWidth: 0 }}>
-                   <div style={{ fontSize: 14, fontWeight: 600, color: C.cream, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</div>
+                   <div style={{ fontSize: 14, fontWeight: 500, color: C.cream, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</div>
                    {u.detail ? <div style={{ fontSize: 11, color: C.sage, marginTop: 1 }}>{u.detail}</div> : null}
                  </div>
                  {tc ? <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, borderRadius: 6, padding: "2px 7px", background: tc.bg, color: tc.fg, whiteSpace: "nowrap" }}>{u.tag === "friction" ? "unfinished" : u.tag}</span> : null}
@@ -588,18 +588,18 @@ function AdminEngagement() {
         )}
       </div>
       <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 11, color: C.sage }}>
-        <span><span style={{ display: "inline-block", width: 8, height: 8, background: C.gold, borderRadius: 2, marginRight: 4 }} />new</span>
-        <span><span style={{ display: "inline-block", width: 8, height: 8, background: C.sage, borderRadius: 2, marginRight: 4 }} />returning</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, background: C.gold, borderRadius: 6, marginRight: 4 }} />new</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, background: C.sage, borderRadius: 6, marginRight: 4 }} />returning</span>
       </div>
 
       <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 14 }}>How rounds are played (90 days)</div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.cream, marginTop: 6 }}><span>In a game</span><span>{feat.in_game || 0}</span></div>
-      <div style={{ height: 8, borderRadius: 4, background: C.green, marginTop: 3, overflow: "hidden" }}>
-        <div style={{ height: "100%", borderRadius: 4, width: `${featTot > 0 ? Math.round(((feat.in_game || 0) / featTot) * 100) : 0}%`, background: C.gold }} />
+      <div style={{ height: 8, borderRadius: 6, background: C.green, marginTop: 3, overflow: "hidden" }}>
+        <div style={{ height: "100%", borderRadius: 6, width: `${featTot > 0 ? Math.round(((feat.in_game || 0) / featTot) * 100) : 0}%`, background: C.gold }} />
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.cream, marginTop: 8 }}><span>Solo score entry</span><span>{feat.solo || 0}</span></div>
-      <div style={{ height: 8, borderRadius: 4, background: C.green, marginTop: 3, overflow: "hidden" }}>
-        <div style={{ height: "100%", borderRadius: 4, width: `${featTot > 0 ? Math.round(((feat.solo || 0) / featTot) * 100) : 0}%`, background: C.sage }} />
+      <div style={{ height: 8, borderRadius: 6, background: C.green, marginTop: 3, overflow: "hidden" }}>
+        <div style={{ height: "100%", borderRadius: 6, width: `${featTot > 0 ? Math.round(((feat.solo || 0) / featTot) * 100) : 0}%`, background: C.sage }} />
       </div>
     </div>
   );
@@ -708,13 +708,13 @@ function AdminPowerUsers() {
                   <td style={{ padding: "6px 8px", position: "sticky", left: 0, zIndex: 1, background: C.greenLight, maxWidth: 160 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
                       <Avatar src={avatars[r.user_id]} name={r.display_name || "?"} size={22} enlargeable={false} />
-                      <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <div style={{ color: C.cream, fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {r.display_name || "—"}
                       </div>
                     </div>
                     {r.churned ? (
                       <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
-                        <span style={{ fontSize: 11, color: C.cream, background: C.greenMid, borderRadius: 4, padding: "0 5px", fontWeight: 700 }}>quiet</span>
+                        <span style={{ fontSize: 11, color: C.cream, background: C.greenMid, borderRadius: 6, padding: "0 5px", fontWeight: 700 }}>quiet</span>
                       </div>
                     ) : null}
                   </td>
@@ -773,8 +773,8 @@ function AdminAnalytics() {
   const bar = (label: string, n: number, denom: number, color: string, drillStat?: string) => (
     <div key={label} onClick={drillStat ? () => openStatDrill({ stat: drillStat, title: label }) : undefined} style={{ cursor: drillStat ? "pointer" : "default" }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.cream, marginTop: 8 }}><span>{label}{drillStat ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>  who ›</span> : null}</span><span>{n}</span></div>
-      <div style={{ height: 8, borderRadius: 4, background: C.green, marginTop: 3, overflow: "hidden" }}>
-        <div style={{ height: "100%", borderRadius: 4, width: `${denom > 0 ? Math.round((n / denom) * 100) : 0}%`, background: color }} />
+      <div style={{ height: 8, borderRadius: 6, background: C.green, marginTop: 3, overflow: "hidden" }}>
+        <div style={{ height: "100%", borderRadius: 6, width: `${denom > 0 ? Math.round((n / denom) * 100) : 0}%`, background: color }} />
       </div>
     </div>
   );
@@ -1461,7 +1461,7 @@ export function NotificationBell({ user, onSeeAll, onNavigate }: { user: any; on
           bodyStyle={{ padding: "2px 8px 12px" }}
           header={
             <>
-              <div style={{ width: 40, height: 4, background: C.greenLight, borderRadius: 2, margin: "8px auto 4px" }} />
+              <div style={{ width: 40, height: 4, background: C.greenLight, borderRadius: 6, margin: "8px auto 4px" }} />
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 44px 10px 14px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
                 <Eyebrow style={{ margin: 0 }}>NOTIFICATIONS</Eyebrow>
                 <span style={{ flex: 1 }} />
@@ -1476,7 +1476,7 @@ export function NotificationBell({ user, onSeeAll, onNavigate }: { user: any; on
           {items.map((n) => (
             <div key={n.id} onClick={() => { if (!n.read) markOne(n.id); if (n.link && onNavigate) { setOpen(false); onNavigate(n.link); } }}
               style={{ padding: "11px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", display: "flex", gap: 9, cursor: (n.link || !n.read) ? "pointer" : "default" }}>
-              <span style={{ width: 7, height: 7, borderRadius: 4, background: n.read ? "transparent" : C.gold, marginTop: 5, flexShrink: 0 }} />
+              <span style={{ width: 7, height: 7, borderRadius: 6, background: n.read ? "transparent" : C.gold, marginTop: 5, flexShrink: 0 }} />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ color: n.read ? "#CFC9B4" : C.cream, fontSize: 13, lineHeight: 1.4, fontWeight: n.read ? 500 : 800 }}>{n.message}</div>
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{fmtNotifTime(n.created_at)}</div>
@@ -1541,7 +1541,7 @@ export function NotificationsScreen({ user, onNavigate }: { user: any; onNavigat
           {items.map((n) => (
             <div key={n.id} onClick={() => { if (!n.read) markOne(n.id); if (n.link && onNavigate) onNavigate(n.link); }}
               style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 10, display: "flex", gap: 11, cursor: (n.link || !n.read) ? "pointer" : "default" }}>
-              <span style={{ width: 8, height: 8, borderRadius: 4, background: n.read ? "transparent" : C.gold, marginTop: 6, flexShrink: 0 }} />
+              <span style={{ width: 8, height: 8, borderRadius: 6, background: n.read ? "transparent" : C.gold, marginTop: 6, flexShrink: 0 }} />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ color: n.read ? C.sage : C.cream, fontSize: 14, lineHeight: 1.4, fontWeight: n.read ? 500 : 800 }}>{n.message}</div>
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{notifWhen(n.created_at)}</div>
@@ -2021,7 +2021,7 @@ function AdminDailyReport() {
               style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 8px", borderTop: i ? `1px solid ${C.greenMid}` : "none", cursor: "pointer" }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", flex: "0 0 8px", background: dotColor(r.tag) }} />
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13, color: C.cream, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</div>
+                <div style={{ fontSize: 13, color: C.cream, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</div>
                 <div style={{ fontSize: 11, color: C.sage }}>{r.detail} · {r.tag}</div>
               </div>
             </div>
@@ -2077,7 +2077,7 @@ function FrictionItem({ it, onDone }: { it: any; onDone: () => void }) {
     <div style={{ background: C.greenLight, borderRadius: 14, padding: 12, marginBottom: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontWeight: 700, fontSize: 15, color: C.cream }}>{it.subject_name}</span>
-        <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, borderRadius: 5, padding: "1px 6px", background: meta.bg, color: meta.fg }}>{meta.label}</span>
+        <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, borderRadius: 6, padding: "1px 6px", background: meta.bg, color: meta.fg }}>{meta.label}</span>
       </div>
       <div style={{ color: C.cream, fontSize: 12.5, margin: "8px 0 3px", lineHeight: 1.5 }}>{it.detail}</div>
       {resolved ? (
@@ -2088,7 +2088,7 @@ function FrictionItem({ it, onDone }: { it: any; onDone: () => void }) {
       ) : (
         <>
           <div style={{ color: C.sage, fontSize: 11, marginBottom: 8 }}>first seen {when}</div>
-          <button onClick={expand} style={{ background: C.gold, color: C.green, border: "none", borderRadius: 9, padding: "7px 14px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+          <button onClick={expand} style={{ background: C.gold, color: C.green, border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
             {open ? "Close" : "Review \u2192"}
           </button>
           {open ? (
@@ -2096,7 +2096,7 @@ function FrictionItem({ it, onDone }: { it: any; onDone: () => void }) {
               {isCluster ? (
                 <>
                   <div style={{ color: C.sage, fontSize: 11, marginBottom: 6 }}>{it.kind === "multi_draft" ? "Which draft to keep (if any)?" : "Which round to keep?"}</div>
-                  <div style={{ background: C.green, borderRadius: 9, padding: 6, marginBottom: 8 }}>
+                  <div style={{ background: C.green, borderRadius: 8, padding: 6, marginBottom: 8 }}>
                     {(rounds || []).map((r: any) => {
                       const sel = keep === r.round_id;
                       return (
@@ -2139,8 +2139,8 @@ function FrictionItem({ it, onDone }: { it: any; onDone: () => void }) {
     </div>
   );
 }
-const btnPrimary: React.CSSProperties = { background: "#5BBE7E", color: "#06251a", border: "none", borderRadius: 9, padding: "8px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer" };
-const btnGhost: React.CSSProperties = { background: "transparent", color: C.cream, border: "1px solid #6f8a7e", borderRadius: 9, padding: "8px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" };
+const btnPrimary: React.CSSProperties = { background: "#5BBE7E", color: "#06251a", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer" };
+const btnGhost: React.CSSProperties = { background: "transparent", color: C.cream, border: "1px solid #6f8a7e", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" };
 
 function AdminFrictionReview() {
   const [tab, setTab] = useState<"open" | "needs_action" | "resolved">("open");

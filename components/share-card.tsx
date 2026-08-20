@@ -59,7 +59,7 @@ function ShareModalInner({ round, statusFinal, fmtLabel, title, subtitle, summar
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, zIndex: 1100, overflowY: "auto" }}>
       <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 430, width: "100%", margin: "10px 0 40px" }}>
         {/* The exportable card */}
-        <div ref={cardRef} style={{ background: C.green, borderRadius: 18, padding: "16px 14px 14px" }}>
+        <div ref={cardRef} style={{ background: C.green, borderRadius: 14, padding: "16px 14px 14px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.4, padding: "3px 9px", borderRadius: 999, background: statusFinal ? "#3F3414" : "#1f7a52", color: statusFinal ? "#E4CF86" : "#CFF5E2" }}>{statusFinal ? "FINAL" : "LIVE"}</span>
             <span style={{ color: C.gold, fontSize: 11, letterSpacing: 1.4, fontWeight: 700 }}>{fmtLabel}</span>
@@ -67,7 +67,7 @@ function ShareModalInner({ round, statusFinal, fmtLabel, title, subtitle, summar
           <div style={{ fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, color: C.cream, marginTop: 10 }}>{title}</div>
           <div style={{ color: C.sage, fontSize: 13, marginTop: 3 }}>{subtitle}</div>
           <div style={{ color: C.cream, fontSize: 13.5, marginTop: 10, fontWeight: 700 }}>{summaryLine}</div>
-          {statsLine && <div style={{ color: C.sage, fontSize: 12, marginTop: 4, fontWeight: 600 }}>{statsLine}</div>}
+          {statsLine && <div style={{ color: C.sage, fontSize: 12, marginTop: 4, fontWeight: 500 }}>{statsLine}</div>}
           <div style={{ marginTop: 6 }}>
             <SoloScoreGrid round={round} />
           </div>
@@ -306,7 +306,7 @@ export function ShareGameModal({ game, players, courseTees, onClose }: { game: a
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, zIndex: 1100, overflowY: "auto" }}>
       <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 430, width: "100%", margin: "10px 0 40px" }}>
-        <div ref={cardRef} style={{ background: C.green, borderRadius: 18, padding: "16px 14px 14px" }}>
+        <div ref={cardRef} style={{ background: C.green, borderRadius: 14, padding: "16px 14px 14px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.4, padding: "3px 9px", borderRadius: 999, background: ended ? "#3F3414" : "#1f7a52", color: ended ? "#E4CF86" : "#CFF5E2" }}>{ended ? "FINAL" : "LIVE"}</span>
             <span style={{ color: C.gold, fontSize: 11, letterSpacing: 1.4, fontWeight: 700 }}>{fmt}</span>
@@ -318,7 +318,7 @@ export function ShareGameModal({ game, players, courseTees, onClose }: { game: a
             {board.map((r, i) => (
               <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 11px", borderBottom: i < board.length - 1 ? "1px solid #EEE8D6" : "none" }}>
                 <span style={{ width: 14, color: C.faint, fontWeight: 800, fontSize: 13 }}>{i + 1}</span>
-                <span style={{ flex: 1, fontWeight: 800, fontSize: 14, color: C.ink }}>{r.name} <span style={{ color: C.faint, fontWeight: 600, fontSize: 11 }}>· hcp {r.hcp}</span></span>
+                <span style={{ flex: 1, fontWeight: 800, fontSize: 14, color: C.ink }}>{r.name} <span style={{ color: C.faint, fontWeight: 500, fontSize: 11 }}>· hcp {r.hcp}</span></span>
                 <span style={{ fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 16, color: i === 0 ? "#1f8f54" : C.faint }}>{stab ? `${r.pts} pts` : `net ${r.net}`}</span>
               </div>
             ))}
@@ -372,7 +372,7 @@ function SoloScoreGrid({ round }: { round: Round }) {
             {slice.map((h) => (
               <td key={h.hole_number} style={{ ...sgCell, color: C.faint, fontWeight: 700, fontSize: 11 }}>
                 {h.hole_number}
-                {h.yardage != null && <div style={{ fontSize: 11, fontWeight: 600, color: C.faint, opacity: 0.85 }}>{h.yardage}</div>}
+                {h.yardage != null && <div style={{ fontSize: 11, fontWeight: 500, color: C.faint, opacity: 0.85 }}>{h.yardage}</div>}
               </td>
             ))}
             <td style={{ ...sgTot, color: C.greenMid, fontSize: 11 }}>{totLbl}</td>

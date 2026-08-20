@@ -39,7 +39,7 @@ export function LeaderRow({ p, pos, tied, showTag, showBetStatus, user, isStroke
         <div style={{ flex: 1, minWidth: 0, marginLeft: 8 }}>
           <div style={{ color: C.cream, fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {leaderName(p.display_name)}{p.user_id === user.id ? " (you)" : ""}
-            {showTag && fkey ? <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, borderRadius: 5, padding: "1px 6px", background: flightTagColor(fkey), color: "#06251A" }}>{fkey}</span> : null}
+            {showTag && fkey ? <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, borderRadius: 6, padding: "1px 6px", background: flightTagColor(fkey), color: "#06251A" }}>{fkey}</span> : null}
           </div>
           <div style={{ color: C.sage, fontSize: 11 }}>
             {p.course_handicap != null ? `CH ${p.course_handicap}` : "no hcp"}

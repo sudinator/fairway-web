@@ -1,3 +1,52 @@
+## 177.67.260820 — Geometry: weight scale, radius scale, button roles
+- **NO migration. Cosmetic + CI only.**
+- **Font weight: 6 values -> 3.** 500 body / 700 emphasis / 800 title, with 500 set as a base on
+  `body`. 1,098 pieces of text declared a `fontSize` and no `fontWeight`, inheriting the browser
+  default of 400; only 11 explicit 400s existed, so this is one CSS rule rather than a migration.
+  500 rather than 400 because light strokes optically thin out on a dark background, which made
+  11-12px secondary text harder to read than it needed to be. 800 kept for titles rather than
+  stepping down to 700 — the app uses it 457 times and it is what holds a title against the green.
+- **Corner radius: 20 values -> 6.** `999` pill, `14` sheet, `12` card, `10` control, `8` compact,
+  `6` tag. 108 sites snapped to their nearest neighbour, none moving more than 4px. `r20` (x6) and
+  `r24` (x1) swept to 14 by decision.
+- **`btn()` extended to four roles and two sizes** — `primary`, `secondary`, `ghost`, `danger` x
+  `standard`, `compact`. **Additive only: no call site changed.** The boolean form still works and
+  all 243 existing calls are untouched.
+  The reason matters: of 172 hand-rolled buttons in 129 distinct shapes, **86 were ghost buttons**
+  — transparent, text-only — a role `btn()` never offered. People were not being careless; there
+  was nothing to reach for. Migrating those 86 will move layout, so it is deliberately separate
+  work to be done in reviewable batches.
+- **DISPLAY_RULES Part 5 rewritten from measurement.** Three of its four scales were written from
+  theory before anything was counted, and all three were wrong. The radius scale alone would have
+  changed 278 sites AWAY from values the app already used consistently. Font size and padding are
+  now explicitly NOT prescribed, with the reasoning recorded: enforcing the documented type scale
+  would have resized body text across 759 sites, and padding has 161 values with no dominant
+  cluster and a real risk of moving layout.
+- `ci/check-design-scale.py` updated to the measured scale.
+
+## 177.66.260820 — Conditional-style pairing, and the bugs it uncovered
+- **NO migration. Cosmetic + CI only.** Follows 177.65, which is already deployed.
+- **Why this is a separate version:** 177.65 was packaged, deployed, and then extended. Shipping
+  the extended set under the same number would have meant two different builds both reporting
+  177.65 in Help. The version-ledger guard cannot catch this — it checks package.json against
+  DEPLOY_NOTES, and both agreed. It has no way to know what is already live.
+- **The contrast checker now pairs conditional styles by their shared CONDITION.** It previously
+  cross-multiplied every text colour against every background, so a chip whose background and
+  label both flip on `selected` was reported as failing for combinations that never render —
+  (gold, cream) and (green, dark) when only (gold, dark) and (green, cream) exist.
+- **It also stops attributing text to an ancestor when the element's own background is a variable
+  it cannot resolve.** The dashboard bar labels sit on the bar, not on the card behind it.
+- **Removing that noise exposed real defects that had been hidden in it:**
+  - five near-identical error reds (`#FB7185`, `#EF9D90`, `#E8A199`, `#F3A3A0`, `#F0A99F`) all
+    short of 4.5:1 on green, now one token
+  - `C.faint` (a cream-surface token) used as text on green in money.tsx
+  - `C.indivDot` at 3.18:1, lifted to 4.72:1
+  - the sand marker `#E8730C` at 2.68:1 on a light wash
+  - white on the mid-green confirm button at 4.11:1
+- **Contrast end to end: 523 sub-threshold sites at 177.58 -> 25.** The residual 25 were each
+  inspected by hand: 2 PayPal/Venmo brand fills that cannot change, several nested correlated
+  ternaries where both real states are fine, and near-misses at 3.7-4.4:1. None is unreadable.
+
 ## 177.65.260820 — Visual states audit: opacity, SVG, borders, shadows, native controls, focus
 - **NO migration. Cosmetic + CI only.** Completes the surface migration by auditing the seven
   categories that background and text colour alone never covered.
@@ -37,6 +86,18 @@
   3:1 everywhere, so cream outer plus dark inner covers gold buttons (6.75:1) and green cards
   (7.29:1) alike.
 - **Dashboard stat bars** had `C.cream` labels on light fills — 1.57:1 at worst. Now `C.green`.
+- **Contrast, end to end: 523 sub-threshold sites at 177.58 -> 25.** The residual 25 are: 2 PayPal/
+  Venmo brand fills (allowlisted, cannot change), several correlated ternaries where background and
+  text flip on the same condition but sit on different elements, and a handful of near-misses at
+  3.7-4.4:1. Each was inspected by hand rather than assumed.
+- **The checker now pairs conditional styles by their shared CONDITION.** Previously it
+  cross-multiplied every text colour against every background, reporting combinations that can
+  never render — a chip whose background and label both flip on `selected` only ever paints
+  (gold, dark) or (green, cream), never (gold, cream). It also no longer attributes text to an
+  ancestor when the element's own background is a variable it cannot resolve; the dashboard bar
+  labels sit on the bar, not the card behind it.
+- Error reds unified: `#FB7185`, `#EF9D90`, `#E8A199`, `#F3A3A0`, `#F0A99F` were five
+  near-identical values all short of 4.5:1 on green. Now one token.
 - **NOT done:** the share-card PNG export. `html-to-image` rasterises separately from the on-screen
   render, so it needs verifying against a real generated image with real data rather than by
   static analysis.

@@ -476,7 +476,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
             </div>
           </div>
 
-          {searchErr && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{searchErr}</div>}
+          {searchErr && <div style={{ color: C.overRedDark, fontSize: 13, marginTop: 10 }}>{searchErr}</div>}
 
           {/* Live database results */}
           {results && results.length > 0 && (
@@ -696,7 +696,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
           {realCH != null && (
             <div style={{ color: C.gold, fontWeight: 800, marginTop: 12, fontSize: 15 }}>
               Course handicap: {realCH} {realCH >= 0 ? `(you get ${realCH} stroke${realCH === 1 ? "" : "s"})` : "(plus handicap)"}
-              <div style={{ color: C.sage, fontWeight: 400, fontSize: 11, marginTop: 4 }}>
+              <div style={{ color: C.sage, fontWeight: 500, fontSize: 11, marginTop: 4 }}>
                 index × (slope ÷ 113) + (rating − par), rounded
               </div>
             </div>
@@ -717,7 +717,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
                 <input inputMode="numeric" placeholder="86" value={grossStr}
                   onChange={(e) => setGrossStr(e.target.value.replace(/\D/g, ""))}
                   style={{ ...inputStyle, marginTop: 6, maxWidth: 140 }} />
-                {grossErr && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 8 }}>{grossErr}</div>}
+                {grossErr && <div style={{ color: C.overRedDark, fontSize: 13, marginTop: 8 }}>{grossErr}</div>}
               </div>
             ) : (
               <div style={{ color: C.sage, fontSize: 12, marginTop: 10 }}>Enter each hole's score on the next screen.</div>

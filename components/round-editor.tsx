@@ -571,7 +571,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
             </label>
           </div>
           {ratingSlopeError ? (
-            <div style={{ color: "#E8A199", fontSize: 12, marginTop: 8 }}>{ratingSlopeError}</div>
+            <div style={{ color: C.overRedDark, fontSize: 12, marginTop: 8 }}>{ratingSlopeError}</div>
           ) : ratingSlopeEdited ? (
             <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>
               Preview: {effectiveCourseHandicap != null ? `course handicap ${effectiveCourseHandicap}` : "no course handicap"}
@@ -607,7 +607,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
         onActiveHole={(i) => saveDraftHole(round.id, i)}
         resumeHole={resumeHoleTarget}
       />
-      {err && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{err}</div>}
+      {err && <div style={{ color: C.overRedDark, fontSize: 13, marginTop: 10 }}>{err}</div>}
       {bgSaveFailed && <div style={{ color: C.gold, fontSize: 12, marginTop: 10, lineHeight: 1.45 }}>Saved on this device. Couldn&apos;t back up to the server yet — it&apos;ll keep retrying as you enter, and &ldquo;Finish round&rdquo; saves everything.</div>}
       {courseInfoChanged && (
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 14 }}>

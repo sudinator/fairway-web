@@ -32,9 +32,9 @@ export function Toaster() {
         <div
           key={t.id}
           onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
-          style={{ pointerEvents: "auto", cursor: "pointer", maxWidth: 440, width: "100%", background: t.kind === "error" ? "#B83A2E" : "#16503D", color: "#FFFDF6", borderRadius: 12, padding: "12px 14px", fontSize: 13, fontWeight: 600, lineHeight: 1.4, boxShadow: "0 6px 24px rgba(0,0,0,0.28)" }}
+          style={{ pointerEvents: "auto", cursor: "pointer", maxWidth: 440, width: "100%", background: t.kind === "error" ? "#B83A2E" : "#16503D", color: "#FFFDF6", borderRadius: 12, padding: "12px 14px", fontSize: 13, fontWeight: 500, lineHeight: 1.4, boxShadow: "0 6px 24px rgba(0,0,0,0.28)" }}
         >
-          {t.msg} <span style={{ opacity: 0.7, fontWeight: 400 }}>· tap to dismiss</span>
+          {t.msg} <span style={{ opacity: 0.7, fontWeight: 500 }}>· tap to dismiss</span>
         </div>
       ))}
     </div>

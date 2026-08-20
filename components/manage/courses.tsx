@@ -386,7 +386,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
         ) : inGroup ? (
           <div style={{ display: "flex", alignItems: "center", borderLeft: `1px solid ${C.borderCard}`, padding: "0 14px", color: C.cream, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>In Club ✓</div>
         ) : (
-          <button style={{ ...btn(true), borderRadius: 0, padding: "0 14px", fontSize: 12, opacity: busyId === c.id ? 0.5 : 1 }} disabled={busyId === c.id} onClick={() => addToMyGroup(c)}>＋ Add to Club</button>
+          <button style={{ ...btn(true), borderRadius: 6, padding: "0 14px", fontSize: 12, opacity: busyId === c.id ? 0.5 : 1 }} disabled={busyId === c.id} onClick={() => addToMyGroup(c)}>＋ Add to Club</button>
         )}
       </div>
     );
@@ -638,7 +638,7 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
             <button style={{ ...btn(true), whiteSpace: "nowrap", opacity: q.trim() ? 1 : 0.5 }} disabled={!q.trim() || searching} onClick={runSearch}>{searching ? "…" : "Search"}</button>
           </div>
         </div>
-        {err && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 8 }}>{err}</div>}
+        {err && <div style={{ color: C.overRedDark, fontSize: 13, marginTop: 8 }}>{err}</div>}
         {results?.map((r) => (
           <button key={r.id} onClick={() => pick(r.id, r.location)} disabled={loadingId != null}
             style={{ display: "block", width: "100%", textAlign: "left", marginTop: 8, cursor: "pointer", background: C.greenLight, border: `1px solid ${C.borderCard}`, borderRadius: 10, padding: "12px 14px" }}>
@@ -799,7 +799,7 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
       )}
       {!existingId && providerSource && (
         <div style={{ marginTop: 10, border: `1px solid ${providerSource.stored ? C.gold : C.borderCard}`, borderRadius: 10, padding: 10, background: providerSource.stored ? C.greenMid : C.greenLight }}>
-          <div style={{ color: providerSource.stored ? C.cream : C.sage, fontSize: 11, fontWeight: 900, letterSpacing: 1.2 }}>
+          <div style={{ color: providerSource.stored ? C.cream : C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1.2 }}>
             {providerSource.stored ? (sourceMode === "provider" ? "REVIEWING GOLFCOURSEAPI DATA" : "ALREADY IN BNN") : "NEW COURSE FROM GOLFCOURSEAPI"}
           </div>
           {providerSource.stored ? (
@@ -877,7 +877,7 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
               <button type="button" onClick={() => setYardTee(yardTee === i ? null : i)}
                 title={yd > 0 ? "Total yardage for this tee — tap to edit per hole" : "Tap to enter per-hole yardages"}
                 style={{ marginTop: 4, width: "100%", background: "#173a2c", border: `1px solid #37624f`, borderRadius: 8, padding: "6px 8px", color: yd > 0 ? C.cream : C.sage, fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "left" }}>
-                {yd > 0 ? yd.toLocaleString() : "Add"} <span style={{ color: C.sage, fontSize: 11, fontWeight: 600 }}>{yardTee === i ? "· close" : "· edit"}</span>
+                {yd > 0 ? yd.toLocaleString() : "Add"} <span style={{ color: C.sage, fontSize: 11, fontWeight: 500 }}>{yardTee === i ? "· close" : "· edit"}</span>
               </button>
             </div>
             {course.tees.length > 1 && (
@@ -959,7 +959,7 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
         })()}
       </div>
 
-      {err && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{err}</div>}
+      {err && <div style={{ color: C.overRedDark, fontSize: 13, marginTop: 10 }}>{err}</div>}
 
       {showCorrectionReason && (
         <div style={{ marginTop: 16 }}>

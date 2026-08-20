@@ -187,11 +187,11 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
           <div style={{ flex: 1, background: totalA >= totalB ? C.greenMid : C.greenLight, borderRadius: 12, padding: 14, textAlign: "center" }}>
             <div style={{ color: C.cream, fontWeight: 800 }}>{teams![0].name}</div>
-            <div style={{ color: C.cream, fontSize: 32, fontWeight: 900, fontFamily: "Georgia, serif" }}>{fmtSkins(totalA)}</div>
+            <div style={{ color: C.cream, fontSize: 32, fontWeight: 800, fontFamily: "Georgia, serif" }}>{fmtSkins(totalA)}</div>
           </div>
           <div style={{ flex: 1, background: totalB >= totalA ? C.greenMid : C.greenLight, borderRadius: 12, padding: 14, textAlign: "center" }}>
             <div style={{ color: C.cream, fontWeight: 800 }}>{teams![1].name}</div>
-            <div style={{ color: C.cream, fontSize: 32, fontWeight: 900, fontFamily: "Georgia, serif" }}>{fmtSkins(totalB)}</div>
+            <div style={{ color: C.cream, fontSize: 32, fontWeight: 800, fontFamily: "Georgia, serif" }}>{fmtSkins(totalB)}</div>
           </div>
         </div>
 
@@ -206,7 +206,7 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
               <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                 <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{f.name}{mine ? " · your match" : ""}</div>
                 <div style={{ flex: 1 }} />
-                <div style={{ color: C.cream, fontWeight: 900, fontFamily: "Georgia, serif" }}>{fmtSkins(result.skinsBySide.a || 0)}–{fmtSkins(result.skinsBySide.b || 0)}</div>
+                <div style={{ color: C.cream, fontWeight: 800, fontFamily: "Georgia, serif" }}>{fmtSkins(result.skinsBySide.a || 0)}–{fmtSkins(result.skinsBySide.b || 0)}</div>
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                 <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
@@ -264,11 +264,11 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <div style={{ flex: 1, background: teamTotals.A >= teamTotals.B ? C.greenMid : C.greenLight, borderRadius: 12, padding: 14, textAlign: "center" }}>
               <div style={{ color: C.cream, fontWeight: 800 }}>{teams![0].name}</div>
-              <div style={{ color: C.cream, fontSize: 32, fontWeight: 900, fontFamily: "Georgia, serif" }}>{fmtSkins(teamTotals.A)}</div>
+              <div style={{ color: C.cream, fontSize: 32, fontWeight: 800, fontFamily: "Georgia, serif" }}>{fmtSkins(teamTotals.A)}</div>
             </div>
             <div style={{ flex: 1, background: teamTotals.B >= teamTotals.A ? C.greenMid : C.greenLight, borderRadius: 12, padding: 14, textAlign: "center" }}>
               <div style={{ color: C.cream, fontWeight: 800 }}>{teams![1].name}</div>
-              <div style={{ color: C.cream, fontSize: 32, fontWeight: 900, fontFamily: "Georgia, serif" }}>{fmtSkins(teamTotals.B)}</div>
+              <div style={{ color: C.cream, fontSize: 32, fontWeight: 800, fontFamily: "Georgia, serif" }}>{fmtSkins(teamTotals.B)}</div>
             </div>
           </div>
         )}
@@ -297,9 +297,9 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
         {matchCards.map(({ idx, pa, pb, result }) => (
           <div key={idx} style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 12, border: pa.id === myKey || pb.id === myKey ? `1px solid ${C.gold}` : "none" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{pa.name}{isTeamSkins ? ` (${teamName(playerOf(pa.id)?.team)})` : ""} <span style={{ color: C.sage, fontWeight: 400 }}>vs</span> {pb.name}{isTeamSkins ? ` (${teamName(playerOf(pb.id)?.team)})` : ""}</div>
+              <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{pa.name}{isTeamSkins ? ` (${teamName(playerOf(pa.id)?.team)})` : ""} <span style={{ color: C.sage, fontWeight: 500 }}>vs</span> {pb.name}{isTeamSkins ? ` (${teamName(playerOf(pb.id)?.team)})` : ""}</div>
               <div style={{ flex: 1 }} />
-              <div style={{ color: C.cream, fontWeight: 900, fontFamily: "Georgia, serif" }}>{fmtSkins(result.skinsBySide[pa.id] || 0)}–{fmtSkins(result.skinsBySide[pb.id] || 0)}</div>
+              <div style={{ color: C.cream, fontWeight: 800, fontFamily: "Georgia, serif" }}>{fmtSkins(result.skinsBySide[pa.id] || 0)}–{fmtSkins(result.skinsBySide[pb.id] || 0)}</div>
             </div>
             <div style={{ marginTop: 10 }}>
               {result.holes.map((h) => {
@@ -627,10 +627,10 @@ export function MatchView({
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", color: C.cream, fontWeight: 700, fontSize: 15 }}>
                   <Avatar src={pa.avatar_url} name={pa.display_name} size={24} />
-                  <span>{pa.display_name}{isTeam ? <span style={{ color: C.gold, fontWeight: 400, fontSize: 12 }}> ({teamName(pa.team)})</span> : null}</span>
-                  <span style={{ color: C.sage, fontWeight: 400 }}>vs</span>
+                  <span>{pa.display_name}{isTeam ? <span style={{ color: C.gold, fontWeight: 500, fontSize: 12 }}> ({teamName(pa.team)})</span> : null}</span>
+                  <span style={{ color: C.sage, fontWeight: 500 }}>vs</span>
                   <Avatar src={pb.avatar_url} name={pb.display_name} size={24} />
-                  <span>{pb.display_name}{isTeam ? <span style={{ color: C.gold, fontWeight: 400, fontSize: 12 }}> ({teamName(pb.team)})</span> : null}</span>
+                  <span>{pb.display_name}{isTeam ? <span style={{ color: C.gold, fontWeight: 500, fontSize: 12 }}> ({teamName(pb.team)})</span> : null}</span>
                 </div>
                 <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
                   thru {st.thru} · {pa.display_name}{" "}
@@ -707,7 +707,7 @@ export function SweepBroom({ side }: { side: "left" | "right" }) {
 // in on the third. Two rows: title, then the live leader line. Big brooms sweep inward.
 export function CleanSweepBanner({ name, val, thru, unit }: { name: string; val: number; thru: number; unit: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, borderRadius: 13, padding: "10px 14px", margin: "12px 0", background: "linear-gradient(180deg,#D9B23A,#C9A227)", border: "1px solid #E0C043", boxShadow: "0 6px 18px -8px rgba(0,0,0,0.6)" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 12, borderRadius: 12, padding: "10px 14px", margin: "12px 0", background: "linear-gradient(180deg,#D9B23A,#C9A227)", border: "1px solid #E0C043", boxShadow: "0 6px 18px -8px rgba(0,0,0,0.6)" }}>
       <SweepBroom side="left" />
       <div style={{ flex: 1, textAlign: "center", minWidth: 0 }}>
         <div style={{ fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 15, letterSpacing: 0.4, textTransform: "uppercase", color: "#1c1706", whiteSpace: "nowrap" }}>Clean Sweep Watch</div>
@@ -737,7 +737,7 @@ export function SweepTrophy() {
 // the watch banner, with brooms flanking a trophy and a congratulatory message.
 export function SweepAchievedBanner({ name, potNote }: { name: string; potNote?: string }) {
   return (
-    <div style={{ position: "relative", overflow: "hidden", borderRadius: 15, padding: "16px 14px", margin: "12px 0", textAlign: "center", background: "radial-gradient(120% 120% at 50% 0%, #F0CF6A 0%, #D9B23A 45%, #C9A227 100%)", border: "1px solid #EBD37E", boxShadow: "0 10px 26px -10px rgba(0,0,0,0.7)" }}>
+    <div style={{ position: "relative", overflow: "hidden", borderRadius: 14, padding: "16px 14px", margin: "12px 0", textAlign: "center", background: "radial-gradient(120% 120% at 50% 0%, #F0CF6A 0%, #D9B23A 45%, #C9A227 100%)", border: "1px solid #EBD37E", boxShadow: "0 10px 26px -10px rgba(0,0,0,0.7)" }}>
       <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-end", gap: 8, marginBottom: 4 }}>
         <SweepBroom side="left" />
         <SweepTrophy />
@@ -1212,16 +1212,16 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
     return (
       <div key={key} style={{ borderTop: "1px solid rgba(255,255,255,0.10)", padding: "10px 0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ flex: 1, display: "flex", alignItems: "center", gap: 7, minWidth: 0, color: C.cream, fontSize: 15, fontWeight: 600 }}><Avatar src={a.avatar_url} name={a.display_name} size={24} /><span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.display_name}</span> <span style={{ color: C.sage, fontSize: 12, fontWeight: 400 }}>ph {phStr(a)}</span></span>
+          <span style={{ flex: 1, display: "flex", alignItems: "center", gap: 7, minWidth: 0, color: C.cream, fontSize: 15, fontWeight: 500 }}><Avatar src={a.avatar_url} name={a.display_name} size={24} /><span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.display_name}</span> <span style={{ color: C.sage, fontSize: 12, fontWeight: 500 }}>ph {phStr(a)}</span></span>
           <span style={{ color: C.faint, fontSize: 12 }}>vs</span>
-          <span style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 7, minWidth: 0, color: C.cream, fontSize: 15, fontWeight: 600 }}><span style={{ color: C.sage, fontSize: 12, fontWeight: 400 }}>ph {phStr(b)}</span> <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{b.display_name}</span><Avatar src={b.avatar_url} name={b.display_name} size={24} /></span>
+          <span style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 7, minWidth: 0, color: C.cream, fontSize: 15, fontWeight: 500 }}><span style={{ color: C.sage, fontSize: 12, fontWeight: 500 }}>ph {phStr(b)}</span> <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{b.display_name}</span><Avatar src={b.avatar_url} name={b.display_name} size={24} /></span>
         </div>
         <div style={{ color: "#CFE3D8", fontSize: 12, marginTop: 6 }}>
           {allow.a === 0 && allow.b === 0
             ? "Even match — no strokes."
             : allow.a === 0
-              ? <><span style={{ color: C.sage }}>{a.display_name} plays off scratch.</span> {b.display_name} — <span style={{ color: "#E4CF86", fontWeight: 600 }}>{strokeText(allow.b)}</span></>
-              : <><span style={{ color: C.sage }}>{b.display_name} plays off scratch.</span> {a.display_name} — <span style={{ color: "#E4CF86", fontWeight: 600 }}>{strokeText(allow.a)}</span></>}
+              ? <><span style={{ color: C.sage }}>{a.display_name} plays off scratch.</span> {b.display_name} — <span style={{ color: "#E4CF86", fontWeight: 500 }}>{strokeText(allow.b)}</span></>
+              : <><span style={{ color: C.sage }}>{b.display_name} plays off scratch.</span> {a.display_name} — <span style={{ color: "#E4CF86", fontWeight: 500 }}>{strokeText(allow.a)}</span></>}
         </div>
       </div>
     );
@@ -1233,7 +1233,7 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
     const low = Math.min(...members.map((m) => applyAllowance(chBasis(m, game.course_par), allowance)));
     const col = (side: string[], teamKey: string | null) => (
       <div style={{ flex: 1, borderTop: `2px solid ${teamColOf(teamKey)}`, paddingTop: 8 }}>
-        {teams && teamKey && <div style={{ color: teamColOf(teamKey), fontSize: 11, fontWeight: 600, marginBottom: 6 }}>{teams.find((t) => t.key === teamKey)?.name?.toUpperCase()}</div>}
+        {teams && teamKey && <div style={{ color: teamColOf(teamKey), fontSize: 11, fontWeight: 500, marginBottom: 6 }}>{teams.find((t) => t.key === teamKey)?.name?.toUpperCase()}</div>}
         {side.map(byKey).filter((p): p is Player => !!p).map((p) => {
           const recv = applyAllowance(chBasis(p, game.course_par), allowance) - low;
           return (

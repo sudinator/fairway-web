@@ -103,11 +103,52 @@ def scan_tags(src):
 
 
 BG = re.compile(r"background(?:Color)?:\s*(C\.\w+|\"#[0-9A-Fa-f]{3,8}\")")
+
+def value_of_style(attrs, prop):
+    """Whole style value up to the next top-level comma — keeps a ternary intact."""
+    m = re.search(rf"\b{prop}(?:Color)?\s*:\s*", attrs)
+    if not m:
+        return None
+    i, depth, out = m.end(), 0, []
+    while i < len(attrs):
+        c = attrs[i]
+        if c in "({[":
+            depth += 1
+        elif c in ")]}":
+            if depth == 0:
+                break
+            depth -= 1
+        elif c == "," and depth == 0:
+            break
+        out.append(c)
+        i += 1
+    return "".join(out).strip()
 # Literal colours AND conditional ones. A ternary — `color: cond ? C.birdie : C.green` — is
 # still a colour that paints on screen, and BOTH branches must survive their background. The
 # original pattern matched literals only, so 123 conditional sites were never examined at all;
 # one of them shipped "G1 2 UP" in C.green on a C.greenLight card at 1.54:1.
 COLOR = re.compile(r"color:\s*(C\.\w+|\"#[0-9A-Fa-f]{3,8}\")")
+
+# A conditional style is `cond ? A : B` — possibly chained. Capturing the CONDITIONS as well as
+# the values is what lets a text colour be matched to the right background branch. Without it the
+# checker cross-multiplies every text against every background and reports combinations that can
+# never appear on screen: a chip whose background and label both flip on `selected` only ever
+# renders (gold, dark) or (green, cream), never (gold, cream).
+COND_CHAIN = re.compile(r"([A-Za-z_$][\w$.?\[\]]*)\s*(?:===?\s*[^?]+?)?\s*\?")
+
+def branches(expr):
+    """[(condition_or_None, value), ...] for a ternary chain; [] if not conditional."""
+    if not expr or "?" not in expr:
+        return []
+    out, rest = [], expr
+    while "?" in rest and ":" in rest:
+        cond, _, rest = rest.partition("?")
+        val, _, rest = rest.partition(":")
+        out.append((cond.strip(), val.strip()))
+        if "?" not in rest:
+            out.append((None, rest.strip()))
+            break
+    return out
 COLOR_EXPR = re.compile(r"color:\s*([^,}]*?\?[^,}]*?:[^,}]+)")
 TOKEN_IN_EXPR = re.compile(r"C\.\w+|\"#[0-9A-Fa-f]{6}\"")
 SIZE = re.compile(r"fontSize:\s*(\d+)")
@@ -123,15 +164,17 @@ def norm(raw):
 
 def analyse(path):
     src = path.read_text(encoding="utf-8", errors="replace")
-    stack, out = [], []
+    stack, stack_raw, out = [], [], []
     for start, closing, name, attrs, selfclose in scan_tags(src):
         if closing:
             for k in range(len(stack) - 1, -1, -1):
                 if stack[k][0] == name:
                     del stack[k:]
+                    del stack_raw[k:]
                     break
             continue
         bgm = BG.search(attrs)
+        braw = value_of_style(attrs, "background") if "background" in attrs else None
         bg = norm(bgm.group(1))[0] if bgm else None
         if bg is None:
             if "...inputStyle" in attrs:
@@ -155,7 +198,11 @@ def analyse(path):
 
         for cand in candidates:
             fg_hex, fg_name = norm(cand)
-            eff_bg = bg or next((b for _, b in reversed(stack) if b), None)
+            # If this element sets a background we cannot resolve (a variable or a call),
+            # the text is painted on THAT, not on any ancestor. Skip rather than mis-attribute.
+            unresolvable_own = (braw is not None and bg is None
+                                and not re.search(r"transparent|none", braw or ""))
+            eff_bg = None if unresolvable_own else (bg or next((b for _, b in reversed(stack) if b), None))
             if fg_hex and eff_bg:
                 sz = int(SIZE.search(attrs).group(1)) if SIZE.search(attrs) else 15
                 wt = int(WEIGHT.search(attrs).group(1)) if WEIGHT.search(attrs) else 400
@@ -170,6 +217,7 @@ def analyse(path):
                     })
         if not selfclose:
             stack.append((name, bg))
+            stack_raw.append((name, bg, braw))
     return out
 
 

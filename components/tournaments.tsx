@@ -848,7 +848,7 @@ function CreateGame({
                   <span style={{ flex: 1, minWidth: 0, color: C.cream, fontWeight: 700, fontSize: 15 }}>
                     {p.display_name}{isMe ? " (you)" : ""}
                     {checked && resolved ? (
-                      <span style={{ display: "block", color: C.sage, fontSize: 11, fontWeight: 400, marginTop: 2 }}>
+                      <span style={{ display: "block", color: C.sage, fontSize: 11, fontWeight: 500, marginTop: 2 }}>
                         {resolved.tee.name} · {teeSourceLabel(resolved.source, resolved.flight)}
                       </span>
                     ) : null}
@@ -1118,7 +1118,7 @@ function CreateGame({
                   : "Carry over \u2014 a tied hole pushes its skin to the next, building the pot. Scales to any field."}
               </div>
               {tooMany && (
-                <div style={{ background: "#4a1d16", border: `1px solid ${C.birdie}`, borderRadius: 9, padding: "8px 10px", marginTop: 8, color: "#f0c5bd", fontSize: 11.5, lineHeight: 1.45 }}>
+                <div style={{ background: "#4a1d16", border: `1px solid ${C.birdie}`, borderRadius: 8, padding: "8px 10px", marginTop: 8, color: "#f0c5bd", fontSize: 11.5, lineHeight: 1.45 }}>
                   {fieldCount} players is too many for split skins. Use <b>Team skins</b> or <b>1:1 matchups</b>, or switch to <b>Carry over</b>.
                 </div>
               )}
@@ -1225,7 +1225,7 @@ function CreateGame({
                   ))}
                 </div>
                 {(idxVal == null || flightNeedsHcp.length > 0) ? (
-                  <div style={{ background: "rgba(184,58,46,.12)", border: "1px solid rgba(184,58,46,.4)", borderRadius: 11, padding: "10px 12px", marginBottom: 10 }}>
+                  <div style={{ background: "rgba(184,58,46,.12)", border: "1px solid rgba(184,58,46,.4)", borderRadius: 12, padding: "10px 12px", marginBottom: 10 }}>
                     <div style={{ color: C.cream, fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Handicaps needed to flight this event</div>
                     {idxVal == null ? <div style={{ color: C.sage, fontSize: 11, marginBottom: 6 }}>Enter your own index in the field above.</div> : null}
                     {flightNeedsHcp.map((p) => {
@@ -1311,7 +1311,7 @@ function CreateGame({
                 [!flightBlocked, "Flights", flightMode === "oneoff" ? `${flightCount} flights ready` : "Off"],
               ].map(([ok, label, value], i) => (
                 <div key={String(label)} style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 0", borderBottom: i < 4 ? "1px solid rgba(255,255,255,.08)" : "none" }}>
-                  <span style={{ color: ok ? "#5BD08A" : C.gold, fontWeight: 900 }}>{ok ? "✓" : "!"}</span>
+                  <span style={{ color: ok ? "#5BD08A" : C.gold, fontWeight: 800 }}>{ok ? "✓" : "!"}</span>
                   <span style={{ color: C.sage, fontSize: 12, minWidth: 76 }}>{label}</span>
                   <span style={{ color: C.cream, fontSize: 12.5, fontWeight: 700, marginLeft: "auto", textAlign: "right" }}>{value}</span>
                 </div>
@@ -1341,7 +1341,7 @@ function CreateGame({
         )}
       </CreateGameWorkspace>
       {err && (
-        <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>
+        <div style={{ color: C.overRedDark, fontSize: 13, marginTop: 10 }}>
           {err}
         </div>
       )}
@@ -2768,7 +2768,7 @@ function GameRoom({
         )}
       </div>
       {isOrganizer && orgWide && (
-        <a href={`/organize/${game.id}`} style={{ display: "block", marginTop: 10, textAlign: "center", color: C.gold, fontSize: 13, fontWeight: 700, textDecoration: "none", border: `1px solid ${C.gold}`, borderRadius: 9, padding: "9px 0" }}>
+        <a href={`/organize/${game.id}`} style={{ display: "block", marginTop: 10, textAlign: "center", color: C.gold, fontSize: 13, fontWeight: 700, textDecoration: "none", border: `1px solid ${C.gold}`, borderRadius: 8, padding: "9px 0" }}>
           Set up flights &amp; matchups in the desktop organizer →
         </a>
       )}
@@ -2931,7 +2931,7 @@ function GameRoom({
           {game.game_type === "match" ? "⛳ Singles Match Play" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "⛳ Four-Ball · Shootout" : "⛳ Four-Ball Match (Best Net)") : game.game_type === "trifecta" ? (game.team_score_mode === "aggregate" ? "⛳ Trifecta · Shootout" : "⛳ Trifecta") : game.game_type === "skins" ? "🪙 Skins (Net)" : game.game_type === "stroke" ? (game.stroke_basis === "gross" ? "⛳ Stroke Play (Gross)" : "⛳ Stroke Play (Net)") : "🏆 Stableford Tournament"}
         </span>
         {isEnded ? (
-          <span style={{ fontSize: 12, fontWeight: 800, background: C.gold, color: "#1A1A1A", borderRadius: 20, padding: "3px 10px" }}>FINAL · GAME ENDED</span>
+          <span style={{ fontSize: 12, fontWeight: 800, background: C.gold, color: C.cream, borderRadius: 14, padding: "3px 10px" }}>FINAL · GAME ENDED</span>
         ) : (
           <span style={{ color: C.cream, opacity: 0.8, fontSize: 12 }}>
             {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "2 v 2 · aggregate net (both balls)" : "2 v 2 better-net-ball") : game.game_type === "trifecta" ? (game.trifecta_scoring === "match" ? "2 singles + a team match · 3 pts/foursome" : "2 singles + a team point · 3 pts/hole") : game.game_type === "skins" ? "net skins · carryovers" : game.game_type === "stroke" ? "lowest total wins" : "net Stableford leaderboard"}
@@ -3047,7 +3047,7 @@ function GameRoom({
         const complete = fp.gaps.length === 0;
         return (
           <div onClick={() => setFinishPrompt(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 1000 }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, color: C.cream, borderRadius: 16, padding: 20, maxWidth: 460, width: "100%", maxHeight: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 32px)", overflowY: "auto" }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, color: C.cream, borderRadius: 14, padding: 20, maxWidth: 460, width: "100%", maxHeight: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 32px)", overflowY: "auto" }}>
               <div style={{ fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800, color: C.cream }}>
                 {fp.kind === "group" ? `Finish Group ${fp.teeGroup}'s round?` : "End the game for everyone?"}
               </div>
@@ -3201,7 +3201,7 @@ function GameRoom({
               <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                 {(["flight", "overall"] as const).map((v) => (
                   <button key={v} onClick={() => setFlightView(v)} style={{
-                    flex: 1, padding: "7px 0", borderRadius: 9,
+                    flex: 1, padding: "7px 0", borderRadius: 8,
                     border: `1px solid ${flightView === v ? C.gold : "rgba(255,255,255,0.25)"}`,
                     background: flightView === v ? C.gold : "transparent",
                     color: flightView === v ? "#06251A" : C.cream, fontWeight: 800, fontSize: 12, cursor: "pointer",
@@ -3234,7 +3234,7 @@ function GameRoom({
                   return (
                     <div key={b.key} style={{ marginTop: 12 }}>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "8px 4px 0" }}>
-                        <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: flightTagColor(b.key) }} />
+                        <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 6, background: flightTagColor(b.key) }} />
                         <span style={{ fontFamily: "Georgia, serif", fontSize: 15, fontWeight: 700, color: C.cream }}>{b.name}</span>
                         <span style={{ color: C.sage, fontSize: 11 }}>index {flightRangeLabel(flightDefs, bi)} · {inFlight.length} player{inFlight.length === 1 ? "" : "s"}</span>
                       </div>
@@ -3304,7 +3304,7 @@ function GameRoom({
                     <>
                       <div style={{ color: C.cream, fontWeight: 800, marginTop: 6 }}>
                         {s.who.join(" & ")}
-                        <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", color: C.green, background: C.sage, borderRadius: 5, padding: "1px 6px", verticalAlign: "middle" }}>
+                        <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", color: C.green, background: C.sage, borderRadius: 6, padding: "1px 6px", verticalAlign: "middle" }}>
                           {s.who.length > 1 ? "tied" : "leading"}
                         </span>
                       </div>

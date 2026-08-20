@@ -108,7 +108,7 @@ export function FeedbackForm({
         We'll automatically include your app version ({APP_VERSION}) and current group to help us track it down.
       </div>
 
-      {err && <div style={{ color: "#f0a99f", fontSize: 12, marginTop: 8 }}>{err}</div>}
+      {err && <div style={{ color: C.overRedDark, fontSize: 12, marginTop: 8 }}>{err}</div>}
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
         <button onClick={submit} disabled={busy || !msg.trim()} style={{ ...btn(true), opacity: busy || !msg.trim() ? 0.5 : 1 }}>

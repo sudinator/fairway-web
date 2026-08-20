@@ -304,7 +304,7 @@ export function HelpSearch({ onSendQuestion }: { onSendQuestion?: (q: string) =>
                 borderRadius: "14px 14px 4px 14px",
                 padding: "9px 13px",
                 fontSize: 13,
-                fontWeight: 600,
+                fontWeight: 500,
               }}
             >
               {m.text}
