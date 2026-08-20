@@ -247,7 +247,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
     </div>
   );
   const expandBtn = (open: boolean, onClick: () => void) => (
-    <button onClick={onClick} style={{ background: open ? "transparent" : "rgba(201,162,39,0.12)", border: `1px solid ${C.gold}`, color: C.gold, fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "3px 10px", borderRadius: 999, whiteSpace: "nowrap", letterSpacing: 0.3 }}>{open ? "− Less" : "＋ More"}</button>
+    <button onClick={onClick} style={{ background: open ? "transparent" : "rgba(201,162,39,0.12)", border: `1px solid ${C.gold}`, color: C.gold, fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "9px 10px", borderRadius: 999, whiteSpace: "nowrap", letterSpacing: 0.3 }}>{open ? "− Less" : "＋ More"}</button>
   );
   const dirLower = new Set<StatKey>(["rounds", "avgpar", "best", "diff", "par3", "par4", "par5", "putts", "threeputt", "pen"]);
   const perRoundNum = (key: StatKey, r: Round): number | null => {

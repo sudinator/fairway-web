@@ -365,7 +365,7 @@ export function HelpSearch({ onSendQuestion }: { onSendQuestion?: (q: string) =>
             if (e.key === "Enter") ask(input);
           }}
         />
-        <button onClick={() => ask(input)} style={{ ...btn(true), padding: "0 16px" }}>
+        <button onClick={() => ask(input)} style={{ ...btn(true), padding: "7px 16px" }}>
           Ask
         </button>
       </div>

@@ -994,7 +994,7 @@ export function FourballView({
                 {f[team].map((uid) => (
                   <div key={uid} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0" }}>
                     <span style={{ flex: 1, color: C.cream, fontSize: 14 }}>{nameOf(uid)}</span>
-                    {isCreator && <button style={{ ...btn(false), fontSize: 11, padding: "3px 8px", opacity: foursomesBlocked ? 0.55 : 1 }} disabled={foursomesBlocked} onClick={() => unassign(f.id, team, uid)}>Remove</button>}
+                    {isCreator && <button style={{ ...btn(false), fontSize: 11, padding: "9px 8px", opacity: foursomesBlocked ? 0.55 : 1 }} disabled={foursomesBlocked} onClick={() => unassign(f.id, team, uid)}>Remove</button>}
                   </div>
                 ))}
                 {isCreator && f[team].length < 2 && (
@@ -1308,7 +1308,7 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
   const toggleBtn = showToggle ? (
     <button
       onClick={(e) => { e.stopPropagation(); setShowAll((sa) => !sa); }}
-      style={{ background: "none", border: "none", color: C.gold, fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", padding: "4px 2px", flexShrink: 0 }}
+      style={{ background: "none", border: "none", color: C.gold, fontSize: 12, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap", padding: "9px 2px", flexShrink: 0 }}
     >
       {showAll ? "▴ Show my group" : `▾ Show all ${allGroupsCount} groups`}
     </button>

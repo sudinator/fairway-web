@@ -382,11 +382,11 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
         {source === "group" ? (
           <button title="Remove from club library"
             onClick={() => { if (confirm(`Remove "${courseCardTitle(c)}" from this club's library?\n\nThe course remains in the global app library and can be added back later.`)) remove(c.id, courseCardTitle(c)); }}
-            style={{ background: "none", border: "none", borderLeft: `1px solid ${C.borderCard}`, color: C.overRedDark, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>✕</button>
+            style={{ background: "none", border: "none", borderLeft: `1px solid ${C.borderCard}`, color: C.overRedDark, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "6px 16px" }}>✕</button>
         ) : inGroup ? (
           <div style={{ display: "flex", alignItems: "center", borderLeft: `1px solid ${C.borderCard}`, padding: "0 14px", color: C.cream, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>In Club ✓</div>
         ) : (
-          <button style={{ ...btn(true), borderRadius: 6, padding: "0 14px", fontSize: 12, opacity: busyId === c.id ? 0.5 : 1 }} disabled={busyId === c.id} onClick={() => addToMyGroup(c)}>＋ Add to Club</button>
+          <button style={{ ...btn(true), borderRadius: 6, padding: "9px 14px", fontSize: 12, opacity: busyId === c.id ? 0.5 : 1 }} disabled={busyId === c.id} onClick={() => addToMyGroup(c)}>＋ Add to Club</button>
         )}
       </div>
     );

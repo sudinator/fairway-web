@@ -312,7 +312,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
               </div>
             ) : null}
           </div>
-          {wait ? <span style={{ fontSize: 11, fontWeight: 800, background: C.greenLight, color: C.gold, borderRadius: 14, padding: "3px 9px" }}>Waitlist{waitPos.get(r.user_id) ? ` #${waitPos.get(r.user_id)}` : ""}</span> : null}
+          {wait ? <span style={{ fontSize: 11, fontWeight: 800, background: C.greenLight, color: C.gold, borderRadius: 14, padding: "9px 9px" }}>Waitlist{waitPos.get(r.user_id) ? ` #${waitPos.get(r.user_id)}` : ""}</span> : null}
           {wait && canOrganizeTee ? <button onClick={() => promote(sel, r.user_id)} disabled={busy} style={{ ...btn(false), fontSize: 11, padding: "5px 9px" }}>Move up</button> : null}
           {showOrg && canOrganizeTee ? (
             <button onClick={() => orgSetRsvp(sel, r.user_id, r.choice === "in" ? "out" : "in")} disabled={busy}

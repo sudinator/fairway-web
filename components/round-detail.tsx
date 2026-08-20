@@ -236,7 +236,7 @@ function GhinPanel({ round, ghinNumber, playerName }: { round: Round; ghinNumber
     <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: `1px solid ${C.borderCard}` }}>
       <div style={{ color: "#5A6B62", fontSize: 13, width: 120 }}>{label}</div>
       <div style={{ color: "#16201C", fontSize: 15, fontWeight: 800, flex: 1 }}>{value}</div>
-      <button style={{ ...btn(false), fontSize: 11, padding: "4px 10px" }} onClick={() => copy(key, value)}>{copied === key ? "✓ Copied" : "Copy"}</button>
+      <button style={{ ...btn(false), fontSize: 11, padding: "9px 10px" }} onClick={() => copy(key, value)}>{copied === key ? "✓ Copied" : "Copy"}</button>
     </div>
   );
 

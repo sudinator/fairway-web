@@ -128,7 +128,7 @@ export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHc
             return (
               <button key={g} onClick={() => setGoalHcp(g)} style={{
                 border: `1px solid ${on ? C.gold : "#2c5142"}`, background: on ? C.gold : "#173a2c",
-                color: on ? "#2a2410" : C.cream, borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                color: on ? "#2a2410" : C.cream, borderRadius: 999, padding: "9px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer",
               }}>{synGoalLabel(g)}</button>
             );
           })}

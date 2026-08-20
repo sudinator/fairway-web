@@ -106,7 +106,7 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
           const active = cur === o.v;
           return (
             <button key={o.v} onClick={() => setPref(key, o.v)}
-              style={{ padding: "4px 9px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
+              style={{ padding: "9px 9px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
                 border: `1px solid ${active ? (o.v === "off" ? "#8B6A62" : C.gold) : C.borderCard}`,
                 background: active ? (o.v === "off" ? "#6B2F28" : C.gold) : "transparent",
                 color: active ? (o.v === "off" ? "#F6DEDB" : "#16201C") : C.sage }}>
@@ -674,7 +674,7 @@ function AdminPowerUsers() {
         <div style={{ display: "flex", gap: 4 }}>
           {([[null, "All-time"], [90, "90 days"]] as [number | null, string][]).map(([d, lbl]) => (
             <button key={lbl} onClick={() => setDays(d)}
-              style={{ fontSize: 11, padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
+              style={{ fontSize: 11, padding: "9px 10px", borderRadius: 999, border: "none", cursor: "pointer",
                 background: days === d ? C.gold : C.greenLight, color: days === d ? C.green : C.cream, fontWeight: 700 }}>
               {lbl}
             </button>
@@ -956,7 +956,7 @@ function OpsMetrics() {
                         <button
                           onClick={() => delStale(g)}
                           disabled={delId === g.game_id}
-                          style={{ background: "transparent", color: C.overRedDark, border: `1px solid ${C.birdie}`, borderRadius: 8, padding: "2px 8px", fontSize: 11, fontWeight: 700, cursor: delId === g.game_id ? "default" : "pointer", opacity: delId === g.game_id ? 0.62 : 1, whiteSpace: "nowrap" }}
+                          style={{ background: "transparent", color: C.overRedDark, border: `1px solid ${C.birdie}`, borderRadius: 8, padding: "9px 8px", fontSize: 11, fontWeight: 700, cursor: delId === g.game_id ? "default" : "pointer", opacity: delId === g.game_id ? 0.62 : 1, whiteSpace: "nowrap" }}
                         >
                           {delId === g.game_id ? "Deleting…" : "Delete"}
                         </button>
@@ -1317,7 +1317,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                       return (
                         <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: `1px solid ${C.borderGreen}` }}>
                           <span style={{ flex: 1, color: C.cream, fontSize: 13 }}>{g?.name || "Club"}{m.role === "admin" ? " · admin" : ""}</span>
-                          <button style={{ ...btn(false), padding: "4px 10px", fontSize: 11, color: C.overRedDark }} onClick={() => removeFromGroup(p, m, g?.name || "this club")}>Remove</button>
+                          <button style={{ ...btn(false), padding: "9px 10px", fontSize: 11, color: C.overRedDark }} onClick={() => removeFromGroup(p, m, g?.name || "this club")}>Remove</button>
                         </div>
                       );
                     })}
@@ -2174,7 +2174,7 @@ function AdminFrictionReview() {
     <div>
       <div style={{ display: "flex", alignItems: "center", margin: "18px 0 4px" }}>
         <span style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700, color: C.cream }}>Friction review</span>
-        <button onClick={runNow} disabled={sweeping} style={{ marginLeft: "auto", background: C.greenLight, color: C.sage, border: `1px solid ${C.borderGreen}`, borderRadius: 8, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+        <button onClick={runNow} disabled={sweeping} style={{ marginLeft: "auto", background: C.greenLight, color: C.sage, border: `1px solid ${C.borderGreen}`, borderRadius: 8, padding: "9px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
           {sweeping ? "Checking\u2026" : "Run check now"}
         </button>
       </div>
@@ -2542,26 +2542,26 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
             </div>
             <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
               <button disabled={busy === g.group_id} onClick={() => revokeInvites(g)}
-                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
+                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
                 Revoke invites
               </button>
               <button disabled={busy === g.group_id} onClick={() => { setMergeSrc(mergeSrc === g.group_id ? null : g.group_id); setMergeTo(""); }}
-                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
+                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
                 Merge…
               </button>
               {!g.is_default && (
                 <button disabled={busy === g.group_id} onClick={() => setDefault(g)}
-                  style={{ background: "transparent", color: C.sage, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
+                  style={{ background: "transparent", color: C.sage, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
                   Set as default
                 </button>
               )}
               <button disabled={busy === g.group_id} onClick={() => delGroup(g)}
-                style={{ background: "transparent", color: C.overRedDark, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
+                style={{ background: "transparent", color: C.overRedDark, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
                 Delete group
               </button>
               {g.is_test && (
                 <button disabled={busy === g.group_id} onClick={() => wipeGroup(g)}
-                  style={{ background: "transparent", color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
+                  style={{ background: "transparent", color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
                   Wipe data
                 </button>
               )}
@@ -2691,20 +2691,20 @@ export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean 
             <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
               {isOwner && !u.is_owner && !isSelf && (
                 <button disabled={busy === u.id} onClick={() => setSystemAdmin(u, !u.is_admin)}
-                  style={{ background: "transparent", color: u.is_admin ? C.overRedDark : C.sage, border: `1px solid ${u.is_admin ? C.birdie : C.sage}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}>
+                  style={{ background: "transparent", color: u.is_admin ? C.overRedDark : C.sage, border: `1px solid ${u.is_admin ? C.birdie : C.sage}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: "pointer" }}>
                   {u.is_admin ? "Remove system admin" : "Make system admin"}
                 </button>
               )}
               <button disabled={busy === u.id} onClick={() => { setMergeKeep(mergeKeep === u.id ? null : u.id); setMergeRemove(""); setPreview(null); }}
-                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}>
+                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: "pointer" }}>
                 Merge another into this…
               </button>
               <button disabled={busy === u.id || isSelf} onClick={() => setBanned(u, !banned)}
-                style={{ background: "transparent", color: banned ? C.sage : C.overRedDark, border: `1px solid ${banned ? C.sage : C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.62 : 1 }}>
+                style={{ background: "transparent", color: banned ? C.sage : C.overRedDark, border: `1px solid ${banned ? C.sage : C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.62 : 1 }}>
                 {banned ? "Restore" : "Suspend"}
               </button>
               <button disabled={busy === u.id || isSelf} onClick={() => wipe(u)}
-                style={{ background: "transparent", color: C.overRedDark, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.62 : 1 }}>
+                style={{ background: "transparent", color: C.overRedDark, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.62 : 1 }}>
                 Wipe data
               </button>
             </div>

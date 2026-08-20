@@ -86,7 +86,7 @@ export function InstallHint() {
       )}
       <button onClick={dismiss} aria-label="Dismiss" style={{
         background: "none", border: "none", color: "#93A99B", fontSize: 18,
-        cursor: "pointer", flexShrink: 0, lineHeight: 1, padding: "0 2px",
+        cursor: "pointer", flexShrink: 0, lineHeight: 1, padding: "5px 2px",
       }}>×</button>
     </div>
   );

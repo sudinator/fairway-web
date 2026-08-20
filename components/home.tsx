@@ -124,8 +124,8 @@ function ViewportDiag() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
         <b style={{ fontSize: 12, color: "#C9A227" }}>VIEWPORT DIAG</b>
         <span style={{ display: "flex", gap: 6 }}>
-          <button onClick={measure} style={{ fontSize: 11, background: C.greenMid, color: "#fff", border: "none", borderRadius: 6, padding: "3px 8px", fontWeight: 700 }}>Remeasure</button>
-          <button onClick={copy} style={{ fontSize: 11, background: C.gold, color: "#0E3B2E", border: "none", borderRadius: 6, padding: "3px 8px", fontWeight: 700 }}>{copied ? "Copied" : "Copy"}</button>
+          <button onClick={measure} style={{ fontSize: 11, background: C.greenMid, color: "#fff", border: "none", borderRadius: 6, padding: "9px 8px", fontWeight: 700 }}>Remeasure</button>
+          <button onClick={copy} style={{ fontSize: 11, background: C.gold, color: "#0E3B2E", border: "none", borderRadius: 6, padding: "9px 8px", fontWeight: 700 }}>{copied ? "Copied" : "Copy"}</button>
         </span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
@@ -801,7 +801,7 @@ export function Home({ session }: { session: any }) {
         {returnTab && !stage && !viewing && (tab === "players" || tab === "groups") && (
           <div style={{ display: "flex", alignItems: "center", position: "relative", padding: "2px 0 12px", marginBottom: 4, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
             <button onClick={() => { const t = returnTab; setReturnTab(null); setTab(t); }}
-              style={{ display: "flex", alignItems: "center", gap: 3, background: "none", border: "none", color: C.gold, fontSize: 15, fontWeight: 700, cursor: "pointer", padding: "2px 4px" }}>
+              style={{ display: "flex", alignItems: "center", gap: 3, background: "none", border: "none", color: C.gold, fontSize: 15, fontWeight: 700, cursor: "pointer", padding: "7px 4px" }}>
               <span style={{ fontSize: 20, lineHeight: 1, marginTop: -1 }}>‹</span>{tabTitle(returnTab)}
             </button>
             <div style={{ position: "absolute", left: 0, right: 0, textAlign: "center", color: C.cream, fontSize: 14, fontWeight: 800, pointerEvents: "none" }}>{tabTitle(tab)}</div>

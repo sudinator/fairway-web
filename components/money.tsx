@@ -997,7 +997,7 @@ function AddExpense({ user, gid, members, guests, balances, busy, setBusy, requi
         <Eyebrow>Split between</Eyebrow>
         <span style={{ flex: 1, color: C.sage, fontSize: 11, marginLeft: 8 }}>{selected.length} of {parties.length} selected{mode === "even" && amtCents > 0 && selected.length ? ` · ${fmtUSD(Math.floor(amtCents / selected.length))} each` : ""}</span>
         {parties.length > 0 && (() => { const allOn = parties.every((p) => checked.has(keyOf(p)));
-          return <button onClick={() => setChecked(allOn ? new Set() : new Set(parties.map(keyOf)))} style={{ background: "none", border: "none", color: C.gold, fontSize: 12, fontWeight: 700, cursor: "pointer", padding: "2px 0" }}>{allOn ? "Deselect all" : "Select all"}</button>; })()}
+          return <button onClick={() => setChecked(allOn ? new Set() : new Set(parties.map(keyOf)))} style={{ background: "none", border: "none", color: C.gold, fontSize: 12, fontWeight: 700, cursor: "pointer", padding: "9px 0" }}>{allOn ? "Deselect all" : "Select all"}</button>; })()}
       </div>
       <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
         <button onClick={() => setMode("even")} style={chip(mode === "even")}>Split evenly</button>

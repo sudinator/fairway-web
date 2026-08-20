@@ -1,3 +1,22 @@
+## 177.71.260820 — Tap targets: 30 buttons too small to hit reliably
+- **NO migration. Cosmetic + CI only.** Vertical padding only — horizontal is untouched, verified
+  line by line, so nothing got wider and nothing can wrap.
+- **30 buttons rendered under 24px tall.** The worst was an 18px band around 11px text
+  (`manage.tsx` delete-stale). Apple's HIG minimum is 44pt; under ~24px is a miss-and-retry on a
+  phone, one-handed, outdoors — which is how this app is used. All 30 now render >= 32px.
+  One was correctly excluded: the course-library star toggle sits in an `alignItems: "stretch"`
+  row and already fills the row height.
+- **The 152 buttons in the 24-31px band are left alone.** Tight but hittable. Standardising them
+  would move layout across the app for a benefit nobody would feel.
+- **The wider padding scale is NOT being pursued.** 161 padding values remain 161. Analysis showed
+  it is a cross-product of two axes rather than 161 arbitrary strings, so a 5x5 or 6x6 scale would
+  collapse it to 20-31 combinations with 454 of 508 sites moving only 1-2px. That is invisible: it
+  would be 508 sites of layout risk, with no component test harness, for a change no user could
+  perceive. Ratcheted so it cannot get worse; not collapsed. Reasoning recorded in DISPLAY_RULES.
+- **NEW `ci/check_tap_targets.py`** — fails the build if a button drops below 24px estimated
+  height. Height is fontSize * 1.25 + 2 * vertical padding; buttons inside a `stretch` container
+  are skipped because they fill the parent. Negative-tested. Baseline is 0.
+
 ## 177.70.260820 — Release verification, and the eight bugs it found
 - **NO migration. Cosmetic + CI only.** Supersedes the 177.69 candidate, which was packaged but is
   incomplete.

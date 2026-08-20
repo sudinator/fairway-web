@@ -452,7 +452,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
                   </button>
                   <button title="Remove from favorites"
                     onClick={() => { if (confirm(`Remove "${f.name}" from favorites?`)) deleteFavorite(f.id); }}
-                    style={{ background: "none", border: "none", borderLeft: `1px solid ${C.borderCard}`, color: C.overRedDark, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>
+                    style={{ background: "none", border: "none", borderLeft: `1px solid ${C.borderCard}`, color: C.overRedDark, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "6px 16px" }}>
                     ✕
                   </button>
                 </div>
