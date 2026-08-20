@@ -78,4 +78,46 @@ ok(lum(C.underDark) > 0.4, "C.underDark is light (a score colour, not a success 
   eq(btn("primary", "compact").fontSize, 12, "compact size applies");
 }
 
-report("release check 177.69");
+
+
+// ── backdropDismiss: the scroll-closes-the-sheet bug (APP_RULES #26) ────────
+{
+  const { backdropDismiss } = require("../components/ui") as typeof import("../components/ui");
+  let closed = 0;
+  const Overlay = () => (
+    <div data-testid="scrim" {...backdropDismiss(() => { closed += 1; })}
+         style={{ position: "fixed", inset: 0 }}>
+      <div data-testid="panel" style={{ background: "#1B5A46" }}>content</div>
+    </div>
+  );
+  const { container, unmount } = renderToDom(<Overlay />);
+  const scrim = container.querySelector("[data-testid=scrim]") as HTMLElement;
+  const panel = container.querySelector("[data-testid=panel]") as HTMLElement;
+
+  const down = (el: Element, x: number, y: number) =>
+    el.dispatchEvent(new (window as any).MouseEvent("pointerdown",
+      { bubbles: true, clientX: x, clientY: y }));
+  const click = (el: Element, x: number, y: number) =>
+    el.dispatchEvent(new (window as any).MouseEvent("click",
+      { bubbles: true, clientX: x, clientY: y }));
+
+  // a clean tap on the scrim closes
+  closed = 0; down(scrim, 50, 50); click(scrim, 50, 50);
+  eq(closed, 1, "a clean backdrop tap closes the overlay");
+
+  // a gesture that STARTS on the panel and lifts over the scrim must NOT close.
+  // this is the real bug: the click target is the scrim, so onClick alone would fire.
+  closed = 0; down(panel, 50, 400); click(scrim, 50, 60);
+  eq(closed, 0, "a scroll starting in the panel does NOT close the overlay");
+
+  // a drag on the scrim is not a tap
+  closed = 0; down(scrim, 50, 50); click(scrim, 50, 300);
+  eq(closed, 0, "a drag across the backdrop does NOT close the overlay");
+
+  // a click inside the panel never closes
+  closed = 0; down(panel, 50, 50); click(panel, 50, 50);
+  eq(closed, 0, "a click inside the panel does NOT close the overlay");
+  unmount();
+}
+
+report("backdrop dismiss");

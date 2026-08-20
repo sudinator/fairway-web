@@ -1,3 +1,30 @@
+## 177.72.260820 — Overlays: a scroll no longer closes the sheet
+- **NO migration. Cosmetic + CI only.**
+- **FIX: four overlays closed when a scroll gesture ended on the backdrop**, discarding whatever
+  the user was entering. The failure is subtle: `onClick` fires on whatever sits under the finger
+  when it lifts, so a scroll that starts inside the panel and drifts onto the scrim registers as a
+  backdrop tap. `stopPropagation` on the panel does not help — the click target really is the
+  backdrop. Affected: the hole score sheet (`ui.tsx`), the share modal (`share-card.tsx`, 2 sites),
+  the player card (`player-card.tsx`) and the end-game confirmation (`tournaments.tsx`).
+- **NEW `backdropDismiss()` in `ui.tsx`.** Requires that the gesture BEGAN on the backdrop and that
+  the finger travelled less than 10px. `BottomSheet` avoids the problem structurally by putting the
+  scrim in a separate sibling div; these four wrap the panel inside the scrim, and this makes that
+  shape safe without restructuring them.
+- **Verified by execution, not inspection.** Four new assertions in `lib/release-check.test.tsx`
+  dispatch real pointer events: a clean backdrop tap closes; a scroll starting in the panel does
+  not; a drag across the backdrop does not; a click inside the panel does not. Negative-tested —
+  reverting to the naive `onClick` fails three of the four.
+- **Safe-area padding added** to the share modal and player card, which lacked it. Without it a
+  full-screen overlay can place its content under the notch or the home indicator.
+- **Two of the eight "hand-rolled overlays" were false positives** and are left alone: `ui.tsx:211`
+  is `BottomSheet` itself, and `home.tsx:944` is a bare click-catcher behind a menu, not a panel.
+  A third, `ui.tsx:44`, is the avatar photo lightbox — a different pattern from a sheet, and
+  correct as written.
+- **Share-card PNG export reviewed.** No action needed: the card uses only system fonts (Georgia,
+  `-apple-system`) so there is no webfont to inline, contains no remote images to fetch, and falls
+  back to "Copy as text" on failure. Every colour inside the exported card measures 5.16:1 or
+  better against `C.green`.
+
 ## 177.71.260820 — Tap targets: 30 buttons too small to hit reliably
 - **NO migration. Cosmetic + CI only.** Vertical padding only — horizontal is untouched, verified
   line by line, so nothing got wider and nothing can wrap.

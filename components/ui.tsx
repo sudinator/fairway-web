@@ -195,6 +195,37 @@ export function UnsavedChangesSheet({ open, saving, message, onSave, onDiscard, 
   );
 }
 
+// Backdrop dismiss that survives a scroll.
+//
+// APP_RULES #26: a scrollable overlay must not close on a backdrop tap. The failure is subtle —
+// `onClick` fires on whatever sits under the finger when it lifts, so a scroll that starts inside
+// the panel and drifts onto the scrim registers as a backdrop tap and discards what the user was
+// entering. `stopPropagation` on the panel does not help: the click target really is the backdrop.
+//
+// The fix is to require that the gesture BEGAN on the backdrop too, and that the finger did not
+// travel far. Spread onto the element that owns the scrim:
+//
+//     <div {...backdropDismiss(onClose)} style={{ position: "fixed", inset: 0, ... }}>
+//
+// Pass undefined to make an overlay non-dismissible.
+export function backdropDismiss(onClose?: () => void) {
+  if (!onClose) return {};
+  let startedHere = false;
+  let sx = 0, sy = 0;
+  return {
+    onPointerDown: (e: React.PointerEvent) => {
+      startedHere = e.target === e.currentTarget;
+      sx = e.clientX; sy = e.clientY;
+    },
+    onClick: (e: React.MouseEvent) => {
+      if (e.target !== e.currentTarget) return;          // a click inside the panel
+      if (!startedHere) return;                          // gesture began on the panel — a scroll
+      if (Math.hypot(e.clientX - sx, e.clientY - sy) > 10) return;  // a drag, not a tap
+      onClose();
+    },
+  };
+}
+
 export function BottomSheet({ onClose, children, header, panelStyle, bodyStyle, maxWidth = 520, margin = 12, scrim = "rgba(8,26,20,.72)", dismissOnBackdrop = true }: {
   onClose?: () => void;
   children: React.ReactNode;
@@ -471,7 +502,7 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
   const picks = Array.from(new Set([par - 1, par, par + 1, par + 2].filter((v) => v >= 1 && v <= netDouble)));
   const fwBtns: [("hit" | "left" | "right"), string][] = [["hit", "✓ Hit"], ["left", "◀ Left"], ["right", "Right ▶"]];
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
+    <div {...backdropDismiss(onClose)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: 300, maxWidth: "100%", maxHeight: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 32px)", overflowY: "auto", background: C.card, borderRadius: 14, padding: 16 }}>
         <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
           <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{title}</div>

@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import { C, Hole, Round, stablefordPts, allocateStrokes, applyAllowance, fmtDate, girStats, firStats, fracPct } from "@/lib/golf";
-import { ScoreMark, btn } from "@/components/ui";
+import { ScoreMark, btn, backdropDismiss } from "@/components/ui";
 import { createClient } from "@/lib/supabase";
 import { loadCoursesForGroup, type CourseTee } from "@/lib/courses";
 
@@ -56,7 +56,7 @@ function ShareModalInner({ round, statusFinal, fmtLabel, title, subtitle, summar
   const { busy, msg, shareImage, copyText } = useCardExport(cardRef, fileBase, title, buildText);
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, zIndex: 1100, overflowY: "auto" }}>
+    <div {...backdropDismiss(onClose)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, zIndex: 1100, overflowY: "auto" , paddingTop: "max(12px, env(safe-area-inset-top))", paddingBottom: "max(12px, env(safe-area-inset-bottom))"}}>
       <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 430, width: "100%", margin: "10px 0 40px" }}>
         {/* The exportable card */}
         <div ref={cardRef} style={{ background: C.green, borderRadius: 14, padding: "16px 14px 14px" }}>
@@ -304,7 +304,7 @@ export function ShareGameModal({ game, players, courseTees, onClose }: { game: a
   };
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, zIndex: 1100, overflowY: "auto" }}>
+    <div {...backdropDismiss(onClose)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, zIndex: 1100, overflowY: "auto" }}>
       <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 430, width: "100%", margin: "10px 0 40px" }}>
         <div ref={cardRef} style={{ background: C.green, borderRadius: 14, padding: "16px 14px 14px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>

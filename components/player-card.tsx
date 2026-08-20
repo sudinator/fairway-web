@@ -5,7 +5,7 @@ import { C } from "@/lib/golf";
 import type { Round } from "@/lib/golf";
 import { computeCardStats } from "@/lib/card";
 import { BADGE_BY_KEY } from "@/lib/badges";
-import { Avatar, Eyebrow } from "@/components/ui";
+import { Avatar, Eyebrow, backdropDismiss } from "@/components/ui";
 
 const supabase = createClient();
 const TIER_COLOR: Record<string, string> = { common: C.sage, rare: "#7FB8FF", elite: C.gold };
@@ -252,7 +252,7 @@ export function PeerCardModal({ member, groupId, viewerUserId, onClose }: { memb
   }, [member, groupId]);
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(6,20,15,.72)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+    <div {...backdropDismiss(onClose)} style={{ position: "fixed", inset: 0, background: "rgba(6,20,15,.72)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 , paddingTop: "max(12px, env(safe-area-inset-top))", paddingBottom: "max(12px, env(safe-area-inset-bottom))"}}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, position: "relative" }}>
         <button onClick={onClose} aria-label="Close" style={{ position: "absolute", top: -6, right: -6, zIndex: 2, width: 30, height: 30, borderRadius: 14, border: "none", background: C.green, color: C.cream, fontSize: 17, cursor: "pointer", boxShadow: "0 2px 8px rgba(0,0,0,.4)" }}>{"×"}</button>
         {loading ? (
