@@ -334,7 +334,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
             <div style={{ color: "#f3e2a8", fontSize: 13, fontWeight: 700 }}>Confirm your payment</div>
             <div style={{ color: "#e6cf8a", fontSize: 12, marginTop: 2 }}>You started settling {fmtUSD(myPending.reduce((s, p) => s + p.amount_cents, 0))} but haven't confirmed it went through.</div>
             <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-              <button disabled={busy} onClick={confirmPending} style={{ ...btn(true), flex: 1, background: "#7fd6a3", color: C.green }}>Mark settled</button>
+              <button disabled={busy} onClick={confirmPending} style={{ ...btn(true), flex: 1, background: "#7FD6A3", color: C.green }}>Mark settled</button>
               <button disabled={busy} onClick={discardPending} style={{ ...btn(false), flex: 0, padding: "8px 14px" }}>Undo</button>
             </div>
           </div>
@@ -343,7 +343,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
           onOpenLedger={(mid) => setLedgerFor(mid)}
           onNudge={(m, owe) => { const link = "https://birdienumnum.vercel.app"; if (m.phone) window.location.href = nudgeSms(m.phone, m.display_name, owe, activeGroup.name, link); }} />
         {isAdmin && (
-          <button onClick={() => setScreen("untangle")} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginTop: 12, background: "#123528", border: `1px solid ${C.borderGreen}`, borderRadius: 12, padding: "11px 13px", color: C.sage, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+          <button onClick={() => setScreen("untangle")} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", marginTop: 12, background: C.green, border: `1px solid ${C.borderGreen}`, borderRadius: 12, padding: "11px 13px", color: C.sage, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
             <span style={{ fontSize: 15 }}>&#9874;</span> Untangle payments <span style={{ marginLeft: "auto", color: C.sage, fontWeight: 500, fontSize: 11.5 }}>admin · fix an entry</span>
           </button>
         )}
@@ -434,7 +434,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
               <button onClick={() => { try { navigator.clipboard?.writeText(zelleInfo.handle); } catch {} }} style={{ ...btn(false), marginTop: 10, fontSize: 12.5, padding: "8px 12px" }}>Copy contact</button>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button disabled={busy} onClick={() => { const z = zelleInfo; setZelleInfo(null); recordSettlement(z.from, z.to, z.amt, "zelle", z.bucketId); }} style={{ ...btn(true), flex: 1, background: "#7fd6a3", color: C.green }}>✓ I&apos;ve paid, mark settled</button>
+              <button disabled={busy} onClick={() => { const z = zelleInfo; setZelleInfo(null); recordSettlement(z.from, z.to, z.amt, "zelle", z.bucketId); }} style={{ ...btn(true), flex: 1, background: "#7FD6A3", color: C.green }}>✓ I&apos;ve paid, mark settled</button>
               <button onClick={() => setZelleInfo(null)} style={{ ...btn(false), flex: 1 }}>Cancel</button>
             </div>
         </BottomSheet>
@@ -446,7 +446,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
             <div style={{ color: C.cream, fontWeight: 800, fontSize: 17 }}>Back from paying — did it go through?</div>
             <div style={{ color: C.sage, fontSize: 13, margin: "8px 0 4px" }}>You were settling <b style={{ color: C.gold }}>{fmtUSD(myPending.length > 0 ? myPending.reduce((s, p) => s + p.amount_cents, 0) : (pending?.amt || 0))}</b></div>
             <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-              <button disabled={busy} onClick={() => { if (myPending.length > 0) confirmPending(); else if (pending) recordSettlement(pending.from, pending.to, pending.amt, "venmo", pending.bucketId); }} style={{ ...btn(true), flex: 1, background: "#7fd6a3", color: C.green }}>✓ Yes, mark settled</button>
+              <button disabled={busy} onClick={() => { if (myPending.length > 0) confirmPending(); else if (pending) recordSettlement(pending.from, pending.to, pending.amt, "venmo", pending.bucketId); }} style={{ ...btn(true), flex: 1, background: "#7FD6A3", color: C.green }}>✓ Yes, mark settled</button>
               <button onClick={() => { setAskReturn(false); if (!myPending.length) setPending(null); }} style={{ ...btn(false), flex: 1 }}>Not yet</button>
             </div>
         </BottomSheet>
@@ -462,7 +462,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
               {memberById[payChoose.to]?.paypal_handle && <button onClick={() => { const u = payLink("paypal", memberById[payChoose.to]!.paypal_handle!, payChoose.amt, `${activeGroup.name} golf`); if (typeof window !== "undefined") window.location.href = u; }} style={{ ...btn(false), flex: 1 }}>PayPal</button>}
             </div>
             {memberById[payChoose.to]?.zelle_handle && (
-              <div style={{ background: "#123528", borderRadius: 10, padding: "9px 11px", marginTop: 10 }}>
+              <div style={{ background: C.green, borderRadius: 10, padding: "9px 11px", marginTop: 10 }}>
                 <div style={{ color: C.sage, fontSize: 11 }}>Or Zelle to</div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ color: C.cream, fontSize: 14, fontWeight: 700, wordBreak: "break-all", flex: 1 }}>{memberById[payChoose.to]!.zelle_handle}</span>
@@ -471,7 +471,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
               </div>
             )}
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-              <button disabled={busy} onClick={confirmPending} style={{ ...btn(true), flex: 1, background: "#7fd6a3", color: C.green }}>Paid — mark settled</button>
+              <button disabled={busy} onClick={confirmPending} style={{ ...btn(true), flex: 1, background: "#7FD6A3", color: C.green }}>Paid — mark settled</button>
               <button disabled={busy} onClick={discardPending} style={{ ...btn(false), flex: 0, padding: "10px 16px" }}>Cancel</button>
             </div>
         </BottomSheet>
@@ -504,7 +504,7 @@ function GuestManager({ guests, members, busy, me, isAdmin, onRetire, onUnretire
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ flex: 1, color: C.cream, fontSize: 13.5, fontWeight: 500, minWidth: 0 }}>{g.name}</span>
             {(g.created_by === me || isAdmin)
-              ? <button disabled={busy} onClick={() => { setOpenId(openId === g.id ? null : g.id); setBecame(""); }} style={{ background: "#173a2c", color: C.cream, border: `1px solid #37624f`, borderRadius: 8, padding: "5px 10px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>{openId === g.id ? "Cancel" : "Retire"}</button>
+              ? <button disabled={busy} onClick={() => { setOpenId(openId === g.id ? null : g.id); setBecame(""); }} style={{ background: C.green, color: C.cream, border: `1px solid #37624f`, borderRadius: 8, padding: "5px 10px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>{openId === g.id ? "Cancel" : "Retire"}</button>
               : <span style={{ color: C.sage, fontSize: 11 }}>added by {g.created_by ? nameOf(g.created_by) : "someone else"}</span>}
           </div>
           {openId === g.id && (
@@ -560,7 +560,7 @@ function BalancesScreen({ members, guests, shares, payers, balances, me, onNudge
             <div style={{ color: owed ? "#7fd6a3" : owes ? "#ef9d90" : C.sage, fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 15 }}>
               {owed ? "is owed " + fmtUSD(v) : owes ? "owes " + fmtUSD(-v) : "settled"}
             </div>
-            {owes && m.phone && <button onClick={(e) => { e.stopPropagation(); onNudge(m, -v); }} style={{ marginLeft: 6, background: "#173a2c", color: C.cream, border: `1px solid #37624f`, borderRadius: 8, padding: "5px 10px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>Nudge</button>}
+            {owes && m.phone && <button onClick={(e) => { e.stopPropagation(); onNudge(m, -v); }} style={{ marginLeft: 6, background: C.green, color: C.cream, border: `1px solid #37624f`, borderRadius: 8, padding: "5px 10px", fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>Nudge</button>}
             <span style={{ color: C.sage, fontSize: 16, marginLeft: 2 }}>&#8250;</span>
           </div>
         );
@@ -665,7 +665,7 @@ function AdminUntangle({ members, expenses, deletedExpenses, shares, payers, set
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                 <span style={{ color: C.cream, fontSize: 12.5 }}>{e.description || "expense"} &middot; {fmtUSD(e.amount_cents)}</span>
                 {restoreId === e.id
-                  ? <span style={{ display: "flex", gap: 6 }}><button disabled={busy} onClick={async () => { setRestoreId(null); await onRestoreExpense(e); }} style={{ ...actBtn, background: "#7fd6a3", color: C.green, border: "none" }}>Confirm</button><button disabled={busy} onClick={() => setRestoreId(null)} style={{ ...actBtn, background: "transparent", color: C.sage, border: `1px solid ${C.borderGreen}` }}>Cancel</button></span>
+                  ? <span style={{ display: "flex", gap: 6 }}><button disabled={busy} onClick={async () => { setRestoreId(null); await onRestoreExpense(e); }} style={{ ...actBtn, background: "#7FD6A3", color: C.green, border: "none" }}>Confirm</button><button disabled={busy} onClick={() => setRestoreId(null)} style={{ ...actBtn, background: "transparent", color: C.sage, border: `1px solid ${C.borderGreen}` }}>Cancel</button></span>
                   : <button disabled={busy} onClick={() => setRestoreId(e.id)} style={{ ...actBtn, background: "transparent", color: "#e6cf8a", border: "1px solid #6b5e2e" }}>Restore</button>}
               </div>
               {restoreId === e.id && <div style={{ color: "#e6cf8a", fontSize: 11, marginTop: 4 }}>Restores it to everyone's balances exactly as it was.</div>}
@@ -981,7 +981,7 @@ function AddExpense({ user, gid, members, guests, balances, busy, setBusy, requi
         <button onClick={() => { setNewEventOpen(true); setEventId(null); }} style={{ ...chip(newEventOpen), borderStyle: "dashed" }}>＋ New Bucket</button>
       </div>
       {newEventOpen && (
-        <div style={{ background: "#0f3529", borderRadius: 10, padding: 10, marginTop: 8 }}>
+        <div style={{ background: C.green, borderRadius: 10, padding: 10, marginTop: 8 }}>
           <input value={newEventName} onChange={(e) => setNewEventName(e.target.value)} placeholder="Bucket name (e.g. Ireland Trip)" style={inputStyle} />
           <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", justifyContent: "flex-end" }}>
             <button disabled={busy || !newEventName.trim()} onClick={async () => {
@@ -1024,7 +1024,7 @@ function AddExpense({ user, gid, members, guests, balances, busy, setBusy, requi
           {isGuest && on && (
             <div onClick={(e) => e.stopPropagation()} style={{ background: "#14352b", border: `1.5px solid ${needSponsor ? C.birdie : "#3c6f59"}`, borderTop: "none", borderRadius: "0 0 10px 10px", padding: "8px 10px 9px 38px" }}>
               <FieldLabel>
-                Sponsored by {needSponsor ? <span style={{ color: C.birdie }}>· required</span> : <span style={{ color: "#7fbf9c" }}>✓</span>}
+                Sponsored by {needSponsor ? <span style={{ color: C.overRedDark }}>· required</span> : <span style={{ color: "#7fbf9c" }}>✓</span>}
               </FieldLabel>
               <select value={guestSponsors[p.id] || ""} onChange={(e) => setGuestSponsors((s) => ({ ...s, [p.id]: e.target.value }))}
                 style={{ ...inputStyle, padding: "8px 11px", fontSize: 14, borderColor: needSponsor ? C.birdie : C.line, color: needSponsor ? C.faint : C.ink }}>
@@ -1040,7 +1040,7 @@ function AddExpense({ user, gid, members, guests, balances, busy, setBusy, requi
       {!showGuest
         ? <button onClick={() => setShowGuest(true)} style={{ ...btn(false), marginTop: 10 }}>+ Add a guest</button>
         : (
-          <div style={{ background: "#173a2c", borderRadius: 10, padding: 10, marginTop: 10 }}>
+          <div style={{ background: C.green, borderRadius: 10, padding: 10, marginTop: 10 }}>
             <Eyebrow>Guest name</Eyebrow>
             <input value={gName} onChange={(e) => setGName(e.target.value)} placeholder="e.g. Sam" style={inputStyle} />
             <div style={{ color: C.sage, fontSize: 11, marginTop: 7, lineHeight: 1.45 }}>You'll pick who's covering them on each expense they're part of.</div>
@@ -1051,12 +1051,12 @@ function AddExpense({ user, gid, members, guests, balances, busy, setBusy, requi
           </div>
         )}
 
-      {guestsMissingSponsor && <div style={{ color: C.birdie, fontSize: 11.5, fontWeight: 700, marginTop: 8 }}>Choose a sponsor for each guest before saving.</div>}
+      {guestsMissingSponsor && <div style={{ color: C.overRedDark, fontSize: 11.5, fontWeight: 700, marginTop: 8 }}>Choose a sponsor for each guest before saving.</div>}
 
       <button disabled={!canSave} onClick={save} style={{ ...btn(true), marginTop: 14, opacity: canSave ? 1 : 0.62 }}>{editing ? "Save changes" : "Add expense"}</button>
       {editing && canDelete && (
         <button disabled={busy} onClick={askVoid}
-          style={{ ...btn(false), marginTop: 8, color: C.birdie, borderColor: C.birdie }}>Void expense</button>
+          style={{ ...btn(false), marginTop: 8, color: C.overRedDark, borderColor: C.birdie }}>Void expense</button>
       )}
       {pendingConfirm && (
         <ImpactModal title={pendingConfirm.mode === "void" ? "Void “" + (desc.trim() || editing?.description || "expense") + "”?" : (editing ? "Save these changes?" : "Add this expense?")}
@@ -1147,7 +1147,7 @@ function ExpenseDetail({ expense, shares, payers, memberById, guestById, version
           {canMove && !moving && <button onClick={() => setMoving(true)} style={{ border: `1px solid ${C.borderGreen}`, background: "transparent", color: C.sage, fontSize: 11, fontWeight: 800, padding: "5px 10px", borderRadius: 8, cursor: "pointer" }}>Move</button>}
         </div>
         {moving && (
-          <div style={{ background: "#0f3529", borderRadius: 10, padding: 10, marginTop: 8 }}>
+          <div style={{ background: C.green, borderRadius: 10, padding: 10, marginTop: 8 }}>
             <div style={{ color: C.sage, fontSize: 11, marginBottom: 6 }}>Move this expense to an open event (or ungroup):</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               <button onClick={() => onMove(null)} style={chip(!currentEvent)}>Ungrouped</button>

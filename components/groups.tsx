@@ -345,7 +345,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
                   {isAdmin && !self && m.status !== "removed" && (
                     <>
                       <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px" }} disabled={busy} onClick={() => updateMember(m, { role: m.role === "admin" ? "member" : "admin" })}>{m.role === "admin" ? "Make member" : "Make admin"}</button>
-                      <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", color: C.birdie }} disabled={busy} onClick={() => { if (confirm(`Remove ${m.profiles?.display_name || m.email} from ${active.name}?`)) updateMember(m, { status: "removed" }); }}>Remove</button>
+                      <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", color: C.overRedDark }} disabled={busy} onClick={() => { if (confirm(`Remove ${m.profiles?.display_name || m.email} from ${active.name}?`)) updateMember(m, { status: "removed" }); }}>Remove</button>
                     </>
                   )}
                 </div>

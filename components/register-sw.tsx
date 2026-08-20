@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { APP_VERSION } from "@/lib/app-version";
+import { C } from "@/lib/golf";
 
 // Registers the service worker AND handles updates.
 //
@@ -176,7 +177,7 @@ export function RegisterSW() {
         A new version of Birdie Num Num is available. Your current app will stay on this version until you update.
       </div>
       <button onClick={applyUpdate} style={{
-        background: "#C9A227", color: "#0E3B2E", border: "none", borderRadius: 8,
+        background: C.gold, color: "#0E3B2E", border: "none", borderRadius: 8,
         padding: "8px 14px", fontWeight: 800, fontSize: 13, cursor: "pointer", flexShrink: 0,
       }} disabled={applying}>{applying ? "Updating…" : "Update"}</button>
     </div>

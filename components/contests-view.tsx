@@ -367,7 +367,7 @@ export function ContestHoleChip({ gameId, hole, players, userId, myName, canLogO
                 </div>
               </div>
               <button onClick={() => setOpenId(open ? null : contest.id)}
-                style={{ background: "#14351f", color: "#EAF3EC", border: "none", borderRadius: 8, padding: "6px 11px", fontWeight: 800, fontSize: 12, cursor: "pointer" }}>
+                style={{ background: C.green, color: "#EAF3EC", border: "none", borderRadius: 8, padding: "6px 11px", fontWeight: 800, fontSize: 12, cursor: "pointer" }}>
                 {open ? "Close" : "Log ›"}
               </button>
             </div>
@@ -423,7 +423,7 @@ function InlineLog({ contest, hole, players, userId, myName, canLogOthers, onSav
         </select>
       )}
       {err && <div style={{ color: "#b3382c", fontSize: 12 }}>{err}</div>}
-      <button disabled={busy} onClick={save} style={{ background: "#14351f", color: "#EAF3EC", border: "none", borderRadius: 8, padding: "9px 4px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>{busy ? "Saving…" : "Log it"}</button>
+      <button disabled={busy} onClick={save} style={{ background: C.green, color: "#EAF3EC", border: "none", borderRadius: 8, padding: "9px 4px", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>{busy ? "Saving…" : "Log it"}</button>
     </div>
   );
 }

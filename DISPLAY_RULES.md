@@ -218,9 +218,28 @@ cell can wrap. Minimum 380 sites, highest risk, least visible benefit. Ratcheted
     btn(role, "compact")       inline with text, or inside a table row
 
 `btn()` previously offered only primary and secondary. Of 172 hand-rolled buttons in 129 distinct
-shapes, **86 were ghost buttons** — a role the helper never provided, so each one was invented
-locally. The roles exist as of 177.67; migrating the call sites is separate work, and the ghost
-ones must be done in reviewable batches because uniform padding will move things.
+shapes, **86 were ghost buttons** — a role the helper never provided, so each was invented locally.
+
+**Not every bare `<button>` is a styling failure.** 12 of them wrap a whole card or selector tile:
+`<button>` around custom content, with no styling because the child provides the layout. Applying
+`btn()` to those would break them. They are correct as written and are excluded from the guard.
+
+#### Allowed off-palette button fills
+
+These are deliberate and must not be swept into the palette. Recorded at 177.68 after converting
+21 other bespoke fills to tokens.
+
+| Fill | Where | Why it stays |
+|---|---|---|
+| `#3D95CE` | Venmo pay button (`money.tsx`) | Brand mark. Recolouring misrepresents the service |
+| `#003087` | PayPal pay button (`money.tsx`) | Brand mark |
+| `#6D1ED4` | Zelle pay button (`money.tsx`) | Brand mark |
+| `#4ADE80` | `nav-debug.tsx` | Orphan file, imported nowhere — see Part 10 |
+| `#5BBE7E` x3 | admin resolve-confirm (`manage.tsx`) | Success green. No token exists; adding one for three admin-only buttons is not worth the palette surface |
+| `#3F3414`, `#7A4E18`, `#5a3a10`, `#3a3320` | caution actions (setup workspace, manage, money, tournaments) | Amber washes for "this is reversible but think first". Same reasoning — a token for four sites is not earning its place |
+| `#0f2a20`, `#14352b`, `#2a2320` | conditional fills in `money.tsx` | Within 4-20 RGB of `C.green`, but each sits inside a ternary paired with a matching text colour. Snapping them risks breaking a correlated pair for no visible gain |
+
+None of these is a contrast failure — every one was measured. They are off-palette, not wrong.
 
 ### Colour
 

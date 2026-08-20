@@ -215,7 +215,7 @@ export function HandicapSummary({ rounds, profile, onOpen }: { rounds: Round[]; 
         <div style={{ background: C.greenLight, borderRadius: 10, padding: "9px 12px", marginTop: 10 }}>
           <div style={{ color: C.sage, fontSize: 12 }}>Your entered index <span style={{ color: C.cream, fontWeight: 700 }}>{official.toFixed(1)}</span></div>
           {delta != null && (
-            <div style={{ color: delta >= 1 ? C.birdie : C.sage, fontSize: 11, marginTop: 2 }}>
+            <div style={{ color: delta >= 1 ? C.overRedDark : C.sage, fontSize: 11, marginTop: 2 }}>
               {delta >= 1 ? `Differs from the app estimate by ${delta.toFixed(1)} — check your rounds are in sync with GHIN` : "In line with the app estimate"}
             </div>
           )}
@@ -956,7 +956,7 @@ function OpsMetrics() {
                         <button
                           onClick={() => delStale(g)}
                           disabled={delId === g.game_id}
-                          style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, padding: "2px 8px", fontSize: 11, fontWeight: 700, cursor: delId === g.game_id ? "default" : "pointer", opacity: delId === g.game_id ? 0.62 : 1, whiteSpace: "nowrap" }}
+                          style={{ background: "transparent", color: C.overRedDark, border: `1px solid ${C.birdie}`, borderRadius: 8, padding: "2px 8px", fontSize: 11, fontWeight: 700, cursor: delId === g.game_id ? "default" : "pointer", opacity: delId === g.game_id ? 0.62 : 1, whiteSpace: "nowrap" }}
                         >
                           {delId === g.game_id ? "Deleting…" : "Delete"}
                         </button>
@@ -1271,7 +1271,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
             </div>
             {(() => {
               const mine = memberships.filter((m) => m.user_id === p.id);
-              if (mine.length === 0) return <div style={{ color: C.birdie, fontSize: 12, marginTop: 2 }}>Clubs: none</div>;
+              if (mine.length === 0) return <div style={{ color: C.overRedDark, fontSize: 12, marginTop: 2 }}>Clubs: none</div>;
               return (
                 <div style={{ color: C.cream, fontSize: 12, marginTop: 2, display: "flex", flexWrap: "wrap", gap: 6 }}>
                   <span style={{ color: C.sage }}>Clubs:</span>
@@ -1301,7 +1301,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
           <button style={{ ...btn(false), padding: "6px 12px", fontSize: 12 }} onClick={() => setManageGroupsFor(manageGroupsFor === p.id ? null : p.id)}>
             {manageGroupsFor === p.id ? "Close" : "Manage"}
           </button>
-          {p.deactivated && <span style={{ color: C.birdie, fontSize: 11, fontWeight: 800 }}>DEACTIVATED</span>}
+          {p.deactivated && <span style={{ color: C.overRedDark, fontSize: 11, fontWeight: 800 }}>DEACTIVATED</span>}
 
           {manageGroupsFor === p.id && (
             <div style={{ width: "100%", background: C.greenLight, borderRadius: 10, padding: 12, marginTop: 8 }}>
@@ -1317,7 +1317,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                       return (
                         <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: `1px solid ${C.borderGreen}` }}>
                           <span style={{ flex: 1, color: C.cream, fontSize: 13 }}>{g?.name || "Club"}{m.role === "admin" ? " · admin" : ""}</span>
-                          <button style={{ ...btn(false), padding: "4px 10px", fontSize: 11, color: C.birdie }} onClick={() => removeFromGroup(p, m, g?.name || "this club")}>Remove</button>
+                          <button style={{ ...btn(false), padding: "4px 10px", fontSize: 11, color: C.overRedDark }} onClick={() => removeFromGroup(p, m, g?.name || "this club")}>Remove</button>
                         </div>
                       );
                     })}
@@ -1389,7 +1389,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
               </div>
             </div>
             <button style={{ ...btn(true), padding: "7px 12px", fontSize: 12 }} onClick={() => approveGroup(g)}>Approve</button>
-            <button style={{ ...btn(false), padding: "7px 12px", fontSize: 12, color: C.birdie }} onClick={() => declineGroup(g)}>Decline</button>
+            <button style={{ ...btn(false), padding: "7px 12px", fontSize: 12, color: C.overRedDark }} onClick={() => declineGroup(g)}>Decline</button>
           </div>
         ))}
       </div>
@@ -1818,7 +1818,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
                 {!self && (
                   <>
                     <button style={{ ...btn(false), padding: "7px 10px", fontSize: 12 }} disabled={busyId === row.id} onClick={() => toggleRole(row)}>{row.role === "admin" ? "Remove club admin" : "Make club admin"}</button>
-                    <button style={{ ...btn(false), padding: "7px 10px", fontSize: 12, color: C.birdie }} disabled={busyId === row.id} onClick={() => removeFromGroup(row)}>Remove</button>
+                    <button style={{ ...btn(false), padding: "7px 10px", fontSize: 12, color: C.overRedDark }} disabled={busyId === row.id} onClick={() => removeFromGroup(row)}>Remove</button>
                   </>
                 )}
               </div>
@@ -2221,7 +2221,7 @@ function AdminSandbaggers() {
             <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>Entered {Number(r.entered).toFixed(1)} · scoring says {Number(r.calc).toFixed(1)} · {r.rounds} rounds</div>
           </div>
           <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <div style={{ color: r.direction === "entered_high" ? C.birdie : C.gold, fontWeight: 800, fontSize: 15 }}>{r.diff_pct}%</div>
+            <div style={{ color: r.direction === "entered_high" ? C.overRedDark : C.gold, fontWeight: 800, fontSize: 15 }}>{r.diff_pct}%</div>
             <div style={{ color: C.sage, fontSize: 11 }}>{r.direction === "entered_high" ? "index looks high" : "index looks low"}</div>
           </div>
         </div>
@@ -2556,7 +2556,7 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
                 </button>
               )}
               <button disabled={busy === g.group_id} onClick={() => delGroup(g)}
-                style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
+                style={{ background: "transparent", color: C.overRedDark, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
                 Delete group
               </button>
               {g.is_test && (
@@ -2682,7 +2682,7 @@ export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean 
               <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{u.display_name || "(no name)"}</div>
               {u.is_owner ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>★ owner</span>
                 : u.is_admin ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>★ system admin</span> : null}
-              {banned && <span style={{ color: C.birdie, fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>· suspended</span>}
+              {banned && <span style={{ color: C.overRedDark, fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>· suspended</span>}
             </div>
             <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>{u.email || "—"}</div>
             <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
@@ -2691,7 +2691,7 @@ export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean 
             <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
               {isOwner && !u.is_owner && !isSelf && (
                 <button disabled={busy === u.id} onClick={() => setSystemAdmin(u, !u.is_admin)}
-                  style={{ background: "transparent", color: u.is_admin ? C.birdie : C.sage, border: `1px solid ${u.is_admin ? C.birdie : C.sage}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}>
+                  style={{ background: "transparent", color: u.is_admin ? C.overRedDark : C.sage, border: `1px solid ${u.is_admin ? C.birdie : C.sage}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}>
                   {u.is_admin ? "Remove system admin" : "Make system admin"}
                 </button>
               )}
@@ -2700,11 +2700,11 @@ export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean 
                 Merge another into this…
               </button>
               <button disabled={busy === u.id || isSelf} onClick={() => setBanned(u, !banned)}
-                style={{ background: "transparent", color: banned ? C.sage : C.birdie, border: `1px solid ${banned ? C.sage : C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.62 : 1 }}>
+                style={{ background: "transparent", color: banned ? C.sage : C.overRedDark, border: `1px solid ${banned ? C.sage : C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.62 : 1 }}>
                 {banned ? "Restore" : "Suspend"}
               </button>
               <button disabled={busy === u.id || isSelf} onClick={() => wipe(u)}
-                style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.62 : 1 }}>
+                style={{ background: "transparent", color: C.overRedDark, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.62 : 1 }}>
                 Wipe data
               </button>
             </div>

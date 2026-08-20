@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { C } from "@/lib/golf";
 
 // A small, dismissible "install this app" hint. On Android/desktop Chrome it uses
 // the native install prompt; on iOS (which has no prompt) it shows the manual
@@ -79,7 +80,7 @@ export function InstallHint() {
       </div>
       {!isIOS && deferred && (
         <button onClick={install} style={{
-          background: "#C9A227", color: "#0E3B2E", border: "none", borderRadius: 8,
+          background: C.gold, color: "#0E3B2E", border: "none", borderRadius: 8,
           padding: "7px 12px", fontWeight: 800, fontSize: 12, cursor: "pointer", flexShrink: 0,
         }}>Install</button>
       )}

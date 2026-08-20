@@ -124,8 +124,8 @@ function ViewportDiag() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
         <b style={{ fontSize: 12, color: "#C9A227" }}>VIEWPORT DIAG</b>
         <span style={{ display: "flex", gap: 6 }}>
-          <button onClick={measure} style={{ fontSize: 11, background: "#16503D", color: "#fff", border: "none", borderRadius: 6, padding: "3px 8px", fontWeight: 700 }}>Remeasure</button>
-          <button onClick={copy} style={{ fontSize: 11, background: "#C9A227", color: "#0E3B2E", border: "none", borderRadius: 6, padding: "3px 8px", fontWeight: 700 }}>{copied ? "Copied" : "Copy"}</button>
+          <button onClick={measure} style={{ fontSize: 11, background: C.greenMid, color: "#fff", border: "none", borderRadius: 6, padding: "3px 8px", fontWeight: 700 }}>Remeasure</button>
+          <button onClick={copy} style={{ fontSize: 11, background: C.gold, color: "#0E3B2E", border: "none", borderRadius: 6, padding: "3px 8px", fontWeight: 700 }}>{copied ? "Copied" : "Copy"}</button>
         </span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
@@ -789,7 +789,7 @@ export function Home({ session }: { session: any }) {
         };
         return (
           <button key={club.id} onClick={goToClub}
-            style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: "#5a2018", border: "1px solid #7a2e22", borderRadius: 12, padding: "11px 14px", marginTop: 14, cursor: "pointer" }}>
+            style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: C.danger, border: "1px solid #7a2e22", borderRadius: 12, padding: "11px 14px", marginTop: 14, cursor: "pointer" }}>
             <span style={{ fontSize: 18 }}>&#9888;&#65039;</span>
             <span style={{ flex: 1, color: "#ffd9d2", fontSize: 13 }}>You owe <b style={{ color: "#fff" }}>{fmtUSD(club.cents)}</b>{multi ? <> in <b style={{ color: "#fff" }}>{club.name}</b></> : " to settle up"}</span>
             <span style={{ background: C.gold, color: "#2a2410", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>Settle up &#8594;</span>

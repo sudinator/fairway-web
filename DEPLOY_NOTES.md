@@ -1,3 +1,65 @@
+## 177.70.260820 — Release verification, and the eight bugs it found
+- **NO migration. Cosmetic + CI only.** Supersedes the 177.69 candidate, which was packaged but is
+  incomplete.
+- **NEW `ci/verify_release.py`** — 20 assertions that every agreed fix from 177.59 onward is still
+  in place: both `undefined`-override fixes, the weight and radius scales, `C.field`, the
+  `color-scheme` declaration, no mangled token names from scripted edits, and the version ledger.
+  Wired into `npm run guards`, so a later release cannot silently undo an earlier one.
+- **NEW `lib/release-check.test.tsx`** — 18 assertions that EXECUTE the changed components rather
+  than reading source. This is the layer that would have caught the 177.68 blue buttons: the static
+  checks confirmed the file said what was claimed, but only rendering shows the colour is wrong.
+- **The first version of the C.birdie check silently passed its own bug.** It resolved the
+  background with a 900-character lookback — the same proximity heuristic responsible for several
+  misses in this series. Rewritten to walk the JSX ancestor chain, it failed immediately and then
+  found **8 more sites** the button-scoped pass at 177.69 had missed:
+  `organizer-panel.tsx` 1063/1097/1098, `scoring-views.tsx` 642, `manage.tsx` 1274/2224,
+  `money.tsx` 1027. All `C.birdie` on a green surface at 1.42:1, most inside ternaries — which is
+  precisely what proximity matching cannot see. Now `C.overRedDark` at 4.91:1.
+- Both new checks were NEGATIVE-TESTED: each bug was deliberately reintroduced and confirmed to
+  fail the suite, then reverted. A check that cannot fail is decoration.
+- Total destructive-action sites corrected across 177.69 and 177.70: **44**.
+
+## 177.69.260820 — Destructive actions made visible; a bad token map reverted
+- **NO migration. Cosmetic + CI only.**
+- **FIX: 36 destructive actions were effectively invisible.** Every ghost-styled Delete, Ban, Wipe
+  and Remove used `C.birdie` as its text colour — a CREAM-surface token measuring **1.42:1** on a
+  green card. Now `C.overRedDark` at 4.91:1, across 10 files. Same failure mode as the score
+  colours fixed at 177.65: a colour correct for a cream surface, stranded when 177.62 turned that
+  surface green. Filled danger buttons already used `C.danger` and are unaffected.
+- **FIX: six success buttons were turned blue by 177.68.** "Mark settled" and the payment confirms
+  used `#7FD6A3` (mint). 177.68 mapped that literal to `C.underDark` — but `C.underDark` was
+  `#7FD6A3` only until 177.66, when it was lifted to `#A3C6F5` to clear a contrast near-miss. The
+  map matched the OLD value, an 82-point channel shift, on the buttons that confirm money has been
+  paid. Reverted to `#7FD6A3` and allowlisted with the reason.
+  The gates could not catch this: `#A3C6F5` with dark text is 8.9:1, so it passed every contrast
+  check. It was readable — it just meant the wrong thing. Found only because the change was
+  questioned.
+- **Lesson recorded in the guard comments:** a token's value can change after code maps a literal
+  onto it. Map to a token by MEANING, not by matching its current hex.
+- 21 bespoke button fills converted to tokens at 177.68 remain; the other 15 stay documented as
+  exceptions in DISPLAY_RULES with reasons.
+
+## 177.68.260820 — Button fills to palette tokens
+- **NO migration. Cosmetic + CI only.** No layout change: only fill colours move, and every one
+  moves to a token within a few RGB steps of the value it replaces.
+- **21 bespoke button fills converted to palette tokens.** `#173a2c`, `#0f3529`, `#14351f`,
+  `#123528` -> `C.green`; `#16503D` -> `C.greenMid`; `#C9A227` -> `C.gold`; `#7fd6a3` ->
+  `C.underDark`; `#5a2018` -> `C.danger`. Off-palette button fills 36 -> 15.
+- **15 kept and documented as exceptions**, with reasons, in DISPLAY_RULES and in the palette
+  guard's allowlist: three payment brand marks (Venmo, PayPal, Zelle) that cannot be recoloured
+  without misrepresenting the service; one in the orphan `nav-debug.tsx`; a success green used by
+  three admin-only buttons; four amber caution washes; and three conditional fills in `money.tsx`
+  that sit inside ternaries paired with matching text colours, where snapping risks breaking a
+  correlated pair for no visible gain. None is a contrast failure — each was measured.
+- **The "174 ad-hoc buttons" figure in earlier notes was misleading** and is corrected here.
+  Properly categorised: 307 already use `btn()`; 67 have bespoke fills; 66 are real ghost buttons;
+  24 map cleanly to a role; and **12 are structural wrappers** — `<button>` around a whole card or
+  selector tile, unstyled because the child provides the layout. Applying `btn()` to those would
+  break them. They are correct as written and are now documented as excluded.
+- No call sites migrated to `btn()` in this drop. The 66 ghost buttons remain outstanding: their
+  padding is currently sized to fit tight spaces, so standardising it will move layout and needs
+  reviewable batches rather than a sweep.
+
 ## 177.67.260820 — Geometry: weight scale, radius scale, button roles
 - **NO migration. Cosmetic + CI only.**
 - **Font weight: 6 values -> 3.** 500 body / 700 emphasis / 800 title, with 500 set as a base on

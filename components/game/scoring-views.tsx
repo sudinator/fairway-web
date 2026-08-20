@@ -641,7 +641,7 @@ export function MatchView({
               <div style={{ textAlign: "right" }}>
                 <div
                   style={{
-                    color: st.result ? C.birdie : C.cream,
+                    color: st.result ? C.overRedDark : C.cream,
                     fontWeight: 800,
                     fontSize: 16,
                     fontFamily: "Georgia, serif",
@@ -662,7 +662,7 @@ export function MatchView({
                   style={{
                     background: "none",
                     border: "none",
-                    color: C.birdie,
+                    color: C.overRedDark,
                     cursor: "pointer",
                     marginLeft: 10,
                     fontWeight: 800,
@@ -986,7 +986,7 @@ export function FourballView({
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input value={f.name} onChange={(e) => renameFoursome(f.id, e.target.value)} disabled={!isCreator || foursomesBlocked}
                 style={{ ...inputStyle, flex: 1, fontWeight: 700 }} />
-              {isCreator && <button style={{ ...btn(false), fontSize: 11, color: C.birdie, opacity: foursomesBlocked ? 0.55 : 1 }} disabled={foursomesBlocked} onClick={() => removeFoursome(f.id)}>Remove</button>}
+              {isCreator && <button style={{ ...btn(false), fontSize: 11, color: C.overRedDark, opacity: foursomesBlocked ? 0.55 : 1 }} disabled={foursomesBlocked} onClick={() => removeFoursome(f.id)}>Remove</button>}
             </div>
             {(["a", "b"] as const).map((team) => (
               <div key={team} style={{ marginTop: 10 }}>

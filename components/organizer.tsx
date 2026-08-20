@@ -171,7 +171,7 @@ export function OrganizerConsole({ gameId }: { gameId: string }) {
           {/* field rail */}
           <div style={S.rail}>
             <div style={S.railHdr}><h3 style={S.railH3}>Field · {players.length}</h3>
-              {needIdx.length ? <span style={{ color: C.birdie, fontSize: 11, fontWeight: 700 }}>{needIdx.length} need index</span> : <span style={{ color: C.sage, fontSize: 11 }}>all set</span>}
+              {needIdx.length ? <span style={{ color: C.overRedDark, fontSize: 11, fontWeight: 700 }}>{needIdx.length} need index</span> : <span style={{ color: C.sage, fontSize: 11 }}>all set</span>}
             </div>
             {players.map((p) => (
               <div key={p.id}>

@@ -306,7 +306,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
                 {r.guest_names.map((gn, gi) => (
                   <span key={gi} style={{ display: "inline-flex", alignItems: "center", gap: 5, background: C.greenLight, border: `1px solid ${C.borderCard}`, borderRadius: 999, padding: "2px 6px 2px 9px", fontSize: 11, color: C.cream }}>
                     {gn || "Guest"}
-                    <button onClick={() => dropGuest(sel, r.user_id, gi)} disabled={busy} aria-label={`Remove guest ${gn || ""}`} title="Remove guest (frees a spot)" style={{ background: "none", border: "none", color: C.birdie, cursor: "pointer", fontSize: 12, padding: 0, lineHeight: 1 }}>✕</button>
+                    <button onClick={() => dropGuest(sel, r.user_id, gi)} disabled={busy} aria-label={`Remove guest ${gn || ""}`} title="Remove guest (frees a spot)" style={{ background: "none", border: "none", color: C.overRedDark, cursor: "pointer", fontSize: 12, padding: 0, lineHeight: 1 }}>✕</button>
                   </span>
                 ))}
               </div>
@@ -459,7 +459,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
         )}
 
         {canOrganizeTee && sel.status !== "cancelled" && (
-          <button onClick={() => cancelTeeTime(sel)} disabled={busy} style={{ ...btn(false), width: "100%", marginTop: 14, fontSize: 13, color: C.birdie, borderColor: C.birdie }}>Cancel this tee time</button>
+          <button onClick={() => cancelTeeTime(sel)} disabled={busy} style={{ ...btn(false), width: "100%", marginTop: 14, fontSize: 13, color: C.overRedDark, borderColor: C.birdie }}>Cancel this tee time</button>
         )}
 
         {rsvpOpen && <RsvpSheet tt={sel} mine={mine} spotsLeft={spotsLeft} warn={deadlinePassed(sel) && !canManage} busy={busy} onClose={() => setRsvpOpen(false)} onSubmit={(choice, guests) => submitRsvp(sel, choice, guests)} />}
@@ -771,7 +771,7 @@ function CaptainPicker({ candidates, current, busy, onClose, onPick }: {
           </div>
         ))}
         <div style={{ display: "flex", gap: 10, padding: 16 }}>
-          {current && <button onClick={() => onPick(null)} disabled={busy} style={{ ...btn(false), flex: 1, fontSize: 13, color: C.birdie, borderColor: C.birdie }}>Clear</button>}
+          {current && <button onClick={() => onPick(null)} disabled={busy} style={{ ...btn(false), flex: 1, fontSize: 13, color: C.overRedDark, borderColor: C.birdie }}>Clear</button>}
           <button onClick={onClose} disabled={busy} style={{ ...btn(false), flex: 1, fontSize: 13 }}>Close</button>
         </div>
     </BottomSheet>

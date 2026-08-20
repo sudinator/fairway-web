@@ -922,7 +922,7 @@ function CreateGame({
                       />
                       <button
                         onClick={() => { const raw = (guestIdxEdits[g.id] ?? "").trim(); const num = parseFloat(raw); if (raw === "" || Number.isNaN(num)) return; setGuestPlayers((prev) => prev.map((p) => (p.id === g.id ? { ...p, handicap_index: num } : p))); }}
-                        style={{ background: "#7fd6a3", color: C.green, border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}
+                        style={{ background: "#7FD6A3", color: C.green, border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}
                       >✓</button>
                     </>
                   )}
@@ -947,7 +947,7 @@ function CreateGame({
                   ) : null}
                   <button
                     onClick={() => { setGuestPlayers((prev) => prev.filter((p) => p.id !== g.id)); setGuestIdxEdits((m) => { const n = { ...m }; delete n[g.id]; return n; }); setTeeAssignments((cur) => { const player = { ...cur.player }; delete player[g.id]; return { ...cur, player }; }); }}
-                    style={{ background: "none", border: "none", color: C.birdie, cursor: "pointer", fontSize: 14, padding: 0 }}
+                    style={{ background: "none", border: "none", color: C.overRedDark, cursor: "pointer", fontSize: 14, padding: 0 }}
                   >
                     ✕
                   </button>
@@ -2788,7 +2788,7 @@ function GameRoom({
               ? <button onClick={adminReopenGame} style={{ background: "transparent", color: C.cream, border: `1px solid ${C.sage}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "6px 12px", cursor: "pointer" }}>Reopen</button>
               : <button onClick={adminEndGame} style={{ background: "transparent", color: C.cream, border: `1px solid ${C.sage}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "6px 12px", cursor: "pointer" }}>Force end</button>}
             <button onClick={adminResetGame} style={{ background: "transparent", color: C.cream, border: `1px solid ${C.sage}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "6px 12px", cursor: "pointer" }}>Reset scores</button>
-            <button onClick={adminDeleteGame} style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "6px 12px", cursor: "pointer" }}>Delete game</button>
+            <button onClick={adminDeleteGame} style={{ background: "transparent", color: C.overRedDark, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "6px 12px", cursor: "pointer" }}>Delete game</button>
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
             <span style={{ color: C.sage, fontSize: 12 }}>Reassign organizer:</span>
@@ -3060,7 +3060,7 @@ function GameRoom({
                     {fp.gaps.map((g) => (
                       <div key={g.name} style={{ background: C.greenLight, borderRadius: 10, padding: "9px 12px", fontSize: 13, lineHeight: 1.45 }}>
                         <b>{g.name}</b>{" \u2014 "}
-                        {g.noScores ? <span style={{ color: C.birdie }}>no scores entered</span> : (
+                        {g.noScores ? <span style={{ color: C.overRedDark }}>no scores entered</span> : (
                           <span style={{ color: C.sage }}>
                             {[
                               g.missScores.length ? `scores on ${finishListFmt(g.missScores)}` : null,

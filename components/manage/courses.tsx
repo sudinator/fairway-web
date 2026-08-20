@@ -382,7 +382,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
         {source === "group" ? (
           <button title="Remove from club library"
             onClick={() => { if (confirm(`Remove "${courseCardTitle(c)}" from this club's library?\n\nThe course remains in the global app library and can be added back later.`)) remove(c.id, courseCardTitle(c)); }}
-            style={{ background: "none", border: "none", borderLeft: `1px solid ${C.borderCard}`, color: C.birdie, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>✕</button>
+            style={{ background: "none", border: "none", borderLeft: `1px solid ${C.borderCard}`, color: C.overRedDark, fontSize: 16, fontWeight: 800, cursor: "pointer", padding: "0 16px" }}>✕</button>
         ) : inGroup ? (
           <div style={{ display: "flex", alignItems: "center", borderLeft: `1px solid ${C.borderCard}`, padding: "0 14px", color: C.cream, fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>In Club ✓</div>
         ) : (
@@ -876,12 +876,12 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
               <label style={{ color: C.sage, fontSize: 11 }}>Yards</label>
               <button type="button" onClick={() => setYardTee(yardTee === i ? null : i)}
                 title={yd > 0 ? "Total yardage for this tee — tap to edit per hole" : "Tap to enter per-hole yardages"}
-                style={{ marginTop: 4, width: "100%", background: "#173a2c", border: `1px solid #37624f`, borderRadius: 8, padding: "6px 8px", color: yd > 0 ? C.cream : C.sage, fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "left" }}>
+                style={{ marginTop: 4, width: "100%", background: C.green, border: `1px solid #37624f`, borderRadius: 8, padding: "6px 8px", color: yd > 0 ? C.cream : C.sage, fontSize: 13, fontWeight: 700, cursor: "pointer", textAlign: "left" }}>
                 {yd > 0 ? yd.toLocaleString() : "Add"} <span style={{ color: C.sage, fontSize: 11, fontWeight: 500 }}>{yardTee === i ? "· close" : "· edit"}</span>
               </button>
             </div>
             {course.tees.length > 1 && (
-              <button onClick={() => removeTee(i)} style={{ background: "none", border: "none", color: C.birdie, cursor: "pointer", fontWeight: 800, padding: "10px 6px" }}>✕</button>
+              <button onClick={() => removeTee(i)} style={{ background: "none", border: "none", color: C.overRedDark, cursor: "pointer", fontWeight: 800, padding: "10px 6px" }}>✕</button>
             )}
           </div>
           {yardTee === i && (

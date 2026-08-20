@@ -31,6 +31,19 @@ ALLOWLIST = {
     "#3D95CE": "Venmo brand mark",
     "#5AA9E6": "Team 1 identity colour",
     "#E8934F": "Team 2 identity colour",
+    # Button fills reviewed and kept at 177.68 — see DISPLAY_RULES, "Allowed off-palette
+    # button fills". Brand marks cannot be recoloured; the rest are single-purpose washes
+    # where a palette token would not earn its place. None is a contrast failure.
+    "#6D1ED4": "Zelle brand mark",
+    "#5BBE7E": "admin resolve-confirm success green (x3, admin-only)",
+    "#3F3414": "caution wash — setup workspace delete",
+    "#7A4E18": "caution wash — deactivate player",
+    "#5A3A10": "caution wash — tournament sync",
+    "#3A3320": "caution wash — money screen tab",
+    # Success green on "mark settled" / confirm buttons (x6). NOT C.underDark — that token was
+    # #7FD6A3 when added at 177.65 and was lifted to #A3C6F5 at 177.66 for contrast, which made
+    # it a BLUE. Mapping this mint to it at 177.68 turned six success buttons light blue.
+    "#7FD6A3": "success fill — mark settled / confirm (x6)",
 }
 
 
