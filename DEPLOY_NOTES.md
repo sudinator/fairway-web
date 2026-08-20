@@ -1,3 +1,15 @@
+## 177.63.260819 — Fix: package-lock.json missing from the 177.62 drop
+- **CI-only. No application code, no visual change, no migration.**
+- 177.62 added four devDependencies for the new component test harness (`jsdom`, `@types/jsdom`,
+  `@testing-library/react`, `@testing-library/dom`) but shipped `package.json` WITHOUT the matching
+  `package-lock.json`. `npm ci` requires the two to agree exactly and fails hard when they do not —
+  "Missing: <pkg> from lock file", exit code 1, before any gate runs.
+- Regenerated `package-lock.json` (6,913 -> 7,587 lines).
+- **Root cause of the miss:** local verification used `npm install`, which UPDATES the lock file as
+  a side effect and therefore always succeeds. GitHub runs `npm ci`, which VALIDATES it. Testing
+  with the wrong command hid the defect through a full six-gate verification pass. Verification now
+  uses `npm ci` on a clean extract, which is what CI actually does.
+
 ## 177.62.260819 — Surface migration: list rows and panels go green
 - **NO migration. Cosmetic + CI only.** Builds on 177.61 (same staging base).
 - **63 surfaces flipped from cream to green**, from a per-site classification of all 118 light
