@@ -335,18 +335,23 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
             {members?.map((m) => {
               const name = m.profiles?.display_name || m.email;
               const self = m.user_id === user.id;
+              // The row and the panel behind it were both C.greenLight — 1.00:1, the same colour —
+              // so members read as one undifferentiated list with no card and no divider.
+              // greenMid plus a visible outline separates them.
               return (
-                <div key={m.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div key={m.id} style={{ background: C.greenMid, border: `1px solid ${C.borderGreen}`,
+                  borderRadius: 12, padding: "12px 14px", marginTop: 10, display: "flex",
+                  alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <Avatar src={m.profiles?.avatar_url} name={name} size={40} />
-                  <div style={{ flex: 1, minWidth: 190 }}>
+                  <div style={{ flex: 1, minWidth: 140 }}>
                     <div style={{ color: C.cream, fontWeight: 800 }}>{name}{self ? " (you)" : ""}</div>
                     <div style={{ color: C.sage, fontSize: 12 }}>{m.status}{m.role === "admin" ? " · admin" : ""}</div>
                   </div>
                   {isAdmin && !self && m.status !== "removed" && (
-                    <>
+                    <div style={{ display: "flex", gap: 8, flexShrink: 0, marginLeft: "auto" }}>
                       <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px" }} disabled={busy} onClick={() => updateMember(m, { role: m.role === "admin" ? "member" : "admin" })}>{m.role === "admin" ? "Make member" : "Make admin"}</button>
                       <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", color: C.overRedDark }} disabled={busy} onClick={() => { if (confirm(`Remove ${m.profiles?.display_name || m.email} from ${active.name}?`)) updateMember(m, { status: "removed" }); }}>Remove</button>
-                    </>
+                    </div>
                   )}
                 </div>
               );

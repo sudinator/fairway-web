@@ -25,6 +25,24 @@ single most important habit — it has caught countless bugs.
 - **Supabase** (Postgres + Auth + Row-Level Security). Project ref `epmbsmykyrnoiccwnoxq`. **FREE tier** —
   mind quotas.
 - **Vercel** hosting. Repo: `sudinator/fairway-web`. Live: `birdienumnum.vercel.app`.
+
+### GOLF_API_KEY lives in THREE places
+
+The GolfCourseAPI key is needed by two independent systems and is unreadable from both once set.
+This bit us: it was set in June, never written down, and could not be recovered — Vercel marks it
+Sensitive (write-only) and GolfCourseAPI does not display an existing key.
+
+| Where | Why | Notes |
+|---|---|---|
+| **Vercel** env var `GOLF_API_KEY` | the app's course search (`app/api/courses/route.ts`) | Sensitive, Production + Preview. Changing it requires a REDEPLOY |
+| **GitHub** repository secret `GOLF_API_KEY` | the weekly contract monitor | must be a REPOSITORY secret — the workflow declares no `environment:` |
+| **Password manager** | so it can be recovered | the step that was skipped |
+
+Account is at golfcourseapi.com — free, sign-in is by emailed link, no password.
+
+If it ever needs replacing: regenerate, save to the password manager FIRST, then Vercel, then
+redeploy, then GitHub. Course search is the only thing affected and it fails with a clear message,
+not silently. Verify with `https://birdienumnum.vercel.app/api/courses?q=francis+byrne`.
 - **PWA** (installable; service worker at `public/sw.js`, version-stamped).
 - Sister app "Fairway Card" (separate repo, `fairway-web-eosin.vercel.app`) is occasionally referenced —
   not this project.

@@ -1,3 +1,48 @@
+## 177.73.260820 — Three display fixes; GolfCourseAPI monitor repaired
+- **NO migration. CI and docs only.** No application code changes.
+- **The weekly monitor has never run successfully.** `GOLF_API_KEY` was set in Vercel for the app
+  but never added as a GitHub repository secret, so every scheduled run since the workflow was
+  added has failed at the first line. Adding the secret then exposed a second, real defect.
+- **FIX: the monitor exceeded the provider's rate limit.** It makes 31 requests (13 searches +
+  18 detail lookups) and fired them back-to-back, returning HTTP 429 about a third of the way
+  through. Now paced at 400ms between calls with exponential backoff on 429, honouring
+  `Retry-After` when present. A full run takes ~20-25s, irrelevant for a weekly job.
+- **FIX: the alert issue sent readers after the wrong problem.** Any failure produced "Check
+  provider ids, search/detail response shape, required fields..." — so a missing secret looked
+  like an API change. Exit codes now distinguish them: **1 = contract drift** (the provider really
+  did change), **2 = monitor problem** (missing key, rate limit, outage). The issue body reports
+  the right one, and for a monitor problem says explicitly "this is NOT evidence that the contract
+  changed" and "do NOT change application code for this".
+- 401/403 now reports that the key was rejected and names both places it must be updated.
+  5xx retries as a provider outage rather than failing immediately.
+- **All five paths verified offline** with a stubbed `fetch`: missing key, 401, 429, 5xx and real
+  drift each produce the right exit code and message.
+- **THREE DISPLAY FIXES, spotted on device:**
+  - **Badge grid alignment.** The badges-earned grid was `display:flex` with `flexWrap` and fixed
+    74px cells, so each wrapped row took the height of its tallest label — a one-line label
+    ("Birdie") left its disc at a different vertical position from a three-line one ("Best
+    differential / new record"). Now a 4-column grid with cells top-aligned, so every disc lands
+    on the same line regardless of label length.
+  - **Club member rows had no boundary.** The row background was `C.greenLight` and so was the
+    panel behind it — **1.00:1, the same colour** — so members read as one undifferentiated list
+    with no card and no divider. Rows are now `C.greenMid` on a `C.borderGreen` outline. Same
+    family as the border work at 177.65; this one escaped because both sides are legitimate
+    tokens, so nothing looked wrong in source. The `Make admin` / `Remove` pair is now grouped in
+    a non-shrinking flex box: as bare flex children behind a 190px name field, `Remove` dropped
+    onto a line of its own on a phone.
+  - **Badge count pill clipped.** The `×2` / `×3` pill sits at `top: -4` so it straddles the disc
+    edge, inside a strip declaring `overflowX: "auto"` for horizontal scrolling. **A scroll
+    container clips BOTH axes** — CSS has no way to scroll one direction and spill the other — so
+    the pill lost its top 4px. Fixed with 6px top padding on the scroller rather than
+    `overflow: visible`, which would have disabled the horizontal scroll. Only badges earned more
+    than once have a pill, which is why it appeared intermittent. Every other `overflowX:auto`
+    containing a badge was checked; this was the only one.
+
+- **HANDOFF.md now records that `GOLF_API_KEY` lives in THREE places** — Vercel (app), GitHub
+  secret (monitor), password manager (recovery) — with the reason. The key set in June was
+  unrecoverable: Vercel marks it Sensitive and write-only, and GolfCourseAPI does not display an
+  existing key. Documenting this is what stops it recurring.
+
 ## 177.72.260820 — Overlays: a scroll no longer closes the sheet
 - **NO migration. Cosmetic + CI only.**
 - **FIX: four overlays closed when a scroll gesture ended on the backdrop**, discarding whatever
