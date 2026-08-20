@@ -1,3 +1,50 @@
+## 177.60.260819 — Version ledger guard + CI psql hardening
+- **NO migration. No application code. CI and release-metadata only.**
+- **Root cause fixed.** 177.59 was committed and deployed to the staging app with `package.json`
+  still reading `177.58.260816`, so Help kept reporting the previous version. Nothing caught it:
+  typecheck, lint, 55 guards, tests and the build were all green, because a version string is data,
+  not code. The bump had been left as a manual step with no gate behind it.
+- **NEW `ci/check_version_ledger.py`** — fails the build when `package.json` FEATURE.EDIT does not
+  match the newest `DEPLOY_NOTES.md` heading, and when DEPLOY_NOTES entries are prepended out of
+  order. The DATE segment is deliberately not compared: DEPLOY_NOTES records when the notes were
+  written, `scripts/write-version.mjs` stamps the US/Eastern date the build actually ran, and a
+  release prepared late or deployed the next morning legitimately differs. Comparing them would
+  produce false failures and the guard would get switched off. Negative-tested.
+- `npm run guards` 55 -> 56 checks.
+- **CI: stop reinstalling psql when it is already on the runner.** `ci.yml` and `robustness.yml`
+  both ran `apt-get install postgresql-client` unconditionally. On 2026-08-19 that step stalled
+  **8m41s** in `ci.yml` on an unreachable `azure.archive.ubuntu.com` mirror (dozens of `Ign:`
+  retries) while `robustness.yml` sailed through the identical step on a different runner — i.e.
+  transient infrastructure, not code. A plain re-run went green. Both steps now check for `psql`
+  first; the fallback branch is byte-identical to the previous command, so the worst case is
+  unchanged behaviour.
+- Adds the missing `DEPLOY_NOTES` entry for 177.59, which shipped undocumented.
+
+## 177.59.260819 — Display rules: spec, ratcheted guards, and two button rendering fixes
+- **NO migration. Cosmetic + CI only.** No schema, RLS or RPC changes.
+  *(Deployed to staging as commit `1de2898` before this entry existed; recorded retroactively in
+  177.60. `package.json` was not bumped at the time — see the 177.60 root cause above.)*
+- **FIX — two buttons were rendering as the browser's default control.** "End game for everyone"
+  (`tournaments.tsx`) and "Copy round summary" (`organizer-panel.tsx`) showed as a light grey pill
+  with iOS accent-blue text instead of BNN gold. Cause: a style spread overridden with `undefined`
+  (`{...btn(true), background: cond ? X : undefined}`), which discards `btn()` entirely because
+  React skips undefined values. Invisible to typecheck, lint and build; only visible on a device.
+- **NEW `DISPLAY_RULES.md`** — the authoritative visual spec. Surface families (cream = scorecard,
+  score entry, editable fields, pick-control outlines; green = everything else), surface-bound text
+  colour, gold semantics, the five scales, mandatory components, a manual audit checklist, a
+  decision tree, code hazards and a debt register.
+- `APP_RULES.md` rules 25/26 rewritten around it.
+- **Visual:** editable fields `C.card` -> `C.cream` app-wide via one `inputStyle` definition. Gold
+  now strictly means "someone must act" — `vetted ★`, the ★ toggle and `✓ in your library` move to
+  `C.sage`; `club edit pending review` stays gold. Also fixes a 2.38:1 contrast failure on the
+  vetted tag. Games-list share code -> `C.cream` (`C.green`-as-text is cream-surface only, 1.54:1
+  on green). `borderRadius: 99` -> `999` on 8 stroke dots — no pixel change; CSS clamps radius to
+  half the box.
+- **NEW CI guards**, ratcheted and negative-tested: `ci/check-design-scale.py`,
+  `ci/check-palette-closure.py`, `ci/check-overlay-contract.py`. Baselines: 1,680 off-scale
+  geometry uses, 122 off-palette colours, 8 hand-rolled overlays. The undefined-override pattern is
+  zero-tolerance.
+
 ## 177.58.260816 — Create Game convergence audit closeout
 - **NO migration. Runtime behavior unchanged from 177.57.** Final staging-only audit/packaging checkpoint before the cumulative Production PR.
 - Added `DE_NOVO_CREATE_GAME_AUDIT_CLOSEOUT_177.58.md`, consolidating the fresh 177.46 Production -> final staging responsibility/contract comparison. The audit found no missing legacy Create Game capability and documents the intentional Lean Create ownership boundary plus the inherited non-atomic create risk.
