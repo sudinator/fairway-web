@@ -1,0 +1,11 @@
+{
+  "components/dashboard.tsx": 1,
+  "components/game/game-list.tsx": 1,
+  "components/game/organizer-panel.tsx": 2,
+  "components/game/scorecard-views.tsx": 1,
+  "components/money.tsx": 7,
+  "components/player-card.tsx": 1,
+  "components/tournaments.tsx": 3,
+  "components/ui.tsx": 8,
+  "components/yardage-backfill.tsx": 1
+}

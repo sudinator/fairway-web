@@ -1,3 +1,318 @@
+## 177.72.260820 — Overlays: a scroll no longer closes the sheet
+- **NO migration. Cosmetic + CI only.**
+- **FIX: four overlays closed when a scroll gesture ended on the backdrop**, discarding whatever
+  the user was entering. The failure is subtle: `onClick` fires on whatever sits under the finger
+  when it lifts, so a scroll that starts inside the panel and drifts onto the scrim registers as a
+  backdrop tap. `stopPropagation` on the panel does not help — the click target really is the
+  backdrop. Affected: the hole score sheet (`ui.tsx`), the share modal (`share-card.tsx`, 2 sites),
+  the player card (`player-card.tsx`) and the end-game confirmation (`tournaments.tsx`).
+- **NEW `backdropDismiss()` in `ui.tsx`.** Requires that the gesture BEGAN on the backdrop and that
+  the finger travelled less than 10px. `BottomSheet` avoids the problem structurally by putting the
+  scrim in a separate sibling div; these four wrap the panel inside the scrim, and this makes that
+  shape safe without restructuring them.
+- **Verified by execution, not inspection.** Four new assertions in `lib/release-check.test.tsx`
+  dispatch real pointer events: a clean backdrop tap closes; a scroll starting in the panel does
+  not; a drag across the backdrop does not; a click inside the panel does not. Negative-tested —
+  reverting to the naive `onClick` fails three of the four.
+- **Safe-area padding added** to the share modal and player card, which lacked it. Without it a
+  full-screen overlay can place its content under the notch or the home indicator.
+- **Two of the eight "hand-rolled overlays" were false positives** and are left alone: `ui.tsx:211`
+  is `BottomSheet` itself, and `home.tsx:944` is a bare click-catcher behind a menu, not a panel.
+  A third, `ui.tsx:44`, is the avatar photo lightbox — a different pattern from a sheet, and
+  correct as written.
+- **Share-card PNG export reviewed.** No action needed: the card uses only system fonts (Georgia,
+  `-apple-system`) so there is no webfont to inline, contains no remote images to fetch, and falls
+  back to "Copy as text" on failure. Every colour inside the exported card measures 5.16:1 or
+  better against `C.green`.
+
+## 177.71.260820 — Tap targets: 30 buttons too small to hit reliably
+- **NO migration. Cosmetic + CI only.** Vertical padding only — horizontal is untouched, verified
+  line by line, so nothing got wider and nothing can wrap.
+- **30 buttons rendered under 24px tall.** The worst was an 18px band around 11px text
+  (`manage.tsx` delete-stale). Apple's HIG minimum is 44pt; under ~24px is a miss-and-retry on a
+  phone, one-handed, outdoors — which is how this app is used. All 30 now render >= 32px.
+  One was correctly excluded: the course-library star toggle sits in an `alignItems: "stretch"`
+  row and already fills the row height.
+- **The 152 buttons in the 24-31px band are left alone.** Tight but hittable. Standardising them
+  would move layout across the app for a benefit nobody would feel.
+- **The wider padding scale is NOT being pursued.** 161 padding values remain 161. Analysis showed
+  it is a cross-product of two axes rather than 161 arbitrary strings, so a 5x5 or 6x6 scale would
+  collapse it to 20-31 combinations with 454 of 508 sites moving only 1-2px. That is invisible: it
+  would be 508 sites of layout risk, with no component test harness, for a change no user could
+  perceive. Ratcheted so it cannot get worse; not collapsed. Reasoning recorded in DISPLAY_RULES.
+- **NEW `ci/check_tap_targets.py`** — fails the build if a button drops below 24px estimated
+  height. Height is fontSize * 1.25 + 2 * vertical padding; buttons inside a `stretch` container
+  are skipped because they fill the parent. Negative-tested. Baseline is 0.
+
+## 177.70.260820 — Release verification, and the eight bugs it found
+- **NO migration. Cosmetic + CI only.** Supersedes the 177.69 candidate, which was packaged but is
+  incomplete.
+- **NEW `ci/verify_release.py`** — 20 assertions that every agreed fix from 177.59 onward is still
+  in place: both `undefined`-override fixes, the weight and radius scales, `C.field`, the
+  `color-scheme` declaration, no mangled token names from scripted edits, and the version ledger.
+  Wired into `npm run guards`, so a later release cannot silently undo an earlier one.
+- **NEW `lib/release-check.test.tsx`** — 18 assertions that EXECUTE the changed components rather
+  than reading source. This is the layer that would have caught the 177.68 blue buttons: the static
+  checks confirmed the file said what was claimed, but only rendering shows the colour is wrong.
+- **The first version of the C.birdie check silently passed its own bug.** It resolved the
+  background with a 900-character lookback — the same proximity heuristic responsible for several
+  misses in this series. Rewritten to walk the JSX ancestor chain, it failed immediately and then
+  found **8 more sites** the button-scoped pass at 177.69 had missed:
+  `organizer-panel.tsx` 1063/1097/1098, `scoring-views.tsx` 642, `manage.tsx` 1274/2224,
+  `money.tsx` 1027. All `C.birdie` on a green surface at 1.42:1, most inside ternaries — which is
+  precisely what proximity matching cannot see. Now `C.overRedDark` at 4.91:1.
+- Both new checks were NEGATIVE-TESTED: each bug was deliberately reintroduced and confirmed to
+  fail the suite, then reverted. A check that cannot fail is decoration.
+- Total destructive-action sites corrected across 177.69 and 177.70: **44**.
+
+## 177.69.260820 — Destructive actions made visible; a bad token map reverted
+- **NO migration. Cosmetic + CI only.**
+- **FIX: 36 destructive actions were effectively invisible.** Every ghost-styled Delete, Ban, Wipe
+  and Remove used `C.birdie` as its text colour — a CREAM-surface token measuring **1.42:1** on a
+  green card. Now `C.overRedDark` at 4.91:1, across 10 files. Same failure mode as the score
+  colours fixed at 177.65: a colour correct for a cream surface, stranded when 177.62 turned that
+  surface green. Filled danger buttons already used `C.danger` and are unaffected.
+- **FIX: six success buttons were turned blue by 177.68.** "Mark settled" and the payment confirms
+  used `#7FD6A3` (mint). 177.68 mapped that literal to `C.underDark` — but `C.underDark` was
+  `#7FD6A3` only until 177.66, when it was lifted to `#A3C6F5` to clear a contrast near-miss. The
+  map matched the OLD value, an 82-point channel shift, on the buttons that confirm money has been
+  paid. Reverted to `#7FD6A3` and allowlisted with the reason.
+  The gates could not catch this: `#A3C6F5` with dark text is 8.9:1, so it passed every contrast
+  check. It was readable — it just meant the wrong thing. Found only because the change was
+  questioned.
+- **Lesson recorded in the guard comments:** a token's value can change after code maps a literal
+  onto it. Map to a token by MEANING, not by matching its current hex.
+- 21 bespoke button fills converted to tokens at 177.68 remain; the other 15 stay documented as
+  exceptions in DISPLAY_RULES with reasons.
+
+## 177.68.260820 — Button fills to palette tokens
+- **NO migration. Cosmetic + CI only.** No layout change: only fill colours move, and every one
+  moves to a token within a few RGB steps of the value it replaces.
+- **21 bespoke button fills converted to palette tokens.** `#173a2c`, `#0f3529`, `#14351f`,
+  `#123528` -> `C.green`; `#16503D` -> `C.greenMid`; `#C9A227` -> `C.gold`; `#7fd6a3` ->
+  `C.underDark`; `#5a2018` -> `C.danger`. Off-palette button fills 36 -> 15.
+- **15 kept and documented as exceptions**, with reasons, in DISPLAY_RULES and in the palette
+  guard's allowlist: three payment brand marks (Venmo, PayPal, Zelle) that cannot be recoloured
+  without misrepresenting the service; one in the orphan `nav-debug.tsx`; a success green used by
+  three admin-only buttons; four amber caution washes; and three conditional fills in `money.tsx`
+  that sit inside ternaries paired with matching text colours, where snapping risks breaking a
+  correlated pair for no visible gain. None is a contrast failure — each was measured.
+- **The "174 ad-hoc buttons" figure in earlier notes was misleading** and is corrected here.
+  Properly categorised: 307 already use `btn()`; 67 have bespoke fills; 66 are real ghost buttons;
+  24 map cleanly to a role; and **12 are structural wrappers** — `<button>` around a whole card or
+  selector tile, unstyled because the child provides the layout. Applying `btn()` to those would
+  break them. They are correct as written and are now documented as excluded.
+- No call sites migrated to `btn()` in this drop. The 66 ghost buttons remain outstanding: their
+  padding is currently sized to fit tight spaces, so standardising it will move layout and needs
+  reviewable batches rather than a sweep.
+
+## 177.67.260820 — Geometry: weight scale, radius scale, button roles
+- **NO migration. Cosmetic + CI only.**
+- **Font weight: 6 values -> 3.** 500 body / 700 emphasis / 800 title, with 500 set as a base on
+  `body`. 1,098 pieces of text declared a `fontSize` and no `fontWeight`, inheriting the browser
+  default of 400; only 11 explicit 400s existed, so this is one CSS rule rather than a migration.
+  500 rather than 400 because light strokes optically thin out on a dark background, which made
+  11-12px secondary text harder to read than it needed to be. 800 kept for titles rather than
+  stepping down to 700 — the app uses it 457 times and it is what holds a title against the green.
+- **Corner radius: 20 values -> 6.** `999` pill, `14` sheet, `12` card, `10` control, `8` compact,
+  `6` tag. 108 sites snapped to their nearest neighbour, none moving more than 4px. `r20` (x6) and
+  `r24` (x1) swept to 14 by decision.
+- **`btn()` extended to four roles and two sizes** — `primary`, `secondary`, `ghost`, `danger` x
+  `standard`, `compact`. **Additive only: no call site changed.** The boolean form still works and
+  all 243 existing calls are untouched.
+  The reason matters: of 172 hand-rolled buttons in 129 distinct shapes, **86 were ghost buttons**
+  — transparent, text-only — a role `btn()` never offered. People were not being careless; there
+  was nothing to reach for. Migrating those 86 will move layout, so it is deliberately separate
+  work to be done in reviewable batches.
+- **DISPLAY_RULES Part 5 rewritten from measurement.** Three of its four scales were written from
+  theory before anything was counted, and all three were wrong. The radius scale alone would have
+  changed 278 sites AWAY from values the app already used consistently. Font size and padding are
+  now explicitly NOT prescribed, with the reasoning recorded: enforcing the documented type scale
+  would have resized body text across 759 sites, and padding has 161 values with no dominant
+  cluster and a real risk of moving layout.
+- `ci/check-design-scale.py` updated to the measured scale.
+
+## 177.66.260820 — Conditional-style pairing, and the bugs it uncovered
+- **NO migration. Cosmetic + CI only.** Follows 177.65, which is already deployed.
+- **Why this is a separate version:** 177.65 was packaged, deployed, and then extended. Shipping
+  the extended set under the same number would have meant two different builds both reporting
+  177.65 in Help. The version-ledger guard cannot catch this — it checks package.json against
+  DEPLOY_NOTES, and both agreed. It has no way to know what is already live.
+- **The contrast checker now pairs conditional styles by their shared CONDITION.** It previously
+  cross-multiplied every text colour against every background, so a chip whose background and
+  label both flip on `selected` was reported as failing for combinations that never render —
+  (gold, cream) and (green, dark) when only (gold, dark) and (green, cream) exist.
+- **It also stops attributing text to an ancestor when the element's own background is a variable
+  it cannot resolve.** The dashboard bar labels sit on the bar, not on the card behind it.
+- **Removing that noise exposed real defects that had been hidden in it:**
+  - five near-identical error reds (`#FB7185`, `#EF9D90`, `#E8A199`, `#F3A3A0`, `#F0A99F`) all
+    short of 4.5:1 on green, now one token
+  - `C.faint` (a cream-surface token) used as text on green in money.tsx
+  - `C.indivDot` at 3.18:1, lifted to 4.72:1
+  - the sand marker `#E8730C` at 2.68:1 on a light wash
+  - white on the mid-green confirm button at 4.11:1
+- **Contrast end to end: 523 sub-threshold sites at 177.58 -> 25.** The residual 25 were each
+  inspected by hand: 2 PayPal/Venmo brand fills that cannot change, several nested correlated
+  ternaries where both real states are fine, and near-misses at 3.7-4.4:1. None is unreadable.
+
+## 177.65.260820 — Visual states audit: opacity, SVG, borders, shadows, native controls, focus
+- **NO migration. Cosmetic + CI only.** Completes the surface migration by auditing the seven
+  categories that background and text colour alone never covered.
+- **Runtime-computed colours: 21 of 33 combinations were failing, now 0.** Helpers like
+  `ptsColor()`, `colorFor()`, `relCol` and the achievements hole chips return a fixed set of
+  values, so their range is enumerable even though a static scanner cannot read them. Every one
+  had been tuned for a cream surface and left at 1.26-2.27:1 when those surfaces flipped in
+  177.62. The achievements chips were the worst in the app at 1.26:1 — every possible state
+  unreadable. NEW `ci/computed_colour_matrix.py` checks all 33 combinations on every build.
+- **Disabled controls:** eight different opacity values (0.3-0.85) collapsed to one, 0.62. At 0.3
+  and 0.4 a control did not read as disabled, it read as broken. WCAG exempts disabled controls
+  from contrast minimums, so this is legibility rather than compliance.
+- **SVG:** `player-card` FormChart carried the OLD `C.faint` (#8B8775) and OLD `C.sage` (#A9C4B5)
+  frozen into `fill=` attributes, which no `color:` scanner reads. Axis labels measured 2.24:1 on
+  the green panel. Now `C.sage`; the series red lifted for a dark ground.
+- **Borders: 103 below 1.7:1, triaged by PURPOSE not by value.** 5 deleted as redundant (the
+  surface change already gave >=3:1), 93 raised so the edge is visible, 5 lifted to 3:1 because
+  they communicate state. Two of those five were real bugs: the SELECTED course row and
+  destructive controls were both effectively invisible at 1.34:1 and 1.42:1.
+- **Destructive actions: five treatments collapsed to one.** Two outline variants, bare red text,
+  `#7A2F28` and `#5A1E1E` all become `C.danger` with `C.cream`. The three outline-only ones did
+  not read as buttons at all. `C.dangerEdge` is added for the two that sit directly on `C.green`,
+  where the fill alone is 1.03:1.
+- **Selection rings** to full-opacity `C.gold` (1.34 -> 3.34:1). At .25 a selected item was marked
+  by a smudge.
+- **Box shadows:** black drop shadows do almost nothing on a dark page — `rgba(0,0,0,.45)` is
+  3.36:1 on white but 1.37:1 on `C.green`. The inert card shadows are removed; the raised border
+  now carries elevation. 22 distinct shadow values collapse to 3.
+- **Native controls:** `color-scheme` was never set, so iOS chose light or dark from the USER'S
+  phone setting — the same screen rendered differently for different people. Now declared light,
+  matching the cream fields. `accent-color: C.gold` globally; it had been set at exactly one of
+  two checkboxes, leaving the other iOS system blue. The one date input on a dark surface now
+  matches the other three (iOS draws the value text, so cream was never guaranteed).
+- **Focus:** nothing removed the outline, so keyboard and Switch Control users were never
+  stranded — but the browser default is system blue at 2.01:1 on a green card, and which blue
+  depends on the browser. A two-tone `:focus-visible` ring replaces it; no single colour clears
+  3:1 everywhere, so cream outer plus dark inner covers gold buttons (6.75:1) and green cards
+  (7.29:1) alike.
+- **Dashboard stat bars** had `C.cream` labels on light fills — 1.57:1 at worst. Now `C.green`.
+- **Contrast, end to end: 523 sub-threshold sites at 177.58 -> 25.** The residual 25 are: 2 PayPal/
+  Venmo brand fills (allowlisted, cannot change), several correlated ternaries where background and
+  text flip on the same condition but sit on different elements, and a handful of near-misses at
+  3.7-4.4:1. Each was inspected by hand rather than assumed.
+- **The checker now pairs conditional styles by their shared CONDITION.** Previously it
+  cross-multiplied every text colour against every background, reporting combinations that can
+  never render — a chip whose background and label both flip on `selected` only ever paints
+  (gold, dark) or (green, cream), never (gold, cream). It also no longer attributes text to an
+  ancestor when the element's own background is a variable it cannot resolve; the dashboard bar
+  labels sit on the bar, not the card behind it.
+- Error reds unified: `#FB7185`, `#EF9D90`, `#E8A199`, `#F3A3A0`, `#F0A99F` were five
+  near-identical values all short of 4.5:1 on green. Now one token.
+- **NOT done:** the share-card PNG export. `html-to-image` rasterises separately from the on-screen
+  render, so it needs verifying against a real generated image with real data rather than by
+  static analysis.
+
+## 177.64.260820 — Fix: surfaces and text 177.62 missed
+- **NO migration. Cosmetic + CI only.** Completes the 177.62 surface migration.
+- **Root cause: every scanner I wrote matched the LITERAL form and treated "no match" as "nothing
+  there".** `color: C.faint` matched; `color: cond ? C.faint : C.green` did not. `background:
+  C.card` matched; `background: sel ? C.cream : C.card` did not. In a codebase where conditional
+  styling is common this silently excluded a large fraction of reality while reporting a clean
+  pass. Three separate defects, one habit.
+- **123 conditional colour expressions** were never examined by `check_resolved_contrast.py`. One
+  of them shipped "G1 2 UP" as `C.green` on a `C.greenLight` card — 1.54:1, effectively invisible.
+  The guard now evaluates BOTH branches of a ternary.
+- **19 conditional light surfaces** were never inventoried, which is why Courses went green while
+  New Round and Create Game kept white course pickers. Now flipped: create-game course rows,
+  new-round favourites rows, leaderboard rows, scoring total cards, scoring player cards, the
+  admin provider-source panel.
+- **`round-setup.tsx` favourites row was misclassified** as the par grid on the line above it.
+- **Dark-on-green text fixed at 20+ sites** — `C.green`, `C.ink` and bespoke hexes (`#14351f`,
+  `#4a6b54`, `#8a5a12`, `#9a6a12`, `#5a4a12`, `#6B6857`) left behind by the flip because the swap
+  map only knew `C.*` tokens.
+- **Case-sensitivity, twice.** The tree mixes `#14351F` and `#14351f`; case-sensitive replacement
+  matched 2 of 9 sites, the same mistake that made the first flip script miss 14 of 63. Every
+  scanner now treats hex as case-insensitive.
+- **NEW `ci/style_audit.py`** — resolves literal AND conditional styles and, critically, PRINTS
+  every expression it could not parse instead of skipping it silently. A scanner that hides its
+  blind spots produces confident wrong answers, which is what happened three times here.
+- Guard baselines regenerated from the fixed state, not from the broken one. The 177.62 baselines
+  had frozen the defects as "known", so `npm run guards` passed over them.
+
+## 177.63.260819 — Fix: package-lock.json missing from the 177.62 drop
+- **CI-only. No application code, no visual change, no migration.**
+- 177.62 added four devDependencies for the new component test harness (`jsdom`, `@types/jsdom`,
+  `@testing-library/react`, `@testing-library/dom`) but shipped `package.json` WITHOUT the matching
+  `package-lock.json`. `npm ci` requires the two to agree exactly and fails hard when they do not —
+  "Missing: <pkg> from lock file", exit code 1, before any gate runs.
+- Regenerated `package-lock.json` (6,913 -> 7,587 lines).
+- **Root cause of the miss:** local verification used `npm install`, which UPDATES the lock file as
+  a side effect and therefore always succeeds. GitHub runs `npm ci`, which VALIDATES it. Testing
+  with the wrong command hid the defect through a full six-gate verification pass. Verification now
+  uses `npm ci` on a clean extract, which is what CI actually does.
+
+## 177.62.260819 — Surface migration: list rows and panels go green
+- **NO migration. Cosmetic + CI only.** Builds on 177.61 (same staging base).
+- **63 surfaces flipped from cream to green**, from a per-site classification of all 118 light
+  surfaces in the app. The rule (APP_RULES #25): cream is scorecards, score entry, editable fields
+  and pick-control outlines; green is everything else. Affected: rounds list, games list, course
+  library, Manage Game player cards, tee times and RSVP rows, admin panels, contests standings, the
+  end-game confirmation, and assorted chrome.
+- **174 text colours re-picked** on those surfaces. This is the part that matters: a flipped
+  background silently leaves its text on the wrong family — `C.ink` is 1.90:1 on green, `C.faint`
+  2.24:1, and `C.green`-as-text 1.54:1. Every one was resolved by walking the JSX ancestor chain,
+  then verified by `ci/check_resolved_contrast.py`.
+- **Net contrast effect: zero regressions.** 39 sub-threshold sites before, 39 after, and no text
+  anywhere on the wrong surface family. Two intermediate states during the work were worse (68 at
+  one point) and were caught by the guard, not by review.
+- **Editable fields now read correctly.** `C.field` (#EBE3CC) was introduced in 177.61 but sat on
+  near-white cards, so two light tones competed. On green the field reads as a filled-in slot,
+  which is what the token was for.
+- **Deferred 177.61 changes are now correct**, three of them applied automatically by the
+  resolver: `vetted ★` and `✓ in your library` -> `C.sage`; Games-list share code -> `C.cream`
+  (7.29:1 on green). The course-library star toggle -> `C.gold` when set, `C.sage` outline when
+  not; it is a control you act on, so gold belongs there, and `C.line` at 1.49:1 had made the
+  empty state nearly invisible.
+- **NEW component test harness** — `lib/test-dom.ts`, `lib/test-render.ts`,
+  `lib/component-render.test.tsx` (17 assertions). jsdom + React 19 `createRoot` inside `act()`,
+  following the repo's existing compile-then-run convention rather than adding a framework. Before
+  this, no component in this repo had ever been executed in a test.
+- **Correction to an earlier claim:** the conditional `useId()` fixed at 177.59 was described in
+  prior notes as a runtime crash. The harness proves it is not — React 19 neither throws nor warns
+  in either hook-count direction. It remains a rules-of-hooks violation worth fixing, but it was
+  never an outage risk and should not have been characterised as one.
+- **Still deferred:** the geometry scales (161 paddings, 21 radii, 20 font sizes, 174 ad-hoc
+  buttons) remain ratcheted but not collapsed. 39 sub-threshold sites remain, mostly near-miss reds
+  on green (3.8-4.1:1) needing a lighter red token.
+
+## 177.61.260819 — Colour correctness: measured contrast across the whole app
+- **NO migration. Cosmetic + CI only.** Supersedes the 177.59/177.60 candidates, which were never
+  merged to main; this is built from the same staging base.
+- **Sub-threshold text: 523 sites -> 39 (-92%).** Measured by resolving each text colour against the
+  background its JSX ancestor actually paints, then applying WCAG 2.1 (4.5:1 normal, 3:1 large).
+- **Two token changes fix 405 of them.** `C.faint` #8B8775 -> #676253 and `C.sage` #A9C4B5 ->
+  #B2CBBD. These are the app's default secondary-text colours; both were marginally under the floor
+  everywhere they appeared (3.55:1 on cream, 4.33:1 on green) because they were chosen by eye.
+- **62 wrong-family sites corrected** — `C.faint` (cream-surface text) sitting on green at 2.24:1,
+  and `C.sage` (green-surface text) sitting on cream at 1.83:1.
+- **NEW `C.field` #EBE3CC + `C.fieldLine` #C4BB9E.** Editable fields now read as a filled-in slot.
+  177.59 used `C.cream` for this, which is 1.09:1 against `C.card` — invisible.
+- **Corrects three 177.59 candidate changes that made contrast WORSE.** `vetted ★` and
+  `✓ in your library` were moved to `C.sage` on cream rows (1.83:1, worse than the 2.38:1 gold they
+  replaced); they are now `C.faint` (5.98:1). The Games-list share code was moved to `C.cream`
+  (1.09:1) ahead of a surface change that has not shipped; it stays `C.green` (12.25:1) until the
+  row actually turns green.
+- **FIX — two buttons rendered as the browser default control.** "End game for everyone"
+  (`tournaments.tsx`) and "Copy round summary" (`organizer-panel.tsx`) appeared as a light grey pill
+  with iOS accent-blue text. A style spread was overridden with `undefined`, which discards `btn()`
+  because React skips undefined values. Invisible to typecheck, lint and build.
+- `borderRadius: 99` -> `999` at 8 stroke-dot sites. No pixel change; CSS clamps radius to half the box.
+- **NEW `DISPLAY_RULES.md`** — the authoritative visual spec, with a manual audit checklist.
+  `APP_RULES.md` 25/26 rewritten around it.
+- **NEW guards**, all ratcheted and negative-tested: `check_resolved_contrast.py` (ancestor-resolved
+  WCAG), `check-design-scale.py`, `check-palette-closure.py`, `check-overlay-contract.py`
+  (undefined-override is zero-tolerance), `check_version_ledger.py`. `npm run guards` 51 -> 56.
+- **Deferred to the next release:** the 238-site cream->green surface migration, and the geometry
+  scales (161 paddings, 21 radii, 20 font sizes) which are ratcheted but not yet collapsed.
+
 ## 177.58.260816 — Create Game convergence audit closeout
 - **NO migration. Runtime behavior unchanged from 177.57.** Final staging-only audit/packaging checkpoint before the cumulative Production PR.
 - Added `DE_NOVO_CREATE_GAME_AUDIT_CLOSEOUT_177.58.md`, consolidating the fresh 177.46 Production -> final staging responsibility/contract comparison. The audit found no missing legacy Create Game capability and documents the intentional Lean Create ownership boundary plus the inherited non-atomic create risk.

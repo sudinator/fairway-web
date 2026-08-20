@@ -29,7 +29,7 @@ export function GroupSelector({ groups, activeGroupId, onChange }: { groups: App
         <span style={{ color: C.cream, fontSize: 13, fontWeight: 800 }}>{active.name}{active.role === "admin" ? " ★" : ""}</span>
       ) : (
         <select value={activeGroupId || groups[0].id} onChange={(e) => onChange(e.target.value)}
-          style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 8, color: C.ink, fontWeight: 700, padding: "6px 8px", maxWidth: 180 }}>
+          style={{ background: C.card, border: `1px solid ${C.borderCard}`, borderRadius: 8, color: C.ink, fontWeight: 700, padding: "6px 8px", maxWidth: 180 }}>
           {groups.map((g) => <option key={g.id} value={g.id}>{g.name}{g.role === "admin" ? " ★" : ""}</option>)}
         </select>
       )}
@@ -55,7 +55,7 @@ function FeatureMirrorControl({ groups, activeGroupId }: { groups: AppGroup[]; a
         ))}
         <option value="__self__">Off — App Testing behaves as itself</option>
       </select>
-      <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Per-device setting; changing it reloads the app. No data is copied or changed.</div>
+      <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Per-device setting; changing it reloads the app. No data is copied or changed.</div>
     </div>
   );
 }
@@ -293,7 +293,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
                 <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 24, fontWeight: 800 }}>{active.name}</div>
                 {isAdmin && <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px" }} onClick={() => setRenaming(true)}>Rename</button>}
                 {isAdmin && (members || []).filter((m) => m.status === "active" && m.user_id !== user.id).length === 0 && (
-                  <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", background: "#7A2F28" }} disabled={busy} onClick={deleteGroup}>Delete club</button>
+                  <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", background: C.danger }} disabled={busy} onClick={deleteGroup}>Delete club</button>
                 )}
               </div>
             )}
@@ -318,10 +318,10 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
                 {copyMsg && <span style={{ color: C.gold, fontSize: 12 }}>{copyMsg}</span>}
               </div>
               {inviteLink && (
-                <div style={{ background: C.card, borderRadius: 10, padding: 12, marginTop: 10 }}>
-                  <div style={{ color: C.faint, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>SHARE THIS LINK</div>
-                  <div style={{ color: C.green, fontSize: 13, marginTop: 6, wordBreak: "break-all", fontWeight: 800 }}>{inviteLink}</div>
-                  <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Expires in 30 days and can only be used once.</div>
+                <div style={{ background: C.greenLight, borderRadius: 10, padding: 12, marginTop: 10 }}>
+                  <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>SHARE THIS LINK</div>
+                  <div style={{ color: C.cream, fontSize: 13, marginTop: 6, wordBreak: "break-all", fontWeight: 800 }}>{inviteLink}</div>
+                  <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Expires in 30 days and can only be used once.</div>
                 </div>
               )}
             </div>
@@ -336,16 +336,16 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
               const name = m.profiles?.display_name || m.email;
               const self = m.user_id === user.id;
               return (
-                <div key={m.id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <div key={m.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 10, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <Avatar src={m.profiles?.avatar_url} name={name} size={40} />
                   <div style={{ flex: 1, minWidth: 190 }}>
-                    <div style={{ color: C.ink, fontWeight: 800 }}>{name}{self ? " (you)" : ""}</div>
-                    <div style={{ color: C.faint, fontSize: 12 }}>{m.status}{m.role === "admin" ? " · admin" : ""}</div>
+                    <div style={{ color: C.cream, fontWeight: 800 }}>{name}{self ? " (you)" : ""}</div>
+                    <div style={{ color: C.sage, fontSize: 12 }}>{m.status}{m.role === "admin" ? " · admin" : ""}</div>
                   </div>
                   {isAdmin && !self && m.status !== "removed" && (
                     <>
                       <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px" }} disabled={busy} onClick={() => updateMember(m, { role: m.role === "admin" ? "member" : "admin" })}>{m.role === "admin" ? "Make member" : "Make admin"}</button>
-                      <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", color: C.birdie }} disabled={busy} onClick={() => { if (confirm(`Remove ${m.profiles?.display_name || m.email} from ${active.name}?`)) updateMember(m, { status: "removed" }); }}>Remove</button>
+                      <button style={{ ...btn(false), fontSize: 12, padding: "7px 10px", color: C.overRedDark }} disabled={busy} onClick={() => { if (confirm(`Remove ${m.profiles?.display_name || m.email} from ${active.name}?`)) updateMember(m, { status: "removed" }); }}>Remove</button>
                     </>
                   )}
                 </div>

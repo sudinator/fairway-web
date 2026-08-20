@@ -106,8 +106,8 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
           const active = cur === o.v;
           return (
             <button key={o.v} onClick={() => setPref(key, o.v)}
-              style={{ padding: "4px 9px", borderRadius: 7, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                border: `1px solid ${active ? (o.v === "off" ? "#8B6A62" : C.gold) : C.line}`,
+              style={{ padding: "9px 9px", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                border: `1px solid ${active ? (o.v === "off" ? "#8B6A62" : C.gold) : C.borderCard}`,
                 background: active ? (o.v === "off" ? "#6B2F28" : C.gold) : "transparent",
                 color: active ? (o.v === "off" ? "#F6DEDB" : "#16201C") : C.sage }}>
               {o.l}
@@ -136,7 +136,7 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
             <div>4. Open BNN from that new <b>Home-Screen icon</b>.</div>
             <div>5. Come back here and tap <b>Turn on notifications</b>.</div>
           </div>
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>An icon added from Chrome or any other browser won&apos;t work — it must be added from Safari.</div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>An icon added from Chrome or any other browser won&apos;t work — it must be added from Safari.</div>
         </div>
       ) : gate === "unsupported" ? (
         <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>This browser can't receive push notifications. Try Chrome on Android/desktop, or install to the Home Screen on iPhone via Safari.</div>
@@ -147,7 +147,7 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
           <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>
             Get a phone notification when you're added to a game, when you owe or get paid, and more — even when the app is closed.
           </div>
-          <button onClick={on ? disable : enable} disabled={busy} style={{ ...btn(!on), marginTop: 10, fontSize: 13, opacity: busy ? 0.6 : 1 }}>
+          <button onClick={on ? disable : enable} disabled={busy} style={{ ...btn(!on), marginTop: 10, fontSize: 13, opacity: busy ? 0.62 : 1 }}>
             {busy ? "…" : on ? "Turn off on this device" : "Turn on notifications"}
           </button>
         </>
@@ -155,13 +155,13 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
       {msg && <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>{msg}</div>}
 
       {gate !== "unconfigured" && (
-        <div style={{ marginTop: 14, borderTop: `1px solid ${C.greenMid}`, paddingTop: 10 }}>
+        <div style={{ marginTop: 14, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 10 }}>
           <Eyebrow>WHAT TO NOTIFY ME ABOUT</Eyebrow>
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 3 }}>Push buzzes your phone (needs notifications on for the device); In-app just shows in the bell.</div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>Push buzzes your phone (needs notifications on for the device); In-app just shows in the bell.</div>
           {NOTIF_TYPES.map((t) => (
             <div key={t.key} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 9 }}>
               <div style={{ flex: 1, color: C.cream, fontSize: 12 }}>
-                {t.label}{!t.live && <span style={{ color: C.faint, fontSize: 11 }}> · soon</span>}
+                {t.label}{!t.live && <span style={{ color: C.sage, fontSize: 11 }}> · soon</span>}
               </div>
               {seg(t.key, t.def)}
             </div>
@@ -215,7 +215,7 @@ export function HandicapSummary({ rounds, profile, onOpen }: { rounds: Round[]; 
         <div style={{ background: C.greenLight, borderRadius: 10, padding: "9px 12px", marginTop: 10 }}>
           <div style={{ color: C.sage, fontSize: 12 }}>Your entered index <span style={{ color: C.cream, fontWeight: 700 }}>{official.toFixed(1)}</span></div>
           {delta != null && (
-            <div style={{ color: delta >= 1 ? C.birdie : C.sage, fontSize: 11, marginTop: 2 }}>
+            <div style={{ color: delta >= 1 ? C.overRedDark : C.sage, fontSize: 11, marginTop: 2 }}>
               {delta >= 1 ? `Differs from the app estimate by ${delta.toFixed(1)} — check your rounds are in sync with GHIN` : "In line with the app estimate"}
             </div>
           )}
@@ -264,11 +264,11 @@ export function HandicapSummary({ rounds, profile, onOpen }: { rounds: Round[]; 
           {rows.map(({ r, date, ag, diff, used }) => (
             <div key={r.id} onClick={onOpen ? () => onOpen(r) : undefined} role={onOpen ? "button" : undefined} tabIndex={onOpen ? 0 : undefined}
               onKeyDown={onOpen ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpen(r); } } : undefined}
-              style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 4px", borderBottom: `1px solid rgba(255,255,255,0.10)`, opacity: used ? 1 : 0.66, background: used ? "rgba(228,207,134,0.06)" : "transparent", cursor: onOpen ? "pointer" : "default" }}>
-              <div style={{ width: 7, height: 7, borderRadius: 4, background: used ? C.gold : "transparent", flexShrink: 0 }} />
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 4px", borderBottom: `1px solid rgba(255,255,255,0.10)`, opacity: used ? 1 : 0.62, background: used ? "rgba(228,207,134,0.06)" : "transparent", cursor: onOpen ? "pointer" : "default" }}>
+              <div style={{ width: 7, height: 7, borderRadius: 6, background: used ? C.gold : "transparent", flexShrink: 0 }} />
               <div style={{ width: 48, flexShrink: 0, color: C.sage, fontSize: 11 }}>{date}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: C.cream, fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.course || "—"}</div>
+                <div style={{ color: C.cream, fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.course || "—"}</div>
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 1 }}>{[r.tee_name, r.rating != null && r.slope != null ? `${r.rating}/${r.slope}` : null].filter(Boolean).join(" · ") || "—"}</div>
               </div>
               <div style={{ width: 38, textAlign: "right", color: C.cream, fontSize: 13, fontWeight: 700, fontFamily: "Georgia, serif" }}>{ag != null ? ag : "—"}</div>
@@ -279,7 +279,7 @@ export function HandicapSummary({ rounds, profile, onOpen }: { rounds: Round[]; 
             </div>
           ))}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10, padding: "0 4px" }}>
-            <div style={{ width: 7, height: 7, borderRadius: 4, background: C.gold, flexShrink: 0 }} />
+            <div style={{ width: 7, height: 7, borderRadius: 6, background: C.gold, flexShrink: 0 }} />
             <div style={{ color: C.sage, fontSize: 11, flex: 1 }}>Counts toward index ({hcp.used} lowest differentials)</div>
           </div>
           <div style={{ background: C.greenLight, borderRadius: 10, padding: "9px 12px", marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -383,7 +383,7 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
       <CardVisibilityToggle user={user} initial={profile?.show_card !== false} />
       <Eyebrow>YOUR PROFILE</Eyebrow>
       <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, paddingBottom: 16, marginBottom: 16, borderBottom: `1px solid ${C.greenMid}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, paddingBottom: 16, marginBottom: 16, borderBottom: `1px solid ${C.borderGreen}` }}>
           <Avatar src={avatarUrl} name={name || profile?.display_name || "?"} size={64} />
           <div style={{ flex: 1 }}>
             <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Profile photo</div>
@@ -391,13 +391,13 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
               Helps your group recognize you on the scorecard. Any photo works — it&apos;s resized automatically.
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-              <label style={{ ...btn(true), fontSize: 12, padding: "7px 12px", cursor: photoBusy ? "default" : "pointer", opacity: photoBusy ? 0.6 : 1 }}>
+              <label style={{ ...btn(true), fontSize: 12, padding: "7px 12px", cursor: photoBusy ? "default" : "pointer", opacity: photoBusy ? 0.62 : 1 }}>
                 {photoBusy ? "Working…" : avatarUrl ? "Change" : "Add photo"}
                 <input type="file" accept="image/*" disabled={photoBusy} onChange={pickPhoto} style={{ display: "none" }} />
               </label>
               {avatarUrl && !photoBusy && (
                 <button onClick={removePhoto}
-                  style={{ background: "transparent", color: "#E8A199", border: `0.5px solid #7A3A34`, borderRadius: 8, padding: "7px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                  style={{ background: "transparent", color: C.overRedDark, border: `0.5px solid #7A3A34`, borderRadius: 8, padding: "7px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
                   Remove
                 </button>
               )}
@@ -427,7 +427,7 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
           <label style={{ color: C.sage, fontSize: 12 }}>Zelle contact (phone or email, optional)</label>
           <input style={{ ...inputStyle, marginTop: 6 }} placeholder="phone or email you use for Zelle" value={zelle} onChange={(e) => setZelle(e.target.value)} />
         </div>
-        <div style={{ color: C.faint, fontSize: 11, marginTop: 6 }}>Used only to pre-fill payments when settling up in Money. Never shared elsewhere.</div>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Used only to pre-fill payments when settling up in Money. Never shared elsewhere.</div>
         <div style={{ marginTop: 14 }}>
           <label style={{ color: C.sage, fontSize: 12 }}>Handicap index (enter manually)</label>
           <input style={{ ...inputStyle, marginTop: 6, maxWidth: 160 }} inputMode="decimal" placeholder="14.2"
@@ -441,7 +441,7 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
             Stored for reference. Automatic handicap import from GHIN isn't connected — enter your index manually for now.
           </div>
         </div>
-        <button style={{ ...btn(true), marginTop: 18, opacity: saving ? 0.5 : 1 }} disabled={saving} onClick={save}>{saving ? "Saving…" : "Save profile"}</button>
+        <button style={{ ...btn(true), marginTop: 18, opacity: saving ? 0.62 : 1 }} disabled={saving} onClick={save}>{saving ? "Saving…" : "Save profile"}</button>
         {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
       </div>
 
@@ -451,7 +451,7 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
 
       <PushToggle user={user} profile={profile} />
 
-      <div style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${C.greenMid}` }}>
+      <div style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${C.borderGreen}` }}>
         <button style={{ ...btn(false), fontSize: 13 }} onClick={() => { clearAllLocalState(); supabase.auth.signOut(); }}>Sign out</button>
       </div>
     </div>
@@ -505,7 +505,7 @@ function StatDrawerHost() {
                <div key={i} style={{ display: "flex", alignItems: "center", gap: 11, padding: "11px 8px", borderTop: i ? "1px solid rgba(255,255,255,.06)" : "none" }}>
                  <Avatar src={u.avatar_url} name={u.name || "?"} size={34} />
                  <div style={{ minWidth: 0 }}>
-                   <div style={{ fontSize: 14, fontWeight: 600, color: C.cream, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</div>
+                   <div style={{ fontSize: 14, fontWeight: 500, color: C.cream, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{u.name}</div>
                    {u.detail ? <div style={{ fontSize: 11, color: C.sage, marginTop: 1 }}>{u.detail}</div> : null}
                  </div>
                  {tc ? <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, borderRadius: 6, padding: "2px 7px", background: tc.bg, color: tc.fg, whiteSpace: "nowrap" }}>{u.tag === "friction" ? "unfinished" : u.tag}</span> : null}
@@ -588,18 +588,18 @@ function AdminEngagement() {
         )}
       </div>
       <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 11, color: C.sage }}>
-        <span><span style={{ display: "inline-block", width: 8, height: 8, background: C.gold, borderRadius: 2, marginRight: 4 }} />new</span>
-        <span><span style={{ display: "inline-block", width: 8, height: 8, background: C.sage, borderRadius: 2, marginRight: 4 }} />returning</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, background: C.gold, borderRadius: 6, marginRight: 4 }} />new</span>
+        <span><span style={{ display: "inline-block", width: 8, height: 8, background: C.sage, borderRadius: 6, marginRight: 4 }} />returning</span>
       </div>
 
       <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 14 }}>How rounds are played (90 days)</div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.cream, marginTop: 6 }}><span>In a game</span><span>{feat.in_game || 0}</span></div>
-      <div style={{ height: 8, borderRadius: 4, background: C.green, marginTop: 3, overflow: "hidden" }}>
-        <div style={{ height: "100%", borderRadius: 4, width: `${featTot > 0 ? Math.round(((feat.in_game || 0) / featTot) * 100) : 0}%`, background: C.gold }} />
+      <div style={{ height: 8, borderRadius: 6, background: C.green, marginTop: 3, overflow: "hidden" }}>
+        <div style={{ height: "100%", borderRadius: 6, width: `${featTot > 0 ? Math.round(((feat.in_game || 0) / featTot) * 100) : 0}%`, background: C.gold }} />
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.cream, marginTop: 8 }}><span>Solo score entry</span><span>{feat.solo || 0}</span></div>
-      <div style={{ height: 8, borderRadius: 4, background: C.green, marginTop: 3, overflow: "hidden" }}>
-        <div style={{ height: "100%", borderRadius: 4, width: `${featTot > 0 ? Math.round(((feat.solo || 0) / featTot) * 100) : 0}%`, background: C.sage }} />
+      <div style={{ height: 8, borderRadius: 6, background: C.green, marginTop: 3, overflow: "hidden" }}>
+        <div style={{ height: "100%", borderRadius: 6, width: `${featTot > 0 ? Math.round(((feat.solo || 0) / featTot) * 100) : 0}%`, background: C.sage }} />
       </div>
     </div>
   );
@@ -674,7 +674,7 @@ function AdminPowerUsers() {
         <div style={{ display: "flex", gap: 4 }}>
           {([[null, "All-time"], [90, "90 days"]] as [number | null, string][]).map(([d, lbl]) => (
             <button key={lbl} onClick={() => setDays(d)}
-              style={{ fontSize: 11, padding: "3px 10px", borderRadius: 999, border: "none", cursor: "pointer",
+              style={{ fontSize: 11, padding: "9px 10px", borderRadius: 999, border: "none", cursor: "pointer",
                 background: days === d ? C.gold : C.greenLight, color: days === d ? C.green : C.cream, fontWeight: 700 }}>
               {lbl}
             </button>
@@ -704,17 +704,17 @@ function AdminPowerUsers() {
             </thead>
             <tbody>
               {sorted.map((r) => (
-                <tr key={r.user_id} style={{ borderTop: `1px solid ${C.greenMid}` }}>
+                <tr key={r.user_id} style={{ borderTop: `1px solid ${C.borderGreen}` }}>
                   <td style={{ padding: "6px 8px", position: "sticky", left: 0, zIndex: 1, background: C.greenLight, maxWidth: 160 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
                       <Avatar src={avatars[r.user_id]} name={r.display_name || "?"} size={22} enlargeable={false} />
-                      <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <div style={{ color: C.cream, fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {r.display_name || "—"}
                       </div>
                     </div>
                     {r.churned ? (
                       <div style={{ display: "flex", gap: 4, marginTop: 2 }}>
-                        <span style={{ fontSize: 11, color: C.cream, background: C.greenMid, borderRadius: 4, padding: "0 5px", fontWeight: 700 }}>quiet</span>
+                        <span style={{ fontSize: 11, color: C.cream, background: C.greenMid, borderRadius: 6, padding: "0 5px", fontWeight: 700 }}>quiet</span>
                       </div>
                     ) : null}
                   </td>
@@ -773,8 +773,8 @@ function AdminAnalytics() {
   const bar = (label: string, n: number, denom: number, color: string, drillStat?: string) => (
     <div key={label} onClick={drillStat ? () => openStatDrill({ stat: drillStat, title: label }) : undefined} style={{ cursor: drillStat ? "pointer" : "default" }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.cream, marginTop: 8 }}><span>{label}{drillStat ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>  who ›</span> : null}</span><span>{n}</span></div>
-      <div style={{ height: 8, borderRadius: 4, background: C.green, marginTop: 3, overflow: "hidden" }}>
-        <div style={{ height: "100%", borderRadius: 4, width: `${denom > 0 ? Math.round((n / denom) * 100) : 0}%`, background: color }} />
+      <div style={{ height: 8, borderRadius: 6, background: C.green, marginTop: 3, overflow: "hidden" }}>
+        <div style={{ height: "100%", borderRadius: 6, width: `${denom > 0 ? Math.round((n / denom) * 100) : 0}%`, background: color }} />
       </div>
     </div>
   );
@@ -788,7 +788,7 @@ function AdminAnalytics() {
 
   const hrow = (label: string, val: string, good?: boolean, drill?: { stat: string; cap?: string }) => (
     <div onClick={drill ? () => openStatDrill({ stat: drill.stat, title: label, cap: drill.cap }) : undefined}
-      style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "8px 0", borderTop: `1px solid ${C.greenMid}`, cursor: drill ? "pointer" : "default" }}>
+      style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "8px 0", borderTop: `1px solid ${C.borderGreen}`, cursor: drill ? "pointer" : "default" }}>
       <span style={{ color: C.cream, fontSize: 13 }}>{label}{drill ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>  who ›</span> : null}</span>
       <span style={{ fontWeight: 800, fontSize: 15, color: good === undefined ? C.cream : good ? "#5BD08A" : "#E0796B" }}>{val}</span>
     </div>
@@ -806,9 +806,9 @@ function AdminAnalytics() {
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
         <div style={{ display: "flex", textAlign: "center" }}>
-          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_dau", title: "Active today", cap: "Users who opened BNN today" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.dau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>Today · unique</div><div style={{ color: C.faint, fontSize: 11, marginTop: 1 }}>{ac.views_today ?? 0} views · who ›</div></div>
-          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_wau", title: "Active this week", cap: "Users active in the last 7 days" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.wau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This week · unique</div><div style={{ color: C.faint, fontSize: 11, marginTop: 1 }}>{ac.views_7d ?? 0} views · who ›</div></div>
-          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_mau", title: "Active this month", cap: "Users active in the last 30 days" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.mau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This month · unique</div><div style={{ color: C.faint, fontSize: 11, marginTop: 1 }}>{ac.views_30d ?? 0} views · who ›</div></div>
+          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_dau", title: "Active today", cap: "Users who opened BNN today" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.dau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>Today · unique</div><div style={{ color: C.sage, fontSize: 11, marginTop: 1 }}>{ac.views_today ?? 0} views · who ›</div></div>
+          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_wau", title: "Active this week", cap: "Users active in the last 7 days" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.wau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This week · unique</div><div style={{ color: C.sage, fontSize: 11, marginTop: 1 }}>{ac.views_7d ?? 0} views · who ›</div></div>
+          <div style={{ flex: 1, cursor: "pointer" }} onClick={() => openStatDrill({ stat: "active_mau", title: "Active this month", cap: "Users active in the last 30 days" })}><div style={{ color: C.gold, fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800 }}>{ac.mau ?? 0}</div><div style={{ color: C.sage, fontSize: 11 }}>This month · unique</div><div style={{ color: C.sage, fontSize: 11, marginTop: 1 }}>{ac.views_30d ?? 0} views · who ›</div></div>
         </div>
         {series.length > 0 && (
           <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 120, marginTop: 12 }}>
@@ -817,7 +817,7 @@ function AdminAnalytics() {
             {line && <path d={line} fill="none" stroke={C.gold} strokeWidth={2.5} strokeLinejoin="round" />}
           </svg>
         )}
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.faint }}><span>30 days ago</span><span>today</span></div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: C.sage }}><span>30 days ago</span><span>today</span></div>
         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
           {tile(ac.avg7 ?? 0, "7-day avg", undefined, C.green)}
           {tile(ac.avg30 ?? 0, "30-day avg", undefined, C.green)}
@@ -827,12 +827,12 @@ function AdminAnalytics() {
           {tile(t.rounds_per_active_user ?? 0, "Rounds / active user", undefined, C.green)}
           {tile(ac.churn_30d ?? 0, "Lapsed (30–60d, gone)", undefined, C.green, { stat: "lapsed", cap: "Active 30–60d ago, silent since" })}
         </div>
-        <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Unique = distinct users; views = total app opens. Test accounts are excluded from all figures. Days run midnight–midnight US Eastern. Trends build over time.</div>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Unique = distinct users; views = total app opens. Test accounts are excluded from all figures. Days run midnight–midnight US Eastern. Trends build over time.</div>
       </div>
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
         <div style={{ color: C.sage, fontSize: 12, fontWeight: 700 }}>Games by format</div>
-        {fmtEntries.length ? fmtEntries.map(([k, n]) => bar(fmtName[k] || k, n, fmtMax, fmtColors[k] || C.sage)) : <div style={{ color: C.faint, fontSize: 12, marginTop: 6 }}>No games yet.</div>}
+        {fmtEntries.length ? fmtEntries.map(([k, n]) => bar(fmtName[k] || k, n, fmtMax, fmtColors[k] || C.sage)) : <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>No games yet.</div>}
         <div style={{ color: C.sage, fontSize: 12, fontWeight: 700, marginTop: 14 }}>Feature usage</div>
         {feat.map(([k, n]) => bar(k, n, featMax, "#5AA9E6", k === "Avatars set" ? "avatars_set" : k === "AI summaries" ? "ai_summaries" : undefined))}
       </div>
@@ -846,7 +846,7 @@ function AdminAnalytics() {
         {hrow("Signups never joined a club", `${h.never_joined_group_pct ?? 0}%`, false, { stat: "never_joined_group", cap: "Users with no active club membership" })}
         {hrow("Retention \u2014 week 1", `${h.retention_w1_pct ?? 0}%`)}
         {hrow("Retention \u2014 week 4", `${h.retention_w4_pct ?? 0}%`)}
-        <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>Rounds counted only when completed; deleted rounds never count. Retention accrues over the first weeks.</div>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>Rounds counted only when completed; deleted rounds never count. Retention accrues over the first weeks.</div>
       </div>
 
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 10 }}>
@@ -951,12 +951,12 @@ function OpsMetrics() {
                         {vlabel[g.verdict] || g.verdict}
                       </div>
                       {g.rounds_posted > 0 ? (
-                        <div style={{ color: C.faint, fontSize: 11, whiteSpace: "nowrap" }}>has rounds</div>
+                        <div style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap" }}>has rounds</div>
                       ) : (
                         <button
                           onClick={() => delStale(g)}
                           disabled={delId === g.game_id}
-                          style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, padding: "2px 8px", fontSize: 11, fontWeight: 700, cursor: delId === g.game_id ? "default" : "pointer", opacity: delId === g.game_id ? 0.5 : 1, whiteSpace: "nowrap" }}
+                          style={{ background: "transparent", color: C.overRedDark, border: `1px solid ${C.birdie}`, borderRadius: 8, padding: "9px 8px", fontSize: 11, fontWeight: 700, cursor: delId === g.game_id ? "default" : "pointer", opacity: delId === g.game_id ? 0.62 : 1, whiteSpace: "nowrap" }}
                         >
                           {delId === g.game_id ? "Deleting…" : "Delete"}
                         </button>
@@ -1259,22 +1259,22 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
 
       {profiles === null && <div style={{ color: C.sage, marginTop: 12 }}>Loading…</div>}
       {profiles?.map((p) => (
-        <div key={p.id} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div key={p.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <Avatar src={p.avatar_url} name={p.display_name || p.email || "?"} size={40} />
           <div style={{ flex: 1, minWidth: 180 }}>
-            <div style={{ color: C.ink, fontWeight: 700 }}>{p.display_name || "Golfer"}{p.id === user.id ? " (you)" : ""}{p.is_admin ? " ★" : ""}</div>
-            <div style={{ color: C.faint, fontSize: 12 }}>
+            <div style={{ color: C.cream, fontWeight: 700 }}>{p.display_name || "Golfer"}{p.id === user.id ? " (you)" : ""}{p.is_admin ? " ★" : ""}</div>
+            <div style={{ color: C.sage, fontSize: 12 }}>
               {p.email || "no email"}{p.phone ? ` · ${p.phone}` : ""}{p.ghin_number ? ` · GHIN ${p.ghin_number}` : ""}
             </div>
-            <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
+            <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
               Handicap: {p.handicap_index != null ? p.handicap_index : "—"}
             </div>
             {(() => {
               const mine = memberships.filter((m) => m.user_id === p.id);
-              if (mine.length === 0) return <div style={{ color: C.birdie, fontSize: 12, marginTop: 2 }}>Clubs: none</div>;
+              if (mine.length === 0) return <div style={{ color: C.overRedDark, fontSize: 12, marginTop: 2 }}>Clubs: none</div>;
               return (
-                <div style={{ color: C.green, fontSize: 12, marginTop: 2, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  <span style={{ color: C.faint }}>Clubs:</span>
+                <div style={{ color: C.cream, fontSize: 12, marginTop: 2, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  <span style={{ color: C.sage }}>Clubs:</span>
                   {mine.map((m) => {
                     const g = allGroups.find((x) => x.id === m.group_id);
                     return (
@@ -1286,7 +1286,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                 </div>
               );
             })()}
-            <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>active {timeAgo(p.last_active)}</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>active {timeAgo(p.last_active)}</div>
           </div>
           <div>
             <label style={{ color: C.sage, fontSize: 11 }}>Handicap index</label>
@@ -1294,14 +1294,14 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
               <input inputMode="decimal" defaultValue={p.handicap_index != null ? String(p.handicap_index) : ""}
                 onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setEdits((m) => ({ ...m, [p.id]: v })); }}
                 style={{ ...inputStyle, padding: "6px 8px", width: 80, textAlign: "center" }} />
-              <button style={{ ...btn(true), padding: "6px 12px", fontSize: 12, opacity: savingId === p.id ? 0.5 : 1 }} disabled={savingId === p.id} onClick={() => saveHandicap(p)}>Save</button>
+              <button style={{ ...btn(true), padding: "6px 12px", fontSize: 12, opacity: savingId === p.id ? 0.62 : 1 }} disabled={savingId === p.id} onClick={() => saveHandicap(p)}>Save</button>
             </div>
           </div>
           <button style={{ ...btn(false), padding: "6px 12px", fontSize: 12 }} onClick={() => setScoringFor(p)}>Edit scores</button>
           <button style={{ ...btn(false), padding: "6px 12px", fontSize: 12 }} onClick={() => setManageGroupsFor(manageGroupsFor === p.id ? null : p.id)}>
             {manageGroupsFor === p.id ? "Close" : "Manage"}
           </button>
-          {p.deactivated && <span style={{ color: C.birdie, fontSize: 11, fontWeight: 800 }}>DEACTIVATED</span>}
+          {p.deactivated && <span style={{ color: C.overRedDark, fontSize: 11, fontWeight: 800 }}>DEACTIVATED</span>}
 
           {manageGroupsFor === p.id && (
             <div style={{ width: "100%", background: C.greenLight, borderRadius: 10, padding: 12, marginTop: 8 }}>
@@ -1311,13 +1311,13 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                 const myGroupIds = new Set(mine.map((m) => m.group_id));
                 return (
                   <>
-                    {mine.length === 0 && <div style={{ color: C.faint, fontSize: 12, marginTop: 6 }}>Not in any club.</div>}
+                    {mine.length === 0 && <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>Not in any club.</div>}
                     {mine.map((m) => {
                       const g = allGroups.find((x) => x.id === m.group_id);
                       return (
-                        <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: `1px solid ${C.greenMid}` }}>
+                        <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: `1px solid ${C.borderGreen}` }}>
                           <span style={{ flex: 1, color: C.cream, fontSize: 13 }}>{g?.name || "Club"}{m.role === "admin" ? " · admin" : ""}</span>
-                          <button style={{ ...btn(false), padding: "4px 10px", fontSize: 11, color: C.birdie }} onClick={() => removeFromGroup(p, m, g?.name || "this club")}>Remove</button>
+                          <button style={{ ...btn(false), padding: "9px 10px", fontSize: 11, color: C.overRedDark }} onClick={() => removeFromGroup(p, m, g?.name || "this club")}>Remove</button>
                         </div>
                       );
                     })}
@@ -1330,7 +1330,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                       </select>
                     </div>
 
-                    <div style={{ borderTop: `1px solid ${C.greenMid}`, marginTop: 12, paddingTop: 10 }}>
+                    <div style={{ borderTop: `1px solid ${C.borderGreen}`, marginTop: 12, paddingTop: 10 }}>
                       <Eyebrow>ANALYTICS</Eyebrow>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8 }}>
                         <div style={{ flex: 1, color: C.cream, fontSize: 12 }}>
@@ -1341,7 +1341,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                       </div>
                     </div>
 
-                    <div style={{ borderTop: `1px solid ${C.greenMid}`, marginTop: 12, paddingTop: 10 }}>
+                    <div style={{ borderTop: `1px solid ${C.borderGreen}`, marginTop: 12, paddingTop: 10 }}>
                       <Eyebrow>REMOVE FROM APP</Eyebrow>
                       <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
                         {p.deactivated ? (
@@ -1351,7 +1351,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                             Deactivate (keep data)
                           </button>
                         )}
-                        <button style={{ background: "#5A1E1E", color: "#F6DEDB", border: "none", borderRadius: 8, padding: "7px 12px", fontWeight: 700, cursor: "pointer", fontSize: 12 }} onClick={() => deletePlayer(p)}>
+                        <button style={{ background: C.danger, color: "#F6DEDB", border: "none", borderRadius: 8, padding: "7px 12px", fontWeight: 700, cursor: "pointer", fontSize: 12 }} onClick={() => deletePlayer(p)}>
                           Delete permanently
                         </button>
                       </div>
@@ -1367,7 +1367,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
         </div>
       ))}
       {hasMore && (
-        <button style={{ ...btn(false), marginTop: 10, fontSize: 13, opacity: loadingMore ? 0.5 : 1 }} disabled={loadingMore} onClick={loadMorePlayers}>
+        <button style={{ ...btn(false), marginTop: 10, fontSize: 13, opacity: loadingMore ? 0.62 : 1 }} disabled={loadingMore} onClick={loadMorePlayers}>
           {loadingMore ? "Loading…" : "Load more players"}
         </button>
       )}
@@ -1381,15 +1381,15 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 16, marginTop: 8, color: C.sage }}>No pending requests.</div>
         )}
         {pendingGroups.map((g) => (
-          <div key={g.id} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div key={g.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 180 }}>
-              <div style={{ color: C.ink, fontWeight: 700 }}>{g.name}</div>
-              <div style={{ color: C.faint, fontSize: 12 }}>
+              <div style={{ color: C.cream, fontWeight: 700 }}>{g.name}</div>
+              <div style={{ color: C.sage, fontSize: 12 }}>
                 from {g.requester?.display_name || g.requester?.email || "a member"}{g.request_note ? ` · "${g.request_note}"` : ""}
               </div>
             </div>
             <button style={{ ...btn(true), padding: "7px 12px", fontSize: 12 }} onClick={() => approveGroup(g)}>Approve</button>
-            <button style={{ ...btn(false), padding: "7px 12px", fontSize: 12, color: C.birdie }} onClick={() => declineGroup(g)}>Decline</button>
+            <button style={{ ...btn(false), padding: "7px 12px", fontSize: 12, color: C.overRedDark }} onClick={() => declineGroup(g)}>Decline</button>
           </div>
         ))}
       </div>
@@ -1403,10 +1403,10 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 16, marginTop: 8, color: C.sage }}>No deleted courses.</div>
         )}
         {deletedCourses.map((c) => (
-          <div key={c.id} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div key={c.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 160 }}>
-              <div style={{ color: C.ink, fontWeight: 700 }}>{c.name}</div>
-              <div style={{ color: C.faint, fontSize: 12 }}>{c.location ? c.location + " · " : ""}deleted {timeAgo(c.deleted_at)}</div>
+              <div style={{ color: C.cream, fontWeight: 700 }}>{c.name}</div>
+              <div style={{ color: C.sage, fontSize: 12 }}>{c.location ? c.location + " · " : ""}deleted {timeAgo(c.deleted_at)}</div>
             </div>
             <button style={{ ...btn(true), padding: "6px 14px", fontSize: 12 }} onClick={() => restoreCourse(c)}>Restore</button>
           </div>
@@ -1461,7 +1461,7 @@ export function NotificationBell({ user, onSeeAll, onNavigate }: { user: any; on
           bodyStyle={{ padding: "2px 8px 12px" }}
           header={
             <>
-              <div style={{ width: 40, height: 4, background: C.greenLight, borderRadius: 2, margin: "8px auto 4px" }} />
+              <div style={{ width: 40, height: 4, background: C.greenLight, borderRadius: 6, margin: "8px auto 4px" }} />
               <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 44px 10px 14px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
                 <Eyebrow style={{ margin: 0 }}>NOTIFICATIONS</Eyebrow>
                 <span style={{ flex: 1 }} />
@@ -1476,7 +1476,7 @@ export function NotificationBell({ user, onSeeAll, onNavigate }: { user: any; on
           {items.map((n) => (
             <div key={n.id} onClick={() => { if (!n.read) markOne(n.id); if (n.link && onNavigate) { setOpen(false); onNavigate(n.link); } }}
               style={{ padding: "11px 8px", borderBottom: "1px solid rgba(255,255,255,0.07)", display: "flex", gap: 9, cursor: (n.link || !n.read) ? "pointer" : "default" }}>
-              <span style={{ width: 7, height: 7, borderRadius: 4, background: n.read ? "transparent" : C.gold, marginTop: 5, flexShrink: 0 }} />
+              <span style={{ width: 7, height: 7, borderRadius: 6, background: n.read ? "transparent" : C.gold, marginTop: 5, flexShrink: 0 }} />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ color: n.read ? "#CFC9B4" : C.cream, fontSize: 13, lineHeight: 1.4, fontWeight: n.read ? 500 : 800 }}>{n.message}</div>
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{fmtNotifTime(n.created_at)}</div>
@@ -1540,13 +1540,13 @@ export function NotificationsScreen({ user, onNavigate }: { user: any; onNavigat
         <>
           {items.map((n) => (
             <div key={n.id} onClick={() => { if (!n.read) markOne(n.id); if (n.link && onNavigate) onNavigate(n.link); }}
-              style={{ background: C.card, borderRadius: 12, padding: "13px 16px", marginTop: 10, display: "flex", gap: 11, cursor: (n.link || !n.read) ? "pointer" : "default" }}>
-              <span style={{ width: 8, height: 8, borderRadius: 4, background: n.read ? "transparent" : C.gold, marginTop: 6, flexShrink: 0 }} />
+              style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 10, display: "flex", gap: 11, cursor: (n.link || !n.read) ? "pointer" : "default" }}>
+              <span style={{ width: 8, height: 8, borderRadius: 6, background: n.read ? "transparent" : C.gold, marginTop: 6, flexShrink: 0 }} />
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ color: n.read ? "#6B6857" : C.ink, fontSize: 14, lineHeight: 1.4, fontWeight: n.read ? 500 : 800 }}>{n.message}</div>
-                <div style={{ color: C.faint, fontSize: 11, marginTop: 3 }}>{notifWhen(n.created_at)}</div>
+                <div style={{ color: n.read ? C.sage : C.cream, fontSize: 14, lineHeight: 1.4, fontWeight: n.read ? 500 : 800 }}>{n.message}</div>
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{notifWhen(n.created_at)}</div>
               </div>
-              {n.link ? <span style={{ color: C.faint, fontSize: 20, alignSelf: "center", flexShrink: 0 }}>›</span> : null}
+              {n.link ? <span style={{ color: C.sage, fontSize: 20, alignSelf: "center", flexShrink: 0 }}>›</span> : null}
             </div>
           ))}
           {hasMore && (
@@ -1621,12 +1621,12 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
           <button style={btn(false)} onClick={() => setEditing(null)}>‹ Back</button>
           <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 20 }}>Admin edit · {player.display_name}</div>
         </div>
-        <div style={{ background: "#5A1E1E", color: "#F6DEDB", borderRadius: 10, padding: "8px 12px", marginTop: 10, fontSize: 12 }}>
+        <div style={{ background: C.danger, color: "#F6DEDB", borderRadius: 10, padding: "8px 12px", marginTop: 10, fontSize: 12 }}>
           ⚠ Admin mode — you are editing another player's official scores. They will be notified.
         </div>
         <div style={{ color: C.sage, fontSize: 13, marginTop: 10 }}>{editing.course}{editing.tee_name ? ` · ${editing.tee_name}` : ""} · {fmtDate(editing.played_at)}</div>
         <div style={{ background: C.card, borderRadius: 12, padding: 12, marginTop: 10 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, padding: "0 2px 6px", color: C.faint, fontSize: 11, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.line}` }}>
+          <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, padding: "0 2px 6px", color: C.faint, fontSize: 11, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.borderCard}` }}>
             <div>HOLE</div><div style={{ textAlign: "center" }}>PAR</div><div style={{ textAlign: "center" }}>SCORE</div><div style={{ textAlign: "center" }}>PUTTS</div>
           </div>
           {holes.map((h, i) => {
@@ -1638,7 +1638,7 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
             const sPutts = seg.reduce((s, x) => s + (x.putts || 0), 0);
             return (
               <React.Fragment key={i}>
-                <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, alignItems: "center", padding: "5px 2px", borderBottom: `1px solid ${C.line}` }}>
+                <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, alignItems: "center", padding: "5px 2px", borderBottom: `1px solid ${C.borderCard}` }}>
                   <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{h.hole_number}</div>
                   <div style={{ textAlign: "center", color: C.parBlue, fontWeight: 700 }}>{h.par}</div>
                   <div style={{ textAlign: "center" }}>
@@ -1649,11 +1649,11 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
                   </div>
                 </div>
                 {subtotalAfter && (
-                  <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, padding: "6px 2px", background: C.greenLight, borderTop: `2px solid ${C.greenMid}`, fontWeight: 800 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, padding: "6px 2px", background: C.greenLight, borderTop: `2px solid ${C.borderGreen}`, fontWeight: 800 }}>
                     <div style={{ color: C.gold, fontSize: 11 }}>{segStart === 0 ? "OUT" : "IN"}</div>
-                    <div style={{ textAlign: "center", color: C.ink }}>{sPar}</div>
-                    <div style={{ textAlign: "center", color: C.green }}>{sScore || "–"}</div>
-                    <div style={{ textAlign: "center", color: C.faint }}>{sPutts || "–"}</div>
+                    <div style={{ textAlign: "center", color: C.cream }}>{sPar}</div>
+                    <div style={{ textAlign: "center", color: C.cream }}>{sScore || "–"}</div>
+                    <div style={{ textAlign: "center", color: C.sage }}>{sPutts || "–"}</div>
                   </div>
                 )}
               </React.Fragment>
@@ -1675,7 +1675,7 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
         {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>{msg}</div>}
         <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
           <button style={btn(false)} onClick={() => setEditing(null)}>Cancel</button>
-          <button style={{ ...btn(true), opacity: saving ? 0.5 : 1 }} disabled={saving} onClick={saveRound}>{saving ? "Saving…" : "Save changes"}</button>
+          <button style={{ ...btn(true), opacity: saving ? 0.62 : 1 }} disabled={saving} onClick={saveRound}>{saving ? "Saving…" : "Save changes"}</button>
         </div>
       </div>
     );
@@ -1779,7 +1779,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
         const p = row.profiles || {};
         const self = row.user_id === user.id;
         return (
-          <div key={row.id} style={{ background: C.card, borderRadius: 12, padding: "12px 16px", marginTop: 10 }}>
+          <div key={row.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 16px", marginTop: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
               <button
                 onClick={() => row.user_id && setCardMember(row)}
@@ -1789,36 +1789,36 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
               >
                 <Avatar src={row.avatar_url} name={p.display_name || row.email || "?"} size={48} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>{p.display_name || row.email}{self ? " (you)" : ""}{row.role === "admin" ? " · admin" : ""}</div>
-                  <div style={{ color: C.faint, fontSize: 12 }}>
+                  <div style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>{p.display_name || row.email}{self ? " (you)" : ""}{row.role === "admin" ? " · admin" : ""}</div>
+                  <div style={{ color: C.sage, fontSize: 12 }}>
                     {p.handicap_index != null ? `Handicap ${p.handicap_index}` : row.status === "invited" ? "Invited" : "No handicap set"}
                     {p.ghin_number ? ` · GHIN ${p.ghin_number}` : ""}
                   </div>
                 </div>
               </button>
               {p.phone ? (
-                <a href={`tel:${p.phone}`} style={{ color: C.green, fontWeight: 700, fontSize: 14, textDecoration: "none", background: C.cream, borderRadius: 8, padding: "8px 12px" }}>{p.phone}</a>
+                <a href={`tel:${p.phone}`} style={{ color: C.cream, fontWeight: 700, fontSize: 14, textDecoration: "none", background: C.greenLight, borderRadius: 8, padding: "8px 12px" }}>{p.phone}</a>
               ) : !p.display_name ? (
-                <span style={{ color: C.faint, fontSize: 12 }}>{row.email}</span>
+                <span style={{ color: C.sage, fontSize: 12 }}>{row.email}</span>
               ) : null}
             </div>
 
             {isGroupAdmin && row.user_id && (
-              <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "flex-end", flexWrap: "wrap", borderTop: `1px solid ${C.line}`, paddingTop: 10 }}>
+              <div style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "flex-end", flexWrap: "wrap", borderTop: `1px solid ${C.borderCard}`, paddingTop: 10 }}>
                 <div>
                   <label style={{ color: C.sage, fontSize: 11 }}>Handicap index</label>
                   <div style={{ display: "flex", gap: 6, marginTop: 2 }}>
                     <input inputMode="decimal" defaultValue={p.handicap_index != null ? String(p.handicap_index) : ""}
                       onChange={(e) => { const v = e.target.value; if (v === "" || /^\d*\.?\d*$/.test(v)) setEdits((m) => ({ ...m, [row.id]: v })); }}
                       style={{ ...inputStyle, padding: "6px 8px", width: 78, textAlign: "center" }} />
-                    <button style={{ ...btn(true), padding: "6px 10px", fontSize: 12, opacity: busyId === row.id ? 0.5 : 1 }} disabled={busyId === row.id} onClick={() => saveHandicap(row)}>Set</button>
+                    <button style={{ ...btn(true), padding: "6px 10px", fontSize: 12, opacity: busyId === row.id ? 0.62 : 1 }} disabled={busyId === row.id} onClick={() => saveHandicap(row)}>Set</button>
                   </div>
                 </div>
                 <div style={{ flex: 1 }} />
                 {!self && (
                   <>
                     <button style={{ ...btn(false), padding: "7px 10px", fontSize: 12 }} disabled={busyId === row.id} onClick={() => toggleRole(row)}>{row.role === "admin" ? "Remove club admin" : "Make club admin"}</button>
-                    <button style={{ ...btn(false), padding: "7px 10px", fontSize: 12, color: C.birdie }} disabled={busyId === row.id} onClick={() => removeFromGroup(row)}>Remove</button>
+                    <button style={{ ...btn(false), padding: "7px 10px", fontSize: 12, color: C.overRedDark }} disabled={busyId === row.id} onClick={() => removeFromGroup(row)}>Remove</button>
                   </>
                 )}
               </div>
@@ -1996,7 +1996,7 @@ function AdminDailyReport() {
               background: sel === d.iso ? C.gold : C.greenLight, color: sel === d.iso ? C.green : C.cream }}>{d.label}</button>
         ))}
         <input type="date" value={sel} max={days[0]?.iso} onChange={(e) => setSel(e.target.value)}
-          style={{ fontSize: 11, borderRadius: 8, border: `1px solid ${C.greenMid}`, background: C.green, color: C.cream, padding: "4px 8px", WebkitAppearance: "none", appearance: "none" }} />
+          style={{ ...inputStyle, fontSize: 11, padding: "4px 8px", width: "auto", WebkitAppearance: "none", appearance: "none" }} />
       </div>
 
       <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
@@ -2021,7 +2021,7 @@ function AdminDailyReport() {
               style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 8px", borderTop: i ? `1px solid ${C.greenMid}` : "none", cursor: "pointer" }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", flex: "0 0 8px", background: dotColor(r.tag) }} />
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13, color: C.cream, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</div>
+                <div style={{ fontSize: 13, color: C.cream, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.name}</div>
                 <div style={{ fontSize: 11, color: C.sage }}>{r.detail} · {r.tag}</div>
               </div>
             </div>
@@ -2077,26 +2077,26 @@ function FrictionItem({ it, onDone }: { it: any; onDone: () => void }) {
     <div style={{ background: C.greenLight, borderRadius: 14, padding: 12, marginBottom: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontWeight: 700, fontSize: 15, color: C.cream }}>{it.subject_name}</span>
-        <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, borderRadius: 5, padding: "1px 6px", background: meta.bg, color: meta.fg }}>{meta.label}</span>
+        <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 800, borderRadius: 6, padding: "1px 6px", background: meta.bg, color: meta.fg }}>{meta.label}</span>
       </div>
       <div style={{ color: C.cream, fontSize: 12.5, margin: "8px 0 3px", lineHeight: 1.5 }}>{it.detail}</div>
       {resolved ? (
-        <div style={{ color: C.faint, fontSize: 11, marginTop: 4 }}>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
           {it.status === "auto_resolved" ? "Auto-resolved — the data was cleaned up." : `${it.status === "cleared" ? "Cleared" : "Needs action"}${it.reason ? " · " + it.reason : ""}`}
           {it.reviewed_at ? " · " + new Date(it.reviewed_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}
         </div>
       ) : (
         <>
-          <div style={{ color: C.faint, fontSize: 11, marginBottom: 8 }}>first seen {when}</div>
-          <button onClick={expand} style={{ background: C.gold, color: C.green, border: "none", borderRadius: 9, padding: "7px 14px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+          <div style={{ color: C.sage, fontSize: 11, marginBottom: 8 }}>first seen {when}</div>
+          <button onClick={expand} style={{ background: C.gold, color: C.green, border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
             {open ? "Close" : "Review \u2192"}
           </button>
           {open ? (
-            <div style={{ borderTop: `1px solid ${C.greenMid}`, marginTop: 10, paddingTop: 10 }}>
+            <div style={{ borderTop: `1px solid ${C.borderGreen}`, marginTop: 10, paddingTop: 10 }}>
               {isCluster ? (
                 <>
                   <div style={{ color: C.sage, fontSize: 11, marginBottom: 6 }}>{it.kind === "multi_draft" ? "Which draft to keep (if any)?" : "Which round to keep?"}</div>
-                  <div style={{ background: C.green, borderRadius: 9, padding: 6, marginBottom: 8 }}>
+                  <div style={{ background: C.green, borderRadius: 8, padding: 6, marginBottom: 8 }}>
                     {(rounds || []).map((r: any) => {
                       const sel = keep === r.round_id;
                       return (
@@ -2111,7 +2111,7 @@ function FrictionItem({ it, onDone }: { it: any; onDone: () => void }) {
                       );
                     })}
                     {it.kind === "multi_draft" ? (
-                      <div onClick={() => setKeep(null)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 6px", cursor: "pointer", borderTop: `1px solid ${C.greenMid}` }}>
+                      <div onClick={() => setKeep(null)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 6px", cursor: "pointer", borderTop: `1px solid ${C.borderGreen}` }}>
                         <span style={{ width: 14, height: 14, borderRadius: "50%", flex: "0 0 14px", border: `2px solid ${keep === null ? C.gold : C.sage}`, background: keep === null ? C.gold : "transparent" }} />
                         <span style={{ fontSize: 11.5, color: keep === null ? C.cream : C.sage }}>Keep none — remove all these drafts</span>
                       </div>
@@ -2120,7 +2120,7 @@ function FrictionItem({ it, onDone }: { it: any; onDone: () => void }) {
                 </>
               ) : null}
               <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Optional note (e.g. 'v1.135 in-progress inflation bug')"
-                style={{ width: "100%", background: C.green, border: `1px solid ${C.greenMid}`, borderRadius: 8, color: C.cream, fontSize: 13, padding: 8, marginBottom: 8, fontFamily: "inherit" }} />
+                style={{ width: "100%", background: C.green, border: `1px solid ${C.borderGreen}`, borderRadius: 8, color: C.cream, fontSize: 13, padding: 8, marginBottom: 8, fontFamily: "inherit" }} />
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 {isCluster ? (
                   <>
@@ -2139,8 +2139,8 @@ function FrictionItem({ it, onDone }: { it: any; onDone: () => void }) {
     </div>
   );
 }
-const btnPrimary: React.CSSProperties = { background: "#5BBE7E", color: "#06251a", border: "none", borderRadius: 9, padding: "8px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer" };
-const btnGhost: React.CSSProperties = { background: "transparent", color: C.cream, border: "1px solid #6f8a7e", borderRadius: 9, padding: "8px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" };
+const btnPrimary: React.CSSProperties = { background: "#5BBE7E", color: "#06251a", border: "none", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer" };
+const btnGhost: React.CSSProperties = { background: "transparent", color: C.cream, border: "1px solid #6f8a7e", borderRadius: 8, padding: "8px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" };
 
 function AdminFrictionReview() {
   const [tab, setTab] = useState<"open" | "needs_action" | "resolved">("open");
@@ -2174,7 +2174,7 @@ function AdminFrictionReview() {
     <div>
       <div style={{ display: "flex", alignItems: "center", margin: "18px 0 4px" }}>
         <span style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700, color: C.cream }}>Friction review</span>
-        <button onClick={runNow} disabled={sweeping} style={{ marginLeft: "auto", background: C.greenLight, color: C.sage, border: `1px solid ${C.greenMid}`, borderRadius: 8, padding: "4px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+        <button onClick={runNow} disabled={sweeping} style={{ marginLeft: "auto", background: C.greenLight, color: C.sage, border: `1px solid ${C.borderGreen}`, borderRadius: 8, padding: "9px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
           {sweeping ? "Checking\u2026" : "Run check now"}
         </button>
       </div>
@@ -2213,16 +2213,16 @@ function AdminSandbaggers() {
         Players whose entered index differs from what their scoring in the app implies by 20% or more, once they have at least 18 posted rounds. An entered index higher than their scoring warrants (“index looks high”) is the classic sandbag — more strokes than their game deserves. The entered (GHIN) index always wins for display; this is only a flag to review. Under 18 rounds, nobody is judged.
       </div>
       {rows.length === 0 ? (
-        <div style={{ background: C.card, borderRadius: 12, padding: 16, color: C.faint, fontSize: 13 }}>No one flagged — every player with 18+ rounds has an entered index within 20% of their scoring.</div>
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: 16, color: C.sage, fontSize: 13 }}>No one flagged — every player with 18+ rounds has an entered index within 20% of their scoring.</div>
       ) : rows.map((r) => (
-        <div key={r.user_id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
+        <div key={r.user_id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ color: C.ink, fontWeight: 800, fontSize: 14 }}>{r.name}</div>
-            <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>Entered {Number(r.entered).toFixed(1)} · scoring says {Number(r.calc).toFixed(1)} · {r.rounds} rounds</div>
+            <div style={{ color: C.cream, fontWeight: 800, fontSize: 14 }}>{r.name}</div>
+            <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>Entered {Number(r.entered).toFixed(1)} · scoring says {Number(r.calc).toFixed(1)} · {r.rounds} rounds</div>
           </div>
           <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <div style={{ color: r.direction === "entered_high" ? C.birdie : C.gold, fontWeight: 800, fontSize: 15 }}>{r.diff_pct}%</div>
-            <div style={{ color: C.faint, fontSize: 11 }}>{r.direction === "entered_high" ? "index looks high" : "index looks low"}</div>
+            <div style={{ color: r.direction === "entered_high" ? C.overRedDark : C.gold, fontWeight: 800, fontSize: 15 }}>{r.diff_pct}%</div>
+            <div style={{ color: C.sage, fontSize: 11 }}>{r.direction === "entered_high" ? "index looks high" : "index looks low"}</div>
           </div>
         </div>
       ))}
@@ -2375,9 +2375,9 @@ export function ActivityTab() {
         </div>
       )}
       {shown.map((r) => (
-        <div key={r.id} style={{ background: C.card, borderRadius: 12, padding: "11px 14px", marginTop: 8 }}>
-          <div style={{ color: C.ink, fontSize: 14 }}>{r.summary}</div>
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 3 }}>
+        <div key={r.id} style={{ background: C.greenLight, borderRadius: 12, padding: "11px 14px", marginTop: 8 }}>
+          <div style={{ color: C.cream, fontSize: 14 }}>{r.summary}</div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>
             {r.actor_name || "Someone"} · {fmtDate(r.created_at)} at {new Date(r.created_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} · {timeAgo(r.created_at)}
           </div>
         </div>
@@ -2516,11 +2516,11 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
       {shown.map((g) => {
         const archived = g.status === "archived";
         return (
-          <div key={g.group_id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 8, opacity: archived ? 0.6 : 1 }}>
+          <div key={g.group_id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 8, opacity: archived ? 0.62 : 1 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{g.name}</div>
+              <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{g.name}</div>
               {g.is_default && <span style={{ color: C.gold, fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>★ default</span>}
-              {archived && <span style={{ color: C.faint, fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>· archived</span>}
+              {archived && <span style={{ color: C.sage, fontSize: 11, fontWeight: 700, textTransform: "uppercase" }}>· archived</span>}
               <div style={{ flex: 1 }} />
               {g.my_support ? (
                 <button disabled={busy === g.group_id}
@@ -2529,39 +2529,39 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
               ) : (
                 <button disabled={busy === g.group_id}
                   onClick={async () => { setBusy(g.group_id); try { await onEnterGroup?.({ group_id: g.group_id, name: g.name }); } finally { setBusy(null); } }}
-                  style={{ ...btn(false), fontSize: 12, padding: "5px 11px", opacity: busy === g.group_id ? 0.5 : 1 }}>Enter</button>
+                  style={{ ...btn(false), fontSize: 12, padding: "5px 11px", opacity: busy === g.group_id ? 0.62 : 1 }}>Enter</button>
               )}
               <button disabled={busy === g.group_id} onClick={() => setStatus(g, archived ? "active" : "archived")}
-                style={{ ...btn(false), fontSize: 12, padding: "5px 11px", opacity: busy === g.group_id ? 0.5 : 1 }}>
+                style={{ ...btn(false), fontSize: 12, padding: "5px 11px", opacity: busy === g.group_id ? 0.62 : 1 }}>
                 {archived ? "Restore" : "Archive"}
               </button>
             </div>
-            <div style={{ color: C.faint, fontSize: 12, marginTop: 4 }}>Admin: {g.admin_names || "—"}</div>
-            <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
+            <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>Admin: {g.admin_names || "—"}</div>
+            <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
               {g.member_count} member{g.member_count === 1 ? "" : "s"} · {g.rounds_count} round{g.rounds_count === 1 ? "" : "s"} · {g.games_count} game{g.games_count === 1 ? "" : "s"} · last activity {g.last_activity ? fmtDate(g.last_activity) : "—"}
             </div>
             <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
               <button disabled={busy === g.group_id} onClick={() => revokeInvites(g)}
-                style={{ background: "transparent", color: C.faint, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
                 Revoke invites
               </button>
               <button disabled={busy === g.group_id} onClick={() => { setMergeSrc(mergeSrc === g.group_id ? null : g.group_id); setMergeTo(""); }}
-                style={{ background: "transparent", color: C.faint, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
                 Merge…
               </button>
               {!g.is_default && (
                 <button disabled={busy === g.group_id} onClick={() => setDefault(g)}
-                  style={{ background: "transparent", color: C.faint, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                  style={{ background: "transparent", color: C.sage, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
                   Set as default
                 </button>
               )}
               <button disabled={busy === g.group_id} onClick={() => delGroup(g)}
-                style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                style={{ background: "transparent", color: C.overRedDark, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
                 Delete group
               </button>
               {g.is_test && (
                 <button disabled={busy === g.group_id} onClick={() => wipeGroup(g)}
-                  style={{ background: "transparent", color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.4 : 1 }}>
+                  style={{ background: "transparent", color: C.gold, border: `1px solid ${C.gold}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: "pointer", opacity: busy === g.group_id ? 0.62 : 1 }}>
                   Wipe data
                 </button>
               )}
@@ -2570,14 +2570,14 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
               <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", background: C.greenLight, borderRadius: 8, padding: 8 }}>
                 <span style={{ color: C.sage, fontSize: 12 }}>Merge into:</span>
                 <select value={mergeTo} onChange={(e) => setMergeTo(e.target.value)}
-                  style={{ background: C.card, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
+                  style={{ background: C.card, color: C.ink, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
                   <option value="">Select target…</option>
                   {(rows || []).filter((r) => r.group_id !== g.group_id).map((r) => (
                     <option key={r.group_id} value={r.group_id}>{r.name}</option>
                   ))}
                 </select>
                 <button disabled={!mergeTo || busy === g.group_id} onClick={() => doMerge(g)}
-                  style={{ background: C.gold, color: C.green, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, padding: "5px 12px", cursor: "pointer", opacity: mergeTo ? 1 : 0.4 }}>Merge & delete source</button>
+                  style={{ background: C.gold, color: C.green, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, padding: "5px 12px", cursor: "pointer", opacity: mergeTo ? 1 : 0.62 }}>Merge & delete source</button>
               </div>
             )}
           </div>
@@ -2671,40 +2671,40 @@ export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean 
         Every account. Suspend a bad actor, wipe a user&apos;s data on request, or merge two accounts that are the same person (dedup). Merge and wipe are irreversible.{isOwner ? " As the owner, you can also grant or revoke system-admin access (app-wide — separate from club admin). Only you can." : ""}
       </div>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or email…"
-        style={{ width: "100%", marginTop: 12, background: C.card, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 10, padding: "9px 12px", fontSize: 14 }} />
+        style={{ width: "100%", marginTop: 12, background: C.card, color: C.ink, border: `1px solid ${C.borderCard}`, borderRadius: 10, padding: "9px 12px", fontSize: 14 }} />
       {rows === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
       {shown.map((u) => {
         const banned = !!u.banned;
         const isSelf = u.id === user.id;
         return (
-          <div key={u.id} style={{ background: C.card, borderRadius: 12, padding: "12px 14px", marginTop: 8, opacity: banned ? 0.65 : 1 }}>
+          <div key={u.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 8, opacity: banned ? 0.62 : 1 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <div style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{u.display_name || "(no name)"}</div>
+              <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{u.display_name || "(no name)"}</div>
               {u.is_owner ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>★ owner</span>
                 : u.is_admin ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>★ system admin</span> : null}
-              {banned && <span style={{ color: C.birdie, fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>· suspended</span>}
+              {banned && <span style={{ color: C.overRedDark, fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>· suspended</span>}
             </div>
-            <div style={{ color: C.faint, fontSize: 12, marginTop: 3 }}>{u.email || "—"}</div>
-            <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
+            <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>{u.email || "—"}</div>
+            <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
               {u.group_count} group{u.group_count === 1 ? "" : "s"} · {u.rounds_count} round{u.rounds_count === 1 ? "" : "s"}{u.handicap_index != null ? ` · hcp ${u.handicap_index}` : ""}
             </div>
             <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
               {isOwner && !u.is_owner && !isSelf && (
                 <button disabled={busy === u.id} onClick={() => setSystemAdmin(u, !u.is_admin)}
-                  style={{ background: "transparent", color: u.is_admin ? C.birdie : C.sage, border: `1px solid ${u.is_admin ? C.birdie : C.sage}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}>
+                  style={{ background: "transparent", color: u.is_admin ? C.overRedDark : C.sage, border: `1px solid ${u.is_admin ? C.birdie : C.sage}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: "pointer" }}>
                   {u.is_admin ? "Remove system admin" : "Make system admin"}
                 </button>
               )}
               <button disabled={busy === u.id} onClick={() => { setMergeKeep(mergeKeep === u.id ? null : u.id); setMergeRemove(""); setPreview(null); }}
-                style={{ background: "transparent", color: C.faint, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: "pointer" }}>
+                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: "pointer" }}>
                 Merge another into this…
               </button>
               <button disabled={busy === u.id || isSelf} onClick={() => setBanned(u, !banned)}
-                style={{ background: "transparent", color: banned ? C.sage : C.birdie, border: `1px solid ${banned ? C.sage : C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.3 : 1 }}>
+                style={{ background: "transparent", color: banned ? C.sage : C.overRedDark, border: `1px solid ${banned ? C.sage : C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.62 : 1 }}>
                 {banned ? "Restore" : "Suspend"}
               </button>
               <button disabled={busy === u.id || isSelf} onClick={() => wipe(u)}
-                style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "4px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.3 : 1 }}>
+                style={{ background: "transparent", color: C.overRedDark, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.62 : 1 }}>
                 Wipe data
               </button>
             </div>
@@ -2713,14 +2713,14 @@ export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean 
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <span style={{ color: C.sage, fontSize: 12 }}>Merge a duplicate INTO {u.display_name || u.email}:</span>
                   <select value={mergeRemove} onChange={(e) => { setMergeRemove(e.target.value); setPreview(null); }}
-                    style={{ background: C.card, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
+                    style={{ background: C.card, color: C.ink, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
                     <option value="">Select duplicate…</option>
                     {(rows || []).filter((r) => r.id !== u.id).map((r) => (
                       <option key={r.id} value={r.id}>{r.display_name || r.email}</option>
                     ))}
                   </select>
                   <button disabled={!mergeRemove} onClick={() => runPreview(u.id)}
-                    style={{ background: "transparent", color: C.cream, border: `1px solid ${C.sage}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "5px 10px", cursor: "pointer", opacity: mergeRemove ? 1 : 0.4 }}>Preview</button>
+                    style={{ background: "transparent", color: C.cream, border: `1px solid ${C.sage}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "5px 10px", cursor: "pointer", opacity: mergeRemove ? 1 : 0.62 }}>Preview</button>
                 </div>
                 {preview && (
                   <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
@@ -2781,7 +2781,7 @@ export function HelpPage({ isAdmin, user, displayName, groupId }: { isAdmin: boo
                 </div>
               ))}
               {isTGC && (
-                <div style={{ marginTop: 2, borderTop: `1px solid ${C.greenMid}`, paddingTop: 9 }}>
+                <div style={{ marginTop: 2, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 9 }}>
                   <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>★ EXCLUSIVE TO YOUR CLUB</div>
                   {exclusives.map((x, i) => (
                     <div key={i} style={{ marginTop: 7 }}>
@@ -2924,7 +2924,7 @@ function UpdateChecker() {
       <div style={{ color: C.cream, fontSize: 13, marginTop: 10, lineHeight: 1.7 }}>
         <div><b>Current version:</b> {APP_VERSION}</div>
         <div><b>Latest version:</b> {latest || "Not checked yet"}</div>
-        <div style={{ color: C.faint, fontSize: 11, marginTop: 12, lineHeight: 1.6 }}>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 12, lineHeight: 1.6 }}>
           Birdie Num Num — created by Amit Sud
           <br />© 2026 Amit Sud. All rights reserved.
         </div>

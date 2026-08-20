@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import { C, Hole, Round, stablefordPts, allocateStrokes, applyAllowance, fmtDate, girStats, firStats, fracPct } from "@/lib/golf";
-import { ScoreMark, btn } from "@/components/ui";
+import { ScoreMark, btn, backdropDismiss } from "@/components/ui";
 import { createClient } from "@/lib/supabase";
 import { loadCoursesForGroup, type CourseTee } from "@/lib/courses";
 
@@ -56,10 +56,10 @@ function ShareModalInner({ round, statusFinal, fmtLabel, title, subtitle, summar
   const { busy, msg, shareImage, copyText } = useCardExport(cardRef, fileBase, title, buildText);
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, zIndex: 1100, overflowY: "auto" }}>
+    <div {...backdropDismiss(onClose)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, zIndex: 1100, overflowY: "auto" , paddingTop: "max(12px, env(safe-area-inset-top))", paddingBottom: "max(12px, env(safe-area-inset-bottom))"}}>
       <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 430, width: "100%", margin: "10px 0 40px" }}>
         {/* The exportable card */}
-        <div ref={cardRef} style={{ background: C.green, borderRadius: 18, padding: "16px 14px 14px" }}>
+        <div ref={cardRef} style={{ background: C.green, borderRadius: 14, padding: "16px 14px 14px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.4, padding: "3px 9px", borderRadius: 999, background: statusFinal ? "#3F3414" : "#1f7a52", color: statusFinal ? "#E4CF86" : "#CFF5E2" }}>{statusFinal ? "FINAL" : "LIVE"}</span>
             <span style={{ color: C.gold, fontSize: 11, letterSpacing: 1.4, fontWeight: 700 }}>{fmtLabel}</span>
@@ -67,7 +67,7 @@ function ShareModalInner({ round, statusFinal, fmtLabel, title, subtitle, summar
           <div style={{ fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, color: C.cream, marginTop: 10 }}>{title}</div>
           <div style={{ color: C.sage, fontSize: 13, marginTop: 3 }}>{subtitle}</div>
           <div style={{ color: C.cream, fontSize: 13.5, marginTop: 10, fontWeight: 700 }}>{summaryLine}</div>
-          {statsLine && <div style={{ color: C.sage, fontSize: 12, marginTop: 4, fontWeight: 600 }}>{statsLine}</div>}
+          {statsLine && <div style={{ color: C.sage, fontSize: 12, marginTop: 4, fontWeight: 500 }}>{statsLine}</div>}
           <div style={{ marginTop: 6 }}>
             <SoloScoreGrid round={round} />
           </div>
@@ -208,7 +208,7 @@ export function ShareRoundModal({ round, playerName, onClose }: { round: any; pl
 // ---- Compact group scorecard share: leaderboard + two nine-hole grids (players as rows) ----
 const sgNm: React.CSSProperties = { textAlign: "left", width: 52, fontSize: 11, padding: "3px 2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 const sgCell: React.CSSProperties = { textAlign: "center", fontSize: 11, padding: "3px 0" };
-const sgTot: React.CSSProperties = { textAlign: "center", width: 28, fontSize: 11, fontWeight: 800, color: C.green, borderLeft: `1px solid ${C.line}` };
+const sgTot: React.CSSProperties = { textAlign: "center", width: 28, fontSize: 11, fontWeight: 800, color: C.green, borderLeft: `1px solid ${C.borderCard}` };
 
 export function ShareGameModal({ game, players, courseTees, onClose }: { game: any; players: any[]; courseTees?: CourseTee[]; onClose: () => void }) {
   const cardRef = useRef<HTMLDivElement>(null);
@@ -275,12 +275,12 @@ export function ShareGameModal({ game, players, courseTees, onClose }: { game: a
       <div style={{ background: C.card, borderRadius: 12, padding: "8px 8px 10px", marginTop: 8 }}>
         <div style={{ color: C.greenMid, fontSize: 11, letterSpacing: 1.5, fontWeight: 800, margin: "0 2px 6px" }}>{label}</div>
         <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}><tbody>
-          <tr style={{ borderBottom: `1px solid ${C.line}` }}>
+          <tr style={{ borderBottom: `1px solid ${C.borderCard}` }}>
             <td style={{ ...sgNm, color: C.faint, fontWeight: 700, fontSize: 11 }}>Hole</td>
             {slice.map((m) => <td key={m.n} style={{ ...sgCell, color: C.faint, fontWeight: 700, fontSize: 11 }}>{m.n}</td>)}
             <td style={{ ...sgTot, color: C.greenMid, fontSize: 11 }}>{totLbl}</td>
           </tr>
-          <tr style={{ borderBottom: `1px solid ${C.line}` }}>
+          <tr style={{ borderBottom: `1px solid ${C.borderCard}` }}>
             <td style={{ ...sgNm, color: C.faint, fontWeight: 700, fontSize: 11 }}>Par</td>
             {slice.map((m) => <td key={m.n} style={{ ...sgCell, color: C.faint, fontWeight: 700, fontSize: 11 }}>{m.par}</td>)}
             <td style={{ ...sgTot, color: C.faint, fontSize: 11 }}>{slice.reduce((s, m) => s + m.par, 0)}</td>
@@ -304,9 +304,9 @@ export function ShareGameModal({ game, players, courseTees, onClose }: { game: a
   };
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, zIndex: 1100, overflowY: "auto" }}>
+    <div {...backdropDismiss(onClose)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: 16, zIndex: 1100, overflowY: "auto" }}>
       <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 430, width: "100%", margin: "10px 0 40px" }}>
-        <div ref={cardRef} style={{ background: C.green, borderRadius: 18, padding: "16px 14px 14px" }}>
+        <div ref={cardRef} style={{ background: C.green, borderRadius: 14, padding: "16px 14px 14px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.4, padding: "3px 9px", borderRadius: 999, background: ended ? "#3F3414" : "#1f7a52", color: ended ? "#E4CF86" : "#CFF5E2" }}>{ended ? "FINAL" : "LIVE"}</span>
             <span style={{ color: C.gold, fontSize: 11, letterSpacing: 1.4, fontWeight: 700 }}>{fmt}</span>
@@ -318,7 +318,7 @@ export function ShareGameModal({ game, players, courseTees, onClose }: { game: a
             {board.map((r, i) => (
               <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 11px", borderBottom: i < board.length - 1 ? "1px solid #EEE8D6" : "none" }}>
                 <span style={{ width: 14, color: C.faint, fontWeight: 800, fontSize: 13 }}>{i + 1}</span>
-                <span style={{ flex: 1, fontWeight: 800, fontSize: 14, color: C.ink }}>{r.name} <span style={{ color: C.faint, fontWeight: 600, fontSize: 11 }}>· hcp {r.hcp}</span></span>
+                <span style={{ flex: 1, fontWeight: 800, fontSize: 14, color: C.ink }}>{r.name} <span style={{ color: C.faint, fontWeight: 500, fontSize: 11 }}>· hcp {r.hcp}</span></span>
                 <span style={{ fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 16, color: i === 0 ? "#1f8f54" : C.faint }}>{stab ? `${r.pts} pts` : `net ${r.net}`}</span>
               </div>
             ))}
@@ -367,17 +367,17 @@ function SoloScoreGrid({ round }: { round: Round }) {
       <div style={{ background: C.card, borderRadius: 12, padding: "8px 8px 10px", marginTop: 8 }}>
         <div style={{ color: C.greenMid, fontSize: 11, letterSpacing: 1.5, fontWeight: 800, margin: "0 2px 6px" }}>{label}</div>
         <table style={{ borderCollapse: "collapse", width: "100%", tableLayout: "fixed" }}><tbody>
-          <tr style={{ borderBottom: `1px solid ${C.line}` }}>
+          <tr style={{ borderBottom: `1px solid ${C.borderCard}` }}>
             <td style={{ ...sgNm, color: C.faint, fontWeight: 700, fontSize: 11 }}>Hole</td>
             {slice.map((h) => (
               <td key={h.hole_number} style={{ ...sgCell, color: C.faint, fontWeight: 700, fontSize: 11 }}>
                 {h.hole_number}
-                {h.yardage != null && <div style={{ fontSize: 11, fontWeight: 600, color: C.faint, opacity: 0.85 }}>{h.yardage}</div>}
+                {h.yardage != null && <div style={{ fontSize: 11, fontWeight: 500, color: C.faint, opacity: 0.85 }}>{h.yardage}</div>}
               </td>
             ))}
             <td style={{ ...sgTot, color: C.greenMid, fontSize: 11 }}>{totLbl}</td>
           </tr>
-          <tr style={{ borderBottom: `1px solid ${C.line}` }}>
+          <tr style={{ borderBottom: `1px solid ${C.borderCard}` }}>
             <td style={{ ...sgNm, color: C.faint, fontWeight: 700, fontSize: 11 }}>Par</td>
             {slice.map((h) => <td key={h.hole_number} style={{ ...sgCell, color: C.faint, fontWeight: 700, fontSize: 11 }}>{h.par}</td>)}
             <td style={{ ...sgTot, color: C.faint, fontSize: 11 }}>{parSum}</td>

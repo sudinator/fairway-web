@@ -68,6 +68,7 @@ import {
   HoleScoreModal,
   ShortDateInput,
   Avatar,
+  backdropDismiss,
 } from "@/components/ui";
 
 const supabase = createClient();
@@ -639,9 +640,9 @@ function CreateGame({
     <div style={{ maxWidth: 600 }}>
       <Eyebrow>CREATE A GAME</Eyebrow>
       {draftAvailable && !draftDismissed && (
-        <div style={{ marginTop: 12, background: "#faf6ea", border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 14px" }}>
-          <div style={{ color: C.ink, fontSize: 13, fontWeight: 700 }}>Resume your setup?</div>
-          <div style={{ color: C.faint, fontSize: 12, marginTop: 3, lineHeight: 1.45 }}>
+        <div style={{ marginTop: 12, background: C.greenLight, border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 14px" }}>
+          <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Resume your setup?</div>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 3, lineHeight: 1.45 }}>
             You left a game setup unfinished {draftAgeLabel(draftAvailable.savedAt)}. Pick up where you left off, or start fresh.
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
@@ -716,20 +717,20 @@ function CreateGame({
               textAlign: "left",
               marginTop: 8,
               cursor: "pointer",
-              background: selected ? C.cream : C.card,
-              border: `${selected ? 2 : 1}px solid ${selected ? C.gold : C.line}`,
+              background: selected ? C.greenMid : C.greenLight,
+              border: `${selected ? 2 : 1}px solid ${selected ? C.gold : "rgba(255,255,255,0.12)"}`,
               borderRadius: 10,
               padding: "10px 14px",
             }}
           >
             <span style={{ width: 20, height: 20, borderRadius: 999, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: selected ? C.green : "transparent", border: selected ? "none" : `1.5px solid ${C.line}`, color: C.cream, fontSize: 12, fontWeight: 800 }}>{selected ? "✓" : ""}</span>
             <span style={{ flex: 1 }}>
-              <span style={{ color: C.ink, fontWeight: 700 }}>{f.name}</span>
+              <span style={{ color: C.cream, fontWeight: 700 }}>{f.name}</span>
               {f.location ? (
-                <span style={{ color: C.faint, fontSize: 13 }}>{" "}· {f.location}</span>
+                <span style={{ color: C.sage, fontSize: 13 }}>{" "}· {f.location}</span>
               ) : null}
             </span>
-            {selected && <span style={{ color: C.green, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>SELECTED</span>}
+            {selected && <span style={{ color: C.cream, fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>SELECTED</span>}
           </button>
           );
         })}
@@ -829,7 +830,7 @@ function CreateGame({
                 key={p.id}
                 style={{
                   padding: "12px",
-                  borderBottom: `1px solid ${C.greenMid}`,
+                  borderBottom: `1px solid ${C.borderGreen}`,
                   borderRadius: 8,
                   background: checked ? "rgba(216,178,74,0.10)" : "transparent",
                 }}
@@ -848,7 +849,7 @@ function CreateGame({
                   <span style={{ flex: 1, minWidth: 0, color: C.cream, fontWeight: 700, fontSize: 15 }}>
                     {p.display_name}{isMe ? " (you)" : ""}
                     {checked && resolved ? (
-                      <span style={{ display: "block", color: C.sage, fontSize: 11, fontWeight: 400, marginTop: 2 }}>
+                      <span style={{ display: "block", color: C.sage, fontSize: 11, fontWeight: 500, marginTop: 2 }}>
                         {resolved.tee.name} · {teeSourceLabel(resolved.source, resolved.flight)}
                       </span>
                     ) : null}
@@ -922,7 +923,7 @@ function CreateGame({
                       />
                       <button
                         onClick={() => { const raw = (guestIdxEdits[g.id] ?? "").trim(); const num = parseFloat(raw); if (raw === "" || Number.isNaN(num)) return; setGuestPlayers((prev) => prev.map((p) => (p.id === g.id ? { ...p, handicap_index: num } : p))); }}
-                        style={{ background: "#7fd6a3", color: C.green, border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}
+                        style={{ background: "#7FD6A3", color: C.green, border: "none", borderRadius: 8, padding: "5px 10px", fontSize: 12, fontWeight: 800, cursor: "pointer" }}
                       >✓</button>
                     </>
                   )}
@@ -947,7 +948,7 @@ function CreateGame({
                   ) : null}
                   <button
                     onClick={() => { setGuestPlayers((prev) => prev.filter((p) => p.id !== g.id)); setGuestIdxEdits((m) => { const n = { ...m }; delete n[g.id]; return n; }); setTeeAssignments((cur) => { const player = { ...cur.player }; delete player[g.id]; return { ...cur, player }; }); }}
-                    style={{ background: "none", border: "none", color: C.birdie, cursor: "pointer", fontSize: 14, padding: 0 }}
+                    style={{ background: "none", border: "none", color: C.overRedDark, cursor: "pointer", fontSize: 14, padding: 0 }}
                   >
                     ✕
                   </button>
@@ -1118,7 +1119,7 @@ function CreateGame({
                   : "Carry over \u2014 a tied hole pushes its skin to the next, building the pot. Scales to any field."}
               </div>
               {tooMany && (
-                <div style={{ background: "#4a1d16", border: `1px solid ${C.birdie}`, borderRadius: 9, padding: "8px 10px", marginTop: 8, color: "#f0c5bd", fontSize: 11.5, lineHeight: 1.45 }}>
+                <div style={{ background: "#4a1d16", border: `1px solid ${C.birdie}`, borderRadius: 8, padding: "8px 10px", marginTop: 8, color: "#f0c5bd", fontSize: 11.5, lineHeight: 1.45 }}>
                   {fieldCount} players is too many for split skins. Use <b>Team skins</b> or <b>1:1 matchups</b>, or switch to <b>Carry over</b>.
                 </div>
               )}
@@ -1225,7 +1226,7 @@ function CreateGame({
                   ))}
                 </div>
                 {(idxVal == null || flightNeedsHcp.length > 0) ? (
-                  <div style={{ background: "rgba(184,58,46,.12)", border: "1px solid rgba(184,58,46,.4)", borderRadius: 11, padding: "10px 12px", marginBottom: 10 }}>
+                  <div style={{ background: "rgba(184,58,46,.12)", border: "1px solid rgba(184,58,46,.4)", borderRadius: 12, padding: "10px 12px", marginBottom: 10 }}>
                     <div style={{ color: C.cream, fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Handicaps needed to flight this event</div>
                     {idxVal == null ? <div style={{ color: C.sage, fontSize: 11, marginBottom: 6 }}>Enter your own index in the field above.</div> : null}
                     {flightNeedsHcp.map((p) => {
@@ -1246,7 +1247,7 @@ function CreateGame({
                             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); setIt(); } }}
                             style={{ ...inputStyle, width: 72, padding: "6px 9px", fontSize: 13, textAlign: "center" }} />
                           <button onClick={setIt} disabled={!valid}
-                            style={{ ...btn(valid), fontSize: 12, padding: "6px 12px", opacity: valid ? 1 : 0.4, cursor: valid ? "pointer" : "not-allowed" }}>Set</button>
+                            style={{ ...btn(valid), fontSize: 12, padding: "6px 12px", opacity: valid ? 1 : 0.62, cursor: valid ? "pointer" : "not-allowed" }}>Set</button>
                         </div>
                       );
                     })}
@@ -1302,7 +1303,7 @@ function CreateGame({
 
         {createSection === "review" && (
           <div>
-            <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, border: `1px solid ${C.greenMid}` }}>
+            <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, border: `1px solid ${C.borderGreen}` }}>
               {[
                 [!!pickedFav, "Course", pickedFav?.name || "Select a course"],
                 [!!tee, "Default tee", tee?.name || "Select a tee"],
@@ -1311,7 +1312,7 @@ function CreateGame({
                 [!flightBlocked, "Flights", flightMode === "oneoff" ? `${flightCount} flights ready` : "Off"],
               ].map(([ok, label, value], i) => (
                 <div key={String(label)} style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 0", borderBottom: i < 4 ? "1px solid rgba(255,255,255,.08)" : "none" }}>
-                  <span style={{ color: ok ? "#5BD08A" : C.gold, fontWeight: 900 }}>{ok ? "✓" : "!"}</span>
+                  <span style={{ color: ok ? "#5BD08A" : C.gold, fontWeight: 800 }}>{ok ? "✓" : "!"}</span>
                   <span style={{ color: C.sage, fontSize: 12, minWidth: 76 }}>{label}</span>
                   <span style={{ color: C.cream, fontSize: 12.5, fontWeight: 700, marginLeft: "auto", textAlign: "right" }}>{value}</span>
                 </div>
@@ -1323,7 +1324,7 @@ function CreateGame({
             <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
               <button style={btn(false)} onClick={onCancel}>Cancel</button>
               <button
-                style={{ ...btn(true), opacity: pickedFav && tee && !busy && !flightBlocked ? 1 : 0.5 }}
+                style={{ ...btn(true), opacity: pickedFav && tee && !busy && !flightBlocked ? 1 : 0.62 }}
                 disabled={!pickedFav || !tee || busy || flightBlocked}
                 onClick={create}
               >
@@ -1341,7 +1342,7 @@ function CreateGame({
         )}
       </CreateGameWorkspace>
       {err && (
-        <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>
+        <div style={{ color: C.overRedDark, fontSize: 13, marginTop: 10 }}>
           {err}
         </div>
       )}
@@ -2768,7 +2769,7 @@ function GameRoom({
         )}
       </div>
       {isOrganizer && orgWide && (
-        <a href={`/organize/${game.id}`} style={{ display: "block", marginTop: 10, textAlign: "center", color: C.gold, fontSize: 13, fontWeight: 700, textDecoration: "none", border: `1px solid ${C.gold}`, borderRadius: 9, padding: "9px 0" }}>
+        <a href={`/organize/${game.id}`} style={{ display: "block", marginTop: 10, textAlign: "center", color: C.gold, fontSize: 13, fontWeight: 700, textDecoration: "none", border: `1px solid ${C.gold}`, borderRadius: 8, padding: "9px 0" }}>
           Set up flights &amp; matchups in the desktop organizer →
         </a>
       )}
@@ -2788,19 +2789,19 @@ function GameRoom({
               ? <button onClick={adminReopenGame} style={{ background: "transparent", color: C.cream, border: `1px solid ${C.sage}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "6px 12px", cursor: "pointer" }}>Reopen</button>
               : <button onClick={adminEndGame} style={{ background: "transparent", color: C.cream, border: `1px solid ${C.sage}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "6px 12px", cursor: "pointer" }}>Force end</button>}
             <button onClick={adminResetGame} style={{ background: "transparent", color: C.cream, border: `1px solid ${C.sage}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "6px 12px", cursor: "pointer" }}>Reset scores</button>
-            <button onClick={adminDeleteGame} style={{ background: "transparent", color: C.birdie, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "6px 12px", cursor: "pointer" }}>Delete game</button>
+            <button onClick={adminDeleteGame} style={{ background: "transparent", color: C.overRedDark, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "6px 12px", cursor: "pointer" }}>Delete game</button>
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
             <span style={{ color: C.sage, fontSize: 12 }}>Reassign organizer:</span>
             <select value={reassignTo} onChange={(e) => setReassignTo(e.target.value)}
-              style={{ background: C.card, color: C.ink, border: `1px solid ${C.line}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
+              style={{ background: C.card, color: C.ink, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
               <option value="">Select player…</option>
               {players.filter((p) => p.user_id).map((p) => (
                 <option key={p.user_id} value={p.user_id as string}>{p.display_name}</option>
               ))}
             </select>
             <button disabled={!reassignTo} onClick={adminReassignOrganizer}
-              style={{ background: C.gold, color: C.green, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, padding: "6px 12px", cursor: "pointer", opacity: reassignTo ? 1 : 0.4 }}>Assign</button>
+              style={{ background: C.gold, color: C.green, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, padding: "6px 12px", cursor: "pointer", opacity: reassignTo ? 1 : 0.62 }}>Assign</button>
           </div>
         </div>
       )}
@@ -2810,7 +2811,7 @@ function GameRoom({
           <div style={{
             background: (syncState === "error" || pendingHoles > 0) ? "#3A2A12" : syncState === "synced" ? "#13412c" : "#15302a",
             color: C.cream,
-            border: `1px solid ${(syncState === "error" || pendingHoles > 0) ? C.gold : syncState === "synced" ? "#1f8f54" : C.line}`,
+            border: `1px solid ${(syncState === "error" || pendingHoles > 0) ? C.gold : syncState === "synced" ? "#1f8f54" : C.borderCard}`,
             borderRadius: 999, padding: "8px 14px", fontSize: 12.5, fontWeight: 700,
             boxShadow: "0 8px 22px rgba(0,0,0,.35)", display: "flex", alignItems: "center", gap: 10, maxWidth: "100%", pointerEvents: "auto",
           }}>
@@ -2826,7 +2827,7 @@ function GameRoom({
             </span>
             {pendingHoles > 0 && !offline && (
               <button onClick={syncNow} disabled={syncing}
-                style={{ background: C.gold, color: "#3B2A00", border: "none", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer", opacity: syncing ? 0.6 : 1, whiteSpace: "nowrap" }}>
+                style={{ background: C.gold, color: "#3B2A00", border: "none", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 800, cursor: "pointer", opacity: syncing ? 0.62 : 1, whiteSpace: "nowrap" }}>
                 {syncing ? "Syncing…" : "Sync now"}
               </button>
             )}
@@ -2931,7 +2932,7 @@ function GameRoom({
           {game.game_type === "match" ? "⛳ Singles Match Play" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "⛳ Four-Ball · Shootout" : "⛳ Four-Ball Match (Best Net)") : game.game_type === "trifecta" ? (game.team_score_mode === "aggregate" ? "⛳ Trifecta · Shootout" : "⛳ Trifecta") : game.game_type === "skins" ? "🪙 Skins (Net)" : game.game_type === "stroke" ? (game.stroke_basis === "gross" ? "⛳ Stroke Play (Gross)" : "⛳ Stroke Play (Net)") : "🏆 Stableford Tournament"}
         </span>
         {isEnded ? (
-          <span style={{ fontSize: 12, fontWeight: 800, background: C.gold, color: "#1A1A1A", borderRadius: 20, padding: "3px 10px" }}>FINAL · GAME ENDED</span>
+          <span style={{ fontSize: 12, fontWeight: 800, background: C.gold, color: C.cream, borderRadius: 14, padding: "3px 10px" }}>FINAL · GAME ENDED</span>
         ) : (
           <span style={{ color: C.cream, opacity: 0.8, fontSize: 12 }}>
             {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "2 v 2 · aggregate net (both balls)" : "2 v 2 better-net-ball") : game.game_type === "trifecta" ? (game.trifecta_scoring === "match" ? "2 singles + a team match · 3 pts/foursome" : "2 singles + a team point · 3 pts/hole") : game.game_type === "skins" ? "net skins · carryovers" : game.game_type === "stroke" ? "lowest total wins" : "net Stableford leaderboard"}
@@ -2951,7 +2952,7 @@ function GameRoom({
             {(["per_hole", "match"] as const).map((val) => {
               const on = (game.trifecta_scoring === "match" ? "match" : "per_hole") === val;
               return (
-                <button key={val} onClick={() => changeTrifectaScoring(val)} style={{ flex: 1, border: `1px solid ${on ? C.gold : C.greenMid}`, background: on ? C.gold : "transparent", borderRadius: 10, padding: "9px 8px", cursor: "pointer", textAlign: "center" }}>
+                <button key={val} onClick={() => changeTrifectaScoring(val)} style={{ flex: 1, border: `1px solid ${on ? C.gold : C.borderGreen}`, background: on ? C.gold : "transparent", borderRadius: 10, padding: "9px 8px", cursor: "pointer", textAlign: "center" }}>
                   <div style={{ fontSize: 13, fontWeight: 800, color: on ? "#1c1606" : C.cream }}>{val === "match" ? "1 match = 1 pt" : "1 hole = 1 pt"}</div>
                   <div style={{ fontSize: 11, marginTop: 2, color: on ? "#3c3208" : C.sage }}>{val === "match" ? "Ryder Cup · 3 pts/foursome" : "Per-hole · 3 pts/hole"}</div>
                 </button>
@@ -3000,7 +3001,7 @@ function GameRoom({
                 <span style={{ flex: 1 }} />
                 {onPace ? (
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(91,208,138,0.15)", color: "#7FD0A0", border: "1px solid rgba(91,208,138,0.4)", borderRadius: 999, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>
-                    <span style={{ width: 7, height: 7, borderRadius: 99, background: "#5BD08A", display: "block" }} />On pace
+                    <span style={{ width: 7, height: 7, borderRadius: 999, background: "#5BD08A", display: "block" }} />On pace
                   </span>
                 ) : (
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(216,178,74,0.16)", color: "#E4CF86", border: `1px solid rgba(216,178,74,0.5)`, borderRadius: 999, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>
@@ -3046,22 +3047,22 @@ function GameRoom({
           : "Final standings lock in and every player's scorecard posts to their Rounds tab.";
         const complete = fp.gaps.length === 0;
         return (
-          <div onClick={() => setFinishPrompt(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 1000 }}>
-            <div onClick={(e) => e.stopPropagation()} style={{ background: C.card, color: C.ink, borderRadius: 16, padding: 20, maxWidth: 460, width: "100%", maxHeight: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 32px)", overflowY: "auto" }}>
-              <div style={{ fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800, color: C.green }}>
+          <div {...backdropDismiss(() => setFinishPrompt(null))} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18, zIndex: 1000 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ background: C.greenLight, color: C.cream, borderRadius: 14, padding: 20, maxWidth: 460, width: "100%", maxHeight: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 32px)", overflowY: "auto" }}>
+              <div style={{ fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800, color: C.cream }}>
                 {fp.kind === "group" ? `Finish Group ${fp.teeGroup}'s round?` : "End the game for everyone?"}
               </div>
               {complete ? (
-                <div style={{ color: C.faint, fontSize: 14, marginTop: 10, lineHeight: 1.5 }}>Everything's entered. {lockMsg}</div>
+                <div style={{ color: C.sage, fontSize: 14, marginTop: 10, lineHeight: 1.5 }}>Everything's entered. {lockMsg}</div>
               ) : (
                 <>
-                  <div style={{ color: C.ink, fontSize: 14, marginTop: 10, lineHeight: 1.5 }}>Some things aren't filled in yet:</div>
+                  <div style={{ color: C.cream, fontSize: 14, marginTop: 10, lineHeight: 1.5 }}>Some things aren't filled in yet:</div>
                   <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
                     {fp.gaps.map((g) => (
-                      <div key={g.name} style={{ background: "#F4F0E1", borderRadius: 10, padding: "9px 12px", fontSize: 13, lineHeight: 1.45 }}>
+                      <div key={g.name} style={{ background: C.greenLight, borderRadius: 10, padding: "9px 12px", fontSize: 13, lineHeight: 1.45 }}>
                         <b>{g.name}</b>{" \u2014 "}
-                        {g.noScores ? <span style={{ color: C.birdie }}>no scores entered</span> : (
-                          <span style={{ color: C.faint }}>
+                        {g.noScores ? <span style={{ color: C.overRedDark }}>no scores entered</span> : (
+                          <span style={{ color: C.sage }}>
                             {[
                               g.missScores.length ? `scores on ${finishListFmt(g.missScores)}` : null,
                               g.missPutts.length ? `putts on ${finishListFmt(g.missPutts)}` : null,
@@ -3072,12 +3073,12 @@ function GameRoom({
                       </div>
                     ))}
                   </div>
-                  <div style={{ color: C.faint, fontSize: 12.5, marginTop: 12, lineHeight: 1.5 }}>{lockMsg} You can finish anyway — missing scores just won't count.</div>
+                  <div style={{ color: C.sage, fontSize: 12.5, marginTop: 12, lineHeight: 1.5 }}>{lockMsg} You can finish anyway — missing scores just won't count.</div>
                 </>
               )}
               <div style={{ display: "flex", gap: 10, marginTop: 16, justifyContent: "flex-end" }}>
                 <button onClick={() => setFinishPrompt(null)} style={{ ...btn(false), padding: "9px 16px" }}>{complete ? "Cancel" : "Go back"}</button>
-                <button onClick={async () => { const run = fp.kind === "group" ? finishMyGroup : endGame; setFinishPrompt(null); await run(); }} style={{ ...btn(true), padding: "9px 16px", background: "#5A1E1E", color: "#fff" }}>
+                <button onClick={async () => { const run = fp.kind === "group" ? finishMyGroup : endGame; setFinishPrompt(null); await run(); }} style={{ ...btn(true), padding: "9px 16px", background: C.danger, color: C.cream }}>
                   {complete ? (fp.kind === "group" ? "Finish group" : "End game") : "Finish anyway"}
                 </button>
               </div>
@@ -3097,7 +3098,7 @@ function GameRoom({
               </button>
             )}
             {isOrganizer && (
-              <button onClick={requestEndGame} style={{ ...btn(!canFinishGroup), flex: 1, minWidth: 180, fontSize: 13, padding: "10px 0", background: canFinishGroup ? "#5A1E1E" : undefined, color: canFinishGroup ? "#fff" : undefined }}>
+              <button onClick={requestEndGame} style={{ ...btn(!canFinishGroup), flex: 1, minWidth: 180, fontSize: 13, padding: "10px 0", ...(canFinishGroup ? { background: C.danger, color: C.cream } : {}) }}>
                 🔒 End game for everyone
               </button>
             )}
@@ -3113,7 +3114,7 @@ function GameRoom({
       )}
       {roomTab === "setup" && (isOrganizer || isAdmin) && <ScoreHistory gameId={gameId} />}
       {roomTab === "play" && cardView && (game.marker_user_id || myGroupHasMarker) && !isEnded && (
-        <div style={{ background: "#16302A", border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
+        <div style={{ background: "#16302A", border: `1px solid ${C.borderCard}`, borderRadius: 12, padding: "12px 14px", marginTop: 10 }}>
           <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>Group scoring is on</div>
           <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>
             One person is keeping the whole group's card. Anyone can switch the group back to scoring their own cards.
@@ -3201,7 +3202,7 @@ function GameRoom({
               <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                 {(["flight", "overall"] as const).map((v) => (
                   <button key={v} onClick={() => setFlightView(v)} style={{
-                    flex: 1, padding: "7px 0", borderRadius: 9,
+                    flex: 1, padding: "7px 0", borderRadius: 8,
                     border: `1px solid ${flightView === v ? C.gold : "rgba(255,255,255,0.25)"}`,
                     background: flightView === v ? C.gold : "transparent",
                     color: flightView === v ? "#06251A" : C.cream, fontWeight: 800, fontSize: 12, cursor: "pointer",
@@ -3234,7 +3235,7 @@ function GameRoom({
                   return (
                     <div key={b.key} style={{ marginTop: 12 }}>
                       <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "8px 4px 0" }}>
-                        <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: flightTagColor(b.key) }} />
+                        <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 6, background: flightTagColor(b.key) }} />
                         <span style={{ fontFamily: "Georgia, serif", fontSize: 15, fontWeight: 700, color: C.cream }}>{b.name}</span>
                         <span style={{ color: C.sage, fontSize: 11 }}>index {flightRangeLabel(flightDefs, bi)} · {inFlight.length} player{inFlight.length === 1 ? "" : "s"}</span>
                       </div>
@@ -3288,7 +3289,7 @@ function GameRoom({
                 >
                   <div style={{ color: C.sage, fontSize: 12 }}>{s.label}</div>
                   {!s.started ? (
-                    <div style={{ color: C.faint, fontSize: 13, marginTop: 6 }}>
+                    <div style={{ color: C.sage, fontSize: 13, marginTop: 6 }}>
                       Not started
                     </div>
                   ) : s.complete ? (
@@ -3304,7 +3305,7 @@ function GameRoom({
                     <>
                       <div style={{ color: C.cream, fontWeight: 800, marginTop: 6 }}>
                         {s.who.join(" & ")}
-                        <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", color: C.green, background: C.sage, borderRadius: 5, padding: "1px 6px", verticalAlign: "middle" }}>
+                        <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, textTransform: "uppercase", color: C.green, background: C.sage, borderRadius: 6, padding: "1px 6px", verticalAlign: "middle" }}>
                           {s.who.length > 1 ? "tied" : "leading"}
                         </span>
                       </div>

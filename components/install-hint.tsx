@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { C } from "@/lib/golf";
 
 // A small, dismissible "install this app" hint. On Android/desktop Chrome it uses
 // the native install prompt; on iOS (which has no prompt) it shows the manual
@@ -65,7 +66,7 @@ export function InstallHint() {
       padding: "10px 14px", display: "flex", alignItems: "center", gap: 10,
     }}>
       <div style={{
-        width: 30, height: 30, borderRadius: 7, background: "#0E3B2E",
+        width: 30, height: 30, borderRadius: 6, background: "#0E3B2E",
         border: "1px solid #C9A227", flexShrink: 0,
         display: "flex", alignItems: "center", justifyContent: "center",
         color: "#F7F3E8", fontFamily: "Georgia, serif", fontSize: 13, fontWeight: 700,
@@ -79,13 +80,13 @@ export function InstallHint() {
       </div>
       {!isIOS && deferred && (
         <button onClick={install} style={{
-          background: "#C9A227", color: "#0E3B2E", border: "none", borderRadius: 8,
+          background: C.gold, color: "#0E3B2E", border: "none", borderRadius: 8,
           padding: "7px 12px", fontWeight: 800, fontSize: 12, cursor: "pointer", flexShrink: 0,
         }}>Install</button>
       )}
       <button onClick={dismiss} aria-label="Dismiss" style={{
         background: "none", border: "none", color: "#93A99B", fontSize: 18,
-        cursor: "pointer", flexShrink: 0, lineHeight: 1, padding: "0 2px",
+        cursor: "pointer", flexShrink: 0, lineHeight: 1, padding: "5px 2px",
       }}>×</button>
     </div>
   );

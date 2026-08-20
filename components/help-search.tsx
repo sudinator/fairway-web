@@ -261,8 +261,8 @@ export function HelpSearch({ onSendQuestion }: { onSendQuestion?: (q: string) =>
       onClick={() => ask(q)}
       style={{
         background: faded ? "transparent" : C.green,
-        color: faded ? C.green : C.sage,
-        border: `1px solid ${C.line}`,
+        color: faded ? C.cream : C.sage,
+        border: `1px solid ${C.borderCard}`,
         borderRadius: 999,
         fontSize: 11.5,
         padding: "6px 11px",
@@ -304,7 +304,7 @@ export function HelpSearch({ onSendQuestion }: { onSendQuestion?: (q: string) =>
                 borderRadius: "14px 14px 4px 14px",
                 padding: "9px 13px",
                 fontSize: 13,
-                fontWeight: 600,
+                fontWeight: 500,
               }}
             >
               {m.text}
@@ -315,15 +315,15 @@ export function HelpSearch({ onSendQuestion }: { onSendQuestion?: (q: string) =>
               style={{
                 alignSelf: "flex-start",
                 maxWidth: "92%",
-                background: C.card,
+                background: C.greenLight,
                 borderRadius: "14px 14px 14px 4px",
                 padding: "11px 14px",
               }}
             >
               {m.faq ? (
                 <>
-                  <div style={{ color: C.green, fontWeight: 800, fontSize: 13.5, marginBottom: 6 }}>{m.faq.q}</div>
-                  <ol style={{ margin: 0, paddingLeft: 18, color: C.ink, fontSize: 12.8, lineHeight: 1.5 }}>
+                  <div style={{ color: C.cream, fontWeight: 800, fontSize: 13.5, marginBottom: 6 }}>{m.faq.q}</div>
+                  <ol style={{ margin: 0, paddingLeft: 18, color: C.cream, fontSize: 12.8, lineHeight: 1.5 }}>
                     {m.faq.steps.map((s, j) => (
                       <li key={j} style={{ marginBottom: 3 }}>
                         {s}
@@ -332,7 +332,7 @@ export function HelpSearch({ onSendQuestion }: { onSendQuestion?: (q: string) =>
                   </ol>
                 </>
               ) : (
-                <div style={{ color: C.ink, fontSize: 12.8, lineHeight: 1.5 }}>{m.text}</div>
+                <div style={{ color: C.cream, fontSize: 12.8, lineHeight: 1.5 }}>{m.text}</div>
               )}
               {m.unanswered && onSendQuestion && (
                 <button
@@ -344,7 +344,7 @@ export function HelpSearch({ onSendQuestion }: { onSendQuestion?: (q: string) =>
               )}
               {m.related && m.related.length > 0 && (
                 <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}>
-                  <div style={{ color: C.faint, fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase" }}>
+                  <div style={{ color: C.sage, fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase" }}>
                     Related
                   </div>
                   {m.related.map((q) => chip(q, true))}
@@ -365,7 +365,7 @@ export function HelpSearch({ onSendQuestion }: { onSendQuestion?: (q: string) =>
             if (e.key === "Enter") ask(input);
           }}
         />
-        <button onClick={() => ask(input)} style={{ ...btn(true), padding: "0 16px" }}>
+        <button onClick={() => ask(input)} style={{ ...btn(true), padding: "7px 16px" }}>
           Ask
         </button>
       </div>

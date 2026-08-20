@@ -31,7 +31,7 @@ const CAT_DESC: Record<StatKey, { measured: string; work: string }> = {
 // ---- Shared category-bar language (used by BOTH cards) --------------------
 // Band-relative 0–100 score: 50 = the peer average for your handicap; +/- moves
 // toward the strong/weak edge of your handicap's typical range (putts inverted).
-const SYN_GOOD = "#8FE0B0", SYN_OK = "#F0C97B", SYN_WEAK = "#FB7185";
+const SYN_GOOD = "#8FE0B0", SYN_OK = "#F0C97B", SYN_WEAK = "#FFB3BC";
 function catScore(key: StatKey, value: number, band: Band) {
   const half = (band.hi - band.lo) / 2 || 1;
   const rel = BENCH_DIR[key] * (value - band.avg) / half;
@@ -56,14 +56,14 @@ function CatBar({ name, score, sub, statKey, open, onToggle }: {
     <div style={{ marginTop: 12 }}>
       <div onClick={clickable ? onToggle : undefined} style={{ cursor: clickable ? "pointer" : "default" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-          <span style={{ color: C.cream, fontSize: 12.5, fontWeight: 600 }}>
+          <span style={{ color: C.cream, fontSize: 12.5, fontWeight: 500 }}>
             {name}
             {clickable && <span style={{ color: C.gold, fontSize: 11, marginLeft: 6, fontWeight: 700 }}>{open ? "▲" : "ⓘ"}</span>}
           </span>
           <span style={{ color: vcol, fontSize: 11, fontWeight: 700 }}>{vlabel}</span>
         </div>
-        <div style={{ position: "relative", height: 9, background: C.green, borderRadius: 5 }}>
-          <div style={{ position: "absolute", left: 0, top: 0, height: 9, width: `${Math.round(score)}%`, background: vcol, borderRadius: 5 }} />
+        <div style={{ position: "relative", height: 9, background: C.green, borderRadius: 6 }}>
+          <div style={{ position: "absolute", left: 0, top: 0, height: 9, width: `${Math.round(score)}%`, background: vcol, borderRadius: 6 }} />
           <div style={{ position: "absolute", top: -2, left: "50%", width: 2, height: 13, background: "#fff", opacity: 0.75 }} />
         </div>
         <div style={{ color: C.sage, fontSize: 11, marginTop: 4, lineHeight: 1.45 }}>{sub}</div>
@@ -128,7 +128,7 @@ export function ShotSynthesis({ fir, gir, puttsPerRound, scramble, index, goalHc
             return (
               <button key={g} onClick={() => setGoalHcp(g)} style={{
                 border: `1px solid ${on ? C.gold : "#2c5142"}`, background: on ? C.gold : "#173a2c",
-                color: on ? "#2a2410" : C.cream, borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                color: on ? "#2a2410" : C.cream, borderRadius: 999, padding: "9px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer",
               }}>{synGoalLabel(g)}</button>
             );
           })}

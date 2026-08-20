@@ -7,6 +7,10 @@ out
 .DS_Store
 tsconfig.tsbuildinfo
 .testout/
+.testout-ui/
 .env
 .env.*
 !.env.example
+
+# Per-drop handover notes. The permanent release ledger is DEPLOY_NOTES.md.
+CHANGES.md

@@ -159,11 +159,11 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
       if (ti >= 0) return teamAccent(game.teams[ti].name, ti);
     }
     const idx = playerOrder.findIndex((x) => x.id === p.id);
-    return idx % 2 === 0 ? "#5B8DEF" : "#C9A227";
+    return idx % 2 === 0 ? C.overDark : "#E0C25E";
   };
   const colTmpl = `58px ${cols.map((c) => (c.type === "divider" ? "10px" : "minmax(58px, 1fr)")).join(" ")}`;
-  const cell: React.CSSProperties = { position: "relative", background: "#FBFAF4", borderRadius: 5, height: 42, display: "flex", alignItems: "center", justifyContent: "center" };
-  const agg: React.CSSProperties = { position: "relative", background: C.greenLight, borderRadius: 5, height: 30, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 15, fontWeight: 800 };
+  const cell: React.CSSProperties = { position: "relative", background: "#FBFAF4", borderRadius: 6, height: 42, display: "flex", alignItems: "center", justifyContent: "center" };
+  const agg: React.CSSProperties = { position: "relative", background: C.greenLight, borderRadius: 6, height: 30, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 15, fontWeight: 800 };
 
   const sums = (p: Player, from: number, to: number) => {
     let g = 0, mPts = 0, cPts = 0;
@@ -217,7 +217,7 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           {cols.map((c, ci) => {
-            if (c.type === "divider") return <div key={`hd${i}-${ci}`} style={{ width: 2, alignSelf: "stretch", background: "rgba(216,178,74,0.5)", borderRadius: 2, margin: "16px 1px 0" }} />;
+            if (c.type === "divider") return <div key={`hd${i}-${ci}`} style={{ width: 2, alignSelf: "stretch", background: "rgba(216,178,74,0.5)", borderRadius: 6, margin: "16px 1px 0" }} />;
             const p = c.p;
             const gross = p.scores?.[i] ?? null;
             const recv = recvFor(p, m.si);
@@ -228,27 +228,27 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
               <div key={p.id + i} style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: colorFor(p), fontSize: 11, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 3 }}>{p.display_name}</div>
                 <div
-                  style={{ position: "relative", background: "#FBFAF4", borderRadius: 7, height: 56, display: "flex", alignItems: "center", justifyContent: "center", cursor: (isMarker || p.user_id === user?.id) ? "pointer" : "default", outline: isMarker ? "1px solid #E6E0CC" : (p.user_id === user?.id ? "1px dashed #C9BF9B" : "none") }}
+                  style={{ position: "relative", background: "#FBFAF4", borderRadius: 6, height: 56, display: "flex", alignItems: "center", justifyContent: "center", cursor: (isMarker || p.user_id === user?.id) ? "pointer" : "default", outline: isMarker ? "1px solid #E6E0CC" : (p.user_id === user?.id ? "1px dashed #C9BF9B" : "none") }}
                   onClick={(isMarker || p.user_id === user?.id) ? () => { setEdit({ playerId: p.id, holeIdx: i }); } : undefined}>
                   {recv > 0 && (
                     <div style={{ position: "absolute", top: 4, left: 5, display: "flex", gap: 2 }}>
                       {Array.from({ length: Math.min(recv, 2) }).map((_, d) => (
-                        <span key={d} style={{ width: 6, height: 6, borderRadius: 99, background: "#E8730C", display: "block" }} />
+                        <span key={d} style={{ width: 6, height: 6, borderRadius: 999, background: "#E8730C", display: "block" }} />
                       ))}
                     </div>
                   )}
                   {indRecv > 0 && (
                     <div style={{ position: "absolute", bottom: 4, left: 5, display: "flex", gap: 2 }}>
                       {Array.from({ length: Math.min(indRecv, 2) }).map((_, d) => (
-                        <span key={d} style={{ width: 6, height: 6, borderRadius: 99, background: C.indivDot, display: "block" }} />
+                        <span key={d} style={{ width: 6, height: 6, borderRadius: 999, background: C.indivDot, display: "block" }} />
                       ))}
                     </div>
                   )}
                   <span style={{ fontSize: 26, fontWeight: 800, color: gross != null && gross > 0 ? netColor(gross, recv, m.par) : "#C7C2B0" }}>{gross != null && gross > 0 ? gross : m.par}</span>
                   {gross != null && gross > 0 && (relBasis ? (
                     <>
-                      <span style={{ position: "absolute", top: 3, right: 3, minWidth: 16, height: 16, padding: "0 2px", border: "1.5px solid #E8730C", borderRadius: 5, background: "#FBEEE2", color: "#E8730C", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{oPts ?? 0}</span>
-                      <span style={{ position: "absolute", bottom: 3, right: 3, minWidth: 16, height: 16, padding: "0 2px", border: `1.5px solid ${C.indivDot}`, borderRadius: 5, background: "#EAF3FB", color: "#1E5B8A", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{bPts ?? 0}</span>
+                      <span style={{ position: "absolute", top: 3, right: 3, minWidth: 16, height: 16, padding: "0 2px", border: "1.5px solid #E8730C", borderRadius: 6, background: "#FBEEE2", color: "#9A4A08", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{oPts ?? 0}</span>
+                      <span style={{ position: "absolute", bottom: 3, right: 3, minWidth: 16, height: 16, padding: "0 2px", border: `1.5px solid ${C.indivDot}`, borderRadius: 6, background: "#EAF3FB", color: "#1E5B8A", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{bPts ?? 0}</span>
                     </>
                   ) : (
                     <span style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#fff", fontSize: 11, fontWeight: 800, padding: "0 6px", borderRadius: 6 }}>{oPts ?? 0}</span>
@@ -267,17 +267,17 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
       <div style={{ color: "#CFE3D8", fontSize: 11, fontWeight: 800, letterSpacing: 1.5, marginBottom: 8 }}>{label}</div>
       <div style={{ display: "flex", gap: 6 }}>
         {cols.map((c, ci) => {
-          if (c.type === "divider") return <div key={`sd${label}-${ci}`} style={{ width: 2, alignSelf: "stretch", background: "rgba(216,178,74,0.5)", borderRadius: 2, margin: "0 1px" }} />;
+          if (c.type === "divider") return <div key={`sd${label}-${ci}`} style={{ width: 2, alignSelf: "stretch", background: "rgba(216,178,74,0.5)", borderRadius: 6, margin: "0 1px" }} />;
           const p = c.p;
           const s = sums(p, from, to);
           return (
             <div key={p.id + label} style={{ flex: 1, minWidth: 0, textAlign: "center" }}>
-              <div style={{ position: "relative", background: C.greenLight, borderRadius: 7, height: 44, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
+              <div style={{ position: "relative", background: C.greenLight, borderRadius: 6, height: 44, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
                 <span style={{ fontSize: 20, fontWeight: 800 }}>{s.g || "–"}</span>
                 {s.g > 0 && (relBasis ? (
                   <>
-                    <span style={{ position: "absolute", top: 3, right: 3, minWidth: 15, height: 15, padding: "0 2px", border: "1.5px solid #E8730C", borderRadius: 5, color: "#F0A45E", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.mPts}</span>
-                    <span style={{ position: "absolute", bottom: 3, right: 3, minWidth: 15, height: 15, padding: "0 2px", border: `1.5px solid ${C.indivDot}`, borderRadius: 5, color: C.indivDot, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.cPts}</span>
+                    <span style={{ position: "absolute", top: 3, right: 3, minWidth: 15, height: 15, padding: "0 2px", border: "1.5px solid #E8730C", borderRadius: 6, color: C.dot, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.mPts}</span>
+                    <span style={{ position: "absolute", bottom: 3, right: 3, minWidth: 15, height: 15, padding: "0 2px", border: `1.5px solid ${C.indivDot}`, borderRadius: 6, color: C.indivDot, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.cPts}</span>
                   </>
                 ) : (
                   <span style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#E4CF86", fontSize: 11, fontWeight: 800, padding: "0 5px", borderRadius: 6 }}>{s.mPts}</span>
@@ -313,7 +313,7 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
           </div>
         ) : markerName ? (
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#13352A", border: "0.5px solid #2E6B55", borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
-            <span style={{ width: 9, height: 9, borderRadius: 99, background: "#5BD08A", boxShadow: "0 0 0 3px rgba(91,208,138,0.25)" }} />
+            <span style={{ width: 9, height: 9, borderRadius: 999, background: "#5BD08A", boxShadow: "0 0 0 3px rgba(91,208,138,0.25)" }} />
             <span style={{ color: "#CFE3D8", fontSize: 12, flex: 1 }}>{groupLabel} · <strong style={{ color: C.cream }}>{markerName}</strong> is keeping score</span>
             {canClaim && onClaimGroup && <button onClick={() => { if (confirm(`Take over scoring for ${groupLabel} from ${markerName}?`)) onClaimGroup(); }} style={{ ...btn(false), fontSize: 11, padding: "5px 10px" }}>Take over</button>}
           </div>
@@ -322,7 +322,7 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
             <span style={{ color: C.sage, fontSize: 12, flex: 1 }}>No one is keeping score for {groupLabel} yet.</span>
             {canClaim && onClaimGroup
               ? <button onClick={onClaimGroup} style={{ ...btn(true), fontSize: 11, padding: "5px 10px" }}>Keep score for this group</button>
-              : <span style={{ color: C.faint, fontSize: 11 }}>view only</span>}
+              : <span style={{ color: C.sage, fontSize: 11 }}>view only</span>}
           </div>
         )
       ) : isMarker ? (
@@ -333,7 +333,7 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
         </div>
       ) : markerName ? (
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#13352A", border: "0.5px solid #2E6B55", borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
-          <span style={{ width: 9, height: 9, borderRadius: 99, background: "#5BD08A", boxShadow: "0 0 0 3px rgba(91,208,138,0.25)" }} />
+          <span style={{ width: 9, height: 9, borderRadius: 999, background: "#5BD08A", boxShadow: "0 0 0 3px rgba(91,208,138,0.25)" }} />
           <span style={{ color: "#CFE3D8", fontSize: 12, flex: 1 }}>Live · <strong style={{ color: C.cream }}>{markerName}</strong> is keeping score</span>
           <button onClick={() => { if (confirm(`Take over scoring from ${markerName}?`)) onTakeOver(); }} style={{ ...btn(false), fontSize: 11, padding: "5px 10px" }}>Take over</button>
         </div>
@@ -349,11 +349,11 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
         <span style={{ color: "#E0796B", fontSize: 11 }}>● over (net)</span>
         {relBasis
           ? <>
-              <span style={{ color: "#E8730C", fontSize: 11 }}>● ▢ match hcp</span>
+              <span style={{ color: "#9A4A08", fontSize: 11 }}>● ▢ match hcp</span>
               <span style={{ color: C.indivDot, fontSize: 11 }}>● ▢ course hcp</span>
               <span style={{ color: C.faint, fontSize: 11 }}>dots = strokes · box = net Stableford</span>
             </>
-          : <span style={{ color: "#E8730C", fontSize: 11 }}>● gets a stroke · corner = Stableford</span>}
+          : <span style={{ color: "#9A4A08", fontSize: 11 }}>● gets a stroke · corner = Stableford</span>}
       </div>
       <div id="scorecard-sticky" style={{ position: "sticky", top: 0, zIndex: 5, background: C.green, paddingTop: 8, paddingBottom: 10, marginBottom: 4, boxShadow: "0 6px 10px -8px rgba(0,0,0,0.55)" }}>
         {(() => {
@@ -378,7 +378,7 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
               {showPace && <span style={{ flex: 1 }} />}
               {showPace && (onPace ? (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(91,208,138,0.15)", color: "#7FD0A0", border: "1px solid rgba(91,208,138,0.4)", borderRadius: 999, padding: "2px 9px", fontSize: 11, fontWeight: 700 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: 99, background: "#5BD08A", display: "block" }} />On pace
+                  <span style={{ width: 6, height: 6, borderRadius: 999, background: "#5BD08A", display: "block" }} />On pace
                 </span>
               ) : (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5, background: "rgba(216,178,74,0.16)", color: "#E4CF86", border: "1px solid rgba(216,178,74,0.5)", borderRadius: 999, padding: "2px 9px", fontSize: 11, fontWeight: 700 }}>
@@ -390,14 +390,14 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
         })()}
         <div style={{ display: "flex", gap: 6 }}>
           {cols.map((c, ci) => {
-            if (c.type === "divider") return <div key={`lg${ci}`} style={{ width: 2, alignSelf: "stretch", background: "rgba(216,178,74,0.5)", borderRadius: 2, margin: "0 1px" }} />;
+            if (c.type === "divider") return <div key={`lg${ci}`} style={{ width: 2, alignSelf: "stretch", background: "rgba(216,178,74,0.5)", borderRadius: 6, margin: "0 1px" }} />;
             const p = c.p;
             return (
               <div key={p.id} style={{ flex: 1, minWidth: 0, textAlign: "center", padding: "4px 2px", borderBottom: `2px solid ${colorFor(p)}` }}>
                 <div style={{ display: "flex", justifyContent: "center", marginBottom: 3 }}>
                   <Avatar src={p.avatar_url} name={p.display_name} cssSize="min(54px, 90%)" accent={colorFor(p)} />
                 </div>
-                <div style={{ color: C.cream, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                <div style={{ color: C.cream, fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                   {p.display_name}{p.is_guest ? " ·G" : ""}
                 </div>
                 {(() => {
@@ -406,7 +406,7 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
                   if (!relBasis) return <div style={{ color: C.sage, fontSize: 11 }}>hcp {matchHcp}</div>;
                   const line = (color: string, label: string, val: number) => (
                     <div style={{ color: C.sage, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, whiteSpace: "nowrap" }}>
-                      <span style={{ width: 5, height: 5, borderRadius: 99, background: color, display: "inline-block", flex: "none" }} />{label} {val}
+                      <span style={{ width: 5, height: 5, borderRadius: 999, background: color, display: "inline-block", flex: "none" }} />{label} {val}
                     </div>
                   );
                   return <>{line("#E8730C", "match hcp", matchHcp)}{line(C.indivDot, "course hcp", courseHcp)}</>;
@@ -480,12 +480,12 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
         );
       })()}
       {isMarker && onMarkOut && !groupLocked && (
-        <div style={{ marginTop: 14, borderTop: `0.5px solid ${C.line}`, paddingTop: 12 }}>
+        <div style={{ marginTop: 14, borderTop: `0.5px solid ${C.borderCard}`, paddingTop: 12 }}>
           <div style={{ color: C.sage, fontSize: 11, marginBottom: 7 }}>Someone leave early? Tap to mark them out. The holes they've played still count; {(game.game_type === "fourball" || game.game_type === "trifecta") ? "the holes they didn't play score net double bogey for their team" : game.game_type === "match" ? "the match stands on the holes already played" : "their unplayed holes score nothing"}.</div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {players.map((p) => (
               <button key={p.id} onClick={() => onMarkOut(p)}
-                style={{ border: `1px solid ${p.no_show ? "#E08A5B" : C.line}`, background: p.no_show ? "#5A2E22" : "transparent", color: p.no_show ? "#F2B894" : C.sage, borderRadius: 999, padding: "6px 11px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                style={{ border: `1px solid ${p.no_show ? "#E08A5B" : C.borderCard}`, background: p.no_show ? "#5A2E22" : "transparent", color: p.no_show ? "#F2B894" : C.sage, borderRadius: 999, padding: "6px 11px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                 {p.no_show ? `${p.display_name} · out ✓` : p.display_name}
               </button>
             ))}
@@ -558,7 +558,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, getTeeGroupPolicy,
           <button
             onClick={() => { if (canRandomize) onRandomize(); }}
             disabled={!canRandomize || randomizing}
-            style={{ ...btn(true), fontSize: 13, opacity: canRandomize && !randomizing ? 1 : 0.5, cursor: canRandomize && !randomizing ? "pointer" : "not-allowed" }}>
+            style={{ ...btn(true), fontSize: 13, opacity: canRandomize && !randomizing ? 1 : 0.62, cursor: canRandomize && !randomizing ? "pointer" : "not-allowed" }}>
             {randomizing ? "Shuffling…" : "🎲 Randomize groups"}
           </button>
           <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>
@@ -567,7 +567,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, getTeeGroupPolicy,
               : randomizeReason}
           </div>
           {overflowIds.length > 0 && (
-            <div style={{ marginTop: 8, background: "#fff6e6", border: `1px solid ${C.gold}`, borderRadius: 8, padding: "9px 11px", color: "#8a5a12", fontSize: 12, lineHeight: 1.45 }}>
+            <div style={{ marginTop: 8, background: C.greenLight, border: `1px solid ${C.gold}`, borderRadius: 8, padding: "9px 11px", color: C.gold, fontSize: 12, lineHeight: 1.45 }}>
               {overflowIds.length} guest{overflowIds.length === 1 ? "" : "s"} couldn&apos;t be auto-placed (a member brought more than three): {overflowIds.map((id) => players.find((p) => p.id === id)?.display_name || "guest").join(", ")}. Assign {overflowIds.length === 1 ? "them" : "each"} to a group below.
             </div>
           )}
@@ -577,17 +577,17 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, getTeeGroupPolicy,
       {units.map((u) => {
         const g = unitGroup(u);
         return (
-          <div key={u.id} style={{ background: C.card, borderRadius: 10, padding: 12, marginTop: 10, border: `1px solid ${C.line}`, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <div key={u.id} style={{ background: C.greenLight, borderRadius: 10, padding: 12, marginTop: 10, border: `1px solid ${C.borderCard}`, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: C.ink, fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis" }}>{u.label}</div>
-              <div style={{ color: C.faint, fontSize: 11 }}>{u.members.length} player{u.members.length === 1 ? "" : "s"}</div>
+              <div style={{ color: C.cream, fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis" }}>{u.label}</div>
+              <div style={{ color: C.sage, fontSize: 11 }}>{u.members.length} player{u.members.length === 1 ? "" : "s"}</div>
             </div>
             {(() => {
               const unitBlocked = u.members.some((m) => getTeeGroupPolicy?.(m, g).blocked);
               const unitReason = u.members.map((m) => getTeeGroupPolicy?.(m, g).reason).find(Boolean);
               return <select value={g ?? ""} onChange={(e) => assign(u, e.target.value ? parseInt(e.target.value, 10) : null)}
                 disabled={unitBlocked} title={unitReason}
-                style={{ ...inputStyle, padding: "6px 8px", minWidth: 110, opacity: unitBlocked ? .5 : 1 }}>
+                style={{ ...inputStyle, padding: "6px 8px", minWidth: 110, opacity: unitBlocked ? 0.62 : 1 }}>
               <option value="">No group</option>
               {groupOptions.map((n) => <option key={n} value={n}>Group {n}</option>)}
             </select>;
@@ -601,13 +601,13 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, getTeeGroupPolicy,
           {teeGroups.map((gn) => {
             const mem = players.filter((p) => p.tee_group === gn);
             return (
-              <div key={gn} style={{ background: C.card, borderRadius: 10, padding: 12, border: `1px solid ${C.gold}` }}>
+              <div key={gn} style={{ background: C.greenLight, borderRadius: 10, padding: 12, border: `1px solid ${C.gold}` }}>
                 <div style={{ color: C.gold, fontWeight: 800, fontSize: 13 }}>Group {gn}{gn === firstGroup ? " · off first" : ""}</div>
-                <div style={{ color: C.faint, fontSize: 11, marginTop: 2 }}>{mem.length} player{mem.length === 1 ? "" : "s"}</div>
-                <div style={{ marginTop: 8, color: C.ink, fontSize: 13, lineHeight: 1.7 }}>
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>{mem.length} player{mem.length === 1 ? "" : "s"}</div>
+                <div style={{ marginTop: 8, color: C.cream, fontSize: 13, lineHeight: 1.7 }}>
                   {mem.map((p) => {
                     const sponsor = p.is_guest && p.guest_of ? (players.find((m) => m.user_id === p.guest_of)?.display_name || null) : null;
-                    return <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 7 }}><Avatar src={p.avatar_url} name={p.display_name} size={20} enlargeable={false} /><span>{p.display_name}{sponsor ? <span style={{ color: C.faint, fontSize: 11 }}> · guest of {sponsor}</span> : null}</span></div>;
+                    return <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 7 }}><Avatar src={p.avatar_url} name={p.display_name} size={20} enlargeable={false} /><span>{p.display_name}{sponsor ? <span style={{ color: C.sage, fontSize: 11 }}> · guest of {sponsor}</span> : null}</span></div>;
                   })}
                 </div>
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Scorer: chosen on the course</div>
@@ -638,18 +638,18 @@ export function ShareControl({ game, onShare }: { game: Game; onShare: (on: bool
       </div>
       {!shared ? (
         <button disabled={busy} onClick={() => toggle(true)}
-          style={{ ...btn(true), marginTop: 10, fontSize: 13, display: "block", opacity: busy ? 0.6 : 1 }}>
+          style={{ ...btn(true), marginTop: 10, fontSize: 13, display: "block", opacity: busy ? 0.62 : 1 }}>
           {busy ? "Creating…" : "Create live link"}
         </button>
       ) : (
         <div style={{ marginTop: 10 }}>
           <div style={{ display: "flex", gap: 6 }}>
             <input readOnly value={link} onFocus={(e) => e.currentTarget.select()}
-              style={{ flex: 1, background: C.green, color: C.cream, border: `1px solid ${C.greenMid}`, borderRadius: 6, padding: "8px 10px", fontSize: 12 }} />
+              style={{ flex: 1, background: C.green, color: C.cream, border: `1px solid ${C.borderGreen}`, borderRadius: 6, padding: "8px 10px", fontSize: 12 }} />
             <button onClick={copy} style={{ ...btn(true), fontSize: 12, padding: "8px 12px" }}>{copied ? "Copied" : "Copy"}</button>
           </div>
           <button disabled={busy} onClick={() => toggle(false)}
-            style={{ background: "transparent", color: "#E8A199", border: `0.5px solid #7A3A34`, borderRadius: 8, padding: "7px 12px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 12, display: "block", opacity: busy ? 0.6 : 1 }}>
+            style={{ background: "transparent", color: C.overRedDark, border: `0.5px solid #7A3A34`, borderRadius: 8, padding: "7px 12px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 12, display: "block", opacity: busy ? 0.62 : 1 }}>
             {busy ? "…" : "Stop sharing (revoke link)"}
           </button>
         </div>

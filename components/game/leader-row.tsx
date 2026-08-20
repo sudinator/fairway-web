@@ -28,7 +28,7 @@ export function LeaderRow({ p, pos, tied, showTag, showBetStatus, user, isStroke
     const fkey = (p as any).flight as string | null;
     return (
       <div key={p.id} style={{
-        background: p.user_id === user.id ? C.cream : C.card,
+        background: p.user_id === user.id ? C.greenMid : C.greenLight,
         borderRadius: 12, padding: "10px 16px", marginTop: 8,
         display: "flex", alignItems: "center",
       }}>
@@ -37,11 +37,11 @@ export function LeaderRow({ p, pos, tied, showTag, showBetStatus, user, isStroke
         </div>
         <Avatar src={p.avatar_url} name={p.display_name} size={32} />
         <div style={{ flex: 1, minWidth: 0, marginLeft: 8 }}>
-          <div style={{ color: C.ink, fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <div style={{ color: C.cream, fontWeight: 700, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {leaderName(p.display_name)}{p.user_id === user.id ? " (you)" : ""}
-            {showTag && fkey ? <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, borderRadius: 5, padding: "1px 6px", background: flightTagColor(fkey), color: "#06251A" }}>{fkey}</span> : null}
+            {showTag && fkey ? <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 800, borderRadius: 6, padding: "1px 6px", background: flightTagColor(fkey), color: "#06251A" }}>{fkey}</span> : null}
           </div>
-          <div style={{ color: C.faint, fontSize: 11 }}>
+          <div style={{ color: C.sage, fontSize: 11 }}>
             {p.course_handicap != null ? `CH ${p.course_handicap}` : "no hcp"}
             {showBetStatus && p.bets === false ? <span style={{ color: C.gold, fontWeight: 800 }}> · no bet</span> : ""}
           </div>
@@ -49,23 +49,24 @@ export function LeaderRow({ p, pos, tied, showTag, showBetStatus, user, isStroke
         {isStroke ? (() => {
           const relV = (strokeNet ? playerNet(p) : playerGross(p)) - parThru(p);
           const relS = !thru ? "–" : relV === 0 ? "E" : relV > 0 ? `+${relV}` : `${relV}`;
-          const relCol = !thru ? C.faint : relV < 0 ? "#1F8F54" : relV > 0 ? C.birdie : "#6B6857";
+          // Row is green since 177.62 — the cream-surface set measured 1.33-2.27:1 here.
+          const relCol = !thru ? C.sage : relV < 0 ? C.underDark : relV > 0 ? C.overRedDark : C.sage;
           return (<>
-            <div style={{ width: 40, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru || "–"}</div>
-            <div style={{ width: 48, textAlign: "center", color: C.ink, fontWeight: strokeNet ? 700 : 800, fontSize: strokeNet ? 15 : 18, fontFamily: strokeNet ? undefined : "Georgia, serif" }}>{thru ? playerGross(p) : "–"}</div>
+            <div style={{ width: 40, textAlign: "center", color: C.cream, fontWeight: 700, fontSize: 15 }}>{thru || "–"}</div>
+            <div style={{ width: 48, textAlign: "center", color: C.cream, fontWeight: strokeNet ? 700 : 800, fontSize: strokeNet ? 15 : 18, fontFamily: strokeNet ? undefined : "Georgia, serif" }}>{thru ? playerGross(p) : "–"}</div>
             <div style={{ width: 48, textAlign: "center", color: relCol, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{relS}</div>
-            <div style={{ width: 50, textAlign: "center", color: strokeNet ? C.green : C.ink, fontWeight: strokeNet ? 800 : 700, fontSize: strokeNet ? 19 : 15, fontFamily: strokeNet ? "Georgia, serif" : undefined }}>{thru ? playerNet(p) : "–"}</div>
+            <div style={{ width: 50, textAlign: "center", color: strokeNet ? C.gold : C.cream, fontWeight: strokeNet ? 800 : 700, fontSize: strokeNet ? 19 : 15, fontFamily: strokeNet ? "Georgia, serif" : undefined }}>{thru ? playerNet(p) : "–"}</div>
           </>);
         })() : (<>
-          <div style={{ width: 44, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru || "–"}</div>
-          <div style={{ width: 48, textAlign: "center", color: C.ink, fontWeight: 700, fontSize: 15 }}>{thru ? playerGross(p) : "–"}</div>
+          <div style={{ width: 44, textAlign: "center", color: C.cream, fontWeight: 700, fontSize: 15 }}>{thru || "–"}</div>
+          <div style={{ width: 48, textAlign: "center", color: C.cream, fontWeight: 700, fontSize: 15 }}>{thru ? playerGross(p) : "–"}</div>
           {(() => {
-            if (!thru) return <div style={{ width: 44, textAlign: "center", color: C.faint, fontWeight: 700, fontSize: 16, fontFamily: "Georgia, serif" }}>–</div>;
+            if (!thru) return <div style={{ width: 44, textAlign: "center", color: C.sage, fontWeight: 700, fontSize: 16, fontFamily: "Georgia, serif" }}>–</div>;
             const rel = 2 * thru - pts;
-            const col = rel < 0 ? "#1F8F54" : rel > 0 ? C.birdie : "#6B6857";
+            const col = rel < 0 ? C.underDark : rel > 0 ? C.overRedDark : C.sage;
             return <div style={{ width: 44, textAlign: "center", color: col, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>{relToParStr(p)}</div>;
           })()}
-          <div style={{ width: 40, textAlign: "center", color: C.green, fontWeight: 800, fontSize: 19, fontFamily: "Georgia, serif" }}>{pts}</div>
+          <div style={{ width: 40, textAlign: "center", color: C.cream, fontWeight: 800, fontSize: 19, fontFamily: "Georgia, serif" }}>{pts}</div>
         </>)}
       </div>
     );

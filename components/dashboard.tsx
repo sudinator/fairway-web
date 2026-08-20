@@ -41,9 +41,9 @@ function ChartTip({ active, payload, nameMap, fmt }: any) {
   const label = p0.course ? `${p0.course}${p0.name ? " · " + p0.name : ""}` : "";
   const rows = payload.filter((e: any) => e.value != null);
   return (
-    <div style={{ position: "relative", background: C.green, border: `1px solid ${C.gold}`, borderRadius: 10, padding: "9px 12px", paddingRight: 30, boxShadow: "0 8px 22px -10px rgba(0,0,0,0.7)", minWidth: 132 }}>
+    <div style={{ position: "relative", background: C.green, border: `1px solid ${C.gold}`, borderRadius: 10, padding: "9px 12px", paddingRight: 30, minWidth: 132 }}>
       <button aria-label="Close" onClick={(e) => { e.stopPropagation(); if (typeof window !== "undefined") window.dispatchEvent(new Event("bnn-chart-dismiss")); }}
-        style={{ position: "absolute", top: 3, right: 3, width: 22, height: 22, borderRadius: 11, background: C.greenMid, border: "none", color: C.cream, fontSize: 14, fontWeight: 800, lineHeight: 1, cursor: "pointer", padding: 0 }}>×</button>
+        style={{ position: "absolute", top: 3, right: 3, width: 22, height: 22, borderRadius: 12, background: C.greenMid, border: "none", color: C.cream, fontSize: 14, fontWeight: 800, lineHeight: 1, cursor: "pointer", padding: 0 }}>×</button>
       {label && <div style={{ color: C.gold, fontWeight: 700, fontSize: 11.5, marginBottom: 6 }}>{label}</div>}
       {rows.map((e: any, i: number) => (
         <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "baseline" }}>
@@ -247,7 +247,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
     </div>
   );
   const expandBtn = (open: boolean, onClick: () => void) => (
-    <button onClick={onClick} style={{ background: open ? "transparent" : "rgba(201,162,39,0.12)", border: `1px solid ${C.gold}`, color: C.gold, fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "3px 10px", borderRadius: 999, whiteSpace: "nowrap", letterSpacing: 0.3 }}>{open ? "− Less" : "＋ More"}</button>
+    <button onClick={onClick} style={{ background: open ? "transparent" : "rgba(201,162,39,0.12)", border: `1px solid ${C.gold}`, color: C.gold, fontSize: 11, fontWeight: 700, cursor: "pointer", padding: "9px 10px", borderRadius: 999, whiteSpace: "nowrap", letterSpacing: 0.3 }}>{open ? "− Less" : "＋ More"}</button>
   );
   const dirLower = new Set<StatKey>(["rounds", "avgpar", "best", "diff", "par3", "par4", "par5", "putts", "threeputt", "pen"]);
   const perRoundNum = (key: StatKey, r: Round): number | null => {
@@ -316,7 +316,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
         )}
         {hcp.index != null && hcp.recentDetail.length > 0 && showDiffs && (
           <div style={{ marginTop: 8 }}>
-            <div style={{ color: C.faint, fontSize: 11, marginBottom: 4 }}>Newest round first.</div>
+            <div style={{ color: C.sage, fontSize: 11, marginBottom: 4 }}>Newest round first.</div>
             <div style={{ color: C.cream, fontSize: 12, lineHeight: 1.9 }}>
               {hcp.recentDetail.map((x, i) => (
                 <span key={i}>
@@ -346,7 +346,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
           <div style={{ display: "flex", gap: 5 }}>
             {(([["5", "Last 5"], ["20", "Last 20"], ["season", "Season"], ["all", "All"]] as [typeof win, string][]).map(([k, label]) => (
               <button key={k} onClick={() => setWin(k)} style={{
-                flex: 1, textAlign: "center", fontSize: 11, borderRadius: 7, padding: "7px 0", border: "none", cursor: "pointer",
+                flex: 1, textAlign: "center", fontSize: 11, borderRadius: 6, padding: "7px 0", border: "none", cursor: "pointer",
                 background: win === k ? C.gold : C.greenLight, color: win === k ? C.green : C.sage, fontWeight: win === k ? 700 : 400,
               }}>{label}</button>
             )))}
@@ -402,9 +402,9 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
           </DismissableChart>
           <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
             {diffTrend.length > 30 ? (
-              <>Each dot is one round’s differential (course-adjusted, lower is better); the line is your 5-round rolling average — <span style={{ color: "#9be9c0" }}>green</span> when it’s under your average{diffFormAvg != null ? ` (${diffFormAvg.toFixed(1)})` : ""}, <span style={{ color: "#f3a3a0" }}>red</span> when over.{unratedTrend > 0 ? ` ${unratedTrend} round${unratedTrend === 1 ? "" : "s"} not shown (need 18 holes + rating/slope).` : ""}</>
+              <>Each dot is one round’s differential (course-adjusted, lower is better); the line is your 5-round rolling average — <span style={{ color: "#9be9c0" }}>green</span> when it’s under your average{diffFormAvg != null ? ` (${diffFormAvg.toFixed(1)})` : ""}, <span style={{ color: C.overRedDark }}>red</span> when over.{unratedTrend > 0 ? ` ${unratedTrend} round${unratedTrend === 1 ? "" : "s"} not shown (need 18 holes + rating/slope).` : ""}</>
             ) : (
-              <>Each bar is one round’s differential (course-adjusted, lower is better). <span style={{ color: "#9be9c0" }}>Green</span> beat your average{diffFormAvg != null ? ` (${diffFormAvg.toFixed(1)})` : ""}, <span style={{ color: "#f3a3a0" }}>red</span> didn’t. The cream line is your 5-round rolling average.{unratedTrend > 0 ? ` ${unratedTrend} round${unratedTrend === 1 ? "" : "s"} not shown (need 18 holes + rating/slope).` : ""}</>
+              <>Each bar is one round’s differential (course-adjusted, lower is better). <span style={{ color: "#9be9c0" }}>Green</span> beat your average{diffFormAvg != null ? ` (${diffFormAvg.toFixed(1)})` : ""}, <span style={{ color: C.overRedDark }}>red</span> didn’t. The cream line is your 5-round rolling average.{unratedTrend > 0 ? ` ${unratedTrend} round${unratedTrend === 1 ? "" : "s"} not shown (need 18 holes + rating/slope).` : ""}</>
             )}
           </div>
         </div>
@@ -469,7 +469,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
           <div style={{ display: "flex", alignItems: "center" }}>
             <Eyebrow>{detailLabels[detail]} · TREND</Eyebrow>
             <div style={{ flex: 1 }} />
-            <button aria-label="Close" onClick={() => setDetail(null)} style={{ background: C.greenMid, border: "none", color: C.cream, width: 30, height: 30, borderRadius: 15, fontSize: 17, fontWeight: 800, lineHeight: 1, cursor: "pointer", flexShrink: 0 }}>×</button>
+            <button aria-label="Close" onClick={() => setDetail(null)} style={{ background: C.greenMid, border: "none", color: C.cream, width: 30, height: 30, borderRadius: 14, fontSize: 17, fontWeight: 800, lineHeight: 1, cursor: "pointer", flexShrink: 0 }}>×</button>
           </div>
           {(() => {
             const key = detail as StatKey;
@@ -512,9 +512,9 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
                 </DismissableChart>
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 4, lineHeight: 1.45 }}>
                   {dense ? (
-                    <>Each dot is one round ({dirLower.has(key) ? "lower is better" : "higher is better"}); the line is your 5-round rolling average — <span style={{ color: "#9be9c0" }}>green</span> when it beats your average ({pctStat ? Math.round(seriesAvg) + "%" : seriesAvg.toFixed(1)}), <span style={{ color: "#f3a3a0" }}>red</span> when it doesn’t.</>
+                    <>Each dot is one round ({dirLower.has(key) ? "lower is better" : "higher is better"}); the line is your 5-round rolling average — <span style={{ color: "#9be9c0" }}>green</span> when it beats your average ({pctStat ? Math.round(seriesAvg) + "%" : seriesAvg.toFixed(1)}), <span style={{ color: C.overRedDark }}>red</span> when it doesn’t.</>
                   ) : (
-                    <>Each bar is one round ({dirLower.has(key) ? "lower is better" : "higher is better"}). <span style={{ color: "#4ADE80" }}>Green</span> beat your average ({pctStat ? Math.round(seriesAvg) + "%" : seriesAvg.toFixed(1)}), <span style={{ color: "#FB7185" }}>red</span> didn’t. The cream line is your 5-round rolling average{series.length >= 10 ? <>; <span style={{ color: C.gold }}>gold</span> is the 10-round.</> : series.length >= 5 ? "; the 10-round line joins at 10 rounds." : "; the rolling line needs 5 rounds."}</>
+                    <>Each bar is one round ({dirLower.has(key) ? "lower is better" : "higher is better"}). <span style={{ color: "#4ADE80" }}>Green</span> beat your average ({pctStat ? Math.round(seriesAvg) + "%" : seriesAvg.toFixed(1)}), <span style={{ color: C.overRedDark }}>red</span> didn’t. The cream line is your 5-round rolling average{series.length >= 10 ? <>; <span style={{ color: C.gold }}>gold</span> is the 10-round.</> : series.length >= 5 ? "; the 10-round line joins at 10 rounds." : "; the rolling line needs 5 rounds."}</>
                   )}
                 </div>
               </>
@@ -531,12 +531,12 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
             <Eyebrow>HOLE OUTCOMES</Eyebrow>
             <span style={{ color: C.sage, fontSize: 11 }}>{distTotal} holes · {done.length} round{done.length === 1 ? "" : "s"}</span>
           </div>
-          <div style={{ display: "flex", height: 26, borderRadius: 7, overflow: "hidden", marginTop: 12 }}>
+          <div style={{ display: "flex", height: 26, borderRadius: 6, overflow: "hidden", marginTop: 12 }}>
             {distData.filter((d) => d.v > 0).map((d, i) => {
               const p = distTotal ? (100 * d.v) / distTotal : 0;
               return (
                 <div key={i} title={`${d.name}: ${d.v} (${Math.round(p)}%)`}
-                  style={{ width: `${p}%`, background: d.c, display: "flex", alignItems: "center", justifyContent: "center", color: "#0E3B2E", fontSize: 11, fontWeight: 800 }}>
+                  style={{ width: `${p}%`, background: d.c, display: "flex", alignItems: "center", justifyContent: "center", color: C.green, fontSize: 11, fontWeight: 800 }}>
                   {p >= 8 ? `${Math.round(p)}%` : ""}
                 </div>
               );
@@ -545,7 +545,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
           <div style={{ display: "flex", flexWrap: "wrap", gap: "9px 14px", marginTop: 11 }}>
             {distData.map((d, i) => (
               <span key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: C.cream }}>
-                <span style={{ width: 11, height: 11, borderRadius: 3, background: d.c, display: "inline-block" }} />
+                <span style={{ width: 11, height: 11, borderRadius: 6, background: d.c, display: "inline-block" }} />
                 {d.name} <b style={{ fontWeight: 800 }}>{d.v}</b> <span style={{ color: C.sage }}>{distTotal ? Math.round(100 * d.v / distTotal) : 0}%</span>
               </span>
             ))}
@@ -553,7 +553,7 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
           <div style={{ color: C.cream, fontSize: 12, marginTop: 12 }}>
             Par or better: <b style={{ color: "#7FE3A3" }}>{distTotal ? Math.round(100 * (buckets.eagle + buckets.birdie + buckets.par) / distTotal) : 0}%</b>
             <span style={{ color: C.sage }}> · </span>
-            Doubles+: <b style={{ color: "#FB7185" }}>{distTotal ? Math.round(100 * buckets.double / distTotal) : 0}%</b>
+            Doubles+: <b style={{ color: C.overRedDark }}>{distTotal ? Math.round(100 * buckets.double / distTotal) : 0}%</b>
           </div>
         </div>
       )}
@@ -639,7 +639,7 @@ function DashboardCoach({ aggregate, roundsUsed, userEmail, userId, saved, onSav
 
       {open && data && (
         <>
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 8 }}>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 8 }}>
             Generated {fmt(data.date)} · based on {data.rounds} round{data.rounds === 1 ? "" : "s"}
           </div>
           <div style={{ color: C.cream, fontSize: 14, marginTop: 8, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{data.text}</div>
@@ -647,7 +647,7 @@ function DashboardCoach({ aggregate, roundsUsed, userEmail, userId, saved, onSav
       )}
 
       {state === "loading" && <div style={{ color: C.gold, fontSize: 13, marginTop: 10 }}>Reviewing your game…</div>}
-      {state === "error" && <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{err}</div>}
+      {state === "error" && <div style={{ color: C.overRedDark, fontSize: 13, marginTop: 10 }}>{err}</div>}
 
       <div style={{ marginTop: 10 }}>
         {state !== "loading" && (

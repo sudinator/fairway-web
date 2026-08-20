@@ -30,6 +30,13 @@ body {
   overscroll-behavior: none;
   background: #0E3B2E;
   font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Base body weight. 1,098 pieces of text declare a fontSize and no fontWeight, so they
+     inherited the browser default of 400. On a dark background light strokes optically thin
+     out, which made 11-12px secondary text harder to read. Scale: 500 body / 700 emphasis /
+     800 title. 800 is kept because the app uses it 457 times and it is what makes a title
+     hold against the green. Avoid intermediate weights like 650 — they only interpolate on
+     a variable font and snap unpredictably against a static face. */
+  font-weight: 500;
 }
 
 .app-shell {
@@ -45,4 +52,27 @@ body {
 @media (display-mode: standalone) {
   /* Installed app: iOS gives a stable full-glass viewport. */
   .app-shell { height: 100lvh; }
+}
+
+/* Native controls are drawn by iOS, not by this stylesheet. Without color-scheme the
+   OS picks light or dark from the USER'S phone setting, so the same screen rendered
+   differently for different people. The app's fields are cream, so light is correct —
+   the point is that it is now declared rather than inherited.
+   accent-color tints checkboxes, radios and range thumbs; it was previously set at
+   exactly one of two checkboxes, leaving the other iOS system blue. */
+:root {
+  color-scheme: light;
+  accent-color: #C9A227;
+}
+
+/* Focus ring. Nothing in the app removed the browser default, so keyboard and Switch
+   Control users were never stranded — but the default is system blue at 2.01:1 on a
+   green card, and which blue depends on the browser. Two tones because no single colour
+   clears 3:1 on every surface: cream is 7.29:1 on green but only 2.18:1 on a gold
+   button, where the dark inner edge takes over at 6.75:1.
+   :focus-visible so pointer and touch users see nothing. */
+:focus-visible {
+  outline: 2px solid #F7F3E8;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px #0E241B;
 }

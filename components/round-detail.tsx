@@ -58,7 +58,7 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
           onClick={() => setShowShare(true)}>📤 Share</button>}
         <button style={{ ...btn(false), fontSize: 12.5, padding: "8px 8px", whiteSpace: "nowrap", flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
           onClick={onEdit}>Edit round</button>
-        <button style={{ ...btn(false), background: "#7A2F28", fontSize: 12.5, padding: "8px 8px", whiteSpace: "nowrap", flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
+        <button style={{ ...btn(false), background: C.danger, fontSize: 12.5, padding: "8px 8px", whiteSpace: "nowrap", flex: "1 1 auto", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
           onClick={() => { if (confirm("Delete this round? This can't be undone.")) onDelete(); }}>Delete</button>
       </div>
 
@@ -67,7 +67,7 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
 
       {roundDifferential(round) != null && (
         <button onClick={() => setShowDiff(true)}
-          style={{ marginTop: 12, background: C.greenLight, border: `1px solid ${C.greenMid}`, borderRadius: 10, padding: "9px 13px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", width: "100%", textAlign: "left" }}>
+          style={{ marginTop: 12, background: C.greenLight, border: `1px solid ${C.borderGreen}`, borderRadius: 10, padding: "9px 13px", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", width: "100%", textAlign: "left" }}>
           <span style={{ color: C.sage, fontSize: 12.5 }}>Differential</span>
           <span style={{ color: C.cream, fontWeight: 800, fontFamily: "Georgia, serif", fontSize: 16 }}>{roundDifferential(round)!.toFixed(1)}</span>
           {round.rating != null && round.slope != null && <span style={{ color: C.sage, fontSize: 12 }}>· {round.rating}/{round.slope}</span>}
@@ -87,7 +87,7 @@ export function RoundDetail({ round, ghinNumber, playerName, priorRounds, userEm
                 <div style={{ position: "relative", width: 46, height: 46, margin: "0 auto" }}>
                   <div style={{ width: 46, height: 46, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, background: "radial-gradient(circle at 50% 32%, #20624a, #0e3a2c)", border: `2px solid ${ROUND_TIER_COLOR[def.tier]}`, boxShadow: def.tier !== "common" ? `0 0 12px -4px ${ROUND_TIER_COLOR[def.tier]}` : "none" }}>{def.icon}</div>
                   {a.kind === "count" && (a.value ?? 1) > 1 && (
-                    <div style={{ position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, padding: "0 4px", borderRadius: 9, background: C.gold, color: "#1B140A", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,.4)" }}>×{a.value}</div>
+                    <div style={{ position: "absolute", top: -4, right: -4, minWidth: 18, height: 18, padding: "0 4px", borderRadius: 8, background: C.gold, color: "#1B140A", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 4px rgba(0,0,0,.4)" }}>×{a.value}</div>
                   )}
                 </div>
                 <div style={{ fontSize: 11, color: C.cream, marginTop: 5, lineHeight: 1.2, fontWeight: 700 }}>{def.label}</div>
@@ -193,7 +193,7 @@ function StatsReminder({ round, onEdit }: { round: Round; onEdit: () => void }) 
           {noFw.length > 0 && <li>Fairways not recorded on {noFw.length === 1 ? "hole" : "holes"} {list(noFw)} (par 3s don&apos;t count)</li>}
         </ul>
       </div>
-      <div style={{ color: C.faint, fontSize: 12, marginTop: 8, lineHeight: 1.45 }}>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.45 }}>
         If someone else kept the group&apos;s card, your score is here but your own putts and fairways won&apos;t be &mdash; add them on your own round.
       </div>
       <button style={{ ...btn(true), marginTop: 12 }} onClick={onEdit}>Add the missing stats</button>
@@ -233,10 +233,10 @@ function GhinPanel({ round, ghinNumber, playerName }: { round: Round; ghinNumber
   ].filter(Boolean).join("\n");
 
   const field = (label: string, value: string, key: string) => (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: `1px solid ${C.line}` }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: `1px solid ${C.borderCard}` }}>
       <div style={{ color: "#5A6B62", fontSize: 13, width: 120 }}>{label}</div>
       <div style={{ color: "#16201C", fontSize: 15, fontWeight: 800, flex: 1 }}>{value}</div>
-      <button style={{ ...btn(false), fontSize: 11, padding: "4px 10px" }} onClick={() => copy(key, value)}>{copied === key ? "✓ Copied" : "Copy"}</button>
+      <button style={{ ...btn(false), fontSize: 11, padding: "9px 10px" }} onClick={() => copy(key, value)}>{copied === key ? "✓ Copied" : "Copy"}</button>
     </div>
   );
 
@@ -282,7 +282,7 @@ function GhinPanel({ round, ghinNumber, playerName }: { round: Round; ghinNumber
           <HScroll>
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${holeRows.length}, 1fr)`, gap: 4, minWidth: holeRows.length * 34 }}>
               {holeRows.map((r) => <div key={r.n} style={{ color: C.cream, opacity: 0.8, fontSize: 11, textAlign: "center", fontWeight: 700 }}>{r.n}</div>)}
-              {holeRows.map((r) => <div key={r.n} style={{ color: "#16201C", background: C.cream, fontSize: 17, fontWeight: 800, textAlign: "center", borderRadius: 5, padding: "6px 0" }}>{r.gross}</div>)}
+              {holeRows.map((r) => <div key={r.n} style={{ color: "#16201C", background: C.cream, fontSize: 17, fontWeight: 800, textAlign: "center", borderRadius: 6, padding: "6px 0" }}>{r.gross}</div>)}
             </div>
           </HScroll>
           <div style={{ color: C.cream, fontSize: 11, marginTop: 6, opacity: 0.85 }}>
@@ -347,7 +347,7 @@ function RoundStats({ round }: { round: Round }) {
     <div style={{ flex: "1 1 80px", background: C.greenLight, borderRadius: 10, padding: "10px 12px", minWidth: 80 }}>
       <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: size, fontWeight: 800 }}>{value}</div>
       <div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>{label}</div>
-      {hint ? <div style={{ color: C.faint, fontSize: 11, marginTop: 1 }}>{hint}</div> : null}
+      {hint ? <div style={{ color: C.sage, fontSize: 11, marginTop: 1 }}>{hint}</div> : null}
     </div>
   );
   return (
@@ -381,7 +381,7 @@ function RoundStats({ round }: { round: Round }) {
                 {sumRow("Stableford", cellVal(outN.played, outN.pts), cellVal(inN.played, inN.pts), cellVal(totN.played, totN.pts), C.gold, true)}
               </tbody>
             </table>
-            <div style={{ color: C.faint, fontSize: 11, marginTop: 10, lineHeight: 1.4 }}>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 10, lineHeight: 1.4 }}>
               Differential uses adjusted gross (net double bogey cap) × 113 / slope{round.rating == null || round.slope == null ? " — needs rating + slope" : ""}. Net and Stableford use your full course handicap{round.course_handicap != null ? ` (${round.course_handicap})` : ""}, allocated by stroke index.
             </div>
           </div>
@@ -500,12 +500,12 @@ function AiAnalysis({ round, priorRounds, userEmail, onRoundUpdated }: { round: 
         <div style={{ color: C.gold, fontSize: 13, marginTop: 10 }}>Analyzing your round…</div>
       )}
       {state === "error" && (
-        <div style={{ color: "#E8A199", fontSize: 13, marginTop: 10 }}>{err}</div>
+        <div style={{ color: C.overRedDark, fontSize: 13, marginTop: 10 }}>{err}</div>
       )}
       {state === "done" && (
         <>
           <div style={{ color: C.cream, fontSize: 14, marginTop: 10, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>{text}</div>
-          <div style={{ color: C.faint, fontSize: 11, marginTop: 10 }}>AI-generated from your round stats{unlimited ? "" : ` · ${left} analyses left today`}</div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>AI-generated from your round stats{unlimited ? "" : ` · ${left} analyses left today`}</div>
         </>
       )}
     </div>

@@ -209,7 +209,7 @@ export function GameList({
               onKeyDown={(e) => e.key === "Enter" && join()}
             />
             <button
-              style={{ ...btn(false), whiteSpace: "nowrap", opacity: code.trim() ? 1 : 0.5 }}
+              style={{ ...btn(false), whiteSpace: "nowrap", opacity: code.trim() ? 1 : 0.62 }}
               disabled={!code.trim() || joining}
               onClick={join}
             >
@@ -217,7 +217,7 @@ export function GameList({
             </button>
           </div>
           {joinErr && (
-            <div style={{ color: "#E8A199", fontSize: 13, marginTop: 8 }}>
+            <div style={{ color: C.overRedDark, fontSize: 13, marginTop: 8 }}>
               {joinErr}
             </div>
           )}
@@ -250,19 +250,19 @@ export function GameList({
           key={g.id}
           onClick={() => onOpen(g.id)}
           style={{
-            background: C.card,
+            background: C.greenLight,
             borderRadius: 12,
             padding: "14px 16px",
             marginTop: 10,
             cursor: "pointer",
           }}
         >
-          <div style={{ color: C.ink, fontWeight: 700, fontSize: 15 }}>
+          <div style={{ color: C.cream, fontWeight: 700, fontSize: 15 }}>
             {g.name}
-            {g.status === "ended" ? <span style={{ color: "#1A1A1A", background: C.gold, borderRadius: 20, padding: "2px 8px", fontSize: 11, fontWeight: 800, marginLeft: 8 }}>FINAL</span> : null}
+            {g.status === "ended" ? <span style={{ color: C.cream, background: C.gold, borderRadius: 14, padding: "2px 8px", fontSize: 11, fontWeight: 800, marginLeft: 8 }}>FINAL</span> : null}
           </div>
-          <div style={{ color: C.faint, fontSize: 12, marginTop: 2 }}>
-            {g.course} · code <b style={{ color: C.green }}>{g.code}</b>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
+            {g.course} · code <b style={{ color: C.cream }}>{g.code}</b>
           </div>
         </div>
       ))}

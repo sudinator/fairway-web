@@ -18,10 +18,10 @@ export function Login() {
     <div style={{ maxWidth: 420, margin: "80px auto", padding: 24, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "center" }}><Wordmark width={300} /></div>
       <div style={{ color: C.sage, fontSize: 15, marginTop: 16 }}>Track your scores, handicap & stats.</div>
-      <div style={{ background: C.greenLight, borderRadius: 16, padding: 28, marginTop: 30 }}>
+      <div style={{ background: C.greenLight, borderRadius: 14, padding: 28, marginTop: 30 }}>
         <button onClick={signIn}
           style={{ ...btn(true), width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "14px" }}>
-          <span style={{ background: "#fff", borderRadius: 4, width: 22, height: 22, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#4285F4", fontWeight: 900 }}>G</span>
+          <span style={{ background: "#fff", borderRadius: 6, width: 22, height: 22, display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#4285F4", fontWeight: 800 }}>G</span>
           Continue with Google
         </button>
         <div style={{ color: C.sage, fontSize: 12, marginTop: 16, lineHeight: 1.5 }}>

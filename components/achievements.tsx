@@ -35,7 +35,8 @@ const fmtDate = (d?: string | null) => {
 
 function HoleChip({ h }: { h: Hole }) {
   const tp = h.strokes != null ? h.strokes - h.par : null;
-  const col = tp == null ? C.faint : tp < 0 ? C.birdie : tp > 0 ? C.bogey : C.ink;
+  // Panel is C.greenLight — C.bogey measured 1.26:1 here, the worst in the app.
+  const col = tp == null ? C.sage : tp < 0 ? C.underDark : tp > 0 ? C.overDark : C.cream;
   return (
     <div style={{ textAlign: "center", minWidth: 26 }}>
       <div style={{ fontSize: 11, color: C.faint }}>{h.hole_number}</div>
@@ -97,13 +98,13 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
         if (!next) return null;
         const pct = Math.min(100, Math.round((100 * rp) / next));
         return (
-          <div style={{ background: "#0e3a2c", border: `1px solid ${C.greenMid}`, borderRadius: 12, padding: "11px 13px", marginBottom: 6 }}>
+          <div style={{ background: "#0e3a2c", border: `1px solid ${C.borderGreen}`, borderRadius: 12, padding: "11px 13px", marginBottom: 6 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 7 }}>
               <div style={{ color: C.sage, fontSize: 11.5 }}>Next up · <b style={{ color: C.cream, fontWeight: 800 }}>{next} rounds played</b></div>
               <div style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>{rp} / {next}</div>
             </div>
-            <div style={{ height: 7, borderRadius: 4, background: "rgba(0,0,0,.28)", overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${C.gold}, #E7C860)`, borderRadius: 4 }} />
+            <div style={{ height: 7, borderRadius: 6, background: "rgba(0,0,0,.28)", overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${pct}%`, background: `linear-gradient(90deg, ${C.gold}, #E7C860)`, borderRadius: 6 }} />
             </div>
           </div>
         );
@@ -131,13 +132,13 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
                       width: 48, height: 48, margin: "0 auto", borderRadius: "50%",
                       display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
                       background: on ? "radial-gradient(circle at 50% 32%, #20624a, #0e3a2c)" : "#20463a",
-                      border: `2px solid ${on ? tc : C.greenMid}`,
+                      border: `2px solid ${on ? tc : C.borderGreen}`,
                       boxShadow: isOpen ? `0 0 0 3px ${tc}66` : on && b.tier !== "common" ? `0 0 12px -4px ${tc}` : "none",
                       filter: on ? "none" : "grayscale(1)", position: "relative",
                     }}>
                       <span>{on ? b.icon : "🔒"}</span>
                       {showCount && (
-                        <span style={{ position: "absolute", right: -4, top: -4, minWidth: 18, height: 18, padding: "0 4px", borderRadius: 9, background: C.gold, color: "#1c1c15", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #10402f" }}>{"×"}{e!.count}</span>
+                        <span style={{ position: "absolute", right: -4, top: -4, minWidth: 18, height: 18, padding: "0 4px", borderRadius: 8, background: C.gold, color: "#1c1c15", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #10402f" }}>{"×"}{e!.count}</span>
                       )}
                     </div>
                     <div style={{ fontSize: 11, color: C.cream, marginTop: 6, lineHeight: 1.2, fontWeight: on ? 700 : 500 }}>{b.label}</div>
@@ -154,14 +155,14 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
               const evHoles = ev?.holes && rnd ? rnd.holes.filter((h) => ev.holes!.includes(h.hole_number)).sort((a, b) => a.hole_number - b.hole_number) : [];
               const repeat = openDefInCat.kind === "count" && (e.count || 0) > 1;
               return (
-                <div style={{ marginTop: 12, background: "#0e3a2c", border: `1px solid ${C.greenMid}`, borderRadius: 12, padding: "12px 14px" }}>
+                <div style={{ marginTop: 12, background: "#0e3a2c", border: `1px solid ${C.borderGreen}`, borderRadius: 12, padding: "12px 14px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
                     <div style={{ color: C.cream, fontSize: 13.5, fontWeight: 800 }}>{openDefInCat.icon} {openDefInCat.label}</div>
                     <button onClick={() => setOpen(null)} style={{ background: "transparent", border: "none", color: C.sage, fontSize: 16, cursor: "pointer", lineHeight: 1 }}>{"×"}</button>
                   </div>
                   <div style={{ color: C.sage, fontSize: 11.5, marginTop: 3, lineHeight: 1.5 }}>{openDefInCat.desc}</div>
 
-                  {ev && <div style={{ color: C.cream, fontSize: 12.5, marginTop: 9, fontWeight: 600 }}>{ev.text}</div>}
+                  {ev && <div style={{ color: C.cream, fontSize: 12.5, marginTop: 9, fontWeight: 500 }}>{ev.text}</div>}
 
                   {evHoles.length > 0 && (
                     <div style={{ display: "flex", gap: 8, marginTop: 9, overflowX: "auto", paddingBottom: 2 }}>
@@ -175,7 +176,7 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
                       {repeat ? ` · earned ${e.count}×` : ""}
                     </div>
                   )}
-                  {!rnd && <div style={{ color: C.faint, fontSize: 11, marginTop: 10 }}>Earned {fmtDate(e.first_earned_at)}.</div>}
+                  {!rnd && <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>Earned {fmtDate(e.first_earned_at)}.</div>}
                 </div>
               );
             })()}
@@ -208,7 +209,7 @@ export function AchievementsTeaser({ userId, onViewAll }: { userId: string; onVi
     .slice(0, 6);
 
   return (
-    <button onClick={onViewAll} style={{ display: "block", width: "100%", textAlign: "left", background: C.greenLight, border: `1px solid ${C.greenMid}`, borderRadius: 14, padding: 14, marginTop: 16, cursor: "pointer" }}>
+    <button onClick={onViewAll} style={{ display: "block", width: "100%", textAlign: "left", background: C.greenLight, border: `1px solid ${C.borderGreen}`, borderRadius: 14, padding: 14, marginTop: 16, cursor: "pointer" }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 }}>
         <div style={{ fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 800, color: C.cream }}>Achievements</div>
         <div style={{ color: C.gold, fontSize: 12, fontWeight: 800 }}>View all →</div>

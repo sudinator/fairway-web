@@ -51,7 +51,7 @@ export function CreateGameWorkspace({
                 background: s.done ? "#5BD08A" : isActive ? C.gold : "transparent",
                 color: s.done ? "#0E241B" : isActive ? "#23303A" : C.sage,
                 border: s.done || isActive ? "none" : "1px solid rgba(255,255,255,.25)",
-                boxShadow: isActive ? "0 0 0 3px rgba(201,162,39,.2)" : "none",
+                boxShadow: isActive ? `0 0 0 3px ${C.gold}` : "none",
               }}>
                 {s.done ? "✓" : i + 1}
               </div>

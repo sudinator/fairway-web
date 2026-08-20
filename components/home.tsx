@@ -124,8 +124,8 @@ function ViewportDiag() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
         <b style={{ fontSize: 12, color: "#C9A227" }}>VIEWPORT DIAG</b>
         <span style={{ display: "flex", gap: 6 }}>
-          <button onClick={measure} style={{ fontSize: 11, background: "#16503D", color: "#fff", border: "none", borderRadius: 6, padding: "3px 8px", fontWeight: 700 }}>Remeasure</button>
-          <button onClick={copy} style={{ fontSize: 11, background: "#C9A227", color: "#0E3B2E", border: "none", borderRadius: 6, padding: "3px 8px", fontWeight: 700 }}>{copied ? "Copied" : "Copy"}</button>
+          <button onClick={measure} style={{ fontSize: 11, background: C.greenMid, color: "#fff", border: "none", borderRadius: 6, padding: "9px 8px", fontWeight: 700 }}>Remeasure</button>
+          <button onClick={copy} style={{ fontSize: 11, background: C.gold, color: "#0E3B2E", border: "none", borderRadius: 6, padding: "9px 8px", fontWeight: 700 }}>{copied ? "Copied" : "Copy"}</button>
         </span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
@@ -680,7 +680,7 @@ export function Home({ session }: { session: any }) {
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <Wordmark width={150} />
         {activeGroup && (
-          <span style={{ background: C.greenLight, color: C.cream, fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 20 }}>
+          <span style={{ background: C.greenLight, color: C.cream, fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 14 }}>
             {activeGroup.name}
           </span>
         )}
@@ -693,7 +693,7 @@ export function Home({ session }: { session: any }) {
           <div style={{ color: C.sage, fontSize: 12 }}>{index != null ? `Handicap ${index}` : "Set your handicap in Profile"}</div>
         </div>
         <NotificationBell user={user} onNavigate={navigateFromNotif} onSeeAll={() => { setTab("notifications"); setReturnTab(null); setStage(null); setViewing(null); }} />
-        {tab !== "money" && <button style={{ ...btn(true), opacity: activeGroup ? 1 : 0.5 }} disabled={!activeGroup} onClick={() => {
+        {tab !== "money" && <button style={{ ...btn(true), opacity: activeGroup ? 1 : 0.62 }} disabled={!activeGroup} onClick={() => {
           if (dbInProgress) {
             if (typeof window !== "undefined") window.alert(`You have an unfinished round at ${dbInProgress.course || "a course"}. Finish it, mark it complete, or discard it before starting a new one.`);
             setStage(null); setViewing(null); setTab("dashboard");
@@ -727,7 +727,7 @@ export function Home({ session }: { session: any }) {
       {/* Unfinished-round nudge: a started round only counts once it's completed, so
           prompt to finish it (partial is fine), mark it complete as-is, or discard it. */}
       {dbInProgress && !(stage && typeof stage === "object" && "round" in stage) && (
-        <div style={{ background: C.greenLight, border: `1px solid ${C.line}`, borderRadius: 12, padding: "12px 14px", marginTop: 12 }}>
+        <div style={{ background: C.greenLight, border: `1px solid ${C.borderCard}`, borderRadius: 12, padding: "12px 14px", marginTop: 12 }}>
           <div style={{ color: C.cream, fontSize: 13, fontWeight: 700 }}>⛳ {inProgressCount > 1 ? `You have ${inProgressCount} unfinished rounds` : "You have an unfinished round"}</div>
           <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
             {dbInProgress.course || "Your round"} · {dbInProgress.holes?.filter((h) => h.strokes != null).length || 0} holes entered. A round only counts once it's completed — finishing a 9- or 15-hole round is fine. {inProgressCount > 1 ? "Showing the most recent; discard all to clear the rest. " : ""}You'll need to resolve this before starting a new round.
@@ -747,7 +747,7 @@ export function Home({ session }: { session: any }) {
         <div style={{ background: "#16302A", border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 14px", marginTop: 12 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             <div style={{ color: C.cream, fontSize: 13, fontWeight: 700, flex: 1 }}>✨ Finish setting up your profile</div>
-            <button onClick={dismissProfNudge} style={{ background: "none", border: "none", color: C.faint, fontSize: 12, cursor: "pointer" }}>Dismiss</button>
+            <button onClick={dismissProfNudge} style={{ background: "none", border: "none", color: C.sage, fontSize: 12, cursor: "pointer" }}>Dismiss</button>
           </div>
           <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 3 }}>
             {[!profile.avatar_url ? "a profile photo" : null, profile.handicap_index == null ? "your handicap index" : null].filter(Boolean).join(" and ")} {(!profile.avatar_url && profile.handicap_index == null) ? "are" : "is"} missing — adding {(!profile.avatar_url && profile.handicap_index == null) ? "them" : "it"} helps your group recognise you and keeps net scoring accurate.
@@ -789,7 +789,7 @@ export function Home({ session }: { session: any }) {
         };
         return (
           <button key={club.id} onClick={goToClub}
-            style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: "#5a2018", border: "1px solid #7a2e22", borderRadius: 12, padding: "11px 14px", marginTop: 14, cursor: "pointer" }}>
+            style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left", background: C.danger, border: "1px solid #7a2e22", borderRadius: 12, padding: "11px 14px", marginTop: 14, cursor: "pointer" }}>
             <span style={{ fontSize: 18 }}>&#9888;&#65039;</span>
             <span style={{ flex: 1, color: "#ffd9d2", fontSize: 13 }}>You owe <b style={{ color: "#fff" }}>{fmtUSD(club.cents)}</b>{multi ? <> in <b style={{ color: "#fff" }}>{club.name}</b></> : " to settle up"}</span>
             <span style={{ background: C.gold, color: "#2a2410", borderRadius: 999, padding: "5px 12px", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" }}>Settle up &#8594;</span>
@@ -801,7 +801,7 @@ export function Home({ session }: { session: any }) {
         {returnTab && !stage && !viewing && (tab === "players" || tab === "groups") && (
           <div style={{ display: "flex", alignItems: "center", position: "relative", padding: "2px 0 12px", marginBottom: 4, borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
             <button onClick={() => { const t = returnTab; setReturnTab(null); setTab(t); }}
-              style={{ display: "flex", alignItems: "center", gap: 3, background: "none", border: "none", color: C.gold, fontSize: 15, fontWeight: 700, cursor: "pointer", padding: "2px 4px" }}>
+              style={{ display: "flex", alignItems: "center", gap: 3, background: "none", border: "none", color: C.gold, fontSize: 15, fontWeight: 700, cursor: "pointer", padding: "7px 4px" }}>
               <span style={{ fontSize: 20, lineHeight: 1, marginTop: -1 }}>‹</span>{tabTitle(returnTab)}
             </button>
             <div style={{ position: "absolute", left: 0, right: 0, textAlign: "center", color: C.cream, fontSize: 14, fontWeight: 800, pointerEvents: "none" }}>{tabTitle(tab)}</div>
@@ -871,7 +871,7 @@ export function Home({ session }: { session: any }) {
       <div style={{ position: "relative", flexShrink: 0, zIndex: 61 }}>
       <nav data-diag="nav" style={{
         flexShrink: 0, zIndex: 50,
-        background: C.green, borderTop: `1px solid ${C.greenMid}`,
+        background: C.green, borderTop: `1px solid ${C.borderGreen}`,
         display: "flex", justifyContent: "space-around", alignItems: "stretch",
         paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)",
       }}>
@@ -963,7 +963,7 @@ function NameGate({ user, onSaved }: { user: any; onSaved: () => void }) {
   return (
     <div style={{ maxWidth: 440, margin: "70px auto", padding: 24, textAlign: "center" }}>
       <div style={{ display: "flex", justifyContent: "center" }}><Wordmark width={240} /></div>
-      <div style={{ background: C.greenLight, borderRadius: 16, padding: 26, marginTop: 26, textAlign: "left" }}>
+      <div style={{ background: C.greenLight, borderRadius: 14, padding: 26, marginTop: 26, textAlign: "left" }}>
         <Eyebrow style={{ marginTop: 0 }}>WELCOME</Eyebrow>
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, marginTop: 8 }}>
           What's your name?
@@ -974,8 +974,8 @@ function NameGate({ user, onSaved }: { user: any; onSaved: () => void }) {
         <input autoFocus style={{ ...inputStyle, marginTop: 16, fontSize: 16 }} placeholder="e.g. Amit Sharma"
           value={name} onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") save(); }} />
-        {err && <div style={{ color: "#E8A199", fontSize: 12, marginTop: 8 }}>{err}</div>}
-        <button style={{ ...btn(true), width: "100%", marginTop: 16, padding: "13px", opacity: saving ? 0.5 : 1 }} disabled={saving} onClick={save}>
+        {err && <div style={{ color: C.overRedDark, fontSize: 12, marginTop: 8 }}>{err}</div>}
+        <button style={{ ...btn(true), width: "100%", marginTop: 16, padding: "13px", opacity: saving ? 0.62 : 1 }} disabled={saving} onClick={save}>
           {saving ? "Saving…" : "Continue"}
         </button>
       </div>
