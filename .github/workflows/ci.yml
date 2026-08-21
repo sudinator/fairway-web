@@ -50,7 +50,15 @@ jobs:
       - name: Rebuild a fresh Supabase database from committed migrations
         run: bash ci/test_fresh_db_rebuild.sh
 
+      # The VAPID public key is NOT a secret — it ships to every browser in public/sw.js.
+      # It is set here so `prebuild` can run its drift check instead of skipping it. Absence
+      # is now a build failure (see scripts/check-vapid-key.mjs), so this must be present.
       - run: npm run ci
+        env:
+          # Falls back to the committed sw.js value when the repository variable is unset,
+          # so a missing variable does not block CI. The authoritative comparison — Vercel's
+          # environment against sw.js — happens in the Vercel build, which also runs prebuild.
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'BPosOVuEyjpY3zfcnhq_LP__z1IEs2_sgNPg9JNYG38_n54R5wpGgRx4cyq-lr5w9_UIdMC0Fn2bIocDJj9H0fc' }}
 
       - name: Real staging integration gate
         if: github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'staging'
