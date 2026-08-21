@@ -8,6 +8,7 @@ import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr
 import capabilities from "@/lib/capabilities.json";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LabelList } from "recharts";
 import { write, writeAll } from "@/lib/db-write";
+import { failureMessage } from "@/lib/errors";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { diagEnabled, setDiagEnabled, reproduceBug, setReproduceBug, getDiagLog, clearDiagLog } from "@/lib/debuglog";
@@ -373,7 +374,7 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
       handicap_index: idx,
     }).eq("id", user.id);
     setSaving(false);
-    if (error) { setMsg("Couldn't save: " + error.message); return; }
+    if (error) { setMsg(failureMessage("Couldn't save", error)); return; }
     setMsg("Saved ✓");
     onSaved();
   };
@@ -476,7 +477,7 @@ function StatDrawerHost() {
     _openDrill = (p) => {
       setPayload(p); setOpen(true); setRows(null); setErr(null);
       supabase.rpc("admin_stat_users", { p_stat: p.stat, p_arg: p.arg ?? null, p_date: p.date ?? null })
-        .then(({ data, error }: any) => { if (error) setErr(error.message); else setRows(data || []); });
+        .then(({ data, error }: any) => { if (error) setErr(failureMessage("Couldn't stat drawer host", error)); else setRows(data || []); });
     };
     return () => { _openDrill = null; };
   }, []);
@@ -526,7 +527,7 @@ function AdminEngagement() {
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     supabase.rpc("get_admin_engagement").then(({ data, error }: any) => {
-      if (error) setErr(error.message); else setE(data);
+      if (error) setErr(failureMessage("Couldn't load the contest", error)); else setE(data);
     });
   }, []);
   if (err) return null; // supplementary; stay quiet if the RPC isn't deployed yet
@@ -624,7 +625,7 @@ function AdminPowerUsers() {
   useEffect(() => {
     setRows(null); setErr(null);
     supabase.rpc("get_power_users", { p_days: days }).then(({ data, error }: any) => {
-      if (error) setErr(error.message); else setRows(data || []);
+      if (error) setErr(failureMessage("Couldn't save the entry", error)); else setRows(data || []);
     });
   }, [days]);
 
@@ -745,7 +746,7 @@ function AdminAnalytics() {
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     supabase.rpc("get_admin_analytics").then(({ data, error }: any) => {
-      if (error) setErr(error.message); else setA(data);
+      if (error) setErr(failureMessage("Couldn't load the contest", error)); else setA(data);
     });
   }, []);
   if (err) return <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>Analytics unavailable: {err}</div>;
@@ -871,7 +872,7 @@ function OpsMetrics() {
   const [delId, setDelId] = useState<string | null>(null);
   useEffect(() => {
     supabase.rpc("get_ops_metrics").then(({ data, error }: any) => {
-      if (error) setErr(error.message); else setM(data);
+      if (error) setErr(failureMessage("Couldn't load these figures", error)); else setM(data);
     });
     supabase.rpc("admin_stale_games").then(({ data }: any) => {
       if (Array.isArray(data)) setSg(data);
@@ -1144,7 +1145,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
   const toggleTestPlayer = async (p: any) => {
     const next = !p.is_test;
     const { error } = await supabase.rpc("admin_set_test", { p_user: p.id, p_is_test: next });
-    if (error) { alert("Couldn't update test mode — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't update test mode", error)); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: next ? "player_test_on" : "player_test_off", target_user_id: p.id, summary: `${next ? "Marked" : "Unmarked"} ${p.display_name || p.email} as a test account` });
     await load();
   };
@@ -1624,7 +1625,7 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
       await load();
       setEditing(null);
     } catch (e: any) {
-      setMsg("Couldn't save: " + (e.message || "error"));
+      setMsg(failureMessage("Couldn't save", e));
     } finally {
       setSaving(false);
     }
@@ -1753,7 +1754,8 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
     const idx = raw.trim() === "" ? null : parseFloat(raw);
     setBusyId(row.id); setMsg(null);
     const { error } = await supabase.from("profiles").update({ handicap_index: idx }).eq("id", row.user_id);
-    if (error) { setMsg("Couldn't update handicap: " + error.message); setBusyId(null); return; }
+    // Raw provider text ("TypeError: Load failed" on Safari) says nothing a user can act on.
+    if (error) { setMsg(failureMessage("Couldn't save this handicap", error)); setBusyId(null); return; }
     if (row.user_id !== user.id) await notify(row.user_id, `Your handicap index was set to ${idx ?? "—"} by a group admin.`);
     await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Group admin", action: "handicap_changed", group_id: activeGroupId, target_user_id: row.user_id, summary: `Set ${row.profiles?.display_name || row.email}'s handicap to ${idx ?? "—"}` });
     setBusyId(null);
@@ -1869,7 +1871,7 @@ function SystemTools({ user }: { user: any }) {
             onClick={async () => {
               const next = !isTest; setIsTest(next);
               const { error } = await supabase.rpc("admin_set_test", { p_user: user.id, p_is_test: next });
-              if (error) { setIsTest(!next); setMsg("Couldn't update test mode — " + error.message); }
+              if (error) { setIsTest(!next); setMsg(failureMessage("Couldn't update test mode", error)); }
             }}
             style={{ ...btn(!!isTest), fontSize: 12, padding: "8px 14px", whiteSpace: "nowrap" }}
           >{isTest ? "Turn off" : "Turn on"}</button>
@@ -1891,7 +1893,7 @@ function AdminExtraStats() {
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     supabase.rpc("get_admin_extra_stats").then(({ data, error }: any) => {
-      if (error) setErr(error.message); else setX(data);
+      if (error) setErr(failureMessage("Couldn't save the entry", error)); else setX(data);
     });
   }, []);
   if (err || !x) return null; // supplementary; stays hidden until 0091 is deployed
@@ -2435,7 +2437,7 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
     setBusy(g.group_id);
     try {
       const { error } = await supabase.rpc("admin_set_group_status", { p_group: g.group_id, p_status: next });
-      if (error) { alert("Couldn't update — " + error.message); return; }
+      if (error) { alert(failureMessage("Couldn't update", error)); return; }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: next === "archived" ? "group_archived" : "group_restored", group_id: g.group_id, summary: `${next === "archived" ? "Archived" : "Restored"} group "${g.name}"` });
       await load();
     } finally { setBusy(null); }
@@ -2450,7 +2452,7 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
     setBusy(g.group_id);
     try {
       const { error } = await supabase.rpc("admin_delete_group", { p_group: g.group_id });
-      if (error) { alert("Couldn't delete — " + error.message); return; }
+      if (error) { alert(failureMessage("Couldn't delete that", error)); return; }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "group_deleted", group_id: null, summary: `Deleted group "${g.name}" (admin)` });
       await load();
       if (onGroupsChanged) await onGroupsChanged();
@@ -2462,7 +2464,7 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
     setBusy(g.group_id);
     try {
       const { error } = await supabase.rpc("admin_set_default_group", { p_group: g.group_id });
-      if (error) { alert("Couldn't set default — " + error.message); return; }
+      if (error) { alert(failureMessage("Couldn't set default", error)); return; }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "group_set_default", group_id: g.group_id, summary: `Set "${g.name}" as the default group` });
       await load();
     } finally { setBusy(null); }
@@ -2475,7 +2477,7 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
     setBusy(g.group_id);
     try {
       const { data, error } = await supabase.rpc("admin_wipe_group", { p_group: g.group_id });
-      if (error) { alert("Couldn't wipe — " + error.message); return; }
+      if (error) { alert(failureMessage("Couldn't wipe", error)); return; }
       if (data === "wiped") {
         await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "group_wiped", group_id: g.group_id, summary: `Wiped test club "${g.name}" data` });
         alert(`Wiped all data in "${g.name}".`);
@@ -2491,7 +2493,7 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
     setBusy(g.group_id);
     try {
       const { error } = await supabase.rpc("admin_revoke_group_invites", { p_group: g.group_id });
-      if (error) { alert("Couldn't revoke — " + error.message); return; }
+      if (error) { alert(failureMessage("Couldn't revoke", error)); return; }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "group_invites_revoked", group_id: g.group_id, summary: `Revoked invite links for "${g.name}"` });
     } finally { setBusy(null); }
   };
@@ -2503,7 +2505,7 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
     setBusy(src.group_id);
     try {
       const { error } = await supabase.rpc("admin_merge_group", { p_source: src.group_id, p_target: mergeTo });
-      if (error) { alert("Couldn't merge — " + error.message); return; }
+      if (error) { alert(failureMessage("Couldn't merge those", error)); return; }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "group_merged", group_id: mergeTo, summary: `Merged "${src.name}" into "${target.name}"` });
       setMergeSrc(null); setMergeTo("");
       await load();
@@ -2626,7 +2628,7 @@ export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean 
     try {
       // The RPC is owner-gated and writes its own audit entry, so no client-side logging here.
       const { error } = await supabase.rpc("admin_set_system_admin", { p_user: u.id, p_make: make });
-      if (error) { alert("Couldn't update — " + error.message); return; }
+      if (error) { alert(failureMessage("Couldn't update", error)); return; }
       await load();
     } finally { setBusy(null); }
   };
@@ -2642,7 +2644,7 @@ export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean 
     setBusy(u.id);
     try {
       const { error } = await supabase.rpc("admin_set_banned", { p_user: u.id, p_banned: banned });
-      if (error) { alert("Couldn't update — " + error.message); return; }
+      if (error) { alert(failureMessage("Couldn't update", error)); return; }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: banned ? "user_banned" : "user_unbanned", target_user_id: u.id, summary: `${banned ? "Suspended" : "Restored"} ${u.display_name || u.email || "a user"}` });
       await load();
     } finally { setBusy(null); }
@@ -2654,7 +2656,7 @@ export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean 
     setBusy(u.id);
     try {
       const { error } = await supabase.rpc("admin_wipe_user", { p_user: u.id });
-      if (error) { alert("Couldn't wipe — " + error.message); return; }
+      if (error) { alert(failureMessage("Couldn't wipe", error)); return; }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "user_wiped", target_user_id: u.id, summary: `Wiped data for ${u.display_name || u.email || "a user"}` });
       await load();
     } finally { setBusy(null); }
@@ -2673,7 +2675,7 @@ export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean 
     setBusy(keep.id);
     try {
       const { error } = await supabase.rpc("admin_merge_users", { p_keep: keep.id, p_remove: mergeRemove });
-      if (error) { alert("Couldn't merge — " + error.message); return; }
+      if (error) { alert(failureMessage("Couldn't merge those", error)); return; }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "users_merged", target_user_id: keep.id, summary: `Merged ${rem.display_name || rem.email} into ${keep.display_name || keep.email}` });
       setMergeKeep(null); setMergeRemove(""); setPreview(null);
       await load();

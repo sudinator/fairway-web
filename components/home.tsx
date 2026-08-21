@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
 import { C, titleCaseName, Round, Hole, allocateStrokes, dedupeHoles, TGC_GROUP_ID, effectiveGroupId } from "@/lib/golf";
 import { computeBalances, fmtUSD } from "@/lib/money";
@@ -529,7 +530,7 @@ export function Home({ session }: { session: any }) {
     // deleted_at reliably removes the round from all stats/handicap. It also survives
     // any re-post (recordMyGameRound finds the hidden row and updates it in place).
     const { error } = await supabase.from("rounds").update({ deleted_at: new Date().toISOString() }).eq("id", id);
-    if (error) { alert("Couldn't delete that round — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't delete that round", error)); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "round_deleted", summary: `Deleted a round${r ? ` at ${r.course}` : ""}` });
     await loadRounds();
   };
@@ -541,7 +542,7 @@ export function Home({ session }: { session: any }) {
     const { error } = await supabase.from("rounds")
       .update({ status: "final", gross_score: gross || null, played_at: (r as any).played_at || new Date().toISOString(), finished_by: user.id, finished_at: new Date().toISOString() })
       .eq("id", r.id);
-    if (error) { alert("Couldn't mark that round complete — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't mark that round complete", error)); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "round_completed", summary: `Marked a round complete${r.course ? ` at ${r.course}` : ""}` });
     await loadRounds();
   };
@@ -555,7 +556,7 @@ export function Home({ session }: { session: any }) {
     )) return;
     const { error } = await supabase.from("rounds").update({ deleted_at: new Date().toISOString() })
       .eq("user_id", user.id).eq("status", "in_progress").is("deleted_at", null);
-    if (error) { alert("Couldn't discard — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't discard that", error)); return; }
     setStage(null);
     await loadRounds();
   };
@@ -571,14 +572,14 @@ export function Home({ session }: { session: any }) {
   // only the support row (never a real membership).
   const enterSupportGroup = async (g: { group_id: string; name: string }) => {
     const { error } = await supabase.rpc("admin_enter_group", { p_group: g.group_id, p_email: user.email || "" });
-    if (error) { alert("Couldn't enter the Club — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't enter the Club", error)); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "admin_entered_group", group_id: g.group_id, summary: `Master admin entered Club "${g.name}" (support session)` });
     await loadGroups(g.group_id);
     setStage(null); setViewing(null); setMoreOpen(false); setTab("dashboard");
   };
   const exitSupportGroup = async (g: { group_id: string; name: string }) => {
     const { error } = await supabase.rpc("admin_exit_group", { p_group: g.group_id });
-    if (error) { alert("Couldn't exit the Club — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't exit the Club", error)); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "admin_exited_group", group_id: g.group_id, summary: `Master admin exited group "${g.name}" (support session)` });
     await loadGroups();
   };

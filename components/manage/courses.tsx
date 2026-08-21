@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
 import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID, effectiveGroupId, runningHandicap, handicapRounds, adjustedGross, roundDifferential, nextRoundOutlook } from "@/lib/golf";
 import capabilities from "@/lib/capabilities.json";
@@ -320,7 +321,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
       setMsg("Course edit approved globally. The local club override was cleared because the global record now matches it.");
       await load();
     } catch (e: any) {
-      setMsg("Couldn't approve edit: " + (e.message || "error"));
+      setMsg(failureMessage("Couldn't approve that edit", e));
     } finally {
       setBusyId(null);
     }
@@ -336,7 +337,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
       setMsg("Course edit kept for the submitting club only. The global course record was not changed.");
       await load();
     } catch (e: any) {
-      setMsg("Couldn't keep edit club-only: " + (e.message || "error"));
+      setMsg(failureMessage("Couldn't keep edit club-only", e));
     } finally {
       setBusyId(null);
     }
@@ -353,7 +354,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
       setMsg("Course edit rejected and the submitting club's override was removed.");
       await load();
     } catch (e: any) {
-      setMsg("Couldn't reject and remove override: " + (e.message || "error"));
+      setMsg(failureMessage("Couldn't reject and remove override", e));
     } finally {
       setBusyId(null);
     }
@@ -565,7 +566,7 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Search failed");
       setResults(data.courses || []);
-    } catch (e: any) { setErr(e.message); setResults([]); }
+    } catch (e: any) { setErr(failureMessage("Couldn't run search", e)); setResults([]); }
     finally { setSearching(false); }
   };
   const pick = async (id: string, fallbackLoc?: string) => {
@@ -612,7 +613,7 @@ export function CourseEditor({ user, activeGroupId, initial, existingId, onCance
 
       setProviderSource({ provider, stored: null, existingId: null, selectedSource: "provider" });
       setCourse(provider); setMode("form");
-    } catch (e: any) { setErr(e.message); }
+    } catch (e: any) { setErr(failureMessage("Couldn't save that choice", e)); }
     finally { setLoadingId(null); }
   };
   const startManual = () => {
@@ -792,7 +793,7 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
         await linkCourseToGroup(supabase, activeGroupId, courseId!, user.id);
       }
       onSaved();
-    } catch (e: any) { setErr(e.message || "Save failed."); setSaving(false); }
+    } catch (e: any) { setErr(failureMessage("Couldn't save this course", e)); setSaving(false); }
   };
 
   return (

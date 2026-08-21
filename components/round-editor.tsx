@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
 import { dbg, newSid, reproduceBug } from "@/lib/debuglog";
 import {
@@ -486,7 +487,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
       clearDraft();
       onSaved();
     } catch (e: any) {
-      setErr(e.message || "Save failed. Check your connection and try again.");
+      setErr(failureMessage("Couldn't save this round", e));
       setSaving(false);
     }
   };

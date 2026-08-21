@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
 import { Avatar, btn, inputStyle, Eyebrow, FieldLabel, BottomSheet } from "@/components/ui";
@@ -184,7 +185,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     setBusy(true);
     const { error } = await supabase.rpc("move_expense_event", { p_expense: expenseId, p_event: eventId });
     setBusy(false);
-    if (error) { alert("Couldn't move the expense — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't move the expense", error)); return; }
     await load();
   };
 
@@ -273,7 +274,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     if (!window.confirm("Unmark this payment? " + nameOf(s2.from_user_id) + " → " + nameOf(s2.to_user_id) + " " + fmtUSD(s2.amount_cents) + ". Balances will recompute.")) return;
     setBusy(true);
     const { error } = await supabase.from("settlements").delete().eq("id", s2.id);
-    if (error) { setBusy(false); alert("Couldn't unmark — " + error.message); return; }
+    if (error) { setBusy(false); alert(failureMessage("Couldn't unmark", error)); return; }
     await logActivity("settlement_removed", "unmarked " + fmtUSD(s2.amount_cents) + " paid: " + nameOf(s2.from_user_id) + " → " + nameOf(s2.to_user_id), { from: s2.from_user_id, to: s2.to_user_id, amount_cents: s2.amount_cents });
     setBusy(false);
     await load();

@@ -263,6 +263,44 @@ export function collapseRoundAwards(awards: Award[]): Award[] {
   return awards.filter((a) => !drop.has(a.key));
 }
 
+// A "first X" badge is superseded once its counting sibling has been earned more than once.
+// The pairs are explicit rather than derived from the key, because first_round has no counting
+// sibling and must never be hidden — it is a milestone, not a duplicate.
+export const FIRST_SUPERSEDED_BY: Record<string, string> = {
+  first_birdie: "birdie",
+  first_eagle: "eagle",
+};
+
+/**
+ * Which badges to SHOW on the achievements wall, given what has been earned.
+ *
+ * Hides only what a better badge already tells you:
+ *   - score-ladder entries below the hardest one earned (broke_85 x9 makes broke_100 x9 noise)
+ *   - "first X" once its counting sibling is above 1
+ *
+ * Locked badges are always kept: they show what is still achievable, which is the point of a wall.
+ * Counts are not modified — this is a display rule, not a scoring change.
+ */
+export function visibleWallBadges<T extends { key: string }>(
+  defs: T[],
+  earned: Record<string, { count?: number | null }> | null | undefined,
+): T[] {
+  if (!earned) return defs;
+  const has = (k: string) => !!earned[k];
+  const countOf = (k: string) => earned[k]?.count ?? 0;
+
+  const bestScore = [...SCORE_LADDER].reverse().find(has);
+  const hiddenScore = new Set(bestScore ? SCORE_LADDER.filter((k) => k !== bestScore) : []);
+
+  return defs.filter((d) => {
+    if (!has(d.key)) return true;                       // locked: always show what is achievable
+    if (hiddenScore.has(d.key)) return false;           // a harder threshold is already shown
+    const sib = FIRST_SUPERSEDED_BY[d.key];
+    if (sib && countOf(sib) > 1) return false;          // "First birdie" once there are several
+    return true;
+  });
+}
+
 // Human-readable evidence for how a badge was earned in a given round, recomputed
 // from the round's holes. `holes` (when present) is the qualifying stretch to
 // highlight. Pure — the wall/card fetch the round and call this on tap.

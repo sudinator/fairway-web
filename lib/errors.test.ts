@@ -27,11 +27,23 @@ function eq<T>(a: T, b: T, label: string) {
   ok(!/try again/i.test(a.action), "RLS does NOT advise retrying");
 }
 
-// Connection: retrying is exactly right.
+// Connection: retrying is exactly right. Every engine words this differently, and matching only
+// Chrome's phrasing meant an iPhone in airplane mode fell through to the generic branch — found
+// on a real device minutes after shipping, which is why each wording is pinned here.
 {
-  const a = adviceFor({ message: "Failed to fetch" });
-  eq(a.code, "NET", "a network failure is coded NET");
-  ok(/try again/i.test(a.action), "a network failure advises retrying");
+  for (const [msg, engine] of [
+    ["Failed to fetch", "Chrome"],
+    ["Load failed", "Safari — every iPhone"],
+    ["NetworkError when attempting to fetch resource", "Firefox"],
+    ["Network request failed", "React Native / older WebKit"],
+    ["The Internet connection appears to be offline.", "iOS system"],
+  ] as const) {
+    const a = adviceFor({ message: msg });
+    eq(a.code, "NET", `"${msg}" (${engine}) is coded NET`);
+    ok(/try again/i.test(a.action), `"${msg}" advises retrying`);
+  }
+  // A TypeError wrapper is what actually reaches us from a fetch rejection.
+  eq(adviceFor({ message: "TypeError: Load failed" }).code, "NET", "the TypeError wrapper is still NET");
 }
 
 { eq(adviceFor({ code: "23505" }).code, "23505", "duplicate key keeps its code");

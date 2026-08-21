@@ -88,7 +88,12 @@ export function adviceFor(error: SupabaseishError): FailureAdvice {
   if (code === "PGRST116") {
     return { action: "It may already have been changed by someone else. Refresh.", code: "PGRST116" };
   }
-  if (/failed to fetch|network|offline|connection|timeout|aborted/i.test(msg)) {
+  // Every browser words a dropped connection differently, and this is the failure a golfer will
+  // actually hit. Safari (so every iPhone) says "Load failed"; Chrome says "Failed to fetch";
+  // Firefox says "NetworkError when attempting to fetch resource". Matching only Chrome's wording
+  // meant an iPhone user got the generic "Try again" with no explanation — found within minutes
+  // of shipping, in airplane mode on a real device.
+  if (/failed to fetch|load failed|networkerror|network request failed|network|offline|connection|timeout|aborted|dns/i.test(msg)) {
     // The common case on a course. Retrying is the right advice and usually works.
     return { action: "Check your connection and try again.", code: "NET" };
   }

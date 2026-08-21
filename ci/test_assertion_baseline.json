@@ -1,0 +1,25 @@
+{
+  "total": 1252,
+  "suites": {
+    "(unnamed suites)": 491,
+    "ai-sanitize": 11,
+    "badges": 75,
+    "bucket-model": 34,
+    "card": 11,
+    "chart-helpers": 10,
+    "component render": 17,
+    "contests": 26,
+    "course ordering": 4,
+    "failure messages": 24,
+    "finish-gaps": 18,
+    "game-create": 56,
+    "game-utils": 21,
+    "golf/computeBetting tests": 53,
+    "grouping tests": 281,
+    "legs": 23,
+    "player-scoring": 63,
+    "round stat completeness": 8,
+    "segments": 20,
+    "sync/column tests": 6
+  }
+}
