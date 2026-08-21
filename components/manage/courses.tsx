@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase";
 import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID, effectiveGroupId, runningHandicap, handicapRounds, adjustedGross, roundDifferential, nextRoundOutlook } from "@/lib/golf";
 import capabilities from "@/lib/capabilities.json";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LabelList } from "recharts";
+import { write } from "@/lib/db-write";
 import { buildCustomCourse, Course, CourseHole, courseLabel, findExistingCourseId, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { normalizeCourseProviderId } from "@/lib/course-provider-id";
 import { buildCourseRatingTexts, buildCourseSourceView, shouldShowCourseCorrectionReason, type CourseSourceMode } from "@/lib/course-source-review";
@@ -250,7 +251,10 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   const toggleVetted = async (c: LibCourse) => {
     setBusyId(c.id); setMsg(null);
     const next = !c.vetted;
-    await supabase.from("favorite_courses").update({ vetted: next }).eq("id", c.id);
+    // Group B: the activity log below asserts this happened. If the update failed and we logged
+    // anyway, the log would say "Amit vetted Berkshire Valley" when nothing changed.
+    if (!(await write(supabase.from("favorite_courses").update({ vetted: next }).eq("id", c.id),
+      next ? "Couldn't mark this course vetted" : "Couldn't remove the vetted mark"))) { setBusyId(null); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: next ? "course_vetted" : "course_unvetted", summary: `${next ? "Marked" : "Unmarked"} "${courseCardTitle(c)}" as vetted` });
     setBusyId(null);
     await load();
@@ -299,7 +303,9 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
 
   // Remove a course FROM THIS GROUP only (unlink). The global record and other groups are untouched.
   const remove = async (id: string, courseName: string) => {
-    await supabase.from("group_courses").delete().eq("group_id", activeGroupId).eq("course_id", id);
+    // Group B: logActivity below asserts the unlink happened.
+    if (!(await write(supabase.from("group_courses").delete().eq("group_id", activeGroupId).eq("course_id", id),
+      "Couldn't remove this course from the group"))) return;
     await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_removed", group_id: activeGroupId, summary: `Removed course "${courseName}" from a club` });
     await load();
   };

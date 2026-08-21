@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase";
 import { C, titleCaseName, Round, Hole, allocateStrokes, dedupeHoles, TGC_GROUP_ID, effectiveGroupId } from "@/lib/golf";
 import { computeBalances, fmtUSD } from "@/lib/money";
 import { logActivity } from "@/lib/activity";
+import { write } from "@/lib/db-write";
 import { Toaster, notifyInfo } from "@/components/toast";
 import { loadDraft, draftHasScores, clearAllLocalState } from "@/lib/draft";
 import { loadActiveGame, saveAppBootCache, loadAppBootCache, loadEditorDraft, loadActiveCourseEdit } from "@/lib/draft";
@@ -425,8 +426,15 @@ export function Home({ session }: { session: any }) {
   }, [loadGroups, user.id]);
 
   const saveIndex = async (idx: number | null) => {
+    const previous = profile?.handicap_index ?? null;
     setProfile((p: any) => ({ ...p, handicap_index: idx }));
-    await supabase.from("profiles").update({ handicap_index: idx }).eq("id", user.id);
+    // A handicap that silently fails to save changes every net score recorded afterwards, and the
+    // optimistic update above gives the player no reason to doubt it. On failure, put the old
+    // value back so the screen matches the database.
+    if (!(await write(supabase.from("profiles").update({ handicap_index: idx }).eq("id", user.id),
+      "Couldn't save your handicap index"))) {
+      setProfile((p: any) => ({ ...p, handicap_index: previous }));
+    }
   };
 
   const loadRounds = useCallback(async () => {

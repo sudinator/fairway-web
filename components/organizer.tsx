@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { write } from "@/lib/db-write";
 import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
 import { autoSplitFlights, flightForIndex, flightRangeLabel, type FlightBand } from "@/lib/flights";
@@ -112,7 +113,11 @@ export function OrganizerConsole({ gameId }: { gameId: string }) {
   const setIndex = async (p: GP, val: number) => {
     setBusy(true);
     try {
-      await supabase.from("game_players").update({ handicap_index: val }).eq("id", p.id);
+      // try/finally without a catch does nothing here: a Supabase failure RESOLVES with { error }
+      // rather than throwing, so this was silent — and the draft is cleared below, so the value
+      // the organizer typed simply vanished on reload.
+      if (!(await write(supabase.from("game_players").update({ handicap_index: val }).eq("id", p.id),
+        "Couldn't save that handicap"))) return;
       if (p.user_id) { try { await supabase.from("profiles").update({ handicap_index: val }).eq("id", p.user_id); } catch { /* non-blocking */ } }
       setHcpDraft((d) => { const nx = { ...d }; delete nx[p.id]; return nx; });
       await load();

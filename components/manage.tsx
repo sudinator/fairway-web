@@ -7,6 +7,7 @@ import { pushGate, subscribeToPush, unsubscribeFromPush, currentPermission, sync
 import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID, effectiveGroupId, runningHandicap, handicapRounds, adjustedGross, roundDifferential, nextRoundOutlook } from "@/lib/golf";
 import capabilities from "@/lib/capabilities.json";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LabelList } from "recharts";
+import { write, writeAll } from "@/lib/db-write";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { diagEnabled, setDiagEnabled, reproduceBug, setReproduceBug, getDiagLog, clearDiagLog } from "@/lib/debuglog";
@@ -1156,12 +1157,20 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
     let { data: rs, error: rE } = await supabase.from("rounds").select("id").eq("user_id", p.id).is("deleted_at", null);
     if (rE) { const rt = await supabase.from("rounds").select("id").eq("user_id", p.id); rs = rt.data; }
     const roundIds = (rs || []).map((r: any) => r.id);
-    if (roundIds.length) { await supabase.from("holes").delete().in("round_id", roundIds); }
-    await supabase.from("rounds").delete().eq("user_id", p.id);
-    await supabase.from("game_players").delete().eq("user_id", p.id);
-    await supabase.from("group_members").delete().eq("user_id", p.id);
+    // Group C: five deletes in sequence. Unchecked, a failure partway left the player's rounds
+    // gone, the log claiming a permanent delete, and the profile still present — with no error.
+    // writeAll stops at the first failure and reports what already went. It cannot roll back;
+    // making this atomic needs the cascade moved into a Postgres function (see BACKLOG).
+    const steps: { op: any; label: string }[] = [];
+    if (roundIds.length) steps.push({ op: supabase.from("holes").delete().in("round_id", roundIds), label: "hole scores" });
+    steps.push({ op: supabase.from("rounds").delete().eq("user_id", p.id), label: "rounds" });
+    steps.push({ op: supabase.from("game_players").delete().eq("user_id", p.id), label: "game entries" });
+    steps.push({ op: supabase.from("group_members").delete().eq("user_id", p.id), label: "club membership" });
+    if (!(await writeAll(steps, "Couldn't delete this player"))) { await load(); return; }
+    if (!(await write(supabase.from("profiles").delete().eq("id", p.id),
+      "Couldn't delete this player's profile"))) { await load(); return; }
+    // Logged only once every delete has actually landed.
     await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "player_deleted", summary: `Permanently deleted ${p.display_name || p.email}` });
-    await supabase.from("profiles").delete().eq("id", p.id);
     await load();
   };
 
@@ -1183,7 +1192,11 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
   };
 
   const restoreCourse = async (c: any) => {
-    await supabase.from("favorite_courses").update({ deleted: false, deleted_by: null, deleted_at: null }).eq("id", c.id);
+    // Group B: the notify below tells another member their deleted course was restored. Sending
+    // that after a failed update would be telling them something untrue.
+    if (!(await write(
+      supabase.from("favorite_courses").update({ deleted: false, deleted_by: null, deleted_at: null }).eq("id", c.id),
+      "Couldn't restore this course"))) return;
     if (c.deleted_by && c.deleted_by !== user.id) {
       await notify(c.deleted_by, `An admin restored the course "${c.name}" you deleted.`);
     }
@@ -1199,7 +1212,10 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
     if (raw === undefined) return;
     const idx = raw.trim() === "" ? null : parseFloat(raw);
     setSavingId(p.id);
-    await supabase.from("profiles").update({ handicap_index: idx }).eq("id", p.id);
+    // The notifications below tell the player their handicap was set. Sending those after a
+    // failed write would have them playing off a number the database does not hold.
+    if (!(await write(supabase.from("profiles").update({ handicap_index: idx }).eq("id", p.id),
+      "Couldn't save this player's handicap"))) { setSavingId(null); return; }
     // Notify both the player and the admin.
     const who = p.display_name || "a player";
     await notify(p.id, `Your handicap index was set to ${idx ?? "—"} by an admin.`);
