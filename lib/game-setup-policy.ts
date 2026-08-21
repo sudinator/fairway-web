@@ -169,7 +169,21 @@ export function decideSetupChange({ game, players, action }: SetupPolicyContext)
           "The existing foursomes and gross scorecards are kept. Team results will be recalculated using the new scoring format.",
         );
       }
-      return block("This format change would alter the competitive structure after scoring has started. Individual/team identity, pairings and foursomes are frozen at the first score.");
+      // Naming the way out matters: in a team format a hole's score belongs to a PAIR (best ball
+      // or aggregate), so reinterpreting those same numbers as individual Stableford would
+      // silently change what each entry meant when it was typed. Refusing is right — but the user
+      // still has two legitimate routes, and the message used to mention neither.
+      return block(
+        `Can't switch to ${action.target} once scoring has started.\n\n` +
+        "This game is a team format, where a hole's score belongs to a pair rather than to one " +
+        "player. Reading those same scores as an individual format would change what they meant " +
+        "when they were entered.\n\n" +
+        "You can either:\n" +
+        "  • clear every score in this game, then change the format, or\n" +
+        "  • leave this game as it is and create a new one in the format you want.\n\n" +
+        "Formats within the same family can still be changed — team formats to other team " +
+        "formats, individual to other individual."
+      );
     }
     case "set_allowance": {
       if (!anyScores) return allow();

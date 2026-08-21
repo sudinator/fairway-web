@@ -7,6 +7,49 @@ Running list of things to build or tighten. Newest ideas near the top of each se
 - [x] Full pre-create structural draft rejected by design: it duplicated Manage Game state and added risk without meaningful capability. Lean Create hands structural formats to Manage Game after the core game exists.
 - [ ] Before Production: de novo 177.46 Production → final staging line-by-line contract comparison, complete format-selection matrix browser QA, adjacent Create → Manage → Play scenarios, full release gate, then one cumulative staging → main PR.
 
+## Admin: system health notifications (designed 177.73, not built)
+
+Two signals surfaced in the admin panel, both requested after the GolfCourseAPI monitor was found
+to have been broken since the day it was added.
+
+**1 · Course library exceeds 50.** Easy: `get_admin_todos()` (migration 0084) already returns a
+JSON object of counts that `AdminHome` renders as card badges. Add `courses_total` from
+`favorite_courses where coalesce(deleted,false)=false`. Threshold 50 — the point at which the
+monitor's 18 hand-curated golden fixtures stop being representative and the run gets long enough
+that batching starts to earn its place.
+
+**2 · The weekly contract monitor did not run.** Harder, and the more valuable of the two. The app
+cannot see GitHub Actions, so this needs a heartbeat — the workflow writes a timestamp on success
+and the admin panel flags it when stale.
+
+*Why it matters:* if the workflow stops running — cron disabled after 60 days of repo inactivity,
+secret revoked, workflow file broken — **nothing fails.** No alert fires because nothing ran.
+Silence is indistinguishable from success. That is exactly how `GOLF_API_KEY` stayed unset from
+the day the workflow was added until 177.73. A dead-man's switch is the only way to detect absence.
+
+### Design
+
+- **NEW migration `0139_ops_heartbeats.sql`** — `ops_heartbeats(key text primary key, last_ok_at
+  timestamptz not null default now(), detail jsonb)`. RLS on, admin read only. Must end with
+  `select public.record_migration('0139_ops_heartbeats')` per the ledger contract.
+- **`external-api-contracts.yml`** gains a final step, only on success, writing the heartbeat via
+  `psql "$SUPABASE_DB_URL"` — the `SUPABASE_DB_URL` repository secret already exists and
+  `robustness.yml` uses it the same way.
+- **`get_admin_todos()`** gains `courses_total` and `monitor_stale` (`last_ok_at < now() -
+  interval '8 days'` — one missed weekly run plus a day of grace).
+- **`AdminHome`** gains a "System health" card showing both.
+
+### Notes before building
+
+- This is a **schema change**. DEPLOY_NOTES records that deploy order puts code before migrations,
+  so the migration must be applied FIRST, then the code — otherwise `get_admin_todos()` queries a
+  table that does not exist yet.
+- The heartbeat table generalises: any scheduled job can write a keyed row, and the same staleness
+  check covers it. Worth keeping the schema job-agnostic rather than golfcourseapi-specific.
+- Related and still open: the VAPID guard skips in CI because `NEXT_PUBLIC_VAPID_PUBLIC_KEY` is not
+  set there — the same class of problem as `GOLF_API_KEY`, a check that reports success because it
+  never ran.
+
 ## Batched for next release (small)
 - **Remove the "Built: <date>" line** in the version display — `components/manage.tsx:3659`
   (the `{APP_BUILT_AT ? <div ...>Built: …</div> : null}` line). Redundant now that the release date is

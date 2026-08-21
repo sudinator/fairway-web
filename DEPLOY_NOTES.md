@@ -1,3 +1,61 @@
+## 177.75.260820 — Course library sorted; format-block message names the way out
+- **NO migration. No schema change.** Includes the 177.74 VAPID work, folded in as agreed.
+- **FIX: the course library had no ordering at all.** `loadCoursesForGroup` queried
+  `favorite_courses` with no `ORDER BY`, so Postgres returned rows in whatever order it found
+  them — not stable between loads. It was not a scheme nobody had spotted; there was no scheme.
+  Now sorted alphabetically by name, matching the player list, which has sorted by `display_name`
+  with the same collation since it was written.
+  The sort runs AFTER group overrides are merged, because an override can rename a course —
+  ordering in SQL alone would fall out of alphabetical order the moment a group renames one.
+  One change covers every surface: New Round, Create Game, Manage Game, the scorecard views and
+  the share card all read through the same loader. The admin "All App Courses" list already had
+  `.order("name")`; the group library was the outlier.
+- **NEW `lib/courses-order.test.ts`** — 4 assertions that call `loadCoursesForGroup` through a
+  stubbed Supabase. An earlier draft pinned a copy of the comparator instead, which passed whether
+  or not the function used it; removing the sort was confirmed to fail this version.
+  `lib/courses.ts` now imports its sibling relatively rather than via the `@/` alias, which the
+  repo's test runner cannot resolve — that is what made the module untestable.
+- **The format-change block now names the way out.** Changing a team format to an individual one
+  after scoring has started is correctly refused: in a team format a hole's score belongs to a
+  PAIR (best ball or aggregate), so reading those same numbers as individual Stableford would
+  silently change what each entry meant when it was typed. The message explained the constraint
+  but offered no route forward. It now states both: clear every score and change the format, or
+  leave the game and create a new one. It also notes that changes WITHIN a family are still
+  allowed. Behaviour is unchanged — only the message.
+- **FOLDED IN FROM 177.74:** the VAPID drift check now fails on an absent key instead of exiting 0
+  with "comparison skipped", CI supplies the key so the comparison actually runs, and
+  `ci/check_vapid_contract.py` asserts the checker cannot regress to skipping. Corrected framing:
+  the Vercel build already performed this comparison correctly; the hole was that deleting the
+  variable would have produced a green build that verified nothing.
+- **BACKLOG.md** records the designed-but-unbuilt admin system-health notifications.
+
+## 177.74.260820 — VAPID drift check: absence is now a failure, not a skip
+- **NO migration. CI and build-script only.** No application code changes.
+- **Correcting an earlier characterisation:** the VAPID key check was described as "skipping in CI,
+  so push could break silently". That was overstated. `prebuild` runs automatically before `build`,
+  so the Vercel build — where the environment variable IS set — already performs the comparison and
+  fails on a mismatch. That protection was working.
+- **The real hole was narrower.** `scripts/check-vapid-key.mjs` exited **0** with "comparison
+  skipped" when `NEXT_PUBLIC_VAPID_PUBLIC_KEY` was absent. So deleting the variable from Vercel
+  would have produced a GREEN build that verified nothing, and push notifications would then fail
+  at runtime with nothing having flagged it. Absence of the input is a failure of the check, not a
+  pass — the same shape as `GOLF_API_KEY`, which sat unset for months while its workflow reported
+  nothing wrong.
+- **Absent key now exits 1**, with a message naming the expected value and the three places it can
+  be set. `VAPID_CHECK_OPTIONAL=1` is an explicit opt-out for local builds only; CI and Vercel must
+  never set it. All four paths verified: matching key 0, mismatched 1, absent 1, absent+opt-out 0.
+- **CI now supplies the key** so the comparison actually runs there, sourced from the repository
+  VARIABLE `vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY` — deliberately a variable, not a secret, because a
+  VAPID public key ships to every browser in `public/sw.js` and is not confidential. Making it
+  readable is the point: an unreadable value is exactly what made `GOLF_API_KEY` unrecoverable.
+  Falls back to the committed `sw.js` value if the variable is unset, so a missing variable cannot
+  block CI.
+- **`ci/check_vapid_contract.py` extended** to assert that the checker fails rather than skips, and
+  that CI supplies the key. Negative-tested: restoring the silent skip fails the guard.
+- `.env.example` documents `VAPID_CHECK_OPTIONAL`, caught by the existing env-hygiene guard.
+- **BACKLOG.md** records the designed-but-unbuilt admin system-health notifications: a course-count
+  threshold and a heartbeat dead-man's switch for the weekly contract monitor.
+
 ## 177.73.260820 — Three display fixes; GolfCourseAPI monitor repaired
 - **NO migration. CI and docs only.** No application code changes.
 - **The weekly monitor has never run successfully.** `GOLF_API_KEY` was set in Vercel for the app

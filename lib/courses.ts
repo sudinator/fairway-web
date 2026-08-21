@@ -1,7 +1,7 @@
 // A small starter set of well-known courses so the app is useful immediately,
 // plus helpers to build a standard course when someone enters their own.
 // Stroke index follows the common allocation (odd holes front nine, even back).
-import { normalizeCourseProviderId } from "@/lib/course-provider-id";
+import { normalizeCourseProviderId } from "./course-provider-id";
 //
 // NOTE: ratings/slopes here are representative published values; players should
 // confirm against the physical scorecard, which is the authoritative source.
@@ -105,18 +105,25 @@ export async function loadCoursesForGroup(supabase: any, groupId: string): Promi
   if (overridesError) throw overridesError;
   const byCourse = Object.fromEntries((overrides || []).map((o: any) => [o.course_id, o]));
 
-  return rows.map((f: any) => {
-    const o = byCourse[f.id];
-    if (!o) return f;
-    return {
-      ...f,
-      name: o.name || f.name,
-      location: o.location ?? f.location,
-      data: o.data || f.data,
-      group_override: true,
-      group_override_updated_at: o.updated_at,
-    };
-  });
+  return rows
+    .map((f: any) => {
+      const o = byCourse[f.id];
+      if (!o) return f;
+      return {
+        ...f,
+        name: o.name || f.name,
+        location: o.location ?? f.location,
+        data: o.data || f.data,
+        group_override: true,
+        group_override_updated_at: o.updated_at,
+      };
+    })
+    // Alphabetical, applied AFTER overrides because an override can rename a course — ordering in
+    // SQL alone would fall out of order the moment a group renames one. Matches the player list,
+    // which has sorted by display_name with the same collation since it was written.
+    .sort((a: any, b: any) =>
+      String(a?.name ?? "").localeCompare(String(b?.name ?? ""), undefined, { sensitivity: "base" }),
+    );
 }
 
 // Ensure a course (by id) is linked to a group. Safe to call repeatedly.
