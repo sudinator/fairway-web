@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
+import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
 import { btn, Eyebrow, BottomSheet, Avatar } from "@/components/ui";
@@ -42,7 +43,7 @@ export function ContestsSection({
 
   const load = async () => {
     const { data: cs, error: e1 } = await supabase.from("game_contests").select("*").eq("game_id", gameId);
-    if (e1) { setErr(e1.message); setLoading(false); return; }
+    if (e1) { setErr(failureMessage("Couldn't load that", e1)); setLoading(false); return; }
     const list = (cs || []) as Contest[];
     list.sort((a, b) => a.created_at! < b.created_at! ? -1 : 1);
     setContests(list);
@@ -68,20 +69,20 @@ export function ContestsSection({
       p_game: gameId, p_kind: kind, p_label: d.label, p_holes: holes, p_unit: d.unit, p_better: d.better,
     });
     setBusy(false);
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(failureMessage("Couldn't create the contest", error)); return; }
     setAdding(false); await load();
   };
 
   const removeContest = async (c: Contest) => {
     if (!confirm(`Remove "${c.label}"? Its entries are deleted too.`)) return;
     const { error } = await supabase.rpc("delete_game_contest", { p_contest: c.id });
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(failureMessage("Couldn't remove contest", error)); return; }
     await load();
   };
 
   const voidEntry = async (e: ContestEntry) => {
     const { error } = await supabase.rpc("void_contest_entry", { p_entry: e.id, p_void: true });
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(failureMessage("Couldn't void entry", error)); return; }
     await load();
   };
 
@@ -278,7 +279,7 @@ function LogEntrySheet({ ctx, players, userId, myName, canLogOthers, onClose, on
       p_contest: contest.id, p_hole: hole, p_player, p_guest, p_player_name: p_name, p_value: value,
     });
     setBusy(false);
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(failureMessage("Couldn't save", error)); return; }
     onDone();
   };
 
@@ -401,7 +402,7 @@ function InlineLog({ contest, hole, players, userId, myName, canLogOthers, onSav
     setBusy(true); setErr(null);
     const { error } = await supabase.rpc("log_contest_entry", { p_contest: contest.id, p_hole: hole, p_player, p_guest, p_player_name: p_name, p_value: value });
     setBusy(false);
-    if (error) { setErr(error.message); return; }
+    if (error) { setErr(failureMessage("Couldn't save", error)); return; }
     onSaved();
   };
 

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { C, Round, Hole } from "@/lib/golf";
-import { BADGES, BADGE_BY_KEY, badgeEvidence } from "@/lib/badges";
+import { BADGES, BADGE_BY_KEY, badgeEvidence, visibleWallBadges, FIRST_SUPERSEDED_BY } from "@/lib/badges";
 import { syncBadges } from "@/lib/badge-sync";
 import { Eyebrow } from "@/components/ui";
 
@@ -44,6 +44,12 @@ function HoleChip({ h }: { h: Hole }) {
     </div>
   );
 }
+
+// Inverse of FIRST_SUPERSEDED_BY: given a counting badge, which "first" it absorbed. Used so
+// the count badge can carry the first-earned date once the separate tile is hidden.
+const FIRST_SUPERSEDED_BY_INV: Record<string, string> = Object.fromEntries(
+  Object.entries(FIRST_SUPERSEDED_BY).map(([first, count]) => [count, first]),
+);
 
 export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; rounds?: Round[]; refreshKey?: number }) {
   const [earned, setEarned] = useState<Record<string, Earned> | null>(null);
@@ -117,8 +123,8 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
         return (
           <div key={cat} style={{ marginTop: 14 }}>
             <Eyebrow>{CAT_LABEL[cat]}</Eyebrow>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))", gap: 12 }}>
-              {defs.map((b) => {
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))", gap: 12, alignItems: "start" }}>
+              {visibleWallBadges(defs, earned).map((b) => {
                 const e = earned?.[b.key];
                 const on = !!e;
                 const tc = TIER_COLOR[b.tier];
@@ -127,9 +133,14 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
                 const isOpen = open === b.key && on;
                 return (
                   <button key={b.key} onClick={() => on && setOpen(isOpen ? null : b.key)} title={b.desc}
-                    style={{ textAlign: "center", opacity: on ? 1 : 0.4, background: "transparent", border: "none", padding: 0, cursor: on ? "pointer" : "default" }}>
+                    style={{ textAlign: "center", opacity: on ? 1 : 0.4, background: "transparent",
+                      border: "none", padding: 0, cursor: on ? "pointer" : "default",
+                      // A <button> vertically centres its content, and grid stretches every cell to the
+                      // tallest in its row — so a badge with only a label sat lower than one that also
+                      // shows a count and a best value. Explicit top-aligned column pins the circles.
+                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start" }}>
                     <div style={{
-                      width: 48, height: 48, margin: "0 auto", borderRadius: "50%",
+                      width: 48, height: 48, borderRadius: "50%", flexShrink: 0,
                       display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22,
                       background: on ? "radial-gradient(circle at 50% 32%, #20624a, #0e3a2c)" : "#20463a",
                       border: `2px solid ${on ? tc : C.borderGreen}`,
@@ -141,7 +152,7 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
                         <span style={{ position: "absolute", right: -4, top: -4, minWidth: 18, height: 18, padding: "0 4px", borderRadius: 8, background: C.gold, color: "#1c1c15", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #10402f" }}>{"×"}{e!.count}</span>
                       )}
                     </div>
-                    <div style={{ fontSize: 11, color: C.cream, marginTop: 6, lineHeight: 1.2, fontWeight: on ? 700 : 500 }}>{b.label}</div>
+                    <div style={{ fontSize: 11, color: C.cream, marginTop: 6, lineHeight: 1.25, fontWeight: on ? 700 : 500 }}>{b.label}</div>
                     {best != null && <div style={{ fontSize: 11, color: C.gold, fontWeight: 800, marginTop: 1 }}>{best}</div>}
                   </button>
                 );
@@ -174,6 +185,14 @@ export function AchievementsWall({ user, rounds, refreshKey = 0 }: { user: any; 
                     <div style={{ color: C.gold, fontSize: 11, marginTop: 10, fontWeight: 700 }}>
                       {repeat ? "Most recently at " : "At "}{rnd.course}{rnd.played_at ? ` · ${fmtDate(rnd.played_at)}` : ""}
                       {repeat ? ` · earned ${e.count}×` : ""}
+                    </div>
+                  )}
+                  {/* The separate "First birdie" tile is hidden once there are several (see
+                      visibleWallBadges). The date must not vanish with it — first_earned_at is
+                      stored on every badge row, so the count badge carries the memory. */}
+                  {repeat && FIRST_SUPERSEDED_BY_INV[openDefInCat.key] && e.first_earned_at && (
+                    <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
+                      First on {fmtDate(e.first_earned_at)}.
                     </div>
                   )}
                   {!rnd && <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>Earned {fmtDate(e.first_earned_at)}.</div>}

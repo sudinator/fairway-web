@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
+import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
 import { btn, inputStyle, Eyebrow } from "@/components/ui";
@@ -33,7 +34,7 @@ export function FeedbackForm({
   useEffect(() => {
     if (prefill) {
       setKind(prefill.kind);
-      setMsg(prefill.message);
+      setMsg(failureMessage("Couldn't send your feedback", prefill));
       setSent(false);
       onConsumePrefill?.();
     }

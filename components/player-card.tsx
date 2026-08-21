@@ -146,7 +146,7 @@ export function PlayerCardView({ view }: { view: CardView }) {
           {/* paddingTop/Bottom, not overflow:visible: overflowX:"auto" makes this a scroll
               container on BOTH axes, so the count pill at top:-4 was being clipped. Padding
               gives it room without disturbing the horizontal scroll. */}
-          <div className="bnn-noscroll" style={{ display: "flex", gap: 12, overflowX: "auto",
+          <div className="bnn-noscroll" style={{ display: "flex", alignItems: "flex-start", gap: 12, overflowX: "auto",
             paddingTop: 6, paddingBottom: 2, scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}>
             {badges.map((b) => (
               <div key={b.key} style={{ flex: "none", width: 62, textAlign: "center" }}>

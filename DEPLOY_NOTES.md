@@ -1,3 +1,98 @@
+## 177.78.260820 — Achievements wall: alignment, redundant badges, and an assertion ratchet
+- **NO migration. No schema change.**
+- **FIX: badge discs sat at different heights on the Achievements tab.** A `<button>` vertically
+  centres its own content, and CSS grid stretches every cell to the tallest in its row — so a badge
+  with only a label ("First birdie") centred and dropped below one that also shows a count and a
+  best value ("Birdie x9 / best 2"). Fixed in `achievements.tsx` with an explicit top-aligned flex
+  column, the same fix already applied to `round-detail.tsx`. `player-card.tsx` is top-aligned too
+  as a precaution, though it uses `<div>` and was never affected.
+  **This was NOT a regression:** `achievements.tsx` had only ever had its COLOURS changed. The
+  earlier fix went into `round-detail.tsx`, a different screen. Two grids, one fixed.
+- **FIX: "First birdie" showed beside "Birdie x9".** Once several exist, the separate tile is
+  noise. It is now hidden, and the date is NOT lost: `first_earned_at` is already stored on every
+  badge row, so the count badge's detail reads "First on 14 Jun". Kept when there is genuinely only
+  one, because then the "first" IS the achievement. `first_round` is never hidden — it is a
+  milestone with no counting sibling.
+- **FIX: an 83 credited Broke 100, Broke 90 AND Broke 85.** Each counter is factually correct — the
+  round is under all three — but three tiles reading x9 tell you nothing the hardest one does not.
+  The wall now shows only the hardest threshold earned. **Unearned harder badges stay visible** as
+  targets, which is the point of a wall. Stored counts are untouched, so this is a display rule and
+  reversible without recomputing anything.
+  The round view (`collapseRoundAwards`) and the player card (`BROKE_CHAIN`, `CARD_EXCLUDE`) had
+  both done this for a long time. The wall was the only screen that never did.
+- **NEW `ci/check_test_assertions.py`** — ratchets the assertion count per suite, failing if any
+  suite verifies LESS than it did. Baseline: **1,252 assertions across 20 suites.**
+  This exists because of a mistake made while writing the badge tests above: 11 assertions were
+  appended AFTER the file's report line, so the suite printed its old total and could not fail the
+  build. It was caught only by deliberately sabotaging the code and noticing the tests still
+  passed. That is the fourth "reports success having checked nothing" failure found in this
+  series — after the GolfCourseAPI monitor that had never run, the VAPID check that skipped on a
+  missing key, and a contrast check that passed its own bug. Negative-tested against both shapes:
+  reproducing the exact bug reports "badges: 75 -> 64 (11 fewer)", and deleting a test is refused.
+- `lib/badges.test.ts` 64 -> 75 assertions; sabotaging `visibleWallBadges` correctly fails three.
+
+## 177.77.260820 — Error messages: Safari's wording, and 58 raw-provider leaks
+- **NO migration. No schema change.** Follows 177.76, found by testing it in airplane mode on a
+  real iPhone within minutes of shipping.
+- **FIX: the network-failure detection only matched Chrome.** Safari — so every iPhone — words a
+  dropped connection as **"Load failed"**; Chrome says "Failed to fetch"; Firefox says
+  "NetworkError when attempting to fetch resource". Matching only Chrome's phrasing meant an
+  iPhone user in airplane mode fell through to the generic "Try again" with no explanation of
+  why. All five wordings are now matched AND pinned in `lib/errors.test.ts`, so the same gap
+  cannot reopen for another engine.
+- **FIX: 58 places showed the user the provider's raw message.** These predate the mapping and
+  were never in the 64 silent writes, because they DID check the error — they just printed
+  "TypeError: Load failed", which names no cause and no action. All 58 now route through
+  `failureMessage()`, so every one gains plain advice and a quotable error code. **0 remain.**
+- The ProfilePanel handicap save was one of them: it had its own inline gold status line, a third
+  error style alongside `alert()` and the toast. It now uses the same mapping as everything else.
+- Descriptions derived from the enclosing function name were hand-corrected where they read
+  badly — "Couldn't admin power users" and "Couldn't ops metrics" are not sentences a user should
+  see. Every generated string was reviewed by eye, not assumed.
+- `lib/errors.test.ts` 15 -> 24 assertions. Negative-tested: reverting to Chrome-only matching
+  fails the suite on the Safari case specifically.
+
+## 177.76.260820 — Failed database writes are no longer silent
+- **NO migration. No schema change.**
+- **The app had 64 writes that never inspected their error.** Most were deliberate and are left
+  alone: a notification mark-read that self-corrects on reload does not need an alert, and the
+  `group_activity` inserts are already wrapped with "logging never blocks the action", which is
+  the right call. **Scores were never at risk** — they go through a durable outbox with a per-row
+  synced watermark and retry on reconnect, foreground, poll and manual sync.
+- **Fixed the 11 where silence was not defensible:**
+  - **Writes followed by a LOG or NOTIFY (3).** `toggleVetted` wrote "Amit vetted Berkshire Valley"
+    to the activity log whether or not the update landed; `restoreCourse` told a member their
+    deleted course was restored when it had not been. The evidence became wrong, not just the
+    state. The log/notify no longer runs on failure, and in the delete cascade the activity entry
+    moved AFTER the deletes it describes.
+  - **The permanent-delete cascade (5).** Five deletes in sequence, unchecked: a failure partway
+    left the player's rounds gone, the log claiming a permanent delete, and the profile still
+    present, with no error. Now stops at the first failure and names both the step that failed and
+    the steps already completed. It still cannot roll back — making it atomic needs the cascade
+    moved into a Postgres function, recorded in BACKLOG.
+  - **Handicap writes (3).** A handicap that silently fails to save changes every net score
+    recorded afterwards, and the optimistic UI gave the player no reason to doubt it.
+    `home.tsx saveIndex` now reverts the on-screen value to match the database. `organizer.tsx
+    setIndex` had `try { } finally { }` with no catch, which does nothing for a Supabase failure —
+    those RESOLVE with `{ error }` rather than throwing — so it was silent while also clearing the
+    draft, making the typed value vanish on reload.
+- **Messages say what to do, not what went wrong internally.** The first draft surfaced the raw
+  provider text ("new row violates row-level security policy"), which serves a developer and means
+  nothing to a golfer. `lib/errors.ts` now maps a failure to plain advice plus a quotable error
+  code, and **the advice changes with the cause**: a permission failure says "ask a group admin"
+  and deliberately does NOT say "try again", because retrying is pointless; a dropped connection
+  says exactly the opposite. Codes are the real Postgres/PostgREST ones where they exist (42501,
+  23505, 23503, 23502, PGRST116) so they are searchable; only NET, AUTH and BNN-UNK are ours.
+- **NEW `lib/db-write.ts`** — `write()` for a single statement, `writeAll()` for a sequence that
+  must not half-apply. Both surface through the existing `notifyError` toast, whose own comment
+  already stated the purpose: "so a failed database write becomes VISIBLE instead of a silent
+  no-op". It was used 7 times against 70 `alert()` calls; `lib/errors.ts` existed and was used in
+  ZERO components. Both were built and never adopted; this drop adopts them rather than adding a
+  third mechanism.
+- **NEW `lib/errors.test.ts`** — 15 assertions, including a regression test that the raw provider
+  message never reaches the toast.
+- Silent writes 64 -> 53. The remaining 53 are the deliberate ones.
+
 ## 177.75.260820 — Course library sorted; format-block message names the way out
 - **NO migration. No schema change.** Includes the 177.74 VAPID work, folded in as agreed.
 - **FIX: the course library had no ordering at all.** `loadCoursesForGroup` queried

@@ -1,5 +1,5 @@
 // Unit tests for evaluateRound in lib/badges.ts — run with `npm test`.
-import { evaluateRound, computeBadgeState, badgeEvidence, badgesForRound, collapseRoundAwards, PriorBadges } from "./badges";
+import { evaluateRound, computeBadgeState, badgeEvidence, badgesForRound, collapseRoundAwards, visibleWallBadges, PriorBadges } from "./badges";
 import type { Round, Hole } from "./golf";
 
 let pass = 0, fail = 0; const fails: string[] = [];
@@ -262,5 +262,47 @@ const parRound = () => mkRound(Array(18).fill([4, 4, 2, "hit"]) as HS[]);
   ok("broke par supersedes the whole ladder", withPar.length === 1 && withPar[0] === "broke_par");
 }
 
+// ---------------------------------------------------------------------------
+// Wall display rules. The round view (collapseRoundAwards) and the player card (BROKE_CHAIN,
+// CARD_EXCLUDE) already suppressed superseded badges; the achievements WALL was the only screen
+// showing all of them, so an 83 produced "Broke 100 x9, Broke 90 x9, Broke 85 x9" and "First
+// birdie" sat beside "Birdie x9".
+{
+  const defs = [
+    { key: "broke_100" }, { key: "broke_90" }, { key: "broke_85" }, { key: "broke_80" },
+    { key: "first_birdie" }, { key: "birdie" }, { key: "first_round" }, { key: "eagle" },
+  ];
+
+  // An 83, nine times: all three thresholds are factually earned, only the hardest is shown.
+  const earned: any = {
+    broke_100: { count: 9 }, broke_90: { count: 9 }, broke_85: { count: 9 },
+    first_birdie: { count: 1 }, birdie: { count: 9 }, first_round: { count: 1 },
+  };
+  const keys = visibleWallBadges(defs, earned).map((d) => d.key);
+
+  ok("broke_100 hidden when broke_85 is earned", !keys.includes("broke_100"));
+  ok("broke_90 hidden when broke_85 is earned", !keys.includes("broke_90"));
+  ok("the hardest threshold earned is shown", keys.includes("broke_85"));
+  ok("an UNEARNED harder badge stays visible as a target", keys.includes("broke_80"));
+  ok("First birdie hidden once there are several", !keys.includes("first_birdie"));
+  ok("the birdie count badge remains", keys.includes("birdie"));
+  ok("first_round is a milestone and is never hidden", keys.includes("first_round"));
+  ok("an unearned badge stays visible", keys.includes("eagle"));
+}
+
+{
+  // Exactly one birdie: the "first" IS the achievement and must not be hidden.
+  const defs = [{ key: "first_birdie" }, { key: "birdie" }];
+  const keys = visibleWallBadges(defs, { first_birdie: { count: 1 }, birdie: { count: 1 } } as any).map((d) => d.key);
+  ok("First birdie kept when it is the only one", keys.includes("first_birdie"));
+}
+
+{
+  // Nothing earned yet: the whole wall is a list of targets.
+  const defs = [{ key: "broke_100" }, { key: "first_birdie" }];
+  ok("an empty wall shows every badge as a target", visibleWallBadges(defs, {}).length === 2);
+  ok("no earned data shows every badge", visibleWallBadges(defs, null).length === 2);
+}
+
 console.log(`badges: ${pass} passed, ${fail} failed`);
-if (fail) { console.error(fails.join("\n")); process.exit(1); }
+if (fail) { console.error(fails.join("\n")); process.exit(1); }

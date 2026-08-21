@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
 import { ContestsSection, ContestHoleChip } from "@/components/contests-view";
 import { betResultToPost } from "@/lib/money";
@@ -631,7 +632,7 @@ function CreateGame({
       clearSetupDraft(activeGroupId, teeTimeId); // setup finished — drop the local draft
       onCreated(game.id, destination.roomTab, destination.setupTab as SetupTab | undefined);
     } catch (e: any) {
-      setErr(e.message || "Failed to create game.");
+      setErr(failureMessage("Couldn't create the game", e));
       setBusy(false);
     }
   };
@@ -1510,7 +1511,7 @@ function GameRoom({
     const left = countPending();
     if (left > 0) { recomputePending(); alert(left + (left === 1 ? " hole hasn't" : " holes haven't") + " uploaded yet. Tap \"Sync now\", wait until it reaches 0, then finish so the recorded round is complete."); return; }
     const { error } = await supabase.rpc("finish_tee_group_and_post", { p_game: game.id });
-    if (error) { alert("Couldn't finish this group — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't finish this group", error)); return; }
     await load();
   };
   // Non-organizers only ever see the scorecard.
@@ -2329,7 +2330,7 @@ function GameRoom({
     const { error } = await supabase.rpc("change_game_course_before_scoring", {
       p_game: game.id, p_course: course.name, p_course_par: par, p_holes_meta: holesMeta,
     });
-    if (error) { alert("Couldn't change the course: " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't change the course", error)); return; }
     clearAllGameScores(game.id);
     setCourseTees(Array.isArray(course.tees) ? course.tees : []);
     await load();
@@ -2344,7 +2345,7 @@ function GameRoom({
       if (!confirm(`This game is dated ${newDate} — ${days} day${days === 1 ? "" : "s"} in the past. Move all players' rounds to that date?`)) return;
     }
     const { error } = await supabase.rpc("set_game_played_date", { p_game: game.id, p_date: newDate });
-    if (error) { alert("Couldn't change the date: " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't change the date", error)); return; }
     await load();
   };
 
@@ -2376,27 +2377,27 @@ function GameRoom({
     // formats that don't use a given structure simply ignore it (see the
     // game_type guards in StrokesSummary and the setup tab steps).
     const { error } = await supabase.from("games").update(patch).eq("id", game.id);
-    if (error) { alert("Couldn't change the format — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't change the format", error)); return; }
     await load();
   };
 
   const setTeamScoreMode = async (mode: "best_ball" | "aggregate") => {
     if (!game || (game.team_score_mode ?? "best_ball") === mode || !allowSetupChange({ type: "set_team_score_mode", mode })) return;
     const { error } = await supabase.from("games").update({ team_score_mode: mode }).eq("id", game.id);
-    if (error) { alert("Couldn't change the team scoring — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't change the team scoring", error)); return; }
     await load();
   };
 
   const setLegConfig = async (cfg: LegConfig) => {
     if (!game || !allowSetupChange({ type: "set_leg_config" })) return;
     const { error } = await supabase.from("games").update({ leg_config: cfg }).eq("id", game.id);
-    if (error) { alert("Couldn't save the leg settings — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't save the leg settings", error)); return; }
     await load();
   };
   const updateSkinsMode = async (mode: "carryover" | "split") => {
     if (!game || (game.skins_mode ?? "carryover") === mode || !allowSetupChange({ type: "set_skins_mode", mode })) return;
     const { error } = await supabase.from("games").update({ skins_mode: mode }).eq("id", game.id);
-    if (error) { alert("Couldn't change the tie handling — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't change the tie handling", error)); return; }
     await load();
   };
   // Convert a skins game between individual / 1:1 team / 2v2 best-ball mid-round.
@@ -2410,7 +2411,7 @@ function GameRoom({
       style,
     );
     const { error } = await supabase.from("games").update(patch).eq("id", game.id);
-    if (error) { alert("Couldn't change the skins style — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't change the skins style", error)); return; }
     await load();
     if (flippedSplit) alert("Halved (split) skins is best for up to 4 players — with a bigger field, individual skins is set to carry over instead.");
   };
@@ -2420,7 +2421,7 @@ function GameRoom({
     if (!game || shapeOf(game).usesTeams === on || !allowSetupChange({ type: "set_match_team", on })) return;
     const patch = buildMatchTeamPatch(game, on);
     const { error } = await supabase.from("games").update(patch).eq("id", game.id);
-    if (error) { alert("Couldn't change the match type — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't change the match type", error)); return; }
     await load();
   };
 
@@ -2435,7 +2436,7 @@ function GameRoom({
     // One database transaction: end the game, post every player's round, and freeze running clocks.
     // If round posting fails, the game remains active rather than entering a split-brain "ended but not posted" state.
     const { error: finErr } = await supabase.rpc("finish_game_and_post_rounds", { p_game: game.id });
-    if (finErr) { alert("Couldn't end the game — " + finErr.message); return; }
+    if (finErr) { alert(failureMessage("Couldn't end the game", finErr)); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_ended", group_id: (game as any).group_id || null, summary: `Ended the game "${game.name}"` });
     await load();
   };
@@ -2564,25 +2565,25 @@ function GameRoom({
   const adminEndGame = async () => {
     if (!game || !confirm(`Force-end "${game.name}" as admin?`)) return;
     const { error } = await supabase.rpc("admin_end_game", { p_game: game.id });
-    if (error) { alert("Couldn't end — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't end that", error)); return; }
     await adminLog(`Admin force-ended game "${game.name}"`); await load();
   };
   const adminReopenGame = async () => {
     if (!game || !confirm(`Reopen "${game.name}" as admin?`)) return;
     const { error } = await supabase.rpc("admin_reopen_game", { p_game: game.id });
-    if (error) { alert("Couldn't reopen — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't reopen", error)); return; }
     await adminLog(`Admin reopened game "${game.name}"`); await load();
   };
   const adminResetGame = async () => {
     if (!game || !confirm(`Reset ALL scores in "${game.name}" as admin? This can't be undone.`)) return;
     const { error } = await supabase.rpc("admin_reset_game", { p_game: game.id });
-    if (error) { alert("Couldn't reset — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't reset", error)); return; }
     await adminLog(`Admin reset scores in game "${game.name}"`); await load();
   };
   const adminDeleteGame = async () => {
     if (!game || !confirm(`Delete "${game.name}" as admin? Rounds already posted to players' history are kept. This can't be undone.`)) return;
     const { error } = await supabase.rpc("admin_delete_game", { p_game: game.id });
-    if (error) { alert("Couldn't delete — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't delete that", error)); return; }
     await adminLog(`Admin deleted game "${game.name}"`); onBack();
   };
   const adminReassignOrganizer = async () => {
@@ -2590,7 +2591,7 @@ function GameRoom({
     const who = players.find((p) => p.user_id === reassignTo);
     if (!confirm(`Make ${who?.display_name || "this player"} the organizer of "${game.name}"?`)) return;
     const { error } = await supabase.rpc("admin_reassign_organizer", { p_game: game.id, p_user: reassignTo });
-    if (error) { alert("Couldn't reassign — " + error.message); return; }
+    if (error) { alert(failureMessage("Couldn't reassign that", error)); return; }
     await adminLog(`Admin made ${who?.display_name || "a player"} organizer of "${game.name}"`);
     setReassignTo(""); await load();
   };

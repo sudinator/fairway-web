@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
 import { C, TGC_GROUP_ID, APP_TESTING_GROUP_ID, MIRROR_KEY, effectiveGroupId } from "@/lib/golf";
 import { btn, inputStyle, Eyebrow, Avatar } from "@/components/ui";
@@ -137,7 +138,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
       setNewGroup(""); setNewNote("");
       setMsg(`Request submitted for "${name}". An admin will review it — you'll be notified when it's approved.`);
     } catch (e: any) {
-      setMsg("Couldn't submit request: " + (e.message || "error"));
+      setMsg(failureMessage("Couldn't submit request", e));
     } finally { setBusy(false); }
   };
 
@@ -153,7 +154,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
       await onGroupsChanged();
       setMsg("Club renamed.");
     } catch (e: any) {
-      setMsg("Couldn't rename club: " + (e.message || "error"));
+      setMsg(failureMessage("Couldn't rename club", e));
     } finally { setBusy(false); }
   };
 
@@ -210,7 +211,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
         ? "One-time invite link generated. Send it to a single player."
         : `Invite link generated — anyone can use it for the next ${linkKind === "7d" ? "7 days" : "24 hours"}.`);
     } catch (e: any) {
-      setMsg("Couldn't generate invite link: " + (e.message || "error"));
+      setMsg(failureMessage("Couldn't generate invite link", e));
     } finally { setBusy(false); }
   };
 
@@ -248,7 +249,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
       }
       await loadMembers();
       await onGroupsChanged();
-    } catch (e: any) { setMsg("Couldn't update member: " + (e.message || "error")); }
+    } catch (e: any) { setMsg(failureMessage("Couldn't update member", e)); }
     finally { setBusy(false); }
   };
 

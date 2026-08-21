@@ -50,6 +50,25 @@ the day the workflow was added until 177.73. A dead-man's switch is the only way
   set there — the same class of problem as `GOLF_API_KEY`, a check that reports success because it
   never ran.
 
+## Make the permanent-delete cascade atomic (identified 177.76)
+
+`manage.tsx` deletePlayer runs five deletes in sequence from the client: hole scores, rounds, game
+entries, club membership, profile. 177.76 made it stop at the first failure and report which steps
+already completed — but **it still cannot roll back.** A failure partway leaves a genuinely mixed
+state, and the toast can only say so honestly.
+
+The fix is a Postgres function so the whole cascade is one transaction:
+
+    create or replace function public.delete_player_permanently(p_user uuid) ...
+    security definer, single transaction, ends with record_migration
+
+Then the client makes one RPC call that either fully succeeds or fully rolls back, and the
+"partial change" message stops being possible.
+
+Needs: a migration, admin-only `grant execute`, and the existing RLS/ledger guards satisfied.
+Same treatment would suit any other multi-table client-side cascade — worth grepping for them at
+the same time.
+
 ## Batched for next release (small)
 - **Remove the "Built: <date>" line** in the version display — `components/manage.tsx:3659`
   (the `{APP_BUILT_AT ? <div ...>Built: …</div> : null}` line). Redundant now that the release date is
