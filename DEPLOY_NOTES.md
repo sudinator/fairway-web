@@ -1,3 +1,30 @@
+## 177.79.260822 — Installed app: bottom nav labels were clipped off-screen
+- **NO migration. One CSS declaration.**
+- **FIX: the installed app showed bare icons in the bottom nav; the browser showed labels.** Same
+  version, same code. `.app-shell` was `height: 100lvh` in standalone, on the documented
+  assumption that "iOS gives a stable full-glass viewport". It is stable — but on a notched iPhone
+  **100lvh measures the whole screen INCLUDING the strip behind the status bar**, while the shell
+  is already pushed down by `padding-top: env(safe-area-inset-top)`.
+  Measured on device via the built-in ViewportDiag:
+      innerHeight / docClientH / visualVP_h   894      the visible viewport
+      100lvh                                  956      = 894 + safe-area-inset-top (62)
+      navTop / navBottom                      859/956
+      navBottom_vs_visible                    -62      <- the nav ran off-screen
+  `.app-shell` is `overflow: hidden`, so that 62px was silently clipped. The nav is the last child
+  and its LABELS sit below its icons, so only 35px of a 97px nav was visible — enough for the
+  icon, not the text. In a browser `safe-area-inset-top` is 0, so the bug could not occur there,
+  which is why two identical builds looked different.
+- **The correct height was already being measured.** `--app-h` (set by ViewportSync) reported
+  894px and `100dvh` 893.98 — both matching the visible viewport. The standalone media query was
+  discarding a correct value in favour of an incorrect assumption. Both contexts now use
+  `var(--app-h, 100dvh)`. The rule is kept rather than deleted so the reasoning survives and
+  nobody reinstates `100lvh`.
+- The file's header comment documented the wrong model and has been rewritten with the measured
+  numbers.
+- **`navBottom_vs_visible` in ViewportDiag is the permanent check**: if it is ever negative again,
+  the shell is taller than the viewport and something at the bottom is being cut off. It was
+  already computed and already displayed — it named this bug precisely, once someone looked.
+
 ## 177.78.260820 — Achievements wall: alignment, redundant badges, and an assertion ratchet
 - **NO migration. No schema change.**
 - **FIX: badge discs sat at different heights on the Achievements tab.** A `<button>` vertically
