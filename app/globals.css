@@ -80,9 +80,10 @@ body {
      bug could not appear there — which is why the installed app and the web app looked different
      while running identical code.
 
-     100dvh (893.98) and the JS-measured --app-h (894px) both match the visible viewport, so the
-     base rule was right all along and this override only needs to not fight it. Kept as an
-     explicit rule rather than deleted, so the reasoning survives and nobody reinstates 100lvh. */
+     --app-h is the visible viewport, so the shell ends exactly where rendering ends and the nav
+     is both fully visible and flush to the bottom of it. ci/check_shell_layout.py asserts both
+     halves of that across four device profiles — a value that clips the labels and a value that
+     leaves a gap below the nav each fail it. */
   .app-shell { height: var(--app-h, 100dvh); }
 }
 

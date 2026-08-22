@@ -882,7 +882,18 @@ export function Home({ session }: { session: any }) {
         flexShrink: 0, zIndex: 50,
         background: C.green, borderTop: `1px solid ${C.borderGreen}`,
         display: "flex", justifyContent: "space-around", alignItems: "stretch",
-        paddingBottom: "calc(env(safe-area-inset-bottom) + 8px)",
+        // The safe-area inset alone keeps the label clear of the home indicator; the button
+        // below already pads its own bottom, so adding a further 8px here just deepened the
+        // dead band under the labels. See the note on the button padding.
+        // NOT env(safe-area-inset-bottom). The shell is sized to the VISIBLE viewport
+        // (--app-h), which on a notched iPhone already ends above the home indicator:
+        // shell bottom 894, glass bottom 956, indicator inside that strip. Reserving the
+        // inset here as well counted it twice and floated the nav above the bottom of the
+        // app — the gap reported after 177.79. In a browser tab the inset resolves to 0,
+        // so nothing changes there. 4px, not 8: the button already contributes its own
+        // bottom padding, and ci/check_shell_geometry.py allows 8px total of padding we
+        // chose below the labels before the bar reads as bottom-heavy.
+        paddingBottom: 4,
       }}>
         {(() => {
           const primary: { key: Tab; label: string; icon: string }[] = [
@@ -894,7 +905,18 @@ export function Home({ session }: { session: any }) {
           const item = (active: boolean, icon: string, label: string, onClick: () => void) => (
             <button onClick={onClick} style={{
               flex: 1, background: "none", border: "none", cursor: "pointer",
-              padding: "10px 4px 8px", display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+              // 4px 10px (an allowed padding — see DISPLAY_RULES Part 5) rather than 10px 4px 8px:
+              // measured on device the nav was 97px — 63px of content
+              // plus the 34px home-indicator inset — against Apple's own 83pt tab bar
+              // (49pt + 34pt). The surplus all sat below the label, since that is the last
+              // ink in the button. Now 43px of content, inside the platform standard, and still
+              // well above the 24px tap-target floor. Horizontal padding is irrelevant here:
+              // the button is flex:1, so it fills a fifth of the bar whatever it is set to.
+              // gap 4, not 3: the button padding must stay "4px 10px" to remain on the
+              // documented scale (DISPLAY_RULES Part 5), which left the tap target at 43px —
+              // 1px under Apple's 44pt minimum. The gap is not scale-governed, so the pixel
+              // comes from there. Nav content 48px against Apple's own 49pt tab bar.
+              padding: "4px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
               color: active ? C.gold : C.sage,
             }}>
               <span style={{ fontSize: 19, lineHeight: 1 }}>{icon}</span>
@@ -920,7 +942,13 @@ export function Home({ session }: { session: any }) {
             position: "absolute", left: 0, right: 0, bottom: "100%",
             background: C.greenLight, borderTopLeftRadius: 18, borderTopRightRadius: 18,
             padding: "6px 12px 12px", boxShadow: "0 -8px 30px rgba(0,0,0,.4)",
-            maxHeight: "calc(100dvh - env(safe-area-inset-top) - 96px)", overflowY: "auto",
+            // Space above the nav: the shell height, less the top inset, less the nav
+            // itself (97px on a notched iPhone: 53px of content + 8px + the 34px home
+            // indicator inset), less a 16px gap so the menu never touches the status bar.
+            // The old value subtracted a flat 96px, which was 1px short of the nav — masked
+            // until 177.79 made the shell 62px shorter and removed the spare room.
+            maxHeight: "calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 79px)",
+            overflowY: "auto",
           }}>
             <div style={{ display: "flex", alignItems: "center", padding: "2px 2px 8px" }}>
               <span style={{ flex: 1, color: C.gold, fontSize: 11, letterSpacing: 3, fontWeight: 700 }}>MORE</span>
