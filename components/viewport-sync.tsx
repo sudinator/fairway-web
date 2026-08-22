@@ -4,8 +4,11 @@ import { useEffect } from "react";
 // Publishes the live *usable* viewport height as the CSS var --app-h. In a browser tab this
 // tracks Safari's toolbar as it grows/shrinks (visualViewport fires on resize + scroll), so the
 // bottom nav stays pinned to the visible bottom instead of hiding behind the toolbar. In the
-// installed PWA a display-mode:standalone CSS rule overrides the shell to 100lvh (full glass),
-// so this var is only consulted in the browser — but we keep it updated everywhere anyway.
+// installed PWA it is ALSO what the shell uses: a standalone rule used to override the shell to
+// 100lvh, but on a notched iPhone 100lvh measures the full screen INCLUDING the strip behind the
+// status bar, so the shell overran the visible area by exactly safe-area-inset-top and its
+// overflow:hidden clipped the bottom nav's labels. Fixed at 177.79 — both contexts now read this
+// var, so it is load-bearing everywhere, not just in the browser.
 export function ViewportSync() {
   useEffect(() => {
     const vv = window.visualViewport;

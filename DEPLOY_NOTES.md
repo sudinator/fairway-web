@@ -1,3 +1,87 @@
+## 177.80.260822 — Bottom nav sits flush; the geometry guard made to actually evaluate
+- **NO migration. Layout + CI only.**
+- **FIX: the nav floated ~34px above the bottom of the app.** 177.79 sized the shell to the VISIBLE
+  viewport (`--app-h` = 894 on a notched iPhone), which already ends above the home indicator — the
+  glass is 956 and the indicator sits in that strip. The nav then reserved
+  `env(safe-area-inset-bottom)` again on top of that, counting it twice. Its padding is now a flat
+  4px, which with the button's own padding leaves 8px below the labels on every profile.
+- **A third wrong height was caught before shipping.** Reasoning from the device numbers I changed
+  the shell to `calc(var(--app-h) + env(safe-area-inset-top))`; the guard failed it immediately
+  with the same "+62, labels clipped" as the original `100lvh`. Two constraints hold at once — the
+  nav must not exceed the visible viewport AND must not stop short of it — which pins the height to
+  exactly `--app-h`. The gap was never the shell height.
+- **The guard that should have caught all this had two holes, both the shape this series keeps
+  hitting — a check that passes because it never evaluated the thing it claims to verify:**
+  - It matched the shell height as a STRING for `"lvh"`. `calc(var(--app-h) + env(...))` contains
+    no "lvh" and sailed through while being wrong in exactly the same way. The height is now
+    EVALUATED per device profile, and an expression it cannot parse is a hard failure rather than
+    a silent pass.
+  - `slack = gapBelowLabel - safeBottom` forgave reserving the bottom inset inside the nav. That is
+    only legitimate where the shell extends under the home indicator; where it is sized to the
+    visible viewport it stops above it. The allowance is now conditional on the shell actually
+    reaching the glass — without which the exact bug reported after 177.79 passed.
+  - The `--verbose` table computed its own figure rather than the one the assertion uses, so it
+    displayed -26 while the check reasoned about 8. A display that disagrees with the verdict makes
+    a wrong value look reassuring. It now prints the same expression.
+  Negative-tested against every wrong value this episode produced — `100lvh`, `--app-h + safeTop`,
+  a deliberately short shell, and the double-reserved nav inset. Before these fixes it caught one
+  of the four; it now catches all four.
+- **The guard was reading the wrong `gap`.** Its pattern matched the first
+  `alignItems: "center", gap: N` anywhere in home.tsx — an unrelated flex row 200 lines above the
+  nav, with `gap: 10` against the nav button's `gap: 3`. The height model had therefore been
+  running on an input 7px too large the entire time: wrong input, confident output. Every value the
+  guard reads is now anchored to the nav button's own declaration, and the other four reads were
+  audited to confirm they already were.
+- **That correction exposed a 43px tap target**, 1px under Apple's 44pt minimum and invisible while
+  the model was wrong. The button padding has to stay "4px 10px" to remain on the documented
+  scale — check-design-scale.py rejected "5px 10px", correctly — so the pixel comes from the
+  icon/label gap instead, which is not scale-governed. Tap target 44px on every profile, nav
+  content 48px against Apple's own 49pt tab bar, and 8px below the labels throughout.
+- **I built the same guard twice.** `ci/check_shell_layout.py` was written before noticing
+  `ci/check_shell_geometry.py` already existed. The pre-existing one is a superset — six device
+  profiles to four, it also checks tap-target height, and it needs no browser at runtime, so it
+  cannot silently skip where Playwright is absent. The duplicate has been deleted rather than left
+  to drift.
+
+## 177.79.260822 — Installed app: bottom nav labels were clipped off-screen
+- **NO migration. One CSS declaration.**
+- **FIX: the installed app showed bare icons in the bottom nav; the browser showed labels.** Same
+  version, same code. `.app-shell` was `height: 100lvh` in standalone, on the documented
+  assumption that "iOS gives a stable full-glass viewport". It is stable — but on a notched iPhone
+  **100lvh measures the whole screen INCLUDING the strip behind the status bar**, while the shell
+  is already pushed down by `padding-top: env(safe-area-inset-top)`.
+  Measured on device via the built-in ViewportDiag:
+      innerHeight / docClientH / visualVP_h   894      the visible viewport
+      100lvh                                  956      = 894 + safe-area-inset-top (62)
+      navTop / navBottom                      859/956
+      navBottom_vs_visible                    -62      <- the nav ran off-screen
+  `.app-shell` is `overflow: hidden`, so that 62px was silently clipped. The nav is the last child
+  and its LABELS sit below its icons, so only 35px of a 97px nav was visible — enough for the
+  icon, not the text. In a browser `safe-area-inset-top` is 0, so the bug could not occur there,
+  which is why two identical builds looked different.
+- **The correct height was already being measured.** `--app-h` (set by ViewportSync) reported
+  894px and `100dvh` 893.98 — both matching the visible viewport. The standalone media query was
+  discarding a correct value in favour of an incorrect assumption. Both contexts now use
+  `var(--app-h, 100dvh)`. The rule is kept rather than deleted so the reasoning survives and
+  nobody reinstates `100lvh`.
+- The file's header comment documented the wrong model and has been rewritten with the measured
+  numbers.
+- **Two follow-on effects of the shorter shell, both checked and fixed:**
+  - The **More menu** subtracted a flat 96px for the nav in its `maxHeight`. The nav actually
+    measures 97, so the menu could ask for 1px more than the space above it — masked until now by
+    the 62px of slack the over-tall shell provided. It now subtracts both safe-area insets and the
+    nav's real height, leaving a deliberate 16px gap below the status bar. Verified with the menu
+    open at device dimensions: menu top 405 against a 62px inset, not clipped.
+  - `components/viewport-sync.tsx` documented the removed override and claimed `--app-h` was "only
+    consulted in the browser". It is now load-bearing in both contexts; the comment says so.
+- Everything else that reads a viewport unit was checked: `auth.tsx` and `organizer.tsx` use
+  `minHeight: 100vh` but are ordinary scrolling pages outside the shell, so the extra height
+  scrolls rather than clipping. `ui.tsx` notes that BottomSheet is positioned rather than sized by
+  height math, so it is unaffected by design.
+- **`navBottom_vs_visible` in ViewportDiag is the permanent check**: if it is ever negative again,
+  the shell is taller than the viewport and something at the bottom is being cut off. It was
+  already computed and already displayed — it named this bug precisely, once someone looked.
+
 ## 177.78.260820 — Achievements wall: alignment, redundant badges, and an assertion ratchet
 - **NO migration. No schema change.**
 - **FIX: badge discs sat at different heights on the Achievements tab.** A `<button>` vertically
