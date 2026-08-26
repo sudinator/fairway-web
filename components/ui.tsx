@@ -16,12 +16,26 @@ const initialsOf = (name: string) =>
     .join("") || "?";
 
 // A stable, pleasant color derived from the name when no team accent is supplied.
-const AVATAR_PALETTE = ["#16503D", "#5A7BC0", "#B05B5B", "#4FB8A8", "#C9A227", "#7A5BB0", "#C77B3A"];
-const colorFor = (name: string) => {
+// Each colour is paired with the ink that is actually readable on it. Initials used to be #fff
+// on all seven, which fails AA on four — worst 2.40:1 on the teal, i.e. barely visible. The blue
+// is 8% darker than the original #5A7BC0 because at that value NEITHER white nor dark ink cleared
+// 4.5:1. Worst case across the palette is now 4.67:1.
+const AVATAR_PALETTE: { bg: string; ink: string }[] = [
+  { bg: "#16503D", ink: "#FFFFFF" },  // 9.34:1
+  { bg: "#5271B0", ink: "#FFFFFF" },  // 4.83:1  (was #5A7BC0 at 4.18:1)
+  { bg: "#B05B5B", ink: "#FFFFFF" },  // 4.67:1
+  { bg: "#4FB8A8", ink: "#0E241B" },  // 6.80:1  (was #fff at 2.40:1)
+  { bg: "#C9A227", ink: "#0E241B" },  // 6.75:1  (was #fff at 2.42:1)
+  { bg: "#7A5BB0", ink: "#FFFFFF" },  // 5.32:1
+  { bg: "#C77B3A", ink: "#0E241B" },  // 4.91:1  (was #fff at 3.32:1)
+];
+const avatarColors = (name: string) => {
   let h = 0;
   for (let i = 0; i < (name || "").length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
   return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
 };
+/** Kept for callers that only want the fill (team accents, chips). */
+const colorFor = (name: string) => avatarColors(name).bg;
 
 export function Avatar({ src, name, size = 32, accent, enlargeable = true, cssSize }: {
   src?: string | null; name: string; size?: number; accent?: string | null; enlargeable?: boolean;
@@ -68,8 +82,10 @@ export function Avatar({ src, name, size = 32, accent, enlargeable = true, cssSi
     <div
       style={{
         ...common,
-        background: accent || colorFor(name),
-        color: "#fff",
+        background: accent || avatarColors(name).bg,
+        // Paired with the fill. A supplied team accent keeps white, since its contrast is the
+        // caller's to own — that path is covered separately by the contrast guards.
+        color: accent ? "#fff" : avatarColors(name).ink,
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",

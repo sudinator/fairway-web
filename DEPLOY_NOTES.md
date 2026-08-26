@@ -1,3 +1,64 @@
+## 177.81.260824 — Screen render tests: real components, in a fake browser
+- **NO migration.** One user-visible fix, plus the test harness that found it.
+- **NEW `lib/screen-harness.ts` + `lib/screens.test.tsx`** — mounts REAL components from
+  `components/` in jsdom and asserts what a person would otherwise check by eye: every row is on
+  screen, all text clears WCAG AA against the background it actually resolves against, no button
+  is below the tap-target floor, nothing renders `null`/`undefined`/`NaN`, and the screen mounts at
+  all. 24 assertions across `RoundsList` and `LeaderRow` (four net-vs-par states each).
+  Wired into `npm test`; assertion baseline 1252 -> 1276.
+- **Why:** the unit suite tests logic and never opens a screen, so a whole class of defect reached
+  devices this week with every gate green — six buttons rendered blue, 44 destructive actions at
+  1.42:1, the nav's labels clipped off-screen, badge discs on different lines. All are "render it
+  and measure" problems.
+- **FIX found on the harness's first run: avatar initials were `#fff` on every palette colour**,
+  which fails AA on four of the seven — worst **2.40:1** on the teal, effectively invisible. Each
+  colour is now paired with the ink that is readable on it, and the blue moved 8% darker
+  (`#5A7BC0` -> `#5271B0`) because at the original value NEITHER ink cleared 4.5. Worst case across
+  the palette 2.40:1 -> 4.67:1, and `check_resolved_contrast` fell from 25 known sub-threshold
+  sites to **17**.
+- **`C.gold` as text on light-green surfaces (3.34:1) is accepted, not fixed.** 163 sites use it;
+  lightening it enough to clear 4.5 would visibly change the brand colour app-wide and make
+  gold-on-cream worse. Recorded as a named allowance with its measured ratio and reason, and
+  **printed on every run** so it stays visible rather than becoming a silent skip.
+- **Testing the REAL component corrected the test twice**, which a hand-written stand-in never
+  would have: the field is `course`, not `course_name`; and gross and Stableford are DERIVED from
+  the holes, so a row-level `gross` is ignored. Both assumptions were mine and both were wrong.
+- **Negative-tested against four defects**: reverting the avatar ink, stranding a score colour on
+  the wrong surface, dropping rows from the list, and a crash on a round with no putts recorded.
+  All four fail the suite; the shipped code passes.
+- **NEW `ci/check_no_build_artifacts.py`** — 149 compiled `.js` files had accumulated under `app/`,
+  `components/` and `lib/` from a `tsc` run without `--outDir`. They were invisible to everything:
+  `tsc --noEmit` reads the `.ts`, `next build` resolves `.ts` first, and the unit suite imports
+  from `.testout/`. Only eslint noticed, by failing to parse the JSX. Had they been committed,
+  module resolution could have served a stale compiled component while the source on screen looked
+  correct. Removed, and the guard runs FIRST so it cannot recur. Negative-tested.
+- `ci/patch_test_aliases.mjs` rewrites `require("@/...")` in compiled test output — tsc resolves
+  the alias for types only, which is what made the components untestable in the first place.
+- **SECOND BATCH: `SegmentBoard` and `ShotSynthesis`.** 24 -> 62 assertions.
+  - `SegmentBoard`: collapsed and expanded, both scoring modes, four player rows including a tie
+    on total, a mid-round player and one who has not started, plus the empty case that must render
+    nothing at all rather than a stray heading.
+  - `ShotSynthesis`: three states — no handicap index, no stat meeting its minimum sample, and a
+    qualifying sample at 0% / 100% / a repeating decimal, where formatting and rounding break.
+  - **NEW `click()` in the harness.** An accordion that never opens is a whole branch of markup no
+    assertion has ever seen; SegmentBoard's player rows are only reachable once expanded.
+- **The real components corrected the tests four more times**, which is the whole argument for
+  testing them rather than stand-ins: `SegmentBoard` is a COLLAPSED accordion, not an open board;
+  its segments are three blocks of six, not front/back nine; `ShotSynthesis` returns null without a
+  handicap index; and it returns null again when no stat meets its minimum sample. All four were my
+  assumptions, and a stand-in I had written would have agreed with every one.
+- **Several "prop-only" components construct a Supabase client at MODULE scope**, so importing them
+  throws before any test runs — my earlier count looked for `supabase.` usages and missed it. The
+  harness sets placeholder credentials before any component is imported. No request is made;
+  anything that genuinely queries will fail loudly against a placeholder host, which is correct —
+  it means that component needs the fake client rather than a silent pass.
+- Negative-tested again: a changed segment column label, a dropped player row, and a colour token
+  stranded on the wrong surface are all caught.
+- Assertion baseline 1276 -> **1314**.
+
+- **Scope:** 18 components take props only and are testable with no database stand-in. The 20
+  Supabase-coupled screens need a fake client and come next.
+
 ## 177.80.260822 — Bottom nav sits flush; the geometry guard made to actually evaluate
 - **NO migration. Layout + CI only.**
 - **FIX: the nav floated ~34px above the bottom of the app.** 177.79 sized the shell to the VISIBLE
