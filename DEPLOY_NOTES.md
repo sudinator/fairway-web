@@ -1,3 +1,54 @@
+## 177.82.260826 — CI ran every test twice; alternate shot logic (inert)
+- **NO migration. No user-visible change.**
+- **FIX: `npm run ci` executed the whole test suite twice and timed out at 1800s.** The chain was
+  `guards && test`, and `ci/check_test_assertions.py` — the assertion ratchet — shelled out to
+  `npm test` itself. I wrote that guard without noticing the pipeline already ran the suite. Adding
+  the screen render tests at 177.81 pushed the second run past the timeout, so CI has been failing
+  on every push since.
+  `npm test` now writes its output to `.test-report.txt` and the ratchet reads that. The ratchet
+  step drops from ~10 minutes to 0 seconds. Re-running remains the fallback for standalone use, and
+  a report older than the newest source file is REJECTED — trusting a stale one would let the guard
+  pass against results that predate the change being checked. Verified by touching a source file
+  and watching it go back to a full run.
+- **A second defect found while fixing the first:** the initial version piped the suite through
+  `tee`, which `sh` cannot make fail-safe — npm runs scripts with `sh`, which has no `pipefail`, so
+  a failing suite would have exited 0 behind tee's own success. A test suite that cannot fail the
+  build is worse than no test suite. Rewritten to capture the real exit code, and verified by
+  sabotaging a test and confirming `npm test` still returns non-zero.
+- The `ci` chain now runs `test` before `guards`, so the report exists when the ratchet looks for
+  it. Every check still runs; only the order changed.
+- **The game-type union was written out verbatim in SEVEN places across five files** — `GameType`,
+  `GameTypeOpt`, and five inline copies in `game-types.ts`, `organizer-panel.tsx`,
+  `tournaments.tsx` (x3) and the live view. Adding a format meant finding all seven, and the six
+  missed would have silently excluded it from the picker, the live scoreboard and the organizer's
+  format switcher, with no error anywhere. All now reference one list.
+- **NEW alternate shot (foursomes) logic — INERT in this release.** `alt_shot` is in the type union
+  and in `shapeOf`, but no picker offers it, so no game can be created with it. The existing
+  85-assertion game-shape suite passes unchanged, which is the evidence that every existing format
+  behaves identically. The UI lands separately.
+  - `lib/alt-shot.ts` (60 assertions) — team handicap at 50% of combined Course Handicaps, match
+    strokes, odd/even tee order, low-net hole result, match state.
+    **Rounding happens ONCE, at the difference.** Rounding each side first loses a stroke: combined
+    28 and 15 give 14 and 7.5, a difference of 6.5 that rounds to 7 — pre-rounding gives 14 and 8,
+    a difference of 6. The worked example is pinned as a test.
+    A missing handicap is REPORTED, never guessed: a partner off 20 counted as scratch turns a team
+    handicap of 17 into 7 and hands the other side ten strokes with nothing on screen to say so.
+    The organiser is told which partner and chooses; unresolved means NO strokes, not wrong ones.
+  - `lib/match-length.ts` (38 assertions) — 18 / front 9 / back 9, for EVERY format, asked as two
+    questions: how many holes, then which nine, and the second only when it applies. Hole numbers
+    are NOT renumbered — a back-nine card must say 10-18, or a player reads "hole 1" on the 10th
+    tee. Halving the Course Handicap for a nine is documented as an APPROXIMATION: WHS uses that
+    nine's own Course Rating and Slope, which BNN does not have because GolfCourseAPI does not
+    publish per-nine figures.
+  - `lib/alt-shot-scores.ts` (16 assertions) — one score fanned out to both partners' rows, so the
+    outbox, scorecard and leaderboard all work untouched. Stats are deliberately NOT fanned out:
+    whose putt was it? Duplicating would double the side's putts in every aggregate.
+  - `lib/game-type-coverage.test.ts` (72 assertions) — walks every game type and asserts each has a
+    DISTINCT label and a valid shape. Distinctness matters: the label chain ends in a fall-through
+    to "Stableford", so a format added to the union but forgotten there is not labelled with its
+    raw key — it is labelled as a different real format, and nothing looks wrong.
+- Assertion baseline 1314 -> **1512 across 26 suites**.
+
 ## 177.81.260824 — Screen render tests: real components, in a fake browser
 - **NO migration.** One user-visible fix, plus the test harness that found it.
 - **NEW `lib/screen-harness.ts` + `lib/screens.test.tsx`** — mounts REAL components from

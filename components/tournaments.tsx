@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import type { GameType } from "@/lib/game-shape";
 import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
 import { ContestsSection, ContestHoleChip } from "@/components/contests-view";
@@ -237,7 +238,7 @@ function CreateGame({
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState("");
   const [profileIdx, setProfileIdx] = useState<number | null>(null);
-  const [gameType, setGameType] = useState<"stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta">(
+  const [gameType, setGameType] = useState<GameType>(
     "stableford",
   );
   // Handicap allowance % (playing handicap = allowance% of course handicap).
@@ -257,7 +258,7 @@ function CreateGame({
   // In-progress text for each missing-handicap field, so a row stays put while typing and
   // only commits (leaving the "needs" list) when the organizer taps Set.
   const [flightHcpDraft, setFlightHcpDraft] = useState<Record<string, string>>({});
-  const selectGameType = (nextType: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => {
+  const selectGameType = (nextType: GameType) => {
     setGameType(nextType);
     const nextAllowance = nextType === "fourball" || nextType === "trifecta" ? 85 : 100;
     setAllowancePct(nextAllowance);
@@ -2369,7 +2370,7 @@ function GameRoom({
     await supabase.from("games").update({ trifecta_scoring: next }).eq("id", game.id);
     await load();
   };
-  const setFormat = async (next: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => {
+  const setFormat = async (next: GameType) => {
     if (!game || next === game.game_type || !allowSetupChange({ type: "set_format", target: next })) return;
     const patch = buildFormatPatch(game, next);
     // NOTE: we deliberately do NOT clear pairings/foursomes/teams when switching

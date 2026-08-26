@@ -39,13 +39,46 @@ PATTERNS = [
 ]
 
 
+REPORT = ROOT / ".test-report.txt"
+
+
+def newest_source_mtime() -> float:
+    """Most recent change to anything the suite covers, so a stale report is never trusted."""
+    newest = 0.0
+    for d in ("lib", "components", "app"):
+        base = ROOT / d
+        if not base.exists():
+            continue
+        for p in base.rglob("*.ts*"):
+            try:
+                newest = max(newest, p.stat().st_mtime)
+            except OSError:
+                pass
+    return newest
+
+
 def collect():
-    """Run the suite and total the reported assertions per named suite."""
-    r = subprocess.run(["npm", "test"], cwd=ROOT, capture_output=True, text=True, timeout=1800)
-    out = r.stdout + r.stderr
-    if r.returncode != 0:
-        print("TEST ASSERTIONS: npm test failed — fix the tests before running this guard.")
-        sys.exit(1)
+    """Total the reported assertions per named suite.
+
+    Prefers the report written by `npm test`. The guard used to run the suite itself, and because
+    `npm run ci` runs guards AND test, every suite executed twice — which pushed CI past its
+    30-minute timeout once the screen render tests were added. Re-running is kept as a fallback so
+    the check still works on its own, but the pipeline no longer pays for it twice.
+
+    A report older than the newest source file is ignored: trusting a stale one would let a guard
+    pass against results that predate the change being checked.
+    """
+    out = None
+    if REPORT.exists() and REPORT.stat().st_mtime >= newest_source_mtime():
+        out = REPORT.read_text(encoding="utf-8", errors="replace")
+        if "failed" not in out and "FAIL" not in out:
+            out = None  # not a recognisable report; fall through and run the suite
+    if out is None:
+        r = subprocess.run(["npm", "test"], cwd=ROOT, capture_output=True, text=True, timeout=1800)
+        out = r.stdout + r.stderr
+        if r.returncode != 0:
+            print("TEST ASSERTIONS: npm test failed — fix the tests before running this guard.")
+            sys.exit(1)
 
     counts = {}
     anonymous = 0

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import type { GameType } from "@/lib/game-shape";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { Avatar } from "@/components/ui";
@@ -22,7 +23,7 @@ type LivePlayer = {
 };
 type LiveGame = {
   name: string; course: string; course_par: number | null;
-  game_type: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta";
+  game_type: GameType;
   status: "active" | "ended"; allowance_pct: number | null;
   team_score_mode: "best_ball" | "aggregate" | null;
   trifecta_scoring: "per_hole" | "match" | null;

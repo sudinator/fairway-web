@@ -3,7 +3,18 @@
 // Unit-tested in game-shape.test.ts.
 import { applyAllowance, matchAllowance, matchStrokesFor, strokesReceived } from "./golf";
 
-export type GameType = "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta";
+/**
+ * `alt_shot` is foursomes: 2v2 match play with ONE ball per side, partners alternating strokes.
+ * Distinct from `fourball`, which is also 2v2 but with four balls and the better score counting.
+ * The single ball is what drives everything else — a side has one score rather than two, and the
+ * handicap allowance is 50% of the partners' combined Course Handicaps.
+ */
+export type GameType = "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta" | "alt_shot";
+
+/** Every game type, for exhaustiveness tests and for building pickers without hardcoding a list. */
+export const GAME_TYPES: GameType[] = [
+  "stableford", "stroke", "match", "fourball", "skins", "trifecta", "alt_shot",
+];
 export type TeamDef = { key: string; name: string };
 export type FoursomeDef = { id: string; name: string; a: string[]; b: string[]; swap?: boolean };
 export type PairDef = { a: string; b: string };
@@ -28,7 +39,7 @@ export type GameShape = {
   usesMatchups: boolean;
   usesFoursomes: boolean;
   dotBasis: "absolute" | "relative_pair" | "relative_foursome";
-  view: "stableford" | "stroke" | "match" | "fourball" | "trifecta" | "skins_individual" | "skins_team_11" | "skins_team_2v2";
+  view: "stableford" | "stroke" | "match" | "fourball" | "trifecta" | "alt_shot" | "skins_individual" | "skins_team_11" | "skins_team_2v2";
 };
 export function shapeOf(game: ShapeGame): GameShape {
   const gt = game.game_type;
@@ -36,18 +47,19 @@ export function shapeOf(game: ShapeGame): GameShape {
   const hasFour = Array.isArray(game.foursomes);
   const skinsStyle: GameShape["skinsStyle"] =
     gt !== "skins" ? null : !teams2 ? "individual" : hasFour ? "team_2v2" : "team_11";
-  const usesFoursomes = gt === "fourball" || gt === "trifecta" || skinsStyle === "team_2v2";
+  const usesFoursomes =
+    gt === "fourball" || gt === "trifecta" || gt === "alt_shot" || skinsStyle === "team_2v2";
   // The global Teams step applies only when two named teams actually exist: team match,
   // team skins, trifecta (always), and the team-mode four-ball variant. Plain four-ball
   // builds its sides inside each foursome (pair A vs pair B), so it has NO global teams.
   const usesTeams =
-    teams2 && (gt === "match" || gt === "fourball" || gt === "trifecta" || gt === "skins");
+    teams2 && (gt === "match" || gt === "fourball" || gt === "trifecta" || gt === "skins" || gt === "alt_shot");
   const usesMatchups =
-    gt === "match" || gt === "fourball" || gt === "trifecta" || (gt === "skins" && skinsStyle !== "individual" && skinsStyle !== null);
+    gt === "match" || gt === "fourball" || gt === "trifecta" || gt === "alt_shot" || (gt === "skins" && skinsStyle !== "individual" && skinsStyle !== null);
   const dotBasis: GameShape["dotBasis"] =
     gt === "match"
       ? "relative_pair"
-      : gt === "fourball" || gt === "trifecta"
+      : gt === "fourball" || gt === "trifecta" || gt === "alt_shot"
       ? "relative_foursome"
       : gt === "skins"
       ? (skinsStyle === "team_2v2" ? "relative_foursome" : skinsStyle === "team_11" ? "relative_pair" : "absolute")

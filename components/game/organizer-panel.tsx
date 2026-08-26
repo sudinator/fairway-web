@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import type { GameType } from "@/lib/game-shape";
 import { createClient } from "@/lib/supabase";
 import { ContestsSection, ContestHoleChip } from "@/components/contests-view";
 import { betResultToPost } from "@/lib/money";
@@ -95,7 +96,7 @@ export type OrganizerPanelProps = {
   onAddMember?: (m: { id: string; display_name: string; handicap_index: number | null }) => Promise<void>;
   onAddGuest?: (name: string, hcp: number, sponsor: string) => Promise<void>;
   onSetAllowance?: (pct: number) => Promise<void>;
-  onSetFormat?: (f: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => Promise<void>;
+  onSetFormat?: (f: GameType) => Promise<void>;
   onSetTeamScoreMode?: (m: "best_ball" | "aggregate") => Promise<void>;
   onSetSkinsMode?: (m: "carryover" | "split") => Promise<void>;
   onSetSkinsStyle?: (s: "individual" | "team_11" | "team_2v2") => Promise<void>;
@@ -486,7 +487,7 @@ export function OrganizerPanel({
                     ? [["stableford", "Stableford"], ["stroke", "Stroke play"], ["skins", "Skins"]]
                     : [["match", "Match"], ["fourball", "Four-ball"], ["trifecta", "Trifecta"], ["skins", "Skins"]]
                   ).map(([rawKey, label]) => {
-                    const key = rawKey as "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta";
+                    const key = rawKey as GameType;
                     const isCur = game.game_type === key;
                     const d = policy({ type: "set_format", target: key });
                     const allowed = isCur || d.decision !== "block";

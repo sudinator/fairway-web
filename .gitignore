@@ -16,3 +16,4 @@ tsconfig.tsbuildinfo
 CHANGES.md
 .testout-screens/
 .testout-rel/
+.test-report.txt

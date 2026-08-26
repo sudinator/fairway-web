@@ -1,4 +1,5 @@
 import type { GameTypeOpt } from "./game-create";
+import type { MatchLength } from "./match-length";
 
 export type CreateFormatState = {
   gameType: GameTypeOpt;
@@ -8,6 +9,15 @@ export type CreateFormatState = {
   trifectaScoring: "per_hole" | "match";
   strokeBasis: "net" | "gross";
   skinsMode: "carryover" | "split";
+  /** The handicap allowance. Some formats define it (alternate shot is 50%); others let the
+   *  organiser choose. */
+  allowancePct?: number;
+  /**
+   * 18 holes, front nine or back nine. Applies to EVERY format, not just alternate shot — a
+   * nine-hole singles match or four-ball is just as ordinary. Optional so existing drafts and
+   * saved games, which predate the setting, keep behaving as 18 holes.
+   */
+  matchLength?: MatchLength;
 };
 
 export type GuidedFormatState = CreateFormatState & {
@@ -51,8 +61,17 @@ export function selectGuidedMatchKind(state: GuidedFormatState, kind: "ind" | "t
     : { matchKind: "team", gameType: "fourball" };
 }
 
-export function selectGuidedTeamFormat(gameType: "fourball" | "trifecta" | "skins"): CreateFormatPatch {
+export function selectGuidedTeamFormat(
+  gameType: "fourball" | "trifecta" | "skins" | "alt_shot",
+): CreateFormatPatch {
   if (gameType === "skins") return { gameType, teamMode: true, skinsTeamStyle: "best_ball" };
+  if (gameType === "alt_shot") {
+    // One ball per side, so best-ball vs aggregate does not apply — forced rather than left over
+    // from four-ball, where it would sit in the review label claiming a choice this format lacks.
+    // 50% is the format's definition, not a preference: carrying four-ball's 90% across would hand
+    // out nearly twice the strokes.
+    return { gameType, teamMode: true, teamScoreMode: "best_ball", allowancePct: 50 };
+  }
   return { gameType };
 }
 
@@ -72,6 +91,11 @@ export function formatReviewLabel(state: CreateFormatState): string {
     case "match": return `Match Play · ${state.teamMode ? "Team" : "Individual"}`;
     case "fourball": return `Four-ball · ${state.teamMode ? "Team vs Team" : "2 v 2 Match"} · ${state.teamScoreMode === "aggregate" ? "Shootout" : "Best ball"}`;
     case "trifecta": return `Trifecta · ${state.teamScoreMode === "aggregate" ? "Shootout" : "Best ball"} · ${state.trifectaScoring === "match" ? "Ryder Cup" : "Per hole"}`;
+    case "alt_shot":
+      // One ball per side, so there is no best-ball/aggregate choice to state — that is the whole
+      // difference from four-ball. The match length is worth showing because a nine is a genuinely
+      // different match, not a shorter one.
+      return `Alternate Shot · 2 v 2 Match${state.matchLength && state.matchLength !== "18" ? ` · ${state.matchLength === "front9" ? "Front 9" : "Back 9"}` : ""}`;
     case "skins": {
       const style = skinsStyleFromState(state);
       const styleLabel = style === "individual" ? "Individual" : style === "team_11" ? "1:1 Teams" : "2 v 2 Best-ball";
