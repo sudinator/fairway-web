@@ -4,7 +4,7 @@
  * The cases that matter are the disagreements — a row edited outside the alternate-shot flow, or
  * an outbox still catching up. Preferring one partner silently would show a score nobody entered.
  */
-import { altShotScoreWrites, sideScore, altShotStatsOwner } from "./alt-shot-scores";
+import { altShotScoreWrites, sideScore, altShotStatsOwner, partnerRowIds } from "./alt-shot-scores";
 
 let pass = 0, fail = 0; const fails: string[] = [];
 const ok = (n: string, c: boolean) => { if (c) pass++; else { fail++; fails.push("FAIL " + n); } };
@@ -53,6 +53,47 @@ eq("zero is a value, not a blank", sideScore([0], [0], 0), { strokes: 0, conflic
 // putt count would double the side's putts in any aggregate.
 eq("stats belong to one row only", altShotStatsOwner(["amit", "bryan"]), "amit");
 ok("stats owner is stable across calls", altShotStatsOwner(["amit", "bryan"]) === altShotStatsOwner(["amit", "bryan"]));
+
+
+// ── finding the partner ────────────────────────────────────────────────────
+// Foursome sides hold player KEYS (user_id ?? row id), not row ids. Writing scores needs row ids.
+{
+  const players = [
+    { id: "row-amit", user_id: "u-amit" },
+    { id: "row-bryan", user_id: "u-bryan" },
+    { id: "row-guest", user_id: null },      // a guest: key IS the row id
+    { id: "row-shubho", user_id: "u-shubho" },
+  ];
+  const foursomes = [{ id: "f1", a: ["u-amit", "u-bryan"], b: ["row-guest", "u-shubho"] }];
+
+  // The mapping step is the point: passing keys straight through would return "u-amit", which is
+  // not a row id, and the write would silently land nowhere.
+  eq("side A resolves to ROW ids", partnerRowIds("row-amit", foursomes, players), ["row-amit", "row-bryan"]);
+  eq("either partner finds the same pair", partnerRowIds("row-bryan", foursomes, players), ["row-amit", "row-bryan"]);
+  // A guest is keyed by row id, which is exactly the case that would pass even with the bug.
+  eq("side B with a guest", partnerRowIds("row-guest", foursomes, players), ["row-guest", "row-shubho"]);
+  eq("the guest's partner finds it too", partnerRowIds("row-shubho", foursomes, players), ["row-guest", "row-shubho"]);
+
+  eq("a player in no foursome", partnerRowIds("row-nobody", foursomes, players), null);
+  eq("no foursomes at all", partnerRowIds("row-amit", null, players), null);
+  eq("empty foursomes", partnerRowIds("row-amit", [], players), null);
+}
+{
+  // A side must hold exactly two. One or three is not an alternate shot pair, and guessing which
+  // two to write would put a score on someone who did not play the ball.
+  const players = [{ id: "r1", user_id: "u1" }, { id: "r2", user_id: "u2" }, { id: "r3", user_id: "u3" }];
+  eq("a side of one", partnerRowIds("r1", [{ id: "f", a: ["u1"], b: ["u2"] }], players), null);
+  eq("a side of three", partnerRowIds("r1", [{ id: "f", a: ["u1", "u2", "u3"], b: [] }], players), null);
+  // A player removed mid-round leaves a key resolving to nothing; writing to the survivor alone
+  // would quietly turn the pair into a single.
+  eq("a partner no longer in the game", partnerRowIds("r1", [{ id: "f", a: ["u1", "u-gone"], b: [] }], players), null);
+}
+{
+  // Malformed data must not throw — foursomes come from the database.
+  const players = [{ id: "r1", user_id: "u1" }];
+  eq("null sides", partnerRowIds("r1", [{ id: "f", a: null, b: null }], players), null);
+  eq("missing sides", partnerRowIds("r1", [{ id: "f" }], players), null);
+}
 
 console.log(`alt shot scores: ${pass} passed, ${fail} failed`);
 if (fail) { console.error(fails.join("\n")); process.exit(1); }

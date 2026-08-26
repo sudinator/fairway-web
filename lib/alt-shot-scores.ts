@@ -85,3 +85,50 @@ export function sideScore(
 export function altShotStatsOwner(partnerIds: [string, string]): string {
   return partnerIds[0];
 }
+
+
+// ---------------------------------------------------------------------------
+// Finding the partner.
+
+export type SidePlayer = { id: string; user_id: string | null };
+export type Foursome = { id: string; name?: string; a?: string[] | null; b?: string[] | null };
+
+/** Same rule as lib/game-shape's pkey: user_id when signed in, row id for a guest. */
+const keyOf = (p: SidePlayer) => p.user_id ?? p.id;
+
+/**
+ * The two ROW ids making up the side that `playerId` belongs to.
+ *
+ * Foursome sides hold player KEYS, not row ids, so each key is mapped back through the players
+ * list. Skipping that step would look correct for guests — whose key IS their row id — and
+ * silently write nothing for every signed-in member.
+ *
+ * Returns null when the player is not in any foursome, or when their side does not hold exactly
+ * two players. A side of one or three is not an alternate shot pair, and guessing which two to
+ * write would put a score on someone who did not play the ball.
+ */
+export function partnerRowIds(
+  playerId: string,
+  foursomes: Foursome[] | null | undefined,
+  players: SidePlayer[],
+): [string, string] | null {
+  const self = players.find((p) => p.id === playerId);
+  if (!self || !Array.isArray(foursomes)) return null;
+  const key = keyOf(self);
+
+  for (const f of foursomes) {
+    for (const side of [f?.a, f?.b]) {
+      if (!Array.isArray(side) || !side.includes(key)) continue;
+      const rows = side
+        .map((k) => players.find((p) => keyOf(p) === k))
+        .filter((p): p is SidePlayer => !!p)
+        .map((p) => p.id);
+      // Exactly two, and both resolvable. A player listed in a foursome but no longer in the game
+      // — removed mid-round — leaves a key that resolves to nothing, and writing to the survivor
+      // alone would quietly turn the pair into a single.
+      if (rows.length !== 2) return null;
+      return [rows[0], rows[1]];
+    }
+  }
+  return null;
+}

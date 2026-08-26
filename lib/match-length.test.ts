@@ -26,8 +26,12 @@ const eq = <T,>(n: string, a: T, b: T) => {
   else { fail++; fails.push(`FAIL ${n}\n     expected ${JSON.stringify(b)}\n     actual   ${JSON.stringify(a)}`); }
 };
 
+// The REAL shape: CourseHole is { n, par, si }, and holes_meta stores the same. An earlier
+// version of this file used `hole_number`, which course holes do not carry — the fixtures agreed
+// with the module because both were built from the same assumption, and only a test against the
+// real payload builder caught it.
 const course = Array.from({ length: 18 }, (_, i) => ({
-  hole_number: i + 1,
+  n: i + 1,
   par: i % 6 === 5 ? 5 : i % 4 === 3 ? 3 : 4,
   // Stroke indexes interleave odd/even across the nines, as real courses do.
   si: i < 9 ? i * 2 + 1 : (i - 9) * 2 + 2,
@@ -38,9 +42,9 @@ eq("front9 -> nine", holeCountFor(course, "front9"), 9);
 eq("back9 -> nine", holeCountFor(course, "back9"), 9);
 
 // Hole numbers must NOT be renumbered: a back-nine match is played on 10 through 18.
-eq("front nine is holes 1-9", holesForLength(course, "front9").map((h) => h.hole_number),
+eq("front nine is holes 1-9", holesForLength(course, "front9").map((h) => h.n),
    [1, 2, 3, 4, 5, 6, 7, 8, 9]);
-eq("back nine is holes 10-18, NOT renumbered", holesForLength(course, "back9").map((h) => h.hole_number),
+eq("back nine is holes 10-18, NOT renumbered", holesForLength(course, "back9").map((h) => h.n),
    [10, 11, 12, 13, 14, 15, 16, 17, 18]);
 
 // Stroke indexes come through untouched — strokes must fall on the course's own hardest holes.
@@ -103,6 +107,14 @@ eq("second answer sets the nine", setNine("back9"), "back9");
 ok("18-hole course can choose a nine", canChooseNine(course));
 ok("nine-hole course cannot", !canChooseNine(course.slice(0, 9)));
 ok("empty course cannot", !canChooseNine([]));
+
+
+// Round holes use `hole_number` rather than `n`, so both must resolve.
+{
+  const roundHoles = Array.from({ length: 18 }, (_, i) => ({ hole_number: i + 1, par: 4, si: i + 1 }));
+  eq("back nine of ROUND holes is labelled 10-18",
+     matchLengthLabel("back9", holesForLength(roundHoles, "back9")), "Back nine (10\u201318)");
+}
 
 console.log(`match length: ${pass} passed, ${fail} failed`);
 if (fail) { console.error(fails.join("\n")); process.exit(1); }

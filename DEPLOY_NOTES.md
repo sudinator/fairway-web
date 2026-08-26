@@ -1,3 +1,56 @@
+## 177.85.260826 — Three staging defects: Format tab, allowance field, and the missing 9/18 picker
+- **NO migration.** All three reported from staging; each verified from the code before any fix.
+- **FIX: the Format tab was missing Alternate Shot and looked different from Create Game.** It
+  carried its OWN hardcoded list of game types as `[key, label]` tuples — an EIGHTH copy of a list
+  already consolidated seven times at 177.82. My earlier sweep searched for the type-union pattern
+  and a tuple array does not match it. That is why the format appeared at creation and vanished
+  afterwards, and why the tiles were sized differently (minWidth 100 / padding "7px 12px" against
+  Create Game's 150 / standard).
+  **NEW `components/game/format-picker.tsx`** — one control driven by `GAME_TYPES`, shared by both
+  screens, so the next format reaches both or neither. Everything the Format tab has that Create
+  Game does not is preserved and passed explicitly: the per-format legality verdict, the
+  greyed-with-reason state (a blocked format is SHOWN disabled, never hidden — an option that
+  silently vanishes teaches nobody why), the per-preset allowance block, and the anyScores note.
+  Create Game omits them because nothing is scored yet. 25 rendering assertions.
+- **FIX: the allowance after creation had no free-text field and no 50 preset**, so a game created
+  as alternate shot at its defined 50% could never be corrected back to it. Presets are now
+  [100, 90, 85, 50] plus the free-text field, shared with Create Game.
+- **FIX: the 9/18 picker did not exist ANYWHERE.** `match-length.ts` was built and tested at
+  177.82 and nothing rendered it, while the deploy notes said it applied "to EVERY format" — which
+  reads as shipped. That was misleading and it wasted a staging round trip.
+  **NEW `components/game/match-length-picker.tsx`** — two questions, "how many holes" then "which
+  nine", the second only when it applies. Renders NOTHING on a nine-hole course, where there is one
+  nine and it is the course. 18 rendering assertions.
+- **A nine-hole game needs NO schema change:** it is simply nine entries in `holes_meta`.
+  `holesForLength` slices the course's holes at payload time, keeping their own hole numbers and
+  stroke indexes — so a back nine reads 10-18 and strokes still fall on the course's hardest holes.
+  12 assertions run the REAL `buildGamePayload` to prove it.
+- **The scorecard needed no change at all.** Verified rather than assumed: `ScoreEntryCard` already
+  gates its IN and TOTAL rows on `holes.length > 9`, and the scorecard's divider separates PLAYERS
+  (pairings), not front/back nine. Every `|| 18` in the codebase is a fallback for missing data,
+  not an assumption. Nine-hole rendering was built long ago; there was no way to create such a game.
+- **`match-length.ts` was written against the WRONG FIELD.** `CourseHole` is `{ n, par, si }`; I had
+  used `hole_number`, which course holes do not carry, and then tested it with fixtures built from
+  the same assumption — so module and tests agreed and both were wrong. Only a test against the
+  real payload builder exposed it. It now accepts either field, because round holes (lib/golf.ts)
+  genuinely do use `hole_number`.
+- **Match length is editable until the first score, then locked** — the rule you asked for, and the
+  same rule as `change_course`, for a concrete reason: scores are stored POSITIONALLY against
+  holes_meta, so shortening an 18-hole game after someone has played the 12th would orphan those
+  entries. New `set_match_length` policy action, 5 assertions, negative-tested both directions.
+- **Match length persists in the setup draft.** Surfaced by the state-inventory guard demanding it
+  be classified: it is domain state, so without persistence an organiser who picks the back nine,
+  leaves setup and returns would silently be back at 18 and create the game on the wrong holes.
+  Optional throughout, and a test pins that a draft saved BEFORE this field existed still resumes —
+  at 18, not undefined — so nobody mid-setup when the release lands loses their draft.
+- **TWO guards pinned a VARIABLE NAME rather than the behaviour.** Both required the literal
+  `target: key`, so extracting the shared picker and renaming the loop variable to `t` failed them
+  while the guarantee was intact. Both now match the ACTION. A guard that breaks on a rename
+  teaches people to weaken guards. Each was negative-tested afterwards to confirm it still catches
+  the policy actually being removed.
+- Removing the duplicated control paid down design debt: off-scale `padding "7px 12px"` 32 -> 30.
+- Assertion baseline 1521 -> **1594 across 29 suites**.
+
 ## 177.84.260826 — Alternate Shot appears in Create Game
 - **NO migration.** First user-visible piece of the alternate shot format: it can now be selected.
   Scoring and the scorecard follow separately, so a game created in this format is not yet

@@ -1,4 +1,5 @@
 import type { SetupDraft } from "./setup-draft";
+import type { MatchLength } from "./match-length";
 import type { GameTypeOpt } from "./game-create";
 
 export type DraftGuest = {
@@ -27,6 +28,8 @@ export type GameSetupDraft = {
   format: {
     gameType: GameTypeOpt;
     allowancePct: number;
+    /** 18 / front9 / back9. Optional so drafts saved before this existed restore as 18. */
+    matchLength?: MatchLength;
     teamScoreMode: "best_ball" | "aggregate";
     trifectaScoring: "per_hole" | "match";
     strokeBasis: "gross" | "net";
@@ -61,6 +64,7 @@ export type GameSetupDraftInput = {
   hcpOverrides: Record<string, number>;
   gameType: GameTypeOpt;
   allowancePct: number;
+  matchLength?: MatchLength;
   teamScoreMode: "best_ball" | "aggregate";
   trifectaScoring: "per_hole" | "match";
   strokeBasis: "gross" | "net";
@@ -94,6 +98,7 @@ export function buildGameSetupDraft(i: GameSetupDraftInput): GameSetupDraft {
     },
     format: {
       gameType: i.gameType,
+      matchLength: i.matchLength,
       allowancePct: i.allowancePct,
       teamScoreMode: i.teamScoreMode,
       trifectaScoring: i.trifectaScoring,
@@ -122,6 +127,8 @@ export function toLegacySetupData(d: GameSetupDraft): LegacySetupData {
     teeIdx: d.game.defaultTeeIdx,
     idxStr: d.game.creatorHandicapText,
     gameType: d.format.gameType,
+    // Older drafts have no length; 18 is the correct restore, not undefined.
+    matchLength: d.format.matchLength ?? "18",
     allowancePct: d.format.allowancePct,
     teamScoreMode: d.format.teamScoreMode,
     trifectaScoring: d.format.trifectaScoring,

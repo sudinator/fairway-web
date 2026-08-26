@@ -24,6 +24,10 @@
     "components/rounds-list.tsx",
     "components/game/leader-row.tsx",
     "components/game/segment-views.tsx",
-    "components/compare-stats.tsx"
+    "components/compare-stats.tsx",
+    "lib/format-picker.test.tsx",
+    "components/game/format-picker.tsx",
+    "lib/match-length-picker.test.tsx",
+    "components/game/match-length-picker.tsx"
   ]
 }

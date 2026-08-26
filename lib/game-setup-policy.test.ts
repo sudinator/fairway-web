@@ -68,6 +68,23 @@ check("course pre-score allowed", decision(baseGame(), [blank], { type: "change_
 check("course scored blocked", decision(baseGame(), [scored], { type: "change_course" }), "block");
 check("course ended blocked", decision({ ...baseGame(), status: "ended" }, [blank], { type: "change_course" }), "block");
 
+
+// ── match length: editable until the first score, exactly like the course ──
+// Scores are stored positionally against holes_meta, so shortening an 18-hole game to a nine
+// after someone has played the 12th would orphan those entries. The lock is about the data.
+check("length editable before any score",
+  decision(baseGame(), [P("p1")], { type: "set_match_length", length: "front9" }), "allow");
+check("length locked once scoring begins",
+  decision(baseGame(), [P("p1", [4, null])], { type: "set_match_length", length: "front9" }), "block");
+// Every length locks, including re-selecting 18 — the lock is about the data, not the option.
+check("back9 locked after scoring",
+  decision(baseGame(), [P("p1", [4, null])], { type: "set_match_length", length: "back9" }), "block");
+check("18 locked after scoring",
+  decision(baseGame(), [P("p1", [4, null])], { type: "set_match_length", length: "18" }), "block");
+// One player's score locks it for the whole game, as with the course.
+check("another player's score locks it too",
+  decision(baseGame(), [P("p1"), P("p2", [5, null])], { type: "set_match_length", length: "front9" }), "block");
+
 console.log(`\n=== game-setup-policy.test ===\nPASS ${pass}  FAIL ${fail}`);
 if (failures.length) { console.log(failures.join("\n")); process.exit(1); }
 console.log("All assertions passed.");

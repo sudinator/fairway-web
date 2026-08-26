@@ -20,7 +20,17 @@ export const MATCH_LENGTHS: { value: MatchLength; label: string; short: string }
   { value: "back9", label: "Back nine", short: "B9" },
 ];
 
-type HoleLike = { hole_number?: number | null; par?: number | null; si?: number | null };
+/**
+ * A hole from either shape in the app: course holes and holes_meta use `n`; round holes
+ * (lib/golf.ts Hole) use `hole_number`. Accepting both keeps this usable for both without
+ * callers having to translate — and translating was where the first version went wrong.
+ */
+type HoleLike = { n?: number | null; hole_number?: number | null; par?: number | null; si?: number | null };
+
+/** The hole's number, whichever field carries it. */
+export function holeNumberOf(h: HoleLike): number | null {
+  return h?.n ?? h?.hole_number ?? null;
+}
 
 /**
  * The holes actually in play.
@@ -79,8 +89,8 @@ export function matchLengthLabel(length: MatchLength, holes: HoleLike[]): string
   const def = MATCH_LENGTHS.find((m) => m.value === length);
   if (!def) return "18 holes";
   if (length === "18" || !holes.length) return def.label;
-  const first = holes[0]?.hole_number;
-  const last = holes[holes.length - 1]?.hole_number;
+  const first = holeNumberOf(holes[0]);
+  const last = holeNumberOf(holes[holes.length - 1]);
   return first != null && last != null ? `${def.label} (${first}\u2013${last})` : def.label;
 }
 

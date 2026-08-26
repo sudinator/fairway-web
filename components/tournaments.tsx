@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { MatchLengthPicker } from "@/components/game/match-length-picker";
+import { holesForLength, type MatchLength } from "@/lib/match-length";
 import type { GameType } from "@/lib/game-shape";
 import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
@@ -268,6 +270,8 @@ function CreateGame({
     setAllowancePct(nextAllowance);
     setAllowanceInput(String(nextAllowance));
   };
+  // 18 / front nine / back nine. Applies to every format, not just alternate shot.
+  const [matchLength, setMatchLength] = useState<MatchLength>("18");
   const [teamScoreMode, setTeamScoreMode] = useState<"best_ball" | "aggregate">("best_ball");
   const [trifectaScoring, setTrifectaScoring] = useState<"per_hole" | "match">("per_hole");
   const [strokeBasis, setStrokeBasis] = useState<"gross" | "net">("net");
@@ -455,7 +459,7 @@ function CreateGame({
     resumedRef.current = true;
     guestsSeeded.current = true; // don't re-seed tee-time guests over the restored ones
     setName(d.name); setMatchDate(d.matchDate); setTeeIdx(d.teeIdx); setIdxStr(d.idxStr);
-    setGameType(d.gameType as any); setAllowancePct(d.allowancePct); setAllowanceInput(String(d.allowancePct ?? 100)); setTeamScoreMode(d.teamScoreMode as any);
+    setGameType(d.gameType as any); setAllowancePct(d.allowancePct); setAllowanceInput(String(d.allowancePct ?? 100)); setMatchLength((d.matchLength ?? "18") as MatchLength); setTeamScoreMode(d.teamScoreMode as any);
     setTrifectaScoring(d.trifectaScoring as any); setStrokeBasis(d.strokeBasis as any); setFmtFamily(d.fmtFamily as any);
     setMatchKind(d.matchKind as any); setTeamMode(d.teamMode); setSkinsTeamStyle(d.skinsTeamStyle as any);
     setSkinsMode(d.skinsMode as any); setTeam1(d.team1); setTeam2(d.team2);
@@ -487,13 +491,13 @@ function CreateGame({
   // leaving/killing the app mid-setup cannot lose the latest rendered setup state.
   const draftSnapshot = useMemo(() => ({
     ...toLegacySetupData(buildGameSetupDraft({
-      name, matchDate, favName: pickedFav?.name ?? null, teeIdx, idxStr, gameType, allowancePct,
+      name, matchDate, favName: pickedFav?.name ?? null, teeIdx, idxStr, gameType, allowancePct, matchLength,
       teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle,
       skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount,
       flightTeeIdx: teeAssignments.flight, playerTeeOverrides: teeAssignments.player,
     })),
     createSection,
-  }), [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount, teeAssignments, createSection]);
+  }), [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, matchLength, teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount, teeAssignments, createSection]);
   const latestDraftRef = React.useRef(draftSnapshot);
   latestDraftRef.current = draftSnapshot;
 
@@ -579,7 +583,11 @@ function CreateGame({
     setErr(null);
     try {
       const payload = GC.buildGamePayload({
-        code: makeCode(), activeGroupId, name, courseName: pickedFav.name, courseHoles: pickedFav.holes,
+        code: makeCode(), activeGroupId, name, courseName: pickedFav.name,
+        // A nine-hole game is simply nine entries in holes_meta. holesForLength keeps the
+        // course's own hole numbers and stroke indexes, so a back nine reads 10-18 and strokes
+        // still fall on the course's hardest holes.
+        courseHoles: holesForLength(pickedFav.holes, matchLength),
         teeYardages: tee?.yardages, coursePar, matchDate, allowancePct, gameType, teamMode, team1, team2,
         skinsTeamStyle, teamScoreMode, trifectaScoring, strokeBasis, skinsMode, flightsSupported, flightMode, flightBands,
       });
@@ -1220,6 +1228,14 @@ function CreateGame({
             Players play off this percentage of their course handicap. 100% for singles/Stableford/Skins, 85% standard for four-ball. The lower handicap still plays off the difference in match formats.
           </div>
         </div>
+        {/* 18 / front nine / back nine. Renders nothing on a nine-hole course, where there is one
+            nine and it is the course. Create Game passes no verdict: nothing is scored yet, so
+            every length is legal. */}
+        <MatchLengthPicker
+          value={matchLength}
+          onChange={setMatchLength}
+          courseHoles={pickedFav?.holes ?? []}
+        />
         {flightsSupported && (
           <div style={{ marginTop: 14 }}>
             <label style={{ color: C.sage, fontSize: 12 }}>Flights</label>
