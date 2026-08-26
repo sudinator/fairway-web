@@ -23,12 +23,19 @@ alongside the new tests, so the number is always a deliberate record rather than
 """
 import json
 import re
+import time
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = ROOT / "ci" / "test_assertion_baseline.json"
+# The whole suite runs in about 25s. 180 leaves generous room for a slow CI runner
+# while still catching a hang, which costs minutes rather than seconds.
+SLOW_RUN_SECONDS = 180
+# Hard stop. A hung suite used to sit here for the full 1800s, so the failure arrived
+# long after anyone was still watching the build.
+HANG_SECONDS = 300
 
 # The suites print in two styles that grew up side by side. Both are matched rather than
 # normalised, because rewriting 30 test files to agree would be a bigger change than the guard.
@@ -74,10 +81,41 @@ def collect():
         if "failed" not in out and "FAIL" not in out:
             out = None  # not a recognisable report; fall through and run the suite
     if out is None:
-        r = subprocess.run(["npm", "test"], cwd=ROOT, capture_output=True, text=True, timeout=1800)
+        started = time.monotonic()
+        try:
+            r = subprocess.run(
+                ["npm", "test"], cwd=ROOT, capture_output=True, text=True,
+                timeout=HANG_SECONDS,
+            )
+        except subprocess.TimeoutExpired:
+            print(
+                f"TEST ASSERTIONS: the suite did not finish within {HANG_SECONDS}s — it is HUNG,\n"
+                "  not merely slow. The whole suite runs in about 25s.\n\n"
+                "  The usual cause is a test harness that returns on success instead of calling\n"
+                "  process.exit(0): jsdom holds a live window and React keeps scheduler callbacks\n"
+                "  for any mounted root, so node's event loop never drains. The suite prints\n"
+                "  'passed' and then hangs, which is why the log looks healthy.\n\n"
+                "  Run the newest suite on its own to find it."
+            )
+            sys.exit(1)
+        elapsed = time.monotonic() - started
         out = r.stdout + r.stderr
         if r.returncode != 0:
             print("TEST ASSERTIONS: npm test failed — fix the tests before running this guard.")
+            sys.exit(1)
+        # A passing suite that takes minutes is not slow, it is STUCK. jsdom holds a live window and
+        # React keeps scheduler callbacks for any mounted root, so a harness that returns instead of
+        # exiting leaves node waiting until CI's job timeout — while still printing "passed", so the
+        # log looks fine and the only symptom is a mysteriously long build. That cost 30 minutes a
+        # push before anyone read it as a bug rather than a slowdown.
+        if elapsed > SLOW_RUN_SECONDS:
+            print(
+                f"TEST ASSERTIONS: the suite passed but took {elapsed:.0f}s "
+                f"(expected under {SLOW_RUN_SECONDS}s).\n"
+                "  A suite that prints its result and then hangs is the usual cause: a test harness\n"
+                "  that returns on success instead of calling process.exit(0), leaving jsdom and\n"
+                "  React roots holding the event loop open. Check the newest suite first."
+            )
             sys.exit(1)
 
     counts = {}

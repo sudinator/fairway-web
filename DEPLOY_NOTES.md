@@ -1,3 +1,41 @@
+## 177.83.260826 — The screen suite never exited; a preflight gate so it cannot recur
+- **NO migration. No user-visible change.** Supersedes the 177.82 candidate.
+- **ROOT CAUSE of the CI slowdown: `lib/screens.test.tsx` printed its result and then HUNG.**
+  jsdom holds a live window and React keeps scheduler callbacks for any root it still knows about,
+  so node's event loop never drained. `report()` exited non-zero on failure but merely RETURNED on
+  success — so it hung precisely when everything was fine. CI was not doing work for thirty
+  minutes; it was waiting on a dead process, which is why the log looked healthy and the only
+  symptom was a build that ran to its job timeout.
+  Screen suite: hung indefinitely -> **687ms**. Whole `npm test`: timed out -> **~25s**.
+- **HOW IT GOT THROUGH, precisely:** every time I ran that suite I piped it to `tail`, which
+  reports the LAST command's exit status and hides that the process never returned; and I never
+  once ran the full pipeline end to end and looked at the clock. Three things were true — the
+  suite passed, the suite hung, the pipeline took thirty minutes — and reading only the first is
+  how the other two shipped.
+- **`lib/test-render.ts` had the same latent defect** and was one mounted root away from the same
+  fate. It drains today by luck, not design. Both harnesses now tear down the jsdom window and
+  exit explicitly on success as well as failure.
+- **NEW `ci/preflight.py`** — runs what CI runs, the way CI runs it, before anything is packaged:
+  - every step is TIMED against a budget, and an implausible duration fails. A passing suite that
+    takes minutes is not slow, it is stuck.
+  - exit codes come from the process, never from a shell pipeline. `cmd | tail` is what made a
+    hang and a failure both read as success.
+  - the suite runs TWICE, cold and warm, because a step that only works with warm caches fails on
+    a fresh CI runner and CI is always cold.
+  - `--zip` verifies a packaged drop on a CLEAN EXTRACT over the baseline it applies to, so what is
+    checked is what is handed over — not a working tree that happens to have a file the zip forgot.
+  Negative-tested: reinstating the missing `process.exit(0)` is reported as HUNG, with the cause
+  named, rather than running to a timeout.
+- **The assertion ratchet's hang timeout is 1800s -> 300s.** The suite runs in ~25s, so waiting
+  half an hour to conclude it is stuck delivered the message long after anyone was still watching
+  the build. A timeout now explains what a hang means instead of surfacing a raw TimeoutExpired
+  traceback, which is what CI showed and why this read as an infrastructure problem.
+- Measured end to end on this machine: lint 17s, tsc 9s, test 34s, test warm 34s, guards 41s,
+  build 53s — **189s total**.
+- Everything in the 177.82 candidate is included: the double-test-run fix, the `sh`/`pipefail`
+  correction, the seven-way game-type union consolidation, and the inert alternate shot logic
+  layer (1512 assertions across 26 suites).
+
 ## 177.82.260826 — CI ran every test twice; alternate shot logic (inert)
 - **NO migration. No user-visible change.**
 - **FIX: `npm run ci` executed the whole test suite twice and timed out at 1800s.** The chain was

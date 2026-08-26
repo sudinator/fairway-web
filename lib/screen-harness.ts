@@ -244,4 +244,19 @@ export function report(suite: string) {
     for (const f of failures) console.log("  - " + f);
     process.exit(1);
   }
+  // Exit EXPLICITLY on success too. jsdom holds a live window and React keeps scheduler callbacks
+  // for any root it still knows about, so node's event loop never drains on its own — the suite
+  // printed its result and then hung until CI's job timeout. Returning normally here is what made
+  // a passing run indistinguishable from a broken one.
+  closeDom();
+  process.exit(0);
+}
+
+/** Best-effort teardown, so the exit above is tidy rather than merely forceful. */
+function closeDom() {
+  try {
+    (globalThis as { window?: { close?: () => void } }).window?.close?.();
+  } catch {
+    /* already gone — the explicit exit covers it either way */
+  }
 }

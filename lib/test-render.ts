@@ -94,6 +94,14 @@ export function report(suite: string): void {
   if (failed) {
     console.log("failing:");
     for (const f of failures) console.log("  - " + f);
-    process.exit(1);
+    process.exit(1);  }
+  // Explicit on success too. jsdom holds a live window and React keeps scheduler callbacks for any
+  // root still mounted, so the event loop need not drain by itself — the screen suite hung on
+  // exactly that until CI's job timeout, and this harness is one root away from the same fate.
+  try {
+    (globalThis as { window?: { close?: () => void } }).window?.close?.();
+  } catch {
+    /* already gone */
   }
+  process.exit(0);
 }
