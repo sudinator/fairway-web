@@ -260,7 +260,11 @@ function CreateGame({
   const [flightHcpDraft, setFlightHcpDraft] = useState<Record<string, string>>({});
   const selectGameType = (nextType: GameType) => {
     setGameType(nextType);
-    const nextAllowance = nextType === "fourball" || nextType === "trifecta" ? 85 : 100;
+    // Alternate shot is 50% of the partners' COMBINED course handicaps — one ball in play, so
+    // half the strokes. That is the format's definition rather than a preference, unlike
+    // four-ball's 85% which an organiser may reasonably vary.
+    const nextAllowance =
+      nextType === "alt_shot" ? 50 : nextType === "fourball" || nextType === "trifecta" ? 85 : 100;
     setAllowancePct(nextAllowance);
     setAllowanceInput(String(nextAllowance));
   };
@@ -1027,9 +1031,10 @@ function CreateGame({
               </div>
             ) : (
               <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("fourball"))} style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 104, fontSize: 13 }}>Four-ball</button>
-                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("trifecta"))} style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 104, fontSize: 13 }}>Trifecta</button>
-                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("skins"))} style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 104, fontSize: 13 }}>Skins</button>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("fourball"))} style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 150, fontSize: 13 }}>Four-ball</button>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("alt_shot"))} style={{ ...btn(gameType === "alt_shot"), flex: 1, minWidth: 150, fontSize: 13 }}>Alternate Shot</button>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("trifecta"))} style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 150, fontSize: 13 }}>Trifecta</button>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("skins"))} style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 150, fontSize: 13 }}>Skins</button>
               </div>
             )}
           </>
@@ -1039,6 +1044,8 @@ function CreateGame({
             ? "Everyone competes on one net-Stableford leaderboard."
             : gameType === "fourball"
             ? "2-player teams play better-net-ball match play. Big groups split into foursomes (2 v 2) — set them up after creating. Great for 12–16 players in 3–4 foursomes."
+            : gameType === "alt_shot"
+            ? "Partners share ONE ball, alternating shots — one nominates the odd holes, the other the even. Lower net wins the hole. Team handicap is 50% of the pair's combined, and these rounds don't count toward handicaps."
             : gameType === "skins"
             ? "Skins follows match-play structure: singles can be 1:1, team 1:1 rolls skins into team totals, or team best-ball can be played in foursomes. Halved holes carry forward."
             : gameType === "trifecta"
@@ -1128,15 +1135,17 @@ function CreateGame({
             </div>
           );
         })()}
-        {((gameType === "match" || gameType === "fourball") || (fmtFamily === "stroke" && gameType === "skins")) && (
+        {((gameType === "match" || gameType === "fourball" || gameType === "alt_shot") || (fmtFamily === "stroke" && gameType === "skins")) && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
               <input type="checkbox" checked={teamMode} onChange={(e) => applyGuidedFormatPatch(setGuidedTeamMode(e.target.checked))} />
-              <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>{gameType === "skins" ? "Team skins" : gameType === "fourball" ? "Create Team Names (Red vs Blue)" : "Team match (e.g. 4 v 4)"}</span>
+              <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>{gameType === "skins" ? "Team skins" : gameType === "fourball" || gameType === "alt_shot" ? "Create Team Names (Red vs Blue)" : "Team match (e.g. 4 v 4)"}</span>
             </label>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
               {gameType === "skins"
                 ? "Two teams, 1:1 pairings \u2014 skins roll into each team's total. A halved hole carries the pot forward. (For 2-v-2 better-ball, use Match \u00b7 Team \u00b7 Best-ball skins.)"
+                : gameType === "alt_shot"
+                ? "Two teams. Each 2-v-2 foursome plays one ball per side and is worth a point; the team total is the sum across foursomes (a halved foursome = ½ each)."
                 : gameType === "fourball"
                 ? "Two teams. Each 2-v-2 foursome is worth a point; the team total is the sum across foursomes (a halved foursome = ½ each), Ryder-Cup style. You'll assign players to teams after creating."
                 : "Two teams. Each 1-on-1 pairing is worth a point; the team total is the sum (halved matches = ½ each). You'll assign players to teams after creating."}

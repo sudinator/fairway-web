@@ -11,6 +11,35 @@ how anything works, **open the file and read it** — never answer from assumpti
 describe what the app does from memory or inference. Open the file, read it, then respond. This is the
 single most important habit — it has caught countless bugs.
 
+### What "verify" means in practice
+Before writing code that touches a component, read its ACTUAL signature and body. Before writing a
+test fixture, read the field names off the type. Before claiming a check passes, read the exit code
+from the process — not from a pipeline, and not from output piped to `head` or `tail`.
+
+### Assumptions that reached the user, each avoidable by opening one file
+| Assumed | Actually |
+|---|---|
+| `RoundsList` takes `course_name` | the field is `course` — the name rendered blank |
+| a round row carries `gross` | gross is DERIVED from the holes; the row field is ignored |
+| `SegmentBoard` renders an open board | it is a COLLAPSED accordion — names hidden until expanded |
+| its segments are front/back nine | three blocks of six (1-6, 7-12, 13-18) |
+| `ShotSynthesis` always renders | returns null twice over: no index, and no qualifying sample |
+| `LeaderRow` takes plain fields | it takes CALLBACKS — playerNet, parThru, relToParStr |
+| components with no `supabase.` calls are prop-only | several construct a client at MODULE scope |
+| `100lvh` equals the visible viewport when installed | it is larger by exactly safe-area-inset-top |
+| `cmd \| tail` shows me whether cmd passed | it reports TAIL's status — hid a suite that hung forever |
+
+### The shape of the mistake
+It is never "I could not have known". It is always "I did not look, because I was confident."
+Confidence about a file you have not opened in this session is worth nothing.
+
+### Standing checks
+- `python3 ci/preflight.py` before packaging anything — runs the real pipeline, timed, and fails a
+  step that is stuck rather than slow.
+- `python3 ci/preflight.py --zip <drop> --base <baseline>` before handing a drop over, so what is
+  verified is the artifact, not a working tree that happens to have a file the zip forgot.
+- Quote the measured timings in the handover. "The gates passed" is not evidence.
+
 ## 1. What BNN is + your role
 - **Birdie Num Num**: a golf-scoring Progressive Web App for a golf group — scorecards, games/tournaments,
   handicaps (WHS-style), betting/money settle-up, tee-time scheduling, badges, and admin analytics.

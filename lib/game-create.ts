@@ -68,13 +68,13 @@ export function buildGamePayload(o: GamePayloadOpts) {
     game_type: o.gameType,
     pairings: [],
     teams:
-      ((o.gameType === "match" || o.gameType === "skins" || o.gameType === "fourball") && o.teamMode) || o.gameType === "trifecta"
+      ((o.gameType === "match" || o.gameType === "skins" || o.gameType === "fourball" || o.gameType === "alt_shot") && o.teamMode) || o.gameType === "trifecta"
         ? [
             { key: "A", name: o.team1.trim() || "Team 1" },
             { key: "B", name: o.team2.trim() || "Team 2" },
           ]
         : null,
-    foursomes: o.gameType === "fourball" || o.gameType === "trifecta" || (o.gameType === "skins" && o.teamMode && o.skinsTeamStyle === "best_ball") ? [] : null,
+    foursomes: o.gameType === "fourball" || o.gameType === "trifecta" || o.gameType === "alt_shot" || (o.gameType === "skins" && o.teamMode && o.skinsTeamStyle === "best_ball") ? [] : null,
     team_score_mode: o.gameType === "trifecta" || o.gameType === "fourball" || (o.gameType === "skins" && o.teamMode && o.skinsTeamStyle === "best_ball") ? o.teamScoreMode : "best_ball",
     trifecta_scoring: o.gameType === "trifecta" ? o.trifectaScoring : null,
     stroke_basis: o.gameType === "stroke" ? o.strokeBasis : null,

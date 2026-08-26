@@ -9,9 +9,6 @@ export type CreateFormatState = {
   trifectaScoring: "per_hole" | "match";
   strokeBasis: "net" | "gross";
   skinsMode: "carryover" | "split";
-  /** The handicap allowance. Some formats define it (alternate shot is 50%); others let the
-   *  organiser choose. */
-  allowancePct?: number;
   /**
    * 18 holes, front nine or back nine. Applies to EVERY format, not just alternate shot — a
    * nine-hole singles match or four-ball is just as ordinary. Optional so existing drafts and
@@ -68,9 +65,12 @@ export function selectGuidedTeamFormat(
   if (gameType === "alt_shot") {
     // One ball per side, so best-ball vs aggregate does not apply — forced rather than left over
     // from four-ball, where it would sit in the review label claiming a choice this format lacks.
-    // 50% is the format's definition, not a preference: carrying four-ball's 90% across would hand
-    // out nearly twice the strokes.
-    return { gameType, teamMode: true, teamScoreMode: "best_ball", allowancePct: 50 };
+    //
+    // The 50% allowance is NOT set here. applyGuidedFormatPatch does not read an allowance field,
+    // so returning one would have been silently dropped and the format would have played off 100%
+    // — roughly twice the strokes, with nothing on screen to say so. The per-format default lives
+    // in selectGameType alongside four-ball's and trifecta's.
+    return { gameType, teamMode: true, teamScoreMode: "best_ball" };
   }
   return { gameType };
 }

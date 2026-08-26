@@ -18,7 +18,7 @@ const base = {
   gameType: "fourball" as never, teamMode: true, skinsTeamStyle: "head_to_head" as const,
   teamScoreMode: "aggregate" as const, trifectaScoring: "per_hole" as const,
   strokeBasis: "net" as const, skinsMode: "carryover" as const,
-  fmtFamily: "match" as const, matchKind: "team" as const, allowancePct: 90,
+  fmtFamily: "match" as const, matchKind: "team" as const,
 };
 
 {
@@ -27,8 +27,10 @@ const base = {
   ok("is a team format", p.teamMode === true);
   // Carried over from four-ball, "aggregate" would claim a scoring choice one ball cannot have.
   eq("forces best_ball (one ball: no aggregate)", p.teamScoreMode, "best_ball");
-  // 90% carried from four-ball would give nearly twice the strokes. 50% defines the format.
-  eq("forces the 50% allowance", p.allowancePct, 50);
+  // The allowance is deliberately NOT in the patch: applyGuidedFormatPatch does not read such a
+  // field, so returning one would be silently dropped and the format would play off 100%. The
+  // per-format default lives in selectGameType, verified by reading that function.
+  eq("does not carry an allowance the applier ignores", (p as { allowancePct?: number }).allowancePct, undefined);
 }
 {
   // The other team formats keep their own behaviour.

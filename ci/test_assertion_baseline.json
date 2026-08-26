@@ -1,5 +1,5 @@
 {
-  "total": 1512,
+  "total": 1521,
   "suites": {
     "(unnamed suites)": 491,
     "ai-sanitize": 11,
@@ -15,7 +15,7 @@
     "create-game format": 12,
     "failure messages": 24,
     "finish-gaps": 18,
-    "game type coverage": 72,
+    "game type coverage": 81,
     "game-create": 56,
     "game-utils": 21,
     "golf/computeBetting tests": 53,

@@ -1,3 +1,58 @@
+## 177.84.260826 — Alternate Shot appears in Create Game
+- **NO migration.** First user-visible piece of the alternate shot format: it can now be selected.
+  Scoring and the scorecard follow separately, so a game created in this format is not yet
+  playable end to end.
+- **Format picker** now shows four team formats in a 2x2, paired by what they are rather than by
+  order of arrival: **Four-ball | Alternate Shot** on the first row, **Trifecta | Skins** on the
+  second. Four-ball and alternate shot are the same game with a different number of balls — 2v2
+  partners either way, four balls or one — so reading them side by side is the quickest way to
+  understand the new one.
+  `minWidth` 104 -> 150 produces the 2x2 through the existing `flexWrap` with no container change.
+  Measured on a 393px phone: usable row width 337px, so three at 150 need 466 (wraps) and two need
+  308 (fits, 29px spare). Anything from 140 to 178 behaves identically, so 150 sits mid-range
+  rather than at an edge and cannot collapse to a ragged 3+1 on a smaller phone.
+- **FIVE fall-through defects found by reading each `gameType` chain rather than assuming a new
+  team format inherits team handling.** Every one would have shipped looking correct:
+  - `buildGamePayload` wrote **`teams: null` and `foursomes: null`** for alt_shot. The picker would
+    have worked, the review label would have read correctly, and the game would have reached the
+    database with no sides at all — inert at runtime with nothing on screen to explain why. This
+    was the serious one.
+  - The picker's explanatory note fell through to the SINGLES description, "Players are paired
+    1-on-1" — wrong, and wrong in the plausible way that nobody queries.
+  - The team-mode gate (`match | fourball | stroke-skins`) excluded alt_shot, so the organiser
+    could not turn on two named teams and the Teams step never appeared — while `shapeOf` reported
+    `usesTeams: true`. Setup and the shape model would have disagreed.
+  - The team-mode note fell through to "Each 1-on-1 pairing is worth a point".
+  - The Team-mode toggle LABEL fell through to "Team match (e.g. 4 v 4)". It now shares four-ball's
+    "Create Team Names (Red vs Blue)", which is already exactly right, rather than gaining a
+    near-identical third string.
+- **Deliberately NOT changed:** the best-ball/aggregate "Team score" block stays fourball-only.
+  One ball means the choice does not exist, so offering it would claim a choice the format lacks.
+  Same reason `team_score_mode` is not written in the payload.
+- **CORRECTED my own earlier design.** `selectGuidedTeamFormat` returned `allowancePct: 50`, but
+  `applyGuidedFormatPatch` reads nine fields and that is not one of them — the 50% would have been
+  silently dropped and alternate shot would have played off 100%, roughly twice the strokes, with
+  nothing on screen to say so. The per-format default lives in `selectGameType` alongside
+  four-ball's 85%; the unused patch field is gone.
+- **NEW test: the payload must supply whatever the shape claims to use.** For every game type,
+  `usesTeams` implies `teams` in the payload and `usesFoursomes` implies `foursomes`. Nothing
+  enforced that agreement before. Negative-tested: reverting either half of the payload fix fails.
+  Assertion baseline 1512 -> **1521**.
+- **Three findings from auditing this change against APP_RULES rather than asserting compliance:**
+  - I wrote `\\u00bd` in a JSX-rendered string while the line directly below uses a real `½`.
+    APP_RULES #3 permits `\\u` in JS string literals, so not strictly a violation — but matching
+    the code beside it is the point of the rule. Now a real glyph.
+  - **`ci/check-jsx-escapes.py` existed, is named in APP_RULES #3 as the CI enforcement, and was
+    never in the guards chain** — that rule has been unenforced for its whole life. A sweep found
+    it was the only orphan: all 56 `ci/check*.py` scripts now run.
+  - Wiring it in immediately failed the build on `tee-times.tsx:301`, a pre-existing `\\u00b7`
+    inside a nested template literal — which the guard itself labels a "safe false positive" while
+    still exiting 1. A check that cries wolf is almost certainly why it was never wired in. The
+    line now uses a real middot, so the guard stays strict rather than becoming another check that
+    reports something and means nothing.
+- Also run and green: `workflow_fault_simulation.py` (50,087 checks) and `verify_release.py`
+  (20/20), both named in HANDOFF section 6 as required every bundle.
+
 ## 177.83.260826 — The screen suite never exited; a preflight gate so it cannot recur
 - **NO migration. No user-visible change.** Supersedes the 177.82 candidate.
 - **ROOT CAUSE of the CI slowdown: `lib/screens.test.tsx` printed its result and then HUNG.**

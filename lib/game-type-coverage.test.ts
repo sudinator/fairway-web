@@ -10,7 +10,7 @@
  * added to the union but forgotten in a label or a shape fails here rather than on a phone.
  */
 import { GAME_TYPES, shapeOf, type GameType } from "./game-shape";
-import { gameTypeLabel } from "./game-create";
+import { gameTypeLabel, buildGamePayload } from "./game-create";
 
 let pass = 0, fail = 0;
 const fails: string[] = [];
@@ -62,6 +62,32 @@ for (const gt of GAME_TYPES) {
   // One ball per side means the hole is decided within the foursome, exactly as four-ball does.
   ok("alt_shot scores relative to the foursome", s.dotBasis === "relative_foursome");
   ok("alt_shot is not skins", s.skinsStyle === null);
+}
+
+
+// ── the payload must supply whatever the shape claims to use ───────────────
+// A format whose shape says usesTeams but whose payload writes teams:null reaches the database
+// with no sides at all. Every downstream view reads teams/foursomes, so the format is inert at
+// runtime — and the picker, the review label and the game list all look correct.
+{
+  const opts = {
+    code: "ABC", activeGroupId: "g1", name: "", courseName: "C", coursePar: 72,
+    matchDate: "2026-08-26", allowancePct: 50, courseHoles: [],
+    teamMode: true, team1: "Red", team2: "Blue",
+    skinsTeamStyle: "best_ball" as const, teamScoreMode: "best_ball" as const,
+    trifectaScoring: "per_hole" as const, strokeBasis: "net" as const,
+    skinsMode: "carryover" as const, flightsSupported: false, flightMode: "off" as const,
+  };
+  for (const gt of GAME_TYPES) {
+    const shape = shapeOf({ game_type: gt, teams: [{ id: "a", name: "A" }, { id: "b", name: "B" }] as never, foursomes: [] });
+    const payload = buildGamePayload({ ...opts, gameType: gt } as never) as Record<string, unknown>;
+    if (shape.usesTeams) {
+      ok(`${gt}: shape uses teams, so the payload supplies them`, Array.isArray(payload.teams));
+    }
+    if (shape.usesFoursomes) {
+      ok(`${gt}: shape uses foursomes, so the payload supplies them`, payload.foursomes !== null && payload.foursomes !== undefined);
+    }
+  }
 }
 
 console.log(`game type coverage: ${pass} passed, ${fail} failed`);
