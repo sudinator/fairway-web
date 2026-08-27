@@ -1,6 +1,10 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+<<<<<<< Updated upstream
+=======
+import { altShotFanOut } from "@/lib/alt-shot-scores";
+>>>>>>> Stashed changes
 import { MatchLengthPicker } from "@/components/game/match-length-picker";
 import { holesForLength, type MatchLength } from "@/lib/match-length";
 import type { GameType } from "@/lib/game-shape";
@@ -1994,6 +1998,17 @@ function GameRoom({
     await pushScores(me.id, { scores, putts, fairways, penalties, sand, ...clockPatch });
     lastEditRef.current = Date.now();
     setSavingHole(null);
+
+    // Alternate shot: the stroke belongs to the side, so it reaches the partner from THIS path
+    // too. Both write paths are reachable in one game (the Results / Group card toggle), and
+    // fanning out in only one would make a side's score depend on which screen entered it.
+    // Delegates to setPlayerHole so there is a single fan-out implementation, and passes false so
+    // that call does not fan back into this row.
+    if (game) {
+      for (const w of altShotFanOut(game.game_type, me.id, patch as Record<string, unknown>, game.foursomes, players)) {
+        await setPlayerHole(w.playerId, holeIdx, w.patch as typeof patch, false);
+      }
+    }
   };
 
   // Marker: write one hole for ANY player in the group. Requires marker rights,
@@ -2002,6 +2017,10 @@ function GameRoom({
     playerId: string,
     holeIdx: number,
     patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null },
+    // Alternate shot writes the stroke to BOTH partners. The partner's call passes false so it
+    // does not fan straight back and loop. Explicit rather than a depth limit, which would hide
+    // the reason.
+    fanOut = true,
   ) => {
     const target = players.find((p) => p.id === playerId);
     if (!game || !target) return;
@@ -2031,6 +2050,17 @@ function GameRoom({
     lastEditRef.current = Date.now();
     await pushScores(playerId, { scores, putts, fairways, penalties, sand, ...clockPatch });
     lastEditRef.current = Date.now();
+
+    // Alternate shot: one ball per side, so the STROKE belongs to both partners. Stats are not
+    // fanned out — a putt has no player-level owner when one ball is in play, and duplicating it
+    // would double the side's putts in every aggregate.
+    // Runs AFTER the edited row is durable; if this write fails the two rows disagree and
+    // sideScore() surfaces that as a conflict rather than silently preferring one.
+    if (fanOut && game) {
+      for (const w of altShotFanOut(game.game_type, playerId, patch as Record<string, unknown>, game.foursomes, players)) {
+        await setPlayerHole(w.playerId, holeIdx, w.patch as typeof patch, false);
+      }
+    }
   };
 
   // Claim / release the group scorecard (the "marker"). Uses a SECURITY DEFINER

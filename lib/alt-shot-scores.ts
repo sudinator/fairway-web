@@ -132,3 +132,35 @@ export function partnerRowIds(
   }
   return null;
 }
+<<<<<<< Updated upstream
+=======
+
+
+/**
+ * Which rows a hole patch should be written to.
+ *
+ * For every format except alternate shot this is just the player who was edited. For alternate
+ * shot the STROKE belongs to the side, so it is written to both partners — but the stats are not,
+ * because a putt has no player-level owner when one ball is in play.
+ *
+ * Returns the extra rows and the patch to apply to them, so a caller can reuse its existing write
+ * path per row rather than needing a second one.
+ */
+export function altShotFanOut(
+  gameType: string,
+  playerId: string,
+  patch: Record<string, unknown>,
+  foursomes: Foursome[] | null | undefined,
+  players: SidePlayer[],
+): { playerId: string; patch: Record<string, unknown> }[] {
+  if (gameType !== "alt_shot" || !("strokes" in patch)) return [];
+  const pair = partnerRowIds(playerId, foursomes, players);
+  if (!pair) return [];
+  const partner = pair.find((id) => id !== playerId);
+  // A side whose two rows resolve to the same id is malformed; writing twice would be harmless but
+  // pointless, and returning it would hide the data problem.
+  if (!partner) return [];
+  // ONLY the stroke. Putts, fairways, penalties and sand stay on the row that was edited.
+  return [{ playerId: partner, patch: { strokes: patch.strokes ?? null } }];
+}
+>>>>>>> Stashed changes

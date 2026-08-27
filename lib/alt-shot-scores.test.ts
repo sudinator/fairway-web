@@ -4,7 +4,11 @@
  * The cases that matter are the disagreements — a row edited outside the alternate-shot flow, or
  * an outbox still catching up. Preferring one partner silently would show a score nobody entered.
  */
+<<<<<<< Updated upstream
 import { altShotScoreWrites, sideScore, altShotStatsOwner, partnerRowIds } from "./alt-shot-scores";
+=======
+import { altShotScoreWrites, sideScore, altShotStatsOwner, partnerRowIds, altShotFanOut } from "./alt-shot-scores";
+>>>>>>> Stashed changes
 
 let pass = 0, fail = 0; const fails: string[] = [];
 const ok = (n: string, c: boolean) => { if (c) pass++; else { fail++; fails.push("FAIL " + n); } };
@@ -95,5 +99,57 @@ ok("stats owner is stable across calls", altShotStatsOwner(["amit", "bryan"]) ==
   eq("missing sides", partnerRowIds("r1", [{ id: "f" }], players), null);
 }
 
+<<<<<<< Updated upstream
+=======
+
+// ── the fan-out decision, shared by BOTH write paths ──────────────────────
+// There are two: the group card (scoring for anyone) and a player's own card. Both are reachable
+// in the same game, so fanning out in only one would make a side's score depend on WHICH screen
+// entered it — a bug that works in testing and diverges in play.
+{
+  const players = [
+    { id: "r1", user_id: "u1" }, { id: "r2", user_id: "u2" },
+    { id: "r3", user_id: "u3" }, { id: "r4", user_id: "u4" },
+  ];
+  const fs = [{ id: "f", a: ["u1", "u2"], b: ["u3", "u4"] }];
+
+  {
+    const out = altShotFanOut("alt_shot", "r1", { strokes: 5 }, fs, players);
+    eq("writes to the partner", out.map((w) => w.playerId), ["r2"]);
+    eq("with the same stroke", out[0].patch, { strokes: 5 });
+    // Never back to the row already being written — that would double-write it.
+    ok("does not include the edited row", !out.some((w) => w.playerId === "r1"));
+  }
+  {
+    // Clearing must clear BOTH, or the side keeps a score it no longer has.
+    const out = altShotFanOut("alt_shot", "r1", { strokes: null }, fs, players);
+    eq("clearing fans out too", out.map((w) => w.patch.strokes), [null]);
+  }
+
+  // STATS ARE NOT FANNED OUT. Whose putt was it? Duplicating would double the side's putts.
+  {
+    const out = altShotFanOut("alt_shot", "r1", { strokes: 4, putts: 2, fairway: "hit" }, fs, players);
+    eq("only the stroke reaches the partner", Object.keys(out[0].patch), ["strokes"]);
+    ok("putts do not", !("putts" in out[0].patch));
+    ok("fairway does not", !("fairway" in out[0].patch));
+  }
+  {
+    // A stats-only patch fans out nothing at all.
+    eq("stats-only patch is not fanned out",
+       altShotFanOut("alt_shot", "r1", { putts: 2 }, fs, players).length, 0);
+  }
+
+  // Every other format is untouched — this must not change four-ball or singles.
+  for (const gt of ["match", "fourball", "stableford", "stroke", "skins", "trifecta"]) {
+    eq(`${gt} does not fan out`, altShotFanOut(gt, "r1", { strokes: 5 }, fs, players).length, 0);
+  }
+
+  // A player with no resolvable pair writes only their own row rather than guessing.
+  eq("no foursome, no fan-out", altShotFanOut("alt_shot", "r1", { strokes: 5 }, null, players).length, 0);
+  eq("player not in a foursome", altShotFanOut("alt_shot", "rX", { strokes: 5 }, fs, players).length, 0);
+  eq("a side of one", altShotFanOut("alt_shot", "r1", { strokes: 5 }, [{ id: "f", a: ["u1"], b: [] }], players).length, 0);
+}
+
+>>>>>>> Stashed changes
 console.log(`alt shot scores: ${pass} passed, ${fail} failed`);
 if (fail) { console.error(fails.join("\n")); process.exit(1); }

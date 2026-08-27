@@ -87,6 +87,20 @@ body {
   .app-shell { height: var(--app-h, 100dvh); }
 }
 
+/* While a keyboard is open, stop tracking the visual viewport.
+   --app-h shrinks by the keyboard's height, which drags the shell up with it: the nav lands in the
+   middle of the screen with app background beneath it, and the content reflows mid-typing. Pinning
+   the shell to the glass restores the pre-177.79 behaviour — the keyboard simply covers the bottom
+   of the app, iOS scrolls the focused field into view, and nothing moves.
+   100dvh is the fallback for browsers without lvh; both mean "do not shrink for the keyboard". */
+html[data-kb="open"] .app-shell { height: 100dvh; height: 100lvh; }
+
+/* And the nav goes away while typing. At full shell height it sits under the keyboard anyway, but
+   display:none makes that explicit rather than incidental — and on a short screen, where the
+   keyboard leaves less room than the nav needs, it is the difference between seeing the field and
+   not. */
+html[data-kb="open"] [data-diag="nav"] { display: none; }
+
 /* Native controls are drawn by iOS, not by this stylesheet. Without color-scheme the
    OS picks light or dark from the USER'S phone setting, so the same screen rendered
    differently for different people. The app's fields are cream, so light is correct —

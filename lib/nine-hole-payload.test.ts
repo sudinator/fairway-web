@@ -24,8 +24,15 @@ for (const [len, count, first, last] of [
   eq(`${len}: hole count`, hm.length, count);
   eq(`${len}: first hole number`, hm[0].n, first);
   eq(`${len}: last hole number`, hm[hm.length - 1].n, last);
+<<<<<<< Updated upstream
   // Stroke indexes are the course's own, so strokes still fall on its hardest holes.
   eq(`${len}: stroke index preserved`, hm[0].si, first);
+=======
+  // Stroke indexes are RE-RANKED 1-9 within a nine — an 18-hole index over nine holes is not a
+  // ranking of those nine, and using it gave a 7-stroke allowance only 3 strokes. The stored
+  // holes_meta must carry the re-ranked value, because that is what allocateStrokes reads.
+  eq(`${len}: stroke index`, hm[0].si, len === "18" ? first : 1);
+>>>>>>> Stashed changes
 }
 console.log(`nine-hole payload: ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

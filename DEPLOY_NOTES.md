@@ -1,3 +1,44 @@
+<<<<<<< Updated upstream
+=======
+## 177.88.260826 — Nine-hole stroke indexes; the keyboard dead band
+- **NO migration.** Two defects reported from staging, both traced to changes I made.
+- **FIX: a 9-hole match allocated too FEW strokes.** Reported as "ph 1 v ph 8, the strokes box says
+  7 strokes, the scorecard shows 3". Not a second halving — the handicap was right.
+  A back nine keeps the COURSE's stroke indexes, typically every second one (2, 4, 6 ... 18), so a
+  7-stroke allowance matched SI <= 7 — holes 2, 4 and 6 only. Three strokes instead of seven, a
+  shortfall of roughly half, which is why it read as double-halving.
+  **`holesForLength` now RE-RANKS stroke indexes 1..9 within the nine**, preserving the difficulty
+  order the course assigned: the hardest of the nine becomes SI 1. Holes with no index keep null
+  and rank last, so incomplete course data degrades to "no strokes there" rather than silently
+  becoming the hardest hole.
+  **This was my error, and I wrote it into the deploy notes as a feature** — "strokes still fall on
+  the course's hardest holes" at 177.85. That is right for hole NUMBERS, which must stay 10-18 or a
+  player reads "hole 1" on the 10th tee, and wrong for stroke INDEXES, because an 18-hole index
+  spread over nine holes is not a ranking of those nine. Two opposite calls that I made the same
+  way. TWO stale assertions had pinned the wrong behaviour and were corrected with the reason
+  recorded; reverting the change now fails the suite.
+- **FIX: the keyboard dead band.** Since 177.79 the shell is sized to the VISUAL viewport
+  (`--app-h`). A keyboard shrinks that by ~380px, so the shell shrank with it, the nav rode UP to
+  sit mid-screen with app background beneath it, and the content reflowed mid-typing.
+  Before 177.79 the shell was a fixed `100lvh`: the keyboard simply covered the bottom of the app,
+  the nav went under it, nothing moved, and iOS scrolled the focused field into view.
+  **While a keyboard is open the shell is now pinned to the glass and the nav is hidden.**
+  `--app-h` keeps tracking Safari's toolbar the rest of the time, which is what it was added for.
+  Measured at device dimensions (glass 956, keyboard 380): before, the nav sat inside the visible
+  area; after, it does not, and the field stays in the top half.
+- **The keyboard is inferred**, since there is no API: the visual viewport being >120px shorter
+  than the layout viewport. 120 sits well above toolbar movement (~50px) and well below any
+  keyboard (~287px on the smallest phone). Eight cases checked including both borderlines at 119
+  and 121; zero mismatches.
+- An ATTRIBUTE, not a CSS style query: style queries need Safari 18+ and behave unpredictably when
+  the custom property is unregistered. An attribute works everywhere, is visible in the inspector,
+  and a test can assert it.
+- **I tried this at 177.86 and reverted it**, because I had paired it with a wrong theory about
+  `visualViewport.offsetTop` and could not separate the two. The offset theory stays dead — the
+  harness disproved it. This is the other half, now with a measured mechanism.
+- Assertion baseline 1626 -> **1636**.
+
+>>>>>>> Stashed changes
 ## 177.87.260826 — Nine-hole matches now allocate half the handicap
 - **NO migration.** Fixes the defect reported from staging: a 9-hole match allocated the FULL
   18-hole handicap — "ph 16" and "a stroke on every hole, + 2nd on 10, 13, 16, 17, 18".
