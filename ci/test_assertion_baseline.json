@@ -1,5 +1,5 @@
 {
-  "total": 1970,
+  "total": 1966,
   "suites": {
     "(unnamed suites)": 496,
     "ai-sanitize": 11,
@@ -27,7 +27,7 @@
     "match length picker": 18,
     "nine-hole handicap": 15,
     "nine-hole payload": 12,
-    "nine-hole posting": 24,
+    "nine-hole posting": 20,
     "player-scoring": 63,
     "round stat completeness": 8,
     "screen render": 62,

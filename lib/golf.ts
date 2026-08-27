@@ -496,14 +496,23 @@ export function adjustedGross(r: Round): number | null {
 export function roundDifferential(r: Round): number | null {
   const ag = adjustedGross(r);
   if (ag == null || r.rating == null || r.slope == null) return null;
-  // A nine uses the nine-hole basis: rating halves, slope does not. WHS wants a PUBLISHED 9-hole
-  // Course Rating and Slope; GolfCourseAPI supplies neither, so these are halved from the
-  // eighteen-hole figures and the result is an approximation — flagged by nineHoleBasis and
-  // documented there. BNN is not the record of truth for handicaps.
-  const played = roundHoleCount(r);
-  const basis = nineHoleBasis(r.rating, r.slope, r.course_par ?? null, played);
-  if (basis.rating == null || basis.slope == null) return null;
-  return (113 / basis.slope) * (ag - basis.rating);
+  // The stored rating ALREADY matches the holes played — do NOT halve here.
+  //   posted from a game : migration 0139 halves at write time (stored 35.2 for a nine)
+  //   entered by hand    : the rating comes from a nine-hole course's own tee
+  // Halving again at read time turned a 2.43 differential into 17.7, and made the explainer's own
+  // arithmetic disagree with its headline. One rule, one place.
+  const raw = (113 / r.slope) * (ag - r.rating);
+
+  // A NINE returns its 18-HOLE EQUIVALENT. The raw figure is on a nine-hole scale — around 2.4
+  // where the same player's eighteens sit around 14 — and the Handicap Index averages the LOWEST 8
+  // of the last 20, so an unconverted nine enters as the best round of the player's life and drags
+  // the index down every time they play one.
+  // WHS combines it with an EXPECTED differential for the nine not played; see
+  // expectedNineDifferential for the approximation and its calibration.
+  if (roundHoleCount(r) === 9) {
+    return nineToEighteenDifferential(raw, r.handicap_index ?? null);
+  }
+  return raw;
 }
 
 // For a 9-17 hole round that counts toward the handicap, describe the net-par fill for the UI.
@@ -1293,32 +1302,46 @@ export function titleCaseName(s: string): string {
 }
 
 
+// NOTE: a nineHoleBasis() helper lived here and was removed at 177.96.
+// The nine-hole halving happens ONCE, at WRITE time, in migration 0139_nine_hole_round_basis.sql:
+// a posted nine stores rating, par and course_handicap already halved (slope untouched — it is a
+// ratio, not a stroke count). Every reader therefore uses round.rating as-is.
+// An exported helper that halves a rating, sitting beside code that must not halve, is a trap: it
+// looks like the sanctioned way and reintroduces the double halve. It did exactly that — a 2.43
+// differential displayed as 17.7.
+
+
 /**
- * The rating/slope/par basis for a round of `holeCount` holes.
+ * The EXPECTED 9-hole Score Differential for a player of this Handicap Index.
  *
- * For a deliberate NINE, rating and par halve while slope is left alone. Slope is a ratio on the
- * 55-155 scale rather than a stroke count: a published 9-hole Slope Rating for a hard nine is still
- * around 140, not 70. Halving it would apply the difficulty adjustment a second time — 3.5 strokes
- * too few on a 113 course, 4.8 on a 155 course, with the error growing as the course gets harder.
+ * Used to convert a nine into an 18-hole equivalent, which is the only form the Handicap Index can
+ * average. A player's average differential runs about 3 strokes above their index — the index is
+ * the best 8 of 20, not the mean — and a nine is half of that.
  *
- * This is an APPROXIMATION and is documented as one. WHS requires a published 9-hole Course Rating
- * and Slope Rating; GolfCourseAPI publishes neither, so BNN halves the eighteen-hole figures. BNN
- * is not the record of truth for handicaps, and the app already approximates in the same spirit
- * when it fills an unfinished round's missing holes with net par.
+ * APPROXIMATION. USGA does not publish the expected-score table. This is calibrated to their
+ * worked example: a 14.0 index posting a 9-hole differential of 7.2 receives 15.7, implying an
+ * expected 8.5. (14 + 3) / 2 = 8.5 exactly. A second published example (14 index, 6.96 -> 15.4)
+ * implies 8.44, within a rounding step.
  */
-export function nineHoleBasis(
-  rating: number | null,
-  slope: number | null,
-  par: number | null,
-  holeCount: number,
-): { rating: number | null; slope: number | null; par: number | null; approximated: boolean } {
-  // Only an exact nine. A partial round is an eighteen with holes missing and takes the net-par
-  // fill instead — a different rule for a different situation.
-  if (holeCount !== 9) return { rating, slope, par, approximated: false };
-  return {
-    rating: rating == null ? null : rating / 2,
-    slope,                                     // NOT halved — see above
-    par: par == null ? null : Math.round(par / 2),
-    approximated: true,
-  };
+export function expectedNineDifferential(index: number | null): number | null {
+  if (index == null || !Number.isFinite(index)) return null;
+  // A plus handicap's expectation floors at zero rather than going negative: a nine cannot be
+  // expected to beat the rating by more than the player's own ability implies.
+  return Math.max(0, (index + 3) / 2);
+}
+
+/**
+ * An 18-hole Score Differential from a nine, so it can sit alongside eighteens in the index.
+ *
+ * Returns null when the index is unknown — a nine with no conversion must NOT be averaged as-is.
+ * Its raw differential is on a nine-hole scale and would look like the best round of the player's
+ * life: around 2.4 where their eighteens sit around 14.
+ */
+export function nineToEighteenDifferential(
+  nineDifferential: number | null,
+  index: number | null,
+): number | null {
+  const expected = expectedNineDifferential(index);
+  if (nineDifferential == null || expected == null) return null;
+  return nineDifferential + expected;
 }

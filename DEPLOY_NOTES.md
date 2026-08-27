@@ -1,3 +1,67 @@
+## 177.97.260827 — A nine now posts an 18-hole EQUIVALENT; par is summed, not halved
+- **NO new migration.** 0139 is amended in place — **if you already applied it, apply the updated
+  file again.** It is `create or replace` throughout, so re-running is safe.
+- **FIX: par was HALVED instead of SUMMED.** A par-35 back nine displayed as Par 36, because 0139
+  computed `round(course_par / 2)` — half of 71 is 36, and a back nine is commonly 35 or 37. Wrong
+  on both. `holes_meta` carries every hole's real par and the function already read it for the holes
+  table, so the correct value was one line away. Now `sum((e->>'par')::int)` over the game's holes.
+  Rating still halves, because BNN has no per-nine rating and cannot derive one; par is different —
+  it is a plain sum of holes we hold. The CI guard had encoded my WRONG rule (it demanded par be
+  halved) and now demands the sum, with an added assertion that halving par is forbidden.
+- **FIX: a nine posted its RAW nine-hole differential, which the Handicap Index cannot use.** 2.43
+  was arithmetically correct and unusable: the index averages the LOWEST 8 of the last 20, and a
+  nine's differential sits around 2.4 where the same player's eighteens sit around 14. Every nine
+  would have entered as the best round of that player's life and dragged the index down.
+  **I quoted this WHS rule in the 177.95 notes and then implemented only half of it** — I halved the
+  inputs and never converted the output.
+- **The conversion.** WHS combines the 9-hole Score Differential with an EXPECTED Score Differential
+  for the nine not played, based on the player's current Handicap Index.
+  USGA does not publish the table, so this is calibrated to their worked example: a 14.0 index
+  posting a 9-hole differential of 7.2 receives 15.7, implying **8.5 expected**. A player's average
+  differential runs about 3 above their index — the index being the best 8 of 20, not the mean —
+  and a nine is half of that: `(index + 3) / 2`, which gives **exactly 8.5** for a 14.0. A second
+  published example (index 14, 6.96 -> 15.4) implies 8.44, within a rounding step. Documented as an
+  approximation because it is one.
+  The reported round now posts **10.9** — raw 2.43 plus 8.5 expected — instead of 2.4 or 17.7.
+- **The explainer shows the conversion step**, so its arithmetic still sums to its headline. That
+  disagreement is what made the double-halve findable, and it would have hidden this one too.
+- **A negative test slipped through and exposed a real gap:** nothing asserted that an EIGHTEEN is
+  left unconverted. Widening the condition to `<= 18` passed clean — which would have added ~8.5 to
+  every full round in the app, the largest possible regression here. Now pinned, along with the
+  10-17 hole partial case.
+- Assertion baseline 1953 -> **1966**. All differential suites at 0 mismatches.
+
+## 177.96.260827 — The nine-hole rating was halved TWICE
+- **NO new migration.** 0139 from 177.95 is unchanged and stays required.
+- **FIX: a nine's differential displayed as 17.7 when the arithmetic on the same screen said 2.43.**
+  Reported from staging with the explainer open, which is what made it obvious: the step-by-step
+  and the headline disagreed.
+  **Two halves, one rule.** Migration 0139 halves at WRITE time — a posted nine stores rating 35.2 —
+  and `roundDifferential` then halved it AGAIN at read time to 17.6, so
+  (113/130) x (38 - 17.6) = 17.7 instead of (113/130) x (38 - 35.2) = 2.43.
+  I added both halves in the same release and never checked that they compose. This is the same
+  pattern as the three stroke allocators, reintroduced while fixing that very class of bug.
+- **The write-time halve is the one that stays.** It is stored, it is what the explainer displays,
+  and every reader sees the same number. `roundDifferential` now uses `round.rating` as-is, which is
+  correct for BOTH creation paths: a game-posted nine is halved by 0139, and a hand-entered nine
+  takes its rating from a nine-hole course's own tee.
+- **REMOVED `nineHoleBasis()`.** With the halving owned by the migration, an exported helper that
+  halves a rating — sitting next to code that must NOT halve — is a trap: it reads as the sanctioned
+  way. It was exactly that trap. A note in its place records why, so it does not come back.
+- **That deletion cost 17 assertions and left the rule with NO automated coverage**, because the
+  migration is SQL and no test runs it. The assertion ratchet caught the drop, which is what it is
+  for. **NEW `ci/check_nine_hole_basis.py`** asserts the rule where it now lives:
+  rating, par and course_handicap halve; **slope never does**; the condition is `n = 9` and not a
+  range; and the read side does not halve again. Comments are stripped first, since they quote the
+  forbidden form in order to forbid it.
+  Negative-tested four ways — halving slope, rating ceasing to halve, the `n <= 9` range trap, and
+  the read-side double halve that actually shipped. All caught.
+- **The explainer and the headline must now agree**, asserted directly: the test computes the
+  differential the way the explainer does, from the stored values, and requires it to match
+  `roundDifferential`. Isolated tests could not see the second halve; this can.
+- Assertion baseline 1970 -> **1953** (17 fewer, deliberately: the removed helper's own tests,
+  replaced by a CI guard over the SQL).
+
 ## 177.95.260827 — Nine-hole rounds post properly; the handicap-BASIS gaps closed
 - **MIGRATION 0139_nine_hole_round_basis.sql. MUST BE APPLIED TO PRODUCTION AT THE MERGE.**
   Recorded at the top of HANDOFF.md as well, because a reminder that lives only in a chat is not a

@@ -2,8 +2,7 @@
 
 import React, { useState } from "react";
 import {
-  C, Hole, Round, stablefordPts, ptsColor, adjustedGross, roundDifferential, isGrossOnly, played, fmtDate,
-} from "@/lib/golf";
+  C, Hole, Round, stablefordPts, ptsColor, adjustedGross, roundDifferential, isGrossOnly, played, fmtDate, roundHoleCount, expectedNineDifferential } from "@/lib/golf";
 
 // Player avatar: circular photo when one exists, otherwise a colored circle with
 // the player's initials so the layout is always consistent (never a broken image).
@@ -286,6 +285,10 @@ export function DifferentialSheet({ round, onClose }: { round: Round; onClose: (
   const cr = round.rating;
   const sl = round.slope;
   const diff = roundDifferential(round);
+  // A nine's headline is its 18-HOLE EQUIVALENT, so the steps must show the conversion — otherwise
+  // the arithmetic and the headline disagree, which is exactly what was reported.
+  const isNine = roundHoleCount(round) === 9;
+  const expNine = isNine ? expectedNineDifferential(round.handicap_index ?? null) : null;
   const gross = isGrossOnly(round);
   const playedN = played(round).length;
   const partial = !gross && playedN > 0 && playedN < 18;
@@ -333,7 +336,14 @@ export function DifferentialSheet({ round, onClose }: { round: Round; onClose: (
             <div style={{ color: C.sage, fontSize: 11, fontFamily: "system-ui, sans-serif", letterSpacing: 0.4, textTransform: "uppercase", marginBottom: 2 }}>Step by step</div>
             <div>= (113 ÷ {sl}) × ({ag} − {cr})</div>
             <div>= {(113 / (sl as number)).toFixed(4)} × {((ag as number) - (cr as number)).toFixed(1)}</div>
-            <div>= {((113 / (sl as number)) * ((ag as number) - (cr as number))).toFixed(2)}</div>
+            <div>= {((113 / (sl as number)) * ((ag as number) - (cr as number))).toFixed(2)}{isNine ? " (this nine)" : ""}</div>
+            {isNine && expNine != null ? (
+              <>
+                <div style={{ color: C.sage, fontSize: 13 }}>
+                  + {expNine.toFixed(2)} expected for the nine not played (index {round.handicap_index})
+                </div>
+              </>
+            ) : null}
             <div style={{ color: C.gold, fontWeight: 800 }}>= {diff.toFixed(1)} <span style={{ color: C.sage, fontSize: 11, fontWeight: 500, fontFamily: "system-ui, sans-serif" }}>(rounded to one decimal)</span></div>
           </div>
 

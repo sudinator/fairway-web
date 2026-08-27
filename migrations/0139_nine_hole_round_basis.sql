@@ -53,12 +53,17 @@ declare
   gross   int;
   entered int;
   rdate   date;
+  parsum  int;
 begin
   select * into g from games where id = p_game;
   if not found then return; end if;
 
   hmeta := coalesce(g.holes_meta, '[]'::jsonb);
   n := jsonb_array_length(hmeta);
+  -- Par of the holes ACTUALLY in this game. For a nine this is a plain SUM, never half the course
+  -- par: a back nine is commonly par 35 or 37, and half of 71 is 36 — wrong on both.
+  select coalesce(sum((e->>'par')::int), 0) into parsum
+  from jsonb_array_elements(hmeta) e;
   -- Games are scored live, so a round's recorded date is always the day it was scored (this first
   -- post). The game's play-date field is scheduling/display only. Re-posts preserve played_at, and an
   -- organizer can correct a whole game's date via set_game_played_date.
@@ -83,7 +88,7 @@ begin
         course = g.course, tee_name = pl.tee_name,
         rating = case when n = 9 then pl.rating / 2.0 else pl.rating end,
         slope = pl.slope,                            -- slope is a RATIO: never halved
-        course_par = case when n = 9 then round(g.course_par / 2.0)::int else g.course_par end,
+        course_par = case when n = 9 then parsum else g.course_par end,
         handicap_index = pl.handicap_index,
         course_handicap = case when n = 9 then round(pl.course_handicap / 2.0)::int else pl.course_handicap end,
         group_id = g.group_id,
@@ -97,7 +102,7 @@ begin
         pl.user_id, g.course, pl.tee_name,
         case when n = 9 then pl.rating / 2.0 else pl.rating end,
         pl.slope,                                    -- slope is a RATIO: never halved
-        case when n = 9 then round(g.course_par / 2.0)::int else g.course_par end,
+        case when n = 9 then parsum else g.course_par end,
         pl.handicap_index,
         case when n = 9 then round(pl.course_handicap / 2.0)::int else pl.course_handicap end,
         g.group_id, rdate, 'final', gross, p_game
@@ -157,6 +162,7 @@ declare
   gross   int;
   entered int;
   rdate   date;
+  parsum  int;
 begin
   select * into g from games where id = p_game;
   if not found then return; end if;
@@ -169,6 +175,10 @@ begin
 
   hmeta := coalesce(g.holes_meta, '[]'::jsonb);
   n := jsonb_array_length(hmeta);
+  -- Par of the holes ACTUALLY in this game. For a nine this is a plain SUM, never half the course
+  -- par: a back nine is commonly par 35 or 37, and half of 71 is 36 — wrong on both.
+  select coalesce(sum((e->>'par')::int), 0) into parsum
+  from jsonb_array_elements(hmeta) e;
   -- Deliberately-entered date first, else the date it's actually scored.
   -- Games are scored live, so a round's recorded date is always the day it was scored (this first
   -- post). The game's play-date field is scheduling/display only. Re-posts preserve played_at, and an
@@ -198,7 +208,7 @@ begin
         course = g.course, tee_name = pl.tee_name,
         rating = case when n = 9 then pl.rating / 2.0 else pl.rating end,
         slope = pl.slope,                            -- slope is a RATIO: never halved
-        course_par = case when n = 9 then round(g.course_par / 2.0)::int else g.course_par end,
+        course_par = case when n = 9 then parsum else g.course_par end,
         handicap_index = pl.handicap_index,
         course_handicap = case when n = 9 then round(pl.course_handicap / 2.0)::int else pl.course_handicap end,
         group_id = g.group_id,
@@ -212,7 +222,7 @@ begin
         pl.user_id, g.course, pl.tee_name,
         case when n = 9 then pl.rating / 2.0 else pl.rating end,
         pl.slope,                                    -- slope is a RATIO: never halved
-        case when n = 9 then round(g.course_par / 2.0)::int else g.course_par end,
+        case when n = 9 then parsum else g.course_par end,
         pl.handicap_index,
         case when n = 9 then round(pl.course_handicap / 2.0)::int else pl.course_handicap end,
         g.group_id, rdate, 'final', gross, p_game
