@@ -20,7 +20,13 @@ export type FoursomeDef = { id: string; name: string; a: string[]; b: string[]; 
 export type PairDef = { a: string; b: string };
 export type ShapeGame = { game_type: GameType; teams?: TeamDef[] | null; foursomes?: FoursomeDef[] | null };
 export type ShapePlayer = { id: string; user_id: string | null; team?: string | null; no_show?: boolean | null; course_handicap: number | null; handicap_index?: number | null; slope?: number | null; rating?: number | null };
-export type DotGame = ShapeGame & { allowance_pct?: number | null; course_par: number | null; pairings: PairDef[] };
+export type DotGame = ShapeGame & {
+  allowance_pct?: number | null;
+  course_par: number | null;
+  pairings: PairDef[];
+  /** Holes in play. Optional: absent means 18, which is what every pre-nine caller assumes. */
+  holes_meta?: { n: number; par: number; si: number | null }[] | null;
+};
 
 export const pkey = (p: { user_id: string | null; id: string }) => p.user_id ?? p.id;
 
@@ -71,11 +77,24 @@ export function shapeOf(game: ShapeGame): GameShape {
 export const chBasis = (
   p: { handicap_index?: number | null; slope?: number | null; rating?: number | null; course_handicap: number | null },
   coursePar: number | null | undefined,
+  /**
+   * Holes actually being played. Omit for 18 — every existing caller does, and omitting it keeps
+   * today's behaviour exactly, which matters because this is the scoring engine.
+   */
+  holeCount?: number | null,
 ): number => {
-  if (p.handicap_index != null && p.slope != null && p.rating != null && coursePar != null) {
-    return p.handicap_index * (p.slope / 113) + (p.rating - coursePar);
-  }
-  return p.course_handicap ?? 0;
+  const base =
+    p.handicap_index != null && p.slope != null && p.rating != null && coursePar != null
+      ? p.handicap_index * (p.slope / 113) + (p.rating - coursePar)
+      : p.course_handicap ?? 0;
+
+  // A nine gets half the 18-hole Course Handicap. The WHOLE figure halves, not the par term: the
+  // slope term dominates and par does not touch it, so slicing coursePar instead gives ~52 where
+  // the answer is ~8. WHS proper would use that nine's own Rating and Slope; BNN has only the
+  // 18-hole pair because GolfCourseAPI publishes no per-nine figures, so halving is the documented
+  // practical substitute. NOT rounded here — rounding belongs at the end of the chain, where a
+  // whole number is actually required.
+  return holeCount != null && holeCount > 0 && holeCount <= 9 ? base / 2 : base;
 };
 
 // Orange stroke dots a player RECEIVES on a hole. This MUST match the basis the
@@ -94,7 +113,7 @@ export function dotStrokes(
   allPlayers: ShapePlayer[],
 ): number {
   const allowance = game.allowance_pct ?? 100;
-  const mine = applyAllowance(chBasis(p, game.course_par), allowance);
+  const mine = applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), allowance);
   const key = pkey(p);
   const basis = shapeOf(game).dotBasis;
 
@@ -105,7 +124,7 @@ export function dotStrokes(
     if (pr) {
       const oppId = pr.a === key ? pr.b : pr.a;
       const opp = allPlayers.find((x) => pkey(x) === oppId);
-      const { a } = matchAllowance(chBasis(p, game.course_par), opp ? chBasis(opp, game.course_par) : null, allowance);
+      const { a } = matchAllowance(chBasis(p, game.course_par, game.holes_meta?.length), opp ? chBasis(opp, game.course_par, game.holes_meta?.length) : null, allowance);
       return matchStrokesFor(a, si);
     }
     return matchStrokesFor(mine, si);
@@ -122,7 +141,7 @@ export function dotStrokes(
     }
     const active = group.filter((x) => !x.no_show);
     const ref = active.length ? active : group;
-    const low = Math.min(...ref.map((x) => applyAllowance(chBasis(x, game.course_par), allowance)));
+    const low = Math.min(...ref.map((x) => applyAllowance(chBasis(x, game.course_par, game.holes_meta?.length), allowance)));
     return matchStrokesFor(Math.max(0, mine - low), si);
   }
 
@@ -135,5 +154,5 @@ export function dotStrokes(
 // allowance, no relative subtraction), regardless of the game's format. This is the
 // "course hcp" / blue-dot basis; the match's own allowance %% lives only in dotStrokes.
 export function fullStrokes(game: DotGame, p: ShapePlayer, si: number | null): number {
-  return strokesReceived(si, applyAllowance(chBasis(p, game.course_par), 100));
+  return strokesReceived(si, applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), 100));
 }

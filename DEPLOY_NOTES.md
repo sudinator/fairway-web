@@ -1,3 +1,67 @@
+## 177.87.260826 — Nine-hole matches now allocate half the handicap
+- **NO migration.** Fixes the defect reported from staging: a 9-hole match allocated the FULL
+  18-hole handicap — "ph 16" and "a stroke on every hole, + 2nd on 10, 13, 16, 17, 18".
+- **Root cause: two sources for one number.** The player card reads the STORED `course_handicap`;
+  the strokes panel RECOMPUTES through `chBasis(p, game.course_par)`. Only the second was wrong,
+  which is why the card looked right and the panel did not.
+- **`chBasis` now halves for a nine**, via an OPTIONAL third argument. Omitting it keeps today's
+  behaviour exactly — which matters, because this is the scoring engine: every net score, stroke
+  dot, leaderboard position and money calculation reads it.
+  The hole count is threaded through all **25** call sites across five files. Doing it everywhere
+  rather than only in the strokes panel is the point: fixing one consumer and not the others is
+  what produced two disagreeing numbers in the first place.
+- **Verified arithmetic** (index 14, slope 130, rating 71.5, par 72):
+  18-hole handicap **15.6**; a nine previously got **15.6** unhalved; **half is 7.8** and correct.
+  The WHOLE figure halves, not the par term — the slope term dominates and par does not touch it.
+  WHS proper uses that nine's own Course Rating and Slope; BNN has only the 18-hole pair because
+  GolfCourseAPI publishes no per-nine figures, so halving is the documented practical substitute.
+- **The trap is pinned by a test.** Slicing `coursePar` to 36 looks exactly like the fix and gives
+  **51.6** — worse than the unhalved 15.6 it was meant to correct, because `chBasis` computes
+  `(rating - coursePar)` and an 18-hole rating against a 9-hole par is incoherent. I attempted that
+  slice at 177.86, measured it, and reverted it; an assertion now fails if anyone tries again.
+- The stored-handicap fallback halves too, so a guest with no index is treated the same as a member
+  on the same card.
+- **The differential suite caught a real regression and was resolved deliberately, not silenced.**
+  Threading the hole count produced 6,928 mismatches against `player-scoring.baseline.ts`. That
+  baseline exists to prove the 176.21 EXTRACTION was faithful, not to freeze the maths, so it moves
+  with a deliberate correction — otherwise the suite reports thousands of mismatches forever and
+  its signal is lost. All four diff suites are back to **0 mismatches across ~94,000 comparisons**.
+- **NEW `lib/nine-hole-handicap.test.ts`** — 15 assertions including the 51.6 trap, the
+  stored-handicap fallback, plus scratch, plus-handicap, and guard values (0, negative, null, 12
+  holes) that must NOT be mistaken for a nine. Negative-tested four ways: not halving, halving 18,
+  treating 0 as a nine, and skipping the fallback are all caught.
+- Assertion baseline 1594 -> **1609 across 30 suites**.
+
+## 177.86.260826 — Revert the keyboard change; diagnose the nine-hole handicap
+- **NO migration. A revert plus documentation.** No new behaviour.
+- **REVERTED the keyboard/nav change from the previous drop.** It hid the bottom nav while a
+  keyboard was open, on my theory that `visualViewport.offsetTop` explained the dead band under the
+  nav. The diagnostic disproved it: `vvOffsetTop 0`, `shellBottom 894`, `navBottom_vs_visible 0` —
+  the shell geometry was already correct. The change fixed nothing and altered nav behaviour that
+  had been working. `viewport-sync.tsx`, `globals.css` and `home.tsx` are now BYTE-IDENTICAL to
+  177.80, the last version confirmed good on device.
+  The keyboard dead band is real and remains OPEN. Looking again at the report, the content is
+  clipped under the STATUS BAR at the top, which is a different mechanism from anything I changed.
+  It will be diagnosed from measurements, not guessed at a fourth time.
+- **DIAGNOSED but deliberately NOT fixed: a nine-hole match allocates the full 18-hole handicap.**
+  The strokes panel shows "ph 16" and "a stroke on every hole, + 2nd on 10, 13, 16, 17, 18".
+  The player card and the panel disagree because the card reads the STORED `course_handicap` while
+  the panel RECOMPUTES through `chBasis(p, game.course_par)` — two sources for one number.
+  Verified arithmetic (index 14, slope 130, rating 71.5): the 18-hole handicap is 15.6; a nine
+  currently gets 15.6 unhalved; **slicing `coursePar` to 36 alone gives 51.6 — worse, and visibly
+  absurd**, because `chBasis` computes `(rating - coursePar)` and an 18-hole rating against a
+  9-hole par is incoherent. Halving the WHOLE figure gives 7.8 and is correct, because the slope
+  term dominates and par does not touch it. That is `courseHandicapForLength()`, already written
+  and tested at 177.85 — it simply is not wired in.
+  The fix needs `chBasis` to know the hole count. All 21 callers pass `game.course_par` uniformly,
+  so the plumbing is consistent, but it spans six files including `player-scoring.ts` and its
+  baseline: every net score, stroke dot, leaderboard position and money calculation reads it. Not a
+  change to make at the end of a session and hand over unverified.
+- **I attempted the `coursePar` slice, measured it, and reverted it.** The line now carries a
+  comment saying it is deliberately the full course par and that slicing it alone makes things
+  worse — because it looks exactly like the fix.
+- Full diagnosis, the arithmetic table and the trap are recorded in BACKLOG.md.
+
 ## 177.85.260826 — Three staging defects: Format tab, allowance field, and the missing 9/18 picker
 - **NO migration.** All three reported from staging; each verified from the code before any fix.
 - **FIX: the Format tab was missing Alternate Shot and looked different from Create Game.** It

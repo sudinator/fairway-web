@@ -272,7 +272,7 @@ export function OrganizerPanel({
                     </div>
                     <div style={{ color: C.sage, fontSize: 12 }}>
                       {p.course_handicap != null
-                        ? `course handicap ${p.course_handicap} · plays ${applyAllowance(chBasis(p, game.course_par), game.allowance_pct ?? 100)}${(game.allowance_pct ?? 100) !== 100 ? ` (${game.allowance_pct}%)` : ""}`
+                        ? `course handicap ${p.course_handicap} · plays ${applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100)}${(game.allowance_pct ?? 100) !== 100 ? ` (${game.allowance_pct}%)` : ""}`
                         : "no handicap yet"}
                       {p.tee_name ? ` · ${p.tee_name}` : ""}
                     </div>

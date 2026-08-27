@@ -69,6 +69,43 @@ Needs: a migration, admin-only `grant execute`, and the existing RLS/ledger guar
 Same treatment would suit any other multi-table client-side cascade — worth grepping for them at
 the same time.
 
+## Nine-hole course handicap is not halved (diagnosed 177.86, NOT fixed)
+
+Reported from staging: in a 9-hole match the STROKES panel shows "ph 16" and "a stroke on every
+hole, + 2nd on 10, 13, 16, 17, 18" — the full 18-hole allocation squeezed onto nine holes.
+
+### Why the card and the panel disagree
+The player card reads the STORED `course_handicap`. The strokes panel RECOMPUTES through
+`chBasis(p, game.course_par)`. Two sources for the same number, and only one of them is wrong.
+
+### The maths, verified
+`chBasis` = `index * (slope/113) + (rating - coursePar)`. For index 14, slope 130, rating 71.5:
+
+| | |
+|---|---|
+| 18-hole course handicap | **15.6** |
+| what a nine currently gets | **15.6** — the full figure, unhalved |
+| slicing coursePar to 36 alone | **51.6** — WORSE, and visibly absurd |
+| par and rating both halved | 15.9 — the slope term is still full |
+| **half the 18-hole figure** | **7.8** — correct |
+
+Only halving the WHOLE figure works, because the slope term dominates and par does not touch it.
+That is exactly `courseHandicapForLength()` in `lib/match-length.ts`, already written and tested.
+
+WHS proper would use that nine's own Course Rating and Slope. BNN has neither — GolfCourseAPI
+publishes one pair per tee for the full course — so halving is the documented practical substitute.
+
+### What the fix needs
+`chBasis` must know the hole count. All 21 callers pass `game.course_par` uniformly, so the
+plumbing is consistent, but it spans six files including `player-scoring.ts` and its baseline — it
+is the scoring engine, and every net score, stroke dot, leaderboard position and money calculation
+reads it.
+
+### The trap
+`coursePar` in `tournaments.tsx` is deliberately the FULL course par even for a nine, with a
+comment saying so. Slicing it looks like the fix and makes things worse. Do not change that line
+on its own.
+
 ## Batched for next release (small)
 - **Remove the "Built: <date>" line** in the version display — `components/manage.tsx:3659`
   (the `{APP_BUILT_AT ? <div ...>Built: …</div> : null}` line). Redundant now that the release date is

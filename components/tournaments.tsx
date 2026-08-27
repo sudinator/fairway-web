@@ -525,6 +525,13 @@ function CreateGame({
   }, [activeGroupId, teeTimeId, user.id]);
 
   const tee = pickedFav?.tees?.[teeIdx];
+  // NOTE: deliberately the FULL course par, even for a nine-hole game.
+  //
+  // chBasis computes index*(slope/113) + (rating - coursePar). Slicing par here while the rating
+  // stays an 18-hole rating makes the two incoherent and yields a course handicap of ~52 rather
+  // than the already-wrong ~16. The real fix halves the whole figure (the slope term dominates and
+  // par does not touch it) via courseHandicapForLength, which needs chBasis to know the hole count.
+  // Tracked in BACKLOG; do not "fix" this line on its own.
   const coursePar = pickedFav
     ? pickedFav.holes.reduce((s: number, h: any) => s + (h.par || 0), 0)
     : null;
@@ -3418,7 +3425,7 @@ function GameRoom({
                 if (pr) {
                   const oppId = pr.a === myKey ? pr.b : pr.a;
                   const oppP = players.find((p) => pkey(p) === oppId);
-                  const allowPair = matchAllowance(chBasis(me, game.course_par), oppP ? chBasis(oppP, game.course_par) : null, game.allowance_pct ?? 100);
+                  const allowPair = matchAllowance(chBasis(me, game.course_par, game.holes_meta?.length), oppP ? chBasis(oppP, game.course_par, game.holes_meta?.length) : null, game.allowance_pct ?? 100);
                   matchAllow = allowPair.a;
                   oppAllow = allowPair.b;
                 }
@@ -3428,7 +3435,7 @@ function GameRoom({
                   hole_number: m.n,
                   stroke_index: m.si,
                 })),
-                applyAllowance(chBasis(me, game.course_par), game.allowance_pct ?? 100),
+                applyAllowance(chBasis(me, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100),
               );
               return game.holes_meta.map((m, i) => ({
                 n: m.n,
@@ -3504,7 +3511,7 @@ function GameRoom({
                 const oppIds = onA ? f.b : f.a;
                 const members = [...f.a, ...f.b].map((uid: string) => {
                   const p = players.find((pp) => pkey(pp) === uid);
-                  return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par) : null, noShow: !!p?.no_show };
+                  return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par, game.holes_meta?.length) : null, noShow: !!p?.no_show };
                 });
                 const prog = fourballProgress(game.holes_meta, members, myIds, oppIds, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball");
                 return prog.map((lead) => matchLeadLabel(lead));
@@ -3518,7 +3525,7 @@ function GameRoom({
                 if (!f || !f.a?.length || !f.b?.length) return undefined;
                 const members = [...f.a, ...f.b].map((uid: string) => {
                   const p = players.find((pp) => pkey(pp) === uid);
-                  return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par) : null, noShow: !!p?.no_show };
+                  return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par, game.holes_meta?.length) : null, noShow: !!p?.no_show };
                 });
                 const res = computeTrifecta(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", !!(f as any).swap);
                 const mine = res.contests.find((c) => c.kind === "single" && (c.aIds[0] === myKey || c.bIds[0] === myKey));

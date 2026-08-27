@@ -128,7 +128,7 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
   const teamName = (key: string | null | undefined) => teams?.find((t) => t.key === key)?.name || "—";
   const skinPlayerOf = (uid: string): SkinPlayer | null => {
     const p = playerOf(uid);
-    return p ? { id: pkey(p), name: p.display_name, gross: p.scores || [], ch: chBasis(p, game.course_par), noShow: !!p.no_show } : null;
+    return p ? { id: pkey(p), name: p.display_name, gross: p.scores || [], ch: chBasis(p, game.course_par, game.holes_meta?.length), noShow: !!p.no_show } : null;
   };
   const ORANGE = "#E8730C";
 
@@ -166,7 +166,7 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
     const cards = foursomes.map((f) => {
       const members: FourballMember[] = [...f.a, ...f.b].map((uid) => {
         const p = playerOf(uid);
-        return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par) : null, noShow: !!p?.no_show };
+        return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par, game.holes_meta?.length) : null, noShow: !!p?.no_show };
       });
       const result = computeTeamBestBallSkins(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", game.skins_mode === "split" ? "halved" : "carryover");
       return { f, result };
@@ -324,7 +324,7 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
   // Fallback for old skins games that have not yet been configured with pairings.
   const nameById: Record<string, string> = {};
   players.forEach((p) => (nameById[p.id] = p.display_name));
-  const skinPlayers: SkinPlayer[] = players.map((p) => ({ id: p.id, name: p.display_name, gross: p.scores || [], ch: chBasis(p, game.course_par) }));
+  const skinPlayers: SkinPlayer[] = players.map((p) => ({ id: p.id, name: p.display_name, gross: p.scores || [], ch: chBasis(p, game.course_par, game.holes_meta?.length) }));
   const isSplit = game.skins_mode === "split";
   const result = computeSkins(game.holes_meta, skinPlayers, game.allowance_pct ?? 100, isSplit ? "split" : "carryover");
   const firstUndecided = result.holes.find((h) => !h.decided);
@@ -434,7 +434,7 @@ export function MatchView({
     game.pairings.forEach((pr) => {
       const pa = playerOf(pr.a), pb = playerOf(pr.b);
       if (!pa || !pb) return;
-      const st = matchStatus(game.holes_meta, pa.scores || [], pb.scores || [], chBasis(pa, game.course_par), chBasis(pb, game.course_par), game.allowance_pct ?? 100);
+      const st = matchStatus(game.holes_meta, pa.scores || [], pb.scores || [], chBasis(pa, game.course_par, game.holes_meta?.length), chBasis(pb, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100);
       // Determine which team each player is on.
       const ta = pa.team, tb = pb.team;
       if (!ta || !tb || ta === tb) return; // need a cross-team pairing
@@ -602,7 +602,7 @@ export function MatchView({
           pb.course_handicap,
           game.allowance_pct ?? 100,
         );
-        const allow = matchAllowance(chBasis(pa, game.course_par), chBasis(pb, game.course_par), game.allowance_pct ?? 100);
+        const allow = matchAllowance(chBasis(pa, game.course_par, game.holes_meta?.length), chBasis(pb, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100);
         const leader =
           st.lead > 0 ? pa.display_name : st.lead < 0 ? pb.display_name : null;
         const statusText = st.result
@@ -888,7 +888,7 @@ export function FourballView({
   const members4 = (f: { a: string[]; b: string[] }): FourballMember[] =>
     [...f.a, ...f.b].map((uid) => {
       const p = playerOf(uid);
-      return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par) : null, noShow: !!(p as any)?.no_show };
+      return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par, game.holes_meta?.length) : null, noShow: !!(p as any)?.no_show };
     });
 
   // Ryder-Cup team rollup: each 2-v-2 foursome is worth a point to the winning
@@ -1180,7 +1180,7 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
     return ti >= 0 ? teamAccent(teams[ti].name, ti) : C.gold;
   };
 
-  const phStr = (pp: Player) => (pp.course_handicap == null && pp.handicap_index == null ? "\u2014" : String(applyAllowance(chBasis(pp, game.course_par), allowance)));
+  const phStr = (pp: Player) => (pp.course_handicap == null && pp.handicap_index == null ? "\u2014" : String(applyAllowance(chBasis(pp, game.course_par, game.holes_meta?.length), allowance)));
   // phStr uses the unrounded course handicap (WHS: allowance applied to unrounded, rounded once).
 
   const strokeText = (n: number): string => {
@@ -1208,7 +1208,7 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
   const oneVone = (aId: string, bId: string, key: string) => {
     const a = byKey(aId), b = byKey(bId);
     if (!a || !b) return null;
-    const allow = matchAllowance(chBasis(a, game.course_par), chBasis(b, game.course_par), allowance);
+    const allow = matchAllowance(chBasis(a, game.course_par, game.holes_meta?.length), chBasis(b, game.course_par, game.holes_meta?.length), allowance);
     return (
       <div key={key} style={{ borderTop: "1px solid rgba(255,255,255,0.10)", padding: "10px 0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1230,12 +1230,12 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
   const teamStrip = (f: { a: string[]; b: string[] }, key: string) => {
     const members = [...f.a, ...f.b].map(byKey).filter((p): p is Player => !!p);
     if (members.length < 2) return null;
-    const low = Math.min(...members.map((m) => applyAllowance(chBasis(m, game.course_par), allowance)));
+    const low = Math.min(...members.map((m) => applyAllowance(chBasis(m, game.course_par, game.holes_meta?.length), allowance)));
     const col = (side: string[], teamKey: string | null) => (
       <div style={{ flex: 1, borderTop: `2px solid ${teamColOf(teamKey)}`, paddingTop: 8 }}>
         {teams && teamKey && <div style={{ color: teamColOf(teamKey), fontSize: 11, fontWeight: 500, marginBottom: 6 }}>{teams.find((t) => t.key === teamKey)?.name?.toUpperCase()}</div>}
         {side.map(byKey).filter((p): p is Player => !!p).map((p) => {
-          const recv = applyAllowance(chBasis(p, game.course_par), allowance) - low;
+          const recv = applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), allowance) - low;
           return (
             <div key={p.id} style={{ padding: "4px 0" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", color: C.cream, fontSize: 14 }}><span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}><Avatar src={p.avatar_url} name={p.display_name} size={24} /><span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_name}</span></span><span style={{ color: C.sage }}>ph {phStr(p)}</span></div>
