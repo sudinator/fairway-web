@@ -165,6 +165,10 @@ makes it work — and cream would then compete with gold and win nothing.
 
 ---
 
+- `C.cell` (#FBFAF4) — the scorecard cell surface, a shade off `C.card` so an editable cell
+  reads as a field. Added at 178.0; it had been a literal in three places, which is how a
+  colour drifts: one gets adjusted and the others silently disagree.
+
 ## Part 5 — The scales
 
 Five scales. Nothing outside them.

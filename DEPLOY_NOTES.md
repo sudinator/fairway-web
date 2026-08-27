@@ -1,4 +1,8 @@
-## 178.0.260827 — Share the line-up; tee order fixed to the first hole PLAYED
+## 178.1.260827 — Share the line-up (card + text); tee order fixed to the first hole PLAYED
+- **Supersedes an earlier 178.0** that carried a text-only summary. That build was published
+  and then rebuilt under the same number when the card was added — reusing a version means the
+  number no longer identifies what you have, which is the point of the ledger. Anything
+  labelled 178.0 should be replaced by this.
 - **FEATURE bump.** New user-facing capability, no migration change.
 - **FIX (my bug, reported): the tee order was keyed to hole NUMBER parity.** I had "the first
   partner takes the odd-numbered holes", which on a back nine — opening at hole 10, an even number —
@@ -26,7 +30,33 @@
     text before pasting it somewhere public, and clipboard access can be refused (no HTTPS, or a
     declined permission) — the preview is selectable either way.
   - Built as a pure function so the TEXT is what gets asserted. 27 assertions.
-- The design-scale guard caught an off-scale `10px 12px` padding I had introduced; moved to the
+- **The line-up is now a SHAREABLE CARD, not just text.** `ShareLineupModal` lives in
+  share-card.tsx to reuse `useCardExport`, which already owns image capture, the Web Share sheet,
+  the download fallback and copy-as-text. A second capture implementation would drift from that one
+  exactly as the stroke allocators did. The text it copies comes from `buildSetupSummary`, so the
+  image and the text are one dataset arranged two ways rather than two renderings that can disagree.
+- **Sorted ALPHABETICALLY, team named inline.** Finding yourself is the job, it works unchanged with
+  no teams, and it matches the card. An earlier text draft used R/B prefixes plus a legend — a code
+  you have to decode, which is worse than repeating the word.
+- **The tee is stated ONCE.** "All playing Blue tees", or "Blue tees unless noted" with only the
+  exceptions carrying a tee. Keyed on the number of EXCEPTIONS, not a percentage: a flat 80% has a
+  bad edge, since 3 of 4 players is 75% and would not qualify — yet repeating a tee three times to
+  flag one exception is exactly the repetition worth removing. Factored when exceptions are two or
+  fewer, or at most a quarter of the field; never on an even 2/2 split, where neither tee is "main".
+- Team colour is a KEY, not a word on every row: a swatch plus "Team Red". 6px stripes on BOTH sides
+  of each row — two stripes close a shape, so the row reads as a bracketed block rather than a list
+  item with a coloured edge, and it survives a long name.
+- **Four guards fired on the way in, and three were real:**
+  - a `\u00b7` written in JSX TEXT, which renders as six literal characters rather than a middot;
+  - `#FBFAF4` as a background literal — it turns out to be the scorecard CELL surface and had been a
+    literal in three places, which is how a colour drifts. Now `C.cell`, documented in
+    DISPLAY_RULES, and the palette debt went DOWN by two;
+  - a `borderRadius: 2` on the team swatch, off the six-value scale. Moved to 6, and that debt went
+    down too.
+  The fourth (a hand-rolled overlay) is a reasoned exception: the CARD is what gets captured, and a
+  BottomSheet's own chrome would be captured with it. Both sibling share modals are hand-rolled for
+  the same reason; the baseline was committed deliberately rather than the guard weakened.
+
   on-scale `8px 12px`.
 - Assertion baseline 1988 -> **2015 across 35 suites**. All differential suites at 0 mismatches.
 

@@ -166,7 +166,7 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
     return idx % 2 === 0 ? C.overDark : "#E0C25E";
   };
   const colTmpl = `58px ${cols.map((c) => (c.type === "divider" ? "10px" : "minmax(58px, 1fr)")).join(" ")}`;
-  const cell: React.CSSProperties = { position: "relative", background: "#FBFAF4", borderRadius: 6, height: 42, display: "flex", alignItems: "center", justifyContent: "center" };
+  const cell: React.CSSProperties = { position: "relative", background: C.cell, borderRadius: 6, height: 42, display: "flex", alignItems: "center", justifyContent: "center" };
   const agg: React.CSSProperties = { position: "relative", background: C.greenLight, borderRadius: 6, height: 30, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 15, fontWeight: 800 };
 
   const sums = (p: Player, from: number, to: number) => {
@@ -250,7 +250,7 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
               <div key={p.id + i} style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: colorFor(p), fontSize: 11, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 3 }}>{p.display_name}</div>
                 <div
-                  style={{ position: "relative", background: "#FBFAF4", borderRadius: 6, height: 56, display: "flex", alignItems: "center", justifyContent: "center", cursor: (isMarker || p.user_id === user?.id) ? "pointer" : "default", outline: isMarker ? "1px solid #E6E0CC" : (p.user_id === user?.id ? "1px dashed #C9BF9B" : "none") }}
+                  style={{ position: "relative", background: C.cell, borderRadius: 6, height: 56, display: "flex", alignItems: "center", justifyContent: "center", cursor: (isMarker || p.user_id === user?.id) ? "pointer" : "default", outline: isMarker ? "1px solid #E6E0CC" : (p.user_id === user?.id ? "1px dashed #C9BF9B" : "none") }}
                   onClick={(isMarker || p.user_id === user?.id) ? () => { setEdit({ playerId: p.id, holeIdx: i }); } : undefined}>
                   {recv > 0 && (
                     <div style={{ position: "absolute", top: 4, left: 5, display: "flex", gap: 2 }}>

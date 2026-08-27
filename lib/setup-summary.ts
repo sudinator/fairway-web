@@ -56,31 +56,37 @@ function holesLine(game: SummaryGame): string | null {
     : `${meta.length} holes`;
 }
 
+
+
 /**
- * Group players for display: by team when the game has them, else by tee group, else one flat list.
+ * The tee most players are on, and how many differ — so it can be stated once in the header rather
+ * than repeated on every line.
  *
- * Ordering within a group is the order the organiser built it in, NOT alphabetical — for foursomes
- * that order carries meaning, since the first partner listed tees off first.
+ * Keyed on the number of EXCEPTIONS, not a percentage. A flat "80%" has a bad edge: 3 of 4 players
+ * is 75% and would not qualify, yet repeating a tee three times to flag one exception is exactly
+ * the repetition worth removing.
+ *
+ * Returns null when no tee is a genuine majority — an even 2/2 split has no "main tee", and
+ * calling one dominant would mislabel half the field.
  */
-function grouped(game: SummaryGame, players: SummaryPlayer[]): { label: string | null; rows: SummaryPlayer[] }[] {
-  const teams = game.teams;
-  if (Array.isArray(teams) && teams.length) {
-    const out = teams.map((t) => ({
-      label: t.name || t.key,
-      rows: players.filter((p) => p.team === t.key),
-    }));
-    // Anyone not on a team still has to appear, or the roster is silently incomplete.
-    const spare = players.filter((p) => !teams.some((t) => t.key === p.team));
-    return out.filter((g) => g.rows.length).concat(spare.length ? [{ label: "Not on a team", rows: spare }] : []);
-  }
-  const groups = [...new Set(players.map((p) => p.tee_group ?? null))].filter((g) => g != null) as number[];
-  if (groups.length > 1) {
-    return groups
-      .sort((a, b) => a - b)
-      .map((g) => ({ label: `Group ${g}`, rows: players.filter((p) => p.tee_group === g) }));
-  }
-  return [{ label: null, rows: players }];
+export function dominantTee(players: SummaryPlayer[]): { tee: string; exceptions: number } | null {
+  const named = players.map((p) => p.tee_name).filter((t): t is string => !!t);
+  if (!named.length) return null;
+  const counts = new Map<string, number>();
+  for (const t of named) counts.set(t, (counts.get(t) ?? 0) + 1);
+  let top = ""; let n = 0;
+  for (const [t, c] of counts) if (c > n) { top = t; n = c; }
+  if (n <= named.length / 2) return null;
+  const exceptions = named.length - n;
+  if (exceptions === 0) return { tee: top, exceptions: 0 };
+  // Few enough to list as exceptions: two or fewer, or at most a quarter of the field.
+  if (exceptions <= 2 || exceptions <= named.length * 0.25) return { tee: top, exceptions };
+  return null;
 }
+
+/** Alphabetical by display name — finding yourself is the job this ordering serves. */
+const byName = (a: SummaryPlayer, b: SummaryPlayer) =>
+  a.display_name.localeCompare(b.display_name);
 
 /**
  * The report.
@@ -98,30 +104,42 @@ export function buildSetupSummary(game: SummaryGame, players: SummaryPlayer[]): 
   const meta: string[] = [gameTypeLabel(game.game_type)];
   const h = holesLine(game);
   if (h) meta.push(h);
-  // The allowance is stated only when it is NOT the default, so the common case stays quiet — but
-  // a 50% or 85% game says so, because that is the number people query afterwards.
+  // Stated only when it is NOT the default, so the common case stays quiet — but a 50% or 85% game
+  // says so, because that is the number people query afterwards.
   if (game.allowance_pct != null && game.allowance_pct !== 100) meta.push(`${game.allowance_pct}% allowance`);
   lines.push(meta.join(" \u00b7 "));
+
+  // The tee, once, rather than on every line.
+  const dom = dominantTee(players);
+  if (dom) lines.push(dom.exceptions === 0 ? `All playing ${dom.tee} tees` : `${dom.tee} tees unless noted`);
   lines.push("");
 
-  for (const g of grouped(game, players)) {
-    if (g.label) lines.push(`${g.label}:`);
-    for (const p of g.rows) {
-      // Index and course handicap are BOTH shown: the index is what a player recognises as "their"
-      // handicap, the course handicap is what they will actually play off, and the gap between them
-      // is the thing that surprises people.
-      const bits = [
-        `idx ${val(p.handicap_index)}`,
-        `CH ${val(p.course_handicap)}`,
-        val(p.tee_name),
-      ];
-      if (p.tee_group != null && !g.label?.startsWith("Group")) bits.push(`Grp ${p.tee_group}`);
-      const flag = p.no_show ? "  (no-show)" : "";
-      lines.push(`  ${p.display_name}  \u2014  ${bits.join(" \u00b7 ")}${flag}`);
-    }
-    lines.push("");
+  const teamName = (key: string | null | undefined) => {
+    if (!key) return null;
+    const t = (game.teams || []).find((x) => x.key === key);
+    return t ? `Team ${t.name || t.key}` : `Team ${key}`;
+  };
+  // Tee groups are only worth stating when they actually differ — otherwise it is another column
+  // of the same value.
+  const groups = new Set(players.map((p) => p.tee_group ?? null));
+  const showGroup = groups.size > 1;
+
+  for (const p of [...players].sort(byName)) {
+    const bits: string[] = [];
+    const tn = teamName(p.team);
+    if (tn) bits.push(tn);
+    // BOTH numbers: the index is what a player recognises as "theirs", the course handicap is what
+    // they will actually play off, and the gap between them is what surprises people mid-round.
+    bits.push(`CH ${val(p.course_handicap)}`);
+    bits.push(`idx ${val(p.handicap_index)}`);
+    // The tee appears ONLY when it differs from the one named in the header.
+    if (!dom || p.tee_name !== dom.tee) bits.push(`${val(p.tee_name)} tees`);
+    if (showGroup && p.tee_group != null) bits.push(`Grp ${p.tee_group}`);
+    if (p.no_show) bits.push("no-show");
+    lines.push(`  ${p.display_name}  \u2014  ${bits.join(" \u00b7 ")}`);
   }
 
+  lines.push("");
   lines.push("Check your handicap and tee before we start.");
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }

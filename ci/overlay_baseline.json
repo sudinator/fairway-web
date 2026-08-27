@@ -1,7 +1,7 @@
 {
   "components/home.tsx": 1,
   "components/player-card.tsx": 1,
-  "components/share-card.tsx": 2,
+  "components/share-card.tsx": 3,
   "components/tournaments.tsx": 1,
   "components/ui.tsx": 3
 }

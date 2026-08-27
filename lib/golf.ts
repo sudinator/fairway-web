@@ -3,6 +3,9 @@
 export const C = {
   green: "#0E3B2E", greenMid: "#16503D", greenLight: "#1B5A46",
   cream: "#F7F3E8", card: "#FFFDF6", ink: "#26251F",
+  // Scorecard cell: a shade off `card`, so an editable cell reads as a field. Was a literal in
+  // three places, which is how a colour drifts — one gets adjusted and the others disagree.
+  cell: "#FBFAF4",
   faint: "#676253", line: "#D8D2BE",
   birdie: "#B83A2E", bogey: "#2E5AB8", gold: "#C9A227", sage: "#B2CBBD",
   dot: "#E8730C", parBlue: "#1E3A8A", indivDot: "#8FC4EE",
