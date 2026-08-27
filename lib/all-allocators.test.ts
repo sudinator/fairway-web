@@ -209,5 +209,70 @@ for (const holes of [BACK9, FULL18]) {
   ok("and never NaN", Number.isFinite(total));
 }
 
+
+// ── ALTERNATE SHOT: the SIDE's handicap, not the individual's ─────────────
+// One ball per side, so the side handicap is 50% of the partners combined and strokes are the
+// DIFFERENCE between sides, the lower playing scratch. Both partners get the same dots — the dot
+// means "this SIDE receives a stroke here".
+{
+  const P = (id: string, ch: number) =>
+    ({ id, user_id: id, handicap_index: null, slope: null, rating: null, course_handicap: ch, team: null }) as never;
+  // Side A off 20 and 8 -> 14. Side B off 10 and 5 -> 7.5. Difference 6.5 -> 7 strokes to A.
+  const players = [P("a", 20), P("b", 8), P("c", 10), P("d", 5)];
+  const game = {
+    game_type: "alt_shot", course_par: 72, pairings: [], holes_meta: FULL18, allowance_pct: 100,
+    teams: [{ key: "A", name: "A" }, { key: "B", name: "B" }],
+    foursomes: [{ id: "f1", name: "F1", a: ["a", "b"], b: ["c", "d"] }],
+  } as never;
+  const dots = (p: never) => FULL18.reduce((s, h) => s + dotStrokes(game, p, h.si, players as never), 0);
+
+  // Rounding ONCE at the difference: 14 - 7.5 = 6.5 -> 7. Rounding each side first gives 14 - 8 = 6.
+  eq("side A receives 7 strokes", dots(players[0]), 7);
+  eq("BOTH partners on side A get the same", dots(players[1]), 7);
+  eq("side B plays scratch", dots(players[2]), 0);
+  eq("and its partner too", dots(players[3]), 0);
+}
+{
+  // Equal sides: nobody receives.
+  const P = (id: string, ch: number) =>
+    ({ id, user_id: id, handicap_index: null, slope: null, rating: null, course_handicap: ch, team: null }) as never;
+  const players = [P("a", 12), P("b", 8), P("c", 14), P("d", 6)];
+  const game = {
+    game_type: "alt_shot", course_par: 72, pairings: [], holes_meta: FULL18, allowance_pct: 100,
+    teams: [{ key: "A", name: "A" }, { key: "B", name: "B" }],
+    foursomes: [{ id: "f1", name: "F1", a: ["a", "b"], b: ["c", "d"] }],
+  } as never;
+  // Both sides are 10. Nobody gets a stroke.
+  for (const p of players) {
+    eq("equal side handicaps -> scratch", FULL18.reduce((s, h) => s + dotStrokes(game, p, h.si, players as never), 0), 0);
+  }
+}
+{
+  // A nine halves each partner BEFORE the 50%, so the side difference halves too.
+  const P = (id: string, ch: number) =>
+    ({ id, user_id: id, handicap_index: null, slope: null, rating: null, course_handicap: ch, team: null }) as never;
+  const players = [P("a", 20), P("b", 8), P("c", 10), P("d", 5)];
+  const game = {
+    game_type: "alt_shot", course_par: 72, pairings: [], holes_meta: BACK9, allowance_pct: 100,
+    teams: [{ key: "A", name: "A" }, { key: "B", name: "B" }],
+    foursomes: [{ id: "f1", name: "F1", a: ["a", "b"], b: ["c", "d"] }],
+  } as never;
+  // Halved: A is (10+4)/2 = 7, B is (5+2.5)/2 = 3.75. Difference 3.25 -> 3.
+  const dots = BACK9.reduce((s, h) => s + dotStrokes(game, players[0], h.si, players as never), 0);
+  eq("a nine's side difference is roughly half the eighteen's", dots, 3);
+}
+{
+  // A player in no foursome receives nothing rather than a guessed value.
+  const P = (id: string, ch: number) =>
+    ({ id, user_id: id, handicap_index: null, slope: null, rating: null, course_handicap: ch, team: null }) as never;
+  const players = [P("a", 20), P("b", 8), P("x", 12)];
+  const game = {
+    game_type: "alt_shot", course_par: 72, pairings: [], holes_meta: FULL18, allowance_pct: 100,
+    teams: [{ key: "A", name: "A" }, { key: "B", name: "B" }],
+    foursomes: [{ id: "f1", name: "F1", a: ["a"], b: ["b"] }],
+  } as never;
+  eq("unpaired player gets nothing", FULL18.reduce((s, h) => s + dotStrokes(game, players[2], h.si, players as never), 0), 0);
+}
+
 console.log(`all allocators: ${pass} passed, ${fail} failed`);
 if (fail) { console.error(fails.join("\n")); process.exit(1); }

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { buildSetupSummary } from "@/lib/setup-summary";
 import { C } from "@/lib/golf";
 import { pkey, shapeOf } from "@/lib/game-shape";
 import type { Game, Player } from "@/lib/game-types";
@@ -54,6 +55,9 @@ export function GameSetupWorkspace({
   randomizing,
   groupOverflow,
 }: GameSetupWorkspaceProps) {
+  // Transient "Copied" flash on the line-up button. Local because it is presentation, not setup
+  // state, and must not survive a tab change.
+  const [summaryCopied, setSummaryCopied] = React.useState(false);
   const { usesTeams, usesMatchups, usesFoursomes } = shapeOf(game);
   const total = players.length;
   const pairings = Array.isArray(game.pairings) ? game.pairings : [];
@@ -244,6 +248,43 @@ export function GameSetupWorkspace({
 
       {section === "review" && (
         <div>
+          {/* The roster, ready to paste into the group chat. Shown as well as copied: a copy button
+              alone gives no way to check the text before pasting it somewhere public. */}
+          <div style={{ ...cardStyle, marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 8 }}>
+              <div style={{ color: C.cream, fontWeight: 800, fontSize: 14 }}>Share the line-up</div>
+              <button
+                onClick={async () => {
+                  const text = buildSetupSummary(game as never, players as never);
+                  try {
+                    await navigator.clipboard.writeText(text);
+                    setSummaryCopied(true);
+                    setTimeout(() => setSummaryCopied(false), 2000);
+                  } catch {
+                    // Clipboard can be blocked (no HTTPS, or a permission prompt declined). The
+                    // preview below is always selectable, so there is a way through either way.
+                    setSummaryCopied(false);
+                  }
+                }}
+                style={{ ...btn(true), fontSize: 13 }}
+              >
+                {summaryCopied ? "Copied" : "Copy"}
+              </button>
+            </div>
+            <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 8 }}>
+              Paste this into your group chat so everyone can check their handicap, tee and team before you start.
+            </div>
+            <pre
+              style={{
+                background: C.card, color: C.green, borderRadius: 8, padding: "8px 12px",
+                fontSize: 12, lineHeight: 1.55, whiteSpace: "pre-wrap", wordBreak: "break-word",
+                margin: 0, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                maxHeight: 260, overflowY: "auto",
+              }}
+            >
+              {buildSetupSummary(game as never, players as never)}
+            </pre>
+          </div>
           <div style={cardStyle}>
             {[
               [playersDone, "All players have tees and handicaps set"],

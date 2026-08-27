@@ -2,6 +2,7 @@
 // is this game", plus the stroke-dot basis that MUST match golf.ts scoring.
 // Unit-tested in game-shape.test.ts.
 import { applyAllowance, matchAllowance, matchStrokesFor, strokesReceived, allocateStrokes } from "./golf";
+import { altShotTeamHandicap, altShotMatchStrokes } from "./alt-shot";
 
 /**
  * `alt_shot` is foursomes: 2v2 match play with ONE ball per side, partners alternating strokes.
@@ -44,7 +45,7 @@ export type GameShape = {
   usesTeams: boolean;
   usesMatchups: boolean;
   usesFoursomes: boolean;
-  dotBasis: "absolute" | "relative_pair" | "relative_foursome";
+  dotBasis: "absolute" | "relative_pair" | "relative_foursome" | "alt_shot_side";
   view: "stableford" | "stroke" | "match" | "fourball" | "trifecta" | "alt_shot" | "skins_individual" | "skins_team_11" | "skins_team_2v2";
 };
 export function shapeOf(game: ShapeGame): GameShape {
@@ -65,7 +66,12 @@ export function shapeOf(game: ShapeGame): GameShape {
   const dotBasis: GameShape["dotBasis"] =
     gt === "match"
       ? "relative_pair"
-      : gt === "fourball" || gt === "trifecta" || gt === "alt_shot"
+      // Alternate shot is NOT relative_foursome. That basis gives each player strokes relative to
+      // the foursome's lowest INDIVIDUAL handicap, which is four-ball's rule. Here the SIDE has one
+      // handicap (50% of the partners combined) and strokes are the difference between SIDES.
+      : gt === "alt_shot"
+      ? "alt_shot_side"
+      : gt === "fourball" || gt === "trifecta"
       ? "relative_foursome"
       : gt === "skins"
       ? (skinsStyle === "team_2v2" ? "relative_foursome" : skinsStyle === "team_11" ? "relative_pair" : "absolute")
@@ -161,6 +167,32 @@ export function dotStrokes(
       return matchStrokesFor(a, si, allocHoles(game));
     }
     return matchStrokesFor(mine, si, allocHoles(game));
+  }
+
+  // ALTERNATE SHOT. One ball per side, so the SIDE has one handicap — 50% of the two partners'
+  // combined — and strokes are the difference between the two sides, the lower playing scratch.
+  // Both partners receive the same dots: the dot means "this SIDE gets a stroke here".
+  if (basis === "alt_shot_side") {
+    const fs = (game.foursomes || []).find((f) => [...f.a, ...f.b].includes(key));
+    if (!fs) return 0;
+    const chOf = (uid: string) => {
+      const q = allPlayers.find((x) => pkey(x) === uid);
+      return q ? applyAllowance(chBasis(q, game.course_par, game.holes_meta?.length), 100) : null;
+    };
+    // The side handicaps are kept EXACT here. altShotMatchStrokes rounds once, at the difference:
+    // rounding each side first loses a stroke whenever a pair's combined total is odd.
+    const sideCh = (ids: string[]) => {
+      const vals = ids.map(chOf);
+      if (vals.some((v) => v == null)) return null;
+      return altShotTeamHandicap(vals[0] as number, vals[1] as number).value;
+    };
+    const aCh = sideCh(fs.a);
+    const bCh = sideCh(fs.b);
+    const mineIsA = fs.a.includes(key);
+    const { receiving, strokes } = altShotMatchStrokes(aCh, bCh);
+    if (receiving == null || strokes <= 0) return 0;
+    const iReceive = (receiving === "a" && mineIsA) || (receiving === "b" && !mineIsA);
+    return iReceive ? matchStrokesFor(strokes, si, allocHoles(game)) : 0;
   }
 
   // Relative to the foursome's lowest playing handicap (low plays scratch):

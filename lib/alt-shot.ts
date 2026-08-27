@@ -209,3 +209,31 @@ export function altShotMatch(results: HoleResult[], totalHoles = 18): MatchState
 export function altShotPostsRounds(): false {
   return false;
 }
+
+
+/**
+ * Who drives on this hole, for each side of a foursome.
+ *
+ * The FIRST partner listed on a side takes the ODD holes; the other takes the even ones. That
+ * ordering is the foursome's own — the order the sides were built in — so no separate nomination
+ * needs storing, and there is only one source of truth.
+ *
+ * Returns null for a side that does not hold exactly two players: a side of one or three is not an
+ * alternate shot pair, and naming a driver for it would be inventing information.
+ */
+export function altShotDrivers(
+  side: string[] | null | undefined,
+  /**
+   * The hole's POSITION in the round, zero-based — not its number. A back nine opens at hole 10,
+   * and parity on the hole NUMBER would make the second partner drive first there, which nobody
+   * expects. Alternate shot nominates who tees off on the FIRST HOLE PLAYED, then alternates.
+   */
+  holeIndex: number,
+): { driver: string; other: string } | null {
+  if (!Array.isArray(side) || side.length !== 2) return null;
+  const [first, second] = side;
+  // Rule 22: the order holds for the whole round, so it is derived from position, never toggled.
+  return holeIndex % 2 === 0
+    ? { driver: first, other: second }
+    : { driver: second, other: first };
+}

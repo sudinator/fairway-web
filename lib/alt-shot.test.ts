@@ -10,6 +10,7 @@ import {
   altShotEffectiveHandicap,
   altShotMatchStrokes,
   altShotTeeOrder,
+  altShotDrivers,
   altShotNet,
   altShotHoleResult,
   altShotMatch,
@@ -102,6 +103,36 @@ eq("null side -> nobody receives", altShotMatchStrokes(null, 12), { receiving: n
   // Nominating the second partner simply swaps the pattern.
   eq("bryan on odds -> hole 1 is bryan", altShotTeeOrder(side, "bryan", 1), "bryan");
   eq("bryan on odds -> hole 2 is amit", altShotTeeOrder(side, "bryan", 2), "amit");
+}
+
+
+// ── who drives: the FIRST HOLE PLAYED, then alternating ──────────────────
+// Keyed to POSITION in the round, not to the hole number. A back nine opens at hole 10, and parity
+// on the number would make the second partner drive first there — which nobody expects and which
+// an earlier version of this did. The nomination is "who tees off first", full stop.
+{
+  const side = ["amit", "bryan"];
+  eq("first hole played: the first listed partner", altShotDrivers(side, 0)?.driver, "amit");
+  eq("second hole played: the other", altShotDrivers(side, 1)?.driver, "bryan");
+  eq("ninth hole played", altShotDrivers(side, 8)?.driver, "amit");
+  eq("eighteenth hole played", altShotDrivers(side, 17)?.driver, "bryan");
+  // The partner is reported too, so a reminder names both without a second lookup.
+  eq("names the partner", altShotDrivers(side, 0)?.other, "bryan");
+}
+{
+  // The point of the change: a BACK NINE must open with the same partner as a front nine.
+  // Position 0 is hole 10 there, and hole 1 on the front. Both give the first listed partner.
+  const side = ["amit", "bryan"];
+  eq("a back nine opens with the SAME partner as a front nine", altShotDrivers(side, 0)?.driver, "amit");
+  // And an 18-hole round agrees with both.
+  eq("an eighteen opens the same way", altShotDrivers(side, 0)?.driver, "amit");
+}
+{
+  // A side that is not exactly two is not a pair; naming a driver would invent information.
+  eq("a side of one", altShotDrivers(["solo"], 0), null);
+  eq("a side of three", altShotDrivers(["a", "b", "c"], 0), null);
+  eq("no side at all", altShotDrivers(null, 0), null);
+  eq("an empty side", altShotDrivers([], 0), null);
 }
 
 // ── net, and the hole result ───────────────────────────────────────────────

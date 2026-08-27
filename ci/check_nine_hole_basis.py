@@ -90,6 +90,27 @@ if loose:
 if "case when n = 9" not in code:
     failures.append("no 'case when n = 9' found — the halving is not conditional on an exact nine.")
 
+# ── formats with no individual score must NOT post ────────────────────────
+# Foursomes is one ball per side, so the score belongs to the pair; after the fan-out both partners
+# carry it and posting would record it as each player's own round. The rule lives only in SQL, so
+# nothing else can check it.
+gate = re.findall(r"g\.game_type in \(([^)]*)\)", code)
+if len(gate) < 2:
+    failures.append(
+        f"the no-post format gate appears {len(gate)} time(s); both posting functions need it.\n"
+        "  post_game_rounds_internal AND post_group_rounds must both return early for formats that\n"
+        "  produce no individual score, or one path posts and the other does not."
+    )
+else:
+    for g_ in gate:
+        if "alt_shot" not in g_:
+            failures.append(
+                "the no-post gate does not list 'alt_shot'.\n"
+                "  Foursomes produces no individual score: both partners' rows carry the PAIR's\n"
+                "  score after the fan-out, so posting writes a round neither player shot alone."
+            )
+            break
+
 # ── the read side must NOT halve again ─────────────────────────────────────
 golf = (ROOT / "lib" / "golf.ts").read_text(encoding="utf-8")
 golf_code = re.sub(r"^\s*//.*$", "", golf, flags=re.M)

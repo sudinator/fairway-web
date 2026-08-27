@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { altShotDrivers } from "@/lib/alt-shot";
 import { createClient } from "@/lib/supabase";
 import { ContestsSection, ContestHoleChip } from "@/components/contests-view";
 import { betResultToPost } from "@/lib/money";
@@ -128,7 +129,10 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
       rest.forEach((p) => out.push({ type: "player", p }));
       return out.length ? out : ps.map((p) => ({ type: "player" as const, p }));
     }
-    if ((gt === "fourball" || gt === "trifecta") && Array.isArray(game.foursomes)) {
+    // alt_shot groups the same way: partners adjacent, divider between the sides. Both partners
+    // show the SIDE's score after the fan-out, so the divider is what makes the card readable
+    // rather than looking like the same score repeated by mistake.
+    if ((gt === "fourball" || gt === "trifecta" || gt === "alt_shot") && Array.isArray(game.foursomes)) {
       const f = game.foursomes.find((fr) => [...fr.a, ...fr.b].some((uid) => ps.some((p) => pkey(p) === uid)));
       if (f) {
         const aSide = ps.filter((p) => f.a.includes(pkey(p)));
@@ -215,6 +219,24 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
           <span style={{ color: C.cream, fontSize: 18, fontWeight: 800, lineHeight: 1 }}>Hole {m.n}</span>
           <span style={{ color: "#CFE3D8", fontSize: 13 }}>Par <b style={{ color: C.cream }}>{m.par}</b>{(() => { const y = ydsAt(i, m.yards); return y ? <> · <b style={{ color: C.cream }}>{y}</b> yds</> : null; })()} · SI <b style={{ color: C.cream }}>{m.si ?? "–"}</b></span>
         </div>
+        {game.game_type === "alt_shot" && Array.isArray(game.foursomes) ? (
+          <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 8, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {(game.foursomes || []).flatMap((fr: { a?: string[]; b?: string[] }) =>
+              [fr.a, fr.b].map((sideIds, si2) => {
+                const d = altShotDrivers(sideIds, i);   // POSITION in the round, not the hole number
+                if (!d) return null;
+                const who = players.find((q) => pkey(q) === d.driver);
+                if (!who) return null;
+                return (
+                  <span key={`tee${fr ? si2 : si2}-${d.driver}`}>
+                    <span style={{ color: C.gold }}>{"\u26F3"}</span>{" "}
+                    <b style={{ color: C.cream, fontWeight: 700 }}>{who.display_name.split(" ")[0]}</b> tees off
+                  </span>
+                );
+              }),
+            )}
+          </div>
+        ) : null}
         <div style={{ display: "flex", gap: 6 }}>
           {cols.map((c, ci) => {
             if (c.type === "divider") return <div key={`hd${i}-${ci}`} style={{ width: 2, alignSelf: "stretch", background: "rgba(216,178,74,0.5)", borderRadius: 6, margin: "16px 1px 0" }} />;

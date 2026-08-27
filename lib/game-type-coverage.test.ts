@@ -59,8 +59,13 @@ for (const gt of GAME_TYPES) {
   ok("alt_shot uses two named teams", s.usesTeams);
   ok("alt_shot uses matchups", s.usesMatchups);
   ok("alt_shot uses foursomes (the 2v2 pairs)", s.usesFoursomes);
-  // One ball per side means the hole is decided within the foursome, exactly as four-ball does.
-  ok("alt_shot scores relative to the foursome", s.dotBasis === "relative_foursome");
+  // NOT relative_foursome — that was the assumption at 177.82, modelling alternate shot on
+  // four-ball. It gives each player strokes against the foursome's lowest INDIVIDUAL handicap.
+  // Alternate shot's SIDE has one handicap (50% of the partners combined) and strokes are the
+  // difference between sides, so it needs its own basis.
+  ok("alt_shot uses the side basis, not four-ball's", s.dotBasis === "alt_shot_side");
+  ok("and four-ball still uses relative_foursome",
+     shapeOf({ game_type: "fourball", teams: teams as never, foursomes: [] }).dotBasis === "relative_foursome");
   ok("alt_shot is not skins", s.skinsStyle === null);
 }
 

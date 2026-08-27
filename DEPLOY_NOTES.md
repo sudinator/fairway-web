@@ -1,3 +1,93 @@
+## 178.0.260827 — Share the line-up; tee order fixed to the first hole PLAYED
+- **FEATURE bump.** New user-facing capability, no migration change.
+- **FIX (my bug, reported): the tee order was keyed to hole NUMBER parity.** I had "the first
+  partner takes the odd-numbered holes", which on a back nine — opening at hole 10, an even number —
+  makes the SECOND partner drive first. I had even written that off in a test comment as "correct:
+  the rule alternates, it does not fix who starts". That reasoning was wrong.
+  Alternate shot nominates who tees off on the FIRST HOLE PLAYED, then alternates; whether that
+  hole is numbered 1 or 10 is irrelevant. Now keyed to POSITION in the round, so the first listed
+  partner always drives first on any set of holes. The assertion that had encoded the wrong
+  behaviour is replaced by one requiring a back nine to open with the SAME partner as a front nine.
+- **NEW: Share the line-up.** A plain-text roster on the Review step, ready to paste into a group
+  chat: game, course, format, holes, a non-default allowance, then every player grouped by team (or
+  by tee group when there are no teams) with their handicap index, course handicap, tee and group.
+  - **Both numbers are shown.** The index is what a player recognises as "their" handicap; the
+    course handicap is what they will actually play off, and the gap between the two is the thing
+    that surprises people mid-round.
+  - **Nobody is silently dropped.** A player with no team appears under "Not on a team", and a
+    no-show is flagged rather than hidden, so the count in the chat matches the count on the tee.
+  - **A nine names its holes** — "9 holes (10-18)". Someone arriving at the 1st tee for a back-nine
+    match is exactly what this exists to prevent.
+  - **A default 100% allowance stays quiet**; 85% or 50% is stated, because that is the number
+    people query afterwards.
+  - **Plain text only** — no box drawing, no tabs, no reliance on a monospace font, asserted
+    directly. WhatsApp, iMessage and Slack render none of those consistently.
+  - **A preview is shown as well as the copy button.** A copy button alone gives no way to check the
+    text before pasting it somewhere public, and clipboard access can be refused (no HTTPS, or a
+    declined permission) — the preview is selectable either way.
+  - Built as a pure function so the TEXT is what gets asserted. 27 assertions.
+- The design-scale guard caught an off-scale `10px 12px` padding I had introduced; moved to the
+  on-scale `8px 12px`.
+- Assertion baseline 1988 -> **2015 across 35 suites**. All differential suites at 0 mismatches.
+
+## 177.99.260827 — Alternate shot is playable end to end
+- **NO migration change.** 0139 as shipped at 177.98 stands.
+- **The group card now groups alternate shot by SIDE** — partners adjacent, a divider between the
+  two sides. It had been falling through to a flat four-column list. Both partners show the SIDE's
+  score after the fan-out, so without the divider the card reads as the same score repeated by
+  mistake rather than as one ball per side. The fourball/trifecta branch already did exactly this;
+  alt_shot simply was not in it.
+- **Scoring works through the existing group card, as requested:** all four players shown, one score
+  entered, written to both partners on that side. The fan-out was built at 177.87 and the group card
+  already routes through `setPlayerHole`, so nothing new was needed on the write path.
+- **NEW tee reminder, per hole.** The first partner listed on a side takes the ODD holes; the other
+  takes the even. **No stored nomination and no migration**: `FoursomeDef.a` and `.b` are ORDERED
+  arrays, so the data already expresses it and there is one source of truth rather than two.
+  Shown in each hole's header, because that is where a player is looking when they reach the tee —
+  and playing out of order is a Rule 22 penalty, which is the thing pairs actually forget.
+  11 assertions, including that a BACK NINE opens on hole 10 — an even hole — so the second partner
+  drives first that day. That is correct: the rule alternates, it does not fix who starts.
+- **On handicaps, to state it plainly: strokes off the low.** The side with the higher handicap
+  receives the DIFFERENCE; the lower side plays scratch. Not each side playing its own full
+  handicap. Sides off 14 and 7.5 give 7 strokes to the higher side and none to the lower, and both
+  partners on the receiving side show identical dots because the dot means "this SIDE receives a
+  stroke here".
+- Assertion baseline 1977 -> **1988**. All differential suites at 0 mismatches.
+
+## 177.98.260827 — Alternate shot: no posting, and its OWN stroke basis
+- **0139 AMENDED AGAIN — re-run it.** `create or replace` throughout, so re-running is safe.
+- **Alternate shot no longer posts rounds to handicaps, enforced in the DATABASE.**
+  `altShotPostsRounds()` has existed since 177.82 returning `false` and enforcing NOTHING — it is a
+  TypeScript function read only by a test. Posting happens in Postgres, so an alternate shot game
+  finishing wrote a round like any other.
+  Foursomes is one ball per side: the score belongs to the PAIR, and after the fan-out both
+  partners' rows carry it, so posting recorded a round neither player shot alone. WHS does not
+  accept a format that produces no individual score.
+  Gated in BOTH posting functions. `scramble` is listed ahead of the format existing, because the
+  reason is identical and an implementer should find the rule already written.
+  The CI guard now checks the gate is present in both functions and names alt_shot; negative-tested
+  by removing it from one function and by dropping alt_shot from the list.
+- **FOUND while building the scorecard: alternate shot had the WRONG stroke basis.** It was
+  `relative_foursome`, which I set at 177.82 by modelling it on four-ball. That basis gives each
+  player strokes against the foursome's lowest INDIVIDUAL handicap. Alternate shot's SIDE has one
+  handicap — 50% of the two partners combined — and strokes are the difference between the two
+  SIDES, the lower playing scratch.
+  Every alternate shot game created so far has therefore had wrong stroke dots. Nobody could have
+  seen it, because the format is not playable end to end yet.
+- **NEW `alt_shot_side` basis**, wired to `altShotTeamHandicap` and `altShotMatchStrokes` — written
+  and tested at 177.82 and never connected to anything until now. Both partners receive the SAME
+  dots, because the dot means "this SIDE gets a stroke here".
+  Rounding happens ONCE, at the difference: sides off 14 and 7.5 differ by 6.5 and round to 7,
+  where rounding each side first gives 14 and 8, a difference of 6.
+- **10 new assertions**: the 7-stroke difference case, both partners receiving equally, equal sides
+  playing scratch, a nine halving the difference, and an unpaired player receiving nothing.
+  Negative-tested three ways — falling back to relative_foursome, rounding each side first, and only
+  one partner receiving. All caught.
+- **A stale assertion in game-type-coverage had pinned the wrong basis** and failed, which is
+  exactly what it is for. Corrected, with the reason recorded, plus a new assertion that four-ball
+  still uses relative_foursome.
+- Assertion baseline 1966 -> **1977**. All differential suites at 0 mismatches.
+
 ## 177.97.260827 — A nine now posts an 18-hole EQUIVALENT; par is summed, not halved
 - **NO new migration.** 0139 is amended in place — **if you already applied it, apply the updated
   file again.** It is `create or replace` throughout, so re-running is safe.

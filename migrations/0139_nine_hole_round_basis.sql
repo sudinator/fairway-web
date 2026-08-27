@@ -58,6 +58,15 @@ begin
   select * into g from games where id = p_game;
   if not found then return; end if;
 
+  -- FORMATS THAT DO NOT POST TO HANDICAPS.
+  -- Foursomes (alternate shot) is one ball per side, so the score belongs to the PAIR. After the
+  -- score fan-out both partners' rows carry it, and posting would record it as each player's own
+  -- individual round — a score neither of them shot alone. WHS does not accept a format that
+  -- produces no individual score.
+  -- Scramble is listed ahead of the format existing: the reason is identical, and an implementer
+  -- should find the rule already here rather than rediscover it.
+  if g.game_type in ('alt_shot', 'scramble') then return; end if;
+
   hmeta := coalesce(g.holes_meta, '[]'::jsonb);
   n := jsonb_array_length(hmeta);
   -- Par of the holes ACTUALLY in this game. For a nine this is a plain SUM, never half the course
@@ -172,6 +181,15 @@ begin
   ) then
     return;
   end if;
+
+  -- FORMATS THAT DO NOT POST TO HANDICAPS.
+  -- Foursomes (alternate shot) is one ball per side, so the score belongs to the PAIR. After the
+  -- score fan-out both partners' rows carry it, and posting would record it as each player's own
+  -- individual round — a score neither of them shot alone. WHS does not accept a format that
+  -- produces no individual score.
+  -- Scramble is listed ahead of the format existing: the reason is identical, and an implementer
+  -- should find the rule already here rather than rediscover it.
+  if g.game_type in ('alt_shot', 'scramble') then return; end if;
 
   hmeta := coalesce(g.holes_meta, '[]'::jsonb);
   n := jsonb_array_length(hmeta);
