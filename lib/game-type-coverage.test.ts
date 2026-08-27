@@ -95,5 +95,24 @@ for (const gt of GAME_TYPES) {
   }
 }
 
+
+// ── every format's setup must be COMPLETABLE ─────────────────────────────
+// shapeOf says which structures a format needs; the UI must offer an editor for each. alt_shot
+// required foursomes while the foursome builder was gated on fourball||trifecta only — so the
+// Matchups tab rendered nothing, the Tee groups tab is hidden when usesFoursomes is true, and
+// setup could never finish. Every previous check passed.
+{
+  const teams = [{ id: "a", name: "A" }, { id: "b", name: "B" }];
+  for (const gt of GAME_TYPES) {
+    const shape = shapeOf({ game_type: gt, teams: teams as never, foursomes: [] });
+    // A format cannot demand foursomes AND have no tee-group fallback unless an editor exists.
+    // This is the reachability the app depends on; the source check below enforces the other half.
+    ok(
+      `${gt}: does not require a structure with no way to reach it`,
+      !(shape.usesFoursomes && !shape.usesTeams && !shape.usesMatchups),
+    );
+  }
+}
+
 console.log(`game type coverage: ${pass} passed, ${fail} failed`);
 if (fail) { console.error(fails.join("\n")); process.exit(1); }

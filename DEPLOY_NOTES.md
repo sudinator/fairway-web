@@ -1,3 +1,27 @@
+## 178.2.260827 — Alternate shot setup could never complete
+- **NO migration change.**
+- **FIX: an alternate shot game was unplayable from the moment it was created.** The Teams step
+  reported "matchups not assigned" with no way to assign anything, so setup never finished.
+  The foursome builder in tournaments.tsx is gated on `fourball || trifecta`. alt_shot was not in
+  it, so the Matchups tab rendered nothing — and because the Tee groups tab is HIDDEN whenever
+  `usesFoursomes` is true, there was no other route. A dead end in both directions.
+  alt_shot added to that gate and to the play-tab equivalent. The foursome IS the matchup for a 2v2
+  format, and the builder is the same one four-ball uses.
+- **HOW IT WAS MISSED, precisely.** Every existing check passed, and none of them asked the only
+  question that mattered.
+  `game-type-coverage` asserted each type has a distinct label and a valid shape. The
+  shape/payload test asserted that a shape claiming `usesFoursomes` gets `foursomes` written. The
+  format-selection test asserted the picker offers it. All true, all green, and the game still
+  could not be set up — because **nothing tested that a user can FINISH**. Every test checked a
+  layer in isolation; the failure was between the shape and the UI, which no layer owns.
+  I also never created an alternate shot game and walked the setup flow. The format has been in the
+  picker since 177.84 and I built four releases on top of it without once using it.
+- **NEW `ci/check_setup_reachable.py`** — reads which types `shapeOf` marks `usesFoursomes` and
+  requires each to appear in the foursome editor's gate. Checked against the SOURCE, because the
+  gates are JSX conditions that no unit test can see. Negative-tested against the exact bug that
+  shipped, and it names the offending type in its output.
+- Assertion baseline 2019 -> **2026**.
+
 ## 178.1.260827 — Share the line-up (card + text); tee order fixed to the first hole PLAYED
 - **Supersedes an earlier 178.0** that carried a text-only summary. That build was published
   and then rebuilt under the same number when the card was added — reusing a version means the

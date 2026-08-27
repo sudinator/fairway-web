@@ -1,5 +1,5 @@
 {
-  "total": 2019,
+  "total": 2026,
   "suites": {
     "(unnamed suites)": 496,
     "ai-sanitize": 11,
@@ -17,7 +17,7 @@
     "failure messages": 24,
     "finish-gaps": 18,
     "format picker": 25,
-    "game type coverage": 82,
+    "game type coverage": 89,
     "game-create": 56,
     "game-utils": 21,
     "golf/computeBetting tests": 53,

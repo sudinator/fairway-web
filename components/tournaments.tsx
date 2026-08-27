@@ -3097,7 +3097,7 @@ function GameRoom({
         />
       )}
 
-      {roomTab === "play" && (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta") && (
+      {roomTab === "play" && (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot") && (
         <GroupSegmentSummary game={game} players={players} />
       )}
 
@@ -3233,7 +3233,7 @@ function GameRoom({
             onMarkOut={toggleNoShow}
           />
         </>
-      ) : (game.game_type === "fourball" || game.game_type === "trifecta") && (roomTab === "play" || (roomTab === "setup" && setupTab === "matchups")) ? (
+      ) : (game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot") && (roomTab === "play" || (roomTab === "setup" && setupTab === "matchups")) ? (
         <FourballView
           game={game}
           players={players}
