@@ -99,10 +99,36 @@ export function withHistoricalRatingSlopeCorrection(r: Round, rating: number | n
   };
 }
 
-export function strokesReceived(si: number | null, ch: number | null): number {
+/**
+ * Strokes received on the hole with stroke index `si`.
+ *
+ * THIS IS A WRAPPER, NOT A SECOND ALGORITHM. It used to be its own formula —
+ * `floor(ch/18) + (si <= ch % 18)` — with 18 hardcoded, and it agreed with allocateStrokes on a
+ * full round with a clean 1-18 index and diverged everywhere else. A nine-hole game holds every
+ * second index, so it handed out roughly half the strokes owed while the rest of the app allocated
+ * correctly, and the two disagreed on screen.
+ *
+ * Two implementations of one rule is the defect; this now delegates so there is exactly one.
+ *
+ * `holes` is optional only because a few callers pass a bare stroke index. Omitting it synthesises
+ * a 1..18 index, which is precisely what the old formula assumed — so a full round behaves
+ * identically by construction rather than by coincidence. Callers that HAVE the hole list should
+ * pass it: that is the only way a nine, or a course with duplicate or missing indexes, comes out
+ * right.
+ */
+export function strokesReceived(
+  si: number | null,
+  ch: number | null,
+  holes?: { hole_number: number; stroke_index: number | null }[] | null,
+): number {
   if (si == null || ch == null) return 0;
-  if (ch >= 0) return Math.floor(ch / 18) + (si <= ch % 18 ? 1 : 0);
-  return si > 18 + ch ? -1 : 0;
+  const list =
+    holes && holes.length
+      ? holes
+      : Array.from({ length: 18 }, (_, i) => ({ hole_number: i + 1, stroke_index: i + 1 }));
+  const alloc = allocateStrokes(list, ch);
+  const hole = list.find((h) => h.stroke_index === si);
+  return hole ? alloc[hole.hole_number] ?? 0 : 0;
 }
 
 // Robust allocation: distribute exactly `ch` strokes across the given holes by
@@ -426,6 +452,12 @@ export function adjustedGross(r: Round): number | null {
     const ch = r.course_handicap ?? courseHandicap(r.handicap_index as number, r.slope, r.rating, r.course_par as number);
     if (ch == null || r.course_par == null) return null; // can't fill safely -> don't count
     const playedPar = holes.reduce((s, h) => s + h.par, 0);
+    // Deliberately WITHOUT the hole list: this is an 18-hole round with holes missing, not a
+    // nine-hole round. WHS fills the unplayed holes with net par, and unplayedRecv = ch -
+    // playedRecv only balances if playedRecv counts strokes under the FULL 18-hole
+    // allocation. Re-allocating ch across just the played holes inflates playedRecv and
+    // drives unplayedRecv negative. See ci/check_single_stroke_allocator.py, which allows
+    // this one call by name.
     const playedRecv = holes.reduce((s, h) => s + strokesReceived(h.stroke_index, ch), 0);
     const unplayedPar = r.course_par - playedPar;
     const unplayedRecv = ch - playedRecv;
@@ -846,13 +878,16 @@ export function computeSkins(
   const out: SkinHole[] = [];
   let carry = 0;
   const split = mode === "split";
+  // The allocator wants { hole_number, stroke_index }; these carry { n, si }. Mapped ONCE, not per
+  // hole per player — this loop runs for every player on every hole.
+  const betHoles = holes.map((h, i) => ({ hole_number: h.n ?? i + 1, stroke_index: h.si ?? null }));
   holes.forEach((h, i) => {
     const netById: Record<string, number | null> = {};
     let allPlayed = true;
     for (const p of players) {
       const g = p.gross[i];
       if (g == null || g <= 0) { netById[p.id] = null; allPlayed = false; }
-      else netById[p.id] = g - strokesReceived(h.si, applyAllowance(p.ch, allowancePct));
+      else netById[p.id] = g - strokesReceived(h.si, applyAllowance(p.ch, allowancePct), betHoles);
     }
     if (!allPlayed || players.length < 2) {
       // In split mode every hole is worth exactly 1 (no pot); carryover builds the pot.

@@ -1,7 +1,7 @@
 // Pure game-shape + stroke logic. No React. Single source of truth for "what mode
 // is this game", plus the stroke-dot basis that MUST match golf.ts scoring.
 // Unit-tested in game-shape.test.ts.
-import { applyAllowance, matchAllowance, matchStrokesFor, strokesReceived } from "./golf";
+import { applyAllowance, matchAllowance, matchStrokesFor, strokesReceived, allocateStrokes } from "./golf";
 
 /**
  * `alt_shot` is foursomes: 2v2 match play with ONE ball per side, partners alternating strokes.
@@ -105,6 +105,31 @@ export const chBasis = (
 //   • everything else (stableford, stroke, 1:1 skins) — full playing handicap
 // "Playing handicap" = course handicap with the allowance % applied. Posting a
 // round to a handicap record still uses the full playing handicap (handled
+
+/**
+ * Strokes a player receives on the hole with stroke index `si`, allocated by RANK across the holes
+ * actually in play.
+ *
+ * Uses allocateStrokes rather than the `si <= ch % 18` form, because that form hardcodes 18 and a
+ * nine-hole game holds only half the indexes — it would match si <= ch and hand out roughly half
+ * the strokes owed. Ranking is also immune to duplicate, missing or out-of-range indexes.
+ */
+function recvByRank(game: DotGame, si: number | null, ch: number): number {
+  if (si == null) return 0;
+  const meta = game.holes_meta;
+  // No hole list (older callers, hand-built DotGames in tests): fall back to the 18-hole form,
+  // which is correct for a full round and is what those callers have always used.
+  if (!Array.isArray(meta) || meta.length === 0) return strokesReceived(si, ch);
+  const alloc = allocateStrokes(
+    meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })),
+    ch,
+  );
+  // Find the hole carrying this stroke index. Duplicate indexes would be a data fault; the first
+  // match is taken, matching the ranking order allocateStrokes itself used.
+  const hole = meta.find((m) => m.si === si);
+  return hole ? alloc[hole.n] ?? 0 : 0;
+}
+
 // elsewhere) — that is intentionally different from the live match relativity.
 export function dotStrokes(
   game: DotGame,
@@ -146,7 +171,7 @@ export function dotStrokes(
   }
 
   // Full playing handicap: stableford, stroke, individual skins.
-  return strokesReceived(si, mine);
+  return recvByRank(game, si, mine);
 }
 
 // Full COURSE handicap for an INDIVIDUAL competition (e.g. the Group-results low-net /
@@ -154,5 +179,5 @@ export function dotStrokes(
 // allowance, no relative subtraction), regardless of the game's format. This is the
 // "course hcp" / blue-dot basis; the match's own allowance %% lives only in dotStrokes.
 export function fullStrokes(game: DotGame, p: ShapePlayer, si: number | null): number {
-  return strokesReceived(si, applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), 100));
+  return recvByRank(game, si, applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), 100));
 }

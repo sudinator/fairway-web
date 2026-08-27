@@ -1599,7 +1599,7 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
     const merged: Round[] = rs.map((r: any) => ({
       ...r,
       holes: dedupeHoles(byRound[r.id] || []).sort((a, b) => a.hole_number - b.hole_number)
-        .map((h) => ({ ...h, recv: strokesReceived(h.stroke_index, r.course_handicap) })),
+        .map((h, _i, all) => ({ ...h, recv: strokesReceived(h.stroke_index, r.course_handicap, all) })),
     }));
     setRounds(merged);
   }, [player.id]);

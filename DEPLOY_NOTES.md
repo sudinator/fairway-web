@@ -1,3 +1,66 @@
+## 177.92.260827 — ONE stroke allocator, with a guard that keeps it that way
+- **NO migration. No behaviour change from 177.91** — this removes the possibility of the class of
+  bug, rather than another instance of it.
+- **The right question was "why are there two?"** There should never have been. Every remaining
+  `strokesReceived` caller already had the hole list in scope, so the split bought nothing and cost
+  three releases of misdiagnosis.
+  `strokesReceived` is now a THIN WRAPPER over `allocateStrokes`. One algorithm. Where no hole list
+  is supplied it synthesises a 1..18 index — precisely what the old formula assumed — so a full
+  round behaves identically **by construction rather than by coincidence**.
+- **NEW `ci/check_single_stroke_allocator.py`** — the built-in check. It asserts:
+  1. `strokesReceived` still delegates and has not regrown a formula of its own;
+  2. no new hand-rolled allocation appears anywhere — an `si <= ch` threshold, a `% 18` on a
+     handicap, or a `floor(ch / 18)`;
+  3. every caller that HAS a hole list passes it, since omitting it silently falls back to 1..18
+     and reintroduces the nine-hole bug.
+  Paired with `lib/stroke-agreement.test.ts`, which asserts the scorecard dots and the Strokes
+  panel produce the SAME total across ten handicaps on a back nine, a front nine and a full
+  eighteen. The guard catches the shape; the test catches the numbers.
+- **The guard found a THIRD hand-rolled allocator on its first run** — inside `recvByRank`, added
+  by me at 177.91. It turned out to be my own doc comment quoting the old formula, so the guard now
+  strips comments before matching: a check that fires on its own explanation teaches people to
+  delete the explanation.
+- **Negative-tested three ways**, and the FIRST attempt let a sabotage through: allowlisting all of
+  `lib/golf.ts` meant `strokesReceived` could regrow its formula undetected — the one thing the
+  guard exists to prevent. The allowlist is now matched by TEXT, not by file, so anything else in
+  that file fails.
+- **The betting suite caught a real distinction I had flattened.** A NINE-HOLE GAME is a nine-hole
+  round: allocate across those nine. A PARTIAL round is an EIGHTEEN-hole round with holes missing —
+  WHS fills the unplayed holes with net par, and `unplayedRecv = ch - playedRecv` only balances if
+  playedRecv counts strokes under the FULL 18-hole allocation. Re-allocating across the 15 played
+  holes inflated playedRecv and skewed the differential from 12.45 to 9.98. That call site is back
+  on the 18-hole basis, documented at the line, and the guard allows it by name.
+- All differential suites remain at **0 mismatches**; `computeBetting` back to 53/53.
+
+## 177.91.260827 — The scorecard and the Strokes panel used DIFFERENT allocators
+- **NO migration.** Root cause of the repeated "strokes don't match" reports, including the very
+  first one I misdiagnosed twice.
+- **There were TWO stroke allocators, and they disagreed on a nine:**
+  - `allocateStrokes(holes, ch)` — ranks the holes ACTUALLY in play and distributes. Used by the
+    Strokes panel, which is why that panel has been correct throughout.
+  - `strokesReceived(si, ch)` = `floor(ch/18) + (si <= ch % 18)` — **18 HARDCODED**. Used by the
+    scorecard dots and the header totals.
+  On 18 holes with a clean 1-18 index the two agree, which is why this was invisible for years. On
+  a nine they do not: a back nine holds every SECOND index (2, 4, 6 ... 18), so the threshold form
+  matches only `si <= ch` and hands out roughly half the strokes owed. Amit off a nine-hole 8.5 got
+  dots on SI 2, 4, 6, 8 — four — while the panel correctly said nine.
+- **The game paths now allocate by RANK** via a new `recvByRank`, which uses `game.holes_meta` —
+  available at both call sites. `strokesReceived` is left untouched: its other callers are 18-hole
+  ROUND paths (manage.tsx, round stats) where it is correct and no hole list is threaded through.
+  A DotGame with no holes_meta falls back to the old form, which is what hand-built callers and
+  older tests have always used.
+- **This was the original "7 in the box, 3 on the card" report.** I attributed it to stroke indexes
+  at 177.88 and re-ranked them, which was both wrong and destructive; reverted at 177.90. Then I
+  attributed it to fractional rounding at 177.90 — a real bug, now fixed, but not this one. Three
+  attempts, and only reading BOTH code paths side by side found it.
+- **NEW `lib/stroke-agreement.test.ts`** — 34 assertions asserting the scorecard dots and the
+  Strokes panel produce the SAME total, for ten handicaps across a back nine, a front nine and a
+  full eighteen. The reported figures are pinned directly: 17 -> 9 dots, 28 -> 14, 4 -> 2. Before
+  the fix those were 4, 7 and 1. Negative-tested twice.
+- All differential suites remain at **0 mismatches across ~114,000 comparisons**; 18-hole play is
+  provably unchanged.
+- Assertion baseline 1657 -> **1691 across 32 suites**.
+
 ## 177.90.260826 — Revert the stroke-index re-rank; round strokes once
 - **NO migration.** Two corrections, both to changes I made, and one of them fixes a defect that
   predates this whole line of work.
