@@ -1,5 +1,5 @@
 {
-  "total": 1636,
+  "total": 1657,
   "suites": {
     "(unnamed suites)": 496,
     "ai-sanitize": 11,
@@ -22,7 +22,7 @@
     "golf/computeBetting tests": 53,
     "grouping tests": 281,
     "legs": 23,
-    "match length": 49,
+    "match length": 46,
     "match length picker": 18,
     "nine-hole handicap": 15,
     "nine-hole payload": 12,
@@ -30,6 +30,7 @@
     "round stat completeness": 8,
     "screen render": 62,
     "segments": 20,
+    "stroke rounding": 24,
     "sync/column tests": 6
   }
 }

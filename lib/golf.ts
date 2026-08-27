@@ -119,7 +119,14 @@ export function allocateStrokes(holes: { hole_number: number; stroke_index: numb
     if (sa !== sb) return sa - sb;
     return a.hole_number - b.hole_number;
   });
-  const total = Math.abs(ch);
+  // A stroke is indivisible: a hole either carries a dot or it does not. The handicap arrives
+  // UNROUNDED — chBasis keeps it exact so the nine-hole halving and the format allowance compose
+  // without double rounding — so it is rounded once, here, at the last point in the chain.
+  //
+  // Without this the loop condition `k < total` makes 10.5 behave as a CEILING and hand out eleven
+  // strokes. Not rounding, not truncation, and invisible on screen.
+  // Half rounds up, matching the team-handicap and playing-handicap rules elsewhere.
+  const total = Math.round(Math.abs(ch));
   const sign = ch >= 0 ? 1 : -1;
   for (let k = 0; k < total; k++) {
     const idx = sign > 0 ? (k % n) : (n - 1 - (k % n));

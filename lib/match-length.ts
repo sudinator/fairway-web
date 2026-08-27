@@ -10,13 +10,12 @@
  * say so — a player looking at "hole 1" while standing on the 10th tee is a scoring error waiting
  * to happen.
  *
- * STROKE INDEXES ARE. This is the opposite call, and the reason matters: an 18-hole stroke index
- * spread across nine holes is not a ranking of those nine. A back nine typically holds every
- * second index (2, 4, 6 ... 18), so an eight-stroke allowance would land on SI <= 8 — four holes —
- * when the player is owed eight strokes. On the card that reads as though the handicap were halved
- * a second time, which is exactly how it was reported from staging.
- * A nine-hole competition uses its own stroke index, 1-9. Re-ranking preserves the relative
- * difficulty the course assigned: the hardest of the nine becomes SI 1, the next SI 2, and so on.
+ * NEITHER ARE STROKE INDEXES. A course's stroke index is a fact about the course — a back nine
+ * genuinely holds SI 2, 4, 6 ... 18 — and the app does not get to rewrite it. 177.88 re-ranked them
+ * 1-9 and the card then showed a real course's back nine as SI 4, 6, 1, 5, 9, which is simply wrong.
+ * It was also unnecessary: allocateStrokes RANKS rather than thresholds — it sorts by stroke index
+ * and walks the ranked list — so a seven-stroke allowance already lands on the seven hardest of the
+ * nine, whatever their absolute indexes happen to be.
  */
 
 export type MatchLength = "18" | "front9" | "back9";
@@ -52,26 +51,11 @@ export function holeNumberOf(h: HoleLike): number | null {
 export function holesForLength<T extends HoleLike>(courseHoles: T[], length: MatchLength): T[] {
   if (!Array.isArray(courseHoles) || courseHoles.length < 18) return courseHoles ?? [];
   const half = Math.floor(courseHoles.length / 2);
-  if (length === "18") return courseHoles;
-  const nine = length === "front9" ? courseHoles.slice(0, half) : courseHoles.slice(half);
-  return rerankStrokeIndexes(nine);
+  if (length === "front9") return courseHoles.slice(0, half);
+  if (length === "back9") return courseHoles.slice(half);
+  return courseHoles;
 }
 
-/**
- * Re-rank stroke indexes 1..N within a set of holes, preserving the course's difficulty ORDER.
- *
- * Holes with no stroke index keep null and are ranked last, so a course with incomplete data
- * degrades to "no strokes on those holes" rather than silently making them the hardest.
- */
-export function rerankStrokeIndexes<T extends HoleLike>(holes: T[]): T[] {
-  const ranked = holes
-    .map((h, i) => ({ i, si: h?.si }))
-    .filter((x) => x.si != null)
-    .sort((a, b) => (a.si as number) - (b.si as number));
-  const rank = new Map<number, number>();
-  ranked.forEach((x, n) => rank.set(x.i, n + 1));
-  return holes.map((h, i) => (rank.has(i) ? { ...h, si: rank.get(i) as number } : h));
-}
 
 /** How many holes a selection yields, for labels and for the match runner's totalHoles. */
 export function holeCountFor(courseHoles: HoleLike[], length: MatchLength): number {

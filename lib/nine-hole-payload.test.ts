@@ -27,7 +27,9 @@ for (const [len, count, first, last] of [
   // Stroke indexes are RE-RANKED 1-9 within a nine — an 18-hole index over nine holes is not a
   // ranking of those nine, and using it gave a 7-stroke allowance only 3 strokes. The stored
   // holes_meta must carry the re-ranked value, because that is what allocateStrokes reads.
-  eq(`${len}: stroke index`, hm[0].si, len === "18" ? first : 1);
+  // The course's OWN stroke index, preserved. allocateStrokes ranks rather than thresholds, so
+  // the seven hardest of a nine receive strokes without renumbering anything.
+  eq(`${len}: stroke index preserved`, hm[0].si, first);
 }
 console.log(`nine-hole payload: ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

@@ -4,6 +4,7 @@
  * The cases that matter: hole NUMBERS must survive a back-nine selection (a card showing "hole 1"
  * on the 10th tee is a scoring error), and the course handicap must halve for a nine.
  */
+import { allocateStrokes } from "./golf";
 import {
   nineOf,
   holeCountOf,
@@ -16,7 +17,6 @@ import {
   courseHandicapForLength,
   matchLengthLabel,
   MATCH_LENGTHS,
-  rerankStrokeIndexes,
 } from "./match-length";
 
 let pass = 0, fail = 0;
@@ -48,12 +48,7 @@ eq("front nine is holes 1-9", holesForLength(course, "front9").map((h) => h.n),
 eq("back nine is holes 10-18, NOT renumbered", holesForLength(course, "back9").map((h) => h.n),
    [10, 11, 12, 13, 14, 15, 16, 17, 18]);
 
-// Stroke indexes are RE-RANKED 1-9 within the nine. This assertion previously demanded the
-// course's own indexes come through untouched, which is what produced the reported bug: a back
-// nine holds every second index, so a 7-stroke allowance landed on only 3 holes. Difficulty ORDER
-// is preserved; the range is not. Covered in detail below.
-eq("back nine is re-ranked, hardest first", holesForLength(course, "back9").map((h) => h.si),
-   [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+// Stroke indexes are the course's own — see the dedicated section below.
 
 // A nine-hole course has no back nine to take; returning nothing would be far worse.
 {
@@ -121,40 +116,32 @@ ok("empty course cannot", !canChooseNine([]));
 }
 
 
-// ── stroke indexes are re-ranked within a nine ────────────────────────────
-// Reported from staging: a 7-stroke allowance showed only 3 strokes on the card, reading as a
-// second halving. It was not — an 18-hole stroke index spread over nine holes is not a ranking of
-// those nine. A back nine holds every second index, so SI <= 7 matched only 2, 4 and 6.
+// ── the course's stroke indexes are PRESERVED ─────────────────────────────
+// A course's stroke index is a fact about the course. 177.88 re-ranked them 1-9 and a real
+// course's back nine then displayed as SI 4, 6, 1, 5, 9. It was also unnecessary: allocateStrokes
+// RANKS rather than thresholds, so the seven hardest of a nine already receive strokes.
 {
   const back = holesForLength(course, "back9");
-  eq("back nine is re-ranked 1-9", back.map((h) => h.si), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
-  // Hole NUMBERS are deliberately not renumbered — the opposite call, for a different reason.
-  eq("but hole numbers stay 10-18", back.map((h) => h.n), [10, 11, 12, 13, 14, 15, 16, 17, 18]);
+  eq("back nine keeps the course's own indexes", back.map((h) => h.si), [2, 4, 6, 8, 10, 12, 14, 16, 18]);
+  eq("and holes 10-18", back.map((h) => h.n), [10, 11, 12, 13, 14, 15, 16, 17, 18]);
 
   const front = holesForLength(course, "front9");
-  eq("front nine is re-ranked 1-9", front.map((h) => h.si), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
-  eq("front nine keeps holes 1-9", front.map((h) => h.n), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
-
-  // The reported case: a 7-stroke allowance must now fall on 7 of the 9 holes.
-  const strokesAt = (holes: { si?: number | null }[], ch: number) =>
-    holes.filter((h) => h.si != null && (h.si as number) <= ch).length;
-  eq("7 strokes now land on 7 holes", strokesAt(back, 7), 7);
-  eq("8 strokes land on 8 holes", strokesAt(back, 8), 8);
-  eq("1 stroke lands on the hardest hole only", strokesAt(back, 1), 1);
-
-  // 18 holes must be untouched — the course's own index, unchanged.
-  eq("18 holes keeps the course index", holesForLength(course, "18").map((h) => h.si),
-     course.map((h) => h.si));
+  eq("front nine keeps its own indexes", front.map((h) => h.si), [1, 3, 5, 7, 9, 11, 13, 15, 17]);
+  eq("18 holes untouched", holesForLength(course, "18").map((h) => h.si), course.map((h) => h.si));
 }
 {
-  // Difficulty ORDER is preserved, not just the range. The hardest of the nine becomes SI 1.
-  const holes = [{ si: 14 }, { si: 2 }, { si: 8 }];
-  eq("order preserved when re-ranking", rerankStrokeIndexes(holes).map((h) => h.si), [3, 1, 2]);
-}
-{
-  // A hole with no stroke index keeps null rather than silently becoming the hardest.
-  const holes = [{ si: 5 }, { si: null }, { si: 1 }];
-  eq("null stroke index stays null", rerankStrokeIndexes(holes).map((h) => h.si), [2, null, 1]);
+  // The reported case, checked against the REAL allocator rather than an SI threshold: a
+  // seven-stroke allowance over a back nine must land on seven holes, the seven hardest.
+  const back = holesForLength(course, "back9");
+  const alloc = allocateStrokes(back.map((h) => ({ hole_number: h.n as number, stroke_index: h.si as number })), 7);
+  const withStroke = Object.values(alloc).filter((v) => v > 0).length;
+  eq("7 strokes land on 7 holes", withStroke, 7);
+  // The two hardest holes of the nine are SI 2 and 4 — holes 10 and 11 in this fixture.
+  ok("the hardest hole of the nine gets one", alloc[10] === 1);
+  // And 10 strokes gives one everywhere plus a second on the hardest.
+  const alloc10 = allocateStrokes(back.map((h) => ({ hole_number: h.n as number, stroke_index: h.si as number })), 10);
+  eq("10 strokes: every hole", Object.values(alloc10).filter((v) => v > 0).length, 9);
+  eq("with a second on the hardest", alloc10[10], 2);
 }
 
 console.log(`match length: ${pass} passed, ${fail} failed`);

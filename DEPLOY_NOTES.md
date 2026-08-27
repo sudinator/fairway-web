@@ -1,3 +1,32 @@
+## 177.90.260826 — Revert the stroke-index re-rank; round strokes once
+- **NO migration.** Two corrections, both to changes I made, and one of them fixes a defect that
+  predates this whole line of work.
+- **REVERTED the stroke-index re-ranking from 177.88.** It was unnecessary AND it corrupted real
+  data: the card showed a real course's back nine as SI 4, 6, 1, 5, 9 instead of its true 2, 4, 6,
+  8 ... 18. A course's stroke index is a fact about the course; the app does not get to rewrite it.
+  It was unnecessary because **`allocateStrokes` already RANKS** — it sorts by stroke index and
+  walks the ranked list — so a back nine with SI 2, 4, 6 ... 18 and a seven-stroke allowance
+  already receives seven strokes, on the seven hardest, whatever the absolute indexes are.
+  **My 177.88 diagnosis was wrong.** I attributed the reported "7 in the box, 3 on the card" to the
+  stroke index and changed the wrong thing. Assertions now pin the opposite, including one that
+  runs the REAL allocator against unmodified indexes.
+- **FIX: a fractional handicap handed out an extra stroke.** The allocator's loop condition
+  `k < total` makes a fractional total behave as a CEILING — 10.2 gave eleven strokes. Neither
+  rounding nor truncation, and invisible on screen. This is the "ph and strokes received don't line
+  up" report, and the likely real cause of the original 7-vs-3.
+  **NOT a nine-hole issue.** Any allowance produces fractions — 85% of 12 is 10.2 — so four-ball
+  and trifecta have been mis-allocating for as long as those allowances have existed. It only
+  surfaced now because the nine-hole halving makes .5 values common.
+  Rounded ONCE, half-up, inside `allocateStrokes`: 21 consumers feed it, a stroke is indivisible by
+  definition, and it is the last point in the chain so nothing double-rounds upstream. chBasis
+  continues to return an exact figure so the halving and the allowance compose cleanly.
+- **All differential suites at 0 mismatches across ~114,000 comparisons**, which is the evidence
+  that 18-hole scoring is unchanged. Whole-number handicaps are provably untouched.
+- **NEW `lib/stroke-rounding.test.ts`** — 24 assertions covering fractions either side of the half,
+  the nine-hole .5 cases, plus handicaps rounding the same way, and more strokes than holes. Three
+  negative tests: no rounding, floor, and ceil are all caught.
+- Assertion baseline 1633 -> **1657 across 31 suites**.
+
 ## 177.89.260826 — Keyboard detection now works in the INSTALLED app
 - **NO migration.** Fixes 177.88's keyboard work, which could never have worked in the installed
   app — the case it was written for.
