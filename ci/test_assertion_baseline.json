@@ -1,11 +1,12 @@
 {
-  "total": 2026,
+  "total": 2054,
   "suites": {
     "(unnamed suites)": 496,
     "ai-sanitize": 11,
     "all allocators": 261,
     "alt shot": 71,
     "alt shot scores": 45,
+    "alt shot scoring": 28,
     "badges": 75,
     "bucket-model": 34,
     "card": 11,

@@ -1348,3 +1348,95 @@ export function nineToEighteenDifferential(
   if (nineDifferential == null || expected == null) return null;
   return nineDifferential + expected;
 }
+
+// ---------------- Alternate shot (foursomes) ----------------
+// One ball per side. The SIDE has a single handicap — the sum of its two partners' allowanced
+// figures, which for the WHS 50% foursomes allowance is the same as half their combined — and
+// strokes are the DIFFERENCE between the two sides, the lower side playing scratch.
+//
+// This cannot reuse fourballNets. That function is best-ball: it takes min() across a side's two
+// players, each carrying their own handicap relative to the foursome's lowest INDIVIDUAL. With one
+// shared ball both partners record the same gross, so min() silently returns whichever partner
+// happens to receive more strokes — a number with no meaning in this format.
+//
+// Measured on a real staging game: side A should have received 7 strokes over 9 holes and received
+// 5, because best-ball resolved to its higher-handicapped partner's 5 rather than the side
+// difference of 7. Two holes lost a stroke; one of them (both sides on 5) turned a win into a half.
+
+export type AltShotSideInput = {
+  /** The side's two players, in the order the foursome lists them. */
+  ids: string[];
+  /** Each player's allowanced course handicap. Already halved for a nine by chBasis. */
+  chs: (number | null)[];
+  /** The side's gross per hole. Both partners hold the same value after the score fan-out. */
+  gross: (number | null)[];
+};
+
+/**
+ * The side handicaps and the strokes given, EXACT and unrounded.
+ *
+ * Rounding happens once, at the difference: sides of 14 and 7.5 differ by 6.5 and round to 7,
+ * where rounding each side first gives 14 and 8 — a difference of 6, and one stroke decides matches.
+ */
+export function altShotSideStrokes(
+  a: AltShotSideInput,
+  b: AltShotSideInput,
+): { aCh: number | null; bCh: number | null; receiving: "a" | "b" | null; strokes: number } {
+  const sum = (chs: (number | null)[]) =>
+    chs.some((c) => c == null) ? null : chs.reduce((s, c) => (s as number) + (c as number), 0) as number;
+  const aCh = sum(a.chs);
+  const bCh = sum(b.chs);
+  if (aCh == null || bCh == null) return { aCh, bCh, receiving: null, strokes: 0 };
+  const diff = aCh - bCh;
+  const strokes = Math.round(Math.abs(diff));
+  if (strokes === 0) return { aCh, bCh, receiving: null, strokes: 0 };
+  return { aCh, bCh, receiving: diff > 0 ? "a" : "b", strokes };
+}
+
+/**
+ * Hole-by-hole detail for an alternate shot match: each side's gross, strokes received, net, and
+ * who won. `r` is 1 for side A, -1 for B, 0 halved, null when a hole is not yet complete —
+ * matching fourballHoleDetail so the display layer needs no special case.
+ */
+export function altShotHoleDetail(
+  holes: MatchHoleMeta[],
+  a: AltShotSideInput,
+  b: AltShotSideInput,
+): { hole: number; aNet: number | null; bNet: number | null; r: number | null; aRun: number; bRun: number; aRecv: number; bRecv: number }[] {
+  const { receiving, strokes } = altShotSideStrokes(a, b);
+  const alloc = allocateStrokes(
+    holes.map((h, i) => ({ hole_number: h.n ?? i + 1, stroke_index: h.si ?? null })),
+    strokes,
+  );
+  let aRun = 0, bRun = 0;
+  return holes.map((h, i) => {
+    const n = h.n ?? i + 1;
+    const got = alloc[n] ?? 0;
+    const aRecv = receiving === "a" ? got : 0;
+    const bRecv = receiving === "b" ? got : 0;
+    const ag = a.gross[i];
+    const bg = b.gross[i];
+    let aNet: number | null = null, bNet: number | null = null, r: number | null = null;
+    if (ag != null && ag > 0 && bg != null && bg > 0) {
+      aNet = ag - aRecv;
+      bNet = bg - bRecv;
+      r = aNet < bNet ? 1 : bNet < aNet ? -1 : 0;
+      if (r > 0) aRun += 1; else if (r < 0) bRun += 1; else { aRun += 0.5; bRun += 0.5; }
+    }
+    return { hole: n, aNet, bNet, r, aRun, bRun, aRecv, bRecv };
+  });
+}
+
+/** Running match lead from side A's perspective, aligned to holes. Null until a hole is complete. */
+export function altShotProgress(
+  holes: MatchHoleMeta[],
+  a: AltShotSideInput,
+  b: AltShotSideInput,
+): (number | null)[] {
+  let lead = 0;
+  return altShotHoleDetail(holes, a, b).map((d) => {
+    if (d.r == null) return null;
+    lead += d.r;
+    return lead;
+  });
+}

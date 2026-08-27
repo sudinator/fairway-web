@@ -101,7 +101,9 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
   // Only meaningful when the game uses a relative basis (match/four-ball/trifecta) — on
   // stableford/stroke the orange dots already ARE the full-handicap strokes, so we don't
   // draw a duplicate blue set.
-  const relBasis = shapeOf(game).dotBasis !== "absolute";
+  // Drives the blue course-handicap dots and the per-player course-Stableford column. Alternate
+  // shot records no individual score, so both describe something that never happened.
+  const relBasis = shapeOf(game).dotBasis !== "absolute" && game.game_type !== "alt_shot";
   const indRecvFor = (p: Player, si: number | null) => fullStrokes(game, p, si);
 
   // Column order + colour. Stableford: alphabetical. Team match: each pairing's

@@ -1202,8 +1202,69 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
     game.game_type === "match" ||
     game.game_type === "fourball" ||
     game.game_type === "trifecta" ||
+    game.game_type === "alt_shot" ||
     (game.game_type === "skins" && hasStructure);
   if (!usesStructure) return null;
+
+
+  /**
+   * Alternate shot: one ball per side, so the SIDE has one handicap and strokes are the difference
+   * between sides. Every step is shown — a wrong allocation ran for a whole round because this
+   * panel returned null for the format and there was no way to check the arithmetic.
+   */
+  const altShotSide = (fr: { id: string; name?: string; a?: string[]; b?: string[] }) => {
+    const rowsFor = (ids: string[] | undefined) =>
+      (ids || []).map((k) => byKey(k)).filter((p): p is Player => !!p);
+    const aRows = rowsFor(fr.a);
+    const bRows = rowsFor(fr.b);
+    if (aRows.length !== 2 || bRows.length !== 2) return null;
+    const chOf = (p: Player) => applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), allowance);
+    const sideOf = (rows: Player[]) => rows.reduce((s, p) => s + chOf(p), 0);
+    const aCh = sideOf(aRows), bCh = sideOf(bRows);
+    const diff = aCh - bCh;
+    const strokes = Math.round(Math.abs(diff));
+    const recvRows = diff > 0 ? aRows : bRows;
+    const alloc = allocateStrokes(
+      meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })),
+      strokes,
+    );
+    const holesWith = meta.filter((m) => (alloc[m.n] ?? 0) > 0).map((m) => m.n);
+    const num = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
+
+    const sideLine = (label: string, rows: Player[], ch: number) => (
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "3px 0" }}>
+        <span style={{ color: C.sage, fontSize: 11, width: 44, flex: "none" }}>{label}</span>
+        <span style={{ flex: 1, color: C.cream, fontSize: 13, minWidth: 0 }}>
+          {rows.map((p) => `${p.display_name.split(" ")[0]} ${num(chOf(p))}`).join("  +  ")}
+        </span>
+        <span style={{ color: C.gold, fontSize: 14, fontWeight: 800, fontFamily: "Georgia, serif" }}>{num(ch)}</span>
+      </div>
+    );
+
+    return (
+      <div key={fr.id} style={{ borderTop: "1px solid rgba(255,255,255,0.10)", padding: "10px 0" }}>
+        {fr.name ? <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1.2, marginBottom: 4 }}>{fr.name.toUpperCase()}</div> : null}
+        {sideLine("Side 1", aRows, aCh)}
+        {sideLine("Side 2", bRows, bCh)}
+        <div style={{ color: C.sage, fontSize: 11.5, marginTop: 6, lineHeight: 1.5 }}>
+          {allowance !== 100 ? <>Each handicap at <b style={{ color: C.cream }}>{allowance}%</b>, then added for the side. </> : null}
+          Difference <b style={{ color: C.cream }}>{num(Math.abs(diff))}</b>
+          {strokes > 0 ? (
+            <>
+              {" \u2192 "}
+              <span style={{ color: C.gold, fontWeight: 700 }}>
+                {recvRows.map((p) => p.display_name.split(" ")[0]).join(" & ")} receive {strokes} stroke{strokes === 1 ? "" : "s"}
+              </span>
+              {holesWith.length ? <>, on holes <b style={{ color: C.cream }}>{holesWith.join(", ")}</b></> : null}
+              . The other side plays off scratch.
+            </>
+          ) : (
+            <> {"\u2192"} both sides play off scratch.</>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const oneVone = (aId: string, bId: string, key: string) => {
     const a = byKey(aId), b = byKey(bId);
@@ -1293,14 +1354,20 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
         ? { border: "1px solid rgba(255,255,255,0.30)", borderRadius: 8, padding: 10, marginTop: 10, opacity: 0.62 }
         : { borderTop: "1px solid rgba(255,255,255,0.10)", paddingTop: 10, marginTop: 6 }}>
         {opts?.label !== false && <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>{(f.name || `Foursome ${i + 1}`).toUpperCase()}</div>}
-        {isTrifecta && singles.length > 0 && (
+        {/* Alternate shot replaces the four-ball body: one ball per side, so there are no
+            individual matchups to list — only the side handicaps and the strokes given. */}
+        {game.game_type === "alt_shot" ? altShotSide(f as never) : null}
+        {game.game_type !== "alt_shot" && isTrifecta && singles.length > 0 && (
           <>
             <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, marginTop: 6 }}>TWO SINGLES</div>
             {singles.map(([aId, bId], si) => oneVone(aId, bId, `${f.id}-s${si}`))}
             <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, marginTop: 10 }}>TEAM POINT · {game.team_score_mode === "aggregate" ? "SHOOTOUT" : "BEST BALL"}</div>
           </>
         )}
-        {teamStrip(f, `${f.id}-t`)}
+        {/* Four-ball's per-player strip: each player against the foursome low. With one ball
+            per side that is meaningless, and showing it next to the side figures is the
+            two-disagreeing-numbers problem that produced the hole 15 error. */}
+        {game.game_type !== "alt_shot" ? teamStrip(f, `${f.id}-t`) : null}
       </div>
     );
   };

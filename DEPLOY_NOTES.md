@@ -1,3 +1,37 @@
+## 178.3.260827 — Alternate shot: its own scorer, and the arithmetic made visible
+- **NO migration change.**
+- **FIX (the hole 15 error): alternate shot was scored by `fourballNets`, which is BEST-BALL.**
+  Diagnosed against the real staging game (b492e67e) rather than by reasoning.
+  fourballNets takes `min()` across a side's two players, each carrying their own handicap relative
+  to the foursome's lowest INDIVIDUAL. With one shared ball both partners record the same gross, so
+  `min()` returns whichever partner happens to receive more strokes — a number with no meaning here.
+  Real figures: side A (16 and 21, halved for the nine, at the 50% allowance) sums to 9.25; side B
+  to 2.5; the difference is 6.75 and rounds to **7 strokes**. Best-ball resolved to side A's
+  higher-handicapped partner and gave it **5**. Two holes lost a stroke; on hole 15 both sides shot
+  5, so that stroke was the entire result. Match should be A up 6; the app had A up 5.
+- **The "after a halved hole" pattern was a coincidence**, and worth recording because it looked
+  causal. Hole 14 is the EASIEST hole by stroke index, where neither basis gives a stroke. Hole 15
+  was simply the first hole close enough for a missing stroke to change the outcome — on hole 12 the
+  same missing stroke changed nothing, because that hole was won by two.
+- **NEW `altShotSideStrokes` / `altShotHoleDetail` / `altShotProgress`** in golf.ts. Rounding once,
+  at the difference: 9.25 and 2.5 give 7, where rounding each side first gives 9 - 3 = 6.
+  **28 assertions replay the real game hole by hole**, including every hole that was already right,
+  so a future change cannot fix 15 by breaking the others.
+- **The 50% is applied ONCE, and I was wrong to suspect otherwise.** 50% of a combined pair is
+  arithmetically identical to summing each halved — the same operation, not a double. The allowance
+  field owns it (`allowance_pct = 50`), consistent with how four-ball's 85% works, and the side
+  handicap is the SUM of the two allowanced figures.
+- **NEW Strokes panel entry for alternate shot.** The panel returned null for the format —
+  `alt_shot` was never added to `usesStructure` — so the format shipped with NO way to see how
+  strokes were derived. That is why a wrong allocation ran for a full round before anyone could
+  question it. It now shows every step: each partner's allowanced handicap, the side total, the
+  difference, which side receives, how many strokes, and exactly which holes carry one.
+- **Individual course-handicap dots removed for alternate shot**, on the scorecard and in the game
+  room. No individual score is recorded, so a per-player handicap describes nothing that happens —
+  and shown beside the orange SIDE dots it was a second, contradictory number.
+- The four-ball per-player team strip is likewise suppressed, for the same reason.
+- Assertion baseline 2026 -> **2054 across 36 suites**.
+
 ## 178.2.260827 — Alternate shot setup could never complete
 - **NO migration change.**
 - **FIX: an alternate shot game was unplayable from the moment it was created.** The Teams step

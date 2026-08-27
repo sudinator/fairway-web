@@ -45,8 +45,7 @@ import {
   type BetPlayer,
   type BetSplit,
   markerOwnsMyRow,
-  mergeBackupRow,
-} from "@/lib/golf";
+  mergeBackupRow, altShotProgress } from "@/lib/golf";
 import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
 import { decideSetupChange, type SetupAction, type SetupDecision } from "@/lib/game-setup-policy";
 import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
@@ -3484,7 +3483,10 @@ function GameRoom({
               }));
             })()}
             hasHandicap={me.course_handicap != null}
-            showIndivDots={shapeOf(game).dotBasis !== "absolute"}
+            // No blue individual-handicap dots in alternate shot: no individual score is
+            // recorded, so a per-player handicap describes nothing that happens — and shown
+            // beside the orange SIDE dots it is a second, contradictory number.
+            showIndivDots={shapeOf(game).dotBasis !== "absolute" && game.game_type !== "alt_shot"}
             matchMode={game.game_type === "match"}
             uncap={game.game_type === "stroke"}
             showSixes={effectiveGroupId((game as any).group_id) === TGC_GROUP_ID}
@@ -3527,6 +3529,31 @@ function GameRoom({
                   game.allowance_pct ?? 100,
                 );
                 return prog.map((lead) => matchLeadLabel(lead));
+              }
+              // Alternate shot: one ball per side, so it needs the side-based scorer. It used to
+              // fall past every branch to `return undefined`, leaving the match line blank and the
+              // rest on individual scoring — the cause of the hole 15 error.
+              if (game.game_type === "alt_shot" && Array.isArray(game.foursomes)) {
+                const myKey = myRow ? pkey(myRow) : null;
+                if (!myKey) return undefined;
+                const f = game.foursomes.find((x: any) =>
+                  [...(x.a || []), ...(x.b || [])].some((uid: string) => uid === myKey));
+                if (!f) return undefined;
+                const sideOf = (ids: string[]) => {
+                  const rows = (ids || []).map((uid: string) => players.find((p) => pkey(p) === uid)).filter(Boolean) as typeof players;
+                  return {
+                    ids,
+                    chs: rows.map((p) => applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100)),
+                    // One ball per side: both partners hold the same score after the fan-out, so
+                    // either row is the side's gross. The first present one is taken.
+                    gross: (game.holes_meta || []).map((_m: any, i: number) =>
+                      rows.map((p) => p.scores?.[i]).find((v) => v != null && v > 0) ?? null),
+                  };
+                };
+                const prog = altShotProgress(game.holes_meta, sideOf(f.a || []), sideOf(f.b || []));
+                // Reported from side A's perspective; flip when I am on side B.
+                const mineIsA = (f.a || []).includes(myKey);
+                return prog.map((lead) => matchLeadLabel(lead == null ? null : (mineIsA ? lead : -lead)));
               }
               if (game.game_type === "fourball" && Array.isArray(game.foursomes)) {
                 // Four-ball has no singles: the player's match IS the team best-ball,
