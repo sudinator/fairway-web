@@ -132,8 +132,6 @@ export function partnerRowIds(
   }
   return null;
 }
-<<<<<<< Updated upstream
-=======
 
 
 /**
@@ -163,4 +161,3 @@ export function altShotFanOut(
   // ONLY the stroke. Putts, fairways, penalties and sand stay on the row that was edited.
   return [{ playerId: partner, patch: { strokes: patch.strokes ?? null } }];
 }
->>>>>>> Stashed changes

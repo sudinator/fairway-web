@@ -1,18 +1,10 @@
 {
-<<<<<<< Updated upstream
-  "total": 1609,
-=======
   "total": 1636,
->>>>>>> Stashed changes
   "suites": {
     "(unnamed suites)": 496,
     "ai-sanitize": 11,
     "alt shot": 60,
-<<<<<<< Updated upstream
-    "alt shot scores": 28,
-=======
     "alt shot scores": 45,
->>>>>>> Stashed changes
     "badges": 75,
     "bucket-model": 34,
     "card": 11,
@@ -30,11 +22,7 @@
     "golf/computeBetting tests": 53,
     "grouping tests": 281,
     "legs": 23,
-<<<<<<< Updated upstream
-    "match length": 39,
-=======
     "match length": 49,
->>>>>>> Stashed changes
     "match length picker": 18,
     "nine-hole handicap": 15,
     "nine-hole payload": 12,

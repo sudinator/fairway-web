@@ -1,5 +1,3 @@
-<<<<<<< Updated upstream
-=======
 ## 177.88.260826 — Nine-hole stroke indexes; the keyboard dead band
 - **NO migration.** Two defects reported from staging, both traced to changes I made.
 - **FIX: a 9-hole match allocated too FEW strokes.** Reported as "ph 1 v ph 8, the strokes box says
@@ -38,7 +36,6 @@
   harness disproved it. This is the other half, now with a measured mechanism.
 - Assertion baseline 1626 -> **1636**.
 
->>>>>>> Stashed changes
 ## 177.87.260826 — Nine-hole matches now allocate half the handicap
 - **NO migration.** Fixes the defect reported from staging: a 9-hole match allocated the FULL
   18-hole handicap — "ph 16" and "a stroke on every hole, + 2nd on 10, 13, 16, 17, 18".

@@ -4,11 +4,7 @@
  * The cases that matter are the disagreements — a row edited outside the alternate-shot flow, or
  * an outbox still catching up. Preferring one partner silently would show a score nobody entered.
  */
-<<<<<<< Updated upstream
-import { altShotScoreWrites, sideScore, altShotStatsOwner, partnerRowIds } from "./alt-shot-scores";
-=======
 import { altShotScoreWrites, sideScore, altShotStatsOwner, partnerRowIds, altShotFanOut } from "./alt-shot-scores";
->>>>>>> Stashed changes
 
 let pass = 0, fail = 0; const fails: string[] = [];
 const ok = (n: string, c: boolean) => { if (c) pass++; else { fail++; fails.push("FAIL " + n); } };
@@ -99,8 +95,6 @@ ok("stats owner is stable across calls", altShotStatsOwner(["amit", "bryan"]) ==
   eq("missing sides", partnerRowIds("r1", [{ id: "f" }], players), null);
 }
 
-<<<<<<< Updated upstream
-=======
 
 // ── the fan-out decision, shared by BOTH write paths ──────────────────────
 // There are two: the group card (scoring for anyone) and a player's own card. Both are reachable
@@ -150,6 +144,5 @@ ok("stats owner is stable across calls", altShotStatsOwner(["amit", "bryan"]) ==
   eq("a side of one", altShotFanOut("alt_shot", "r1", { strokes: 5 }, [{ id: "f", a: ["u1"], b: [] }], players).length, 0);
 }
 
->>>>>>> Stashed changes
 console.log(`alt shot scores: ${pass} passed, ${fail} failed`);
 if (fail) { console.error(fails.join("\n")); process.exit(1); }

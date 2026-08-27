@@ -16,10 +16,7 @@ import {
   courseHandicapForLength,
   matchLengthLabel,
   MATCH_LENGTHS,
-<<<<<<< Updated upstream
-=======
   rerankStrokeIndexes,
->>>>>>> Stashed changes
 } from "./match-length";
 
 let pass = 0, fail = 0;
@@ -51,18 +48,12 @@ eq("front nine is holes 1-9", holesForLength(course, "front9").map((h) => h.n),
 eq("back nine is holes 10-18, NOT renumbered", holesForLength(course, "back9").map((h) => h.n),
    [10, 11, 12, 13, 14, 15, 16, 17, 18]);
 
-<<<<<<< Updated upstream
-// Stroke indexes come through untouched — strokes must fall on the course's own hardest holes.
-eq("back nine keeps its stroke indexes", holesForLength(course, "back9").map((h) => h.si),
-   [2, 4, 6, 8, 10, 12, 14, 16, 18]);
-=======
 // Stroke indexes are RE-RANKED 1-9 within the nine. This assertion previously demanded the
 // course's own indexes come through untouched, which is what produced the reported bug: a back
 // nine holds every second index, so a 7-stroke allowance landed on only 3 holes. Difficulty ORDER
 // is preserved; the range is not. Covered in detail below.
 eq("back nine is re-ranked, hardest first", holesForLength(course, "back9").map((h) => h.si),
    [1, 2, 3, 4, 5, 6, 7, 8, 9]);
->>>>>>> Stashed changes
 
 // A nine-hole course has no back nine to take; returning nothing would be far worse.
 {
@@ -129,8 +120,6 @@ ok("empty course cannot", !canChooseNine([]));
      matchLengthLabel("back9", holesForLength(roundHoles, "back9")), "Back nine (10\u201318)");
 }
 
-<<<<<<< Updated upstream
-=======
 
 // ── stroke indexes are re-ranked within a nine ────────────────────────────
 // Reported from staging: a 7-stroke allowance showed only 3 strokes on the card, reading as a
@@ -168,6 +157,5 @@ ok("empty course cannot", !canChooseNine([]));
   eq("null stroke index stays null", rerankStrokeIndexes(holes).map((h) => h.si), [2, null, 1]);
 }
 
->>>>>>> Stashed changes
 console.log(`match length: ${pass} passed, ${fail} failed`);
 if (fail) { console.error(fails.join("\n")); process.exit(1); }

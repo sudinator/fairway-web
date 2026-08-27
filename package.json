@@ -1,10 +1,6 @@
 {
   "name": "fairway-card",
-<<<<<<< Updated upstream
-  "version": "177.87.260826",
-=======
   "version": "177.88.260826",
->>>>>>> Stashed changes
   "private": true,
   "scripts": {
     "prebuild": "node scripts/check-vapid-key.mjs && node scripts/write-version.mjs",

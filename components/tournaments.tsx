@@ -1,10 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-<<<<<<< Updated upstream
-=======
 import { altShotFanOut } from "@/lib/alt-shot-scores";
->>>>>>> Stashed changes
 import { MatchLengthPicker } from "@/components/game/match-length-picker";
 import { holesForLength, type MatchLength } from "@/lib/match-length";
 import type { GameType } from "@/lib/game-shape";
