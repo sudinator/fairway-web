@@ -1,3 +1,29 @@
+## 177.89.260826 — Keyboard detection now works in the INSTALLED app
+- **NO migration.** Fixes 177.88's keyboard work, which could never have worked in the installed
+  app — the case it was written for.
+- **Root cause: the wrong reference height.** Detection compared `window.innerHeight` against
+  `visualViewport.height`. In Safari the keyboard shrinks the VISUAL viewport while the LAYOUT
+  viewport stays put, so a delta appears and the check fires. **In an installed PWA iOS resizes the
+  layout viewport too**, so both fall together, the delta stays at ~0, and the check never fires.
+  I verified the arithmetic against Safari numbers and shipped it for the installed app.
+- **`lvh` is the reference that does not move.** From this phone's own diagnostic: at rest lvh 956
+  while innerHeight and visualViewport are both 894 — the 62px gap is just the status-bar strip.
+  With a keyboard the visual viewport drops to ~576 and the gap becomes ~380.
+  lvh cannot be read from JS, so it is MEASURED with an offscreen probe, cached, and the cache is
+  cleared on rotation — the only thing that changes it.
+- **Threshold raised 120 -> 180.** Against lvh the resting gap is safeTop (47-62 by device) and
+  Safari's chrome adds another 50-72 on top, reaching ~123 in the worst combination — which would
+  clear a 120 threshold and hide the nav during ordinary scrolling. A keyboard is never smaller
+  than ~260px on any iPhone. 180 leaves ~57px of margin above the worst chrome case and ~80px below
+  the smallest keyboard.
+- **Verified in a real browser, not by arithmetic alone.** The lvh probe measures 956 exactly at
+  this phone's dimensions, and eight scenarios — installed at rest, installed with a keyboard,
+  Safari at rest, Safari with its toolbar, the worst chrome-plus-safe-area combination, Safari with
+  a keyboard, and the smallest phone with a keyboard — all resolve correctly. The two the 177.88
+  logic missed are both installed-app cases.
+- The shell pinning and nav hiding from 177.88 are unchanged; they were correct, and simply never
+  activated in the installed app because the detection they depend on never fired.
+
 ## 177.88.260826 — Nine-hole stroke indexes; the keyboard dead band
 - **NO migration.** Two defects reported from staging, both traced to changes I made.
 - **FIX: a 9-hole match allocated too FEW strokes.** Reported as "ph 1 v ph 8, the strokes box says
