@@ -324,10 +324,29 @@ export function netBySix(holes: Hole[]): [number, number, number] {
 // receives the difference in strokes, allocated by stroke index.
 export type MatchHoleMeta = { n: number; par: number; si: number | null };
 
-export function matchStrokesFor(diff: number, si: number | null): number {
-  // diff = strokes this player receives over the match (>=0); allocate by SI.
+/**
+ * Strokes received on the hole with stroke index `si`, given a match-play DIFFERENCE.
+ *
+ * THIS IS A WRAPPER, NOT A THIRD ALGORITHM. It used to carry its own copy of
+ * `floor(diff/18) + (si <= diff % 18)` — the same formula as strokesReceived, the same hardcoded
+ * 18, and the same failure on a nine: a back nine holds every second index, so a 7.5-stroke
+ * difference matched only si <= 7.5 and gave three strokes where eight were owed.
+ *
+ * `holes` is optional with a 1..18 fallback, exactly as in strokesReceived, so a full round is
+ * unchanged by construction. Callers with a hole list must pass it.
+ */
+
+/** `{ n, si }` holes in the allocator's shape. Mapped once per call, never per hole. */
+const asAllocHoles = (hs: { n?: number | null; si?: number | null }[]) =>
+  hs.map((h, i) => ({ hole_number: h.n ?? i + 1, stroke_index: h.si ?? null }));
+
+export function matchStrokesFor(
+  diff: number,
+  si: number | null,
+  holes?: { hole_number: number; stroke_index: number | null }[] | null,
+): number {
   if (si == null || diff <= 0) return 0;
-  return Math.floor(diff / 18) + (si <= diff % 18 ? 1 : 0);
+  return strokesReceived(si, diff, holes);
 }
 
 // Playing handicap after a match-play allowance (e.g. 85% for four-ball). WHS
@@ -361,8 +380,9 @@ export function matchProgress(
   return holes.map((h, i) => {
     const ga = grossA[i], gb = grossB[i];
     if (ga == null || gb == null || ga <= 0 || gb <= 0) return null;
-    const netA = ga - matchStrokesFor(allow.a, h.si);
-    const netB = gb - matchStrokesFor(allow.b, h.si);
+    const ah = asAllocHoles(holes);
+    const netA = ga - matchStrokesFor(allow.a, h.si, ah);
+    const netB = gb - matchStrokesFor(allow.b, h.si, ah);
     if (netA < netB) lead++;
     else if (netB < netA) lead--;
     return lead;
@@ -390,8 +410,9 @@ export function matchStatus(
     const ga = grossA[i], gb = grossB[i];
     if (ga == null || gb == null || ga <= 0 || gb <= 0) return;
     thru++;
-    const netA = ga - matchStrokesFor(allow.a, h.si);
-    const netB = gb - matchStrokesFor(allow.b, h.si);
+    const ah = asAllocHoles(holes);
+    const netA = ga - matchStrokesFor(allow.a, h.si, ah);
+    const netB = gb - matchStrokesFor(allow.b, h.si, ah);
     if (netA < netB) { lead++; aWins++; }
     else if (netB < netA) { lead--; bWins++; }
     else halves++;
@@ -448,6 +469,11 @@ export function adjustedGross(r: Round): number | null {
   // WHS-permitted method. Derived from course totals so we don't need the missing holes'
   // own par/stroke-index (which aren't stored): unplayed par = course_par - played par,
   // and unplayed strokes = course handicap - strokes received on played holes.
+  // A deliberate NINE is not a partial round. It takes the nine-hole basis (rating and par halved,
+  // slope untouched) and its own gross, with nothing filled in — see roundDifferential. Only 10-17
+  // holes are treated as an eighteen with holes missing.
+  if (holes.length === 9) return adjusted;
+
   if (holes.length < 18) {
     const ch = r.course_handicap ?? courseHandicap(r.handicap_index as number, r.slope, r.rating, r.course_par as number);
     if (ch == null || r.course_par == null) return null; // can't fill safely -> don't count
@@ -470,7 +496,14 @@ export function adjustedGross(r: Round): number | null {
 export function roundDifferential(r: Round): number | null {
   const ag = adjustedGross(r);
   if (ag == null || r.rating == null || r.slope == null) return null;
-  return (113 / r.slope) * (ag - r.rating);
+  // A nine uses the nine-hole basis: rating halves, slope does not. WHS wants a PUBLISHED 9-hole
+  // Course Rating and Slope; GolfCourseAPI supplies neither, so these are halved from the
+  // eighteen-hole figures and the result is an approximation — flagged by nineHoleBasis and
+  // documented there. BNN is not the record of truth for handicaps.
+  const played = roundHoleCount(r);
+  const basis = nineHoleBasis(r.rating, r.slope, r.course_par ?? null, played);
+  if (basis.rating == null || basis.slope == null) return null;
+  return (113 / basis.slope) * (ag - basis.rating);
 }
 
 // For a 9-17 hole round that counts toward the handicap, describe the net-par fill for the UI.
@@ -611,10 +644,10 @@ function fourballNets(holes: MatchHoleMeta[], members: FourballMember[], allowan
         // A flagged player keeps the real net on holes they actually played, and
         // takes net double bogey (par + 2) on holes they didn't. This handles a
         // mid-round departure: holes 1–8 count as played, 9–18 become net dbl bogey.
-        return played ? g - matchStrokesFor(diff, h.si) : h.par + 2;
+        return played ? g - matchStrokesFor(diff, h.si, asAllocHoles(holes)) : h.par + 2;
       }
       if (!played) return null;
-      return g - matchStrokesFor(diff, h.si);
+      return g - matchStrokesFor(diff, h.si, asAllocHoles(holes));
     });
   }
   return out;
@@ -937,8 +970,9 @@ export function computeHeadToHeadSkins(
   let carry = 0;
   holes.forEach((h, i) => {
     const ga = a.gross[i], gb = b.gross[i];
-    const netA = ga != null && ga > 0 ? ga - matchStrokesFor(allow.a, h.si) : null;
-    const netB = gb != null && gb > 0 ? gb - matchStrokesFor(allow.b, h.si) : null;
+    const ah = asAllocHoles(holes);
+    const netA = ga != null && ga > 0 ? ga - matchStrokesFor(allow.a, h.si, ah) : null;
+    const netB = gb != null && gb > 0 ? gb - matchStrokesFor(allow.b, h.si, ah) : null;
     const netById: Record<string, number | null> = { [a.id]: netA, [b.id]: netB };
     const value = carry + 1;
     if (netA == null || netB == null) {
@@ -1256,4 +1290,35 @@ export function clinchState(aPts: number, bPts: number, unclaimed: number): {
 // while preserving intentional caps like "McDonald". Used when saving profile names.
 export function titleCaseName(s: string): string {
   return (s || "").replace(/(^|[\s'\-])([a-z])/g, (_m, sep, ch) => sep + ch.toUpperCase());
+}
+
+
+/**
+ * The rating/slope/par basis for a round of `holeCount` holes.
+ *
+ * For a deliberate NINE, rating and par halve while slope is left alone. Slope is a ratio on the
+ * 55-155 scale rather than a stroke count: a published 9-hole Slope Rating for a hard nine is still
+ * around 140, not 70. Halving it would apply the difficulty adjustment a second time — 3.5 strokes
+ * too few on a 113 course, 4.8 on a 155 course, with the error growing as the course gets harder.
+ *
+ * This is an APPROXIMATION and is documented as one. WHS requires a published 9-hole Course Rating
+ * and Slope Rating; GolfCourseAPI publishes neither, so BNN halves the eighteen-hole figures. BNN
+ * is not the record of truth for handicaps, and the app already approximates in the same spirit
+ * when it fills an unfinished round's missing holes with net par.
+ */
+export function nineHoleBasis(
+  rating: number | null,
+  slope: number | null,
+  par: number | null,
+  holeCount: number,
+): { rating: number | null; slope: number | null; par: number | null; approximated: boolean } {
+  // Only an exact nine. A partial round is an eighteen with holes missing and takes the net-par
+  // fill instead — a different rule for a different situation.
+  if (holeCount !== 9) return { rating, slope, par, approximated: false };
+  return {
+    rating: rating == null ? null : rating / 2,
+    slope,                                     // NOT halved — see above
+    par: par == null ? null : Math.round(par / 2),
+    approximated: true,
+  };
 }

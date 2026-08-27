@@ -6,6 +6,20 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
+## 0. ACTION REQUIRED AT THE NEXT PRODUCTION MERGE
+
+**`migrations/0139_nine_hole_round_basis.sql` must be applied to PRODUCTION when the databases are
+merged.** It redefines three functions (`post_game_rounds_internal`, `post_group_rounds`,
+`set_game_played_date`) so a nine-hole game posts a round on a nine-hole basis: rating, par and
+course handicap halved, **slope unchanged**.
+
+Migrations deploy BEFORE the code that depends on them. Until this runs in production, a nine-hole
+game posted there writes a wrong differential into the player's handicap record — 9 holes against
+par 72 with an eighteen-hole handicap, which falls into the partial-round path and fills nine
+phantom holes with net par.
+
+Requested by Amit, 177.95. Delete this section once it is applied.
+
 ## 0. The one rule that overrides everything
 **Verify every claim about app behavior from the actual code before stating it or acting on it.** Do not
 describe what the app does from memory or inference. Open the file, read it, then respond. This is the

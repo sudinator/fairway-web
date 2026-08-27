@@ -1,3 +1,114 @@
+## 177.95.260827 — Nine-hole rounds post properly; the handicap-BASIS gaps closed
+- **MIGRATION 0139_nine_hole_round_basis.sql. MUST BE APPLIED TO PRODUCTION AT THE MERGE.**
+  Recorded at the top of HANDOFF.md as well, because a reminder that lives only in a chat is not a
+  reminder. Migrations deploy BEFORE the code that depends on them.
+- **CAUGHT BEFORE SHIPPING: the migration had inherited a one-time BACKFILL.** 0110 ended with an
+  `update public.rounds ... set played_at = created_at::date` across every game round — correct as a
+  one-time action there, destructive if re-run. Applying 0139 would have silently overwritten any
+  date an organizer had corrected since, for every game round in the database.
+  Regenerating a function from an older migration inherits that migration's DATA statements too,
+  and those are one-time by nature. 0139 now redefines functions only; the omission is noted in the
+  file so nobody re-adds it.
+
+- **The sweep asked a question the earlier audit had not.** 177.94 traced ALLOCATORS. This traced
+  the HANDICAP BASIS — where the number fed into allocation comes from. `chBasis` is the only thing
+  that halves for a nine, so anything bypassing it feeds an eighteen-hole figure into a nine.
+  Four gaps, none of which the allocator audit could have found.
+- **CORRECTED a decision before implementing it.** The instruction was to halve rating AND slope.
+  Rating and par halve; **slope does not**. Slope is a RATIO on the 55-155 scale, not a stroke
+  count — a published 9-hole Slope for a hard nine is still ~140, not ~70. Halving it applies the
+  difficulty adjustment twice: 3.5 strokes too few on a 113 course, 4.03 on 130, 4.80 on 155. The
+  error GROWS with difficulty, so it would hurt hardest courses most. Pinned as an assertion so
+  nobody "corrects" it later.
+- **GAP 1 — the live scoreboard** (`app/live/[token]/page.tsx`) used `p.ch` and never called
+  chBasis, showing roughly double the strokes on a nine. That is the screen playing partners watch
+  on their own phones. Fixed.
+- **GAP 2 — the share card** had TWO stroke paths, both bypassing chBasis. Both fixed; fixing one
+  is exactly how the allocators diverged in the first place.
+- **GAP 3/4 — posted rounds.** A nine-hole game wrote a round with 9 holes, `course_par` 72, the
+  eighteen-hole `course_handicap` and the eighteen-hole `rating`. Downstream that hit the
+  PARTIAL-round path and filled NINE phantom holes with net par — the pre-2024 combining method
+  applied to holes nobody intended to play, writing a wrong differential into the handicap record.
+  The only gap in this sequence that corrupted stored data rather than a display.
+  `roundDifferential` now routes an exact nine through `nineHoleBasis`; 10-17 holes keep the
+  net-par fill, because a partial round is a different situation.
+- **Confirmed against the rules, not assumed:** WHS accepts 9-hole scores immediately (since
+  January 2024), combining the 9-hole Score Differential with an expected Score Differential from
+  the player's current Handicap Index. Formats where you do not play your own ball — alternate
+  shot, scramble — still do not post. The halving is an APPROXIMATION and is documented as one:
+  WHS wants a PUBLISHED 9-hole Rating and Slope, GolfCourseAPI supplies neither, and BNN is not the
+  record of truth for handicaps. The app already approximates in this spirit when it fills an
+  unfinished round with net par.
+- **The migration guards caught three real omissions on the way in** — missing `record_migration`,
+  a missing `-- AUTHORIZATION:` header, and no deny-by-default REVOKE. That last one matters: these
+  are SECURITY DEFINER functions that write into handicap records, and 0110 (which this was
+  regenerated from) granted to `authenticated` without ever revoking from `public` and `anon`.
+- **NEW `lib/nine-hole-posting.test.ts`** — 24 assertions. Negative-tested three ways: halving
+  slope, not halving rating, and treating a partial round as a nine. All caught.
+- Assertion baseline 1793 -> **1970 across 34 suites**. All differential suites at 0 mismatches;
+  computeBetting 53/53.
+
+## 177.94.260827 — Full audit: SIX stroke producers, all verified
+- **NO migration.** A systematic sweep instead of another one-report-at-a-time fix.
+- **The audit.** Every function that turns a handicap into per-hole strokes, found by SHAPE rather
+  than by name, then traced TRANSITIVELY to the single allocator:
+
+  | producer | reaches `allocateStrokes` | own formula |
+  |---|---|---|
+  | `allocateStrokes` | is the core | no |
+  | `strokesReceived` | yes | no |
+  | `matchStrokesFor` | yes | no |
+  | `dotStrokes` | yes | no |
+  | `fullStrokes` | yes | no |
+  | `recvByRank` | yes | no |
+
+  **Six producers, one algorithm, zero private formulas.** The first sweep reported three as
+  "separate" because it only looked for DIRECT calls — transitive tracing is what proved it.
+- **FIX: one live call site still fell back to a synthesised 1..18.** `tournaments.tsx:3482` — the
+  "holes where I give a stroke" line, shown during play — called `matchStrokesFor` without the hole
+  list while mapping over `game.holes_meta`. Wrong on a nine, in the one place a player actually
+  looks mid-round. Three bare call sites remain and all three are correct: two are documented
+  no-hole-list fallbacks, one is the partial-round differential that MUST use the 18-hole basis.
+- **NEW `lib/all-allocators.test.ts`** — 98 assertions running EVERY producer against the same
+  inputs, asserting five properties that must hold for all of them:
+  1. the total allocated equals the handicap, rounded — a producer that thresholds on stroke index
+     cannot satisfy this on a nine, which is exactly how all three copies failed;
+  2. strokes land on the HARDEST holes first, and nowhere else;
+  3. more strokes than holes wraps to a second stroke rather than capping;
+  4. `dotStrokes` and `fullStrokes` — what the scorecard actually draws — agree with the core;
+  5. a nine gets exactly HALF an eighteen.
+  Twelve handicaps from 0 to 36, across a real back nine (every second index) and a full eighteen.
+- Negative-tested four ways: `strokesReceived` regrowing its formula, `matchStrokesFor` regrowing
+  its formula, `recvByRank` dropping the hole list, and `chBasis` ceasing to halve. All caught.
+- **Why this rather than a fifth bug report:** three copies were found one at a time, each after a
+  report, because each screen was internally consistent and only disagreed with a DIFFERENT screen.
+  Enumerating the producers and asserting shared properties is what makes a fourth unable to hide.
+- Assertion baseline 1695 -> **1793 across 33 suites**.
+
+## 177.93.260827 — A THIRD copy of the same formula: match strokes
+- **NO migration.** The match-handicap half of the same defect.
+- **`matchStrokesFor` carried a verbatim third copy** of `floor(x/18) + (si <= x % 18)`. Same
+  hardcoded 18, same failure on a nine: a back nine holds every second index, so Amit's 7.5-stroke
+  match difference matched only si <= 7.5 and found indexes 2, 4 and 6 — **three strokes where
+  eight were owed**. That is exactly the "match hcp 3" in the report.
+  It now delegates to `allocateStrokes` like the others. One algorithm, three wrappers.
+  The hole list is threaded through all **11** call sites; the golf.ts sites map their holes ONCE
+  per function rather than per hole per player.
+- **The guard I added at 177.92 did not catch it, and that is the more important failure.** Its
+  patterns keyed on variable NAMES — ch, hcp, handicap — and `matchStrokesFor` names its parameter
+  `diff`, so a verbatim copy of the formula sat one file away and passed clean.
+  The patterns now match the SHAPE: `floor(<anything>/18)` and `si <= <anything> % 18`, whatever
+  the variable is called. **A guard tuned to the instance you already found will not catch the next
+  one** — which is the whole lesson of this sequence, and it took the guard failing on its first
+  real test to see it.
+  Negative-tested against the exact bug that shipped AND against a fresh copy under a new name
+  (`shotsOn(si, alw)`); both now fail the guard.
+- Verified against the reported numbers: nine-hole handicaps 9, 1, 10, 5 now produce match dots of
+  **8, 0, 9, 4** — the true differences from the low handicap. Before the fix: 3, 0, 4, 2. Pinned
+  as assertions.
+- All differential suites remain at **0 mismatches**; `computeBetting` 53/53.
+- Assertion baseline 1691 -> **1695 across 32 suites**.
+
 ## 177.92.260827 — ONE stroke allocator, with a guard that keeps it that way
 - **NO migration. No behaviour change from 177.91** — this removes the possibility of the class of
   bug, rather than another instance of it.

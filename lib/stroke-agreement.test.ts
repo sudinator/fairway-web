@@ -9,7 +9,7 @@
  * second index, so the threshold form matches only si <= ch and hands out roughly half the strokes
  * owed. Amit off 8.5 got four dots while the panel correctly said nine.
  */
-import { fullStrokes, chBasis } from "./game-shape";
+import { fullStrokes, chBasis, dotStrokes } from "./game-shape";
 import { allocateStrokes, applyAllowance } from "./golf";
 
 let pass = 0, fail = 0; const fails: string[] = [];
@@ -58,6 +58,35 @@ eq("G22: 28 -> 14 dots", dots(BACK9, 28), 14);
 eq("G1: 4 -> 2 dots", dots(BACK9, 4), 2);
 // Before the fix these were 4, 7 and 1 — the SI-threshold form.
 eq("18 holes is unchanged: 17 -> 17 dots", dots(FULL18, 17), 17);
+
+
+// ── MATCH strokes: the difference, allocated across the holes in play ─────
+// matchStrokesFor carried a THIRD copy of the same 18-hardcoded formula. On the reported back
+// nine it gave Amit three strokes where the difference was eight, because it matched si <= 7.5
+// against indexes 2, 4, 6, 8 ... 18.
+{
+  const meta = [
+    { n: 10, par: 4, si: 4 }, { n: 11, par: 4, si: 16 }, { n: 12, par: 3, si: 12 },
+    { n: 13, par: 4, si: 2 }, { n: 14, par: 4, si: 6 }, { n: 15, par: 4, si: 8 },
+    { n: 16, par: 4, si: 10 }, { n: 17, par: 4, si: 14 }, { n: 18, par: 4, si: 18 },
+  ];
+  const P = (id: string, ch: number) =>
+    ({ id, user_id: id, handicap_index: null, slope: null, rating: null, course_handicap: ch, team: null }) as never;
+  const players = [P("a", 17), P("b", 2), P("c", 20), P("d", 10)];
+  const game = {
+    game_type: "fourball", course_par: 72, pairings: [], holes_meta: meta, allowance_pct: 100,
+    teams: [{ key: "A", name: "A" }, { key: "B", name: "B" }],
+    foursomes: [{ id: "f1", name: "F1", a: ["a", "b"], b: ["c", "d"] }],
+  } as never;
+  const dots = (p: never) => meta.reduce((s, m) => s + dotStrokes(game, p, m.si, players as never), 0);
+
+  // Nine-hole handicaps are 9, 1, 10, 5. The lowest plays scratch, so the others get the
+  // DIFFERENCE: 8, 0, 9, 4. Before the fix these were 3, 0, 4, 2.
+  eq("match dots = 9 - 1 = 8", dots(players[0]), 8);
+  eq("the low handicap plays scratch", dots(players[1]), 0);
+  eq("match dots = 10 - 1 = 9", dots(players[2]), 9);
+  eq("match dots = 5 - 1 = 4", dots(players[3]), 4);
+}
 
 console.log(`stroke agreement: ${pass} passed, ${fail} failed`);
 if (fail) { console.error(fails.join("\n")); process.exit(1); }

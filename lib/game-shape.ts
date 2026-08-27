@@ -114,6 +114,14 @@ export const chBasis = (
  * nine-hole game holds only half the indexes — it would match si <= ch and hand out roughly half
  * the strokes owed. Ranking is also immune to duplicate, missing or out-of-range indexes.
  */
+/** The game's holes in the allocator's shape, or null when it carries none. */
+function allocHoles(game: DotGame) {
+  const meta = game.holes_meta;
+  return Array.isArray(meta) && meta.length
+    ? meta.map((m) => ({ hole_number: m.n, stroke_index: m.si }))
+    : null;
+}
+
 function recvByRank(game: DotGame, si: number | null, ch: number): number {
   if (si == null) return 0;
   const meta = game.holes_meta;
@@ -150,9 +158,9 @@ export function dotStrokes(
       const oppId = pr.a === key ? pr.b : pr.a;
       const opp = allPlayers.find((x) => pkey(x) === oppId);
       const { a } = matchAllowance(chBasis(p, game.course_par, game.holes_meta?.length), opp ? chBasis(opp, game.course_par, game.holes_meta?.length) : null, allowance);
-      return matchStrokesFor(a, si);
+      return matchStrokesFor(a, si, allocHoles(game));
     }
-    return matchStrokesFor(mine, si);
+    return matchStrokesFor(mine, si, allocHoles(game));
   }
 
   // Relative to the foursome's lowest playing handicap (low plays scratch):
@@ -167,7 +175,7 @@ export function dotStrokes(
     const active = group.filter((x) => !x.no_show);
     const ref = active.length ? active : group;
     const low = Math.min(...ref.map((x) => applyAllowance(chBasis(x, game.course_par, game.holes_meta?.length), allowance)));
-    return matchStrokesFor(Math.max(0, mine - low), si);
+    return matchStrokesFor(Math.max(0, mine - low), si, allocHoles(game));
   }
 
   // Full playing handicap: stableford, stroke, individual skins.

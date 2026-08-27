@@ -3479,7 +3479,7 @@ function GameRoom({
                 indRecv: fullStrokes(game, me, m.si),
                 // If I receive none but my opponent does, show the holes where I give a stroke.
                 gives: game.game_type === "match" && (matchAllow ?? 0) === 0 && oppAllow != null
-                  ? matchStrokesFor(oppAllow, m.si)
+                  ? matchStrokesFor(oppAllow, m.si, game.holes_meta.map((x: any) => ({ hole_number: x.n, stroke_index: x.si })))
                   : 0,
               }));
             })()}

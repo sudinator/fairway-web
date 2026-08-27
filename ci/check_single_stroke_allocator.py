@@ -72,19 +72,27 @@ else:
 # Deliberately narrow: an si/stroke_index compared against a handicap, or a modulo/divide by 18
 # sitting next to one. Broad enough to catch a re-implementation, narrow enough not to fire on
 # unrelated arithmetic.
+# Matched on SHAPE, not on variable names. The first version of this guard keyed on ch/hcp/handicap
+# and missed matchStrokesFor, which names its parameter `diff` and carried a verbatim copy of the
+# same formula one file away. A guard tuned to the instance you already found will not catch the
+# next one.
 PATTERNS = [
-    (re.compile(r"(?:si|stroke_index|strokeIndex)\s*<=\s*(?:ch|hcp|handicap)\b"),
-     "an 'si <= ch' threshold — allocate by rank instead, via allocateStrokes"),
-    (re.compile(r"(?:ch|hcp|handicap)\w*\s*%\s*18\b"),
-     "a '% 18' on a handicap — 18 is not always the hole count"),
-    (re.compile(r"Math\.floor\(\s*(?:ch|hcp|handicap)\w*\s*/\s*18\s*\)"),
-     "a 'floor(ch / 18)' — 18 is not always the hole count"),
+    (re.compile(r"(?:si|stroke_index|strokeIndex)\s*<=\s*[A-Za-z_$][\w$.]*\s*%\s*18\b"),
+     "an 'si <= x % 18' threshold — allocate by rank instead, via allocateStrokes"),
+    (re.compile(r"(?:si|stroke_index|strokeIndex)\s*<=\s*(?:ch|hcp|handicap|diff|allow)\w*\b"),
+     "an 'si <= handicap' threshold — allocate by rank instead, via allocateStrokes"),
+    (re.compile(r"Math\.floor\(\s*[A-Za-z_$][\w$.]*\s*/\s*18\s*\)"),
+     "a 'floor(x / 18)' on a handicap-like value — 18 is not always the hole count"),
+    (re.compile(r"[A-Za-z_$][\w$.]*\s*%\s*18\b"),
+     "a '% 18' — 18 is not always the hole count"),
 ]
 # Matched by TEXT, not by file. Allowlisting all of golf.ts was too broad: it let strokesReceived
 # regrow its own formula undetected, which is the one thing this guard exists to prevent.
 ALLOWED_SNIPPETS = (
     # The wrapper's documented fallback, which synthesises a 1..18 index on purpose.
     "Array.from({ length: 18 }",
+    # Genuine 18-hole domain arithmetic: hole numbering and index wrap-around, not allocation.
+    "% 18) + 1",
 )
 for d in ("lib", "components", "app"):
     base = ROOT / d

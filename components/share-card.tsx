@@ -105,7 +105,10 @@ export function ShareScorecardModal({ game, player, onClose }: { game: any; play
 
   const { round, gross, net, pts, dateStr, statsTxt, hasDetail } = useMemo(() => {
     const meta = (game.holes_meta || []) as { n: number; par: number; si: number | null }[];
-    const ch = player.course_handicap ?? 0;
+    // Halve for a nine before the allowance — same gap as the live view. The share card is the
+    // image that leaves the app, so a wrong stroke count travels furthest.
+    const raw = player.course_handicap ?? 0;
+    const ch = meta.length === 9 ? raw / 2 : raw;
     const playing = applyAllowance(ch, game.allowance_pct ?? 100);
     const alloc = allocateStrokes(meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })), playing);
     const myTee = courseTees.find((t) => t.name === player.tee_name);
@@ -217,7 +220,9 @@ export function ShareGameModal({ game, players, courseTees, onClose }: { game: a
 
   const rows = useMemo(() => {
     return (players || []).filter((p: any) => !p.no_show).map((p: any) => {
-      const ch = p.course_handicap ?? 0;
+      // Halve for a nine, as above. Two stroke paths in this file; fixing one and not the other
+      // is exactly how the allocators diverged.
+      const ch = meta.length === 9 ? (p.course_handicap ?? 0) / 2 : (p.course_handicap ?? 0);
       const playing = applyAllowance(ch, game.allowance_pct ?? 100);
       const alloc = allocateStrokes(meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })), playing);
       const tee = (courseTees || []).find((t) => t.name === p.tee_name);
