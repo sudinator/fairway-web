@@ -7,6 +7,10 @@ export interface Leg { k: string; from: number; to: number; tot?: boolean }
 
 /** Build the legs for a segmentation scheme over n holes, de-duping identical ranges. */
 export function buildLegs(scheme: string, n: number): Leg[] {
+  // "none" turns the segment side game off. Returning no legs means every consumer that maps over
+  // them renders nothing, so the panels disappear without each needing its own flag — and it lives
+  // in the existing leg_config jsonb, so no migration.
+  if (scheme === "none") return [];
   const legs: Leg[] = [];
   if (scheme === "nines") {
     legs.push({ k: "F9", from: 0, to: Math.min(9, n) });
@@ -49,6 +53,7 @@ export function fmtPt(v: number): string {
   return (w ? String(w) : "") + (h ? "\u00bd" : "");
 }
 
+/** `scheme` of "none" disables the segment side game entirely. */
 export interface LegConfig { scheme: string; metric: "pts" | "net"; points: Record<string, number> }
 export const DEFAULT_LEG_CONFIG: LegConfig = { scheme: "sixes", metric: "pts", points: {} };
 

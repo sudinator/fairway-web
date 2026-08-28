@@ -1,3 +1,107 @@
+## 178.7.260827 — The side game nobody chose
+- **NO migration change** — the off switch lives in the existing `leg_config` jsonb.
+- **FIX: the six-hole segments panel appeared on every format, unchosen.** It is a SIDE GAME —
+  each player's own low net or net Stableford across the three sixes, both nines and the full round
+  — and it was gated on `roomTab === "play"` alone, with no setting anywhere to control it.
+  For alternate shot it was wrong twice over: both partners hold the SIDE's score after the fan-out,
+  so it listed four players with duplicated figures, implying four independent rounds nobody played.
+  Now gated on the SHAPE (`dotBasis !== "alt_shot_side"`) rather than the game type, so any future
+  format without individual scores is covered without another edit at that site.
+- **NEW: the segment side game can be turned OFF.** It was configurable — scheme, metric, points —
+  but had no "off", so it always ran. A scheme of `"none"` disables it; `buildLegs` returns an empty
+  list, which means every consumer that maps over legs renders nothing without each needing its own
+  flag. Offered as **Off** in the scheme picker. Stored in the existing jsonb, so no migration.
+  Asserted: `"none"` yields no legs on 9 and 18; every other scheme is unchanged; and an UNKNOWN
+  scheme still builds legs, so a typo cannot silently disable a side game.
+- **NEW on Review: "What you are playing"** — the main game named, and the side games actually
+  running. "None" is displayed as a real answer rather than a blank line, because blank reads as
+  "not configured yet" instead of "nothing is running". Being able to turn a side game off is half
+  the fix; saying plainly what is on is the other half.
+- Assertion baseline 6766 -> **6773**.
+
+## 178.6.260827 — Scoring verification layers 2 and 3
+- **NO migration change. No behaviour change** — this is verification, plus one finding to decide.
+- **LAYER 2, `lib/hole-result-consistency.test.ts` — 981 assertions.** Every hole-result producer
+  (matchProgress, fourballHoleDetail, altShotHoleDetail, altShotProgress) across five score patterns
+  chosen to sit ON the boundaries — exact ties, one-stroke margins, part-played holes — and several
+  handicap spreads. It asserts:
+  the declared winner FOLLOWS from the nets (a separate line of code that can be wrong on its own);
+  a halved hole is `0` and NEVER collapses to `null` (0 is falsy in JS, so `if (result)` would treat
+  every halve as unplayed); won + lost + halved == played; only one side ever receives; and the
+  running progress matches the per-hole results, so the two views cannot drift.
+  Negative-tested four ways — halve collapsed to null, winner inverted, both sides receiving,
+  progress drifting. All caught.
+- **LAYER 3, `lib/format-rules.test.ts` — 34 assertions.** Each format's defining rule, stated by
+  name. Layers 1 and 2 only prove SELF-CONSISTENCY; they cannot catch a format being consistently
+  wrong, which is precisely what alternate shot was — dots and result agreeing while both used
+  four-ball's basis.
+  **The rules were confirmed with the owner rather than assumed.** I had been wrong about the
+  alternate shot rule three times, and a test written alone would have frozen the misunderstanding.
+  Also asserts the four bases stay DISTINCT: if any two collapse, a format has silently inherited
+  another's rule.
+- **FINDING, not yet fixed: trifecta's singles legs use the FOURSOME basis, not 1v1.**
+  `computeTrifecta` draws every leg's nets from `fourballNets`, so a singles leg between two players
+  is scored off each player's handicap relative to the foursome's lowest — not off the difference
+  between the two of them.
+  The two allocate the SAME NUMBER of strokes but on DIFFERENT HOLES: for a 10 vs 5 pairing with a
+  foursome low of 2, they disagree on 6 of the first 9 holes. Whether a leg's result changes depends
+  on the scores.
+  There is a reasonable argument for the current behaviour — one dot allocation per player, used for
+  all three legs, so the card shows a single consistent set of dots. That is a golf-rules judgement,
+  so it is recorded rather than changed. See BACKLOG.md.
+- Assertion baseline 5751 -> **6766 across 40 suites**.
+
+## 178.5.260827 — The setup draft outlived the game it was drafting
+- **NO migration change.**
+- **FIX: after creating a game, the next Create Game offered to resume the setup just completed.**
+  `clearSetupDraft` ran correctly on creation — the bug was ORDERING, not the clear.
+  The component keeps its form state after creating, and `hydratedRef` stays true, so the very next
+  render fired the save effect and wrote the same snapshot straight back. The pagehide /
+  visibilitychange checkpoint would do the same, since its listeners stay attached until unmount.
+  Every function involved was individually correct.
+- **NEW `doneRef`**, set at creation BEFORE the clear and checked by every save path. A ref rather
+  than state deliberately: it has to hold for the CURRENT render pass, and setting state would
+  schedule an update the save could beat.
+- **NEW `lib/setup-draft-lifecycle.test.ts`** — 10 assertions at the store level, including the
+  proof that a save AFTER a clear does resurrect the draft (which is why the component must stop
+  saving), and that the keys are symmetrical: clearing one tee time leaves another, a tee-time draft
+  is distinct from a no-tee-time one, and groups are isolated.
+- **NEW `ci/check_draft_not_resurrected.py`** — the unit test cannot see ordering, so this checks the
+  SOURCE: the guard exists, it is set before the clear, and every `saveSetupDraft` is gated on it.
+  **The first version let a sabotage through**: a fixed 400-character lookback found a DIFFERENT
+  save's guard and passed an ungated one. The window now runs back only to the nearest unmatched
+  `{` — the block the call actually sits in. Negative-tested three ways; all caught.
+- The Create Game state-inventory contract flagged `doneRef` as unclassified, which is what it is
+  for — an unregistered ref is usually one added without thinking about its lifecycle, and that is
+  precisely how this bug happened. Registered.
+- Assertion baseline 5741 -> **5751 across 38 suites**.
+
+## 178.4.260827 — A scoring matrix across every format, and two bugs it found
+- **NO migration change.**
+- **NEW `lib/scoring-matrix.test.ts` — 3,695 assertions.** Every game type across a matrix of hole
+  set (18 / front 9 / back 9, with REAL stroke indexes), allowance (100 / 90 / 85 / 50), handicap
+  spread (scratch / narrow / wide / plus / odd-sum) and field size.
+  It asserts the property that would have caught all four stroke bugs this week: **whatever the card
+  DRAWS, the result must USE** — checkable with no expected value, and true for every format by
+  definition. It also covers `trifecta` and `alt_shot`, which the existing fuzzers never touched
+  (they run 5 of 7 types).
+- **BUG 1, found on the matrix's first run: the alternate shot branch hardcoded a 100% allowance.**
+  It ignored `game.allowance_pct` entirely, then halved the combined pair separately. At exactly
+  50% those two errors CANCEL — which is why the staging game looked plausible — and at 85% or 90%
+  they do not. Fixed to Option A: the allowance owns the percentage.
+- **BUG 2, found immediately after: applying the allowance per player DOUBLE-ROUNDS.**
+  `applyAllowance` rounds. Summing two rounded halves loses a stroke: 20 and 8 give 10 + 4 = 14,
+  while 10 and 5 give 5 + 3 = 8 (JS rounds 2.5 up) — a difference of 6, where exact gives
+  14.0 - 7.5 = 6.5 and rounds ONCE to 7.
+  WHS states foursomes as 50% of the COMBINED Course Handicaps, and "combined" is doing real work
+  in that sentence. **This is the same double-rounding removed from the allocator at 177.90**, and
+  I reintroduced it through applyAllowance one day later.
+- **Two assertions of mine were wrong and are corrected with reasons:**
+  a plus handicap gives strokes BACK, so its dot count is negative and must be compared by
+  magnitude; and "a player never receives more than their own handicap" is an individual-format
+  assumption that is FALSE for alternate shot, where the entitlement belongs to the SIDE.
+- Assertion baseline 2054 -> **5741 across 37 suites**.
+
 ## 178.3.260827 — Alternate shot: its own scorer, and the arithmetic made visible
 - **NO migration change.**
 - **FIX (the hole 15 error): alternate shot was scored by `fourballNets`, which is BEST-BALL.**

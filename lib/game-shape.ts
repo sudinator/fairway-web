@@ -175,16 +175,24 @@ export function dotStrokes(
   if (basis === "alt_shot_side") {
     const fs = (game.foursomes || []).find((f) => [...f.a, ...f.b].includes(key));
     if (!fs) return 0;
+    // RAW course handicap, unrounded and without the allowance — see sideCh.
     const chOf = (uid: string) => {
       const q = allPlayers.find((x) => pkey(x) === uid);
-      return q ? applyAllowance(chBasis(q, game.course_par, game.holes_meta?.length), 100) : null;
+      return q ? chBasis(q, game.course_par, game.holes_meta?.length) : null;
     };
-    // The side handicaps are kept EXACT here. altShotMatchStrokes rounds once, at the difference:
-    // rounding each side first loses a stroke whenever a pair's combined total is odd.
+    // The allowance is applied to the COMBINED pair, exactly once, and the result is kept EXACT.
+    //
+    // Not applyAllowance per player: that rounds each, and summing two rounded halves loses a
+    // stroke. 20 and 8 give 10 + 4 = 14; 10 and 5 give 5 + 3 = 8 (JS rounds 2.5 up) — a difference
+    // of 6, where exact gives 14.0 - 7.5 = 6.5 and rounds ONCE to 7.
+    //
+    // WHS states foursomes as 50% of the COMBINED Course Handicaps, and "combined" is doing real
+    // work in that sentence. This is the same double-rounding removed from the allocator at 177.90.
     const sideCh = (ids: string[]) => {
       const vals = ids.map(chOf);
       if (vals.some((v) => v == null)) return null;
-      return altShotTeamHandicap(vals[0] as number, vals[1] as number).value;
+      const combined = (vals as number[]).reduce((a, b) => a + b, 0);
+      return (combined * allowance) / 100;
     };
     const aCh = sideCh(fs.a);
     const bCh = sideCh(fs.b);

@@ -149,7 +149,12 @@ for (const holes of [BACK9, FULL18]) {
         // negative count. Those bounds hold for every format and catch a wrong basis.
         const own = Math.round(applyAllowance(chBasis(p as never, 72, holes.length), 100));
         ok(`${gt} on ${label}: dots are not negative`, dots >= 0);
-        ok(`${gt} on ${label}: dots never exceed the player's own handicap`, dots <= own);
+        // Alternate shot is exempt: the entitlement belongs to the SIDE, so a low-handicap
+        // partner legitimately receives the side's full difference — more than their own figure.
+        // Every other format derives strokes from the individual, where this bound holds.
+        if (gt !== "alt_shot") {
+          ok(`${gt} on ${label}: dots never exceed the player's own handicap`, dots <= own);
+        }
       }
     }
   }
@@ -211,7 +216,8 @@ for (const holes of [BACK9, FULL18]) {
 
 
 // ── ALTERNATE SHOT: the SIDE's handicap, not the individual's ─────────────
-// One ball per side, so the side handicap is 50% of the partners combined and strokes are the
+// One ball per side. The ALLOWANCE owns the 50% (Option A), so the side handicap is the SUM of
+// the two allowanced figures and strokes are the
 // DIFFERENCE between sides, the lower playing scratch. Both partners get the same dots — the dot
 // means "this SIDE receives a stroke here".
 {
@@ -220,7 +226,7 @@ for (const holes of [BACK9, FULL18]) {
   // Side A off 20 and 8 -> 14. Side B off 10 and 5 -> 7.5. Difference 6.5 -> 7 strokes to A.
   const players = [P("a", 20), P("b", 8), P("c", 10), P("d", 5)];
   const game = {
-    game_type: "alt_shot", course_par: 72, pairings: [], holes_meta: FULL18, allowance_pct: 100,
+    game_type: "alt_shot", course_par: 72, pairings: [], holes_meta: FULL18, allowance_pct: 50,
     teams: [{ key: "A", name: "A" }, { key: "B", name: "B" }],
     foursomes: [{ id: "f1", name: "F1", a: ["a", "b"], b: ["c", "d"] }],
   } as never;
@@ -238,7 +244,7 @@ for (const holes of [BACK9, FULL18]) {
     ({ id, user_id: id, handicap_index: null, slope: null, rating: null, course_handicap: ch, team: null }) as never;
   const players = [P("a", 12), P("b", 8), P("c", 14), P("d", 6)];
   const game = {
-    game_type: "alt_shot", course_par: 72, pairings: [], holes_meta: FULL18, allowance_pct: 100,
+    game_type: "alt_shot", course_par: 72, pairings: [], holes_meta: FULL18, allowance_pct: 50,
     teams: [{ key: "A", name: "A" }, { key: "B", name: "B" }],
     foursomes: [{ id: "f1", name: "F1", a: ["a", "b"], b: ["c", "d"] }],
   } as never;
@@ -253,7 +259,7 @@ for (const holes of [BACK9, FULL18]) {
     ({ id, user_id: id, handicap_index: null, slope: null, rating: null, course_handicap: ch, team: null }) as never;
   const players = [P("a", 20), P("b", 8), P("c", 10), P("d", 5)];
   const game = {
-    game_type: "alt_shot", course_par: 72, pairings: [], holes_meta: BACK9, allowance_pct: 100,
+    game_type: "alt_shot", course_par: 72, pairings: [], holes_meta: BACK9, allowance_pct: 50,
     teams: [{ key: "A", name: "A" }, { key: "B", name: "B" }],
     foursomes: [{ id: "f1", name: "F1", a: ["a", "b"], b: ["c", "d"] }],
   } as never;
@@ -267,7 +273,7 @@ for (const holes of [BACK9, FULL18]) {
     ({ id, user_id: id, handicap_index: null, slope: null, rating: null, course_handicap: ch, team: null }) as never;
   const players = [P("a", 20), P("b", 8), P("x", 12)];
   const game = {
-    game_type: "alt_shot", course_par: 72, pairings: [], holes_meta: FULL18, allowance_pct: 100,
+    game_type: "alt_shot", course_par: 72, pairings: [], holes_meta: FULL18, allowance_pct: 50,
     teams: [{ key: "A", name: "A" }, { key: "B", name: "B" }],
     foursomes: [{ id: "f1", name: "F1", a: ["a"], b: ["b"] }],
   } as never;

@@ -327,6 +327,10 @@ function CreateGame({
   const [draftDismissed, setDraftDismissed] = useState(false);
   const [pendingFavName, setPendingFavName] = useState<string | null>(null); // restore the course once favorites load
   const hydratedRef = React.useRef(false); // gates saving until we've decided resume-vs-fresh (don't clobber the draft first)
+  // True once the game has been created: setup is over, so the draft must never be written
+  // again. A ref, not state: it has to hold for the CURRENT render pass, before any
+  // re-render can fire the save effect above.
+  const doneRef = React.useRef(false);
   const resumedRef = React.useRef(false);  // when true, skip the tee-time seed prefill (the draft already captured it)
 
   const addGuestPlayer = () => {
@@ -503,14 +507,18 @@ function CreateGame({
 
   // Save the in-progress setup on every meaningful change (once we've decided
   // resume-vs-fresh, so we never overwrite an offered draft before the user chooses).
+  // `doneRef` stops the save once the game has been CREATED. Without it the clear on creation was
+  // undone immediately: the component keeps its form state, so the next render — or the
+  // pagehide/visibility checkpoint below, still listening — wrote the same snapshot back, and the
+  // draft offered on the next Create Game was the one just finished.
   useEffect(() => {
-    if (!hydratedRef.current) return;
+    if (!hydratedRef.current || doneRef.current) return;
     if (draftHasProgress(draftSnapshot, user.id)) saveSetupDraft(activeGroupId, teeTimeId, draftSnapshot);
   }, [draftSnapshot, activeGroupId, teeTimeId, user.id]);
 
   useEffect(() => {
     const checkpoint = () => {
-      if (!hydratedRef.current) return;
+      if (!hydratedRef.current || doneRef.current) return;
       const snap = latestDraftRef.current;
       if (draftHasProgress(snap, user.id)) saveSetupDraft(activeGroupId, teeTimeId, snap);
     };
@@ -649,6 +657,8 @@ function CreateGame({
       // Lean Create owns the core game only. Persisted structure stays authoritative in
       // Manage Game, so formats that need teams/matchups/foursomes hand off there.
       const destination = GC.postCreateDestination(gameType, teamMode);
+      // Set BEFORE the clear, so nothing between here and unmount can write the draft back.
+      doneRef.current = true;
       clearSetupDraft(activeGroupId, teeTimeId); // setup finished — drop the local draft
       onCreated(game.id, destination.roomTab, destination.setupTab as SetupTab | undefined);
     } catch (e: any) {
@@ -3325,7 +3335,12 @@ function GameRoom({
             </div>
           </div>
 
-          {/* Three sixes */}
+          {/* Three sixes — a SIDE GAME: each player's own low net across the sixes. It rendered on
+              roomTab alone, so it appeared for every format including ones with no individual
+              score. In alternate shot both partners hold the SIDE's score after the fan-out, so
+              this listed four players with duplicated figures, implying four rounds nobody played.
+              Gated on the SHAPE, so a future non-individual format is covered without another edit. */}
+          {shapeOf(game).dotBasis !== "alt_shot_side" && (
           <div style={{ marginTop: 18 }}>
             <Eyebrow>{isStroke ? "SIX-HOLE SEGMENTS (NET SCORE)" : "SIX-HOLE SEGMENTS (NET STABLEFORD)"}</Eyebrow>
             <div
@@ -3391,6 +3406,7 @@ function GameRoom({
               })}
             />
           </div>
+          )}
 
           {effectiveGroupId((game as any)?.group_id) === TGC_GROUP_ID && (
             <BettingPanel

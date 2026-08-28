@@ -1,3 +1,21 @@
+## Trifecta singles legs: foursome basis vs 1v1 (open, needs a rules decision)
+
+`computeTrifecta` draws every leg's nets from `fourballNets`, so a SINGLES leg is scored off each
+player's handicap relative to the foursome's lowest — not off the difference between the two players
+in that leg.
+
+The two allocate the same NUMBER of strokes but on DIFFERENT holes. For A 10 vs B 5 with a foursome
+low of 2, they disagree on 6 of the first 9 holes:
+
+    SI 1-3: foursome basis gives both a stroke (net 0); 1v1 gives A one
+    SI 6-8: foursome basis gives A one; 1v1 gives neither
+
+Arguments both ways. Against changing it: a player sees ONE set of dots on the card, used for all
+three legs, and changing the basis per leg means two different dot patterns for the same player.
+For changing it: the owner's stated rule is that the singles legs are 1v1.
+
+Recorded at 178.6. Not changed, because it is a rules judgement rather than a defect.
+
 # Birdie Num Num — Backlog & Improvements
 
 Running list of things to build or tighten. Newest ideas near the top of each section.

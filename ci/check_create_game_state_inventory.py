@@ -20,7 +20,7 @@ context = {'favorites','profileIdx','groupRoster'}
 transient = {'flightHcpDraft','guestName','guestHcp','guestSponsor','guestIdxEdits','allowanceInput'}
 runtime = {'busy','err','draftAvailable','draftDismissed','pendingFavName','createSection'}
 expected_state = domain | context | transient | runtime
-expected_refs = {'hydratedRef','resumedRef','guestsSeeded','latestDraftRef'}
+expected_refs = {'hydratedRef','resumedRef','guestsSeeded','latestDraftRef','doneRef'}
 
 missing = expected_state - actual_state
 unclassified = actual_state - expected_state
