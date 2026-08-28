@@ -17,6 +17,7 @@ const KIND_ICON: Record<string, string> = { ctp: "🎯", long_drive: "💪", str
 
 export function ContestsSection({
   gameId, holesMeta, players, userId, myName, isOrganizer, isEnded,
+  allowEmpty = false,
 }: {
   gameId: string;
   holesMeta: { n: number; par: number }[];
@@ -25,6 +26,8 @@ export function ContestsSection({
   myName: string;
   isOrganizer: boolean;
   isEnded: boolean;
+  /** Show the empty-state prompt. True only where a contest is ADDED — not during play. */
+  allowEmpty?: boolean;
 }) {
   const [contests, setContests] = useState<Contest[]>([]);
   const [entries, setEntries] = useState<ContestEntry[]>([]);
@@ -88,7 +91,10 @@ export function ContestsSection({
 
   // hide entirely for non-organizers when there's nothing to show
   if (loading) return null;
-  if (contests.length === 0 && !isOrganizer) return null;
+  // Nothing to show when there are no contests, UNLESS this is the place they are added.
+  // Previously any organizer saw the whole panel — heading, prompt, Add button — on every
+  // game during play, which reads as a side game running when none is.
+  if (contests.length === 0 && !(isOrganizer && allowEmpty)) return null;
 
   return (
     <div style={{ background: C.greenMid, borderRadius: 14, padding: 14, marginTop: 14 }}>

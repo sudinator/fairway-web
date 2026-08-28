@@ -74,8 +74,12 @@ import { useNowTick } from "@/lib/use-now-tick";
 
 const supabase = createClient();
 
-export function GroupScorecard({ game, players, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup, groupLocked = false, onMarkOut, courseTees = [], offline = false }: {
-  game: Game; players: Player[]; user: any;
+export function GroupScorecard({ game, players, allPlayers, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup, groupLocked = false, onMarkOut, courseTees = [], offline = false }: {
+  game: Game; players: Player[];
+  /** Every player in the game. `players` is filtered by tee group for DISPLAY; stroke bases
+   *  that need the opposing side (alternate shot) must see the whole field. */
+  allPlayers?: Player[];
+  user: any;
   isMarker: boolean; markerName: string | null;
   onTakeOver: () => void; onRelease: () => void;
   onSetHole: (playerId: string, holeIdx: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null }) => void;
@@ -96,7 +100,11 @@ export function GroupScorecard({ game, players, user, isMarker, markerName, onTa
     const net = gross - recv;
     return net < par ? GREEN : net === par ? BLUE : RED;
   };
-  const recvFor = (p: Player, si: number | null) => dotStrokes(game, p, si, players);
+  // ALL players, not the visible subset. `players` here is filtered by tee group for display,
+  // and a stroke basis that needs the opposing side — alternate shot — returns 0 when that
+  // side is filtered out, so the card showed no dots at all.
+  const strokePool = allPlayers && allPlayers.length ? allPlayers : players;
+  const recvFor = (p: Player, si: number | null) => dotStrokes(game, p, si, strokePool);
   // Individual (full playing handicap) strokes for the low-net / Stableford side game.
   // Only meaningful when the game uses a relative basis (match/four-ball/trifecta) — on
   // stableford/stroke the orange dots already ARE the full-handicap strokes, so we don't

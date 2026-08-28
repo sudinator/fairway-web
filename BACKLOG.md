@@ -1,3 +1,16 @@
+## Hole count cannot be changed after a game is created (open)
+
+`set_match_length` exists in lib/game-setup-policy.ts, is negative-tested, and NOTHING dispatches it.
+`MatchLengthPicker` is rendered only in Create Game, so once a game exists the 9/18 choice is fixed
+even before any score is entered.
+
+Building it means more than surfacing the picker: changing the length must rewrite `holes_meta` and
+re-derive every player's course handicap (chBasis halves for a nine), and decide what happens to a
+`leg_config` whose scheme assumes 18 holes.
+
+Found at 178.8 by the owner. Same shape as the 178.2 setup dead end: policy and guard written, no
+route to reach them.
+
 ## Trifecta singles legs: foursome basis vs 1v1 (open, needs a rules decision)
 
 `computeTrifecta` draws every leg's nets from `fourballNets`, so a SINGLES leg is scored off each

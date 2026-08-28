@@ -3106,6 +3106,23 @@ function GameRoom({
         />
       )}
 
+      {/* Contests are CONFIGURATION, so their editable home — including the empty add-a-contest
+          prompt — is the setup Format tab. The play tab keeps them read-mostly and only when they
+          exist. 178.8 gated the empty prompt and passed allowEmpty nowhere, so no new game could
+          gain a contest at all; this is the missing entry point, put where configuration lives. */}
+      {roomTab === "setup" && setupTab === "format" && (
+        <ContestsSection
+          gameId={game.id}
+          holesMeta={(game.holes_meta || []).map((h: any) => ({ n: h.n, par: h.par }))}
+          players={players}
+          userId={user.id}
+          myName={myRow?.display_name || "Me"}
+          isOrganizer={isOrganizer}
+          isEnded={isEnded}
+          allowEmpty
+        />
+      )}
+
       {roomTab === "play" && (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot") && (
         <GroupSegmentSummary game={game} players={players} />
       )}
@@ -3226,7 +3243,7 @@ function GameRoom({
               )}
             </div>
           )}
-          <GroupScorecard game={game} players={cardPlayers} user={user} courseTees={courseTees}
+          <GroupScorecard game={game} players={cardPlayers} allPlayers={players} user={user} courseTees={courseTees}
             isMarker={cardCanEdit}
             markerName={viewedMarkerPlayer?.display_name ?? null}
             onTakeOver={takeOverScoring}

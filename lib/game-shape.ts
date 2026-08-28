@@ -145,6 +145,49 @@ function recvByRank(game: DotGame, si: number | null, ch: number): number {
 }
 
 // elsewhere) — that is intentionally different from the live match relativity.
+
+/**
+ * THE side handicaps for an alternate shot foursome — the only place they are computed.
+ *
+ * Each side is its two players' course handicaps COMBINED, with the game's allowance applied to the
+ * combined figure exactly once, kept exact. Not per player: applyAllowance rounds, and summing two
+ * rounded halves loses a stroke (20 and 8 give 14; 10 and 5 give 8 via JS rounding 2.5 up — a
+ * difference of 6 where exact gives 6.5 -> 7).
+ *
+ * Every consumer — the scorecard dots, the Strokes panel, anything future — must call this. Two
+ * screens disagreeing about strokes has caused a wrong hole result once already; two screens cannot
+ * disagree about a number only one function produces.
+ *
+ * Returns null side values when a player is missing or has no handicap: a side difference is not
+ * computable from half a pairing, and the CALLER must therefore pass every player in the game, not
+ * a display-filtered subset.
+ */
+export function altShotSides(
+  game: ShapeGame & { course_par?: number | null; holes_meta?: { n: number }[] | null; allowance_pct?: number | null },
+  allPlayers: ShapePlayer[],
+  foursome: { a?: string[] | null; b?: string[] | null },
+): { aCh: number | null; bCh: number | null; receiving: "a" | "b" | null; strokes: number } {
+  const allowance = game.allowance_pct ?? 100;
+  const chOf = (uid: string) => {
+    const q = allPlayers.find((x) => pkey(x) === uid);
+    return q ? chBasis(q, game.course_par, game.holes_meta?.length) : null;
+  };
+  const sideCh = (ids: string[] | null | undefined) => {
+    if (!Array.isArray(ids) || ids.length !== 2) return null;
+    const vals = ids.map(chOf);
+    if (vals.some((v) => v == null)) return null;
+    const combined = (vals as number[]).reduce((a, b) => a + b, 0);
+    return (combined * allowance) / 100;
+  };
+  const aCh = sideCh(foursome.a);
+  const bCh = sideCh(foursome.b);
+  if (aCh == null || bCh == null) return { aCh, bCh, receiving: null, strokes: 0 };
+  const diff = aCh - bCh;
+  const strokes = Math.round(Math.abs(diff));
+  if (strokes === 0) return { aCh, bCh, receiving: null, strokes: 0 };
+  return { aCh, bCh, receiving: diff > 0 ? "a" : "b", strokes };
+}
+
 export function dotStrokes(
   game: DotGame,
   p: ShapePlayer,
@@ -175,29 +218,11 @@ export function dotStrokes(
   if (basis === "alt_shot_side") {
     const fs = (game.foursomes || []).find((f) => [...f.a, ...f.b].includes(key));
     if (!fs) return 0;
-    // RAW course handicap, unrounded and without the allowance — see sideCh.
-    const chOf = (uid: string) => {
-      const q = allPlayers.find((x) => pkey(x) === uid);
-      return q ? chBasis(q, game.course_par, game.holes_meta?.length) : null;
-    };
-    // The allowance is applied to the COMBINED pair, exactly once, and the result is kept EXACT.
-    //
-    // Not applyAllowance per player: that rounds each, and summing two rounded halves loses a
-    // stroke. 20 and 8 give 10 + 4 = 14; 10 and 5 give 5 + 3 = 8 (JS rounds 2.5 up) — a difference
-    // of 6, where exact gives 14.0 - 7.5 = 6.5 and rounds ONCE to 7.
-    //
-    // WHS states foursomes as 50% of the COMBINED Course Handicaps, and "combined" is doing real
-    // work in that sentence. This is the same double-rounding removed from the allocator at 177.90.
-    const sideCh = (ids: string[]) => {
-      const vals = ids.map(chOf);
-      if (vals.some((v) => v == null)) return null;
-      const combined = (vals as number[]).reduce((a, b) => a + b, 0);
-      return (combined * allowance) / 100;
-    };
-    const aCh = sideCh(fs.a);
-    const bCh = sideCh(fs.b);
+    // ONE source: altShotSides is the only place side handicaps are computed. The inline version
+    // that lived here was one of TWO — the Strokes panel had another — and two implementations of
+    // one rule feeding two screens is the exact pattern behind five bugs this week.
     const mineIsA = fs.a.includes(key);
-    const { receiving, strokes } = altShotMatchStrokes(aCh, bCh);
+    const { receiving, strokes } = altShotSides(game, allPlayers, fs);
     if (receiving == null || strokes <= 0) return 0;
     const iReceive = (receiving === "a" && mineIsA) || (receiving === "b" && !mineIsA);
     return iReceive ? matchStrokesFor(strokes, si, allocHoles(game)) : 0;

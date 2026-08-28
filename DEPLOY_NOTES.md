@@ -1,3 +1,52 @@
+## 178.9.260827 — Contests reachable again; ONE source for alt-shot side handicaps
+- **NO migration change.**
+- **FIX (my 178.8 regression): no new game could gain a side contest.** 178.8 gated the empty
+  add-a-contest prompt behind `allowEmpty` and passed it NOWHERE — the one call site was the play
+  tab. The fix for showing-too-much became showing-nothing: the entry point to add a contest was
+  unreachable on any game without one.
+  Contests now have a SETUP home, on the Format tab, with `allowEmpty` — configuration belongs with
+  the format and allowance it sits beside. The play tab keeps showing contests only when they exist.
+- **STRUCTURAL: `altShotSides` in game-shape.ts is now the ONLY place side handicaps are computed.**
+  This is the fifth one-rule-two-implementations bug in a week, and the honest mechanism each time is
+  the same: the rule was implemented where the immediate task needed it, and the other live
+  implementation was left standing. Guards that look for copied FORMULAS never caught these, because
+  the two blocks never looked alike.
+  The countermeasure is DELETION, not another agreement test: dotStrokes' inline sideCh and the
+  Strokes panel's inline chOf/sideOf are both gone, replaced by calls to the one function. Two
+  screens cannot disagree about a number only one function produces.
+- **NEW `ci/check_single_altshot_source.py`** — checks the INGREDIENTS, not the formula: any
+  alt-shot-aware file doing its own handicap arithmetic without `altShotSides` fails. Negative-tested
+  by resurrecting the panel's inline calculation; caught.
+- Assertion baseline unchanged at **6776**.
+
+## 178.8.260827 — Alt shot scorecard dots; the empty contests panel
+- **NO migration change.**
+- **FIX: the alternate shot scorecard showed NO stroke dots** while the Strokes panel was correct.
+  Two sources again, and this one is mine from 178.3: the Strokes panel uses the `altShotSide` block
+  I wrote there, while the scorecard uses `dotStrokes`.
+  The scorecard passes `cardPlayers`, which is FILTERED BY TEE GROUP for display. Alternate shot
+  needs the OPPOSING side to compute a difference, so with that side filtered out `dotStrokes`
+  returned 0 and no dots drew at all. Four-ball degrades instead of vanishing, which is exactly why
+  four-ball looked fine and this did not.
+  `GroupScorecard` now takes an explicit `allPlayers` prop for the stroke computation, separate from
+  the filtered `players` it renders. Display and computation genuinely want different lists, and
+  conflating them is what caused this.
+  Pinned in the matrix: with the opposing side absent no strokes CAN be computed, which is why the
+  caller's contract must be to pass every player.
+- **FIX: the side-contests panel appeared during play with no contests.** The condition was
+  `contests.length === 0 && !isOrganizer`, so any ORGANIZER saw the full panel — heading, prompt and
+  Add button — on every game whether or not a contest existed. During a round that reads as a side
+  game running when none is. The empty state now needs an explicit `allowEmpty`, true only where a
+  contest is actually added.
+- **DIAGNOSED, NOT FIXED: the hole count cannot be changed after creation.** `set_match_length` is
+  defined in the setup policy, negative-tested, and **no component ever dispatches it** — the
+  MatchLengthPicker exists only in Create Game. So it is not that 18 is blocked after choosing 9;
+  there is no control at all once the game exists.
+  Same shape as the alternate-shot setup dead end at 178.2: a policy written, a guard written, and
+  no route to reach it. Changing it also has to rewrite `holes_meta` and re-derive every handicap,
+  so it needs building deliberately rather than bolting on. Recorded in BACKLOG.md.
+- Assertion baseline 6773 -> **6776**.
+
 ## 178.7.260827 — The side game nobody chose
 - **NO migration change** — the off switch lives in the existing `leg_config` jsonb.
 - **FIX: the six-hole segments panel appeared on every format, unchosen.** It is a SIDE GAME —

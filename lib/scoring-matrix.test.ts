@@ -143,5 +143,24 @@ for (const gt of FORMATS) {
   }
 }
 
+
+// ── a stroke basis must not silently vanish on a FILTERED player list ────
+// The scorecard passes `cardPlayers`, filtered by tee group for display. Alternate shot needs the
+// OPPOSING side to compute a difference, so with the other side filtered out it returned 0 and the
+// card showed no dots at all — while four-ball degraded and still looked plausible.
+{
+  const players = [20, 12, 8, 2].map((c, i) => P(`p${i}`, c, i < 2 ? "A" : "B"));
+  const game = mkGame("alt_shot", H18, 50);
+  const full = H18.reduce((s, h) => s + dotStrokes(game, players[0], h.si, players as never), 0);
+  ok("with the full field, dots are allocated", full > 0);
+
+  // Only side A present — the shape the scorecard was passing.
+  const half = H18.reduce((s, h) => s + dotStrokes(game, players[0], h.si, players.slice(0, 2) as never), 0);
+  // It is legitimate to return 0 here (a side difference is uncomputable), which is exactly why the
+  // CALLER must pass every player. This pins the behaviour so the caller's contract is explicit.
+  eq("with the opposing side missing, no strokes can be computed", half, 0);
+  ok("which is why the scorecard must pass allPlayers, not the visible subset", full !== half);
+}
+
 console.log(`scoring matrix: ${pass} passed, ${fail} failed`);
 if (fail) { console.error(fails.join("\n")); process.exit(1); }

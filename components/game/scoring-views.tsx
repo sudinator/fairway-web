@@ -41,7 +41,7 @@ import {
   markerOwnsMyRow,
   mergeBackupRow,
 } from "@/lib/golf";
-import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
+import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, altShotSides } from "@/lib/game-shape";
 import { decideSetupChange, type SetupAction } from "@/lib/game-setup-policy";
 import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
@@ -1218,12 +1218,16 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
     const aRows = rowsFor(fr.a);
     const bRows = rowsFor(fr.b);
     if (aRows.length !== 2 || bRows.length !== 2) return null;
-    const chOf = (p: Player) => applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), allowance);
-    const sideOf = (rows: Player[]) => rows.reduce((s, p) => s + chOf(p), 0);
-    const aCh = sideOf(aRows), bCh = sideOf(bRows);
+    // ONE source: this panel had its own inline side calculation while the scorecard dots used
+    // dotStrokes — the fifth two-implementations bug in a week, and the reason the panel could be
+    // right while the card was blank. Both now read altShotSides, so they cannot disagree.
+    const sides = altShotSides(game as never, players as never, fr as never);
+    const aCh = sides.aCh ?? 0, bCh = sides.bCh ?? 0;
     const diff = aCh - bCh;
-    const strokes = Math.round(Math.abs(diff));
-    const recvRows = diff > 0 ? aRows : bRows;
+    const strokes = sides.strokes;
+    const recvRows = sides.receiving === "a" ? aRows : bRows;
+    // Per-player display figures only — the SIDE numbers above are the ones that decide strokes.
+    const chOf = (p: Player) => chBasis(p, game.course_par, game.holes_meta?.length) * (allowance / 100);
     const alloc = allocateStrokes(
       meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })),
       strokes,
