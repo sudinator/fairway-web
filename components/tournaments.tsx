@@ -46,7 +46,7 @@ import {
   type BetSplit,
   markerOwnsMyRow,
   mergeBackupRow, altShotProgress } from "@/lib/golf";
-import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
+import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, altShotSides } from "@/lib/game-shape";
 import { decideSetupChange, type SetupAction, type SetupDecision } from "@/lib/game-setup-policy";
 import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
@@ -3557,8 +3557,8 @@ function GameRoom({
                   game.holes_meta,
                   me.scores || [],
                   oppP.scores || [],
-                  me.course_handicap,
-                  oppP.course_handicap,
+                  chBasis(me, game.course_par, game.holes_meta?.length),
+                  chBasis(oppP, game.course_par, game.holes_meta?.length),
                   game.allowance_pct ?? 100,
                 );
                 return prog.map((lead) => matchLeadLabel(lead));
@@ -3572,18 +3572,26 @@ function GameRoom({
                 const f = game.foursomes.find((x: any) =>
                   [...(x.a || []), ...(x.b || [])].some((uid: string) => uid === myKey));
                 if (!f) return undefined;
-                const sideOf = (ids: string[]) => {
+                const sides = altShotSides(game as never, players as never, f as never);
+                const sideOf = (ids: string[], sideCh: number | null) => {
                   const rows = (ids || []).map((uid: string) => players.find((p) => pkey(p) === uid)).filter(Boolean) as typeof players;
                   return {
                     ids,
-                    chs: rows.map((p) => applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100)),
+                    // Canonical alternate-shot side handicap: combine exact partner CHs, then apply
+                    // the allowance once. Keep it exact here; altShotProgress rounds only the side
+                    // difference, matching the dots / Strokes panel.
+                    chs: [sideCh],
                     // One ball per side: both partners hold the same score after the fan-out, so
                     // either row is the side's gross. The first present one is taken.
                     gross: (game.holes_meta || []).map((_m: any, i: number) =>
                       rows.map((p) => p.scores?.[i]).find((v) => v != null && v > 0) ?? null),
                   };
                 };
-                const prog = altShotProgress(game.holes_meta, sideOf(f.a || []), sideOf(f.b || []));
+                const prog = altShotProgress(
+                  game.holes_meta,
+                  sideOf(f.a || [], sides.aCh),
+                  sideOf(f.b || [], sides.bCh),
+                );
                 // Reported from side A's perspective; flip when I am on side B.
                 const mineIsA = (f.a || []).includes(myKey);
                 return prog.map((lead) => matchLeadLabel(lead == null ? null : (mineIsA ? lead : -lead)));

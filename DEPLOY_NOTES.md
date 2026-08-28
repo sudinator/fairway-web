@@ -1,3 +1,12 @@
+# Birdie Num Num — Deploy & Migration Notes
+
+## 178.10.260828 — Scoring correctness: exact match allowances + canonical alternate-shot sides
+- **Singles match:** all live `matchStatus` / `matchProgress` callers now pass exact `chBasis(...)` values rather than the stored rounded `course_handicap`, so percentage allowances are applied before the final rounding step. This fixes boundary cases such as exact CH 10.5 at 90%, which must receive 9 rather than 10 strokes.
+- **Alternate shot:** the individual scorecard running match line now consumes `altShotSides(...)`, the same canonical side-handicap source used by the stroke dots / Strokes panel. It no longer rounds each partner's allowance before combining the side. The documented 20+8 vs 10+5 at 50% case therefore remains a 7-stroke difference, not 6.
+- **Guard:** added `ci/check_scoring_input_contract.py` and wired it into `npm run guards` to block future production match callers from using stored rounded handicaps or rebuilding alternate-shot side allowances.
+- **Database:** no migration. No score-entry, persistence, betting, leaderboard, or round-posting behavior changed.
+- **Validation note:** source-contract scoring guards pass. Full dependency-backed type/test/build validation could not be completed in the ChatGPT container because `npm ci` repeatedly timed out and left missing type packages; this package must not be promoted beyond staging until normal GitHub CI and staging validation pass.
+
 ## 178.9.260827 — Contests reachable again; ONE source for alt-shot side handicaps
 - **NO migration change.**
 - **FIX (my 178.8 regression): no new game could gain a side contest.** 178.8 gated the empty

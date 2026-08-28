@@ -598,8 +598,8 @@ export function MatchView({
           game.holes_meta,
           pa.scores || [],
           pb.scores || [],
-          pa.course_handicap,
-          pb.course_handicap,
+          chBasis(pa, game.course_par, game.holes_meta?.length),
+          chBasis(pb, game.course_par, game.holes_meta?.length),
           game.allowance_pct ?? 100,
         );
         const allow = matchAllowance(chBasis(pa, game.course_par, game.holes_meta?.length), chBasis(pb, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100);
