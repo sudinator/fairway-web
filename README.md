@@ -1,3 +1,5 @@
+**Current staging candidate:** 178.18.260829 — Environment-contract correction documenting the migration-ledger test fixture; no application, scoring, or database change.
+
 **Current staging candidate:** 178.17.260829 — React hook-order correction for the Alternate Shot side-game suppression plus a permanent pre-lint source guard; no scoring or database change.
 **Current staging candidate:** 178.14.260829 — Alternate Shot score entry is team-based (one ball/one side score), team playing handicap is shown/applied, and individual side-game/personal-card surfaces are suppressed.
 

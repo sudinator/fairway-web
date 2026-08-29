@@ -1,3 +1,5 @@
+> **178.18.260829:** No schema change. Environment-contract documentation only.
+
 > **178.17.260829:** No schema change. React hook-order correction and source guard only.
 > **178.16.260829:** No schema change. TypeScript-only correction to the Alternate Shot team-card release.
 

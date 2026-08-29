@@ -1,3 +1,8 @@
+## 178.18.260829 — Environment hygiene release correction
+
+- [x] Document `BNN_MIGRATION_LEDGER_FIXTURE` in `.env.example` as test-only so environment hygiene matches the migration-parity tooling.
+- [x] No runtime, scoring, persistence, or database behavior change.
+
 ## 178.17.260829 — React hook-order release hardening
 - [x] Move `GroupSegmentSummary` hook above the Alternate Shot early return so hooks remain unconditional.
 - [x] Preserve Alternate Shot side-game suppression (`return null`) after hooks are initialized.

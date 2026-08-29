@@ -1,3 +1,5 @@
+> **178.18.260829:** No migration. Environment-contract documentation only; database contract unchanged.
+
 > **178.17.260829:** No migration. React hook-order correction and source guard only; database contract unchanged.
 > **178.16.260829:** No migration. TypeScript-only correction to the Alternate Shot individual-card exclusion; database contract unchanged.
 

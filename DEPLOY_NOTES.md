@@ -1,3 +1,10 @@
+## 178.18.260829 — Document migration-parity test fixture
+
+- Adds `BNN_MIGRATION_LEDGER_FIXTURE` to `.env.example` as a test-only variable.
+- Fixes the environment-hygiene CI failure introduced with the migration-parity fixture support.
+- No application behavior, scoring, persistence, or database change.
+- Migration: none.
+
 ## 178.17.260829 — Fix Alternate Shot side-game hook ordering + add pre-lint guard
 
 - No database migration.
