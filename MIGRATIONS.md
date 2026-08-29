@@ -1,3 +1,5 @@
+> **178.15.260829:** No migration. Release infrastructure now mechanically verifies the live staging/Production `schema_migrations` ledgers against the committed migration chain and fails if this checklist is stale.
+> **178.14.260829:** No migration. Alternate Shot team-card/side-game presentation correction only.
 > **178.13.260829:** No migration. CI assertion-baseline/documentation-only correction; Alternate Shot scoring code is unchanged from 178.12.
 
 # Migrations run-ledger
@@ -10,7 +12,7 @@ Regenerate after shipping (adds new files, keeps ticks and the notes block):
 Confirm database-applied state with:
 `select id, applied_at from public.schema_migrations order by id;`
 
-Total: 122 migrations. Unchecked = not yet confirmed applied in this checklist.
+Total: 124 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -136,10 +138,8 @@ Total: 122 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [x] 0135_ledger_backfill.sql
 - [x] 0136_core_rls_helpers.sql
 - [x] 0137_core_rls_baseline.sql
-- [x] 0138_change_game_course_before_scoring.sql — 177.45 atomic pre-score course replacement. Confirmed applied in staging and Production on 2026-08-16; the schema_migrations ledger remains authoritative.
-
-<!-- VERIFIED_LEDGER_17740 -->
-- **Production/staging ledger reconciliation (177.40, 2026-08-15 US/Eastern):** `schema_migrations` was checked directly. Production records `baseline_through_0110`, every migration 0111-0128, 0130-0137; 0129 is an intentional reserved numbering gap. Staging and Production both applied/verified 0135 -> 0136 -> 0137, with the 12 core RLS tables exposing the expected 60 policies. The real staging integration harness passed after application and the Production smoke test passed. `schema_migrations` remains authoritative; these checkboxes are the human mirror only.
+- [x] 0138_change_game_course_before_scoring.sql
+- [ ] 0139_nine_hole_round_basis.sql
 
 <!-- NOTES:START -->
 

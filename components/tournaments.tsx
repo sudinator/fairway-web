@@ -3144,7 +3144,7 @@ function GameRoom({
         />
       )}
 
-      {roomTab === "play" && (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot") && (
+      {roomTab === "play" && (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta") && (
         <GroupSegmentSummary game={game} players={players} />
       )}
 
@@ -3466,7 +3466,7 @@ function GameRoom({
           keeps my gross score it's shown view-only ("kept by X") while my putts / fairways
           / sand / penalties stay editable (they save through the stats chokepoint). The
           group scorer and self-scorers get a fully-editable card. */}
-      {roomTab === "play" && me && (() => {
+      {roomTab === "play" && me && game.game_type !== "alt_shot" && (() => {
         const myScoreLocked = !isEnded && markerOwnsMyRowRef.current;
         const mk = myScoreLocked
           ? ((teeGroupsInUse && myRow?.tee_group != null)

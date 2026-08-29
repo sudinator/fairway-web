@@ -1,3 +1,5 @@
+> **178.15.260829:** No schema change. CI now verifies live `schema_migrations` parity for staging and Production against the committed migration chain.
+> **178.14.260829:** No schema change. Alternate Shot continues to persist one side score by fan-out to both partner rows.
 > **178.13.260829:** No schema change.
 
 # Birdie Num Num — Database Schema & Conventions

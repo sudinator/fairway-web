@@ -196,6 +196,8 @@ export function SegmentBoard({
 }
 
 export function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] }) {
+  // Alternate shot has no individual ball, so an individual sixes/low-net side game is invalid.
+  if (game.game_type === "alt_shot") return null;
   const cfg: LegConfig = (game.leg_config as LegConfig) || DEFAULT_LEG_CONFIG;
   const [metric, setMetric] = React.useState<"net" | "pts">(cfg.metric === "net" ? "net" : "pts");
   const meta = (game.holes_meta || []) as { n: number; par: number; si: number | null }[];

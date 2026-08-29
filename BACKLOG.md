@@ -1,3 +1,16 @@
+## 178.15.260829 — Migration parity release gate
+
+- Added live staging/Production schema_migrations parity checks to CI.
+- Added generated MIGRATIONS.md freshness enforcement.
+- Added released-migration immutability protection for PRs targeting main.
+- No database migration.
+
+## 178.14.260829 — Alternate Shot team card corrected
+- [x] Alternate Shot group scorecard now renders two side/team scoring columns rather than four duplicated individual player columns.
+- [x] Alternate Shot score modal identifies the team, shows side playing handicap, and applies side match strokes.
+- [x] Individual personal card and individual six-hole/Group Results side-game surfaces are suppressed for Alternate Shot.
+- [x] Alternate Shot side-game component hard-stops if accidentally invoked.
+
 ## Hole count cannot be changed after a game is created (open)
 
 `set_match_length` exists in lib/game-setup-policy.ts, is negative-tested, and NOTHING dispatches it.

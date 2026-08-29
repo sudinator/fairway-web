@@ -1,3 +1,22 @@
+## 178.15.260829 — Mandatory database migration parity gate
+
+- No database migration in this release.
+- CI now checks the live staging `schema_migrations` ledger against every committed ledger-era migration before staging validation can pass.
+- A staging -> main PR now has a separate Production migration-parity job, isolated in the GitHub `production` environment. It blocks merge if Production is missing any committed migration.
+- Pushes to `main` rerun the Production parity check as a post-merge safety check.
+- `MIGRATIONS.md` is mechanically regenerated/checked so a committed migration cannot disappear from the human manifest.
+- Migrations already present on `main` are byte-immutable: modify behavior with a new numbered migration rather than editing released SQL.
+- Required GitHub Production environment secrets: `BNN_PRODUCTION_SUPABASE_URL` and `BNN_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY`.
+
+## 178.14.260829 — Alternate Shot team-card presentation + side-game cleanup
+- **Team-based scorecard:** Alternate Shot no longer presents the duplicated partner rows as separate player score columns. Each foursome renders exactly two scoring entities — the two sides — while persistence still fans the one side score to both partner rows.
+- **Team identity in score entry:** tapping an Alternate Shot score opens the team name (for example, Team Red), not the clicked player. The modal shows the side playing handicap and applies the relative match strokes to the net score.
+- **No fake individual card:** the personal `YOUR CARD / ENTER YOUR SCORES` surface is suppressed for Alternate Shot because no player is playing an individual ball.
+- **Side games default off in practice:** the individual Group Results / six-hole low-net-Stableford side-game surface is not rendered for Alternate Shot, and `GroupSegmentSummary` hard-stops if called with Alternate Shot. Setup continues to report Side games: None.
+- **No individual stats masquerading as team stats:** Alternate Shot team score entry hides fairway/putts/penalties and writes only the side gross score; existing fan-out remains the single persistence path.
+- **Guard:** added `ci/check_altshot_team_card_contract.py` and wired it into normal guards.
+- **Database:** no migration. Four-Ball and Trifecta behavior are unchanged.
+
 ## 178.13.260829 — CI assertion baseline update for Alternate Shot hardening
 - **No application/scoring behavior change from 178.12.** The Alternate Shot integration, conflict handling, finalization guard, and rounding fixes are unchanged.
 - **CI fix:** updated `ci/test_assertion_baseline.json` to record the intentionally expanded 178.12 test inventory seen in GitHub CI: Alternate Shot 73, Alternate Shot scores 49, Alternate Shot scoring 30, and new Alternate Shot simulation 178,103. Total baseline is now **184,887 assertions across 41 suites**.

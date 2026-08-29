@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { altShotDrivers } from "@/lib/alt-shot";
+import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { createClient } from "@/lib/supabase";
 import { ContestsSection, ContestHoleChip } from "@/components/contests-view";
 import { betResultToPost } from "@/lib/money";
@@ -42,7 +43,7 @@ import {
   markerOwnsMyRow,
   mergeBackupRow,
 } from "@/lib/golf";
-import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
+import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, altShotSides } from "@/lib/game-shape";
 import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
@@ -117,7 +118,8 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
   // Column order + colour. Stableford: alphabetical. Team match: each pairing's
   // two players adjacent, with a divider between matches. Foursome formats: Pair A
   // then Pair B. Column underline uses the real team colour when teams exist.
-  type Col = { type: "player"; p: Player } | { type: "divider" };
+  type AltSideMeta = { name: string; memberIds: string[]; memberNames: string[]; sideCh: number | null; receiving: boolean; matchStrokes: number };
+  type Col = { type: "player"; p: Player; altSide?: AltSideMeta } | { type: "divider" };
   const cols: Col[] = (() => {
     const ps = players;
     const gt = game.game_type;
@@ -139,10 +141,38 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
       rest.forEach((p) => out.push({ type: "player", p }));
       return out.length ? out : ps.map((p) => ({ type: "player" as const, p }));
     }
-    // alt_shot groups the same way: partners adjacent, divider between the sides. Both partners
-    // show the SIDE's score after the fan-out, so the divider is what makes the card readable
-    // rather than looking like the same score repeated by mistake.
-    if ((gt === "fourball" || gt === "trifecta" || gt === "alt_shot") && Array.isArray(game.foursomes)) {
+    // Alternate shot is one ball per side. The database deliberately duplicates that one score
+    // onto both partner rows for sync safety, but the scorecard must never present those as two
+    // individual scores. Collapse each foursome to exactly TWO scoring entities: the two sides.
+    if (gt === "alt_shot" && Array.isArray(game.foursomes)) {
+      const f = game.foursomes.find((fr) => [...fr.a, ...fr.b].some((uid) => ps.some((p) => pkey(p) === uid)));
+      if (f) {
+        const sideInfo = altShotSides(game, strokePool, f);
+        const makeSide = (ids: string[], which: "a" | "b"): Col | null => {
+          const members = ids.map((uid) => strokePool.find((p) => pkey(p) === uid)).filter((p): p is Player => !!p);
+          if (!members.length) return null;
+          const rep = members[0];
+          const read = members.length >= 2 ? readAltShotSideScores(members[0].scores, members[1].scores, meta.length) : { gross: rep.scores || [], conflictHoles: [] };
+          const teamKey = rep.team;
+          const ti = Array.isArray(game.teams) ? game.teams.findIndex((t) => t.key === teamKey) : -1;
+          const teamName = ti >= 0 ? game.teams![ti].name : `Team ${which === "a" ? "A" : "B"}`;
+          const sideCh = which === "a" ? sideInfo.aCh : sideInfo.bCh;
+          return {
+            type: "player",
+            p: { ...rep, display_name: teamName, scores: read.gross },
+            altSide: { name: teamName, memberIds: members.map((m) => m.id), memberNames: members.map((m) => m.display_name), sideCh, receiving: sideInfo.receiving === which, matchStrokes: sideInfo.receiving === which ? sideInfo.strokes : 0 },
+          };
+        };
+        const a = makeSide(f.a || [], "a");
+        const b = makeSide(f.b || [], "b");
+        const out: Col[] = [];
+        if (a) out.push(a);
+        if (a && b) out.push({ type: "divider" });
+        if (b) out.push(b);
+        if (out.length) return out;
+      }
+    }
+    if ((gt === "fourball" || gt === "trifecta") && Array.isArray(game.foursomes)) {
       const f = game.foursomes.find((fr) => [...fr.a, ...fr.b].some((uid) => ps.some((p) => pkey(p) === uid)));
       if (f) {
         const aSide = ps.filter((p) => f.a.includes(pkey(p)));
@@ -180,16 +210,17 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
   const agg: React.CSSProperties = { position: "relative", background: C.greenLight, borderRadius: 6, height: 30, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 15, fontWeight: 800 };
 
   const sums = (p: Player, from: number, to: number) => {
-    let g = 0, mPts = 0, cPts = 0;
+    let g = 0, net = 0, mPts = 0, cPts = 0;
     for (let i = from; i <= to && i < meta.length; i++) {
       const gross = p.scores?.[i] ?? null;
       if (gross != null && gross > 0) {
         g += gross;
+        net += gross - recvFor(p, meta[i].si);
         mPts += stablefordPts(gross, meta[i].par, recvFor(p, meta[i].si)) || 0;          // match handicap
         cPts += relBasis ? (stablefordPts(gross, meta[i].par, indRecvFor(p, meta[i].si)) || 0) : 0; // course handicap
       }
     }
-    return { g, mPts, cPts };
+    return { g, net, mPts, cPts };
   };
 
   // --- Resume where the user was scoring (survives a phone lock / app refresh) ---
@@ -235,7 +266,7 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
               [fr.a, fr.b].map((sideIds, si2) => {
                 const d = altShotDrivers(sideIds, i);   // POSITION in the round, not the hole number
                 if (!d) return null;
-                const who = players.find((q) => pkey(q) === d.driver);
+                const who = strokePool.find((q) => pkey(q) === d.driver);
                 if (!who) return null;
                 return (
                   <span key={`tee${fr ? si2 : si2}-${d.driver}`}>
@@ -260,8 +291,8 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
               <div key={p.id + i} style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: colorFor(p), fontSize: 11, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 3 }}>{p.display_name}</div>
                 <div
-                  style={{ position: "relative", background: C.cell, borderRadius: 6, height: 56, display: "flex", alignItems: "center", justifyContent: "center", cursor: (isMarker || p.user_id === user?.id) ? "pointer" : "default", outline: isMarker ? "1px solid #E6E0CC" : (p.user_id === user?.id ? "1px dashed #C9BF9B" : "none") }}
-                  onClick={(isMarker || p.user_id === user?.id) ? () => { setEdit({ playerId: p.id, holeIdx: i }); } : undefined}>
+                  style={{ position: "relative", background: C.cell, borderRadius: 6, height: 56, display: "flex", alignItems: "center", justifyContent: "center", cursor: (isMarker || (c.altSide ? c.altSide.memberIds.some((id) => strokePool.find((x) => x.id === id)?.user_id === user?.id) : p.user_id === user?.id)) ? "pointer" : "default", outline: isMarker ? "1px solid #E6E0CC" : ((c.altSide ? c.altSide.memberIds.some((id) => strokePool.find((x) => x.id === id)?.user_id === user?.id) : p.user_id === user?.id) ? "1px dashed #C9BF9B" : "none") }}
+                  onClick={(isMarker || (c.altSide ? c.altSide.memberIds.some((id) => strokePool.find((x) => x.id === id)?.user_id === user?.id) : p.user_id === user?.id)) ? () => { setEdit({ playerId: p.id, holeIdx: i }); } : undefined}>
                   {recv > 0 && (
                     <div style={{ position: "absolute", top: 4, left: 5, display: "flex", gap: 2 }}>
                       {Array.from({ length: Math.min(recv, 2) }).map((_, d) => (
@@ -277,7 +308,8 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
                     </div>
                   )}
                   <span style={{ fontSize: 26, fontWeight: 800, color: gross != null && gross > 0 ? netColor(gross, recv, m.par) : "#C7C2B0" }}>{gross != null && gross > 0 ? gross : m.par}</span>
-                  {gross != null && gross > 0 && (relBasis ? (
+                  {c.altSide && gross != null && gross > 0 && <span style={{ position: "absolute", bottom: 3, right: 4, color: C.faint, fontSize: 11, fontWeight: 800 }}>net {gross - recv}</span>}
+                  {!c.altSide && gross != null && gross > 0 && (relBasis ? (
                     <>
                       <span style={{ position: "absolute", top: 3, right: 3, minWidth: 16, height: 16, padding: "0 2px", border: "1.5px solid #E8730C", borderRadius: 6, background: "#FBEEE2", color: "#9A4A08", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{oPts ?? 0}</span>
                       <span style={{ position: "absolute", bottom: 3, right: 3, minWidth: 16, height: 16, padding: "0 2px", border: `1.5px solid ${C.indivDot}`, borderRadius: 6, background: "#EAF3FB", color: "#1E5B8A", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{bPts ?? 0}</span>
@@ -306,7 +338,8 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
             <div key={p.id + label} style={{ flex: 1, minWidth: 0, textAlign: "center" }}>
               <div style={{ position: "relative", background: C.greenLight, borderRadius: 6, height: 44, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
                 <span style={{ fontSize: 20, fontWeight: 800 }}>{s.g || "–"}</span>
-                {s.g > 0 && (relBasis ? (
+                {c.altSide && s.g > 0 && <span style={{ position: "absolute", bottom: 2, right: 4, color: C.sage, fontSize: 11, fontWeight: 800 }}>net {s.net}</span>}
+                {!c.altSide && s.g > 0 && (relBasis ? (
                   <>
                     <span style={{ position: "absolute", top: 3, right: 3, minWidth: 15, height: 15, padding: "0 2px", border: "1.5px solid #E8730C", borderRadius: 6, color: C.dot, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.mPts}</span>
                     <span style={{ position: "absolute", bottom: 3, right: 3, minWidth: 15, height: 15, padding: "0 2px", border: `1.5px solid ${C.indivDot}`, borderRadius: 6, color: C.indivDot, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.cPts}</span>
@@ -426,24 +459,27 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
             const p = c.p;
             return (
               <div key={p.id} style={{ flex: 1, minWidth: 0, textAlign: "center", padding: "4px 2px", borderBottom: `2px solid ${colorFor(p)}` }}>
-                <div style={{ display: "flex", justifyContent: "center", marginBottom: 3 }}>
-                  <Avatar src={p.avatar_url} name={p.display_name} cssSize="min(54px, 90%)" accent={colorFor(p)} />
-                </div>
-                <div style={{ color: C.cream, fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {p.display_name}{p.is_guest ? " ·G" : ""}
-                </div>
-                {(() => {
-                  const matchHcp = meta.reduce((a, m) => a + recvFor(p, m.si), 0);
-                  const courseHcp = meta.reduce((a, m) => a + indRecvFor(p, m.si), 0);
-                  if (!relBasis) return <div style={{ color: C.sage, fontSize: 11 }}>hcp {matchHcp}</div>;
-                  const line = (color: string, label: string, val: number) => (
-                    <div style={{ color: C.sage, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, whiteSpace: "nowrap" }}>
-                      <span style={{ width: 5, height: 5, borderRadius: 999, background: color, display: "inline-block", flex: "none" }} />{label} {val}
-                    </div>
-                  );
-                  return <>{line("#E8730C", "match hcp", matchHcp)}{line(C.indivDot, "course hcp", courseHcp)}</>;
-                })()}
-                {p.tee_name && <div style={{ color: C.sage, fontSize: 11, opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.tee_name}</div>}
+                {c.altSide ? (
+                  <>
+                    <div style={{ color: C.cream, fontSize: 13, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.altSide.name}</div>
+                    <div style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.altSide.memberNames.map((n) => n.split(" ")[0]).join(" / ")}</div>
+                    <div style={{ color: C.sage, fontSize: 11 }}>playing hcp {c.altSide.sideCh == null ? "–" : Number(c.altSide.sideCh.toFixed(2))}</div>
+                    <div style={{ color: c.altSide.receiving ? C.gold : C.sage, fontSize: 11, fontWeight: 700 }}>{c.altSide.receiving ? `gets ${c.altSide.matchStrokes}` : "plays scratch"}</div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ display: "flex", justifyContent: "center", marginBottom: 3 }}><Avatar src={p.avatar_url} name={p.display_name} cssSize="min(54px, 90%)" accent={colorFor(p)} /></div>
+                    <div style={{ color: C.cream, fontSize: 12, fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_name}{p.is_guest ? " ·G" : ""}</div>
+                    {(() => {
+                      const matchHcp = meta.reduce((a, m) => a + recvFor(p, m.si), 0);
+                      const courseHcp = meta.reduce((a, m) => a + indRecvFor(p, m.si), 0);
+                      if (!relBasis) return <div style={{ color: C.sage, fontSize: 11 }}>hcp {matchHcp}</div>;
+                      const line = (color: string, label: string, val: number) => (<div style={{ color: C.sage, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, whiteSpace: "nowrap" }}><span style={{ width: 5, height: 5, borderRadius: 999, background: color, display: "inline-block", flex: "none" }} />{label} {val}</div>);
+                      return <>{line("#E8730C", "match hcp", matchHcp)}{line(C.indivDot, "course hcp", courseHcp)}</>;
+                    })()}
+                    {p.tee_name && <div style={{ color: C.sage, fontSize: 11, opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.tee_name}</div>}
+                  </>
+                )}
               </div>
             );
           })}
@@ -464,14 +500,16 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
         const p = players.find((x) => x.id === edit.playerId);
         const m = meta[edit.holeIdx];
         if (!p || !m) return null;
-        const gross = p.scores?.[edit.holeIdx] ?? null;
+        const sideCol = cols.find((c): c is Extract<Col, { type: "player" }> => c.type === "player" && !!c.altSide && c.p.id === edit.playerId);
+        const displayP = sideCol?.p || p;
+        const gross = displayP.scores?.[edit.holeIdx] ?? null;
         const putts = p.putts?.[edit.holeIdx] ?? null;
         const fw = p.fairways?.[edit.holeIdx] ?? null;
         const penN = p.penalties?.[edit.holeIdx] || 0;
         const sandOn = !!p.sand?.[edit.holeIdx];
         const recv = recvFor(p, m.si);
         const order = playerOrder;
-        const scoreLocked = !isMarker && !!p.user_id && p.user_id === user?.id; // non-marker editing my own row → stats only
+        const scoreLocked = sideCol?.altSide ? false : (!isMarker && !!p.user_id && p.user_id === user?.id); // alternate shot edits the SIDE; ordinary non-marker self-row stays stats-only
         const goNext = () => {
           // Move to the next player on THIS hole who still needs a score (wrap around the
           // row, skip no-shows). Nothing is auto-scored — a score is only recorded when the
@@ -489,7 +527,7 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
         };
         return (
           <HoleScoreModal
-            title={`${p.display_name} · Hole ${m.n}`}
+            title={`${sideCol?.altSide ? `${sideCol.altSide.name} · playing hcp ${sideCol.altSide.sideCh == null ? "–" : Number(sideCol.altSide.sideCh.toFixed(2))}` : p.display_name} · Hole ${m.n}`}
             par={m.par}
             si={m.si ?? null}
             yardage={ydsAt(edit.holeIdx, m.yards)}
@@ -499,12 +537,12 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
             penalties={penN}
             sand={sandOn}
             recv={recv}
-            showFairway
-            showPutts
-            showPenalties
+            showFairway={!sideCol?.altSide}
+            showPutts={!sideCol?.altSide}
+            showPenalties={!sideCol?.altSide}
             scoreLocked={scoreLocked}
             lockedByName={markerName}
-            onPatch={(patch) => { if (scoreLocked) { const { strokes: _s, ...statsOnly } = patch; onSetHole(p.id, edit.holeIdx, statsOnly); } else { onSetHole(p.id, edit.holeIdx, patch); } }}
+            onPatch={(patch) => { if (sideCol?.altSide) { onSetHole(p.id, edit.holeIdx, { strokes: patch.strokes }); } else if (scoreLocked) { const { strokes: _s, ...statsOnly } = patch; onSetHole(p.id, edit.holeIdx, statsOnly); } else { onSetHole(p.id, edit.holeIdx, patch); } }}
             onNext={scoreLocked ? () => { const ni = edit.holeIdx + 1; if (ni < meta.length) setEdit({ playerId: p.id, holeIdx: ni }); else setEdit(null); } : goNext}
             onClose={() => setEdit(null)}
             belowPicker={<ContestHoleChip gameId={game.id} hole={m.n} players={players} userId={user.id} myName={players.find((x: Player) => x.user_id === user.id)?.display_name || "Me"} canLogOthers={!!isMarker} />}
