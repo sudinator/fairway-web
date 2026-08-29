@@ -95,7 +95,7 @@ export function altShotMatchStrokes(
   // The ONLY rounding in the chain, half-up, because a side cannot receive half a stroke on a
   // hole. Rounding the team handicaps first instead would lose a stroke on any pairing whose
   // combined total is odd.
-  const strokes = Math.round(Math.abs(diff));
+  const strokes = Math.floor(Math.abs(diff) + 0.5 + 1e-9);
   if (strokes === 0) return { receiving: null, strokes: 0 };
   return diff > 0 ? { receiving: "a", strokes } : { receiving: "b", strokes };
 }

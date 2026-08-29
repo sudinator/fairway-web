@@ -1,4 +1,18 @@
-# Birdie Num Num — Deploy & Migration Notes
+## 178.12.260829 — Alternate Shot scoring integration hardening
+- **Alternate Shot results now use the Alternate Shot engine end-to-end.** `FourballView` remains the shared 2-v-2 UI/setup shell, but Alternate Shot no longer falls through to `fourballStatus` / `fourballHoleDetail`. Match cards, hole detail, and team rollups use `altShotStatus` / `altShotHoleDetail` with the canonical combined-side handicap.
+- **One-ball duplicated-row reads are conflict-safe.** Added `readAltShotSideScores(...)`: agreeing rows read normally, a one-row lag is accepted, and two different partner scores mark that hole conflicted. Conflicted holes are excluded from match scoring and surfaced in Results rather than silently preferring one row.
+- **Finalization safety:** Alternate Shot group finish and end-game are blocked while any partner-row score conflict remains, naming the affected holes.
+- **Floating-point half-up fix:** match-stroke rounding now tolerates binary floating noise at exact `.5` boundaries. The reproduced 40.05 vs 8.55 side-handicap difference now correctly gives 32 strokes, not 31. `altShotSides` and `altShotSideStrokes` both delegate to the same `altShotMatchStrokes` rounding rule.
+- **Scorecard/read-path agreement:** the individual running-match line now reads both duplicated partner rows through the same conflict-safe reader used by Results.
+- **UI correctness:** Alternate Shot now has its own Play header/subtitle and Results heading instead of falling through to Stableford/Four-Ball wording.
+- **Permanent tests/guards:** added deterministic model-based `alt-shot-simulation.test.ts` and `ci/check_altshot_view_contract.py`, wired into normal tests/guards.
+- **Database:** no migration. Existing Alternate Shot rule remains: no individual handicap rounds are posted.
+
+## 178.11.260828 — Scoring fix release-note contract correction
+- **NO scoring/code behavior change from 178.10.** The two P1 scoring fixes are unchanged.
+- **Release-gate correction:** restored the existing `DEPLOY_NOTES.md` contract: the file must begin immediately with the newest `## <version>` release heading. The failed 178.10 staging candidate accidentally inserted a generic document title above that heading, causing `ci/verify_release.py` to fail even though the substantive test assertions passed.
+- **Version:** bumped to 178.11.260828 because the release package changed after the failed staging candidate.
+- **Database:** no migration.
 
 ## 178.10.260828 — Scoring correctness: exact match allowances + canonical alternate-shot sides
 - **Singles match:** all live `matchStatus` / `matchProgress` callers now pass exact `chBasis(...)` values rather than the stored rounded `course_handicap`, so percentage allowances are applied before the final rounding step. This fixes boundary cases such as exact CH 10.5 at 90%, which must receive 9 rather than 10 strokes.

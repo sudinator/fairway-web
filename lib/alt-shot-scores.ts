@@ -73,6 +73,30 @@ export function sideScore(
 }
 
 /**
+ * Read the one-ball score arrays for an alternate-shot side from its two duplicated player rows.
+ * Conflicting partner rows are deliberately returned as null for that hole so no match result is
+ * produced from ambiguous data; the caller can surface `conflictHoles` for repair.
+ */
+export function readAltShotSideScores(
+  first: (number | null)[] | null | undefined,
+  second: (number | null)[] | null | undefined,
+  holeCount: number,
+): { gross: (number | null)[]; conflictHoles: number[] } {
+  const gross: (number | null)[] = [];
+  const conflictHoles: number[] = [];
+  for (let i = 0; i < holeCount; i++) {
+    const r = sideScore(first, second, i);
+    if (r.conflict) {
+      gross.push(null);
+      conflictHoles.push(i);
+    } else {
+      gross.push(r.strokes);
+    }
+  }
+  return { gross, conflictHoles };
+}
+
+/**
  * Per-hole stats — putts, fairways, penalties — for a side.
  *
  * Deliberately NOT fanned out. Whose putt was it? In alternate shot the question has no answer at

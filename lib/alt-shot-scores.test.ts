@@ -4,7 +4,7 @@
  * The cases that matter are the disagreements — a row edited outside the alternate-shot flow, or
  * an outbox still catching up. Preferring one partner silently would show a score nobody entered.
  */
-import { altShotScoreWrites, sideScore, altShotStatsOwner, partnerRowIds, altShotFanOut } from "./alt-shot-scores";
+import { altShotScoreWrites, sideScore, readAltShotSideScores, altShotStatsOwner, partnerRowIds, altShotFanOut } from "./alt-shot-scores";
 
 let pass = 0, fail = 0; const fails: string[] = [];
 const ok = (n: string, c: boolean) => { if (c) pass++; else { fail++; fails.push("FAIL " + n); } };
@@ -144,5 +144,14 @@ ok("stats owner is stable across calls", altShotStatsOwner(["amit", "bryan"]) ==
   eq("a side of one", altShotFanOut("alt_shot", "r1", { strokes: 5 }, [{ id: "f", a: ["u1"], b: [] }], players).length, 0);
 }
 
+
+// Production read adapter: disagreement must pause that hole instead of silently preferring a row.
+{
+  const r = readAltShotSideScores([4, 5, null], [4, 6, 7], 3);
+  eq("side read keeps agreeing score", r.gross[0], 4);
+  eq("side read blanks conflicting score", r.gross[1], null);
+  eq("side read accepts one-row pending score", r.gross[2], 7);
+  eq("side read reports conflicting hole index", r.conflictHoles.join(","), "1");
+}
 console.log(`alt shot scores: ${pass} passed, ${fail} failed`);
 if (fail) { console.error(fails.join("\n")); process.exit(1); }

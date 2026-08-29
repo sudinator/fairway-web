@@ -182,10 +182,8 @@ export function altShotSides(
   const aCh = sideCh(foursome.a);
   const bCh = sideCh(foursome.b);
   if (aCh == null || bCh == null) return { aCh, bCh, receiving: null, strokes: 0 };
-  const diff = aCh - bCh;
-  const strokes = Math.round(Math.abs(diff));
-  if (strokes === 0) return { aCh, bCh, receiving: null, strokes: 0 };
-  return { aCh, bCh, receiving: diff > 0 ? "a" : "b", strokes };
+  const match = altShotMatchStrokes(aCh, bCh);
+  return { aCh, bCh, receiving: match.receiving, strokes: match.strokes };
 }
 
 export function dotStrokes(

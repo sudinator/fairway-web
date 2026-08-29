@@ -213,6 +213,13 @@ eq("neither played -> no result", altShotHoleResult(null, 0, null, 0), null);
 // ── the handicap exclusion, stated so it cannot be quietly dropped ─────────
 ok("alternate shot does not post rounds for handicap", altShotPostsRounds() === false);
 
+
+// Floating-point half boundary: 40.05 - 8.55 is mathematically 31.5 but JS can represent it just below.
+{
+  const r = altShotMatchStrokes(40.05, 8.55);
+  eq("31.5 floating boundary rounds half-up to 32", r.strokes, 32);
+  eq("higher side receives floating-boundary strokes", r.receiving, "a");
+}
 console.log(`alt shot: ${pass} passed, ${fail} failed`);
 if (fail) {
   console.error(fails.join("\n"));

@@ -1,4 +1,5 @@
 // Shared golf logic and styling — no React here, just functions and constants.
+import { altShotMatchStrokes } from "./alt-shot";
 
 export const C = {
   green: "#0E3B2E", greenMid: "#16503D", greenLight: "#1B5A46",
@@ -1387,10 +1388,8 @@ export function altShotSideStrokes(
   const aCh = sum(a.chs);
   const bCh = sum(b.chs);
   if (aCh == null || bCh == null) return { aCh, bCh, receiving: null, strokes: 0 };
-  const diff = aCh - bCh;
-  const strokes = Math.round(Math.abs(diff));
-  if (strokes === 0) return { aCh, bCh, receiving: null, strokes: 0 };
-  return { aCh, bCh, receiving: diff > 0 ? "a" : "b", strokes };
+  const match = altShotMatchStrokes(aCh, bCh);
+  return { aCh, bCh, receiving: match.receiving, strokes: match.strokes };
 }
 
 /**
@@ -1439,4 +1438,23 @@ export function altShotProgress(
     lead += d.r;
     return lead;
   });
+}
+
+/** Match summary for alternate shot, using the same side scores and side handicap basis as the hole detail. */
+export function altShotStatus(
+  holes: MatchHoleMeta[],
+  a: AltShotSideInput,
+  b: AltShotSideInput,
+): { thru: number; lead: number; result: string } {
+  const prog = altShotProgress(holes, a, b);
+  const played = prog.filter((p) => p != null) as number[];
+  const thru = played.length;
+  const lead = thru ? played[played.length - 1] : 0;
+  const remaining = holes.length - thru;
+  let result: string;
+  if (thru === 0) result = "Not started";
+  else if (Math.abs(lead) > remaining) result = remaining === 0 ? `${Math.abs(lead)} UP` : `${Math.abs(lead)} & ${remaining}`;
+  else if (thru === holes.length) result = lead === 0 ? "Halved" : `${Math.abs(lead)} UP`;
+  else result = lead === 0 ? "All square" : `${Math.abs(lead)} UP`;
+  return { thru, lead, result };
 }

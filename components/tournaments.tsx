@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { altShotFanOut } from "@/lib/alt-shot-scores";
+import { altShotFanOut, readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { MatchLengthPicker } from "@/components/game/match-length-picker";
 import { holesForLength, type MatchLength } from "@/lib/match-length";
 import type { GameType } from "@/lib/game-shape";
@@ -1545,6 +1545,23 @@ function GameRoom({
     await supabase.rpc("release_group_marker", { p_game: game.id });
     load();
   };
+  const altShotConflictHoles = (teeGroup?: number): number[] => {
+    if (!game || game.game_type !== "alt_shot" || !Array.isArray(game.foursomes)) return [];
+    const out = new Set<number>();
+    for (const f of game.foursomes) {
+      const keys = [...(f.a || []), ...(f.b || [])];
+      const foursomeRows = keys.map((k: string) => players.find((p) => pkey(p) === k)).filter(Boolean) as Player[];
+      if (teeGroup != null && !foursomeRows.some((p) => p.tee_group === teeGroup)) continue;
+      for (const ids of [f.a || [], f.b || []]) {
+        const rows = ids.map((k: string) => players.find((p) => pkey(p) === k)).filter(Boolean) as Player[];
+        if (rows.length !== 2) continue;
+        const read = readAltShotSideScores(rows[0].scores, rows[1].scores, game.holes_meta.length);
+        for (const i of read.conflictHoles) out.add(game.holes_meta[i]?.n ?? i + 1);
+      }
+    }
+    return [...out].sort((a, b) => a - b);
+  };
+
   const finishMyGroup = async () => {
     if (!game || !myRow?.tee_group) return;
     if (!requireOnline("You're offline. Finishing needs a connection — do it back at the clubhouse. Keep playing; scores are saved on this phone.")) return;
@@ -1553,6 +1570,8 @@ function GameRoom({
     await drainOutbox();
     const left = countPending();
     if (left > 0) { recomputePending(); alert(left + (left === 1 ? " hole hasn't" : " holes haven't") + " uploaded yet. Tap \"Sync now\", wait until it reaches 0, then finish so the recorded round is complete."); return; }
+    const conflicts = altShotConflictHoles(myRow.tee_group);
+    if (conflicts.length) { alert(`Alternate-shot partner scores disagree on hole${conflicts.length === 1 ? "" : "s"} ${conflicts.join(", ")}. Fix those scores before finishing the group.`); return; }
     const { error } = await supabase.rpc("finish_tee_group_and_post", { p_game: game.id });
     if (error) { alert(failureMessage("Couldn't finish this group", error)); return; }
     await load();
@@ -2502,6 +2521,8 @@ function GameRoom({
     await drainOutbox();
     const left = countPending();
     if (left > 0) { recomputePending(); alert(left + (left === 1 ? " hole hasn't" : " holes haven't") + " uploaded yet. Tap \"Sync now\", wait until it reaches 0, then end the game so every recorded round is complete."); return; }
+    const conflicts = altShotConflictHoles();
+    if (conflicts.length) { alert(`Alternate-shot partner scores disagree on hole${conflicts.length === 1 ? "" : "s"} ${conflicts.join(", ")}. Fix those scores before ending the game.`); return; }
     // One database transaction: end the game, post every player's round, and freeze running clocks.
     // If round posting fails, the game remains active rather than entering a split-brain "ended but not posted" state.
     const { error: finErr } = await supabase.rpc("finish_game_and_post_rounds", { p_game: game.id });
@@ -2997,15 +3018,15 @@ function GameRoom({
       })()}
 
       {roomTab === "play" && (
-      <div style={{ marginTop: 16, background: isEnded ? "#3A3A3A" : game.game_type === "match" ? "#1E3A8A" : game.game_type === "fourball" || game.game_type === "trifecta" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <div style={{ marginTop: 16, background: isEnded ? "#3A3A3A" : game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>
-          {game.game_type === "match" ? "⛳ Singles Match Play" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "⛳ Four-Ball · Shootout" : "⛳ Four-Ball Match (Best Net)") : game.game_type === "trifecta" ? (game.team_score_mode === "aggregate" ? "⛳ Trifecta · Shootout" : "⛳ Trifecta") : game.game_type === "skins" ? "🪙 Skins (Net)" : game.game_type === "stroke" ? (game.stroke_basis === "gross" ? "⛳ Stroke Play (Gross)" : "⛳ Stroke Play (Net)") : "🏆 Stableford Tournament"}
+          {game.game_type === "match" ? "⛳ Singles Match Play" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "⛳ Four-Ball · Shootout" : "⛳ Four-Ball Match (Best Net)") : game.game_type === "trifecta" ? (game.team_score_mode === "aggregate" ? "⛳ Trifecta · Shootout" : "⛳ Trifecta") : game.game_type === "alt_shot" ? "⛳ Alternate Shot Match" : game.game_type === "skins" ? "🪙 Skins (Net)" : game.game_type === "stroke" ? (game.stroke_basis === "gross" ? "⛳ Stroke Play (Gross)" : "⛳ Stroke Play (Net)") : "🏆 Stableford Tournament"}
         </span>
         {isEnded ? (
           <span style={{ fontSize: 12, fontWeight: 800, background: C.gold, color: C.cream, borderRadius: 14, padding: "3px 10px" }}>FINAL · GAME ENDED</span>
         ) : (
           <span style={{ color: C.cream, opacity: 0.8, fontSize: 12 }}>
-            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "2 v 2 · aggregate net (both balls)" : "2 v 2 better-net-ball") : game.game_type === "trifecta" ? (game.trifecta_scoring === "match" ? "2 singles + a team match · 3 pts/foursome" : "2 singles + a team point · 3 pts/hole") : game.game_type === "skins" ? "net skins · carryovers" : game.game_type === "stroke" ? "lowest total wins" : "net Stableford leaderboard"}
+            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "2 v 2 · aggregate net (both balls)" : "2 v 2 better-net-ball") : game.game_type === "trifecta" ? (game.trifecta_scoring === "match" ? "2 singles + a team match · 3 pts/foursome" : "2 singles + a team point · 3 pts/hole") : game.game_type === "alt_shot" ? "2 v 2 · one ball per side · match play" : game.game_type === "skins" ? "net skins · carryovers" : game.game_type === "stroke" ? "lowest total wins" : "net Stableford leaderboard"}
           </span>
         )}
       </div>
@@ -3575,16 +3596,20 @@ function GameRoom({
                 const sides = altShotSides(game as never, players as never, f as never);
                 const sideOf = (ids: string[], sideCh: number | null) => {
                   const rows = (ids || []).map((uid: string) => players.find((p) => pkey(p) === uid)).filter(Boolean) as typeof players;
+                  const read = rows.length === 2
+                    ? readAltShotSideScores(rows[0].scores, rows[1].scores, game.holes_meta.length)
+                    : { gross: Array(game.holes_meta.length).fill(null), conflictHoles: [] as number[] };
                   return {
                     ids,
                     // Canonical alternate-shot side handicap: combine exact partner CHs, then apply
                     // the allowance once. Keep it exact here; altShotProgress rounds only the side
                     // difference, matching the dots / Strokes panel.
                     chs: [sideCh],
-                    // One ball per side: both partners hold the same score after the fan-out, so
-                    // either row is the side's gross. The first present one is taken.
-                    gross: (game.holes_meta || []).map((_m: any, i: number) =>
-                      rows.map((p) => p.scores?.[i]).find((v) => v != null && v > 0) ?? null),
+                    // One ball is duplicated onto both partner rows for persistence. Read both: a
+                    // disagreement is ambiguous, so the shared reader blanks that hole rather than
+                    // silently preferring whichever row happened to be first. FourballView surfaces
+                    // the same conflict explicitly in Results.
+                    gross: read.gross,
                   };
                 };
                 const prog = altShotProgress(

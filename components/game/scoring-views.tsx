@@ -23,6 +23,8 @@ import {
   fourballStatus,
   fourballProgress,
   fourballHoleDetail,
+  altShotStatus,
+  altShotHoleDetail,
   type ContestHole,
   computeTrifecta,
   clinchState,
@@ -42,6 +44,7 @@ import {
   mergeBackupRow,
 } from "@/lib/golf";
 import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, altShotSides } from "@/lib/game-shape";
+import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { decideSetupChange, type SetupAction } from "@/lib/game-setup-policy";
 import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
@@ -894,7 +897,23 @@ export function FourballView({
   // Ryder-Cup team rollup: each 2-v-2 foursome is worth a point to the winning
   // side's team; a halved foursome is ½ each. Sides must be cross-team.
   const isTeam = shapeOf(game).usesTeams;
+  const isAltShot = game.game_type === "alt_shot";
   const holesCount = game.holes_meta?.length ?? 18;
+  const altShotInputs = (f: { a: string[]; b: string[] }) => {
+    if (!isAltShot || f.a.length !== 2 || f.b.length !== 2) return null;
+    const aRows = f.a.map(playerOf);
+    const bRows = f.b.map(playerOf);
+    if (aRows.some((x) => !x) || bRows.some((x) => !x)) return null;
+    const sides = altShotSides(game as never, players as never, f as never);
+    const ar = readAltShotSideScores(aRows[0]!.scores, aRows[1]!.scores, holesCount);
+    const br = readAltShotSideScores(bRows[0]!.scores, bRows[1]!.scores, holesCount);
+    const conflictHoles = Array.from(new Set([...ar.conflictHoles, ...br.conflictHoles])).map((i) => game.holes_meta?.[i]?.n ?? i + 1);
+    return {
+      a: { ids: f.a, chs: [sides.aCh, 0], gross: ar.gross },
+      b: { ids: f.b, chs: [sides.bCh, 0], gross: br.gross },
+      conflictHoles,
+    };
+  };
   const teamStandings = (() => {
     if (!isTeam) return null;
     const pts: Record<string, number> = { A: 0, B: 0 };
@@ -904,8 +923,12 @@ export function FourballView({
       if (!f.a.length || !f.b.length) return;
       const ta = playerOf(f.a[0])?.team, tb = playerOf(f.b[0])?.team;
       if (!ta || !tb || ta === tb) return; // need a cross-team foursome
+      const alt = altShotInputs(f);
+      if (isAltShot && !alt) return;
       valid++;
-      const st = fourballStatus(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball");
+      const st = isAltShot
+        ? altShotStatus(game.holes_meta, alt!.a as never, alt!.b as never)
+        : fourballStatus(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball");
       if (st.thru === 0) return;
       const decided = st.thru === holesCount || Math.abs(st.lead) > holesCount - st.thru;
       if (decided) dec++;
@@ -970,7 +993,11 @@ export function FourballView({
           </div>
         )}
         <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
-          {isTeam
+          {isAltShot
+            ? (isTeam
+              ? `Each foursome is ${teams![0].name} vs ${teams![1].name}. Each pair plays one ball in alternate shot; the side handicap is based on the two partners combined.`
+              : "Each foursome is a 2-v-2 alternate-shot match. Put exactly 2 players on each side; each pair plays one shared ball.")
+            : isTeam
             ? `Each foursome is ${teams![0].name} vs ${teams![1].name} (2-v-2 better-net-ball). Each side only lists its own team's players, so the team total stays correct.`
             : "Each foursome is a 2-v-2 better-net-ball match. Put 2 players in each pair. Big groups: add a foursome per group of four."}
         </div>
@@ -1035,7 +1062,7 @@ export function FourballView({
   const standPts = isTrifecta ? trifectaStandings : teamStandings ? teamStandings.pts : null;
   return (
     <div style={{ marginTop: 16 }}>
-      <Eyebrow>{isTrifecta ? (teamScoreMode === "aggregate" ? "TRIFECTA · SHOOTOUT" : "TRIFECTA") : (teamScoreMode === "aggregate" ? "FOUR-BALL · SHOOTOUT" : "FOUR-BALL MATCHES")}</Eyebrow>
+      <Eyebrow>{isAltShot ? "ALTERNATE SHOT MATCHES" : isTrifecta ? (teamScoreMode === "aggregate" ? "TRIFECTA · SHOOTOUT" : "TRIFECTA") : (teamScoreMode === "aggregate" ? "FOUR-BALL · SHOOTOUT" : "FOUR-BALL MATCHES")}</Eyebrow>
       {isTeam && standPts && (
         <div style={{ background: C.green, borderRadius: 12, padding: 14, marginTop: 12 }}>
           <div style={{ display: "flex", alignItems: "center" }}>
@@ -1068,12 +1095,19 @@ export function FourballView({
       )}
       {foursomes.map((f) => {
         const ms = members4(f);
-        const full = f.a.length && f.b.length;
-        const st = full ? fourballStatus(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball") : null;
+        const full = isAltShot ? f.a.length === 2 && f.b.length === 2 : !!(f.a.length && f.b.length);
+        const alt = full ? altShotInputs(f) : null;
+        const st = full
+          ? (isAltShot
+            ? (alt ? altShotStatus(game.holes_meta, alt.a as never, alt.b as never) : null)
+            : fourballStatus(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball"))
+          : null;
         const myKey = players.find((p) => p.user_id === user.id)?.user_id ?? user.id;
         const mine = f.a.includes(myKey) || f.b.includes(myKey);
         const lead = st?.lead ?? 0;
-        const leadText = !st || st.thru === 0 ? "" : lead === 0 ? "All square" : `${firstName(lead > 0 ? f.a[0] : f.b[0])}'s pair ${Math.abs(lead)} UP`;
+        const leadText = !st || st.thru === 0 ? "" : lead === 0 ? "All square" : isAltShot
+          ? `${isTeam ? teamName(playerOf(lead > 0 ? f.a[0] : f.b[0])?.team) : (lead > 0 ? "Pair 1" : "Pair 2")} ${Math.abs(lead)} UP`
+          : `${firstName(lead > 0 ? f.a[0] : f.b[0])}'s pair ${Math.abs(lead)} UP`;
         const tri = isTrifecta && full ? computeTrifecta(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap, triScoring) : null;
         // Match scoring (Ryder Cup): show the LIVE provisional match tally (who currently
         // leads each contest) rather than 0–0 until matches settle.
@@ -1097,6 +1131,11 @@ export function FourballView({
                 <div style={{ color: C.cream, fontSize: 13 }}>{f.b.map(firstName).join(" & ") || "—"}</div>
               </div>
             </div>
+            {isAltShot && alt && alt.conflictHoles.length > 0 && (
+              <div style={{ marginTop: 8, background: C.danger, border: `1px solid ${C.overRedDark}`, borderRadius: 8, padding: "8px 12px", color: C.cream, fontSize: 11.5, lineHeight: 1.45 }}>
+                Partner score rows disagree on hole{alt.conflictHoles.length === 1 ? "" : "s"} {alt.conflictHoles.join(", ")}. Those holes are excluded from the match result until the scores agree.
+              </div>
+            )}
             {tri && (
               <div style={{ marginTop: 8 }}>
                 {tri.contests.map((c, ci) => {
@@ -1130,9 +1169,11 @@ export function FourballView({
               </div>
             )}
             {!isTrifecta && st && st.thru > 0 && (() => {
-              const key = `${f.id}-fb`;
+              const key = `${f.id}-${isAltShot ? "as" : "fb"}`;
               const isOpen = openKey === key;
-              const detail = fourballHoleDetail(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100);
+              const detail = isAltShot && alt
+                ? altShotHoleDetail(game.holes_meta, alt.a as never, alt.b as never)
+                : fourballHoleDetail(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100);
               return (
                 <div style={{ marginTop: 6 }}>
                   <div onClick={() => setOpenKey(isOpen ? null : key)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${C.borderCard}`, cursor: "pointer" }}>
@@ -1140,11 +1181,11 @@ export function FourballView({
                     <span style={{ flex: 1, color: C.cream, fontSize: 12 }}>{leadText}</span>
                     <span style={{ color: C.sage, fontSize: 11 }}>thru {st.thru}</span>
                   </div>
-                  {isOpen && <HoleDetail rows={detail} aLabel={firstName(f.a[0]) + "'s"} bLabel={firstName(f.b[0]) + "'s"} aColor={C.birdie} bColor={C.bogey} />}
+                  {isOpen && <HoleDetail rows={detail} aLabel={isAltShot ? (isTeam ? teamName(playerOf(f.a[0])?.team) : "Pair 1") : firstName(f.a[0]) + "'s"} bLabel={isAltShot ? (isTeam ? teamName(playerOf(f.b[0])?.team) : "Pair 2") : firstName(f.b[0]) + "'s"} aColor={C.birdie} bColor={C.bogey} runningMatch={isAltShot} />}
                 </div>
               );
             })()}
-            {!full && <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Needs players in both pairs.</div>}
+            {!full && <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{isAltShot ? "Alternate shot needs exactly two players on each side." : "Needs players in both pairs."}</div>}
           </div>
         );
       })}

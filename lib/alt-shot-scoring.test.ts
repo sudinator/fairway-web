@@ -108,5 +108,16 @@ const B = { ids: ["g1", "thisone"], chs: [0.5 * 0.5, 4.5 * 0.5], gross: REAL.map
   eq("and no net for the missing side", part[0].bNet, null);
 }
 
+
+{
+  // Production bug found by exhaustive simulation: mathematically 31.5 was represented just below
+  // the half boundary and Math.round returned 31. Match strokes must be robustly half-up.
+  const edge = altShotSideStrokes(
+    { ids: ["a1", "a2"], chs: [40.05, 0], gross: [] } as never,
+    { ids: ["b1", "b2"], chs: [8.55, 0], gross: [] } as never,
+  );
+  eq("floating 31.5 side difference gives 32 strokes", edge.strokes, 32);
+  eq("floating boundary still identifies receiving side", edge.receiving, "a");
+}
 console.log(`alt shot scoring: ${pass} passed, ${fail} failed`);
 if (fail) { console.error(fails.join("\n")); process.exit(1); }

@@ -457,7 +457,7 @@ small-team; there is no true team-vs-many-teams leaderboard yet. That leaderboar
 - **[ ] Aggregate "2 best balls of 4"** — sum of best 2 net/hole. Classic charity/corporate outing format.
 - **[ ] Team Stableford (best-N points/hole)** — most forgiving for large mixed-ability fields; extends
   existing Stableford scoring; keeps everyone playing in.
-- **[ ] Alternate Shot / Foursomes** — 2-player, one ball, alternate (50% combined). Match or stroke.
+- **[~] Alternate Shot / Foursomes** — match-play implementation built; v178.12 hardens the dedicated one-ball scoring path, conflict handling, and simulations. Pending full staging runtime acceptance before marking complete. Stroke-play variant is not built.
 - **[ ] Greensomes / Chapman (Pinehurst)** — both drive, then select/alternate; step up from foursomes.
 - **[ ] Team Nassau** — front / back / overall as three team matches.
 
