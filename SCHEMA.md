@@ -1,3 +1,5 @@
+> **178.13.260829:** No schema change.
+
 # Birdie Num Num — Database Schema & Conventions
 
 **Documentation only — NOT the authoritative schema.** The authoritative, canonical schema is the

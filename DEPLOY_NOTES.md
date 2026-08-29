@@ -1,3 +1,9 @@
+## 178.13.260829 — CI assertion baseline update for Alternate Shot hardening
+- **No application/scoring behavior change from 178.12.** The Alternate Shot integration, conflict handling, finalization guard, and rounding fixes are unchanged.
+- **CI fix:** updated `ci/test_assertion_baseline.json` to record the intentionally expanded 178.12 test inventory seen in GitHub CI: Alternate Shot 73, Alternate Shot scores 49, Alternate Shot scoring 30, and new Alternate Shot simulation 178,103. Total baseline is now **184,887 assertions across 41 suites**.
+- **Why CI failed:** the assertion ratchet intentionally fails on both decreases and increases until the committed baseline is updated, so the 178.12 run correctly stopped after proving the new tests existed.
+- **Database:** no migration.
+
 ## 178.12.260829 — Alternate Shot scoring integration hardening
 - **Alternate Shot results now use the Alternate Shot engine end-to-end.** `FourballView` remains the shared 2-v-2 UI/setup shell, but Alternate Shot no longer falls through to `fourballStatus` / `fourballHoleDetail`. Match cards, hole detail, and team rollups use `altShotStatus` / `altShotHoleDetail` with the canonical combined-side handicap.
 - **One-ball duplicated-row reads are conflict-safe.** Added `readAltShotSideScores(...)`: agreeing rows read normally, a one-row lag is accepted, and two different partner scores mark that hole conflicted. Conflicted holes are excluded from match scoring and surfaced in Results rather than silently preferring one row.

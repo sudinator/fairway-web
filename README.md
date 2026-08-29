@@ -1,3 +1,5 @@
+**Current staging candidate:** 178.13.260829 — no scoring behavior change from 178.12; updates the CI assertion baseline for the expanded Alternate Shot test suites.
+
 # Fairway Card — Web App
 
 A golf score tracker your friends sign into with Google. Tracks scores hole by
