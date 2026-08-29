@@ -1,3 +1,4 @@
+> **178.17.260829:** No schema change. React hook-order correction and source guard only.
 > **178.16.260829:** No schema change. TypeScript-only correction to the Alternate Shot team-card release.
 
 > **178.15.260829:** No schema change. CI now verifies live `schema_migrations` parity for staging and Production against the committed migration chain.

@@ -1,3 +1,9 @@
+## 178.17.260829 — React hook-order release hardening
+- [x] Move `GroupSegmentSummary` hook above the Alternate Shot early return so hooks remain unconditional.
+- [x] Preserve Alternate Shot side-game suppression (`return null`) after hooks are initialized.
+- [x] Add a dependency-free source guard for top-level early-return-before-hook regressions.
+- [x] Keep ESLint hooks lint as the authoritative gate; source guard is a pre-lint backstop.
+
 ## 178.16.260829 — Alternate Shot TypeScript build correction
 - Completed: remove unreachable Alternate Shot comparisons/branch from the individual card after Alternate Shot moved to team-based scoring.
 - No behavior change; staging build must pass TypeScript before release proceeds.

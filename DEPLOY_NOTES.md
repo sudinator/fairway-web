@@ -1,3 +1,12 @@
+## 178.17.260829 — Fix Alternate Shot side-game hook ordering + add pre-lint guard
+
+- No database migration.
+- Moves `GroupSegmentSummary`'s existing `useState` above the Alternate Shot early return so React hooks are called in a stable order on every render.
+- Alternate Shot still returns `null` from the individual six-hole/low-net side-game component; no Alternate Shot scoring or persistence behavior changes.
+- Adds `ci/check_react_hook_order_source.py`, a dependency-free source backstop that detects top-level early returns before the first top-level hook in function components.
+- Wires the new hook-order source guard into `npm run guards`; ESLint `react-hooks/rules-of-hooks` remains the authoritative dependency-backed gate.
+- Synthetic negative case (early return before `useState`) is detected by the new source guard.
+
 ## 178.16.260829 — Fix Alternate Shot team-card TypeScript narrowing
 
 - No database migration.

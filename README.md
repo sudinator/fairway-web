@@ -1,4 +1,4 @@
-**Current staging candidate:** 178.16.260829 — TypeScript build correction for the Alternate Shot team-card release; no behavior or database change from 178.15.
+**Current staging candidate:** 178.17.260829 — React hook-order correction for the Alternate Shot side-game suppression plus a permanent pre-lint source guard; no scoring or database change.
 **Current staging candidate:** 178.14.260829 — Alternate Shot score entry is team-based (one ball/one side score), team playing handicap is shown/applied, and individual side-game/personal-card surfaces are suppressed.
 
 **Current staging candidate:** 178.13.260829 — no scoring behavior change from 178.12; updates the CI assertion baseline for the expanded Alternate Shot test suites.
