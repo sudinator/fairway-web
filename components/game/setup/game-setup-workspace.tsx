@@ -1,6 +1,9 @@
 "use client";
 
 import React from "react";
+import { gameTypeLabel } from "@/lib/game-create";
+import { ShareLineupModal } from "@/components/share-card";
+import { buildSetupSummary } from "@/lib/setup-summary";
 import { C } from "@/lib/golf";
 import { pkey, shapeOf } from "@/lib/game-shape";
 import type { Game, Player } from "@/lib/game-types";
@@ -54,6 +57,25 @@ export function GameSetupWorkspace({
   randomizing,
   groupOverflow,
 }: GameSetupWorkspaceProps) {
+  // Whether the line-up card is open. Local: presentation, not setup state.
+  const [showLineup, setShowLineup] = React.useState(false);
+  /**
+   * The side games actually running, named. "None" is a real answer and must be shown as one —
+   * a blank line reads as "not configured yet" rather than "nothing is running".
+   */
+  const sideGameSummary = React.useMemo(() => {
+    const on: string[] = [];
+    const scheme = (game as { leg_config?: { scheme?: string } }).leg_config?.scheme ?? "sixes";
+    // Formats with no individual score never run the segment side game, whatever the config says.
+    const individual = shapeOf(game).dotBasis !== "alt_shot_side";
+    if (individual && scheme !== "none") {
+      on.push(scheme === "nines" ? "Nines" : scheme === "total" ? "Total" : "Six-hole segments");
+    }
+    const contests = (game as { contests?: unknown[] }).contests;
+    if (Array.isArray(contests) && contests.length) on.push(`${contests.length} side contest${contests.length === 1 ? "" : "s"}`);
+    return on.length ? on.join(" \u00b7 ") : "None";
+  }, [game]);
+
   const { usesTeams, usesMatchups, usesFoursomes } = shapeOf(game);
   const total = players.length;
   const pairings = Array.isArray(game.pairings) ? game.pairings : [];
@@ -244,6 +266,30 @@ export function GameSetupWorkspace({
 
       {section === "review" && (
         <div>
+          {/* The roster, as a shareable card. Opens the same modal the scorecard share uses, so
+              the image, the Web Share sheet and the copy-as-text path are all one implementation. */}
+          <div style={{ ...cardStyle, marginBottom: 10 }}>
+            <div style={{ color: C.cream, fontWeight: 800, fontSize: 14, marginBottom: 4 }}>Share the line-up</div>
+            <div style={{ color: C.sage, fontSize: 11.5, marginBottom: 8 }}>
+              Post this to your group chat so everyone can check their handicap, tee and team before you start.
+            </div>
+            <button onClick={() => setShowLineup(true)} style={{ ...btn(true), width: "100%", fontSize: 13 }}>
+              View line-up card
+            </button>
+          </div>
+          {/* What is actually RUNNING. The reported bug was a side game nobody chose; being able to
+              turn it off is half the fix, and saying plainly what is on is the other half. */}
+          <div style={{ ...cardStyle, marginBottom: 10 }}>
+            <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1.2, fontWeight: 800, marginBottom: 6 }}>WHAT YOU ARE PLAYING</div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "3px 0" }}>
+              <span style={{ color: C.sage, fontSize: 11, width: 74, flex: "none" }}>Main game</span>
+              <span style={{ color: C.cream, fontSize: 14, fontWeight: 700 }}>{gameTypeLabel(game.game_type)}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "3px 0" }}>
+              <span style={{ color: C.sage, fontSize: 11, width: 74, flex: "none" }}>Side games</span>
+              <span style={{ color: C.cream, fontSize: 14 }}>{sideGameSummary}</span>
+            </div>
+          </div>
           <div style={cardStyle}>
             {[
               [playersDone, "All players have tees and handicaps set"],
@@ -257,6 +303,9 @@ export function GameSetupWorkspace({
           </div>
         </div>
       )}
+      {showLineup ? (
+        <ShareLineupModal game={game} players={players} onClose={() => setShowLineup(false)} />
+      ) : null}
     </div>
   );
 }

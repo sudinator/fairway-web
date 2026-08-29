@@ -39,7 +39,12 @@ checks = [
     (tournaments, '!allowSetupChange({ type: "set_tee_group", player: p, group })', "tee-group write must be policy-gated"),
     (organizer, 'const policy = (action: SetupAction) => decideSetupChange({ game, players, action });', "Organizer UI must use same central policy"),
     (organizer, 'disabled={blocked({ type: "remove_player", player: p })}', "scored-player Remove must be visibly disabled"),
-    (organizer, 'const d = policy({ type: "set_format", target: key });', "format buttons must mirror central policy"),
+    # Matches the ACTION, not the loop variable. This previously pinned `target: key`, so
+    # extracting the shared FormatPicker and renaming the variable to `t` failed the guard while
+    # the guarantee was intact — and a guard that breaks on a rename teaches people to weaken
+    # guards. The rendered behaviour (blocked format disabled, with its reason) is additionally
+    # covered by lib/format-picker.test.tsx.
+    (organizer, 'policy({ type: "set_format", target:', "format buttons must mirror central policy"),
     (workspace, 'game.status === "ended" ? "FINAL" : anyScores ? "SCORING" : "SETUP"', "Control Center must distinguish ended from active scoring"),
     (groups, 'getTeeGroupPolicy?: (p: Player, group: number | null)', "Groups UI must consume the tee-group policy"),
     (policy, '| { type: "change_course" }', "course replacement must be represented in central policy"),

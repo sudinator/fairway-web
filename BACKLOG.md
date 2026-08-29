@@ -1,3 +1,34 @@
+## Hole count cannot be changed after a game is created (open)
+
+`set_match_length` exists in lib/game-setup-policy.ts, is negative-tested, and NOTHING dispatches it.
+`MatchLengthPicker` is rendered only in Create Game, so once a game exists the 9/18 choice is fixed
+even before any score is entered.
+
+Building it means more than surfacing the picker: changing the length must rewrite `holes_meta` and
+re-derive every player's course handicap (chBasis halves for a nine), and decide what happens to a
+`leg_config` whose scheme assumes 18 holes.
+
+Found at 178.8 by the owner. Same shape as the 178.2 setup dead end: policy and guard written, no
+route to reach them.
+
+## Trifecta singles legs: foursome basis vs 1v1 (open, needs a rules decision)
+
+`computeTrifecta` draws every leg's nets from `fourballNets`, so a SINGLES leg is scored off each
+player's handicap relative to the foursome's lowest — not off the difference between the two players
+in that leg.
+
+The two allocate the same NUMBER of strokes but on DIFFERENT holes. For A 10 vs B 5 with a foursome
+low of 2, they disagree on 6 of the first 9 holes:
+
+    SI 1-3: foursome basis gives both a stroke (net 0); 1v1 gives A one
+    SI 6-8: foursome basis gives A one; 1v1 gives neither
+
+Arguments both ways. Against changing it: a player sees ONE set of dots on the card, used for all
+three legs, and changing the basis per leg means two different dot patterns for the same player.
+For changing it: the owner's stated rule is that the singles legs are 1v1.
+
+Recorded at 178.6. Not changed, because it is a rules judgement rather than a defect.
+
 # Birdie Num Num — Backlog & Improvements
 
 Running list of things to build or tighten. Newest ideas near the top of each section.
@@ -68,6 +99,43 @@ Then the client makes one RPC call that either fully succeeds or fully rolls bac
 Needs: a migration, admin-only `grant execute`, and the existing RLS/ledger guards satisfied.
 Same treatment would suit any other multi-table client-side cascade — worth grepping for them at
 the same time.
+
+## Nine-hole course handicap is not halved (diagnosed 177.86, NOT fixed)
+
+Reported from staging: in a 9-hole match the STROKES panel shows "ph 16" and "a stroke on every
+hole, + 2nd on 10, 13, 16, 17, 18" — the full 18-hole allocation squeezed onto nine holes.
+
+### Why the card and the panel disagree
+The player card reads the STORED `course_handicap`. The strokes panel RECOMPUTES through
+`chBasis(p, game.course_par)`. Two sources for the same number, and only one of them is wrong.
+
+### The maths, verified
+`chBasis` = `index * (slope/113) + (rating - coursePar)`. For index 14, slope 130, rating 71.5:
+
+| | |
+|---|---|
+| 18-hole course handicap | **15.6** |
+| what a nine currently gets | **15.6** — the full figure, unhalved |
+| slicing coursePar to 36 alone | **51.6** — WORSE, and visibly absurd |
+| par and rating both halved | 15.9 — the slope term is still full |
+| **half the 18-hole figure** | **7.8** — correct |
+
+Only halving the WHOLE figure works, because the slope term dominates and par does not touch it.
+That is exactly `courseHandicapForLength()` in `lib/match-length.ts`, already written and tested.
+
+WHS proper would use that nine's own Course Rating and Slope. BNN has neither — GolfCourseAPI
+publishes one pair per tee for the full course — so halving is the documented practical substitute.
+
+### What the fix needs
+`chBasis` must know the hole count. All 21 callers pass `game.course_par` uniformly, so the
+plumbing is consistent, but it spans six files including `player-scoring.ts` and its baseline — it
+is the scoring engine, and every net score, stroke dot, leaderboard position and money calculation
+reads it.
+
+### The trap
+`coursePar` in `tournaments.tsx` is deliberately the FULL course par even for a nine, with a
+comment saying so. Slicing it looks like the fix and makes things worse. Do not change that line
+on its own.
 
 ## Batched for next release (small)
 - **Remove the "Built: <date>" line** in the version display — `components/manage.tsx:3659`
@@ -389,7 +457,7 @@ small-team; there is no true team-vs-many-teams leaderboard yet. That leaderboar
 - **[ ] Aggregate "2 best balls of 4"** — sum of best 2 net/hole. Classic charity/corporate outing format.
 - **[ ] Team Stableford (best-N points/hole)** — most forgiving for large mixed-ability fields; extends
   existing Stableford scoring; keeps everyone playing in.
-- **[ ] Alternate Shot / Foursomes** — 2-player, one ball, alternate (50% combined). Match or stroke.
+- **[~] Alternate Shot / Foursomes** — match-play implementation built; v178.12 hardens the dedicated one-ball scoring path, conflict handling, and simulations; v178.13 records the expanded assertion baseline so CI can accept those tests. Pending full staging runtime acceptance before marking complete. Stroke-play variant is not built.
 - **[ ] Greensomes / Chapman (Pinehurst)** — both drive, then select/alternate; step up from foursomes.
 - **[ ] Team Nassau** — front / back / overall as three team matches.
 

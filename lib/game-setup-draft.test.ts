@@ -43,6 +43,9 @@ const legacyExpected = {
   teeIdx: base.teeIdx,
   idxStr: base.idxStr,
   gameType: base.gameType,
+  // Added at 177.85, emitted beside gameType because both describe the format. Key ORDER matters:
+  // this expectation is compared via JSON.stringify, so it must mirror the adapter's emit order.
+  matchLength: base.matchLength ?? "18",
   allowancePct: base.allowancePct,
   teamScoreMode: base.teamScoreMode,
   trifectaScoring: base.trifectaScoring,
@@ -100,7 +103,9 @@ for (let i = 0; i < 2000; i++) {
   const d = buildGameSetupDraft(input);
   const expected = {
     name: input.name, matchDate: input.matchDate, favName: input.favName, teeIdx: input.teeIdx, idxStr: input.idxStr,
-    gameType: input.gameType, allowancePct: input.allowancePct, teamScoreMode: input.teamScoreMode,
+    // Emitted beside gameType by the adapter; this compares stringified output, so order matters.
+    gameType: input.gameType, matchLength: input.matchLength ?? "18", allowancePct: input.allowancePct,
+    teamScoreMode: input.teamScoreMode,
     trifectaScoring: input.trifectaScoring, strokeBasis: input.strokeBasis, fmtFamily: input.fmtFamily,
     matchKind: input.matchKind, teamMode: input.teamMode, skinsTeamStyle: input.skinsTeamStyle, skinsMode: input.skinsMode,
     team1: input.team1, team2: input.team2, flightMode: input.flightMode, flightCount: input.flightCount,
@@ -108,6 +113,21 @@ for (let i = 0; i < 2000; i++) {
     selectedPlayers: input.selectedPlayers, guestPlayers: input.guestPlayers,
   };
   eq(toLegacySetupData(d), expected, `differential legacy shape ${i}`);
+}
+
+
+// A draft saved BEFORE matchLength existed must still resume — an organiser mid-setup when the
+// release lands must not lose their draft, and must not get `undefined` holes.
+{
+  const older = buildGameSetupDraft(base);
+  delete (older.format as { matchLength?: unknown }).matchLength;
+  const restored = toLegacySetupData(older);
+  eq(restored.matchLength, "18", "a pre-177.85 draft restores as 18, not undefined");
+}
+{
+  // And a saved nine survives the round trip, which is the whole point of persisting it.
+  const nine = buildGameSetupDraft({ ...base, matchLength: "back9" });
+  eq(toLegacySetupData(nine).matchLength, "back9", "a chosen nine survives a resume");
 }
 
 console.log(`game-setup-draft: ${n}/${n} assertions passed`);

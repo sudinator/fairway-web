@@ -1,3 +1,1016 @@
+## 178.13.260829 — CI assertion baseline update for Alternate Shot hardening
+- **No application/scoring behavior change from 178.12.** The Alternate Shot integration, conflict handling, finalization guard, and rounding fixes are unchanged.
+- **CI fix:** updated `ci/test_assertion_baseline.json` to record the intentionally expanded 178.12 test inventory seen in GitHub CI: Alternate Shot 73, Alternate Shot scores 49, Alternate Shot scoring 30, and new Alternate Shot simulation 178,103. Total baseline is now **184,887 assertions across 41 suites**.
+- **Why CI failed:** the assertion ratchet intentionally fails on both decreases and increases until the committed baseline is updated, so the 178.12 run correctly stopped after proving the new tests existed.
+- **Database:** no migration.
+
+## 178.12.260829 — Alternate Shot scoring integration hardening
+- **Alternate Shot results now use the Alternate Shot engine end-to-end.** `FourballView` remains the shared 2-v-2 UI/setup shell, but Alternate Shot no longer falls through to `fourballStatus` / `fourballHoleDetail`. Match cards, hole detail, and team rollups use `altShotStatus` / `altShotHoleDetail` with the canonical combined-side handicap.
+- **One-ball duplicated-row reads are conflict-safe.** Added `readAltShotSideScores(...)`: agreeing rows read normally, a one-row lag is accepted, and two different partner scores mark that hole conflicted. Conflicted holes are excluded from match scoring and surfaced in Results rather than silently preferring one row.
+- **Finalization safety:** Alternate Shot group finish and end-game are blocked while any partner-row score conflict remains, naming the affected holes.
+- **Floating-point half-up fix:** match-stroke rounding now tolerates binary floating noise at exact `.5` boundaries. The reproduced 40.05 vs 8.55 side-handicap difference now correctly gives 32 strokes, not 31. `altShotSides` and `altShotSideStrokes` both delegate to the same `altShotMatchStrokes` rounding rule.
+- **Scorecard/read-path agreement:** the individual running-match line now reads both duplicated partner rows through the same conflict-safe reader used by Results.
+- **UI correctness:** Alternate Shot now has its own Play header/subtitle and Results heading instead of falling through to Stableford/Four-Ball wording.
+- **Permanent tests/guards:** added deterministic model-based `alt-shot-simulation.test.ts` and `ci/check_altshot_view_contract.py`, wired into normal tests/guards.
+- **Database:** no migration. Existing Alternate Shot rule remains: no individual handicap rounds are posted.
+
+## 178.11.260828 — Scoring fix release-note contract correction
+- **NO scoring/code behavior change from 178.10.** The two P1 scoring fixes are unchanged.
+- **Release-gate correction:** restored the existing `DEPLOY_NOTES.md` contract: the file must begin immediately with the newest `## <version>` release heading. The failed 178.10 staging candidate accidentally inserted a generic document title above that heading, causing `ci/verify_release.py` to fail even though the substantive test assertions passed.
+- **Version:** bumped to 178.11.260828 because the release package changed after the failed staging candidate.
+- **Database:** no migration.
+
+## 178.10.260828 — Scoring correctness: exact match allowances + canonical alternate-shot sides
+- **Singles match:** all live `matchStatus` / `matchProgress` callers now pass exact `chBasis(...)` values rather than the stored rounded `course_handicap`, so percentage allowances are applied before the final rounding step. This fixes boundary cases such as exact CH 10.5 at 90%, which must receive 9 rather than 10 strokes.
+- **Alternate shot:** the individual scorecard running match line now consumes `altShotSides(...)`, the same canonical side-handicap source used by the stroke dots / Strokes panel. It no longer rounds each partner's allowance before combining the side. The documented 20+8 vs 10+5 at 50% case therefore remains a 7-stroke difference, not 6.
+- **Guard:** added `ci/check_scoring_input_contract.py` and wired it into `npm run guards` to block future production match callers from using stored rounded handicaps or rebuilding alternate-shot side allowances.
+- **Database:** no migration. No score-entry, persistence, betting, leaderboard, or round-posting behavior changed.
+- **Validation note:** source-contract scoring guards pass. Full dependency-backed type/test/build validation could not be completed in the ChatGPT container because `npm ci` repeatedly timed out and left missing type packages; this package must not be promoted beyond staging until normal GitHub CI and staging validation pass.
+
+## 178.9.260827 — Contests reachable again; ONE source for alt-shot side handicaps
+- **NO migration change.**
+- **FIX (my 178.8 regression): no new game could gain a side contest.** 178.8 gated the empty
+  add-a-contest prompt behind `allowEmpty` and passed it NOWHERE — the one call site was the play
+  tab. The fix for showing-too-much became showing-nothing: the entry point to add a contest was
+  unreachable on any game without one.
+  Contests now have a SETUP home, on the Format tab, with `allowEmpty` — configuration belongs with
+  the format and allowance it sits beside. The play tab keeps showing contests only when they exist.
+- **STRUCTURAL: `altShotSides` in game-shape.ts is now the ONLY place side handicaps are computed.**
+  This is the fifth one-rule-two-implementations bug in a week, and the honest mechanism each time is
+  the same: the rule was implemented where the immediate task needed it, and the other live
+  implementation was left standing. Guards that look for copied FORMULAS never caught these, because
+  the two blocks never looked alike.
+  The countermeasure is DELETION, not another agreement test: dotStrokes' inline sideCh and the
+  Strokes panel's inline chOf/sideOf are both gone, replaced by calls to the one function. Two
+  screens cannot disagree about a number only one function produces.
+- **NEW `ci/check_single_altshot_source.py`** — checks the INGREDIENTS, not the formula: any
+  alt-shot-aware file doing its own handicap arithmetic without `altShotSides` fails. Negative-tested
+  by resurrecting the panel's inline calculation; caught.
+- Assertion baseline unchanged at **6776**.
+
+## 178.8.260827 — Alt shot scorecard dots; the empty contests panel
+- **NO migration change.**
+- **FIX: the alternate shot scorecard showed NO stroke dots** while the Strokes panel was correct.
+  Two sources again, and this one is mine from 178.3: the Strokes panel uses the `altShotSide` block
+  I wrote there, while the scorecard uses `dotStrokes`.
+  The scorecard passes `cardPlayers`, which is FILTERED BY TEE GROUP for display. Alternate shot
+  needs the OPPOSING side to compute a difference, so with that side filtered out `dotStrokes`
+  returned 0 and no dots drew at all. Four-ball degrades instead of vanishing, which is exactly why
+  four-ball looked fine and this did not.
+  `GroupScorecard` now takes an explicit `allPlayers` prop for the stroke computation, separate from
+  the filtered `players` it renders. Display and computation genuinely want different lists, and
+  conflating them is what caused this.
+  Pinned in the matrix: with the opposing side absent no strokes CAN be computed, which is why the
+  caller's contract must be to pass every player.
+- **FIX: the side-contests panel appeared during play with no contests.** The condition was
+  `contests.length === 0 && !isOrganizer`, so any ORGANIZER saw the full panel — heading, prompt and
+  Add button — on every game whether or not a contest existed. During a round that reads as a side
+  game running when none is. The empty state now needs an explicit `allowEmpty`, true only where a
+  contest is actually added.
+- **DIAGNOSED, NOT FIXED: the hole count cannot be changed after creation.** `set_match_length` is
+  defined in the setup policy, negative-tested, and **no component ever dispatches it** — the
+  MatchLengthPicker exists only in Create Game. So it is not that 18 is blocked after choosing 9;
+  there is no control at all once the game exists.
+  Same shape as the alternate-shot setup dead end at 178.2: a policy written, a guard written, and
+  no route to reach it. Changing it also has to rewrite `holes_meta` and re-derive every handicap,
+  so it needs building deliberately rather than bolting on. Recorded in BACKLOG.md.
+- Assertion baseline 6773 -> **6776**.
+
+## 178.7.260827 — The side game nobody chose
+- **NO migration change** — the off switch lives in the existing `leg_config` jsonb.
+- **FIX: the six-hole segments panel appeared on every format, unchosen.** It is a SIDE GAME —
+  each player's own low net or net Stableford across the three sixes, both nines and the full round
+  — and it was gated on `roomTab === "play"` alone, with no setting anywhere to control it.
+  For alternate shot it was wrong twice over: both partners hold the SIDE's score after the fan-out,
+  so it listed four players with duplicated figures, implying four independent rounds nobody played.
+  Now gated on the SHAPE (`dotBasis !== "alt_shot_side"`) rather than the game type, so any future
+  format without individual scores is covered without another edit at that site.
+- **NEW: the segment side game can be turned OFF.** It was configurable — scheme, metric, points —
+  but had no "off", so it always ran. A scheme of `"none"` disables it; `buildLegs` returns an empty
+  list, which means every consumer that maps over legs renders nothing without each needing its own
+  flag. Offered as **Off** in the scheme picker. Stored in the existing jsonb, so no migration.
+  Asserted: `"none"` yields no legs on 9 and 18; every other scheme is unchanged; and an UNKNOWN
+  scheme still builds legs, so a typo cannot silently disable a side game.
+- **NEW on Review: "What you are playing"** — the main game named, and the side games actually
+  running. "None" is displayed as a real answer rather than a blank line, because blank reads as
+  "not configured yet" instead of "nothing is running". Being able to turn a side game off is half
+  the fix; saying plainly what is on is the other half.
+- Assertion baseline 6766 -> **6773**.
+
+## 178.6.260827 — Scoring verification layers 2 and 3
+- **NO migration change. No behaviour change** — this is verification, plus one finding to decide.
+- **LAYER 2, `lib/hole-result-consistency.test.ts` — 981 assertions.** Every hole-result producer
+  (matchProgress, fourballHoleDetail, altShotHoleDetail, altShotProgress) across five score patterns
+  chosen to sit ON the boundaries — exact ties, one-stroke margins, part-played holes — and several
+  handicap spreads. It asserts:
+  the declared winner FOLLOWS from the nets (a separate line of code that can be wrong on its own);
+  a halved hole is `0` and NEVER collapses to `null` (0 is falsy in JS, so `if (result)` would treat
+  every halve as unplayed); won + lost + halved == played; only one side ever receives; and the
+  running progress matches the per-hole results, so the two views cannot drift.
+  Negative-tested four ways — halve collapsed to null, winner inverted, both sides receiving,
+  progress drifting. All caught.
+- **LAYER 3, `lib/format-rules.test.ts` — 34 assertions.** Each format's defining rule, stated by
+  name. Layers 1 and 2 only prove SELF-CONSISTENCY; they cannot catch a format being consistently
+  wrong, which is precisely what alternate shot was — dots and result agreeing while both used
+  four-ball's basis.
+  **The rules were confirmed with the owner rather than assumed.** I had been wrong about the
+  alternate shot rule three times, and a test written alone would have frozen the misunderstanding.
+  Also asserts the four bases stay DISTINCT: if any two collapse, a format has silently inherited
+  another's rule.
+- **FINDING, not yet fixed: trifecta's singles legs use the FOURSOME basis, not 1v1.**
+  `computeTrifecta` draws every leg's nets from `fourballNets`, so a singles leg between two players
+  is scored off each player's handicap relative to the foursome's lowest — not off the difference
+  between the two of them.
+  The two allocate the SAME NUMBER of strokes but on DIFFERENT HOLES: for a 10 vs 5 pairing with a
+  foursome low of 2, they disagree on 6 of the first 9 holes. Whether a leg's result changes depends
+  on the scores.
+  There is a reasonable argument for the current behaviour — one dot allocation per player, used for
+  all three legs, so the card shows a single consistent set of dots. That is a golf-rules judgement,
+  so it is recorded rather than changed. See BACKLOG.md.
+- Assertion baseline 5751 -> **6766 across 40 suites**.
+
+## 178.5.260827 — The setup draft outlived the game it was drafting
+- **NO migration change.**
+- **FIX: after creating a game, the next Create Game offered to resume the setup just completed.**
+  `clearSetupDraft` ran correctly on creation — the bug was ORDERING, not the clear.
+  The component keeps its form state after creating, and `hydratedRef` stays true, so the very next
+  render fired the save effect and wrote the same snapshot straight back. The pagehide /
+  visibilitychange checkpoint would do the same, since its listeners stay attached until unmount.
+  Every function involved was individually correct.
+- **NEW `doneRef`**, set at creation BEFORE the clear and checked by every save path. A ref rather
+  than state deliberately: it has to hold for the CURRENT render pass, and setting state would
+  schedule an update the save could beat.
+- **NEW `lib/setup-draft-lifecycle.test.ts`** — 10 assertions at the store level, including the
+  proof that a save AFTER a clear does resurrect the draft (which is why the component must stop
+  saving), and that the keys are symmetrical: clearing one tee time leaves another, a tee-time draft
+  is distinct from a no-tee-time one, and groups are isolated.
+- **NEW `ci/check_draft_not_resurrected.py`** — the unit test cannot see ordering, so this checks the
+  SOURCE: the guard exists, it is set before the clear, and every `saveSetupDraft` is gated on it.
+  **The first version let a sabotage through**: a fixed 400-character lookback found a DIFFERENT
+  save's guard and passed an ungated one. The window now runs back only to the nearest unmatched
+  `{` — the block the call actually sits in. Negative-tested three ways; all caught.
+- The Create Game state-inventory contract flagged `doneRef` as unclassified, which is what it is
+  for — an unregistered ref is usually one added without thinking about its lifecycle, and that is
+  precisely how this bug happened. Registered.
+- Assertion baseline 5741 -> **5751 across 38 suites**.
+
+## 178.4.260827 — A scoring matrix across every format, and two bugs it found
+- **NO migration change.**
+- **NEW `lib/scoring-matrix.test.ts` — 3,695 assertions.** Every game type across a matrix of hole
+  set (18 / front 9 / back 9, with REAL stroke indexes), allowance (100 / 90 / 85 / 50), handicap
+  spread (scratch / narrow / wide / plus / odd-sum) and field size.
+  It asserts the property that would have caught all four stroke bugs this week: **whatever the card
+  DRAWS, the result must USE** — checkable with no expected value, and true for every format by
+  definition. It also covers `trifecta` and `alt_shot`, which the existing fuzzers never touched
+  (they run 5 of 7 types).
+- **BUG 1, found on the matrix's first run: the alternate shot branch hardcoded a 100% allowance.**
+  It ignored `game.allowance_pct` entirely, then halved the combined pair separately. At exactly
+  50% those two errors CANCEL — which is why the staging game looked plausible — and at 85% or 90%
+  they do not. Fixed to Option A: the allowance owns the percentage.
+- **BUG 2, found immediately after: applying the allowance per player DOUBLE-ROUNDS.**
+  `applyAllowance` rounds. Summing two rounded halves loses a stroke: 20 and 8 give 10 + 4 = 14,
+  while 10 and 5 give 5 + 3 = 8 (JS rounds 2.5 up) — a difference of 6, where exact gives
+  14.0 - 7.5 = 6.5 and rounds ONCE to 7.
+  WHS states foursomes as 50% of the COMBINED Course Handicaps, and "combined" is doing real work
+  in that sentence. **This is the same double-rounding removed from the allocator at 177.90**, and
+  I reintroduced it through applyAllowance one day later.
+- **Two assertions of mine were wrong and are corrected with reasons:**
+  a plus handicap gives strokes BACK, so its dot count is negative and must be compared by
+  magnitude; and "a player never receives more than their own handicap" is an individual-format
+  assumption that is FALSE for alternate shot, where the entitlement belongs to the SIDE.
+- Assertion baseline 2054 -> **5741 across 37 suites**.
+
+## 178.3.260827 — Alternate shot: its own scorer, and the arithmetic made visible
+- **NO migration change.**
+- **FIX (the hole 15 error): alternate shot was scored by `fourballNets`, which is BEST-BALL.**
+  Diagnosed against the real staging game (b492e67e) rather than by reasoning.
+  fourballNets takes `min()` across a side's two players, each carrying their own handicap relative
+  to the foursome's lowest INDIVIDUAL. With one shared ball both partners record the same gross, so
+  `min()` returns whichever partner happens to receive more strokes — a number with no meaning here.
+  Real figures: side A (16 and 21, halved for the nine, at the 50% allowance) sums to 9.25; side B
+  to 2.5; the difference is 6.75 and rounds to **7 strokes**. Best-ball resolved to side A's
+  higher-handicapped partner and gave it **5**. Two holes lost a stroke; on hole 15 both sides shot
+  5, so that stroke was the entire result. Match should be A up 6; the app had A up 5.
+- **The "after a halved hole" pattern was a coincidence**, and worth recording because it looked
+  causal. Hole 14 is the EASIEST hole by stroke index, where neither basis gives a stroke. Hole 15
+  was simply the first hole close enough for a missing stroke to change the outcome — on hole 12 the
+  same missing stroke changed nothing, because that hole was won by two.
+- **NEW `altShotSideStrokes` / `altShotHoleDetail` / `altShotProgress`** in golf.ts. Rounding once,
+  at the difference: 9.25 and 2.5 give 7, where rounding each side first gives 9 - 3 = 6.
+  **28 assertions replay the real game hole by hole**, including every hole that was already right,
+  so a future change cannot fix 15 by breaking the others.
+- **The 50% is applied ONCE, and I was wrong to suspect otherwise.** 50% of a combined pair is
+  arithmetically identical to summing each halved — the same operation, not a double. The allowance
+  field owns it (`allowance_pct = 50`), consistent with how four-ball's 85% works, and the side
+  handicap is the SUM of the two allowanced figures.
+- **NEW Strokes panel entry for alternate shot.** The panel returned null for the format —
+  `alt_shot` was never added to `usesStructure` — so the format shipped with NO way to see how
+  strokes were derived. That is why a wrong allocation ran for a full round before anyone could
+  question it. It now shows every step: each partner's allowanced handicap, the side total, the
+  difference, which side receives, how many strokes, and exactly which holes carry one.
+- **Individual course-handicap dots removed for alternate shot**, on the scorecard and in the game
+  room. No individual score is recorded, so a per-player handicap describes nothing that happens —
+  and shown beside the orange SIDE dots it was a second, contradictory number.
+- The four-ball per-player team strip is likewise suppressed, for the same reason.
+- Assertion baseline 2026 -> **2054 across 36 suites**.
+
+## 178.2.260827 — Alternate shot setup could never complete
+- **NO migration change.**
+- **FIX: an alternate shot game was unplayable from the moment it was created.** The Teams step
+  reported "matchups not assigned" with no way to assign anything, so setup never finished.
+  The foursome builder in tournaments.tsx is gated on `fourball || trifecta`. alt_shot was not in
+  it, so the Matchups tab rendered nothing — and because the Tee groups tab is HIDDEN whenever
+  `usesFoursomes` is true, there was no other route. A dead end in both directions.
+  alt_shot added to that gate and to the play-tab equivalent. The foursome IS the matchup for a 2v2
+  format, and the builder is the same one four-ball uses.
+- **HOW IT WAS MISSED, precisely.** Every existing check passed, and none of them asked the only
+  question that mattered.
+  `game-type-coverage` asserted each type has a distinct label and a valid shape. The
+  shape/payload test asserted that a shape claiming `usesFoursomes` gets `foursomes` written. The
+  format-selection test asserted the picker offers it. All true, all green, and the game still
+  could not be set up — because **nothing tested that a user can FINISH**. Every test checked a
+  layer in isolation; the failure was between the shape and the UI, which no layer owns.
+  I also never created an alternate shot game and walked the setup flow. The format has been in the
+  picker since 177.84 and I built four releases on top of it without once using it.
+- **NEW `ci/check_setup_reachable.py`** — reads which types `shapeOf` marks `usesFoursomes` and
+  requires each to appear in the foursome editor's gate. Checked against the SOURCE, because the
+  gates are JSX conditions that no unit test can see. Negative-tested against the exact bug that
+  shipped, and it names the offending type in its output.
+- Assertion baseline 2019 -> **2026**.
+
+## 178.1.260827 — Share the line-up (card + text); tee order fixed to the first hole PLAYED
+- **Supersedes an earlier 178.0** that carried a text-only summary. That build was published
+  and then rebuilt under the same number when the card was added — reusing a version means the
+  number no longer identifies what you have, which is the point of the ledger. Anything
+  labelled 178.0 should be replaced by this.
+- **FEATURE bump.** New user-facing capability, no migration change.
+- **FIX (my bug, reported): the tee order was keyed to hole NUMBER parity.** I had "the first
+  partner takes the odd-numbered holes", which on a back nine — opening at hole 10, an even number —
+  makes the SECOND partner drive first. I had even written that off in a test comment as "correct:
+  the rule alternates, it does not fix who starts". That reasoning was wrong.
+  Alternate shot nominates who tees off on the FIRST HOLE PLAYED, then alternates; whether that
+  hole is numbered 1 or 10 is irrelevant. Now keyed to POSITION in the round, so the first listed
+  partner always drives first on any set of holes. The assertion that had encoded the wrong
+  behaviour is replaced by one requiring a back nine to open with the SAME partner as a front nine.
+- **NEW: Share the line-up.** A plain-text roster on the Review step, ready to paste into a group
+  chat: game, course, format, holes, a non-default allowance, then every player grouped by team (or
+  by tee group when there are no teams) with their handicap index, course handicap, tee and group.
+  - **Both numbers are shown.** The index is what a player recognises as "their" handicap; the
+    course handicap is what they will actually play off, and the gap between the two is the thing
+    that surprises people mid-round.
+  - **Nobody is silently dropped.** A player with no team appears under "Not on a team", and a
+    no-show is flagged rather than hidden, so the count in the chat matches the count on the tee.
+  - **A nine names its holes** — "9 holes (10-18)". Someone arriving at the 1st tee for a back-nine
+    match is exactly what this exists to prevent.
+  - **A default 100% allowance stays quiet**; 85% or 50% is stated, because that is the number
+    people query afterwards.
+  - **Plain text only** — no box drawing, no tabs, no reliance on a monospace font, asserted
+    directly. WhatsApp, iMessage and Slack render none of those consistently.
+  - **A preview is shown as well as the copy button.** A copy button alone gives no way to check the
+    text before pasting it somewhere public, and clipboard access can be refused (no HTTPS, or a
+    declined permission) — the preview is selectable either way.
+  - Built as a pure function so the TEXT is what gets asserted. 27 assertions.
+- **The line-up is now a SHAREABLE CARD, not just text.** `ShareLineupModal` lives in
+  share-card.tsx to reuse `useCardExport`, which already owns image capture, the Web Share sheet,
+  the download fallback and copy-as-text. A second capture implementation would drift from that one
+  exactly as the stroke allocators did. The text it copies comes from `buildSetupSummary`, so the
+  image and the text are one dataset arranged two ways rather than two renderings that can disagree.
+- **Sorted ALPHABETICALLY, team named inline.** Finding yourself is the job, it works unchanged with
+  no teams, and it matches the card. An earlier text draft used R/B prefixes plus a legend — a code
+  you have to decode, which is worse than repeating the word.
+- **The tee is stated ONCE.** "All playing Blue tees", or "Blue tees unless noted" with only the
+  exceptions carrying a tee. Keyed on the number of EXCEPTIONS, not a percentage: a flat 80% has a
+  bad edge, since 3 of 4 players is 75% and would not qualify — yet repeating a tee three times to
+  flag one exception is exactly the repetition worth removing. Factored when exceptions are two or
+  fewer, or at most a quarter of the field; never on an even 2/2 split, where neither tee is "main".
+- Team colour is a KEY, not a word on every row: a swatch plus "Team Red". 6px stripes on BOTH sides
+  of each row — two stripes close a shape, so the row reads as a bracketed block rather than a list
+  item with a coloured edge, and it survives a long name.
+- **Four guards fired on the way in, and three were real:**
+  - a `\u00b7` written in JSX TEXT, which renders as six literal characters rather than a middot;
+  - `#FBFAF4` as a background literal — it turns out to be the scorecard CELL surface and had been a
+    literal in three places, which is how a colour drifts. Now `C.cell`, documented in
+    DISPLAY_RULES, and the palette debt went DOWN by two;
+  - a `borderRadius: 2` on the team swatch, off the six-value scale. Moved to 6, and that debt went
+    down too.
+  The fourth (a hand-rolled overlay) is a reasoned exception: the CARD is what gets captured, and a
+  BottomSheet's own chrome would be captured with it. Both sibling share modals are hand-rolled for
+  the same reason; the baseline was committed deliberately rather than the guard weakened.
+
+  on-scale `8px 12px`.
+- Assertion baseline 1988 -> **2015 across 35 suites**. All differential suites at 0 mismatches.
+
+## 177.99.260827 — Alternate shot is playable end to end
+- **NO migration change.** 0139 as shipped at 177.98 stands.
+- **The group card now groups alternate shot by SIDE** — partners adjacent, a divider between the
+  two sides. It had been falling through to a flat four-column list. Both partners show the SIDE's
+  score after the fan-out, so without the divider the card reads as the same score repeated by
+  mistake rather than as one ball per side. The fourball/trifecta branch already did exactly this;
+  alt_shot simply was not in it.
+- **Scoring works through the existing group card, as requested:** all four players shown, one score
+  entered, written to both partners on that side. The fan-out was built at 177.87 and the group card
+  already routes through `setPlayerHole`, so nothing new was needed on the write path.
+- **NEW tee reminder, per hole.** The first partner listed on a side takes the ODD holes; the other
+  takes the even. **No stored nomination and no migration**: `FoursomeDef.a` and `.b` are ORDERED
+  arrays, so the data already expresses it and there is one source of truth rather than two.
+  Shown in each hole's header, because that is where a player is looking when they reach the tee —
+  and playing out of order is a Rule 22 penalty, which is the thing pairs actually forget.
+  11 assertions, including that a BACK NINE opens on hole 10 — an even hole — so the second partner
+  drives first that day. That is correct: the rule alternates, it does not fix who starts.
+- **On handicaps, to state it plainly: strokes off the low.** The side with the higher handicap
+  receives the DIFFERENCE; the lower side plays scratch. Not each side playing its own full
+  handicap. Sides off 14 and 7.5 give 7 strokes to the higher side and none to the lower, and both
+  partners on the receiving side show identical dots because the dot means "this SIDE receives a
+  stroke here".
+- Assertion baseline 1977 -> **1988**. All differential suites at 0 mismatches.
+
+## 177.98.260827 — Alternate shot: no posting, and its OWN stroke basis
+- **0139 AMENDED AGAIN — re-run it.** `create or replace` throughout, so re-running is safe.
+- **Alternate shot no longer posts rounds to handicaps, enforced in the DATABASE.**
+  `altShotPostsRounds()` has existed since 177.82 returning `false` and enforcing NOTHING — it is a
+  TypeScript function read only by a test. Posting happens in Postgres, so an alternate shot game
+  finishing wrote a round like any other.
+  Foursomes is one ball per side: the score belongs to the PAIR, and after the fan-out both
+  partners' rows carry it, so posting recorded a round neither player shot alone. WHS does not
+  accept a format that produces no individual score.
+  Gated in BOTH posting functions. `scramble` is listed ahead of the format existing, because the
+  reason is identical and an implementer should find the rule already written.
+  The CI guard now checks the gate is present in both functions and names alt_shot; negative-tested
+  by removing it from one function and by dropping alt_shot from the list.
+- **FOUND while building the scorecard: alternate shot had the WRONG stroke basis.** It was
+  `relative_foursome`, which I set at 177.82 by modelling it on four-ball. That basis gives each
+  player strokes against the foursome's lowest INDIVIDUAL handicap. Alternate shot's SIDE has one
+  handicap — 50% of the two partners combined — and strokes are the difference between the two
+  SIDES, the lower playing scratch.
+  Every alternate shot game created so far has therefore had wrong stroke dots. Nobody could have
+  seen it, because the format is not playable end to end yet.
+- **NEW `alt_shot_side` basis**, wired to `altShotTeamHandicap` and `altShotMatchStrokes` — written
+  and tested at 177.82 and never connected to anything until now. Both partners receive the SAME
+  dots, because the dot means "this SIDE gets a stroke here".
+  Rounding happens ONCE, at the difference: sides off 14 and 7.5 differ by 6.5 and round to 7,
+  where rounding each side first gives 14 and 8, a difference of 6.
+- **10 new assertions**: the 7-stroke difference case, both partners receiving equally, equal sides
+  playing scratch, a nine halving the difference, and an unpaired player receiving nothing.
+  Negative-tested three ways — falling back to relative_foursome, rounding each side first, and only
+  one partner receiving. All caught.
+- **A stale assertion in game-type-coverage had pinned the wrong basis** and failed, which is
+  exactly what it is for. Corrected, with the reason recorded, plus a new assertion that four-ball
+  still uses relative_foursome.
+- Assertion baseline 1966 -> **1977**. All differential suites at 0 mismatches.
+
+## 177.97.260827 — A nine now posts an 18-hole EQUIVALENT; par is summed, not halved
+- **NO new migration.** 0139 is amended in place — **if you already applied it, apply the updated
+  file again.** It is `create or replace` throughout, so re-running is safe.
+- **FIX: par was HALVED instead of SUMMED.** A par-35 back nine displayed as Par 36, because 0139
+  computed `round(course_par / 2)` — half of 71 is 36, and a back nine is commonly 35 or 37. Wrong
+  on both. `holes_meta` carries every hole's real par and the function already read it for the holes
+  table, so the correct value was one line away. Now `sum((e->>'par')::int)` over the game's holes.
+  Rating still halves, because BNN has no per-nine rating and cannot derive one; par is different —
+  it is a plain sum of holes we hold. The CI guard had encoded my WRONG rule (it demanded par be
+  halved) and now demands the sum, with an added assertion that halving par is forbidden.
+- **FIX: a nine posted its RAW nine-hole differential, which the Handicap Index cannot use.** 2.43
+  was arithmetically correct and unusable: the index averages the LOWEST 8 of the last 20, and a
+  nine's differential sits around 2.4 where the same player's eighteens sit around 14. Every nine
+  would have entered as the best round of that player's life and dragged the index down.
+  **I quoted this WHS rule in the 177.95 notes and then implemented only half of it** — I halved the
+  inputs and never converted the output.
+- **The conversion.** WHS combines the 9-hole Score Differential with an EXPECTED Score Differential
+  for the nine not played, based on the player's current Handicap Index.
+  USGA does not publish the table, so this is calibrated to their worked example: a 14.0 index
+  posting a 9-hole differential of 7.2 receives 15.7, implying **8.5 expected**. A player's average
+  differential runs about 3 above their index — the index being the best 8 of 20, not the mean —
+  and a nine is half of that: `(index + 3) / 2`, which gives **exactly 8.5** for a 14.0. A second
+  published example (index 14, 6.96 -> 15.4) implies 8.44, within a rounding step. Documented as an
+  approximation because it is one.
+  The reported round now posts **10.9** — raw 2.43 plus 8.5 expected — instead of 2.4 or 17.7.
+- **The explainer shows the conversion step**, so its arithmetic still sums to its headline. That
+  disagreement is what made the double-halve findable, and it would have hidden this one too.
+- **A negative test slipped through and exposed a real gap:** nothing asserted that an EIGHTEEN is
+  left unconverted. Widening the condition to `<= 18` passed clean — which would have added ~8.5 to
+  every full round in the app, the largest possible regression here. Now pinned, along with the
+  10-17 hole partial case.
+- Assertion baseline 1953 -> **1966**. All differential suites at 0 mismatches.
+
+## 177.96.260827 — The nine-hole rating was halved TWICE
+- **NO new migration.** 0139 from 177.95 is unchanged and stays required.
+- **FIX: a nine's differential displayed as 17.7 when the arithmetic on the same screen said 2.43.**
+  Reported from staging with the explainer open, which is what made it obvious: the step-by-step
+  and the headline disagreed.
+  **Two halves, one rule.** Migration 0139 halves at WRITE time — a posted nine stores rating 35.2 —
+  and `roundDifferential` then halved it AGAIN at read time to 17.6, so
+  (113/130) x (38 - 17.6) = 17.7 instead of (113/130) x (38 - 35.2) = 2.43.
+  I added both halves in the same release and never checked that they compose. This is the same
+  pattern as the three stroke allocators, reintroduced while fixing that very class of bug.
+- **The write-time halve is the one that stays.** It is stored, it is what the explainer displays,
+  and every reader sees the same number. `roundDifferential` now uses `round.rating` as-is, which is
+  correct for BOTH creation paths: a game-posted nine is halved by 0139, and a hand-entered nine
+  takes its rating from a nine-hole course's own tee.
+- **REMOVED `nineHoleBasis()`.** With the halving owned by the migration, an exported helper that
+  halves a rating — sitting next to code that must NOT halve — is a trap: it reads as the sanctioned
+  way. It was exactly that trap. A note in its place records why, so it does not come back.
+- **That deletion cost 17 assertions and left the rule with NO automated coverage**, because the
+  migration is SQL and no test runs it. The assertion ratchet caught the drop, which is what it is
+  for. **NEW `ci/check_nine_hole_basis.py`** asserts the rule where it now lives:
+  rating, par and course_handicap halve; **slope never does**; the condition is `n = 9` and not a
+  range; and the read side does not halve again. Comments are stripped first, since they quote the
+  forbidden form in order to forbid it.
+  Negative-tested four ways — halving slope, rating ceasing to halve, the `n <= 9` range trap, and
+  the read-side double halve that actually shipped. All caught.
+- **The explainer and the headline must now agree**, asserted directly: the test computes the
+  differential the way the explainer does, from the stored values, and requires it to match
+  `roundDifferential`. Isolated tests could not see the second halve; this can.
+- Assertion baseline 1970 -> **1953** (17 fewer, deliberately: the removed helper's own tests,
+  replaced by a CI guard over the SQL).
+
+## 177.95.260827 — Nine-hole rounds post properly; the handicap-BASIS gaps closed
+- **MIGRATION 0139_nine_hole_round_basis.sql. MUST BE APPLIED TO PRODUCTION AT THE MERGE.**
+  Recorded at the top of HANDOFF.md as well, because a reminder that lives only in a chat is not a
+  reminder. Migrations deploy BEFORE the code that depends on them.
+- **CAUGHT BEFORE SHIPPING: the migration had inherited a one-time BACKFILL.** 0110 ended with an
+  `update public.rounds ... set played_at = created_at::date` across every game round — correct as a
+  one-time action there, destructive if re-run. Applying 0139 would have silently overwritten any
+  date an organizer had corrected since, for every game round in the database.
+  Regenerating a function from an older migration inherits that migration's DATA statements too,
+  and those are one-time by nature. 0139 now redefines functions only; the omission is noted in the
+  file so nobody re-adds it.
+
+- **The sweep asked a question the earlier audit had not.** 177.94 traced ALLOCATORS. This traced
+  the HANDICAP BASIS — where the number fed into allocation comes from. `chBasis` is the only thing
+  that halves for a nine, so anything bypassing it feeds an eighteen-hole figure into a nine.
+  Four gaps, none of which the allocator audit could have found.
+- **CORRECTED a decision before implementing it.** The instruction was to halve rating AND slope.
+  Rating and par halve; **slope does not**. Slope is a RATIO on the 55-155 scale, not a stroke
+  count — a published 9-hole Slope for a hard nine is still ~140, not ~70. Halving it applies the
+  difficulty adjustment twice: 3.5 strokes too few on a 113 course, 4.03 on 130, 4.80 on 155. The
+  error GROWS with difficulty, so it would hurt hardest courses most. Pinned as an assertion so
+  nobody "corrects" it later.
+- **GAP 1 — the live scoreboard** (`app/live/[token]/page.tsx`) used `p.ch` and never called
+  chBasis, showing roughly double the strokes on a nine. That is the screen playing partners watch
+  on their own phones. Fixed.
+- **GAP 2 — the share card** had TWO stroke paths, both bypassing chBasis. Both fixed; fixing one
+  is exactly how the allocators diverged in the first place.
+- **GAP 3/4 — posted rounds.** A nine-hole game wrote a round with 9 holes, `course_par` 72, the
+  eighteen-hole `course_handicap` and the eighteen-hole `rating`. Downstream that hit the
+  PARTIAL-round path and filled NINE phantom holes with net par — the pre-2024 combining method
+  applied to holes nobody intended to play, writing a wrong differential into the handicap record.
+  The only gap in this sequence that corrupted stored data rather than a display.
+  `roundDifferential` now routes an exact nine through `nineHoleBasis`; 10-17 holes keep the
+  net-par fill, because a partial round is a different situation.
+- **Confirmed against the rules, not assumed:** WHS accepts 9-hole scores immediately (since
+  January 2024), combining the 9-hole Score Differential with an expected Score Differential from
+  the player's current Handicap Index. Formats where you do not play your own ball — alternate
+  shot, scramble — still do not post. The halving is an APPROXIMATION and is documented as one:
+  WHS wants a PUBLISHED 9-hole Rating and Slope, GolfCourseAPI supplies neither, and BNN is not the
+  record of truth for handicaps. The app already approximates in this spirit when it fills an
+  unfinished round with net par.
+- **The migration guards caught three real omissions on the way in** — missing `record_migration`,
+  a missing `-- AUTHORIZATION:` header, and no deny-by-default REVOKE. That last one matters: these
+  are SECURITY DEFINER functions that write into handicap records, and 0110 (which this was
+  regenerated from) granted to `authenticated` without ever revoking from `public` and `anon`.
+- **NEW `lib/nine-hole-posting.test.ts`** — 24 assertions. Negative-tested three ways: halving
+  slope, not halving rating, and treating a partial round as a nine. All caught.
+- Assertion baseline 1793 -> **1970 across 34 suites**. All differential suites at 0 mismatches;
+  computeBetting 53/53.
+
+## 177.94.260827 — Full audit: SIX stroke producers, all verified
+- **NO migration.** A systematic sweep instead of another one-report-at-a-time fix.
+- **The audit.** Every function that turns a handicap into per-hole strokes, found by SHAPE rather
+  than by name, then traced TRANSITIVELY to the single allocator:
+
+  | producer | reaches `allocateStrokes` | own formula |
+  |---|---|---|
+  | `allocateStrokes` | is the core | no |
+  | `strokesReceived` | yes | no |
+  | `matchStrokesFor` | yes | no |
+  | `dotStrokes` | yes | no |
+  | `fullStrokes` | yes | no |
+  | `recvByRank` | yes | no |
+
+  **Six producers, one algorithm, zero private formulas.** The first sweep reported three as
+  "separate" because it only looked for DIRECT calls — transitive tracing is what proved it.
+- **FIX: one live call site still fell back to a synthesised 1..18.** `tournaments.tsx:3482` — the
+  "holes where I give a stroke" line, shown during play — called `matchStrokesFor` without the hole
+  list while mapping over `game.holes_meta`. Wrong on a nine, in the one place a player actually
+  looks mid-round. Three bare call sites remain and all three are correct: two are documented
+  no-hole-list fallbacks, one is the partial-round differential that MUST use the 18-hole basis.
+- **NEW `lib/all-allocators.test.ts`** — 98 assertions running EVERY producer against the same
+  inputs, asserting five properties that must hold for all of them:
+  1. the total allocated equals the handicap, rounded — a producer that thresholds on stroke index
+     cannot satisfy this on a nine, which is exactly how all three copies failed;
+  2. strokes land on the HARDEST holes first, and nowhere else;
+  3. more strokes than holes wraps to a second stroke rather than capping;
+  4. `dotStrokes` and `fullStrokes` — what the scorecard actually draws — agree with the core;
+  5. a nine gets exactly HALF an eighteen.
+  Twelve handicaps from 0 to 36, across a real back nine (every second index) and a full eighteen.
+- Negative-tested four ways: `strokesReceived` regrowing its formula, `matchStrokesFor` regrowing
+  its formula, `recvByRank` dropping the hole list, and `chBasis` ceasing to halve. All caught.
+- **Why this rather than a fifth bug report:** three copies were found one at a time, each after a
+  report, because each screen was internally consistent and only disagreed with a DIFFERENT screen.
+  Enumerating the producers and asserting shared properties is what makes a fourth unable to hide.
+- Assertion baseline 1695 -> **1793 across 33 suites**.
+
+## 177.93.260827 — A THIRD copy of the same formula: match strokes
+- **NO migration.** The match-handicap half of the same defect.
+- **`matchStrokesFor` carried a verbatim third copy** of `floor(x/18) + (si <= x % 18)`. Same
+  hardcoded 18, same failure on a nine: a back nine holds every second index, so Amit's 7.5-stroke
+  match difference matched only si <= 7.5 and found indexes 2, 4 and 6 — **three strokes where
+  eight were owed**. That is exactly the "match hcp 3" in the report.
+  It now delegates to `allocateStrokes` like the others. One algorithm, three wrappers.
+  The hole list is threaded through all **11** call sites; the golf.ts sites map their holes ONCE
+  per function rather than per hole per player.
+- **The guard I added at 177.92 did not catch it, and that is the more important failure.** Its
+  patterns keyed on variable NAMES — ch, hcp, handicap — and `matchStrokesFor` names its parameter
+  `diff`, so a verbatim copy of the formula sat one file away and passed clean.
+  The patterns now match the SHAPE: `floor(<anything>/18)` and `si <= <anything> % 18`, whatever
+  the variable is called. **A guard tuned to the instance you already found will not catch the next
+  one** — which is the whole lesson of this sequence, and it took the guard failing on its first
+  real test to see it.
+  Negative-tested against the exact bug that shipped AND against a fresh copy under a new name
+  (`shotsOn(si, alw)`); both now fail the guard.
+- Verified against the reported numbers: nine-hole handicaps 9, 1, 10, 5 now produce match dots of
+  **8, 0, 9, 4** — the true differences from the low handicap. Before the fix: 3, 0, 4, 2. Pinned
+  as assertions.
+- All differential suites remain at **0 mismatches**; `computeBetting` 53/53.
+- Assertion baseline 1691 -> **1695 across 32 suites**.
+
+## 177.92.260827 — ONE stroke allocator, with a guard that keeps it that way
+- **NO migration. No behaviour change from 177.91** — this removes the possibility of the class of
+  bug, rather than another instance of it.
+- **The right question was "why are there two?"** There should never have been. Every remaining
+  `strokesReceived` caller already had the hole list in scope, so the split bought nothing and cost
+  three releases of misdiagnosis.
+  `strokesReceived` is now a THIN WRAPPER over `allocateStrokes`. One algorithm. Where no hole list
+  is supplied it synthesises a 1..18 index — precisely what the old formula assumed — so a full
+  round behaves identically **by construction rather than by coincidence**.
+- **NEW `ci/check_single_stroke_allocator.py`** — the built-in check. It asserts:
+  1. `strokesReceived` still delegates and has not regrown a formula of its own;
+  2. no new hand-rolled allocation appears anywhere — an `si <= ch` threshold, a `% 18` on a
+     handicap, or a `floor(ch / 18)`;
+  3. every caller that HAS a hole list passes it, since omitting it silently falls back to 1..18
+     and reintroduces the nine-hole bug.
+  Paired with `lib/stroke-agreement.test.ts`, which asserts the scorecard dots and the Strokes
+  panel produce the SAME total across ten handicaps on a back nine, a front nine and a full
+  eighteen. The guard catches the shape; the test catches the numbers.
+- **The guard found a THIRD hand-rolled allocator on its first run** — inside `recvByRank`, added
+  by me at 177.91. It turned out to be my own doc comment quoting the old formula, so the guard now
+  strips comments before matching: a check that fires on its own explanation teaches people to
+  delete the explanation.
+- **Negative-tested three ways**, and the FIRST attempt let a sabotage through: allowlisting all of
+  `lib/golf.ts` meant `strokesReceived` could regrow its formula undetected — the one thing the
+  guard exists to prevent. The allowlist is now matched by TEXT, not by file, so anything else in
+  that file fails.
+- **The betting suite caught a real distinction I had flattened.** A NINE-HOLE GAME is a nine-hole
+  round: allocate across those nine. A PARTIAL round is an EIGHTEEN-hole round with holes missing —
+  WHS fills the unplayed holes with net par, and `unplayedRecv = ch - playedRecv` only balances if
+  playedRecv counts strokes under the FULL 18-hole allocation. Re-allocating across the 15 played
+  holes inflated playedRecv and skewed the differential from 12.45 to 9.98. That call site is back
+  on the 18-hole basis, documented at the line, and the guard allows it by name.
+- All differential suites remain at **0 mismatches**; `computeBetting` back to 53/53.
+
+## 177.91.260827 — The scorecard and the Strokes panel used DIFFERENT allocators
+- **NO migration.** Root cause of the repeated "strokes don't match" reports, including the very
+  first one I misdiagnosed twice.
+- **There were TWO stroke allocators, and they disagreed on a nine:**
+  - `allocateStrokes(holes, ch)` — ranks the holes ACTUALLY in play and distributes. Used by the
+    Strokes panel, which is why that panel has been correct throughout.
+  - `strokesReceived(si, ch)` = `floor(ch/18) + (si <= ch % 18)` — **18 HARDCODED**. Used by the
+    scorecard dots and the header totals.
+  On 18 holes with a clean 1-18 index the two agree, which is why this was invisible for years. On
+  a nine they do not: a back nine holds every SECOND index (2, 4, 6 ... 18), so the threshold form
+  matches only `si <= ch` and hands out roughly half the strokes owed. Amit off a nine-hole 8.5 got
+  dots on SI 2, 4, 6, 8 — four — while the panel correctly said nine.
+- **The game paths now allocate by RANK** via a new `recvByRank`, which uses `game.holes_meta` —
+  available at both call sites. `strokesReceived` is left untouched: its other callers are 18-hole
+  ROUND paths (manage.tsx, round stats) where it is correct and no hole list is threaded through.
+  A DotGame with no holes_meta falls back to the old form, which is what hand-built callers and
+  older tests have always used.
+- **This was the original "7 in the box, 3 on the card" report.** I attributed it to stroke indexes
+  at 177.88 and re-ranked them, which was both wrong and destructive; reverted at 177.90. Then I
+  attributed it to fractional rounding at 177.90 — a real bug, now fixed, but not this one. Three
+  attempts, and only reading BOTH code paths side by side found it.
+- **NEW `lib/stroke-agreement.test.ts`** — 34 assertions asserting the scorecard dots and the
+  Strokes panel produce the SAME total, for ten handicaps across a back nine, a front nine and a
+  full eighteen. The reported figures are pinned directly: 17 -> 9 dots, 28 -> 14, 4 -> 2. Before
+  the fix those were 4, 7 and 1. Negative-tested twice.
+- All differential suites remain at **0 mismatches across ~114,000 comparisons**; 18-hole play is
+  provably unchanged.
+- Assertion baseline 1657 -> **1691 across 32 suites**.
+
+## 177.90.260826 — Revert the stroke-index re-rank; round strokes once
+- **NO migration.** Two corrections, both to changes I made, and one of them fixes a defect that
+  predates this whole line of work.
+- **REVERTED the stroke-index re-ranking from 177.88.** It was unnecessary AND it corrupted real
+  data: the card showed a real course's back nine as SI 4, 6, 1, 5, 9 instead of its true 2, 4, 6,
+  8 ... 18. A course's stroke index is a fact about the course; the app does not get to rewrite it.
+  It was unnecessary because **`allocateStrokes` already RANKS** — it sorts by stroke index and
+  walks the ranked list — so a back nine with SI 2, 4, 6 ... 18 and a seven-stroke allowance
+  already receives seven strokes, on the seven hardest, whatever the absolute indexes are.
+  **My 177.88 diagnosis was wrong.** I attributed the reported "7 in the box, 3 on the card" to the
+  stroke index and changed the wrong thing. Assertions now pin the opposite, including one that
+  runs the REAL allocator against unmodified indexes.
+- **FIX: a fractional handicap handed out an extra stroke.** The allocator's loop condition
+  `k < total` makes a fractional total behave as a CEILING — 10.2 gave eleven strokes. Neither
+  rounding nor truncation, and invisible on screen. This is the "ph and strokes received don't line
+  up" report, and the likely real cause of the original 7-vs-3.
+  **NOT a nine-hole issue.** Any allowance produces fractions — 85% of 12 is 10.2 — so four-ball
+  and trifecta have been mis-allocating for as long as those allowances have existed. It only
+  surfaced now because the nine-hole halving makes .5 values common.
+  Rounded ONCE, half-up, inside `allocateStrokes`: 21 consumers feed it, a stroke is indivisible by
+  definition, and it is the last point in the chain so nothing double-rounds upstream. chBasis
+  continues to return an exact figure so the halving and the allowance compose cleanly.
+- **All differential suites at 0 mismatches across ~114,000 comparisons**, which is the evidence
+  that 18-hole scoring is unchanged. Whole-number handicaps are provably untouched.
+- **NEW `lib/stroke-rounding.test.ts`** — 24 assertions covering fractions either side of the half,
+  the nine-hole .5 cases, plus handicaps rounding the same way, and more strokes than holes. Three
+  negative tests: no rounding, floor, and ceil are all caught.
+- Assertion baseline 1633 -> **1657 across 31 suites**.
+
+## 177.89.260826 — Keyboard detection now works in the INSTALLED app
+- **NO migration.** Fixes 177.88's keyboard work, which could never have worked in the installed
+  app — the case it was written for.
+- **Root cause: the wrong reference height.** Detection compared `window.innerHeight` against
+  `visualViewport.height`. In Safari the keyboard shrinks the VISUAL viewport while the LAYOUT
+  viewport stays put, so a delta appears and the check fires. **In an installed PWA iOS resizes the
+  layout viewport too**, so both fall together, the delta stays at ~0, and the check never fires.
+  I verified the arithmetic against Safari numbers and shipped it for the installed app.
+- **`lvh` is the reference that does not move.** From this phone's own diagnostic: at rest lvh 956
+  while innerHeight and visualViewport are both 894 — the 62px gap is just the status-bar strip.
+  With a keyboard the visual viewport drops to ~576 and the gap becomes ~380.
+  lvh cannot be read from JS, so it is MEASURED with an offscreen probe, cached, and the cache is
+  cleared on rotation — the only thing that changes it.
+- **Threshold raised 120 -> 180.** Against lvh the resting gap is safeTop (47-62 by device) and
+  Safari's chrome adds another 50-72 on top, reaching ~123 in the worst combination — which would
+  clear a 120 threshold and hide the nav during ordinary scrolling. A keyboard is never smaller
+  than ~260px on any iPhone. 180 leaves ~57px of margin above the worst chrome case and ~80px below
+  the smallest keyboard.
+- **Verified in a real browser, not by arithmetic alone.** The lvh probe measures 956 exactly at
+  this phone's dimensions, and eight scenarios — installed at rest, installed with a keyboard,
+  Safari at rest, Safari with its toolbar, the worst chrome-plus-safe-area combination, Safari with
+  a keyboard, and the smallest phone with a keyboard — all resolve correctly. The two the 177.88
+  logic missed are both installed-app cases.
+- The shell pinning and nav hiding from 177.88 are unchanged; they were correct, and simply never
+  activated in the installed app because the detection they depend on never fired.
+
+## 177.88.260826 — Nine-hole stroke indexes; the keyboard dead band
+- **NO migration.** Two defects reported from staging, both traced to changes I made.
+- **FIX: a 9-hole match allocated too FEW strokes.** Reported as "ph 1 v ph 8, the strokes box says
+  7 strokes, the scorecard shows 3". Not a second halving — the handicap was right.
+  A back nine keeps the COURSE's stroke indexes, typically every second one (2, 4, 6 ... 18), so a
+  7-stroke allowance matched SI <= 7 — holes 2, 4 and 6 only. Three strokes instead of seven, a
+  shortfall of roughly half, which is why it read as double-halving.
+  **`holesForLength` now RE-RANKS stroke indexes 1..9 within the nine**, preserving the difficulty
+  order the course assigned: the hardest of the nine becomes SI 1. Holes with no index keep null
+  and rank last, so incomplete course data degrades to "no strokes there" rather than silently
+  becoming the hardest hole.
+  **This was my error, and I wrote it into the deploy notes as a feature** — "strokes still fall on
+  the course's hardest holes" at 177.85. That is right for hole NUMBERS, which must stay 10-18 or a
+  player reads "hole 1" on the 10th tee, and wrong for stroke INDEXES, because an 18-hole index
+  spread over nine holes is not a ranking of those nine. Two opposite calls that I made the same
+  way. TWO stale assertions had pinned the wrong behaviour and were corrected with the reason
+  recorded; reverting the change now fails the suite.
+- **FIX: the keyboard dead band.** Since 177.79 the shell is sized to the VISUAL viewport
+  (`--app-h`). A keyboard shrinks that by ~380px, so the shell shrank with it, the nav rode UP to
+  sit mid-screen with app background beneath it, and the content reflowed mid-typing.
+  Before 177.79 the shell was a fixed `100lvh`: the keyboard simply covered the bottom of the app,
+  the nav went under it, nothing moved, and iOS scrolled the focused field into view.
+  **While a keyboard is open the shell is now pinned to the glass and the nav is hidden.**
+  `--app-h` keeps tracking Safari's toolbar the rest of the time, which is what it was added for.
+  Measured at device dimensions (glass 956, keyboard 380): before, the nav sat inside the visible
+  area; after, it does not, and the field stays in the top half.
+- **The keyboard is inferred**, since there is no API: the visual viewport being >120px shorter
+  than the layout viewport. 120 sits well above toolbar movement (~50px) and well below any
+  keyboard (~287px on the smallest phone). Eight cases checked including both borderlines at 119
+  and 121; zero mismatches.
+- An ATTRIBUTE, not a CSS style query: style queries need Safari 18+ and behave unpredictably when
+  the custom property is unregistered. An attribute works everywhere, is visible in the inspector,
+  and a test can assert it.
+- **I tried this at 177.86 and reverted it**, because I had paired it with a wrong theory about
+  `visualViewport.offsetTop` and could not separate the two. The offset theory stays dead — the
+  harness disproved it. This is the other half, now with a measured mechanism.
+- Assertion baseline 1626 -> **1636**.
+
+## 177.87.260826 — Nine-hole matches now allocate half the handicap
+- **NO migration.** Fixes the defect reported from staging: a 9-hole match allocated the FULL
+  18-hole handicap — "ph 16" and "a stroke on every hole, + 2nd on 10, 13, 16, 17, 18".
+- **Root cause: two sources for one number.** The player card reads the STORED `course_handicap`;
+  the strokes panel RECOMPUTES through `chBasis(p, game.course_par)`. Only the second was wrong,
+  which is why the card looked right and the panel did not.
+- **`chBasis` now halves for a nine**, via an OPTIONAL third argument. Omitting it keeps today's
+  behaviour exactly — which matters, because this is the scoring engine: every net score, stroke
+  dot, leaderboard position and money calculation reads it.
+  The hole count is threaded through all **25** call sites across five files. Doing it everywhere
+  rather than only in the strokes panel is the point: fixing one consumer and not the others is
+  what produced two disagreeing numbers in the first place.
+- **Verified arithmetic** (index 14, slope 130, rating 71.5, par 72):
+  18-hole handicap **15.6**; a nine previously got **15.6** unhalved; **half is 7.8** and correct.
+  The WHOLE figure halves, not the par term — the slope term dominates and par does not touch it.
+  WHS proper uses that nine's own Course Rating and Slope; BNN has only the 18-hole pair because
+  GolfCourseAPI publishes no per-nine figures, so halving is the documented practical substitute.
+- **The trap is pinned by a test.** Slicing `coursePar` to 36 looks exactly like the fix and gives
+  **51.6** — worse than the unhalved 15.6 it was meant to correct, because `chBasis` computes
+  `(rating - coursePar)` and an 18-hole rating against a 9-hole par is incoherent. I attempted that
+  slice at 177.86, measured it, and reverted it; an assertion now fails if anyone tries again.
+- The stored-handicap fallback halves too, so a guest with no index is treated the same as a member
+  on the same card.
+- **The differential suite caught a real regression and was resolved deliberately, not silenced.**
+  Threading the hole count produced 6,928 mismatches against `player-scoring.baseline.ts`. That
+  baseline exists to prove the 176.21 EXTRACTION was faithful, not to freeze the maths, so it moves
+  with a deliberate correction — otherwise the suite reports thousands of mismatches forever and
+  its signal is lost. All four diff suites are back to **0 mismatches across ~94,000 comparisons**.
+- **NEW `lib/nine-hole-handicap.test.ts`** — 15 assertions including the 51.6 trap, the
+  stored-handicap fallback, plus scratch, plus-handicap, and guard values (0, negative, null, 12
+  holes) that must NOT be mistaken for a nine. Negative-tested four ways: not halving, halving 18,
+  treating 0 as a nine, and skipping the fallback are all caught.
+- Assertion baseline 1594 -> **1609 across 30 suites**.
+
+## 177.86.260826 — Revert the keyboard change; diagnose the nine-hole handicap
+- **NO migration. A revert plus documentation.** No new behaviour.
+- **REVERTED the keyboard/nav change from the previous drop.** It hid the bottom nav while a
+  keyboard was open, on my theory that `visualViewport.offsetTop` explained the dead band under the
+  nav. The diagnostic disproved it: `vvOffsetTop 0`, `shellBottom 894`, `navBottom_vs_visible 0` —
+  the shell geometry was already correct. The change fixed nothing and altered nav behaviour that
+  had been working. `viewport-sync.tsx`, `globals.css` and `home.tsx` are now BYTE-IDENTICAL to
+  177.80, the last version confirmed good on device.
+  The keyboard dead band is real and remains OPEN. Looking again at the report, the content is
+  clipped under the STATUS BAR at the top, which is a different mechanism from anything I changed.
+  It will be diagnosed from measurements, not guessed at a fourth time.
+- **DIAGNOSED but deliberately NOT fixed: a nine-hole match allocates the full 18-hole handicap.**
+  The strokes panel shows "ph 16" and "a stroke on every hole, + 2nd on 10, 13, 16, 17, 18".
+  The player card and the panel disagree because the card reads the STORED `course_handicap` while
+  the panel RECOMPUTES through `chBasis(p, game.course_par)` — two sources for one number.
+  Verified arithmetic (index 14, slope 130, rating 71.5): the 18-hole handicap is 15.6; a nine
+  currently gets 15.6 unhalved; **slicing `coursePar` to 36 alone gives 51.6 — worse, and visibly
+  absurd**, because `chBasis` computes `(rating - coursePar)` and an 18-hole rating against a
+  9-hole par is incoherent. Halving the WHOLE figure gives 7.8 and is correct, because the slope
+  term dominates and par does not touch it. That is `courseHandicapForLength()`, already written
+  and tested at 177.85 — it simply is not wired in.
+  The fix needs `chBasis` to know the hole count. All 21 callers pass `game.course_par` uniformly,
+  so the plumbing is consistent, but it spans six files including `player-scoring.ts` and its
+  baseline: every net score, stroke dot, leaderboard position and money calculation reads it. Not a
+  change to make at the end of a session and hand over unverified.
+- **I attempted the `coursePar` slice, measured it, and reverted it.** The line now carries a
+  comment saying it is deliberately the full course par and that slicing it alone makes things
+  worse — because it looks exactly like the fix.
+- Full diagnosis, the arithmetic table and the trap are recorded in BACKLOG.md.
+
+## 177.85.260826 — Three staging defects: Format tab, allowance field, and the missing 9/18 picker
+- **NO migration.** All three reported from staging; each verified from the code before any fix.
+- **FIX: the Format tab was missing Alternate Shot and looked different from Create Game.** It
+  carried its OWN hardcoded list of game types as `[key, label]` tuples — an EIGHTH copy of a list
+  already consolidated seven times at 177.82. My earlier sweep searched for the type-union pattern
+  and a tuple array does not match it. That is why the format appeared at creation and vanished
+  afterwards, and why the tiles were sized differently (minWidth 100 / padding "7px 12px" against
+  Create Game's 150 / standard).
+  **NEW `components/game/format-picker.tsx`** — one control driven by `GAME_TYPES`, shared by both
+  screens, so the next format reaches both or neither. Everything the Format tab has that Create
+  Game does not is preserved and passed explicitly: the per-format legality verdict, the
+  greyed-with-reason state (a blocked format is SHOWN disabled, never hidden — an option that
+  silently vanishes teaches nobody why), the per-preset allowance block, and the anyScores note.
+  Create Game omits them because nothing is scored yet. 25 rendering assertions.
+- **FIX: the allowance after creation had no free-text field and no 50 preset**, so a game created
+  as alternate shot at its defined 50% could never be corrected back to it. Presets are now
+  [100, 90, 85, 50] plus the free-text field, shared with Create Game.
+- **FIX: the 9/18 picker did not exist ANYWHERE.** `match-length.ts` was built and tested at
+  177.82 and nothing rendered it, while the deploy notes said it applied "to EVERY format" — which
+  reads as shipped. That was misleading and it wasted a staging round trip.
+  **NEW `components/game/match-length-picker.tsx`** — two questions, "how many holes" then "which
+  nine", the second only when it applies. Renders NOTHING on a nine-hole course, where there is one
+  nine and it is the course. 18 rendering assertions.
+- **A nine-hole game needs NO schema change:** it is simply nine entries in `holes_meta`.
+  `holesForLength` slices the course's holes at payload time, keeping their own hole numbers and
+  stroke indexes — so a back nine reads 10-18 and strokes still fall on the course's hardest holes.
+  12 assertions run the REAL `buildGamePayload` to prove it.
+- **The scorecard needed no change at all.** Verified rather than assumed: `ScoreEntryCard` already
+  gates its IN and TOTAL rows on `holes.length > 9`, and the scorecard's divider separates PLAYERS
+  (pairings), not front/back nine. Every `|| 18` in the codebase is a fallback for missing data,
+  not an assumption. Nine-hole rendering was built long ago; there was no way to create such a game.
+- **`match-length.ts` was written against the WRONG FIELD.** `CourseHole` is `{ n, par, si }`; I had
+  used `hole_number`, which course holes do not carry, and then tested it with fixtures built from
+  the same assumption — so module and tests agreed and both were wrong. Only a test against the
+  real payload builder exposed it. It now accepts either field, because round holes (lib/golf.ts)
+  genuinely do use `hole_number`.
+- **Match length is editable until the first score, then locked** — the rule you asked for, and the
+  same rule as `change_course`, for a concrete reason: scores are stored POSITIONALLY against
+  holes_meta, so shortening an 18-hole game after someone has played the 12th would orphan those
+  entries. New `set_match_length` policy action, 5 assertions, negative-tested both directions.
+- **Match length persists in the setup draft.** Surfaced by the state-inventory guard demanding it
+  be classified: it is domain state, so without persistence an organiser who picks the back nine,
+  leaves setup and returns would silently be back at 18 and create the game on the wrong holes.
+  Optional throughout, and a test pins that a draft saved BEFORE this field existed still resumes —
+  at 18, not undefined — so nobody mid-setup when the release lands loses their draft.
+- **TWO guards pinned a VARIABLE NAME rather than the behaviour.** Both required the literal
+  `target: key`, so extracting the shared picker and renaming the loop variable to `t` failed them
+  while the guarantee was intact. Both now match the ACTION. A guard that breaks on a rename
+  teaches people to weaken guards. Each was negative-tested afterwards to confirm it still catches
+  the policy actually being removed.
+- Removing the duplicated control paid down design debt: off-scale `padding "7px 12px"` 32 -> 30.
+- Assertion baseline 1521 -> **1594 across 29 suites**.
+
+## 177.84.260826 — Alternate Shot appears in Create Game
+- **NO migration.** First user-visible piece of the alternate shot format: it can now be selected.
+  Scoring and the scorecard follow separately, so a game created in this format is not yet
+  playable end to end.
+- **Format picker** now shows four team formats in a 2x2, paired by what they are rather than by
+  order of arrival: **Four-ball | Alternate Shot** on the first row, **Trifecta | Skins** on the
+  second. Four-ball and alternate shot are the same game with a different number of balls — 2v2
+  partners either way, four balls or one — so reading them side by side is the quickest way to
+  understand the new one.
+  `minWidth` 104 -> 150 produces the 2x2 through the existing `flexWrap` with no container change.
+  Measured on a 393px phone: usable row width 337px, so three at 150 need 466 (wraps) and two need
+  308 (fits, 29px spare). Anything from 140 to 178 behaves identically, so 150 sits mid-range
+  rather than at an edge and cannot collapse to a ragged 3+1 on a smaller phone.
+- **FIVE fall-through defects found by reading each `gameType` chain rather than assuming a new
+  team format inherits team handling.** Every one would have shipped looking correct:
+  - `buildGamePayload` wrote **`teams: null` and `foursomes: null`** for alt_shot. The picker would
+    have worked, the review label would have read correctly, and the game would have reached the
+    database with no sides at all — inert at runtime with nothing on screen to explain why. This
+    was the serious one.
+  - The picker's explanatory note fell through to the SINGLES description, "Players are paired
+    1-on-1" — wrong, and wrong in the plausible way that nobody queries.
+  - The team-mode gate (`match | fourball | stroke-skins`) excluded alt_shot, so the organiser
+    could not turn on two named teams and the Teams step never appeared — while `shapeOf` reported
+    `usesTeams: true`. Setup and the shape model would have disagreed.
+  - The team-mode note fell through to "Each 1-on-1 pairing is worth a point".
+  - The Team-mode toggle LABEL fell through to "Team match (e.g. 4 v 4)". It now shares four-ball's
+    "Create Team Names (Red vs Blue)", which is already exactly right, rather than gaining a
+    near-identical third string.
+- **Deliberately NOT changed:** the best-ball/aggregate "Team score" block stays fourball-only.
+  One ball means the choice does not exist, so offering it would claim a choice the format lacks.
+  Same reason `team_score_mode` is not written in the payload.
+- **CORRECTED my own earlier design.** `selectGuidedTeamFormat` returned `allowancePct: 50`, but
+  `applyGuidedFormatPatch` reads nine fields and that is not one of them — the 50% would have been
+  silently dropped and alternate shot would have played off 100%, roughly twice the strokes, with
+  nothing on screen to say so. The per-format default lives in `selectGameType` alongside
+  four-ball's 85%; the unused patch field is gone.
+- **NEW test: the payload must supply whatever the shape claims to use.** For every game type,
+  `usesTeams` implies `teams` in the payload and `usesFoursomes` implies `foursomes`. Nothing
+  enforced that agreement before. Negative-tested: reverting either half of the payload fix fails.
+  Assertion baseline 1512 -> **1521**.
+- **Three findings from auditing this change against APP_RULES rather than asserting compliance:**
+  - I wrote `\\u00bd` in a JSX-rendered string while the line directly below uses a real `½`.
+    APP_RULES #3 permits `\\u` in JS string literals, so not strictly a violation — but matching
+    the code beside it is the point of the rule. Now a real glyph.
+  - **`ci/check-jsx-escapes.py` existed, is named in APP_RULES #3 as the CI enforcement, and was
+    never in the guards chain** — that rule has been unenforced for its whole life. A sweep found
+    it was the only orphan: all 56 `ci/check*.py` scripts now run.
+  - Wiring it in immediately failed the build on `tee-times.tsx:301`, a pre-existing `\\u00b7`
+    inside a nested template literal — which the guard itself labels a "safe false positive" while
+    still exiting 1. A check that cries wolf is almost certainly why it was never wired in. The
+    line now uses a real middot, so the guard stays strict rather than becoming another check that
+    reports something and means nothing.
+- Also run and green: `workflow_fault_simulation.py` (50,087 checks) and `verify_release.py`
+  (20/20), both named in HANDOFF section 6 as required every bundle.
+
+## 177.83.260826 — The screen suite never exited; a preflight gate so it cannot recur
+- **NO migration. No user-visible change.** Supersedes the 177.82 candidate.
+- **ROOT CAUSE of the CI slowdown: `lib/screens.test.tsx` printed its result and then HUNG.**
+  jsdom holds a live window and React keeps scheduler callbacks for any root it still knows about,
+  so node's event loop never drained. `report()` exited non-zero on failure but merely RETURNED on
+  success — so it hung precisely when everything was fine. CI was not doing work for thirty
+  minutes; it was waiting on a dead process, which is why the log looked healthy and the only
+  symptom was a build that ran to its job timeout.
+  Screen suite: hung indefinitely -> **687ms**. Whole `npm test`: timed out -> **~25s**.
+- **HOW IT GOT THROUGH, precisely:** every time I ran that suite I piped it to `tail`, which
+  reports the LAST command's exit status and hides that the process never returned; and I never
+  once ran the full pipeline end to end and looked at the clock. Three things were true — the
+  suite passed, the suite hung, the pipeline took thirty minutes — and reading only the first is
+  how the other two shipped.
+- **`lib/test-render.ts` had the same latent defect** and was one mounted root away from the same
+  fate. It drains today by luck, not design. Both harnesses now tear down the jsdom window and
+  exit explicitly on success as well as failure.
+- **NEW `ci/preflight.py`** — runs what CI runs, the way CI runs it, before anything is packaged:
+  - every step is TIMED against a budget, and an implausible duration fails. A passing suite that
+    takes minutes is not slow, it is stuck.
+  - exit codes come from the process, never from a shell pipeline. `cmd | tail` is what made a
+    hang and a failure both read as success.
+  - the suite runs TWICE, cold and warm, because a step that only works with warm caches fails on
+    a fresh CI runner and CI is always cold.
+  - `--zip` verifies a packaged drop on a CLEAN EXTRACT over the baseline it applies to, so what is
+    checked is what is handed over — not a working tree that happens to have a file the zip forgot.
+  Negative-tested: reinstating the missing `process.exit(0)` is reported as HUNG, with the cause
+  named, rather than running to a timeout.
+- **The assertion ratchet's hang timeout is 1800s -> 300s.** The suite runs in ~25s, so waiting
+  half an hour to conclude it is stuck delivered the message long after anyone was still watching
+  the build. A timeout now explains what a hang means instead of surfacing a raw TimeoutExpired
+  traceback, which is what CI showed and why this read as an infrastructure problem.
+- Measured end to end on this machine: lint 17s, tsc 9s, test 34s, test warm 34s, guards 41s,
+  build 53s — **189s total**.
+- Everything in the 177.82 candidate is included: the double-test-run fix, the `sh`/`pipefail`
+  correction, the seven-way game-type union consolidation, and the inert alternate shot logic
+  layer (1512 assertions across 26 suites).
+
+## 177.82.260826 — CI ran every test twice; alternate shot logic (inert)
+- **NO migration. No user-visible change.**
+- **FIX: `npm run ci` executed the whole test suite twice and timed out at 1800s.** The chain was
+  `guards && test`, and `ci/check_test_assertions.py` — the assertion ratchet — shelled out to
+  `npm test` itself. I wrote that guard without noticing the pipeline already ran the suite. Adding
+  the screen render tests at 177.81 pushed the second run past the timeout, so CI has been failing
+  on every push since.
+  `npm test` now writes its output to `.test-report.txt` and the ratchet reads that. The ratchet
+  step drops from ~10 minutes to 0 seconds. Re-running remains the fallback for standalone use, and
+  a report older than the newest source file is REJECTED — trusting a stale one would let the guard
+  pass against results that predate the change being checked. Verified by touching a source file
+  and watching it go back to a full run.
+- **A second defect found while fixing the first:** the initial version piped the suite through
+  `tee`, which `sh` cannot make fail-safe — npm runs scripts with `sh`, which has no `pipefail`, so
+  a failing suite would have exited 0 behind tee's own success. A test suite that cannot fail the
+  build is worse than no test suite. Rewritten to capture the real exit code, and verified by
+  sabotaging a test and confirming `npm test` still returns non-zero.
+- The `ci` chain now runs `test` before `guards`, so the report exists when the ratchet looks for
+  it. Every check still runs; only the order changed.
+- **The game-type union was written out verbatim in SEVEN places across five files** — `GameType`,
+  `GameTypeOpt`, and five inline copies in `game-types.ts`, `organizer-panel.tsx`,
+  `tournaments.tsx` (x3) and the live view. Adding a format meant finding all seven, and the six
+  missed would have silently excluded it from the picker, the live scoreboard and the organizer's
+  format switcher, with no error anywhere. All now reference one list.
+- **NEW alternate shot (foursomes) logic — INERT in this release.** `alt_shot` is in the type union
+  and in `shapeOf`, but no picker offers it, so no game can be created with it. The existing
+  85-assertion game-shape suite passes unchanged, which is the evidence that every existing format
+  behaves identically. The UI lands separately.
+  - `lib/alt-shot.ts` (60 assertions) — team handicap at 50% of combined Course Handicaps, match
+    strokes, odd/even tee order, low-net hole result, match state.
+    **Rounding happens ONCE, at the difference.** Rounding each side first loses a stroke: combined
+    28 and 15 give 14 and 7.5, a difference of 6.5 that rounds to 7 — pre-rounding gives 14 and 8,
+    a difference of 6. The worked example is pinned as a test.
+    A missing handicap is REPORTED, never guessed: a partner off 20 counted as scratch turns a team
+    handicap of 17 into 7 and hands the other side ten strokes with nothing on screen to say so.
+    The organiser is told which partner and chooses; unresolved means NO strokes, not wrong ones.
+  - `lib/match-length.ts` (38 assertions) — 18 / front 9 / back 9, for EVERY format, asked as two
+    questions: how many holes, then which nine, and the second only when it applies. Hole numbers
+    are NOT renumbered — a back-nine card must say 10-18, or a player reads "hole 1" on the 10th
+    tee. Halving the Course Handicap for a nine is documented as an APPROXIMATION: WHS uses that
+    nine's own Course Rating and Slope, which BNN does not have because GolfCourseAPI does not
+    publish per-nine figures.
+  - `lib/alt-shot-scores.ts` (16 assertions) — one score fanned out to both partners' rows, so the
+    outbox, scorecard and leaderboard all work untouched. Stats are deliberately NOT fanned out:
+    whose putt was it? Duplicating would double the side's putts in every aggregate.
+  - `lib/game-type-coverage.test.ts` (72 assertions) — walks every game type and asserts each has a
+    DISTINCT label and a valid shape. Distinctness matters: the label chain ends in a fall-through
+    to "Stableford", so a format added to the union but forgotten there is not labelled with its
+    raw key — it is labelled as a different real format, and nothing looks wrong.
+- Assertion baseline 1314 -> **1512 across 26 suites**.
+
+## 177.81.260824 — Screen render tests: real components, in a fake browser
+- **NO migration.** One user-visible fix, plus the test harness that found it.
+- **NEW `lib/screen-harness.ts` + `lib/screens.test.tsx`** — mounts REAL components from
+  `components/` in jsdom and asserts what a person would otherwise check by eye: every row is on
+  screen, all text clears WCAG AA against the background it actually resolves against, no button
+  is below the tap-target floor, nothing renders `null`/`undefined`/`NaN`, and the screen mounts at
+  all. 24 assertions across `RoundsList` and `LeaderRow` (four net-vs-par states each).
+  Wired into `npm test`; assertion baseline 1252 -> 1276.
+- **Why:** the unit suite tests logic and never opens a screen, so a whole class of defect reached
+  devices this week with every gate green — six buttons rendered blue, 44 destructive actions at
+  1.42:1, the nav's labels clipped off-screen, badge discs on different lines. All are "render it
+  and measure" problems.
+- **FIX found on the harness's first run: avatar initials were `#fff` on every palette colour**,
+  which fails AA on four of the seven — worst **2.40:1** on the teal, effectively invisible. Each
+  colour is now paired with the ink that is readable on it, and the blue moved 8% darker
+  (`#5A7BC0` -> `#5271B0`) because at the original value NEITHER ink cleared 4.5. Worst case across
+  the palette 2.40:1 -> 4.67:1, and `check_resolved_contrast` fell from 25 known sub-threshold
+  sites to **17**.
+- **`C.gold` as text on light-green surfaces (3.34:1) is accepted, not fixed.** 163 sites use it;
+  lightening it enough to clear 4.5 would visibly change the brand colour app-wide and make
+  gold-on-cream worse. Recorded as a named allowance with its measured ratio and reason, and
+  **printed on every run** so it stays visible rather than becoming a silent skip.
+- **Testing the REAL component corrected the test twice**, which a hand-written stand-in never
+  would have: the field is `course`, not `course_name`; and gross and Stableford are DERIVED from
+  the holes, so a row-level `gross` is ignored. Both assumptions were mine and both were wrong.
+- **Negative-tested against four defects**: reverting the avatar ink, stranding a score colour on
+  the wrong surface, dropping rows from the list, and a crash on a round with no putts recorded.
+  All four fail the suite; the shipped code passes.
+- **NEW `ci/check_no_build_artifacts.py`** — 149 compiled `.js` files had accumulated under `app/`,
+  `components/` and `lib/` from a `tsc` run without `--outDir`. They were invisible to everything:
+  `tsc --noEmit` reads the `.ts`, `next build` resolves `.ts` first, and the unit suite imports
+  from `.testout/`. Only eslint noticed, by failing to parse the JSX. Had they been committed,
+  module resolution could have served a stale compiled component while the source on screen looked
+  correct. Removed, and the guard runs FIRST so it cannot recur. Negative-tested.
+- `ci/patch_test_aliases.mjs` rewrites `require("@/...")` in compiled test output — tsc resolves
+  the alias for types only, which is what made the components untestable in the first place.
+- **SECOND BATCH: `SegmentBoard` and `ShotSynthesis`.** 24 -> 62 assertions.
+  - `SegmentBoard`: collapsed and expanded, both scoring modes, four player rows including a tie
+    on total, a mid-round player and one who has not started, plus the empty case that must render
+    nothing at all rather than a stray heading.
+  - `ShotSynthesis`: three states — no handicap index, no stat meeting its minimum sample, and a
+    qualifying sample at 0% / 100% / a repeating decimal, where formatting and rounding break.
+  - **NEW `click()` in the harness.** An accordion that never opens is a whole branch of markup no
+    assertion has ever seen; SegmentBoard's player rows are only reachable once expanded.
+- **The real components corrected the tests four more times**, which is the whole argument for
+  testing them rather than stand-ins: `SegmentBoard` is a COLLAPSED accordion, not an open board;
+  its segments are three blocks of six, not front/back nine; `ShotSynthesis` returns null without a
+  handicap index; and it returns null again when no stat meets its minimum sample. All four were my
+  assumptions, and a stand-in I had written would have agreed with every one.
+- **Several "prop-only" components construct a Supabase client at MODULE scope**, so importing them
+  throws before any test runs — my earlier count looked for `supabase.` usages and missed it. The
+  harness sets placeholder credentials before any component is imported. No request is made;
+  anything that genuinely queries will fail loudly against a placeholder host, which is correct —
+  it means that component needs the fake client rather than a silent pass.
+- Negative-tested again: a changed segment column label, a dropped player row, and a colour token
+  stranded on the wrong surface are all caught.
+- Assertion baseline 1276 -> **1314**.
+
+- **Scope:** 18 components take props only and are testable with no database stand-in. The 20
+  Supabase-coupled screens need a fake client and come next.
+
 ## 177.80.260822 — Bottom nav sits flush; the geometry guard made to actually evaluate
 - **NO migration. Layout + CI only.**
 - **FIX: the nav floated ~34px above the bottom of the app.** 177.79 sized the shell to the VISIBLE

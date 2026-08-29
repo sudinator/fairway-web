@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import type { GameType } from "@/lib/game-shape";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { Avatar } from "@/components/ui";
@@ -22,7 +23,7 @@ type LivePlayer = {
 };
 type LiveGame = {
   name: string; course: string; course_par: number | null;
-  game_type: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta";
+  game_type: GameType;
   status: "active" | "ended"; allowance_pct: number | null;
   team_score_mode: "best_ball" | "aggregate" | null;
   trifecta_scoring: "per_hole" | "match" | null;
@@ -51,7 +52,10 @@ type PStat = {
 };
 
 function computePlayer(p: LivePlayer, meta: LiveMeta[], allowance: number): PStat {
-  const playing = applyAllowance(p.ch, allowance);
+  // Halve for a nine BEFORE the allowance. p.ch is the stored eighteen-hole figure and this view
+  // never touched chBasis, so a nine showed roughly double the strokes — on the screen playing
+  // partners watch.
+  const playing = applyAllowance(meta.length === 9 ? p.ch / 2 : p.ch, allowance);
   const alloc = allocateStrokes(meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })), playing);
   let gross = 0, parPlayed = 0, thru = 0, points = 0, net = 0, putts = 0, pen = 0, fwHit = 0, fwTot = 0, fwLeft = 0, fwRight = 0, girHit = 0, girTot = 0;
   let puttsT = false, penT = false, fwT = false;

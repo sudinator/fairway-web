@@ -66,5 +66,21 @@ check("legPoints set", legPoints(cfg, { k: "1\u20136", from: 0, to: 6 }), 0.5);
 check("legPoints unset -> 0", legPoints(cfg, { k: "7\u201312", from: 6, to: 12 }), 0);
 check("legPoints default cfg", legPoints(DEFAULT_LEG_CONFIG, { k: "Total", from: 0, to: 18, tot: true }), 0);
 
+
+// ── "none" turns the segment side game OFF ───────────────────────────────
+// It was configurable but had no way to disable, so a side game nobody chose ran on every game.
+// Returning no legs means every consumer that maps over them renders nothing.
+{
+  for (const n of [9, 18]) {
+    check(`none over ${n} holes yields no legs`, buildLegs("none", n).length, 0);
+  }
+  // Every other scheme is unchanged — the off switch must not have altered them.
+  for (const scheme of ["sixes", "nines", "sixesNoTot", "total"]) {
+    ok(`${scheme} still builds legs`, buildLegs(scheme, 18).length > 0);
+  }
+  // An unknown scheme must NOT silently disable the side game — it falls back, it does not vanish.
+  ok("an unknown scheme still builds legs", buildLegs("wat", 18).length > 0);
+}
+
 console.log(`legs: PASS ${pass}  FAIL ${fail}`);
 if (fail) { console.log(fails.join("\n")); process.exit(1); }

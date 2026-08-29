@@ -4,6 +4,7 @@
 // only — no runtime code — so moving them here cannot change behavior.
 
 import type { LegConfig } from "./legs";
+import type { GameType } from "./game-shape";
 
 export type Game = {
   id: string;
@@ -13,7 +14,7 @@ export type Game = {
   course: string;
   course_par: number | null;
   holes_meta: { n: number; par: number; si: number | null; yards?: number | null }[]; // par + stroke index (+ yardage) per hole
-  game_type: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta";
+  game_type: GameType;
   stroke_basis?: "gross" | "net" | null; // stroke play: gross or net total
   skins_mode?: "carryover" | "split" | null; // individual skins: carryover (default) or split
   allowance_pct?: number | null; // handicap allowance % applied to net scoring

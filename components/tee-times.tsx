@@ -298,7 +298,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: C.ink }}>{name}{r.user_id === user.id ? " (you)" : ""}</div>
             <div style={{ fontSize: 11, color: C.faint }}>
-              {m?.handicap_index != null ? `Idx ${m.handicap_index}${chSel != null ? ` \u00b7 CH ${chSel}` : ""}` : "no idx"}
+              {m?.handicap_index != null ? `Idx ${m.handicap_index}${chSel != null ? ` · CH ${chSel}` : ""}` : "no idx"}
               {r.guest_names?.length && !canOrganizeTee ? ` · +${r.guest_names.length} guest: ${r.guest_names.join(", ")}` : ""}
             </div>
             {canOrganizeTee && r.guest_names?.length ? (

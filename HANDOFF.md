@@ -6,10 +6,53 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
+## 0. ACTION REQUIRED AT THE NEXT PRODUCTION MERGE
+
+**`migrations/0139_nine_hole_round_basis.sql` must be applied to PRODUCTION when the databases are
+merged.** It redefines three functions (`post_game_rounds_internal`, `post_group_rounds`,
+`set_game_played_date`) so a nine-hole game posts a round on a nine-hole basis: rating, par and
+course handicap halved, **slope unchanged**.
+
+Migrations deploy BEFORE the code that depends on them. Until this runs in production, a nine-hole
+game posted there writes a wrong differential into the player's handicap record — 9 holes against
+par 72 with an eighteen-hole handicap, which falls into the partial-round path and fills nine
+phantom holes with net par.
+
+Requested by Amit, 177.95. Delete this section once it is applied.
+
 ## 0. The one rule that overrides everything
 **Verify every claim about app behavior from the actual code before stating it or acting on it.** Do not
 describe what the app does from memory or inference. Open the file, read it, then respond. This is the
 single most important habit — it has caught countless bugs.
+
+### What "verify" means in practice
+Before writing code that touches a component, read its ACTUAL signature and body. Before writing a
+test fixture, read the field names off the type. Before claiming a check passes, read the exit code
+from the process — not from a pipeline, and not from output piped to `head` or `tail`.
+
+### Assumptions that reached the user, each avoidable by opening one file
+| Assumed | Actually |
+|---|---|
+| `RoundsList` takes `course_name` | the field is `course` — the name rendered blank |
+| a round row carries `gross` | gross is DERIVED from the holes; the row field is ignored |
+| `SegmentBoard` renders an open board | it is a COLLAPSED accordion — names hidden until expanded |
+| its segments are front/back nine | three blocks of six (1-6, 7-12, 13-18) |
+| `ShotSynthesis` always renders | returns null twice over: no index, and no qualifying sample |
+| `LeaderRow` takes plain fields | it takes CALLBACKS — playerNet, parThru, relToParStr |
+| components with no `supabase.` calls are prop-only | several construct a client at MODULE scope |
+| `100lvh` equals the visible viewport when installed | it is larger by exactly safe-area-inset-top |
+| `cmd \| tail` shows me whether cmd passed | it reports TAIL's status — hid a suite that hung forever |
+
+### The shape of the mistake
+It is never "I could not have known". It is always "I did not look, because I was confident."
+Confidence about a file you have not opened in this session is worth nothing.
+
+### Standing checks
+- `python3 ci/preflight.py` before packaging anything — runs the real pipeline, timed, and fails a
+  step that is stuck rather than slow.
+- `python3 ci/preflight.py --zip <drop> --base <baseline>` before handing a drop over, so what is
+  verified is the artifact, not a working tree that happens to have a file the zip forgot.
+- Quote the measured timings in the handover. "The gates passed" is not evidence.
 
 ## 1. What BNN is + your role
 - **Birdie Num Num**: a golf-scoring Progressive Web App for a golf group — scorecards, games/tournaments,

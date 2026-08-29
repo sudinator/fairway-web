@@ -1,8 +1,12 @@
 // Shared golf logic and styling — no React here, just functions and constants.
+import { altShotMatchStrokes } from "./alt-shot";
 
 export const C = {
   green: "#0E3B2E", greenMid: "#16503D", greenLight: "#1B5A46",
   cream: "#F7F3E8", card: "#FFFDF6", ink: "#26251F",
+  // Scorecard cell: a shade off `card`, so an editable cell reads as a field. Was a literal in
+  // three places, which is how a colour drifts — one gets adjusted and the others disagree.
+  cell: "#FBFAF4",
   faint: "#676253", line: "#D8D2BE",
   birdie: "#B83A2E", bogey: "#2E5AB8", gold: "#C9A227", sage: "#B2CBBD",
   dot: "#E8730C", parBlue: "#1E3A8A", indivDot: "#8FC4EE",
@@ -99,10 +103,36 @@ export function withHistoricalRatingSlopeCorrection(r: Round, rating: number | n
   };
 }
 
-export function strokesReceived(si: number | null, ch: number | null): number {
+/**
+ * Strokes received on the hole with stroke index `si`.
+ *
+ * THIS IS A WRAPPER, NOT A SECOND ALGORITHM. It used to be its own formula —
+ * `floor(ch/18) + (si <= ch % 18)` — with 18 hardcoded, and it agreed with allocateStrokes on a
+ * full round with a clean 1-18 index and diverged everywhere else. A nine-hole game holds every
+ * second index, so it handed out roughly half the strokes owed while the rest of the app allocated
+ * correctly, and the two disagreed on screen.
+ *
+ * Two implementations of one rule is the defect; this now delegates so there is exactly one.
+ *
+ * `holes` is optional only because a few callers pass a bare stroke index. Omitting it synthesises
+ * a 1..18 index, which is precisely what the old formula assumed — so a full round behaves
+ * identically by construction rather than by coincidence. Callers that HAVE the hole list should
+ * pass it: that is the only way a nine, or a course with duplicate or missing indexes, comes out
+ * right.
+ */
+export function strokesReceived(
+  si: number | null,
+  ch: number | null,
+  holes?: { hole_number: number; stroke_index: number | null }[] | null,
+): number {
   if (si == null || ch == null) return 0;
-  if (ch >= 0) return Math.floor(ch / 18) + (si <= ch % 18 ? 1 : 0);
-  return si > 18 + ch ? -1 : 0;
+  const list =
+    holes && holes.length
+      ? holes
+      : Array.from({ length: 18 }, (_, i) => ({ hole_number: i + 1, stroke_index: i + 1 }));
+  const alloc = allocateStrokes(list, ch);
+  const hole = list.find((h) => h.stroke_index === si);
+  return hole ? alloc[hole.hole_number] ?? 0 : 0;
 }
 
 // Robust allocation: distribute exactly `ch` strokes across the given holes by
@@ -119,7 +149,14 @@ export function allocateStrokes(holes: { hole_number: number; stroke_index: numb
     if (sa !== sb) return sa - sb;
     return a.hole_number - b.hole_number;
   });
-  const total = Math.abs(ch);
+  // A stroke is indivisible: a hole either carries a dot or it does not. The handicap arrives
+  // UNROUNDED — chBasis keeps it exact so the nine-hole halving and the format allowance compose
+  // without double rounding — so it is rounded once, here, at the last point in the chain.
+  //
+  // Without this the loop condition `k < total` makes 10.5 behave as a CEILING and hand out eleven
+  // strokes. Not rounding, not truncation, and invisible on screen.
+  // Half rounds up, matching the team-handicap and playing-handicap rules elsewhere.
+  const total = Math.round(Math.abs(ch));
   const sign = ch >= 0 ? 1 : -1;
   for (let k = 0; k < total; k++) {
     const idx = sign > 0 ? (k % n) : (n - 1 - (k % n));
@@ -291,10 +328,29 @@ export function netBySix(holes: Hole[]): [number, number, number] {
 // receives the difference in strokes, allocated by stroke index.
 export type MatchHoleMeta = { n: number; par: number; si: number | null };
 
-export function matchStrokesFor(diff: number, si: number | null): number {
-  // diff = strokes this player receives over the match (>=0); allocate by SI.
+/**
+ * Strokes received on the hole with stroke index `si`, given a match-play DIFFERENCE.
+ *
+ * THIS IS A WRAPPER, NOT A THIRD ALGORITHM. It used to carry its own copy of
+ * `floor(diff/18) + (si <= diff % 18)` — the same formula as strokesReceived, the same hardcoded
+ * 18, and the same failure on a nine: a back nine holds every second index, so a 7.5-stroke
+ * difference matched only si <= 7.5 and gave three strokes where eight were owed.
+ *
+ * `holes` is optional with a 1..18 fallback, exactly as in strokesReceived, so a full round is
+ * unchanged by construction. Callers with a hole list must pass it.
+ */
+
+/** `{ n, si }` holes in the allocator's shape. Mapped once per call, never per hole. */
+const asAllocHoles = (hs: { n?: number | null; si?: number | null }[]) =>
+  hs.map((h, i) => ({ hole_number: h.n ?? i + 1, stroke_index: h.si ?? null }));
+
+export function matchStrokesFor(
+  diff: number,
+  si: number | null,
+  holes?: { hole_number: number; stroke_index: number | null }[] | null,
+): number {
   if (si == null || diff <= 0) return 0;
-  return Math.floor(diff / 18) + (si <= diff % 18 ? 1 : 0);
+  return strokesReceived(si, diff, holes);
 }
 
 // Playing handicap after a match-play allowance (e.g. 85% for four-ball). WHS
@@ -328,8 +384,9 @@ export function matchProgress(
   return holes.map((h, i) => {
     const ga = grossA[i], gb = grossB[i];
     if (ga == null || gb == null || ga <= 0 || gb <= 0) return null;
-    const netA = ga - matchStrokesFor(allow.a, h.si);
-    const netB = gb - matchStrokesFor(allow.b, h.si);
+    const ah = asAllocHoles(holes);
+    const netA = ga - matchStrokesFor(allow.a, h.si, ah);
+    const netB = gb - matchStrokesFor(allow.b, h.si, ah);
     if (netA < netB) lead++;
     else if (netB < netA) lead--;
     return lead;
@@ -357,8 +414,9 @@ export function matchStatus(
     const ga = grossA[i], gb = grossB[i];
     if (ga == null || gb == null || ga <= 0 || gb <= 0) return;
     thru++;
-    const netA = ga - matchStrokesFor(allow.a, h.si);
-    const netB = gb - matchStrokesFor(allow.b, h.si);
+    const ah = asAllocHoles(holes);
+    const netA = ga - matchStrokesFor(allow.a, h.si, ah);
+    const netB = gb - matchStrokesFor(allow.b, h.si, ah);
     if (netA < netB) { lead++; aWins++; }
     else if (netB < netA) { lead--; bWins++; }
     else halves++;
@@ -415,10 +473,21 @@ export function adjustedGross(r: Round): number | null {
   // WHS-permitted method. Derived from course totals so we don't need the missing holes'
   // own par/stroke-index (which aren't stored): unplayed par = course_par - played par,
   // and unplayed strokes = course handicap - strokes received on played holes.
+  // A deliberate NINE is not a partial round. It takes the nine-hole basis (rating and par halved,
+  // slope untouched) and its own gross, with nothing filled in — see roundDifferential. Only 10-17
+  // holes are treated as an eighteen with holes missing.
+  if (holes.length === 9) return adjusted;
+
   if (holes.length < 18) {
     const ch = r.course_handicap ?? courseHandicap(r.handicap_index as number, r.slope, r.rating, r.course_par as number);
     if (ch == null || r.course_par == null) return null; // can't fill safely -> don't count
     const playedPar = holes.reduce((s, h) => s + h.par, 0);
+    // Deliberately WITHOUT the hole list: this is an 18-hole round with holes missing, not a
+    // nine-hole round. WHS fills the unplayed holes with net par, and unplayedRecv = ch -
+    // playedRecv only balances if playedRecv counts strokes under the FULL 18-hole
+    // allocation. Re-allocating ch across just the played holes inflates playedRecv and
+    // drives unplayedRecv negative. See ci/check_single_stroke_allocator.py, which allows
+    // this one call by name.
     const playedRecv = holes.reduce((s, h) => s + strokesReceived(h.stroke_index, ch), 0);
     const unplayedPar = r.course_par - playedPar;
     const unplayedRecv = ch - playedRecv;
@@ -431,7 +500,23 @@ export function adjustedGross(r: Round): number | null {
 export function roundDifferential(r: Round): number | null {
   const ag = adjustedGross(r);
   if (ag == null || r.rating == null || r.slope == null) return null;
-  return (113 / r.slope) * (ag - r.rating);
+  // The stored rating ALREADY matches the holes played — do NOT halve here.
+  //   posted from a game : migration 0139 halves at write time (stored 35.2 for a nine)
+  //   entered by hand    : the rating comes from a nine-hole course's own tee
+  // Halving again at read time turned a 2.43 differential into 17.7, and made the explainer's own
+  // arithmetic disagree with its headline. One rule, one place.
+  const raw = (113 / r.slope) * (ag - r.rating);
+
+  // A NINE returns its 18-HOLE EQUIVALENT. The raw figure is on a nine-hole scale — around 2.4
+  // where the same player's eighteens sit around 14 — and the Handicap Index averages the LOWEST 8
+  // of the last 20, so an unconverted nine enters as the best round of the player's life and drags
+  // the index down every time they play one.
+  // WHS combines it with an EXPECTED differential for the nine not played; see
+  // expectedNineDifferential for the approximation and its calibration.
+  if (roundHoleCount(r) === 9) {
+    return nineToEighteenDifferential(raw, r.handicap_index ?? null);
+  }
+  return raw;
 }
 
 // For a 9-17 hole round that counts toward the handicap, describe the net-par fill for the UI.
@@ -572,10 +657,10 @@ function fourballNets(holes: MatchHoleMeta[], members: FourballMember[], allowan
         // A flagged player keeps the real net on holes they actually played, and
         // takes net double bogey (par + 2) on holes they didn't. This handles a
         // mid-round departure: holes 1–8 count as played, 9–18 become net dbl bogey.
-        return played ? g - matchStrokesFor(diff, h.si) : h.par + 2;
+        return played ? g - matchStrokesFor(diff, h.si, asAllocHoles(holes)) : h.par + 2;
       }
       if (!played) return null;
-      return g - matchStrokesFor(diff, h.si);
+      return g - matchStrokesFor(diff, h.si, asAllocHoles(holes));
     });
   }
   return out;
@@ -839,13 +924,16 @@ export function computeSkins(
   const out: SkinHole[] = [];
   let carry = 0;
   const split = mode === "split";
+  // The allocator wants { hole_number, stroke_index }; these carry { n, si }. Mapped ONCE, not per
+  // hole per player — this loop runs for every player on every hole.
+  const betHoles = holes.map((h, i) => ({ hole_number: h.n ?? i + 1, stroke_index: h.si ?? null }));
   holes.forEach((h, i) => {
     const netById: Record<string, number | null> = {};
     let allPlayed = true;
     for (const p of players) {
       const g = p.gross[i];
       if (g == null || g <= 0) { netById[p.id] = null; allPlayed = false; }
-      else netById[p.id] = g - strokesReceived(h.si, applyAllowance(p.ch, allowancePct));
+      else netById[p.id] = g - strokesReceived(h.si, applyAllowance(p.ch, allowancePct), betHoles);
     }
     if (!allPlayed || players.length < 2) {
       // In split mode every hole is worth exactly 1 (no pot); carryover builds the pot.
@@ -895,8 +983,9 @@ export function computeHeadToHeadSkins(
   let carry = 0;
   holes.forEach((h, i) => {
     const ga = a.gross[i], gb = b.gross[i];
-    const netA = ga != null && ga > 0 ? ga - matchStrokesFor(allow.a, h.si) : null;
-    const netB = gb != null && gb > 0 ? gb - matchStrokesFor(allow.b, h.si) : null;
+    const ah = asAllocHoles(holes);
+    const netA = ga != null && ga > 0 ? ga - matchStrokesFor(allow.a, h.si, ah) : null;
+    const netB = gb != null && gb > 0 ? gb - matchStrokesFor(allow.b, h.si, ah) : null;
     const netById: Record<string, number | null> = { [a.id]: netA, [b.id]: netB };
     const value = carry + 1;
     if (netA == null || netB == null) {
@@ -1214,4 +1303,158 @@ export function clinchState(aPts: number, bPts: number, unclaimed: number): {
 // while preserving intentional caps like "McDonald". Used when saving profile names.
 export function titleCaseName(s: string): string {
   return (s || "").replace(/(^|[\s'\-])([a-z])/g, (_m, sep, ch) => sep + ch.toUpperCase());
+}
+
+
+// NOTE: a nineHoleBasis() helper lived here and was removed at 177.96.
+// The nine-hole halving happens ONCE, at WRITE time, in migration 0139_nine_hole_round_basis.sql:
+// a posted nine stores rating, par and course_handicap already halved (slope untouched — it is a
+// ratio, not a stroke count). Every reader therefore uses round.rating as-is.
+// An exported helper that halves a rating, sitting beside code that must not halve, is a trap: it
+// looks like the sanctioned way and reintroduces the double halve. It did exactly that — a 2.43
+// differential displayed as 17.7.
+
+
+/**
+ * The EXPECTED 9-hole Score Differential for a player of this Handicap Index.
+ *
+ * Used to convert a nine into an 18-hole equivalent, which is the only form the Handicap Index can
+ * average. A player's average differential runs about 3 strokes above their index — the index is
+ * the best 8 of 20, not the mean — and a nine is half of that.
+ *
+ * APPROXIMATION. USGA does not publish the expected-score table. This is calibrated to their
+ * worked example: a 14.0 index posting a 9-hole differential of 7.2 receives 15.7, implying an
+ * expected 8.5. (14 + 3) / 2 = 8.5 exactly. A second published example (14 index, 6.96 -> 15.4)
+ * implies 8.44, within a rounding step.
+ */
+export function expectedNineDifferential(index: number | null): number | null {
+  if (index == null || !Number.isFinite(index)) return null;
+  // A plus handicap's expectation floors at zero rather than going negative: a nine cannot be
+  // expected to beat the rating by more than the player's own ability implies.
+  return Math.max(0, (index + 3) / 2);
+}
+
+/**
+ * An 18-hole Score Differential from a nine, so it can sit alongside eighteens in the index.
+ *
+ * Returns null when the index is unknown — a nine with no conversion must NOT be averaged as-is.
+ * Its raw differential is on a nine-hole scale and would look like the best round of the player's
+ * life: around 2.4 where their eighteens sit around 14.
+ */
+export function nineToEighteenDifferential(
+  nineDifferential: number | null,
+  index: number | null,
+): number | null {
+  const expected = expectedNineDifferential(index);
+  if (nineDifferential == null || expected == null) return null;
+  return nineDifferential + expected;
+}
+
+// ---------------- Alternate shot (foursomes) ----------------
+// One ball per side. The SIDE has a single handicap — the sum of its two partners' allowanced
+// figures, which for the WHS 50% foursomes allowance is the same as half their combined — and
+// strokes are the DIFFERENCE between the two sides, the lower side playing scratch.
+//
+// This cannot reuse fourballNets. That function is best-ball: it takes min() across a side's two
+// players, each carrying their own handicap relative to the foursome's lowest INDIVIDUAL. With one
+// shared ball both partners record the same gross, so min() silently returns whichever partner
+// happens to receive more strokes — a number with no meaning in this format.
+//
+// Measured on a real staging game: side A should have received 7 strokes over 9 holes and received
+// 5, because best-ball resolved to its higher-handicapped partner's 5 rather than the side
+// difference of 7. Two holes lost a stroke; one of them (both sides on 5) turned a win into a half.
+
+export type AltShotSideInput = {
+  /** The side's two players, in the order the foursome lists them. */
+  ids: string[];
+  /** Each player's allowanced course handicap. Already halved for a nine by chBasis. */
+  chs: (number | null)[];
+  /** The side's gross per hole. Both partners hold the same value after the score fan-out. */
+  gross: (number | null)[];
+};
+
+/**
+ * The side handicaps and the strokes given, EXACT and unrounded.
+ *
+ * Rounding happens once, at the difference: sides of 14 and 7.5 differ by 6.5 and round to 7,
+ * where rounding each side first gives 14 and 8 — a difference of 6, and one stroke decides matches.
+ */
+export function altShotSideStrokes(
+  a: AltShotSideInput,
+  b: AltShotSideInput,
+): { aCh: number | null; bCh: number | null; receiving: "a" | "b" | null; strokes: number } {
+  const sum = (chs: (number | null)[]) =>
+    chs.some((c) => c == null) ? null : chs.reduce((s, c) => (s as number) + (c as number), 0) as number;
+  const aCh = sum(a.chs);
+  const bCh = sum(b.chs);
+  if (aCh == null || bCh == null) return { aCh, bCh, receiving: null, strokes: 0 };
+  const match = altShotMatchStrokes(aCh, bCh);
+  return { aCh, bCh, receiving: match.receiving, strokes: match.strokes };
+}
+
+/**
+ * Hole-by-hole detail for an alternate shot match: each side's gross, strokes received, net, and
+ * who won. `r` is 1 for side A, -1 for B, 0 halved, null when a hole is not yet complete —
+ * matching fourballHoleDetail so the display layer needs no special case.
+ */
+export function altShotHoleDetail(
+  holes: MatchHoleMeta[],
+  a: AltShotSideInput,
+  b: AltShotSideInput,
+): { hole: number; aNet: number | null; bNet: number | null; r: number | null; aRun: number; bRun: number; aRecv: number; bRecv: number }[] {
+  const { receiving, strokes } = altShotSideStrokes(a, b);
+  const alloc = allocateStrokes(
+    holes.map((h, i) => ({ hole_number: h.n ?? i + 1, stroke_index: h.si ?? null })),
+    strokes,
+  );
+  let aRun = 0, bRun = 0;
+  return holes.map((h, i) => {
+    const n = h.n ?? i + 1;
+    const got = alloc[n] ?? 0;
+    const aRecv = receiving === "a" ? got : 0;
+    const bRecv = receiving === "b" ? got : 0;
+    const ag = a.gross[i];
+    const bg = b.gross[i];
+    let aNet: number | null = null, bNet: number | null = null, r: number | null = null;
+    if (ag != null && ag > 0 && bg != null && bg > 0) {
+      aNet = ag - aRecv;
+      bNet = bg - bRecv;
+      r = aNet < bNet ? 1 : bNet < aNet ? -1 : 0;
+      if (r > 0) aRun += 1; else if (r < 0) bRun += 1; else { aRun += 0.5; bRun += 0.5; }
+    }
+    return { hole: n, aNet, bNet, r, aRun, bRun, aRecv, bRecv };
+  });
+}
+
+/** Running match lead from side A's perspective, aligned to holes. Null until a hole is complete. */
+export function altShotProgress(
+  holes: MatchHoleMeta[],
+  a: AltShotSideInput,
+  b: AltShotSideInput,
+): (number | null)[] {
+  let lead = 0;
+  return altShotHoleDetail(holes, a, b).map((d) => {
+    if (d.r == null) return null;
+    lead += d.r;
+    return lead;
+  });
+}
+
+/** Match summary for alternate shot, using the same side scores and side handicap basis as the hole detail. */
+export function altShotStatus(
+  holes: MatchHoleMeta[],
+  a: AltShotSideInput,
+  b: AltShotSideInput,
+): { thru: number; lead: number; result: string } {
+  const prog = altShotProgress(holes, a, b);
+  const played = prog.filter((p) => p != null) as number[];
+  const thru = played.length;
+  const lead = thru ? played[played.length - 1] : 0;
+  const remaining = holes.length - thru;
+  let result: string;
+  if (thru === 0) result = "Not started";
+  else if (Math.abs(lead) > remaining) result = remaining === 0 ? `${Math.abs(lead)} UP` : `${Math.abs(lead)} & ${remaining}`;
+  else if (thru === holes.length) result = lead === 0 ? "Halved" : `${Math.abs(lead)} UP`;
+  else result = lead === 0 ? "All square" : `${Math.abs(lead)} UP`;
+  return { thru, lead, result };
 }

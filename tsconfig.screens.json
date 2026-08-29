@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "outDir": ".testout-screens",
+    "module": "commonjs",
+    "target": "ES2020",
+    "jsx": "react-jsx",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    },
+    "strict": false,
+    "noEmitOnError": false
+  },
+  "files": [
+    "lib/screens.test.tsx",
+    "lib/screen-harness.ts",
+    "lib/test-render.ts",
+    "lib/test-dom.ts",
+    "components/rounds-list.tsx",
+    "components/game/leader-row.tsx",
+    "components/game/segment-views.tsx",
+    "components/compare-stats.tsx",
+    "lib/format-picker.test.tsx",
+    "components/game/format-picker.tsx",
+    "lib/match-length-picker.test.tsx",
+    "components/game/match-length-picker.tsx"
+  ]
+}

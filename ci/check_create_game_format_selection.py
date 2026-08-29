@@ -14,7 +14,10 @@ checks = {
     "fourball team-name label clarified": 'Create Team Names (Red vs Blue)' in create_src and 'Create named teams (e.g. Red vs Blue)' not in create_src and 'Team four-ball (Red vs Blue)' not in create_src,
     "custom handicap allowance restored": 'type="number"' in create_src and 'value={allowanceInput}' in create_src and 'editAllowance(e.target.value)' in create_src and 'commitAllowance(allowanceInput)' in create_src and '[100, 90, 85].map' in create_src,
     "custom allowance resume is not overwritten": 'setGameType(d.gameType as any); setAllowancePct(d.allowancePct); setAllowanceInput(String(d.allowancePct ?? 100))' in create_src and 'const selectGameType =' in create_src and 'useEffect(() => { setAllowancePct' not in create_src,
-    "manage format keeps policy gate": 'policy({ type: "set_format", target: key })' in manage_src and 'd.decision !== "block"' in manage_src,
+    # Matches the ACTION, not the loop variable: pinning `target: key` failed when the shared
+    # FormatPicker was extracted and the variable became `t`, while the guarantee was intact.
+    # The rendered behaviour is also covered by lib/format-picker.test.tsx.
+    "manage format keeps policy gate": 'policy({ type: "set_format", target:' in manage_src and 'd.decision !== "block"' in manage_src,
     "manage family cards are presentation only": 'The family cards only filter the choices; the game changes when you select a format.' in manage_src,
     "review keeps detailed shape": 'formatReviewLabel({ gameType, teamMode, skinsTeamStyle, teamScoreMode, trifectaScoring, strokeBasis, skinsMode })' in create_src,
     "guided helpers model runtime actions": all(token in helper for token in ['export function selectGuidedFamily', 'export function selectGuidedStrokeFormat', 'export function selectGuidedMatchKind', 'export function selectGuidedTeamFormat', 'export function setGuidedTeamMode']),

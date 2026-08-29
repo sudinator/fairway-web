@@ -1,6 +1,10 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { altShotFanOut, readAltShotSideScores } from "@/lib/alt-shot-scores";
+import { MatchLengthPicker } from "@/components/game/match-length-picker";
+import { holesForLength, type MatchLength } from "@/lib/match-length";
+import type { GameType } from "@/lib/game-shape";
 import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
 import { ContestsSection, ContestHoleChip } from "@/components/contests-view";
@@ -41,9 +45,8 @@ import {
   type BetPlayer,
   type BetSplit,
   markerOwnsMyRow,
-  mergeBackupRow,
-} from "@/lib/golf";
-import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
+  mergeBackupRow, altShotProgress } from "@/lib/golf";
+import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, altShotSides } from "@/lib/game-shape";
 import { decideSetupChange, type SetupAction, type SetupDecision } from "@/lib/game-setup-policy";
 import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
@@ -237,7 +240,7 @@ function CreateGame({
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState("");
   const [profileIdx, setProfileIdx] = useState<number | null>(null);
-  const [gameType, setGameType] = useState<"stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta">(
+  const [gameType, setGameType] = useState<GameType>(
     "stableford",
   );
   // Handicap allowance % (playing handicap = allowance% of course handicap).
@@ -257,12 +260,18 @@ function CreateGame({
   // In-progress text for each missing-handicap field, so a row stays put while typing and
   // only commits (leaving the "needs" list) when the organizer taps Set.
   const [flightHcpDraft, setFlightHcpDraft] = useState<Record<string, string>>({});
-  const selectGameType = (nextType: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => {
+  const selectGameType = (nextType: GameType) => {
     setGameType(nextType);
-    const nextAllowance = nextType === "fourball" || nextType === "trifecta" ? 85 : 100;
+    // Alternate shot is 50% of the partners' COMBINED course handicaps — one ball in play, so
+    // half the strokes. That is the format's definition rather than a preference, unlike
+    // four-ball's 85% which an organiser may reasonably vary.
+    const nextAllowance =
+      nextType === "alt_shot" ? 50 : nextType === "fourball" || nextType === "trifecta" ? 85 : 100;
     setAllowancePct(nextAllowance);
     setAllowanceInput(String(nextAllowance));
   };
+  // 18 / front nine / back nine. Applies to every format, not just alternate shot.
+  const [matchLength, setMatchLength] = useState<MatchLength>("18");
   const [teamScoreMode, setTeamScoreMode] = useState<"best_ball" | "aggregate">("best_ball");
   const [trifectaScoring, setTrifectaScoring] = useState<"per_hole" | "match">("per_hole");
   const [strokeBasis, setStrokeBasis] = useState<"gross" | "net">("net");
@@ -318,6 +327,10 @@ function CreateGame({
   const [draftDismissed, setDraftDismissed] = useState(false);
   const [pendingFavName, setPendingFavName] = useState<string | null>(null); // restore the course once favorites load
   const hydratedRef = React.useRef(false); // gates saving until we've decided resume-vs-fresh (don't clobber the draft first)
+  // True once the game has been created: setup is over, so the draft must never be written
+  // again. A ref, not state: it has to hold for the CURRENT render pass, before any
+  // re-render can fire the save effect above.
+  const doneRef = React.useRef(false);
   const resumedRef = React.useRef(false);  // when true, skip the tee-time seed prefill (the draft already captured it)
 
   const addGuestPlayer = () => {
@@ -450,7 +463,7 @@ function CreateGame({
     resumedRef.current = true;
     guestsSeeded.current = true; // don't re-seed tee-time guests over the restored ones
     setName(d.name); setMatchDate(d.matchDate); setTeeIdx(d.teeIdx); setIdxStr(d.idxStr);
-    setGameType(d.gameType as any); setAllowancePct(d.allowancePct); setAllowanceInput(String(d.allowancePct ?? 100)); setTeamScoreMode(d.teamScoreMode as any);
+    setGameType(d.gameType as any); setAllowancePct(d.allowancePct); setAllowanceInput(String(d.allowancePct ?? 100)); setMatchLength((d.matchLength ?? "18") as MatchLength); setTeamScoreMode(d.teamScoreMode as any);
     setTrifectaScoring(d.trifectaScoring as any); setStrokeBasis(d.strokeBasis as any); setFmtFamily(d.fmtFamily as any);
     setMatchKind(d.matchKind as any); setTeamMode(d.teamMode); setSkinsTeamStyle(d.skinsTeamStyle as any);
     setSkinsMode(d.skinsMode as any); setTeam1(d.team1); setTeam2(d.team2);
@@ -482,26 +495,30 @@ function CreateGame({
   // leaving/killing the app mid-setup cannot lose the latest rendered setup state.
   const draftSnapshot = useMemo(() => ({
     ...toLegacySetupData(buildGameSetupDraft({
-      name, matchDate, favName: pickedFav?.name ?? null, teeIdx, idxStr, gameType, allowancePct,
+      name, matchDate, favName: pickedFav?.name ?? null, teeIdx, idxStr, gameType, allowancePct, matchLength,
       teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle,
       skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount,
       flightTeeIdx: teeAssignments.flight, playerTeeOverrides: teeAssignments.player,
     })),
     createSection,
-  }), [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount, teeAssignments, createSection]);
+  }), [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, matchLength, teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount, teeAssignments, createSection]);
   const latestDraftRef = React.useRef(draftSnapshot);
   latestDraftRef.current = draftSnapshot;
 
   // Save the in-progress setup on every meaningful change (once we've decided
   // resume-vs-fresh, so we never overwrite an offered draft before the user chooses).
+  // `doneRef` stops the save once the game has been CREATED. Without it the clear on creation was
+  // undone immediately: the component keeps its form state, so the next render — or the
+  // pagehide/visibility checkpoint below, still listening — wrote the same snapshot back, and the
+  // draft offered on the next Create Game was the one just finished.
   useEffect(() => {
-    if (!hydratedRef.current) return;
+    if (!hydratedRef.current || doneRef.current) return;
     if (draftHasProgress(draftSnapshot, user.id)) saveSetupDraft(activeGroupId, teeTimeId, draftSnapshot);
   }, [draftSnapshot, activeGroupId, teeTimeId, user.id]);
 
   useEffect(() => {
     const checkpoint = () => {
-      if (!hydratedRef.current) return;
+      if (!hydratedRef.current || doneRef.current) return;
       const snap = latestDraftRef.current;
       if (draftHasProgress(snap, user.id)) saveSetupDraft(activeGroupId, teeTimeId, snap);
     };
@@ -516,6 +533,13 @@ function CreateGame({
   }, [activeGroupId, teeTimeId, user.id]);
 
   const tee = pickedFav?.tees?.[teeIdx];
+  // NOTE: deliberately the FULL course par, even for a nine-hole game.
+  //
+  // chBasis computes index*(slope/113) + (rating - coursePar). Slicing par here while the rating
+  // stays an 18-hole rating makes the two incoherent and yields a course handicap of ~52 rather
+  // than the already-wrong ~16. The real fix halves the whole figure (the slope term dominates and
+  // par does not touch it) via courseHandicapForLength, which needs chBasis to know the hole count.
+  // Tracked in BACKLOG; do not "fix" this line on its own.
   const coursePar = pickedFav
     ? pickedFav.holes.reduce((s: number, h: any) => s + (h.par || 0), 0)
     : null;
@@ -574,7 +598,11 @@ function CreateGame({
     setErr(null);
     try {
       const payload = GC.buildGamePayload({
-        code: makeCode(), activeGroupId, name, courseName: pickedFav.name, courseHoles: pickedFav.holes,
+        code: makeCode(), activeGroupId, name, courseName: pickedFav.name,
+        // A nine-hole game is simply nine entries in holes_meta. holesForLength keeps the
+        // course's own hole numbers and stroke indexes, so a back nine reads 10-18 and strokes
+        // still fall on the course's hardest holes.
+        courseHoles: holesForLength(pickedFav.holes, matchLength),
         teeYardages: tee?.yardages, coursePar, matchDate, allowancePct, gameType, teamMode, team1, team2,
         skinsTeamStyle, teamScoreMode, trifectaScoring, strokeBasis, skinsMode, flightsSupported, flightMode, flightBands,
       });
@@ -629,6 +657,8 @@ function CreateGame({
       // Lean Create owns the core game only. Persisted structure stays authoritative in
       // Manage Game, so formats that need teams/matchups/foursomes hand off there.
       const destination = GC.postCreateDestination(gameType, teamMode);
+      // Set BEFORE the clear, so nothing between here and unmount can write the draft back.
+      doneRef.current = true;
       clearSetupDraft(activeGroupId, teeTimeId); // setup finished — drop the local draft
       onCreated(game.id, destination.roomTab, destination.setupTab as SetupTab | undefined);
     } catch (e: any) {
@@ -1026,9 +1056,10 @@ function CreateGame({
               </div>
             ) : (
               <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("fourball"))} style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 104, fontSize: 13 }}>Four-ball</button>
-                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("trifecta"))} style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 104, fontSize: 13 }}>Trifecta</button>
-                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("skins"))} style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 104, fontSize: 13 }}>Skins</button>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("fourball"))} style={{ ...btn(gameType === "fourball"), flex: 1, minWidth: 150, fontSize: 13 }}>Four-ball</button>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("alt_shot"))} style={{ ...btn(gameType === "alt_shot"), flex: 1, minWidth: 150, fontSize: 13 }}>Alternate Shot</button>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("trifecta"))} style={{ ...btn(gameType === "trifecta"), flex: 1, minWidth: 150, fontSize: 13 }}>Trifecta</button>
+                <button onClick={() => applyGuidedFormatPatch(selectGuidedTeamFormat("skins"))} style={{ ...btn(gameType === "skins"), flex: 1, minWidth: 150, fontSize: 13 }}>Skins</button>
               </div>
             )}
           </>
@@ -1038,6 +1069,8 @@ function CreateGame({
             ? "Everyone competes on one net-Stableford leaderboard."
             : gameType === "fourball"
             ? "2-player teams play better-net-ball match play. Big groups split into foursomes (2 v 2) — set them up after creating. Great for 12–16 players in 3–4 foursomes."
+            : gameType === "alt_shot"
+            ? "Partners share ONE ball, alternating shots — one nominates the odd holes, the other the even. Lower net wins the hole. Team handicap is 50% of the pair's combined, and these rounds don't count toward handicaps."
             : gameType === "skins"
             ? "Skins follows match-play structure: singles can be 1:1, team 1:1 rolls skins into team totals, or team best-ball can be played in foursomes. Halved holes carry forward."
             : gameType === "trifecta"
@@ -1127,15 +1160,17 @@ function CreateGame({
             </div>
           );
         })()}
-        {((gameType === "match" || gameType === "fourball") || (fmtFamily === "stroke" && gameType === "skins")) && (
+        {((gameType === "match" || gameType === "fourball" || gameType === "alt_shot") || (fmtFamily === "stroke" && gameType === "skins")) && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
               <input type="checkbox" checked={teamMode} onChange={(e) => applyGuidedFormatPatch(setGuidedTeamMode(e.target.checked))} />
-              <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>{gameType === "skins" ? "Team skins" : gameType === "fourball" ? "Create Team Names (Red vs Blue)" : "Team match (e.g. 4 v 4)"}</span>
+              <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>{gameType === "skins" ? "Team skins" : gameType === "fourball" || gameType === "alt_shot" ? "Create Team Names (Red vs Blue)" : "Team match (e.g. 4 v 4)"}</span>
             </label>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
               {gameType === "skins"
                 ? "Two teams, 1:1 pairings \u2014 skins roll into each team's total. A halved hole carries the pot forward. (For 2-v-2 better-ball, use Match \u00b7 Team \u00b7 Best-ball skins.)"
+                : gameType === "alt_shot"
+                ? "Two teams. Each 2-v-2 foursome plays one ball per side and is worth a point; the team total is the sum across foursomes (a halved foursome = ½ each)."
                 : gameType === "fourball"
                 ? "Two teams. Each 2-v-2 foursome is worth a point; the team total is the sum across foursomes (a halved foursome = ½ each), Ryder-Cup style. You'll assign players to teams after creating."
                 : "Two teams. Each 1-on-1 pairing is worth a point; the team total is the sum (halved matches = ½ each). You'll assign players to teams after creating."}
@@ -1210,6 +1245,14 @@ function CreateGame({
             Players play off this percentage of their course handicap. 100% for singles/Stableford/Skins, 85% standard for four-ball. The lower handicap still plays off the difference in match formats.
           </div>
         </div>
+        {/* 18 / front nine / back nine. Renders nothing on a nine-hole course, where there is one
+            nine and it is the course. Create Game passes no verdict: nothing is scored yet, so
+            every length is legal. */}
+        <MatchLengthPicker
+          value={matchLength}
+          onChange={setMatchLength}
+          courseHoles={pickedFav?.holes ?? []}
+        />
         {flightsSupported && (
           <div style={{ marginTop: 14 }}>
             <label style={{ color: C.sage, fontSize: 12 }}>Flights</label>
@@ -1502,6 +1545,23 @@ function GameRoom({
     await supabase.rpc("release_group_marker", { p_game: game.id });
     load();
   };
+  const altShotConflictHoles = (teeGroup?: number): number[] => {
+    if (!game || game.game_type !== "alt_shot" || !Array.isArray(game.foursomes)) return [];
+    const out = new Set<number>();
+    for (const f of game.foursomes) {
+      const keys = [...(f.a || []), ...(f.b || [])];
+      const foursomeRows = keys.map((k: string) => players.find((p) => pkey(p) === k)).filter(Boolean) as Player[];
+      if (teeGroup != null && !foursomeRows.some((p) => p.tee_group === teeGroup)) continue;
+      for (const ids of [f.a || [], f.b || []]) {
+        const rows = ids.map((k: string) => players.find((p) => pkey(p) === k)).filter(Boolean) as Player[];
+        if (rows.length !== 2) continue;
+        const read = readAltShotSideScores(rows[0].scores, rows[1].scores, game.holes_meta.length);
+        for (const i of read.conflictHoles) out.add(game.holes_meta[i]?.n ?? i + 1);
+      }
+    }
+    return [...out].sort((a, b) => a - b);
+  };
+
   const finishMyGroup = async () => {
     if (!game || !myRow?.tee_group) return;
     if (!requireOnline("You're offline. Finishing needs a connection — do it back at the clubhouse. Keep playing; scores are saved on this phone.")) return;
@@ -1510,6 +1570,8 @@ function GameRoom({
     await drainOutbox();
     const left = countPending();
     if (left > 0) { recomputePending(); alert(left + (left === 1 ? " hole hasn't" : " holes haven't") + " uploaded yet. Tap \"Sync now\", wait until it reaches 0, then finish so the recorded round is complete."); return; }
+    const conflicts = altShotConflictHoles(myRow.tee_group);
+    if (conflicts.length) { alert(`Alternate-shot partner scores disagree on hole${conflicts.length === 1 ? "" : "s"} ${conflicts.join(", ")}. Fix those scores before finishing the group.`); return; }
     const { error } = await supabase.rpc("finish_tee_group_and_post", { p_game: game.id });
     if (error) { alert(failureMessage("Couldn't finish this group", error)); return; }
     await load();
@@ -1961,6 +2023,17 @@ function GameRoom({
     await pushScores(me.id, { scores, putts, fairways, penalties, sand, ...clockPatch });
     lastEditRef.current = Date.now();
     setSavingHole(null);
+
+    // Alternate shot: the stroke belongs to the side, so it reaches the partner from THIS path
+    // too. Both write paths are reachable in one game (the Results / Group card toggle), and
+    // fanning out in only one would make a side's score depend on which screen entered it.
+    // Delegates to setPlayerHole so there is a single fan-out implementation, and passes false so
+    // that call does not fan back into this row.
+    if (game) {
+      for (const w of altShotFanOut(game.game_type, me.id, patch as Record<string, unknown>, game.foursomes, players)) {
+        await setPlayerHole(w.playerId, holeIdx, w.patch as typeof patch, false);
+      }
+    }
   };
 
   // Marker: write one hole for ANY player in the group. Requires marker rights,
@@ -1969,6 +2042,10 @@ function GameRoom({
     playerId: string,
     holeIdx: number,
     patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null },
+    // Alternate shot writes the stroke to BOTH partners. The partner's call passes false so it
+    // does not fan straight back and loop. Explicit rather than a depth limit, which would hide
+    // the reason.
+    fanOut = true,
   ) => {
     const target = players.find((p) => p.id === playerId);
     if (!game || !target) return;
@@ -1998,6 +2075,17 @@ function GameRoom({
     lastEditRef.current = Date.now();
     await pushScores(playerId, { scores, putts, fairways, penalties, sand, ...clockPatch });
     lastEditRef.current = Date.now();
+
+    // Alternate shot: one ball per side, so the STROKE belongs to both partners. Stats are not
+    // fanned out — a putt has no player-level owner when one ball is in play, and duplicating it
+    // would double the side's putts in every aggregate.
+    // Runs AFTER the edited row is durable; if this write fails the two rows disagree and
+    // sideScore() surfaces that as a conflict rather than silently preferring one.
+    if (fanOut && game) {
+      for (const w of altShotFanOut(game.game_type, playerId, patch as Record<string, unknown>, game.foursomes, players)) {
+        await setPlayerHole(w.playerId, holeIdx, w.patch as typeof patch, false);
+      }
+    }
   };
 
   // Claim / release the group scorecard (the "marker"). Uses a SECURITY DEFINER
@@ -2369,7 +2457,7 @@ function GameRoom({
     await supabase.from("games").update({ trifecta_scoring: next }).eq("id", game.id);
     await load();
   };
-  const setFormat = async (next: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => {
+  const setFormat = async (next: GameType) => {
     if (!game || next === game.game_type || !allowSetupChange({ type: "set_format", target: next })) return;
     const patch = buildFormatPatch(game, next);
     // NOTE: we deliberately do NOT clear pairings/foursomes/teams when switching
@@ -2433,6 +2521,8 @@ function GameRoom({
     await drainOutbox();
     const left = countPending();
     if (left > 0) { recomputePending(); alert(left + (left === 1 ? " hole hasn't" : " holes haven't") + " uploaded yet. Tap \"Sync now\", wait until it reaches 0, then end the game so every recorded round is complete."); return; }
+    const conflicts = altShotConflictHoles();
+    if (conflicts.length) { alert(`Alternate-shot partner scores disagree on hole${conflicts.length === 1 ? "" : "s"} ${conflicts.join(", ")}. Fix those scores before ending the game.`); return; }
     // One database transaction: end the game, post every player's round, and freeze running clocks.
     // If round posting fails, the game remains active rather than entering a split-brain "ended but not posted" state.
     const { error: finErr } = await supabase.rpc("finish_game_and_post_rounds", { p_game: game.id });
@@ -2928,15 +3018,15 @@ function GameRoom({
       })()}
 
       {roomTab === "play" && (
-      <div style={{ marginTop: 16, background: isEnded ? "#3A3A3A" : game.game_type === "match" ? "#1E3A8A" : game.game_type === "fourball" || game.game_type === "trifecta" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <div style={{ marginTop: 16, background: isEnded ? "#3A3A3A" : game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot" ? "#1E3A8A" : C.green, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}>
-          {game.game_type === "match" ? "⛳ Singles Match Play" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "⛳ Four-Ball · Shootout" : "⛳ Four-Ball Match (Best Net)") : game.game_type === "trifecta" ? (game.team_score_mode === "aggregate" ? "⛳ Trifecta · Shootout" : "⛳ Trifecta") : game.game_type === "skins" ? "🪙 Skins (Net)" : game.game_type === "stroke" ? (game.stroke_basis === "gross" ? "⛳ Stroke Play (Gross)" : "⛳ Stroke Play (Net)") : "🏆 Stableford Tournament"}
+          {game.game_type === "match" ? "⛳ Singles Match Play" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "⛳ Four-Ball · Shootout" : "⛳ Four-Ball Match (Best Net)") : game.game_type === "trifecta" ? (game.team_score_mode === "aggregate" ? "⛳ Trifecta · Shootout" : "⛳ Trifecta") : game.game_type === "alt_shot" ? "⛳ Alternate Shot Match" : game.game_type === "skins" ? "🪙 Skins (Net)" : game.game_type === "stroke" ? (game.stroke_basis === "gross" ? "⛳ Stroke Play (Gross)" : "⛳ Stroke Play (Net)") : "🏆 Stableford Tournament"}
         </span>
         {isEnded ? (
           <span style={{ fontSize: 12, fontWeight: 800, background: C.gold, color: C.cream, borderRadius: 14, padding: "3px 10px" }}>FINAL · GAME ENDED</span>
         ) : (
           <span style={{ color: C.cream, opacity: 0.8, fontSize: 12 }}>
-            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "2 v 2 · aggregate net (both balls)" : "2 v 2 better-net-ball") : game.game_type === "trifecta" ? (game.trifecta_scoring === "match" ? "2 singles + a team match · 3 pts/foursome" : "2 singles + a team point · 3 pts/hole") : game.game_type === "skins" ? "net skins · carryovers" : game.game_type === "stroke" ? "lowest total wins" : "net Stableford leaderboard"}
+            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "2 v 2 · aggregate net (both balls)" : "2 v 2 better-net-ball") : game.game_type === "trifecta" ? (game.trifecta_scoring === "match" ? "2 singles + a team match · 3 pts/foursome" : "2 singles + a team point · 3 pts/hole") : game.game_type === "alt_shot" ? "2 v 2 · one ball per side · match play" : game.game_type === "skins" ? "net skins · carryovers" : game.game_type === "stroke" ? "lowest total wins" : "net Stableford leaderboard"}
           </span>
         )}
       </div>
@@ -3037,7 +3127,24 @@ function GameRoom({
         />
       )}
 
-      {roomTab === "play" && (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta") && (
+      {/* Contests are CONFIGURATION, so their editable home — including the empty add-a-contest
+          prompt — is the setup Format tab. The play tab keeps them read-mostly and only when they
+          exist. 178.8 gated the empty prompt and passed allowEmpty nowhere, so no new game could
+          gain a contest at all; this is the missing entry point, put where configuration lives. */}
+      {roomTab === "setup" && setupTab === "format" && (
+        <ContestsSection
+          gameId={game.id}
+          holesMeta={(game.holes_meta || []).map((h: any) => ({ n: h.n, par: h.par }))}
+          players={players}
+          userId={user.id}
+          myName={myRow?.display_name || "Me"}
+          isOrganizer={isOrganizer}
+          isEnded={isEnded}
+          allowEmpty
+        />
+      )}
+
+      {roomTab === "play" && (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot") && (
         <GroupSegmentSummary game={game} players={players} />
       )}
 
@@ -3157,7 +3264,7 @@ function GameRoom({
               )}
             </div>
           )}
-          <GroupScorecard game={game} players={cardPlayers} user={user} courseTees={courseTees}
+          <GroupScorecard game={game} players={cardPlayers} allPlayers={players} user={user} courseTees={courseTees}
             isMarker={cardCanEdit}
             markerName={viewedMarkerPlayer?.display_name ?? null}
             onTakeOver={takeOverScoring}
@@ -3173,7 +3280,7 @@ function GameRoom({
             onMarkOut={toggleNoShow}
           />
         </>
-      ) : (game.game_type === "fourball" || game.game_type === "trifecta") && (roomTab === "play" || (roomTab === "setup" && setupTab === "matchups")) ? (
+      ) : (game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot") && (roomTab === "play" || (roomTab === "setup" && setupTab === "matchups")) ? (
         <FourballView
           game={game}
           players={players}
@@ -3266,7 +3373,12 @@ function GameRoom({
             </div>
           </div>
 
-          {/* Three sixes */}
+          {/* Three sixes — a SIDE GAME: each player's own low net across the sixes. It rendered on
+              roomTab alone, so it appeared for every format including ones with no individual
+              score. In alternate shot both partners hold the SIDE's score after the fan-out, so
+              this listed four players with duplicated figures, implying four rounds nobody played.
+              Gated on the SHAPE, so a future non-individual format is covered without another edit. */}
+          {shapeOf(game).dotBasis !== "alt_shot_side" && (
           <div style={{ marginTop: 18 }}>
             <Eyebrow>{isStroke ? "SIX-HOLE SEGMENTS (NET SCORE)" : "SIX-HOLE SEGMENTS (NET STABLEFORD)"}</Eyebrow>
             <div
@@ -3332,6 +3444,7 @@ function GameRoom({
               })}
             />
           </div>
+          )}
 
           {effectiveGroupId((game as any)?.group_id) === TGC_GROUP_ID && (
             <BettingPanel
@@ -3392,7 +3505,7 @@ function GameRoom({
                 if (pr) {
                   const oppId = pr.a === myKey ? pr.b : pr.a;
                   const oppP = players.find((p) => pkey(p) === oppId);
-                  const allowPair = matchAllowance(chBasis(me, game.course_par), oppP ? chBasis(oppP, game.course_par) : null, game.allowance_pct ?? 100);
+                  const allowPair = matchAllowance(chBasis(me, game.course_par, game.holes_meta?.length), oppP ? chBasis(oppP, game.course_par, game.holes_meta?.length) : null, game.allowance_pct ?? 100);
                   matchAllow = allowPair.a;
                   oppAllow = allowPair.b;
                 }
@@ -3402,7 +3515,7 @@ function GameRoom({
                   hole_number: m.n,
                   stroke_index: m.si,
                 })),
-                applyAllowance(chBasis(me, game.course_par), game.allowance_pct ?? 100),
+                applyAllowance(chBasis(me, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100),
               );
               return game.holes_meta.map((m, i) => ({
                 n: m.n,
@@ -3419,12 +3532,15 @@ function GameRoom({
                 indRecv: fullStrokes(game, me, m.si),
                 // If I receive none but my opponent does, show the holes where I give a stroke.
                 gives: game.game_type === "match" && (matchAllow ?? 0) === 0 && oppAllow != null
-                  ? matchStrokesFor(oppAllow, m.si)
+                  ? matchStrokesFor(oppAllow, m.si, game.holes_meta.map((x: any) => ({ hole_number: x.n, stroke_index: x.si })))
                   : 0,
               }));
             })()}
             hasHandicap={me.course_handicap != null}
-            showIndivDots={shapeOf(game).dotBasis !== "absolute"}
+            // No blue individual-handicap dots in alternate shot: no individual score is
+            // recorded, so a per-player handicap describes nothing that happens — and shown
+            // beside the orange SIDE dots it is a second, contradictory number.
+            showIndivDots={shapeOf(game).dotBasis !== "absolute" && game.game_type !== "alt_shot"}
             matchMode={game.game_type === "match"}
             uncap={game.game_type === "stroke"}
             showSixes={effectiveGroupId((game as any).group_id) === TGC_GROUP_ID}
@@ -3462,11 +3578,48 @@ function GameRoom({
                   game.holes_meta,
                   me.scores || [],
                   oppP.scores || [],
-                  me.course_handicap,
-                  oppP.course_handicap,
+                  chBasis(me, game.course_par, game.holes_meta?.length),
+                  chBasis(oppP, game.course_par, game.holes_meta?.length),
                   game.allowance_pct ?? 100,
                 );
                 return prog.map((lead) => matchLeadLabel(lead));
+              }
+              // Alternate shot: one ball per side, so it needs the side-based scorer. It used to
+              // fall past every branch to `return undefined`, leaving the match line blank and the
+              // rest on individual scoring — the cause of the hole 15 error.
+              if (game.game_type === "alt_shot" && Array.isArray(game.foursomes)) {
+                const myKey = myRow ? pkey(myRow) : null;
+                if (!myKey) return undefined;
+                const f = game.foursomes.find((x: any) =>
+                  [...(x.a || []), ...(x.b || [])].some((uid: string) => uid === myKey));
+                if (!f) return undefined;
+                const sides = altShotSides(game as never, players as never, f as never);
+                const sideOf = (ids: string[], sideCh: number | null) => {
+                  const rows = (ids || []).map((uid: string) => players.find((p) => pkey(p) === uid)).filter(Boolean) as typeof players;
+                  const read = rows.length === 2
+                    ? readAltShotSideScores(rows[0].scores, rows[1].scores, game.holes_meta.length)
+                    : { gross: Array(game.holes_meta.length).fill(null), conflictHoles: [] as number[] };
+                  return {
+                    ids,
+                    // Canonical alternate-shot side handicap: combine exact partner CHs, then apply
+                    // the allowance once. Keep it exact here; altShotProgress rounds only the side
+                    // difference, matching the dots / Strokes panel.
+                    chs: [sideCh],
+                    // One ball is duplicated onto both partner rows for persistence. Read both: a
+                    // disagreement is ambiguous, so the shared reader blanks that hole rather than
+                    // silently preferring whichever row happened to be first. FourballView surfaces
+                    // the same conflict explicitly in Results.
+                    gross: read.gross,
+                  };
+                };
+                const prog = altShotProgress(
+                  game.holes_meta,
+                  sideOf(f.a || [], sides.aCh),
+                  sideOf(f.b || [], sides.bCh),
+                );
+                // Reported from side A's perspective; flip when I am on side B.
+                const mineIsA = (f.a || []).includes(myKey);
+                return prog.map((lead) => matchLeadLabel(lead == null ? null : (mineIsA ? lead : -lead)));
               }
               if (game.game_type === "fourball" && Array.isArray(game.foursomes)) {
                 // Four-ball has no singles: the player's match IS the team best-ball,
@@ -3478,7 +3631,7 @@ function GameRoom({
                 const oppIds = onA ? f.b : f.a;
                 const members = [...f.a, ...f.b].map((uid: string) => {
                   const p = players.find((pp) => pkey(pp) === uid);
-                  return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par) : null, noShow: !!p?.no_show };
+                  return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par, game.holes_meta?.length) : null, noShow: !!p?.no_show };
                 });
                 const prog = fourballProgress(game.holes_meta, members, myIds, oppIds, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball");
                 return prog.map((lead) => matchLeadLabel(lead));
@@ -3492,7 +3645,7 @@ function GameRoom({
                 if (!f || !f.a?.length || !f.b?.length) return undefined;
                 const members = [...f.a, ...f.b].map((uid: string) => {
                   const p = players.find((pp) => pkey(pp) === uid);
-                  return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par) : null, noShow: !!p?.no_show };
+                  return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par, game.holes_meta?.length) : null, noShow: !!p?.no_show };
                 });
                 const res = computeTrifecta(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", !!(f as any).swap);
                 const mine = res.contests.find((c) => c.kind === "single" && (c.aIds[0] === myKey || c.bIds[0] === myKey));

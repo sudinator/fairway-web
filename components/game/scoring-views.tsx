@@ -23,6 +23,8 @@ import {
   fourballStatus,
   fourballProgress,
   fourballHoleDetail,
+  altShotStatus,
+  altShotHoleDetail,
   type ContestHole,
   computeTrifecta,
   clinchState,
@@ -41,7 +43,8 @@ import {
   markerOwnsMyRow,
   mergeBackupRow,
 } from "@/lib/golf";
-import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
+import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, altShotSides } from "@/lib/game-shape";
+import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { decideSetupChange, type SetupAction } from "@/lib/game-setup-policy";
 import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
@@ -128,7 +131,7 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
   const teamName = (key: string | null | undefined) => teams?.find((t) => t.key === key)?.name || "—";
   const skinPlayerOf = (uid: string): SkinPlayer | null => {
     const p = playerOf(uid);
-    return p ? { id: pkey(p), name: p.display_name, gross: p.scores || [], ch: chBasis(p, game.course_par), noShow: !!p.no_show } : null;
+    return p ? { id: pkey(p), name: p.display_name, gross: p.scores || [], ch: chBasis(p, game.course_par, game.holes_meta?.length), noShow: !!p.no_show } : null;
   };
   const ORANGE = "#E8730C";
 
@@ -166,7 +169,7 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
     const cards = foursomes.map((f) => {
       const members: FourballMember[] = [...f.a, ...f.b].map((uid) => {
         const p = playerOf(uid);
-        return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par) : null, noShow: !!p?.no_show };
+        return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par, game.holes_meta?.length) : null, noShow: !!p?.no_show };
       });
       const result = computeTeamBestBallSkins(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", game.skins_mode === "split" ? "halved" : "carryover");
       return { f, result };
@@ -324,7 +327,7 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
   // Fallback for old skins games that have not yet been configured with pairings.
   const nameById: Record<string, string> = {};
   players.forEach((p) => (nameById[p.id] = p.display_name));
-  const skinPlayers: SkinPlayer[] = players.map((p) => ({ id: p.id, name: p.display_name, gross: p.scores || [], ch: chBasis(p, game.course_par) }));
+  const skinPlayers: SkinPlayer[] = players.map((p) => ({ id: p.id, name: p.display_name, gross: p.scores || [], ch: chBasis(p, game.course_par, game.holes_meta?.length) }));
   const isSplit = game.skins_mode === "split";
   const result = computeSkins(game.holes_meta, skinPlayers, game.allowance_pct ?? 100, isSplit ? "split" : "carryover");
   const firstUndecided = result.holes.find((h) => !h.decided);
@@ -434,7 +437,7 @@ export function MatchView({
     game.pairings.forEach((pr) => {
       const pa = playerOf(pr.a), pb = playerOf(pr.b);
       if (!pa || !pb) return;
-      const st = matchStatus(game.holes_meta, pa.scores || [], pb.scores || [], chBasis(pa, game.course_par), chBasis(pb, game.course_par), game.allowance_pct ?? 100);
+      const st = matchStatus(game.holes_meta, pa.scores || [], pb.scores || [], chBasis(pa, game.course_par, game.holes_meta?.length), chBasis(pb, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100);
       // Determine which team each player is on.
       const ta = pa.team, tb = pb.team;
       if (!ta || !tb || ta === tb) return; // need a cross-team pairing
@@ -598,11 +601,11 @@ export function MatchView({
           game.holes_meta,
           pa.scores || [],
           pb.scores || [],
-          pa.course_handicap,
-          pb.course_handicap,
+          chBasis(pa, game.course_par, game.holes_meta?.length),
+          chBasis(pb, game.course_par, game.holes_meta?.length),
           game.allowance_pct ?? 100,
         );
-        const allow = matchAllowance(chBasis(pa, game.course_par), chBasis(pb, game.course_par), game.allowance_pct ?? 100);
+        const allow = matchAllowance(chBasis(pa, game.course_par, game.holes_meta?.length), chBasis(pb, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100);
         const leader =
           st.lead > 0 ? pa.display_name : st.lead < 0 ? pb.display_name : null;
         const statusText = st.result
@@ -888,13 +891,29 @@ export function FourballView({
   const members4 = (f: { a: string[]; b: string[] }): FourballMember[] =>
     [...f.a, ...f.b].map((uid) => {
       const p = playerOf(uid);
-      return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par) : null, noShow: !!(p as any)?.no_show };
+      return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par, game.holes_meta?.length) : null, noShow: !!(p as any)?.no_show };
     });
 
   // Ryder-Cup team rollup: each 2-v-2 foursome is worth a point to the winning
   // side's team; a halved foursome is ½ each. Sides must be cross-team.
   const isTeam = shapeOf(game).usesTeams;
+  const isAltShot = game.game_type === "alt_shot";
   const holesCount = game.holes_meta?.length ?? 18;
+  const altShotInputs = (f: { a: string[]; b: string[] }) => {
+    if (!isAltShot || f.a.length !== 2 || f.b.length !== 2) return null;
+    const aRows = f.a.map(playerOf);
+    const bRows = f.b.map(playerOf);
+    if (aRows.some((x) => !x) || bRows.some((x) => !x)) return null;
+    const sides = altShotSides(game as never, players as never, f as never);
+    const ar = readAltShotSideScores(aRows[0]!.scores, aRows[1]!.scores, holesCount);
+    const br = readAltShotSideScores(bRows[0]!.scores, bRows[1]!.scores, holesCount);
+    const conflictHoles = Array.from(new Set([...ar.conflictHoles, ...br.conflictHoles])).map((i) => game.holes_meta?.[i]?.n ?? i + 1);
+    return {
+      a: { ids: f.a, chs: [sides.aCh, 0], gross: ar.gross },
+      b: { ids: f.b, chs: [sides.bCh, 0], gross: br.gross },
+      conflictHoles,
+    };
+  };
   const teamStandings = (() => {
     if (!isTeam) return null;
     const pts: Record<string, number> = { A: 0, B: 0 };
@@ -904,8 +923,12 @@ export function FourballView({
       if (!f.a.length || !f.b.length) return;
       const ta = playerOf(f.a[0])?.team, tb = playerOf(f.b[0])?.team;
       if (!ta || !tb || ta === tb) return; // need a cross-team foursome
+      const alt = altShotInputs(f);
+      if (isAltShot && !alt) return;
       valid++;
-      const st = fourballStatus(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball");
+      const st = isAltShot
+        ? altShotStatus(game.holes_meta, alt!.a as never, alt!.b as never)
+        : fourballStatus(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball");
       if (st.thru === 0) return;
       const decided = st.thru === holesCount || Math.abs(st.lead) > holesCount - st.thru;
       if (decided) dec++;
@@ -970,7 +993,11 @@ export function FourballView({
           </div>
         )}
         <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>
-          {isTeam
+          {isAltShot
+            ? (isTeam
+              ? `Each foursome is ${teams![0].name} vs ${teams![1].name}. Each pair plays one ball in alternate shot; the side handicap is based on the two partners combined.`
+              : "Each foursome is a 2-v-2 alternate-shot match. Put exactly 2 players on each side; each pair plays one shared ball.")
+            : isTeam
             ? `Each foursome is ${teams![0].name} vs ${teams![1].name} (2-v-2 better-net-ball). Each side only lists its own team's players, so the team total stays correct.`
             : "Each foursome is a 2-v-2 better-net-ball match. Put 2 players in each pair. Big groups: add a foursome per group of four."}
         </div>
@@ -1035,7 +1062,7 @@ export function FourballView({
   const standPts = isTrifecta ? trifectaStandings : teamStandings ? teamStandings.pts : null;
   return (
     <div style={{ marginTop: 16 }}>
-      <Eyebrow>{isTrifecta ? (teamScoreMode === "aggregate" ? "TRIFECTA · SHOOTOUT" : "TRIFECTA") : (teamScoreMode === "aggregate" ? "FOUR-BALL · SHOOTOUT" : "FOUR-BALL MATCHES")}</Eyebrow>
+      <Eyebrow>{isAltShot ? "ALTERNATE SHOT MATCHES" : isTrifecta ? (teamScoreMode === "aggregate" ? "TRIFECTA · SHOOTOUT" : "TRIFECTA") : (teamScoreMode === "aggregate" ? "FOUR-BALL · SHOOTOUT" : "FOUR-BALL MATCHES")}</Eyebrow>
       {isTeam && standPts && (
         <div style={{ background: C.green, borderRadius: 12, padding: 14, marginTop: 12 }}>
           <div style={{ display: "flex", alignItems: "center" }}>
@@ -1068,12 +1095,19 @@ export function FourballView({
       )}
       {foursomes.map((f) => {
         const ms = members4(f);
-        const full = f.a.length && f.b.length;
-        const st = full ? fourballStatus(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball") : null;
+        const full = isAltShot ? f.a.length === 2 && f.b.length === 2 : !!(f.a.length && f.b.length);
+        const alt = full ? altShotInputs(f) : null;
+        const st = full
+          ? (isAltShot
+            ? (alt ? altShotStatus(game.holes_meta, alt.a as never, alt.b as never) : null)
+            : fourballStatus(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball"))
+          : null;
         const myKey = players.find((p) => p.user_id === user.id)?.user_id ?? user.id;
         const mine = f.a.includes(myKey) || f.b.includes(myKey);
         const lead = st?.lead ?? 0;
-        const leadText = !st || st.thru === 0 ? "" : lead === 0 ? "All square" : `${firstName(lead > 0 ? f.a[0] : f.b[0])}'s pair ${Math.abs(lead)} UP`;
+        const leadText = !st || st.thru === 0 ? "" : lead === 0 ? "All square" : isAltShot
+          ? `${isTeam ? teamName(playerOf(lead > 0 ? f.a[0] : f.b[0])?.team) : (lead > 0 ? "Pair 1" : "Pair 2")} ${Math.abs(lead)} UP`
+          : `${firstName(lead > 0 ? f.a[0] : f.b[0])}'s pair ${Math.abs(lead)} UP`;
         const tri = isTrifecta && full ? computeTrifecta(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap, triScoring) : null;
         // Match scoring (Ryder Cup): show the LIVE provisional match tally (who currently
         // leads each contest) rather than 0–0 until matches settle.
@@ -1097,6 +1131,11 @@ export function FourballView({
                 <div style={{ color: C.cream, fontSize: 13 }}>{f.b.map(firstName).join(" & ") || "—"}</div>
               </div>
             </div>
+            {isAltShot && alt && alt.conflictHoles.length > 0 && (
+              <div style={{ marginTop: 8, background: C.danger, border: `1px solid ${C.overRedDark}`, borderRadius: 8, padding: "8px 12px", color: C.cream, fontSize: 11.5, lineHeight: 1.45 }}>
+                Partner score rows disagree on hole{alt.conflictHoles.length === 1 ? "" : "s"} {alt.conflictHoles.join(", ")}. Those holes are excluded from the match result until the scores agree.
+              </div>
+            )}
             {tri && (
               <div style={{ marginTop: 8 }}>
                 {tri.contests.map((c, ci) => {
@@ -1130,9 +1169,11 @@ export function FourballView({
               </div>
             )}
             {!isTrifecta && st && st.thru > 0 && (() => {
-              const key = `${f.id}-fb`;
+              const key = `${f.id}-${isAltShot ? "as" : "fb"}`;
               const isOpen = openKey === key;
-              const detail = fourballHoleDetail(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100);
+              const detail = isAltShot && alt
+                ? altShotHoleDetail(game.holes_meta, alt.a as never, alt.b as never)
+                : fourballHoleDetail(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100);
               return (
                 <div style={{ marginTop: 6 }}>
                   <div onClick={() => setOpenKey(isOpen ? null : key)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${C.borderCard}`, cursor: "pointer" }}>
@@ -1140,11 +1181,11 @@ export function FourballView({
                     <span style={{ flex: 1, color: C.cream, fontSize: 12 }}>{leadText}</span>
                     <span style={{ color: C.sage, fontSize: 11 }}>thru {st.thru}</span>
                   </div>
-                  {isOpen && <HoleDetail rows={detail} aLabel={firstName(f.a[0]) + "'s"} bLabel={firstName(f.b[0]) + "'s"} aColor={C.birdie} bColor={C.bogey} />}
+                  {isOpen && <HoleDetail rows={detail} aLabel={isAltShot ? (isTeam ? teamName(playerOf(f.a[0])?.team) : "Pair 1") : firstName(f.a[0]) + "'s"} bLabel={isAltShot ? (isTeam ? teamName(playerOf(f.b[0])?.team) : "Pair 2") : firstName(f.b[0]) + "'s"} aColor={C.birdie} bColor={C.bogey} runningMatch={isAltShot} />}
                 </div>
               );
             })()}
-            {!full && <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Needs players in both pairs.</div>}
+            {!full && <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>{isAltShot ? "Alternate shot needs exactly two players on each side." : "Needs players in both pairs."}</div>}
           </div>
         );
       })}
@@ -1180,7 +1221,7 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
     return ti >= 0 ? teamAccent(teams[ti].name, ti) : C.gold;
   };
 
-  const phStr = (pp: Player) => (pp.course_handicap == null && pp.handicap_index == null ? "\u2014" : String(applyAllowance(chBasis(pp, game.course_par), allowance)));
+  const phStr = (pp: Player) => (pp.course_handicap == null && pp.handicap_index == null ? "\u2014" : String(applyAllowance(chBasis(pp, game.course_par, game.holes_meta?.length), allowance)));
   // phStr uses the unrounded course handicap (WHS: allowance applied to unrounded, rounded once).
 
   const strokeText = (n: number): string => {
@@ -1202,13 +1243,78 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
     game.game_type === "match" ||
     game.game_type === "fourball" ||
     game.game_type === "trifecta" ||
+    game.game_type === "alt_shot" ||
     (game.game_type === "skins" && hasStructure);
   if (!usesStructure) return null;
+
+
+  /**
+   * Alternate shot: one ball per side, so the SIDE has one handicap and strokes are the difference
+   * between sides. Every step is shown — a wrong allocation ran for a whole round because this
+   * panel returned null for the format and there was no way to check the arithmetic.
+   */
+  const altShotSide = (fr: { id: string; name?: string; a?: string[]; b?: string[] }) => {
+    const rowsFor = (ids: string[] | undefined) =>
+      (ids || []).map((k) => byKey(k)).filter((p): p is Player => !!p);
+    const aRows = rowsFor(fr.a);
+    const bRows = rowsFor(fr.b);
+    if (aRows.length !== 2 || bRows.length !== 2) return null;
+    // ONE source: this panel had its own inline side calculation while the scorecard dots used
+    // dotStrokes — the fifth two-implementations bug in a week, and the reason the panel could be
+    // right while the card was blank. Both now read altShotSides, so they cannot disagree.
+    const sides = altShotSides(game as never, players as never, fr as never);
+    const aCh = sides.aCh ?? 0, bCh = sides.bCh ?? 0;
+    const diff = aCh - bCh;
+    const strokes = sides.strokes;
+    const recvRows = sides.receiving === "a" ? aRows : bRows;
+    // Per-player display figures only — the SIDE numbers above are the ones that decide strokes.
+    const chOf = (p: Player) => chBasis(p, game.course_par, game.holes_meta?.length) * (allowance / 100);
+    const alloc = allocateStrokes(
+      meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })),
+      strokes,
+    );
+    const holesWith = meta.filter((m) => (alloc[m.n] ?? 0) > 0).map((m) => m.n);
+    const num = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
+
+    const sideLine = (label: string, rows: Player[], ch: number) => (
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "3px 0" }}>
+        <span style={{ color: C.sage, fontSize: 11, width: 44, flex: "none" }}>{label}</span>
+        <span style={{ flex: 1, color: C.cream, fontSize: 13, minWidth: 0 }}>
+          {rows.map((p) => `${p.display_name.split(" ")[0]} ${num(chOf(p))}`).join("  +  ")}
+        </span>
+        <span style={{ color: C.gold, fontSize: 14, fontWeight: 800, fontFamily: "Georgia, serif" }}>{num(ch)}</span>
+      </div>
+    );
+
+    return (
+      <div key={fr.id} style={{ borderTop: "1px solid rgba(255,255,255,0.10)", padding: "10px 0" }}>
+        {fr.name ? <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1.2, marginBottom: 4 }}>{fr.name.toUpperCase()}</div> : null}
+        {sideLine("Side 1", aRows, aCh)}
+        {sideLine("Side 2", bRows, bCh)}
+        <div style={{ color: C.sage, fontSize: 11.5, marginTop: 6, lineHeight: 1.5 }}>
+          {allowance !== 100 ? <>Each handicap at <b style={{ color: C.cream }}>{allowance}%</b>, then added for the side. </> : null}
+          Difference <b style={{ color: C.cream }}>{num(Math.abs(diff))}</b>
+          {strokes > 0 ? (
+            <>
+              {" \u2192 "}
+              <span style={{ color: C.gold, fontWeight: 700 }}>
+                {recvRows.map((p) => p.display_name.split(" ")[0]).join(" & ")} receive {strokes} stroke{strokes === 1 ? "" : "s"}
+              </span>
+              {holesWith.length ? <>, on holes <b style={{ color: C.cream }}>{holesWith.join(", ")}</b></> : null}
+              . The other side plays off scratch.
+            </>
+          ) : (
+            <> {"\u2192"} both sides play off scratch.</>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const oneVone = (aId: string, bId: string, key: string) => {
     const a = byKey(aId), b = byKey(bId);
     if (!a || !b) return null;
-    const allow = matchAllowance(chBasis(a, game.course_par), chBasis(b, game.course_par), allowance);
+    const allow = matchAllowance(chBasis(a, game.course_par, game.holes_meta?.length), chBasis(b, game.course_par, game.holes_meta?.length), allowance);
     return (
       <div key={key} style={{ borderTop: "1px solid rgba(255,255,255,0.10)", padding: "10px 0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1230,12 +1336,12 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
   const teamStrip = (f: { a: string[]; b: string[] }, key: string) => {
     const members = [...f.a, ...f.b].map(byKey).filter((p): p is Player => !!p);
     if (members.length < 2) return null;
-    const low = Math.min(...members.map((m) => applyAllowance(chBasis(m, game.course_par), allowance)));
+    const low = Math.min(...members.map((m) => applyAllowance(chBasis(m, game.course_par, game.holes_meta?.length), allowance)));
     const col = (side: string[], teamKey: string | null) => (
       <div style={{ flex: 1, borderTop: `2px solid ${teamColOf(teamKey)}`, paddingTop: 8 }}>
         {teams && teamKey && <div style={{ color: teamColOf(teamKey), fontSize: 11, fontWeight: 500, marginBottom: 6 }}>{teams.find((t) => t.key === teamKey)?.name?.toUpperCase()}</div>}
         {side.map(byKey).filter((p): p is Player => !!p).map((p) => {
-          const recv = applyAllowance(chBasis(p, game.course_par), allowance) - low;
+          const recv = applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), allowance) - low;
           return (
             <div key={p.id} style={{ padding: "4px 0" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", color: C.cream, fontSize: 14 }}><span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}><Avatar src={p.avatar_url} name={p.display_name} size={24} /><span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_name}</span></span><span style={{ color: C.sage }}>ph {phStr(p)}</span></div>
@@ -1293,14 +1399,20 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
         ? { border: "1px solid rgba(255,255,255,0.30)", borderRadius: 8, padding: 10, marginTop: 10, opacity: 0.62 }
         : { borderTop: "1px solid rgba(255,255,255,0.10)", paddingTop: 10, marginTop: 6 }}>
         {opts?.label !== false && <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, fontWeight: 800 }}>{(f.name || `Foursome ${i + 1}`).toUpperCase()}</div>}
-        {isTrifecta && singles.length > 0 && (
+        {/* Alternate shot replaces the four-ball body: one ball per side, so there are no
+            individual matchups to list — only the side handicaps and the strokes given. */}
+        {game.game_type === "alt_shot" ? altShotSide(f as never) : null}
+        {game.game_type !== "alt_shot" && isTrifecta && singles.length > 0 && (
           <>
             <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, marginTop: 6 }}>TWO SINGLES</div>
             {singles.map(([aId, bId], si) => oneVone(aId, bId, `${f.id}-s${si}`))}
             <div style={{ color: C.sage, fontSize: 11, letterSpacing: 1, marginTop: 10 }}>TEAM POINT · {game.team_score_mode === "aggregate" ? "SHOOTOUT" : "BEST BALL"}</div>
           </>
         )}
-        {teamStrip(f, `${f.id}-t`)}
+        {/* Four-ball's per-player strip: each player against the foursome low. With one ball
+            per side that is meaningless, and showing it next to the side figures is the
+            two-disagreeing-numbers problem that produced the hole 15 error. */}
+        {game.game_type !== "alt_shot" ? teamStrip(f, `${f.id}-t`) : null}
       </div>
     );
   };

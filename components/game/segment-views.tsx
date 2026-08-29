@@ -89,6 +89,8 @@ export function LegConfigEditor({ game, onSave }: { game: Game; onSave: (cfg: Le
 
   const schemes = [
     { k: "sixes", label: "Three sixes + Total" },
+    // No way to turn it OFF existed: a side game nobody chose still ran on every game.
+    { k: "none", label: "Off" },
     { k: "nines", label: "Front 9 / Back 9 / Total" },
     { k: "sixesNoTot", label: "Three sixes only" },
     { k: "total", label: "Total only" },

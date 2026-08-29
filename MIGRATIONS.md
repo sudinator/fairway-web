@@ -1,3 +1,5 @@
+> **178.13.260829:** No migration. CI assertion-baseline/documentation-only correction; Alternate Shot scoring code is unchanged from 178.12.
+
 # Migrations run-ledger
 
 Migrations are applied **by hand** in the Supabase SQL editor, in filename order. From migration 0113 onward, `public.schema_migrations` is the database source of truth; this file remains the human checklist and release notes.

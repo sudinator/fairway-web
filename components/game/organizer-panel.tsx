@@ -1,5 +1,7 @@
 "use client";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { FormatPicker, AllowancePicker } from "@/components/game/format-picker";
+import type { GameType } from "@/lib/game-shape";
 import { createClient } from "@/lib/supabase";
 import { ContestsSection, ContestHoleChip } from "@/components/contests-view";
 import { betResultToPost } from "@/lib/money";
@@ -95,7 +97,7 @@ export type OrganizerPanelProps = {
   onAddMember?: (m: { id: string; display_name: string; handicap_index: number | null }) => Promise<void>;
   onAddGuest?: (name: string, hcp: number, sponsor: string) => Promise<void>;
   onSetAllowance?: (pct: number) => Promise<void>;
-  onSetFormat?: (f: "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta") => Promise<void>;
+  onSetFormat?: (f: GameType) => Promise<void>;
   onSetTeamScoreMode?: (m: "best_ball" | "aggregate") => Promise<void>;
   onSetSkinsMode?: (m: "carryover" | "split") => Promise<void>;
   onSetSkinsStyle?: (s: "individual" | "team_11" | "team_2v2") => Promise<void>;
@@ -179,6 +181,9 @@ export function OrganizerPanel({
 
   // One policy owns every setup transition. UI state mirrors the same decision
   // the mutation handler will enforce, so disabled controls and writes cannot drift.
+  // Free-text allowance, seeded from the game so the field opens showing the current value
+  // rather than blank. Kept local: it is editor state, not game state, until committed.
+  const [allowanceText, setAllowanceText] = React.useState(String(game.allowance_pct ?? 100));
   const policy = (action: SetupAction) => decideSetupChange({ game, players, action });
   const blocked = (action: SetupAction) => policy(action).decision === "block";
   const reasonFor = (action: SetupAction) => { const d = policy(action); return d.decision === "block" ? d.reason : undefined; };
@@ -267,7 +272,7 @@ export function OrganizerPanel({
                     </div>
                     <div style={{ color: C.sage, fontSize: 12 }}>
                       {p.course_handicap != null
-                        ? `course handicap ${p.course_handicap} · plays ${applyAllowance(chBasis(p, game.course_par), game.allowance_pct ?? 100)}${(game.allowance_pct ?? 100) !== 100 ? ` (${game.allowance_pct}%)` : ""}`
+                        ? `course handicap ${p.course_handicap} · plays ${applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100)}${(game.allowance_pct ?? 100) !== 100 ? ` (${game.allowance_pct}%)` : ""}`
                         : "no handicap yet"}
                       {p.tee_name ? ` · ${p.tee_name}` : ""}
                     </div>
@@ -466,14 +471,25 @@ export function OrganizerPanel({
             </div>
             {game.status !== "ended" && onSetAllowance && (
               <div style={{ marginTop: 12 }}>
-                <div style={{ color: C.sage, fontSize: 12 }}>Handicap allowance</div>
-                <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  {[100, 90, 85].map((amt) => (
-                    <button key={amt} onClick={() => onSetAllowance(amt)} disabled={blocked({ type: "set_allowance", pct: amt })} title={reasonFor({ type: "set_allowance", pct: amt })} style={{ ...btn((game.allowance_pct ?? 100) === amt), fontSize: 13, padding: "7px 12px", opacity: blocked({ type: "set_allowance", pct: amt }) ? .45 : 1 }}>{amt}%</button>
-                  ))}
-                  <span style={{ color: C.sage, fontSize: 12 }}>now {game.allowance_pct ?? 100}%</span>
-                </div>
-                <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>In match formats the lower handicap plays off the difference; standings update live.</div>
+                {/* Shared with Create Game. The Format tab previously offered three presets and
+                    no free-text field, and 50 was not among them — so a game created as alternate
+                    shot at its defined 50% could not be corrected back to it. blocked() carries the
+                    mid-game legality Create Game does not need. */}
+                <AllowancePicker
+                  value={game.allowance_pct ?? 100}
+                  onPick={(pct) => onSetAllowance(pct)}
+                  text={allowanceText}
+                  onText={setAllowanceText}
+                  blocked={(pct) => {
+                    const d = policy({ type: "set_allowance", pct });
+                    return { allowed: d.decision !== "block", reason: d.decision === "block" ? d.reason : undefined };
+                  }}
+                  note={
+                    <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
+                      In match formats the lower handicap plays off the difference; standings update immediately.
+                    </div>
+                  }
+                />
               </div>
             )}
 
@@ -481,23 +497,20 @@ export function OrganizerPanel({
               <div style={{ marginTop: 12 }}>
                 <div style={{ color: C.sage, fontSize: 12 }}>Format</div>
                 <FormatFamilySelector value={manageFormatFamily} onChange={setManageFormatFamily} />
-                <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                  {(manageFormatFamily === "stroke"
-                    ? [["stableford", "Stableford"], ["stroke", "Stroke play"], ["skins", "Skins"]]
-                    : [["match", "Match"], ["fourball", "Four-ball"], ["trifecta", "Trifecta"], ["skins", "Skins"]]
-                  ).map(([rawKey, label]) => {
-                    const key = rawKey as "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta";
-                    const isCur = game.game_type === key;
-                    const d = policy({ type: "set_format", target: key });
-                    const allowed = isCur || d.decision !== "block";
-                    return (
-                      <button key={key} disabled={!allowed}
-                        title={d.decision === "block" ? d.reason : undefined}
-                        onClick={() => { if (!isCur && allowed) onSetFormat(key); }}
-                        style={{ ...btn(isCur), flex: 1, minWidth: 100, fontSize: 13, padding: "7px 12px", opacity: allowed ? 1 : 0.4, cursor: allowed ? "pointer" : "not-allowed" }}>{label}</button>
-                    );
-                  })}
-                </div>
+                {/* Shared with Create Game, driven by GAME_TYPES. The list used to be hardcoded
+                    here — an eighth copy of the game types — which is why Alternate Shot appeared
+                    at creation and was absent afterwards. verdictFor carries the mid-game legality
+                    Create Game has no need of: a blocked format is greyed WITH its reason rather
+                    than hidden, because an option that silently vanishes teaches nobody why. */}
+                <FormatPicker
+                  family={manageFormatFamily}
+                  current={game.game_type}
+                  onPick={(t) => onSetFormat(t)}
+                  verdictFor={(t) => {
+                    const d = policy({ type: "set_format", target: t });
+                    return { allowed: d.decision !== "block", reason: d.decision === "block" ? d.reason : undefined };
+                  }}
+                />
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Choose a family above, then the format. The family cards only filter the choices; the game changes when you select a format.</div>
                 {anyScores && <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Scores are in — individual Stableford / Stroke / Individual Skins may be reinterpreted with confirmation. Structural individual/team changes are locked.</div>}
               </div>

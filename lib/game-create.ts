@@ -1,4 +1,5 @@
 import { courseHandicap } from "./golf";
+import type { GameType } from "./game-shape";
 import { flightForIndex, type FlightBand } from "./flights";
 import { GP_STATE_DEFAULTS } from "./game-utils";
 import { resolveCreateGameTee, type TeeOption } from "./game-tee-assignment";
@@ -7,7 +8,12 @@ import { resolveCreateGameTee, type TeeOption } from "./game-tee-assignment";
 // insert payload, the initial game_players rows, and the split-skins field-size check — all pure
 // functions of the setup state, so a future team-formats feature can reuse them.
 
-export type GameTypeOpt = "stableford" | "stroke" | "match" | "fourball" | "skins" | "trifecta";
+/**
+ * The game types the create flow offers. Derived from GameType rather than restated: it used to be
+ * a second copy of the same union, so adding a format meant editing two lists with nothing to
+ * catch you if you edited only one.
+ */
+export type GameTypeOpt = GameType;
 
 export type GamePayloadOpts = {
   code: string;
@@ -35,7 +41,7 @@ export type GamePayloadOpts = {
 
 // The auto-name label for a game type.
 export function gameTypeLabel(gameType: GameTypeOpt): string {
-  return gameType === "match" ? "Match Play" : gameType === "fourball" ? "Four-Ball" : gameType === "skins" ? "Skins" : gameType === "trifecta" ? "Trifecta" : gameType === "stroke" ? "Stroke Play" : "Stableford";
+  return gameType === "alt_shot" ? "Alternate Shot" : gameType === "match" ? "Match Play" : gameType === "fourball" ? "Four-Ball" : gameType === "skins" ? "Skins" : gameType === "trifecta" ? "Trifecta" : gameType === "stroke" ? "Stroke Play" : "Stableford";
 }
 
 // The games-table insert payload (everything except server-side defaults).
@@ -62,13 +68,13 @@ export function buildGamePayload(o: GamePayloadOpts) {
     game_type: o.gameType,
     pairings: [],
     teams:
-      ((o.gameType === "match" || o.gameType === "skins" || o.gameType === "fourball") && o.teamMode) || o.gameType === "trifecta"
+      ((o.gameType === "match" || o.gameType === "skins" || o.gameType === "fourball" || o.gameType === "alt_shot") && o.teamMode) || o.gameType === "trifecta"
         ? [
             { key: "A", name: o.team1.trim() || "Team 1" },
             { key: "B", name: o.team2.trim() || "Team 2" },
           ]
         : null,
-    foursomes: o.gameType === "fourball" || o.gameType === "trifecta" || (o.gameType === "skins" && o.teamMode && o.skinsTeamStyle === "best_ball") ? [] : null,
+    foursomes: o.gameType === "fourball" || o.gameType === "trifecta" || o.gameType === "alt_shot" || (o.gameType === "skins" && o.teamMode && o.skinsTeamStyle === "best_ball") ? [] : null,
     team_score_mode: o.gameType === "trifecta" || o.gameType === "fourball" || (o.gameType === "skins" && o.teamMode && o.skinsTeamStyle === "best_ball") ? o.teamScoreMode : "best_ball",
     trifecta_scoring: o.gameType === "trifecta" ? o.trifectaScoring : null,
     stroke_basis: o.gameType === "stroke" ? o.strokeBasis : null,

@@ -10,7 +10,10 @@ export function playerHoles(p: Player, game: Game | null): Hole[] {
   if (!game) return [];
   const alloc = allocateStrokes(
     game.holes_meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })),
-    applyAllowance(chBasis(p, game.course_par), game.allowance_pct ?? 100),
+    // Nine-hole halving added at 177.87. The baseline tracks a deliberate correction to the
+    // maths, not just the shape of the extraction — otherwise the diff suite reports
+    // thousands of mismatches forever and stops meaning anything.
+    applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100),
   );
   return game.holes_meta.map((m, i) => ({
     hole_number: m.n,

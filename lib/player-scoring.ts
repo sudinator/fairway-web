@@ -11,7 +11,7 @@ export function playerHoles(p: Player, game: Game | null): Hole[] {
   if (!game) return [];
   const alloc = allocateStrokes(
     game.holes_meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })),
-    applyAllowance(chBasis(p, game.course_par), game.allowance_pct ?? 100),
+    applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100),
   );
   return game.holes_meta.map((m, i) => ({
     hole_number: m.n,

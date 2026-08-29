@@ -20,6 +20,7 @@ export type SetupAction =
   | { type: "set_tee_group"; player: Player; group: number | null }
   | { type: "randomize_groups" }
   | { type: "set_format"; target: GameType }
+  | { type: "set_match_length"; length: "18" | "front9" | "back9" }
   | { type: "set_allowance"; pct: number }
   | { type: "set_team_score_mode"; mode: "best_ball" | "aggregate" }
   | { type: "set_skins_mode"; mode: "carryover" | "split" }
@@ -77,6 +78,13 @@ export function decideSetupChange({ game, players, action }: SetupPolicyContext)
 
   if (action.type === "change_course") {
     return anyScores ? block("The course is locked once scoring begins.") : allow();
+  }
+
+  // Same rule as the course, for the same concrete reason: scores are stored positionally against
+  // holes_meta, so shortening an 18-hole game to a nine after someone has played the 12th would
+  // orphan those entries. Not a tidiness judgement — the data would be wrong.
+  if (action.type === "set_match_length") {
+    return anyScores ? block("The number of holes is locked once scoring begins.") : allow();
   }
 
   switch (action.type) {
