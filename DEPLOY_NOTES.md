@@ -1,3 +1,12 @@
+## 178.16.260829 — Fix Alternate Shot team-card TypeScript narrowing
+
+- No database migration.
+- Fixes the two TypeScript compile errors introduced when 178.14 excluded Alternate Shot from the individual `YOUR CARD` block.
+- Removes redundant/impossible `game.game_type !== "alt_shot"` logic inside a block already narrowed away from Alternate Shot.
+- Removes the now-unreachable Alternate Shot individual-card `matchRun` branch; Alternate Shot continues to use the dedicated team-based scorecard/results paths added in 178.14/178.12.
+- Removes imports used only by that unreachable branch.
+- No intended scoring, persistence, Four-Ball, Trifecta, or database behavior change.
+
 ## 178.15.260829 — Mandatory database migration parity gate
 
 - No database migration in this release.

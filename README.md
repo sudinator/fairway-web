@@ -1,4 +1,4 @@
-**Current staging candidate:** 178.15.260829 — Database migration parity is now a mandatory release gate: staging and Production ledgers are checked against committed migrations, the migration checklist must be regenerated, and released migrations cannot be silently edited.
+**Current staging candidate:** 178.16.260829 — TypeScript build correction for the Alternate Shot team-card release; no behavior or database change from 178.15.
 **Current staging candidate:** 178.14.260829 — Alternate Shot score entry is team-based (one ball/one side score), team playing handicap is shown/applied, and individual side-game/personal-card surfaces are suppressed.
 
 **Current staging candidate:** 178.13.260829 — no scoring behavior change from 178.12; updates the CI assertion baseline for the expanded Alternate Shot test suites.

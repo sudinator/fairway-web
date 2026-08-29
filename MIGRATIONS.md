@@ -1,3 +1,5 @@
+> **178.16.260829:** No migration. TypeScript-only correction to the Alternate Shot individual-card exclusion; database contract unchanged.
+
 > **178.15.260829:** No migration. Release infrastructure now mechanically verifies the live staging/Production `schema_migrations` ledgers against the committed migration chain and fails if this checklist is stale.
 > **178.14.260829:** No migration. Alternate Shot team-card/side-game presentation correction only.
 > **178.13.260829:** No migration. CI assertion-baseline/documentation-only correction; Alternate Shot scoring code is unchanged from 178.12.

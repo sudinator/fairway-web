@@ -45,8 +45,8 @@ import {
   type BetPlayer,
   type BetSplit,
   markerOwnsMyRow,
-  mergeBackupRow, altShotProgress } from "@/lib/golf";
-import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, altShotSides } from "@/lib/game-shape";
+  mergeBackupRow } from "@/lib/golf";
+import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
 import { decideSetupChange, type SetupAction, type SetupDecision } from "@/lib/game-setup-policy";
 import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
@@ -3537,10 +3537,7 @@ function GameRoom({
               }));
             })()}
             hasHandicap={me.course_handicap != null}
-            // No blue individual-handicap dots in alternate shot: no individual score is
-            // recorded, so a per-player handicap describes nothing that happens — and shown
-            // beside the orange SIDE dots it is a second, contradictory number.
-            showIndivDots={shapeOf(game).dotBasis !== "absolute" && game.game_type !== "alt_shot"}
+            showIndivDots={shapeOf(game).dotBasis !== "absolute"}
             matchMode={game.game_type === "match"}
             uncap={game.game_type === "stroke"}
             showSixes={effectiveGroupId((game as any).group_id) === TGC_GROUP_ID}
@@ -3583,43 +3580,6 @@ function GameRoom({
                   game.allowance_pct ?? 100,
                 );
                 return prog.map((lead) => matchLeadLabel(lead));
-              }
-              // Alternate shot: one ball per side, so it needs the side-based scorer. It used to
-              // fall past every branch to `return undefined`, leaving the match line blank and the
-              // rest on individual scoring — the cause of the hole 15 error.
-              if (game.game_type === "alt_shot" && Array.isArray(game.foursomes)) {
-                const myKey = myRow ? pkey(myRow) : null;
-                if (!myKey) return undefined;
-                const f = game.foursomes.find((x: any) =>
-                  [...(x.a || []), ...(x.b || [])].some((uid: string) => uid === myKey));
-                if (!f) return undefined;
-                const sides = altShotSides(game as never, players as never, f as never);
-                const sideOf = (ids: string[], sideCh: number | null) => {
-                  const rows = (ids || []).map((uid: string) => players.find((p) => pkey(p) === uid)).filter(Boolean) as typeof players;
-                  const read = rows.length === 2
-                    ? readAltShotSideScores(rows[0].scores, rows[1].scores, game.holes_meta.length)
-                    : { gross: Array(game.holes_meta.length).fill(null), conflictHoles: [] as number[] };
-                  return {
-                    ids,
-                    // Canonical alternate-shot side handicap: combine exact partner CHs, then apply
-                    // the allowance once. Keep it exact here; altShotProgress rounds only the side
-                    // difference, matching the dots / Strokes panel.
-                    chs: [sideCh],
-                    // One ball is duplicated onto both partner rows for persistence. Read both: a
-                    // disagreement is ambiguous, so the shared reader blanks that hole rather than
-                    // silently preferring whichever row happened to be first. FourballView surfaces
-                    // the same conflict explicitly in Results.
-                    gross: read.gross,
-                  };
-                };
-                const prog = altShotProgress(
-                  game.holes_meta,
-                  sideOf(f.a || [], sides.aCh),
-                  sideOf(f.b || [], sides.bCh),
-                );
-                // Reported from side A's perspective; flip when I am on side B.
-                const mineIsA = (f.a || []).includes(myKey);
-                return prog.map((lead) => matchLeadLabel(lead == null ? null : (mineIsA ? lead : -lead)));
               }
               if (game.game_type === "fourball" && Array.isArray(game.foursomes)) {
                 // Four-ball has no singles: the player's match IS the team best-ball,

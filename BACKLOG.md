@@ -1,3 +1,7 @@
+## 178.16.260829 — Alternate Shot TypeScript build correction
+- Completed: remove unreachable Alternate Shot comparisons/branch from the individual card after Alternate Shot moved to team-based scoring.
+- No behavior change; staging build must pass TypeScript before release proceeds.
+
 ## 178.15.260829 — Migration parity release gate
 
 - Added live staging/Production schema_migrations parity checks to CI.
