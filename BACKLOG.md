@@ -1,3 +1,7 @@
+## 178.26.260830 release-candidate hardening
+
+- [x] Fix PR-only Staging integration crash when verifying Alternate Shot reset count; preserve full Supabase head/count response and permanently guard the contract. No app/database behavior change.
+
 ## 178.25.260830 release-candidate hardening
 - Production migration-parity CI now canonicalizes Supabase URLs so copied REST endpoints cannot create duplicate `/rest/v1` paths. No product backlog behavior changed.
 

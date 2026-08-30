@@ -223,8 +223,9 @@ try {
   ok(clearRow.strokes == null, "clear persists a canonical NULL tombstone instead of deleting the override");
 
   expectNoError(await admin.client.rpc("reset_game_scores", { p_game: altGame.id }), "organizer reset clears canonical Alternate Shot scoring");
-  const afterAltReset = expectNoError(await service.from("game_alt_shot_scores").select("game_id", { count: "exact", head: true }).eq("game_id", altGame.id), "verify Alternate Shot score reset");
-  ok((afterAltReset.count || 0) === 0, "reset removes all canonical Alternate Shot side scores");
+  const afterAltReset = await service.from("game_alt_shot_scores").select("game_id", { count: "exact", head: true }).eq("game_id", altGame.id);
+  ok(!afterAltReset.error, `verify Alternate Shot score reset${afterAltReset.error ? ` — ${afterAltReset.error.message}` : ""}`);
+  ok((afterAltReset.count ?? 0) === 0, "reset removes all canonical Alternate Shot side scores");
   const markerAfterReset = expectNoError(await service.from("games").select("alt_shot_scoring_started_at").eq("id", altGame.id).single(), "verify Alternate Shot start marker reset");
   ok(markerAfterReset.alt_shot_scoring_started_at == null, "reset clears Alternate Shot scoring-start marker");
 

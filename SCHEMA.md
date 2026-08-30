@@ -1,3 +1,7 @@
+## 178.26.260830 — no schema change
+
+CI/integration-harness-only correction. Migrations 0140 and 0141 are unchanged.
+
 ## 178.25.260830 — no schema change
 CI-only migration-parity URL hardening. Migrations 0140 and 0141 are unchanged.
 
