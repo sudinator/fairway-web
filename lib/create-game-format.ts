@@ -62,6 +62,7 @@ export function selectGuidedTeamFormat(
   gameType: "fourball" | "trifecta" | "skins" | "alt_shot",
 ): CreateFormatPatch {
   if (gameType === "skins") return { gameType, teamMode: true, skinsTeamStyle: "best_ball" };
+  if (gameType === "fourball") return { gameType, teamMode: true };
   if (gameType === "alt_shot") {
     // One ball per side, so best-ball vs aggregate does not apply — forced rather than left over
     // from four-ball, where it would sit in the review label claiming a choice this format lacks.
@@ -89,7 +90,7 @@ export function formatReviewLabel(state: CreateFormatState): string {
     case "stableford": return "Stableford";
     case "stroke": return `Stroke Play · ${state.strokeBasis === "gross" ? "Gross" : "Net"}`;
     case "match": return `Match Play · ${state.teamMode ? "Team" : "Individual"}`;
-    case "fourball": return `Four-ball · ${state.teamMode ? "Team vs Team" : "2 v 2 Match"} · ${state.teamScoreMode === "aggregate" ? "Shootout" : "Best ball"}`;
+    case "fourball": return `Four-ball · Team vs Team · ${state.teamScoreMode === "aggregate" ? "Shootout" : "Best ball"}`;
     case "trifecta": return `Trifecta · ${state.teamScoreMode === "aggregate" ? "Shootout" : "Best ball"} · ${state.trifectaScoring === "match" ? "Ryder Cup" : "Per hole"}`;
     case "alt_shot":
       // One ball per side, so there is no best-ball/aggregate choice to state — that is the whole
@@ -107,7 +108,7 @@ export function formatReviewLabel(state: CreateFormatState): string {
 
 export function reachableFormatKeys(): string[] {
   const out = ["stableford", "stroke:net", "stroke:gross", "match:individual", "match:team"];
-  for (const competition of ["2v2", "team"] as const) for (const score of ["best_ball", "aggregate"] as const) out.push(`fourball:${competition}:${score}`);
+  for (const score of ["best_ball", "aggregate"] as const) out.push(`fourball:team:${score}`);
   for (const score of ["best_ball", "aggregate"] as const) for (const scoring of ["per_hole", "match"] as const) out.push(`trifecta:${score}:${scoring}`);
   for (const ties of ["carryover", "split"] as const) {
     out.push(`skins:individual:${ties}`);

@@ -42,16 +42,28 @@ for path in files:
 
     last = own[-1]
     tail = sql[last.end():].strip()
-    # 0113 intentionally displays the freshly-created ledger after recording itself.
-    if tail and not (
-        stem == "0113_migration_ledger"
-        and re.fullmatch(
-            r"select\s+id\s*,\s*applied_at\s+from\s+public\.schema_migrations\s+order\s+by\s+id\s*;?",
-            tail,
-            re.I | re.S,
+    # The inline/manual deployment workflow intentionally appends READ-ONLY verification SELECTs
+    # after recording a migration. Preserve that exact staged SQL while still rejecting the thing
+    # this guard exists to prevent: any schema/data mutation after the ledger says the migration is
+    # complete. COMMIT is transaction control, not a post-ledger behavior change.
+    if tail:
+        verify_tail = re.sub(r"^\s*commit\s*;", "", tail, flags=re.I).strip()
+        statements = [x.strip() for x in verify_tail.split(";") if x.strip()]
+        allowed_sources = (
+            "public.schema_migrations",
+            "information_schema.columns",
+            "information_schema.routines",
+            "pg_publication_tables",
         )
-    ):
-        errors.append(f"{path.name}: record_migration must be the final executable statement")
+        safe_verify = all(
+            re.match(r"^select\b", stmt, re.I)
+            and any(src in stmt.lower() for src in allowed_sources)
+            and not re.search(r"\b(insert|update|delete|alter|create|drop|grant|revoke|truncate|call|do)\b", stmt, re.I)
+            and "record_migration" not in stmt.lower()
+            for stmt in statements
+        )
+        if not safe_verify:
+            errors.append(f"{path.name}: only read-only verification SELECTs may follow record_migration")
 
 # Every numbering gap inside the committed migrations sequence must be explicitly documented.
 if nums:

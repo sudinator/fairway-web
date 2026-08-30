@@ -57,7 +57,7 @@ for (const gt of GAME_TYPES) {
   const teams = [{ id: "a", name: "A" }, { id: "b", name: "B" }];
   const s = shapeOf({ game_type: "alt_shot", teams: teams as never, foursomes: [] });
   ok("alt_shot uses two named teams", s.usesTeams);
-  ok("alt_shot uses matchups", s.usesMatchups);
+  ok("alt_shot does not use redundant matchups", !s.usesMatchups);
   ok("alt_shot uses foursomes (the 2v2 pairs)", s.usesFoursomes);
   // NOT relative_foursome — that was the assumption at 177.82, modelling alternate shot on
   // four-ball. It gives each player strokes against the foursome's lowest INDIVIDUAL handicap.

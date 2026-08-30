@@ -1,3 +1,26 @@
+## 178.26.260830 — Staging integration reset-count fix
+
+- **NO migration.** Fixes the PR-only real Staging integration harness after the Alternate Shot reset test crashed after 60 successful checks.
+- Root cause: Supabase `select(..., { count: "exact", head: true })` intentionally returns `data = null` and exposes `count` on the response object. The test wrapped that response in `expectNoError()`, whose contract returns only `result.data`, so `afterAltReset` became `null` before `.count` was read.
+- The reset verification now keeps the full Supabase response, asserts the query itself succeeded, then reads `response.count`. Assertion count is unchanged.
+- Added a permanent integration source-contract check preventing this exact response/data confusion from returning.
+- Audited the rest of `ci/integration/staging.mjs`: this was the only `head:true/count` query incorrectly passed through `expectNoError`; the cleanup count query already retains the full response correctly.
+- No application behavior, scoring logic, database schema, or migration file changed. Production 0140/0141 remain byte-identical to staging.
+
+## 178.25.260830 — Production migration-parity URL hardening
+
+- **NO migration.** CI-only release-candidate hardening after the production PR exposed a malformed PostgREST request (`PGRST125 Invalid path specified`).
+- `ci/check_live_migration_parity.mjs` now accepts either a Supabase project base URL or a copied `/rest/v1` endpoint, canonicalizes it to the project origin, strips query/hash fragments, and rejects unrelated paths with a precise configuration error. This prevents accidental `/rest/v1/rest/v1/...` requests while preserving the same service-role authentication and ledger comparison.
+- The migration-parity source contract now permanently requires URL canonicalization and canonical REST endpoint construction.
+- No application behavior, scoring logic, database schema, or migration file changed. Production 0140/0141 remain byte-identical to staging.
+
+**Current staging candidate:** 178.24.260830 — approved Ryder Cup-style Team Individual Match results: Team A left, THRU/AS centered, Team B right, leader-only UP status, Details opens the net-score progression. Migrations 0140–0141 remain required.
+
+**Prior release:** 178.18.260829 — Environment-contract correction documenting the migration-ledger test fixture; no application, scoring, or database change.
+
+**Current staging candidate:** 178.17.260829 — React hook-order correction for the Alternate Shot side-game suppression plus a permanent pre-lint source guard; no scoring or database change.
+**Current staging candidate:** 178.14.260829 — Alternate Shot score entry is team-based (one ball/one side score), team playing handicap is shown/applied, and individual side-game/personal-card surfaces are suppressed.
+
 **Current staging candidate:** 178.13.260829 — no scoring behavior change from 178.12; updates the CI assertion baseline for the expanded Alternate Shot test suites.
 
 # Fairway Card — Web App

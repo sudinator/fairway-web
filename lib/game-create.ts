@@ -68,7 +68,7 @@ export function buildGamePayload(o: GamePayloadOpts) {
     game_type: o.gameType,
     pairings: [],
     teams:
-      ((o.gameType === "match" || o.gameType === "skins" || o.gameType === "fourball" || o.gameType === "alt_shot") && o.teamMode) || o.gameType === "trifecta"
+      ((o.gameType === "match" || o.gameType === "skins") && o.teamMode) || o.gameType === "fourball" || o.gameType === "alt_shot" || o.gameType === "trifecta"
         ? [
             { key: "A", name: o.team1.trim() || "Team 1" },
             { key: "B", name: o.team2.trim() || "Team 2" },
@@ -79,6 +79,7 @@ export function buildGamePayload(o: GamePayloadOpts) {
     trifecta_scoring: o.gameType === "trifecta" ? o.trifectaScoring : null,
     stroke_basis: o.gameType === "stroke" ? o.strokeBasis : null,
     skins_mode: o.gameType === "skins" ? o.skinsMode : null,
+    leg_config: o.gameType === "alt_shot" ? { scheme: "none", metric: "net", points: {} } : undefined,
     flight_mode: o.flightsSupported ? o.flightMode : "off",
     flights: o.flightMode === "oneoff" && o.flightsSupported ? o.flightBands : null,
   };
@@ -98,10 +99,10 @@ export type PostCreateDestination = {
 // directly to the relevant Manage Game section after the game/player rows exist.
 export function postCreateDestination(gameType: GameTypeOpt, teamMode: boolean): PostCreateDestination {
   if (gameType === "stableford" || gameType === "stroke") return { roomTab: "play" };
-  if (gameType === "trifecta" || ((gameType === "match" || gameType === "fourball" || gameType === "skins") && teamMode)) {
+  if (gameType === "trifecta" || gameType === "fourball" || gameType === "alt_shot" || ((gameType === "match" || gameType === "skins") && teamMode)) {
     return { roomTab: "setup", setupTab: "teams" };
   }
-  if (gameType === "match" || gameType === "fourball") return { roomTab: "setup", setupTab: "matchups" };
+  if (gameType === "match") return { roomTab: "setup", setupTab: "matchups" };
   return { roomTab: "setup", setupTab: "groups" };
 }
 

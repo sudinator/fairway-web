@@ -33,6 +33,13 @@ if 'const URL = process.env.BNN_STAGING_SUPABASE_URL;' in text:
     errors.append('staging harness shadows the global URL constructor')
 if 'new URL(STAGING_URL)' not in text:
     errors.append('staging harness must parse STAGING_URL with the global URL constructor')
+
+# Supabase head/count queries return data=null and expose count on the response object.
+# Never pass such a query through expectNoError(), which intentionally returns only result.data.
+if 'const afterAltReset = await service.from("game_alt_shot_scores").select("game_id", { count: "exact", head: true })' not in text:
+    errors.append('Alternate Shot reset verification must retain the full Supabase head/count response')
+if 'ok((afterAltReset.count ?? 0) === 0, "reset removes all canonical Alternate Shot side scores")' not in text:
+    errors.append('Alternate Shot reset verification must read count from the full Supabase response')
 manual_needles={
  'manual mutation input':'confirm_mutation:',
  'manual input wiring':'BNN_STAGING_ALLOW_MUTATION: ${{ inputs.confirm_mutation }}',

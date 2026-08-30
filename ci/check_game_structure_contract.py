@@ -35,7 +35,7 @@ for text, needle, label in runtime_links:
         raise SystemExit(f"FAIL: runtime no longer reaches shared structure helper for {label}")
 
 # Preserve the critical persistence boundary: pure helpers must not own Supabase or browser UI side effects.
-for forbidden in ["supabase", ".from(", ".rpc(", "alert(", "confirm(", "localStorage", "window."]:
+for forbidden in ["supabase", "createClient(", ".rpc(", ".channel(", "alert(", "confirm(", "localStorage", "window."]:
     if forbidden in structure:
         raise SystemExit(f"FAIL: lib/game-structure.ts owns side effect {forbidden!r}")
 

@@ -1,3 +1,119 @@
+## 178.26.260830 — Staging integration reset-count fix
+
+- **NO migration.** Fixes the PR-only real Staging integration harness after the Alternate Shot reset test crashed after 60 successful checks.
+- Root cause: Supabase `select(..., { count: "exact", head: true })` intentionally returns `data = null` and exposes `count` on the response object. The test wrapped that response in `expectNoError()`, whose contract returns only `result.data`, so `afterAltReset` became `null` before `.count` was read.
+- The reset verification now keeps the full Supabase response, asserts the query itself succeeded, then reads `response.count`. Assertion count is unchanged.
+- Added a permanent integration source-contract check preventing this exact response/data confusion from returning.
+- Audited the rest of `ci/integration/staging.mjs`: this was the only `head:true/count` query incorrectly passed through `expectNoError`; the cleanup count query already retains the full response correctly.
+- No application behavior, scoring logic, database schema, or migration file changed. Production 0140/0141 remain byte-identical to staging.
+
+## 178.25.260830 — Production migration-parity URL hardening
+
+- **NO migration.** CI-only release-candidate hardening after the production PR exposed a malformed PostgREST request (`PGRST125 Invalid path specified`).
+- `ci/check_live_migration_parity.mjs` now accepts either a Supabase project base URL or a copied `/rest/v1` endpoint, canonicalizes it to the project origin, strips query/hash fragments, and rejects unrelated paths with a precise configuration error. This prevents accidental `/rest/v1/rest/v1/...` requests while preserving the same service-role authentication and ledger comparison.
+- The migration-parity source contract now permanently requires URL canonicalization and canonical REST endpoint construction.
+- No application behavior, scoring logic, database schema, or migration file changed. Production 0140/0141 remain byte-identical to staging.
+
+## 178.24.260830 — Ryder Cup-style Team Individual Match results
+
+- Replaces the stacked Team Individual Match result cards with the approved Ryder Cup-style three-column summary.
+- Each match stays on exactly one horizontal row: Team A player left, THRU centered, Team B player right.
+- Only the player currently leading shows `n UP`; the trailing side does not repeat a redundant `n DN`.
+- When the match is tied after play has started, `AS` appears in the center beneath THRU.
+- `Details` remains the one-tap entry to the 178.23 hole-by-hole net-score progression table.
+- Pairings are normalized by team key for display so legacy reversed a/b storage cannot put the wrong team on the wrong side.
+- Singles Match Play keeps its existing presentation; scoring, handicap allowance, persistence, and match math are unchanged.
+- Uses the existing BNN display scale/palette contracts; no new database migration. Existing staging prerequisites remain 0140 + 0141.
+
+## 178.23.260829 — Match progression net-score summary
+
+- Replaces the compact Match progression chips with a reusable scorecard-style history table.
+- Expanded progression now shows Hole, each player's net score, and the rolling match state (AS / UP / DN).
+- Uses the existing canonical Match Play handicap allowance, stroke allocation, and `matchProgress()` result; no scoring-engine change.
+- Incomplete holes remain excluded from history until both players have valid scores.
+- Lower net on the hole is emphasized for quick auditability.
+- Trifecta / Four-Ball / Alternate Shot scoring behavior is unchanged.
+- No database migration. Existing staging prerequisites remain 0140 + 0141.
+
+## 178.22.260829 — Team setup / Group Results / match progression staging fixes
+
+- **Four-Ball team names:** new Four-Ball and Alternate Shot creation always expose both editable team-name fields; Manage → Teams also allows the organizer to rename both teams while preserving team keys and player assignments.
+- **Group Results / Legs:** `LegConfigEditor` now lives inside the actual Game Setup → Format workspace instead of an external render path, so it remains visible when setup is revisited. Turning the scheme **Off** now suppresses `GroupSegmentSummary` entirely; On → Off → On follows the persisted `leg_config`.
+- **Team Individual Match progression:** each match status is clickable again and expands the existing `matchProgress()` history hole-by-hole; scoring math is unchanged.
+- **Regression guard:** adds a dependency-free contract covering Four-Ball team-name visibility, Manage team renaming, Legs placement/Off behavior, and clickable match progression.
+- **No database migration.** Existing Staging migrations 0140 + 0141 remain required.
+
+## 178.21.260829 — CI assertion baseline + downstream gate preflight
+
+- Records the intentional four-assertion increase exposed after the 178.20 stale Matchups test was corrected: unnamed-suite baseline 507 -> 511; total 189,908 -> 189,912.
+- No application, scoring, persistence, setup, or database behavior change from 178.20.
+- Corrects the prior 178.19 feature entry that was accidentally labeled 178.20 in DEPLOY_NOTES.
+- Proactive downstream preflight executed: all source guards after npm test through version/release verification pass locally.
+- GitHub remains authoritative for the dependency-backed assertion rerun and final Next build.
+- No new migration; Staging migrations 0140 + 0141 remain required and already applied.
+
+## 178.20.260829 — CI contract correction
+
+- Corrects the stale `game-type-coverage` assertion that still expected new team Alternate Shot to use Matchups.
+- No application behavior or database behavior changes from 178.19.
+- No migration. Existing Staging 0140 + 0141 remain required.
+- Targeted game-type coverage: 89/89 PASS locally. Full dependency-backed gate remains GitHub/Vercel.
+
+## 178.19.260829 — Team-play setup + true Alternate Shot side scoring
+
+- **Four-Ball:** new team games use Teams + Groups; a separate Matchups step is not required because the two teams inside each playing group define the match.
+- **Alternate Shot:** new games use Teams + Groups; each side explicitly selects who tees off first. The selected first driver persists in `games.foursomes` as `a_first` / `b_first` and alternates by round position, including back-nine starts.
+- **Trifecta:** keeps Teams + Groups + Matchups because individual 1v1 opponent identity contributes points in addition to the team point.
+- **Canonical Alternate Shot scores:** migration `0140_alt_shot_side_scores.sql` adds `game_alt_shot_scores`; new/edited Alternate Shot holes store one score per side rather than copying the same score into both partners' `game_players.scores`.
+- **Backward compatibility:** historical Alternate Shot games remain readable through the existing duplicated-player-score fallback until a canonical side score exists for that side/hole. Legacy Four-Ball/Alternate Shot games with no global teams retain their historical matchup structure.
+- **Sync:** canonical side scores have optimistic local state, offline drafts/retry, realtime reload, clear/re-entry handling, and reset protection.
+- **Finalization:** pending Alternate Shot side-score drafts block finish/end. Alternate Shot remains excluded from individual handicap-round posting.
+- **Migrations:** 0140 creates the side-score store and has been applied/verified on Staging (structure 5/5; security/grants 9/9). Staging review then found a legacy-clear resurrection edge case, so 0141 adds explicit NULL clear tombstones. 0141 must be applied to Staging before the 178.19 app candidate. Neither migration should be applied to Production until staging acceptance and the production migration gate.
+
+## 178.18.260829 — Document migration-parity test fixture
+
+- Adds `BNN_MIGRATION_LEDGER_FIXTURE` to `.env.example` as a test-only variable.
+- Fixes the environment-hygiene CI failure introduced with the migration-parity fixture support.
+- No application behavior, scoring, persistence, or database change.
+- Migration: none.
+
+## 178.17.260829 — Fix Alternate Shot side-game hook ordering + add pre-lint guard
+
+- No database migration.
+- Moves `GroupSegmentSummary`'s existing `useState` above the Alternate Shot early return so React hooks are called in a stable order on every render.
+- Alternate Shot still returns `null` from the individual six-hole/low-net side-game component; no Alternate Shot scoring or persistence behavior changes.
+- Adds `ci/check_react_hook_order_source.py`, a dependency-free source backstop that detects top-level early returns before the first top-level hook in function components.
+- Wires the new hook-order source guard into `npm run guards`; ESLint `react-hooks/rules-of-hooks` remains the authoritative dependency-backed gate.
+- Synthetic negative case (early return before `useState`) is detected by the new source guard.
+
+## 178.16.260829 — Fix Alternate Shot team-card TypeScript narrowing
+
+- No database migration.
+- Fixes the two TypeScript compile errors introduced when 178.14 excluded Alternate Shot from the individual `YOUR CARD` block.
+- Removes redundant/impossible `game.game_type !== "alt_shot"` logic inside a block already narrowed away from Alternate Shot.
+- Removes the now-unreachable Alternate Shot individual-card `matchRun` branch; Alternate Shot continues to use the dedicated team-based scorecard/results paths added in 178.14/178.12.
+- Removes imports used only by that unreachable branch.
+- No intended scoring, persistence, Four-Ball, Trifecta, or database behavior change.
+
+## 178.15.260829 — Mandatory database migration parity gate
+
+- No database migration in this release.
+- CI now checks the live staging `schema_migrations` ledger against every committed ledger-era migration before staging validation can pass.
+- A staging -> main PR now has a separate Production migration-parity job, isolated in the GitHub `production` environment. It blocks merge if Production is missing any committed migration.
+- Pushes to `main` rerun the Production parity check as a post-merge safety check.
+- `MIGRATIONS.md` is mechanically regenerated/checked so a committed migration cannot disappear from the human manifest.
+- Migrations already present on `main` are byte-immutable: modify behavior with a new numbered migration rather than editing released SQL.
+- Required GitHub Production environment secrets: `BNN_PRODUCTION_SUPABASE_URL` and `BNN_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY`.
+
+## 178.14.260829 — Alternate Shot team-card presentation + side-game cleanup
+- **Team-based scorecard:** Alternate Shot no longer presents the duplicated partner rows as separate player score columns. Each foursome renders exactly two scoring entities — the two sides — while persistence still fans the one side score to both partner rows.
+- **Team identity in score entry:** tapping an Alternate Shot score opens the team name (for example, Team Red), not the clicked player. The modal shows the side playing handicap and applies the relative match strokes to the net score.
+- **No fake individual card:** the personal `YOUR CARD / ENTER YOUR SCORES` surface is suppressed for Alternate Shot because no player is playing an individual ball.
+- **Side games default off in practice:** the individual Group Results / six-hole low-net-Stableford side-game surface is not rendered for Alternate Shot, and `GroupSegmentSummary` hard-stops if called with Alternate Shot. Setup continues to report Side games: None.
+- **No individual stats masquerading as team stats:** Alternate Shot team score entry hides fairway/putts/penalties and writes only the side gross score; existing fan-out remains the single persistence path.
+- **Guard:** added `ci/check_altshot_team_card_contract.py` and wired it into normal guards.
+- **Database:** no migration. Four-Ball and Trifecta behavior are unchanged.
+
 ## 178.13.260829 — CI assertion baseline update for Alternate Shot hardening
 - **No application/scoring behavior change from 178.12.** The Alternate Shot integration, conflict handling, finalization guard, and rounding fixes are unchanged.
 - **CI fix:** updated `ci/test_assertion_baseline.json` to record the intentionally expanded 178.12 test inventory seen in GitHub CI: Alternate Shot 73, Alternate Shot scores 49, Alternate Shot scoring 30, and new Alternate Shot simulation 178,103. Total baseline is now **184,887 assertions across 41 suites**.

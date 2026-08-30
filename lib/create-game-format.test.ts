@@ -41,7 +41,7 @@ eq(selectGuidedMatchKind({ ...guided, gameType: "fourball", fmtFamily: "match", 
 eq(selectGuidedMatchKind({ ...guided, gameType: "match", fmtFamily: "match", matchKind: "ind" }, "team"), { matchKind: "team", gameType: "fourball" }, "individual to team branch");
 eq(selectGuidedMatchKind({ ...guided, gameType: "trifecta", fmtFamily: "match", matchKind: "team" }, "team"), { matchKind: "team" }, "team branch keeps trifecta");
 
-eq(selectGuidedTeamFormat("fourball"), { gameType: "fourball" }, "select fourball");
+eq(selectGuidedTeamFormat("fourball"), { gameType: "fourball", teamMode: true }, "select fourball");
 eq(selectGuidedTeamFormat("trifecta"), { gameType: "trifecta" }, "select trifecta");
 eq(selectGuidedTeamFormat("skins"), { gameType: "skins", teamMode: true, skinsTeamStyle: "best_ball" }, "select best-ball skins");
 eq(setGuidedTeamMode(true), { teamMode: true }, "enable team mode");
@@ -64,13 +64,13 @@ eq(skinsStyleFromState({ teamMode: true, skinsTeamStyle: "best_ball" }), "team_2
 eq(formatReviewLabel(base), "Stableford", "stableford review");
 eq(formatReviewLabel({ ...base, gameType: "stroke", strokeBasis: "gross" }), "Stroke Play · Gross", "stroke review");
 eq(formatReviewLabel({ ...base, gameType: "match", teamMode: true }), "Match Play · Team", "match review");
-eq(formatReviewLabel({ ...base, gameType: "fourball", teamMode: false, teamScoreMode: "aggregate" }), "Four-ball · 2 v 2 Match · Shootout", "fourball review");
+eq(formatReviewLabel({ ...base, gameType: "fourball", teamMode: false, teamScoreMode: "aggregate" }), "Four-ball · Team vs Team · Shootout", "fourball review");
 eq(formatReviewLabel({ ...base, gameType: "trifecta", trifectaScoring: "match" }), "Trifecta · Best ball · Ryder Cup", "trifecta review");
 eq(formatReviewLabel({ ...base, gameType: "skins", teamMode: true, skinsTeamStyle: "best_ball", teamScoreMode: "aggregate", skinsMode: "split" }), "Skins · 2 v 2 Best-ball · Aggregate · Halved", "skins review");
 
 const keys = reachableFormatKeys();
-eq(keys.length, 21, "historical shape count");
+eq(keys.length, 19, "current reachable format shape count");
 eq(new Set(keys).size, keys.length, "historical keys unique");
-for (const required of ["stableford", "stroke:net", "stroke:gross", "match:individual", "match:team", "fourball:2v2:best_ball", "fourball:team:aggregate", "trifecta:aggregate:match", "skins:individual:split", "skins:team_11:carryover", "skins:team_2v2:aggregate:split"]) eq(keys.includes(required), true, `reachable ${required}`);
+for (const required of ["stableford", "stroke:net", "stroke:gross", "match:individual", "match:team", "fourball:team:aggregate", "trifecta:aggregate:match", "skins:individual:split", "skins:team_11:carryover", "skins:team_2v2:aggregate:split"]) eq(keys.includes(required), true, `reachable ${required}`);
 
 console.log(`create-game-format: ${n}/${n} assertions passed`);

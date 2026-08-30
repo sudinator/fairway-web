@@ -53,6 +53,13 @@ jobs:
       # The VAPID public key is NOT a secret — it ships to every browser in public/sw.js.
       # It is set here so `prebuild` can run its drift check instead of skipping it. Absence
       # is now a build failure (see scripts/check-vapid-key.mjs), so this must be present.
+      - name: Verify live staging migration parity
+        if: github.ref == 'refs/heads/staging' || github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && github.head_ref == 'staging')
+        env:
+          BNN_STAGING_SUPABASE_URL: ${{ secrets.BNN_STAGING_SUPABASE_URL }}
+          BNN_STAGING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BNN_STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+        run: node ci/check_live_migration_parity.mjs staging
+
       - run: npm run ci
         env:
           # Falls back to the committed sw.js value when the repository variable is unset,
@@ -69,3 +76,18 @@ jobs:
           BNN_STAGING_ALLOW_MUTATION: YES
           BNN_PRODUCTION_SUPABASE_PROJECT_REF: epmbsmykyrnoiccwnoxq
         run: npm run test:staging
+
+  production-migration-parity:
+    if: (github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'staging') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Verify live production migration parity
+        env:
+          BNN_PRODUCTION_SUPABASE_URL: ${{ secrets.BNN_PRODUCTION_SUPABASE_URL }}
+          BNN_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.BNN_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
+        run: node ci/check_live_migration_parity.mjs production

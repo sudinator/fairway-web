@@ -1,3 +1,24 @@
+## 178.26.260830 — no schema change
+
+CI/integration-harness-only correction. Migrations 0140 and 0141 are unchanged.
+
+## 178.25.260830 — no schema change
+CI-only migration-parity URL hardening. Migrations 0140 and 0141 are unchanged.
+
+> 178.24: No schema change. Team Individual Match results presentation only; migrations 0140–0141 remain the latest schema prerequisites.
+
+> 178.23: No schema change. Match progression display only; migrations 0140–0141 remain the latest schema prerequisites.
+
+<!-- 178.22: no schema change; relies on 0140-0141 already staged. -->
+> **178.21.260829:** Migrations `0140_alt_shot_side_scores.sql` + `0141_alt_shot_clear_tombstones.sql` add canonical Alternate Shot side-owned scoring. `game_alt_shot_scores` owns one side/hole value; nullable `strokes` is an explicit clear tombstone that masks legacy duplicated player scores. `games.alt_shot_scoring_started_at` locks structural setup once canonical scoring begins.
+
+> **178.18.260829:** No schema change. Environment-contract documentation only.
+
+> **178.17.260829:** No schema change. React hook-order correction and source guard only.
+> **178.16.260829:** No schema change. TypeScript-only correction to the Alternate Shot team-card release.
+
+> **178.15.260829:** No schema change. CI now verifies live `schema_migrations` parity for staging and Production against the committed migration chain.
+> **178.14.260829:** No schema change. Alternate Shot continues to persist one side score by fan-out to both partner rows.
 > **178.13.260829:** No schema change.
 
 # Birdie Num Num — Database Schema & Conventions
@@ -51,9 +72,11 @@ longer silently no-op.
 
 **player_cards** (0080): one row per `user_id` (PK) — peer-visible card summary. `idx` (running WHS index), `idx_trend` (index now minus index before the last 5 rounds; neg = improving), `form` (jsonb — last-5 rolling-average differential series), `rounds` (int), `updated_at`. Computed client-side (`lib/card.ts` `computeCardStats`) and written by `lib/card-sync.ts`.
 
-**games**: `id`, `code`, `name`, `course`, `course_par`, `played_at` (**date**, not null, default current_date — the match date), `allowance_pct` (numeric, not null, default 100 — handicap allowance for match/four-ball), `holes_meta` (jsonb), `group_id`, `game_type` (stableford/match/fourball/skins), `status` (active/ended), `pairings` (jsonb), `teams` (jsonb), `foursomes` (jsonb), `created_by`, `created_at`. Unique on `code`.
+**games**: `id`, `code`, `name`, `course`, `course_par`, `played_at` (**date**, not null, default current_date — the match date), `allowance_pct` (numeric, not null, default 100 — handicap allowance for match/four-ball), `holes_meta` (jsonb), `group_id`, `game_type` (stableford/match/fourball/skins), `status` (active/ended), `pairings` (jsonb), `teams` (jsonb), `foursomes` (jsonb), `created_by`, `created_at`, `alt_shot_scoring_started_at` (timestamptz, 0140). Unique on `code`.
 
 **game_players**: `id`, `game_id`, `user_id` (default auth.uid()), `display_name`, `handicap_index`, `rating`, `slope`, `tee_name`, `course_handicap`, `scores`/`putts`/`fairways` (jsonb), `team`, `no_show` (bool, default false), `created_at`. Unique on (`game_id`, `user_id`).
+
+**game_alt_shot_scores** (0140; nullable-clear refinement 0141): canonical one-ball Alternate Shot score store. Primary key (`game_id`, `foursome_id`, `side`, `hole_index`); `side` is `a`/`b`; `strokes` is 1–30 or NULL, where NULL is an intentional clear tombstone. Writes go only through `save_alt_shot_side_score(...)`; authenticated direct INSERT/UPDATE/DELETE is revoked; SELECT is RLS-limited to legitimate game viewers. Historical duplicated player scores are retained only as a backward-compatible read fallback and are masked by any canonical row, including NULL.
 
 **activity_log**: `id`, `actor_id`, `actor_name`, `action`, `summary`, `group_id`, `target_user_id`, `created_at`.
 

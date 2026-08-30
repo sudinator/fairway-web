@@ -34,7 +34,7 @@ const base = {
 }
 {
   // The other team formats keep their own behaviour.
-  eq("four-ball is unchanged", selectGuidedTeamFormat("fourball"), { gameType: "fourball" });
+  eq("four-ball is always team play", selectGuidedTeamFormat("fourball"), { gameType: "fourball", teamMode: true });
   eq("trifecta is unchanged", selectGuidedTeamFormat("trifecta"), { gameType: "trifecta" });
   ok("team skins still forces best_ball style", selectGuidedTeamFormat("skins").skinsTeamStyle === "best_ball");
 }

@@ -22,6 +22,8 @@ NOTES_START = "<!-- NOTES:START -->"
 NOTES_END = "<!-- NOTES:END -->"
 
 existing = LEDGER.read_text(encoding="utf-8") if LEDGER.exists() else ""
+HEADER = "# Migrations run-ledger"
+prefix = existing.split(HEADER, 1)[0] if HEADER in existing else ""
 
 # Accept both `- [x] 0130_foo.sql` and `- [x] **0130_foo.sql**`.
 already = {
@@ -51,7 +53,8 @@ for filename in files:
     rows.append(f"- [{box}] {filename}")
 
 body = (
-    "# Migrations run-ledger\n\n"
+    prefix
+    + "# Migrations run-ledger\n\n"
     "Migrations are applied **by hand** in the Supabase SQL editor, in filename order. "
     "From migration 0113 onward, `public.schema_migrations` is the database source of truth; "
     "this file remains the human checklist and release notes.\n\n"

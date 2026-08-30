@@ -223,16 +223,15 @@ export function altShotPostsRounds(): false {
  */
 export function altShotDrivers(
   side: string[] | null | undefined,
-  /**
-   * The hole's POSITION in the round, zero-based — not its number. A back nine opens at hole 10,
-   * and parity on the hole NUMBER would make the second partner drive first there, which nobody
-   * expects. Alternate shot nominates who tees off on the FIRST HOLE PLAYED, then alternates.
-   */
+  /** The hole's POSITION in the round, zero-based — not its course number. */
   holeIndex: number,
+  /** Persisted player key nominated to tee off on the first hole played. Legacy games may omit it. */
+  firstTeePlayerId?: string | null,
 ): { driver: string; other: string } | null {
   if (!Array.isArray(side) || side.length !== 2) return null;
-  const [first, second] = side;
-  // Rule 22: the order holds for the whole round, so it is derived from position, never toggled.
+  const [listedFirst, listedSecond] = side;
+  const first = firstTeePlayerId && side.includes(firstTeePlayerId) ? firstTeePlayerId : listedFirst;
+  const second = first === listedFirst ? listedSecond : listedFirst;
   return holeIndex % 2 === 0
     ? { driver: first, other: second }
     : { driver: second, other: first };

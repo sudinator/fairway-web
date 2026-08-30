@@ -1,3 +1,59 @@
+## 178.26.260830 release-candidate hardening
+
+- [x] Fix PR-only Staging integration crash when verifying Alternate Shot reset count; preserve full Supabase head/count response and permanently guard the contract. No app/database behavior change.
+
+## 178.25.260830 release-candidate hardening
+- Production migration-parity CI now canonicalizes Supabase URLs so copied REST endpoints cannot create duplicate `/rest/v1` paths. No product backlog behavior changed.
+
+- [x] **178.24 Team Individual Match result layout** — approved Ryder Cup-style one-row match summary: team 1 left, THRU/AS centered, team 2 right, leader-only UP status, Details opens net-score progression.
+- [x] **178.23 Match progression clarity** — Team Individual Match historical progression now shows hole, both player net scores, and rolling match state instead of status-only chips.
+## 178.22 staging regression fixes
+- Four-Ball team names, Group Results/Legs visibility+Off suppression, and Team Individual Match clickable progression addressed in 178.22 staging candidate; validate manually before production.
+
+## 178.21.260829 — CI assertion baseline / downstream preflight
+
+- [x] New Four-Ball uses Teams + Groups; no redundant Matchups step.
+- [x] New Alternate Shot uses Teams + Groups; no redundant Matchups step.
+- [x] Trifecta retains Matchups because individual 1v1 opponent identity affects scoring.
+- [x] Alternate Shot persists first tee player per side and derives alternating drivers from that choice.
+- [x] Alternate Shot new/edited scoring writes one canonical side score per hole, not duplicated player scores.
+- [x] Historical Alternate Shot duplicated scores remain readable as fallback.
+- [x] Canonical side score path supports offline draft/retry, realtime refresh, clear/re-entry, reset protection and finish blocking while unsynced.
+- [x] Migration 0140 added; Staging structural and security verification passed.
+- [x] Legacy clear/re-entry edge case found during pre-release simulation; migration 0141 added so a cleared canonical hole masks any historical duplicated player score.
+- [ ] Apply and verify 0141 on Staging before deploying the 178.19 application candidate.
+- [ ] GitHub dependency-backed CI/type/test/build must pass on staging candidate.
+- [ ] Vercel staging build must be Ready.
+- [ ] Targeted staging acceptance: Four-Ball Teams+Groups, Alternate Shot first-driver + side-owned scores, Trifecta Matchups retained.
+
+## 178.18.260829 — Environment hygiene release correction
+
+- [x] Document `BNN_MIGRATION_LEDGER_FIXTURE` in `.env.example` as test-only so environment hygiene matches the migration-parity tooling.
+- [x] No runtime, scoring, persistence, or database behavior change.
+
+## 178.17.260829 — React hook-order release hardening
+- [x] Move `GroupSegmentSummary` hook above the Alternate Shot early return so hooks remain unconditional.
+- [x] Preserve Alternate Shot side-game suppression (`return null`) after hooks are initialized.
+- [x] Add a dependency-free source guard for top-level early-return-before-hook regressions.
+- [x] Keep ESLint hooks lint as the authoritative gate; source guard is a pre-lint backstop.
+
+## 178.16.260829 — Alternate Shot TypeScript build correction
+- Completed: remove unreachable Alternate Shot comparisons/branch from the individual card after Alternate Shot moved to team-based scoring.
+- No behavior change; staging build must pass TypeScript before release proceeds.
+
+## 178.15.260829 — Migration parity release gate
+
+- Added live staging/Production schema_migrations parity checks to CI.
+- Added generated MIGRATIONS.md freshness enforcement.
+- Added released-migration immutability protection for PRs targeting main.
+- No database migration.
+
+## 178.14.260829 — Alternate Shot team card corrected
+- [x] Alternate Shot group scorecard now renders two side/team scoring columns rather than four duplicated individual player columns.
+- [x] Alternate Shot score modal identifies the team, shows side playing handicap, and applies side match strokes.
+- [x] Individual personal card and individual six-hole/Group Results side-game surfaces are suppressed for Alternate Shot.
+- [x] Alternate Shot side-game component hard-stops if accidentally invoked.
+
 ## Hole count cannot be changed after a game is created (open)
 
 `set_match_length` exists in lib/game-setup-policy.ts, is negative-tested, and NOTHING dispatches it.

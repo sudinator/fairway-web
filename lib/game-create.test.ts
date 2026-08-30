@@ -31,6 +31,9 @@ eq("custom name kept", buildGamePayload({ ...base, name: "  My Game  " }).name, 
 eq("teams on match+teamMode", buildGamePayload({ ...base, gameType: "match", teamMode: true, team1: " Reds " }).teams, [{ key: "A", name: "Reds" }, { key: "B", name: "Team 2" }]);
 eq("trifecta always teams", buildGamePayload({ ...base, gameType: "trifecta" }).teams?.length, 2);
 eq("fourball foursomes []", buildGamePayload({ ...base, gameType: "fourball" }).foursomes, []);
+eq("fourball always teams", buildGamePayload({ ...base, gameType: "fourball", teamMode: false }).teams?.length, 2);
+eq("alternate shot always teams", buildGamePayload({ ...base, gameType: "alt_shot", teamMode: false }).teams?.length, 2);
+eq("alternate shot side game defaults off", (buildGamePayload({ ...base, gameType: "alt_shot" }) as any).leg_config?.scheme, "none");
 eq("skins bb foursomes []", buildGamePayload({ ...base, gameType: "skins", teamMode: true, skinsTeamStyle: "best_ball" }).foursomes, []);
 eq("skins h2h foursomes null", buildGamePayload({ ...base, gameType: "skins", teamMode: true, skinsTeamStyle: "head_to_head" }).foursomes, null);
 eq("stroke basis set", buildGamePayload({ ...base, gameType: "stroke", strokeBasis: "gross" }).stroke_basis, "gross");
@@ -52,9 +55,10 @@ eq("stableford creates straight to play", postCreateDestination("stableford", fa
 eq("stroke creates straight to play", postCreateDestination("stroke", false), { roomTab: "play" });
 eq("individual match hands off to matchups", postCreateDestination("match", false), { roomTab: "setup", setupTab: "matchups" });
 eq("team match hands off to teams", postCreateDestination("match", true), { roomTab: "setup", setupTab: "teams" });
-eq("plain fourball hands off to matchups", postCreateDestination("fourball", false), { roomTab: "setup", setupTab: "matchups" });
+eq("fourball hands off to teams even if legacy teamMode false", postCreateDestination("fourball", false), { roomTab: "setup", setupTab: "teams" });
 eq("team fourball hands off to teams", postCreateDestination("fourball", true), { roomTab: "setup", setupTab: "teams" });
 eq("trifecta hands off to teams", postCreateDestination("trifecta", false), { roomTab: "setup", setupTab: "teams" });
+eq("alternate shot hands off to teams", postCreateDestination("alt_shot", false), { roomTab: "setup", setupTab: "teams" });
 eq("individual skins hands off to groups", postCreateDestination("skins", false), { roomTab: "setup", setupTab: "groups" });
 eq("team skins hands off to teams", postCreateDestination("skins", true), { roomTab: "setup", setupTab: "teams" });
 

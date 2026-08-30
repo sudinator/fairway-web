@@ -26,7 +26,9 @@ expectShape("stroke", G({ game_type: "stroke" }), { skinsStyle: null, usesTeams:
 expectShape("match.singles", G({ game_type: "match", pairings: [{ a: "p1", b: "p2" }] }), { usesTeams: false, usesMatchups: true, usesFoursomes: false, dotBasis: "relative_pair", view: "match" });
 expectShape("match.team", G({ game_type: "match", teams: TA, pairings: [{ a: "p1", b: "p2" }] }), { usesTeams: true, usesMatchups: true, usesFoursomes: false, dotBasis: "relative_pair", view: "match" });
 expectShape("fourball.plain", G({ game_type: "fourball", foursomes: FS }), { usesTeams: false, usesMatchups: true, usesFoursomes: true, dotBasis: "relative_foursome", view: "fourball" });
-expectShape("fourball.team", G({ game_type: "fourball", teams: TA, foursomes: FS }), { usesTeams: true, usesMatchups: true, usesFoursomes: true, dotBasis: "relative_foursome", view: "fourball" });
+expectShape("fourball.team", G({ game_type: "fourball", teams: TA, foursomes: FS }), { usesTeams: true, usesMatchups: false, usesFoursomes: true, dotBasis: "relative_foursome", view: "fourball" });
+expectShape("altshot.legacy", G({ game_type: "alt_shot", foursomes: FS }), { usesTeams: false, usesMatchups: true, usesFoursomes: true, dotBasis: "alt_shot_side", view: "alt_shot" });
+expectShape("altshot.team", G({ game_type: "alt_shot", teams: TA, foursomes: FS }), { usesTeams: true, usesMatchups: false, usesFoursomes: true, dotBasis: "alt_shot_side", view: "alt_shot" });
 expectShape("trifecta", G({ game_type: "trifecta", teams: TA, foursomes: FS }), { usesTeams: true, usesMatchups: true, usesFoursomes: true, dotBasis: "relative_foursome", view: "trifecta" });
 expectShape("skins.individual", G({ game_type: "skins" }), { skinsStyle: "individual", usesTeams: false, usesMatchups: false, usesFoursomes: false, dotBasis: "absolute", view: "skins_individual" });
 expectShape("skins.team_11", G({ game_type: "skins", teams: TA, pairings: [{ a: "p1", b: "p2" }] }), { skinsStyle: "team_11", usesTeams: true, usesMatchups: true, usesFoursomes: false, dotBasis: "relative_pair", view: "skins_team_11" });
