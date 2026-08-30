@@ -1,3 +1,12 @@
+## 178.21.260829 — CI assertion baseline + downstream gate preflight
+
+- Records the intentional four-assertion increase exposed after the 178.20 stale Matchups test was corrected: unnamed-suite baseline 507 -> 511; total 189,908 -> 189,912.
+- No application, scoring, persistence, setup, or database behavior change from 178.20.
+- Corrects the prior 178.19 feature entry that was accidentally labeled 178.20 in DEPLOY_NOTES.
+- Proactive downstream preflight executed: all source guards after npm test through version/release verification pass locally.
+- GitHub remains authoritative for the dependency-backed assertion rerun and final Next build.
+- No new migration; Staging migrations 0140 + 0141 remain required and already applied.
+
 ## 178.20.260829 — CI contract correction
 
 - Corrects the stale `game-type-coverage` assertion that still expected new team Alternate Shot to use Matchups.
@@ -5,7 +14,7 @@
 - No migration. Existing Staging 0140 + 0141 remain required.
 - Targeted game-type coverage: 89/89 PASS locally. Full dependency-backed gate remains GitHub/Vercel.
 
-## 178.20.260829 — Team-play setup + true Alternate Shot side scoring
+## 178.19.260829 — Team-play setup + true Alternate Shot side scoring
 
 - **Four-Ball:** new team games use Teams + Groups; a separate Matchups step is not required because the two teams inside each playing group define the match.
 - **Alternate Shot:** new games use Teams + Groups; each side explicitly selects who tees off first. The selected first driver persists in `games.foursomes` as `a_first` / `b_first` and alternates by round position, including back-nine starts.

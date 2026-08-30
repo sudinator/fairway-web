@@ -1,4 +1,4 @@
-> **178.20.260829:** Migrations `0140_alt_shot_side_scores.sql` + `0141_alt_shot_clear_tombstones.sql` add canonical Alternate Shot side-owned scoring. `game_alt_shot_scores` owns one side/hole value; nullable `strokes` is an explicit clear tombstone that masks legacy duplicated player scores. `games.alt_shot_scoring_started_at` locks structural setup once canonical scoring begins.
+> **178.21.260829:** Migrations `0140_alt_shot_side_scores.sql` + `0141_alt_shot_clear_tombstones.sql` add canonical Alternate Shot side-owned scoring. `game_alt_shot_scores` owns one side/hole value; nullable `strokes` is an explicit clear tombstone that masks legacy duplicated player scores. `games.alt_shot_scoring_started_at` locks structural setup once canonical scoring begins.
 
 > **178.18.260829:** No schema change. Environment-contract documentation only.
 

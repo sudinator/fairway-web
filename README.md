@@ -1,4 +1,4 @@
-**Current staging candidate:** 178.20.260829 — Team-play structure simplification and canonical Alternate Shot side-owned scoring. Four-Ball/Alternate Shot use Teams + Groups (no redundant Matchups for new team games); Trifecta retains Matchups. Migrations 0140–0141 required.
+**Current staging candidate:** 178.21.260829 — CI assertion-baseline/downstream-gate correction on top of the 178.19 team-play + canonical Alternate Shot side-scoring release. Migrations 0140–0141 required.
 
 **Prior release:** 178.18.260829 — Environment-contract correction documenting the migration-ledger test fixture; no application, scoring, or database change.
 
