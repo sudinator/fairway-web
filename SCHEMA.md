@@ -1,3 +1,5 @@
+> 178.23: No schema change. Match progression display only; migrations 0140–0141 remain the latest schema prerequisites.
+
 <!-- 178.22: no schema change; relies on 0140-0141 already staged. -->
 > **178.21.260829:** Migrations `0140_alt_shot_side_scores.sql` + `0141_alt_shot_clear_tombstones.sql` add canonical Alternate Shot side-owned scoring. `game_alt_shot_scores` owns one side/hole value; nullable `strokes` is an explicit clear tombstone that masks legacy duplicated player scores. `games.alt_shot_scoring_started_at` locks structural setup once canonical scoring begins.
 

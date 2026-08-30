@@ -1,3 +1,13 @@
+## 178.23.260829 — Match progression net-score summary
+
+- Replaces the compact Match progression chips with a reusable scorecard-style history table.
+- Expanded progression now shows Hole, each player's net score, and the rolling match state (AS / UP / DN).
+- Uses the existing canonical Match Play handicap allowance, stroke allocation, and `matchProgress()` result; no scoring-engine change.
+- Incomplete holes remain excluded from history until both players have valid scores.
+- Lower net on the hole is emphasized for quick auditability.
+- Trifecta / Four-Ball / Alternate Shot scoring behavior is unchanged.
+- No database migration. Existing staging prerequisites remain 0140 + 0141.
+
 ## 178.22.260829 — Team setup / Group Results / match progression staging fixes
 
 - **Four-Ball team names:** new Four-Ball and Alternate Shot creation always expose both editable team-name fields; Manage → Teams also allows the organizer to rename both teams while preserving team keys and player assignments.

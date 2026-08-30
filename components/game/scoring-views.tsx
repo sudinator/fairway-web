@@ -617,14 +617,24 @@ export function MatchView({
           : st.lead === 0
             ? "All square"
             : `${leader} ${Math.abs(st.lead)} UP`;
-        const progression = matchProgress(
+        const progressionLeads = matchProgress(
           game.holes_meta,
           pa.scores || [],
           pb.scores || [],
           chBasis(pa, game.course_par, game.holes_meta?.length),
           chBasis(pb, game.course_par, game.holes_meta?.length),
           game.allowance_pct ?? 100,
-        ).map((lead) => matchLeadLabel(lead));
+        );
+        const progressionRows = game.holes_meta.map((hole, h) => {
+          const lead = progressionLeads[h];
+          const ga = pa.scores?.[h] ?? null;
+          const gb = pb.scores?.[h] ?? null;
+          if (lead == null || ga == null || gb == null || ga <= 0 || gb <= 0) return null;
+          const allocHoles = game.holes_meta.map((x) => ({ hole_number: x.n, stroke_index: x.si }));
+          const aNet = ga - matchStrokesFor(allow.a, hole.si, allocHoles);
+          const bNet = gb - matchStrokesFor(allow.b, hole.si, allocHoles);
+          return { hole: hole.n, aNet, bNet, lead };
+        }).filter((row): row is { hole: number; aNet: number; bNet: number; lead: number } => row != null);
         const myKey = players.find((p) => p.user_id === user.id)?.user_id ?? user.id;
         const iAmIn = pr.a === myKey || pr.b === myKey;
         return (
@@ -683,14 +693,34 @@ export function MatchView({
             {openProgress === idx && (
               <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.borderGreen}` }}>
                 <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginBottom: 7 }}>MATCH PROGRESSION</div>
-                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-                  {progression.map((label, h) => (
-                    <div key={h} style={{ minWidth: 42, borderRadius: 8, padding: "4px 10px", textAlign: "center", background: label ? C.green : "transparent", border: `1px solid ${label ? C.borderGreen : C.borderCard}` }}>
-                      <div style={{ color: C.sage, fontSize: 11 }}>H{game.holes_meta[h]?.n ?? h + 1}</div>
-                      <div style={{ color: label === "AS" ? C.cream : label?.includes("UP") ? C.gold : C.sage, fontSize: 11, fontWeight: 800, marginTop: 1 }}>{label || "—"}</div>
+                {progressionRows.length === 0 ? (
+                  <div style={{ color: C.sage, fontSize: 12 }}>No holes scored yet.</div>
+                ) : (
+                  <div style={{ overflowX: "auto" }}>
+                    <div style={{ minWidth: 330 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "42px minmax(82px, 1fr) minmax(82px, 1fr) 76px", gap: 8, color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: "4px 10px" }}>
+                        <span>HOLE</span>
+                        <span>{pa.display_name.split(" ")[0]} NET</span>
+                        <span>{pb.display_name.split(" ")[0]} NET</span>
+                        <span style={{ textAlign: "right" }}>MATCH</span>
+                      </div>
+                      {progressionRows.map((row) => {
+                        const aWon = row.aNet < row.bNet;
+                        const bWon = row.bNet < row.aNet;
+                        const label = matchLeadLabel(row.lead);
+                        return (
+                          <div key={row.hole} style={{ display: "grid", gridTemplateColumns: "42px minmax(82px, 1fr) minmax(82px, 1fr) 76px", gap: 8, alignItems: "center", padding: "8px 12px", borderTop: `1px solid ${C.borderGreen}`, color: C.cream, fontSize: 12 }}>
+                            <span style={{ color: C.sage }}>{row.hole}</span>
+                            <span style={{ fontWeight: aWon ? 800 : 500, color: aWon ? C.gold : C.cream }}>{row.aNet}</span>
+                            <span style={{ fontWeight: bWon ? 800 : 500, color: bWon ? C.gold : C.cream }}>{row.bNet}</span>
+                            <span style={{ textAlign: "right", fontWeight: 800, color: label === "AS" ? C.cream : row.lead > 0 ? C.gold : C.sage }}>{label}</span>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
+                <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Net scores drive the running match position. Bold gold marks the lower net on each hole.</div>
               </div>
             )}
           </div>

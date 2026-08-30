@@ -23,6 +23,7 @@ checks = [
     ('old external leg editor removed', 'setupTab === "format" && isOrganizer && !isEnded && (game.game_type === "match"' not in trn),
     ('off suppresses group results', 'game.game_type === "alt_shot" || cfg.scheme === "none"' in seg),
     ('match progression is clickable', 'tap for progression' in score and 'MATCH PROGRESSION' in score and 'setOpenProgress' in score),
+    ('match progression shows both net scores', 'pa.display_name.split(" ")[0]} NET' in score and 'pb.display_name.split(" ")[0]} NET' in score and 'Net scores drive the running match position' in score),
 ]
 for label, ok in checks:
     need(ok, label)

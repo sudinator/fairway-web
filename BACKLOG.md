@@ -1,3 +1,4 @@
+- [x] **178.23 Match progression clarity** — Team Individual Match historical progression now shows hole, both player net scores, and rolling match state instead of status-only chips.
 ## 178.22 staging regression fixes
 - Four-Ball team names, Group Results/Legs visibility+Off suppression, and Team Individual Match clickable progression addressed in 178.22 staging candidate; validate manually before production.
 

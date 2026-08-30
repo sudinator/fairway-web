@@ -1,4 +1,4 @@
-**Current staging candidate:** 178.22.260829 — fixes Four-Ball team-name entry, restores Group Results/Legs setup + Off behavior, and restores clickable Team Match progression. Migrations 0140–0141 remain required.
+**Current staging candidate:** 178.23.260829 — replaces compact Match progression chips with a hole-by-hole net-score summary showing both players and the rolling match position. Migrations 0140–0141 remain required.
 
 **Prior release:** 178.18.260829 — Environment-contract correction documenting the migration-ledger test fixture; no application, scoring, or database change.
 
