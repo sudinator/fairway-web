@@ -17,7 +17,7 @@ export const GAME_TYPES: GameType[] = [
   "stableford", "stroke", "match", "fourball", "skins", "trifecta", "alt_shot",
 ];
 export type TeamDef = { key: string; name: string };
-export type FoursomeDef = { id: string; name: string; a: string[]; b: string[]; swap?: boolean };
+export type FoursomeDef = { id: string; name: string; a: string[]; b: string[]; swap?: boolean; a_first?: string | null; b_first?: string | null };
 export type PairDef = { a: string; b: string };
 export type ShapeGame = { game_type: GameType; teams?: TeamDef[] | null; foursomes?: FoursomeDef[] | null };
 export type ShapePlayer = { id: string; user_id: string | null; team?: string | null; no_show?: boolean | null; course_handicap: number | null; handicap_index?: number | null; slope?: number | null; rating?: number | null };
@@ -56,13 +56,13 @@ export function shapeOf(game: ShapeGame): GameShape {
     gt !== "skins" ? null : !teams2 ? "individual" : hasFour ? "team_2v2" : "team_11";
   const usesFoursomes =
     gt === "fourball" || gt === "trifecta" || gt === "alt_shot" || skinsStyle === "team_2v2";
-  // The global Teams step applies only when two named teams actually exist: team match,
-  // team skins, trifecta (always), and the team-mode four-ball variant. Plain four-ball
-  // builds its sides inside each foursome (pair A vs pair B), so it has NO global teams.
+  // The global Teams step applies when two named teams actually exist. New Four-Ball and
+  // Alternate Shot games always have two global teams; legacy games without them retain
+  // their historical local-foursome matchup structure for backward compatibility.
   const usesTeams =
     teams2 && (gt === "match" || gt === "fourball" || gt === "trifecta" || gt === "skins" || gt === "alt_shot");
   const usesMatchups =
-    gt === "match" || gt === "fourball" || gt === "trifecta" || gt === "alt_shot" || (gt === "skins" && skinsStyle !== "individual" && skinsStyle !== null);
+    gt === "match" || gt === "trifecta" || ((gt === "fourball" || gt === "alt_shot") && !teams2) || (gt === "skins" && skinsStyle !== "individual" && skinsStyle !== null);
   const dotBasis: GameShape["dotBasis"] =
     gt === "match"
       ? "relative_pair"

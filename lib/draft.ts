@@ -274,14 +274,14 @@ export const AI_DAILY_LIMIT_VALUE = AI_DAILY_LIMIT;
 // row, all player rows, and the course tee yardages. Merged on save so the game
 // room can write {game,players} and the tees effect can add {courseTees} later.
 function gameSnapKey(gameId: string) { return `bnn_game_snap_${gameId}`; }
-export function saveGameSnapshot(gameId: string, partial: { game?: any; players?: any[]; courseTees?: any[] }): void {
+export function saveGameSnapshot(gameId: string, partial: { game?: any; players?: any[]; courseTees?: any[]; altShotScores?: any[] }): void {
   try {
     if (typeof window === "undefined") return;
     const existing = loadGameSnapshot(gameId) || {};
     window.localStorage.setItem(gameSnapKey(gameId), JSON.stringify({ ...existing, ...partial, at: Date.now() }));
   } catch {}
 }
-export function loadGameSnapshot(gameId: string): { game?: any; players?: any[]; courseTees?: any[]; at?: number } | null {
+export function loadGameSnapshot(gameId: string): { game?: any; players?: any[]; courseTees?: any[]; altShotScores?: any[]; at?: number } | null {
   try {
     if (typeof window === "undefined") return null;
     const raw = window.localStorage.getItem(gameSnapKey(gameId));

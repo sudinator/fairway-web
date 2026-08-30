@@ -45,6 +45,7 @@ import {
 } from "@/lib/golf";
 import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, altShotSides } from "@/lib/game-shape";
 import { readAltShotSideScores } from "@/lib/alt-shot-scores";
+import { canonicalAltShotGross, type AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import { decideSetupChange, type SetupAction } from "@/lib/game-setup-policy";
 import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
@@ -365,12 +366,14 @@ export function MatchView({
   isCreator,
   mode = "play",
   onChanged,
+  altShotScores = [],
 }: {
   game: Game;
   players: Player[];
   user: any;
   isCreator: boolean;
   mode?: "play" | "setup";
+  altShotScores?: AltShotScoreRow[];
   onChanged: () => void;
 }) {
   const [editing, setEditing] = useState(false);
@@ -792,6 +795,7 @@ export function FourballView({
   user,
   isCreator,
   mode = "play",
+  altShotScores = [],
   onChanged,
 }: {
   game: Game;
@@ -799,6 +803,7 @@ export function FourballView({
   user: any;
   isCreator: boolean;
   mode?: "play" | "setup";
+  altShotScores?: AltShotScoreRow[];
   onChanged: () => void;
 }) {
   const foursomes = game.foursomes || [];
@@ -905,12 +910,14 @@ export function FourballView({
     const bRows = f.b.map(playerOf);
     if (aRows.some((x) => !x) || bRows.some((x) => !x)) return null;
     const sides = altShotSides(game as never, players as never, f as never);
-    const ar = readAltShotSideScores(aRows[0]!.scores, aRows[1]!.scores, holesCount);
-    const br = readAltShotSideScores(bRows[0]!.scores, bRows[1]!.scores, holesCount);
-    const conflictHoles = Array.from(new Set([...ar.conflictHoles, ...br.conflictHoles])).map((i) => game.holes_meta?.[i]?.n ?? i + 1);
+    const arLegacy = readAltShotSideScores(aRows[0]!.scores, aRows[1]!.scores, holesCount);
+    const brLegacy = readAltShotSideScores(bRows[0]!.scores, bRows[1]!.scores, holesCount);
+    const aGross = canonicalAltShotGross(altShotScores, (f as any).id, "a", holesCount, arLegacy.gross);
+    const bGross = canonicalAltShotGross(altShotScores, (f as any).id, "b", holesCount, brLegacy.gross);
+    const conflictHoles = altShotScores.some((r) => r.foursome_id === (f as any).id) ? [] : Array.from(new Set([...arLegacy.conflictHoles, ...brLegacy.conflictHoles])).map((i) => game.holes_meta?.[i]?.n ?? i + 1);
     return {
-      a: { ids: f.a, chs: [sides.aCh, 0], gross: ar.gross },
-      b: { ids: f.b, chs: [sides.bCh, 0], gross: br.gross },
+      a: { ids: f.a, chs: [sides.aCh, 0], gross: aGross },
+      b: { ids: f.b, chs: [sides.bCh, 0], gross: bGross },
       conflictHoles,
     };
   };

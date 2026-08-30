@@ -22,13 +22,15 @@ export type Game = {
   pairings: { a: string; b: string }[]; // for match play: pkey(player) vs pkey(player)
   status?: "active" | "ended" | null;
   teams?: { key: string; name: string }[] | null; // two named teams for team match play
-  foursomes?: { id: string; name: string; a: string[]; b: string[]; swap?: boolean }[] | null; // four-ball / trifecta: pair A vs pair B (swap = cross the singles)
+  foursomes?: { id: string; name: string; a: string[]; b: string[]; swap?: boolean; a_first?: string | null; b_first?: string | null }[] | null; // four-ball / trifecta: pair A vs pair B (swap = cross the singles)
   team_score_mode?: "best_ball" | "aggregate" | null; // trifecta team leg: low net vs both nets added
   leg_config?: LegConfig | null; // "Group results: legs & team points" — organizer-set scheme/metric/per-leg points
-  structure_stash?: { teams?: { key: string; name: string }[] | null; foursomes?: { id: string; name: string; a: string[]; b: string[]; swap?: boolean }[] | null; pairings?: { a: string; b: string }[] | null } | null; // last team structure, kept when a format switch hides it so switching back restores it
+  structure_stash?: { teams?: { key: string; name: string }[] | null; foursomes?: { id: string; name: string; a: string[]; b: string[]; swap?: boolean; a_first?: string | null; b_first?: string | null }[] | null; pairings?: { a: string; b: string }[] | null } | null; // last team structure, kept when a format switch hides it so switching back restores it
   trifecta_scoring?: "per_hole" | "match" | null; // trifecta: per-hole points vs Ryder-Cup 1pt-per-match
   share_token?: string | null; // public live-scorecard token (organizer-set); null = not shared
-  ended_at?: string | null; // when the game was ended (stamped by trigger); drives the 3-day live window
+  ended_at?: string | null;
+  alt_shot_scoring_started_at?: string | null;
+  scores_reset_at?: string | null; // when the game was ended (stamped by trigger); drives the 3-day live window
   created_by: string;
   created_at: string;
 };

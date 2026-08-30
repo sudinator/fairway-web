@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { altShotFanOut, readAltShotSideScores } from "@/lib/alt-shot-scores";
+import { readAltShotSideScores } from "@/lib/alt-shot-scores";
+import { canonicalAltShotGross, upsertAltShotScoreLocal, loadAltShotDrafts, saveAltShotDraft, clearAltShotDraft, clearAllAltShotDrafts, type AltShotScoreRow, type AltShotScoreSide } from "@/lib/alt-shot-side-scores";
 import { MatchLengthPicker } from "@/components/game/match-length-picker";
 import { holesForLength, type MatchLength } from "@/lib/match-length";
 import type { GameType } from "@/lib/game-shape";
@@ -98,7 +99,7 @@ import { GroupScorecard } from "@/components/game/scorecard-views";
 import { BettingPanel, type OrganizerPanelProps } from "@/components/game/organizer-panel";
 import { GameSetupWorkspace, type SetupTab } from "@/components/game/setup/game-setup-workspace";
 import { CreateGameWorkspace, type CreateGameSection } from "@/components/game/setup/create-game-workspace";
-import { buildFormatPatch, buildSkinsStylePatch, buildMatchTeamPatch } from "@/lib/game-structure";
+import { buildFormatPatch, buildSkinsStylePatch, buildMatchTeamPatch, deriveTeamFoursomesFromGroups } from "@/lib/game-structure";
 import { resolveCreateGameTee, teeSourceLabel } from "@/lib/game-tee-assignment";
 import { formatReviewLabel, selectGuidedFamily, selectGuidedMatchKind, selectGuidedStrokeFormat, selectGuidedTeamFormat, setGuidedTeamMode, type CreateFormatPatch, type GuidedFormatState } from "@/lib/create-game-format";
 import { commitAllowance, editAllowance } from "@/lib/handicap-allowance";
@@ -1163,7 +1164,7 @@ function CreateGame({
         {((gameType === "match" || gameType === "fourball" || gameType === "alt_shot") || (fmtFamily === "stroke" && gameType === "skins")) && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <input type="checkbox" checked={teamMode} onChange={(e) => applyGuidedFormatPatch(setGuidedTeamMode(e.target.checked))} />
+              <input type="checkbox" checked={(gameType === "fourball" || gameType === "alt_shot") ? true : teamMode} disabled={gameType === "fourball" || gameType === "alt_shot"} onChange={(e) => applyGuidedFormatPatch(setGuidedTeamMode(e.target.checked))} />
               <span style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>{gameType === "skins" ? "Team skins" : gameType === "fourball" || gameType === "alt_shot" ? "Create Team Names (Red vs Blue)" : "Team match (e.g. 4 v 4)"}</span>
             </label>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
@@ -1419,6 +1420,7 @@ function GameRoom({
   const [game, setGame] = useState<Game | null>(null);
   const paceNow = useNowTick();
   const [players, setPlayers] = useState<Player[]>([]);
+  const [altShotScores, setAltShotScores] = useState<AltShotScoreRow[]>([]);
   const [me, setMe] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
   const [savingHole, setSavingHole] = useState<number | null>(null);
@@ -1555,6 +1557,8 @@ function GameRoom({
       for (const ids of [f.a || [], f.b || []]) {
         const rows = ids.map((k: string) => players.find((p) => pkey(p) === k)).filter(Boolean) as Player[];
         if (rows.length !== 2) continue;
+        const hasCanonical = altShotScores.some((r) => r.foursome_id === f.id && r.side === (ids === f.a ? "a" : "b"));
+        if (hasCanonical) continue;
         const read = readAltShotSideScores(rows[0].scores, rows[1].scores, game.holes_meta.length);
         for (const i of read.conflictHoles) out.add(game.holes_meta[i]?.n ?? i + 1);
       }
@@ -1570,6 +1574,8 @@ function GameRoom({
     await drainOutbox();
     const left = countPending();
     if (left > 0) { recomputePending(); alert(left + (left === 1 ? " hole hasn't" : " holes haven't") + " uploaded yet. Tap \"Sync now\", wait until it reaches 0, then finish so the recorded round is complete."); return; }
+    const altDrafts = game.game_type === "alt_shot" ? loadAltShotDrafts(game.id).length : 0;
+    if (altDrafts > 0) { alert(`${altDrafts} Alternate Shot score${altDrafts === 1 ? " has" : "s have"} not uploaded yet. Reconnect and wait for sync before finishing.`); return; }
     const conflicts = altShotConflictHoles(myRow.tee_group);
     if (conflicts.length) { alert(`Alternate-shot partner scores disagree on hole${conflicts.length === 1 ? "" : "s"} ${conflicts.join(", ")}. Fix those scores before finishing the group.`); return; }
     const { error } = await supabase.rpc("finish_tee_group_and_post", { p_game: game.id });
@@ -1604,6 +1610,9 @@ function GameRoom({
       });
       setGame(snap.game as any);
       setPlayers(mergedPlayers);
+      let offlineAlt = (snap.altShotScores || []) as AltShotScoreRow[];
+      for (const d of loadAltShotDrafts(gameId)) offlineAlt = upsertAltShotScoreLocal(offlineAlt, gameId, d.foursomeId, d.side, d.holeIndex, d.strokes);
+      setAltShotScores(offlineAlt);
       const mineOff = mergedPlayers.find((p: any) => p.user_id === user.id) || null;
       setMe(mineOff);
       if (snap.courseTees) setCourseTees(snap.courseTees as any);
@@ -1627,6 +1636,17 @@ function GameRoom({
       .from("game_players")
       .select("*")
       .eq("game_id", gameId);
+    const { data: altRows } = await supabase
+      .from("game_alt_shot_scores")
+      .select("game_id,foursome_id,side,hole_index,strokes,updated_at,updated_by")
+      .eq("game_id", gameId);
+    let loadedAlt = (altRows || []) as AltShotScoreRow[];
+    const altResetAt = (g as any)?.scores_reset_at ? new Date((g as any).scores_reset_at).getTime() : 0;
+    for (const d of loadAltShotDrafts(gameId)) {
+      if (altResetAt && d.at < altResetAt) { clearAltShotDraft(gameId, d.foursomeId, d.side, d.holeIndex); continue; }
+      loadedAlt = upsertAltShotScoreLocal(loadedAlt, gameId, d.foursomeId, d.side, d.holeIndex, d.strokes);
+    }
+    setAltShotScores(loadedAlt);
     if (!g) { if (bootFromSnapshot()) return; }
     // Defensively normalize: a freshly created or legacy game may have null
     // pairings/teams/holes_meta, which would crash the match views downstream.
@@ -1670,7 +1690,7 @@ function GameRoom({
     let mine = reconciled.find((p: any) => p.user_id === user.id) || null;
     setPlayers(reconciled);
     setMe(mine);
-    if (safeGame) saveGameSnapshot(gameId, { game: safeGame, players: reconciled });
+    if (safeGame) saveGameSnapshot(gameId, { game: safeGame, players: reconciled, altShotScores: loadedAlt });
     if (mine && mine.course_handicap == null && (safeGame as any)?.holes_meta?.length)
       setNeedsSetup(true);
     setLoading(false);
@@ -1765,6 +1785,7 @@ function GameRoom({
     const ch = supabase
       .channel(`game-${gameId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "game_players", filter: `game_id=eq.${gameId}` }, refresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "game_alt_shot_scores", filter: `game_id=eq.${gameId}` }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "games", filter: `id=eq.${gameId}` }, refresh)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -2024,16 +2045,7 @@ function GameRoom({
     lastEditRef.current = Date.now();
     setSavingHole(null);
 
-    // Alternate shot: the stroke belongs to the side, so it reaches the partner from THIS path
-    // too. Both write paths are reachable in one game (the Results / Group card toggle), and
-    // fanning out in only one would make a side's score depend on which screen entered it.
-    // Delegates to setPlayerHole so there is a single fan-out implementation, and passes false so
-    // that call does not fan back into this row.
-    if (game) {
-      for (const w of altShotFanOut(game.game_type, me.id, patch as Record<string, unknown>, game.foursomes, players)) {
-        await setPlayerHole(w.playerId, holeIdx, w.patch as typeof patch, false);
-      }
-    }
+
   };
 
   // Marker: write one hole for ANY player in the group. Requires marker rights,
@@ -2042,10 +2054,6 @@ function GameRoom({
     playerId: string,
     holeIdx: number,
     patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null },
-    // Alternate shot writes the stroke to BOTH partners. The partner's call passes false so it
-    // does not fan straight back and loop. Explicit rather than a depth limit, which would hide
-    // the reason.
-    fanOut = true,
   ) => {
     const target = players.find((p) => p.id === playerId);
     if (!game || !target) return;
@@ -2076,19 +2084,43 @@ function GameRoom({
     await pushScores(playerId, { scores, putts, fairways, penalties, sand, ...clockPatch });
     lastEditRef.current = Date.now();
 
-    // Alternate shot: one ball per side, so the STROKE belongs to both partners. Stats are not
-    // fanned out — a putt has no player-level owner when one ball is in play, and duplicating it
-    // would double the side's putts in every aggregate.
-    // Runs AFTER the edited row is durable; if this write fails the two rows disagree and
-    // sideScore() surfaces that as a conflict rather than silently preferring one.
-    if (fanOut && game) {
-      for (const w of altShotFanOut(game.game_type, playerId, patch as Record<string, unknown>, game.foursomes, players)) {
-        await setPlayerHole(w.playerId, holeIdx, w.patch as typeof patch, false);
-      }
-    }
+
   };
 
-  // Claim / release the group scorecard (the "marker"). Uses a SECURITY DEFINER
+
+  const setAltShotSideHole = async (foursomeId: string, side: AltShotScoreSide, holeIdx: number, strokes: number | null) => {
+    if (!game || game.game_type !== "alt_shot") return;
+    setAltShotScores((rows) => upsertAltShotScoreLocal(rows, game.id, foursomeId, side, holeIdx, strokes));
+    const draft = { foursomeId, side, holeIndex: holeIdx, strokes, at: Date.now() };
+    saveAltShotDraft(game.id, draft);
+    if (typeof navigator !== "undefined" && navigator.onLine === false) { setSyncState("retry"); return; }
+    setSyncState("saving");
+    const { error } = await supabase.rpc("save_alt_shot_side_score", { p_game: game.id, p_foursome_id: foursomeId, p_side: side, p_hole_index: holeIdx, p_strokes: strokes });
+    if (error) { setSyncState("error"); return; }
+    clearAltShotDraft(game.id, foursomeId, side, holeIdx);
+    setSyncState("synced");
+    window.setTimeout(() => setSyncState((cur) => cur === "synced" ? "idle" : cur), 1200);
+  };
+
+  useEffect(() => {
+    if (!game || game.game_type !== "alt_shot") return;
+    const flush = async () => {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+      const resetAt = game.scores_reset_at ? new Date(game.scores_reset_at).getTime() : 0;
+      const drafts = loadAltShotDrafts(game.id);
+      for (const d of drafts) {
+        if (resetAt && d.at < resetAt) { clearAltShotDraft(game.id, d.foursomeId, d.side, d.holeIndex); continue; }
+        const { error } = await supabase.rpc("save_alt_shot_side_score", { p_game: game.id, p_foursome_id: d.foursomeId, p_side: d.side, p_hole_index: d.holeIndex, p_strokes: d.strokes });
+        if (!error) clearAltShotDraft(game.id, d.foursomeId, d.side, d.holeIndex);
+      }
+      if (drafts.length) load();
+    };
+    void flush();
+    window.addEventListener("online", flush);
+    return () => window.removeEventListener("online", flush);
+  }, [game?.id, game?.game_type, load]);
+
+    // Claim / release the group scorecard (the "marker"). Uses a SECURITY DEFINER
   // RPC so only a group member can claim, and only the marker can release.
   const takeOverScoring = async () => {
     if (!game) return;
@@ -2210,10 +2242,30 @@ function GameRoom({
     await load();
   };
 
+  const syncTeamPlayFoursomes = async (nextPlayers: Player[]) => {
+    if (!game || !Array.isArray(game.teams) || game.teams.length !== 2) return;
+    if (game.game_type !== "fourball" && game.game_type !== "alt_shot") return;
+    const next = deriveTeamFoursomesFromGroups(nextPlayers, game.teams, game.foursomes);
+    await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
+    setGame({ ...game, foursomes: next });
+  };
+
+  const setAltShotFirstDriver = async (foursomeId: string, side: "a" | "b", playerKey: string) => {
+    if (!game || game.game_type !== "alt_shot" || !Array.isArray(game.foursomes)) return;
+    if (!allowSetupChange({ type: "set_foursomes" })) return;
+    const next = game.foursomes.map((f) => f.id === foursomeId ? { ...f, [side === "a" ? "a_first" : "b_first"]: playerKey } : f);
+    const { error } = await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
+    if (error) { notifyError("Couldn't save the starting player — please try again."); return; }
+    setGame({ ...game, foursomes: next });
+  };
+
   // Organizer: update a player's team assignment from the unified setup roster.
   const setPlayerTeam = async (p: Player, team: string | null) => {
     if (!allowSetupChange({ type: "set_team", player: p, team })) return;
     await supabase.from("game_players").update({ team }).eq("id", p.id);
+    const nextPlayers = players.map((x) => x.id === p.id ? { ...x, team } : x);
+    setPlayers(nextPlayers);
+    await syncTeamPlayFoursomes(nextPlayers);
     await load();
   };
 
@@ -2221,7 +2273,10 @@ function GameRoom({
   const setPlayerTeeGroup = async (p: Player, group: number | null) => {
     if (!allowSetupChange({ type: "set_tee_group", player: p, group })) return;
     const { error } = await supabase.rpc("set_tee_group", { p_player: p.id, p_group: group });
-    if (error) notifyError("Couldn't update that player's group — please try again.");
+    if (error) { notifyError("Couldn't update that player's group — please try again."); return; }
+    const nextPlayers = players.map((x) => x.id === p.id ? { ...x, tee_group: group } : x);
+    setPlayers(nextPlayers);
+    await syncTeamPlayFoursomes(nextPlayers);
     await load();
   };
 
@@ -2250,6 +2305,8 @@ function GameRoom({
       ];
       const { error } = await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: payload });
       if (error) throw error;
+      const nextPlayers = players.map((p) => p.no_show ? p : ({ ...p, tee_group: overflowGuestIds.includes(p.id) ? null : (byId.get(p.id) ?? null) }));
+      await syncTeamPlayFoursomes(nextPlayers);
     } catch {
       notifyError("Couldn't save the shuffled groups — please try again."); // reload below reconciles from the DB
     } finally {
@@ -2451,7 +2508,7 @@ function GameRoom({
   // offered in the UI (see formatGroup); pairings/foursomes/teams are kept in
   // place so a switch is reversible. Allowance auto-suggests the new format's
   // common-practice number but the organizer can override after.
-  const anyScores = players.some((p) => (p.scores || []).some((s) => s != null));
+  const anyScores = players.some((p) => (p.scores || []).some((s) => s != null)) || !!game?.alt_shot_scoring_started_at;
   const changeTrifectaScoring = async (next: "per_hole" | "match") => {
     if (!game || (game.trifecta_scoring ?? "per_hole") === next || !allowSetupChange({ type: "set_trifecta_scoring", mode: next })) return;
     await supabase.from("games").update({ trifecta_scoring: next }).eq("id", game.id);
@@ -2521,6 +2578,8 @@ function GameRoom({
     await drainOutbox();
     const left = countPending();
     if (left > 0) { recomputePending(); alert(left + (left === 1 ? " hole hasn't" : " holes haven't") + " uploaded yet. Tap \"Sync now\", wait until it reaches 0, then end the game so every recorded round is complete."); return; }
+    const altDrafts = game.game_type === "alt_shot" ? loadAltShotDrafts(game.id).length : 0;
+    if (altDrafts > 0) { alert(`${altDrafts} Alternate Shot score${altDrafts === 1 ? " has" : "s have"} not uploaded yet. Reconnect and wait for sync before ending the game.`); return; }
     const conflicts = altShotConflictHoles();
     if (conflicts.length) { alert(`Alternate-shot partner scores disagree on hole${conflicts.length === 1 ? "" : "s"} ${conflicts.join(", ")}. Fix those scores before ending the game.`); return; }
     // One database transaction: end the game, post every player's round, and freeze running clocks.
@@ -2533,7 +2592,29 @@ function GameRoom({
 
   // Pre-conclusion completeness: list what's missing for the players being locked.
   const finishListFmt = (a: number[]) => FG.finishListFmt(a);
-  const computeFinishGaps = (scope: Player[]): FinishGap[] => FG.computeFinishGaps(scope, game?.holes_meta || []);
+  const computeFinishGaps = (scope: Player[]): FinishGap[] => {
+    if (!game || game.game_type !== "alt_shot" || !Array.isArray(game.foursomes)) return FG.computeFinishGaps(scope, game?.holes_meta || []);
+    const scopeGroups = new Set(scope.map((p) => p.tee_group).filter((g): g is number => g != null));
+    const gaps: FinishGap[] = [];
+    for (const f of game.foursomes) {
+      const rows = [...f.a, ...f.b].map((k) => players.find((p) => pkey(p) === k)).filter((p): p is Player => !!p);
+      if (scopeGroups.size && !rows.some((p) => p.tee_group != null && scopeGroups.has(p.tee_group))) continue;
+      for (const [side, ids] of [["a", f.a], ["b", f.b]] as const) {
+        const ps = ids.map((k) => players.find((p) => pkey(p) === k)).filter((p): p is Player => !!p);
+        if (ps.length !== 2) continue;
+        const legacy = readAltShotSideScores(ps[0].scores, ps[1].scores, game.holes_meta.length).gross;
+        const gross = canonicalAltShotGross(altShotScores, f.id, side, game.holes_meta.length, legacy);
+        const entered = gross.filter((v) => v != null && v > 0).length;
+        const missScores = game.holes_meta.filter((_, i) => gross[i] == null || (gross[i] ?? 0) <= 0).map((h) => h.n);
+        if (entered === 0 || missScores.length) {
+          const teamIndex = side === "a" ? 0 : 1;
+          const name = Array.isArray(game.teams) && game.teams[teamIndex] ? `${f.name} · ${game.teams[teamIndex].name}` : `${f.name} · Side ${side.toUpperCase()}`;
+          gaps.push({ name, noScores: entered === 0, missScores: entered === 0 ? [] : missScores, missPutts: [], missFw: [] });
+        }
+      }
+    }
+    return gaps;
+  };
   const requestEndGame = async () => {
     if (!game) return;
     setFinishPrompt({ kind: "game", gaps: computeFinishGaps(players) });
@@ -3011,7 +3092,7 @@ function GameRoom({
         } satisfies OrganizerPanelProps;
         const workspaceProps = {
           game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate, courseOptions, onChangeCourse: changeGameCourse,
-          onSetTeeGroup: setPlayerTeeGroup, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, canRandomize, randomizeReason,
+          onSetTeeGroup: setPlayerTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, canRandomize, randomizeReason,
           randomizing, groupOverflow,
         } satisfies React.ComponentProps<typeof GameSetupWorkspace>;
         return <GameSetupWorkspace {...workspaceProps} />;
@@ -3270,6 +3351,8 @@ function GameRoom({
             onTakeOver={takeOverScoring}
             onRelease={releaseScoring}
             onSetHole={setPlayerHole}
+            altShotScores={altShotScores}
+            onSetAltShotScore={setAltShotSideHole}
             teeMode={teeGroupsInUse}
             groupLabel={viewGroup != null ? `Group ${viewGroup}` : ""}
             groupLocked={viewedGroupLocked || gameEnded}
@@ -3287,6 +3370,7 @@ function GameRoom({
           user={user}
           isCreator={game.created_by === user.id}
           mode={roomTab}
+          altShotScores={altShotScores}
           onChanged={load}
         />
       ) : game.game_type === "match" && (roomTab === "play" || (roomTab === "setup" && setupTab === "matchups")) ? (

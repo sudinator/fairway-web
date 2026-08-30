@@ -11,6 +11,8 @@ import {
   assignFoursomePlayer,
   unassignFoursomePlayer,
   deriveTeeGroupsFromFoursomes,
+  deriveTeamFoursomesFromGroups,
+  DEFAULT_TEAMS,
 } from "./game-structure";
 
 type F = NonNullable<Game["foursomes"]>[number];
@@ -72,7 +74,7 @@ function oldAssign(fs:F[], fId:string, team:"a"|"b", uid:string):F[] {
 const oldUnassign=(fs:F[],fId:string,team:"a"|"b",uid:string)=>fs.map(f=>f.id===fId?{...f,[team]:f[team].filter(x=>x!==uid)}:f);
 function oldGroups(fs:F[]){const out:Record<string,number>={};fs.forEach((f,i)=>{[...f.a,...f.b].forEach(uid=>{out[uid]=i+1;});});return out;}
 
-const formats: Game["game_type"][] = ["stableford","stroke","match","fourball","skins","trifecta"];
+const formats: Game["game_type"][] = ["stableford","stroke","match","skins","trifecta"];
 for (const next of formats) {
   for (const teamMode of [null, "best_ball"] as const) {
     for (const tri of [null, "per_hole"] as const) {
@@ -83,6 +85,11 @@ for (const next of formats) {
     }
   }
 }
+
+const fbPatch = buildFormatPatch(baseGame({teams:null,foursomes:null}), "fourball");
+same(fbPatch, { game_type:"fourball", allowance_pct:85, teams:DEFAULT_TEAMS, foursomes:[] }, "fourball team structure is mandatory");
+const asPatch = buildFormatPatch(baseGame({teams:null,foursomes:null}), "alt_shot");
+same(asPatch, { game_type:"alt_shot", allowance_pct:50, teams:DEFAULT_TEAMS, foursomes:[], leg_config:{scheme:"none",metric:"net",points:{}} }, "alternate shot team structure + side games off");
 
 const teams=[{key:"A",name:"Alpha"},{key:"B",name:"Beta"}];
 const pairings=[{a:"p1",b:"p2"}];
@@ -126,3 +133,23 @@ for(let i=0;i<5000;i++){
   same(deriveTeeGroupsFromFoursomes(fs),oldGroups(fs),"tee groups"); assertions++;
 }
 console.log(`game-structure differential: ${assertions} randomized assertions + fixed transition matrix PASS`);
+
+// Team-play formats derive contests from Teams + Groups; no redundant Matchups step.
+{
+  const ps = [
+    { id:"r1", user_id:"r1", team:"A", tee_group:1 },
+    { id:"r2", user_id:"r2", team:"A", tee_group:1 },
+    { id:"b1", user_id:"b1", team:"B", tee_group:1 },
+    { id:"b2", user_id:"b2", team:"B", tee_group:1 },
+    { id:"r3", user_id:"r3", team:"A", tee_group:2 },
+    { id:"r4", user_id:"r4", team:"A", tee_group:2 },
+    { id:"b3", user_id:"b3", team:"B", tee_group:2 },
+    { id:"b4", user_id:"b4", team:"B", tee_group:2 },
+  ];
+  const d = deriveTeamFoursomesFromGroups(ps as any, [{key:"A",name:"Red"},{key:"B",name:"Blue"}], []);
+  same(d.length, 2, "team groups create two foursomes");
+  same(d[0].a, ["r1","r2"], "group 1 red side");
+  same(d[0].b, ["b1","b2"], "group 1 blue side");
+  const d2 = deriveTeamFoursomesFromGroups(ps as any, [{key:"A",name:"Red"},{key:"B",name:"Blue"}], [{...d[0],a_first:"r2",b_first:"b1"} as any,d[1]]);
+  same([(d2[0] as any).a_first,(d2[0] as any).b_first], ["r2","b1"], "first driver preserved");
+}

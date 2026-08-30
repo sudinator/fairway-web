@@ -11,8 +11,11 @@ export const DEFAULT_TEAMS: TeamDef[] = [
 ];
 
 export function buildFormatPatch(game: Game, next: Game["game_type"]): Record<string, unknown> {
-  const suggested = next === "fourball" || next === "trifecta" ? 85 : 100;
+  const suggested = next === "alt_shot" ? 50 : next === "fourball" || next === "trifecta" ? 85 : 100;
   const patch: Record<string, unknown> = { game_type: next, allowance_pct: suggested };
+  if ((next === "fourball" || next === "alt_shot") && (!Array.isArray(game.teams) || game.teams.length !== 2)) patch.teams = DEFAULT_TEAMS;
+  if ((next === "fourball" || next === "alt_shot") && !Array.isArray(game.foursomes)) patch.foursomes = [];
+  if (next === "alt_shot") patch.leg_config = { scheme: "none", metric: "net", points: {} };
   if (next === "trifecta" && !game.team_score_mode) patch.team_score_mode = "best_ball";
   if (next === "trifecta" && !game.trifecta_scoring) patch.trifecta_scoring = "per_hole";
   if (next === "stroke" && !game.stroke_basis) patch.stroke_basis = "net";
@@ -110,4 +113,34 @@ export function deriveTeeGroupsFromFoursomes(foursomes: Foursome[]): Record<stri
 
 export function applyTeamAssignment<T extends Pick<Player, "id" | "team">>(players: T[], playerId: string, team: string | null): T[] {
   return players.map((p) => (p.id === playerId ? { ...p, team } : p));
+}
+
+/**
+ * Team-play Four-Ball / Alternate Shot: team membership + tee group defines the contest.
+ * Rebuild foursomes from those two facts, preserving stable ids/name and Alternate Shot first-driver
+ * selections for groups that already exist. Trifecta is intentionally excluded: its explicit
+ * singles matchups still live in the Matchups step.
+ */
+export function deriveTeamFoursomesFromGroups(
+  players: { id: string; user_id: string | null; team?: string | null; tee_group?: number | null }[],
+  teams: { key: string; name: string }[] | null | undefined,
+  existing: Foursome[] | null | undefined,
+): Foursome[] {
+  if (!Array.isArray(teams) || teams.length !== 2) return Array.isArray(existing) ? existing : [];
+  const keyOf = (p: { id: string; user_id: string | null }) => p.user_id ?? p.id;
+  const groups = Array.from(new Set(players.map((p) => p.tee_group).filter((g): g is number => g != null))).sort((a,b)=>a-b);
+  return groups.map((g, i) => {
+    const prev = (existing || [])[i] || (existing || []).find((f) => f.name === `Group ${g}`);
+    const a = players.filter((p) => p.tee_group === g && p.team === teams[0].key).map(keyOf);
+    const b = players.filter((p) => p.tee_group === g && p.team === teams[1].key).map(keyOf);
+    const validFirst = (v: string | null | undefined, ids: string[]) => v && ids.includes(v) ? v : null;
+    return {
+      id: prev?.id || `group-${g}`,
+      name: `Group ${g}`,
+      a,
+      b,
+      ...(validFirst((prev as any)?.a_first, a) ? { a_first: validFirst((prev as any)?.a_first, a)! } : {}),
+      ...(validFirst((prev as any)?.b_first, b) ? { b_first: validFirst((prev as any)?.b_first, b)! } : {}),
+    } as Foursome;
+  });
 }

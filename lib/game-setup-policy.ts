@@ -61,7 +61,8 @@ const sameFoursomeFamily = (game: Game, target: GameType): boolean => {
 };
 
 export function decideSetupChange({ game, players, action }: SetupPolicyContext): SetupDecision {
-  const anyScores = gameHasScores(players);
+  const altSideScoresStarted = game.game_type === "alt_shot" && !!game.alt_shot_scoring_started_at;
+  const anyScores = gameHasScores(players) || altSideScoresStarted;
 
   // Metadata/visibility remain safe even after the competition has ended.
   if (action.type === "rename_game" || action.type === "share_live") return allow();
@@ -100,6 +101,7 @@ export function decideSetupChange({ game, players, action }: SetupPolicyContext)
       return block("Players cannot be added after scoring starts in a match or team contest because that would change the competitive structure.");
     }
     case "remove_player": {
+      if (altSideScoresStarted) return block("Players are frozen once Alternate Shot side scoring begins. Reset scores before changing the sides.");
       if (playerHasScores(action.player)) {
         return block(`${action.player.display_name} already has scores. Mark them No-show / Out instead so their played holes stay in the game.`);
       }
@@ -124,26 +126,28 @@ export function decideSetupChange({ game, players, action }: SetupPolicyContext)
       );
     }
     case "set_handicap": {
-      if (!playerHasScores(action.player)) return allow();
+      if (!playerHasScores(action.player) && !altSideScoresStarted) return allow();
       return requireConfirm(
         `Correct ${action.player.display_name}'s handicap?`,
         "This recalculates received strokes and net results for the entire game, including holes already scored. Gross scores are not changed.",
       );
     }
     case "set_tee": {
-      if (!playerHasScores(action.player)) return allow();
+      if (!playerHasScores(action.player) && !altSideScoresStarted) return allow();
       return requireConfirm(
         `Correct ${action.player.display_name}'s tee to ${action.teeName}?`,
         `This treats ${action.player.display_name}'s entire round as having been played from ${action.teeName} and recalculates rating, slope, course handicap and net results. Gross scores are not changed. Do not use this if the player physically changed tees during the round.`,
       );
     }
     case "set_team": {
+      if (altSideScoresStarted) return block("Teams are frozen once Alternate Shot side scoring begins. Reset scores before changing the sides.");
       if (playerHasScores(action.player)) {
         return block(`${action.player.display_name} already has scores. Team membership is frozen once that player's scoring begins.`);
       }
       return allow();
     }
     case "set_tee_group": {
+      if (altSideScoresStarted) return block("Groups are frozen once Alternate Shot side scoring begins. Reset scores before moving players.");
       if (playerHasScores(action.player) || action.player.group_locked) {
         return block(`${action.player.display_name}'s tee group is frozen because scoring has started for that player/group.`);
       }

@@ -64,6 +64,11 @@ check("pairings pre-score allowed", decision({ ...baseGame(), game_type: "match"
 check("pairings scored blocked", decision({ ...baseGame(), game_type: "match", pairings: [{ a: "p1", b: "p2" }] }, [scored, blank], { type: "set_pairings" }), "block");
 check("foursomes pre-score allowed", decision({ ...baseGame(), game_type: "fourball", teams, foursomes }, [blank], { type: "set_foursomes" }), "allow");
 check("foursomes scored blocked", decision({ ...baseGame(), game_type: "fourball", teams, foursomes }, [scored], { type: "set_foursomes" }), "block");
+check("alt-shot canonical scoring marker freezes foursomes", decision({ ...baseGame(), game_type: "alt_shot", teams, foursomes, alt_shot_scoring_started_at: "2026-08-29T12:00:00Z" }, [blank], { type: "set_foursomes" }), "block");
+check("alt-shot canonical scoring marker freezes groups", decision({ ...baseGame(), game_type: "alt_shot", teams, foursomes, alt_shot_scoring_started_at: "2026-08-29T12:00:00Z" }, [blank], { type: "set_tee_group", player: blank, group: 2 }), "block");
+check("alt-shot canonical scoring marker freezes team", decision({ ...baseGame(), game_type: "alt_shot", teams, foursomes, alt_shot_scoring_started_at: "2026-08-29T12:00:00Z" }, [blank], { type: "set_team", player: blank, team: "B" }), "block");
+check("alt-shot canonical scoring marker requires handicap correction confirmation", decision({ ...baseGame(), game_type: "alt_shot", teams, foursomes, alt_shot_scoring_started_at: "2026-08-29T12:00:00Z" }, [blank], { type: "set_handicap", player: blank }), "confirm");
+check("alt-shot canonical scoring marker blocks player removal", decision({ ...baseGame(), game_type: "alt_shot", teams, foursomes, alt_shot_scoring_started_at: "2026-08-29T12:00:00Z" }, [blank], { type: "remove_player", player: blank }), "block");
 check("course pre-score allowed", decision(baseGame(), [blank], { type: "change_course" }), "allow");
 check("course scored blocked", decision(baseGame(), [scored], { type: "change_course" }), "block");
 check("course ended blocked", decision({ ...baseGame(), status: "ended" }, [blank], { type: "change_course" }), "block");

@@ -25,6 +25,7 @@ export type GameSetupWorkspaceProps = {
   courseOptions: Course[];
   onChangeCourse: (course: Course) => Promise<void>;
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
+  onSetAltShotFirstDriver?: (foursomeId: string, side: "a" | "b", playerKey: string) => Promise<void>;
   getTeeGroupPolicy: (p: Player, group: number | null) => { blocked: boolean; reason?: string };
   onRandomizeGroups: () => Promise<void>;
   canRandomize: boolean;
@@ -50,6 +51,7 @@ export function GameSetupWorkspace({
   courseOptions,
   onChangeCourse,
   onSetTeeGroup,
+  onSetAltShotFirstDriver,
   getTeeGroupPolicy,
   onRandomizeGroups,
   canRandomize,
@@ -91,10 +93,14 @@ export function GameSetupWorkspace({
   const playersDone = total > 0 && cWithHcp === total;
   const teamsDone = !usesTeams || (total > 0 && cWithTeam === total);
   const matchupsDone = !usesMatchups || (total > 0 && cPlaced === total);
-  const groupsDone = usesFoursomes || (total > 0 && cGrouped === total);
+  const teamGroupFormat = usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot");
+  const showGroupsTab = !usesFoursomes || teamGroupFormat;
+  const teamGroupsValid = teamGroupFormat && total > 0 && cGrouped === total && foursomes.length > 0 && foursomes.every((f) => f.a.length === 2 && f.b.length === 2);
+  const altDriversDone = game.game_type !== "alt_shot" || (foursomes.length > 0 && foursomes.every((f) => !!f.a_first && !!f.b_first));
+  const groupsDone = teamGroupFormat ? (teamGroupsValid && altDriversDone) : usesFoursomes || (total > 0 && cGrouped === total);
   const structureDone = teamsDone && matchupsDone && groupsDone;
   const allDone = playersDone && structureDone;
-  const anyScores = players.some((p) => (p.scores || []).some((s) => s != null));
+  const anyScores = players.some((p) => (p.scores || []).some((s) => s != null)) || !!game.alt_shot_scoring_started_at;
 
   const section = setupTab === "teams" || setupTab === "matchups" || setupTab === "groups" ? "structure" : setupTab;
   const structureDefault: SetupTab = usesTeams ? "teams" : usesMatchups ? "matchups" : "groups";
@@ -256,10 +262,10 @@ export function GameSetupWorkspace({
           <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
             {usesTeams && <button onClick={() => onSetupTabChange("teams")} style={{ ...btn(setupTab === "teams"), flex: 1, fontSize: 12 }}>Teams</button>}
             {usesMatchups && <button onClick={() => onSetupTabChange("matchups")} style={{ ...btn(setupTab === "matchups"), flex: 1, fontSize: 12 }}>Matchups</button>}
-            {!usesFoursomes && <button onClick={() => onSetupTabChange("groups")} style={{ ...btn(setupTab === "groups"), flex: 1, fontSize: 12 }}>Tee groups</button>}
+            {showGroupsTab && <button onClick={() => onSetupTabChange("groups")} style={{ ...btn(setupTab === "groups"), flex: 1, fontSize: 12 }}>Groups</button>}
           </div>
           {setupTab === "teams" && <OrganizerPanel section="teams" {...organizerPanelProps} />}
-          {setupTab === "groups" && <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup} getTeeGroupPolicy={getTeeGroupPolicy} onRandomize={onRandomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} overflowIds={groupOverflow} />}
+          {setupTab === "groups" && <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup} onSetAltShotFirstDriver={onSetAltShotFirstDriver} getTeeGroupPolicy={getTeeGroupPolicy} onRandomize={onRandomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} overflowIds={groupOverflow} />}
           {setupTab === "matchups" && <div style={{ ...cardStyle, color: C.sage, fontSize: 12 }}>Build and review matchups below. The existing matchup editor is unchanged.</div>}
         </>
       )}
@@ -295,7 +301,7 @@ export function GameSetupWorkspace({
               [playersDone, "All players have tees and handicaps set"],
               [teamsDone, usesTeams ? "Team assignments are complete" : "Teams are not required"],
               [matchupsDone, usesMatchups ? "Matchups are complete" : "Matchups are not required"],
-              [groupsDone, usesFoursomes ? "Foursomes define the playing groups" : "Tee groups are set"],
+              [groupsDone, teamGroupFormat ? (game.game_type === "alt_shot" ? "Teams, groups and first tee players are set" : "Teams and groups define each Four-Ball match") : usesFoursomes ? "Foursomes define the playing groups" : "Tee groups are set"],
             ].map(([ok, text], i) => <div key={i} style={{ display: "flex", gap: 9, alignItems: "center", padding: "8px 0", borderBottom: i < 3 ? "1px solid rgba(255,255,255,.08)" : "none", color: C.cream, fontSize: 12.5 }}><span style={{ color: ok ? "#5BD08A" : C.gold, fontWeight: 800 }}>{ok ? "✓" : "!"}</span><span>{text}</span></div>)}
           </div>
           <div style={{ background: allDone ? "rgba(91,208,138,.12)" : "rgba(201,162,39,.12)", border: `1px solid ${allDone ? "#5BD08A" : C.gold}`, borderRadius: 12, padding: 12, marginTop: 10, color: C.cream, fontSize: 12.5, lineHeight: 1.45 }}>

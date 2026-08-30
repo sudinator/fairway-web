@@ -28,7 +28,17 @@ for (let i = 0; i < 4000; i++) {
     skinsMode: pick(["carryover", "split", "halved"] as const), flightsSupported: R() < 0.5,
     flightMode: pick(["off", "oneoff", "season"] as const), flightBands: R() < 0.5 ? [{ key: "A", name: "A", hi: 12 }, { key: "B", name: "B", hi: null }] as any : null,
   };
-  same("buildGamePayload", OLD.buildGamePayload(o), NEW.buildGamePayload(o), `pay#${i} ${o.gameType}`);
+  const oldPayload = OLD.buildGamePayload(o) as any;
+  const newPayload = NEW.buildGamePayload(o) as any;
+  if (o.gameType === "fourball") {
+    // Intentional 178.19 delta: new Four-Ball is always global team play. Compare every
+    // unaffected payload field byte-for-byte; explicit game-create tests pin the new teams contract.
+    const { teams: _oldTeams, ...oldRest } = oldPayload;
+    const { teams: _newTeams, ...newRest } = newPayload;
+    same("buildGamePayload/fourball unaffected fields", oldRest, newRest, `pay#${i} ${o.gameType}`);
+  } else {
+    same("buildGamePayload", oldPayload, newPayload, `pay#${i} ${o.gameType}`);
+  }
 }
 // splitSkins with identical args to both sides
 for (let i = 0; i < 2000; i++) {

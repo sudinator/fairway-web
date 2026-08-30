@@ -1,3 +1,19 @@
+## 178.19.260829 — Team-play / Alternate Shot structural correction
+
+- [x] New Four-Ball uses Teams + Groups; no redundant Matchups step.
+- [x] New Alternate Shot uses Teams + Groups; no redundant Matchups step.
+- [x] Trifecta retains Matchups because individual 1v1 opponent identity affects scoring.
+- [x] Alternate Shot persists first tee player per side and derives alternating drivers from that choice.
+- [x] Alternate Shot new/edited scoring writes one canonical side score per hole, not duplicated player scores.
+- [x] Historical Alternate Shot duplicated scores remain readable as fallback.
+- [x] Canonical side score path supports offline draft/retry, realtime refresh, clear/re-entry, reset protection and finish blocking while unsynced.
+- [x] Migration 0140 added; Staging structural and security verification passed.
+- [x] Legacy clear/re-entry edge case found during pre-release simulation; migration 0141 added so a cleared canonical hole masks any historical duplicated player score.
+- [ ] Apply and verify 0141 on Staging before deploying the 178.19 application candidate.
+- [ ] GitHub dependency-backed CI/type/test/build must pass on staging candidate.
+- [ ] Vercel staging build must be Ready.
+- [ ] Targeted staging acceptance: Four-Ball Teams+Groups, Alternate Shot first-driver + side-owned scores, Trifecta Matchups retained.
+
 ## 178.18.260829 — Environment hygiene release correction
 
 - [x] Document `BNN_MIGRATION_LEDGER_FIXTURE` in `.env.example` as test-only so environment hygiene matches the migration-parity tooling.

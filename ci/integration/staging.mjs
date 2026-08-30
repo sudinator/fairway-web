@@ -78,6 +78,8 @@ try {
   const admin = await createUser("admin", true);
   const alice = await createUser("alice");
   const bob = await createUser("bob");
+  const charlie = await createUser("charlie");
+  const dana = await createUser("dana");
   const outsider = await createUser("outsider");
 
   const group = expectNoError(await service.from("groups").insert({ name: `BNN Integration ${suffix}`, created_by: admin.id, status: "active" }).select("id").single(), "create disposable group");
@@ -85,6 +87,8 @@ try {
   await addMember(group.id, admin, "admin");
   await addMember(group.id, alice);
   await addMember(group.id, bob);
+  await addMember(group.id, charlie);
+  await addMember(group.id, dana);
 
   const course = expectNoError(await service.from("favorite_courses").insert({ user_id: admin.id, name: `Integration Course ${suffix}`, location: "Testville", data: { holes: [{ n: 1, par: 4, si: 1 }] }, vetted: true, deleted: false }).select("id").single(), "create disposable course");
   createdCourseIds.push(course.id);
@@ -162,6 +166,67 @@ try {
   ok(!!badRepost.error, "bet repost deliberately fails on duplicate split");
   const originalBet = expectNoError(await service.from("expenses").select("id,amount_cents").eq("id", bet.id).maybeSingle(), "check original bet after failed repost");
   ok(originalBet?.id === bet.id && originalBet.amount_cents === 1000, "failed bet repost preserves original posted expense");
+
+  // Alternate Shot: canonical side-owned scoring. One score belongs to the SIDE, not to
+  // two duplicated game_players rows. Direct writes are denied; the RPC authorizes a player
+  // only for their own side (organizer/admin may score either side); outsiders cannot read.
+  const altGame = expectNoError(await service.from("games").insert({
+    code: `A${suffix.slice(-6)}`,
+    name: "Integration Alternate Shot",
+    course: "Integration Course",
+    holes_meta: [{ n: 1, par: 4, si: 1 }, { n: 2, par: 4, si: 2 }],
+    group_id: group.id,
+    created_by: admin.id,
+    status: "active",
+    game_type: "alt_shot",
+    allowance_pct: 83,
+    teams: [{ key: "A", name: "Red" }, { key: "B", name: "Blue" }],
+    foursomes: [{ id: "alt-group-1", name: "Group 1", a: [alice.id, bob.id], b: [charlie.id, dana.id], a_first: alice.id, b_first: charlie.id }],
+    leg_config: { scheme: "none", metric: "net", points: {} },
+  }).select("id").single(), "create Alternate Shot fixture");
+  const blank = [null, null];
+  const altPlayerRows = [
+    { user: alice, name: "Alice", team: "A", ch: 26 },
+    { user: bob, name: "Bob", team: "A", ch: 12 },
+    { user: charlie, name: "Charlie", team: "B", ch: 14 },
+    { user: dana, name: "Dana", team: "B", ch: 8 },
+  ].map(({ user: u, name, team, ch }) => ({
+    game_id: altGame.id, user_id: u.id, display_name: name, is_guest: false, team, tee_group: 1,
+    handicap_index: ch, course_handicap: ch, scores: blank, putts: blank, fairways: blank,
+    penalties: blank, sand: [false, false], bets: true,
+  }));
+  expectNoError(await service.from("game_players").insert(altPlayerRows), "seed Alternate Shot players");
+
+  const directAltWrite = await alice.client.from("game_alt_shot_scores").insert({ game_id: altGame.id, foursome_id: "alt-group-1", side: "a", hole_index: 0, strokes: 5 });
+  ok(!!directAltWrite.error, "Alternate Shot direct browser score insert is blocked");
+
+  expectNoError(await alice.client.rpc("save_alt_shot_side_score", { p_game: altGame.id, p_foursome_id: "alt-group-1", p_side: "a", p_hole_index: 0, p_strokes: 5 }), "Side A player can score Side A");
+  const opponentWrite = await alice.client.rpc("save_alt_shot_side_score", { p_game: altGame.id, p_foursome_id: "alt-group-1", p_side: "b", p_hole_index: 0, p_strokes: 4 });
+  ok(!!opponentWrite.error, "ordinary Side A player cannot overwrite Side B");
+  expectNoError(await charlie.client.rpc("save_alt_shot_side_score", { p_game: altGame.id, p_foursome_id: "alt-group-1", p_side: "b", p_hole_index: 0, p_strokes: 4 }), "Side B player can score Side B");
+
+  const sideRows = expectNoError(await alice.client.from("game_alt_shot_scores").select("foursome_id,side,hole_index,strokes").eq("game_id", altGame.id).eq("hole_index", 0).order("side"), "read canonical Alternate Shot side scores");
+  ok(sideRows.length === 2 && sideRows[0].side === "a" && sideRows[0].strokes === 5 && sideRows[1].side === "b" && sideRows[1].strokes === 4, "exactly one canonical score per side/hole persists");
+  const playerScoresAfter = expectNoError(await service.from("game_players").select("user_id,scores").eq("game_id", altGame.id), "inspect individual rows after side scoring");
+  ok(playerScoresAfter.every((r) => Array.isArray(r.scores) && r.scores.every((v) => v == null)), "Alternate Shot side score is not copied into individual player scores");
+  const outsiderAlt = expectNoError(await outsider.client.from("game_alt_shot_scores").select("game_id").eq("game_id", altGame.id), "outsider side-score query is safely filtered by RLS");
+  ok(outsiderAlt.length === 0, "Alternate Shot side scores are hidden from outsiders");
+  const started = expectNoError(await service.from("games").select("alt_shot_scoring_started_at").eq("id", altGame.id).single(), "inspect Alternate Shot scoring-start marker");
+  ok(!!started.alt_shot_scoring_started_at, "canonical Alternate Shot scoring stamps scoring-start marker");
+
+  // Backward-compatible clear: seed a historical duplicated player score, then clear the
+  // canonical side/hole. 0141 must persist an explicit NULL tombstone rather than deleting the
+  // row, otherwise the old player score would become visible again in the application fallback.
+  expectNoError(await service.from("game_players").update({ scores: [null, 6] }).eq("game_id", altGame.id).in("user_id", [alice.id, bob.id]), "seed historical duplicated Alternate Shot score");
+  expectNoError(await alice.client.rpc("save_alt_shot_side_score", { p_game: altGame.id, p_foursome_id: "alt-group-1", p_side: "a", p_hole_index: 1, p_strokes: null }), "clearing a legacy Alternate Shot hole succeeds");
+  const clearRow = expectNoError(await service.from("game_alt_shot_scores").select("strokes").eq("game_id", altGame.id).eq("foursome_id", "alt-group-1").eq("side", "a").eq("hole_index", 1).single(), "inspect Alternate Shot clear tombstone");
+  ok(clearRow.strokes == null, "clear persists a canonical NULL tombstone instead of deleting the override");
+
+  expectNoError(await admin.client.rpc("reset_game_scores", { p_game: altGame.id }), "organizer reset clears canonical Alternate Shot scoring");
+  const afterAltReset = expectNoError(await service.from("game_alt_shot_scores").select("game_id", { count: "exact", head: true }).eq("game_id", altGame.id), "verify Alternate Shot score reset");
+  ok((afterAltReset.count || 0) === 0, "reset removes all canonical Alternate Shot side scores");
+  const markerAfterReset = expectNoError(await service.from("games").select("alt_shot_scoring_started_at").eq("id", altGame.id).single(), "verify Alternate Shot start marker reset");
+  ok(markerAfterReset.alt_shot_scoring_started_at == null, "reset clears Alternate Shot scoring-start marker");
 
   // Safe delete: a populated group is rejected; an empty admin-only group can be removed.
   const populatedDelete = await admin.client.rpc("delete_group_safely", { p_group: group.id });

@@ -1,3 +1,14 @@
+## 178.19.260829 — Team-play setup + true Alternate Shot side scoring
+
+- **Four-Ball:** new team games use Teams + Groups; a separate Matchups step is not required because the two teams inside each playing group define the match.
+- **Alternate Shot:** new games use Teams + Groups; each side explicitly selects who tees off first. The selected first driver persists in `games.foursomes` as `a_first` / `b_first` and alternates by round position, including back-nine starts.
+- **Trifecta:** keeps Teams + Groups + Matchups because individual 1v1 opponent identity contributes points in addition to the team point.
+- **Canonical Alternate Shot scores:** migration `0140_alt_shot_side_scores.sql` adds `game_alt_shot_scores`; new/edited Alternate Shot holes store one score per side rather than copying the same score into both partners' `game_players.scores`.
+- **Backward compatibility:** historical Alternate Shot games remain readable through the existing duplicated-player-score fallback until a canonical side score exists for that side/hole. Legacy Four-Ball/Alternate Shot games with no global teams retain their historical matchup structure.
+- **Sync:** canonical side scores have optimistic local state, offline drafts/retry, realtime reload, clear/re-entry handling, and reset protection.
+- **Finalization:** pending Alternate Shot side-score drafts block finish/end. Alternate Shot remains excluded from individual handicap-round posting.
+- **Migrations:** 0140 creates the side-score store and has been applied/verified on Staging (structure 5/5; security/grants 9/9). Staging review then found a legacy-clear resurrection edge case, so 0141 adds explicit NULL clear tombstones. 0141 must be applied to Staging before the 178.19 app candidate. Neither migration should be applied to Production until staging acceptance and the production migration gate.
+
 ## 178.18.260829 — Document migration-parity test fixture
 
 - Adds `BNN_MIGRATION_LEDGER_FIXTURE` to `.env.example` as a test-only variable.
