@@ -1,4 +1,4 @@
-## 178.19.260829 — Team-play / Alternate Shot structural correction
+## 178.20.260829 — Team-play / Alternate Shot structural correction
 
 - [x] New Four-Ball uses Teams + Groups; no redundant Matchups step.
 - [x] New Alternate Shot uses Teams + Groups; no redundant Matchups step.

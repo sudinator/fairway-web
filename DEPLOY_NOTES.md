@@ -1,4 +1,11 @@
-## 178.19.260829 — Team-play setup + true Alternate Shot side scoring
+## 178.20.260829 — CI contract correction
+
+- Corrects the stale `game-type-coverage` assertion that still expected new team Alternate Shot to use Matchups.
+- No application behavior or database behavior changes from 178.19.
+- No migration. Existing Staging 0140 + 0141 remain required.
+- Targeted game-type coverage: 89/89 PASS locally. Full dependency-backed gate remains GitHub/Vercel.
+
+## 178.20.260829 — Team-play setup + true Alternate Shot side scoring
 
 - **Four-Ball:** new team games use Teams + Groups; a separate Matchups step is not required because the two teams inside each playing group define the match.
 - **Alternate Shot:** new games use Teams + Groups; each side explicitly selects who tees off first. The selected first driver persists in `games.foursomes` as `a_first` / `b_first` and alternates by round position, including back-nine starts.
