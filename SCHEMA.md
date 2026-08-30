@@ -1,3 +1,5 @@
+> 178.24: No schema change. Team Individual Match results presentation only; migrations 0140–0141 remain the latest schema prerequisites.
+
 > 178.23: No schema change. Match progression display only; migrations 0140–0141 remain the latest schema prerequisites.
 
 <!-- 178.22: no schema change; relies on 0140-0141 already staged. -->

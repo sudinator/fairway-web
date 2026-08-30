@@ -183,7 +183,7 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
       <div style={{ marginTop: 18 }}>
         <Eyebrow>{`TEAM SKINS · ${game.team_score_mode === "aggregate" ? "AGGREGATE" : "BEST BALL"}${game.allowance_pct != null && game.allowance_pct !== 100 ? ` · ${game.allowance_pct}% ALLOWANCE` : ""}`}</Eyebrow>
         {carrying > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5A3210", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "10px 12px", marginTop: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5A3210", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "8px 12px", marginTop: 10 }}>
             <span style={{ color: ORANGE, fontSize: 18, fontWeight: 800 }}>↑</span>
             <span style={{ color: "#F2C28A", fontSize: 13 }}>{carrying} unresolved skin{carrying > 1 ? "s" : ""} carrying across team skins matches</span>
           </div>
@@ -281,7 +281,7 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
           return <div style={{ textAlign: "center", color: C.faint, fontSize: 12, marginTop: 8 }}>{rem > 0 ? `${fmtSkins(rem)} skin${rem === 1 ? "" : "s"} still in play` : "All skins decided"}</div>;
         })()}
         {carrying > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5A3210", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "10px 12px", marginTop: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5A3210", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "8px 12px", marginTop: 10 }}>
             <span style={{ color: ORANGE, fontSize: 18, fontWeight: 800 }}>↑</span>
             <span style={{ color: "#F2C28A", fontSize: 13 }}>{carrying} unresolved skin{carrying > 1 ? "s" : ""} carrying across 1:1 skins matches</span>
           </div>
@@ -340,7 +340,7 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
     <div style={{ marginTop: 18 }}>
       <Eyebrow>{`SKINS · ${isSplit ? "SPLIT" : "INDIVIDUAL"}${game.allowance_pct != null && game.allowance_pct !== 100 ? ` · ${game.allowance_pct}% ALLOWANCE` : ""}`}</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>{isSplit ? "Split skins — each hole is its own prize; a tie shares it evenly between the tied players, with no carryovers." : "Open Game setup to configure 1:1 pairings or team best-ball skins. Until then, this old game is shown as individual skins."}</div>
-      {!isSplit && carrying > 0 && <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5A3210", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "10px 12px", marginTop: 10 }}><span style={{ color: ORANGE, fontSize: 18, fontWeight: 800 }}>↑</span><span style={{ color: "#F2C28A", fontSize: 13 }}>{carrying} skin{carrying > 1 ? "s" : ""} {intoHole ? `carrying into hole ${intoHole}` : "unclaimed (last hole tied)"}</span></div>}
+      {!isSplit && carrying > 0 && <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#5A3210", border: `1px solid ${ORANGE}`, borderRadius: 10, padding: "8px 12px", marginTop: 10 }}><span style={{ color: ORANGE, fontSize: 18, fontWeight: 800 }}>↑</span><span style={{ color: "#F2C28A", fontSize: 13 }}>{carrying} skin{carrying > 1 ? "s" : ""} {intoHole ? `carrying into hole ${intoHole}` : "unclaimed (last hole tied)"}</span></div>}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
         {totals.map((p) => {
           const n = result.skinsByPlayer[p.id] || 0;
@@ -598,9 +598,20 @@ export function MatchView({
       )}
 
       {game.pairings.map((pr, idx) => {
-        const pa = playerOf(pr.a),
-          pb = playerOf(pr.b);
-        if (!pa || !pb) return null;
+        const rawA = playerOf(pr.a),
+          rawB = playerOf(pr.b);
+        if (!rawA || !rawB) return null;
+
+        // Team Individual Match follows a Ryder Cup-style left/right contract:
+        // team[0] is always left and team[1] always right, even for legacy
+        // pairings whose a/b storage order is reversed. Singles Match keeps its
+        // historical first-listed-player presentation.
+        const teamAKey = teams?.[0]?.key ?? null;
+        const teamBKey = teams?.[1]?.key ?? null;
+        const reverseTeamDisplay = !!(isTeam && teamAKey && teamBKey && rawA.team === teamBKey && rawB.team === teamAKey);
+        const pa = reverseTeamDisplay ? rawB : rawA;
+        const pb = reverseTeamDisplay ? rawA : rawB;
+
         const st = matchStatus(
           game.holes_meta,
           pa.scores || [],
@@ -637,6 +648,107 @@ export function MatchView({
         }).filter((row): row is { hole: number; aNet: number; bNet: number; lead: number } => row != null);
         const myKey = players.find((p) => p.user_id === user.id)?.user_id ?? user.id;
         const iAmIn = pr.a === myKey || pr.b === myKey;
+        const toggleProgress = () => setOpenProgress((v) => v === idx ? null : idx);
+
+        if (isTeam && teams?.length === 2) {
+          const leftLeading = st.lead > 0;
+          const rightLeading = st.lead < 0;
+          const allSquare = st.thru > 0 && st.lead === 0;
+          const leftStatus = st.result && st.lead > 0 ? st.result : leftLeading ? `${Math.abs(st.lead)} UP` : "";
+          const rightStatus = st.result && st.lead < 0 ? st.result : rightLeading ? `${Math.abs(st.lead)} UP` : "";
+          return (
+            <div key={idx}>
+              {idx === 0 && (
+                <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 58px minmax(0, 1fr)", alignItems: "end", gap: 8, marginTop: 10, padding: "4px 10px", color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 0.7 }}>
+                  <span style={{ color: teamAccent(teams[0].name, 0) }}>{teams[0].name.toUpperCase()}</span>
+                  <span style={{ textAlign: "center" }}>THRU</span>
+                  <span style={{ textAlign: "right", color: teamAccent(teams[1].name, 1) }}>{teams[1].name.toUpperCase()}</span>
+                </div>
+              )}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(0, 1fr) 58px minmax(0, 1fr)",
+                  alignItems: "stretch",
+                  background: C.greenLight,
+                  borderRadius: idx === 0 ? "12px 12px 0 0" : idx === game.pairings.length - 1 ? "0 0 12px 12px" : 0,
+                  border: iAmIn ? `1px solid ${C.gold}` : `1px solid ${C.borderGreen}`,
+                  borderTopWidth: idx === 0 || iAmIn ? 1 : 0,
+                  overflow: "hidden",
+                }}
+              >
+                <button type="button" onClick={toggleProgress} aria-expanded={openProgress === idx} style={{ minWidth: 0, minHeight: 64, background: "none", border: "none", padding: "8px 12px", textAlign: "left", cursor: "pointer", color: C.cream }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                    <Avatar src={pa.avatar_url} name={pa.display_name} size={24} />
+                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 14, fontWeight: 800 }}>{pa.display_name}</span>
+                  </div>
+                  {leftStatus ? <div style={{ marginTop: 5, color: teamAccent(teams[0].name, 0), fontSize: 14, fontWeight: 800 }}>{leftStatus}</div> : null}
+                  <div style={{ marginTop: 4, color: C.gold, fontSize: 11, fontWeight: 700 }}>Details ›</div>
+                </button>
+
+                <button type="button" onClick={toggleProgress} aria-expanded={openProgress === idx} style={{ minHeight: 64, background: C.green, border: "none", borderLeft: `1px solid ${C.borderGreen}`, borderRight: `1px solid ${C.borderGreen}`, padding: "8px 12px", textAlign: "center", cursor: "pointer", color: C.cream }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1 }}>{st.thru}</div>
+                  {allSquare ? <div style={{ marginTop: 6, color: C.sage, fontSize: 11, fontWeight: 800 }}>AS</div> : null}
+                </button>
+
+                <button type="button" onClick={toggleProgress} aria-expanded={openProgress === idx} style={{ minWidth: 0, minHeight: 64, background: "none", border: "none", padding: "8px 12px", textAlign: "right", cursor: "pointer", color: C.cream }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 7, minWidth: 0 }}>
+                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 14, fontWeight: 800 }}>{pb.display_name}</span>
+                    <Avatar src={pb.avatar_url} name={pb.display_name} size={24} />
+                  </div>
+                  {rightStatus ? <div style={{ marginTop: 5, color: teamAccent(teams[1].name, 1), fontSize: 14, fontWeight: 800 }}>{rightStatus}</div> : null}
+                  <div style={{ marginTop: 4, color: C.gold, fontSize: 11, fontWeight: 700 }}>Details ›</div>
+                </button>
+              </div>
+
+              {openProgress === idx && (
+                <div style={{ background: C.greenLight, padding: "8px 12px", borderLeft: `1px solid ${iAmIn ? C.gold : C.borderGreen}`, borderRight: `1px solid ${iAmIn ? C.gold : C.borderGreen}`, borderBottom: `1px solid ${iAmIn ? C.gold : C.borderGreen}` }}>
+                  <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginBottom: 7 }}>MATCH PROGRESSION</div>
+                  {progressionRows.length === 0 ? (
+                    <div style={{ color: C.sage, fontSize: 12 }}>No holes scored yet.</div>
+                  ) : (
+                    <div style={{ overflowX: "auto" }}>
+                      <div style={{ minWidth: 330 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "42px minmax(82px, 1fr) minmax(82px, 1fr) 76px", gap: 8, color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: "4px 10px" }}>
+                          <span>HOLE</span>
+                          <span>{pa.display_name.split(" ")[0]} NET</span>
+                          <span>{pb.display_name.split(" ")[0]} NET</span>
+                          <span style={{ textAlign: "right" }}>MATCH</span>
+                        </div>
+                        {progressionRows.map((row) => {
+                          const aWon = row.aNet < row.bNet;
+                          const bWon = row.bNet < row.aNet;
+                          const label = matchLeadLabel(row.lead);
+                          return (
+                            <div key={row.hole} style={{ display: "grid", gridTemplateColumns: "42px minmax(82px, 1fr) minmax(82px, 1fr) 76px", gap: 8, alignItems: "center", padding: "8px 12px", borderTop: `1px solid ${C.borderGreen}`, color: C.cream, fontSize: 12 }}>
+                              <span style={{ color: C.sage }}>{row.hole}</span>
+                              <span style={{ fontWeight: aWon ? 800 : 500, color: aWon ? C.gold : C.cream }}>{row.aNet}</span>
+                              <span style={{ fontWeight: bWon ? 800 : 500, color: bWon ? C.gold : C.cream }}>{row.bNet}</span>
+                              <span style={{ textAlign: "right", fontWeight: 800, color: label === "AS" ? C.cream : row.lead > 0 ? C.gold : C.sage }}>{label}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Net scores drive the running match position. Bold gold marks the lower net on each hole.</div>
+                </div>
+              )}
+
+              {isCreator && editing && (
+                <button
+                  disabled={matchupsBlocked}
+                  title={matchupsBlocked && matchupDecision.decision === "block" ? matchupDecision.reason : undefined}
+                  onClick={() => removePairing(idx)}
+                  style={{ ...btn(false), width: "100%", marginTop: 6, fontSize: 11, color: C.overRedDark }}
+                >
+                  Remove match
+                </button>
+              )}
+            </div>
+          );
+        }
+
         return (
           <div
             key={idx}
@@ -652,10 +764,10 @@ export function MatchView({
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", color: C.cream, fontWeight: 700, fontSize: 15 }}>
                   <Avatar src={pa.avatar_url} name={pa.display_name} size={24} />
-                  <span>{pa.display_name}{isTeam ? <span style={{ color: C.gold, fontWeight: 500, fontSize: 12 }}> ({teamName(pa.team)})</span> : null}</span>
+                  <span>{pa.display_name}</span>
                   <span style={{ color: C.sage, fontWeight: 500 }}>vs</span>
                   <Avatar src={pb.avatar_url} name={pb.display_name} size={24} />
-                  <span>{pb.display_name}{isTeam ? <span style={{ color: C.gold, fontWeight: 500, fontSize: 12 }}> ({teamName(pb.team)})</span> : null}</span>
+                  <span>{pb.display_name}</span>
                 </div>
                 <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
                   thru {st.thru} · {pa.display_name}{" "}
@@ -663,7 +775,7 @@ export function MatchView({
                   {allow.b === 0 ? "scratch" : `+${allow.b}`}
                 </div>
               </div>
-              <button type="button" onClick={() => setOpenProgress((v) => v === idx ? null : idx)} aria-expanded={openProgress === idx} style={{ textAlign: "right", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+              <button type="button" onClick={toggleProgress} aria-expanded={openProgress === idx} style={{ textAlign: "right", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
                 <div style={{ color: st.result ? C.overRedDark : C.cream, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>
                   {statusText} <span style={{ color: C.gold, fontSize: 11 }}>{openProgress === idx ? "▴" : "▾"}</span>
                 </div>

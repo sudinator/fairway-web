@@ -1,4 +1,4 @@
-**Current staging candidate:** 178.23.260829 — replaces compact Match progression chips with a hole-by-hole net-score summary showing both players and the rolling match position. Migrations 0140–0141 remain required.
+**Current staging candidate:** 178.24.260830 — approved Ryder Cup-style Team Individual Match results: Team A left, THRU/AS centered, Team B right, leader-only UP status, Details opens the net-score progression. Migrations 0140–0141 remain required.
 
 **Prior release:** 178.18.260829 — Environment-contract correction documenting the migration-ledger test fixture; no application, scoring, or database change.
 

@@ -1,3 +1,14 @@
+## 178.24.260830 — Ryder Cup-style Team Individual Match results
+
+- Replaces the stacked Team Individual Match result cards with the approved Ryder Cup-style three-column summary.
+- Each match stays on exactly one horizontal row: Team A player left, THRU centered, Team B player right.
+- Only the player currently leading shows `n UP`; the trailing side does not repeat a redundant `n DN`.
+- When the match is tied after play has started, `AS` appears in the center beneath THRU.
+- `Details` remains the one-tap entry to the 178.23 hole-by-hole net-score progression table.
+- Pairings are normalized by team key for display so legacy reversed a/b storage cannot put the wrong team on the wrong side.
+- Singles Match Play keeps its existing presentation; scoring, handicap allowance, persistence, and match math are unchanged.
+- Uses the existing BNN display scale/palette contracts; no new database migration. Existing staging prerequisites remain 0140 + 0141.
+
 ## 178.23.260829 — Match progression net-score summary
 
 - Replaces the compact Match progression chips with a reusable scorecard-style history table.
