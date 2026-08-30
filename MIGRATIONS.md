@@ -1,3 +1,6 @@
+## 178.25.260830 — no migration
+CI-only production migration-parity URL hardening. 0140/0141 are unchanged.
+
 > **178.18.260829:** No migration. Environment-contract documentation only; database contract unchanged.
 
 > **178.17.260829:** No migration. React hook-order correction and source guard only; database contract unchanged.

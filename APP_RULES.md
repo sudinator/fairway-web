@@ -245,3 +245,6 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
 - The score-entry title must use the team/side identity and the canonical side playing handicap; per-hole net uses the side's relative match strokes.
 - Alternate Shot has no individual personal scorecard and no individual six-hole/low-net/Stableford side-game leaderboard. Database fan-out to both partner rows is persistence only and must remain invisible as individual scoring.
 
+
+
+<!-- 178.25.260830: no global rule change; production migration-parity CI URL hardening only. -->

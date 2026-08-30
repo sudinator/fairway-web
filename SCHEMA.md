@@ -1,3 +1,6 @@
+## 178.25.260830 — no schema change
+CI-only migration-parity URL hardening. Migrations 0140 and 0141 are unchanged.
+
 > 178.24: No schema change. Team Individual Match results presentation only; migrations 0140–0141 remain the latest schema prerequisites.
 
 > 178.23: No schema change. Match progression display only; migrations 0140–0141 remain the latest schema prerequisites.

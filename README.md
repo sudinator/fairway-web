@@ -1,3 +1,10 @@
+## 178.25.260830 — Production migration-parity URL hardening
+
+- **NO migration.** CI-only release-candidate hardening after the production PR exposed a malformed PostgREST request (`PGRST125 Invalid path specified`).
+- `ci/check_live_migration_parity.mjs` now accepts either a Supabase project base URL or a copied `/rest/v1` endpoint, canonicalizes it to the project origin, strips query/hash fragments, and rejects unrelated paths with a precise configuration error. This prevents accidental `/rest/v1/rest/v1/...` requests while preserving the same service-role authentication and ledger comparison.
+- The migration-parity source contract now permanently requires URL canonicalization and canonical REST endpoint construction.
+- No application behavior, scoring logic, database schema, or migration file changed. Production 0140/0141 remain byte-identical to staging.
+
 **Current staging candidate:** 178.24.260830 — approved Ryder Cup-style Team Individual Match results: Team A left, THRU/AS centered, Team B right, leader-only UP status, Details opens the net-score progression. Migrations 0140–0141 remain required.
 
 **Prior release:** 178.18.260829 — Environment-contract correction documenting the migration-ledger test fixture; no application, scoring, or database change.

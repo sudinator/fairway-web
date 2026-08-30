@@ -1,3 +1,6 @@
+## 178.25.260830 release-candidate hardening
+- Production migration-parity CI now canonicalizes Supabase URLs so copied REST endpoints cannot create duplicate `/rest/v1` paths. No product backlog behavior changed.
+
 - [x] **178.24 Team Individual Match result layout** — approved Ryder Cup-style one-row match summary: team 1 left, THRU/AS centered, team 2 right, leader-only UP status, Details opens net-score progression.
 - [x] **178.23 Match progression clarity** — Team Individual Match historical progression now shows hole, both player net scores, and rolling match state instead of status-only chips.
 ## 178.22 staging regression fixes
