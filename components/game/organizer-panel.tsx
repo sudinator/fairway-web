@@ -86,6 +86,7 @@ export type OrganizerPanelProps = {
   onRemove: (p: Player) => Promise<void>;
   onToggleNoShow: (p: Player) => Promise<void>;
   onSetTeam: (p: Player, team: string | null) => Promise<void>;
+  onRenameTeams?: (names: [string, string]) => Promise<void>;
   onRename: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
   onEnd: () => Promise<void>;
@@ -115,6 +116,7 @@ export function OrganizerPanel({
   onRemove,
   onToggleNoShow,
   onSetTeam,
+  onRenameTeams,
   section = "players",
   eligibleMembers = [],
   onAddMember,
@@ -133,6 +135,8 @@ export function OrganizerPanel({
   const [addGuestName, setAddGuestName] = useState("");
   const [addGuestHcp, setAddGuestHcp] = useState("");
   const [addGuestSponsor, setAddGuestSponsor] = useState(""); // sponsor user id; "" -> current user
+  const [teamNameEdits, setTeamNameEdits] = useState<[string, string]>([game.teams?.[0]?.name || "Team 1", game.teams?.[1]?.name || "Team 2"]);
+  useEffect(() => { setTeamNameEdits([game.teams?.[0]?.name || "Team 1", game.teams?.[1]?.name || "Team 2"]); }, [game.teams]);
   const currentFormatFamily: FormatFamily =
     game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" ||
     (game.game_type === "skins" && shapeOf(game).skinsStyle === "team_2v2")
@@ -382,6 +386,22 @@ export function OrganizerPanel({
               );
             })}
           </div>
+
+          {section === "teams" && teams.length >= 2 && onRenameTeams && (
+            <div style={{ background: C.greenLight, borderRadius: 10, padding: 12, marginTop: 12, border: `1px solid ${C.borderGreen}` }}>
+              <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>TEAM NAMES</div>
+              <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                {[0, 1].map((i) => (
+                  <input key={teams[i].key} value={teamNameEdits[i]} onChange={(e) => setTeamNameEdits((prev) => { const next: [string, string] = [...prev] as [string, string]; next[i] = e.target.value; return next; })} placeholder={`Team ${i + 1} name`} style={{ ...inputStyle, flex: 1, minWidth: 140 }} />
+                ))}
+                <button
+                  onClick={() => onRenameTeams([teamNameEdits[0].trim() || "Team 1", teamNameEdits[1].trim() || "Team 2"])}
+                  disabled={!teamNameEdits[0].trim() || !teamNameEdits[1].trim() || (teamNameEdits[0].trim() === teams[0].name && teamNameEdits[1].trim() === teams[1].name)}
+                  style={{ ...btn(false), opacity: !teamNameEdits[0].trim() || !teamNameEdits[1].trim() || (teamNameEdits[0].trim() === teams[0].name && teamNameEdits[1].trim() === teams[1].name) ? .5 : 1 }}
+                >Save names</button>
+              </div>
+            </div>
+          )}
 
           {section === "teams" && teams.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginTop: 12 }}>

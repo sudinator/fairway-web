@@ -1,4 +1,4 @@
-**Current staging candidate:** 178.21.260829 — CI assertion-baseline/downstream-gate correction on top of the 178.19 team-play + canonical Alternate Shot side-scoring release. Migrations 0140–0141 required.
+**Current staging candidate:** 178.22.260829 — fixes Four-Ball team-name entry, restores Group Results/Legs setup + Off behavior, and restores clickable Team Match progression. Migrations 0140–0141 remain required.
 
 **Prior release:** 178.18.260829 — Environment-contract correction documenting the migration-ledger test fixture; no application, scoring, or database change.
 

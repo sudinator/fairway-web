@@ -198,8 +198,8 @@ export function SegmentBoard({
 export function GroupSegmentSummary({ game, players }: { game: Game; players: Player[] }) {
   const cfg: LegConfig = (game.leg_config as LegConfig) || DEFAULT_LEG_CONFIG;
   const [metric, setMetric] = React.useState<"net" | "pts">(cfg.metric === "net" ? "net" : "pts");
-  // Alternate shot has no individual ball, so an individual sixes/low-net side game is invalid.
-  if (game.game_type === "alt_shot") return null;
+  // Alternate shot has no individual ball, and an explicitly disabled side game should render nothing.
+  if (game.game_type === "alt_shot" || cfg.scheme === "none") return null;
   const meta = (game.holes_meta || []) as { n: number; par: number; si: number | null }[];
   const n = meta.length;
   const ps = players.filter((p) => !p.no_show).slice().sort((a, b) => (a.display_name || "").localeCompare(b.display_name || ""));

@@ -380,6 +380,7 @@ export function MatchView({
   const [aSel, setASel] = useState("");
   const [bSel, setBSel] = useState("");
   const [busy, setBusy] = useState(false);
+  const [openProgress, setOpenProgress] = useState<number | null>(null);
 
   const nameOf = (uid: string) =>
     players.find((p) => pkey(p) === uid)?.display_name || "—";
@@ -616,6 +617,14 @@ export function MatchView({
           : st.lead === 0
             ? "All square"
             : `${leader} ${Math.abs(st.lead)} UP`;
+        const progression = matchProgress(
+          game.holes_meta,
+          pa.scores || [],
+          pb.scores || [],
+          chBasis(pa, game.course_par, game.holes_meta?.length),
+          chBasis(pb, game.course_par, game.holes_meta?.length),
+          game.allowance_pct ?? 100,
+        ).map((lead) => matchLeadLabel(lead));
         const myKey = players.find((p) => p.user_id === user.id)?.user_id ?? user.id;
         const iAmIn = pr.a === myKey || pr.b === myKey;
         return (
@@ -644,22 +653,15 @@ export function MatchView({
                   {allow.b === 0 ? "scratch" : `+${allow.b}`}
                 </div>
               </div>
-              <div style={{ textAlign: "right" }}>
-                <div
-                  style={{
-                    color: st.result ? C.overRedDark : C.cream,
-                    fontWeight: 800,
-                    fontSize: 16,
-                    fontFamily: "Georgia, serif",
-                  }}
-                >
-                  {statusText}
+              <button type="button" onClick={() => setOpenProgress((v) => v === idx ? null : idx)} aria-expanded={openProgress === idx} style={{ textAlign: "right", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+                <div style={{ color: st.result ? C.overRedDark : C.cream, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>
+                  {statusText} <span style={{ color: C.gold, fontSize: 11 }}>{openProgress === idx ? "▴" : "▾"}</span>
                 </div>
                 <div style={{ color: C.sage, fontSize: 11 }}>
                   {pa.display_name} {st.aWins}–{st.bWins} {pb.display_name}
-                  {st.halves ? ` · ${st.halves} halved` : ""}
+                  {st.halves ? ` · ${st.halves} halved` : ""} · tap for progression
                 </div>
-              </div>
+              </button>
               {isCreator && editing && (
                 <button
                   disabled={matchupsBlocked}
@@ -678,6 +680,19 @@ export function MatchView({
                 </button>
               )}
             </div>
+            {openProgress === idx && (
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.borderGreen}` }}>
+                <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginBottom: 7 }}>MATCH PROGRESSION</div>
+                <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                  {progression.map((label, h) => (
+                    <div key={h} style={{ minWidth: 42, borderRadius: 8, padding: "4px 10px", textAlign: "center", background: label ? C.green : "transparent", border: `1px solid ${label ? C.borderGreen : C.borderCard}` }}>
+                      <div style={{ color: C.sage, fontSize: 11 }}>H{game.holes_meta[h]?.n ?? h + 1}</div>
+                      <div style={{ color: label === "AS" ? C.cream : label?.includes("UP") ? C.gold : C.sage, fontSize: 11, fontWeight: 800, marginTop: 1 }}>{label || "—"}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         );
       })}

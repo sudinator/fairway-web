@@ -1,3 +1,6 @@
+## 178.22 staging regression fixes
+- Four-Ball team names, Group Results/Legs visibility+Off suppression, and Team Individual Match clickable progression addressed in 178.22 staging candidate; validate manually before production.
+
 ## 178.21.260829 — CI assertion baseline / downstream preflight
 
 - [x] New Four-Ball uses Teams + Groups; no redundant Matchups step.

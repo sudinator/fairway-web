@@ -11,7 +11,7 @@ checks = {
     'alternate shot score cells show side net rather than Stableford points': 'c.altSide && gross != null && gross > 0' in score and '!c.altSide && gross != null && gross > 0' in score,
     'alternate shot modal hides individual stat entry': 'showFairway={!sideCol?.altSide}' in score and 'showPutts={!sideCol?.altSide}' in score and 'showPenalties={!sideCol?.altSide}' in score,
     'alternate shot modal writes only the side score': 'if (sideCol?.altSide && edit.alt && onSetAltShotScore)' in score and 'onSetAltShotScore(edit.alt.foursomeId, edit.alt.side, edit.holeIdx, patch.strokes ?? null)' in score,
-    'alternate shot group segment component hard-stops if called': 'if (game.game_type === "alt_shot") return null;' in seg,
+    'alternate shot group segment component hard-stops if called': 'if (game.game_type === "alt_shot" || cfg.scheme === "none") return null;' in seg,
     'alternate shot does not render individual group segment side game': 'game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta")' in tour and 'game.game_type === "trifecta" || game.game_type === "alt_shot") && (\n        <GroupSegmentSummary' not in tour,
     'alternate shot does not render an individual personal scorecard': 'me && game.game_type !== "alt_shot" && (() => {' in tour,
     'alternate shot six-hole individual board remains gated off': 'shapeOf(game).dotBasis !== "alt_shot_side" && (' in tour,

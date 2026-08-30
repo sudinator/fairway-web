@@ -10,6 +10,8 @@ import type { Game, Player } from "@/lib/game-types";
 import { courseLabel, type Course } from "@/lib/courses";
 import { ShareControl } from "@/components/game/scorecard-views";
 import { OrganizerPanel, type OrganizerPanelProps } from "@/components/game/organizer-panel";
+import { LegConfigEditor } from "@/components/game/segment-views";
+import type { LegConfig } from "@/lib/legs";
 import { GroupsBuilder } from "@/components/game/scorecard-views";
 import { btn, inputStyle, ShortDateInput } from "@/components/ui";
 
@@ -26,6 +28,7 @@ export type GameSetupWorkspaceProps = {
   onChangeCourse: (course: Course) => Promise<void>;
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
   onSetAltShotFirstDriver?: (foursomeId: string, side: "a" | "b", playerKey: string) => Promise<void>;
+  onSetLegConfig?: (cfg: LegConfig) => void;
   getTeeGroupPolicy: (p: Player, group: number | null) => { blocked: boolean; reason?: string };
   onRandomizeGroups: () => Promise<void>;
   canRandomize: boolean;
@@ -52,6 +55,7 @@ export function GameSetupWorkspace({
   onChangeCourse,
   onSetTeeGroup,
   onSetAltShotFirstDriver,
+  onSetLegConfig,
   getTeeGroupPolicy,
   onRandomizeGroups,
   canRandomize,
@@ -255,7 +259,14 @@ export function GameSetupWorkspace({
       )}
 
       {section === "players" && <OrganizerPanel section="players" {...organizerPanelProps} />}
-      {section === "format" && <OrganizerPanel section="format" {...organizerPanelProps} />}
+      {section === "format" && (
+        <>
+          <OrganizerPanel section="format" {...organizerPanelProps} />
+          {onSetLegConfig && (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta") && game.status !== "ended" && (
+            <LegConfigEditor game={game} onSave={onSetLegConfig} />
+          )}
+        </>
+      )}
 
       {section === "structure" && (
         <>

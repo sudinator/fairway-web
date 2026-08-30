@@ -1,3 +1,11 @@
+## 178.22.260829 — Team setup / Group Results / match progression staging fixes
+
+- **Four-Ball team names:** new Four-Ball and Alternate Shot creation always expose both editable team-name fields; Manage → Teams also allows the organizer to rename both teams while preserving team keys and player assignments.
+- **Group Results / Legs:** `LegConfigEditor` now lives inside the actual Game Setup → Format workspace instead of an external render path, so it remains visible when setup is revisited. Turning the scheme **Off** now suppresses `GroupSegmentSummary` entirely; On → Off → On follows the persisted `leg_config`.
+- **Team Individual Match progression:** each match status is clickable again and expands the existing `matchProgress()` history hole-by-hole; scoring math is unchanged.
+- **Regression guard:** adds a dependency-free contract covering Four-Ball team-name visibility, Manage team renaming, Legs placement/Off behavior, and clickable match progression.
+- **No database migration.** Existing Staging migrations 0140 + 0141 remain required.
+
 ## 178.21.260829 — CI assertion baseline + downstream gate preflight
 
 - Records the intentional four-assertion increase exposed after the 178.20 stale Matchups test was corrected: unnamed-suite baseline 507 -> 511; total 189,908 -> 189,912.

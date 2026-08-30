@@ -84,7 +84,7 @@ export type { GameSeed } from "@/lib/game-types";
 import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
 import { useNowTick } from "@/lib/use-now-tick";
 import { ScoreHistory, SkinsView, MatchView, FourballView, StrokesSummary, SweepBroom, CleanSweepBanner, SweepTrophy, SweepAchievedBanner, TeamClinchLine } from "@/components/game/scoring-views";
-import { LegConfigEditor, SegmentBoard, GroupSegmentSummary } from "@/components/game/segment-views";
+import { SegmentBoard, GroupSegmentSummary } from "@/components/game/segment-views";
 import { GameList } from "@/components/game/game-list";
 import * as PS from "@/lib/player-scoring";
 import * as FG from "@/lib/finish-gaps";
@@ -1176,7 +1176,7 @@ function CreateGame({
                 ? "Two teams. Each 2-v-2 foursome is worth a point; the team total is the sum across foursomes (a halved foursome = ½ each), Ryder-Cup style. You'll assign players to teams after creating."
                 : "Two teams. Each 1-on-1 pairing is worth a point; the team total is the sum (halved matches = ½ each). You'll assign players to teams after creating."}
             </div>
-            {teamMode && (
+            {(teamMode || gameType === "fourball" || gameType === "alt_shot") && (
               <>
                 <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
                   <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
@@ -2259,6 +2259,15 @@ function GameRoom({
     setGame({ ...game, foursomes: next });
   };
 
+
+  const renameTeams = async (names: [string, string]) => {
+    if (!game || !Array.isArray(game.teams) || game.teams.length < 2) return;
+    const next = game.teams.map((t, i) => i < 2 ? { ...t, name: names[i] } : t);
+    const { error } = await supabase.from("games").update({ teams: next }).eq("id", game.id);
+    if (error) { notifyError("Couldn't save team names — please try again."); return; }
+    setGame({ ...game, teams: next });
+  };
+
   // Organizer: update a player's team assignment from the unified setup roster.
   const setPlayerTeam = async (p: Player, team: string | null) => {
     if (!allowSetupChange({ type: "set_team", player: p, team })) return;
@@ -3084,7 +3093,7 @@ function GameRoom({
         const panelProps = {
           game, players, user,
           onOverride: overridePlayerHandicap, courseTees, onSetTee: setPlayerTee,
-          onRemove: removePlayer, onToggleNoShow: toggleNoShow, onSetTeam: setPlayerTeam,
+          onRemove: removePlayer, onToggleNoShow: toggleNoShow, onSetTeam: setPlayerTeam, onRenameTeams: renameTeams,
           onRename: renameGame, onDelete: deleteGame,
           onEnd: requestEndGame, onReopen: reopenGame, onReset: resetScores, onShare: setShare,
           eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,
@@ -3092,7 +3101,7 @@ function GameRoom({
         } satisfies OrganizerPanelProps;
         const workspaceProps = {
           game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate, courseOptions, onChangeCourse: changeGameCourse,
-          onSetTeeGroup: setPlayerTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, canRandomize, randomizeReason,
+          onSetTeeGroup: setPlayerTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, onSetLegConfig: setLegConfig, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, canRandomize, randomizeReason,
           randomizing, groupOverflow,
         } satisfies React.ComponentProps<typeof GameSetupWorkspace>;
         return <GameSetupWorkspace {...workspaceProps} />;
@@ -3111,10 +3120,6 @@ function GameRoom({
           </span>
         )}
       </div>
-      )}
-
-      {roomTab === "setup" && setupTab === "format" && isOrganizer && !isEnded && (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta") && (
-        <LegConfigEditor game={game} onSave={setLegConfig} />
       )}
 
       {roomTab === "setup" && setupTab === "format" && isOrganizer && game.game_type === "trifecta" && !isEnded && (
