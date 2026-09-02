@@ -104,13 +104,14 @@ begin
      and user_id = auth.uid() and status = 'active' and role = 'member';
   if n <> 1 then raise exception 'Security boundary: invite acceptance did not preserve member role'; end if;
 
-  denied := false;
-  begin
-    update public.group_members set role = 'admin'
-     where id = 'b5000000-0000-0000-0000-000000000002';
-  exception when others then denied := true;
-  end;
-  if not denied then raise exception 'Security boundary: invitee upgraded own membership role'; end if;
+  -- PostgreSQL RLS commonly filters an unauthorized UPDATE to zero rows rather than throwing.
+  -- Prove the persisted outcome instead of requiring a particular error surface.
+  update public.group_members set role = 'admin'
+   where id = 'b5000000-0000-0000-0000-000000000002';
+  select count(*) into n from public.group_members
+   where id = 'b5000000-0000-0000-0000-000000000002'
+     and role = 'admin';
+  if n <> 0 then raise exception 'Security boundary: invitee upgraded own membership role'; end if;
 
   update public.games set name = 'Hijacked'
    where id = 'b6000000-0000-0000-0000-000000000001';

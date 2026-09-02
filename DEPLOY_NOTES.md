@@ -1,3 +1,11 @@
+## 179.9.260902 — Consolidated security and mobile-fit candidate
+
+- Supersedes every earlier v179.8 ZIP with one authoritative changed-files overlay.
+- Includes the complete v179.8 authorization, workflow-boundary, and mobile-fit hardening plus the corrected disposable-database assertion.
+- Corrects the invite-role negative test to verify the persisted membership role after an RLS-filtered update; PostgreSQL may return zero affected rows without raising an exception.
+- Preserves the separation between Staging validation and the `main`-only live Production schema guard.
+- No new database migration. Migration 0144 is unchanged and must not be rerun where `0144_authorization_hardening` is already recorded.
+
 ## 179.8.260902 — Authorization and mobile-fit hardening
 
 - Closes three authorization escalation paths found by a de novo review: ordinary users cannot set `profiles.is_owner`, self-appoint as an admin of an arbitrary club, or turn an emailed member invitation into an admin membership.
@@ -8,6 +16,7 @@
 - Moves the live Production schema guard out of the all-branch Robustness workflow into a dedicated `main`-only workflow. Staging pushes use the disposable fresh-database contract and Staging integration instead of incorrectly comparing Staging code with Production's pre-release schema.
 - Corrects full-width padded containers in Ryder Cup sessions, the finish-game dialog, admin club management, and toasts; Match progression uses the standard contained `HScroll` component.
 - Adds disposable negative authorization tests and permanent CI guards for the credential boundary and mobile-fit contract.
+- The invite-role attack test verifies the persisted row outcome because PostgreSQL RLS may reject an unauthorized `UPDATE` by filtering it to zero affected rows rather than raising an exception.
 - Requires migration **0144_authorization_hardening.sql**. Ship through one Staging build and one `staging → main` pull request after both database environments are verified.
 
 ## 179.7.260902 — Staging integration VAPID wiring
