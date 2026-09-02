@@ -1,3 +1,18 @@
+## 179.0.260901 — Ryder Cup-style multi-session team competitions
+
+- Adds a new **Cups** surface inside Games without changing BNN's primary bottom navigation.
+- A Cup has two persistent club teams and a fixed roster; team names/assignments seed every child session.
+- Sessions reuse existing BNN scoring engines rather than creating a new one: Four-Ball, Alternate Shot, and Team Singles Match are ordinary linked games.
+- Creating a session opens the standard Create Game flow with the Cup roster, team names, format, and date prefilled; course/tees/session participants remain selected through the existing setup UI.
+- Child player rows inherit their Cup team key so existing Teams/Groups/Matchups screens are already populated correctly.
+- The Cup home aggregates live projected points and decided points across linked games; each session shows its own running score and compact match rows.
+- Alternate Shot aggregation reads the canonical 0140/0141 side-score store with legacy fallback; Four-Ball and Singles reuse the existing `fourballStatus` and `matchStatus` math.
+- Adds migration **0142_team_competitions.sql** for `competitions`, `competition_players`, and `competition_sessions`, all RLS-protected and club-scoped.
+- Cup creation is transactional through `create_team_competition(...)`: parent + full roster succeed together or roll back together; the server validates active club membership, distinct team names, and at least one player on each side.
+- Linked child games are constrained to the Cup's same club, supported format, canonical A/B team identities, registered Cup roster, and persistent team assignments. Roster/team identity locks after the first session link while ordinary scoring/pairing/group setup remains owned by the existing game infrastructure.
+- System-admin access remains distinct from club-admin access: system admins retain Cup read/write oversight even without club membership; non-system organizers must remain active club members to mutate Cup structure.
+- This is a staging candidate only until migration 0142 is applied/verified in Staging, GitHub CI/build pass, the real Staging integration gate passes, and targeted Cup browser scenarios pass.
+
 ## 178.26.260830 — Staging integration reset-count fix
 
 - **NO migration.** Fixes the PR-only real Staging integration harness after the Alternate Shot reset test crashed after 60 successful checks.

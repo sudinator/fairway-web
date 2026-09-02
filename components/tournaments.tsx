@@ -104,6 +104,7 @@ import { resolveCreateGameTee, teeSourceLabel } from "@/lib/game-tee-assignment"
 import { formatReviewLabel, selectGuidedFamily, selectGuidedMatchKind, selectGuidedStrokeFormat, selectGuidedTeamFormat, setGuidedTeamMode, type CreateFormatPatch, type GuidedFormatState } from "@/lib/create-game-format";
 import { commitAllowance, editAllowance } from "@/lib/handicap-allowance";
 import { FormatFamilySelector } from "@/components/game/setup/format-family-selector";
+import { Competitions } from "@/components/competitions";
 
 // Stable match identity for a player. Real players key on user_id (so nothing
 // about existing matches changes); guests have no account, so they key on their
@@ -125,18 +126,24 @@ export default function Tournaments({
   session,
   activeGroupId,
   isAdmin,
+  isGroupAdmin,
   seed,
   openGameId,
 }: {
   session: any;
   activeGroupId: string;
   isAdmin?: boolean;
+  isGroupAdmin?: boolean;
   seed?: GameSeed | null;
   openGameId?: string | null;
 }) {
   const [view, setView] = useState<"list" | "create" | { gameId: string; tab?: "play" | "setup"; setupTab?: SetupTab }>(
     seed ? "create" : openGameId ? { gameId: openGameId } : "list",
   );
+  const [listMode, setListMode] = useState<"games" | "cups">("games");
+  const [competitionId, setCompetitionId] = useState<string | null>(null);
+  const [competitionSeed, setCompetitionSeed] = useState<GameSeed | null>(null);
+  const effectiveSeed = competitionSeed ?? seed ?? null;
   // Resume the game room the user was in (survives lock/refresh) — but ONLY if it
   // belongs to the active group, so switching groups never drops you into (or
   // shows players from) a game in a different group.
@@ -185,9 +192,9 @@ export default function Tournaments({
         user={user}
         displayName={displayName}
         activeGroupId={activeGroupId}
-        seed={seed}
-        onCancel={() => setView("list")}
-        onCreated={(gameId, tab, setupTab) => setView({ gameId, tab, setupTab })}
+        seed={effectiveSeed}
+        onCancel={() => { setCompetitionSeed(null); setView("list"); }}
+        onCreated={(gameId, tab, setupTab) => { setCompetitionSeed(null); setView({ gameId, tab, setupTab }); }}
       />
     );
   if (typeof view === "object")
@@ -203,12 +210,30 @@ export default function Tournaments({
       />
     );
   return (
-    <GameList
-      displayName={displayName}
-      activeGroupId={activeGroupId}
-      onOpen={(gameId) => setView({ gameId })}
-      onCreate={() => setView("create")}
-    />
+    <div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <button onClick={() => { setListMode("games"); setCompetitionId(null); }} style={{ ...btn(listMode === "games"), flex: 1 }}>Games</button>
+        <button onClick={() => setListMode("cups")} style={{ ...btn(listMode === "cups"), flex: 1 }}>Cups</button>
+      </div>
+      {listMode === "games" ? (
+        <GameList
+          displayName={displayName}
+          activeGroupId={activeGroupId}
+          onOpen={(gameId) => setView({ gameId })}
+          onCreate={() => { setCompetitionSeed(null); setView("create"); }}
+        />
+      ) : (
+        <Competitions
+          user={user}
+          activeGroupId={activeGroupId}
+          canManage={!!isAdmin || !!isGroupAdmin}
+          selectedId={competitionId}
+          onSelected={setCompetitionId}
+          onOpenGame={(gameId) => setView({ gameId })}
+          onCreateGame={(cupSeed) => { setCompetitionSeed(cupSeed); setView("create"); }}
+        />
+      )}
+    </div>
   );
 }
 
@@ -228,7 +253,7 @@ function CreateGame({
   onCancel: () => void;
   onCreated: (id: string, tab?: "play" | "setup", setupTab?: SetupTab) => void;
 }) {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(seed?.name || "");
   // Match date — defaults to today (local). Stored structured on the game so we
   // can later summarize by season/month. YYYY-MM-DD to match a Postgres `date`.
   const todayLocal = () => {
@@ -241,17 +266,16 @@ function CreateGame({
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState("");
   const [profileIdx, setProfileIdx] = useState<number | null>(null);
-  const [gameType, setGameType] = useState<GameType>(
-    "stableford",
-  );
+  const [gameType, setGameType] = useState<GameType>(seed?.gameType || "stableford");
   // Handicap allowance % (playing handicap = allowance% of course handicap).
   // Default 85 for four-ball, 100 otherwise. Resets to the standard when the
   // format changes; editable any time.
-  const [allowancePct, setAllowancePct] = useState(100);
+  const seededAllowance = seed?.gameType === "alt_shot" ? 50 : seed?.gameType === "fourball" ? 85 : 100;
+  const [allowancePct, setAllowancePct] = useState(seededAllowance);
   // Keep the custom allowance editor as text while the user is typing so deleting
   // the value can leave a genuinely blank field. Blank means no custom override
   // and resolves to the default 100% domain value.
-  const [allowanceInput, setAllowanceInput] = useState("100");
+  const [allowanceInput, setAllowanceInput] = useState(String(seededAllowance));
   // Flights (Stage 1: one-off per-event). "off" | "oneoff". Season "league" is Stage 2.
   const [flightMode, setFlightMode] = useState<"off" | "oneoff">("off");
   const [flightCount, setFlightCount] = useState(3);
@@ -276,13 +300,13 @@ function CreateGame({
   const [teamScoreMode, setTeamScoreMode] = useState<"best_ball" | "aggregate">("best_ball");
   const [trifectaScoring, setTrifectaScoring] = useState<"per_hole" | "match">("per_hole");
   const [strokeBasis, setStrokeBasis] = useState<"gross" | "net">("net");
-  const [fmtFamily, setFmtFamily] = useState<"stroke" | "match">("stroke");
-  const [matchKind, setMatchKind] = useState<"ind" | "team">("ind");
-  const [teamMode, setTeamMode] = useState(false);
+  const [fmtFamily, setFmtFamily] = useState<"stroke" | "match">(seed?.gameType === "match" || seed?.gameType === "fourball" || seed?.gameType === "alt_shot" || seed?.gameType === "trifecta" ? "match" : "stroke");
+  const [matchKind, setMatchKind] = useState<"ind" | "team">(seed?.gameType ? "team" : "ind");
+  const [teamMode, setTeamMode] = useState(seed?.gameType === "match");
   const [skinsTeamStyle, setSkinsTeamStyle] = useState<"head_to_head" | "best_ball">("head_to_head");
   const [skinsMode, setSkinsMode] = useState<"carryover" | "split">("carryover");
-  const [team1, setTeam1] = useState("Team 1");
-  const [team2, setTeam2] = useState("Team 2");
+  const [team1, setTeam1] = useState(seed?.teamNames?.A || "Team 1");
+  const [team2, setTeam2] = useState(seed?.teamNames?.B || "Team 2");
 
   const guidedFormatState = (): GuidedFormatState => ({
     gameType, teamMode, skinsTeamStyle, teamScoreMode, trifectaScoring, strokeBasis, skinsMode, fmtFamily, matchKind,
@@ -324,6 +348,7 @@ function CreateGame({
 
   // ---- Resume an interrupted setup (device-local draft) ----
   const teeTimeId = seed?.teeTimeId ?? null;
+  const draftSourceId = teeTimeId ?? (seed?.competitionSession ? `cup-${seed.competitionSession.competitionId}-${seed.competitionSession.sessionOrder}` : null);
   const [draftAvailable, setDraftAvailable] = useState<SetupDraft | null>(null); // an unfinished draft offered on the banner
   const [draftDismissed, setDraftDismissed] = useState(false);
   const [pendingFavName, setPendingFavName] = useState<string | null>(null); // restore the course once favorites load
@@ -434,6 +459,10 @@ function CreateGame({
     if (resumedRef.current) return;
     if (!seed || groupRoster.length === 0) return;
     setSelectedPlayers((prev) => {
+      if (seed.competitionSession) {
+        const allowed = new Set(seed.memberIds);
+        return Object.fromEntries(groupRoster.map((p) => [p.id, allowed.has(p.id)]));
+      }
       const next = { ...prev };
       seed.memberIds.forEach((id) => { if (groupRoster.some((p) => p.id === id)) next[id] = true; });
       return next;
@@ -455,7 +484,7 @@ function CreateGame({
   // On open, look for an unfinished draft for this group + tee time. If one with
   // real progress exists, offer to resume it; otherwise allow saving right away.
   useEffect(() => {
-    const d = loadSetupDraft(activeGroupId, teeTimeId);
+    const d = loadSetupDraft(activeGroupId, draftSourceId);
     if (d && draftHasProgress(d, user.id)) setDraftAvailable(d);
     else hydratedRef.current = true;
   }, []);
@@ -479,7 +508,7 @@ function CreateGame({
     setDraftAvailable(null); setDraftDismissed(true); hydratedRef.current = true;
   };
   const startFresh = () => {
-    clearSetupDraft(activeGroupId, teeTimeId);
+    clearSetupDraft(activeGroupId, draftSourceId);
     setDraftAvailable(null); setDraftDismissed(true); hydratedRef.current = true;
   };
 
@@ -514,14 +543,14 @@ function CreateGame({
   // draft offered on the next Create Game was the one just finished.
   useEffect(() => {
     if (!hydratedRef.current || doneRef.current) return;
-    if (draftHasProgress(draftSnapshot, user.id)) saveSetupDraft(activeGroupId, teeTimeId, draftSnapshot);
+    if (draftHasProgress(draftSnapshot, user.id)) saveSetupDraft(activeGroupId, draftSourceId, draftSnapshot);
   }, [draftSnapshot, activeGroupId, teeTimeId, user.id]);
 
   useEffect(() => {
     const checkpoint = () => {
       if (!hydratedRef.current || doneRef.current) return;
       const snap = latestDraftRef.current;
-      if (draftHasProgress(snap, user.id)) saveSetupDraft(activeGroupId, teeTimeId, snap);
+      if (draftHasProgress(snap, user.id)) saveSetupDraft(activeGroupId, draftSourceId, snap);
     };
     const onVisibility = () => { if (document.visibilityState === "hidden") checkpoint(); };
     window.addEventListener("pagehide", checkpoint);
@@ -582,6 +611,20 @@ function CreateGame({
       setErr("Pick a course (from your favorites).");
       return;
     }
+    if (seed?.competitionSession && gameType !== seed.competitionSession.format) {
+      setErr(`This Cup session is ${GC.gameTypeLabel(seed.competitionSession.format)}. Keep that format here, or cancel and change the session from the Cup.`);
+      return;
+    }
+    if (seed?.competitionSession && gameType === "match" && !teamMode) {
+      setErr("Cup Singles is a team match. Keep Team match turned on so the result can roll into the Cup score.");
+      return;
+    }
+    if (seed?.competitionSession) {
+      if (guestPlayers.length) { setErr("Cup sessions currently use the registered Cup roster only. Remove guests before creating this session."); return; }
+      const cupRoster = new Set(seed.memberIds);
+      const outside = groupRoster.filter((p) => selectedPlayers[p.id] && !cupRoster.has(p.id));
+      if (outside.length) { setErr(`Cup sessions can only use the Cup roster. Remove: ${outside.map((p) => p.display_name).join(", ")}.`); return; }
+    }
     if (flightBlocked) {
       setErr(idxVal == null
         ? "Enter your own handicap index before flighting this event."
@@ -632,8 +675,12 @@ function CreateGame({
         hcpOverrides, tee, tees: pickedFav.tees, defaultTeeIdx: teeIdx, playerTeeOverrides: teeAssignments.player,
         flightTeeIdx: teeAssignments.flight, coursePar, holesCount: holesMeta.length, flightsSupported, flightMode, flightBands,
         tgcBettingEnabled: effectiveGroupId(activeGroupId) === TGC_GROUP_ID,
+        includeCreator: seed?.competitionSession ? !!selectedPlayers[user.id] && seed.memberIds.includes(user.id) : true,
       });
-      const { error: e2 } = await supabase.from("game_players").insert(rows);
+      const seededRows = seed?.participantTeams
+        ? rows.map((row) => row.user_id ? { ...row, team: seed.participantTeams?.[row.user_id] ?? null } : row)
+        : rows;
+      const { error: e2 } = await supabase.from("game_players").insert(seededRows);
       if (e2) throw e2;
       await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_created", group_id: activeGroupId, summary: `Created the game "${game.name}" at ${pickedFav.name}` });
       // P4 handoff: link this game back to the originating tee time and record it
@@ -644,7 +691,18 @@ function CreateGame({
           await supabase.from("group_activity").insert({ group_id: activeGroupId, actor_user_id: user.id, action: "tt_game_linked", summary: `created a game from this tee time ("${game.name}")`, meta: { tee_time_id: seed.teeTimeId, game_id: game.id } });
         } catch { /* linking never blocks game creation */ }
       }
-      for (const row of rows) {
+      if (seed?.competitionSession) {
+        const cs = seed.competitionSession;
+        const { error: linkErr } = await supabase.from("competition_sessions").insert({
+          competition_id: cs.competitionId, name: cs.name, session_order: cs.sessionOrder, format: cs.format,
+          play_date: cs.playDate, points_per_match: cs.pointsPerMatch, game_id: game.id,
+        });
+        if (linkErr) {
+          try { await supabase.from("games").delete().eq("id", game.id).eq("created_by", user.id); } catch {}
+          throw new Error(`The game was not linked to the Cup session: ${linkErr.message}`);
+        }
+      }
+      for (const row of seededRows) {
         if (row.user_id && row.user_id !== user.id) {
           try {
             await supabase.rpc("create_notification", {
@@ -660,7 +718,7 @@ function CreateGame({
       const destination = GC.postCreateDestination(gameType, teamMode);
       // Set BEFORE the clear, so nothing between here and unmount can write the draft back.
       doneRef.current = true;
-      clearSetupDraft(activeGroupId, teeTimeId); // setup finished — drop the local draft
+      clearSetupDraft(activeGroupId, draftSourceId); // setup finished — drop the local draft
       onCreated(game.id, destination.roomTab, destination.setupTab as SetupTab | undefined);
     } catch (e: any) {
       setErr(failureMessage("Couldn't create the game", e));
@@ -1085,8 +1143,8 @@ function CreateGame({
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>Two teams</div>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Name the two sides, then build the 2-v-2 foursomes after creating. Each foursome plays for three points a hole.</div>
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
-              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
+              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} disabled={!!seed?.competitionSession} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
+              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} disabled={!!seed?.competitionSession} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
             </div>
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>Team point</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
@@ -1179,8 +1237,8 @@ function CreateGame({
             {(teamMode || gameType === "fourball" || gameType === "alt_shot") && (
               <>
                 <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                  <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
-                  <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
+                  <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} disabled={!!seed?.competitionSession} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
+                  <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} disabled={!!seed?.competitionSession} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
                 </div>
               </>
             )}
@@ -1192,8 +1250,8 @@ function CreateGame({
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>Two teams · skins</div>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Each hole is a skin between the two sides. Name the sides, then build the 2-v-2 foursomes after creating.</div>
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
-              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
+              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} disabled={!!seed?.competitionSession} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
+              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} disabled={!!seed?.competitionSession} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
             </div>
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>Team score</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>

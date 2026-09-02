@@ -64,4 +64,24 @@ export type Player = {
 };
 
 // A tee-time handoff seeding a new game (players + guests to prefill in CreateGame).
-export type GameSeed = { teeTimeId: string; course: string | null; playDate: string; memberIds: string[]; guests: { name: string; sponsorUserId: string }[] };
+export type GameSeed = {
+  teeTimeId?: string;
+  course: string | null;
+  playDate: string;
+  memberIds: string[];
+  guests: { name: string; sponsorUserId: string }[];
+  // Optional Cup-session handoff. These fields only prefill the existing Create Game flow;
+  // the resulting child remains a normal BNN game.
+  name?: string;
+  gameType?: GameType;
+  teamNames?: { A: string; B: string };
+  participantTeams?: Record<string, "A" | "B">;
+  competitionSession?: {
+    competitionId: string;
+    name: string;
+    sessionOrder: number;
+    format: "fourball" | "alt_shot" | "match";
+    playDate: string;
+    pointsPerMatch: number;
+  };
+};

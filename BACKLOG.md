@@ -1,3 +1,18 @@
+## 179.0.260901 — Ryder Cup-style team competition
+
+- [x] Add Cup parent + persistent two-team roster model.
+- [x] Add Four-Ball / Alternate Shot / Team Singles sessions linked to ordinary BNN games.
+- [x] Seed child Create Game with Cup date, format, roster, team names and team assignments.
+- [x] Aggregate live projected and decided match points across sessions.
+- [x] Reuse canonical Alternate Shot side scores and existing Four-Ball/Singles scoring engines.
+- [x] Keep the new feature inside Games (`Games | Cups`) so the established bottom navigation does not change.
+- [ ] Apply and verify migration 0142 on Staging.
+- [ ] GitHub dependency-backed CI/type/test/build green.
+- [ ] Vercel Staging Ready.
+- [ ] Real Staging integration gate green.
+- [ ] Browser acceptance: create Cup, roster teams, create each session type, finish/halve matches, live aggregate updates, re-entry/reload, invalid/partial session setup, adjacent ordinary Games workflow.
+- [ ] Only after all gates: staging → main PR, Production migration parity, Production smoke, then main → staging sync.
+
 ## 178.26.260830 release-candidate hardening
 
 - [x] Fix PR-only Staging integration crash when verifying Alternate Shot reset count; preserve full Supabase head/count response and permanently guard the contract. No app/database behavior change.

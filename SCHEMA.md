@@ -1,3 +1,7 @@
+## 179.0.260901 — Team competitions (migration 0142)
+
+`competitions` is the parent Cup/event record: club, name/location/date, two distinct team names, lifecycle status, and creator. `competition_players` snapshots the event roster and stable A/B team membership. `competition_sessions` orders Four-Ball, Alternate Shot, or Team Singles sessions and links each session to one existing `games` row. The linked game remains the authoritative score/pairing/group record; the Cup layer only aggregates its match states. All three tables use RLS: active club members can read; system admins retain oversight outside membership; non-system structural writers must remain active club members. `create_team_competition(...)` atomically creates the parent plus its full roster after validating active membership and both sides. Session-link triggers preserve the same club, supported format, canonical A/B team identities, and Cup-roster/team contract.
+
 ## 178.26.260830 — no schema change
 
 CI/integration-harness-only correction. Migrations 0140 and 0141 are unchanged.

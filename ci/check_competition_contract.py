@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+from pathlib import Path
+
+checks = []
+def check(name, cond):
+    checks.append((name, bool(cond)))
+
+root = Path(__file__).resolve().parents[1]
+mig = (root/'migrations/0142_team_competitions.sql').read_text()
+comp = (root/'components/competitions.tsx').read_text()
+tour = (root/'components/tournaments.tsx').read_text()
+types = (root/'lib/game-types.ts').read_text()
+logic = (root/'lib/competition.ts').read_text()
+
+check('0142 records itself', "record_migration('0142_team_competitions')" in mig)
+check('competition parent/roster/session tables exist', all(x in mig for x in ['create table if not exists public.competitions', 'create table if not exists public.competition_players', 'create table if not exists public.competition_sessions']))
+check('session supports only existing team match engines', "format in ('fourball','alt_shot','match')" in mig)
+check('child session links to ordinary game', 'game_id uuid unique references public.games(id)' in mig)
+check('RLS enabled on all competition tables', mig.count('enable row level security') >= 3)
+check('competition policies call canonical two-argument group helpers', 'is_group_member(group_id, auth.uid())' in mig and 'is_group_admin(group_id, auth.uid())' in mig and 'is_group_admin(p_group, auth.uid())' in mig and 'is_group_member(group_id)' not in mig and 'is_group_admin(group_id)' not in mig)
+check('system admin retains Cup read/update visibility outside membership', 'is_group_member(group_id, auth.uid()) or public.is_admin()' in mig and 'public.is_admin() or (public.is_group_member(group_id, auth.uid())' in mig and mig.count('public.is_group_member(c.group_id, auth.uid()) or public.is_admin()') >= 2)
+check('removed organizers cannot mutate Cup structure unless system admin', mig.count('public.is_admin() or (public.is_group_member(c.group_id, auth.uid()) and (c.created_by = auth.uid() or public.is_group_admin(c.group_id, auth.uid())))') >= 7 and mig.count('public.is_admin() or (public.is_group_member(group_id, auth.uid()) and (created_by = auth.uid() or public.is_group_admin(group_id, auth.uid())))') >= 3)
+check('Cup creation is atomic through one database RPC', 'create or replace function public.create_team_competition' in mig and 'supabase.rpc("create_team_competition"' in comp)
+check('Cup creation RPC validates active club roster and both teams', all(x in mig for x in ["Every Cup player must be an active club member", "Put at least one player on each Cup team"]))
+check('Cup teams require distinct names and canonical A/B child keys', 'competitions_distinct_team_names_chk' in mig and "Cup team names must be different" in mig and "g.teams->0->>'key','') <> 'A'" in mig and "new.teams->1->>'key','') <> 'B'" in mig)
+check('cup entry lives inside Games surface', 'listMode === "cups"' in tour and '<Competitions' in tour)
+check('cup child game reuses CreateGame seed', 'competitionSession?:' in types and 'participantTeams?:' in types and 'seed?.competitionSession' in tour)
+check('team assignment is inherited into child game rows', 'seed?.participantTeams' in tour and 'team: seed.participantTeams?.[row.user_id]' in tour)
+check('aggregation uses canonical existing scoring engines', all(x in logic for x in ['matchStatus(', 'fourballStatus(', 'altShotStatus(', 'canonicalAltShotGross(']))
+check('UI exposes Four-Ball Alternate Shot Singles sessions', all(x in comp for x in ['Four-Ball', 'Alternate Shot', 'Singles']))
+check('one match row keeps teams left/right with centered thru', 'gridTemplateColumns: "minmax(0,1fr) 52px minmax(0,1fr)"' in comp and 'Thru ${m.thru}' in comp)
+check('linked Cup games keep persistent team contract', all(x in mig for x in ['competition_game_player_contract', 'competition_game_structure_contract', 'competition_roster_contract']))
+check('roster trigger handles DELETE without touching NEW', "case when tg_op = 'DELETE' then old.competition_id else new.competition_id end" in mig)
+check('competition score normalizes Team A to left', 'const reversed = ta === "B" && tb === "A"' in logic and 'winnerTeam: displayLead === 0 ? null : (displayLead > 0 ? "A" : "B")' in logic)
+check('Cup score refreshes live while open', 'window.setInterval(() => { void load(); }, 15000)' in comp and '↻ Refresh' in comp)
+
+bad=[name for name,ok in checks if not ok]
+for name,ok in checks: print(('PASS' if ok else 'FAIL')+': '+name)
+if bad: raise SystemExit(1)
+print(f'competition contract: PASS ({len(checks)}/{len(checks)})')

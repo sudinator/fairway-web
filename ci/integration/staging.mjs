@@ -60,6 +60,14 @@ async function cleanup() {
     if (auditRemaining.error) throw new Error(`Cleanup could not verify money_audit fixtures for ${gid}: ${auditRemaining.error.message}`);
     if ((auditRemaining.count || 0) !== 0) throw new Error(`Cleanup left ${(auditRemaining.count || 0)} money_audit fixture row(s) for ${gid}.`);
     await service.from("tee_times").delete().eq("group_id", gid);
+    const cupRows = await service.from("competitions").select("id").eq("group_id", gid);
+    if (cupRows.error) throw new Error(`Cleanup could not inspect Cup fixtures for ${gid}: ${cupRows.error.message}`);
+    const cupIds = (cupRows.data || []).map((r) => r.id);
+    if (cupIds.length) {
+      await service.from("competition_sessions").delete().in("competition_id", cupIds);
+      await service.from("competition_players").delete().in("competition_id", cupIds);
+      await service.from("competitions").delete().in("id", cupIds);
+    }
     await service.from("group_events").delete().eq("group_id", gid);
     await service.from("group_guests").delete().eq("group_id", gid);
     await service.from("games").delete().eq("group_id", gid);
@@ -76,6 +84,7 @@ async function cleanup() {
 try {
   console.log(`BNN staging integration run ${suffix}`);
   const admin = await createUser("admin", true);
+  const sysAdmin = await createUser("sysadmin", true);
   const alice = await createUser("alice");
   const bob = await createUser("bob");
   const charlie = await createUser("charlie");
@@ -228,6 +237,60 @@ try {
   ok((afterAltReset.count ?? 0) === 0, "reset removes all canonical Alternate Shot side scores");
   const markerAfterReset = expectNoError(await service.from("games").select("alt_shot_scoring_started_at").eq("id", altGame.id).single(), "verify Alternate Shot start marker reset");
   ok(markerAfterReset.alt_shot_scoring_started_at == null, "reset clears Alternate Shot scoring-start marker");
+
+  // Cup aggregation layer (0142): only a club/system admin creates the parent, members can read,
+  // outsiders cannot, and a linked session must be a same-club ordinary BNN team game whose
+  // player roster/team assignment exactly matches the persistent Cup roster.
+  const memberCupCreate = await alice.client.from("competitions").insert({ group_id: group.id, created_by: alice.id, name: "Bypass Cup", start_date: "2026-09-01", team_a_name: "Violet", team_b_name: "Burgundy" });
+  ok(!!memberCupCreate.error, "ordinary member cannot create a club Cup through the raw API");
+  const memberCupRpc = await alice.client.rpc("create_team_competition", {
+    p_group: group.id, p_name: "Bypass Cup RPC", p_location: null, p_start_date: "2026-09-01", p_team_a_name: "Violet", p_team_b_name: "Burgundy",
+    p_roster: [{ user_id: alice.id, team_key: "A" }, { user_id: charlie.id, team_key: "B" }],
+  });
+  ok(!!memberCupRpc.error, "ordinary member cannot create a club Cup through the atomic RPC");
+  const cupId = expectNoError(await admin.client.rpc("create_team_competition", {
+    p_group: group.id, p_name: `Integration Cup ${suffix}`, p_location: null, p_start_date: "2026-09-01", p_team_a_name: "Violet", p_team_b_name: "Burgundy",
+    p_roster: [
+      { user_id: alice.id, team_key: "A" }, { user_id: bob.id, team_key: "A" },
+      { user_id: charlie.id, team_key: "B" }, { user_id: dana.id, team_key: "B" },
+    ],
+  }), "club admin can atomically create a Cup and persistent roster");
+  const cup = { id: cupId };
+  const seededCupRoster = expectNoError(await service.from("competition_players").select("user_id,team_key").eq("competition_id", cup.id), "inspect atomic Cup roster");
+  ok(seededCupRoster.length === 4, "atomic Cup creation writes the entire roster");
+  const cupMemberRead = expectNoError(await bob.client.from("competitions").select("id").eq("id", cup.id), "club member can read Cup");
+  ok(cupMemberRead.length === 1, "Cup is visible to active club members");
+  const cupOutsiderRead = expectNoError(await outsider.client.from("competitions").select("id").eq("id", cup.id), "outsider Cup query is safely filtered by RLS");
+  ok(cupOutsiderRead.length === 0, "Cup is hidden from outsiders");
+  const sysAdminCupRead = expectNoError(await sysAdmin.client.from("competitions").select("id").eq("id", cup.id), "system admin can read Cup without club membership");
+  ok(sysAdminCupRead.length === 1, "system admin Cup visibility is not accidentally membership-gated");
+  expectNoError(await sysAdmin.client.from("competitions").update({ location: "System admin check" }).eq("id", cup.id), "system admin can update Cup without club membership");
+  expectNoError(await admin.client.from("competitions").update({ location: null }).eq("id", cup.id), "club admin can restore Cup metadata");
+  expectNoError(await admin.client.from("competition_players").delete().eq("competition_id", cup.id).eq("user_id", bob.id), "Cup organizer can remove a roster player before any session is linked");
+  expectNoError(await admin.client.from("competition_players").insert({ competition_id: cup.id, user_id: bob.id, team_key: "A", display_name: "Bob" }), "Cup organizer can restore the pre-session roster player");
+
+  const cupGame = expectNoError(await service.from("games").insert({
+    code: `C${suffix.slice(-6)}`, name: "Integration Cup Singles", course: "Integration Course",
+    holes_meta: [{ n: 1, par: 4, si: 1 }], group_id: group.id, created_by: admin.id, status: "active",
+    game_type: "match", allowance_pct: 100, teams: [{ key: "A", name: "Violet" }, { key: "B", name: "Burgundy" }],
+    pairings: [{ a: alice.id, b: charlie.id }],
+  }).select("id").single(), "create ordinary BNN team Singles game for Cup session");
+  expectNoError(await service.from("game_players").insert([
+    { game_id: cupGame.id, user_id: alice.id, display_name: "Alice", is_guest: false, team: "A", handicap_index: 0, course_handicap: 0, scores: [4], putts: [null], fairways: [null], penalties: [null], sand: [false], bets: true },
+    { game_id: cupGame.id, user_id: charlie.id, display_name: "Charlie", is_guest: false, team: "B", handicap_index: 0, course_handicap: 0, scores: [5], putts: [null], fairways: [null], penalties: [null], sand: [false], bets: true },
+  ]), "seed Cup child game players with inherited teams");
+  const cupSession = expectNoError(await admin.client.from("competition_sessions").insert({ competition_id: cup.id, name: "Sunday Singles", session_order: 1, format: "match", play_date: "2026-09-01", points_per_match: 1, game_id: cupGame.id }).select("id,game_id").single(), "Cup organizer can link a valid ordinary game session");
+  ok(cupSession.game_id === cupGame.id, "Cup session retains linked BNN game as authoritative scoring source");
+  const memberSessionWrite = await alice.client.from("competition_sessions").insert({ competition_id: cup.id, name: "Bypass", session_order: 2, format: "match", play_date: "2026-09-01", points_per_match: 1, game_id: cupGame.id });
+  ok(!!memberSessionWrite.error, "ordinary member cannot mutate Cup session structure");
+  const badLink = await admin.client.from("competition_sessions").insert({ competition_id: cup.id, name: "Wrong teams", session_order: 2, format: "alt_shot", play_date: "2026-09-01", points_per_match: 1, game_id: altGame.id });
+  ok(!!badLink.error, "Cup session contract rejects a linked game whose persistent teams do not match the Cup");
+  const driftPlayerTeam = await service.from("game_players").update({ team: "B" }).eq("game_id", cupGame.id).eq("user_id", alice.id);
+  ok(!!driftPlayerTeam.error, "linked Cup game rejects player team drift after session link");
+  const driftGameTeams = await service.from("games").update({ teams: [{ key: "A", name: "Changed" }, { key: "B", name: "Burgundy" }] }).eq("id", cupGame.id);
+  ok(!!driftGameTeams.error, "linked Cup game rejects persistent team-name drift");
+  const driftCupRoster = await admin.client.from("competition_players").update({ team_key: "B" }).eq("competition_id", cup.id).eq("user_id", alice.id);
+  ok(!!driftCupRoster.error, "Cup roster is locked after the first session is linked");
 
   // Safe delete: a populated group is rejected; an empty admin-only group can be removed.
   const populatedDelete = await admin.client.rpc("delete_group_safely", { p_group: group.id });

@@ -20,7 +20,7 @@ Regenerate after shipping (adds new files, keeps ticks and the notes block):
 Confirm database-applied state with:
 `select id, applied_at from public.schema_migrations order by id;`
 
-Total: 126 migrations. Unchecked = not yet confirmed applied in this checklist.
+Total: 127 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -147,9 +147,10 @@ Total: 126 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [x] 0136_core_rls_helpers.sql
 - [x] 0137_core_rls_baseline.sql
 - [x] 0138_change_game_course_before_scoring.sql
-- [ ] 0139_nine_hole_round_basis.sql
-- [ ] 0140_alt_shot_side_scores.sql
-- [ ] 0141_alt_shot_clear_tombstones.sql
+- [x] 0139_nine_hole_round_basis.sql
+- [x] 0140_alt_shot_side_scores.sql
+- [x] 0141_alt_shot_clear_tombstones.sql
+- [ ] 0142_team_competitions.sql
 
 <!-- NOTES:START -->
 
