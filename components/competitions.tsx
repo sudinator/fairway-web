@@ -9,7 +9,7 @@ import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import {
   combineCompetitionScores,
   competitionFormatLabel,
-  competitionPointsNeeded,
+  competitionOutcome,
   competitionSchedule,
   fmtCompetitionPoints,
   scoreCompetitionGame,
@@ -88,7 +88,7 @@ export function Competitions({
   const createCompetition = async () => {
     if (!name.trim()) { setErr("Enter a competition name."); return; }
     const picked = Object.entries(assign).filter(([, t]) => t === "A" || t === "B");
-    if (teamA.trim().toLocaleLowerCase() === teamB.trim().toLocaleLowerCase()) { setErr("Give the two Cup teams different names."); return; }
+    if (teamA.trim().toLocaleLowerCase() === teamB.trim().toLocaleLowerCase()) { setErr("Give the two Ryder Cup teams different names."); return; }
     if (!picked.some(([, t]) => t === "A") || !picked.some(([, t]) => t === "B")) { setErr("Put at least one player on each team."); return; }
     setBusy(true); setErr(null);
     try {
@@ -114,11 +114,11 @@ export function Competitions({
       <div style={{ maxWidth: 620 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button onClick={() => setCreating(false)} style={{ ...btn(false), padding: "8px 12px" }}>‹ Back</button>
-          <Eyebrow style={{ margin: 0 }}>NEW CUP</Eyebrow>
+          <Eyebrow style={{ margin: 0 }}>NEW RYDER CUP</Eyebrow>
         </div>
         <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 14 }}>
           <label style={{ color: C.sage, fontSize: 11, fontWeight: 800 }}>COMPETITION NAME</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="TGC Cup 2026" style={{ ...inputStyle, marginTop: 6 }} />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Club Ryder Cup 2026" style={{ ...inputStyle, marginTop: 6 }} />
           <label style={{ display: "block", color: C.sage, fontSize: 11, fontWeight: 800, marginTop: 14 }}>LOCATION <span style={{ fontWeight: 500 }}>(optional)</span></label>
           <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Tumble Creek Club" style={{ ...inputStyle, marginTop: 6 }} />
           <div style={{ marginTop: 14 }}><label style={{ color: C.sage, fontSize: 11, fontWeight: 800 }}>START DATE</label><ShortDateInput value={startDate} onChange={setStartDate} /></div>
@@ -130,7 +130,7 @@ export function Competitions({
             <div><label style={{ color: C.sage, fontSize: 11, fontWeight: 800 }}>TEAM 1</label><input value={teamA} onChange={(e) => setTeamA(e.target.value)} style={{ ...inputStyle, marginTop: 6 }} /></div>
             <div><label style={{ color: C.sage, fontSize: 11, fontWeight: 800 }}>TEAM 2</label><input value={teamB} onChange={(e) => setTeamB(e.target.value)} style={{ ...inputStyle, marginTop: 6 }} /></div>
           </div>
-          <div style={{ color: C.sage, fontSize: 12, marginTop: 12, lineHeight: 1.45 }}>Assign the Cup roster once. Each session inherits these teams; you can choose which players participate when creating that session's game.</div>
+          <div style={{ color: C.sage, fontSize: 12, marginTop: 12, lineHeight: 1.45 }}>Assign the Ryder Cup roster once. Each session inherits these teams; you can choose which players participate when creating that session's game.</div>
         </div>
 
         <Eyebrow>ROSTER</Eyebrow>
@@ -146,21 +146,21 @@ export function Competitions({
           })}
         </div>
         {err ? <div style={{ color: C.overRedDark, fontSize: 12, marginTop: 12 }}>{err}</div> : null}
-        <button disabled={busy} onClick={createCompetition} style={{ ...btn(true), width: "100%", marginTop: 16 }}>{busy ? "Creating…" : "Create Cup"}</button>
+        <button disabled={busy} onClick={createCompetition} style={{ ...btn(true), width: "100%", marginTop: 16 }}>{busy ? "Creating…" : "Create Ryder Cup"}</button>
       </div>
     );
   }
 
   return (
     <div>
-      <Eyebrow>CUPS</Eyebrow>
+      <Eyebrow>RYDER CUPS</Eyebrow>
       <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 10 }}>
-        <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 700 }}>Run a Ryder Cup-style competition</div>
-        <div style={{ color: C.sage, fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>Create two club teams, add Four-Ball, Alternate Shot and Singles sessions, and let BNN tally every match into one live Cup score.</div>
-        {canManage ? <button onClick={() => setCreating(true)} style={{ ...btn(true), marginTop: 12 }}>＋ Start a Cup</button> : null}
+        <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 700 }}>Run a Ryder Cup</div>
+        <div style={{ color: C.sage, fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>Create two club teams, add Four-Ball, Alternate Shot and Singles sessions, and let BNN tally every match into one live Ryder Cup score.</div>
+        {canManage ? <button onClick={() => setCreating(true)} style={{ ...btn(true), marginTop: 12 }}>＋ Start a Ryder Cup</button> : null}
       </div>
-      <Eyebrow>YOUR CUPS</Eyebrow>
-      {competitions === null ? <div style={{ color: C.sage }}>Loading…</div> : competitions.length === 0 ? <div style={{ background: C.greenLight, borderRadius: 14, padding: 22, color: C.sage, textAlign: "center" }}>No Cups yet.</div> : competitions.map((c) => (
+      <Eyebrow>YOUR RYDER CUPS</Eyebrow>
+      {competitions === null ? <div style={{ color: C.sage }}>Loading…</div> : competitions.length === 0 ? <div style={{ background: C.greenLight, borderRadius: 14, padding: 22, color: C.sage, textAlign: "center" }}>No Ryder Cups yet.</div> : competitions.map((c) => (
         <button key={c.id} onClick={() => onSelected(c.id)} style={{ width: "100%", textAlign: "left", background: C.greenLight, border: "none", borderRadius: 12, padding: "13px 16px", marginTop: 10, cursor: "pointer" }}>
           <div style={{ color: C.cream, fontSize: 15, fontWeight: 800 }}>{c.name}</div>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>{formatDate(c.start_date)}{c.location ? ` · ${c.location}` : ""} · {c.team_a_name} vs {c.team_b_name}</div>
@@ -193,7 +193,7 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
       supabase.from("competition_sessions").select("*").eq("competition_id", competitionId).order("session_order"),
     ]);
     if (cRes.error || !cRes.data) { setErr(cRes.error?.message || "Competition not found."); return; }
-    if (rRes.error || sRes.error) { setErr(rRes.error?.message || sRes.error?.message || "Could not load Cup setup."); return; }
+    if (rRes.error || sRes.error) { setErr(rRes.error?.message || sRes.error?.message || "Could not load Ryder Cup setup."); return; }
     const rawSessions = (sRes.data || []) as CompetitionSession[];
     const ids = rawSessions.map((s) => s.game_id).filter((x): x is string => !!x);
     let games: Game[] = [], players: Player[] = [], altScores: AltShotScoreRow[] = [];
@@ -203,7 +203,7 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
         supabase.from("game_players").select("*").in("game_id", ids),
         supabase.from("game_alt_shot_scores").select("*").in("game_id", ids),
       ]);
-      if (gRes.error || pRes.error || aRes.error) { setErr(gRes.error?.message || pRes.error?.message || aRes.error?.message || "Could not load Cup match scores."); return; }
+      if (gRes.error || pRes.error || aRes.error) { setErr(gRes.error?.message || pRes.error?.message || aRes.error?.message || "Could not load Ryder Cup match scores."); return; }
       games = (gRes.data || []) as Game[]; players = (pRes.data || []) as Player[]; altScores = (aRes.data || []) as AltShotScoreRow[];
     }
     setCompetition(cRes.data as Competition);
@@ -225,7 +225,7 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
 
   const total = useMemo(() => combineCompetitionScores((sessions || []).map((s) => s.score)), [sessions]);
   const schedule = useMemo(() => competitionSchedule(sessions || [], competition?.tie_rule || "shared"), [sessions, competition?.tie_rule]);
-  if (!competition) return <div><button onClick={onBack} style={{ ...btn(false), marginBottom: 12 }}>‹ Cups</button><div style={{ color: err ? C.overRedDark : C.sage }}>{err || "Loading…"}</div></div>;
+  if (!competition) return <div><button onClick={onBack} style={{ ...btn(false), marginBottom: 12 }}>‹ Ryder Cups</button><div style={{ color: err ? C.overRedDark : C.sage }}>{err || "Loading…"}</div></div>;
   const manage = canManage || competition.created_by === user.id;
   const aColor = teamAccent(competition.team_a_name, 0), bColor = teamAccent(competition.team_b_name, 1);
 
@@ -273,7 +273,7 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
   };
 
   const reopenSchedule = async () => {
-    const reason = prompt("Why is the locked Cup schedule being changed?")?.trim();
+    const reason = prompt("Why is the locked Ryder Cup schedule being changed?")?.trim();
     if (!reason) return;
     setScheduleBusy(true); setErr(null);
     const { error } = await supabase.rpc("reopen_competition_schedule", { p_competition: competition.id, p_reason: reason });
@@ -289,14 +289,27 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
   const locked = competition.schedule_status === "locked";
   const editingSession = sessions?.find((s) => s.id === editingSessionId) || null;
   const plannedMatchCount = (sessions || []).reduce((sum, s) => sum + Number(s.planned_match_count || 0), 0);
-  const aNeeded = competitionPointsNeeded(total.decidedA, schedule.teamATarget);
-  const bNeeded = competitionPointsNeeded(total.decidedB, schedule.teamBTarget);
-  const clinched: "A" | "B" | null = locked && total.decidedA >= schedule.teamATarget ? "A" : locked && total.decidedB >= schedule.teamBTarget ? "B" : null;
+  const outcome = competitionOutcome(total.decidedA, total.decidedB, schedule, competition.tie_rule);
+  const clinched: "A" | "B" | null = locked && outcome.teamA.clinched ? "A" : locked && outcome.teamB.clinched ? "B" : null;
+  const cupShared = locked && competition.tie_rule === "shared" && outcome.remainingPoints < 1e-9 && Math.abs(total.decidedA - total.decidedB) < 1e-9;
+  const pathText = (name: string, path: typeof outcome.teamA, target: number) => {
+    if (path.canWin) {
+      const action = target <= schedule.totalPoints / 2 + 1e-9 ? "retain the Ryder Cup" : "win the Ryder Cup";
+      return `${name} needs ${fmtCompetitionPoints(path.pointsNeeded)} ${path.pointsNeeded <= 1 + 1e-9 ? "point" : "points"} to ${action}`;
+    }
+    if (path.canShare) {
+      const mustTakeAll = Math.abs(path.maxPoints - schedule.totalPoints / 2) < 1e-9;
+      return mustTakeAll
+        ? `${name} must take all ${fmtCompetitionPoints(outcome.remainingPoints)} remaining points to share the Ryder Cup`
+        : `${name} can still share the Ryder Cup`;
+    }
+    return `${name} cannot win or share the Ryder Cup`;
+  };
 
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <button onClick={onBack} style={{ ...btn(false), padding: "8px 12px" }}>‹ Cups</button>
+        <button onClick={onBack} style={{ ...btn(false), padding: "8px 12px" }}>‹ Ryder Cups</button>
         <div style={{ flex: 1 }} />
         <span style={{ color: locked ? "#5BD08A" : C.gold, fontSize: 11 }}>{locked ? "● Schedule locked" : "● Schedule draft"}</span>
         <button onClick={() => { void load(); }} style={{ ...btn(false), padding: "8px 12px", fontSize: 12 }}>↻ Refresh</button>
@@ -314,13 +327,15 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
         </div>
         {locked ? <div style={{ marginTop: 12, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 10, textAlign: "center" }}>
           <div style={{ color: C.cream, fontSize: 12, fontWeight: 800 }}>
-            {clinched
-              ? `${clinched === "A" ? competition.team_a_name : competition.team_b_name} has clinched the Cup`
-              : `${competition.team_a_name} needs ${fmtCompetitionPoints(aNeeded)} · ${competition.team_b_name} needs ${fmtCompetitionPoints(bNeeded)}`}
+            {cupShared
+              ? "The Ryder Cup is shared"
+              : clinched
+                ? `${clinched === "A" ? competition.team_a_name : competition.team_b_name} has clinched the Ryder Cup`
+                : <><div>{pathText(competition.team_a_name, outcome.teamA, schedule.teamATarget)}</div><div style={{ marginTop: 3 }}>{pathText(competition.team_b_name, outcome.teamB, schedule.teamBTarget)}</div></>}
           </div>
-          <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{fmtCompetitionPoints(schedule.totalPoints)} scheduled points · {competition.tie_rule === "shared" ? "a level finish shares the Cup" : `${competition.tie_rule === "team_a_retains" ? competition.team_a_name : competition.team_b_name} retains on a tie`}</div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{fmtCompetitionPoints(schedule.totalPoints)} scheduled points · {competition.tie_rule === "shared" ? "a level finish shares the Ryder Cup" : `${competition.tie_rule === "team_a_retains" ? competition.team_a_name : competition.team_b_name} retains on a tie`}</div>
         </div> : <div style={{ marginTop: 12, background: "rgba(201,162,39,.12)", border: `1px solid ${C.gold}`, borderRadius: 10, padding: "8px 12px", color: C.cream, fontSize: 11.5, lineHeight: 1.4 }}>
-          Schedule is not locked. Current games can be scored, but BNN will not declare a Cup winner until the points denominator is confirmed.
+          Schedule is not locked. Current games can be scored, but BNN will not declare a Ryder Cup winner until the points denominator is confirmed.
         </div>}
       </div>
 
@@ -334,8 +349,8 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
 
       <div style={{ display: "flex", alignItems: "center" }}><Eyebrow>SESSIONS</Eyebrow><div style={{ flex: 1 }} />{manage && !locked ? <button onClick={() => { setAdding((v) => !v); setEditingSessionId(null); }} style={{ ...btn(false), fontSize: 12, padding: "8px 12px" }}>{adding ? "Cancel" : "＋ Add session"}</button> : null}</div>
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginBottom: 10, border: `1px solid ${locked ? "#5BD08A" : C.gold}` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ flex: 1 }}><div style={{ color: C.cream, fontWeight: 800, fontSize: 13 }}>{locked ? "Cup scoring contract" : "Build the Cup scoring contract"}</div><div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{sessions?.length || 0} sessions · {plannedMatchCount} matches · {fmtCompetitionPoints(schedule.totalPoints)} total points</div></div>{manage ? <button disabled={scheduleBusy || (!locked && !sessions?.length)} onClick={locked ? reopenSchedule : lockSchedule} style={{ ...btn(!locked), fontSize: 11, padding: "8px 12px", opacity: scheduleBusy ? .6 : 1 }}>{locked ? "Reopen schedule" : "Review & lock"}</button> : null}</div>
-        <label style={{ display: "block", color: C.sage, fontSize: 11, fontWeight: 800, marginTop: 10 }}>IF THE CUP FINISHES LEVEL<select disabled={locked || !manage || scheduleBusy} value={competition.tie_rule} onChange={(e) => void changeTieRule(e.target.value as Competition["tie_rule"])} style={{ ...inputStyle, marginTop: 5, width: "100%", fontSize: 12 }}><option value="shared">The Cup is shared</option><option value="team_a_retains">{competition.team_a_name} retains the Cup</option><option value="team_b_retains">{competition.team_b_name} retains the Cup</option></select></label>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ flex: 1 }}><div style={{ color: C.cream, fontWeight: 800, fontSize: 13 }}>{locked ? "Ryder Cup scoring contract" : "Build the Ryder Cup scoring contract"}</div><div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{sessions?.length || 0} sessions · {plannedMatchCount} matches · {fmtCompetitionPoints(schedule.totalPoints)} total points</div></div>{manage ? <button disabled={scheduleBusy || (!locked && !sessions?.length)} onClick={locked ? reopenSchedule : lockSchedule} style={{ ...btn(!locked), fontSize: 11, padding: "8px 12px", opacity: scheduleBusy ? .6 : 1 }}>{locked ? "Reopen schedule" : "Review & lock"}</button> : null}</div>
+        <label style={{ display: "block", color: C.sage, fontSize: 11, fontWeight: 800, marginTop: 10 }}>IF THE RYDER CUP FINISHES LEVEL<select disabled={locked || !manage || scheduleBusy} value={competition.tie_rule} onChange={(e) => void changeTieRule(e.target.value as Competition["tie_rule"])} style={{ ...inputStyle, marginTop: 5, width: "100%", fontSize: 12 }}><option value="shared">The Ryder Cup is shared</option><option value="team_a_retains">{competition.team_a_name} retains the Ryder Cup</option><option value="team_b_retains">{competition.team_b_name} retains the Ryder Cup</option></select></label>
       </div>
       {adding ? <div style={{ background: C.greenLight, borderRadius: 14, padding: 14, marginBottom: 12 }}>
         <label style={{ color: C.sage, fontSize: 11, fontWeight: 800 }}>SESSION NAME</label><input value={sessionName} onChange={(e) => setSessionName(e.target.value)} style={{ ...inputStyle, marginTop: 6 }} />
@@ -344,7 +359,7 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
         <div style={{ marginTop: 12 }}><label style={{ color: C.sage, fontSize: 11, fontWeight: 800 }}>DATE</label><ShortDateInput value={playDate} onChange={setPlayDate} /></div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}><label style={{ color: C.sage, fontSize: 11, fontWeight: 800 }}>MATCHES<input inputMode="numeric" value={plannedMatches} onChange={(e) => setPlannedMatches(e.target.value)} style={{ ...inputStyle, marginTop: 6 }} /></label><label style={{ color: C.sage, fontSize: 11, fontWeight: 800 }}>POINTS EACH<input inputMode="decimal" value={pointsPerMatch} onChange={(e) => setPointsPerMatch(e.target.value)} style={{ ...inputStyle, marginTop: 6 }} /></label></div>
         <div style={{ color: C.sage, fontSize: 11, lineHeight: 1.45, marginTop: 10 }}>A halved match splits its value equally. Save every planned session, review the total, then lock the schedule before play.</div>
-        <button disabled={scheduleBusy} onClick={savePlannedSession} style={{ ...btn(true), width: "100%", marginTop: 12 }}>{scheduleBusy ? "Saving…" : editingSessionId ? "Save schedule changes" : "Add to Cup schedule"}</button>
+        <button disabled={scheduleBusy} onClick={savePlannedSession} style={{ ...btn(true), width: "100%", marginTop: 12 }}>{scheduleBusy ? "Saving…" : editingSessionId ? "Save schedule changes" : "Add to Ryder Cup schedule"}</button>
       </div> : null}
 
       {sessions === null ? <div style={{ color: C.sage }}>Loading sessions…</div> : sessions.length === 0 ? <div style={{ background: C.greenLight, borderRadius: 12, padding: 18, color: C.sage, textAlign: "center" }}>No sessions yet. Add Four-Ball, Alternate Shot or Singles.</div> : sessions.map((s) => (

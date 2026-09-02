@@ -6,6 +6,16 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
+## Current staging candidate: 179.5.260902
+
+- The user-facing multi-session team feature is named **Ryder Cup**; internal `competitions` tables, RPCs, and types intentionally retain their established names.
+- Games explains the distinction in place: a Game is one round/format/scorecard; a Ryder Cup combines several team sessions into one overall match score.
+- A game launched from a Ryder Cup session passes `sideContestsEnabled: false` to both the game payload and player-row builders. This persists `leg_config.scheme = "none"` and `bets = false` for every participant. No `game_contests` rows are created by default.
+- Standalone Game defaults are unchanged. No migration is added beyond 0143.
+- Before Production, complete `RELEASE_VERIFICATION_179.5.md` and obtain product/legal approval for use of the third-party `Ryder Cup` name.
+
+---
+
 ## 0. ACTION REQUIRED AT THE NEXT PRODUCTION MERGE
 
 **`migrations/0139_nine_hole_round_basis.sql` must be applied to PRODUCTION when the databases are

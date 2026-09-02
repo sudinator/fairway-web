@@ -214,7 +214,10 @@ export default function Tournaments({
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         <button onClick={() => { setListMode("games"); setCompetitionId(null); }} style={{ ...btn(listMode === "games"), flex: 1 }}>Games</button>
-        <button onClick={() => setListMode("cups")} style={{ ...btn(listMode === "cups"), flex: 1 }}>Cups</button>
+        <button onClick={() => setListMode("cups")} style={{ ...btn(listMode === "cups"), flex: 1 }}>Ryder Cups</button>
+      </div>
+      <div style={{ color: C.sage, fontSize: 11.5, lineHeight: 1.45, margin: "0 2px 12px" }}>
+        <b style={{ color: C.cream }}>Game:</b> one round, one format and one scorecard. <b style={{ color: C.cream }}>Ryder Cup:</b> several team sessions combined into one overall match score.
       </div>
       {listMode === "games" ? (
         <GameList
@@ -613,18 +616,18 @@ function CreateGame({
       return;
     }
     if (seed?.competitionSession && gameType !== seed.competitionSession.format) {
-      setErr(`This Cup session is ${GC.gameTypeLabel(seed.competitionSession.format)}. Keep that format here, or cancel and change the session from the Cup.`);
+      setErr(`This Ryder Cup session is ${GC.gameTypeLabel(seed.competitionSession.format)}. Keep that format here, or cancel and change the session from the Ryder Cup.`);
       return;
     }
     if (seed?.competitionSession && gameType === "match" && !teamMode) {
-      setErr("Cup Singles is a team match. Keep Team match turned on so the result can roll into the Cup score.");
+      setErr("Ryder Cup Singles is a team match. Keep Team match turned on so the result can roll into the Ryder Cup score.");
       return;
     }
     if (seed?.competitionSession) {
-      if (guestPlayers.length) { setErr("Cup sessions currently use the registered Cup roster only. Remove guests before creating this session."); return; }
+      if (guestPlayers.length) { setErr("Ryder Cup sessions currently use the registered Ryder Cup roster only. Remove guests before creating this session."); return; }
       const cupRoster = new Set(seed.memberIds);
       const outside = groupRoster.filter((p) => selectedPlayers[p.id] && !cupRoster.has(p.id));
-      if (outside.length) { setErr(`Cup sessions can only use the Cup roster. Remove: ${outside.map((p) => p.display_name).join(", ")}.`); return; }
+      if (outside.length) { setErr(`Ryder Cup sessions can only use the Ryder Cup roster. Remove: ${outside.map((p) => p.display_name).join(", ")}.`); return; }
     }
     if (flightBlocked) {
       setErr(idxVal == null
@@ -650,6 +653,7 @@ function CreateGame({
         courseHoles: holesForLength(pickedFav.holes, matchLength),
         teeYardages: tee?.yardages, coursePar, matchDate, allowancePct, gameType, teamMode, team1, team2,
         skinsTeamStyle, teamScoreMode, trifectaScoring, strokeBasis, skinsMode, flightsSupported, flightMode, flightBands,
+        sideContestsEnabled: !seed?.competitionSession,
       });
       const holesMeta = payload.holes_meta;
       const { data: game, error } = await supabase
@@ -676,6 +680,7 @@ function CreateGame({
         hcpOverrides, tee, tees: pickedFav.tees, defaultTeeIdx: teeIdx, playerTeeOverrides: teeAssignments.player,
         flightTeeIdx: teeAssignments.flight, coursePar, holesCount: holesMeta.length, flightsSupported, flightMode, flightBands,
         tgcBettingEnabled: effectiveGroupId(activeGroupId) === TGC_GROUP_ID,
+        sideContestsEnabled: !seed?.competitionSession,
         includeCreator: seed?.competitionSession ? !!selectedPlayers[user.id] && seed.memberIds.includes(user.id) : true,
       });
       const seededRows = seed?.participantTeams
@@ -698,7 +703,7 @@ function CreateGame({
           .eq("id", cs.sessionId).eq("competition_id", cs.competitionId).is("game_id", null).select("id").maybeSingle();
         if (linkErr || !linkedSession) {
           try { await supabase.from("games").delete().eq("id", game.id).eq("created_by", user.id); } catch {}
-          throw new Error(`The game was not linked to the Cup session: ${linkErr?.message || "the session was already linked or no longer exists"}`);
+          throw new Error(`The game was not linked to the Ryder Cup session: ${linkErr?.message || "the session was already linked or no longer exists"}`);
         }
       }
       for (const row of seededRows) {
@@ -1498,7 +1503,7 @@ function GameRoom({
       const { data } = await supabase.from("competition_sessions").select("competition_id, competitions(name)").eq("game_id", gameId).maybeSingle();
       if (cancelled || !data) return;
       const joined = Array.isArray((data as any).competitions) ? (data as any).competitions[0] : (data as any).competitions;
-      setCompetitionLink({ competition_id: String((data as any).competition_id), name: joined?.name || "Cup" });
+      setCompetitionLink({ competition_id: String((data as any).competition_id), name: joined?.name || "Ryder Cup" });
     })();
     return () => { cancelled = true; };
   }, [gameId]);

@@ -1,5 +1,13 @@
 # Refactor test plan — verifying component moves (Stage 1b: OrganizerPanel, BettingPanel, GroupScorecard, GroupsBuilder)
 
+## 179.5 Ryder Cup naming and quiet-default targeted gate
+
+Use `RELEASE_VERIFICATION_179.5.md`. Confirm every user-facing Cups surface now reads Ryder Cup, the Games selector explains Game versus Ryder Cup, and a newly created Ryder Cup Four-Ball, Alternate Shot, and Singles session starts with Group Results and money participation off. Standalone Games must retain their historical defaults. No database migration is added.
+
+## 179.4 weighted Cup outcome targeted gate
+
+Use `RELEASE_VERIFICATION_179.4.md` against the locked 13½-point `Main Test` schedule before completing its final three Singles matches. Blocking coverage includes quarter-fraction display, share-only detection, attainable points-needed copy, Team Singles match-point wording, and long-name wrapping. No database migration is added.
+
 ## 179.3 Cup schedule/scoring targeted gate
 
 Use `RELEASE_VERIFICATION_179.3.md` after migration 0143 is applied. Blocking coverage includes locked-denominator arithmetic, reason-required audited reopen, RLS/RPC authorization, live-versus-final match completion, first mathematical close-out, points-needed/clinch state, planned-session game linking, Cup navigation, and next-incomplete setup routing. Existing Match/Four-Ball/Alternate Shot engine suites remain unchanged and must stay green.

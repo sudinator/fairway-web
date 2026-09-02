@@ -1,3 +1,11 @@
+## 179.5.260902 staging candidate — Ryder Cup naming and quiet defaults
+
+The multi-session team competition is now called **Ryder Cup** throughout the interface. The Games screen explains the difference between a one-round Game and a multi-session Ryder Cup. Games launched from a Ryder Cup session begin with Group Results, money-game participation, and hole contests off; organizers can opt into them afterward. No migration is required beyond 0143.
+
+## 179.4.260902 staging candidate — weighted Cup outcome clarity
+
+Weighted Cup standings now use golf-style quarter fractions, identify when a team can only share rather than win outright, and state Team Singles clinch requirements in match points. Long Singles matchup names wrap on the running board. No migration is required beyond 0143.
+
 ## 179.3.260902 staging candidate — Cup schedule and clinch contract
 
 Cups now plan every session before play: match count, points per match, halved-match split, and the overall tied-Cup rule produce a locked total-points denominator. Standings distinguish projected from secured points, show what each side needs, and declare a clinch only against that locked schedule. Migration `0143_competition_schedule_contract.sql` is required before Staging browser validation.

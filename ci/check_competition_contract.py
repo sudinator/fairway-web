@@ -12,6 +12,7 @@ tour = (root/'components/tournaments.tsx').read_text()
 types = (root/'lib/game-types.ts').read_text()
 create = (root/'lib/game-create.ts').read_text()
 logic = (root/'lib/competition.ts').read_text()
+scoring = (root/'components/game/scoring-views.tsx').read_text()
 schedule_mig = (root/'migrations/0143_competition_schedule_contract.sql').read_text()
 
 check('0142 records itself', "record_migration('0142_team_competitions')" in mig)
@@ -38,8 +39,11 @@ check('competition score normalizes Team A to left', 'const reversed = ta === "B
 check('Cup score refreshes live while open', 'window.setInterval(() => { void load(); }, 15000)' in comp and '↻ Refresh' in comp)
 check('0143 records locked schedule contract', "record_migration('0143_competition_schedule_contract')" in schedule_mig and 'planned_match_count' in schedule_mig and 'schedule_status' in schedule_mig)
 check('locked schedule changes require explicit audited reopen', all(x in schedule_mig for x in ['lock_competition_schedule', 'reopen_competition_schedule', 'competition_schedule_events', 'p_reason']))
-check('Cup denominator and clinch copy use planned schedule', all(x in logic + comp for x in ['competitionSchedule', 'planned_match_count', 'has clinched the Cup', 'needs ${fmtCompetitionPoints']))
+check('Cup denominator and clinch copy use planned schedule', all(x in logic + comp for x in ['competitionSchedule', 'planned_match_count', 'has clinched the Ryder Cup', 'needs ${fmtCompetitionPoints']))
 check('Cup game handoff links an existing planned session', 'sessionId:' in types and 'from("competition_sessions").update({ game_id: game.id })' in tour)
+check('weighted Cup points use golf quarter fractions', all(x in logic for x in ['"¼"', '"½"', '"¾"']) and 'fmtCompetitionPoints(path.pointsNeeded)' in comp)
+check('Cup outcome separates outright and share-only paths', 'competitionOutcome' in logic and 'path.canShare' in comp and 'cannot win or share the Ryder Cup' in comp)
+check('Singles outlook uses match points and long names wrap', 'matchPointsNeeded' in scoring and 'to win this session' in scoring and scoring.count('overflowWrap: "anywhere", lineHeight: 1.2') >= 2)
 
 bad=[name for name,ok in checks if not ok]
 for name,ok in checks: print(('PASS' if ok else 'FAIL')+': '+name)

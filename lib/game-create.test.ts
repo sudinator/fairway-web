@@ -34,6 +34,7 @@ eq("fourball foursomes []", buildGamePayload({ ...base, gameType: "fourball" }).
 eq("fourball always teams", buildGamePayload({ ...base, gameType: "fourball", teamMode: false }).teams?.length, 2);
 eq("alternate shot always teams", buildGamePayload({ ...base, gameType: "alt_shot", teamMode: false }).teams?.length, 2);
 eq("alternate shot side game defaults off", (buildGamePayload({ ...base, gameType: "alt_shot" }) as any).leg_config?.scheme, "none");
+eq("Ryder Cup session Group Results default off", (buildGamePayload({ ...base, gameType: "fourball", sideContestsEnabled: false }) as any).leg_config?.scheme, "none");
 eq("skins bb foursomes []", buildGamePayload({ ...base, gameType: "skins", teamMode: true, skinsTeamStyle: "best_ball" }).foursomes, []);
 eq("skins h2h foursomes null", buildGamePayload({ ...base, gameType: "skins", teamMode: true, skinsTeamStyle: "head_to_head" }).foursomes, null);
 eq("stroke basis set", buildGamePayload({ ...base, gameType: "stroke", strokeBasis: "gross" }).stroke_basis, "gross");
@@ -87,6 +88,15 @@ const rosterBase = {
 {
   const rows = buildPlayerRows({ ...rosterBase, includeCreator: false });
   eq("Cup organizer can be excluded when not playing", rows.length, 0);
+}
+{
+  const rows = buildPlayerRows({
+    ...rosterBase,
+    sideContestsEnabled: false,
+    guestPlayers: [{ display_name: "Guest", handicap_index: 12, guest_of: "me" }],
+  });
+  eq("Ryder Cup session opts members out of money side contest", rows.find((r) => !r.is_guest)?.bets, false);
+  eq("Ryder Cup session opts guests out of money side contest", rows.find((r) => r.is_guest)?.bets, false);
 }
 {
   const roster = [

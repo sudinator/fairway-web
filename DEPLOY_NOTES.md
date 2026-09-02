@@ -1,3 +1,19 @@
+## 179.5.260902 — Ryder Cup naming and side-contest defaults
+
+- Renames the user-facing multi-session team competition from **Cup** to **Ryder Cup** while retaining the existing `competitions` schema, RPCs, links, and score aggregation.
+- Adds a compact Games-screen explanation: a Game is one round/format/scorecard; a Ryder Cup combines several team sessions into one overall match score.
+- Games created from a Ryder Cup session now explicitly start with Group Results off and every participant opted out of the money side game. Closest-to-pin, longest-drive, and straightest-drive contests remain off because no contest rows are created by default.
+- Standalone Games preserve their existing defaults. Organizers may enable any optional contest after creating the Ryder Cup session game.
+- No database migration. Existing migration 0143 remains the latest required schema change.
+
+## 179.4.260902 — Cup outcome-path clarity
+
+- Formats quarter-point Cup values with golf fractions (`¼`, `¾`, `6¾`) instead of mixing decimal and fractional notation.
+- Uses the locked denominator and secured score to distinguish an outright winning path from a share-only path; an unreachable “points needed” target is no longer presented as attainable.
+- Rewords the Team Singles session outlook in match points (including halves) and explicitly names the session, rather than implying that only outright match wins count.
+- Allows long Singles matchup names to wrap on the Ryder-style running board instead of truncating them behind ellipses.
+- No database migration. Staging browser verification is required against the weighted 13½-point `Main Test` Cup before Production.
+
 ## 179.3.260902 — Cup schedule contract and live match UX
 
 - Adds migration **0143_competition_schedule_contract.sql**: planned sessions now declare match count and points per match; the locked schedule is the authoritative Cup denominator, with an audited reason-required reopen path and an explicit overall tie rule.

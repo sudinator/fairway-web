@@ -150,8 +150,8 @@ Total: 128 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [x] 0139_nine_hole_round_basis.sql
 - [x] 0140_alt_shot_side_scores.sql
 - [x] 0141_alt_shot_clear_tombstones.sql
-- [ ] 0142_team_competitions.sql
-- [ ] 0143_competition_schedule_contract.sql
+- [x] 0142_team_competitions.sql
+- [x] 0143_competition_schedule_contract.sql
 
 <!-- NOTES:START -->
 
