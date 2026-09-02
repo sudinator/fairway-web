@@ -1,3 +1,11 @@
+## 179.3.260902 — Authoritative Cup schedule (migration 0143)
+
+`competitions.schedule_status` (`draft`/`locked`), lock metadata, revision, and `tie_rule` define whether a Cup has a final scoring contract. `competition_sessions.planned_match_count × points_per_match` is the authoritative denominator even before a child game exists; a halved match splits that value equally. `lock_competition_schedule(...)` validates and freezes the schedule. `reopen_competition_schedule(..., reason)` is organizer/admin-only, requires an explanation, increments the revision, and writes `competition_schedule_events`. While locked, session scoring fields and the tie rule are trigger-protected; linking an already-planned session to its ordinary BNN game remains allowed.
+
+## 179.0.260901 — Team competitions (migration 0142)
+
+`competitions` is the parent Cup/event record: club, name/location/date, two distinct team names, lifecycle status, and creator. `competition_players` snapshots the event roster and stable A/B team membership. `competition_sessions` orders Four-Ball, Alternate Shot, or Team Singles sessions and links each session to one existing `games` row. The linked game remains the authoritative score/pairing/group record; the Cup layer only aggregates its match states. All three tables use RLS: active club members can read; system admins retain oversight outside membership; non-system structural writers must remain active club members. `create_team_competition(...)` atomically creates the parent plus its full roster after validating active membership and both sides. Session-link triggers preserve the same club, supported format, canonical A/B team identities, and Cup-roster/team contract.
+
 ## 178.26.260830 — no schema change
 
 CI/integration-harness-only correction. Migrations 0140 and 0141 are unchanged.

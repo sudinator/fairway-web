@@ -37,6 +37,9 @@ export type GamePayloadOpts = {
   flightsSupported: boolean;
   flightMode: string;                // "off" | "oneoff" | ...
   flightBands: FlightBand[] | null;
+  // Games launched from a Ryder Cup session start with every optional side
+  // contest off. Standalone games omit this flag and keep historical defaults.
+  sideContestsEnabled?: boolean;
 };
 
 // The auto-name label for a game type.
@@ -79,7 +82,7 @@ export function buildGamePayload(o: GamePayloadOpts) {
     trifecta_scoring: o.gameType === "trifecta" ? o.trifectaScoring : null,
     stroke_basis: o.gameType === "stroke" ? o.strokeBasis : null,
     skins_mode: o.gameType === "skins" ? o.skinsMode : null,
-    leg_config: o.gameType === "alt_shot" ? { scheme: "none", metric: "net", points: {} } : undefined,
+    leg_config: o.gameType === "alt_shot" || o.sideContestsEnabled === false ? { scheme: "none", metric: "net", points: {} } : undefined,
     flight_mode: o.flightsSupported ? o.flightMode : "off",
     flights: o.flightMode === "oneoff" && o.flightsSupported ? o.flightBands : null,
   };
@@ -143,17 +146,24 @@ export type PlayerRowsOpts = {
   // TGC-only money-game semantics. Defaults true for backward-compatible pure callers;
   // CreateGame passes the actual effective-group gate explicitly.
   tgcBettingEnabled?: boolean;
+  // Explicit false opts every participant out of optional side contests. This
+  // is used by Ryder Cup session games without changing standalone defaults.
+  sideContestsEnabled?: boolean;
+  // Cup sessions may be organized by a captain who is not playing. Historical Create Game
+  // behavior includes the creator by default; only an explicit false opts out.
+  includeCreator?: boolean;
 };
 
 // The initial game_players rows for creation: creator + selected members + guests, with course
 // handicaps from the shared tee, flight assignment, and the small-field tee-group default.
 export function buildPlayerRows(o: PlayerRowsOpts) {
+  const includeCreator = o.includeCreator !== false;
   const selectedIds = new Set([
-    o.userId,
+    ...(includeCreator ? [o.userId] : []),
     ...Object.keys(o.selectedPlayers).filter((id) => o.selectedPlayers[id]),
   ]);
   const selectedRoster = o.groupRoster.filter((p) => selectedIds.has(p.id));
-  if (!selectedRoster.some((p) => p.id === o.userId)) {
+  if (includeCreator && !selectedRoster.some((p) => p.id === o.userId)) {
     selectedRoster.unshift({
       id: o.userId,
       display_name: o.displayName,
@@ -178,7 +188,7 @@ export function buildPlayerRows(o: PlayerRowsOpts) {
       game_id: o.gameId,
       user_id: p.id,
       is_guest: false,
-      bets: true, // members default into the TGC money game (never rely on the DB default)
+      bets: o.sideContestsEnabled === false ? false : true, // Ryder Cup sessions start side contests off; standalone members retain the historical default.
       ...GP_STATE_DEFAULTS,
       display_name: p.display_name || "Player",
       avatar_url: (p as any).avatar_url ?? null,
@@ -206,7 +216,7 @@ export function buildPlayerRows(o: PlayerRowsOpts) {
     user_id: null,
     is_guest: true,
     guest_of: p.guest_of || null,
-    bets: o.tgcBettingEnabled === false ? true : false,
+    bets: o.sideContestsEnabled === false ? false : (o.tgcBettingEnabled === false ? true : false),
     ...GP_STATE_DEFAULTS,
     display_name: p.display_name,
     handicap_index: p.handicap_index,

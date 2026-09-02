@@ -28,6 +28,9 @@ jobs:
       BNN_PRODUCTION_SUPABASE_PROJECT_REF: epmbsmykyrnoiccwnoxq
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.BNN_STAGING_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.BNN_STAGING_SUPABASE_ANON_KEY }}
+      # Same non-secret public-key input as the normal CI workflow. This keeps the
+      # prebuild drift check active; do not use VAPID_CHECK_OPTIONAL in GitHub.
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${{ vars.NEXT_PUBLIC_VAPID_PUBLIC_KEY || 'BPosOVuEyjpY3zfcnhq_LP__z1IEs2_sgNPg9JNYG38_n54R5wpGgRx4cyq-lr5w9_UIdMC0Fn2bIocDJj9H0fc' }}
 
     steps:
       - uses: actions/checkout@v4

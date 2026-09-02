@@ -1,5 +1,25 @@
 # Refactor test plan — verifying component moves (Stage 1b: OrganizerPanel, BettingPanel, GroupScorecard, GroupsBuilder)
 
+## 179.7 Staging-integration workflow corrective
+
+Use `RELEASE_VERIFICATION_179.7.md`. Confirm the manual workflow provides the public VAPID key through the same fallback contract as normal CI and does not set the local-only bypass. Rerun the workflow on `staging` with mutation confirmation `YES`; it must pass the build and reach the real Staging-only integration harness. No application or database behavior changes.
+
+## 179.6 complete-overlay corrective gate
+
+Use `RELEASE_VERIFICATION_179.6.md`. Confirm the Vercel build resolves the v179.5 missing-export failure, then rerun the complete v179.4 weighted-outcome checks and v179.5 naming/quiet-default checks. The corrective package must include `lib/competition.ts`, `lib/competition.test.ts`, and `components/game/scoring-views.tsx`. No database migration is added.
+
+## 179.5 Ryder Cup naming and quiet-default targeted gate
+
+Use `RELEASE_VERIFICATION_179.5.md`. Confirm every user-facing Cups surface now reads Ryder Cup, the Games selector explains Game versus Ryder Cup, and a newly created Ryder Cup Four-Ball, Alternate Shot, and Singles session starts with Group Results and money participation off. Standalone Games must retain their historical defaults. No database migration is added.
+
+## 179.4 weighted Cup outcome targeted gate
+
+Use `RELEASE_VERIFICATION_179.4.md` against the locked 13½-point `Main Test` schedule before completing its final three Singles matches. Blocking coverage includes quarter-fraction display, share-only detection, attainable points-needed copy, Team Singles match-point wording, and long-name wrapping. No database migration is added.
+
+## 179.3 Cup schedule/scoring targeted gate
+
+Use `RELEASE_VERIFICATION_179.3.md` after migration 0143 is applied. Blocking coverage includes locked-denominator arithmetic, reason-required audited reopen, RLS/RPC authorization, live-versus-final match completion, first mathematical close-out, points-needed/clinch state, planned-session game linking, Cup navigation, and next-incomplete setup routing. Existing Match/Four-Ball/Alternate Shot engine suites remain unchanged and must stay green.
+
 The leaf moves so far were low-risk enough that "did it build?" was the whole test. These four are a step
 up: they're still top-level components coupled only through typed props (no shared scope), BUT they perform
 ~23 Supabase writes between them (posting/unposting bets, setting/randomizing tee groups, claiming/releasing

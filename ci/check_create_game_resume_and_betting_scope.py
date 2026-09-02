@@ -15,7 +15,8 @@ checks = [
     ("draft stores handicap overrides", 'hcpOverrides?: Record<string, number>;' in setup),
     ("leader no-bet label is capability gated", 'showBetStatus && p.bets === false' in leader),
     ("create path passes TGC capability", 'tgcBettingEnabled: effectiveGroupId(activeGroupId) === TGC_GROUP_ID' in tour),
-    ("non-TGC guest row defaults neutral", 'bets: o.tgcBettingEnabled === false ? true : false' in create),
+    ("non-TGC guest row defaults neutral outside Ryder Cup sessions", 'o.sideContestsEnabled === false ? false : (o.tgcBettingEnabled === false ? true : false)' in create),
+    ("Ryder Cup creation explicitly disables participant side contests", 'sideContestsEnabled: !seed?.competitionSession' in tour and tour.count('sideContestsEnabled: !seed?.competitionSession') == 2),
     ("in-game guest betting is TGC gated", 'bets: effectiveGroupId(game.group_id) === TGC_GROUP_ID ? false : true' in tour),
 ]
 failed=[n for n,ok in checks if not ok]

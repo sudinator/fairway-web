@@ -47,7 +47,7 @@ import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, altShotSides } from "@
 import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { canonicalAltShotGross, type AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import { decideSetupChange, type SetupAction } from "@/lib/game-setup-policy";
-import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
+import { balancedOneVOne, randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
 import type { LegConfig, Leg } from "@/lib/legs";
@@ -136,7 +136,7 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
   };
   const ORANGE = "#E8730C";
 
-  if (mode === "setup") {
+  if (String(mode) === "setup") {
     if (isTeamBestBallSkins) {
       return (
         <div style={{ marginTop: 18 }}>
@@ -359,6 +359,109 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
 }
 
 
+type MatchDraft = { a: string; b: string };
+
+function MatchSetupBuilder({ game, players, teams, blocked, blockedReason, onSave }: {
+  game: Game;
+  players: Player[];
+  teams: { key: string; name: string }[] | null;
+  blocked: boolean;
+  blockedReason?: string;
+  onSave: (pairings: MatchDraft[]) => Promise<void>;
+}) {
+  const isTeam = !!(teams && teams.length === 2);
+  const activePlayers = players.filter((p) => !p.no_show);
+  const desiredRows = isTeam
+    ? Math.max(...teams!.map((t) => activePlayers.filter((p) => p.team === t.key).length), 1)
+    : Math.max(1, Math.ceil(activePlayers.length / 2));
+  const pad = (pairings: MatchDraft[]) => [
+    ...pairings.map((pair) => ({ ...pair })),
+    ...Array.from({ length: Math.max(0, desiredRows - pairings.length) }, () => ({ a: "", b: "" })),
+  ];
+  const pairingSignature = JSON.stringify(game.pairings || []);
+  const [drafts, setDrafts] = useState<MatchDraft[]>(() => pad(game.pairings || []));
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setDrafts(pad(game.pairings || [])), [pairingSignature, desiredRows]);
+
+  const playerByKey = (key: string) => players.find((p) => pkey(p) === key) || null;
+  const playingHandicap = (p: Player) => applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100);
+  const optionLabel = (p: Player) => `${p.display_name} · PH ${playingHandicap(p)}`;
+  const used = new Set(drafts.flatMap((pair) => [pair.a, pair.b]).filter(Boolean));
+  const unassigned = activePlayers.filter((p) => !used.has(pkey(p)));
+  const readyCount = drafts.filter((pair) => pair.a && pair.b && pair.a !== pair.b).length;
+
+  const choicesFor = (side: "a" | "b", row: number) => {
+    const current = drafts[row]?.[side] || "";
+    const opponent = drafts[row]?.[side === "a" ? "b" : "a"] || "";
+    const teamKey = isTeam ? teams![side === "a" ? 0 : 1].key : null;
+    return activePlayers.filter((p) => {
+      const key = pkey(p);
+      return (!teamKey || p.team === teamKey) && key !== opponent && (!used.has(key) || key === current);
+    }).sort((a, b) => a.display_name.localeCompare(b.display_name));
+  };
+
+  const persist = async (next: MatchDraft[]) => {
+    const complete = next.filter((pair) => pair.a && pair.b && pair.a !== pair.b);
+    setBusy(true);
+    try { await onSave(complete); } finally { setBusy(false); }
+  };
+  const setSlot = (row: number, side: "a" | "b", value: string) => {
+    const next = drafts.map((pair, index) => index === row ? { ...pair, [side]: value } : pair);
+    setDrafts(next);
+    void persist(next);
+  };
+  const buildBalanced = () => {
+    const result = balancedOneVOne(
+      activePlayers.map((p) => ({ id: pkey(p), team: p.team, playingHandicap: playingHandicap(p) })),
+      isTeam ? [teams![0].key, teams![1].key] : undefined,
+    );
+    const next = pad(result.pairings);
+    setDrafts(next);
+    void persist(next);
+  };
+
+  return (
+    <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 18 }}>
+      <Eyebrow>MATCHUPS · BUILD EACH MATCH</Eyebrow>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.45 }}>
+        {isTeam ? `Pair one ${teams![0].name} player against one ${teams![1].name} player.` : "Pair players into individual 1-v-1 matches."} A selected player is removed from every other dropdown.
+      </div>
+      {blocked && blockedReason ? <div style={{ background: C.green, border: `1px solid ${C.birdie}`, borderRadius: 10, padding: "8px 12px", color: C.cream, fontSize: 11.5, lineHeight: 1.45, marginTop: 10 }}>{blockedReason}</div> : null}
+
+      <div style={{ marginTop: 12, padding: "8px 12px", borderTop: `1px solid ${C.borderGreen}`, borderBottom: `1px solid ${C.borderGreen}` }}>
+        <div style={{ color: C.cream, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>UNASSIGNED PLAYERS</div>
+        {isTeam ? teams!.map((team, index) => {
+          const rows = unassigned.filter((p) => p.team === team.key);
+          return <div key={team.key} style={{ marginTop: 6, color: C.sage, fontSize: 11.5, lineHeight: 1.4 }}><span style={{ color: teamAccent(team.name, index), fontWeight: 800 }}>{team.name}:</span> {rows.length ? rows.map(optionLabel).join(", ") : "None"}</div>;
+        }) : <div style={{ marginTop: 6, color: C.sage, fontSize: 11.5, lineHeight: 1.4 }}>{unassigned.length ? unassigned.map(optionLabel).join(", ") : "None"}</div>}
+      </div>
+
+      <button onClick={buildBalanced} disabled={blocked || busy} style={{ ...btn(true), width: "100%", marginTop: 12, fontSize: 13, opacity: blocked || busy ? .58 : 1 }}>{busy ? "Saving…" : "🎲 Build balanced matches"}</button>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, color: C.sage, fontSize: 11, marginTop: 12 }}><b style={{ color: C.cream }}>{readyCount} of {desiredRows} matches ready</b><span>{activePlayers.length} players</span></div>
+
+      {drafts.map((pair, row) => {
+        const ready = !!(pair.a && pair.b && pair.a !== pair.b);
+        return <div key={row} style={{ background: C.greenMid, borderRadius: 12, padding: 12, marginTop: 10, border: `1px solid ${ready ? C.gold : C.borderGreen}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ color: C.cream, fontSize: 15, fontWeight: 800 }}>Match {row + 1}</div><div style={{ marginLeft: "auto", color: ready ? "#FFE08A" : C.sage, fontSize: 11, fontWeight: 800 }}>{ready ? "✓ READY · 1 v 1" : "NEEDS PLAYERS"}</div></div>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 24px minmax(0,1fr)", gap: 7, alignItems: "center", marginTop: 10 }}>
+            {(["a", "b"] as const).map((side, sideIndex) => <React.Fragment key={side}>
+              {sideIndex === 1 ? <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, textAlign: "center" }}>VS</div> : null}
+              <label style={{ minWidth: 0 }}>
+                <span style={{ display: "block", color: isTeam ? teamAccent(teams![sideIndex].name, sideIndex) : C.sage, fontSize: 11, fontWeight: 800, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isTeam ? teams![sideIndex].name : `Player ${sideIndex + 1}`}</span>
+                <select aria-label={`Match ${row + 1} player ${sideIndex + 1}`} value={pair[side]} disabled={blocked || busy} onChange={(e) => setSlot(row, side, e.target.value)} style={{ ...inputStyle, width: "100%", minWidth: 0, padding: "8px 12px", fontSize: 11.5 }}>
+                  <option value="">Select player…</option>
+                  {choicesFor(side, row).map((p) => <option key={pkey(p)} value={pkey(p)}>{optionLabel(p)}</option>)}
+                </select>
+              </label>
+            </React.Fragment>)}
+          </div>
+          {ready ? <div style={{ color: C.sage, fontSize: 11, marginTop: 7 }}>{playerByKey(pair.a)?.display_name} vs {playerByKey(pair.b)?.display_name}</div> : null}
+        </div>;
+      })}
+    </div>
+  );
+}
+
 export function MatchView({
   game,
   players,
@@ -426,6 +529,22 @@ export function MatchView({
   const teamB = teams && teams[1] ? teams[1] : null;
   const useTeamPick = !!(teamA && teamB);
 
+  if (mode === "setup") {
+    return <MatchSetupBuilder
+      game={game}
+      players={players}
+      teams={useTeamPick ? teams : null}
+      blocked={!isCreator || matchupsBlocked}
+      blockedReason={matchupDecision.decision === "block" ? matchupDecision.reason : undefined}
+      onSave={async (pairings) => {
+        if (!allowSetupMutation({ type: "set_pairings" })) return;
+        const { error } = await supabase.from("games").update({ pairings }).eq("id", game.id);
+        if (error) { notifyError("Couldn't save those matchups — please try again."); return; }
+        onChanged();
+      }}
+    />;
+  }
+
   const assignTeam = async (p: Player, key: string | null) => {
     if (!allowSetupMutation({ type: "set_team", player: p, team: key })) return;
     await supabase.from("game_players").update({ team: key }).eq("id", p.id);
@@ -491,9 +610,9 @@ export function MatchView({
 
       {/* Team assignments now live in Organizer · Manage Game so each player is configured once. */}
       <div style={{ display: "flex", alignItems: "center" }}>
-        <Eyebrow>{mode === "setup" ? "SET MATCHUPS" : "MATCHES"}</Eyebrow>
+        <Eyebrow>{String(mode) === "setup" ? "SET MATCHUPS" : "MATCHES"}</Eyebrow>
         <div style={{ flex: 1 }} />
-        {mode === "setup" && isCreator && (
+        {String(mode) === "setup" && isCreator && (
           <button
             style={{ ...btn(false), fontSize: 12, opacity: matchupsBlocked ? 0.55 : 1 }}
             disabled={matchupsBlocked}
@@ -505,13 +624,13 @@ export function MatchView({
         )}
       </div>
 
-      {mode === "setup" && isCreator && matchupsBlocked && matchupDecision.decision === "block" && (
+      {String(mode) === "setup" && isCreator && matchupsBlocked && matchupDecision.decision === "block" && (
         <div style={{ background: "#4a1d16", border: `1px solid ${C.birdie}`, borderRadius: 10, padding: "9px 11px", color: "#f0c5bd", fontSize: 11.5, lineHeight: 1.45, marginTop: 10 }}>
           {matchupDecision.reason}
         </div>
       )}
 
-      {mode === "setup" && editing && isCreator && (
+      {String(mode) === "setup" && editing && isCreator && (
         <div
           style={{
             background: C.greenLight,
@@ -680,7 +799,7 @@ export function MatchView({
                 <button type="button" onClick={toggleProgress} aria-expanded={openProgress === idx} style={{ minWidth: 0, minHeight: 64, background: "none", border: "none", padding: "8px 12px", textAlign: "left", cursor: "pointer", color: C.cream }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
                     <Avatar src={pa.avatar_url} name={pa.display_name} size={24} />
-                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 14, fontWeight: 800 }}>{pa.display_name}</span>
+                    <span style={{ minWidth: 0, overflowWrap: "anywhere", lineHeight: 1.2, fontSize: 14, fontWeight: 800 }}>{pa.display_name}</span>
                   </div>
                   {leftStatus ? <div style={{ marginTop: 5, color: teamAccent(teams[0].name, 0), fontSize: 14, fontWeight: 800 }}>{leftStatus}</div> : null}
                   <div style={{ marginTop: 4, color: C.gold, fontSize: 11, fontWeight: 700 }}>Details ›</div>
@@ -693,7 +812,7 @@ export function MatchView({
 
                 <button type="button" onClick={toggleProgress} aria-expanded={openProgress === idx} style={{ minWidth: 0, minHeight: 64, background: "none", border: "none", padding: "8px 12px", textAlign: "right", cursor: "pointer", color: C.cream }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 7, minWidth: 0 }}>
-                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 14, fontWeight: 800 }}>{pb.display_name}</span>
+                    <span style={{ minWidth: 0, overflowWrap: "anywhere", lineHeight: 1.2, fontSize: 14, fontWeight: 800 }}>{pb.display_name}</span>
                     <Avatar src={pb.avatar_url} name={pb.display_name} size={24} />
                   </div>
                   {rightStatus ? <div style={{ marginTop: 5, color: teamAccent(teams[1].name, 1), fontSize: 14, fontWeight: 800 }}>{rightStatus}</div> : null}
@@ -924,6 +1043,9 @@ export function TeamClinchLine({ aPts, bPts, unclaimed, aName, bName, metric, sh
   const leadName = cs.leader === "A" ? aName : cs.leader === "B" ? bName : null;
   const hi = Math.max(aPts, bPts), lo = Math.min(aPts, bPts);
   const f = (n: number) => (n === Math.floor(n) ? String(n) : `${Math.floor(n)}½`);
+  const totalPool = aPts + bPts + unclaimed;
+  const outrightTarget = Math.floor((totalPool / 2) * 2 + 1e-9) / 2 + 0.5;
+  const matchPointsNeeded = Math.max(0, outrightTarget - hi);
   const noun = (n: number) => metric === "matches" ? `match${n === 1 ? "" : "es"}` : metric === "skins" ? `skin${n === 1 ? "" : "s"}` : `point${n === 1 ? "" : "s"}`;
   const tail = metric === "matches" ? "still out" : metric === "skins" ? "still in play" : "unclaimed";
   return (
@@ -940,7 +1062,11 @@ export function TeamClinchLine({ aPts, bPts, unclaimed, aName, bName, metric, sh
         </div>
       )}
       {showBanner && !cs.clinched && !cs.canTie && !cs.decided && leadName && (
-        <div style={{ color: C.gold, fontSize: 12, fontWeight: 700, textAlign: "center", marginTop: 6 }}>{leadName} wins it with {cs.needToClinch} more {noun(cs.needToClinch)}</div>
+        <div style={{ color: C.gold, fontSize: 12, fontWeight: 700, textAlign: "center", marginTop: 6 }}>
+          {metric === "matches"
+            ? `${leadName} needs ${f(matchPointsNeeded)} match ${matchPointsNeeded <= 1 + 1e-9 ? "point" : "points"} to win this session`
+            : `${leadName} wins it with ${cs.needToClinch} more ${noun(cs.needToClinch)}`}
+        </div>
       )}
     </>
   );
@@ -1269,9 +1395,10 @@ export function FourballView({
         const myKey = players.find((p) => p.user_id === user.id)?.user_id ?? user.id;
         const mine = f.a.includes(myKey) || f.b.includes(myKey);
         const lead = st?.lead ?? 0;
-        const leadText = !st || st.thru === 0 ? "" : lead === 0 ? "All square" : isAltShot
-          ? `${isTeam ? teamName(playerOf(lead > 0 ? f.a[0] : f.b[0])?.team) : (lead > 0 ? "Pair 1" : "Pair 2")} ${Math.abs(lead)} UP`
-          : `${firstName(lead > 0 ? f.a[0] : f.b[0])}'s pair ${Math.abs(lead)} UP`;
+        const leadText = !st || st.thru === 0 ? "" : lead === 0 ? "All square" : isTeam
+          ? `${teamName(playerOf(lead > 0 ? f.a[0] : f.b[0])?.team)} ${Math.abs(lead)} UP`
+          : `${isAltShot ? (lead > 0 ? "Pair 1" : "Pair 2") : `${firstName(lead > 0 ? f.a[0] : f.b[0])}'s pair`} ${Math.abs(lead)} UP`;
+        const matchDecided = !!st && st.thru > 0 && (st.thru === game.holes_meta.length || Math.abs(st.lead) > game.holes_meta.length - st.thru);
         const tri = isTrifecta && full ? computeTrifecta(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap, triScoring) : null;
         // Match scoring (Ryder Cup): show the LIVE provisional match tally (who currently
         // leads each contest) rather than 0–0 until matches settle.
@@ -1283,7 +1410,7 @@ export function FourballView({
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
               <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{f.name}{mine ? " · your match" : ""}</div>
               <div style={{ flex: 1 }} />
-              <div style={{ color: C.cream, fontWeight: 800, fontSize: 14, fontFamily: "Georgia, serif" }}>{isTrifecta ? (tri ? `${fmtPts(triTally ? triTally.a : tri.aPts)}–${fmtPts(triTally ? triTally.b : tri.bPts)}` : "—") : st ? st.result : "—"}</div>
+              <div style={{ color: C.cream, fontWeight: 800, fontSize: 14, fontFamily: "Georgia, serif" }}>{isTrifecta ? (tri ? `${fmtPts(triTally ? triTally.a : tri.aPts)}–${fmtPts(triTally ? triTally.b : tri.bPts)}` : "—") : !st || st.thru === 0 ? "Not started" : matchDecided ? st.result : "Live"}</div>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>

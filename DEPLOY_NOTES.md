@@ -1,3 +1,73 @@
+## 179.7.260902 — Staging integration VAPID wiring
+
+- Supplies `NEXT_PUBLIC_VAPID_PUBLIC_KEY` to the manual Staging integration workflow using the same repository-variable-or-committed-public-key contract as normal CI.
+- Keeps the VAPID drift check active in GitHub; the workflow does not use the local-only `VAPID_CHECK_OPTIONAL` bypass.
+- Extends the permanent VAPID source guard to cover the manual Staging integration workflow and reject any GitHub-side bypass.
+- Corrects only GitHub workflow configuration. No application, scoring, database, migration, Vercel, or Production behavior changes.
+
+## 179.6.260902 — Complete incremental Ryder Cup overlay
+
+- Corrects the v179.5 changed-files package dependency on three v179.4 runtime files that were not present in a repository updated directly from v179.3.
+- Restores `lib/competition.ts` and its tests so `competitionOutcome` is exported for the v179.5 Cup summary, resolving the Vercel missing-export build failure.
+- Restores the v179.4 Singles running-board refinement in `components/game/scoring-views.tsx` so match-point wording and long-name wrapping ship with the promoted candidate.
+- No new application behavior beyond the already reviewed v179.4 and v179.5 changes. No database migration; migration 0143 remains the latest required schema change.
+
+## 179.5.260902 — Ryder Cup naming and side-contest defaults
+
+- Renames the user-facing multi-session team competition from **Cup** to **Ryder Cup** while retaining the existing `competitions` schema, RPCs, links, and score aggregation.
+- Adds a compact Games-screen explanation: a Game is one round/format/scorecard; a Ryder Cup combines several team sessions into one overall match score.
+- Games created from a Ryder Cup session now explicitly start with Group Results off and every participant opted out of the money side game. Closest-to-pin, longest-drive, and straightest-drive contests remain off because no contest rows are created by default.
+- Standalone Games preserve their existing defaults. Organizers may enable any optional contest after creating the Ryder Cup session game.
+- No database migration. Existing migration 0143 remains the latest required schema change.
+
+## 179.4.260902 — Cup outcome-path clarity
+
+- Formats quarter-point Cup values with golf fractions (`¼`, `¾`, `6¾`) instead of mixing decimal and fractional notation.
+- Uses the locked denominator and secured score to distinguish an outright winning path from a share-only path; an unreachable “points needed” target is no longer presented as attainable.
+- Rewords the Team Singles session outlook in match points (including halves) and explicitly names the session, rather than implying that only outright match wins count.
+- Allows long Singles matchup names to wrap on the Ryder-style running board instead of truncating them behind ellipses.
+- No database migration. Staging browser verification is required against the weighted 13½-point `Main Test` Cup before Production.
+
+## 179.3.260902 — Cup schedule contract and live match UX
+
+- Adds migration **0143_competition_schedule_contract.sql**: planned sessions now declare match count and points per match; the locked schedule is the authoritative Cup denominator, with an audited reason-required reopen path and an explicit overall tie rule.
+- Cup standings show secured points, total scheduled points, points each team still needs, and an early clinch state. Unlocked legacy Cups are clearly labeled provisional rather than being declared won from a mutable list of games.
+- Fixes Four-Ball / Alternate Shot running matches being counted complete, and freezes Cup match results at the first mathematical close-out (for example `5 & 3`) without altering the established game scoring engines or stored hole scores.
+- Improves session rows for long names and winner identity, uses `Halved` for completed level matches, removes duplicate running status, and labels Four-Ball handicap dots as Four-Ball rather than Trifecta.
+- Adds a linked-game shortcut back to Cup standings, opens Cup game setup at the next incomplete Matchups/Groups tab, and keeps the weekly profile nudge on Home instead of pushing the Cup screen below the fold.
+- Staging-only candidate: apply/verify 0143, run real Staging integration, then execute `RELEASE_VERIFICATION_179.3.md` before Production.
+
+## 179.2.260902 — Competitive group and Singles assignment builder
+
+- Replaces the player-by-player Four-Ball / Alternate Shot group editor with match-first group cards showing two named-team slots per side, visible playing handicaps, and an explicit 2-v-2 readiness state.
+- Keeps unassigned players above the group cards so organizers do not need to scroll to find the remaining field.
+- Removes an assigned player from every other dropdown while retaining that player in the current slot; slot replacement persists through the existing batch tee-group RPC and immediately re-derives the existing team foursomes.
+- Makes **Build balanced groups** team-aware: it creates only complete 2-v-2 groups and leaves odd or imbalanced players visibly unassigned rather than producing an invalid match.
+- Adds the same match-first assignment pattern to standalone Singles and Ryder Cup Team Singles, with team-restricted sides, one opponent per player, playing handicaps, and balanced matchup generation.
+- Preserves the existing Match, Four-Ball, and Alternate Shot scoring engines and all downstream result aggregation. No database migration.
+
+## 179.1.260901 — Restore omitted Cup Create Game contract files
+
+- CI-only/package correction after the first 179.0 staging bundle omitted `lib/game-create.ts` and `lib/game-create.test.ts` even though `components/tournaments.tsx` already used the new `includeCreator` option. GitHub therefore correctly failed TypeScript with TS2353.
+- Restores the intended shared Create Game contract: Cup organizers may create a session without automatically being inserted as a player, while ordinary Create Game continues to include the creator by default.
+- Adds a permanent competition source guard requiring the caller and shared `PlayerRowsOpts` contract to remain in sync.
+- No database change; staging migration 0142 remains unchanged and already applied.
+
+## 179.0.260901 — Ryder Cup-style multi-session team competitions
+
+- Adds a new **Cups** surface inside Games without changing BNN's primary bottom navigation.
+- A Cup has two persistent club teams and a fixed roster; team names/assignments seed every child session.
+- Sessions reuse existing BNN scoring engines rather than creating a new one: Four-Ball, Alternate Shot, and Team Singles Match are ordinary linked games.
+- Creating a session opens the standard Create Game flow with the Cup roster, team names, format, and date prefilled; course/tees/session participants remain selected through the existing setup UI.
+- Child player rows inherit their Cup team key so existing Teams/Groups/Matchups screens are already populated correctly.
+- The Cup home aggregates live projected points and decided points across linked games; each session shows its own running score and compact match rows.
+- Alternate Shot aggregation reads the canonical 0140/0141 side-score store with legacy fallback; Four-Ball and Singles reuse the existing `fourballStatus` and `matchStatus` math.
+- Adds migration **0142_team_competitions.sql** for `competitions`, `competition_players`, and `competition_sessions`, all RLS-protected and club-scoped.
+- Cup creation is transactional through `create_team_competition(...)`: parent + full roster succeed together or roll back together; the server validates active club membership, distinct team names, and at least one player on each side.
+- Linked child games are constrained to the Cup's same club, supported format, canonical A/B team identities, registered Cup roster, and persistent team assignments. Roster/team identity locks after the first session link while ordinary scoring/pairing/group setup remains owned by the existing game infrastructure.
+- System-admin access remains distinct from club-admin access: system admins retain Cup read/write oversight even without club membership; non-system organizers must remain active club members to mutate Cup structure.
+- This is a staging candidate only until migration 0142 is applied/verified in Staging, GitHub CI/build pass, the real Staging integration gate passes, and targeted Cup browser scenarios pass.
+
 ## 178.26.260830 — Staging integration reset-count fix
 
 - **NO migration.** Fixes the PR-only real Staging integration harness after the Alternate Shot reset test crashed after 60 successful checks.

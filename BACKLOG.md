@@ -1,3 +1,76 @@
+## v179.7 Staging integration workflow corrective
+
+- [x] Identify the manual workflow failure: `npm run ci:staging` reached prebuild without `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.
+- [x] Give the manual workflow the same public-key variable/fallback contract as normal CI while retaining the mandatory drift check.
+- [x] Extend the VAPID source guard so this workflow wiring cannot silently regress.
+- [ ] Push to `staging` and rerun **Staging integration** with confirmation `YES`; the complete workflow must be green before Production promotion.
+
+## v179.6 complete-overlay corrective
+
+- [x] Identify the v179.5 Vercel failure as an incremental-package mismatch: v179.5 `components/competitions.tsx` imported the v179.4 `competitionOutcome` helper while the deployed repository still contained v179.3 `lib/competition.ts`.
+- [x] Include all omitted v179.4 runtime dependencies: `lib/competition.ts`, `lib/competition.test.ts`, and `components/game/scoring-views.tsx`.
+- [ ] Vercel Staging build must be Ready and the combined v179.4/v179.5 browser verification must pass before Production promotion.
+
+## v179.5 Ryder Cup naming and quiet session defaults
+
+- [x] Rename the user-facing Cups surface and related setup/result copy to Ryder Cup.
+- [x] Explain Game versus Ryder Cup directly below the Games/Ryder Cups selector.
+- [x] Default Ryder Cup session games to Group Results off and money-game participation off for every participant.
+- [x] Preserve standalone Game defaults and keep optional hole contests absent until explicitly added.
+- [ ] Deploy to Staging and verify a newly created Four-Ball, Alternate Shot, and Singles session each reports Side games: None before any organizer opt-in.
+- [ ] Product/legal follow-up: confirm permission to use the third-party “Ryder Cup” name in production branding.
+
+## v179.4 weighted Cup outcome clarity
+
+- [x] Format quarter-point totals and requirements with golf fractions instead of decimal notation.
+- [x] Distinguish “can win” from “can only share” using secured points and the locked remaining pool.
+- [x] State Team Singles requirements in match points, including halves, and name the session explicitly.
+- [x] Wrap long player names on the Ryder-style Singles running board.
+- [ ] Deploy to Staging and verify the live 13½-point `Main Test` state before completing the final three matches.
+
+## v179.3 Cup schedule and scoring refinement
+
+- [x] Make the planned Cup schedule the locked source of truth for total points.
+- [x] Configure matches and points per match for each Four-Ball, Alternate Shot, and Singles session.
+- [x] Configure the overall tied-Cup rule; audit any schedule reopen with a required reason.
+- [x] Show secured points, points needed, and an early Cup-clinch state.
+- [x] Stop counting live Four-Ball / Alternate Shot matches as complete.
+- [x] Preserve the first mathematical close-out result in Cup aggregation.
+- [x] Show winning player/pair identity, `Halved`, and long names in Cup session rows.
+- [x] Link Cup games back to Cup standings and route setup to the next incomplete tab.
+- [x] Correct the Four-Ball score-entry legend and keep the profile nudge off the Games/Cups workspace.
+- [x] Apply and verify migration 0143 on Staging (9/9 structural checks; legacy schedule backfill confirmed at 3/3/6).
+- [ ] Run GitHub CI, real Staging integration, and `RELEASE_VERIFICATION_179.3.md` browser scenarios.
+- [ ] Separate follow-up: investigate Berkshire Valley source payload and expand course freshness integrity checks to par, stroke index, and yardage plausibility.
+
+## v179.2 competitive assignment UX
+
+- [x] Show unassigned players above Four-Ball / Alternate Shot group cards.
+- [x] Show named team sides and playing handicaps in each group slot.
+- [x] Remove an assigned player from all other group dropdowns while retaining the current selection.
+- [x] Build only valid 2-v-2 balanced team groups; leave incomplete-team leftovers unassigned.
+- [x] Apply the same one-use assignment model to standalone and team Singles match play.
+- [x] Preserve existing scoring engines and Cup aggregation.
+- [ ] Deploy to Staging and run the real 12-player browser acceptance scenarios in `RELEASE_VERIFICATION_179.2.md`.
+
+## v179.1 staging correction
+- [x] Restore omitted Cup `buildPlayerRows(includeCreator)` shared contract/test in the staging package; add source guard. No migration.
+
+## 179.0.260901 — Ryder Cup-style team competition
+
+- [x] Add Cup parent + persistent two-team roster model.
+- [x] Add Four-Ball / Alternate Shot / Team Singles sessions linked to ordinary BNN games.
+- [x] Seed child Create Game with Cup date, format, roster, team names and team assignments.
+- [x] Aggregate live projected and decided match points across sessions.
+- [x] Reuse canonical Alternate Shot side scores and existing Four-Ball/Singles scoring engines.
+- [x] Keep the new feature inside Games (`Games | Cups`) so the established bottom navigation does not change.
+- [ ] Apply and verify migration 0142 on Staging.
+- [ ] GitHub dependency-backed CI/type/test/build green.
+- [ ] Vercel Staging Ready.
+- [ ] Real Staging integration gate green.
+- [ ] Browser acceptance: create Cup, roster teams, create each session type, finish/halve matches, live aggregate updates, re-entry/reload, invalid/partial session setup, adjacent ordinary Games workflow.
+- [ ] Only after all gates: staging → main PR, Production migration parity, Production smoke, then main → staging sync.
+
 ## 178.26.260830 release-candidate hardening
 
 - [x] Fix PR-only Staging integration crash when verifying Alternate Shot reset count; preserve full Supabase head/count response and permanently guard the contract. No app/database behavior change.

@@ -1,3 +1,25 @@
+## 179.7.260902 staging corrective — integration VAPID wiring
+
+The multi-session team competition is now called **Ryder Cup** throughout the interface. The Games screen explains the difference between a one-round Game and a multi-session Ryder Cup. Games launched from a Ryder Cup session begin with Group Results, money-game participation, and hole contests off; organizers can opt into them afterward. No migration is required beyond 0143.
+
+## 179.4.260902 staging candidate — weighted Cup outcome clarity
+
+Weighted Cup standings now use golf-style quarter fractions, identify when a team can only share rather than win outright, and state Team Singles clinch requirements in match points. Long Singles matchup names wrap on the running board. No migration is required beyond 0143.
+
+## 179.3.260902 staging candidate — Cup schedule and clinch contract
+
+Cups now plan every session before play: match count, points per match, halved-match split, and the overall tied-Cup rule produce a locked total-points denominator. Standings distinguish projected from secured points, show what each side needs, and declare a clinch only against that locked schedule. Migration `0143_competition_schedule_contract.sql` is required before Staging browser validation.
+
+## 179.1.260901 — Cup staging package correction
+
+The 179.0 staging package omitted the updated shared `lib/game-create.ts` contract. 179.1 restores that file plus its test and adds a guard so Cup session organizer opt-out cannot drift from `tournaments.tsx`. No database change.
+
+## 179.0.260901 staging candidate — Ryder Cup-style Cups
+Cup creation is atomic at the database boundary: the event and its persistent A/B roster are created together, with active-club membership and team identity validated before commit.
+
+
+BNN can now organize a multi-session two-team Cup inside the Games area. A Cup keeps a persistent roster/team assignment, launches ordinary Four-Ball / Alternate Shot / Team Singles games as sessions, and aggregates their live and decided match points into one event score. Migration `0142_team_competitions.sql` is required in Staging before browser validation; this candidate is not Production-deployable until the full release gate passes.
+
 ## 178.26.260830 — Staging integration reset-count fix
 
 - **NO migration.** Fixes the PR-only real Staging integration harness after the Alternate Shot reset test crashed after 60 successful checks.
@@ -13,15 +35,6 @@
 - `ci/check_live_migration_parity.mjs` now accepts either a Supabase project base URL or a copied `/rest/v1` endpoint, canonicalizes it to the project origin, strips query/hash fragments, and rejects unrelated paths with a precise configuration error. This prevents accidental `/rest/v1/rest/v1/...` requests while preserving the same service-role authentication and ledger comparison.
 - The migration-parity source contract now permanently requires URL canonicalization and canonical REST endpoint construction.
 - No application behavior, scoring logic, database schema, or migration file changed. Production 0140/0141 remain byte-identical to staging.
-
-**Current staging candidate:** 178.24.260830 — approved Ryder Cup-style Team Individual Match results: Team A left, THRU/AS centered, Team B right, leader-only UP status, Details opens the net-score progression. Migrations 0140–0141 remain required.
-
-**Prior release:** 178.18.260829 — Environment-contract correction documenting the migration-ledger test fixture; no application, scoring, or database change.
-
-**Current staging candidate:** 178.17.260829 — React hook-order correction for the Alternate Shot side-game suppression plus a permanent pre-lint source guard; no scoring or database change.
-**Current staging candidate:** 178.14.260829 — Alternate Shot score entry is team-based (one ball/one side score), team playing handicap is shown/applied, and individual side-game/personal-card surfaces are suppressed.
-
-**Current staging candidate:** 178.13.260829 — no scoring behavior change from 178.12; updates the CI assertion baseline for the expanded Alternate Shot test suites.
 
 # Fairway Card — Web App
 

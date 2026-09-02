@@ -26,7 +26,7 @@ check('save_alt_shot_side_score' in tourn, 'live Alternate Shot scoring writes t
 check('canonicalAltShotGross' in scorecard and 'canonicalAltShotGross' in scoring, 'scorecard and results read canonical side-owned scores')
 check('game_alt_shot_scores' in migration and "record_migration('0140_alt_shot_side_scores')" in migration, '0140 creates and records canonical side-score store')
 check('delete from public.game_alt_shot_scores' in migration and 'alt_shot_scoring_started_at = null' in migration, 'score reset clears side scores and scoring-start marker')
-check('leg_config: o.gameType === "alt_shot" ? { scheme: "none"' in create, 'Alternate Shot side game defaults off')
+check('o.gameType === "alt_shot" || o.sideContestsEnabled === false ? { scheme: "none"' in create, 'Alternate Shot and Ryder Cup session side games default off')
 check('deriveTeamFoursomesFromGroups' in tourn, 'team Four-Ball/Alternate Shot derive contests from Teams + Groups')
 check('alter column strokes drop not null' in tombstone and "record_migration('0141_alt_shot_clear_tombstones')" in tombstone, '0141 persists explicit clear tombstones for legacy-score masking')
 check('strokes: number | null' in Path('lib/alt-shot-side-scores.ts').read_text(), 'canonical side-score model represents clear as a persisted null override')

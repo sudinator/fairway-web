@@ -4,6 +4,7 @@ pkg=(ROOT/'package.json').read_text(encoding='utf-8')
 script=(ROOT/'scripts/check-vapid-key.mjs').read_text(encoding='utf-8')
 sw=(ROOT/'public/sw.js').read_text(encoding='utf-8')
 ci=(ROOT/'.github/workflows/ci.yml').read_text(encoding='utf-8')
+staging_ci=(ROOT/'.github/workflows/staging-integration.yml').read_text(encoding='utf-8')
 checks={
  'prebuild enforces VAPID drift check':'check-vapid-key.mjs' in pkg,
  'checker compares env public key':'NEXT_PUBLIC_VAPID_PUBLIC_KEY' in script and 'envKey !== swKey' in script,
@@ -16,6 +17,10 @@ checks={
    'VAPID_CHECK_OPTIONAL' in script and 'process.exit(1)' in script.split('if (!envKey)')[1].split('if (envKey !== swKey)')[0],
  # ...which means CI must supply the key, or every build fails on configuration.
  'CI supplies the key so the check actually runs':'NEXT_PUBLIC_VAPID_PUBLIC_KEY' in ci,
+ 'manual staging integration supplies the key':
+   'NEXT_PUBLIC_VAPID_PUBLIC_KEY' in staging_ci,
+ 'manual staging integration does not bypass the check':
+   'VAPID_CHECK_OPTIONAL:' not in staging_ci,
 }
 failed=[k for k,v in checks.items() if not v]
 if failed:

@@ -752,7 +752,7 @@ export function Home({ session }: { session: any }) {
 
       {/* Weekly profile-completion nudge — shown in-app when the profile is missing a
           photo or handicap; links to the Profile tab. Dismiss hides it for a week. */}
-      {showProfNudge && (
+      {showProfNudge && tab === "dashboard" && (
         <div style={{ background: "#16302A", border: `1px solid ${C.gold}`, borderRadius: 12, padding: "12px 14px", marginTop: 12 }}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             <div style={{ color: C.cream, fontSize: 13, fontWeight: 700, flex: 1 }}>✨ Finish setting up your profile</div>
