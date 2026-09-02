@@ -9,6 +9,8 @@ import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import {
   combineCompetitionScores,
   competitionFormatLabel,
+  competitionPointsNeeded,
+  competitionSchedule,
   fmtCompetitionPoints,
   scoreCompetitionGame,
   type Competition,
@@ -174,9 +176,13 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
   const [roster, setRoster] = useState<CompetitionPlayer[]>([]);
   const [sessions, setSessions] = useState<SessionLive[] | null>(null);
   const [adding, setAdding] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [sessionName, setSessionName] = useState("Saturday Morning");
   const [format, setFormat] = useState<CompetitionSession["format"]>("fourball");
   const [playDate, setPlayDate] = useState(today());
+  const [plannedMatches, setPlannedMatches] = useState("3");
+  const [pointsPerMatch, setPointsPerMatch] = useState("1");
+  const [scheduleBusy, setScheduleBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -218,29 +224,81 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
   }, [load]);
 
   const total = useMemo(() => combineCompetitionScores((sessions || []).map((s) => s.score)), [sessions]);
+  const schedule = useMemo(() => competitionSchedule(sessions || [], competition?.tie_rule || "shared"), [sessions, competition?.tie_rule]);
   if (!competition) return <div><button onClick={onBack} style={{ ...btn(false), marginBottom: 12 }}>‹ Cups</button><div style={{ color: err ? C.overRedDark : C.sage }}>{err || "Loading…"}</div></div>;
   const manage = canManage || competition.created_by === user.id;
   const aColor = teamAccent(competition.team_a_name, 0), bColor = teamAccent(competition.team_b_name, 1);
 
-  const addSession = () => {
+  const savePlannedSession = async () => {
     const order = (sessions?.reduce((m, s) => Math.max(m, s.session_order), 0) || 0) + 1;
+    const count = Number(plannedMatches), points = Number(pointsPerMatch);
+    if (!Number.isInteger(count) || count < 1 || count > 100) { setErr("Enter a match count between 1 and 100."); return; }
+    if (!Number.isFinite(points) || points <= 0 || points > 10) { setErr("Points per match must be greater than 0 and no more than 10."); return; }
+    setScheduleBusy(true); setErr(null);
+    const values = {
+      name: sessionName.trim() || competitionFormatLabel(format), format, play_date: playDate,
+      points_per_match: points, planned_match_count: count,
+    };
+    const { error } = editingSessionId
+      ? await supabase.from("competition_sessions").update(values).eq("id", editingSessionId).eq("competition_id", competition.id)
+      : await supabase.from("competition_sessions").insert({ competition_id: competition.id, session_order: order, ...values });
+    setScheduleBusy(false);
+    if (error) { setErr(error.message); return; }
+    setAdding(false); setEditingSessionId(null); await load();
+  };
+
+  const editPlannedSession = (session: CompetitionSession) => {
+    setSessionName(session.name); setFormat(session.format); setPlayDate(session.play_date);
+    setPlannedMatches(String(session.planned_match_count)); setPointsPerMatch(String(session.points_per_match));
+    setEditingSessionId(session.id); setAdding(true); setErr(null);
+  };
+
+  const createSessionGame = (session: CompetitionSession) => {
     const participantTeams: Record<string, "A" | "B"> = Object.fromEntries(roster.map((p) => [p.user_id, p.team_key]));
     onCreateGame({
-      playDate, course: null, memberIds: roster.map((p) => p.user_id), guests: [],
-      name: `${competition.name} · ${sessionName.trim() || competitionFormatLabel(format)}`,
-      gameType: format,
+      playDate: session.play_date, course: null, memberIds: roster.map((p) => p.user_id), guests: [],
+      name: `${competition.name} · ${session.name}`,
+      gameType: session.format,
       teamNames: { A: competition.team_a_name, B: competition.team_b_name },
       participantTeams,
-      competitionSession: { competitionId: competition.id, name: sessionName.trim() || competitionFormatLabel(format), sessionOrder: order, format, playDate, pointsPerMatch: 1 },
+      competitionSession: { sessionId: session.id, competitionId: competition.id, name: session.name, sessionOrder: session.session_order, format: session.format, playDate: session.play_date, pointsPerMatch: Number(session.points_per_match) },
     });
   };
+
+  const lockSchedule = async () => {
+    if (!confirm(`Lock ${sessions?.length || 0} sessions worth ${fmtCompetitionPoints(schedule.totalPoints)} total points? Session scoring cannot change unless the schedule is explicitly reopened.`)) return;
+    setScheduleBusy(true); setErr(null);
+    const { error } = await supabase.rpc("lock_competition_schedule", { p_competition: competition.id });
+    setScheduleBusy(false); if (error) { setErr(error.message); return; } await load();
+  };
+
+  const reopenSchedule = async () => {
+    const reason = prompt("Why is the locked Cup schedule being changed?")?.trim();
+    if (!reason) return;
+    setScheduleBusy(true); setErr(null);
+    const { error } = await supabase.rpc("reopen_competition_schedule", { p_competition: competition.id, p_reason: reason });
+    setScheduleBusy(false); if (error) { setErr(error.message); return; } await load();
+  };
+
+  const changeTieRule = async (tieRule: Competition["tie_rule"]) => {
+    setScheduleBusy(true); setErr(null);
+    const { error } = await supabase.from("competitions").update({ tie_rule: tieRule }).eq("id", competition.id);
+    setScheduleBusy(false); if (error) { setErr(error.message); return; } await load();
+  };
+
+  const locked = competition.schedule_status === "locked";
+  const editingSession = sessions?.find((s) => s.id === editingSessionId) || null;
+  const plannedMatchCount = (sessions || []).reduce((sum, s) => sum + Number(s.planned_match_count || 0), 0);
+  const aNeeded = competitionPointsNeeded(total.decidedA, schedule.teamATarget);
+  const bNeeded = competitionPointsNeeded(total.decidedB, schedule.teamBTarget);
+  const clinched: "A" | "B" | null = locked && total.decidedA >= schedule.teamATarget ? "A" : locked && total.decidedB >= schedule.teamBTarget ? "B" : null;
 
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <button onClick={onBack} style={{ ...btn(false), padding: "8px 12px" }}>‹ Cups</button>
         <div style={{ flex: 1 }} />
-        <span style={{ color: C.sage, fontSize: 11 }}>● Live</span>
+        <span style={{ color: locked ? "#5BD08A" : C.gold, fontSize: 11 }}>{locked ? "● Schedule locked" : "● Schedule draft"}</span>
         <button onClick={() => { void load(); }} style={{ ...btn(false), padding: "8px 12px", fontSize: 12 }}>↻ Refresh</button>
       </div>
       <div style={{ marginTop: 12, background: C.green, borderRadius: 14, padding: 16, border: `1px solid ${C.borderGreen}` }}>
@@ -251,7 +309,19 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
           <div style={{ textAlign: "center", color: C.sage, fontSize: 18 }}>–</div>
           <div style={{ textAlign: "center" }}><div style={{ color: bColor, fontSize: 15, fontWeight: 800 }}>{competition.team_b_name}</div><div style={{ color: total.projectedB >= total.projectedA ? "#FFE08A" : C.cream, fontFamily: "Georgia, serif", fontSize: 40, fontWeight: 800 }}>{fmtCompetitionPoints(total.projectedB)}</div></div>
         </div>
-        <div style={{ color: C.sage, fontSize: 11, textAlign: "center", marginTop: 7 }}>Projected from live match states · {fmtCompetitionPoints(total.decidedA)}–{fmtCompetitionPoints(total.decidedB)} decided · {total.decidedCount}/{total.matchCount} matches complete</div>
+        <div style={{ color: C.sage, fontSize: 11, textAlign: "center", marginTop: 7 }}>
+          Live projection · {fmtCompetitionPoints(total.decidedA)}–{fmtCompetitionPoints(total.decidedB)} secured · {total.decidedCount}/{locked ? plannedMatchCount : total.matchCount} matches final
+        </div>
+        {locked ? <div style={{ marginTop: 12, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 10, textAlign: "center" }}>
+          <div style={{ color: C.cream, fontSize: 12, fontWeight: 800 }}>
+            {clinched
+              ? `${clinched === "A" ? competition.team_a_name : competition.team_b_name} has clinched the Cup`
+              : `${competition.team_a_name} needs ${fmtCompetitionPoints(aNeeded)} · ${competition.team_b_name} needs ${fmtCompetitionPoints(bNeeded)}`}
+          </div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{fmtCompetitionPoints(schedule.totalPoints)} scheduled points · {competition.tie_rule === "shared" ? "a level finish shares the Cup" : `${competition.tie_rule === "team_a_retains" ? competition.team_a_name : competition.team_b_name} retains on a tie`}</div>
+        </div> : <div style={{ marginTop: 12, background: "rgba(201,162,39,.12)", border: `1px solid ${C.gold}`, borderRadius: 10, padding: "8px 12px", color: C.cream, fontSize: 11.5, lineHeight: 1.4 }}>
+          Schedule is not locked. Current games can be scored, but BNN will not declare a Cup winner until the points denominator is confirmed.
+        </div>}
       </div>
 
       <Eyebrow>TEAMS</Eyebrow>
@@ -262,21 +332,32 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
         </div>)}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center" }}><Eyebrow>SESSIONS</Eyebrow><div style={{ flex: 1 }} />{manage ? <button onClick={() => setAdding((v) => !v)} style={{ ...btn(false), fontSize: 12, padding: "8px 12px" }}>{adding ? "Cancel" : "＋ Add session"}</button> : null}</div>
+      <div style={{ display: "flex", alignItems: "center" }}><Eyebrow>SESSIONS</Eyebrow><div style={{ flex: 1 }} />{manage && !locked ? <button onClick={() => { setAdding((v) => !v); setEditingSessionId(null); }} style={{ ...btn(false), fontSize: 12, padding: "8px 12px" }}>{adding ? "Cancel" : "＋ Add session"}</button> : null}</div>
+      <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginBottom: 10, border: `1px solid ${locked ? "#5BD08A" : C.gold}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ flex: 1 }}><div style={{ color: C.cream, fontWeight: 800, fontSize: 13 }}>{locked ? "Cup scoring contract" : "Build the Cup scoring contract"}</div><div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{sessions?.length || 0} sessions · {plannedMatchCount} matches · {fmtCompetitionPoints(schedule.totalPoints)} total points</div></div>{manage ? <button disabled={scheduleBusy || (!locked && !sessions?.length)} onClick={locked ? reopenSchedule : lockSchedule} style={{ ...btn(!locked), fontSize: 11, padding: "8px 12px", opacity: scheduleBusy ? .6 : 1 }}>{locked ? "Reopen schedule" : "Review & lock"}</button> : null}</div>
+        <label style={{ display: "block", color: C.sage, fontSize: 11, fontWeight: 800, marginTop: 10 }}>IF THE CUP FINISHES LEVEL<select disabled={locked || !manage || scheduleBusy} value={competition.tie_rule} onChange={(e) => void changeTieRule(e.target.value as Competition["tie_rule"])} style={{ ...inputStyle, marginTop: 5, width: "100%", fontSize: 12 }}><option value="shared">The Cup is shared</option><option value="team_a_retains">{competition.team_a_name} retains the Cup</option><option value="team_b_retains">{competition.team_b_name} retains the Cup</option></select></label>
+      </div>
       {adding ? <div style={{ background: C.greenLight, borderRadius: 14, padding: 14, marginBottom: 12 }}>
         <label style={{ color: C.sage, fontSize: 11, fontWeight: 800 }}>SESSION NAME</label><input value={sessionName} onChange={(e) => setSessionName(e.target.value)} style={{ ...inputStyle, marginTop: 6 }} />
         <label style={{ display: "block", color: C.sage, fontSize: 11, fontWeight: 800, marginTop: 12 }}>FORMAT</label>
-        <select value={format} onChange={(e) => setFormat(e.target.value as CompetitionSession["format"])} style={{ ...inputStyle, marginTop: 6 }}><option value="fourball">Four-Ball</option><option value="alt_shot">Alternate Shot</option><option value="match">Singles</option></select>
+        <select disabled={!!editingSession?.game_id} value={format} onChange={(e) => setFormat(e.target.value as CompetitionSession["format"])} style={{ ...inputStyle, marginTop: 6, opacity: editingSession?.game_id ? .65 : 1 }}><option value="fourball">Four-Ball</option><option value="alt_shot">Alternate Shot</option><option value="match">Singles</option></select>
         <div style={{ marginTop: 12 }}><label style={{ color: C.sage, fontSize: 11, fontWeight: 800 }}>DATE</label><ShortDateInput value={playDate} onChange={setPlayDate} /></div>
-        <div style={{ color: C.sage, fontSize: 11, lineHeight: 1.45, marginTop: 10 }}>Next opens the standard BNN game setup with this Cup roster and team assignments already loaded. Choose the course, tees and the players participating in this session, then build the normal Groups/Matchups.</div>
-        <button onClick={addSession} style={{ ...btn(true), width: "100%", marginTop: 12 }}>Next · Set up this session</button>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 12 }}><label style={{ color: C.sage, fontSize: 11, fontWeight: 800 }}>MATCHES<input inputMode="numeric" value={plannedMatches} onChange={(e) => setPlannedMatches(e.target.value)} style={{ ...inputStyle, marginTop: 6 }} /></label><label style={{ color: C.sage, fontSize: 11, fontWeight: 800 }}>POINTS EACH<input inputMode="decimal" value={pointsPerMatch} onChange={(e) => setPointsPerMatch(e.target.value)} style={{ ...inputStyle, marginTop: 6 }} /></label></div>
+        <div style={{ color: C.sage, fontSize: 11, lineHeight: 1.45, marginTop: 10 }}>A halved match splits its value equally. Save every planned session, review the total, then lock the schedule before play.</div>
+        <button disabled={scheduleBusy} onClick={savePlannedSession} style={{ ...btn(true), width: "100%", marginTop: 12 }}>{scheduleBusy ? "Saving…" : editingSessionId ? "Save schedule changes" : "Add to Cup schedule"}</button>
       </div> : null}
 
       {sessions === null ? <div style={{ color: C.sage }}>Loading sessions…</div> : sessions.length === 0 ? <div style={{ background: C.greenLight, borderRadius: 12, padding: 18, color: C.sage, textAlign: "center" }}>No sessions yet. Add Four-Ball, Alternate Shot or Singles.</div> : sessions.map((s) => (
-        <button key={s.id} disabled={!s.game_id} onClick={() => s.game_id && onOpenGame(s.game_id)} style={{ width: "100%", background: C.greenLight, border: "none", borderRadius: 12, padding: "13px 16px", marginBottom: 9, textAlign: "left", cursor: s.game_id ? "pointer" : "default" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ flex: 1, minWidth: 0 }}><div style={{ color: C.cream, fontSize: 14, fontWeight: 800 }}>{s.name}</div><div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>{competitionFormatLabel(s.format)} · {formatDate(s.play_date)} · {s.score.decidedCount}/{s.score.matchCount} complete</div></div><div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}><span style={{ color: aColor }}>{fmtCompetitionPoints(s.score.projectedA)}</span><span style={{ color: C.sage, margin: "0 6px" }}>–</span><span style={{ color: bColor }}>{fmtCompetitionPoints(s.score.projectedB)}</span></div><span style={{ color: C.gold, fontSize: 18 }}>›</span></div>
-          {s.score.matches.length ? <div style={{ borderTop: `1px solid ${C.borderGreen}`, marginTop: 10, paddingTop: 6 }}>{s.score.matches.map((m) => <div key={m.key} style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 52px minmax(0,1fr)", gap: 8, alignItems: "center", padding: "8px 12px", fontSize: 11 }}><span style={{ color: C.cream, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.leftNames}{m.winnerTeam === "A" ? <b style={{ color: aColor }}> · {m.result || `${Math.abs(m.lead)} UP`}</b> : null}</span><span style={{ color: C.sage, textAlign: "center" }}>{m.thru ? `Thru ${m.thru}` : "—"}{m.started && m.lead === 0 ? " · AS" : ""}</span><span style={{ color: C.cream, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.rightNames}{m.winnerTeam === "B" ? <b style={{ color: bColor }}> · {m.result || `${Math.abs(m.lead)} UP`}</b> : null}</span></div>)}</div> : null}
-        </button>
+        <div key={s.id} style={{ width: "100%", background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginBottom: 9 }}>
+          <button disabled={!s.game_id} onClick={() => s.game_id && onOpenGame(s.game_id)} style={{ width: "100%", background: "none", border: "none", padding: 0, textAlign: "left", cursor: s.game_id ? "pointer" : "default" }}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ flex: 1, minWidth: 0 }}><div style={{ color: C.cream, fontSize: 14, fontWeight: 800 }}>{s.name}</div><div style={{ color: C.sage, fontSize: 11, marginTop: 2 }}>{competitionFormatLabel(s.format)} · {formatDate(s.play_date)} · {s.planned_match_count} × {fmtCompetitionPoints(Number(s.points_per_match))} pt · {s.score.decidedCount}/{s.planned_match_count} final</div></div>{s.game_id ? <><div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 800 }}><span style={{ color: aColor }}>{fmtCompetitionPoints(s.score.projectedA)}</span><span style={{ color: C.sage, margin: "0 6px" }}>–</span><span style={{ color: bColor }}>{fmtCompetitionPoints(s.score.projectedB)}</span></div><span style={{ color: C.gold, fontSize: 18 }}>›</span></> : null}</div></button>
+          {manage && !locked ? <button onClick={() => editPlannedSession(s)} style={{ ...btn(false), marginTop: 9, padding: "8px 12px", fontSize: 11 }}>Edit schedule</button> : null}
+          {!s.game_id && manage ? <button onClick={() => createSessionGame(s)} style={{ ...btn(true), width: "100%", marginTop: 10, fontSize: 12 }}>Set up this session’s game</button> : null}
+          {s.game_id && s.score.matchCount !== Number(s.planned_match_count) ? <div style={{ color: C.gold, fontSize: 11, marginTop: 8 }}>Setup needs attention: this game currently has {s.score.matchCount} of {s.planned_match_count} planned matches.</div> : null}
+          {s.score.matches.length ? <div style={{ borderTop: `1px solid ${C.borderGreen}`, marginTop: 10, paddingTop: 6 }}>{s.score.matches.map((m) => {
+            const status = !m.started ? "Not started" : m.decided ? (m.result || (m.lead === 0 ? "Halved" : `${Math.abs(m.lead)} UP`)) : (m.lead === 0 ? `All square thru ${m.thru}` : `${m.winnerTeam === "A" ? competition.team_a_name : competition.team_b_name} ${Math.abs(m.lead)} UP thru ${m.thru}`);
+            return <div key={m.key} style={{ padding: "8px 12px", borderBottom: `1px solid rgba(178,203,189,.14)` }}><div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 18px minmax(0,1fr)", gap: 6, color: C.cream, fontSize: 11.5 }}><span style={{ overflowWrap: "anywhere" }}>{m.leftNames}</span><span style={{ color: C.sage, textAlign: "center" }}>v</span><span style={{ textAlign: "right", overflowWrap: "anywhere" }}>{m.rightNames}</span></div><div style={{ marginTop: 3, color: m.winnerTeam === "A" ? aColor : m.winnerTeam === "B" ? bColor : C.sage, fontSize: 11, fontWeight: 800, textAlign: "center" }}>{m.decided && m.winnerTeam ? `${m.winnerTeam === "A" ? m.leftNames : m.rightNames} · ${status}` : status}</div></div>;
+          })}</div> : null}
+        </div>
       ))}
       {err ? <div style={{ color: C.overRedDark, fontSize: 12, marginTop: 10 }}>{err}</div> : null}
     </div>

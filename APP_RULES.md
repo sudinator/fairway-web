@@ -248,3 +248,4 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
 
 
 <!-- 178.25.260830: no global rule change; production migration-parity CI URL hardening only. -->
+<!-- 179.3.260902: no global rule change; Cup schedule/scoring contract only. -->

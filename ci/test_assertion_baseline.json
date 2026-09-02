@@ -1,5 +1,5 @@
 {
-  "total": 189932,
+  "total": 189935,
   "suites": {
     "(unnamed suites)": 511,
     "ai-sanitize": 11,
@@ -13,7 +13,7 @@
     "bucket-model": 34,
     "card": 11,
     "chart-helpers": 10,
-    "competition": 9,
+    "competition": 12,
     "component render": 17,
     "contests": 26,
     "course ordering": 4,

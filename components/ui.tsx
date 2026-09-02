@@ -612,7 +612,7 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
   );
 }
 
-export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false, strokeSixes = false, uncap = false, showIndivDots = false, scoreLocked = false, lockedByName, onActiveHole, resumeHole }: {
+export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false, strokeSixes = false, uncap = false, showIndivDots = false, matchStrokeLabel = "team match", scoreLocked = false, lockedByName, onActiveHole, resumeHole }: {
   holes: EntryHole[];
   hasHandicap: boolean;
   onSet: (i: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null }) => void;
@@ -628,6 +628,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   strokeSixes?: boolean;     // stroke games: show net-score (lowest) subtotals, not Stableford
   uncap?: boolean;              // stroke play: lift the net-double entry ceiling so every stroke counts
   showIndivDots?: boolean;      // relative games (match/four-ball/trifecta): also show blue individual (full-handicap) dots
+  matchStrokeLabel?: string;
   scoreLocked?: boolean;        // group scoring: someone else owns my gross score — view-only, stats still editable
   lockedByName?: string | null; // who keeps the score, for the "kept by X" note
   onActiveHole?: (i: number) => void; // fires when a hole's editor opens, so the parent can persist the resume point
@@ -921,7 +922,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
       {!matchMode && anyStroke && hasHandicap && (
         <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>
           {showIndivDots
-            ? <><span style={{ color: C.dot }}>&#9679;</span> match strokes (Trifecta) &middot; <span style={{ color: C.indivDot }}>&#9679;</span> individual strokes (low-net / Stableford side game)</>
+            ? <><span style={{ color: C.dot }}>&#9679;</span> match strokes ({matchStrokeLabel}) &middot; <span style={{ color: C.indivDot }}>&#9679;</span> individual strokes (low-net / Stableford side game)</>
             : (holes.some((h) => h.recv > 0)
                 ? "\u2022 filled dots show the handicap strokes you receive on that hole."
                 : "\u25e6 hollow dots show the holes where you give your opponent a stroke.")}

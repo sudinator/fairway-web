@@ -1,3 +1,18 @@
+## v179.3 Cup schedule and scoring refinement
+
+- [x] Make the planned Cup schedule the locked source of truth for total points.
+- [x] Configure matches and points per match for each Four-Ball, Alternate Shot, and Singles session.
+- [x] Configure the overall tied-Cup rule; audit any schedule reopen with a required reason.
+- [x] Show secured points, points needed, and an early Cup-clinch state.
+- [x] Stop counting live Four-Ball / Alternate Shot matches as complete.
+- [x] Preserve the first mathematical close-out result in Cup aggregation.
+- [x] Show winning player/pair identity, `Halved`, and long names in Cup session rows.
+- [x] Link Cup games back to Cup standings and route setup to the next incomplete tab.
+- [x] Correct the Four-Ball score-entry legend and keep the profile nudge off the Games/Cups workspace.
+- [ ] Apply and verify migration 0143 on Staging.
+- [ ] Run GitHub CI, real Staging integration, and `RELEASE_VERIFICATION_179.3.md` browser scenarios.
+- [ ] Separate follow-up: investigate Berkshire Valley source payload and expand course freshness integrity checks to par, stroke index, and yardage plausibility.
+
 ## v179.2 competitive assignment UX
 
 - [x] Show unassigned players above Four-Ball / Alternate Shot group cards.

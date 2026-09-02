@@ -77,6 +77,7 @@ export type GameSeed = {
   teamNames?: { A: string; B: string };
   participantTeams?: Record<string, "A" | "B">;
   competitionSession?: {
+    sessionId: string;
     competitionId: string;
     name: string;
     sessionOrder: number;

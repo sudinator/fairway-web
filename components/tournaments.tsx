@@ -207,6 +207,7 @@ export default function Tournaments({
         displayName={displayName}
         isAdmin={!!isAdmin}
         onBack={() => { clearActiveGame(); setView("list"); }}
+        onOpenCompetition={(id) => { clearActiveGame(); setView("list"); setListMode("cups"); setCompetitionId(id); }}
       />
     );
   return (
@@ -693,13 +694,11 @@ function CreateGame({
       }
       if (seed?.competitionSession) {
         const cs = seed.competitionSession;
-        const { error: linkErr } = await supabase.from("competition_sessions").insert({
-          competition_id: cs.competitionId, name: cs.name, session_order: cs.sessionOrder, format: cs.format,
-          play_date: cs.playDate, points_per_match: cs.pointsPerMatch, game_id: game.id,
-        });
-        if (linkErr) {
+        const { data: linkedSession, error: linkErr } = await supabase.from("competition_sessions").update({ game_id: game.id })
+          .eq("id", cs.sessionId).eq("competition_id", cs.competitionId).is("game_id", null).select("id").maybeSingle();
+        if (linkErr || !linkedSession) {
           try { await supabase.from("games").delete().eq("id", game.id).eq("created_by", user.id); } catch {}
-          throw new Error(`The game was not linked to the Cup session: ${linkErr.message}`);
+          throw new Error(`The game was not linked to the Cup session: ${linkErr?.message || "the session was already linked or no longer exists"}`);
         }
       }
       for (const row of seededRows) {
@@ -715,7 +714,9 @@ function CreateGame({
       }
       // Lean Create owns the core game only. Persisted structure stays authoritative in
       // Manage Game, so formats that need teams/matchups/foursomes hand off there.
-      const destination = GC.postCreateDestination(gameType, teamMode);
+      const destination = seed?.competitionSession
+        ? { roomTab: "setup" as const, setupTab: (gameType === "match" ? "matchups" : "groups") as SetupTab }
+        : GC.postCreateDestination(gameType, teamMode);
       // Set BEFORE the clear, so nothing between here and unmount can write the draft back.
       doneRef.current = true;
       clearSetupDraft(activeGroupId, draftSourceId); // setup finished — drop the local draft
@@ -1466,6 +1467,7 @@ function GameRoom({
   displayName,
   isAdmin,
   onBack,
+  onOpenCompetition,
 }: {
   gameId: string;
   initialTab?: "play" | "setup";
@@ -1474,6 +1476,7 @@ function GameRoom({
   displayName: string;
   isAdmin?: boolean;
   onBack: () => void;
+  onOpenCompetition: (id: string) => void;
 }) {
   const [game, setGame] = useState<Game | null>(null);
   const paceNow = useNowTick();
@@ -1481,6 +1484,7 @@ function GameRoom({
   const [altShotScores, setAltShotScores] = useState<AltShotScoreRow[]>([]);
   const [me, setMe] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
+  const [competitionLink, setCompetitionLink] = useState<{ competition_id: string; name: string } | null>(null);
   const [savingHole, setSavingHole] = useState<number | null>(null);
   const [syncState, setSyncState] = useState<"idle" | "saving" | "retry" | "synced" | "error">("idle");
   // Connectivity flag. Ownership changes (marker takeover / hand-off / switching to
@@ -1488,6 +1492,16 @@ function GameRoom({
   // across devices without the server, and allowing them would break the single-
   // writer-per-row invariant the group model depends on.
   const [offline, setOffline] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.from("competition_sessions").select("competition_id, competitions(name)").eq("game_id", gameId).maybeSingle();
+      if (cancelled || !data) return;
+      const joined = Array.isArray((data as any).competitions) ? (data as any).competitions[0] : (data as any).competitions;
+      setCompetitionLink({ competition_id: String((data as any).competition_id), name: joined?.name || "Cup" });
+    })();
+    return () => { cancelled = true; };
+  }, [gameId]);
   useEffect(() => {
     const upd = () => setOffline(typeof navigator !== "undefined" && navigator.onLine === false);
     upd();
@@ -2990,6 +3004,7 @@ function GameRoom({
           </div>
           <div style={{ color: C.sage, fontSize: 13 }}>{game.course}</div>
         </div>
+        {competitionLink ? <button onClick={() => onOpenCompetition(competitionLink.competition_id)} style={{ ...btn(false), padding: "8px 12px", fontSize: 12 }}>🏆 {competitionLink.name} standings</button> : null}
         <div style={{ flex: 1 }} />
         {roomTab === "setup" && (
         <button
@@ -3725,6 +3740,7 @@ function GameRoom({
             })()}
             hasHandicap={me.course_handicap != null}
             showIndivDots={shapeOf(game).dotBasis !== "absolute"}
+            matchStrokeLabel={game.game_type === "fourball" ? "Four-Ball" : game.game_type === "trifecta" ? "Trifecta" : "match"}
             matchMode={game.game_type === "match"}
             uncap={game.game_type === "stroke"}
             showSixes={effectiveGroupId((game as any).group_id) === TGC_GROUP_ID}

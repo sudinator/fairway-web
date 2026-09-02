@@ -1,3 +1,12 @@
+## 179.3.260902 — Cup schedule contract and live match UX
+
+- Adds migration **0143_competition_schedule_contract.sql**: planned sessions now declare match count and points per match; the locked schedule is the authoritative Cup denominator, with an audited reason-required reopen path and an explicit overall tie rule.
+- Cup standings show secured points, total scheduled points, points each team still needs, and an early clinch state. Unlocked legacy Cups are clearly labeled provisional rather than being declared won from a mutable list of games.
+- Fixes Four-Ball / Alternate Shot running matches being counted complete, and freezes Cup match results at the first mathematical close-out (for example `5 & 3`) without altering the established game scoring engines or stored hole scores.
+- Improves session rows for long names and winner identity, uses `Halved` for completed level matches, removes duplicate running status, and labels Four-Ball handicap dots as Four-Ball rather than Trifecta.
+- Adds a linked-game shortcut back to Cup standings, opens Cup game setup at the next incomplete Matchups/Groups tab, and keeps the weekly profile nudge on Home instead of pushing the Cup screen below the fold.
+- Staging-only candidate: apply/verify 0143, run real Staging integration, then execute `RELEASE_VERIFICATION_179.3.md` before Production.
+
 ## 179.2.260902 — Competitive group and Singles assignment builder
 
 - Replaces the player-by-player Four-Ball / Alternate Shot group editor with match-first group cards showing two named-team slots per side, visible playing handicaps, and an explicit 2-v-2 readiness state.

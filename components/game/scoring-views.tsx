@@ -1388,9 +1388,10 @@ export function FourballView({
         const myKey = players.find((p) => p.user_id === user.id)?.user_id ?? user.id;
         const mine = f.a.includes(myKey) || f.b.includes(myKey);
         const lead = st?.lead ?? 0;
-        const leadText = !st || st.thru === 0 ? "" : lead === 0 ? "All square" : isAltShot
-          ? `${isTeam ? teamName(playerOf(lead > 0 ? f.a[0] : f.b[0])?.team) : (lead > 0 ? "Pair 1" : "Pair 2")} ${Math.abs(lead)} UP`
-          : `${firstName(lead > 0 ? f.a[0] : f.b[0])}'s pair ${Math.abs(lead)} UP`;
+        const leadText = !st || st.thru === 0 ? "" : lead === 0 ? "All square" : isTeam
+          ? `${teamName(playerOf(lead > 0 ? f.a[0] : f.b[0])?.team)} ${Math.abs(lead)} UP`
+          : `${isAltShot ? (lead > 0 ? "Pair 1" : "Pair 2") : `${firstName(lead > 0 ? f.a[0] : f.b[0])}'s pair`} ${Math.abs(lead)} UP`;
+        const matchDecided = !!st && st.thru > 0 && (st.thru === game.holes_meta.length || Math.abs(st.lead) > game.holes_meta.length - st.thru);
         const tri = isTrifecta && full ? computeTrifecta(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap, triScoring) : null;
         // Match scoring (Ryder Cup): show the LIVE provisional match tally (who currently
         // leads each contest) rather than 0–0 until matches settle.
@@ -1402,7 +1403,7 @@ export function FourballView({
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
               <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{f.name}{mine ? " · your match" : ""}</div>
               <div style={{ flex: 1 }} />
-              <div style={{ color: C.cream, fontWeight: 800, fontSize: 14, fontFamily: "Georgia, serif" }}>{isTrifecta ? (tri ? `${fmtPts(triTally ? triTally.a : tri.aPts)}–${fmtPts(triTally ? triTally.b : tri.bPts)}` : "—") : st ? st.result : "—"}</div>
+              <div style={{ color: C.cream, fontWeight: 800, fontSize: 14, fontFamily: "Georgia, serif" }}>{isTrifecta ? (tri ? `${fmtPts(triTally ? triTally.a : tri.aPts)}–${fmtPts(triTally ? triTally.b : tri.bPts)}` : "—") : !st || st.thru === 0 ? "Not started" : matchDecided ? st.result : "Live"}</div>
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>

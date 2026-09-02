@@ -109,7 +109,13 @@ export function GameSetupWorkspace({
   const anyScores = players.some((p) => (p.scores || []).some((s) => s != null)) || !!game.alt_shot_scoring_started_at;
 
   const section = setupTab === "teams" || setupTab === "matchups" || setupTab === "groups" ? "structure" : setupTab;
-  const structureDefault: SetupTab = usesTeams ? "teams" : usesMatchups ? "matchups" : "groups";
+  const structureDefault: SetupTab = usesTeams && !teamsDone
+    ? "teams"
+    : usesMatchups && !matchupsDone
+      ? "matchups"
+      : showGroupsTab && !groupsDone
+        ? "groups"
+        : "review";
   const gotoStructure = () => onSetupTabChange(structureDefault);
 
   const [nameEdit, setNameEdit] = React.useState(game.name);

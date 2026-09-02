@@ -292,6 +292,24 @@ try {
   const driftCupRoster = await admin.client.from("competition_players").update({ team_key: "B" }).eq("competition_id", cup.id).eq("user_id", alice.id);
   ok(!!driftCupRoster.error, "Cup roster is locked after the first session is linked");
 
+  // 0143: the schedule, not the currently linked games, owns the denominator.
+  const memberScheduleLock = await alice.client.rpc("lock_competition_schedule", { p_competition: cup.id });
+  ok(!!memberScheduleLock.error, "ordinary member cannot lock a Cup schedule");
+  expectNoError(await admin.client.rpc("lock_competition_schedule", { p_competition: cup.id }), "Cup organizer can lock the planned schedule");
+  const lockedCup = expectNoError(await service.from("competitions").select("schedule_status,schedule_revision,schedule_locked_at").eq("id", cup.id).single(), "inspect locked Cup schedule");
+  ok(lockedCup.schedule_status === "locked" && !!lockedCup.schedule_locked_at, "Cup schedule lock is persisted");
+  const lockedSessionChange = await admin.client.from("competition_sessions").update({ points_per_match: 2 }).eq("id", cupSession.id);
+  ok(!!lockedSessionChange.error, "locked Cup rejects point-denominator changes");
+  const lockedTieChange = await admin.client.from("competitions").update({ tie_rule: "team_a_retains" }).eq("id", cup.id);
+  ok(!!lockedTieChange.error, "locked Cup rejects tie-rule drift");
+  const blankReopen = await admin.client.rpc("reopen_competition_schedule", { p_competition: cup.id, p_reason: "" });
+  ok(!!blankReopen.error, "schedule reopen requires an audit reason");
+  expectNoError(await admin.client.rpc("reopen_competition_schedule", { p_competition: cup.id, p_reason: "Integration verification" }), "Cup organizer can explicitly reopen with a reason");
+  const reopenedCup = expectNoError(await service.from("competitions").select("schedule_status,schedule_revision").eq("id", cup.id).single(), "inspect reopened Cup schedule");
+  ok(reopenedCup.schedule_status === "draft" && reopenedCup.schedule_revision === lockedCup.schedule_revision + 1, "reopen returns Cup to draft and increments revision");
+  const scheduleAudit = expectNoError(await service.from("competition_schedule_events").select("action,reason").eq("competition_id", cup.id).order("created_at"), "inspect Cup schedule audit trail");
+  ok(scheduleAudit.some((row) => row.action === "locked") && scheduleAudit.some((row) => row.action === "reopened" && row.reason === "Integration verification"), "schedule lock and reasoned reopen are audited");
+
   // Safe delete: a populated group is rejected; an empty admin-only group can be removed.
   const populatedDelete = await admin.client.rpc("delete_group_safely", { p_group: group.id });
   ok(!!populatedDelete.error, "safe group delete refuses a club with other active members");

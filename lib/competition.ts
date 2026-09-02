@@ -1,5 +1,5 @@
 import type { Game, Player } from "./game-types";
-import { altShotStatus, fourballStatus, matchStatus, type FourballMember } from "./golf";
+import { altShotProgress, fourballProgress, matchProgress, type FourballMember } from "./golf";
 import { pkey, chBasis, altShotSides } from "./game-shape";
 import { readAltShotSideScores } from "./alt-shot-scores";
 import { canonicalAltShotGross, type AltShotScoreRow } from "./alt-shot-side-scores";
@@ -16,6 +16,11 @@ export type Competition = {
   created_by: string;
   created_at: string;
   completed_at?: string | null;
+  schedule_status: "draft" | "locked";
+  schedule_locked_at?: string | null;
+  schedule_locked_by?: string | null;
+  schedule_revision: number;
+  tie_rule: "shared" | "team_a_retains" | "team_b_retains";
 };
 
 export type CompetitionPlayer = {
@@ -35,8 +40,16 @@ export type CompetitionSession = {
   session_order: number;
   play_date: string;
   points_per_match: number;
+  planned_match_count: number;
   game_id?: string | null;
   created_at: string;
+};
+
+export type CompetitionSchedule = {
+  totalPoints: number;
+  scoringUnit: number;
+  teamATarget: number;
+  teamBTarget: number;
 };
 
 export type CompetitionMatchState = {
@@ -66,11 +79,31 @@ const emptyScore = (): CompetitionSessionScore => ({ projectedA: 0, projectedB: 
 export function fmtCompetitionPoints(n: number): string {
   if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
   const whole = Math.floor(n);
-  return whole ? `${whole}½` : "½";
+  if (Math.abs((n - whole) - 0.5) < 1e-9) return whole ? `${whole}½` : "½";
+  return Number(n.toFixed(2)).toString();
 }
 
 export function competitionFormatLabel(format: CompetitionSession["format"]): string {
   return format === "fourball" ? "Four-Ball" : format === "alt_shot" ? "Alternate Shot" : "Singles";
+}
+
+export function competitionSchedule(sessions: CompetitionSession[], tieRule: Competition["tie_rule"] = "shared"): CompetitionSchedule {
+  const scheduled = sessions.filter((s) => Number(s.planned_match_count) > 0 && Number(s.points_per_match) > 0);
+  const totalPoints = scheduled.reduce((sum, s) => sum + Number(s.planned_match_count) * Number(s.points_per_match), 0);
+  const units = scheduled.map((s) => Number(s.points_per_match) / 2).filter((n) => n > 0);
+  const scoringUnit = units.length ? Math.min(...units) : 0.5;
+  const half = totalPoints / 2;
+  const outright = Math.floor((half + 1e-9) / scoringUnit) * scoringUnit + scoringUnit;
+  return {
+    totalPoints,
+    scoringUnit,
+    teamATarget: tieRule === "team_a_retains" ? half : outright,
+    teamBTarget: tieRule === "team_b_retains" ? half : outright,
+  };
+}
+
+export function competitionPointsNeeded(current: number, target: number): number {
+  return Math.max(0, target - current);
 }
 
 function award(out: CompetitionSessionScore, lead: number, decided: boolean, aTeam: "A" | "B", bTeam: "A" | "B", scale = 1) {
@@ -89,6 +122,20 @@ function award(out: CompetitionSessionScore, lead: number, decided: boolean, aTe
   }
 }
 
+// Cup results stop at the first mathematical close-out. The ordinary scorecard
+// engines and stored holes remain untouched; this only controls Cup aggregation.
+function cupMatchStatus(progress: (number | null)[], holeCount: number) {
+  const played = progress.filter((lead): lead is number => lead != null);
+  if (!played.length) return { thru: 0, lead: 0, result: "", decided: false };
+  for (let i = 0; i < played.length; i++) {
+    const thru = i + 1, lead = played[i], remaining = holeCount - thru;
+    if (remaining > 0 && Math.abs(lead) > remaining) return { thru, lead, result: `${Math.abs(lead)} & ${remaining}`, decided: true };
+  }
+  const thru = played.length, lead = played[played.length - 1];
+  if (thru === holeCount) return { thru, lead, result: lead === 0 ? "Halved" : `${Math.abs(lead)} UP`, decided: true };
+  return { thru, lead, result: "", decided: false };
+}
+
 export function scoreCompetitionGame(game: Game, players: Player[], altShotScores: AltShotScoreRow[] = [], pointsPerMatch = 1): CompetitionSessionScore {
   const out = emptyScore();
   const playerOf = (key: string) => players.find((p) => pkey(p) === key) || null;
@@ -105,9 +152,9 @@ export function scoreCompetitionGame(game: Game, players: Player[], altShotScore
       const pa = playerOf(pr.a), pb = playerOf(pr.b);
       const ta = teamOf(pr.a), tb = teamOf(pr.b);
       if (!pa || !pb || !ta || !tb || ta === tb) continue;
-      const st = matchStatus(game.holes_meta, pa.scores || [], pb.scores || [], chBasis(pa, game.course_par, holesCount), chBasis(pb, game.course_par, holesCount), game.allowance_pct ?? 100);
+      const st = cupMatchStatus(matchProgress(game.holes_meta, pa.scores || [], pb.scores || [], chBasis(pa, game.course_par, holesCount), chBasis(pb, game.course_par, holesCount), game.allowance_pct ?? 100), holesCount);
       const started = st.thru > 0;
-      const decided = !!st.result;
+      const decided = st.decided;
       const reversed = ta === "B" && tb === "A";
       const displayLead = reversed ? -st.lead : st.lead;
       const leftKey = reversed ? pr.b : pr.a;
@@ -115,7 +162,7 @@ export function scoreCompetitionGame(game: Game, players: Player[], altShotScore
       out.matchCount++;
       if (decided) out.decidedCount++;
       if (started) award(out, st.lead, decided, ta, tb, pointsPerMatch);
-      out.matches.push({ key: `pair-${i}`, leftNames: nameOf(leftKey), rightNames: nameOf(rightKey), thru: st.thru, lead: displayLead, result: st.result, started, decided, winnerTeam: displayLead === 0 ? null : (displayLead > 0 ? "A" : "B") });
+      out.matches.push({ key: `pair-${i}`, leftNames: nameOf(leftKey), rightNames: nameOf(rightKey), thru: st.thru, lead: displayLead, result: st.result === "AS" ? "Halved" : st.result, started, decided, winnerTeam: displayLead === 0 ? null : (displayLead > 0 ? "A" : "B") });
     }
     return out;
   }
@@ -125,7 +172,7 @@ export function scoreCompetitionGame(game: Game, players: Player[], altShotScore
     if (!f.a.length || !f.b.length) continue;
     const ta = teamOf(f.a[0]), tb = teamOf(f.b[0]);
     if (!ta || !tb || ta === tb) continue;
-    let st: { thru: number; lead: number; result?: string } | null = null;
+    let st: { thru: number; lead: number; result: string; decided: boolean } | null = null;
     if (game.game_type === "alt_shot") {
       if (f.a.length !== 2 || f.b.length !== 2) continue;
       const aRows = f.a.map(playerOf), bRows = f.b.map(playerOf);
@@ -135,16 +182,16 @@ export function scoreCompetitionGame(game: Game, players: Player[], altShotScore
       const bLegacy = readAltShotSideScores(bRows[0]!.scores, bRows[1]!.scores, holesCount);
       const aGross = canonicalAltShotGross(altShotScores, f.id, "a", holesCount, aLegacy.gross);
       const bGross = canonicalAltShotGross(altShotScores, f.id, "b", holesCount, bLegacy.gross);
-      st = altShotStatus(game.holes_meta, { ids: f.a, chs: [sides.aCh, 0], gross: aGross } as never, { ids: f.b, chs: [sides.bCh, 0], gross: bGross } as never);
+      st = cupMatchStatus(altShotProgress(game.holes_meta, { ids: f.a, chs: [sides.aCh, 0], gross: aGross } as never, { ids: f.b, chs: [sides.bCh, 0], gross: bGross } as never), holesCount);
     } else {
       const members: FourballMember[] = [...f.a, ...f.b].map((id) => {
         const p = playerOf(id);
         return { id, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par, holesCount) : null, noShow: !!p?.no_show };
       });
-      st = fourballStatus(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball");
+      st = cupMatchStatus(fourballProgress(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball"), holesCount);
     }
     const started = st.thru > 0;
-    const decided = !!st.result || (started && (st.thru === holesCount || Math.abs(st.lead) > holesCount - st.thru));
+    const decided = st.decided;
     const reversed = ta === "B" && tb === "A";
     const displayLead = reversed ? -st.lead : st.lead;
     const leftIds = reversed ? f.b : f.a;
@@ -152,7 +199,7 @@ export function scoreCompetitionGame(game: Game, players: Player[], altShotScore
     out.matchCount++;
     if (decided) out.decidedCount++;
     if (started) award(out, st.lead, decided, ta, tb, pointsPerMatch);
-    out.matches.push({ key: f.id, leftNames: leftIds.map(nameOf).join(" / "), rightNames: rightIds.map(nameOf).join(" / "), thru: st.thru, lead: displayLead, result: st.result || "", started, decided, winnerTeam: displayLead === 0 ? null : (displayLead > 0 ? "A" : "B") });
+    out.matches.push({ key: f.id, leftNames: leftIds.map(nameOf).join(" / "), rightNames: rightIds.map(nameOf).join(" / "), thru: st.thru, lead: displayLead, result: decided ? (st.result === "AS" ? "Halved" : (st.result || "")) : "", started, decided, winnerTeam: displayLead === 0 ? null : (displayLead > 0 ? "A" : "B") });
   }
   return out;
 }

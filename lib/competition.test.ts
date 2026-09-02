@@ -1,5 +1,5 @@
 import { strict as assert } from "assert";
-import { combineCompetitionScores, competitionFormatLabel, fmtCompetitionPoints, scoreCompetitionGame } from "./competition";
+import { combineCompetitionScores, competitionFormatLabel, competitionPointsNeeded, competitionSchedule, fmtCompetitionPoints, scoreCompetitionGame } from "./competition";
 import type { Game, Player } from "./game-types";
 
 let n = 0;
@@ -7,6 +7,7 @@ const ok = (name: string, fn: () => void) => { fn(); n++; console.log(`ok ${n} -
 
 ok("formats half points", () => {
   assert.equal(fmtCompetitionPoints(0.5), "½");
+  assert.equal(fmtCompetitionPoints(0.25), "0.25");
   assert.equal(fmtCompetitionPoints(2.5), "2½");
   assert.equal(fmtCompetitionPoints(3), "3");
 });
@@ -61,6 +62,15 @@ ok("competition totals combine sessions", () => {
   assert.equal(t.projectedB, 0.5);
   assert.equal(t.matchCount, 2);
 });
+ok("locked schedule denominator comes from planned sessions, not created games", () => {
+  const schedule = competitionSchedule([
+    { id: "s1", competition_id: "c", name: "Four-Ball", format: "fourball", session_order: 1, play_date: "2026-09-01", points_per_match: 1, planned_match_count: 3, game_id: "g1", created_at: "" },
+    { id: "s2", competition_id: "c", name: "Singles", format: "match", session_order: 2, play_date: "2026-09-02", points_per_match: 2, planned_match_count: 6, game_id: null, created_at: "" },
+  ], "shared");
+  assert.equal(schedule.totalPoints, 15);
+  assert.equal(schedule.teamATarget, 8);
+  assert.equal(competitionPointsNeeded(5.5, schedule.teamATarget), 2.5);
+});
 
 const oneHole = [{ n: 1, par: 4, si: 1 }];
 const teamPlayers: Player[] = [
@@ -85,6 +95,25 @@ ok("Four-Ball normalizes Cup Team A to the left when the stored foursome is reve
   assert.equal(s.matches[0].leftNames, "A1 / A2");
   assert.equal(s.matches[0].rightNames, "B1 / B2");
   assert.equal(s.matches[0].winnerTeam, "A");
+});
+ok("a running Four-Ball match is projected but is not counted complete", () => {
+  const g: Game = { ...game, id: "four-live", game_type: "fourball", pairings: [], foursomes: [{ id: "f1", name: "Match 1", a: ["fa1", "fa2"], b: ["fb1", "fb2"] }] };
+  const ps = teamPlayers.map((p) => ({ ...p, game_id: g.id, scores: p.team === "A" ? [4] : [5] }));
+  const s = scoreCompetitionGame(g, ps);
+  assert.equal(s.matches[0].started, true);
+  assert.equal(s.matches[0].decided, false);
+  assert.equal(s.decidedCount, 0);
+  assert.equal(s.projectedA, 1);
+});
+ok("post-clinch Four-Ball holes cannot rewrite a 5 & 3 result as 2 UP", () => {
+  const nine = Array.from({ length: 9 }, (_, i) => ({ n: i + 1, par: 4, si: i + 1 }));
+  const a = [4,4,4,4,4,4,6,6,6], b = [4,5,5,5,5,5,4,4,4];
+  const g: Game = { ...game, id: "four-clinch", holes_meta: nine, course_par: 36, game_type: "fourball", pairings: [], foursomes: [{ id: "f1", name: "Match 1", a: ["fa1", "fa2"], b: ["fb1", "fb2"] }] };
+  const ps = teamPlayers.map((p) => ({ ...p, game_id: g.id, scores: p.team === "A" ? a : b }));
+  const s = scoreCompetitionGame(g, ps);
+  assert.equal(s.matches[0].result, "5 & 3");
+  assert.equal(s.matches[0].thru, 6);
+  assert.equal(s.matches[0].lead, 5);
 });
 ok("Alternate Shot aggregates canonical side-owned scores without copying player scores", () => {
   const g: Game = { ...game, id: "alt", holes_meta: oneHole, course_par: 4, game_type: "alt_shot", pairings: [], foursomes: [{ id: "f1", name: "Match 1", a: ["fa1", "fa2"], b: ["fb1", "fb2"], a_first: "fa1", b_first: "fb1" }] };

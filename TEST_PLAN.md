@@ -1,5 +1,9 @@
 # Refactor test plan — verifying component moves (Stage 1b: OrganizerPanel, BettingPanel, GroupScorecard, GroupsBuilder)
 
+## 179.3 Cup schedule/scoring targeted gate
+
+Use `RELEASE_VERIFICATION_179.3.md` after migration 0143 is applied. Blocking coverage includes locked-denominator arithmetic, reason-required audited reopen, RLS/RPC authorization, live-versus-final match completion, first mathematical close-out, points-needed/clinch state, planned-session game linking, Cup navigation, and next-incomplete setup routing. Existing Match/Four-Ball/Alternate Shot engine suites remain unchanged and must stay green.
+
 The leaf moves so far were low-risk enough that "did it build?" was the whole test. These four are a step
 up: they're still top-level components coupled only through typed props (no shared scope), BUT they perform
 ~23 Supabase writes between them (posting/unposting bets, setting/randomizing tee groups, claiming/releasing
