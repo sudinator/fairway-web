@@ -78,7 +78,10 @@ jobs:
         run: npm run test:staging
 
   production-migration-parity:
-    if: (github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref == 'staging') || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    # Production credentials must never be exposed to code controlled by a pull request.
+    # Pre-merge migration verification is performed explicitly in the release checklist;
+    # this automated parity proof runs only after trusted code lands on main.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
     steps:

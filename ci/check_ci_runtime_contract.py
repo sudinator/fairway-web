@@ -12,6 +12,12 @@ for name in node_workflows:
 rob=(workflows/'robustness.yml').read_text(encoding='utf-8')
 if 'Types, tests, build' in rob or 'npm test' in rob or 'npm run build' in rob:
     errors.append('robustness.yml: duplicate full app CI still present; CI / verify is the single app build gate')
+ci=(workflows/'ci.yml').read_text(encoding='utf-8')
+production_job=ci.split('production-migration-parity:',1)[-1]
+if "if: github.event_name == 'push' && github.ref == 'refs/heads/main'" not in production_job:
+    errors.append('ci.yml: Production migration parity must run only on trusted push-to-main code')
+if "github.event_name == 'pull_request'" in production_job.split('runs-on:',1)[0]:
+    errors.append('ci.yml: Production credentials are reachable from pull-request-controlled code')
 if (ROOT/'.nvmrc').read_text().strip() != '22':
     errors.append('.nvmrc: expected pinned major 22')
 import json

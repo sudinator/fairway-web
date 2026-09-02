@@ -7,7 +7,7 @@ removed member kept access — and the comment-only guard passed. This version a
 catch that class. Heuristic (regex over SQL text), tuned to avoid false positives on the canonical
 patterns; flags for human review, doesn't try to prove correctness. See SECURITY_CHECKLIST.md.
 """
-import re, sys
+import re, sys, runpy
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -76,4 +76,7 @@ def main() -> int:
     return 0
 
 if __name__ == "__main__":
-    sys.exit(main())
+    result = main()
+    if result == 0:
+        runpy.run_path(str(ROOT / "ci" / "check_authorization_hardening_contract.py"), run_name="__main__")
+    sys.exit(result)

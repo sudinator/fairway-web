@@ -74,6 +74,7 @@ import {
 } from "@/components/ui";
 import type { Game, Player } from "@/lib/game-types";
 import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
+import { HScroll } from "@/components/hscroll";
 import { addPairing as nextPairingAdd, removePairing as nextPairingRemove, addFoursome as nextFoursomeAdd, removeFoursome as nextFoursomeRemove, renameFoursome as nextFoursomeRename, assignFoursomePlayer, unassignFoursomePlayer, deriveTeeGroupsFromFoursomes } from "@/lib/game-structure";
 
 const supabase = createClient();
@@ -826,7 +827,7 @@ export function MatchView({
                   {progressionRows.length === 0 ? (
                     <div style={{ color: C.sage, fontSize: 12 }}>No holes scored yet.</div>
                   ) : (
-                    <div style={{ overflowX: "auto" }}>
+                    <HScroll>
                       <div style={{ minWidth: 330 }}>
                         <div style={{ display: "grid", gridTemplateColumns: "42px minmax(82px, 1fr) minmax(82px, 1fr) 76px", gap: 8, color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: "4px 10px" }}>
                           <span>HOLE</span>
@@ -848,7 +849,7 @@ export function MatchView({
                           );
                         })}
                       </div>
-                    </div>
+                    </HScroll>
                   )}
                   <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Net scores drive the running match position. Bold gold marks the lower net on each hole.</div>
                 </div>
@@ -927,7 +928,7 @@ export function MatchView({
                 {progressionRows.length === 0 ? (
                   <div style={{ color: C.sage, fontSize: 12 }}>No holes scored yet.</div>
                 ) : (
-                  <div style={{ overflowX: "auto" }}>
+                  <HScroll>
                     <div style={{ minWidth: 330 }}>
                       <div style={{ display: "grid", gridTemplateColumns: "42px minmax(82px, 1fr) minmax(82px, 1fr) 76px", gap: 8, color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: "4px 10px" }}>
                         <span>HOLE</span>
@@ -949,7 +950,7 @@ export function MatchView({
                         );
                       })}
                     </div>
-                  </div>
+                  </HScroll>
                 )}
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Net scores drive the running match position. Bold gold marks the lower net on each hole.</div>
               </div>
