@@ -1,3 +1,6 @@
+## v179.1 staging correction
+- [x] Restore omitted Cup `buildPlayerRows(includeCreator)` shared contract/test in the staging package; add source guard. No migration.
+
 ## 179.0.260901 — Ryder Cup-style team competition
 
 - [x] Add Cup parent + persistent two-team roster model.

@@ -1,3 +1,7 @@
+## 179.1.260901 — Cup staging package correction
+
+The 179.0 staging package omitted the updated shared `lib/game-create.ts` contract. 179.1 restores that file plus its test and adds a guard so Cup session organizer opt-out cannot drift from `tournaments.tsx`. No database change.
+
 ## 179.0.260901 staging candidate — Ryder Cup-style Cups
 Cup creation is atomic at the database boundary: the event and its persistent A/B roster are created together, with active-club membership and team identity validated before commit.
 

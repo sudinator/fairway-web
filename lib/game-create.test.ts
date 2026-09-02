@@ -85,6 +85,10 @@ const rosterBase = {
   eq("blank scores", rows[0].scores.length, 18);
 }
 {
+  const rows = buildPlayerRows({ ...rosterBase, includeCreator: false });
+  eq("Cup organizer can be excluded when not playing", rows.length, 0);
+}
+{
   const roster = [
     { id: "me", display_name: "Me", avatar_url: "a.png", handicap_index: 9.9 },
     { id: "p2", display_name: "Bob", avatar_url: null, handicap_index: 18.3 },

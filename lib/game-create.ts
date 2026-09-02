@@ -143,17 +143,21 @@ export type PlayerRowsOpts = {
   // TGC-only money-game semantics. Defaults true for backward-compatible pure callers;
   // CreateGame passes the actual effective-group gate explicitly.
   tgcBettingEnabled?: boolean;
+  // Cup sessions may be organized by a captain who is not playing. Historical Create Game
+  // behavior includes the creator by default; only an explicit false opts out.
+  includeCreator?: boolean;
 };
 
 // The initial game_players rows for creation: creator + selected members + guests, with course
 // handicaps from the shared tee, flight assignment, and the small-field tee-group default.
 export function buildPlayerRows(o: PlayerRowsOpts) {
+  const includeCreator = o.includeCreator !== false;
   const selectedIds = new Set([
-    o.userId,
+    ...(includeCreator ? [o.userId] : []),
     ...Object.keys(o.selectedPlayers).filter((id) => o.selectedPlayers[id]),
   ]);
   const selectedRoster = o.groupRoster.filter((p) => selectedIds.has(p.id));
-  if (!selectedRoster.some((p) => p.id === o.userId)) {
+  if (includeCreator && !selectedRoster.some((p) => p.id === o.userId)) {
     selectedRoster.unshift({
       id: o.userId,
       display_name: o.displayName,

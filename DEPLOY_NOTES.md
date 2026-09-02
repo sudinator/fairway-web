@@ -1,3 +1,10 @@
+## 179.1.260901 — Restore omitted Cup Create Game contract files
+
+- CI-only/package correction after the first 179.0 staging bundle omitted `lib/game-create.ts` and `lib/game-create.test.ts` even though `components/tournaments.tsx` already used the new `includeCreator` option. GitHub therefore correctly failed TypeScript with TS2353.
+- Restores the intended shared Create Game contract: Cup organizers may create a session without automatically being inserted as a player, while ordinary Create Game continues to include the creator by default.
+- Adds a permanent competition source guard requiring the caller and shared `PlayerRowsOpts` contract to remain in sync.
+- No database change; staging migration 0142 remains unchanged and already applied.
+
 ## 179.0.260901 — Ryder Cup-style multi-session team competitions
 
 - Adds a new **Cups** surface inside Games without changing BNN's primary bottom navigation.
