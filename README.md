@@ -1,4 +1,4 @@
-## 179.6.260902 staging corrective — complete Ryder Cup overlay
+## 179.7.260902 staging corrective — integration VAPID wiring
 
 The multi-session team competition is now called **Ryder Cup** throughout the interface. The Games screen explains the difference between a one-round Game and a multi-session Ryder Cup. Games launched from a Ryder Cup session begin with Group Results, money-game participation, and hole contests off; organizers can opt into them afterward. No migration is required beyond 0143.
 

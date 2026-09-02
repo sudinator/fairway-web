@@ -1,5 +1,9 @@
 # Refactor test plan — verifying component moves (Stage 1b: OrganizerPanel, BettingPanel, GroupScorecard, GroupsBuilder)
 
+## 179.7 Staging-integration workflow corrective
+
+Use `RELEASE_VERIFICATION_179.7.md`. Confirm the manual workflow provides the public VAPID key through the same fallback contract as normal CI and does not set the local-only bypass. Rerun the workflow on `staging` with mutation confirmation `YES`; it must pass the build and reach the real Staging-only integration harness. No application or database behavior changes.
+
 ## 179.6 complete-overlay corrective gate
 
 Use `RELEASE_VERIFICATION_179.6.md`. Confirm the Vercel build resolves the v179.5 missing-export failure, then rerun the complete v179.4 weighted-outcome checks and v179.5 naming/quiet-default checks. The corrective package must include `lib/competition.ts`, `lib/competition.test.ts`, and `components/game/scoring-views.tsx`. No database migration is added.

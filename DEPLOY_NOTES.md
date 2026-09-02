@@ -1,3 +1,10 @@
+## 179.7.260902 — Staging integration VAPID wiring
+
+- Supplies `NEXT_PUBLIC_VAPID_PUBLIC_KEY` to the manual Staging integration workflow using the same repository-variable-or-committed-public-key contract as normal CI.
+- Keeps the VAPID drift check active in GitHub; the workflow does not use the local-only `VAPID_CHECK_OPTIONAL` bypass.
+- Extends the permanent VAPID source guard to cover the manual Staging integration workflow and reject any GitHub-side bypass.
+- Corrects only GitHub workflow configuration. No application, scoring, database, migration, Vercel, or Production behavior changes.
+
 ## 179.6.260902 — Complete incremental Ryder Cup overlay
 
 - Corrects the v179.5 changed-files package dependency on three v179.4 runtime files that were not present in a repository updated directly from v179.3.

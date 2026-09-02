@@ -1,3 +1,10 @@
+## v179.7 Staging integration workflow corrective
+
+- [x] Identify the manual workflow failure: `npm run ci:staging` reached prebuild without `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.
+- [x] Give the manual workflow the same public-key variable/fallback contract as normal CI while retaining the mandatory drift check.
+- [x] Extend the VAPID source guard so this workflow wiring cannot silently regress.
+- [ ] Push to `staging` and rerun **Staging integration** with confirmation `YES`; the complete workflow must be green before Production promotion.
+
 ## v179.6 complete-overlay corrective
 
 - [x] Identify the v179.5 Vercel failure as an incremental-package mismatch: v179.5 `components/competitions.tsx` imported the v179.4 `competitionOutcome` helper while the deployed repository still contained v179.3 `lib/competition.ts`.

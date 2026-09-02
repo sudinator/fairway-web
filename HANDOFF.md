@@ -6,11 +6,15 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current staging candidate: 179.6.260902
+## Current staging candidate: 179.7.260902
+
+- v179.7 corrects the manual Staging integration workflow so its build receives the same public VAPID-key input as normal CI.
+- The previous v179.6 manual run stopped before `npm run test:staging`; it created no temporary integration users or records.
+- Rerun the workflow on the `staging` branch with mutation confirmation `YES`. Production promotion remains blocked until it is green.
 
 - v179.6 corrects the v179.5 incremental-package mismatch by including the three v179.4 runtime files required by the v179.5 UI: `lib/competition.ts`, `lib/competition.test.ts`, and `components/game/scoring-views.tsx`.
 - The Vercel failure was a compile-time missing export (`competitionOutcome`), not a database or Node runtime defect.
-- Complete `RELEASE_VERIFICATION_179.6.md` before Production; migration 0143 remains the latest schema change.
+- Complete `RELEASE_VERIFICATION_179.7.md` before Production; migration 0143 remains the latest schema change.
 
 - The user-facing multi-session team feature is named **Ryder Cup**; internal `competitions` tables, RPCs, and types intentionally retain their established names.
 - Games explains the distinction in place: a Game is one round/format/scorecard; a Ryder Cup combines several team sessions into one overall match score.
