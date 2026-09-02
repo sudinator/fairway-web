@@ -47,7 +47,7 @@ import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, altShotSides } from "@
 import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { canonicalAltShotGross, type AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import { decideSetupChange, type SetupAction } from "@/lib/game-setup-policy";
-import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
+import { balancedOneVOne, randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
 import type { LegConfig, Leg } from "@/lib/legs";
@@ -136,7 +136,7 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
   };
   const ORANGE = "#E8730C";
 
-  if (mode === "setup") {
+  if (String(mode) === "setup") {
     if (isTeamBestBallSkins) {
       return (
         <div style={{ marginTop: 18 }}>
@@ -359,6 +359,109 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
 }
 
 
+type MatchDraft = { a: string; b: string };
+
+function MatchSetupBuilder({ game, players, teams, blocked, blockedReason, onSave }: {
+  game: Game;
+  players: Player[];
+  teams: { key: string; name: string }[] | null;
+  blocked: boolean;
+  blockedReason?: string;
+  onSave: (pairings: MatchDraft[]) => Promise<void>;
+}) {
+  const isTeam = !!(teams && teams.length === 2);
+  const activePlayers = players.filter((p) => !p.no_show);
+  const desiredRows = isTeam
+    ? Math.max(...teams!.map((t) => activePlayers.filter((p) => p.team === t.key).length), 1)
+    : Math.max(1, Math.ceil(activePlayers.length / 2));
+  const pad = (pairings: MatchDraft[]) => [
+    ...pairings.map((pair) => ({ ...pair })),
+    ...Array.from({ length: Math.max(0, desiredRows - pairings.length) }, () => ({ a: "", b: "" })),
+  ];
+  const pairingSignature = JSON.stringify(game.pairings || []);
+  const [drafts, setDrafts] = useState<MatchDraft[]>(() => pad(game.pairings || []));
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setDrafts(pad(game.pairings || [])), [pairingSignature, desiredRows]);
+
+  const playerByKey = (key: string) => players.find((p) => pkey(p) === key) || null;
+  const playingHandicap = (p: Player) => applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100);
+  const optionLabel = (p: Player) => `${p.display_name} · PH ${playingHandicap(p)}`;
+  const used = new Set(drafts.flatMap((pair) => [pair.a, pair.b]).filter(Boolean));
+  const unassigned = activePlayers.filter((p) => !used.has(pkey(p)));
+  const readyCount = drafts.filter((pair) => pair.a && pair.b && pair.a !== pair.b).length;
+
+  const choicesFor = (side: "a" | "b", row: number) => {
+    const current = drafts[row]?.[side] || "";
+    const opponent = drafts[row]?.[side === "a" ? "b" : "a"] || "";
+    const teamKey = isTeam ? teams![side === "a" ? 0 : 1].key : null;
+    return activePlayers.filter((p) => {
+      const key = pkey(p);
+      return (!teamKey || p.team === teamKey) && key !== opponent && (!used.has(key) || key === current);
+    }).sort((a, b) => a.display_name.localeCompare(b.display_name));
+  };
+
+  const persist = async (next: MatchDraft[]) => {
+    const complete = next.filter((pair) => pair.a && pair.b && pair.a !== pair.b);
+    setBusy(true);
+    try { await onSave(complete); } finally { setBusy(false); }
+  };
+  const setSlot = (row: number, side: "a" | "b", value: string) => {
+    const next = drafts.map((pair, index) => index === row ? { ...pair, [side]: value } : pair);
+    setDrafts(next);
+    void persist(next);
+  };
+  const buildBalanced = () => {
+    const result = balancedOneVOne(
+      activePlayers.map((p) => ({ id: pkey(p), team: p.team, playingHandicap: playingHandicap(p) })),
+      isTeam ? [teams![0].key, teams![1].key] : undefined,
+    );
+    const next = pad(result.pairings);
+    setDrafts(next);
+    void persist(next);
+  };
+
+  return (
+    <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 18 }}>
+      <Eyebrow>MATCHUPS · BUILD EACH MATCH</Eyebrow>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.45 }}>
+        {isTeam ? `Pair one ${teams![0].name} player against one ${teams![1].name} player.` : "Pair players into individual 1-v-1 matches."} A selected player is removed from every other dropdown.
+      </div>
+      {blocked && blockedReason ? <div style={{ background: C.green, border: `1px solid ${C.birdie}`, borderRadius: 10, padding: "8px 12px", color: C.cream, fontSize: 11.5, lineHeight: 1.45, marginTop: 10 }}>{blockedReason}</div> : null}
+
+      <div style={{ marginTop: 12, padding: "8px 12px", borderTop: `1px solid ${C.borderGreen}`, borderBottom: `1px solid ${C.borderGreen}` }}>
+        <div style={{ color: C.cream, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>UNASSIGNED PLAYERS</div>
+        {isTeam ? teams!.map((team, index) => {
+          const rows = unassigned.filter((p) => p.team === team.key);
+          return <div key={team.key} style={{ marginTop: 6, color: C.sage, fontSize: 11.5, lineHeight: 1.4 }}><span style={{ color: teamAccent(team.name, index), fontWeight: 800 }}>{team.name}:</span> {rows.length ? rows.map(optionLabel).join(", ") : "None"}</div>;
+        }) : <div style={{ marginTop: 6, color: C.sage, fontSize: 11.5, lineHeight: 1.4 }}>{unassigned.length ? unassigned.map(optionLabel).join(", ") : "None"}</div>}
+      </div>
+
+      <button onClick={buildBalanced} disabled={blocked || busy} style={{ ...btn(true), width: "100%", marginTop: 12, fontSize: 13, opacity: blocked || busy ? .58 : 1 }}>{busy ? "Saving…" : "🎲 Build balanced matches"}</button>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, color: C.sage, fontSize: 11, marginTop: 12 }}><b style={{ color: C.cream }}>{readyCount} of {desiredRows} matches ready</b><span>{activePlayers.length} players</span></div>
+
+      {drafts.map((pair, row) => {
+        const ready = !!(pair.a && pair.b && pair.a !== pair.b);
+        return <div key={row} style={{ background: C.greenMid, borderRadius: 12, padding: 12, marginTop: 10, border: `1px solid ${ready ? C.gold : C.borderGreen}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ color: C.cream, fontSize: 15, fontWeight: 800 }}>Match {row + 1}</div><div style={{ marginLeft: "auto", color: ready ? "#FFE08A" : C.sage, fontSize: 11, fontWeight: 800 }}>{ready ? "✓ READY · 1 v 1" : "NEEDS PLAYERS"}</div></div>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 24px minmax(0,1fr)", gap: 7, alignItems: "center", marginTop: 10 }}>
+            {(["a", "b"] as const).map((side, sideIndex) => <React.Fragment key={side}>
+              {sideIndex === 1 ? <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, textAlign: "center" }}>VS</div> : null}
+              <label style={{ minWidth: 0 }}>
+                <span style={{ display: "block", color: isTeam ? teamAccent(teams![sideIndex].name, sideIndex) : C.sage, fontSize: 11, fontWeight: 800, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isTeam ? teams![sideIndex].name : `Player ${sideIndex + 1}`}</span>
+                <select aria-label={`Match ${row + 1} player ${sideIndex + 1}`} value={pair[side]} disabled={blocked || busy} onChange={(e) => setSlot(row, side, e.target.value)} style={{ ...inputStyle, width: "100%", minWidth: 0, padding: "8px 12px", fontSize: 11.5 }}>
+                  <option value="">Select player…</option>
+                  {choicesFor(side, row).map((p) => <option key={pkey(p)} value={pkey(p)}>{optionLabel(p)}</option>)}
+                </select>
+              </label>
+            </React.Fragment>)}
+          </div>
+          {ready ? <div style={{ color: C.sage, fontSize: 11, marginTop: 7 }}>{playerByKey(pair.a)?.display_name} vs {playerByKey(pair.b)?.display_name}</div> : null}
+        </div>;
+      })}
+    </div>
+  );
+}
+
 export function MatchView({
   game,
   players,
@@ -426,6 +529,22 @@ export function MatchView({
   const teamB = teams && teams[1] ? teams[1] : null;
   const useTeamPick = !!(teamA && teamB);
 
+  if (mode === "setup") {
+    return <MatchSetupBuilder
+      game={game}
+      players={players}
+      teams={useTeamPick ? teams : null}
+      blocked={!isCreator || matchupsBlocked}
+      blockedReason={matchupDecision.decision === "block" ? matchupDecision.reason : undefined}
+      onSave={async (pairings) => {
+        if (!allowSetupMutation({ type: "set_pairings" })) return;
+        const { error } = await supabase.from("games").update({ pairings }).eq("id", game.id);
+        if (error) { notifyError("Couldn't save those matchups — please try again."); return; }
+        onChanged();
+      }}
+    />;
+  }
+
   const assignTeam = async (p: Player, key: string | null) => {
     if (!allowSetupMutation({ type: "set_team", player: p, team: key })) return;
     await supabase.from("game_players").update({ team: key }).eq("id", p.id);
@@ -491,9 +610,9 @@ export function MatchView({
 
       {/* Team assignments now live in Organizer · Manage Game so each player is configured once. */}
       <div style={{ display: "flex", alignItems: "center" }}>
-        <Eyebrow>{mode === "setup" ? "SET MATCHUPS" : "MATCHES"}</Eyebrow>
+        <Eyebrow>{String(mode) === "setup" ? "SET MATCHUPS" : "MATCHES"}</Eyebrow>
         <div style={{ flex: 1 }} />
-        {mode === "setup" && isCreator && (
+        {String(mode) === "setup" && isCreator && (
           <button
             style={{ ...btn(false), fontSize: 12, opacity: matchupsBlocked ? 0.55 : 1 }}
             disabled={matchupsBlocked}
@@ -505,13 +624,13 @@ export function MatchView({
         )}
       </div>
 
-      {mode === "setup" && isCreator && matchupsBlocked && matchupDecision.decision === "block" && (
+      {String(mode) === "setup" && isCreator && matchupsBlocked && matchupDecision.decision === "block" && (
         <div style={{ background: "#4a1d16", border: `1px solid ${C.birdie}`, borderRadius: 10, padding: "9px 11px", color: "#f0c5bd", fontSize: 11.5, lineHeight: 1.45, marginTop: 10 }}>
           {matchupDecision.reason}
         </div>
       )}
 
-      {mode === "setup" && editing && isCreator && (
+      {String(mode) === "setup" && editing && isCreator && (
         <div
           style={{
             background: C.greenLight,

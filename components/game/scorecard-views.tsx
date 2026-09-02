@@ -579,9 +579,10 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
 }
 
 // Organizer/admin score-change history for a game (reads migration 0042's audit log).
-export function GroupsBuilder({ game, players, onSetTeeGroup, onSetAltShotFirstDriver, getTeeGroupPolicy, onRandomize, canRandomize = false, randomizeReason = "", randomizing = false, overflowIds = [] }: {
+export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot, onSetAltShotFirstDriver, getTeeGroupPolicy, onRandomize, canRandomize = false, randomizeReason = "", randomizing = false, overflowIds = [] }: {
   game: Game; players: Player[];
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
+  onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
   onSetAltShotFirstDriver?: (foursomeId: string, side: "a" | "b", playerKey: string) => Promise<void>;
   getTeeGroupPolicy?: (p: Player, group: number | null) => { blocked: boolean; reason?: string };
   onRandomize?: () => Promise<void>;
@@ -621,6 +622,10 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetAltShotFirstD
   };
   const teeGroups = Array.from(new Set(players.map((p) => p.tee_group).filter((g): g is number => g != null))).sort((a, b) => a - b);
   const firstGroup = teeGroups.length ? Math.min(...teeGroups) : null;
+
+  if (teamGroupsOwnStructure && Array.isArray(game.teams) && game.teams.length === 2) {
+    return <TeamGroupsBuilder game={game} players={players} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} onRandomize={onRandomize} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} />;
+  }
 
   return (
     <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>
@@ -725,6 +730,94 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetAltShotFirstD
   );
 }
 
+function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirstDriver, onRandomize, canRandomize, randomizeReason, randomizing }: {
+  game: Game;
+  players: Player[];
+  onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
+  onSetAltShotFirstDriver?: (foursomeId: string, side: "a" | "b", playerKey: string) => Promise<void>;
+  onRandomize?: () => Promise<void>;
+  canRandomize: boolean;
+  randomizeReason: string;
+  randomizing: boolean;
+}) {
+  const teams = game.teams!;
+  const foursomes = Array.isArray(game.foursomes) ? game.foursomes : [];
+  const byKey = (key: string) => players.find((p) => pkey(p) === key) || null;
+  const ph = (p: Player) => applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100);
+  const label = (p: Player) => `${p.display_name} · PH ${ph(p)}`;
+  const assignedGroups = players.map((p) => p.tee_group).filter((g): g is number => g != null);
+  const maxExisting = assignedGroups.length ? Math.max(...assignedGroups) : 0;
+  const groupCount = Math.max(1, maxExisting, Math.ceil(Math.max(...teams.map((t) => players.filter((p) => p.team === t.key).length)) / 2));
+  const unassigned = players.filter((p) => p.tee_group == null && !p.no_show);
+  const readyCount = Array.from({ length: groupCount }, (_, i) => i + 1).filter((group) =>
+    teams.every((t) => players.filter((p) => p.tee_group === group && p.team === t.key && !p.no_show).length === 2),
+  ).length;
+
+  const selectFor = (teamKey: string, group: number, slot: number) => {
+    const inGroup = players.filter((p) => p.team === teamKey && p.tee_group === group && !p.no_show);
+    const current = inGroup[slot] || null;
+    const choices = players.filter((p) => p.team === teamKey && !p.no_show && (p.tee_group == null || p.id === current?.id));
+    return (
+      <select
+        aria-label={`Group ${group} ${teams.find((t) => t.key === teamKey)?.name || "team"} player ${slot + 1}`}
+        value={current?.id || ""}
+        disabled={!onSetTeamGroupSlot}
+        onChange={(e) => {
+          const next = players.find((p) => p.id === e.target.value) || null;
+          void onSetTeamGroupSlot?.(current, next, group);
+        }}
+        style={{ ...inputStyle, width: "100%", minWidth: 0, padding: "8px 12px", fontSize: 12 }}
+      >
+        <option value="">Select player…</option>
+        {choices.sort((a, b) => a.display_name.localeCompare(b.display_name)).map((p) => <option key={p.id} value={p.id}>{label(p)}</option>)}
+      </select>
+    );
+  };
+
+  return (
+    <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>
+      <Eyebrow>GROUPS · BUILD EACH MATCH</Eyebrow>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.45 }}>
+        Each {game.game_type === "alt_shot" ? "Alternate Shot" : "Four-Ball"} group needs exactly two {teams[0].name} and two {teams[1].name} players. Team membership stays visible while you build the match.
+      </div>
+      {onRandomize ? <div style={{ marginTop: 12 }}>
+        <button onClick={() => canRandomize && onRandomize()} disabled={!canRandomize || randomizing} style={{ ...btn(true), fontSize: 13, opacity: canRandomize && !randomizing ? 1 : 0.62 }}>
+          {randomizing ? "Building…" : "🎲 Build balanced groups"}
+        </button>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>{canRandomize ? "Creates valid 2-v-2 groups and spreads playing handicaps across the matches. You can still change any player below." : randomizeReason}</div>
+      </div> : null}
+
+      <div style={{ marginTop: 12, padding: "8px 12px", borderTop: `1px solid ${C.borderGreen}`, borderBottom: `1px solid ${C.borderGreen}` }}>
+        <div style={{ color: C.cream, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>UNASSIGNED PLAYERS</div>
+        {teams.map((t, ti) => {
+          const rows = unassigned.filter((p) => p.team === t.key);
+          return <div key={t.key} style={{ marginTop: 6, color: C.sage, fontSize: 11.5, lineHeight: 1.4 }}><span style={{ color: teamAccent(t.name, ti), fontWeight: 800 }}>{t.name}:</span> {rows.length ? rows.map(label).join(", ") : "None"}</div>;
+        })}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, color: C.sage, fontSize: 11, marginTop: 12 }}><b style={{ color: C.cream }}>{readyCount} of {groupCount} groups ready</b><span>{players.filter((p) => !p.no_show).length} players · {groupCount} matches</span></div>
+
+      {Array.from({ length: groupCount }, (_, i) => i + 1).map((group) => {
+        const sides = teams.map((t) => players.filter((p) => p.team === t.key && p.tee_group === group && !p.no_show));
+        const ready = sides.every((side) => side.length === 2);
+        const extras = sides.flatMap((side) => side.slice(2));
+        const f = foursomes.find((x) => [...x.a, ...x.b].some((key) => players.some((p) => p.tee_group === group && pkey(p) === key)));
+        return <div key={group} style={{ background: C.greenMid, borderRadius: 12, padding: 12, marginTop: 10, border: `1px solid ${ready ? C.gold : C.borderGreen}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ color: C.cream, fontSize: 15, fontWeight: 800 }}>Group {group}</div><div style={{ marginLeft: "auto", color: ready ? "#FFE08A" : C.sage, fontSize: 11, fontWeight: 800 }}>{ready ? "✓ READY · 2 v 2" : `NEEDS ${Math.max(0, 4 - sides.reduce((n, s) => n + Math.min(2, s.length), 0))} PLAYERS`}</div></div>
+          {teams.map((t, ti) => <div key={t.key} style={{ marginTop: 10, paddingTop: 9, borderTop: "1px solid rgba(178,203,189,.22)" }}>
+            <div style={{ display: "flex", color: teamAccent(t.name, ti), fontSize: 12, fontWeight: 800, marginBottom: 7 }}><span>{t.name}</span><span style={{ marginLeft: "auto", color: C.sage, fontSize: 11 }}>{sides[ti].length}/2 selected</span></div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 7 }}>{selectFor(t.key, group, 0)}{selectFor(t.key, group, 1)}</div>
+          </div>)}
+          {extras.map((p) => <button key={p.id} onClick={() => void onSetTeamGroupSlot?.(p, null, group)} style={{ ...btn(false), width: "100%", marginTop: 7, color: C.overRedDark, fontSize: 11 }}>Move extra player {p.display_name} to unassigned</button>)}
+          {game.game_type === "alt_shot" && ready && f ? <div style={{ marginTop: 10, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 9 }}>
+            {(["a", "b"] as const).map((side, si) => <label key={side} style={{ display: "block", color: C.sage, fontSize: 11, marginTop: si ? 8 : 0 }}>{teams[si].name} · tees off first<select value={(side === "a" ? f.a_first : f.b_first) || ""} onChange={(e) => e.target.value && onSetAltShotFirstDriver?.(f.id, side, e.target.value)} style={{ ...inputStyle, width: "100%", marginTop: 3, padding: "8px 12px", fontSize: 12 }}><option value="">Select player…</option>{f[side].map((id) => <option key={id} value={id}>{byKey(id)?.display_name || id}</option>)}</select></label>)}
+          </div> : null}
+        </div>;
+      })}
+    </div>
+  );
+}
+
 // Organizer control to publish / revoke the public live-scorecard link.
 export function ShareControl({ game, onShare }: { game: Game; onShare: (on: boolean) => Promise<void> }) {
   const [busy, setBusy] = useState(false);
@@ -762,4 +855,3 @@ export function ShareControl({ game, onShare }: { game: Game; onShare: (on: bool
     </div>
   );
 }
-

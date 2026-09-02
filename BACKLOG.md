@@ -1,3 +1,13 @@
+## v179.2 competitive assignment UX
+
+- [x] Show unassigned players above Four-Ball / Alternate Shot group cards.
+- [x] Show named team sides and playing handicaps in each group slot.
+- [x] Remove an assigned player from all other group dropdowns while retaining the current selection.
+- [x] Build only valid 2-v-2 balanced team groups; leave incomplete-team leftovers unassigned.
+- [x] Apply the same one-use assignment model to standalone and team Singles match play.
+- [x] Preserve existing scoring engines and Cup aggregation.
+- [ ] Deploy to Staging and run the real 12-player browser acceptance scenarios in `RELEASE_VERIFICATION_179.2.md`.
+
 ## v179.1 staging correction
 - [x] Restore omitted Cup `buildPlayerRows(includeCreator)` shared contract/test in the staging package; add source guard. No migration.
 

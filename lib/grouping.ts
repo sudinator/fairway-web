@@ -97,6 +97,77 @@ export type RandomResult = {
   overflowGuestIds: string[];                          // to be left unassigned (tee_group = null)
 };
 
+export type CompetitivePlayer = {
+  id: string;
+  team?: string | null;
+  playingHandicap?: number | null;
+};
+
+export type CompetitiveAssignmentResult = {
+  assignments: { playerId: string; group: number }[];
+  unassignedIds: string[];
+};
+
+const handicapOrder = (a: CompetitivePlayer, b: CompetitivePlayer) => {
+  const ah = a.playingHandicap == null || !Number.isFinite(a.playingHandicap) ? Number.POSITIVE_INFINITY : a.playingHandicap;
+  const bh = b.playingHandicap == null || !Number.isFinite(b.playingHandicap) ? Number.POSITIVE_INFINITY : b.playingHandicap;
+  return ah - bh || a.id.localeCompare(b.id);
+};
+
+/**
+ * Build valid team-match foursomes: exactly two players from each of the two
+ * persistent teams. Within each team, low+high handicap pairs reduce the spread
+ * between groups; the second team's pairs are then matched in reverse total order.
+ * Odd/imbalanced leftovers stay explicitly unassigned instead of creating a 3-v-1.
+ */
+export function balancedTeamGroups(field: CompetitivePlayer[], teamKeys: [string, string]): CompetitiveAssignmentResult {
+  const pairsFor = (key: string) => {
+    const sorted = field.filter((p) => p.team === key).sort(handicapOrder);
+    const pairs: CompetitivePlayer[][] = [];
+    while (sorted.length >= 2) pairs.push([sorted.shift()!, sorted.pop()!]);
+    return { pairs, leftovers: sorted };
+  };
+  const a = pairsFor(teamKeys[0]);
+  const b = pairsFor(teamKeys[1]);
+  const pairTotal = (pair: CompetitivePlayer[]) => pair.reduce((n, p) => n + (p.playingHandicap ?? 0), 0);
+  a.pairs.sort((x, y) => pairTotal(y) - pairTotal(x));
+  b.pairs.sort((x, y) => pairTotal(x) - pairTotal(y));
+  const count = Math.min(a.pairs.length, b.pairs.length);
+  const assignments: CompetitiveAssignmentResult["assignments"] = [];
+  for (let i = 0; i < count; i++) {
+    [...a.pairs[i], ...b.pairs[i]].forEach((p) => assignments.push({ playerId: p.id, group: i + 1 }));
+  }
+  const placed = new Set(assignments.map((x) => x.playerId));
+  return { assignments, unassignedIds: field.filter((p) => !placed.has(p.id)).map((p) => p.id) };
+}
+
+/** Build one-opponent-per-player matchups. Team Singles pairs across the two
+ * teams by nearest playing handicap; standalone Singles pairs adjacent players.
+ * An odd or imbalanced remainder is left unassigned and remains visible in setup.
+ */
+export function balancedOneVOne(field: CompetitivePlayer[], teamKeys?: [string, string]): { pairings: { a: string; b: string }[]; unassignedIds: string[] } {
+  const pairings: { a: string; b: string }[] = [];
+  if (teamKeys) {
+    const left = field.filter((p) => p.team === teamKeys[0]).sort(handicapOrder);
+    const available = field.filter((p) => p.team === teamKeys[1]).sort(handicapOrder);
+    for (const a of left) {
+      if (!available.length) break;
+      const ah = a.playingHandicap ?? 0;
+      let best = 0;
+      for (let i = 1; i < available.length; i++) {
+        if (Math.abs((available[i].playingHandicap ?? 0) - ah) < Math.abs((available[best].playingHandicap ?? 0) - ah)) best = i;
+      }
+      const b = available.splice(best, 1)[0];
+      pairings.push({ a: a.id, b: b.id });
+    }
+  } else {
+    const sorted = [...field].sort(handicapOrder);
+    while (sorted.length >= 2) pairings.push({ a: sorted.shift()!.id, b: sorted.shift()!.id });
+  }
+  const placed = new Set(pairings.flatMap((p) => [p.a, p.b]));
+  return { pairings, unassignedIds: field.filter((p) => !placed.has(p.id)).map((p) => p.id) };
+}
+
 // Top-level: field in, group assignments out. Overflow guests are reported so the
 // caller can null their tee_group and prompt the organizer to place them.
 export function randomTeeGroups(field: GPlayer[], maxPer = 4, rng: () => number = Math.random): RandomResult {

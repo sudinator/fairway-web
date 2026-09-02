@@ -27,6 +27,7 @@ export type GameSetupWorkspaceProps = {
   courseOptions: Course[];
   onChangeCourse: (course: Course) => Promise<void>;
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
+  onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
   onSetAltShotFirstDriver?: (foursomeId: string, side: "a" | "b", playerKey: string) => Promise<void>;
   onSetLegConfig?: (cfg: LegConfig) => void;
   getTeeGroupPolicy: (p: Player, group: number | null) => { blocked: boolean; reason?: string };
@@ -54,6 +55,7 @@ export function GameSetupWorkspace({
   courseOptions,
   onChangeCourse,
   onSetTeeGroup,
+  onSetTeamGroupSlot,
   onSetAltShotFirstDriver,
   onSetLegConfig,
   getTeeGroupPolicy,
@@ -276,7 +278,7 @@ export function GameSetupWorkspace({
             {showGroupsTab && <button onClick={() => onSetupTabChange("groups")} style={{ ...btn(setupTab === "groups"), flex: 1, fontSize: 12 }}>Groups</button>}
           </div>
           {setupTab === "teams" && <OrganizerPanel section="teams" {...organizerPanelProps} />}
-          {setupTab === "groups" && <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup} onSetAltShotFirstDriver={onSetAltShotFirstDriver} getTeeGroupPolicy={getTeeGroupPolicy} onRandomize={onRandomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} overflowIds={groupOverflow} />}
+          {setupTab === "groups" && <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} getTeeGroupPolicy={getTeeGroupPolicy} onRandomize={onRandomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} overflowIds={groupOverflow} />}
           {setupTab === "matchups" && <div style={{ ...cardStyle, color: C.sage, fontSize: 12 }}>Build and review matchups below. The existing matchup editor is unchanged.</div>}
         </>
       )}

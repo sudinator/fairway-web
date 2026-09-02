@@ -1,3 +1,12 @@
+## 179.2.260902 — Competitive group and Singles assignment builder
+
+- Replaces the player-by-player Four-Ball / Alternate Shot group editor with match-first group cards showing two named-team slots per side, visible playing handicaps, and an explicit 2-v-2 readiness state.
+- Keeps unassigned players above the group cards so organizers do not need to scroll to find the remaining field.
+- Removes an assigned player from every other dropdown while retaining that player in the current slot; slot replacement persists through the existing batch tee-group RPC and immediately re-derives the existing team foursomes.
+- Makes **Build balanced groups** team-aware: it creates only complete 2-v-2 groups and leaves odd or imbalanced players visibly unassigned rather than producing an invalid match.
+- Adds the same match-first assignment pattern to standalone Singles and Ryder Cup Team Singles, with team-restricted sides, one opponent per player, playing handicaps, and balanced matchup generation.
+- Preserves the existing Match, Four-Ball, and Alternate Shot scoring engines and all downstream result aggregation. No database migration.
+
 ## 179.1.260901 — Restore omitted Cup Create Game contract files
 
 - CI-only/package correction after the first 179.0 staging bundle omitted `lib/game-create.ts` and `lib/game-create.test.ts` even though `components/tournaments.tsx` already used the new `includeCreator` option. GitHub therefore correctly failed TypeScript with TS2353.

@@ -49,7 +49,7 @@ import {
   mergeBackupRow } from "@/lib/golf";
 import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
 import { decideSetupChange, type SetupAction, type SetupDecision } from "@/lib/game-setup-policy";
-import { randomTeeGroups, type GPlayer } from "@/lib/grouping";
+import { balancedTeamGroups, randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
 import type { LegConfig, Leg } from "@/lib/legs";
@@ -2347,6 +2347,28 @@ function GameRoom({
     await load();
   };
 
+  // Team formats edit a visible slot rather than a player's standalone group row.
+  // Save the player leaving and the player entering in one RPC so there is never
+  // a transient duplicate in two group dropdowns.
+  const setTeamGroupSlot = async (current: Player | null, next: Player | null, group: number) => {
+    if (!game || current?.id === next?.id) return;
+    const changes = [
+      ...(current ? [{ player: current, group: null as number | null }] : []),
+      ...(next ? [{ player: next, group }] : []),
+    ];
+    for (const change of changes) {
+      if (!allowSetupChange({ type: "set_tee_group", player: change.player, group: change.group })) return;
+    }
+    const payload = changes.map((change) => ({ player: change.player.id, group: change.group }));
+    const { error } = await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: payload });
+    if (error) { notifyError("Couldn't update that group slot — please try again."); return; }
+    const byId = new Map(changes.map((change) => [change.player.id, change.group]));
+    const nextPlayers = players.map((p) => byId.has(p.id) ? { ...p, tee_group: byId.get(p.id) ?? null } : p);
+    setPlayers(nextPlayers);
+    await syncTeamPlayFoursomes(nextPlayers);
+    await load();
+  };
+
   // Organizer: shuffle the field into balanced foursomes, keeping each guest with
   // the member who sponsored them. Overflow guests (a sponsor with >3 guests) are
   // left unassigned for manual placement. Pre-round only — see canRandomize below.
@@ -2357,10 +2379,28 @@ function GameRoom({
   const randomizeReason = randomizeDecision.decision === "block" ? randomizeDecision.reason : "";
   const randomizeGroups = async () => {
     if (!game || !canRandomize || !allowSetupChange({ type: "randomize_groups" })) return;
-    const field: GPlayer[] = players
-      .filter((p) => !p.no_show)
-      .map((p) => ({ id: p.id, userId: p.user_id ?? null, isGuest: !!p.is_guest, guestOf: p.guest_of ?? null }));
-    const { assignments, overflowGuestIds } = randomTeeGroups(field, 4);
+    const teamFormat = (game.game_type === "fourball" || game.game_type === "alt_shot") && Array.isArray(game.teams) && game.teams.length === 2;
+    let assignments: { playerId: string; group: number }[];
+    let overflowGuestIds: string[];
+    if (teamFormat) {
+      const result = balancedTeamGroups(
+        players.filter((p) => !p.no_show).map((p) => ({
+          id: p.id,
+          team: p.team,
+          playingHandicap: applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100),
+        })),
+        [game.teams![0].key, game.teams![1].key],
+      );
+      assignments = result.assignments;
+      overflowGuestIds = result.unassignedIds;
+    } else {
+      const field: GPlayer[] = players
+        .filter((p) => !p.no_show)
+        .map((p) => ({ id: p.id, userId: p.user_id ?? null, isGuest: !!p.is_guest, guestOf: p.guest_of ?? null }));
+      const result = randomTeeGroups(field, 4);
+      assignments = result.assignments;
+      overflowGuestIds = result.overflowGuestIds;
+    }
     const byId = new Map(assignments.map((a) => [a.playerId, a.group]));
     setPlayers((prev) => prev.map((p) => (p.no_show ? p : ({ ...p, tee_group: overflowGuestIds.includes(p.id) ? null : (byId.get(p.id) ?? null) })))); // optimistic
     setGroupOverflow(overflowGuestIds);
@@ -3160,7 +3200,7 @@ function GameRoom({
         const workspaceProps = {
           game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate, courseOptions, onChangeCourse: changeGameCourse,
           onSetTeeGroup: setPlayerTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, onSetLegConfig: setLegConfig, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, canRandomize, randomizeReason,
-          randomizing, groupOverflow,
+          randomizing, groupOverflow, onSetTeamGroupSlot: setTeamGroupSlot,
         } satisfies React.ComponentProps<typeof GameSetupWorkspace>;
         return <GameSetupWorkspace {...workspaceProps} />;
       })()}

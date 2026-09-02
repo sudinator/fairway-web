@@ -1,5 +1,5 @@
 {
-  "total": 189922,
+  "total": 189932,
   "suites": {
     "(unnamed suites)": 511,
     "ai-sanitize": 11,
@@ -26,7 +26,7 @@
     "game-create": 61,
     "game-utils": 21,
     "golf/computeBetting tests": 53,
-    "grouping tests": 281,
+    "grouping tests": 291,
     "hole result consistency": 981,
     "legs": 30,
     "match length": 46,

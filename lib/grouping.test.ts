@@ -1,5 +1,5 @@
 // Unit tests for lib/grouping.ts — run with `npm test`.
-import { buildParties, seatParties, randomTeeGroups, seededRng, GPlayer } from "./grouping";
+import { balancedOneVOne, balancedTeamGroups, buildParties, seatParties, randomTeeGroups, seededRng, GPlayer } from "./grouping";
 
 let pass = 0, fail = 0; const fails: string[] = [];
 const ok = (name: string, cond: boolean) => { if (cond) pass++; else { fail++; fails.push("FAIL " + name); } };
@@ -43,6 +43,40 @@ eq("9 members -> [3,3,3]", sizes(randomTeeGroups(Array.from({ length: 9 }, (_, i
     ok("seed=" + s + " guest g2 with sponsor a", groupOf(r, "g2") === ga);
     ok("seed=" + s + " no group > 4", sizes(r).every((x) => x <= 4));
   }
+}
+
+// ---- 9. Team grouping always creates 2-v-2 contests and exposes leftovers ----
+{
+  const field = [
+    { id: "a1", team: "A", playingHandicap: 1 }, { id: "a2", team: "A", playingHandicap: 8 },
+    { id: "a3", team: "A", playingHandicap: 12 }, { id: "a4", team: "A", playingHandicap: 20 },
+    { id: "a5", team: "A", playingHandicap: 30 },
+    { id: "b1", team: "B", playingHandicap: 2 }, { id: "b2", team: "B", playingHandicap: 9 },
+    { id: "b3", team: "B", playingHandicap: 13 }, { id: "b4", team: "B", playingHandicap: 21 },
+  ];
+  const r = balancedTeamGroups(field, ["A", "B"]);
+  eq("team builder creates two full groups", sizes(r), [4, 4]);
+  for (const group of [1, 2]) {
+    const ids = r.assignments.filter((x) => x.group === group).map((x) => x.playerId);
+    eq(`group ${group} has two A`, ids.filter((id) => id.startsWith("a")).length, 2);
+    eq(`group ${group} has two B`, ids.filter((id) => id.startsWith("b")).length, 2);
+  }
+  ok("one odd team player remains unassigned", r.unassignedIds.length === 1 && r.unassignedIds[0].startsWith("a"));
+}
+
+// ---- 10. Balanced 1-v-1 uses every player once and leaves odd player visible ----
+{
+  const standalone = balancedOneVOne([
+    { id: "p1", playingHandicap: 1 }, { id: "p2", playingHandicap: 2 }, { id: "p3", playingHandicap: 10 },
+  ]);
+  eq("standalone nearest pair", standalone.pairings, [{ a: "p1", b: "p2" }]);
+  eq("standalone odd remainder", standalone.unassignedIds, ["p3"]);
+  const teams = balancedOneVOne([
+    { id: "a1", team: "A", playingHandicap: 2 }, { id: "a2", team: "A", playingHandicap: 18 },
+    { id: "b1", team: "B", playingHandicap: 3 }, { id: "b2", team: "B", playingHandicap: 20 },
+  ], ["A", "B"]);
+  eq("team singles pairs across teams", teams.pairings, [{ a: "a1", b: "b1" }, { a: "a2", b: "b2" }]);
+  eq("team singles has no leftovers", teams.unassignedIds, []);
 }
 
 // ---- 4. Sponsor + exactly 3 guests fills one foursome, no overflow ----
