@@ -8,7 +8,7 @@ Currently enforces:
 
 Add more checks here as global rules become statically checkable. Exit non-zero on any violation.
 """
-import re, sys, pathlib
+import re, sys, pathlib, runpy
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 fails = []
@@ -31,3 +31,4 @@ if fails:
         print("  - " + f)
     sys.exit(1)
 print("global-rules: pass")
+runpy.run_path(str(ROOT / "ci" / "check_mobile_fit_contract.py"), run_name="__main__")

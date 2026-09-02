@@ -1,4 +1,4 @@
--- READ ONLY hard gate: rebuilt/live core RLS structure must match the checked-in Production baseline.
+-- READ ONLY hard gate: rebuilt/live core RLS structure must match the hardened Production contract.
 -- Generated from ci/core_rls_production_baseline.json captured 2026-08-14.
 -- Expression semantics are proved separately in disposable fresh-DB CI by
 -- ci/assert-core-rls-expressions.sql; this file intentionally does not compare
@@ -85,7 +85,6 @@ begin
       ('game_players'::text, 'tee_group_marker_can_update'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'UPDATE'::text, 'is_tee_group_marker(game_id, tee_group)'::text, 'is_tee_group_marker(game_id, tee_group)'::text),
       ('games'::text, 'create games'::text, 'PERMISSIVE'::text, 'public'::text, 'INSERT'::text, null::text, '(auth.uid() = created_by)'::text),
       ('games'::text, 'find or member games'::text, 'PERMISSIVE'::text, 'public'::text, 'SELECT'::text, '(is_game_member(id) OR is_group_member(group_id, auth.uid()) OR (created_by = auth.uid()) OR is_admin())'::text, null::text),
-      ('games'::text, 'games_group_member_all'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'ALL'::text, 'is_group_member(group_id, auth.uid())'::text, 'is_group_member(group_id, auth.uid())'::text),
       ('games'::text, 'organizer deletes game'::text, 'PERMISSIVE'::text, 'public'::text, 'DELETE'::text, '(created_by = auth.uid())'::text, null::text),
       ('games'::text, 'update own games'::text, 'PERMISSIVE'::text, 'public'::text, 'UPDATE'::text, '(auth.uid() = created_by)'::text, '(auth.uid() = created_by)'::text),
       ('group_courses'::text, 'add group_courses'::text, 'PERMISSIVE'::text, 'public'::text, 'INSERT'::text, null::text, '(EXISTS ( SELECT 1
@@ -152,13 +151,13 @@ begin
   end if;
 end $$;
 
--- Production grants the same seven table privileges to anon and authenticated.
+-- Browser roles need ordinary row operations only, never DDL-like table privileges.
 do $$
 declare
   t text;
   r text;
   got text[];
-  expected text[] := array['DELETE','INSERT','REFERENCES','SELECT','TRIGGER','TRUNCATE','UPDATE'];
+  expected text[] := array['DELETE','INSERT','SELECT','UPDATE'];
 begin
   foreach t in array array['activity_log','favorite_courses','game_players','games','group_courses','group_invites','group_members','groups','holes','notifications','profiles','rounds'] loop
     foreach r in array array['anon','authenticated'] loop
@@ -172,4 +171,4 @@ begin
   end loop;
 end $$;
 
-select 'core RLS live structural contract PASS: 12 tables / 60 policy identities+metadata / grants' as result;
+select 'core RLS live structural contract PASS: 12 tables / 59 policy identities+metadata / least-privilege grants' as result;

@@ -1321,7 +1321,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
           {p.deactivated && <span style={{ color: C.overRedDark, fontSize: 11, fontWeight: 800 }}>DEACTIVATED</span>}
 
           {manageGroupsFor === p.id && (
-            <div style={{ width: "100%", background: C.greenLight, borderRadius: 10, padding: 12, marginTop: 8 }}>
+            <div style={{ width: "100%", boxSizing: "border-box", background: C.greenLight, borderRadius: 10, padding: 12, marginTop: 8 }}>
               <Eyebrow>CLUBS</Eyebrow>
               {(() => {
                 const mine = memberships.filter((m) => m.user_id === p.id);

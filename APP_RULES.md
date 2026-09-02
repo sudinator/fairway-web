@@ -11,6 +11,8 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
    the page:
    1. **Resize / reflow to fit (preferred):** flex `flex:1`, `flexWrap:"wrap"`, responsive
       `gridTemplateColumns: repeat(auto-fit, minmax(…))`, `tableLayout:"fixed"` + `width:"100%"`.
+      A container that combines `width:"100%"` with padding or a border MUST also use
+      `boxSizing:"border-box"`; otherwise its content-box width plus padding extends past the phone.
       **Flex bar charts / any horizontal row of mapped items MUST put `minWidth:0` on each child**
       (flex items default to `min-width:auto` and won't shrink below their content — a `nowrap` label
       then forces the row past the screen and it clips). Put `overflow:"hidden"` on the row, and thin
@@ -31,7 +33,8 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
    Intentional exception: the profile/peer badge shelves are carousels that hide the scrollbar on purpose
    (a half-clipped badge is their swipe cue) — leave them. — CI (`ci/check-global-rules.py` guards the
    scrollRef clamp; `ci/check-chart-overflow.py` flags flex bar-columns missing `minWidth:0`; using
-   HScroll for new boxes is manual)
+   `HScroll` and the full-width padded-container contract are enforced by
+   `ci/check_mobile_fit_contract.py`)
 2. **Minimum font size 11px.** No rendered text below 11px anywhere. — CI (`ci/check-min-fontsize.py`)
 3. **Real glyphs in JSX text, never literal `\uXXXX` escapes** (·, ›, —, …, ×, ‹, ▼). JS string/template
    literals may use `\u`. — CI (`ci/check-jsx-escapes.py`)

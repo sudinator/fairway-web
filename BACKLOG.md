@@ -735,3 +735,14 @@ Still open (lower priority, honestly assessed):
 - [x] Replace stale flat-format helper semantics with authoritative helpers matching the restored Production guided hierarchy; live Create Game selectors now delegate to the helpers and characterization tests cover key round trips.
 - [x] Review uses the same post-create destination helper as runtime and tells the organizer the exact next step (Play / Manage Game → Teams / Matchups / Groups).
 - [ ] Final cumulative Production release remains blocked on the full 177.46→final de novo audit closeout, dependency-backed CI/build, browser matrix, adjacent Manage Game testing, and Production release gate.
+## v179.8 de novo security and mobile-fit review
+
+- [x] Protect `profiles.is_owner` from self-promotion and enforce at most one owner.
+- [x] Prevent arbitrary club-admin self-insertion and role escalation during email-invite acceptance.
+- [x] Restore organizer ownership for game mutations; ordinary club membership remains read access.
+- [x] Remove browser access to internal Money snapshots, anonymous maintenance sweeps, and DDL-like table privileges.
+- [x] Keep Production service-role credentials out of pull-request-controlled workflow code.
+- [x] Audit full-width padded containers, repair all confirmed instances, standardize Match progression on `HScroll`, and add a permanent fit guard.
+- [ ] Privacy follow-up: replace broad co-member profile-row reads with a least-data member directory contract. This needs product/API design because current screens may rely on several profile fields.
+- [ ] CSP follow-up: design and test a nonce/hash policy compatible with the app's existing inline-style architecture.
+- [ ] Reliability follow-up: continue converting inherited silent Supabase reads/writes to checked repository helpers; this review found no direct authorization bypass from those calls.

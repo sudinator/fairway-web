@@ -318,7 +318,7 @@ export function Home({ session }: { session: any }) {
   const activateEmailInvites = useCallback(async () => {
     const email = (user.email || "").toLowerCase();
     if (!email) return;
-    await supabase.from("group_members").update({ user_id: user.id, status: "active" }).eq("email", email).eq("status", "invited");
+    await supabase.rpc("accept_group_email_invites");
   }, [user.id, user.email]);
 
   const loadGroups = useCallback(async (preferId?: string | null) => {

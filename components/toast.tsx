@@ -27,12 +27,12 @@ export function Toaster() {
   }, []);
   if (!toasts.length) return null;
   return (
-    <div style={{ position: "fixed", left: 0, right: 0, bottom: 88, display: "flex", flexDirection: "column", alignItems: "center", gap: 8, zIndex: 99999, pointerEvents: "none", padding: "0 16px" }}>
+    <div style={{ position: "fixed", left: 0, right: 0, bottom: 88, boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, zIndex: 99999, pointerEvents: "none", padding: "0 16px" }}>
       {toasts.map((t) => (
         <div
           key={t.id}
           onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
-          style={{ pointerEvents: "auto", cursor: "pointer", maxWidth: 440, width: "100%", background: t.kind === "error" ? "#B83A2E" : "#16503D", color: "#FFFDF6", borderRadius: 12, padding: "12px 14px", fontSize: 13, fontWeight: 500, lineHeight: 1.4, boxShadow: "0 6px 24px rgba(0,0,0,0.28)" }}
+          style={{ pointerEvents: "auto", cursor: "pointer", maxWidth: 440, width: "100%", boxSizing: "border-box", background: t.kind === "error" ? "#B83A2E" : "#16503D", color: "#FFFDF6", borderRadius: 12, padding: "12px 14px", fontSize: 13, fontWeight: 500, lineHeight: 1.4, boxShadow: "0 6px 24px rgba(0,0,0,0.28)" }}
         >
           {t.msg} <span style={{ opacity: 0.7, fontWeight: 500 }}>· tap to dismiss</span>
         </div>

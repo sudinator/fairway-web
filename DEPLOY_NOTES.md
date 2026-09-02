@@ -1,3 +1,24 @@
+## 179.9.260902 — Consolidated security and mobile-fit candidate
+
+- Supersedes every earlier v179.8 ZIP with one authoritative changed-files overlay.
+- Includes the complete v179.8 authorization, workflow-boundary, and mobile-fit hardening plus the corrected disposable-database assertion.
+- Corrects the invite-role negative test to verify the persisted membership role after an RLS-filtered update; PostgreSQL may return zero affected rows without raising an exception.
+- Preserves the separation between Staging validation and the `main`-only live Production schema guard.
+- No new database migration. Migration 0144 is unchanged and must not be rerun where `0144_authorization_hardening` is already recorded.
+
+## 179.8.260902 — Authorization and mobile-fit hardening
+
+- Closes three authorization escalation paths found by a de novo review: ordinary users cannot set `profiles.is_owner`, self-appoint as an admin of an arbitrary club, or turn an emailed member invitation into an admin membership.
+- Replaces direct email-invitation updates with `accept_group_email_invites()`, which derives identity from the authenticated JWT and preserves the inviter-assigned role.
+- Removes the permissive all-actions game policy. Club membership still grants visibility, while game mutation/deletion remains organizer-owned.
+- Denies browser execution of the internal Money snapshot helper, denies anonymous stale-game sweeps, and removes `REFERENCES`, `TRIGGER`, and `TRUNCATE` from browser table grants.
+- Restricts automated Production migration parity to trusted `main` pushes so pull-request-controlled code never receives Production service-role credentials. Production migration verification is an explicit pre-merge release gate.
+- Moves the live Production schema guard out of the all-branch Robustness workflow into a dedicated `main`-only workflow. Staging pushes use the disposable fresh-database contract and Staging integration instead of incorrectly comparing Staging code with Production's pre-release schema.
+- Corrects full-width padded containers in Ryder Cup sessions, the finish-game dialog, admin club management, and toasts; Match progression uses the standard contained `HScroll` component.
+- Adds disposable negative authorization tests and permanent CI guards for the credential boundary and mobile-fit contract.
+- The invite-role attack test verifies the persisted row outcome because PostgreSQL RLS may reject an unauthorized `UPDATE` by filtering it to zero affected rows rather than raising an exception.
+- Requires migration **0144_authorization_hardening.sql**. Ship through one Staging build and one `staging → main` pull request after both database environments are verified.
+
 ## 179.7.260902 — Staging integration VAPID wiring
 
 - Supplies `NEXT_PUBLIC_VAPID_PUBLIC_KEY` to the manual Staging integration workflow using the same repository-variable-or-committed-public-key contract as normal CI.
