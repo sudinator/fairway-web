@@ -1,5 +1,9 @@
 # Refactor test plan — verifying component moves (Stage 1b: OrganizerPanel, BettingPanel, GroupScorecard, GroupsBuilder)
 
+## 179.6 complete-overlay corrective gate
+
+Use `RELEASE_VERIFICATION_179.6.md`. Confirm the Vercel build resolves the v179.5 missing-export failure, then rerun the complete v179.4 weighted-outcome checks and v179.5 naming/quiet-default checks. The corrective package must include `lib/competition.ts`, `lib/competition.test.ts`, and `components/game/scoring-views.tsx`. No database migration is added.
+
 ## 179.5 Ryder Cup naming and quiet-default targeted gate
 
 Use `RELEASE_VERIFICATION_179.5.md`. Confirm every user-facing Cups surface now reads Ryder Cup, the Games selector explains Game versus Ryder Cup, and a newly created Ryder Cup Four-Ball, Alternate Shot, and Singles session starts with Group Results and money participation off. Standalone Games must retain their historical defaults. No database migration is added.

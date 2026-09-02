@@ -1,3 +1,9 @@
+## v179.6 complete-overlay corrective
+
+- [x] Identify the v179.5 Vercel failure as an incremental-package mismatch: v179.5 `components/competitions.tsx` imported the v179.4 `competitionOutcome` helper while the deployed repository still contained v179.3 `lib/competition.ts`.
+- [x] Include all omitted v179.4 runtime dependencies: `lib/competition.ts`, `lib/competition.test.ts`, and `components/game/scoring-views.tsx`.
+- [ ] Vercel Staging build must be Ready and the combined v179.4/v179.5 browser verification must pass before Production promotion.
+
 ## v179.5 Ryder Cup naming and quiet session defaults
 
 - [x] Rename the user-facing Cups surface and related setup/result copy to Ryder Cup.

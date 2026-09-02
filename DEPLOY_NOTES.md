@@ -1,3 +1,10 @@
+## 179.6.260902 — Complete incremental Ryder Cup overlay
+
+- Corrects the v179.5 changed-files package dependency on three v179.4 runtime files that were not present in a repository updated directly from v179.3.
+- Restores `lib/competition.ts` and its tests so `competitionOutcome` is exported for the v179.5 Cup summary, resolving the Vercel missing-export build failure.
+- Restores the v179.4 Singles running-board refinement in `components/game/scoring-views.tsx` so match-point wording and long-name wrapping ship with the promoted candidate.
+- No new application behavior beyond the already reviewed v179.4 and v179.5 changes. No database migration; migration 0143 remains the latest required schema change.
+
 ## 179.5.260902 — Ryder Cup naming and side-contest defaults
 
 - Renames the user-facing multi-session team competition from **Cup** to **Ryder Cup** while retaining the existing `competitions` schema, RPCs, links, and score aggregation.

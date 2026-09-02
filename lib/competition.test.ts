@@ -1,14 +1,16 @@
 import { strict as assert } from "assert";
-import { combineCompetitionScores, competitionFormatLabel, competitionPointsNeeded, competitionSchedule, fmtCompetitionPoints, scoreCompetitionGame } from "./competition";
+import { combineCompetitionScores, competitionFormatLabel, competitionOutcome, competitionPointsNeeded, competitionSchedule, fmtCompetitionPoints, scoreCompetitionGame } from "./competition";
 import type { Game, Player } from "./game-types";
 
 let n = 0;
 const ok = (name: string, fn: () => void) => { fn(); n++; console.log(`ok ${n} - ${name}`); };
 
-ok("formats half points", () => {
+ok("formats common golf point fractions", () => {
+  assert.equal(fmtCompetitionPoints(0.25), "¼");
   assert.equal(fmtCompetitionPoints(0.5), "½");
-  assert.equal(fmtCompetitionPoints(0.25), "0.25");
+  assert.equal(fmtCompetitionPoints(0.75), "¾");
   assert.equal(fmtCompetitionPoints(2.5), "2½");
+  assert.equal(fmtCompetitionPoints(6.75), "6¾");
   assert.equal(fmtCompetitionPoints(3), "3");
 });
 ok("labels supported cup formats", () => {
@@ -70,6 +72,22 @@ ok("locked schedule denominator comes from planned sessions, not created games",
   assert.equal(schedule.totalPoints, 15);
   assert.equal(schedule.teamATarget, 8);
   assert.equal(competitionPointsNeeded(5.5, schedule.teamATarget), 2.5);
+});
+ok("Cup outlook distinguishes an outright path from a share-only path", () => {
+  const schedule = competitionSchedule([
+    { id: "s1", competition_id: "c", name: "Four-Ball", format: "fourball", session_order: 1, play_date: "2026-09-01", points_per_match: 0.5, planned_match_count: 3, game_id: "g1", created_at: "" },
+    { id: "s2", competition_id: "c", name: "Alternate Shot", format: "alt_shot", session_order: 2, play_date: "2026-09-02", points_per_match: 1, planned_match_count: 3, game_id: "g2", created_at: "" },
+    { id: "s3", competition_id: "c", name: "Singles", format: "match", session_order: 3, play_date: "2026-09-02", points_per_match: 1.5, planned_match_count: 6, game_id: "g3", created_at: "" },
+  ], "shared");
+  const outcome = competitionOutcome(6.75, 2.25, schedule, "shared");
+  assert.equal(schedule.totalPoints, 13.5);
+  assert.equal(schedule.teamATarget, 7);
+  assert.equal(outcome.remainingPoints, 4.5);
+  assert.equal(outcome.teamA.pointsNeeded, 0.25);
+  assert.equal(outcome.teamA.canWin, true);
+  assert.equal(outcome.teamB.canWin, false);
+  assert.equal(outcome.teamB.canShare, true);
+  assert.equal(outcome.teamB.maxPoints, 6.75);
 });
 
 const oneHole = [{ n: 1, par: 4, si: 1 }];

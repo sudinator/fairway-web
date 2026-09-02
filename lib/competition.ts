@@ -52,6 +52,20 @@ export type CompetitionSchedule = {
   teamBTarget: number;
 };
 
+export type CompetitionTeamOutcome = {
+  clinched: boolean;
+  canWin: boolean;
+  canShare: boolean;
+  pointsNeeded: number;
+  maxPoints: number;
+};
+
+export type CompetitionOutcome = {
+  remainingPoints: number;
+  teamA: CompetitionTeamOutcome;
+  teamB: CompetitionTeamOutcome;
+};
+
 export type CompetitionMatchState = {
   key: string;
   leftNames: string;
@@ -79,7 +93,9 @@ const emptyScore = (): CompetitionSessionScore => ({ projectedA: 0, projectedB: 
 export function fmtCompetitionPoints(n: number): string {
   if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
   const whole = Math.floor(n);
-  if (Math.abs((n - whole) - 0.5) < 1e-9) return whole ? `${whole}½` : "½";
+  const fraction = n - whole;
+  const glyph = Math.abs(fraction - 0.25) < 1e-9 ? "¼" : Math.abs(fraction - 0.5) < 1e-9 ? "½" : Math.abs(fraction - 0.75) < 1e-9 ? "¾" : null;
+  if (glyph) return whole ? `${whole}${glyph}` : glyph;
   return Number(n.toFixed(2)).toString();
 }
 
@@ -104,6 +120,28 @@ export function competitionSchedule(sessions: CompetitionSession[], tieRule: Com
 
 export function competitionPointsNeeded(current: number, target: number): number {
   return Math.max(0, target - current);
+}
+
+export function competitionOutcome(
+  currentA: number,
+  currentB: number,
+  schedule: CompetitionSchedule,
+  tieRule: Competition["tie_rule"] = "shared",
+): CompetitionOutcome {
+  const remainingPoints = Math.max(0, schedule.totalPoints - currentA - currentB);
+  const half = schedule.totalPoints / 2;
+  const path = (current: number, opponent: number, target: number): CompetitionTeamOutcome => {
+    const maxPoints = current + remainingPoints;
+    const clinched = current + 1e-9 >= target;
+    const canWin = clinched || maxPoints + 1e-9 >= target;
+    const canShare = tieRule === "shared" && !canWin && maxPoints + 1e-9 >= half && opponent <= half + 1e-9;
+    return { clinched, canWin, canShare, pointsNeeded: competitionPointsNeeded(current, target), maxPoints };
+  };
+  return {
+    remainingPoints,
+    teamA: path(currentA, currentB, schedule.teamATarget),
+    teamB: path(currentB, currentA, schedule.teamBTarget),
+  };
 }
 
 function award(out: CompetitionSessionScore, lead: number, decided: boolean, aTeam: "A" | "B", bTeam: "A" | "B", scale = 1) {

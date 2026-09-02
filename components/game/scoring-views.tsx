@@ -799,7 +799,7 @@ export function MatchView({
                 <button type="button" onClick={toggleProgress} aria-expanded={openProgress === idx} style={{ minWidth: 0, minHeight: 64, background: "none", border: "none", padding: "8px 12px", textAlign: "left", cursor: "pointer", color: C.cream }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
                     <Avatar src={pa.avatar_url} name={pa.display_name} size={24} />
-                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 14, fontWeight: 800 }}>{pa.display_name}</span>
+                    <span style={{ minWidth: 0, overflowWrap: "anywhere", lineHeight: 1.2, fontSize: 14, fontWeight: 800 }}>{pa.display_name}</span>
                   </div>
                   {leftStatus ? <div style={{ marginTop: 5, color: teamAccent(teams[0].name, 0), fontSize: 14, fontWeight: 800 }}>{leftStatus}</div> : null}
                   <div style={{ marginTop: 4, color: C.gold, fontSize: 11, fontWeight: 700 }}>Details ›</div>
@@ -812,7 +812,7 @@ export function MatchView({
 
                 <button type="button" onClick={toggleProgress} aria-expanded={openProgress === idx} style={{ minWidth: 0, minHeight: 64, background: "none", border: "none", padding: "8px 12px", textAlign: "right", cursor: "pointer", color: C.cream }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 7, minWidth: 0 }}>
-                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 14, fontWeight: 800 }}>{pb.display_name}</span>
+                    <span style={{ minWidth: 0, overflowWrap: "anywhere", lineHeight: 1.2, fontSize: 14, fontWeight: 800 }}>{pb.display_name}</span>
                     <Avatar src={pb.avatar_url} name={pb.display_name} size={24} />
                   </div>
                   {rightStatus ? <div style={{ marginTop: 5, color: teamAccent(teams[1].name, 1), fontSize: 14, fontWeight: 800 }}>{rightStatus}</div> : null}
@@ -1043,6 +1043,9 @@ export function TeamClinchLine({ aPts, bPts, unclaimed, aName, bName, metric, sh
   const leadName = cs.leader === "A" ? aName : cs.leader === "B" ? bName : null;
   const hi = Math.max(aPts, bPts), lo = Math.min(aPts, bPts);
   const f = (n: number) => (n === Math.floor(n) ? String(n) : `${Math.floor(n)}½`);
+  const totalPool = aPts + bPts + unclaimed;
+  const outrightTarget = Math.floor((totalPool / 2) * 2 + 1e-9) / 2 + 0.5;
+  const matchPointsNeeded = Math.max(0, outrightTarget - hi);
   const noun = (n: number) => metric === "matches" ? `match${n === 1 ? "" : "es"}` : metric === "skins" ? `skin${n === 1 ? "" : "s"}` : `point${n === 1 ? "" : "s"}`;
   const tail = metric === "matches" ? "still out" : metric === "skins" ? "still in play" : "unclaimed";
   return (
@@ -1059,7 +1062,11 @@ export function TeamClinchLine({ aPts, bPts, unclaimed, aName, bName, metric, sh
         </div>
       )}
       {showBanner && !cs.clinched && !cs.canTie && !cs.decided && leadName && (
-        <div style={{ color: C.gold, fontSize: 12, fontWeight: 700, textAlign: "center", marginTop: 6 }}>{leadName} wins it with {cs.needToClinch} more {noun(cs.needToClinch)}</div>
+        <div style={{ color: C.gold, fontSize: 12, fontWeight: 700, textAlign: "center", marginTop: 6 }}>
+          {metric === "matches"
+            ? `${leadName} needs ${f(matchPointsNeeded)} match ${matchPointsNeeded <= 1 + 1e-9 ? "point" : "points"} to win this session`
+            : `${leadName} wins it with ${cs.needToClinch} more ${noun(cs.needToClinch)}`}
+        </div>
       )}
     </>
   );
