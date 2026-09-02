@@ -5,6 +5,7 @@
 - Removes the permissive all-actions game policy. Club membership still grants visibility, while game mutation/deletion remains organizer-owned.
 - Denies browser execution of the internal Money snapshot helper, denies anonymous stale-game sweeps, and removes `REFERENCES`, `TRIGGER`, and `TRUNCATE` from browser table grants.
 - Restricts automated Production migration parity to trusted `main` pushes so pull-request-controlled code never receives Production service-role credentials. Production migration verification is an explicit pre-merge release gate.
+- Moves the live Production schema guard out of the all-branch Robustness workflow into a dedicated `main`-only workflow. Staging pushes use the disposable fresh-database contract and Staging integration instead of incorrectly comparing Staging code with Production's pre-release schema.
 - Corrects full-width padded containers in Ryder Cup sessions, the finish-game dialog, admin club management, and toasts; Match progression uses the standard contained `HScroll` component.
 - Adds disposable negative authorization tests and permanent CI guards for the credential boundary and mobile-fit contract.
 - Requires migration **0144_authorization_hardening.sql**. Ship through one Staging build and one `staging → main` pull request after both database environments are verified.

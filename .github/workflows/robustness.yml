@@ -9,31 +9,6 @@ on:
     - cron: "0 13 * * *"   # 13:00 UTC daily
 
 jobs:
-  schema-guard:
-    name: Database schema guard (read-only)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install psql client
-        run: |
-          # Skip the apt fetch when psql is already present. GitHub's ubuntu-latest
-          # image ships PostgreSQL, so this usually costs ~0s instead of an apt round
-          # trip. On 2026-08-19 this step stalled 8m41s on azure.archive.ubuntu.com
-          # (dozens of Ign: retries) — nothing was computing, it was waiting on a
-          # mirror. Falls back to the original install if psql really is missing, so
-          # the worst case is identical to the previous behaviour.
-          if command -v psql >/dev/null 2>&1; then
-            echo "psql already present: $(psql --version)"
-          else
-            echo "psql not found - installing postgresql-client"
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends postgresql-client
-          fi
-      - name: Run schema guard
-        env:
-          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
-        run: bash ci/schema-check.sh
-
   onepager-sync:
     name: Marketing one-pagers in sync
     runs-on: ubuntu-latest

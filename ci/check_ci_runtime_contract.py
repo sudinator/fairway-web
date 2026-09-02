@@ -18,6 +18,14 @@ if "if: github.event_name == 'push' && github.ref == 'refs/heads/main'" not in p
     errors.append('ci.yml: Production migration parity must run only on trusted push-to-main code')
 if "github.event_name == 'pull_request'" in production_job.split('runs-on:',1)[0]:
     errors.append('ci.yml: Production credentials are reachable from pull-request-controlled code')
+rob_text=(workflows/'robustness.yml').read_text(encoding='utf-8')
+if 'SUPABASE_DB_URL' in rob_text or 'schema-check.sh' in rob_text:
+    errors.append('robustness.yml: all-branch workflow must not receive Production database credentials')
+prod_schema=(workflows/'production-schema-guard.yml').read_text(encoding='utf-8')
+if 'branches: [main]' not in prod_schema or 'pull_request:' in prod_schema or 'workflow_dispatch:' in prod_schema:
+    errors.append('production-schema-guard.yml: live Production schema checks must be trusted main push/schedule only')
+if 'environment: production' not in prod_schema or 'secrets.SUPABASE_DB_URL' not in prod_schema:
+    errors.append('production-schema-guard.yml: expected protected Production environment and database URL')
 if (ROOT/'.nvmrc').read_text().strip() != '22':
     errors.append('.nvmrc: expected pinned major 22')
 import json
