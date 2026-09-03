@@ -60,6 +60,15 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
 ## Data safety
 8. **Never blank a screen on a query error.** A failed/empty query must not delete data or drop the user
    onto a blank/new screen. Degrade gracefully (keep prior state, show a message). — manual
+8a. **Ryder Cup deletion is format-aware and atomic.** Delete the Ryder Cup, its sessions, and every
+    linked game in one permission-checked database operation. Preserve posted personal rounds only
+    for own-ball formats (Four-Ball and Singles); remove posted Alternate Shot rounds because they
+    represent one shared team ball rather than either player's individual round. — code + CI
+8b. **Completed Game deletion is System Admin-only.** An ordinary organizer may delete an active Game
+    only before it has a posted round. Once a Game is ended or has posted play, only a System Admin may
+    delete it. A Ryder Cup containing any such Game follows the same boundary. Deletion preserves
+    own-ball personal history and removes Alternate Shot shared-ball history. System Admin inspection
+    must not add the inspector to the club, Game, or Ryder Cup roster. — DB + CI
 9. **Yardages on every scorecard.** Per-hole yardages show on ALL scorecards (entry, read-only, game
    group card, round detail, share), based on each player's chosen tee
    (`favorite_courses.data.tees[].yardages`). — manual

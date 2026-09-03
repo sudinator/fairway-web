@@ -1,3 +1,17 @@
+## v180.0 Ryder Cup lifecycle and System Admin Game oversight
+
+- [x] Allow the organizer, a club admin, or a system admin to rename a Ryder Cup, including after its scoring schedule is locked.
+- [x] Delete a Ryder Cup and all linked session games atomically through one permission-checked RPC.
+- [x] Preserve Four-Ball and Singles personal rounds when deleting the Ryder Cup because each golfer played their own ball.
+- [x] Delete Alternate Shot posted rounds with the Ryder Cup because they represent a shared team ball.
+- [x] Remove device-local score backups for every deleted linked game.
+- [x] Record rename and deletion in the activity log and permanently guard the lifecycle contract.
+- [x] Restrict deletion of an ended Game, a Game with a posted round, or a Ryder Cup containing completed play to a System Admin.
+- [x] Add a searchable System Admin Games directory that can inspect any Game without joining its club or player roster.
+- [x] Keep the additional `game_players` access SELECT-only; all destructive work remains permission-checked RPC behavior.
+- [x] Add disposable fresh-database tests for ordinary-user denial, cross-club System Admin visibility, and own-ball/shared-ball preservation.
+- [ ] Apply migration 0145 to Staging and complete the real-browser lifecycle/oversight scenarios before Production.
+
 ## v179.7 Staging integration workflow corrective
 
 - [x] Identify the manual workflow failure: `npm run ci:staging` reached prebuild without `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.

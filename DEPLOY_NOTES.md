@@ -1,3 +1,17 @@
+## 180.0.260902 — Ryder Cup lifecycle and System Admin Game oversight
+
+- Adds organizer/admin controls to rename a Ryder Cup and delete it together with every linked session game.
+- Adds migration **0145_competition_lifecycle.sql** with authenticated, permission-checked RPCs so rename/delete cannot partially apply or be performed by an ordinary club member.
+- Ryder Cup deletion is format-aware: Four-Ball and Singles personal rounds remain in each golfer's history because each golfer played their own ball; Alternate Shot rounds are removed because the score belongs to the shared side ball.
+- Deletion also clears linked game players, side-contest/game-owned rows through existing cascades, session/roster/schedule rows, and local score backups on the deleting device.
+- Rename and deletion are written to the activity log. The scoring schedule may remain locked when only the Ryder Cup title changes because the title does not alter the scoring contract.
+- Adds permanent source/security checks for authorization, atomic child-game cleanup, and the own-ball/shared-ball round rule.
+- Adds **System Admin → Games oversight**, a searchable system-wide directory for Game name, code, course, club, organizer, player, or Ryder Cup. Inspecting a result opens the existing Game room without joining the club or adding the System Admin as a player.
+- Makes completed deletion consistent at the database boundary: ordinary organizers can delete only uncompleted Games; ended Games, Games with posted rounds, and Ryder Cups containing completed play require a System Admin.
+- Adds SELECT-only System Admin visibility for `game_players`; direct mutation remains unavailable and destructive operations remain RPC-gated.
+- Records System Admin deletion inside the database transaction, so the audit entry does not depend on a separate browser write or club membership.
+- Extends the disposable fresh-database suite to prove cross-club inspection, ordinary-user denial, completed Ryder Cup protection, own-ball round preservation, and Alternate Shot shared-ball removal.
+
 ## 179.9.260902 — Consolidated security and mobile-fit candidate
 
 - Supersedes every earlier v179.8 ZIP with one authoritative changed-files overlay.

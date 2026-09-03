@@ -129,6 +129,7 @@ export default function Tournaments({
   isGroupAdmin,
   seed,
   openGameId,
+  onExitOpenGame,
 }: {
   session: any;
   activeGroupId: string;
@@ -136,6 +137,7 @@ export default function Tournaments({
   isGroupAdmin?: boolean;
   seed?: GameSeed | null;
   openGameId?: string | null;
+  onExitOpenGame?: () => void;
 }) {
   const [view, setView] = useState<"list" | "create" | { gameId: string; tab?: "play" | "setup"; setupTab?: SetupTab }>(
     seed ? "create" : openGameId ? { gameId: openGameId } : "list",
@@ -206,7 +208,7 @@ export default function Tournaments({
         user={user}
         displayName={displayName}
         isAdmin={!!isAdmin}
-        onBack={() => { clearActiveGame(); setView("list"); }}
+        onBack={() => { clearActiveGame(); setView("list"); onExitOpenGame?.(); }}
         onOpenCompetition={(id) => { clearActiveGame(); setView("list"); setListMode("cups"); setCompetitionId(id); }}
       />
     );
@@ -231,6 +233,7 @@ export default function Tournaments({
           user={user}
           activeGroupId={activeGroupId}
           canManage={!!isAdmin || !!isGroupAdmin}
+          isSystemAdmin={!!isAdmin}
           selectedId={competitionId}
           onSelected={setCompetitionId}
           onOpenGame={(gameId) => setView({ gameId })}
@@ -1489,6 +1492,7 @@ function GameRoom({
   const [altShotScores, setAltShotScores] = useState<AltShotScoreRow[]>([]);
   const [me, setMe] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
+  const [postedRoundCount, setPostedRoundCount] = useState(0);
   const [competitionLink, setCompetitionLink] = useState<{ competition_id: string; name: string } | null>(null);
   const [savingHole, setSavingHole] = useState<number | null>(null);
   const [syncState, setSyncState] = useState<"idle" | "saving" | "retry" | "synced" | "error">("idle");
@@ -1713,6 +1717,12 @@ function GameRoom({
       .from("game_players")
       .select("*")
       .eq("game_id", gameId);
+    const { count: postedRounds } = await supabase
+      .from("rounds")
+      .select("id", { count: "exact", head: true })
+      .eq("game_id", gameId)
+      .is("deleted_at", null);
+    setPostedRoundCount(postedRounds || 0);
     const { data: altRows } = await supabase
       .from("game_alt_shot_scores")
       .select("game_id,foursome_id,side,hole_index,strokes,updated_at,updated_by")
@@ -2856,45 +2866,50 @@ function GameRoom({
       </div>
     );
 
-  // ---- Master-admin game repair (is_admin only; works on any game) ----
+  // ---- System-admin game repair (profiles.is_admin only; works on any game) ----
   const adminLog = async (summary: string) =>
     logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "admin_game_repair", group_id: (game as any)?.group_id || null, summary });
   const adminEndGame = async () => {
-    if (!game || !confirm(`Force-end "${game.name}" as admin?`)) return;
+    if (!game || !confirm(`Force-end "${game.name}" as system admin?`)) return;
     const { error } = await supabase.rpc("admin_end_game", { p_game: game.id });
     if (error) { alert(failureMessage("Couldn't end that", error)); return; }
-    await adminLog(`Admin force-ended game "${game.name}"`); await load();
+    await adminLog(`System admin force-ended game "${game.name}"`); await load();
   };
   const adminReopenGame = async () => {
-    if (!game || !confirm(`Reopen "${game.name}" as admin?`)) return;
+    if (!game || !confirm(`Reopen "${game.name}" as system admin?`)) return;
     const { error } = await supabase.rpc("admin_reopen_game", { p_game: game.id });
     if (error) { alert(failureMessage("Couldn't reopen", error)); return; }
-    await adminLog(`Admin reopened game "${game.name}"`); await load();
+    await adminLog(`System admin reopened game "${game.name}"`); await load();
   };
   const adminResetGame = async () => {
-    if (!game || !confirm(`Reset ALL scores in "${game.name}" as admin? This can't be undone.`)) return;
+    if (!game || !confirm(`Reset ALL scores in "${game.name}" as system admin? This can't be undone.`)) return;
     const { error } = await supabase.rpc("admin_reset_game", { p_game: game.id });
     if (error) { alert(failureMessage("Couldn't reset", error)); return; }
-    await adminLog(`Admin reset scores in game "${game.name}"`); await load();
+    await adminLog(`System admin reset scores in game "${game.name}"`); await load();
   };
   const adminDeleteGame = async () => {
-    if (!game || !confirm(`Delete "${game.name}" as admin? Rounds already posted to players' history are kept. This can't be undone.`)) return;
+    if (!game) return;
+    const roundRule = game.game_type === "alt_shot"
+      ? "Posted Alternate Shot rounds will also be deleted because they are shared-ball scores."
+      : "Rounds already posted to players' history will be kept.";
+    if (!confirm(`Delete "${game.name}" as system admin? ${roundRule} This can't be undone.`)) return;
     const { error } = await supabase.rpc("admin_delete_game", { p_game: game.id });
     if (error) { alert(failureMessage("Couldn't delete that", error)); return; }
-    await adminLog(`Admin deleted game "${game.name}"`); onBack();
+    onBack();
   };
   const adminReassignOrganizer = async () => {
     if (!game || !reassignTo) return;
     const who = players.find((p) => p.user_id === reassignTo);
-    if (!confirm(`Make ${who?.display_name || "this player"} the organizer of "${game.name}"?`)) return;
+    if (!confirm(`As system admin, make ${who?.display_name || "this player"} the organizer of "${game.name}"?`)) return;
     const { error } = await supabase.rpc("admin_reassign_organizer", { p_game: game.id, p_user: reassignTo });
     if (error) { alert(failureMessage("Couldn't reassign that", error)); return; }
-    await adminLog(`Admin made ${who?.display_name || "a player"} organizer of "${game.name}"`);
+    await adminLog(`System admin made ${who?.display_name || "a player"} organizer of "${game.name}"`);
     setReassignTo(""); await load();
   };
 
   const isOrganizer = game.created_by === user.id;
   const isEnded = game.status === "ended";
+  const completedGame = isEnded || postedRoundCount > 0;
   // What still needs setting for this game to score cleanly. Informational only —
   // scoring is never blocked. A missing handicap just means that player plays off scratch (0).
   const setupMissing: string[] = (() => {
@@ -3080,9 +3095,9 @@ function GameRoom({
         <CleanSweepBanner name={sweepWatch.name} val={sweepWatch.val} thru={sweepWatch.thru} unit={sweepWatch.unit} />
       )}
 
-      {isAdmin && !isOrganizer && (
+      {isAdmin && (!isOrganizer || completedGame) && (
         <div style={{ background: C.greenMid, border: `1px solid ${C.gold}`, borderRadius: 12, padding: 12, marginTop: 12 }}>
-          <div style={{ color: C.gold, fontWeight: 800, fontSize: 13, marginBottom: 8 }}>⚠ Admin repair · you are not the organizer</div>
+          <div style={{ color: C.gold, fontWeight: 800, fontSize: 13, marginBottom: 8 }}>⚠ System admin repair{!isOrganizer ? " · you are not the organizer" : ""}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {game.status === "ended"
               ? <button onClick={adminReopenGame} style={{ background: "transparent", color: C.cream, border: `1px solid ${C.sage}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "6px 12px", cursor: "pointer" }}>Reopen</button>
@@ -3213,6 +3228,7 @@ function GameRoom({
           onOverride: overridePlayerHandicap, courseTees, onSetTee: setPlayerTee,
           onRemove: removePlayer, onToggleNoShow: toggleNoShow, onSetTeam: setPlayerTeam, onRenameTeams: renameTeams,
           onRename: renameGame, onDelete: deleteGame,
+          canDelete: !completedGame, deleteRestriction: "Only a system admin can delete a completed game. Posted own-ball rounds remain in player history; Alternate Shot rounds are removed.",
           onEnd: requestEndGame, onReopen: reopenGame, onReset: resetScores, onShare: setShare,
           eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,
           onSetAllowance: setAllowance, onSetFormat: setFormat, onSetTeamScoreMode: setTeamScoreMode, onSetSkinsMode: updateSkinsMode, onSetSkinsStyle: setSkinsStyle, onSetMatchTeam: setMatchTeam, anyScores,

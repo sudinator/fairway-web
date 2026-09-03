@@ -260,8 +260,12 @@ export function GameSetupWorkspace({
             <div style={{ color: "#F0B0A8", fontSize: 11.5, fontWeight: 700, marginTop: 6 }}>These actions cannot be undone.</div>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>Reset clears all scoring and clocks but keeps players and game structure.</div>
             <button style={{ background: "#3F3414", color: "#E4CF86", border: `0.5px solid ${C.gold}`, borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 13, display: "block" }} onClick={organizerPanelProps.onReset}>↺ Reset scores</button>
-            <div style={{ color: C.sage, fontSize: 11, marginTop: 12 }}>Delete permanently removes this game.</div>
-            <button style={{ background: C.danger, color: "#F6DEDB", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 13, display: "block" }} onClick={organizerPanelProps.onDelete}>Delete this game</button>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 12 }}>
+              {organizerPanelProps.canDelete === false
+                ? organizerPanelProps.deleteRestriction || "Only a system admin can delete a completed game."
+                : "Delete permanently removes this game."}
+            </div>
+            {organizerPanelProps.canDelete !== false ? <button style={{ background: C.danger, color: "#F6DEDB", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 13, display: "block" }} onClick={organizerPanelProps.onDelete}>Delete this game</button> : null}
           </div>
         </div>
       )}

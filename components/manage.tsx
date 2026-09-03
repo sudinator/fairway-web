@@ -975,6 +975,135 @@ function OpsMetrics() {
   );
 }
 
+type AdminGameRow = {
+  game_id: string;
+  code: string;
+  game_name: string;
+  course: string;
+  game_type: string;
+  game_status: string;
+  played_at: string;
+  created_at: string;
+  ended_at: string | null;
+  group_id: string | null;
+  group_name: string;
+  organizer_id: string;
+  organizer_name: string;
+  player_count: number;
+  player_names: string;
+  posted_round_count: number;
+  competition_id: string | null;
+  competition_name: string | null;
+};
+
+function AdminGamesOversight({ onOpenGame }: { onOpenGame: (gameId: string) => void }) {
+  const [rows, setRows] = useState<AdminGameRow[] | null>(null);
+  const [search, setSearch] = useState("");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const [status, setStatus] = useState<"all" | "active" | "ended" | "ryder_cup">("all");
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = useCallback(async (query = appliedSearch, nextStatus = status) => {
+    setLoading(true);
+    setErr(null);
+    const { data, error } = await supabase.rpc("admin_game_oversight", {
+      p_search: query.trim() || null,
+      p_status: nextStatus,
+      p_limit: 200,
+    });
+    setLoading(false);
+    if (error) {
+      setErr(failureMessage("Couldn't load system-wide Games", error));
+      return;
+    }
+    setRows((data || []) as AdminGameRow[]);
+  }, [appliedSearch, status]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const next = search.trim();
+    if (next === appliedSearch) { void load(next, status); return; }
+    setAppliedSearch(next);
+  };
+
+  const chooseStatus = (next: typeof status) => {
+    setStatus(next);
+  };
+
+  const formatLabel = (value: string) => ({
+    stableford: "Stableford", stroke: "Stroke Play", match: "Singles Match", fourball: "Four-Ball",
+    alt_shot: "Alternate Shot", trifecta: "Trifecta", skins: "Skins",
+  }[value] || value.replaceAll("_", " "));
+
+  return (
+    <div>
+      <div style={{ color: C.sage, fontSize: 12.5, lineHeight: 1.5, marginBottom: 12 }}>
+        Search every Game across every club. Inspecting a Game does not join it or add you as a player.
+      </div>
+      <form onSubmit={submit} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Game, code, player, organizer, club…"
+          aria-label="Search all Games"
+          style={{ ...inputStyle, minWidth: 0, flex: 1 }}
+        />
+        <button type="submit" disabled={loading} style={{ ...btn(true), flexShrink: 0, padding: "8px 12px", fontSize: 12, opacity: loading ? .62 : 1 }}>
+          {loading ? "Searching…" : "Search"}
+        </button>
+      </form>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+        {([
+          ["all", "All"], ["active", "Active"], ["ended", "Completed"], ["ryder_cup", "Ryder Cup"],
+        ] as const).map(([value, label]) => (
+          <button key={value} onClick={() => chooseStatus(value)} style={{ ...btn(status === value), padding: "8px 12px", fontSize: 11 }}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {err ? <div style={{ color: C.overRedDark, fontSize: 12, marginTop: 10 }}>{err}</div> : null}
+      <Eyebrow>{rows === null ? "GAMES" : `${rows.length} GAME${rows.length === 1 ? "" : "S"}`}</Eyebrow>
+      {rows === null ? (
+        <div style={{ color: C.sage, fontSize: 12 }}>Loading Games…</div>
+      ) : rows.length === 0 ? (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: 16, color: C.sage, fontSize: 12 }}>No Games match this search.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {rows.map((g) => (
+            <div key={g.game_id} style={{ width: "100%", boxSizing: "border-box", background: C.greenLight, border: `1px solid ${C.borderGreen}`, borderRadius: 12, padding: "8px 12px" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 9 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: C.cream, fontSize: 14, fontWeight: 800, overflowWrap: "anywhere" }}>{g.game_name}</div>
+                  <div style={{ color: C.sage, fontSize: 11.5, marginTop: 3, lineHeight: 1.45, overflowWrap: "anywhere" }}>
+                    {g.group_name} · {formatLabel(g.game_type)} · {g.course}
+                  </div>
+                </div>
+                <span style={{ flexShrink: 0, borderRadius: 999, padding: "4px 10px", background: g.game_status === "ended" ? C.gold : "#1F714D", color: g.game_status === "ended" ? C.green : C.cream, fontSize: 11, fontWeight: 800 }}>
+                  {g.game_status === "ended" ? "COMPLETED" : "ACTIVE"}
+                </span>
+              </div>
+              <div style={{ color: C.sage, fontSize: 11, lineHeight: 1.5, marginTop: 7, overflowWrap: "anywhere" }}>
+                {g.played_at ? new Date(`${g.played_at}T12:00:00`).toLocaleDateString() : "No play date"} · Code {g.code} · Organizer {g.organizer_name}
+              </div>
+              <div style={{ color: C.sage, fontSize: 11, lineHeight: 1.5, overflowWrap: "anywhere" }}>
+                {g.player_count} player{g.player_count === 1 ? "" : "s"} · {g.posted_round_count} posted round{g.posted_round_count === 1 ? "" : "s"}{g.competition_name ? ` · Ryder Cup: ${g.competition_name}` : ""}
+              </div>
+              {g.player_names ? <div style={{ color: C.cream, fontSize: 11, lineHeight: 1.45, marginTop: 5, overflowWrap: "anywhere" }}>{g.player_names}</div> : null}
+              <button onClick={() => onOpenGame(g.game_id)} style={{ ...btn(false), marginTop: 9, padding: "8px 12px", fontSize: 11.5 }}>
+                Inspect Game →
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {rows && rows.length === 200 ? <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>Showing the newest 200 matches. Narrow the search to find older Games.</div> : null}
+    </div>
+  );
+}
+
 function RoundSaveDiag() {
   const [on, setOn] = useState(false);
   const [repro, setRepro] = useState(false);
@@ -2248,9 +2377,10 @@ function AdminSandbaggers() {
   );
 }
 
-export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onGoto, onEnterGroup, onExitGroup, onGroupsChanged }: {
+export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onGoto, onOpenGame, onEnterGroup, onExitGroup, onGroupsChanged }: {
   user: any; profile: any; activeGroupName?: string | null; activeGroupRole?: string | null;
   onGoto: (tab: string) => void;
+  onOpenGame: (gameId: string) => void;
   onEnterGroup: (g: any) => Promise<void>; onExitGroup: (g: any) => Promise<void>; onGroupsChanged: () => void;
 }) {
   const isMaster = !!profile?.is_admin;
@@ -2293,6 +2423,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
       case "analytics": title = "Analytics"; panel = <><AdminAnalytics /><AdminExtraStats /><AdminDailyReport /><AdminEngagement /><AdminPowerUsers /></>; break;
       case "friction": title = "Friction review"; panel = <AdminFrictionReview />; break;
       case "operations": title = "Operations"; panel = <OpsMetrics />; break;
+      case "games": title = "Games oversight"; panel = <AdminGamesOversight onOpenGame={onOpenGame} />; break;
       case "diagnostics": title = "Diagnostics"; panel = <RoundSaveDiag />; break;
       case "activity": title = "Activity log"; panel = <ActivityTab />; break;
       case "oversight": title = "Clubs oversight"; panel = <AdminGroupsTab user={user} onEnterGroup={onEnterGroup} onExitGroup={onExitGroup} onGroupsChanged={onGroupsChanged} />; break;
@@ -2334,6 +2465,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
           {grid(<>
             <Card icon="📊" name="Analytics" cap="Usage, engagement & golf cadence" onClick={() => setView("analytics")} />
             <Card icon="🧭" name="Operations" cap="Nudge funnel, auto-finish, stale rounds & games" onClick={() => setView("operations")} badge={todos.stale_ready} />
+            <Card icon="⛳" name="Games oversight" cap="Find, inspect and repair any Game" onClick={() => setView("games")} />
             <Card icon="⚠︎" name="Friction review" cap="Data-integrity flags to review & clear" onClick={() => setView("friction")} badge={todos.friction_open} />
             <Card icon="📜" name="Activity log" cap="Audit trail across all clubs" onClick={() => setView("activity")} />
             <Card icon="🏟" name="Clubs oversight" cap="Approve clubs, support sessions" onClick={() => setView("oversight")} badge={todos.pending_clubs} />

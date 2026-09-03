@@ -82,6 +82,7 @@ begin
      FROM games g
     WHERE ((g.id = game_players.game_id) AND (g.created_by = auth.uid())))))'::text, null::text),
       ('game_players'::text, 'see co-players'::text, 'PERMISSIVE'::text, 'public'::text, 'SELECT'::text, 'is_game_member(game_id)'::text, null::text),
+      ('game_players'::text, 'system admins read game players'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'SELECT'::text, 'is_admin()'::text, null::text),
       ('game_players'::text, 'tee_group_marker_can_update'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'UPDATE'::text, 'is_tee_group_marker(game_id, tee_group)'::text, 'is_tee_group_marker(game_id, tee_group)'::text),
       ('games'::text, 'create games'::text, 'PERMISSIVE'::text, 'public'::text, 'INSERT'::text, null::text, '(auth.uid() = created_by)'::text),
       ('games'::text, 'find or member games'::text, 'PERMISSIVE'::text, 'public'::text, 'SELECT'::text, '(is_game_member(id) OR is_group_member(group_id, auth.uid()) OR (created_by = auth.uid()) OR is_admin())'::text, null::text),
@@ -171,4 +172,4 @@ begin
   end loop;
 end $$;
 
-select 'core RLS live structural contract PASS: 12 tables / 59 policy identities+metadata / least-privilege grants' as result;
+select 'core RLS live structural contract PASS: 12 tables / 60 policy identities+metadata / least-privilege grants' as result;

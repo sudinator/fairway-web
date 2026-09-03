@@ -89,6 +89,8 @@ export type OrganizerPanelProps = {
   onRenameTeams?: (names: [string, string]) => Promise<void>;
   onRename: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
+  canDelete?: boolean;
+  deleteRestriction?: string;
   onEnd: () => Promise<void>;
   onReopen: () => Promise<void>;
   onReset: () => Promise<void>;

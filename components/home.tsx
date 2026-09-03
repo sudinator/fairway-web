@@ -173,7 +173,8 @@ export function Home({ session }: { session: any }) {
   // already-linked game. One-shot, cleared when we leave the Games tab (like money).
   const [gameSeed, setGameSeed] = useState<GameSeed | null>(null);
   const [openGameId, setOpenGameId] = useState<string | null>(null);
-  useEffect(() => { if (tab !== "games") { setGameSeed(null); setOpenGameId(null); } }, [tab]);
+  const [openGameReturnTab, setOpenGameReturnTab] = useState<"admin" | null>(null);
+  useEffect(() => { if (tab !== "games") { setGameSeed(null); setOpenGameId(null); setOpenGameReturnTab(null); } }, [tab]);
   const [stage, setStage] = useState<null | "setup" | { round: Round }>(null);
   // Tracks the in-progress round draft so we can show a "Resume" banner from any
   // screen. Re-read from storage whenever navigation happens (see refreshDraft).
@@ -846,6 +847,7 @@ export function Home({ session }: { session: any }) {
             activeGroupName={activeGroup?.name}
             activeGroupRole={activeGroup?.role}
             onGoto={(t) => { setReturnTab("admin"); setTab(t as Tab); setMoreOpen(false); }}
+            onOpenGame={(gid) => { setGameSeed(null); setOpenGameId(gid); setOpenGameReturnTab("admin"); setTab("games"); setMoreOpen(false); }}
             onEnterGroup={enterSupportGroup}
             onExitGroup={exitSupportGroup}
             onGroupsChanged={loadGroups}
@@ -857,11 +859,12 @@ export function Home({ session }: { session: any }) {
         ) : tab === "profile" ? (
           <ProfilePanel profile={profile} user={user} onSaved={loadProfile} badgeRefresh={badgeSync} rounds={rounds} onOpen={setViewing} />
         ) : tab === "teetimes" && activeGroup ? (
-          <TeeTimes user={user} activeGroupId={activeGroup.id} activeGroupName={activeGroup.name} canManage={activeGroup.role === "admin"} initialTeeId={deepReady ? deepTeeId : null} onConsumedDeepLink={() => setDeepTeeId(null)} onSpawnGame={(s) => { setOpenGameId(null); setGameSeed(s); setTab("games"); }} onOpenGame={(gid) => { setGameSeed(null); setOpenGameId(gid); setTab("games"); }} />
+          <TeeTimes user={user} activeGroupId={activeGroup.id} activeGroupName={activeGroup.name} canManage={activeGroup.role === "admin"} initialTeeId={deepReady ? deepTeeId : null} onConsumedDeepLink={() => setDeepTeeId(null)} onSpawnGame={(s) => { setOpenGameId(null); setOpenGameReturnTab(null); setGameSeed(s); setTab("games"); }} onOpenGame={(gid) => { setGameSeed(null); setOpenGameId(gid); setOpenGameReturnTab(null); setTab("games"); }} />
         ) : tab === "money" && activeGroup ? (
           <MoneyTab user={user} activeGroup={activeGroup} onChanged={loadOwed} initialTab={moneyInitialTab} />
         ) : tab === "games" && activeGroup ? (
-          <Tournaments session={session} activeGroupId={activeGroup.id} isAdmin={!!profile?.is_admin} seed={gameSeed} openGameId={openGameId} />
+          <Tournaments session={session} activeGroupId={activeGroup.id} isAdmin={!!profile?.is_admin} isGroupAdmin={activeGroup.role === "admin"} seed={gameSeed} openGameId={openGameId}
+            onExitOpenGame={openGameReturnTab === "admin" ? () => { setOpenGameId(null); setOpenGameReturnTab(null); setTab("admin"); } : undefined} />
         ) : loading ? (
           <div style={{ color: C.sage, textAlign: "center", padding: 40 }}>Loading your rounds…</div>
         ) : tab === "dashboard" ? (

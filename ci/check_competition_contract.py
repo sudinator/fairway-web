@@ -14,6 +14,7 @@ create = (root/'lib/game-create.ts').read_text()
 logic = (root/'lib/competition.ts').read_text()
 scoring = (root/'components/game/scoring-views.tsx').read_text()
 schedule_mig = (root/'migrations/0143_competition_schedule_contract.sql').read_text()
+lifecycle_mig = (root/'migrations/0145_competition_lifecycle.sql').read_text()
 
 check('0142 records itself', "record_migration('0142_team_competitions')" in mig)
 check('competition parent/roster/session tables exist', all(x in mig for x in ['create table if not exists public.competitions', 'create table if not exists public.competition_players', 'create table if not exists public.competition_sessions']))
@@ -44,6 +45,11 @@ check('Cup game handoff links an existing planned session', 'sessionId:' in type
 check('weighted Cup points use golf quarter fractions', all(x in logic for x in ['"¼"', '"½"', '"¾"']) and 'fmtCompetitionPoints(path.pointsNeeded)' in comp)
 check('Cup outcome separates outright and share-only paths', 'competitionOutcome' in logic and 'path.canShare' in comp and 'cannot win or share the Ryder Cup' in comp)
 check('Singles outlook uses match points and long names wrap', 'matchPointsNeeded' in scoring and 'to win this session' in scoring and scoring.count('overflowWrap: "anywhere", lineHeight: 1.2') >= 2)
+check('0145 records the Ryder Cup lifecycle contract', "record_migration('0145_competition_lifecycle')" in lifecycle_mig)
+check('Ryder Cup lifecycle RPCs are authenticated and permission checked', all(x in lifecycle_mig for x in ['rename_team_competition', 'delete_team_competition', 'can_manage_competition(p_competition, auth.uid())', 'grant execute on function public.rename_team_competition(uuid, text)', 'grant execute on function public.delete_team_competition(uuid)', 'from public, anon']))
+check('Ryder Cup deletion is atomic across linked games and parent', all(x in lifecycle_mig for x in ["set schedule_status = 'draft'", 'delete from public.game_players', 'delete from public.games', 'delete from public.competitions', 'v_game_ids uuid[]']))
+check('Ryder Cup deletion preserves own-ball rounds and removes shared-ball rounds', all(x in lifecycle_mig for x in ["cs.format = 'alt_shot'", 'delete from public.rounds', 'Four-Ball and Singles posted rounds intentionally remain']))
+check('Ryder Cup UI exposes rename and explicit format-aware deletion', all(x in comp for x in ['Edit title', 'Delete Ryder Cup', 'rename_team_competition', 'delete_team_competition', 'Personal rounds from Four-Ball and Singles will remain', 'Posted Alternate Shot rounds will also be deleted']))
 
 bad=[name for name,ok in checks if not ok]
 for name,ok in checks: print(('PASS' if ok else 'FAIL')+': '+name)

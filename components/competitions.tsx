@@ -4,6 +4,8 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
 import { Avatar, Eyebrow, ShortDateInput, btn, inputStyle } from "@/components/ui";
+import { clearAllGameScores, clearActiveGame, loadActiveGame } from "@/lib/draft";
+import { failureMessage } from "@/lib/errors";
 import type { Game, GameSeed, Player } from "@/lib/game-types";
 import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import {
@@ -23,7 +25,7 @@ import { teamAccent } from "@/lib/game-colors";
 const supabase = createClient();
 
 type Roster = { id: string; display_name: string; avatar_url: string | null; handicap_index: number | null };
-type SessionLive = CompetitionSession & { game?: Game | null; players: Player[]; altScores: AltShotScoreRow[]; score: CompetitionSessionScore };
+type SessionLive = CompetitionSession & { game?: Game | null; players: Player[]; altScores: AltShotScoreRow[]; postedRoundCount: number; score: CompetitionSessionScore };
 
 const today = () => {
   const d = new Date();
@@ -40,6 +42,7 @@ export function Competitions({
   user,
   activeGroupId,
   canManage,
+  isSystemAdmin,
   selectedId,
   onSelected,
   onOpenGame,
@@ -48,6 +51,7 @@ export function Competitions({
   user: any;
   activeGroupId: string;
   canManage: boolean;
+  isSystemAdmin: boolean;
   selectedId: string | null;
   onSelected: (id: string | null) => void;
   onOpenGame: (id: string) => void;
@@ -107,7 +111,7 @@ export function Competitions({
     finally { setBusy(false); }
   };
 
-  if (selectedId) return <CompetitionDetail competitionId={selectedId} user={user} canManage={canManage} onBack={() => onSelected(null)} onOpenGame={onOpenGame} onCreateGame={onCreateGame} />;
+  if (selectedId) return <CompetitionDetail competitionId={selectedId} user={user} canManage={canManage} isSystemAdmin={isSystemAdmin} onBack={() => onSelected(null)} onOpenGame={onOpenGame} onCreateGame={onCreateGame} />;
 
   if (creating) {
     return (
@@ -171,7 +175,7 @@ export function Competitions({
   );
 }
 
-function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame, onCreateGame }: { competitionId: string; user: any; canManage: boolean; onBack: () => void; onOpenGame: (id: string) => void; onCreateGame: (seed: GameSeed) => void }) {
+function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBack, onOpenGame, onCreateGame }: { competitionId: string; user: any; canManage: boolean; isSystemAdmin: boolean; onBack: () => void; onOpenGame: (id: string) => void; onCreateGame: (seed: GameSeed) => void }) {
   const [competition, setCompetition] = useState<Competition | null>(null);
   const [roster, setRoster] = useState<CompetitionPlayer[]>([]);
   const [sessions, setSessions] = useState<SessionLive[] | null>(null);
@@ -183,6 +187,7 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
   const [plannedMatches, setPlannedMatches] = useState("3");
   const [pointsPerMatch, setPointsPerMatch] = useState("1");
   const [scheduleBusy, setScheduleBusy] = useState(false);
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -196,15 +201,16 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
     if (rRes.error || sRes.error) { setErr(rRes.error?.message || sRes.error?.message || "Could not load Ryder Cup setup."); return; }
     const rawSessions = (sRes.data || []) as CompetitionSession[];
     const ids = rawSessions.map((s) => s.game_id).filter((x): x is string => !!x);
-    let games: Game[] = [], players: Player[] = [], altScores: AltShotScoreRow[] = [];
+    let games: Game[] = [], players: Player[] = [], altScores: AltShotScoreRow[] = [], postedRounds: { game_id: string }[] = [];
     if (ids.length) {
-      const [gRes, pRes, aRes] = await Promise.all([
+      const [gRes, pRes, aRes, roundRes] = await Promise.all([
         supabase.from("games").select("*").in("id", ids),
         supabase.from("game_players").select("*").in("game_id", ids),
         supabase.from("game_alt_shot_scores").select("*").in("game_id", ids),
+        supabase.from("rounds").select("game_id").in("game_id", ids).is("deleted_at", null),
       ]);
-      if (gRes.error || pRes.error || aRes.error) { setErr(gRes.error?.message || pRes.error?.message || aRes.error?.message || "Could not load Ryder Cup match scores."); return; }
-      games = (gRes.data || []) as Game[]; players = (pRes.data || []) as Player[]; altScores = (aRes.data || []) as AltShotScoreRow[];
+      if (gRes.error || pRes.error || aRes.error || roundRes.error) { setErr(gRes.error?.message || pRes.error?.message || aRes.error?.message || roundRes.error?.message || "Could not load Ryder Cup match scores."); return; }
+      games = (gRes.data || []) as Game[]; players = (pRes.data || []) as Player[]; altScores = (aRes.data || []) as AltShotScoreRow[]; postedRounds = (roundRes.data || []) as { game_id: string }[];
     }
     setCompetition(cRes.data as Competition);
     setRoster((rRes.data || []) as CompetitionPlayer[]);
@@ -212,7 +218,7 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
       const game = games.find((g) => g.id === s.game_id) || null;
       const gp = game ? players.filter((p) => p.game_id === game.id) : [];
       const as = game ? altScores.filter((a) => a.game_id === game.id) : [];
-      return { ...s, game, players: gp, altScores: as, score: game ? scoreCompetitionGame(game, gp, as, Number(s.points_per_match || 1)) : { projectedA: 0, projectedB: 0, decidedA: 0, decidedB: 0, matchCount: 0, decidedCount: 0, matches: [] } };
+      return { ...s, game, players: gp, altScores: as, postedRoundCount: game ? postedRounds.filter((r) => r.game_id === game.id).length : 0, score: game ? scoreCompetitionGame(game, gp, as, Number(s.points_per_match || 1)) : { projectedA: 0, projectedB: 0, decidedA: 0, decidedB: 0, matchCount: 0, decidedCount: 0, matches: [] } };
     }));
   }, [competitionId]);
   useEffect(() => { load(); }, [load]);
@@ -286,7 +292,50 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
     setScheduleBusy(false); if (error) { setErr(error.message); return; } await load();
   };
 
+  const renameCompetition = async () => {
+    const nextName = prompt("Rename this Ryder Cup", competition.name)?.trim();
+    if (!nextName || nextName === competition.name) return;
+    if (nextName.length > 120) { setErr("Ryder Cup title must be 120 characters or fewer."); return; }
+    setLifecycleBusy(true); setErr(null);
+    const { error } = await supabase.rpc("rename_team_competition", {
+      p_competition: competition.id,
+      p_name: nextName,
+    });
+    setLifecycleBusy(false);
+    if (error) { setErr(failureMessage("Couldn't rename this Ryder Cup", error)); return; }
+    await load();
+  };
+
+  const deleteCompetition = async () => {
+    const linked = (sessions || []).filter((s) => !!s.game_id);
+    const altShot = linked.filter((s) => s.format === "alt_shot").length;
+    const ownBall = linked.length - altShot;
+    const message = [
+      `Delete "${competition.name}" and its ${linked.length} linked game${linked.length === 1 ? "" : "s"}?`,
+      ownBall ? "Personal rounds from Four-Ball and Singles will remain in each player's history." : "",
+      altShot ? "Posted Alternate Shot rounds will also be deleted because they are shared-ball scores." : "",
+      "The Ryder Cup, sessions, games and match scores cannot be recovered.",
+    ].filter(Boolean).join("\n\n");
+    if (!confirm(message)) return;
+
+    setLifecycleBusy(true); setErr(null);
+    const { error } = await supabase.rpc("delete_team_competition", {
+      p_competition: competition.id,
+    });
+    setLifecycleBusy(false);
+    if (error) { setErr(failureMessage("Couldn't delete this Ryder Cup", error)); return; }
+
+    const active = loadActiveGame();
+    linked.forEach((session) => {
+      if (session.game_id) clearAllGameScores(session.game_id);
+    });
+    if (active && linked.some((session) => session.game_id === active.gameId)) clearActiveGame();
+    onBack();
+  };
+
   const locked = competition.schedule_status === "locked";
+  const containsCompletedGame = competition.status === "complete" || (sessions || []).some((s) => s.game?.status === "ended" || s.postedRoundCount > 0);
+  const canDeleteCompetition = manage && (!containsCompletedGame || isSystemAdmin);
   const editingSession = sessions?.find((s) => s.id === editingSessionId) || null;
   const plannedMatchCount = (sessions || []).reduce((sum, s) => sum + Number(s.planned_match_count || 0), 0);
   const outcome = competitionOutcome(total.decidedA, total.decidedB, schedule, competition.tie_rule);
@@ -316,7 +365,10 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
       </div>
       <div style={{ marginTop: 12, background: C.green, borderRadius: 14, padding: 16, border: `1px solid ${C.borderGreen}` }}>
         <div style={{ color: C.sage, fontSize: 11, letterSpacing: 2, fontWeight: 800 }}>TEAM COMPETITION · LIVE SCORE</div>
-        <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800, marginTop: 4 }}>{competition.name}</div>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginTop: 4 }}>
+          <div style={{ minWidth: 0, flex: 1, color: C.cream, fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800, overflowWrap: "anywhere" }}>{competition.name}</div>
+          {manage ? <button disabled={lifecycleBusy} onClick={() => { void renameCompetition(); }} style={{ ...btn(false), flexShrink: 0, padding: "8px 12px", fontSize: 11, opacity: lifecycleBusy ? .6 : 1 }}>Edit title</button> : null}
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) 32px minmax(0,1fr)", alignItems: "center", marginTop: 14 }}>
           <div style={{ textAlign: "center" }}><div style={{ color: aColor, fontSize: 15, fontWeight: 800 }}>{competition.team_a_name}</div><div style={{ color: total.projectedA >= total.projectedB ? "#FFE08A" : C.cream, fontFamily: "Georgia, serif", fontSize: 40, fontWeight: 800 }}>{fmtCompetitionPoints(total.projectedA)}</div></div>
           <div style={{ textAlign: "center", color: C.sage, fontSize: 18 }}>–</div>
@@ -374,6 +426,12 @@ function CompetitionDetail({ competitionId, user, canManage, onBack, onOpenGame,
           })}</div> : null}
         </div>
       ))}
+      {manage ? <div style={{ width: "100%", boxSizing: "border-box", background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 18, border: `1px solid ${C.borderGreen}` }}>
+        <div style={{ color: C.cream, fontSize: 13, fontWeight: 800 }}>Ryder Cup settings</div>
+        <div style={{ color: C.sage, fontSize: 11, lineHeight: 1.45, marginTop: 4 }}>Deleting removes this Ryder Cup and every linked game. Personal rounds are preserved only when each golfer played their own ball.</div>
+        {!canDeleteCompetition ? <div style={{ color: C.gold, fontSize: 11.5, lineHeight: 1.45, marginTop: 9 }}>This Ryder Cup contains a completed game. Only a system admin can delete it.</div> : null}
+        {canDeleteCompetition ? <button disabled={lifecycleBusy} onClick={() => { void deleteCompetition(); }} style={{ background: "transparent", color: C.overRedDark, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "8px 12px", marginTop: 10, cursor: lifecycleBusy ? "default" : "pointer", opacity: lifecycleBusy ? .6 : 1 }}>{lifecycleBusy ? "Working…" : "Delete Ryder Cup"}</button> : null}
+      </div> : null}
       {err ? <div style={{ color: C.overRedDark, fontSize: 12, marginTop: 10 }}>{err}</div> : null}
     </div>
   );
