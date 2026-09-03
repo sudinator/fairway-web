@@ -116,10 +116,10 @@ export function applyTeamAssignment<T extends Pick<Player, "id" | "team">>(playe
 }
 
 /**
- * Team-play Four-Ball / Alternate Shot: team membership + tee group defines the contest.
+ * Team-play Four-Ball / Alternate Shot / Trifecta: team membership + tee group defines the contest.
  * Rebuild foursomes from those two facts, preserving stable ids/name and Alternate Shot first-driver
- * selections for groups that already exist. Trifecta is intentionally excluded: its explicit
- * singles matchups still live in the Matchups step.
+ * selections and Trifecta singles swaps for groups that already exist. Trifecta's singles
+ * pairing choice remains editable in the separate Matchups step.
  */
 export function deriveTeamFoursomesFromGroups(
   players: { id: string; user_id: string | null; team?: string | null; tee_group?: number | null }[],
@@ -141,6 +141,7 @@ export function deriveTeamFoursomesFromGroups(
       b,
       ...(validFirst((prev as any)?.a_first, a) ? { a_first: validFirst((prev as any)?.a_first, a)! } : {}),
       ...(validFirst((prev as any)?.b_first, b) ? { b_first: validFirst((prev as any)?.b_first, b)! } : {}),
+      ...((prev as any)?.swap === true ? { swap: true } : {}),
     } as Foursome;
   });
 }

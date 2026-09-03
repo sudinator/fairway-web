@@ -49,7 +49,7 @@ import {
   mergeBackupRow } from "@/lib/golf";
 import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
 import { decideSetupChange, type SetupAction, type SetupDecision } from "@/lib/game-setup-policy";
-import { balancedTeamGroups, randomTeeGroups, type GPlayer } from "@/lib/grouping";
+import { applyTeamGroupSlotMove, balancedTeamGroups, randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
 import type { LegConfig, Leg } from "@/lib/legs";
@@ -129,6 +129,7 @@ export default function Tournaments({
   isGroupAdmin,
   seed,
   openGameId,
+  onExitOpenGame,
 }: {
   session: any;
   activeGroupId: string;
@@ -136,6 +137,7 @@ export default function Tournaments({
   isGroupAdmin?: boolean;
   seed?: GameSeed | null;
   openGameId?: string | null;
+  onExitOpenGame?: () => void;
 }) {
   const [view, setView] = useState<"list" | "create" | { gameId: string; tab?: "play" | "setup"; setupTab?: SetupTab }>(
     seed ? "create" : openGameId ? { gameId: openGameId } : "list",
@@ -206,7 +208,7 @@ export default function Tournaments({
         user={user}
         displayName={displayName}
         isAdmin={!!isAdmin}
-        onBack={() => { clearActiveGame(); setView("list"); }}
+        onBack={() => { clearActiveGame(); setView("list"); onExitOpenGame?.(); }}
         onOpenCompetition={(id) => { clearActiveGame(); setView("list"); setListMode("cups"); setCompetitionId(id); }}
       />
     );
@@ -214,7 +216,7 @@ export default function Tournaments({
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         <button onClick={() => { setListMode("games"); setCompetitionId(null); }} style={{ ...btn(listMode === "games"), flex: 1 }}>Games</button>
-        <button onClick={() => setListMode("cups")} style={{ ...btn(listMode === "cups"), flex: 1 }}>Ryder Cups</button>
+        <button onClick={() => setListMode("cups")} style={{ ...btn(listMode === "cups"), flex: 1 }}>Ryder Cup</button>
       </div>
       <div style={{ color: C.sage, fontSize: 11.5, lineHeight: 1.45, margin: "0 2px 12px" }}>
         <b style={{ color: C.cream }}>Game:</b> one round, one format and one scorecard. <b style={{ color: C.cream }}>Ryder Cup:</b> several team sessions combined into one overall match score.
@@ -231,6 +233,7 @@ export default function Tournaments({
           user={user}
           activeGroupId={activeGroupId}
           canManage={!!isAdmin || !!isGroupAdmin}
+          isSystemAdmin={!!isAdmin}
           selectedId={competitionId}
           onSelected={setCompetitionId}
           onOpenGame={(gameId) => setView({ gameId })}
@@ -462,6 +465,10 @@ function CreateGame({
   useEffect(() => {
     if (resumedRef.current) return;
     if (!seed || groupRoster.length === 0) return;
+    if (seed.competitionSession?.format === "trifecta") {
+      setTeamScoreMode("best_ball");
+      setTrifectaScoring("match");
+    }
     setSelectedPlayers((prev) => {
       if (seed.competitionSession) {
         const allowed = new Set(seed.memberIds);
@@ -621,6 +628,10 @@ function CreateGame({
     }
     if (seed?.competitionSession && gameType === "match" && !teamMode) {
       setErr("Ryder Cup Singles is a team match. Keep Team match turned on so the result can roll into the Ryder Cup score.");
+      return;
+    }
+    if (seed?.competitionSession?.format === "trifecta" && (teamScoreMode !== "best_ball" || trifectaScoring !== "match")) {
+      setErr("Ryder Cup Trifecta uses two Singles matches and one Four-Ball match per foursome. Keep Best ball and 1 match = 1 point selected.");
       return;
     }
     if (seed?.competitionSession) {
@@ -1147,15 +1158,15 @@ function CreateGame({
         {gameType === "trifecta" && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>Two teams</div>
-            <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Name the two sides, then build the 2-v-2 foursomes after creating. Each foursome plays for three points a hole.</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>{seed?.competitionSession ? "One gross score per golfer feeds two true Singles matches and one Four-Ball match. Singles and Four-Ball strokes are calculated separately." : "Name the two sides, then build the 2-v-2 foursomes after creating. Each foursome plays for three points a hole."}</div>
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
               <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} disabled={!!seed?.competitionSession} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
               <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} disabled={!!seed?.competitionSession} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
             </div>
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>Team point</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-              <button onClick={() => setTeamScoreMode("best_ball")} style={{ ...btn(teamScoreMode === "best_ball"), fontSize: 12, padding: "7px 10px" }}>Best ball</button>
-              <button onClick={() => setTeamScoreMode("aggregate")} style={{ ...btn(teamScoreMode === "aggregate"), fontSize: 12, padding: "7px 10px" }}>Shootout (aggregate)</button>
+              <button disabled={!!seed?.competitionSession} onClick={() => setTeamScoreMode("best_ball")} style={{ ...btn(teamScoreMode === "best_ball"), fontSize: 12, padding: "7px 10px" }}>Best ball</button>
+              {!seed?.competitionSession ? <button onClick={() => setTeamScoreMode("aggregate")} style={{ ...btn(teamScoreMode === "aggregate"), fontSize: 12, padding: "7px 10px" }}>Shootout (aggregate)</button> : null}
             </div>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
               {teamScoreMode === "aggregate"
@@ -1164,8 +1175,8 @@ function CreateGame({
             </div>
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>Scoring</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-              <button onClick={() => setTrifectaScoring("per_hole")} style={{ ...btn(trifectaScoring === "per_hole"), fontSize: 12, padding: "7px 10px" }}>1 hole = 1 pt</button>
-              <button onClick={() => setTrifectaScoring("match")} style={{ ...btn(trifectaScoring === "match"), fontSize: 12, padding: "7px 10px" }}>1 match = 1 pt (Ryder Cup)</button>
+              {!seed?.competitionSession ? <button onClick={() => setTrifectaScoring("per_hole")} style={{ ...btn(trifectaScoring === "per_hole"), fontSize: 12, padding: "7px 10px" }}>1 hole = 1 pt</button> : null}
+              <button disabled={!!seed?.competitionSession} onClick={() => setTrifectaScoring("match")} style={{ ...btn(trifectaScoring === "match"), fontSize: 12, padding: "7px 10px" }}>1 match = 1 pt (Ryder Cup)</button>
             </div>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
               {trifectaScoring === "match"
@@ -1489,6 +1500,7 @@ function GameRoom({
   const [altShotScores, setAltShotScores] = useState<AltShotScoreRow[]>([]);
   const [me, setMe] = useState<Player | null>(null);
   const [loading, setLoading] = useState(true);
+  const [postedRoundCount, setPostedRoundCount] = useState(0);
   const [competitionLink, setCompetitionLink] = useState<{ competition_id: string; name: string } | null>(null);
   const [savingHole, setSavingHole] = useState<number | null>(null);
   const [syncState, setSyncState] = useState<"idle" | "saving" | "retry" | "synced" | "error">("idle");
@@ -1713,6 +1725,12 @@ function GameRoom({
       .from("game_players")
       .select("*")
       .eq("game_id", gameId);
+    const { count: postedRounds } = await supabase
+      .from("rounds")
+      .select("id", { count: "exact", head: true })
+      .eq("game_id", gameId)
+      .is("deleted_at", null);
+    setPostedRoundCount(postedRounds || 0);
     const { data: altRows } = await supabase
       .from("game_alt_shot_scores")
       .select("game_id,foursome_id,side,hole_index,strokes,updated_at,updated_by")
@@ -2321,9 +2339,10 @@ function GameRoom({
 
   const syncTeamPlayFoursomes = async (nextPlayers: Player[]) => {
     if (!game || !Array.isArray(game.teams) || game.teams.length !== 2) return;
-    if (game.game_type !== "fourball" && game.game_type !== "alt_shot") return;
+    if (game.game_type !== "fourball" && game.game_type !== "alt_shot" && game.game_type !== "trifecta") return;
     const next = deriveTeamFoursomesFromGroups(nextPlayers, game.teams, game.foursomes);
-    await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
+    const { error } = await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
+    if (error) { notifyError("Couldn't save the groups — please try again."); return; }
     setGame({ ...game, foursomes: next });
   };
 
@@ -2333,6 +2352,15 @@ function GameRoom({
     const next = game.foursomes.map((f) => f.id === foursomeId ? { ...f, [side === "a" ? "a_first" : "b_first"]: playerKey } : f);
     const { error } = await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
     if (error) { notifyError("Couldn't save the starting player — please try again."); return; }
+    setGame({ ...game, foursomes: next });
+  };
+
+  const setTrifectaPairing = async (foursomeId: string, cross: boolean) => {
+    if (!game || game.game_type !== "trifecta" || !Array.isArray(game.foursomes)) return;
+    if (!allowSetupChange({ type: "set_foursomes" })) return;
+    const next = game.foursomes.map((f) => f.id === foursomeId ? { ...f, swap: cross } : f);
+    const { error } = await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
+    if (error) { notifyError("Couldn't save the Singles matchups — please try again."); return; }
     setGame({ ...game, foursomes: next });
   };
 
@@ -2381,8 +2409,7 @@ function GameRoom({
     const payload = changes.map((change) => ({ player: change.player.id, group: change.group }));
     const { error } = await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: payload });
     if (error) { notifyError("Couldn't update that group slot — please try again."); return; }
-    const byId = new Map(changes.map((change) => [change.player.id, change.group]));
-    const nextPlayers = players.map((p) => byId.has(p.id) ? { ...p, tee_group: byId.get(p.id) ?? null } : p);
+    const nextPlayers = applyTeamGroupSlotMove(players, current?.id || null, next?.id || null, group);
     setPlayers(nextPlayers);
     await syncTeamPlayFoursomes(nextPlayers);
     await load();
@@ -2398,7 +2425,7 @@ function GameRoom({
   const randomizeReason = randomizeDecision.decision === "block" ? randomizeDecision.reason : "";
   const randomizeGroups = async () => {
     if (!game || !canRandomize || !allowSetupChange({ type: "randomize_groups" })) return;
-    const teamFormat = (game.game_type === "fourball" || game.game_type === "alt_shot") && Array.isArray(game.teams) && game.teams.length === 2;
+    const teamFormat = (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta") && Array.isArray(game.teams) && game.teams.length === 2;
     let assignments: { playerId: string; group: number }[];
     let overflowGuestIds: string[];
     if (teamFormat) {
@@ -2831,12 +2858,20 @@ function GameRoom({
       && created.getFullYear() === now.getFullYear()
       && created.getMonth() === now.getMonth()
       && created.getDate() === now.getDate();
-    const msg = sameDay
+    const msg = competitionLink
+      ? `Delete "${game.name}" from this Ryder Cup session? The planned session will remain so you can create a replacement game. Own-ball rounds stay in player history; Alternate Shot shared-ball rounds are removed. This can't be undone.`
+      : sameDay
       ? `Delete "${game.name}"? It was created today, so any scorecards already posted to players' Rounds tabs will ALSO be deleted. This can't be undone.`
       : `Delete "${game.name}"? It's removed for everyone, but each player's posted round stays in their own Rounds history. This can't be undone.`;
     if (!confirm(msg)) return;
-    await supabase.rpc("delete_game", { p_game: game.id, p_delete_rounds: sameDay });
-    await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_deleted", group_id: (game as any).group_id || null, summary: `Deleted the game "${game.name}"${sameDay ? " (and its posted rounds)" : ""}` });
+    const result = competitionLink
+      ? await supabase.rpc("delete_competition_session_game", { p_game: game.id })
+      : await supabase.rpc("delete_game", { p_game: game.id, p_delete_rounds: sameDay });
+    if (result.error) {
+      alert(`Could not delete the game: ${result.error.message}`);
+      return;
+    }
+    await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_deleted", group_id: (game as any).group_id || null, summary: `Deleted the game "${game.name}"${competitionLink ? " from its Ryder Cup session" : sameDay ? " (and its posted rounds)" : ""}` });
     // Coherent local wipe so a deleted game leaves no snapshot, backups, watermarks,
     // or active-game pointer that could resurface or boot straight back into it.
     clearAllGameScores(game.id);
@@ -2856,45 +2891,50 @@ function GameRoom({
       </div>
     );
 
-  // ---- Master-admin game repair (is_admin only; works on any game) ----
+  // ---- System-admin game repair (profiles.is_admin only; works on any game) ----
   const adminLog = async (summary: string) =>
     logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "admin_game_repair", group_id: (game as any)?.group_id || null, summary });
   const adminEndGame = async () => {
-    if (!game || !confirm(`Force-end "${game.name}" as admin?`)) return;
+    if (!game || !confirm(`Force-end "${game.name}" as system admin?`)) return;
     const { error } = await supabase.rpc("admin_end_game", { p_game: game.id });
     if (error) { alert(failureMessage("Couldn't end that", error)); return; }
-    await adminLog(`Admin force-ended game "${game.name}"`); await load();
+    await adminLog(`System admin force-ended game "${game.name}"`); await load();
   };
   const adminReopenGame = async () => {
-    if (!game || !confirm(`Reopen "${game.name}" as admin?`)) return;
+    if (!game || !confirm(`Reopen "${game.name}" as system admin?`)) return;
     const { error } = await supabase.rpc("admin_reopen_game", { p_game: game.id });
     if (error) { alert(failureMessage("Couldn't reopen", error)); return; }
-    await adminLog(`Admin reopened game "${game.name}"`); await load();
+    await adminLog(`System admin reopened game "${game.name}"`); await load();
   };
   const adminResetGame = async () => {
-    if (!game || !confirm(`Reset ALL scores in "${game.name}" as admin? This can't be undone.`)) return;
+    if (!game || !confirm(`Reset ALL scores in "${game.name}" as system admin? This can't be undone.`)) return;
     const { error } = await supabase.rpc("admin_reset_game", { p_game: game.id });
     if (error) { alert(failureMessage("Couldn't reset", error)); return; }
-    await adminLog(`Admin reset scores in game "${game.name}"`); await load();
+    await adminLog(`System admin reset scores in game "${game.name}"`); await load();
   };
   const adminDeleteGame = async () => {
-    if (!game || !confirm(`Delete "${game.name}" as admin? Rounds already posted to players' history are kept. This can't be undone.`)) return;
+    if (!game) return;
+    const roundRule = game.game_type === "alt_shot"
+      ? "Posted Alternate Shot rounds will also be deleted because they are shared-ball scores."
+      : "Rounds already posted to players' history will be kept.";
+    if (!confirm(`Delete "${game.name}" as system admin? ${roundRule} This can't be undone.`)) return;
     const { error } = await supabase.rpc("admin_delete_game", { p_game: game.id });
     if (error) { alert(failureMessage("Couldn't delete that", error)); return; }
-    await adminLog(`Admin deleted game "${game.name}"`); onBack();
+    onBack();
   };
   const adminReassignOrganizer = async () => {
     if (!game || !reassignTo) return;
     const who = players.find((p) => p.user_id === reassignTo);
-    if (!confirm(`Make ${who?.display_name || "this player"} the organizer of "${game.name}"?`)) return;
+    if (!confirm(`As system admin, make ${who?.display_name || "this player"} the organizer of "${game.name}"?`)) return;
     const { error } = await supabase.rpc("admin_reassign_organizer", { p_game: game.id, p_user: reassignTo });
     if (error) { alert(failureMessage("Couldn't reassign that", error)); return; }
-    await adminLog(`Admin made ${who?.display_name || "a player"} organizer of "${game.name}"`);
+    await adminLog(`System admin made ${who?.display_name || "a player"} organizer of "${game.name}"`);
     setReassignTo(""); await load();
   };
 
   const isOrganizer = game.created_by === user.id;
   const isEnded = game.status === "ended";
+  const completedGame = isEnded || postedRoundCount > 0;
   // What still needs setting for this game to score cleanly. Informational only —
   // scoring is never blocked. A missing handicap just means that player plays off scratch (0).
   const setupMissing: string[] = (() => {
@@ -3080,9 +3120,9 @@ function GameRoom({
         <CleanSweepBanner name={sweepWatch.name} val={sweepWatch.val} thru={sweepWatch.thru} unit={sweepWatch.unit} />
       )}
 
-      {isAdmin && !isOrganizer && (
+      {isAdmin && (!isOrganizer || completedGame) && (
         <div style={{ background: C.greenMid, border: `1px solid ${C.gold}`, borderRadius: 12, padding: 12, marginTop: 12 }}>
-          <div style={{ color: C.gold, fontWeight: 800, fontSize: 13, marginBottom: 8 }}>⚠ Admin repair · you are not the organizer</div>
+          <div style={{ color: C.gold, fontWeight: 800, fontSize: 13, marginBottom: 8 }}>⚠ System admin repair{!isOrganizer ? " · you are not the organizer" : ""}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {game.status === "ended"
               ? <button onClick={adminReopenGame} style={{ background: "transparent", color: C.cream, border: `1px solid ${C.sage}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "6px 12px", cursor: "pointer" }}>Reopen</button>
@@ -3213,14 +3253,15 @@ function GameRoom({
           onOverride: overridePlayerHandicap, courseTees, onSetTee: setPlayerTee,
           onRemove: removePlayer, onToggleNoShow: toggleNoShow, onSetTeam: setPlayerTeam, onRenameTeams: renameTeams,
           onRename: renameGame, onDelete: deleteGame,
+          canDelete: !completedGame, deleteRestriction: "Only a system admin can delete a completed game. Posted own-ball rounds remain in player history; Alternate Shot rounds are removed.",
           onEnd: requestEndGame, onReopen: reopenGame, onReset: resetScores, onShare: setShare,
           eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,
           onSetAllowance: setAllowance, onSetFormat: setFormat, onSetTeamScoreMode: setTeamScoreMode, onSetSkinsMode: updateSkinsMode, onSetSkinsStyle: setSkinsStyle, onSetMatchTeam: setMatchTeam, anyScores,
         } satisfies OrganizerPanelProps;
         const workspaceProps = {
           game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate, courseOptions, onChangeCourse: changeGameCourse,
-          onSetTeeGroup: setPlayerTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, onSetLegConfig: setLegConfig, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, canRandomize, randomizeReason,
-          randomizing, groupOverflow, onSetTeamGroupSlot: setTeamGroupSlot,
+          onSetTeeGroup: setPlayerTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, onSetTrifectaPairing: setTrifectaPairing, onSetLegConfig: setLegConfig, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, canRandomize, randomizeReason,
+          randomizing, groupOverflow, onSetTeamGroupSlot: setTeamGroupSlot, isCompetitionGame: !!competitionLink,
         } satisfies React.ComponentProps<typeof GameSetupWorkspace>;
         return <GameSetupWorkspace {...workspaceProps} />;
       })()}
@@ -3486,7 +3527,7 @@ function GameRoom({
             onMarkOut={toggleNoShow}
           />
         </>
-      ) : (game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot") && (roomTab === "play" || (roomTab === "setup" && setupTab === "matchups")) ? (
+      ) : (game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot") && (roomTab === "play" || (roomTab === "setup" && setupTab === "matchups" && game.game_type !== "trifecta")) ? (
         <FourballView
           game={game}
           players={players}

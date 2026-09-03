@@ -29,6 +29,7 @@ export type GameSetupWorkspaceProps = {
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
   onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
   onSetAltShotFirstDriver?: (foursomeId: string, side: "a" | "b", playerKey: string) => Promise<void>;
+  onSetTrifectaPairing?: (foursomeId: string, cross: boolean) => Promise<void>;
   onSetLegConfig?: (cfg: LegConfig) => void;
   getTeeGroupPolicy: (p: Player, group: number | null) => { blocked: boolean; reason?: string };
   onRandomizeGroups: () => Promise<void>;
@@ -36,6 +37,7 @@ export type GameSetupWorkspaceProps = {
   randomizeReason: string;
   randomizing: boolean;
   groupOverflow: string[];
+  isCompetitionGame?: boolean;
 };
 
 const cardStyle: React.CSSProperties = {
@@ -57,6 +59,7 @@ export function GameSetupWorkspace({
   onSetTeeGroup,
   onSetTeamGroupSlot,
   onSetAltShotFirstDriver,
+  onSetTrifectaPairing,
   onSetLegConfig,
   getTeeGroupPolicy,
   onRandomizeGroups,
@@ -64,6 +67,7 @@ export function GameSetupWorkspace({
   randomizeReason,
   randomizing,
   groupOverflow,
+  isCompetitionGame = false,
 }: GameSetupWorkspaceProps) {
   // Whether the line-up card is open. Local: presentation, not setup state.
   const [showLineup, setShowLineup] = React.useState(false);
@@ -99,8 +103,9 @@ export function GameSetupWorkspace({
   const playersDone = total > 0 && cWithHcp === total;
   const teamsDone = !usesTeams || (total > 0 && cWithTeam === total);
   const matchupsDone = !usesMatchups || (total > 0 && cPlaced === total);
-  const teamGroupFormat = usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot");
+  const teamGroupFormat = usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta");
   const showGroupsTab = !usesFoursomes || teamGroupFormat;
+  const showMatchupsTab = usesMatchups && game.game_type !== "trifecta";
   const teamGroupsValid = teamGroupFormat && total > 0 && cGrouped === total && foursomes.length > 0 && foursomes.every((f) => f.a.length === 2 && f.b.length === 2);
   const altDriversDone = game.game_type !== "alt_shot" || (foursomes.length > 0 && foursomes.every((f) => !!f.a_first && !!f.b_first));
   const groupsDone = teamGroupFormat ? (teamGroupsValid && altDriversDone) : usesFoursomes || (total > 0 && cGrouped === total);
@@ -109,21 +114,15 @@ export function GameSetupWorkspace({
   const anyScores = players.some((p) => (p.scores || []).some((s) => s != null)) || !!game.alt_shot_scoring_started_at;
 
   const section = setupTab === "teams" || setupTab === "matchups" || setupTab === "groups" ? "structure" : setupTab;
-  const structureDefault: SetupTab = usesTeams && !teamsDone
-    ? "teams"
-    : usesMatchups && !matchupsDone
-      ? "matchups"
-      : showGroupsTab && !groupsDone
-        ? "groups"
-        : "review";
-  const gotoStructure = () => onSetupTabChange(structureDefault);
-
   const [nameEdit, setNameEdit] = React.useState(game.name);
   const [dateEdit, setDateEdit] = React.useState(String((game as any).played_at || "").slice(0, 10));
   const [dateBusy, setDateBusy] = React.useState(false);
   const [courseBusy, setCourseBusy] = React.useState(false);
   React.useEffect(() => setNameEdit(game.name), [game.name]);
   React.useEffect(() => setDateEdit(String((game as any).played_at || "").slice(0, 10)), [(game as any).played_at]);
+  React.useEffect(() => {
+    if (game.game_type === "trifecta" && setupTab === "matchups") onSetupTabChange("groups");
+  }, [game.game_type, onSetupTabChange, setupTab]);
 
   const stepDefs = [
     { key: "details", label: "Game", done: !!game.name && !!game.course },
@@ -134,7 +133,7 @@ export function GameSetupWorkspace({
   ] as const;
 
   const openSection = (key: typeof stepDefs[number]["key"]) => {
-    if (key === "structure") gotoStructure();
+    if (key === "structure") onSetupTabChange("teams");
     else onSetupTabChange(key);
   };
 
@@ -260,8 +259,12 @@ export function GameSetupWorkspace({
             <div style={{ color: "#F0B0A8", fontSize: 11.5, fontWeight: 700, marginTop: 6 }}>These actions cannot be undone.</div>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>Reset clears all scoring and clocks but keeps players and game structure.</div>
             <button style={{ background: "#3F3414", color: "#E4CF86", border: `0.5px solid ${C.gold}`, borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 13, display: "block" }} onClick={organizerPanelProps.onReset}>↺ Reset scores</button>
-            <div style={{ color: C.sage, fontSize: 11, marginTop: 12 }}>Delete permanently removes this game.</div>
-            <button style={{ background: C.danger, color: "#F6DEDB", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 13, display: "block" }} onClick={organizerPanelProps.onDelete}>Delete this game</button>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 12 }}>
+              {organizerPanelProps.canDelete === false
+                ? organizerPanelProps.deleteRestriction || "Only a system admin can delete a completed game."
+                : "Delete permanently removes this game."}
+            </div>
+            {organizerPanelProps.canDelete !== false ? <button style={{ background: C.danger, color: "#F6DEDB", border: "none", borderRadius: 8, padding: "9px 14px", fontWeight: 700, cursor: "pointer", marginTop: 8, fontSize: 13, display: "block" }} onClick={organizerPanelProps.onDelete}>Delete this game</button> : null}
           </div>
         </div>
       )}
@@ -280,11 +283,25 @@ export function GameSetupWorkspace({
         <>
           <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
             {usesTeams && <button onClick={() => onSetupTabChange("teams")} style={{ ...btn(setupTab === "teams"), flex: 1, fontSize: 12 }}>Teams</button>}
-            {usesMatchups && <button onClick={() => onSetupTabChange("matchups")} style={{ ...btn(setupTab === "matchups"), flex: 1, fontSize: 12 }}>Matchups</button>}
+            {showMatchupsTab && <button onClick={() => onSetupTabChange("matchups")} style={{ ...btn(setupTab === "matchups"), flex: 1, fontSize: 12 }}>Matchups</button>}
             {showGroupsTab && <button onClick={() => onSetupTabChange("groups")} style={{ ...btn(setupTab === "groups"), flex: 1, fontSize: 12 }}>Groups</button>}
           </div>
-          {setupTab === "teams" && <OrganizerPanel section="teams" {...organizerPanelProps} />}
-          {setupTab === "groups" && <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} getTeeGroupPolicy={getTeeGroupPolicy} onRandomize={onRandomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} overflowIds={groupOverflow} />}
+          {setupTab === "teams" && (isCompetitionGame ? (
+            <div style={cardStyle}>
+              <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1.2 }}>RYDER CUP TEAMS</div>
+              <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.45, marginTop: 7 }}>Teams are inherited from the Ryder Cup roster and cannot be changed inside one session.</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))", gap: 10, marginTop: 12 }}>
+                {(game.teams || []).map((team) => (
+                  <div key={team.key} style={{ border: `1px solid ${C.borderGreen}`, borderRadius: 10, padding: 10, minWidth: 0 }}>
+                    <div style={{ color: C.gold, fontSize: 12, fontWeight: 800 }}>{team.name}</div>
+                    {players.filter((p) => p.team === team.key).map((p) => <div key={p.id} style={{ color: C.cream, fontSize: 12, marginTop: 6, overflowWrap: "anywhere" }}>{p.display_name}</div>)}
+                  </div>
+                ))}
+              </div>
+              <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>To change sides, return to the Ryder Cup roster before configuring its sessions.</div>
+            </div>
+          ) : <OrganizerPanel section="teams" {...organizerPanelProps} />)}
+          {setupTab === "groups" && <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} onSetTrifectaPairing={onSetTrifectaPairing} getTeeGroupPolicy={getTeeGroupPolicy} onRandomize={onRandomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} overflowIds={groupOverflow} />}
           {setupTab === "matchups" && <div style={{ ...cardStyle, color: C.sage, fontSize: 12 }}>Build and review matchups below. The existing matchup editor is unchanged.</div>}
         </>
       )}

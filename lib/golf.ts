@@ -400,6 +400,37 @@ export function matchLeadLabel(lead: number | null): string {
   return `${Math.abs(lead)}${lead > 0 ? "UP" : "DN"}`;
 }
 
+export type MatchCloseoutStatus = {
+  thru: number;
+  lead: number;
+  result: string;
+  decided: boolean;
+};
+
+// Resolve a running match at the instant it becomes mathematically final. Scores
+// entered after that point remain stored for the round, but cannot rewrite the
+// match margin (for example, 5 & 3 must never later render as 2 UP or 8 DN).
+export function matchCloseoutStatus(
+  progress: (number | null)[],
+  holeCount: number = progress.length,
+): MatchCloseoutStatus {
+  const played = progress.filter((lead): lead is number => lead != null);
+  if (!played.length) return { thru: 0, lead: 0, result: "", decided: false };
+  for (let i = 0; i < played.length; i++) {
+    const thru = i + 1;
+    const lead = played[i];
+    const remaining = holeCount - thru;
+    if (remaining > 0 && Math.abs(lead) > remaining) {
+      return { thru, lead, result: `${Math.abs(lead)} & ${remaining}`, decided: true };
+    }
+  }
+  const thru = played.length;
+  const lead = played[played.length - 1];
+  return thru === holeCount
+    ? { thru, lead, result: lead === 0 ? "Halved" : `${Math.abs(lead)} UP`, decided: true }
+    : { thru, lead, result: "", decided: false };
+}
+
 export function matchStatus(
   holes: MatchHoleMeta[],
   grossA: (number | null)[],
@@ -758,6 +789,7 @@ export type TrifectaContest = {
   bPts: number;
   thru: number;
   settled: boolean; // match scoring: contest decided/finished; per-hole: all holes played
+  result: string; // match scoring: mathematical close-out label; otherwise empty
   perHole: ContestHole[];
 };
 export type TrifectaResult = {
@@ -826,21 +858,31 @@ export function computeTrifecta(
     if (scoring === "match") {
       // Ryder-Cup: the contest is worth ONE point, decided by the match over 18
       // (½ each if halved). No points until the match is settled.
-      let aH = 0, bH = 0, played = 0;
-      for (const r of results) { if (r == null) continue; played++; if (r > 0) aH++; else if (r < 0) bH++; }
-      const remaining = results.length - played;
-      const lead = aH - bH; // match lead in holes
-      const settled = played > 0 && (Math.abs(lead) > remaining || remaining === 0);
+      let runningLead = 0;
+      const progress = results.map((r) => {
+        if (r == null) return null;
+        if (r > 0) runningLead++;
+        else if (r < 0) runningLead--;
+        return runningLead;
+      });
+      const closeout = matchCloseoutStatus(progress, holes.length);
+      const { lead, thru, decided: settled, result } = closeout;
       let aPts = 0, bPts = 0;
       if (settled) { if (lead > 0) aPts = 1; else if (lead < 0) bPts = 1; else { aPts = 0.5; bPts = 0.5; } }
-      return { kind, aIds: aIdsC, bIds: bIdsC, aPts, bPts, thru: played, lead, settled, perHole };
+      return { kind, aIds: aIdsC, bIds: bIdsC, aPts, bPts, thru, lead, settled, result, perHole };
     }
     const t = tally(results);
-    return { kind, aIds: aIdsC, bIds: bIdsC, ...t, settled: t.thru === holes.length, perHole };
+    return { kind, aIds: aIdsC, bIds: bIdsC, ...t, settled: t.thru === holes.length, result: "", perHole };
   };
 
   for (const [aId, bId] of singles) {
-    const pairs = holes.map((_, i) => ({ aNet: nets[aId]?.[i] ?? null, bNet: nets[bId]?.[i] ?? null }));
+    // A Ryder-Cup Trifecta single is a genuine 1-v-1 match: strokes are
+    // allocated relative to the lower handicap in that pair. The legacy
+    // per-hole Trifecta game keeps its established four-player allocation.
+    const singlesNets = scoring === "match"
+      ? fourballNets(holes, members.filter((m) => m.id === aId || m.id === bId), allowancePct)
+      : nets;
+    const pairs = holes.map((_, i) => ({ aNet: singlesNets[aId]?.[i] ?? null, bNet: singlesNets[bId]?.[i] ?? null }));
     contests.push(buildContest("single", [aId], [bId], pairs));
   }
 

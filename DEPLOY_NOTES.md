@@ -1,3 +1,126 @@
+## 181.11.260903 — Trifecta results freeze at mathematical close-out
+
+- Adds one shared match close-out model for ordinary matches, Four-Ball, Alternate Shot, Trifecta and Ryder Cup aggregation.
+- Freezes the official result and thru value at the first mathematical close-out while retaining every later gross score for the player's round.
+- Updates Trifecta contest rows and expanded progression to stop at the official close-out instead of displaying an impossible raw final margin.
+- Adds the exact game 645502 fixture across all three groups: nine expected results, a 6–3 session total, and rendered rejection of 5 DN and 8 DN.
+- No migration. Migration 0148 remains current.
+
+## 181.10.260903 — Groups selectors use the explicit Unassigned pool
+
+- Occupied team slots show only the current player plus Move to unassigned.
+- Empty slots show only same-team players currently in the Unassigned pool; players assigned to any group are hidden.
+- Adds executed logic and DOM interaction tests that unassign players from two complete groups, exchange them through Unassigned, reload, and verify both groups are complete without duplicates.
+- No migration. Migration 0148 remains current.
+
+## 181.9.260903 — Completed Teams tab remains directly selectable
+
+- Makes the top Manage Game Teams step open Teams directly, matching Game, Players, Format and Review.
+- Removes completeness-based redirection from Teams to Groups or Review; completion now affects only the status checkmark.
+- Adds an executed DOM interaction test for complete and incomplete Ryder Cup Trifecta games, every roster name, no Review redirect, and Teams → Groups → Control Center → Teams re-entry.
+- No migration. Migration 0148 remains current.
+
+## 181.8.260903 — Fully assigned Ryder Cup groups remain editable
+
+- Restores assigned same-team players to other Groups selectors, labeled with their current group, so completed groups can be rearranged.
+- Keeps the current player selected and excludes the teammate already occupying the other same-team slot in the target group.
+- Uses one tested pure transition for the optimistic UI and atomic database payload.
+- Executes the required round trip: fully assign two groups, move an assigned player, reload, fill the vacated slot, and verify both groups are complete without duplicates.
+- No migration. Migration 0148 remains current.
+
+## 181.7.260903 — Ryder Cup session deletion and roster balance
+
+- Adds an authorized, atomic Ryder Cup session-game deletion path that preserves the planned session for replacement even after scoring begins.
+- Preserves posted own-ball rounds while removing Alternate Shot shared-ball rounds.
+- Shows live player counts and handicap-index totals for both teams during Ryder Cup roster assignment.
+- Keeps an assigned player visible in their current Groups selector while excluding already-assigned players from other slot selectors.
+- Adds migration 0148. Apply it to Staging before deploying this version.
+
+## 181.6.260902 — Trifecta Groups owns complete matchup setup
+
+- Consolidates Ryder Cup Trifecta setup into Groups: organizers select each 2-v-2 foursome and choose its two Singles opponents in the same card.
+- Adds explicit Straight and Cross pairing choices with both resulting player-v-player matches shown by name.
+- Removes the redundant Trifecta Matchups tab and redirects stale Matchups routes back to Groups.
+- Keeps Ryder Cup team membership inherited and read-only, matching Four-Ball and Alternate Shot while preserving Trifecta's additional Singles choice.
+- Locks both group membership and Singles pairing once scoring begins and explains why the controls are unavailable.
+- Adds permanent source-contract coverage for ownership, persistence, route closure, and scoring locks.
+- No database migration. Migration 0147 remains current and must not be rerun.
+
+## 181.5.260902 — Complete Ryder Cup Trifecta setup package
+
+- Reissues the Trifecta setup and mobile-fit work as a self-contained overlay, including the required Groups selector implementation that was omitted from the 181.4 ZIP.
+- Retains Groups as the sole owner of foursomes, explicit Standard/Cross Singles choices in Matchups, inherited Ryder Cup teams, and narrow-screen name containment.
+- No database migration. Migration 0147 remains current and must not be rerun.
+
+## 181.4.260902 — Ryder Cup Trifecta setup ownership and mobile fit
+
+- Makes Groups the sole place to create foursomes and assign their four players; Trifecta Matchups no longer duplicates Add foursome or player assignment controls.
+- Makes Trifecta Matchups explicitly choose the two Singles contests with visible Standard and Cross pairing options.
+- Shows Ryder Cup session teams as inherited, read-only roster data so the session editor no longer suggests that team membership can be changed locally.
+- Constrains long player names, playing handicaps, and stroke details within both columns of the Trifecta Best Ball summary on narrow screens.
+- Adds permanent source-contract checks for setup ownership, pairing choices, inherited teams, and mobile containment.
+- No database migration. Migration 0147 remains current and must not be rerun.
+
+## 181.3.260902 — Ryder Cup Trifecta balanced-group correction
+
+- Routes Trifecta through the team-aware group builder so every complete foursome contains two players from each Ryder Cup team.
+- Lets organizers move a same-team player directly from another group; the option identifies that player's current group.
+- Gives every occupied slot an explicit **Move to unassigned** action and prevents empty, dead-end selectors.
+- No database migration. Migration 0147 remains current.
+
+## 181.2.260902 — Ryder Cup Trifecta group setup
+
+- Restores the Groups tab for Ryder Cup Trifecta sessions while retaining Matchups for the two Singles pairings.
+- Makes Teams + Groups generate the underlying 2-v-2 foursomes and preserves any Singles pairing swap when a group changes.
+- Migration 0147 permits empty and partially assembled draft groups, while rejecting malformed groups or more than two players on either side.
+- Surfaces a save error instead of leaving Add foursome apparently unresponsive.
+
+## 181.1.260902 — Ryder Cup session spacing
+- Adds clear separation above and below the Ryder Cup Sessions heading and Add session control.
+- Keeps the existing BNN card borders, colors, button treatment and responsive width rules unchanged.
+
+## 181.0.260902 — Ryder Cup Trifecta
+- Adds Trifecta as a Ryder Cup session: every 2-v-2 foursome contributes two true Singles matches and one Four-Ball match.
+- Reuses one gross scorecard per golfer. Singles strokes are calculated within each 1-v-1 pair; the Four-Ball leg uses the four-player best-ball allocation.
+- Session planning accepts a foursome count and records three planned matches per foursome.
+- Migration 0146 adds the session format and enforces match scoring, best ball, and balanced nonempty foursomes for linked Ryder Cup Trifecta games.
+- Current profile handicaps remain the Create Game defaults and are snapshotted into the child game when it is created.
+
+## 180.3.260902 — Ryder Cup deletion-state closure
+
+- Reloads the Ryder Cup list after successful deletion so a deleted title disappears immediately instead of remaining as stale browser state.
+- Uses zero-row-safe detail loading and shows a clear missing-record message instead of exposing Supabase's single-object coercion error.
+- Changes the Games selector, section heading, and back-navigation label from plural **Ryder Cups** to singular **Ryder Cup**, while preserving grammatical list copy such as **Your Ryder Cups**.
+- Adds permanent source contracts for the complete delete → exit detail → refresh list outcome chain and stale-link handling.
+- No database migration. Migration **0145_competition_lifecycle.sql** remains unchanged and must not be rerun where already recorded.
+
+## 180.2.260902 — Separate system-admin behavior fixture
+
+- Replaces the invalid CI attempt to self-promote the ordinary authorization-test user with a dedicated disposable system-admin identity created during fixture setup.
+- Keeps ordinary-user denial tests and system-admin oversight/deletion tests isolated, while attributing database audit entries to the actual administrative actor.
+- Adds a permanent source contract forbidding direct `is_admin` promotion in the fresh-database fixture.
+- Changes test infrastructure only. Runtime application behavior and migration **0145_competition_lifecycle.sql** are unchanged; do not rerun migration 0145 where it is already recorded.
+
+## 180.1.260902 — Fresh-database Ryder Cup fixture correction
+
+- Corrects the disposable CI database fixture added in v180.0 by creating its two referenced `auth.users` principals before inserting the foreign-key-protected Ryder Cup rows.
+- Adds a permanent source contract requiring authentication principals to precede Ryder Cup fixtures, preventing this setup defect from recurring.
+- Changes test infrastructure only. Runtime application behavior and migration **0145_competition_lifecycle.sql** are unchanged; do not rerun migration 0145 where it is already recorded.
+
+## 180.0.260902 — Ryder Cup lifecycle and System Admin Game oversight
+
+- Adds organizer/admin controls to rename a Ryder Cup and delete it together with every linked session game.
+- Adds migration **0145_competition_lifecycle.sql** with authenticated, permission-checked RPCs so rename/delete cannot partially apply or be performed by an ordinary club member.
+- Ryder Cup deletion is format-aware: Four-Ball and Singles personal rounds remain in each golfer's history because each golfer played their own ball; Alternate Shot rounds are removed because the score belongs to the shared side ball.
+- Deletion also clears linked game players, side-contest/game-owned rows through existing cascades, session/roster/schedule rows, and local score backups on the deleting device.
+- Rename and deletion are written to the activity log. The scoring schedule may remain locked when only the Ryder Cup title changes because the title does not alter the scoring contract.
+- Adds permanent source/security checks for authorization, atomic child-game cleanup, and the own-ball/shared-ball round rule.
+- Adds **System Admin → Games oversight**, a searchable system-wide directory for Game name, code, course, club, organizer, player, or Ryder Cup. Inspecting a result opens the existing Game room without joining the club or adding the System Admin as a player.
+- Makes completed deletion consistent at the database boundary: ordinary organizers can delete only uncompleted Games; ended Games, Games with posted rounds, and Ryder Cups containing completed play require a System Admin.
+- Adds SELECT-only System Admin visibility for `game_players`; direct mutation remains unavailable and destructive operations remain RPC-gated.
+- Records System Admin deletion inside the database transaction, so the audit entry does not depend on a separate browser write or club membership.
+- Extends the disposable fresh-database suite to prove cross-club inspection, ordinary-user denial, completed Ryder Cup protection, own-ball round preservation, and Alternate Shot shared-ball removal.
+
 ## 179.9.260902 — Consolidated security and mobile-fit candidate
 
 - Supersedes every earlier v179.8 ZIP with one authoritative changed-files overlay.

@@ -50,6 +50,8 @@ walked you through (GitHub → Google sign-in setup → Vercel).
 
 The organizer Game Control Center uses one central transition policy for changes after scoring starts. Safe metadata stays editable; score reinterpretations require an explicit confirmation; structural changes that would rewrite who played whom or delete played golf are blocked. Scored-player tee/handicap edits are treated as whole-round corrections and preserve gross scores.
 
+System Admins have a separate Games oversight directory for finding and inspecting any Game without joining its club or roster. Ordinary organizers may delete only uncompleted Games. Completed Games and Ryder Cups containing completed play require a System Admin; own-ball personal rounds remain in history, while Alternate Shot shared-ball rounds are removed with their Game.
+
 
 ## Create Game convergence (staging development)
 

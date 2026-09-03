@@ -1,5 +1,5 @@
 import type { Game, Player } from "./game-types";
-import { altShotProgress, fourballProgress, matchProgress, type FourballMember } from "./golf";
+import { altShotProgress, computeTrifecta, fourballProgress, matchCloseoutStatus, matchProgress, type FourballMember } from "./golf";
 import { pkey, chBasis, altShotSides } from "./game-shape";
 import { readAltShotSideScores } from "./alt-shot-scores";
 import { canonicalAltShotGross, type AltShotScoreRow } from "./alt-shot-side-scores";
@@ -36,7 +36,7 @@ export type CompetitionSession = {
   id: string;
   competition_id: string;
   name: string;
-  format: "fourball" | "alt_shot" | "match";
+  format: "fourball" | "alt_shot" | "match" | "trifecta";
   session_order: number;
   play_date: string;
   points_per_match: number;
@@ -100,7 +100,7 @@ export function fmtCompetitionPoints(n: number): string {
 }
 
 export function competitionFormatLabel(format: CompetitionSession["format"]): string {
-  return format === "fourball" ? "Four-Ball" : format === "alt_shot" ? "Alternate Shot" : "Singles";
+  return format === "fourball" ? "Four-Ball" : format === "alt_shot" ? "Alternate Shot" : format === "trifecta" ? "Trifecta" : "Singles";
 }
 
 export function competitionSchedule(sessions: CompetitionSession[], tieRule: Competition["tie_rule"] = "shared"): CompetitionSchedule {
@@ -160,20 +160,6 @@ function award(out: CompetitionSessionScore, lead: number, decided: boolean, aTe
   }
 }
 
-// Cup results stop at the first mathematical close-out. The ordinary scorecard
-// engines and stored holes remain untouched; this only controls Cup aggregation.
-function cupMatchStatus(progress: (number | null)[], holeCount: number) {
-  const played = progress.filter((lead): lead is number => lead != null);
-  if (!played.length) return { thru: 0, lead: 0, result: "", decided: false };
-  for (let i = 0; i < played.length; i++) {
-    const thru = i + 1, lead = played[i], remaining = holeCount - thru;
-    if (remaining > 0 && Math.abs(lead) > remaining) return { thru, lead, result: `${Math.abs(lead)} & ${remaining}`, decided: true };
-  }
-  const thru = played.length, lead = played[played.length - 1];
-  if (thru === holeCount) return { thru, lead, result: lead === 0 ? "Halved" : `${Math.abs(lead)} UP`, decided: true };
-  return { thru, lead, result: "", decided: false };
-}
-
 export function scoreCompetitionGame(game: Game, players: Player[], altShotScores: AltShotScoreRow[] = [], pointsPerMatch = 1): CompetitionSessionScore {
   const out = emptyScore();
   const playerOf = (key: string) => players.find((p) => pkey(p) === key) || null;
@@ -190,7 +176,7 @@ export function scoreCompetitionGame(game: Game, players: Player[], altShotScore
       const pa = playerOf(pr.a), pb = playerOf(pr.b);
       const ta = teamOf(pr.a), tb = teamOf(pr.b);
       if (!pa || !pb || !ta || !tb || ta === tb) continue;
-      const st = cupMatchStatus(matchProgress(game.holes_meta, pa.scores || [], pb.scores || [], chBasis(pa, game.course_par, holesCount), chBasis(pb, game.course_par, holesCount), game.allowance_pct ?? 100), holesCount);
+      const st = matchCloseoutStatus(matchProgress(game.holes_meta, pa.scores || [], pb.scores || [], chBasis(pa, game.course_par, holesCount), chBasis(pb, game.course_par, holesCount), game.allowance_pct ?? 100), holesCount);
       const started = st.thru > 0;
       const decided = st.decided;
       const reversed = ta === "B" && tb === "A";
@@ -205,7 +191,7 @@ export function scoreCompetitionGame(game: Game, players: Player[], altShotScore
     return out;
   }
 
-  if (game.game_type !== "fourball" && game.game_type !== "alt_shot") return out;
+  if (game.game_type !== "fourball" && game.game_type !== "alt_shot" && game.game_type !== "trifecta") return out;
   for (const f of game.foursomes || []) {
     if (!f.a.length || !f.b.length) continue;
     const ta = teamOf(f.a[0]), tb = teamOf(f.b[0]);
@@ -220,13 +206,45 @@ export function scoreCompetitionGame(game: Game, players: Player[], altShotScore
       const bLegacy = readAltShotSideScores(bRows[0]!.scores, bRows[1]!.scores, holesCount);
       const aGross = canonicalAltShotGross(altShotScores, f.id, "a", holesCount, aLegacy.gross);
       const bGross = canonicalAltShotGross(altShotScores, f.id, "b", holesCount, bLegacy.gross);
-      st = cupMatchStatus(altShotProgress(game.holes_meta, { ids: f.a, chs: [sides.aCh, 0], gross: aGross } as never, { ids: f.b, chs: [sides.bCh, 0], gross: bGross } as never), holesCount);
+      st = matchCloseoutStatus(altShotProgress(game.holes_meta, { ids: f.a, chs: [sides.aCh, 0], gross: aGross } as never, { ids: f.b, chs: [sides.bCh, 0], gross: bGross } as never), holesCount);
     } else {
       const members: FourballMember[] = [...f.a, ...f.b].map((id) => {
         const p = playerOf(id);
         return { id, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par, holesCount) : null, noShow: !!p?.no_show };
       });
-      st = cupMatchStatus(fourballProgress(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball"), holesCount);
+      if (game.game_type === "trifecta") {
+        if (f.a.length !== 2 || f.b.length !== 2) continue;
+        const tri = computeTrifecta(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, "best_ball", !!f.swap, "match");
+        for (let contestIndex = 0; contestIndex < tri.contests.length; contestIndex++) {
+          const contest = tri.contests[contestIndex];
+          let runningLead = 0;
+          const progress = contest.perHole.map((hole) => {
+            if (hole.r == null) return null;
+            if (hole.r > 0) runningLead++;
+            else if (hole.r < 0) runningLead--;
+            return runningLead;
+          });
+          const contestStatus = matchCloseoutStatus(progress, holesCount);
+          const started = contestStatus.thru > 0;
+          const decided = contestStatus.decided;
+          const reversed = ta === "B" && tb === "A";
+          const displayLead = reversed ? -contestStatus.lead : contestStatus.lead;
+          const leftIds = reversed ? contest.bIds : contest.aIds;
+          const rightIds = reversed ? contest.aIds : contest.bIds;
+          out.matchCount++;
+          if (decided) out.decidedCount++;
+          if (started) award(out, contestStatus.lead, decided, ta, tb, pointsPerMatch);
+          out.matches.push({
+            key: `${f.id}-${contest.kind}-${contestIndex}`,
+            leftNames: leftIds.map(nameOf).join(" / "), rightNames: rightIds.map(nameOf).join(" / "),
+            thru: contestStatus.thru, lead: displayLead,
+            result: decided ? contestStatus.result : "", started, decided,
+            winnerTeam: displayLead === 0 ? null : (displayLead > 0 ? "A" : "B"),
+          });
+        }
+        continue;
+      }
+      st = matchCloseoutStatus(fourballProgress(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball"), holesCount);
     }
     const started = st.thru > 0;
     const decided = st.decided;

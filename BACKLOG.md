@@ -1,3 +1,39 @@
+## v180.3 Ryder Cup deletion-state closure
+
+- [x] Remove a successfully deleted Ryder Cup from the visible list immediately.
+- [x] Replace zero-row `.single()` coercion errors with friendly missing-record handling.
+- [x] Use singular **Ryder Cup** for the selector, section title, and back navigation.
+- [x] Preserve plural grammar for the collection heading and empty state.
+- [ ] Verify delete → list return → deleted title absent in the real Staging browser.
+
+## v180.2 separate system-admin fixture corrective
+
+- [x] Preserve User A as an ordinary user throughout the authorization-denial tests.
+- [x] Create a separate disposable System Admin C for cross-club oversight and protected deletion tests.
+- [x] Attribute administrative audit records to System Admin C.
+- [x] Permanently reject direct admin self-promotion in the fresh-database fixture.
+- [ ] Confirm the complete GitHub fresh-database behavior suite passes before browser verification resumes.
+
+## v180.1 fresh-database fixture corrective
+
+- [x] Create disposable `auth.users` principals before inserting FK-protected Ryder Cup fixtures.
+- [x] Permanently guard fixture ordering in the lifecycle source contract.
+- [ ] Confirm the GitHub fresh-database `verify` job passes before continuing Staging browser verification.
+
+## v180.0 Ryder Cup lifecycle and System Admin Game oversight
+
+- [x] Allow the organizer, a club admin, or a system admin to rename a Ryder Cup, including after its scoring schedule is locked.
+- [x] Delete a Ryder Cup and all linked session games atomically through one permission-checked RPC.
+- [x] Preserve Four-Ball and Singles personal rounds when deleting the Ryder Cup because each golfer played their own ball.
+- [x] Delete Alternate Shot posted rounds with the Ryder Cup because they represent a shared team ball.
+- [x] Remove device-local score backups for every deleted linked game.
+- [x] Record rename and deletion in the activity log and permanently guard the lifecycle contract.
+- [x] Restrict deletion of an ended Game, a Game with a posted round, or a Ryder Cup containing completed play to a System Admin.
+- [x] Add a searchable System Admin Games directory that can inspect any Game without joining its club or player roster.
+- [x] Keep the additional `game_players` access SELECT-only; all destructive work remains permission-checked RPC behavior.
+- [x] Add disposable fresh-database tests for ordinary-user denial, cross-club System Admin visibility, and own-ball/shared-ball preservation.
+- [ ] Apply migration 0145 to Staging and complete the real-browser lifecycle/oversight scenarios before Production.
+
 ## v179.7 Staging integration workflow corrective
 
 - [x] Identify the manual workflow failure: `npm run ci:staging` reached prebuild without `NEXT_PUBLIC_VAPID_PUBLIC_KEY`.

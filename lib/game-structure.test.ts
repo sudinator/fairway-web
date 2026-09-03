@@ -150,6 +150,7 @@ console.log(`game-structure differential: ${assertions} randomized assertions + 
   same(d.length, 2, "team groups create two foursomes");
   same(d[0].a, ["r1","r2"], "group 1 red side");
   same(d[0].b, ["b1","b2"], "group 1 blue side");
-  const d2 = deriveTeamFoursomesFromGroups(ps as any, [{key:"A",name:"Red"},{key:"B",name:"Blue"}], [{...d[0],a_first:"r2",b_first:"b1"} as any,d[1]]);
+  const d2 = deriveTeamFoursomesFromGroups(ps as any, [{key:"A",name:"Red"},{key:"B",name:"Blue"}], [{...d[0],a_first:"r2",b_first:"b1",swap:true} as any,d[1]]);
   same([(d2[0] as any).a_first,(d2[0] as any).b_first], ["r2","b1"], "first driver preserved");
+  same((d2[0] as any).swap, true, "Trifecta singles swap preserved when groups change");
 }

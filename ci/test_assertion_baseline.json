@@ -1,5 +1,5 @@
 {
-  "total": 189939,
+  "total": 189953,
   "suites": {
     "(unnamed suites)": 511,
     "ai-sanitize": 11,
@@ -13,7 +13,7 @@
     "bucket-model": 34,
     "card": 11,
     "chart-helpers": 10,
-    "competition": 13,
+    "competition": 16,
     "component render": 17,
     "contests": 26,
     "course ordering": 4,
@@ -26,7 +26,7 @@
     "game-create": 64,
     "game-utils": 21,
     "golf/computeBetting tests": 53,
-    "grouping tests": 291,
+    "grouping tests": 297,
     "hole result consistency": 981,
     "legs": 30,
     "match length": 46,
@@ -37,7 +37,7 @@
     "player-scoring": 63,
     "round stat completeness": 8,
     "scoring matrix": 3698,
-    "screen render": 62,
+    "screen render": 67,
     "segments": 20,
     "setup draft lifecycle": 10,
     "setup summary": 31,

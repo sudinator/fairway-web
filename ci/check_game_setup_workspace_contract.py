@@ -49,7 +49,10 @@ checks = [
     (tournaments, '} satisfies React.ComponentProps<typeof GameSetupWorkspace>;', "GameRoom must keep compile-time checking of the setup workspace boundary"),
     (tournaments, 'return <GameSetupWorkspace {...workspaceProps} />;', "GameRoom setup render must reach the extracted workspace"),
     (tournaments, 'onSetGameDate: setGameDate, courseOptions, onChangeCourse: changeGameCourse,', "game date/course writers must cross the workspace boundary"),
-    (tournaments, 'onSetTeeGroup: setPlayerTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, onSetLegConfig: setLegConfig, getTeeGroupPolicy:', "tee-group/randomize, Alternate Shot first-driver, and leg-config behavior must remain wired through the boundary"),
+    (tournaments, 'onSetTeeGroup: setPlayerTeeGroup,', "tee-group behavior must remain wired through the boundary"),
+    (tournaments, 'onSetAltShotFirstDriver: setAltShotFirstDriver,', "Alternate Shot first-driver behavior must remain wired through the boundary"),
+    (tournaments, 'onSetTrifectaPairing: setTrifectaPairing,', "Trifecta Singles pairing must remain wired through the boundary"),
+    (tournaments, 'onSetLegConfig: setLegConfig, getTeeGroupPolicy:', "leg configuration and group policy must remain wired through the boundary"),
     (tournaments, 'onOverride: overridePlayerHandicap, courseTees, onSetTee: setPlayerTee,', "per-player handicap and tee callbacks must remain wired"),
     (tournaments, 'eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,', "member/guest add callbacks must remain wired"),
 ]
