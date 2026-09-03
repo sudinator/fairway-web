@@ -9,7 +9,12 @@ alter table public.notifications disable trigger user;
 alter table public.rounds disable trigger user;
 alter table public.holes disable trigger user;
 
--- Fixture owners do not need profile rows; is_admin() therefore resolves false.
+-- FK-protected competition fixtures require real authentication principals.
+-- They remain ordinary users because the matching public profiles below are non-admin.
+insert into auth.users(id) values
+ ('11111111-1111-1111-1111-111111111111'),
+ ('22222222-2222-2222-2222-222222222222');
+
 insert into public.notifications(id,user_id,message) values
  ('a1000000-0000-0000-0000-000000000001','11111111-1111-1111-1111-111111111111','A fixture'),
  ('b1000000-0000-0000-0000-000000000001','22222222-2222-2222-2222-222222222222','B fixture');

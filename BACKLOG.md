@@ -1,3 +1,9 @@
+## v180.1 fresh-database fixture corrective
+
+- [x] Create disposable `auth.users` principals before inserting FK-protected Ryder Cup fixtures.
+- [x] Permanently guard fixture ordering in the lifecycle source contract.
+- [ ] Confirm the GitHub fresh-database `verify` job passes before continuing Staging browser verification.
+
 ## v180.0 Ryder Cup lifecycle and System Admin Game oversight
 
 - [x] Allow the organizer, a club admin, or a system admin to rename a Ryder Cup, including after its scoring schedule is locked.

@@ -47,6 +47,10 @@ check("fresh database behavior proves admin visibility and deletion preservation
     "unrelated Game players are not visible", "removed an own-ball round",
     "preserved an Alternate Shot shared-ball round",
 ]))
+auth_fixture_pos = behavior.find("insert into auth.users")
+competition_fixture_pos = behavior.find("insert into public.competitions")
+check("fresh database creates auth principals before FK-protected Ryder Cup fixtures",
+      0 <= auth_fixture_pos < competition_fixture_pos)
 check("Admin home exposes searchable Games oversight", all(x in manage for x in [
     "function AdminGamesOversight", 'case "games": title = "Games oversight"',
     'name="Games oversight"', 'supabase.rpc("admin_game_oversight"', "Inspect Game →",

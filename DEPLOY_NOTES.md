@@ -1,3 +1,9 @@
+## 180.1.260902 — Fresh-database Ryder Cup fixture correction
+
+- Corrects the disposable CI database fixture added in v180.0 by creating its two referenced `auth.users` principals before inserting the foreign-key-protected Ryder Cup rows.
+- Adds a permanent source contract requiring authentication principals to precede Ryder Cup fixtures, preventing this setup defect from recurring.
+- Changes test infrastructure only. Runtime application behavior and migration **0145_competition_lifecycle.sql** are unchanged; do not rerun migration 0145 where it is already recorded.
+
 ## 180.0.260902 — Ryder Cup lifecycle and System Admin Game oversight
 
 - Adds organizer/admin controls to rename a Ryder Cup and delete it together with every linked session game.
