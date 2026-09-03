@@ -22,6 +22,7 @@ import { C } from "@/lib/golf";
 import { RoundsList } from "@/components/rounds-list";
 import { LeaderRow } from "@/components/game/leader-row";
 import { SegmentBoard } from "@/components/game/segment-views";
+import { FourballView } from "@/components/game/scoring-views";
 import { ShotSynthesis } from "@/components/compare-stats";
 
 // ---------------------------------------------------------------------------
@@ -303,6 +304,49 @@ const round = (over: Partial<Record<string, unknown>> = {}) => ({
   assertReadable(extremes, "ShotSynthesis extremes");
   assertTappable(extremes, "ShotSynthesis extremes");
   extremes.unmount();
+}
+
+// ---------------------------------------------------------------------------
+// Game 645502: the real Trifecta result component must render mathematical close-outs, not the
+// raw lead after all nine gross scores. The gross rows intentionally remain complete.
+{
+  const triHoles = [
+    { n: 1, si: 5, par: 4 }, { n: 2, si: 11, par: 3 }, { n: 3, si: 7, par: 4 },
+    { n: 4, si: 13, par: 4 }, { n: 5, si: 17, par: 3 }, { n: 6, si: 1, par: 4 },
+    { n: 7, si: 15, par: 4 }, { n: 8, si: 9, par: 4 }, { n: 9, si: 3, par: 4 },
+  ];
+  const parScores = triHoles.map((h) => h.par);
+  const triRows: [string, string, "A" | "B", number][] = [
+    ["a1", "A.J. Patel", "A", 3.2], ["a2", "Bo Li", "A", 0.8],
+    ["b1", "Amit Sud", "B", 14], ["b2", "R. K. Srinivasan", "B", 12.4],
+    ["a3", "Christopher Alexander Reed", "A", 29.7], ["a4", "Lex Rivera-Santos", "A", 17.3],
+    ["b3", "Chris O'Neal", "B", 5.5], ["b4", "DeShawn Brooks Jr.", "B", 14.8],
+    ["a5", "Michael Van Der Meer", "A", 24.2], ["a6", "Sebastian Montgomery", "A", 20.6],
+    ["b5", "Marcus Johnson", "B", 10.1], ["b6", "T.J. Wu", "B", 7.9],
+  ];
+  const triGame = {
+    id: "645502", code: "645502", name: "Yes 123 · Saturday Morning", course: "Francis Byrne Golf Course",
+    course_par: 70, holes_meta: triHoles, game_type: "trifecta", allowance_pct: 100, pairings: [],
+    trifecta_scoring: "match", team_score_mode: "best_ball", status: "active",
+    teams: [{ key: "A", name: "Violet" }, { key: "B", name: "Burgundy" }],
+    foursomes: [
+      { id: "group-1", name: "Group 1", a: ["a1", "a2"], b: ["b1", "b2"], swap: true },
+      { id: "group-2", name: "Group 2", a: ["a3", "a4"], b: ["b3", "b4"], swap: true },
+      { id: "group-3", name: "Group 3", a: ["a5", "a6"], b: ["b5", "b6"], swap: true },
+    ], created_by: "owner", created_at: "2026-09-03T00:00:00Z",
+  } as any;
+  const triPlayers = triRows.map(([user_id, display_name, team, handicap_index], i) => ({
+    id: `p${i}`, game_id: triGame.id, user_id, display_name, team, handicap_index,
+    rating: 73.5, slope: 137, tee_name: "Black", course_handicap: 0,
+    scores: [...parScores], putts: [], fairways: [], tee_group: Math.floor(i / 4) + 1,
+  })) as any;
+  const rendered = renderScreen(<FourballView game={triGame} players={triPlayers} user={{ id: "viewer" }} isCreator={false} onChanged={() => {}} />);
+  ok(rendered.text.includes("3 & 2"), "game 645502: rendered first Single freezes at 3 & 2");
+  ok(rendered.text.includes("5 & 3"), "game 645502: rendered second Single freezes at 5 & 3");
+  ok(rendered.text.includes("4 & 3"), "game 645502: rendered Best Ball freezes at 4 & 3");
+  ok(!rendered.text.includes("5DN"), "game 645502: rendered result never degrades to 5 DN");
+  ok(!rendered.text.includes("8DN"), "game 645502: rendered result never degrades to 8 DN");
+  rendered.unmount();
 }
 
 // ---------------------------------------------------------------------------

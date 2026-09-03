@@ -1475,9 +1475,9 @@ export function FourballView({
                         <span style={{ color: C.sage, fontSize: 11, width: 12 }}>{isOpen ? "▾" : "▸"}</span>
                         <span style={{ flex: 1, color: C.cream, fontSize: 13 }}>{label}</span>
                         <span style={{ color: C.sage, fontSize: 11 }}>{c.thru ? `thru ${c.thru}` : "—"}</span>
-                        <span style={{ color: C.gold, fontWeight: 800, fontSize: 13, fontFamily: "Georgia, serif", minWidth: 46, textAlign: "right" }}>{triScoring === "match" ? (c.thru ? matchLeadLabel(c.lead) : "—") : `${fmtPts(c.aPts)}–${fmtPts(c.bPts)}`}</span>
+                        <span style={{ color: C.gold, fontWeight: 800, fontSize: 13, fontFamily: "Georgia, serif", minWidth: 46, textAlign: "right" }}>{triScoring === "match" ? (c.thru ? (c.result || matchLeadLabel(c.lead)) : "—") : `${fmtPts(c.aPts)}–${fmtPts(c.bPts)}`}</span>
                       </div>
-                      {isOpen && <HoleDetail rows={c.perHole} aLabel={aLabel} bLabel={bLabel} aColor={aColor} bColor={bColor} runningMatch={triScoring === "match"} />}
+                      {isOpen && <HoleDetail rows={triScoring === "match" && c.settled ? c.perHole.slice(0, c.thru) : c.perHole} aLabel={aLabel} bLabel={bLabel} aColor={aColor} bColor={bColor} runningMatch={triScoring === "match"} />}
                     </React.Fragment>
                   );
                 })}

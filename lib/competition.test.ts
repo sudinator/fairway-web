@@ -167,4 +167,50 @@ ok("Ryder Cup Trifecta Singles allocate strokes within each head-to-head pair", 
   assert.equal(tri.contests[0].perHole[10].r, 0);
 });
 
+ok("game 645502 freezes all nine Trifecta contests at mathematical close-out", () => {
+  const h = [
+    { n: 1, si: 5, par: 4 }, { n: 2, si: 11, par: 3 }, { n: 3, si: 7, par: 4 },
+    { n: 4, si: 13, par: 4 }, { n: 5, si: 17, par: 3 }, { n: 6, si: 1, par: 4 },
+    { n: 7, si: 15, par: 4 }, { n: 8, si: 9, par: 4 }, { n: 9, si: 3, par: 4 },
+  ];
+  const parScores = h.map((hole) => hole.par);
+  const rows: [string, string, "A" | "B", number][] = [
+    ["a1", "A.J. Patel", "A", 3.2], ["a2", "Bo Li", "A", 0.8],
+    ["b1", "Amit Sud", "B", 14], ["b2", "R. K. Srinivasan", "B", 12.4],
+    ["a3", "Christopher Alexander Reed", "A", 29.7], ["a4", "Lex Rivera-Santos", "A", 17.3],
+    ["b3", "Chris O'Neal", "B", 5.5], ["b4", "DeShawn Brooks Jr.", "B", 14.8],
+    ["a5", "Michael Van Der Meer", "A", 24.2], ["a6", "Sebastian Montgomery", "A", 20.6],
+    ["b5", "Marcus Johnson", "B", 10.1], ["b6", "T.J. Wu", "B", 7.9],
+  ];
+  const g: Game = {
+    ...game, id: "645502", code: "645502", name: "Yes 123 · Saturday Morning", course: "Francis Byrne Golf Course",
+    course_par: 70, holes_meta: h, game_type: "trifecta", pairings: [], trifecta_scoring: "match",
+    team_score_mode: "best_ball", foursomes: [
+      { id: "group-1", name: "Group 1", a: ["a1", "a2"], b: ["b1", "b2"], swap: true },
+      { id: "group-2", name: "Group 2", a: ["a3", "a4"], b: ["b3", "b4"], swap: true },
+      { id: "group-3", name: "Group 3", a: ["a5", "a6"], b: ["b5", "b6"], swap: true },
+    ],
+  };
+  const ps: Player[] = rows.map(([user_id, display_name, team, handicap_index], i) => ({
+    ...basePlayer, id: `645502-p${i}`, game_id: g.id, user_id, display_name, team, handicap_index,
+    rating: 73.5, slope: 137, scores: [...parScores],
+  }));
+  const s = scoreCompetitionGame(g, ps);
+  assert.equal(s.matchCount, 9);
+  assert.equal(s.decidedCount, 9);
+  assert.equal(s.projectedA, 6);
+  assert.equal(s.projectedB, 3);
+  assert.deepEqual(
+    s.matches.map((m) => [m.result, m.thru, m.winnerTeam]),
+    [
+      ["3 & 2", 7, "B"], ["5 & 3", 6, "B"], ["4 & 3", 6, "B"],
+      ["5 & 4", 5, "A"], ["5 & 3", 6, "A"], ["5 & 4", 5, "A"],
+      ["5 & 4", 5, "A"], ["4 & 3", 6, "A"], ["5 & 4", 5, "A"],
+    ],
+  );
+  const tri = computeTrifecta(h, ps.slice(0, 4).map((p) => ({ id: p.user_id!, ch: (p.handicap_index! * 137 / 113 + 3.5) / 2, gross: p.scores })), ["a1", "a2"], ["b1", "b2"], 100, "best_ball", true, "match");
+  assert.deepEqual(tri.contests.map((c) => [c.result, c.thru]), [["3 & 2", 7], ["5 & 3", 6], ["4 & 3", 6]]);
+  assert.equal(tri.contests[1].perHole.length, 9, "all gross-score hole detail remains stored in the model");
+});
+
 console.log(`competition: ${n} passed, 0 failed`);

@@ -1,3 +1,11 @@
+## 181.11.260903 — Trifecta results freeze at mathematical close-out
+
+- Adds one shared match close-out model for ordinary matches, Four-Ball, Alternate Shot, Trifecta and Ryder Cup aggregation.
+- Freezes the official result and thru value at the first mathematical close-out while retaining every later gross score for the player's round.
+- Updates Trifecta contest rows and expanded progression to stop at the official close-out instead of displaying an impossible raw final margin.
+- Adds the exact game 645502 fixture across all three groups: nine expected results, a 6–3 session total, and rendered rejection of 5 DN and 8 DN.
+- No migration. Migration 0148 remains current.
+
 ## 181.10.260903 — Groups selectors use the explicit Unassigned pool
 
 - Occupied team slots show only the current player plus Move to unassigned.
