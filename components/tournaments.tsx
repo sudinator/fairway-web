@@ -49,7 +49,7 @@ import {
   mergeBackupRow } from "@/lib/golf";
 import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
 import { decideSetupChange, type SetupAction, type SetupDecision } from "@/lib/game-setup-policy";
-import { balancedTeamGroups, randomTeeGroups, type GPlayer } from "@/lib/grouping";
+import { applyTeamGroupSlotMove, balancedTeamGroups, randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
 import type { LegConfig, Leg } from "@/lib/legs";
@@ -2409,8 +2409,7 @@ function GameRoom({
     const payload = changes.map((change) => ({ player: change.player.id, group: change.group }));
     const { error } = await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: payload });
     if (error) { notifyError("Couldn't update that group slot — please try again."); return; }
-    const byId = new Map(changes.map((change) => [change.player.id, change.group]));
-    const nextPlayers = players.map((p) => byId.has(p.id) ? { ...p, tee_group: byId.get(p.id) ?? null } : p);
+    const nextPlayers = applyTeamGroupSlotMove(players, current?.id || null, next?.id || null, group);
     setPlayers(nextPlayers);
     await syncTeamPlayFoursomes(nextPlayers);
     await load();

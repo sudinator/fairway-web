@@ -1,3 +1,11 @@
+## 181.8.260903 — Fully assigned Ryder Cup groups remain editable
+
+- Restores assigned same-team players to other Groups selectors, labeled with their current group, so completed groups can be rearranged.
+- Keeps the current player selected and excludes the teammate already occupying the other same-team slot in the target group.
+- Uses one tested pure transition for the optimistic UI and atomic database payload.
+- Executes the required round trip: fully assign two groups, move an assigned player, reload, fill the vacated slot, and verify both groups are complete without duplicates.
+- No migration. Migration 0148 remains current.
+
 ## 181.7.260903 — Ryder Cup session deletion and roster balance
 
 - Adds an authorized, atomic Ryder Cup session-game deletion path that preserves the planned session for replacement even after scoring begins.

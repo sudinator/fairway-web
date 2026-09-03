@@ -1,5 +1,5 @@
 // Unit tests for lib/grouping.ts — run with `npm test`.
-import { balancedOneVOne, balancedTeamGroups, buildParties, seatParties, randomTeeGroups, seededRng, GPlayer } from "./grouping";
+import { applyTeamGroupSlotMove, balancedOneVOne, balancedTeamGroups, buildParties, seatParties, randomTeeGroups, seededRng, teamGroupSlotChoices, GPlayer } from "./grouping";
 
 let pass = 0, fail = 0; const fails: string[] = [];
 const ok = (name: string, cond: boolean) => { if (cond) pass++; else { fail++; fails.push("FAIL " + name); } };
@@ -25,6 +25,26 @@ for (let n = 1; n <= 24; n++) {
     ok("n=" + n + " seed=" + s + " no group > 4", sizes(r).every((x) => x <= 4));
     ok("n=" + n + " seed=" + s + " everyone placed", r.assignments.length === n);
   }
+}
+
+// Fully assigned team groups can be changed, reloaded and completed again.
+{
+  type P = { id: string; team: string; tee_group: number | null; no_show: boolean };
+  let field: P[] = [
+    { id: "a1", team: "A", tee_group: 1, no_show: false }, { id: "a2", team: "A", tee_group: 1, no_show: false },
+    { id: "a3", team: "A", tee_group: 2, no_show: false }, { id: "a4", team: "A", tee_group: 2, no_show: false },
+    { id: "b1", team: "B", tee_group: 1, no_show: false }, { id: "b2", team: "B", tee_group: 1, no_show: false },
+    { id: "b3", team: "B", tee_group: 2, no_show: false }, { id: "b4", team: "B", tee_group: 2, no_show: false },
+  ];
+  eq("assigned player in another group remains selectable", teamGroupSlotChoices(field, "A", 1, "a1").map((p) => p.id).sort(), ["a1", "a3", "a4"]);
+  field = applyTeamGroupSlotMove(field, "a1", "a3", 1);
+  eq("selected player moves into target group", field.find((p) => p.id === "a3")?.tee_group, 1);
+  eq("displaced player becomes unassigned", field.find((p) => p.id === "a1")?.tee_group, null);
+  const reloaded = field.map((p) => ({ ...p }));
+  eq("unassigned and other-group players are available after reload", teamGroupSlotChoices(reloaded, "A", 2, null).map((p) => p.id).sort(), ["a1", "a2", "a3"]);
+  field = applyTeamGroupSlotMove(reloaded, null, "a1", 2);
+  eq("both groups complete after rearrangement", [1, 2].map((g) => field.filter((p) => p.team === "A" && p.tee_group === g).length), [2, 2]);
+  ok("no duplicate player after rearrangement", new Set(field.map((p) => p.id)).size === field.length);
 }
 
 // ---- 2. Balanced sizes (no lone single when avoidable) ----
