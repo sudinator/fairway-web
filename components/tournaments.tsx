@@ -2355,6 +2355,15 @@ function GameRoom({
     setGame({ ...game, foursomes: next });
   };
 
+  const setTrifectaPairing = async (foursomeId: string, cross: boolean) => {
+    if (!game || game.game_type !== "trifecta" || !Array.isArray(game.foursomes)) return;
+    if (!allowSetupChange({ type: "set_foursomes" })) return;
+    const next = game.foursomes.map((f) => f.id === foursomeId ? { ...f, swap: cross } : f);
+    const { error } = await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
+    if (error) { notifyError("Couldn't save the Singles matchups — please try again."); return; }
+    setGame({ ...game, foursomes: next });
+  };
+
 
   const renameTeams = async (names: [string, string]) => {
     if (!game || !Array.isArray(game.teams) || game.teams.length < 2) return;
@@ -3244,7 +3253,7 @@ function GameRoom({
         } satisfies OrganizerPanelProps;
         const workspaceProps = {
           game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate, courseOptions, onChangeCourse: changeGameCourse,
-          onSetTeeGroup: setPlayerTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, onSetLegConfig: setLegConfig, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, canRandomize, randomizeReason,
+          onSetTeeGroup: setPlayerTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, onSetTrifectaPairing: setTrifectaPairing, onSetLegConfig: setLegConfig, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, canRandomize, randomizeReason,
           randomizing, groupOverflow, onSetTeamGroupSlot: setTeamGroupSlot, isCompetitionGame: !!competitionLink,
         } satisfies React.ComponentProps<typeof GameSetupWorkspace>;
         return <GameSetupWorkspace {...workspaceProps} />;
@@ -3511,7 +3520,7 @@ function GameRoom({
             onMarkOut={toggleNoShow}
           />
         </>
-      ) : (game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot") && (roomTab === "play" || (roomTab === "setup" && setupTab === "matchups")) ? (
+      ) : (game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot") && (roomTab === "play" || (roomTab === "setup" && setupTab === "matchups" && game.game_type !== "trifecta")) ? (
         <FourballView
           game={game}
           players={players}

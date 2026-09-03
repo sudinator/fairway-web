@@ -579,11 +579,12 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
 }
 
 // Organizer/admin score-change history for a game (reads migration 0042's audit log).
-export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot, onSetAltShotFirstDriver, getTeeGroupPolicy, onRandomize, canRandomize = false, randomizeReason = "", randomizing = false, overflowIds = [] }: {
+export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, getTeeGroupPolicy, onRandomize, canRandomize = false, randomizeReason = "", randomizing = false, overflowIds = [] }: {
   game: Game; players: Player[];
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
   onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
   onSetAltShotFirstDriver?: (foursomeId: string, side: "a" | "b", playerKey: string) => Promise<void>;
+  onSetTrifectaPairing?: (foursomeId: string, cross: boolean) => Promise<void>;
   getTeeGroupPolicy?: (p: Player, group: number | null) => { blocked: boolean; reason?: string };
   onRandomize?: () => Promise<void>;
   canRandomize?: boolean; randomizeReason?: string; randomizing?: boolean; overflowIds?: string[];
@@ -624,7 +625,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
   const firstGroup = teeGroups.length ? Math.min(...teeGroups) : null;
 
   if (teamGroupsOwnStructure && Array.isArray(game.teams) && game.teams.length === 2) {
-    return <TeamGroupsBuilder game={game} players={players} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} onRandomize={onRandomize} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} />;
+    return <TeamGroupsBuilder game={game} players={players} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} onSetTrifectaPairing={onSetTrifectaPairing} onRandomize={onRandomize} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} />;
   }
 
   return (
@@ -730,11 +731,12 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
   );
 }
 
-function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirstDriver, onRandomize, canRandomize, randomizeReason, randomizing }: {
+function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onRandomize, canRandomize, randomizeReason, randomizing }: {
   game: Game;
   players: Player[];
   onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
   onSetAltShotFirstDriver?: (foursomeId: string, side: "a" | "b", playerKey: string) => Promise<void>;
+  onSetTrifectaPairing?: (foursomeId: string, cross: boolean) => Promise<void>;
   onRandomize?: () => Promise<void>;
   canRandomize: boolean;
   randomizeReason: string;
@@ -752,6 +754,7 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
   const readyCount = Array.from({ length: groupCount }, (_, i) => i + 1).filter((group) =>
     teams.every((t) => players.filter((p) => p.tee_group === group && p.team === t.key && !p.no_show).length === 2),
   ).length;
+  const scoringStarted = players.some((p) => (p.scores || []).some((score) => score != null) || p.group_locked) || !!game.alt_shot_scoring_started_at;
 
   const selectFor = (teamKey: string, group: number, slot: number) => {
     const inGroup = players.filter((p) => p.team === teamKey && p.tee_group === group && !p.no_show);
@@ -763,7 +766,7 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
       <select
         aria-label={`Group ${group} ${teams.find((t) => t.key === teamKey)?.name || "team"} player ${slot + 1}`}
         value={current?.id || ""}
-        disabled={!onSetTeamGroupSlot}
+        disabled={!onSetTeamGroupSlot || scoringStarted}
         onChange={(e) => {
           const next = players.find((p) => p.id === e.target.value) || null;
           void onSetTeamGroupSlot?.(current, next, group);
@@ -782,6 +785,8 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.45 }}>
         Each {game.game_type === "alt_shot" ? "Alternate Shot" : game.game_type === "trifecta" ? "Trifecta" : "Four-Ball"} group needs exactly two {teams[0].name} and two {teams[1].name} players. Team membership stays visible while you build the match.
       </div>
+      {game.game_type === "trifecta" ? <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>Once four players are selected, choose the two Singles matchups inside that group.</div> : null}
+      {scoringStarted ? <div style={{ background: "rgba(201,162,39,.12)", border: `1px solid ${C.gold}`, borderRadius: 10, padding: "8px 12px", color: C.cream, fontSize: 11.5, lineHeight: 1.45, marginTop: 10 }}>Groups and Trifecta Singles matchups are locked because scoring has started.</div> : null}
       {onRandomize ? <div style={{ marginTop: 12 }}>
         <button onClick={() => canRandomize && onRandomize()} disabled={!canRandomize || randomizing} style={{ ...btn(true), fontSize: 13, opacity: canRandomize && !randomizing ? 1 : 0.62 }}>
           {randomizing ? "Building…" : "🎲 Build balanced groups"}
@@ -810,9 +815,25 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
             <div style={{ display: "flex", color: teamAccent(t.name, ti), fontSize: 12, fontWeight: 800, marginBottom: 7 }}><span>{t.name}</span><span style={{ marginLeft: "auto", color: C.sage, fontSize: 11 }}>{sides[ti].length}/2 selected</span></div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 7 }}>{selectFor(t.key, group, 0)}{selectFor(t.key, group, 1)}</div>
           </div>)}
-          {extras.map((p) => <button key={p.id} onClick={() => void onSetTeamGroupSlot?.(p, null, group)} style={{ ...btn(false), width: "100%", marginTop: 7, color: C.overRedDark, fontSize: 11 }}>Move extra player {p.display_name} to unassigned</button>)}
+          {extras.map((p) => <button key={p.id} disabled={scoringStarted} onClick={() => void onSetTeamGroupSlot?.(p, null, group)} style={{ ...btn(false), width: "100%", marginTop: 7, color: C.overRedDark, fontSize: 11, opacity: scoringStarted ? .62 : 1 }}>Move extra player {p.display_name} to unassigned</button>)}
           {game.game_type === "alt_shot" && ready && f ? <div style={{ marginTop: 10, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 9 }}>
             {(["a", "b"] as const).map((side, si) => <label key={side} style={{ display: "block", color: C.sage, fontSize: 11, marginTop: si ? 8 : 0 }}>{teams[si].name} · tees off first<select value={(side === "a" ? f.a_first : f.b_first) || ""} onChange={(e) => e.target.value && onSetAltShotFirstDriver?.(f.id, side, e.target.value)} style={{ ...inputStyle, width: "100%", marginTop: 3, padding: "8px 12px", fontSize: 12 }}><option value="">Select player…</option>{f[side].map((id) => <option key={id} value={id}>{byKey(id)?.display_name || id}</option>)}</select></label>)}
+          </div> : null}
+          {game.game_type === "trifecta" && ready && f ? <div style={{ marginTop: 10, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 9 }}>
+            <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>SINGLES MATCHUPS</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 5 }}>Choose who faces whom. This does not change the Four-Ball teams.</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))", gap: 7, marginTop: 8 }}>
+              {([false, true] as const).map((cross) => {
+                const pairs = cross
+                  ? [[f.a[0], f.b[1]], [f.a[1], f.b[0]]]
+                  : [[f.a[0], f.b[0]], [f.a[1], f.b[1]]];
+                const selected = !!f.swap === cross;
+                return <button key={String(cross)} type="button" disabled={scoringStarted || !onSetTrifectaPairing} onClick={() => void onSetTrifectaPairing?.(f.id, cross)} style={{ ...btn(selected), width: "100%", textAlign: "left", padding: "8px 12px", opacity: scoringStarted ? .62 : 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800 }}>{selected ? "✓ " : ""}{cross ? "Cross" : "Straight"}</div>
+                  {pairs.map(([a, b]) => <div key={`${a}-${b}`} style={{ fontSize: 11, fontWeight: 500, marginTop: 4, overflowWrap: "anywhere", lineHeight: 1.3 }}>{byKey(a)?.display_name || "—"} vs {byKey(b)?.display_name || "—"}</div>)}
+                </button>;
+              })}
+            </div>
           </div> : null}
         </div>;
       })}

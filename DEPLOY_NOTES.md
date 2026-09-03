@@ -1,3 +1,13 @@
+## 181.6.260902 — Trifecta Groups owns complete matchup setup
+
+- Consolidates Ryder Cup Trifecta setup into Groups: organizers select each 2-v-2 foursome and choose its two Singles opponents in the same card.
+- Adds explicit Straight and Cross pairing choices with both resulting player-v-player matches shown by name.
+- Removes the redundant Trifecta Matchups tab and redirects stale Matchups routes back to Groups.
+- Keeps Ryder Cup team membership inherited and read-only, matching Four-Ball and Alternate Shot while preserving Trifecta's additional Singles choice.
+- Locks both group membership and Singles pairing once scoring begins and explains why the controls are unavailable.
+- Adds permanent source-contract coverage for ownership, persistence, route closure, and scoring locks.
+- No database migration. Migration 0147 remains current and must not be rerun.
+
 ## 181.5.260902 — Complete Ryder Cup Trifecta setup package
 
 - Reissues the Trifecta setup and mobile-fit work as a self-contained overlay, including the required Groups selector implementation that was omitted from the 181.4 ZIP.

@@ -32,6 +32,13 @@ checks = [
     ('overflowWrap: "anywhere"', matches, "long Trifecta player names wrap inside their column"),
     ("Teams are inherited from the Ryder Cup roster", workspace, "Ryder Cup session teams are explicitly inherited"),
     ("isCompetitionGame: !!competitionLink", tournaments, "competition sessions activate inherited-team setup"),
+    ("onSetTrifectaPairing", groups, "Groups owns the Trifecta Singles pairing action"),
+    ("Choose who faces whom. This does not change the Four-Ball teams.", groups, "Groups explains the Trifecta-only choice"),
+    ('cross ? "Cross" : "Straight"', groups, "Groups exposes explicit Straight and Cross pairings"),
+    ('game.game_type !== "trifecta"', workspace, "Trifecta removes the separate Matchups tab"),
+    ('setupTab === "matchups") onSetupTabChange("groups")', workspace, "stale Trifecta Matchups routes return to Groups"),
+    ('setTrifectaPairing', tournaments, "Trifecta pairing persists through the game-room owner"),
+    ('type: "set_foursomes"', tournaments, "Trifecta pairing uses the scoring-start lock policy"),
 ]
 
 for needle, source, label in checks:
