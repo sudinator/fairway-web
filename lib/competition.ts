@@ -86,6 +86,7 @@ export type CompetitionSessionScore = {
   matchCount: number;
   decidedCount: number;
   matches: CompetitionMatchState[];
+  invalidReason?: string;
 };
 
 const emptyScore = (): CompetitionSessionScore => ({ projectedA: 0, projectedB: 0, decidedA: 0, decidedB: 0, matchCount: 0, decidedCount: 0, matches: [] });
@@ -170,6 +171,11 @@ export function scoreCompetitionGame(game: Game, players: Player[], altShotScore
   const nameOf = (key: string) => playerOf(key)?.display_name || "—";
   const holesCount = game.holes_meta?.length || 18;
 
+  if (game.game_type === "trifecta" && (game.team_score_mode !== "best_ball" || game.trifecta_scoring !== "match")) {
+    out.invalidReason = "Ryder Cup Trifecta requires Best Ball team scoring and Match scoring.";
+    return out;
+  }
+
   if (game.game_type === "match") {
     for (let i = 0; i < (game.pairings || []).length; i++) {
       const pr = game.pairings[i];
@@ -214,7 +220,7 @@ export function scoreCompetitionGame(game: Game, players: Player[], altShotScore
       });
       if (game.game_type === "trifecta") {
         if (f.a.length !== 2 || f.b.length !== 2) continue;
-        const tri = computeTrifecta(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, "best_ball", !!f.swap, "match");
+        const tri = computeTrifecta(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode!, !!f.swap, game.trifecta_scoring!);
         for (let contestIndex = 0; contestIndex < tri.contests.length; contestIndex++) {
           const contest = tri.contests[contestIndex];
           let runningLead = 0;

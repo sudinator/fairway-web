@@ -1,10 +1,10 @@
 // Unit tests for lib/game-shape.ts — run with `npm test`.
 // Covers the full format matrix, adversarial stray/leftover structure, malformed
 // inputs, and dotBasis<->scoring alignment against the real golf.ts functions.
-import { shapeOf, dotStrokes, fullStrokes } from "./game-shape";
+import { shapeOf, dotStrokes, fullStrokes, chBasis } from "./game-shape";
 import type { ShapeGame, ShapePlayer, DotGame, GameShape } from "./game-shape";
 import { applyAllowance, matchAllowance, matchStrokesFor, strokesReceived,
-         computeSkins, computeHeadToHeadSkins } from "./golf";
+         computeSkins, computeHeadToHeadSkins, courseHandicapExact } from "./golf";
 
 const TA = [{ key: "A", name: "Team 1" }, { key: "B", name: "Team 2" }];
 const FS = [{ id: "f1", name: "F1", a: ["p1", "p2"], b: ["p3", "p4"] }];
@@ -49,6 +49,11 @@ expectShape("MAL foursomes=[] (skins+teams) => team_2v2", G({ game_type: "skins"
 // 4) dotBasis <-> scoring alignment
 const par4si1 = [{ n: 1, par: 4, si: 1 }];
 const mk = (id: string, ch: number): ShapePlayer => ({ id, user_id: id, course_handicap: ch });
+{
+  const p = { handicap_index: 12.7, slope: 137, rating: 73.5, course_handicap: 16 };
+  check("CH basis delegates to exact WHS basis", chBasis(p, 70), courseHandicapExact(12.7, 137, 73.5, 70));
+  check("nine-hole CH halves the exact basis", chBasis(p, 70, 9), courseHandicapExact(12.7, 137, 73.5, 70)! / 2);
+}
 { // 4a individual skins -> absolute
   const A = mk("A", 18), B = mk("B", 0);
   const dotA = dotStrokes(G({ game_type: "skins" }), A, 1, [A, B]);

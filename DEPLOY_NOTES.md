@@ -1,3 +1,12 @@
+## 181.12.260903 — Scoring-source and offline-clear integrity
+
+- Makes `courseHandicapExact` the TypeScript source of truth for Course Handicap math; display rounding and game-shape stroke bases now delegate to it.
+- Changes offline recovery to a three-way merge using the last server-confirmed watermark. A genuinely new offline entry still fills a server gap, while a server-side clear made after the device's last sync remains cleared.
+- Makes malformed 1:1 Team Skins totals reconcile by showing unattributable winnings as **Unassigned**, with a visible setup warning.
+- Removes hardcoded Trifecta scoring arguments from Ryder Cup aggregation. The competition tally now validates Match + Best Ball and passes the game's validated settings into the shared scoring engine.
+- Adds permanent tests for exact handicap equivalence, offline entry recovery, stale-device clear protection, malformed Team Skins attribution, and game-room/Ryder Cup Trifecta contract parity.
+- No migration. Migration 0148 remains current.
+
 ## 181.11.260903 — Trifecta results freeze at mathematical close-out
 
 - Adds one shared match close-out model for ordinary matches, Four-Ball, Alternate Shot, Trifecta and Ryder Cup aggregation.

@@ -69,8 +69,8 @@ export type Round = {
 
 // World Handicap System course handicap
 export function courseHandicap(index: number, slope: number, rating: number, par: number): number | null {
-  if ([index, slope, rating, par].some((v) => v == null || isNaN(v as number))) return null;
-  return Math.round(index * (slope / 113) + (rating - par));
+  const exact = courseHandicapExact(index, slope, rating, par);
+  return exact == null ? null : Math.round(exact);
 }
 
 // Unrounded course handicap. Since the April 2024 WHS revision, handicap
@@ -1304,22 +1304,37 @@ export function mergeBackupRow(
   db: { scores?: any[]; putts?: any[]; fairways?: any[]; penalties?: any[]; sand?: any[] },
   backup: { scores?: any[]; putts?: any[]; fairways?: any[]; penalties?: any[]; sand?: any[] },
   n: number,
+  watermark?: { scores?: any[]; putts?: any[]; fairways?: any[]; penalties?: any[]; sand?: any[] } | null,
 ): { merged: { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] }; changed: boolean } {
-  const mergeArr = (d: any[] | undefined, l: any[] | undefined) =>
+  // Three-way reconciliation: the watermark is what this device last confirmed
+  // on the server. A local value may fill a DB null only when that confirmed
+  // base was also null (a genuinely new offline entry). If the watermark held a
+  // value and the DB is now null, another device deliberately cleared it; the
+  // server null wins and the stale local value must not be resurrected.
+  const mergeArr = (d: any[] | undefined, l: any[] | undefined, w: any[] | undefined) =>
     Array.from({ length: n }, (_, i) => {
       const dv = d?.[i] ?? null;
-      return dv != null ? dv : (l?.[i] ?? null);
+      const lv = l?.[i] ?? null;
+      const wv = w?.[i] ?? null;
+      if (dv != null || lv == null) return dv;
+      return wv == null ? lv : null;
     });
   const merged = {
-    scores: mergeArr(db.scores, backup.scores),
-    putts: mergeArr(db.putts, backup.putts),
-    fairways: mergeArr(db.fairways, backup.fairways),
-    penalties: mergeArr(db.penalties, backup.penalties),
-    sand: mergeArr(db.sand, backup.sand),
+    scores: mergeArr(db.scores, backup.scores, watermark?.scores),
+    putts: mergeArr(db.putts, backup.putts, watermark?.putts),
+    fairways: mergeArr(db.fairways, backup.fairways, watermark?.fairways),
+    penalties: mergeArr(db.penalties, backup.penalties, watermark?.penalties),
+    sand: mergeArr(db.sand, backup.sand, watermark?.sand),
   };
-  const dbCount = (db.scores || []).filter((s) => s != null).length;
-  const mergedCount = merged.scores.filter((s) => s != null).length;
-  return { merged, changed: mergedCount > dbCount };
+  const normalizedDb = {
+    scores: Array.from({ length: n }, (_, i) => db.scores?.[i] ?? null),
+    putts: Array.from({ length: n }, (_, i) => db.putts?.[i] ?? null),
+    fairways: Array.from({ length: n }, (_, i) => db.fairways?.[i] ?? null),
+    penalties: Array.from({ length: n }, (_, i) => db.penalties?.[i] ?? null),
+    sand: Array.from({ length: n }, (_, i) => db.sand?.[i] ?? null),
+  };
+  const changed = JSON.stringify(merged) !== JSON.stringify(normalizedDb);
+  return { merged, changed };
 }
 
 

@@ -1693,7 +1693,7 @@ function GameRoom({
       const mergedPlayers = (snap.players || []).map((p: any) => {
         const backup = loadGameScores(gameId, p.id);
         if (!backup) return p;
-        const { merged } = mergeBackupRow(p, backup, n0);
+        const { merged } = mergeBackupRow(p, backup, n0, loadSyncedWatermark(gameId, p.id));
         saveGameScores(gameId, p.id, merged);
         return { ...p, ...merged };
       });
@@ -1771,7 +1771,8 @@ function GameRoom({
       // A backup saved before the organizer's last reset is stale — discard it
       // so a reset can't be undone by this device's pre-reset memory.
       if (resetAt && (backup.at ?? 0) < resetAt) { clearGameScores(gameId, p.id); clearSyncedWatermark(gameId, p.id); reconciled.push(p); continue; }
-      const { merged, changed } = mergeBackupRow(p, backup, n);
+      const watermark = loadSyncedWatermark(gameId, p.id);
+      const { merged, changed } = mergeBackupRow(p, backup, n, watermark);
       let row = p;
       if (changed) {
         row = { ...p, ...merged };

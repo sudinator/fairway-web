@@ -156,6 +156,13 @@ ok("Ryder Cup Trifecta expands each foursome into two Singles and one Four-Ball 
   assert.equal(s.decidedCount, 3);
   assert.deepEqual(s.matches.map((m) => m.key), ["f1-single-0", "f1-single-1", "f1-team-2"]);
 });
+ok("Ryder Cup Trifecta rejects a game-room scoring contract mismatch", () => {
+  const g: Game = { ...game, id: "tri-invalid", holes_meta: oneHole, course_par: 4, game_type: "trifecta", pairings: [], trifecta_scoring: "per_hole", team_score_mode: "best_ball", foursomes: [{ id: "f1", name: "Group 1", a: ["fa1", "fa2"], b: ["fb1", "fb2"] }] };
+  const s = scoreCompetitionGame(g, teamPlayers.map((p) => ({ ...p, game_id: g.id })));
+  assert.equal(s.matchCount, 0);
+  assert.equal(s.projectedA, 0);
+  assert.match(s.invalidReason || "", /Match scoring/);
+});
 ok("Ryder Cup Trifecta Singles allocate strokes within each head-to-head pair", () => {
   const eighteen = Array.from({ length: 18 }, (_, i) => ({ n: i + 1, par: 4, si: i + 1 }));
   const members = [
