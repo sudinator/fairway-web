@@ -596,7 +596,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
   const foursomes = Array.isArray(game.foursomes) ? game.foursomes : [];
   let units: Unit[];
   const sh = shapeOf(game);
-  const teamGroupsOwnStructure = sh.usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot");
+  const teamGroupsOwnStructure = sh.usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta");
   const scoringStarted = players.some((p) => (p.scores || []).some((x) => x != null) || p.group_locked) || !!game.alt_shot_scoring_started_at;
   if (sh.usesFoursomes && foursomes.length && !teamGroupsOwnStructure) {
     units = foursomes.map((f, i) => ({
@@ -778,7 +778,7 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
     <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 12 }}>
       <Eyebrow>GROUPS · BUILD EACH MATCH</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8, lineHeight: 1.45 }}>
-        Each {game.game_type === "alt_shot" ? "Alternate Shot" : "Four-Ball"} group needs exactly two {teams[0].name} and two {teams[1].name} players. Team membership stays visible while you build the match.
+        Each {game.game_type === "alt_shot" ? "Alternate Shot" : game.game_type === "trifecta" ? "Trifecta" : "Four-Ball"} group needs exactly two {teams[0].name} and two {teams[1].name} players. Team membership stays visible while you build the match.
       </div>
       {onRandomize ? <div style={{ marginTop: 12 }}>
         <button onClick={() => canRandomize && onRandomize()} disabled={!canRandomize || randomizing} style={{ ...btn(true), fontSize: 13, opacity: canRandomize && !randomizing ? 1 : 0.62 }}>

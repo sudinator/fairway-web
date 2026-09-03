@@ -99,7 +99,7 @@ export function GameSetupWorkspace({
   const playersDone = total > 0 && cWithHcp === total;
   const teamsDone = !usesTeams || (total > 0 && cWithTeam === total);
   const matchupsDone = !usesMatchups || (total > 0 && cPlaced === total);
-  const teamGroupFormat = usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot");
+  const teamGroupFormat = usesTeams && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta");
   const showGroupsTab = !usesFoursomes || teamGroupFormat;
   const teamGroupsValid = teamGroupFormat && total > 0 && cGrouped === total && foursomes.length > 0 && foursomes.every((f) => f.a.length === 2 && f.b.length === 2);
   const altDriversDone = game.game_type !== "alt_shot" || (foursomes.length > 0 && foursomes.every((f) => !!f.a_first && !!f.b_first));

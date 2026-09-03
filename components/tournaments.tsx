@@ -2339,9 +2339,10 @@ function GameRoom({
 
   const syncTeamPlayFoursomes = async (nextPlayers: Player[]) => {
     if (!game || !Array.isArray(game.teams) || game.teams.length !== 2) return;
-    if (game.game_type !== "fourball" && game.game_type !== "alt_shot") return;
+    if (game.game_type !== "fourball" && game.game_type !== "alt_shot" && game.game_type !== "trifecta") return;
     const next = deriveTeamFoursomesFromGroups(nextPlayers, game.teams, game.foursomes);
-    await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
+    const { error } = await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
+    if (error) { notifyError("Couldn't save the groups — please try again."); return; }
     setGame({ ...game, foursomes: next });
   };
 

@@ -14,7 +14,7 @@ checks = [
     ("export function balancedOneVOne", grouping, "one-use Singles pairing helper"),
     ("UNASSIGNED PLAYERS", groups, "unassigned team players shown above group cards"),
     ("p.tee_group == null || p.id === current?.id", groups, "assigned players removed from other group dropdowns"),
-    ("Each {game.game_type === \"alt_shot\" ? \"Alternate Shot\" : \"Four-Ball\"} group needs exactly two", groups, "2-v-2 guidance"),
+    ("group needs exactly two {teams[0].name} and two {teams[1].name} players", groups, "2-v-2 guidance"),
     ("PH ${ph(p)}", groups, "playing handicap visible in group choices"),
     ("A selected player is removed from every other dropdown.", matches, "Singles duplicate-prevention guidance"),
     ("!used.has(key) || key === current", matches, "Singles choices retain only their own current selection"),

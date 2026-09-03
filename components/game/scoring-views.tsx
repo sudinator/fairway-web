@@ -1141,7 +1141,11 @@ export function FourballView({
 
   const saveFoursomes = async (next: typeof foursomes) => {
     if (!allowFoursomeMutation()) return;
-    await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
+    const { error } = await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
+    if (error) {
+      alert(`Couldn't save the foursomes: ${error.message}`);
+      return;
+    }
     // Each foursome is also its tee group (1-based), so group scoring/markers line up
     // with the foursomes and there's no separate "Groups" step for four-ball.
     const groupOf = deriveTeeGroupsFromFoursomes(next);

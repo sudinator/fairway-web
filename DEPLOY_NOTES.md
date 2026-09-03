@@ -1,3 +1,10 @@
+## 181.2.260902 — Ryder Cup Trifecta group setup
+
+- Restores the Groups tab for Ryder Cup Trifecta sessions while retaining Matchups for the two Singles pairings.
+- Makes Teams + Groups generate the underlying 2-v-2 foursomes and preserves any Singles pairing swap when a group changes.
+- Migration 0147 permits empty and partially assembled draft groups, while rejecting malformed groups or more than two players on either side.
+- Surfaces a save error instead of leaving Add foursome apparently unresponsive.
+
 ## 181.1.260902 — Ryder Cup session spacing
 - Adds clear separation above and below the Ryder Cup Sessions heading and Add session control.
 - Keeps the existing BNN card borders, colors, button treatment and responsive width rules unchanged.
