@@ -1,3 +1,11 @@
+## 182.0.260903 — Manage Game hole-count correction
+
+- Adds the existing 18 holes / Front nine / Back nine picker to Manage Game → Format for games on an 18-hole course.
+- Allows the organizer to change the hole selection until scoring begins while preserving players, tees, teams, groups, matchups and contests.
+- Adds authenticated migration 0149 so `holes_meta` and every positional player array resize atomically; ordinary and Alternate Shot scoring sources are rechecked under row locks.
+- Keeps the controls visible but disabled with an explanation after scoring; Reset Scores restores editability.
+- Adds a fresh-database executed lifecycle: Front nine → 18 → Back nine → score lock → reset → 18.
+
 ## 181.13.260903 — Canonical TypeScript Course Handicap basis
 
 - Replaces the broad 181.12 Staging candidate with one deliberately narrow maintainability change.

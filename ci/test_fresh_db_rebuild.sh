@@ -38,6 +38,9 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-core-rls-live.sql"
 # Disposable-only behavioral proof: execute real authorization outcomes under authenticated RLS.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-core-rls-behavior.sql"
 
+# Execute the full configured-game length round trip, score lock and reset/re-entry behavior.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-match-length-roundtrip.sql"
+
 # Fresh rebuild must contain the six helper functions used by the core RLS policy graph.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
 do $$

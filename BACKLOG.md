@@ -1,3 +1,12 @@
+## v182.0 editable match length
+
+- [x] Reuse the Create Game match-length picker inside Manage Game → Format.
+- [x] Preserve players, tees, handicaps, teams, groups, matchups and contests across length changes.
+- [x] Resize the game and player positional arrays atomically through an organizer-authorized RPC.
+- [x] Keep the control visible with a scoring-lock explanation and restore it after Reset Scores.
+- [x] Execute Front nine → 18 → Back nine → score lock → reset → 18 against a fresh database.
+- [ ] Apply migration 0149 to Staging and complete the browser smoke test.
+
 ## v180.3 Ryder Cup deletion-state closure
 
 - [x] Remove a successfully deleted Ryder Cup from the visible list immediately.

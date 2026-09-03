@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { readAltShotSideScores } from "@/lib/alt-shot-scores";
 import { canonicalAltShotGross, upsertAltShotScoreLocal, loadAltShotDrafts, saveAltShotDraft, clearAltShotDraft, clearAllAltShotDrafts, type AltShotScoreRow, type AltShotScoreSide } from "@/lib/alt-shot-side-scores";
 import { MatchLengthPicker } from "@/components/game/match-length-picker";
-import { holesForLength, type MatchLength } from "@/lib/match-length";
+import { holesForLength, matchLengthFromHoles, type MatchLength } from "@/lib/match-length";
 import type { GameType } from "@/lib/game-shape";
 import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
@@ -1678,6 +1678,7 @@ function GameRoom({
   const [teeIdx, setTeeIdx] = useState(0);
   const [idxStr, setIdxStr] = useState("");
   const [courseTees, setCourseTees] = useState<CourseTee[]>([]);
+  const [courseHoles, setCourseHoles] = useState<Course["holes"]>([]);
   const [courseOptions, setCourseOptions] = useState<Course[]>([]);
   const [finishPrompt, setFinishPrompt] = useState<{ kind: "group" | "game"; teeGroup?: number; gaps: FinishGap[] } | null>(null);
   const [shareCard, setShareCard] = useState(false);
@@ -1797,12 +1798,14 @@ function GameRoom({
   useEffect(() => {
     if (!game?.group_id || !game?.course) {
       setCourseTees([]);
+      setCourseHoles([]);
       setCourseOptions([]);
       return;
     }
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
       const snap = loadGameSnapshot(gameId);
       setCourseTees(snap?.courseTees && snap.courseTees.length ? (snap.courseTees as any) : []);
+      setCourseHoles(snap?.courseHoles && snap.courseHoles.length ? (snap.courseHoles as any) : []);
       return;
     }
     // Capture the already-validated identifiers before entering the async closure.
@@ -1836,6 +1839,9 @@ function GameRoom({
         }
 
         const tees = Array.isArray(found?.tees) ? found.tees : [];
+        const fullHoles = Array.isArray(found?.holes) ? found.holes : [];
+        setCourseHoles(fullHoles);
+        if (fullHoles.length) saveGameSnapshot(gameId, { courseHoles: fullHoles });
         if (tees.length) {
           setCourseTees(tees);
           saveGameSnapshot(gameId, { courseTees: tees });
@@ -1847,10 +1853,12 @@ function GameRoom({
         // snapshots so existing player-level tee choices remain usable.
         const snap = loadGameSnapshot(gameId);
         setCourseTees(snap?.courseTees && snap.courseTees.length ? (snap.courseTees as any) : []);
+        setCourseHoles(snap?.courseHoles && snap.courseHoles.length ? (snap.courseHoles as any) : []);
       } catch {
         if (!alive) return;
         const snap = loadGameSnapshot(gameId);
         if (snap?.courseTees?.length) setCourseTees(snap.courseTees as any);
+        if (snap?.courseHoles?.length) setCourseHoles(snap.courseHoles as any);
       }
     })();
     return () => { alive = false; };
@@ -2679,6 +2687,20 @@ function GameRoom({
     await load();
   };
 
+  const setMatchLength = async (next: MatchLength) => {
+    if (!game || courseHoles.length < 18 || !allowSetupChange({ type: "set_match_length", length: next })) return;
+    const current = matchLengthFromHoles(courseHoles, game.holes_meta);
+    if (current === next) return;
+    const nextHoles = holesForLength(courseHoles, next).map((h) => ({ n: h.n, par: h.par, si: h.si ?? null }));
+    const { error } = await supabase.rpc("change_game_match_length_before_scoring", {
+      p_game: game.id,
+      p_holes_meta: nextHoles,
+    });
+    if (error) { alert(failureMessage("Couldn't change the number of holes", error)); return; }
+    clearAllGameScores(game.id);
+    await load();
+  };
+
   const setTeamScoreMode = async (mode: "best_ball" | "aggregate") => {
     if (!game || (game.team_score_mode ?? "best_ball") === mode || !allowSetupChange({ type: "set_team_score_mode", mode })) return;
     const { error } = await supabase.from("games").update({ team_score_mode: mode }).eq("id", game.id);
@@ -3256,7 +3278,7 @@ function GameRoom({
           canDelete: !completedGame, deleteRestriction: "Only a system admin can delete a completed game. Posted own-ball rounds remain in player history; Alternate Shot rounds are removed.",
           onEnd: requestEndGame, onReopen: reopenGame, onReset: resetScores, onShare: setShare,
           eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,
-          onSetAllowance: setAllowance, onSetFormat: setFormat, onSetTeamScoreMode: setTeamScoreMode, onSetSkinsMode: updateSkinsMode, onSetSkinsStyle: setSkinsStyle, onSetMatchTeam: setMatchTeam, anyScores,
+          onSetAllowance: setAllowance, onSetFormat: setFormat, courseHoles, onSetMatchLength: setMatchLength, onSetTeamScoreMode: setTeamScoreMode, onSetSkinsMode: updateSkinsMode, onSetSkinsStyle: setSkinsStyle, onSetMatchTeam: setMatchTeam, anyScores,
         } satisfies OrganizerPanelProps;
         const workspaceProps = {
           game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate, courseOptions, onChangeCourse: changeGameCourse,
