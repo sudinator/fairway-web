@@ -840,7 +840,13 @@ export function computeTrifecta(
   };
 
   for (const [aId, bId] of singles) {
-    const pairs = holes.map((_, i) => ({ aNet: nets[aId]?.[i] ?? null, bNet: nets[bId]?.[i] ?? null }));
+    // A Ryder-Cup Trifecta single is a genuine 1-v-1 match: strokes are
+    // allocated relative to the lower handicap in that pair. The legacy
+    // per-hole Trifecta game keeps its established four-player allocation.
+    const singlesNets = scoring === "match"
+      ? fourballNets(holes, members.filter((m) => m.id === aId || m.id === bId), allowancePct)
+      : nets;
+    const pairs = holes.map((_, i) => ({ aNet: singlesNets[aId]?.[i] ?? null, bNet: singlesNets[bId]?.[i] ?? null }));
     contests.push(buildContest("single", [aId], [bId], pairs));
   }
 

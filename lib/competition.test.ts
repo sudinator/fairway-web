@@ -1,6 +1,7 @@
 import { strict as assert } from "assert";
 import { combineCompetitionScores, competitionFormatLabel, competitionOutcome, competitionPointsNeeded, competitionSchedule, fmtCompetitionPoints, scoreCompetitionGame } from "./competition";
 import type { Game, Player } from "./game-types";
+import { computeTrifecta } from "./golf";
 
 let n = 0;
 const ok = (name: string, fn: () => void) => { fn(); n++; console.log(`ok ${n} - ${name}`); };
@@ -17,6 +18,7 @@ ok("labels supported cup formats", () => {
   assert.equal(competitionFormatLabel("fourball"), "Four-Ball");
   assert.equal(competitionFormatLabel("alt_shot"), "Alternate Shot");
   assert.equal(competitionFormatLabel("match"), "Singles");
+  assert.equal(competitionFormatLabel("trifecta"), "Trifecta");
 });
 
 const holes = Array.from({ length: 3 }, (_, i) => ({ n: i + 1, par: 4, si: i + 1 }));
@@ -145,6 +147,24 @@ ok("Alternate Shot aggregates canonical side-owned scores without copying player
   assert.equal(s.decidedCount, 1);
   assert.equal(s.projectedA, 1);
   assert.equal(s.matches[0].winnerTeam, "A");
+});
+ok("Ryder Cup Trifecta expands each foursome into two Singles and one Four-Ball match", () => {
+  const g: Game = { ...game, id: "tri", holes_meta: oneHole, course_par: 4, game_type: "trifecta", pairings: [], trifecta_scoring: "match", team_score_mode: "best_ball", foursomes: [{ id: "f1", name: "Group 1", a: ["fa1", "fa2"], b: ["fb1", "fb2"] }] };
+  const ps = teamPlayers.map((p) => ({ ...p, game_id: g.id }));
+  const s = scoreCompetitionGame(g, ps);
+  assert.equal(s.matchCount, 3);
+  assert.equal(s.decidedCount, 3);
+  assert.deepEqual(s.matches.map((m) => m.key), ["f1-single-0", "f1-single-1", "f1-team-2"]);
+});
+ok("Ryder Cup Trifecta Singles allocate strokes within each head-to-head pair", () => {
+  const eighteen = Array.from({ length: 18 }, (_, i) => ({ n: i + 1, par: 4, si: i + 1 }));
+  const members = [
+    { id: "a1", ch: 10, gross: Array(18).fill(4) }, { id: "a2", ch: 0, gross: Array(18).fill(4) },
+    { id: "b1", ch: 12, gross: Array(18).fill(4) }, { id: "b2", ch: 0, gross: Array(18).fill(4) },
+  ];
+  const tri = computeTrifecta(eighteen, members, ["a1", "a2"], ["b1", "b2"], 100, "best_ball", false, "match");
+  assert.equal(tri.contests[0].perHole[0].r, -1);
+  assert.equal(tri.contests[0].perHole[10].r, 0);
 });
 
 console.log(`competition: ${n} passed, 0 failed`);

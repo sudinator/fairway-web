@@ -1,3 +1,14 @@
+## 181.1.260902 — Ryder Cup session spacing
+- Adds clear separation above and below the Ryder Cup Sessions heading and Add session control.
+- Keeps the existing BNN card borders, colors, button treatment and responsive width rules unchanged.
+
+## 181.0.260902 — Ryder Cup Trifecta
+- Adds Trifecta as a Ryder Cup session: every 2-v-2 foursome contributes two true Singles matches and one Four-Ball match.
+- Reuses one gross scorecard per golfer. Singles strokes are calculated within each 1-v-1 pair; the Four-Ball leg uses the four-player best-ball allocation.
+- Session planning accepts a foursome count and records three planned matches per foursome.
+- Migration 0146 adds the session format and enforces match scoring, best ball, and balanced nonempty foursomes for linked Ryder Cup Trifecta games.
+- Current profile handicaps remain the Create Game defaults and are snapshotted into the child game when it is created.
+
 ## 180.3.260902 — Ryder Cup deletion-state closure
 
 - Reloads the Ryder Cup list after successful deletion so a deleted title disappears immediately instead of remaining as stale browser state.

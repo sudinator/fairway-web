@@ -465,6 +465,10 @@ function CreateGame({
   useEffect(() => {
     if (resumedRef.current) return;
     if (!seed || groupRoster.length === 0) return;
+    if (seed.competitionSession?.format === "trifecta") {
+      setTeamScoreMode("best_ball");
+      setTrifectaScoring("match");
+    }
     setSelectedPlayers((prev) => {
       if (seed.competitionSession) {
         const allowed = new Set(seed.memberIds);
@@ -624,6 +628,10 @@ function CreateGame({
     }
     if (seed?.competitionSession && gameType === "match" && !teamMode) {
       setErr("Ryder Cup Singles is a team match. Keep Team match turned on so the result can roll into the Ryder Cup score.");
+      return;
+    }
+    if (seed?.competitionSession?.format === "trifecta" && (teamScoreMode !== "best_ball" || trifectaScoring !== "match")) {
+      setErr("Ryder Cup Trifecta uses two Singles matches and one Four-Ball match per foursome. Keep Best ball and 1 match = 1 point selected.");
       return;
     }
     if (seed?.competitionSession) {
@@ -1150,15 +1158,15 @@ function CreateGame({
         {gameType === "trifecta" && (
           <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginTop: 10 }}>
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>Two teams</div>
-            <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Name the two sides, then build the 2-v-2 foursomes after creating. Each foursome plays for three points a hole.</div>
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>{seed?.competitionSession ? "One gross score per golfer feeds two true Singles matches and one Four-Ball match. Singles and Four-Ball strokes are calculated separately." : "Name the two sides, then build the 2-v-2 foursomes after creating. Each foursome plays for three points a hole."}</div>
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
               <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} disabled={!!seed?.competitionSession} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
               <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} disabled={!!seed?.competitionSession} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
             </div>
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>Team point</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-              <button onClick={() => setTeamScoreMode("best_ball")} style={{ ...btn(teamScoreMode === "best_ball"), fontSize: 12, padding: "7px 10px" }}>Best ball</button>
-              <button onClick={() => setTeamScoreMode("aggregate")} style={{ ...btn(teamScoreMode === "aggregate"), fontSize: 12, padding: "7px 10px" }}>Shootout (aggregate)</button>
+              <button disabled={!!seed?.competitionSession} onClick={() => setTeamScoreMode("best_ball")} style={{ ...btn(teamScoreMode === "best_ball"), fontSize: 12, padding: "7px 10px" }}>Best ball</button>
+              {!seed?.competitionSession ? <button onClick={() => setTeamScoreMode("aggregate")} style={{ ...btn(teamScoreMode === "aggregate"), fontSize: 12, padding: "7px 10px" }}>Shootout (aggregate)</button> : null}
             </div>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
               {teamScoreMode === "aggregate"
@@ -1167,8 +1175,8 @@ function CreateGame({
             </div>
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>Scoring</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-              <button onClick={() => setTrifectaScoring("per_hole")} style={{ ...btn(trifectaScoring === "per_hole"), fontSize: 12, padding: "7px 10px" }}>1 hole = 1 pt</button>
-              <button onClick={() => setTrifectaScoring("match")} style={{ ...btn(trifectaScoring === "match"), fontSize: 12, padding: "7px 10px" }}>1 match = 1 pt (Ryder Cup)</button>
+              {!seed?.competitionSession ? <button onClick={() => setTrifectaScoring("per_hole")} style={{ ...btn(trifectaScoring === "per_hole"), fontSize: 12, padding: "7px 10px" }}>1 hole = 1 pt</button> : null}
+              <button disabled={!!seed?.competitionSession} onClick={() => setTrifectaScoring("match")} style={{ ...btn(trifectaScoring === "match"), fontSize: 12, padding: "7px 10px" }}>1 match = 1 pt (Ryder Cup)</button>
             </div>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
               {trifectaScoring === "match"
