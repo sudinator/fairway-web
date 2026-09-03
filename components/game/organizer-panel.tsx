@@ -73,6 +73,8 @@ import {
 import type { Game, Player } from "@/lib/game-types";
 import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
 import { FormatFamilySelector, type FormatFamily } from "@/components/game/setup/format-family-selector";
+import { MatchLengthPicker } from "@/components/game/match-length-picker";
+import { matchLengthFromHoles, type MatchLength } from "@/lib/match-length";
 
 const supabase = createClient();
 
@@ -101,6 +103,8 @@ export type OrganizerPanelProps = {
   onAddGuest?: (name: string, hcp: number, sponsor: string) => Promise<void>;
   onSetAllowance?: (pct: number) => Promise<void>;
   onSetFormat?: (f: GameType) => Promise<void>;
+  courseHoles?: { n?: number | null; hole_number?: number | null; par?: number | null; si?: number | null }[];
+  onSetMatchLength?: (length: MatchLength) => Promise<void>;
   onSetTeamScoreMode?: (m: "best_ball" | "aggregate") => Promise<void>;
   onSetSkinsMode?: (m: "carryover" | "split") => Promise<void>;
   onSetSkinsStyle?: (s: "individual" | "team_11" | "team_2v2") => Promise<void>;
@@ -125,6 +129,8 @@ export function OrganizerPanel({
   onAddGuest,
   onSetAllowance,
   onSetFormat,
+  courseHoles = [],
+  onSetMatchLength,
   onSetTeamScoreMode,
   onSetSkinsMode,
   onSetSkinsStyle,
@@ -536,6 +542,18 @@ export function OrganizerPanel({
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Choose a family above, then the format. The family cards only filter the choices; the game changes when you select a format.</div>
                 {anyScores && <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Scores are in — individual Stableford / Stroke / Individual Skins may be reinterpreted with confirmation. Structural individual/team changes are locked.</div>}
               </div>
+            )}
+
+            {game.status !== "ended" && onSetMatchLength && courseHoles.length >= 18 && (
+              <MatchLengthPicker
+                value={matchLengthFromHoles(courseHoles, game.holes_meta)}
+                onChange={(length) => { void onSetMatchLength(length); }}
+                courseHoles={courseHoles}
+                verdict={(() => {
+                  const d = policy({ type: "set_match_length", length: matchLengthFromHoles(courseHoles, game.holes_meta) });
+                  return { allowed: d.decision !== "block", reason: d.decision === "block" ? d.reason : undefined };
+                })()}
+              />
             )}
 
             {game.status !== "ended" && game.game_type === "skins" && onSetSkinsStyle && (() => {

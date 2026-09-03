@@ -69,6 +69,11 @@ itself. "CI" = automatically checked by a script in `ci/` (run during every rele
     delete it. A Ryder Cup containing any such Game follows the same boundary. Deletion preserves
     own-ball personal history and removes Alternate Shot shared-ball history. System Admin inspection
     must not add the inspector to the club, Game, or Ryder Cup roster. — DB + CI
+8c. **Match length is editable until scoring begins.** Manage Game → Format shows the same 18 holes /
+    Front nine / Back nine choice as Create Game on an 18-hole course. A change atomically resizes
+    `holes_meta` and every positional player array while preserving players, tees, handicaps, teams,
+    groups, matchups and contests. Once any individual or Alternate Shot score exists, the control
+    remains visible but disabled with an explanation; Reset Scores restores editability. — DB + CI
 9. **Yardages on every scorecard.** Per-hole yardages show on ALL scorecards (entry, read-only, game
    group card, round detail, share), based on each player's chosen tee
    (`favorite_courses.data.tees[].yardages`). — manual

@@ -1,3 +1,28 @@
+## 182.0.260903 — Manage Game hole-count correction
+
+- Adds the existing 18 holes / Front nine / Back nine picker to Manage Game → Format for games on an 18-hole course.
+- Allows the organizer to change the hole selection until scoring begins while preserving players, tees, teams, groups, matchups and contests.
+- Adds authenticated migration 0149 so `holes_meta` and every positional player array resize atomically; ordinary and Alternate Shot scoring sources are rechecked under row locks.
+- Keeps the controls visible but disabled with an explanation after scoring; Reset Scores restores editability.
+- Adds a fresh-database executed lifecycle: Front nine → 18 → Back nine → score lock → reset → 18.
+
+## 181.13.260903 — Canonical TypeScript Course Handicap basis
+
+- Replaces the broad 181.12 Staging candidate with one deliberately narrow maintainability change.
+- `courseHandicapExact` is now the only TypeScript implementation of the WHS Course Handicap formula.
+- Rounded display Course Handicap and the game-shape scoring basis both delegate to the exact helper; nine-hole adjustment remains applied afterward without intermediate rounding.
+- Restores 181.11 behavior for offline reconciliation, Team Skins totals and Ryder Cup Trifecta aggregation. Those defensive findings did not represent practical user-facing Production defects and are not part of this release.
+- No migration. Migration 0148 remains current.
+
+## 181.12.260903 — Scoring-source and offline-clear integrity
+
+- Makes `courseHandicapExact` the TypeScript source of truth for Course Handicap math; display rounding and game-shape stroke bases now delegate to it.
+- Changes offline recovery to a three-way merge using the last server-confirmed watermark. A genuinely new offline entry still fills a server gap, while a server-side clear made after the device's last sync remains cleared.
+- Makes malformed 1:1 Team Skins totals reconcile by showing unattributable winnings as **Unassigned**, with a visible setup warning.
+- Removes hardcoded Trifecta scoring arguments from Ryder Cup aggregation. The competition tally now validates Match + Best Ball and passes the game's validated settings into the shared scoring engine.
+- Adds permanent tests for exact handicap equivalence, offline entry recovery, stale-device clear protection, malformed Team Skins attribution, and game-room/Ryder Cup Trifecta contract parity.
+- No migration. Migration 0148 remains current.
+
 ## 181.11.260903 — Trifecta results freeze at mathematical close-out
 
 - Adds one shared match close-out model for ordinary matches, Four-Ball, Alternate Shot, Trifecta and Ryder Cup aggregation.

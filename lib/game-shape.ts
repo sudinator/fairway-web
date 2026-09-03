@@ -1,7 +1,7 @@
 // Pure game-shape + stroke logic. No React. Single source of truth for "what mode
 // is this game", plus the stroke-dot basis that MUST match golf.ts scoring.
 // Unit-tested in game-shape.test.ts.
-import { applyAllowance, matchAllowance, matchStrokesFor, strokesReceived, allocateStrokes } from "./golf";
+import { applyAllowance, matchAllowance, matchStrokesFor, strokesReceived, allocateStrokes, courseHandicapExact } from "./golf";
 import { altShotTeamHandicap, altShotMatchStrokes } from "./alt-shot";
 
 /**
@@ -89,10 +89,11 @@ export const chBasis = (
    */
   holeCount?: number | null,
 ): number => {
-  const base =
+  const exact =
     p.handicap_index != null && p.slope != null && p.rating != null && coursePar != null
-      ? p.handicap_index * (p.slope / 113) + (p.rating - coursePar)
-      : p.course_handicap ?? 0;
+      ? courseHandicapExact(p.handicap_index, p.slope, p.rating, coursePar)
+      : null;
+  const base = exact ?? p.course_handicap ?? 0;
 
   // A nine gets half the 18-hole Course Handicap. The WHOLE figure halves, not the par term: the
   // slope term dominates and par does not touch it, so slicing coursePar instead gives ~52 where

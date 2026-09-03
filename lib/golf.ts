@@ -69,8 +69,8 @@ export type Round = {
 
 // World Handicap System course handicap
 export function courseHandicap(index: number, slope: number, rating: number, par: number): number | null {
-  if ([index, slope, rating, par].some((v) => v == null || isNaN(v as number))) return null;
-  return Math.round(index * (slope / 113) + (rating - par));
+  const exact = courseHandicapExact(index, slope, rating, par);
+  return exact == null ? null : Math.round(exact);
 }
 
 // Unrounded course handicap. Since the April 2024 WHS revision, handicap

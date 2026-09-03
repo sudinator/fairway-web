@@ -1,3 +1,7 @@
+## 182.0.260903 — Editable unscored match length (migration 0149)
+
+`change_game_match_length_before_scoring(uuid,jsonb)` lets the game organizer atomically change an active, unscored game's hole snapshot among a validated 9- or 18-hole selection. It locks the game and player rows, rejects individual or canonical Alternate Shot scoring, replaces `games.holes_meta`, and resizes positional player scoring/stat arrays. Player identities, tee/rating/slope/handicap snapshots, teams, groups, foursomes, pairings and contests are preserved. Execute is restricted to authenticated callers and authorization is rechecked inside the SECURITY DEFINER function.
+
 ## 179.3.260902 — Authoritative Cup schedule (migration 0143)
 
 `competitions.schedule_status` (`draft`/`locked`), lock metadata, revision, and `tie_rule` define whether a Cup has a final scoring contract. `competition_sessions.planned_match_count × points_per_match` is the authoritative denominator even before a child game exists; a halved match splits that value equally. `lock_competition_schedule(...)` validates and freezes the schedule. `reopen_competition_schedule(..., reason)` is organizer/admin-only, requires an explanation, increments the revision, and writes `competition_schedule_events`. While locked, session scoring fields and the tie rule are trigger-protected; linking an already-planned session to its ordinary BNN game remains allowed.

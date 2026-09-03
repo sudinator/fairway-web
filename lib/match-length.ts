@@ -149,3 +149,13 @@ export function needsNineChoice(length: MatchLength): boolean {
 export function canChooseNine(courseHoles: HoleLike[]): boolean {
   return Array.isArray(courseHoles) && courseHoles.length >= 18;
 }
+
+/** Recover the saved choice by comparing the game's positional hole slice with the full course. */
+export function matchLengthFromHoles(courseHoles: HoleLike[], gameHoles: HoleLike[]): MatchLength {
+  if (!Array.isArray(courseHoles) || courseHoles.length < 18 || !Array.isArray(gameHoles)) return "18";
+  if (gameHoles.length === courseHoles.length) return "18";
+  const sameNumbers = (a: HoleLike[], b: HoleLike[]) =>
+    a.length === b.length && a.every((h, i) => holeNumberOf(h) === holeNumberOf(b[i]));
+  if (sameNumbers(gameHoles, holesForLength(courseHoles, "back9"))) return "back9";
+  return "front9";
+}

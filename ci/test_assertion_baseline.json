@@ -1,7 +1,7 @@
 {
-  "total": 189953,
+  "total": 189958,
   "suites": {
-    "(unnamed suites)": 511,
+    "(unnamed suites)": 513,
     "ai-sanitize": 11,
     "all allocators": 253,
     "alt shot": 73,
@@ -29,7 +29,7 @@
     "grouping tests": 297,
     "hole result consistency": 981,
     "legs": 30,
-    "match length": 46,
+    "match length": 49,
     "match length picker": 18,
     "nine-hole handicap": 15,
     "nine-hole payload": 12,

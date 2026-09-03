@@ -16,6 +16,7 @@ import {
   holeCountFor,
   courseHandicapForLength,
   matchLengthLabel,
+  matchLengthFromHoles,
   MATCH_LENGTHS,
 } from "./match-length";
 
@@ -106,6 +107,11 @@ eq("second answer sets the nine", setNine("back9"), "back9");
 ok("18-hole course can choose a nine", canChooseNine(course));
 ok("nine-hole course cannot", !canChooseNine(course.slice(0, 9)));
 ok("empty course cannot", !canChooseNine([]));
+
+// Manage → Format reconstructs the saved choice from the full course and persisted game slice.
+eq("saved full round is recognized", matchLengthFromHoles(course, holesForLength(course, "18")), "18");
+eq("saved front nine is recognized", matchLengthFromHoles(course, holesForLength(course, "front9")), "front9");
+eq("saved back nine is recognized", matchLengthFromHoles(course, holesForLength(course, "back9")), "back9");
 
 
 // Round holes use `hole_number` rather than `n`, so both must resolve.
