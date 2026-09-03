@@ -13,7 +13,7 @@ checks = [
     ("export function balancedTeamGroups", grouping, "team-aware balanced grouping helper"),
     ("export function balancedOneVOne", grouping, "one-use Singles pairing helper"),
     ("UNASSIGNED PLAYERS", groups, "unassigned team players shown above group cards"),
-    ("p.tee_group !== group || p.id === current?.id", groups, "other-group players remain movable while duplicate same-group slots are excluded"),
+    ("p.tee_group == null || p.id === current?.id", groups, "only unassigned players and the slot's current player are offered"),
     ("Move to unassigned", groups, "occupied team slots can be cleared"),
     ("group needs exactly two {teams[0].name} and two {teams[1].name} players", groups, "2-v-2 guidance"),
     ("PH ${ph(p)}", groups, "playing handicap visible in group choices"),

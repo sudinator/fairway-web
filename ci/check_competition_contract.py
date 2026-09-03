@@ -17,6 +17,7 @@ schedule_mig = (root/'migrations/0143_competition_schedule_contract.sql').read_t
 lifecycle_mig = (root/'migrations/0145_competition_lifecycle.sql').read_text()
 trifecta_mig = (root/'migrations/0146_ryder_cup_trifecta.sql').read_text()
 trifecta_draft_mig = (root/'migrations/0147_ryder_cup_trifecta_draft_groups.sql').read_text()
+session_delete_mig = (root/'migrations/0148_delete_competition_session_game.sql').read_text()
 
 check('0142 records itself', "record_migration('0142_team_competitions')" in mig)
 check('competition parent/roster/session tables exist', all(x in mig for x in ['create table if not exists public.competitions', 'create table if not exists public.competition_players', 'create table if not exists public.competition_sessions']))
@@ -64,6 +65,21 @@ check('deleted Ryder Cup links use zero-row-safe loading and friendly copy',
 check('Ryder Cup navigation title is singular while list grammar remains plural', all(x in comp + tour for x in [
     '>Ryder Cup</button>', '<Eyebrow>RYDER CUP</Eyebrow>', 'YOUR RYDER CUPS', 'No Ryder Cups yet.',
 ]) and '>Ryder Cups</button>' not in tour)
+check('0148 preserves the planned session while deleting its linked game', all(x in session_delete_mig for x in [
+    "update public.competition_sessions set game_id = null", "delete from public.games", "record_migration('0148_delete_competition_session_game')",
+]))
+check('0148 permits only authenticated Cup managers', all(x in session_delete_mig for x in [
+    'can_manage_competition(v_session.competition_id, auth.uid())', 'from public, anon', 'to authenticated',
+]))
+check('0148 preserves own-ball history and removes Alternate Shot shared-ball rounds', all(x in session_delete_mig for x in [
+    "v_game.game_type::text = 'alt_shot'", 'delete from public.holes', 'delete from public.rounds',
+]))
+check('linked-game delete UI uses the dedicated RPC and surfaces failure', all(x in tour for x in [
+    'delete_competition_session_game', 'The planned session will remain', 'Could not delete the game:',
+]))
+check('Ryder Cup roster shows live team count and index balance', all(x in comp for x in [
+    'assignedA.length', 'assignedB.length', 'Team index difference:', 'Equal player counts are required',
+]))
 
 bad=[name for name,ok in checks if not ok]
 for name,ok in checks: print(('PASS' if ok else 'FAIL')+': '+name)

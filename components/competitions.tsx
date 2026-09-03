@@ -114,6 +114,13 @@ export function Competitions({
   if (selectedId) return <CompetitionDetail competitionId={selectedId} user={user} canManage={canManage} isSystemAdmin={isSystemAdmin} onBack={() => onSelected(null)} onDeleted={() => { onSelected(null); void loadList(); }} onOpenGame={onOpenGame} onCreateGame={onCreateGame} />;
 
   if (creating) {
+    const assignedA = roster.filter((p) => assign[p.id] === "A");
+    const assignedB = roster.filter((p) => assign[p.id] === "B");
+    const handicapTotal = (rows: Roster[]) => rows.reduce((sum, p) => sum + (p.handicap_index ?? 0), 0);
+    const indexA = handicapTotal(assignedA);
+    const indexB = handicapTotal(assignedB);
+    const countBalanced = assignedA.length === assignedB.length;
+    const indexDifference = Math.abs(indexA - indexB);
     return (
       <div style={{ maxWidth: 620 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -138,6 +145,14 @@ export function Competitions({
         </div>
 
         <Eyebrow>ROSTER</Eyebrow>
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: "8px 12px", marginBottom: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", gap: 8, alignItems: "center", textAlign: "center" }}>
+            <div style={{ minWidth: 0 }}><div style={{ color: teamAccent(teamA || "Team 1", 0), fontSize: 12, fontWeight: 800, overflowWrap: "anywhere" }}>{teamA || "Team 1"}</div><div style={{ color: C.cream, fontSize: 14, fontWeight: 800 }}>{assignedA.length} players · {indexA.toFixed(1)} index</div></div>
+            <div style={{ color: countBalanced ? C.gold : C.overRedDark, fontSize: 11, fontWeight: 800 }}>{countBalanced ? "BALANCED" : `${Math.abs(assignedA.length - assignedB.length)} PLAYER GAP`}</div>
+            <div style={{ minWidth: 0 }}><div style={{ color: teamAccent(teamB || "Team 2", 1), fontSize: 12, fontWeight: 800, overflowWrap: "anywhere" }}>{teamB || "Team 2"}</div><div style={{ color: C.cream, fontSize: 14, fontWeight: 800 }}>{assignedB.length} players · {indexB.toFixed(1)} index</div></div>
+          </div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 6, textAlign: "center" }}>Team index difference: {indexDifference.toFixed(1)}. Equal player counts are required; handicap totals help you judge competitive balance.</div>
+        </div>
         <div style={{ display: "grid", gap: 8 }}>
           {roster.map((p) => {
             const t = assign[p.id] || "";

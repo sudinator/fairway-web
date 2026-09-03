@@ -2859,12 +2859,20 @@ function GameRoom({
       && created.getFullYear() === now.getFullYear()
       && created.getMonth() === now.getMonth()
       && created.getDate() === now.getDate();
-    const msg = sameDay
+    const msg = competitionLink
+      ? `Delete "${game.name}" from this Ryder Cup session? The planned session will remain so you can create a replacement game. Own-ball rounds stay in player history; Alternate Shot shared-ball rounds are removed. This can't be undone.`
+      : sameDay
       ? `Delete "${game.name}"? It was created today, so any scorecards already posted to players' Rounds tabs will ALSO be deleted. This can't be undone.`
       : `Delete "${game.name}"? It's removed for everyone, but each player's posted round stays in their own Rounds history. This can't be undone.`;
     if (!confirm(msg)) return;
-    await supabase.rpc("delete_game", { p_game: game.id, p_delete_rounds: sameDay });
-    await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_deleted", group_id: (game as any).group_id || null, summary: `Deleted the game "${game.name}"${sameDay ? " (and its posted rounds)" : ""}` });
+    const result = competitionLink
+      ? await supabase.rpc("delete_competition_session_game", { p_game: game.id })
+      : await supabase.rpc("delete_game", { p_game: game.id, p_delete_rounds: sameDay });
+    if (result.error) {
+      alert(`Could not delete the game: ${result.error.message}`);
+      return;
+    }
+    await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_deleted", group_id: (game as any).group_id || null, summary: `Deleted the game "${game.name}"${competitionLink ? " from its Ryder Cup session" : sameDay ? " (and its posted rounds)" : ""}` });
     // Coherent local wipe so a deleted game leaves no snapshot, backups, watermarks,
     // or active-game pointer that could resurface or boot straight back into it.
     clearAllGameScores(game.id);

@@ -1,3 +1,11 @@
+## 181.7.260903 — Ryder Cup session deletion and roster balance
+
+- Adds an authorized, atomic Ryder Cup session-game deletion path that preserves the planned session for replacement even after scoring begins.
+- Preserves posted own-ball rounds while removing Alternate Shot shared-ball rounds.
+- Shows live player counts and handicap-index totals for both teams during Ryder Cup roster assignment.
+- Keeps an assigned player visible in their current Groups selector while excluding already-assigned players from other slot selectors.
+- Adds migration 0148. Apply it to Staging before deploying this version.
+
 ## 181.6.260902 — Trifecta Groups owns complete matchup setup
 
 - Consolidates Ryder Cup Trifecta setup into Groups: organizers select each 2-v-2 foursome and choose its two Singles opponents in the same card.
