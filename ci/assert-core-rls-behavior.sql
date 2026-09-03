@@ -13,7 +13,8 @@ alter table public.holes disable trigger user;
 -- They remain ordinary users because the matching public profiles below are non-admin.
 insert into auth.users(id) values
  ('11111111-1111-1111-1111-111111111111'),
- ('22222222-2222-2222-2222-222222222222');
+ ('22222222-2222-2222-2222-222222222222'),
+ ('33333333-3333-3333-3333-333333333333');
 
 insert into public.notifications(id,user_id,message) values
  ('a1000000-0000-0000-0000-000000000001','11111111-1111-1111-1111-111111111111','A fixture'),
@@ -27,7 +28,8 @@ insert into public.holes(id,round_id,hole_number,par) values
 
 insert into public.profiles(id,display_name,email,is_admin,is_owner,banned) values
  ('11111111-1111-1111-1111-111111111111','RLS A','rls-a@example.test',false,false,false),
- ('22222222-2222-2222-2222-222222222222','RLS B','rls-b@example.test',false,false,false);
+ ('22222222-2222-2222-2222-222222222222','RLS B','rls-b@example.test',false,false,false),
+ ('33333333-3333-3333-3333-333333333333','RLS System Admin','rls-admin@example.test',true,false,false);
 insert into public.groups(id,name,created_by) values
  ('a4000000-0000-0000-0000-000000000001','RLS A Group','11111111-1111-1111-1111-111111111111'),
  ('b4000000-0000-0000-0000-000000000001','RLS B Group','22222222-2222-2222-2222-222222222222');
@@ -200,13 +202,11 @@ insert into public.holes(id,round_id,hole_number,par) values
  ('a7100000-0000-0000-0000-000000000001','a7000000-0000-0000-0000-000000000001',1,4),
  ('a7100000-0000-0000-0000-000000000002','a7000000-0000-0000-0000-000000000002',1,4),
  ('a7100000-0000-0000-0000-000000000003','a7000000-0000-0000-0000-000000000003',1,4);
-update public.profiles set is_admin = true where id = '11111111-1111-1111-1111-111111111111';
-
 set local role authenticated;
-select set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111',true);
+select set_config('request.jwt.claim.sub','33333333-3333-3333-3333-333333333333',true);
 select set_config('request.jwt.claim.role','authenticated',true);
-select set_config('request.jwt.claim.email','rls-a@example.test',true);
-select set_config('request.jwt.claims','{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","email":"rls-a@example.test"}',true);
+select set_config('request.jwt.claim.email','rls-admin@example.test',true);
+select set_config('request.jwt.claims','{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated","email":"rls-admin@example.test"}',true);
 
 do $$
 declare
@@ -253,7 +253,7 @@ begin
   end if;
   if not exists (
     select 1 from public.activity_log
-     where actor_id = '11111111-1111-1111-1111-111111111111'
+     where actor_id = '33333333-3333-3333-3333-333333333333'
        and action = 'admin_game_repair'
        and summary like 'System admin deleted game "RLS A Completed"%'
   ) then
@@ -261,7 +261,7 @@ begin
   end if;
   if not exists (
     select 1 from public.activity_log
-     where actor_id = '11111111-1111-1111-1111-111111111111'
+     where actor_id = '33333333-3333-3333-3333-333333333333'
        and action = 'competition_deleted'
        and summary like 'Deleted Ryder Cup "RLS Completed Ryder Cup"%'
   ) then

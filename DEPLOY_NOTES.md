@@ -1,3 +1,10 @@
+## 180.2.260902 — Separate system-admin behavior fixture
+
+- Replaces the invalid CI attempt to self-promote the ordinary authorization-test user with a dedicated disposable system-admin identity created during fixture setup.
+- Keeps ordinary-user denial tests and system-admin oversight/deletion tests isolated, while attributing database audit entries to the actual administrative actor.
+- Adds a permanent source contract forbidding direct `is_admin` promotion in the fresh-database fixture.
+- Changes test infrastructure only. Runtime application behavior and migration **0145_competition_lifecycle.sql** are unchanged; do not rerun migration 0145 where it is already recorded.
+
 ## 180.1.260902 — Fresh-database Ryder Cup fixture correction
 
 - Corrects the disposable CI database fixture added in v180.0 by creating its two referenced `auth.users` principals before inserting the foreign-key-protected Ryder Cup rows.

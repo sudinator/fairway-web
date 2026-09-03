@@ -51,6 +51,10 @@ auth_fixture_pos = behavior.find("insert into auth.users")
 competition_fixture_pos = behavior.find("insert into public.competitions")
 check("fresh database creates auth principals before FK-protected Ryder Cup fixtures",
       0 <= auth_fixture_pos < competition_fixture_pos)
+check("fresh database keeps ordinary and system-admin identities separate", all(x in behavior for x in [
+    "RLS System Admin", "33333333-3333-3333-3333-333333333333",
+    "rls-admin@example.test",
+]) and "update public.profiles set is_admin = true" not in behavior)
 check("Admin home exposes searchable Games oversight", all(x in manage for x in [
     "function AdminGamesOversight", 'case "games": title = "Games oversight"',
     'name="Games oversight"', 'supabase.rpc("admin_game_oversight"', "Inspect Game →",

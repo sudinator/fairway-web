@@ -1,3 +1,11 @@
+## v180.2 separate system-admin fixture corrective
+
+- [x] Preserve User A as an ordinary user throughout the authorization-denial tests.
+- [x] Create a separate disposable System Admin C for cross-club oversight and protected deletion tests.
+- [x] Attribute administrative audit records to System Admin C.
+- [x] Permanently reject direct admin self-promotion in the fresh-database fixture.
+- [ ] Confirm the complete GitHub fresh-database behavior suite passes before browser verification resumes.
+
 ## v180.1 fresh-database fixture corrective
 
 - [x] Create disposable `auth.users` principals before inserting FK-protected Ryder Cup fixtures.
