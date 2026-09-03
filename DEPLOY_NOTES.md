@@ -1,3 +1,10 @@
+## 181.9.260903 — Completed Teams tab remains directly selectable
+
+- Makes the top Manage Game Teams step open Teams directly, matching Game, Players, Format and Review.
+- Removes completeness-based redirection from Teams to Groups or Review; completion now affects only the status checkmark.
+- Adds an executed DOM interaction test for complete and incomplete Ryder Cup Trifecta games, every roster name, no Review redirect, and Teams → Groups → Control Center → Teams re-entry.
+- No migration. Migration 0148 remains current.
+
 ## 181.8.260903 — Fully assigned Ryder Cup groups remain editable
 
 - Restores assigned same-team players to other Groups selectors, labeled with their current group, so completed groups can be rearranged.

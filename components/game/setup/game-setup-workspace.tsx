@@ -114,15 +114,6 @@ export function GameSetupWorkspace({
   const anyScores = players.some((p) => (p.scores || []).some((s) => s != null)) || !!game.alt_shot_scoring_started_at;
 
   const section = setupTab === "teams" || setupTab === "matchups" || setupTab === "groups" ? "structure" : setupTab;
-  const structureDefault: SetupTab = usesTeams && !teamsDone
-    ? "teams"
-    : showMatchupsTab && !matchupsDone
-      ? "matchups"
-      : showGroupsTab && !groupsDone
-        ? "groups"
-        : "review";
-  const gotoStructure = () => onSetupTabChange(structureDefault);
-
   const [nameEdit, setNameEdit] = React.useState(game.name);
   const [dateEdit, setDateEdit] = React.useState(String((game as any).played_at || "").slice(0, 10));
   const [dateBusy, setDateBusy] = React.useState(false);
@@ -142,7 +133,7 @@ export function GameSetupWorkspace({
   ] as const;
 
   const openSection = (key: typeof stepDefs[number]["key"]) => {
-    if (key === "structure") gotoStructure();
+    if (key === "structure") onSetupTabChange("teams");
     else onSetupTabChange(key);
   };
 

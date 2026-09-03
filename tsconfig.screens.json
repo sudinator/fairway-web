@@ -14,6 +14,7 @@
       ]
     },
     "strict": false,
+    "strictNullChecks": true,
     "noEmitOnError": false
   },
   "files": [
@@ -28,6 +29,7 @@
     "lib/format-picker.test.tsx",
     "components/game/format-picker.tsx",
     "lib/match-length-picker.test.tsx",
+    "lib/game-setup-workspace.test.tsx",
     "components/game/match-length-picker.tsx"
   ]
 }
