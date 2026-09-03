@@ -1,3 +1,10 @@
+## 181.10.260903 — Groups selectors use the explicit Unassigned pool
+
+- Occupied team slots show only the current player plus Move to unassigned.
+- Empty slots show only same-team players currently in the Unassigned pool; players assigned to any group are hidden.
+- Adds executed logic and DOM interaction tests that unassign players from two complete groups, exchange them through Unassigned, reload, and verify both groups are complete without duplicates.
+- No migration. Migration 0148 remains current.
+
 ## 181.9.260903 — Completed Teams tab remains directly selectable
 
 - Makes the top Manage Game Teams step open Teams directly, matching Game, Players, Format and Review.

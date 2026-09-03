@@ -25,7 +25,7 @@ export type BuiltParties = {
 export type TeamGroupPlayer = { id: string; team?: string | null; tee_group?: number | null; no_show?: boolean | null };
 
 export function teamGroupSlotChoices<T extends TeamGroupPlayer>(players: T[], teamKey: string, group: number, currentId: string | null): T[] {
-  return players.filter((p) => p.team === teamKey && !p.no_show && (p.tee_group !== group || p.id === currentId));
+  return players.filter((p) => p.team === teamKey && !p.no_show && (p.tee_group == null || p.id === currentId));
 }
 
 export function applyTeamGroupSlotMove<T extends TeamGroupPlayer>(players: T[], currentId: string | null, nextId: string | null, group: number): T[] {

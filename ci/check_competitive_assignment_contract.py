@@ -13,7 +13,7 @@ checks = [
     ("export function balancedTeamGroups", grouping, "team-aware balanced grouping helper"),
     ("export function balancedOneVOne", grouping, "one-use Singles pairing helper"),
     ("UNASSIGNED PLAYERS", groups, "unassigned team players shown above group cards"),
-    ("teamGroupSlotChoices(players, teamKey, group, current?.id || null)", groups, "fully assigned players remain available for cross-group moves"),
+    ("teamGroupSlotChoices(players, teamKey, group, current?.id || null)", groups, "Groups uses the tested Unassigned-only selector contract"),
     ("applyTeamGroupSlotMove", tournaments, "UI uses the tested atomic move transition"),
     ("Move to unassigned", groups, "occupied team slots can be cleared"),
     ("group needs exactly two {teams[0].name} and two {teams[1].name} players", groups, "2-v-2 guidance"),

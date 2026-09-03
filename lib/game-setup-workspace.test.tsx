@@ -3,6 +3,7 @@ import * as React from "react";
 import { act } from "react";
 import { GameSetupWorkspace, type SetupTab } from "../components/game/setup/game-setup-workspace";
 import type { Game, Player } from "./game-types";
+import { applyTeamGroupSlotMove } from "./grouping";
 import { ok, renderToDom, report, text } from "./test-render";
 
 const game = {
@@ -25,9 +26,10 @@ const players: Player[] = rows.map(([id, team, tee_group, display_name]) => ({
 
 function Harness({ complete }: { complete: boolean }) {
   const [tab, setTab] = React.useState<SetupTab>("overview");
-  return <GameSetupWorkspace game={complete ? game : { ...game, foursomes: [] }} players={complete ? players : players.map((p) => ({ ...p, tee_group: null }))}
+  const [shownPlayers, setShownPlayers] = React.useState<Player[]>(() => complete ? players : players.map((p) => ({ ...p, tee_group: null })));
+  return <GameSetupWorkspace game={complete ? game : { ...game, foursomes: [] }} players={shownPlayers}
     setupTab={tab} onSetupTabChange={setTab} organizerPanelProps={{} as any} onSetGameDate={async()=>{}}
-    courseOptions={[]} onChangeCourse={async()=>{}} onSetTeeGroup={async()=>{}} onSetTeamGroupSlot={async()=>{}}
+    courseOptions={[]} onChangeCourse={async()=>{}} onSetTeeGroup={async()=>{}} onSetTeamGroupSlot={async(current,next,group)=>setShownPlayers((ps)=>applyTeamGroupSlotMove(ps,current?.id||null,next?.id||null,group))}
     getTeeGroupPolicy={()=>({ blocked:false })} onRandomizeGroups={async()=>{}} canRandomize randomizeReason=""
     randomizing={false} groupOverflow={[]} isCompetitionGame />;
 }
@@ -49,6 +51,16 @@ function click(container: HTMLElement, label: string, exact = false) {
   ok(!rendered.includes("Share the line-up"), "completed Teams does not redirect to Review");
   click(v.container, "Groups", true);
   ok(text(v.container).includes("GROUPS · BUILD EACH MATCH"), "Teams to Groups works");
+  const slot = (group: number) => v.container.querySelector<HTMLSelectElement>(`select[aria-label="Group ${group} Violet player 1"]`)!;
+  const emptySlot = (group: number) => Array.from(v.container.querySelectorAll<HTMLSelectElement>(`select[aria-label^="Group ${group} Violet player"]`)).find((s) => s.value === "")!;
+  ok(slot(1).options.length === 2, "fully assigned occupied slot shows only current player and Move to unassigned");
+  act(() => { slot(1).value = ""; slot(1).dispatchEvent(new Event("change", { bubbles: true })); });
+  act(() => { slot(2).value = ""; slot(2).dispatchEvent(new Event("change", { bubbles: true })); });
+  ok(Array.from(emptySlot(1).options).map((o) => o.value).filter(Boolean).sort().join(",") === "a1,a3", "empty slot shows only the two unassigned players");
+  act(() => { const s = emptySlot(1); s.value = "a3"; s.dispatchEvent(new Event("change", { bubbles: true })); });
+  ok(Array.from(emptySlot(2).options).map((o) => o.value).filter(Boolean).join(",") === "a1", "assigned A3 disappears and only unassigned A1 remains");
+  act(() => { const s = emptySlot(2); s.value = "a1"; s.dispatchEvent(new Event("change", { bubbles: true })); });
+  ok(players.every((p) => text(v.container).includes(p.display_name)), "all players remain visible after the exchange");
   click(v.container, "Control center");
   click(v.container, "Teams");
   ok(text(v.container).includes("Alice Adams"), "Teams survives Groups round trip");

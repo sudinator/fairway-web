@@ -27,7 +27,7 @@ for (let n = 1; n <= 24; n++) {
   }
 }
 
-// Fully assigned team groups can be changed, reloaded and completed again.
+// Fully assigned groups change only through the explicit Unassigned pool.
 {
   type P = { id: string; team: string; tee_group: number | null; no_show: boolean };
   let field: P[] = [
@@ -36,13 +36,15 @@ for (let n = 1; n <= 24; n++) {
     { id: "b1", team: "B", tee_group: 1, no_show: false }, { id: "b2", team: "B", tee_group: 1, no_show: false },
     { id: "b3", team: "B", tee_group: 2, no_show: false }, { id: "b4", team: "B", tee_group: 2, no_show: false },
   ];
-  eq("assigned player in another group remains selectable", teamGroupSlotChoices(field, "A", 1, "a1").map((p) => p.id).sort(), ["a1", "a3", "a4"]);
-  field = applyTeamGroupSlotMove(field, "a1", "a3", 1);
-  eq("selected player moves into target group", field.find((p) => p.id === "a3")?.tee_group, 1);
-  eq("displaced player becomes unassigned", field.find((p) => p.id === "a1")?.tee_group, null);
+  eq("occupied slot offers only its current player", teamGroupSlotChoices(field, "A", 1, "a1").map((p) => p.id), ["a1"]);
+  ok("players assigned to other groups are hidden", !teamGroupSlotChoices(field, "A", 1, "a1").some((p) => p.id === "a3" || p.id === "a4"));
+  field = applyTeamGroupSlotMove(field, "a1", null, 1);
+  field = applyTeamGroupSlotMove(field, "a3", null, 2);
+  eq("chosen players enter Unassigned", field.filter((p) => p.tee_group == null).map((p) => p.id).sort(), ["a1", "a3"]);
   const reloaded = field.map((p) => ({ ...p }));
-  eq("unassigned and other-group players are available after reload", teamGroupSlotChoices(reloaded, "A", 2, null).map((p) => p.id).sort(), ["a1", "a2", "a3"]);
-  field = applyTeamGroupSlotMove(reloaded, null, "a1", 2);
+  eq("empty slot offers only unassigned players after reload", teamGroupSlotChoices(reloaded, "A", 1, null).map((p) => p.id).sort(), ["a1", "a3"]);
+  field = applyTeamGroupSlotMove(reloaded, null, "a3", 1);
+  field = applyTeamGroupSlotMove(field, null, "a1", 2);
   eq("both groups complete after rearrangement", [1, 2].map((g) => field.filter((p) => p.team === "A" && p.tee_group === g).length), [2, 2]);
   ok("no duplicate player after rearrangement", new Set(field.map((p) => p.id)).size === field.length);
 }
