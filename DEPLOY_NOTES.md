@@ -1,3 +1,9 @@
+## 181.5.260902 — Complete Ryder Cup Trifecta setup package
+
+- Reissues the Trifecta setup and mobile-fit work as a self-contained overlay, including the required Groups selector implementation that was omitted from the 181.4 ZIP.
+- Retains Groups as the sole owner of foursomes, explicit Standard/Cross Singles choices in Matchups, inherited Ryder Cup teams, and narrow-screen name containment.
+- No database migration. Migration 0147 remains current and must not be rerun.
+
 ## 181.4.260902 — Ryder Cup Trifecta setup ownership and mobile fit
 
 - Makes Groups the sole place to create foursomes and assign their four players; Trifecta Matchups no longer duplicates Add foursome or player assignment controls.

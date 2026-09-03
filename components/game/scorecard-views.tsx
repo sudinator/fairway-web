@@ -756,7 +756,9 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
   const selectFor = (teamKey: string, group: number, slot: number) => {
     const inGroup = players.filter((p) => p.team === teamKey && p.tee_group === group && !p.no_show);
     const current = inGroup[slot] || null;
-    const choices = players.filter((p) => p.team === teamKey && !p.no_show && (p.tee_group == null || p.id === current?.id));
+    // Include players from other groups so an organizer can move them directly.
+    // Exclude only the teammate already occupying the other slot in this group.
+    const choices = players.filter((p) => p.team === teamKey && !p.no_show && (p.tee_group !== group || p.id === current?.id));
     return (
       <select
         aria-label={`Group ${group} ${teams.find((t) => t.key === teamKey)?.name || "team"} player ${slot + 1}`}
@@ -768,8 +770,8 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
         }}
         style={{ ...inputStyle, width: "100%", minWidth: 0, padding: "8px 12px", fontSize: 12 }}
       >
-        <option value="">Select player…</option>
-        {choices.sort((a, b) => a.display_name.localeCompare(b.display_name)).map((p) => <option key={p.id} value={p.id}>{label(p)}</option>)}
+        <option value="">{current ? "Move to unassigned" : "Select player…"}</option>
+        {choices.sort((a, b) => a.display_name.localeCompare(b.display_name)).map((p) => <option key={p.id} value={p.id}>{label(p)}{p.tee_group != null && p.id !== current?.id ? ` · Group ${p.tee_group}` : ""}</option>)}
       </select>
     );
   };
