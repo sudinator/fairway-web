@@ -111,7 +111,7 @@ export function Competitions({
     finally { setBusy(false); }
   };
 
-  if (selectedId) return <CompetitionDetail competitionId={selectedId} user={user} canManage={canManage} isSystemAdmin={isSystemAdmin} onBack={() => onSelected(null)} onOpenGame={onOpenGame} onCreateGame={onCreateGame} />;
+  if (selectedId) return <CompetitionDetail competitionId={selectedId} user={user} canManage={canManage} isSystemAdmin={isSystemAdmin} onBack={() => onSelected(null)} onDeleted={() => { onSelected(null); void loadList(); }} onOpenGame={onOpenGame} onCreateGame={onCreateGame} />;
 
   if (creating) {
     return (
@@ -157,7 +157,7 @@ export function Competitions({
 
   return (
     <div>
-      <Eyebrow>RYDER CUPS</Eyebrow>
+      <Eyebrow>RYDER CUP</Eyebrow>
       <div style={{ background: C.greenLight, borderRadius: 14, padding: 18, marginTop: 10 }}>
         <div style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 18, fontWeight: 700 }}>Run a Ryder Cup</div>
         <div style={{ color: C.sage, fontSize: 13, marginTop: 6, lineHeight: 1.5 }}>Create two club teams, add Four-Ball, Alternate Shot and Singles sessions, and let BNN tally every match into one live Ryder Cup score.</div>
@@ -175,7 +175,7 @@ export function Competitions({
   );
 }
 
-function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBack, onOpenGame, onCreateGame }: { competitionId: string; user: any; canManage: boolean; isSystemAdmin: boolean; onBack: () => void; onOpenGame: (id: string) => void; onCreateGame: (seed: GameSeed) => void }) {
+function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBack, onDeleted, onOpenGame, onCreateGame }: { competitionId: string; user: any; canManage: boolean; isSystemAdmin: boolean; onBack: () => void; onDeleted: () => void; onOpenGame: (id: string) => void; onCreateGame: (seed: GameSeed) => void }) {
   const [competition, setCompetition] = useState<Competition | null>(null);
   const [roster, setRoster] = useState<CompetitionPlayer[]>([]);
   const [sessions, setSessions] = useState<SessionLive[] | null>(null);
@@ -193,11 +193,16 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
   const load = useCallback(async () => {
     setErr(null);
     const [cRes, rRes, sRes] = await Promise.all([
-      supabase.from("competitions").select("*").eq("id", competitionId).single(),
+      supabase.from("competitions").select("*").eq("id", competitionId).maybeSingle(),
       supabase.from("competition_players").select("*").eq("competition_id", competitionId).order("display_name"),
       supabase.from("competition_sessions").select("*").eq("competition_id", competitionId).order("session_order"),
     ]);
-    if (cRes.error || !cRes.data) { setErr(cRes.error?.message || "Competition not found."); return; }
+    if (cRes.error) { setErr(failureMessage("Could not load this Ryder Cup", cRes.error)); return; }
+    if (!cRes.data) {
+      setCompetition(null); setRoster([]); setSessions([]);
+      setErr("This Ryder Cup no longer exists.");
+      return;
+    }
     if (rRes.error || sRes.error) { setErr(rRes.error?.message || sRes.error?.message || "Could not load Ryder Cup setup."); return; }
     const rawSessions = (sRes.data || []) as CompetitionSession[];
     const ids = rawSessions.map((s) => s.game_id).filter((x): x is string => !!x);
@@ -231,7 +236,7 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
 
   const total = useMemo(() => combineCompetitionScores((sessions || []).map((s) => s.score)), [sessions]);
   const schedule = useMemo(() => competitionSchedule(sessions || [], competition?.tie_rule || "shared"), [sessions, competition?.tie_rule]);
-  if (!competition) return <div><button onClick={onBack} style={{ ...btn(false), marginBottom: 12 }}>‹ Ryder Cups</button><div style={{ color: err ? C.overRedDark : C.sage }}>{err || "Loading…"}</div></div>;
+  if (!competition) return <div><button onClick={onBack} style={{ ...btn(false), marginBottom: 12 }}>‹ Ryder Cup</button><div style={{ color: err ? C.overRedDark : C.sage }}>{err || "Loading…"}</div></div>;
   const manage = canManage || competition.created_by === user.id;
   const aColor = teamAccent(competition.team_a_name, 0), bColor = teamAccent(competition.team_b_name, 1);
 
@@ -330,7 +335,7 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
       if (session.game_id) clearAllGameScores(session.game_id);
     });
     if (active && linked.some((session) => session.game_id === active.gameId)) clearActiveGame();
-    onBack();
+    onDeleted();
   };
 
   const locked = competition.schedule_status === "locked";
@@ -358,7 +363,7 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <button onClick={onBack} style={{ ...btn(false), padding: "8px 12px" }}>‹ Ryder Cups</button>
+        <button onClick={onBack} style={{ ...btn(false), padding: "8px 12px" }}>‹ Ryder Cup</button>
         <div style={{ flex: 1 }} />
         <span style={{ color: locked ? "#5BD08A" : C.gold, fontSize: 11 }}>{locked ? "● Schedule locked" : "● Schedule draft"}</span>
         <button onClick={() => { void load(); }} style={{ ...btn(false), padding: "8px 12px", fontSize: 12 }}>↻ Refresh</button>

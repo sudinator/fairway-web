@@ -1,3 +1,11 @@
+## 180.3.260902 — Ryder Cup deletion-state closure
+
+- Reloads the Ryder Cup list after successful deletion so a deleted title disappears immediately instead of remaining as stale browser state.
+- Uses zero-row-safe detail loading and shows a clear missing-record message instead of exposing Supabase's single-object coercion error.
+- Changes the Games selector, section heading, and back-navigation label from plural **Ryder Cups** to singular **Ryder Cup**, while preserving grammatical list copy such as **Your Ryder Cups**.
+- Adds permanent source contracts for the complete delete → exit detail → refresh list outcome chain and stale-link handling.
+- No database migration. Migration **0145_competition_lifecycle.sql** remains unchanged and must not be rerun where already recorded.
+
 ## 180.2.260902 — Separate system-admin behavior fixture
 
 - Replaces the invalid CI attempt to self-promote the ordinary authorization-test user with a dedicated disposable system-admin identity created during fixture setup.

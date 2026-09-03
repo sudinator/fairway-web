@@ -50,6 +50,13 @@ check('Ryder Cup lifecycle RPCs are authenticated and permission checked', all(x
 check('Ryder Cup deletion is atomic across linked games and parent', all(x in lifecycle_mig for x in ["set schedule_status = 'draft'", 'delete from public.game_players', 'delete from public.games', 'delete from public.competitions', 'v_game_ids uuid[]']))
 check('Ryder Cup deletion preserves own-ball rounds and removes shared-ball rounds', all(x in lifecycle_mig for x in ["cs.format = 'alt_shot'", 'delete from public.rounds', 'Four-Ball and Singles posted rounds intentionally remain']))
 check('Ryder Cup UI exposes rename and explicit format-aware deletion', all(x in comp for x in ['Edit title', 'Delete Ryder Cup', 'rename_team_competition', 'delete_team_competition', 'Personal rounds from Four-Ball and Singles will remain', 'Posted Alternate Shot rounds will also be deleted']))
+check('successful Ryder Cup deletion exits detail and reloads the parent list',
+      'onDeleted={() => { onSelected(null); void loadList(); }}' in comp and 'onDeleted();' in comp)
+check('deleted Ryder Cup links use zero-row-safe loading and friendly copy',
+      '.eq("id", competitionId).maybeSingle()' in comp and 'This Ryder Cup no longer exists.' in comp)
+check('Ryder Cup navigation title is singular while list grammar remains plural', all(x in comp + tour for x in [
+    '>Ryder Cup</button>', '<Eyebrow>RYDER CUP</Eyebrow>', 'YOUR RYDER CUPS', 'No Ryder Cups yet.',
+]) and '>Ryder Cups</button>' not in tour)
 
 bad=[name for name,ok in checks if not ok]
 for name,ok in checks: print(('PASS' if ok else 'FAIL')+': '+name)

@@ -216,7 +216,7 @@ export default function Tournaments({
     <div>
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         <button onClick={() => { setListMode("games"); setCompetitionId(null); }} style={{ ...btn(listMode === "games"), flex: 1 }}>Games</button>
-        <button onClick={() => setListMode("cups")} style={{ ...btn(listMode === "cups"), flex: 1 }}>Ryder Cups</button>
+        <button onClick={() => setListMode("cups")} style={{ ...btn(listMode === "cups"), flex: 1 }}>Ryder Cup</button>
       </div>
       <div style={{ color: C.sage, fontSize: 11.5, lineHeight: 1.45, margin: "0 2px 12px" }}>
         <b style={{ color: C.cream }}>Game:</b> one round, one format and one scorecard. <b style={{ color: C.cream }}>Ryder Cup:</b> several team sessions combined into one overall match score.

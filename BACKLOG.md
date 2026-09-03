@@ -1,3 +1,11 @@
+## v180.3 Ryder Cup deletion-state closure
+
+- [x] Remove a successfully deleted Ryder Cup from the visible list immediately.
+- [x] Replace zero-row `.single()` coercion errors with friendly missing-record handling.
+- [x] Use singular **Ryder Cup** for the selector, section title, and back navigation.
+- [x] Preserve plural grammar for the collection heading and empty state.
+- [ ] Verify delete → list return → deleted title absent in the real Staging browser.
+
 ## v180.2 separate system-admin fixture corrective
 
 - [x] Preserve User A as an ordinary user throughout the authorization-denial tests.
