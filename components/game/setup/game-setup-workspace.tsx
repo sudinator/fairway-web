@@ -36,6 +36,7 @@ export type GameSetupWorkspaceProps = {
   randomizeReason: string;
   randomizing: boolean;
   groupOverflow: string[];
+  isCompetitionGame?: boolean;
 };
 
 const cardStyle: React.CSSProperties = {
@@ -64,6 +65,7 @@ export function GameSetupWorkspace({
   randomizeReason,
   randomizing,
   groupOverflow,
+  isCompetitionGame = false,
 }: GameSetupWorkspaceProps) {
   // Whether the line-up card is open. Local: presentation, not setup state.
   const [showLineup, setShowLineup] = React.useState(false);
@@ -287,7 +289,21 @@ export function GameSetupWorkspace({
             {usesMatchups && <button onClick={() => onSetupTabChange("matchups")} style={{ ...btn(setupTab === "matchups"), flex: 1, fontSize: 12 }}>Matchups</button>}
             {showGroupsTab && <button onClick={() => onSetupTabChange("groups")} style={{ ...btn(setupTab === "groups"), flex: 1, fontSize: 12 }}>Groups</button>}
           </div>
-          {setupTab === "teams" && <OrganizerPanel section="teams" {...organizerPanelProps} />}
+          {setupTab === "teams" && (isCompetitionGame ? (
+            <div style={cardStyle}>
+              <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1.2 }}>RYDER CUP TEAMS</div>
+              <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.45, marginTop: 7 }}>Teams are inherited from the Ryder Cup roster and cannot be changed inside one session.</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(145px, 1fr))", gap: 10, marginTop: 12 }}>
+                {(game.teams || []).map((team) => (
+                  <div key={team.key} style={{ border: `1px solid ${C.borderGreen}`, borderRadius: 10, padding: 10, minWidth: 0 }}>
+                    <div style={{ color: C.gold, fontSize: 12, fontWeight: 800 }}>{team.name}</div>
+                    {players.filter((p) => p.team === team.key).map((p) => <div key={p.id} style={{ color: C.cream, fontSize: 12, marginTop: 6, overflowWrap: "anywhere" }}>{p.display_name}</div>)}
+                  </div>
+                ))}
+              </div>
+              <div style={{ color: C.sage, fontSize: 11, marginTop: 10 }}>To change sides, return to the Ryder Cup roster before configuring its sessions.</div>
+            </div>
+          ) : <OrganizerPanel section="teams" {...organizerPanelProps} />)}
           {setupTab === "groups" && <GroupsBuilder game={game} players={players} onSetTeeGroup={onSetTeeGroup} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} getTeeGroupPolicy={getTeeGroupPolicy} onRandomize={onRandomizeGroups} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} overflowIds={groupOverflow} />}
           {setupTab === "matchups" && <div style={{ ...cardStyle, color: C.sage, fontSize: 12 }}>Build and review matchups below. The existing matchup editor is unchanged.</div>}
         </>

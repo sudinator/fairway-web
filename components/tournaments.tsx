@@ -2417,7 +2417,7 @@ function GameRoom({
   const randomizeReason = randomizeDecision.decision === "block" ? randomizeDecision.reason : "";
   const randomizeGroups = async () => {
     if (!game || !canRandomize || !allowSetupChange({ type: "randomize_groups" })) return;
-    const teamFormat = (game.game_type === "fourball" || game.game_type === "alt_shot") && Array.isArray(game.teams) && game.teams.length === 2;
+    const teamFormat = (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta") && Array.isArray(game.teams) && game.teams.length === 2;
     let assignments: { playerId: string; group: number }[];
     let overflowGuestIds: string[];
     if (teamFormat) {
@@ -3245,7 +3245,7 @@ function GameRoom({
         const workspaceProps = {
           game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate, courseOptions, onChangeCourse: changeGameCourse,
           onSetTeeGroup: setPlayerTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, onSetLegConfig: setLegConfig, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, canRandomize, randomizeReason,
-          randomizing, groupOverflow, onSetTeamGroupSlot: setTeamGroupSlot,
+          randomizing, groupOverflow, onSetTeamGroupSlot: setTeamGroupSlot, isCompetitionGame: !!competitionLink,
         } satisfies React.ComponentProps<typeof GameSetupWorkspace>;
         return <GameSetupWorkspace {...workspaceProps} />;
       })()}

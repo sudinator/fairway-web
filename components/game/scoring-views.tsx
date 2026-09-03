@@ -1274,6 +1274,31 @@ export function FourballView({
   })();
   const setSwap = (fId: string, swap: boolean) => saveFoursomes(foursomes.map((f) => (f.id === fId ? { ...f, swap } : f)));
 
+  if (mode === "setup" && isTrifecta) {
+    return (
+      <div style={{ marginTop: 16 }}>
+        <Eyebrow>SINGLES MATCHUPS</Eyebrow>
+        <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.45, marginTop: 7 }}>Groups controls who plays in each foursome. Here, choose exactly who faces whom in the two Singles matches.</div>
+        {foursomes.length === 0 && <div style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 12, color: C.sage, fontSize: 12 }}>Build the foursomes in Groups first.</div>}
+        {foursomes.map((f, i) => {
+          const complete = f.a.length === 2 && f.b.length === 2;
+          const standard = complete ? [[f.a[0], f.b[0]], [f.a[1], f.b[1]]] : [];
+          const cross = complete ? [[f.a[0], f.b[1]], [f.a[1], f.b[0]]] : [];
+          const pairingCard = (label: string, pairs: string[][], selected: boolean, swap: boolean) => (
+            <button type="button" disabled={!isCreator || foursomesBlocked || !complete} onClick={() => setSwap(f.id, swap)} style={{ ...btn(selected), width: "100%", textAlign: "left", padding: "8px 12px", opacity: complete ? 1 : .58 }}>
+              <div style={{ fontSize: 12, fontWeight: 800 }}>{selected ? "✓ " : ""}{label}</div>
+              {pairs.map((pair, pi) => <div key={pi} style={{ fontSize: 12, fontWeight: 500, marginTop: 5, overflowWrap: "anywhere", lineHeight: 1.3 }}>{nameOf(pair[0])} vs {nameOf(pair[1])}</div>)}
+            </button>
+          );
+          return <div key={f.id || i} style={{ background: C.greenLight, border: `1px solid ${C.borderGreen}`, borderRadius: 12, padding: 12, marginTop: 12, minWidth: 0 }}>
+            <div style={{ color: C.cream, fontSize: 14, fontWeight: 800, overflowWrap: "anywhere" }}>{f.name || `Foursome ${i + 1}`}</div>
+            {!complete ? <div style={{ color: C.gold, fontSize: 12, marginTop: 7 }}>Complete this 2-v-2 foursome in Groups before choosing its Singles matchups.</div> : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8, marginTop: 9 }}>{pairingCard("Standard pairing", standard, !f.swap, false)}{pairingCard("Cross pairing", cross, !!f.swap, true)}</div>}
+          </div>;
+        })}
+      </div>
+    );
+  }
+
   if (mode === "setup") {
     return (
       <div style={{ marginTop: 16 }}>
@@ -1634,21 +1659,21 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
     if (members.length < 2) return null;
     const low = Math.min(...members.map((m) => applyAllowance(chBasis(m, game.course_par, game.holes_meta?.length), allowance)));
     const col = (side: string[], teamKey: string | null) => (
-      <div style={{ flex: 1, borderTop: `2px solid ${teamColOf(teamKey)}`, paddingTop: 8 }}>
+      <div style={{ flex: 1, minWidth: 0, borderTop: `2px solid ${teamColOf(teamKey)}`, paddingTop: 8 }}>
         {teams && teamKey && <div style={{ color: teamColOf(teamKey), fontSize: 11, fontWeight: 500, marginBottom: 6 }}>{teams.find((t) => t.key === teamKey)?.name?.toUpperCase()}</div>}
         {side.map(byKey).filter((p): p is Player => !!p).map((p) => {
           const recv = applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), allowance) - low;
           return (
             <div key={p.id} style={{ padding: "4px 0" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", color: C.cream, fontSize: 14 }}><span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}><Avatar src={p.avatar_url} name={p.display_name} size={24} /><span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.display_name}</span></span><span style={{ color: C.sage }}>ph {phStr(p)}</span></div>
-              <div style={{ color: recv > 0 ? "#E4CF86" : C.sage, fontSize: 11, marginTop: 1 }}>{strokeText(recv)}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "start", gap: 7, color: C.cream, fontSize: 14 }}><span style={{ display: "grid", gridTemplateColumns: "auto minmax(0, 1fr)", alignItems: "center", gap: 7, minWidth: 0 }}><Avatar src={p.avatar_url} name={p.display_name} size={24} /><span style={{ overflowWrap: "anywhere", lineHeight: 1.25 }}>{p.display_name}</span></span><span style={{ color: C.sage, whiteSpace: "nowrap" }}>ph {phStr(p)}</span></div>
+              <div style={{ color: recv > 0 ? "#E4CF86" : C.sage, fontSize: 11, marginTop: 1, overflowWrap: "anywhere", minWidth: 0 }}>{strokeText(recv)}</div>
             </div>
           );
         })}
       </div>
     );
     return (
-      <div key={key} style={{ display: "flex", gap: 12, marginTop: 8 }}>
+      <div key={key} style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginTop: 8, minWidth: 0, maxWidth: "100%" }}>
         {col(f.a, byKey(f.a[0])?.team ?? null)}
         {col(f.b, byKey(f.b[0])?.team ?? null)}
       </div>

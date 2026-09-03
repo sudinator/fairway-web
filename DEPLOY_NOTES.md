@@ -1,3 +1,19 @@
+## 181.4.260902 — Ryder Cup Trifecta setup ownership and mobile fit
+
+- Makes Groups the sole place to create foursomes and assign their four players; Trifecta Matchups no longer duplicates Add foursome or player assignment controls.
+- Makes Trifecta Matchups explicitly choose the two Singles contests with visible Standard and Cross pairing options.
+- Shows Ryder Cup session teams as inherited, read-only roster data so the session editor no longer suggests that team membership can be changed locally.
+- Constrains long player names, playing handicaps, and stroke details within both columns of the Trifecta Best Ball summary on narrow screens.
+- Adds permanent source-contract checks for setup ownership, pairing choices, inherited teams, and mobile containment.
+- No database migration. Migration 0147 remains current and must not be rerun.
+
+## 181.3.260902 — Ryder Cup Trifecta balanced-group correction
+
+- Routes Trifecta through the team-aware group builder so every complete foursome contains two players from each Ryder Cup team.
+- Lets organizers move a same-team player directly from another group; the option identifies that player's current group.
+- Gives every occupied slot an explicit **Move to unassigned** action and prevents empty, dead-end selectors.
+- No database migration. Migration 0147 remains current.
+
 ## 181.2.260902 — Ryder Cup Trifecta group setup
 
 - Restores the Groups tab for Ryder Cup Trifecta sessions while retaining Matchups for the two Singles pairings.
