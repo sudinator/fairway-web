@@ -1,5 +1,5 @@
 {
-  "total": 189962,
+  "total": 189955,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -13,7 +13,7 @@
     "bucket-model": 34,
     "card": 11,
     "chart-helpers": 10,
-    "competition": 17,
+    "competition": 16,
     "component render": 17,
     "contests": 26,
     "course ordering": 4,
@@ -25,7 +25,7 @@
     "game type coverage": 89,
     "game-create": 64,
     "game-utils": 21,
-    "golf/computeBetting tests": 59,
+    "golf/computeBetting tests": 53,
     "grouping tests": 297,
     "hole result consistency": 981,
     "legs": 30,

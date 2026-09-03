@@ -255,11 +255,9 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
     const totals: Record<string, number> = {};
     matchCards.forEach(({ result }) => Object.entries(result.skinsBySide).forEach(([id, n]) => { totals[id] = (totals[id] || 0) + n; }));
     const teamTotals: Record<string, number> = { A: 0, B: 0 };
-    let unassignedTotal = 0;
     if (isTeamSkins) {
       players.forEach((p) => {
         if (p.team === "A" || p.team === "B") teamTotals[p.team] += totals[pkey(p)] || 0;
-        else unassignedTotal += totals[pkey(p)] || 0;
       });
     }
     const carrying = matchCards.reduce((s, c) => s + c.result.carryAtEnd, 0);
@@ -268,7 +266,7 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
       <div style={{ marginTop: 18 }}>
         <Eyebrow>{`${isTeamSkins ? "TEAM " : ""}1:1 SKINS · MATCH PLAY${game.allowance_pct != null && game.allowance_pct !== 100 ? ` · ${game.allowance_pct}% ALLOWANCE` : ""}`}</Eyebrow>
         {isTeamSkins && (
-          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <div style={{ flex: 1, background: teamTotals.A >= teamTotals.B ? C.greenMid : C.greenLight, borderRadius: 12, padding: 14, textAlign: "center" }}>
               <div style={{ color: C.cream, fontWeight: 800 }}>{teams![0].name}</div>
               <div style={{ color: C.cream, fontSize: 32, fontWeight: 800, fontFamily: "Georgia, serif" }}>{fmtSkins(teamTotals.A)}</div>
@@ -277,12 +275,10 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
               <div style={{ color: C.cream, fontWeight: 800 }}>{teams![1].name}</div>
               <div style={{ color: C.cream, fontSize: 32, fontWeight: 800, fontFamily: "Georgia, serif" }}>{fmtSkins(teamTotals.B)}</div>
             </div>
-            {unassignedTotal > 0 ? <div style={{ flex: 1, minWidth: 130, background: C.danger, borderRadius: 12, padding: 14, textAlign: "center" }}><div style={{ color: "#F2C28A", fontWeight: 800 }}>Unassigned</div><div style={{ color: C.cream, fontSize: 32, fontWeight: 800, fontFamily: "Georgia, serif" }}>{fmtSkins(unassignedTotal)}</div></div> : null}
           </div>
         )}
-        {unassignedTotal > 0 ? <div style={{ color: "#F2C28A", fontSize: 11.5, lineHeight: 1.45, marginTop: 8 }}>Setup needs attention: a paired player is not assigned to Team A or Team B. Their skins are shown as Unassigned until the team setup is corrected.</div> : null}
         {isTeamSkins && (() => {
-          const rem = game.holes_meta.length - (teamTotals.A + teamTotals.B + unassignedTotal);
+          const rem = game.holes_meta.length - (teamTotals.A + teamTotals.B);
           return <div style={{ textAlign: "center", color: C.faint, fontSize: 12, marginTop: 8 }}>{rem > 0 ? `${fmtSkins(rem)} skin${rem === 1 ? "" : "s"} still in play` : "All skins decided"}</div>;
         })()}
         {carrying > 0 && (

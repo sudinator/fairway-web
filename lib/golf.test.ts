@@ -1,5 +1,5 @@
 // Unit tests for computeBetting in lib/golf.ts — run with `npm test`.
-import { computeBetting, DEFAULT_BET_SPLIT, roundDifferential, partialHandicapInfo, strokesReceived, adjustedGross, handicapRounds, nextRoundOutlook, withHistoricalRatingSlopeCorrection, mergeBackupRow } from "./golf";
+import { computeBetting, DEFAULT_BET_SPLIT, roundDifferential, partialHandicapInfo, strokesReceived, adjustedGross, handicapRounds, nextRoundOutlook, withHistoricalRatingSlopeCorrection } from "./golf";
 import type { BetPlayer, Round, Hole } from "./golf";
 
 let pass = 0, fail = 0; const fails: string[] = [];
@@ -15,27 +15,6 @@ const sumNet = (r: ReturnType<typeof computeBetting>) => r.perPlayer.reduce((s, 
 
 const P = (id: string, total: number, seg: [number, number, number]): BetPlayer =>
   ({ id, name: id, total, seg, segPlayed: [true, true, true] });
-
-// Three-way offline reconciliation. The watermark is the server state this
-// device last confirmed, so a later DB null is an intentional clear rather
-// than a gap for a stale backup to refill.
-{
-  const blank = { scores: [null], putts: [null], fairways: [null], penalties: [null], sand: [null] };
-  const scored = { scores: [5], putts: [2], fairways: ["hit"], penalties: [0], sand: [false] };
-  const recovered = mergeBackupRow(blank, scored, 1, blank);
-  check("new offline score fills a server gap", recovered.merged.scores, [5]);
-  ok("new offline score is marked for upload", recovered.changed);
-
-  const cleared = mergeBackupRow(blank, scored, 1, scored);
-  check("remote clear defeats stale device score", cleared.merged.scores, [null]);
-  check("remote clear defeats stale score statistics", [cleared.merged.putts[0], cleared.merged.fairways[0]], [null, null]);
-  ok("accepted remote clear is not re-uploaded", !cleared.changed);
-
-  const partialDb = { ...blank, scores: [4, null] };
-  const partialLocal = { ...blank, scores: [4, 6] };
-  const partialBase = { ...blank, scores: [4, null] };
-  check("offline entry on a different hole survives", mergeBackupRow(partialDb, partialLocal, 2, partialBase).merged.scores, [4, 6]);
-}
 
 // ---- Zero-sum: every finished bet must net to zero across the group ----
 {

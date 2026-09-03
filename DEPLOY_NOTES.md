@@ -1,3 +1,11 @@
+## 181.13.260903 — Canonical TypeScript Course Handicap basis
+
+- Replaces the broad 181.12 Staging candidate with one deliberately narrow maintainability change.
+- `courseHandicapExact` is now the only TypeScript implementation of the WHS Course Handicap formula.
+- Rounded display Course Handicap and the game-shape scoring basis both delegate to the exact helper; nine-hole adjustment remains applied afterward without intermediate rounding.
+- Restores 181.11 behavior for offline reconciliation, Team Skins totals and Ryder Cup Trifecta aggregation. Those defensive findings did not represent practical user-facing Production defects and are not part of this release.
+- No migration. Migration 0148 remains current.
+
 ## 181.12.260903 — Scoring-source and offline-clear integrity
 
 - Makes `courseHandicapExact` the TypeScript source of truth for Course Handicap math; display rounding and game-shape stroke bases now delegate to it.
