@@ -1,3 +1,14 @@
+## v182.2 Trifecta card uses Ryder Cup singles basis
+
+- [x] Pin the Architects Jul 5 Foursome 1 rows (Sachin v BK) as a real-data fixture: wrong card answer (1UP thru 14, 4UP) and correct result (2UP thru 14, 5UP, 4 & 2).
+- [x] Pass `game.trifecta_scoring` from the player card into `computeTrifecta`.
+- [x] Guard: every production `computeTrifecta` call passes the scoring argument explicitly.
+- [x] Rendered test: real GameRoom card for Sachin/BK/Karan reads 2UP/5UP, 2DN/5DN, 4DN off the DOM; fails on the 182.0 card.
+- [ ] Staging: open the Jul 5 Architects game as Sachin or BK and confirm the card strip reads 2UP after 14 and 5UP at 18, matching Results.
+- [ ] Deferred, never fired in Production data (skins/no-show query returned no rows): individual skins `computeSkins` ignores `noShow` and resolves a hole only when every player has a score, while the setup policy promises "their unplayed holes score nothing". A marked-out player would block every later skin. Fixture will have to be synthetic.
+- [ ] Deferred, needs a real game first: in-game match and Four-Ball cards use count-based `matchStatus`/`fourballStatus`, which can rewrite a decided margin if scores continue after close-out; the Cup tally uses `matchCloseoutStatus`. Query for decided matches with post-close-out scores before touching it.
+- [ ] Deferred, needs a real game first: public live share page — no nine-hole halving for match/four-ball/skins/trifecta, `fourballStatus` without `team_score_mode`, no `alt_shot` branch, guest players dropped from pairings/foursomes by the user_id map in `get_live_scorecard`.
+
 ## v182.0 editable match length
 
 - [x] Reuse the Create Game match-length picker inside Manage Game → Format.

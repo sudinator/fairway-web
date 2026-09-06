@@ -1,3 +1,6 @@
+## 182.2.260906 — no migration
+Trifecta player-card scoring correction only; TypeScript, rendered test and CI guard. 182.1 was never deployed. 0149 remains current.
+
 ## 178.25.260830 — no migration
 CI-only production migration-parity URL hardening. 0140/0141 are unchanged.
 

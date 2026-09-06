@@ -3878,7 +3878,12 @@ function GameRoom({
                   const p = players.find((pp) => pkey(pp) === uid);
                   return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par, game.holes_meta?.length) : null, noShow: !!p?.no_show };
                 });
-                const res = computeTrifecta(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", !!(f as any).swap);
+                // Scoring MUST be passed. Omitted, computeTrifecta defaults to per_hole and scores the
+                // singles on the four-ball basis (off the foursome's low); under Ryder Cup ("match")
+                // scoring a single is a 1-v-1 and strokes are the difference between the two players.
+                // The card omitted it and disagreed with Results from the 14th on (Architects, Jul 5 2026 —
+                // see lib/trifecta-card-scoring.test.ts).
+                const res = computeTrifecta(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", !!(f as any).swap, game.trifecta_scoring === "match" ? "match" : "per_hole");
                 const mine = res.contests.find((c) => c.kind === "single" && (c.aIds[0] === myKey || c.bIds[0] === myKey));
                 if (!mine) return undefined;
                 const iAmA = mine.aIds[0] === myKey;
