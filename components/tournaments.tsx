@@ -305,7 +305,6 @@ function CreateGame({
   // 18 / front nine / back nine. Applies to every format, not just alternate shot.
   const [matchLength, setMatchLength] = useState<MatchLength>("18");
   const [teamScoreMode, setTeamScoreMode] = useState<"best_ball" | "aggregate">("best_ball");
-  const [trifectaScoring, setTrifectaScoring] = useState<"per_hole" | "match">("per_hole");
   const [strokeBasis, setStrokeBasis] = useState<"gross" | "net">("net");
   const [fmtFamily, setFmtFamily] = useState<"stroke" | "match">(seed?.gameType === "match" || seed?.gameType === "fourball" || seed?.gameType === "alt_shot" || seed?.gameType === "trifecta" ? "match" : "stroke");
   const [matchKind, setMatchKind] = useState<"ind" | "team">(seed?.gameType ? "team" : "ind");
@@ -316,7 +315,7 @@ function CreateGame({
   const [team2, setTeam2] = useState(seed?.teamNames?.B || "Team 2");
 
   const guidedFormatState = (): GuidedFormatState => ({
-    gameType, teamMode, skinsTeamStyle, teamScoreMode, trifectaScoring, strokeBasis, skinsMode, fmtFamily, matchKind,
+    gameType, teamMode, skinsTeamStyle, teamScoreMode, strokeBasis, skinsMode, fmtFamily, matchKind,
   });
   const applyGuidedFormatPatch = (patch: CreateFormatPatch) => {
     // Calling selectGameType whenever the helper returns gameType deliberately preserves
@@ -327,7 +326,6 @@ function CreateGame({
     if (patch.teamMode !== undefined) setTeamMode(patch.teamMode);
     if (patch.skinsTeamStyle) setSkinsTeamStyle(patch.skinsTeamStyle);
     if (patch.teamScoreMode) setTeamScoreMode(patch.teamScoreMode);
-    if (patch.trifectaScoring) setTrifectaScoring(patch.trifectaScoring);
     if (patch.strokeBasis) setStrokeBasis(patch.strokeBasis);
     if (patch.skinsMode) setSkinsMode(patch.skinsMode);
   };
@@ -467,7 +465,6 @@ function CreateGame({
     if (!seed || groupRoster.length === 0) return;
     if (seed.competitionSession?.format === "trifecta") {
       setTeamScoreMode("best_ball");
-      setTrifectaScoring("match");
     }
     setSelectedPlayers((prev) => {
       if (seed.competitionSession) {
@@ -505,7 +502,7 @@ function CreateGame({
     guestsSeeded.current = true; // don't re-seed tee-time guests over the restored ones
     setName(d.name); setMatchDate(d.matchDate); setTeeIdx(d.teeIdx); setIdxStr(d.idxStr);
     setGameType(d.gameType as any); setAllowancePct(d.allowancePct); setAllowanceInput(String(d.allowancePct ?? 100)); setMatchLength((d.matchLength ?? "18") as MatchLength); setTeamScoreMode(d.teamScoreMode as any);
-    setTrifectaScoring(d.trifectaScoring as any); setStrokeBasis(d.strokeBasis as any); setFmtFamily(d.fmtFamily as any);
+    setStrokeBasis(d.strokeBasis as any); setFmtFamily(d.fmtFamily as any);
     setMatchKind(d.matchKind as any); setTeamMode(d.teamMode); setSkinsTeamStyle(d.skinsTeamStyle as any);
     setSkinsMode(d.skinsMode as any); setTeam1(d.team1); setTeam2(d.team2);
     setFlightMode((d.flightMode as any) === "oneoff" ? "oneoff" : "off");
@@ -537,12 +534,12 @@ function CreateGame({
   const draftSnapshot = useMemo(() => ({
     ...toLegacySetupData(buildGameSetupDraft({
       name, matchDate, favName: pickedFav?.name ?? null, teeIdx, idxStr, gameType, allowancePct, matchLength,
-      teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle,
+      teamScoreMode, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle,
       skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount,
       flightTeeIdx: teeAssignments.flight, playerTeeOverrides: teeAssignments.player,
     })),
     createSection,
-  }), [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, matchLength, teamScoreMode, trifectaScoring, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount, teeAssignments, createSection]);
+  }), [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, matchLength, teamScoreMode, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount, teeAssignments, createSection]);
   const latestDraftRef = React.useRef(draftSnapshot);
   latestDraftRef.current = draftSnapshot;
 
@@ -630,8 +627,8 @@ function CreateGame({
       setErr("Ryder Cup Singles is a team match. Keep Team match turned on so the result can roll into the Ryder Cup score.");
       return;
     }
-    if (seed?.competitionSession?.format === "trifecta" && (teamScoreMode !== "best_ball" || trifectaScoring !== "match")) {
-      setErr("Ryder Cup Trifecta uses two Singles matches and one Four-Ball match per foursome. Keep Best ball and 1 match = 1 point selected.");
+    if (seed?.competitionSession?.format === "trifecta" && teamScoreMode !== "best_ball") {
+      setErr("Ryder Cup Trifecta uses two Singles matches and one Four-Ball match per foursome. Keep Best ball selected.");
       return;
     }
     if (seed?.competitionSession) {
@@ -663,7 +660,7 @@ function CreateGame({
         // still fall on the course's hardest holes.
         courseHoles: holesForLength(pickedFav.holes, matchLength),
         teeYardages: tee?.yardages, coursePar, matchDate, allowancePct, gameType, teamMode, team1, team2,
-        skinsTeamStyle, teamScoreMode, trifectaScoring, strokeBasis, skinsMode, flightsSupported, flightMode, flightBands,
+        skinsTeamStyle, teamScoreMode, strokeBasis, skinsMode, flightsSupported, flightMode, flightBands,
         sideContestsEnabled: !seed?.competitionSession,
       });
       const holesMeta = payload.holes_meta;
@@ -1174,14 +1171,8 @@ function CreateGame({
                 : "Best ball — the team's hole score is the better net of the two partners."}
             </div>
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>Scoring</div>
-            <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-              {!seed?.competitionSession ? <button onClick={() => setTrifectaScoring("per_hole")} style={{ ...btn(trifectaScoring === "per_hole"), fontSize: 12, padding: "7px 10px" }}>1 hole = 1 pt</button> : null}
-              <button disabled={!!seed?.competitionSession} onClick={() => setTrifectaScoring("match")} style={{ ...btn(trifectaScoring === "match"), fontSize: 12, padding: "7px 10px" }}>1 match = 1 pt (Ryder Cup)</button>
-            </div>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
-              {trifectaScoring === "match"
-                ? "Ryder Cup — each foursome's 2 singles + 1 team match are worth 1 point each over 18 (½ each if halved). 3 points per foursome."
-                : "Per-hole — every hole of all three matches scores. 3 points on every hole."}
+              Each foursome plays 2 singles matches and 1 team match, worth 1 point each over the round (½ each if halved) — 3 points per foursome. Singles strokes are the difference between the two players; the team match plays off the foursome's lowest handicap.
             </div>
           </div>
         )}
@@ -1428,7 +1419,7 @@ function CreateGame({
                 [!!pickedFav, "Course", pickedFav?.name || "Select a course"],
                 [!!tee, "Default tee", tee?.name || "Select a tee"],
                 [(groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length) > 0, "Players", `${groupRoster.filter((p) => selectedPlayers[p.id] || p.id === user.id).length + guestPlayers.length} selected`],
-                [!!gameType, "Format", formatReviewLabel({ gameType, teamMode, skinsTeamStyle, teamScoreMode, trifectaScoring, strokeBasis, skinsMode })],
+                [!!gameType, "Format", formatReviewLabel({ gameType, teamMode, skinsTeamStyle, teamScoreMode, strokeBasis, skinsMode })],
                 [!flightBlocked, "Flights", flightMode === "oneoff" ? `${flightCount} flights ready` : "Off"],
               ].map(([ok, label, value], i) => (
                 <div key={String(label)} style={{ display: "flex", alignItems: "center", gap: 9, padding: "9px 0", borderBottom: i < 4 ? "1px solid rgba(255,255,255,.08)" : "none" }}>
@@ -2670,11 +2661,6 @@ function GameRoom({
   // place so a switch is reversible. Allowance auto-suggests the new format's
   // common-practice number but the organizer can override after.
   const anyScores = players.some((p) => (p.scores || []).some((s) => s != null)) || !!game?.alt_shot_scoring_started_at;
-  const changeTrifectaScoring = async (next: "per_hole" | "match") => {
-    if (!game || (game.trifecta_scoring ?? "per_hole") === next || !allowSetupChange({ type: "set_trifecta_scoring", mode: next })) return;
-    await supabase.from("games").update({ trifecta_scoring: next }).eq("id", game.id);
-    await load();
-  };
   const setFormat = async (next: GameType) => {
     if (!game || next === game.game_type || !allowSetupChange({ type: "set_format", target: next })) return;
     const patch = buildFormatPatch(game, next);
@@ -3297,32 +3283,10 @@ function GameRoom({
           <span style={{ fontSize: 12, fontWeight: 800, background: C.gold, color: C.cream, borderRadius: 14, padding: "3px 10px" }}>FINAL · GAME ENDED</span>
         ) : (
           <span style={{ color: C.cream, opacity: 0.8, fontSize: 12 }}>
-            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "2 v 2 · aggregate net (both balls)" : "2 v 2 better-net-ball") : game.game_type === "trifecta" ? (game.trifecta_scoring === "match" ? "2 singles + a team match · 3 pts/foursome" : "2 singles + a team point · 3 pts/hole") : game.game_type === "alt_shot" ? "2 v 2 · one ball per side · match play" : game.game_type === "skins" ? "net skins · carryovers" : game.game_type === "stroke" ? "lowest total wins" : "net Stableford leaderboard"}
+            {game.game_type === "match" ? "1-on-1 pairings" : game.game_type === "fourball" ? (game.team_score_mode === "aggregate" ? "2 v 2 · aggregate net (both balls)" : "2 v 2 better-net-ball") : game.game_type === "trifecta" ? "2 singles + a team match · 3 pts/foursome" : game.game_type === "alt_shot" ? "2 v 2 · one ball per side · match play" : game.game_type === "skins" ? "net skins · carryovers" : game.game_type === "stroke" ? "lowest total wins" : "net Stableford leaderboard"}
           </span>
         )}
       </div>
-      )}
-
-      {roomTab === "setup" && setupTab === "format" && isOrganizer && game.game_type === "trifecta" && !isEnded && (
-        <div style={{ marginTop: 12, background: C.greenLight, borderRadius: 12, padding: 14 }}>
-          <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase" }}>Trifecta scoring</div>
-          <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-            {(["per_hole", "match"] as const).map((val) => {
-              const on = (game.trifecta_scoring === "match" ? "match" : "per_hole") === val;
-              return (
-                <button key={val} onClick={() => changeTrifectaScoring(val)} style={{ flex: 1, border: `1px solid ${on ? C.gold : C.borderGreen}`, background: on ? C.gold : "transparent", borderRadius: 10, padding: "9px 8px", cursor: "pointer", textAlign: "center" }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: on ? "#1c1606" : C.cream }}>{val === "match" ? "1 match = 1 pt" : "1 hole = 1 pt"}</div>
-                  <div style={{ fontSize: 11, marginTop: 2, color: on ? "#3c3208" : C.sage }}>{val === "match" ? "Ryder Cup · 3 pts/foursome" : "Per-hole · 3 pts/hole"}</div>
-                </button>
-              );
-            })}
-          </div>
-          <div style={{ color: C.sage, fontSize: 11, marginTop: 8, lineHeight: 1.5 }}>
-            {game.trifecta_scoring === "match"
-              ? "Each foursome's 2 singles + 1 team match are worth 1 point each over 18 (½ each if halved)."
-              : "Every hole of all three matches scores — 3 points on every hole."}
-          </div>
-        </div>
       )}
 
       {roomTab === "play" && !cardView && (() => {
@@ -3878,12 +3842,10 @@ function GameRoom({
                   const p = players.find((pp) => pkey(pp) === uid);
                   return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par, game.holes_meta?.length) : null, noShow: !!p?.no_show };
                 });
-                // Scoring MUST be passed. Omitted, computeTrifecta defaults to per_hole and scores the
-                // singles on the four-ball basis (off the foursome's low); under Ryder Cup ("match")
-                // scoring a single is a 1-v-1 and strokes are the difference between the two players.
-                // The card omitted it and disagreed with Results from the 14th on (Architects, Jul 5 2026 —
-                // see lib/trifecta-card-scoring.test.ts).
-                const res = computeTrifecta(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", !!(f as any).swap, game.trifecta_scoring === "match" ? "match" : "per_hole");
+                // Same engine call as Results (scoring-views) and the Cup tally (competition.ts). Until 183.0 a
+                // second per-hole path existed and the card fell into it, disagreeing with Results from the 14th
+                // on (Architects, Jul 5 2026 — lib/trifecta-card-scoring.test.ts). One rule now.
+                const res = computeTrifecta(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball", !!(f as any).swap);
                 const mine = res.contests.find((c) => c.kind === "single" && (c.aIds[0] === myKey || c.bIds[0] === myKey));
                 if (!mine) return undefined;
                 const iAmA = mine.aIds[0] === myKey;

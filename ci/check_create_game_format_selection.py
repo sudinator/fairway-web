@@ -19,7 +19,7 @@ checks = {
     # The rendered behaviour is also covered by lib/format-picker.test.tsx.
     "manage format keeps policy gate": 'policy({ type: "set_format", target:' in manage_src and 'd.decision !== "block"' in manage_src,
     "manage family cards are presentation only": 'The family cards only filter the choices; the game changes when you select a format.' in manage_src,
-    "review keeps detailed shape": 'formatReviewLabel({ gameType, teamMode, skinsTeamStyle, teamScoreMode, trifectaScoring, strokeBasis, skinsMode })' in create_src,
+    "review keeps detailed shape": 'formatReviewLabel({ gameType, teamMode, skinsTeamStyle, teamScoreMode, strokeBasis, skinsMode })' in create_src,
     "guided helpers model runtime actions": all(token in helper for token in ['export function selectGuidedFamily', 'export function selectGuidedStrokeFormat', 'export function selectGuidedMatchKind', 'export function selectGuidedTeamFormat', 'export function setGuidedTeamMode']),
     "create runtime delegates to guided helpers": all(token in create_src for token in ['applyGuidedFormatPatch(selectGuidedFamily', 'applyGuidedFormatPatch(selectGuidedStrokeFormat', 'applyGuidedFormatPatch(selectGuidedMatchKind', 'applyGuidedFormatPatch(selectGuidedTeamFormat', 'applyGuidedFormatPatch(setGuidedTeamMode']),
     "review next step uses runtime destination helper": 'GC.postCreateDestinationLabel(GC.postCreateDestination(gameType, teamMode))' in create_src,

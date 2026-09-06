@@ -1,3 +1,54 @@
+## Admin: read-only "view card as player" in Games oversight
+
+Raised 182.2: the personal scorecard is bound to the signed-in user's own game_players row, so a
+System Admin inspecting a game sees Results and the group scorecard but never another player's card.
+The 182.2 Trifecta strip bug lived only on that screen and was invisible to the organizer for months;
+verifying the fix on Staging required signing in as a test player, which is not possible for every
+account. Proposal: is_admin-gated, read-only render of any player's ScoreEntryCard from Games
+oversight (no score entry, no stats edits, logged like other oversight actions).
+
+- [ ] Decide whether this belongs to super-admin only or also to the game organizer (support use vs
+      privacy: a player's card shows their own strokes and side-game position).
+- [ ] Render the existing ScoreEntryCard with `myRow` = the chosen player, all handlers disabled.
+- [ ] Rendered test: admin viewing Sachin's Jul 5 card reads 5UP at 18.
+
+## v183.0 One Trifecta rule
+
+- [x] Rule confirmed with Amit: Trifecta = two 1-v-1 singles + four-ball, one point each; per-hole variant removed (zero production games used it).
+- [x] Engine, all call sites, create form, in-game picker, policy action, live page, migration 0150, guard, fixtures.
+- [ ] Staging: create a Trifecta — the format step shows one description and no scoring toggle; Results for game 557495 (Architects replay) unchanged at R.K. v Lex 5 UP / 4 & 2.
+
+## Stroke dots — show the basis each contest is actually scored off (found 182.2, Architects Jul 5 replay)
+
+Raised by Amit after the 182.2 reproduction: on a Ryder Cup Trifecta the player card shows team-leg
+dots (orange, foursome basis) and course-handicap dots (blue, full playing handicap) but nothing for
+the SINGLES, which decide two of the three points and are scored off the pair basis. R.K. on the 9th
+saw an orange dot (team leg: stroke off Marcus) with no indication that in his single v Lex he gets
+nothing there; the 14th is the mirror case for Lex.
+
+Principle: every contest the format scores gets its own labelled stroke set; the full course handicap
+stays because side games (TGC sixes, low-net/Stableford pot) and posting are scored off it, but it is
+the side-game basis, not the match basis, and must be labelled as such.
+
+- [ ] Trifecta: add a SINGLES dot set (pair basis) alongside the team-leg dots; label
+      "singles v <opponent>", "team leg", "course hcp (side games)". (183.0 removed per-hole, so no branching.)
+- [ ] The singles dot must be a first-class basis in `dotStrokes`/`shapeOf` and covered by the
+      scoring-matrix test (card draws == result uses). NOT an inline calculation on the card: that
+      would be a third implementation of the pair basis.
+- [ ] Group scorecard legend reads "match hcp / course hcp" for every relative format. Rename per
+      format: singles match → "v opponent"; four-ball / 2v2 skins → "four-ball (off low)"; 1:1 team
+      skins → "v opponent"; trifecta → both "singles" and "team leg". Personal card `matchStrokeLabel`
+      already varies by format; the group card legend does not.
+- [ ] Singles match personal card: blue course-hcp dots are drawn (showIndivDots is true for every
+      relative basis) but the legend that explains them is suppressed in matchMode — the Match strokes
+      box only explains the orange/hollow dots. Either label the blue dots or hide them in singles.
+- [ ] Group scorecard net colour (under/par/over) uses the MATCH-basis recv on relative formats, so a
+      "net par" cell in a singles match means "level with your opponent's strokes", not net par vs the
+      course. Decide which the colour should mean and label it.
+- [ ] Audit each format's card and group card against the table in the 182.2 review before building;
+      alternate shot already models "the dot means the SIDE gets a stroke here" and is the pattern to
+      follow.
+
 ## v182.2 Trifecta card uses Ryder Cup singles basis
 
 - [x] Pin the Architects Jul 5 Foursome 1 rows (Sachin v BK) as a real-data fixture: wrong card answer (1UP thru 14, 4UP) and correct result (2UP thru 14, 5UP, 4 & 2).

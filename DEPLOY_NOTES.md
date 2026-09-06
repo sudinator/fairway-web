@@ -1,3 +1,13 @@
+## 183.0.260906 — One Trifecta rule (migration 0150)
+
+- Trifecta is now exactly one game: two genuine 1-v-1 singles matches plus a four-ball, each worth one point, decided as matches (½ each if halved). Singles strokes are the difference between the two players in that single; the team match plays off the foursome's lowest handicap. Confirmed with the organizer; already how every Trifecta in production was scored.
+- Removes the per-hole Trifecta variant ("1 hole = 1 pt": one net per player off the foursome low, three points a hole). Zero production games ever used it, and its existence as a second engine path is what produced the 182.0 card/Results disagreement when a caller fell into it by default. `computeTrifecta` loses its `scoring` argument and the `TrifectaScoring` type; the create form and in-game setup lose the scoring picker; the setup policy loses `set_trifecta_scoring`; the live share page loses its per-hole wording.
+- Migration 0150: `games.trifecta_scoring` default `per_hole` → `match`, backfill (expected: none), CHECK constraint `match`-or-null. The column stays because the Ryder Cup contract trigger (0146) requires it and the live RPC returns it.
+- `lib/game-setup-policy.ts`: the setup-change switch gains an exhaustive `default` that BLOCKS unknown actions. Found because the old policy test passed the removed action and the switch silently returned `undefined`.
+- Guard `ci/check_trifecta_single_rule.py` replaces `check_trifecta_scoring_argument.py`: no `per_hole` in production source, 7-parameter `computeTrifecta`, no call with more, `trifecta_scoring` only ever written as `"match"`. Negative-tested three ways.
+- Fixtures: `lib/trifecta-card-scoring.test.ts` now pins the one answer for both real games (Architects Jul 5, Sachin v BK 5 UP / 4 & 2; FB 6/21, Gaurav v Masud 5 DN / 4 & 3) with the old per-hole numbers as a regression fence. `lib/trifecta-card-render.test.tsx` unchanged in intent: the real card reads 2UP / 5UP.
+- Ratchets recommitted downward: reachable format shapes 19 → 17; design-scale and resolved-contrast baselines lower after the two pickers were removed.
+
 ## 182.2.260906 — Trifecta player card scores Ryder Cup singles on the pair basis
 
 - Fixes the player's own scorecard running strip for Ryder Cup ("match") Trifecta games. The card called the shared Trifecta engine without the scoring argument, so it defaulted to per-hole and scored the two singles on the Four-Ball basis (strokes off the foursome's low). Under Ryder Cup scoring a single is a 1-v-1 and strokes are the difference between those two players — which is what the Results page and the Cup tally already used.

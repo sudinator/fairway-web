@@ -13,7 +13,7 @@ actual_refs = set(re.findall(r'const\s+([A-Za-z0-9_]+)\s*=\s*React\.useRef', blo
 # by GameSetupDraft; context/transient/runtime state deliberately stays outside that model.
 domain = {
   'name','matchDate','pickedFav','teeIdx','idxStr','gameType','allowancePct','matchLength','flightMode','flightCount',
-  'hcpOverrides','teamScoreMode','trifectaScoring','strokeBasis','fmtFamily','matchKind','teamMode',
+  'hcpOverrides','teamScoreMode','strokeBasis','fmtFamily','matchKind','teamMode',
   'skinsTeamStyle','skinsMode','team1','team2','selectedPlayers','guestPlayers','teeAssignments',
 }
 context = {'favorites','profileIdx','groupRoster'}

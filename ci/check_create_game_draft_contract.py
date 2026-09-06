@@ -9,7 +9,7 @@ checks = [
     ("canonical model exists", 'export type GameSetupDraft =' in m),
     ("game fields mapped", all(x in m for x in ['favoriteCourseName', 'defaultTeeIdx', 'creatorHandicapText'])),
     ("player fields mapped", all(x in m for x in ['selectedPlayers', 'guestPlayers', 'handicapOverrides'])),
-    ("format fields mapped", all(x in m for x in ['gameType', 'allowancePct', 'teamScoreMode', 'trifectaScoring', 'strokeBasis', 'fmtFamily', 'matchKind', 'teamMode', 'skinsTeamStyle', 'skinsMode'])),
+    ("format fields mapped", all(x in m for x in ['gameType', 'allowancePct', 'teamScoreMode', 'strokeBasis', 'fmtFamily', 'matchKind', 'teamMode', 'skinsTeamStyle', 'skinsMode'])),
     ("structure fields mapped", all(x in m for x in ['team1', 'team2'])),
     ("flight fields mapped", all(x in m for x in ['mode:', 'count:'])),
     ("legacy compatibility adapter exists", 'export function toLegacySetupData' in m and 'export function fromLegacySetupDraft' in m),

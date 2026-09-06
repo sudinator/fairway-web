@@ -54,7 +54,8 @@ check("no-show midround confirm", decision(baseGame(), [scored], { type: "toggle
 check("tee target locked blocked", decision(baseGame(), [scored, P("p3", [null, null], { tee_group: 2, group_locked: true }), blank], { type: "set_tee_group", player: blank, group: 2 }), "block");
 check("team score midround confirm", decision({ ...baseGame(), game_type: "fourball", foursomes }, [scored], { type: "set_team_score_mode", mode: "aggregate" }), "confirm");
 check("skins tie mode midround confirm", decision({ ...baseGame(), game_type: "skins" }, [scored], { type: "set_skins_mode", mode: "split" }), "confirm");
-check("trifecta scoring midround confirm", decision({ ...baseGame(), game_type: "trifecta", teams, foursomes }, [scored], { type: "set_trifecta_scoring", mode: "match" }), "confirm");
+// 183.0: Trifecta has one rule; the set_trifecta_scoring action no longer exists. An unknown action must be refused, not undefined.
+check("unknown setup action is blocked", decision({ ...baseGame(), game_type: "trifecta", teams, foursomes }, [scored], { type: "set_trifecta_scoring", mode: "match" } as any), "block");
 check("leg config midround confirm", decision({ ...baseGame(), game_type: "fourball", foursomes }, [scored], { type: "set_leg_config" }), "confirm");
 check("share ended allowed", decision({ ...baseGame(), status: "ended" }, [scored], { type: "share_live" }), "allow");
 check("date ended confirm", decision({ ...baseGame(), status: "ended" }, [scored], { type: "set_game_date" }), "confirm");

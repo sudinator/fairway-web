@@ -31,7 +31,6 @@ export type GameSetupDraft = {
     /** 18 / front9 / back9. Optional so drafts saved before this existed restore as 18. */
     matchLength?: MatchLength;
     teamScoreMode: "best_ball" | "aggregate";
-    trifectaScoring: "per_hole" | "match";
     strokeBasis: "gross" | "net";
     fmtFamily: "stroke" | "match";
     matchKind: "ind" | "team";
@@ -66,7 +65,6 @@ export type GameSetupDraftInput = {
   allowancePct: number;
   matchLength?: MatchLength;
   teamScoreMode: "best_ball" | "aggregate";
-  trifectaScoring: "per_hole" | "match";
   strokeBasis: "gross" | "net";
   fmtFamily: "stroke" | "match";
   matchKind: "ind" | "team";
@@ -101,7 +99,6 @@ export function buildGameSetupDraft(i: GameSetupDraftInput): GameSetupDraft {
       matchLength: i.matchLength,
       allowancePct: i.allowancePct,
       teamScoreMode: i.teamScoreMode,
-      trifectaScoring: i.trifectaScoring,
       strokeBasis: i.strokeBasis,
       fmtFamily: i.fmtFamily,
       matchKind: i.matchKind,
@@ -131,7 +128,6 @@ export function toLegacySetupData(d: GameSetupDraft): LegacySetupData {
     matchLength: d.format.matchLength ?? "18",
     allowancePct: d.format.allowancePct,
     teamScoreMode: d.format.teamScoreMode,
-    trifectaScoring: d.format.trifectaScoring,
     strokeBasis: d.format.strokeBasis,
     fmtFamily: d.format.fmtFamily,
     matchKind: d.format.matchKind,
@@ -163,7 +159,6 @@ export function fromLegacySetupDraft(d: SetupDraft): GameSetupDraft {
     gameType: d.gameType as GameTypeOpt,
     allowancePct: d.allowancePct,
     teamScoreMode: d.teamScoreMode as "best_ball" | "aggregate",
-    trifectaScoring: d.trifectaScoring as "per_hole" | "match",
     strokeBasis: d.strokeBasis as "gross" | "net",
     fmtFamily: d.fmtFamily as "stroke" | "match",
     matchKind: d.matchKind as "ind" | "team",

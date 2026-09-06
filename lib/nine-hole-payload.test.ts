@@ -7,7 +7,7 @@ const base = {
   code: "ABC", activeGroupId: "g", name: "", courseName: "C", coursePar: 72,
   matchDate: "2026-08-26", allowancePct: 100, gameType: "match" as const,
   teamMode: false, team1: "", team2: "", skinsTeamStyle: "head_to_head" as const,
-  teamScoreMode: "best_ball" as const, trifectaScoring: "per_hole" as const,
+  teamScoreMode: "best_ball" as const,
   strokeBasis: "net" as const, skinsMode: "carryover" as const,
   flightsSupported: false, flightMode: "off" as const,
 };

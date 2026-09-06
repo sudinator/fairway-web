@@ -31,7 +31,6 @@ export type GamePayloadOpts = {
   team2: string;
   skinsTeamStyle: string;            // "head_to_head" | "best_ball"
   teamScoreMode: string;
-  trifectaScoring: string;
   strokeBasis: string;
   skinsMode: string;
   flightsSupported: boolean;
@@ -79,7 +78,7 @@ export function buildGamePayload(o: GamePayloadOpts) {
         : null,
     foursomes: o.gameType === "fourball" || o.gameType === "trifecta" || o.gameType === "alt_shot" || (o.gameType === "skins" && o.teamMode && o.skinsTeamStyle === "best_ball") ? [] : null,
     team_score_mode: o.gameType === "trifecta" || o.gameType === "fourball" || (o.gameType === "skins" && o.teamMode && o.skinsTeamStyle === "best_ball") ? o.teamScoreMode : "best_ball",
-    trifecta_scoring: o.gameType === "trifecta" ? o.trifectaScoring : null,
+    trifecta_scoring: o.gameType === "trifecta" ? "match" : null, // one Trifecta rule (183.0)
     stroke_basis: o.gameType === "stroke" ? o.strokeBasis : null,
     skins_mode: o.gameType === "skins" ? o.skinsMode : null,
     leg_config: o.gameType === "alt_shot" || o.sideContestsEnabled === false ? { scheme: "none", metric: "net", points: {} } : undefined,

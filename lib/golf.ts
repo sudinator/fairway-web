@@ -772,7 +772,6 @@ export function fourballStatus(
 // BOTH partners' nets. Points: win = 1, halve = ½.
 
 export type TrifectaMode = "best_ball" | "aggregate";
-export type TrifectaScoring = "per_hole" | "match"; // per-hole points vs Ryder-Cup 1pt-per-match
 
 // Per-hole detail for a contest, so the UI can show "how we got there".
 // aNet/bNet are the contest-relevant nets (single: the two players; team
@@ -788,8 +787,8 @@ export type TrifectaContest = {
   aPts: number;
   bPts: number;
   thru: number;
-  settled: boolean; // match scoring: contest decided/finished; per-hole: all holes played
-  result: string; // match scoring: mathematical close-out label; otherwise empty
+  settled: boolean; // contest decided (mathematical close-out) or finished
+  result: string; // close-out label ("4 & 2", "1 UP", "Halved"); empty until settled
   perHole: ContestHole[];
 };
 export type TrifectaResult = {
@@ -821,24 +820,17 @@ export function computeTrifecta(
   allowancePct: number = 100,
   mode: TrifectaMode = "best_ball",
   swap = false,
-  scoring: TrifectaScoring = "per_hole",
 ): TrifectaResult {
+  // ONE Trifecta rule (confirmed with the organizer, Sep 2026): two genuine 1-v-1 singles plus a
+  // four-ball. Each contest is worth one point, decided as a match. There is no per-hole variant;
+  // the former "per_hole" scoring (one net per player off the foursome low, three points a hole)
+  // was never played in production and was removed in 183.0.
+  //
+  // Team-leg nets: every player relative to the foursome's low (the four-ball rule).
   const nets = fourballNets(holes, members, allowancePct);
   const singles = trifectaSingles(aIds, bIds, swap);
   // A short-handed side forces best-ball on the team leg.
   const teamMode: TrifectaMode = aIds.length === 1 || bIds.length === 1 ? "best_ball" : mode;
-
-  const tally = (perHole: (number | null)[]): { aPts: number; bPts: number; thru: number; lead: number } => {
-    let aPts = 0, bPts = 0, thru = 0, lead = 0;
-    for (const r of perHole) {
-      if (r == null) continue;
-      thru++;
-      if (r > 0) { aPts += 1; lead++; }
-      else if (r < 0) { bPts += 1; lead--; }
-      else { aPts += 0.5; bPts += 0.5; }
-    }
-    return { aPts, bPts, thru, lead };
-  };
 
   const contests: TrifectaContest[] = [];
 
@@ -854,34 +846,25 @@ export function computeTrifecta(
       }
       return { hole: h.n, aNet, bNet, r, aRun, bRun };
     });
-    const results = perHole.map((d) => d.r);
-    if (scoring === "match") {
-      // Ryder-Cup: the contest is worth ONE point, decided by the match over 18
-      // (½ each if halved). No points until the match is settled.
-      let runningLead = 0;
-      const progress = results.map((r) => {
-        if (r == null) return null;
-        if (r > 0) runningLead++;
-        else if (r < 0) runningLead--;
-        return runningLead;
-      });
-      const closeout = matchCloseoutStatus(progress, holes.length);
-      const { lead, thru, decided: settled, result } = closeout;
-      let aPts = 0, bPts = 0;
-      if (settled) { if (lead > 0) aPts = 1; else if (lead < 0) bPts = 1; else { aPts = 0.5; bPts = 0.5; } }
-      return { kind, aIds: aIdsC, bIds: bIdsC, aPts, bPts, thru, lead, settled, result, perHole };
-    }
-    const t = tally(results);
-    return { kind, aIds: aIdsC, bIds: bIdsC, ...t, settled: t.thru === holes.length, result: "", perHole };
+    // The contest is worth ONE point, decided by the match over the round (½ each if halved).
+    // No points until the match is settled; the margin freezes at the mathematical close-out.
+    let runningLead = 0;
+    const progress = perHole.map((d) => {
+      if (d.r == null) return null;
+      if (d.r > 0) runningLead++;
+      else if (d.r < 0) runningLead--;
+      return runningLead;
+    });
+    const { lead, thru, decided: settled, result } = matchCloseoutStatus(progress, holes.length);
+    let aPts = 0, bPts = 0;
+    if (settled) { if (lead > 0) aPts = 1; else if (lead < 0) bPts = 1; else { aPts = 0.5; bPts = 0.5; } }
+    return { kind, aIds: aIdsC, bIds: bIdsC, aPts, bPts, thru, lead, settled, result, perHole };
   };
 
   for (const [aId, bId] of singles) {
-    // A Ryder-Cup Trifecta single is a genuine 1-v-1 match: strokes are
-    // allocated relative to the lower handicap in that pair. The legacy
-    // per-hole Trifecta game keeps its established four-player allocation.
-    const singlesNets = scoring === "match"
-      ? fourballNets(holes, members.filter((m) => m.id === aId || m.id === bId), allowancePct)
-      : nets;
+    // A Trifecta single is a genuine 1-v-1 match: strokes are the difference between THESE TWO
+    // players, allocated on the hardest holes — not the foursome basis the team leg uses.
+    const singlesNets = fourballNets(holes, members.filter((m) => m.id === aId || m.id === bId), allowancePct);
     const pairs = holes.map((_, i) => ({ aNet: singlesNets[aId]?.[i] ?? null, bNet: singlesNets[bId]?.[i] ?? null }));
     contests.push(buildContest("single", [aId], [bId], pairs));
   }

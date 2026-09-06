@@ -6,7 +6,6 @@ export type CreateFormatState = {
   teamMode: boolean;
   skinsTeamStyle: "head_to_head" | "best_ball";
   teamScoreMode: "best_ball" | "aggregate";
-  trifectaScoring: "per_hole" | "match";
   strokeBasis: "net" | "gross";
   skinsMode: "carryover" | "split";
   /**
@@ -91,7 +90,7 @@ export function formatReviewLabel(state: CreateFormatState): string {
     case "stroke": return `Stroke Play · ${state.strokeBasis === "gross" ? "Gross" : "Net"}`;
     case "match": return `Match Play · ${state.teamMode ? "Team" : "Individual"}`;
     case "fourball": return `Four-ball · Team vs Team · ${state.teamScoreMode === "aggregate" ? "Shootout" : "Best ball"}`;
-    case "trifecta": return `Trifecta · ${state.teamScoreMode === "aggregate" ? "Shootout" : "Best ball"} · ${state.trifectaScoring === "match" ? "Ryder Cup" : "Per hole"}`;
+    case "trifecta": return `Trifecta · ${state.teamScoreMode === "aggregate" ? "Shootout" : "Best ball"} · 2 singles + team, 1 pt each`;
     case "alt_shot":
       // One ball per side, so there is no best-ball/aggregate choice to state — that is the whole
       // difference from four-ball. The match length is worth showing because a nine is a genuinely
@@ -109,7 +108,7 @@ export function formatReviewLabel(state: CreateFormatState): string {
 export function reachableFormatKeys(): string[] {
   const out = ["stableford", "stroke:net", "stroke:gross", "match:individual", "match:team"];
   for (const score of ["best_ball", "aggregate"] as const) out.push(`fourball:team:${score}`);
-  for (const score of ["best_ball", "aggregate"] as const) for (const scoring of ["per_hole", "match"] as const) out.push(`trifecta:${score}:${scoring}`);
+  for (const score of ["best_ball", "aggregate"] as const) out.push(`trifecta:${score}`);
   for (const ties of ["carryover", "split"] as const) {
     out.push(`skins:individual:${ties}`);
     out.push(`skins:team_11:${ties}`);

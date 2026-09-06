@@ -8,7 +8,7 @@ const base: GamePayloadOpts = {
   code: "123456", activeGroupId: "grp", name: "", courseName: "Pine Valley", courseHoles: holes,
   teeYardages: Array(18).fill(400), coursePar: 72, matchDate: "2026-08-07", allowancePct: 100,
   gameType: "stableford", teamMode: false, team1: "", team2: "", skinsTeamStyle: "head_to_head",
-  teamScoreMode: "best_ball", trifectaScoring: "per_hole", strokeBasis: "net", skinsMode: "carryover",
+  teamScoreMode: "best_ball", strokeBasis: "net", skinsMode: "carryover",
   flightsSupported: true, flightMode: "off", flightBands: null,
 };
 

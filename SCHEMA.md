@@ -1,3 +1,6 @@
+## 183.0.260906 — Trifecta single rule (migration 0150)
+`games.trifecta_scoring`: default 'match' (was 'per_hole'); CHECK `games_trifecta_scoring_single_rule` (null or 'match'). No other change.
+
 ## 182.0.260903 — Editable unscored match length (migration 0149)
 
 `change_game_match_length_before_scoring(uuid,jsonb)` lets the game organizer atomically change an active, unscored game's hole snapshot among a validated 9- or 18-hole selection. It locks the game and player rows, rejects individual or canonical Alternate Shot scoring, replaces `games.holes_meta`, and resizes positional player scoring/stat arrays. Player identities, tee/rating/slope/handicap snapshots, teams, groups, foursomes, pairings and contests are preserved. Execute is restricted to authenticated callers and authorization is rechecked inside the SECURITY DEFINER function.

@@ -30,7 +30,7 @@ function oldFormatPatch(game: Game, next: Game["game_type"]): Record<string, unk
   const suggested = next === "fourball" || next === "trifecta" ? 85 : 100;
   const patch: Record<string, unknown> = { game_type: next, allowance_pct: suggested };
   if (next === "trifecta" && !game.team_score_mode) patch.team_score_mode = "best_ball";
-  if (next === "trifecta" && !game.trifecta_scoring) patch.trifecta_scoring = "per_hole";
+  if (next === "trifecta" && game.trifecta_scoring !== "match") patch.trifecta_scoring = "match"; // 183.0: one rule; baseline mirrors it
   if (next === "stroke" && !game.stroke_basis) patch.stroke_basis = "net";
   return patch;
 }
@@ -77,7 +77,7 @@ function oldGroups(fs:F[]){const out:Record<string,number>={};fs.forEach((f,i)=>
 const formats: Game["game_type"][] = ["stableford","stroke","match","skins","trifecta"];
 for (const next of formats) {
   for (const teamMode of [null, "best_ball"] as const) {
-    for (const tri of [null, "per_hole"] as const) {
+    for (const tri of [null, "match"] as const) {
       for (const stroke of [null, "gross"] as const) {
         const g=baseGame({team_score_mode:teamMode,trifecta_scoring:tri,stroke_basis:stroke});
         same(buildFormatPatch(g,next),oldFormatPatch(g,next),`format ${next}`);

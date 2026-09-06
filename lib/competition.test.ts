@@ -162,7 +162,7 @@ ok("Ryder Cup Trifecta Singles allocate strokes within each head-to-head pair", 
     { id: "a1", ch: 10, gross: Array(18).fill(4) }, { id: "a2", ch: 0, gross: Array(18).fill(4) },
     { id: "b1", ch: 12, gross: Array(18).fill(4) }, { id: "b2", ch: 0, gross: Array(18).fill(4) },
   ];
-  const tri = computeTrifecta(eighteen, members, ["a1", "a2"], ["b1", "b2"], 100, "best_ball", false, "match");
+  const tri = computeTrifecta(eighteen, members, ["a1", "a2"], ["b1", "b2"], 100, "best_ball", false);
   assert.equal(tri.contests[0].perHole[0].r, -1);
   assert.equal(tri.contests[0].perHole[10].r, 0);
 });
@@ -208,7 +208,7 @@ ok("game 645502 freezes all nine Trifecta contests at mathematical close-out", (
       ["5 & 4", 5, "A"], ["4 & 3", 6, "A"], ["5 & 4", 5, "A"],
     ],
   );
-  const tri = computeTrifecta(h, ps.slice(0, 4).map((p) => ({ id: p.user_id!, ch: (p.handicap_index! * 137 / 113 + 3.5) / 2, gross: p.scores })), ["a1", "a2"], ["b1", "b2"], 100, "best_ball", true, "match");
+  const tri = computeTrifecta(h, ps.slice(0, 4).map((p) => ({ id: p.user_id!, ch: (p.handicap_index! * 137 / 113 + 3.5) / 2, gross: p.scores })), ["a1", "a2"], ["b1", "b2"], 100, "best_ball", true);
   assert.deepEqual(tri.contests.map((c) => [c.result, c.thru]), [["3 & 2", 7], ["5 & 3", 6], ["4 & 3", 6]]);
   assert.equal(tri.contests[1].perHole.length, 9, "all gross-score hole detail remains stored in the model");
 });
