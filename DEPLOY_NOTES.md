@@ -1,3 +1,14 @@
+## 182.2.260906 — Trifecta player card scores Ryder Cup singles on the pair basis
+
+- Fixes the player's own scorecard running strip for Ryder Cup ("match") Trifecta games. The card called the shared Trifecta engine without the scoring argument, so it defaulted to per-hole and scored the two singles on the Four-Ball basis (strokes off the foursome's low). Under Ryder Cup scoring a single is a 1-v-1 and strokes are the difference between those two players — which is what the Results page and the Cup tally already used.
+- Found on real data: The Architects Golf Club, Jul 5 2026, Foursome 1, Sachin v BK. The card showed 4 UP at the finish; Results showed 5 UP (4 & 2). The two diverged from the 14th (SI 4), where BK received a stroke under the foursome basis and none off Sachin. Karan v Ashutosh in the same group agreed under both bases because Karan was the low either way.
+- Adds `lib/trifecta-card-scoring.test.ts`: the exact game rows as a permanent fixture pinning both the wrong card answer and the correct result.
+- Adds `ci/check_trifecta_scoring_argument.py`: every production `computeTrifecta` call must pass the scoring argument explicitly. Verified to fail on the 182.0 source at the exact line.
+- Adds `lib/trifecta-card-render.test.tsx`: mounts the real Tournaments → GameRoom → ScoreEntryCard chain (offline snapshot boot) with the Jul 5 rows and reads the running strip off the DOM. Verified to FAIL on the 182.0 card (1UP thru 14, 4UP) and pass on this one (2UP, 5UP; strip equals the Results single hole for hole).
+- Engine unchanged. Rules confirmed with the organizer: singles off the lower of the two with allowance applied first; team leg off the lowest of the four.
+- Supersedes 182.1, which was packaged but never deployed (it lacked the rendered check).
+- No migration. Migration 0149 remains current.
+
 ## 182.0.260903 — Manage Game hole-count correction
 
 - Adds the existing 18 holes / Front nine / Back nine picker to Manage Game → Format for games on an 18-hole course.
