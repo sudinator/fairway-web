@@ -1,3 +1,11 @@
+## 185.1.260907 — Share-page scorecard: alignment, nine-hole layout, and the stroke bases
+
+- **The score row was not aligned with its own hole numbers.** The Hole, Par and Points cells used the shared centred cell style; the Score cell was written inline with its own padding and NO text-align, so it fell back to left. Scores and their stroke dots sat left of the hole numbers above them. All four rows now use the same cell style.
+- **A nine-hole game renders as one table.** It was split with `Math.ceil(9/2)`, producing a 5/4 break labelled OUT and IN — wrong on both counts for a back nine (holes 10–18). Only an eighteen splits now; a nine shows nine columns and a TOT total.
+- **The share page's per-player scorecard now draws the same stroke bases as the app.** It drew one hardcoded orange row off the full course handicap: the right colour by luck under the 185.0 scheme, but it never showed the basis the match was actually scored on — a four-ball card said "team 3 up" in the header and showed none of the team-leg strokes behind it. It now renders from `lib/live-scoring.liveStrokeSets`, an adapter over the app's own `strokeSets`, with the same colours and the same written labels.
+- This surface was missed by the 185.0 audit, which recorded the share page as drawing no stroke dots at all. It draws them in the expandable per-player card.
+- No migration. 0150 remains current.
+
 ## 185.0.260907 — One colour per stroke basis, and Trifecta finally shows its singles strokes
 
 - **A stroke dot now has one basis, one colour and a written label, on every card.** Before this, orange meant "whatever this format scores off": your full course handicap in Stableford, the match basis in a four-ball. Same dot, different meaning by game.

@@ -1,3 +1,6 @@
+## 185.1.260907 — no migration
+Share-page scorecard layout and stroke bases. 0150 remains current.
+
 ## 185.0.260907 — no migration
 Stroke-dot basis scheme and Trifecta singles strokes. Display + lib only. 0150 remains current.
 

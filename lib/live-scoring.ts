@@ -11,6 +11,7 @@
  * disagrees with the app. Those disagreements are findings for the parity test to report, not
  * things to quietly fix during an extraction.
  */
+import { strokeSets } from "./game-shape";
 import {
   matchProgress,
   fourballProgress,
@@ -125,4 +126,42 @@ export function liveLegs(
   }
 
   return [];
+}
+
+/**
+ * The stroke sets the share page should draw for one player, from the SAME source the app uses
+ * (lib/game-shape.strokeSets). The share page's own per-player scorecard drew a single hardcoded
+ * orange dot row off the full course handicap: right colour by luck under the 185.0 scheme, but it
+ * never showed the basis the match is actually scored on — a four-ball card showed "team 3 up" in
+ * the header and none of the team-leg strokes that produced it.
+ *
+ * `ch` from get_live_scorecard is the exact EIGHTEEN-hole figure, so it is passed as
+ * course_handicap and chBasis halves it for a nine, matching liveCh.
+ */
+export function liveStrokeSets(
+  game: LiveScoringGame & { course_par: number | null },
+  byId: Record<string, LiveScoringPlayer & { display_name?: string | null }>,
+  pairings: { a: string | null; b: string | null }[],
+  foursomes: { id: string; name: string; swap: boolean; a: (string | null)[]; b: (string | null)[] }[],
+  meta: LiveScoringMeta[],
+  playerId: string,
+  si: number | null,
+) {
+  const shapeGame = {
+    game_type: game.game_type,
+    course_par: game.course_par,
+    allowance_pct: game.allowance_pct,
+    team_score_mode: game.team_score_mode,
+    holes_meta: meta,
+    pairings: pairings.map((p) => ({ a: p.a, b: p.b })),
+    foursomes: foursomes.map((f) => ({ id: f.id, name: f.name, swap: f.swap, a: f.a.filter(Boolean), b: f.b.filter(Boolean) })),
+    teams: [{ key: "A" }, { key: "B" }],
+  } as unknown as Parameters<typeof strokeSets>[0];
+  const asShape = (p: LiveScoringPlayer & { display_name?: string | null }) => ({
+    id: p.id, user_id: p.id, display_name: p.display_name ?? null,
+    course_handicap: p.ch, team: p.team, no_show: p.no_show,
+  }) as unknown as Parameters<typeof strokeSets>[1];
+  const me = byId[playerId];
+  if (!me) return [];
+  return strokeSets(shapeGame, asShape(me), si, Object.values(byId).map(asShape));
 }

@@ -1,3 +1,12 @@
+## v185.1 staging checks — share page scorecard
+
+- [ ] Open a share link, expand a player: Score row and its dots line up under the hole numbers.
+- [ ] A NINE-hole game shows ONE table of nine holes with a TOT total — not a 5/4 OUT/IN split.
+- [ ] An 18-hole game still splits OUT / IN.
+- [ ] Four-ball share card: purple (team, off the low) AND orange (course hcp) dots, both named in the legend under the card.
+- [ ] Trifecta share card: teal / purple / orange as applicable.
+- [ ] Stableford share card: orange only, "course hcp".
+
 ## v185.0 staging checks — stroke dots
 
 - [ ] Trifecta (641032 or 557495), player card: THREE dot colours where applicable — teal "v <opponent>", purple "off <low>", orange "course hcp" — and the legend names all three.

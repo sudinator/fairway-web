@@ -11,7 +11,7 @@ import {
   type FourballMember, type SkinPlayer,
   trifectaRowState,
 } from "@/lib/golf";
-import { liveLegs, type LiveLeg } from "@/lib/live-scoring";
+import { liveLegs, liveStrokeSets, type LiveLeg } from "@/lib/live-scoring";
 import type { TrifectaRowSide } from "@/lib/golf";
 
 export const dynamic = "force-dynamic";
@@ -356,7 +356,7 @@ function Scorecard({ data }: { data: LiveData }) {
             </div>
           )}
           {g.players.map((p, idx) => (
-            <PlayerRow key={p.id} p={p} pos={idx + 1} stat={stats[p.id]} meta={meta} right={rightOf(p)} status={statusFor(p, game, pairings, foursomes, byId, meta, allowance)} gameType={game.game_type} strokeNet={strokeNet} />
+            <PlayerRow key={p.id} p={p} pos={idx + 1} stat={stats[p.id]} meta={meta} right={rightOf(p)} status={statusFor(p, game, pairings, foursomes, byId, meta, allowance)} gameType={game.game_type} strokeNet={strokeNet} setsFor={(si) => liveStrokeSets({ game_type: game.game_type, allowance_pct: game.allowance_pct, team_score_mode: game.team_score_mode, course_par: game.course_par }, Object.fromEntries(Object.entries(byId).map(([k2, v]) => [k2, { id: v.id, ch: v.ch, team: v.team, no_show: v.no_show, scores: v.scores || [], display_name: v.display_name }])), pairings, foursomes, meta, p.id, si)} />
           ))}
         </div>
       ))}
@@ -364,7 +364,7 @@ function Scorecard({ data }: { data: LiveData }) {
   );
 }
 
-function PlayerRow({ p, pos, stat, meta, right, status, gameType, strokeNet }: { p: LivePlayer; pos: number; stat: PStat; meta: LiveMeta[]; right: string; status: string; gameType: string; strokeNet: boolean }) {
+function PlayerRow({ p, pos, stat, meta, right, status, gameType, strokeNet, setsFor }: { p: LivePlayer; pos: number; stat: PStat; meta: LiveMeta[]; right: string; status: string; gameType: string; strokeNet: boolean; setsFor?: (si: number | null) => { key: string; strokes: number; gives: number; label: string }[] }) {
   const [open, setOpen] = useState(false);
   return (
     <div onClick={() => setOpen((o) => !o)} style={{ background: C.card, borderRadius: 14, color: C.ink, padding: "12px 14px", marginTop: 8, cursor: "pointer" }}>
@@ -378,16 +378,27 @@ function PlayerRow({ p, pos, stat, meta, right, status, gameType, strokeNet }: {
       <div style={{ color: C.faint, fontSize: 11, marginTop: 4, marginLeft: 26 }}>
         {stat.thru ? `thru ${stat.thru} · gross ${stat.gross}` : "not started"}{status ? ` · ${status}` : ""}
       </div>
-      {open && <PlayerDetail stat={stat} meta={meta} gameType={gameType} strokeNet={strokeNet} />}
+      {open && <PlayerDetail stat={stat} meta={meta} gameType={gameType} strokeNet={strokeNet} setsFor={setsFor} />}
     </div>
   );
 }
 
-function PlayerDetail({ stat, meta, gameType, strokeNet }: { stat: PStat; meta: LiveMeta[]; gameType: string; strokeNet: boolean }) {
+function PlayerDetail({ stat, meta, gameType, strokeNet, setsFor }: { stat: PStat; meta: LiveMeta[]; gameType: string; strokeNet: boolean; setsFor?: (si: number | null) => { key: string; strokes: number; gives: number; label: string }[] }) {
+  // Same three bases, same colours and the same labels as the app's cards (185.0). This card sits on
+  // a cream panel, so the light-ground variants. Before this it drew ONE hardcoded orange row off the
+  // full course handicap and never showed the basis the match was scored on.
+  const BASIS_COLOR: Record<string, string> = {
+    course: C.basisCourse, opponent: C.basisOpponent, group_low: C.basisGroupLow, alt_side: C.basisOpponent,
+  };
   const lblCell: React.CSSProperties = { textAlign: "left", padding: "3px 6px", fontWeight: 700 };
   const cCell: React.CSSProperties = { textAlign: "center", padding: "3px 4px" };
   const totCell: React.CSSProperties = { textAlign: "center", padding: "3px 6px", fontWeight: 800, color: C.green };
-  const half = Math.ceil(meta.length / 2);
+  // Only an eighteen-hole card splits. A nine renders as a single row of nine: the old
+  // Math.ceil(9/2) gave a 5/4 break labelled OUT and IN, which is wrong on both counts for a
+  // back nine (holes 10-18). "TOT" is the honest label for a single-table card.
+  const splits: [number, number, string][] = meta.length > 9
+    ? [[0, Math.ceil(meta.length / 2), "OUT"], [Math.ceil(meta.length / 2), meta.length, "IN"]]
+    : [[0, meta.length, "TOT"]];
 
   const grid = (from: number, to: number, label: string) => {
     const hs = stat.perHole.slice(from, to);
@@ -403,8 +414,10 @@ function PlayerDetail({ stat, meta, gameType, strokeNet }: { stat: PStat; meta: 
             <tr><td style={lblCell}>Score</td>{hs.map((h) => {
               const c = h.gross == null ? C.faint : h.gross < h.par ? "#1B7A4B" : h.gross === h.par ? "#1E5B8A" : "#C0392B";
               return (
-                <td key={h.n} style={{ padding: "2px 3px" }}>
-                  <div style={{ height: 8, lineHeight: 0 }}>{h.recv > 0 && Array.from({ length: Math.min(h.recv, 2) }).map((_, d) => <span key={d} style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#E8730C", margin: "0 1px" }} />)}</div>
+                <td key={h.n} style={cCell}>
+                  <div style={{ lineHeight: 0, textAlign: "center" }}>{(setsFor ? setsFor(meta[stat.perHole.indexOf(h)]?.si ?? null).filter((r) => r.strokes > 0) : (h.recv > 0 ? [{ key: "course", strokes: h.recv, gives: 0, label: "course hcp" }] : [])).map((r) => (
+                    <div key={r.key} style={{ height: 8, lineHeight: 0 }}>{Array.from({ length: Math.min(r.strokes, 2) }).map((_, d) => <span key={d} style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: BASIS_COLOR[r.key], margin: "0 1px" }} />)}</div>
+                  ))}</div>
                   <div style={{ fontWeight: 800, fontSize: 14, color: c }}>{h.gross && h.gross > 0 ? h.gross : "\u00b7"}</div>
                 </td>
               );
@@ -426,8 +439,7 @@ function PlayerDetail({ stat, meta, gameType, strokeNet }: { stat: PStat; meta: 
 
   return (
     <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 10, borderTop: `1px solid ${C.borderCard}`, paddingTop: 6 }}>
-      {grid(0, half, "OUT")}
-      {meta.length > half && grid(half, meta.length, "IN")}
+      {splits.map(([from, to, label]) => <React.Fragment key={label}>{grid(from, to, label)}</React.Fragment>)}
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 13 }}>
         <span style={{ color: C.faint }}>Gross <b style={{ color: C.ink }}>{stat.gross || "\u00b7"}</b>{stat.thru ? <> · Net <b style={{ color: C.ink }}>{Math.round(stat.net)}</b></> : null}</span>
         {gameType === "stroke"
@@ -435,7 +447,14 @@ function PlayerDetail({ stat, meta, gameType, strokeNet }: { stat: PStat; meta: 
           : <span style={{ color: C.faint }}>Stableford <b style={{ color: C.green }}>{stat.points} pts</b></span>}
       </div>
       {chips.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>{chips.map(([k, v]) => <div key={k} style={{ background: "#F2EEDF", borderRadius: 8, padding: "7px 11px", fontSize: 12 }}>{k} <b style={{ color: C.green }}>{v}</b></div>)}</div>}
-      <div style={{ color: C.faint, fontSize: 11, marginTop: 10, lineHeight: 1.5 }}><span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#E8730C", verticalAlign: "middle" }} /> gets a stroke (two = two strokes). Score color: under / par / over. Stats shown only if the player tracked them.</div>
+      <div style={{ color: C.faint, fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>{(() => {
+        const seen = new Map<string, string>();
+        for (const m of meta) for (const r of (setsFor ? setsFor(m.si) : [])) if (!seen.has(r.key)) seen.set(r.key, r.label);
+        if (!seen.size) seen.set("course", "course hcp");
+        return <>{Array.from(seen.entries()).map(([key, label]) => (
+          <span key={key} style={{ marginRight: 10 }}><span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: BASIS_COLOR[key], verticalAlign: "middle" }} /> {label}</span>
+        ))}<span>(two dots = two strokes). Score colour: under / par / over.</span></>;
+      })()}</div>
     </div>
   );
 }
