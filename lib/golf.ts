@@ -440,29 +440,25 @@ export function matchStatus(
   allowancePct: number = 100
 ): { thru: number; lead: number; aWins: number; bWins: number; halves: number; result: string } {
   const allow = matchAllowance(chA, chB, allowancePct);
-  let lead = 0, thru = 0, aWins = 0, bWins = 0, halves = 0;
+  let aWins = 0, bWins = 0, halves = 0;
   holes.forEach((h, i) => {
     const ga = grossA[i], gb = grossB[i];
     if (ga == null || gb == null || ga <= 0 || gb <= 0) return;
-    thru++;
     const ah = asAllocHoles(holes);
     const netA = ga - matchStrokesFor(allow.a, h.si, ah);
     const netB = gb - matchStrokesFor(allow.b, h.si, ah);
-    if (netA < netB) { lead++; aWins++; }
-    else if (netB < netA) { lead--; bWins++; }
+    if (netA < netB) aWins++;
+    else if (netB < netA) bWins++;
     else halves++;
   });
-  const remaining = holes.length - thru;
-  let result = "";
-  if (Math.abs(lead) > remaining && thru > 0) {
-    // Match decided: "X & Y" (up by X with Y to play, before the last counted hole)
-    const upBy = Math.abs(lead);
-    result = remaining === 0 ? `${upBy} UP` : `${upBy} & ${remaining}`;
-  } else if (remaining === 0 && thru > 0) {
-    // Went the full distance without an early close-out: a level finish is a
-    // halve ("AS"), otherwise the final margin. (Mirrors fourballStatus.)
-    result = lead === 0 ? "AS" : `${Math.abs(lead)} UP`;
-  }
+  // thru/lead/result come from the ONE close-out rule, so a decided match freezes at its margin:
+  // 5 & 3 stays 5 & 3 even if the remaining holes are scored. Before 184.1 this counted every played
+  // hole, so the in-game card showed "8 UP" on a match won 5 & 3 at the 6th (staging 571157).
+  // aWins/bWins/halves stay full-round counts — they are hole statistics, not match state.
+  const { thru, lead, result } = matchCloseoutStatus(
+    matchProgress(holes, grossA, grossB, chA, chB, allowancePct),
+    holes.length,
+  );
   return { thru, lead, aWins, bWins, halves, result };
 }
 
@@ -743,21 +739,12 @@ export function fourballStatus(
   mode: "best_ball" | "aggregate" = "best_ball",
 ): { thru: number; lead: number; result: string } {
   const prog = fourballProgress(holes, members, aIds, bIds, allowancePct, mode);
-  const played = prog.filter((p) => p != null) as number[];
-  const thru = played.length;
-  const lead = played.length ? played[played.length - 1] : 0;
-  const remaining = holes.length - thru;
-  let result = "";
+  // One close-out rule, shared with singles, Trifecta, the Cup tally and the public share page.
+  const c = matchCloseoutStatus(prog, holes.length);
+  const { thru, lead } = c;
+  let result = c.result;
   if (thru === 0) result = "Not started";
-  else if (Math.abs(lead) > remaining) {
-    // Match decided early: "X & Y".
-    const up = Math.abs(lead);
-    result = remaining === 0 ? (lead === 0 ? "Halved" : `${up} UP`) : `${up} & ${remaining}`;
-  } else if (thru === holes.length) {
-    result = lead === 0 ? "Halved" : `${Math.abs(lead)} UP`;
-  } else {
-    result = lead === 0 ? "All square" : `${Math.abs(lead)} UP`;
-  }
+  else if (!result) result = lead === 0 ? "All square" : `${Math.abs(lead)} UP`; // still in progress
   return { thru, lead, result };
 }
 

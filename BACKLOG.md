@@ -1,3 +1,48 @@
+## v184.1 staging checks
+
+- [ ] 571157 in the APP: Group 1 reads 5 & 3 (was 8 UP); Group 2 halved. Share link unchanged.
+- [ ] 268834 in the APP: all four singles read the frozen margins (3 & 2, 5 & 4, 2 & 1, 3 & 1).
+- [ ] Any share link on a PHONE: scrolls to the bottom, and does not rubber-band past the ends.
+- [ ] The installed app still does not rubber-band (the global lock was deliberately left alone).
+- [ ] 641032 share link: rows read "won 4 & 2" / "won 4 & 3" next to the highlighted winner — no "lost".
+- [ ] An 18-hole match decided early: app and share link both hold the margin after later holes are scored.
+
+## Banked from 184.0 staging testing — ALL THREE FIXED IN 184.1
+
+- [x] **In-game match and four-ball cards ignore the close-out freeze.** FIXED 184.1. CONFIRMED on staging 571157
+      (nine-hole four-ball, Group 1 DeShawn+Amit v Christopher+Michael): the app shows **8 UP** at the
+      9th where the match was decided **5 & 3 at the 6th**. Handicaps are correct — 8 is the running
+      count, not a stroke error. `components/game/scoring-views.tsx` uses count-based `matchStatus`
+      (singles and team match cards) and `fourballStatus` (four-ball card); `competition.ts`,
+      `computeTrifecta` and now `lib/live-scoring.ts` all use `matchCloseoutStatus`, which freezes.
+      So after 184.0 the PUBLIC SHARE PAGE is more correct than the app for these formats — the share
+      link reads 5 & 3, the app reads 8 UP.
+      Fix: route the in-game cards through `matchCloseoutStatus` too (or have matchStatus/fourballStatus
+      delegate to it), so there is one close-out rule. Watch the "AS" vs "Halved" wording difference —
+      `competition.ts` currently string-patches around it; that patch should go away with the fix.
+      Real-data fixtures available: 571157 Group 1 (5 & 3 thru 6, app shows 8 UP) and Group 2 (halved
+      thru 9); 268834 all four singles pairings.
+      Extend the live/app parity harness to cover this once fixed — it did NOT catch this because the
+      harness compares the live path against the ENGINE contract, not against what scoring-views draws.
+
+
+- [x] **Live share page does not scroll.** FIXED 184.1. `app/globals.css` locks the document for iOS bounce
+      prevention (`html{overflow:hidden}`, `body{position:fixed;overflow:hidden}`); the only scroller
+      is the inner container inside home.tsx's `.app-shell`. The public route renders its own
+      `minHeight:100vh` div straight into that fixed body, so anything below the fold is unreachable.
+      Affects EVERY share link with more than a screenful, all formats — predates 183/184 work.
+      Fix: give the public route its own scroll container (`position:fixed; inset:0; overflow-y:auto;
+      -webkit-overflow-scrolling:touch; overscroll-behavior:contain`) and drop the `minHeight:100vh`.
+      Do NOT relax the global rules — that reintroduces bounce in the installed app.
+      Needs a check that the live route establishes its own scroll context.
+- [x] **Live row contradicts itself: highlighted winner labelled "lost".** FIXED 184.1. 184.0 added
+      winner-highlighting driven by who actually won, but kept the page's old wording, which reads
+      from the LEFT player's perspective. Amit (left) v Christopher (right): Christopher's name is
+      green and bold, and the margin next to it says "lost 4 & 3". Two opposite signals in one row.
+      Fix: phrase the margin from the WINNING/LEADING side always — "won 4 & 3", "3 up" — in green,
+      and let the highlight say who. Never "lost", never "dn". Matches the in-game row, which shows
+      the bare margin and lets the highlight carry the winner. Rendered test on the 641032 rows.
+
 ## v184.0 Live share page held to the app's answers
 
 - [x] Extract the live page's matchup scoring to lib/live-scoring.ts; page renders from it.

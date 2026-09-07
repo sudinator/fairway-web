@@ -1,3 +1,12 @@
+## 184.1.260906 — One close-out rule; the share page scrolls; the winner is labelled as the winner
+
+- **Close-out freeze in the in-game cards.** `matchStatus` and `fourballStatus` now take thru/lead/result from `matchCloseoutStatus`, the rule `competition.ts`, `computeTrifecta` and `lib/live-scoring.ts` already used. A decided match freezes at its margin instead of counting on. Confirmed on staging 571157: the four-ball card read **8 UP** at the 9th on a match won **5 & 3 at the 6th** — handicaps were right, the running count was being displayed. After 184.0 the public share page was more correct than the app for this; both agree now. Hole statistics (aWins/bWins/halves) stay full-round counts — they are stats, not match state.
+- **The public share page scrolls.** `globals.css` locks the document for iOS bounce prevention and the app's only scroller lives inside `.app-shell`; the public route renders outside it, so it had no scrolling element at all and anything below the fold was unreachable — on every share link, every format, since the bounce-prevention CSS landed. The route now owns its own scroll container (`.live-scroll`); the global lock is untouched, so the installed app still doesn't rubber-band.
+- **The highlighted winner is no longer labelled "lost".** 184.0 highlighted the winner's name but kept wording read from the LEFT player, so a row showed Christopher in bold green next to "lost 4 & 3". The margin now reads from the winning/leading side always — "won 4 & 3", "3 up" — and the highlight says who.
+- Guard `ci/check_live_route_contract.py`: the route must carry its own scroll container, `globals.css` must still lock the body, and the leg label may not phrase from the left player. All three negative-tested.
+- Fixture `lib/closeout-freeze.test.ts`: staging 571157 (both groups) and 268834 (singles), pinning the frozen margins with the old running counts as a fence.
+- No migration. 0150 remains current.
+
 ## 184.0.260906 — The public share page is held to the app's answers in CI
 
 - The live share page keeps its own DISPLAY (unauthenticated route, flattened RPC payload, its own palette) but no longer keeps its own arithmetic. Its matchup scoring moves to `lib/live-scoring.ts` (`liveLegs`), and every number the page renders comes from there.

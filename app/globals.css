@@ -123,3 +123,14 @@ html[data-kb="open"] [data-diag="nav"] { display: none; }
   outline-offset: 2px;
   box-shadow: 0 0 0 1px #0E241B;
 }
+
+/* Public live-share route (app/live/[token]) renders outside .app-shell, and the rules above lock
+   the document for iOS bounce prevention. That left the share page with no scrolling element, so
+   anything below the fold was unreachable (fixed 184.1). The page owns its own scroll context. */
+.live-scroll {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}

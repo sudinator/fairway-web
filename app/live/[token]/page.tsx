@@ -205,7 +205,12 @@ export default function LiveScorecardPage() {
   }, [load]);
 
   return (
-    <div style={{ minHeight: "100vh", background: C.green, color: C.cream, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif" }}>
+    // The public route renders OUTSIDE .app-shell, and globals.css locks the document for iOS bounce
+    // prevention (html{overflow:hidden}; body{position:fixed;overflow:hidden}) — so this page had no
+    // scrolling element at all and anything below the fold was unreachable on every share link.
+    // It establishes its own scroll container instead of relaxing the global rules, which would
+    // reintroduce rubber-banding in the installed app. overscroll-behavior stops it chaining to body.
+    <div className="live-scroll" style={{ position: "fixed", inset: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", background: C.green, color: C.cream, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif" }}>
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "20px 14px 60px" }}>
         <div style={{ textAlign: "center", paddingTop: 8 }}>
           <span style={{ fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, color: C.cream }}>Birdie</span>
@@ -452,17 +457,15 @@ function matchLabel(st: { thru: number; lead: number; result: string }): { text:
 // singles were recomputed here with matchStatus, which is count-based: a match won 4 & 2 on the
 // 16th kept counting and rendered "won 4 UP" at 18 while Results said "4 & 2".
 function contestLabel(c: { thru: number; lead: number; settled: boolean; result: string }): { text: string; color: string; aSide: TrifectaRowSide; bSide: TrifectaRowSide } {
-  const WIN = "#1B7A4B", LOSE = "#C0392B", TIE = "#1E5B8A", NEU = "#8B8775";
+  const WIN = "#1B7A4B", TIE = "#1E5B8A", NEU = "#8B8775";
   const st = trifectaRowState(c);
   if (!c.thru) return { text: "not started", color: NEU, aSide: st.aSide, bSide: st.bSide };
   if (st.aSide === "level") return { text: c.settled ? "halved" : "all square", color: TIE, aSide: st.aSide, bSide: st.bSide };
-  const aAhead = st.aSide === "won" || st.aSide === "leads";
-  // Keep this page's established wording (left player's perspective); only the MARGIN changes,
-  // from a running count to the engine's close-out label.
-  const text = c.settled
-    ? `${aAhead ? "won" : "lost"} ${st.label}`
-    : `${st.label.replace(" UP", "")} ${aAhead ? "up" : "dn"}`;
-  return { text, color: aAhead ? WIN : LOSE, aSide: st.aSide, bSide: st.bSide };
+  // Read from the WINNING/LEADING side, never the left player's. 184.0 highlighted the winner's name
+  // but kept the old left-player wording, so a row could show Christopher's name in bold green next
+  // to "lost 4 & 3" — two opposite signals. The highlight says WHO; this says what.
+  const text = c.settled ? `won ${st.label}` : `${st.label.replace(" UP", "")} up`;
+  return { text, color: WIN, aSide: st.aSide, bSide: st.bSide };
 }
 
 function teamLegLabel(lead: number, thru: number, _holes: number, result: string, teamA: string, teamB: string): { text: string; color: string } {

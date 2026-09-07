@@ -15,7 +15,7 @@
  * 183.1 labels every leg from the engine's own contest through the shared trifectaRowState.
  * Both numbers are pinned: the old ones as a regression fence, the correct ones as the contract.
  */
-import { computeTrifecta, matchStatus, trifectaRowState } from "./golf";
+import { computeTrifecta, matchProgress, trifectaRowState } from "./golf";
 import { chBasis } from "./game-shape";
 
 let pass = 0, fail = 0; const fails: string[] = [];
@@ -67,8 +67,15 @@ eq("team leg settled", team.settled, true);
 eq("team leg has a close-out result (was hardcoded \"\" before 183.1)", team.result !== "", true);
 
 // ── Regression fence: the 183.0 share page recomputed the singles with matchStatus ───────────────
-const oldChris = matchStatus(HOLES, gross(CHRIS.id), gross(MICHAEL.id), ch(CHRIS.id), ch(MICHAEL.id), 85);
-const oldAmit = matchStatus(HOLES, gross(AMIT.id), gross(CHRISTOPHER.id), ch(AMIT.id), ch(CHRISTOPHER.id), 85);
+// The old share page counted every played hole and never froze at the close-out. Reproduced here
+// explicitly: as of 184.1 matchStatus itself freezes, so calling it would no longer be a fence.
+const countBased = (a: string, b: string) => {
+  const prog = matchProgress(HOLES, gross(a), gross(b), ch(a), ch(b), 85).filter((x): x is number => x != null);
+  const lead = prog.length ? prog[prog.length - 1] : 0;
+  return { thru: prog.length, lead, result: lead === 0 ? "AS" : `${Math.abs(lead)} UP` };
+};
+const oldChris = countBased(CHRIS.id, MICHAEL.id);
+const oldAmit = countBased(AMIT.id, CHRISTOPHER.id);
 eq("FENCE old Chris label was the screenshot's 'won 4 UP'", `won ${oldChris.result}`, "won 4 UP");
 eq("FENCE old Amit label was the screenshot's 'lost 5 UP'", `lost ${oldAmit.result}`, "lost 5 UP");
 eq("FENCE old computation ran to 18, ignoring close-out", `${oldChris.thru}/${oldAmit.thru}`, "18/18");
