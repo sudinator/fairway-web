@@ -9,7 +9,10 @@ import {
   C, allocateStrokes, applyAllowance, stablefordPts,
   matchStatus, fourballStatus, computeTrifecta, clinchState, computeSkins, toParStr,
   type FourballMember, type SkinPlayer,
+  trifectaRowState,
 } from "@/lib/golf";
+import { liveLegs, type LiveLeg } from "@/lib/live-scoring";
+import type { TrifectaRowSide } from "@/lib/golf";
 
 export const dynamic = "force-dynamic";
 const supabase = createClient();
@@ -147,7 +150,7 @@ function summaryText(game: LiveGame, teamRows?: TeamRows["rows"]): string {
     case "fourball": return named
       ? `Four-ball — ${named}. Each foursome (2 v 2) is a match worth a point for the winning team, \u00bd for a halved match — Ryder-Cup style.${allow}`
       : `Four-ball match play — each 2-player side counts its better net ball on every hole; win more holes to win the match.${allow}`;
-    case "trifecta": return `Trifecta${named ? ` — ${named}` : ""} — every 2-v-2 foursome plays three points a hole: two singles (each player vs an opponent) plus a team point (${game.team_score_mode === "aggregate" ? "both partners' nets added" : "the side's better net ball"}). Points roll up to the team total.${allow}`;
+    case "trifecta": return `Trifecta${named ? ` — ${named}` : ""} — every 2-v-2 foursome plays three matches worth one point each: two singles (each player vs one opponent, strokes off that opponent) plus a team match (${game.team_score_mode === "aggregate" ? "both partners' nets added" : "the side's better net ball"}, off the foursome's lowest handicap). Points roll up to the team total.${allow}`;
     case "stroke": return `Stroke play — lowest ${game.stroke_basis === "gross" ? "gross" : "net"} total over the round wins.${allow}`;
     case "skins": return `Skins — the lowest net score on a hole wins the skin; a tied hole carries the pot forward to the next.${allow}`;
     default: return "";
@@ -444,6 +447,24 @@ function matchLabel(st: { thru: number; lead: number; result: string }): { text:
   return st.lead > 0 ? { text: `${st.lead} up`, color: WIN } : { text: `${-st.lead} dn`, color: LOSE };
 }
 
+// Every Trifecta leg on this page is labelled from the engine's own contest via the shared
+// trifectaRowState, so the public page can never drift from Results (183.1). Before 183.1 the
+// singles were recomputed here with matchStatus, which is count-based: a match won 4 & 2 on the
+// 16th kept counting and rendered "won 4 UP" at 18 while Results said "4 & 2".
+function contestLabel(c: { thru: number; lead: number; settled: boolean; result: string }): { text: string; color: string; aSide: TrifectaRowSide; bSide: TrifectaRowSide } {
+  const WIN = "#1B7A4B", LOSE = "#C0392B", TIE = "#1E5B8A", NEU = "#8B8775";
+  const st = trifectaRowState(c);
+  if (!c.thru) return { text: "not started", color: NEU, aSide: st.aSide, bSide: st.bSide };
+  if (st.aSide === "level") return { text: c.settled ? "halved" : "all square", color: TIE, aSide: st.aSide, bSide: st.bSide };
+  const aAhead = st.aSide === "won" || st.aSide === "leads";
+  // Keep this page's established wording (left player's perspective); only the MARGIN changes,
+  // from a running count to the engine's close-out label.
+  const text = c.settled
+    ? `${aAhead ? "won" : "lost"} ${st.label}`
+    : `${st.label.replace(" UP", "")} ${aAhead ? "up" : "dn"}`;
+  return { text, color: aAhead ? WIN : LOSE, aSide: st.aSide, bSide: st.bSide };
+}
+
 function teamLegLabel(lead: number, thru: number, _holes: number, result: string, teamA: string, teamB: string): { text: string; color: string } {
   const WIN = "#1B7A4B", TIE = "#1E5B8A", NEU = "#8B8775";
   if (thru === 0 || result === "Not started") return { text: "not started", color: NEU };
@@ -471,14 +492,32 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
   const nameStyle: React.CSSProperties = { fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
   const cardStyle: React.CSSProperties = { background: C.card, borderRadius: 14, color: C.ink, padding: "12px 14px", marginTop: 8 };
 
-  const Leg = (key: string, first: boolean, leftIds: string[], rightIds: string[], label: { text: string; color: string }, tag?: string) => (
+  const SIDE_EMPHASIS: Record<TrifectaRowSide, React.CSSProperties> = {
+    won: { fontWeight: 800, color: "#1B7A4B" },
+    leads: { fontWeight: 700, color: "#1B7A4B" },
+    lost: { fontWeight: 500, color: "#8B8775" },
+    trails: { fontWeight: 700 },
+    level: { fontWeight: 700 },
+  };
+  const Leg = (key: string, first: boolean, leftIds: string[], rightIds: string[], label: { text: string; color: string }, tag?: string, sides?: { aSide: TrifectaRowSide; bSide: TrifectaRowSide }) => (
     <div key={key} style={{ display: "flex", alignItems: "center", padding: "8px 0", borderTop: first ? "none" : `1px solid ${C.line}` }}>
       {tag && <span style={{ color: C.faint, fontSize: 11, fontWeight: 700, width: 48, flex: "none" }}>{tag}</span>}
-      <span style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>{sq(colorOf(leftIds[0]))}<span style={nameStyle}>{leftIds.map(nm).join(" & ")}</span></span>
+      <span style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>{sq(colorOf(leftIds[0]))}<span style={{ ...nameStyle, ...(sides ? SIDE_EMPHASIS[sides.aSide] : null) }}>{leftIds.map(nm).join(" & ")}</span></span>
       <span style={{ color: "#B8B19A", fontSize: 11, fontWeight: 700, padding: "0 6px", flex: "none" }}>vs</span>
-      <span style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0, justifyContent: "flex-end" }}><span style={{ ...nameStyle, textAlign: "right" }}>{rightIds.map(nm).join(" & ")}</span>{sq(colorOf(rightIds[0]))}</span>
+      <span style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0, justifyContent: "flex-end" }}><span style={{ ...nameStyle, textAlign: "right", ...(sides ? SIDE_EMPHASIS[sides.bSide] : null) }}>{rightIds.map(nm).join(" & ")}</span>{sq(colorOf(rightIds[0]))}</span>
       <span style={{ fontWeight: 800, fontSize: 13, minWidth: 64, textAlign: "right", flex: "none", color: label.color }}>{label.text}</span>
     </div>
+  );
+
+  // Every matchup number on this page comes from lib/live-scoring, which CI holds against the app's
+  // own answers (lib/live-parity.diff.test.ts). Display stays local to this route; arithmetic does not.
+  const legs: LiveLeg[] = liveLegs(
+    { game_type: gt, allowance_pct: game.allowance_pct, team_score_mode: game.team_score_mode },
+    Object.fromEntries(Object.entries(byId).map(([k, v]) => [k, { id: v.id, ch: v.ch, team: v.team, no_show: v.no_show, scores: v.scores || [] }])),
+    pairings,
+    foursomes,
+    meta,
+    allowance,
   );
 
   let body: React.ReactNode = null;
@@ -489,9 +528,9 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
     body = (
       <div style={cardStyle}>
         {prs.map((pr, i) => {
-          const a = byId[pr.a as string], b = byId[pr.b as string];
-          const st = matchStatus(meta, a?.scores || [], b?.scores || [], a?.ch ?? null, b?.ch ?? null, allowance);
-          return Leg(`m${i}`, i === 0, [pr.a as string], [pr.b as string], matchLabel(st));
+          const leg = legs.find((l) => l.aIds[0] === pr.a && l.bIds[0] === pr.b);
+          const lbl = leg ? contestLabel(leg) : { text: "not started", color: "#8B8775", aSide: "level" as TrifectaRowSide, bSide: "level" as TrifectaRowSide };
+          return Leg(`m${i}`, i === 0, [pr.a as string], [pr.b as string], lbl, undefined, lbl);
         })}
       </div>
     );
@@ -500,8 +539,9 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
     body = <>{foursomes.map((f, i) => {
       const aIds = (f.a || []).filter(Boolean) as string[]; const bIds = (f.b || []).filter(Boolean) as string[];
       if (!aIds.length || !bIds.length) return null;
-      const st = fourballStatus(meta, mem([...aIds, ...bIds]), aIds, bIds, allowance);
-      const lbl = teamLegLabel(st.lead, st.thru, meta.length, st.result, teamNameOf(aIds[0]), teamNameOf(bIds[0]));
+      const leg = legs.find((l) => l.kind === "fourball" && l.aIds.join() === aIds.join() && l.bIds.join() === bIds.join());
+      const st = leg || { lead: 0, thru: 0, result: "", settled: false };
+      const lbl = teamLegLabel(st.lead, st.thru, meta.length, st.settled ? st.result : "", teamNameOf(aIds[0]), teamNameOf(bIds[0]));
       return (
         <div key={`f${i}`} style={cardStyle}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontWeight: 800, fontSize: 14 }}><span>{f.name || `Foursome ${i + 1}`}</span><span style={{ color: C.faint, fontSize: 11, fontWeight: 500 }}>{st.thru ? `thru ${st.thru}` : "not started"}</span></div>
@@ -515,20 +555,19 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
     body = <>{foursomes.map((f, i) => {
       const aIds = (f.a || []).filter(Boolean) as string[]; const bIds = (f.b || []).filter(Boolean) as string[];
       if (!aIds.length || !bIds.length) return null;
-      const tri = computeTrifecta(meta, mem([...aIds, ...bIds]), aIds, bIds, allowance, mode, !!f.swap);
-      const singles = tri.contests.filter((c) => c.kind === "single");
-      const team = tri.contests.find((c) => c.kind === "team");
+      const mine = legs.filter((l) => l.aIds.every((x) => aIds.includes(x)) && l.bIds.every((x) => bIds.includes(x)));
+      const singles = mine.filter((c) => c.kind === "single");
+      const team = mine.find((c) => c.kind === "team");
+      const tri = { thru: Math.max(0, ...mine.map((c) => c.thru)) };
       return (
         <div key={`t${i}`} style={cardStyle}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontWeight: 800, fontSize: 14 }}><span>{f.name || `Foursome ${i + 1}`}</span><span style={{ color: C.faint, fontSize: 11, fontWeight: 500 }}>{tri.thru ? `thru ${tri.thru}` : "not started"}</span></div>
           {singles.map((c, si) => {
-            const aId = c.aIds[0], bId = c.bIds[0];
-            const a = byId[aId], b = byId[bId];
-            const st = matchStatus(meta, a?.scores || [], b?.scores || [], a?.ch ?? null, b?.ch ?? null, allowance);
-            return Leg(`t${i}s${si}`, si === 0, [aId], [bId], matchLabel(st), "Single");
+            const lbl = contestLabel(c);
+            return Leg(`t${i}s${si}`, si === 0, [c.aIds[0]], [c.bIds[0]], lbl, "Single", lbl);
           })}
           {team && (() => {
-            const lbl = teamLegLabel(team.lead, team.thru, meta.length, "", teamNameOf(aIds[0]), teamNameOf(bIds[0]));
+            const lbl = teamLegLabel(team.lead, team.thru, meta.length, team.settled ? (team.result || "") : "", teamNameOf(aIds[0]), teamNameOf(bIds[0]));
             return (
               <div style={{ background: "#F4F0E1", borderRadius: 8, padding: "8px 10px", marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span style={{ fontSize: 12, fontWeight: 700 }}>Team point <span style={{ color: C.faint, fontWeight: 500 }}>({mode === "aggregate" ? "aggregate" : "better ball"})</span></span>

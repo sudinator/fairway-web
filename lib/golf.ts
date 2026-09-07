@@ -812,6 +812,26 @@ export function trifectaSingles(aIds: string[], bIds: string[], swap = false): [
   return [];
 }
 
+/**
+ * Who is ahead in a Trifecta contest, and by what margin, as a display-ready state.
+ * ONE source for every renderer: the in-game Results row and the public live share row have
+ * different layouts but must agree on who is winning and what the margin is. `result` is the
+ * close-out label ("4 & 2") once settled; before that the margin is reported from the LEADER's
+ * side so no renderer has to show a "DN" the reader must attribute (183.1).
+ */
+export type TrifectaRowSide = "won" | "lost" | "leads" | "trails" | "level";
+export function trifectaRowState(c: { thru: number; lead: number; settled: boolean; result: string }): { aSide: TrifectaRowSide; bSide: TrifectaRowSide; label: string } {
+  if (!c.thru) return { aSide: "level", bSide: "level", label: "" };
+  if (c.settled) {
+    if (c.lead > 0) return { aSide: "won", bSide: "lost", label: c.result || matchLeadLabel(c.lead) };
+    if (c.lead < 0) return { aSide: "lost", bSide: "won", label: c.result || matchLeadLabel(-c.lead) };
+    return { aSide: "level", bSide: "level", label: c.result || "Halved" };
+  }
+  if (c.lead > 0) return { aSide: "leads", bSide: "trails", label: `${c.lead} UP` };
+  if (c.lead < 0) return { aSide: "trails", bSide: "leads", label: `${-c.lead} UP` };
+  return { aSide: "level", bSide: "level", label: "AS" };
+}
+
 export function computeTrifecta(
   holes: MatchHoleMeta[],
   members: FourballMember[],

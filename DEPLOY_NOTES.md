@@ -1,3 +1,27 @@
+## 184.0.260906 — The public share page is held to the app's answers in CI
+
+- The live share page keeps its own DISPLAY (unauthenticated route, flattened RPC payload, its own palette) but no longer keeps its own arithmetic. Its matchup scoring moves to `lib/live-scoring.ts` (`liveLegs`), and every number the page renders comes from there.
+- `lib/live-parity.diff.test.ts` feeds one game through BOTH paths — the app's `chBasis` + shared engines as `scoring-views.tsx` calls them, and the `get_live_scorecard` payload shape through `liveLegs` — and fails on any disagreement in thru, lead, settled or the close-out result. Layout is not compared; the two are meant to look different.
+- Extracting the scoring corrected two real defects the share page had:
+  - NINE-HOLE games used the raw eighteen-hole handicap for match and four-ball legs, so a shared nine showed roughly double the strokes. `liveCh` halves it, matching `chBasis`.
+  - Singles and four-balls used count-based status, so a decided match kept moving past its close-out. They now freeze through `matchCloseoutStatus`, as the app does.
+- The harness carries a FENCE that reproduces the pre-184.0 live behaviour and asserts the comparison detects it (4 of 5 non-Trifecta fixtures). A parity harness that cannot see a known-bad implementation is not a harness.
+- Guard `ci/check_live_parity_coverage.py`: MatchupsBlock may not call the engines directly, and every format the page renders must have a parity fixture — adding a format to one side without the other fails the build. Both conditions negative-tested.
+- Fixtures are real games: Architects Jul 5 (90%, aggregate), FB 6/21 via staging 641032 (85%, best ball, swap), a mid-round case, singles match at 18 and at 9, four-ball best-ball, aggregate and 9.
+- NOT covered yet, and therefore not claimed: alternate shot and skins are not rendered by MatchupsBlock and have no parity fixtures; guests are still dropped by `get_live_scorecard`'s user-id map before any of this runs. Both remain in BACKLOG.
+- No migration. 0150 remains current.
+
+## 183.1.260906 — Trifecta results say who won; public share page uses the engine
+
+- Results rows (in-game) now name the winner instead of leaving it to be inferred. Settled: winner's names bold gold, loser's muted. In progress: the leading side gold at 700 — visibly not a win — and the margin is always read from the LEADING side, so no row shows a "DN" the reader has to attribute. Team leg gets the same treatment. Team standings line unchanged.
+- Public live share page: Trifecta singles now come from `computeTrifecta`'s own contests. It had been calling `matchStatus()` on the raw pair and discarding the singles the engine had already returned. `matchStatus` is count-based, so a single won 4 & 2 on the 16th kept counting: staging game 641032 rendered "won 4 UP" and "lost 5 UP" on the public page while Results said 4 & 2 and 4 & 3.
+- Public live share page: the Trifecta team leg was passed a hardcoded empty result, so it never showed a close-out either ("Wildcats 1 up" at 18 instead of the settled margin). It now uses its contest's result.
+- Public live share page: the "how it works" blurb still described the per-hole rule removed in 183.0 ("three points a hole"). Rewritten to two singles plus a team match, one point each, with the stroke basis for each.
+- `trifectaRowState` moved into `lib/golf.ts`: ONE rule for who is ahead and what the margin reads, shared by the in-game row and the public row even though their layouts differ.
+- Guard `ci/check_trifecta_one_singles_source.py`: no `matchStatus`/`fourballStatus` inside the live page's Trifecta block, and both renderers must go through `trifectaRowState`. Negative-tested by restoring the old call.
+- Fixtures from staging 641032 (carrying FB 6/21 production scores): `lib/live-trifecta-labels.test.ts` pins the screenshot's wrong labels as a regression fence against the correct ones; `lib/trifecta-results-row.test.tsx` renders the real row and reads weight and colour per side off the DOM.
+- No migration. 0150 remains current.
+
 ## 183.0.260906 — One Trifecta rule (migration 0150)
 
 - Trifecta is now exactly one game: two genuine 1-v-1 singles matches plus a four-ball, each worth one point, decided as matches (½ each if halved). Singles strokes are the difference between the two players in that single; the team match plays off the foursome's lowest handicap. Confirmed with the organizer; already how every Trifecta in production was scored.

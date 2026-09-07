@@ -1,0 +1,71 @@
+/**
+ * RENDERED CHECK — the in-game Trifecta Results row states WHO won.
+ *
+ * Before 183.1 the row read "Amit v Christopher   thru 15   4 & 3": the margin was there but the
+ * winner had to be inferred, and the running label was always from side A so it could read as a
+ * deficit next to the wrong name. The row now renders the two names as separate spans styled from
+ * the shared trifectaRowState: settled → winner bold gold, loser muted; in progress → leader gold
+ * at normal weight; level → both neutral, with the margin always read from the leading side.
+ *
+ * Data: staging game 641032 Group 1 (FB 6/21 production scores), the same rows the screenshot showed.
+ */
+import { renderScreen, eq, report } from "./screen-harness";
+import * as React from "react";
+import { TrifectaContestRow } from "@/components/game/scoring-views";
+import { computeTrifecta, C } from "@/lib/golf";
+import { chBasis } from "@/lib/game-shape";
+
+const HOLES = [
+  { n: 1, si: 5, par: 4 }, { n: 2, si: 11, par: 3 }, { n: 3, si: 7, par: 4 }, { n: 4, si: 13, par: 4 },
+  { n: 5, si: 17, par: 3 }, { n: 6, si: 1, par: 4 }, { n: 7, si: 15, par: 4 }, { n: 8, si: 9, par: 4 },
+  { n: 9, si: 3, par: 4 }, { n: 10, si: 10, par: 4 }, { n: 11, si: 8, par: 4 }, { n: 12, si: 2, par: 4 },
+  { n: 13, si: 6, par: 4 }, { n: 14, si: 18, par: 3 }, { n: 15, si: 16, par: 5 }, { n: 16, si: 4, par: 4 },
+  { n: 17, si: 12, par: 3 }, { n: 18, si: 14, par: 5 },
+];
+const R = {
+  Chris: { id: "Chris", handicap_index: 9, slope: 137, rating: 72.9, course_handicap: 14, scores: [4, 5, 5, 4, 4, 5, 5, 5, 4, 5, 5, 4, 6, 3, 6, 4, 4, 5] },
+  Amit: { id: "Amit", handicap_index: 23, slope: 135, rating: 70.9, course_handicap: 28, scores: [6, 6, 5, 7, 4, 6, 5, 5, 6, 6, 6, 8, 6, 5, 7, 6, 5, 7] },
+  Christopher: { id: "Christopher", handicap_index: 13, slope: 137, rating: 72.9, course_handicap: 19, scores: [4, 4, 6, 6, 4, 6, 5, 7, 4, 6, 6, 6, 4, 3, 6, 7, 4, 6] },
+  Michael: { id: "Michael", handicap_index: 11, slope: 137, rating: 72.9, course_handicap: 16, scores: [5, 4, 5, 6, 5, 6, 5, 5, 5, 5, 5, 5, 5, 4, 6, 6, 4, 5] },
+};
+const A = ["Chris", "Amit"], B = ["Christopher", "Michael"];
+const mem = (upto = 18) => Object.values(R).map((r) => ({ id: r.id, gross: r.scores.map((g, i) => (i < upto ? g : null)) as number[], ch: chBasis(r, 70, 18), noShow: false }));
+const tri = computeTrifecta(HOLES, mem(), A, B, 85, "best_ball", true);
+const mid = computeTrifecta(HOLES, mem(9), A, B, 85, "best_ball", true);
+
+// Read the rendered row back: [name, weight, color] per side, plus the margin text.
+function readRow(c: Parameters<typeof TrifectaContestRow>[0]["c"], aNames: string, bNames: string) {
+  const s = renderScreen(<TrifectaContestRow c={c} aNames={aNames} bNames={bNames} open={false} onToggle={() => {}} />);
+  const spans = Array.from(s.el.querySelectorAll("span")).filter((e) => e.children.length === 0);
+  const find = (txt: string) => spans.find((e) => (e.textContent || "").trim() === txt)!;
+  const styleOf = (txt: string) => { const e = find(txt); return `${e.style.fontWeight}/${e.style.color}`; };
+  const margin = spans[spans.length - 1].textContent!.trim();
+  s.unmount();
+  return { styleOf, margin };
+}
+const GOLD = "rgb(201, 162, 39)", SAGE = "rgb(178, 203, 189)", CREAM = "rgb(247, 243, 232)";
+
+const chrisC = tri.contests.filter((c) => c.kind === "single").find((c) => c.aIds[0] === "Chris")!;
+const amitC = tri.contests.filter((c) => c.kind === "single").find((c) => c.aIds[0] === "Amit")!;
+
+const r1 = readRow(chrisC, "Chris", "Michael");
+eq(r1.styleOf("Chris"), `800/${GOLD}`, "settled winner (side A) is bold gold");
+eq(r1.styleOf("Michael"), `500/${SAGE}`, "settled loser (side B) is muted");
+eq(r1.margin, "4 & 2", "Chris row margin is the close-out, not a running count");
+
+const r2 = readRow(amitC, "Amit", "Christopher");
+eq(r2.styleOf("Christopher"), `800/${GOLD}`, "settled winner on side B is bold gold");
+eq(r2.styleOf("Amit"), `500/${SAGE}`, "settled loser on side A is muted");
+eq(r2.margin, "4 & 3", "Amit row margin is the close-out (screenshot showed 'lost 5 UP')");
+
+const midChris = mid.contests.filter((c) => c.kind === "single").find((c) => c.aIds[0] === "Chris")!;
+const r3 = readRow(midChris, "Chris", "Michael");
+eq(r3.styleOf("Chris"), `700/${GOLD}`, "in-progress leader is gold at 700, NOT the 800 of a win");
+eq(r3.styleOf("Michael"), `500/${CREAM}`, "in-progress trailer stays cream, not muted");
+eq(r3.margin, "3 UP", "in-progress margin is read from the leader's side");
+
+const teamC = tri.contests.find((c) => c.kind === "team")!;
+const r4 = readRow(teamC, "Chris & Amit", "Christopher & Michael");
+eq(r4.styleOf("Chris & Amit"), `800/${GOLD}`, "team leg highlights the winning pair");
+
+report("trifecta results row");

@@ -1,3 +1,24 @@
+## v184.0 Live share page held to the app's answers
+
+- [x] Extract the live page's matchup scoring to lib/live-scoring.ts; page renders from it.
+- [x] Parity harness (app path vs live path) over real games, with a fence proving it detects the old behaviour.
+- [x] Coverage guard: no direct engine calls in MatchupsBlock; every rendered format has a fixture.
+- [x] Fixed en route: nine-hole handicap halving and close-out freeze on the live page's match and four-ball legs.
+- [ ] Staging: share a NINE-hole match and a nine-hole four-ball; strokes and margins must match the app.
+- [ ] Alternate shot is not rendered by the live page at all (no branch, and the RPC returns no side scores). Add the format, then a parity fixture.
+- [ ] Skins is not rendered by MatchupsBlock; SkinsCarry is a separate path with no parity fixture.
+- [ ] Guests are dropped from pairings/foursomes by the user_id map in get_live_scorecard (0047) before scoring runs — a DB-side fix, not reachable from the harness.
+- [ ] The Stableford/leaderboard side of the live page (computePlayer) is not in the parity harness yet; only matchup legs are.
+
+## v183.1 Trifecta results readability + one singles source
+
+- [x] In-game Results row names the winner (bold gold / muted); leader styled distinctly from winner.
+- [x] Live share page singles come from computeTrifecta, not a second matchStatus computation.
+- [x] Live share team leg shows its close-out result; stale per-hole blurb rewritten.
+- [x] trifectaRowState lives in lib/golf.ts; guard keeps both renderers on it.
+- [ ] Staging: reload the 641032 share link — singles read "won 4 & 2" / "lost 4 & 3", team leg shows its close-out, blurb no longer says "three points a hole".
+- [ ] Not addressed: the live page's `match` and `fourball` blocks still use count-based matchStatus/fourballStatus, so a decided singles match or four-ball outside Trifecta can still drift past close-out on the public page. Same class of bug, different formats — needs its own real-data check.
+
 ## Admin: read-only "view card as player" in Games oversight
 
 Raised 182.2: the personal scorecard is bound to the signed-in user's own game_players row, so a

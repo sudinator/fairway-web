@@ -1,3 +1,9 @@
+## 184.0.260906 — no migration
+Live-share scoring extraction and CI parity harness. 0150 remains current.
+
+## 183.1.260906 — no migration
+Results/live-share display and the live page's Trifecta singles source. 0150 remains current.
+
 ## 183.0.260906 — migration 0150
 Trifecta single rule: `games.trifecta_scoring` default → 'match', backfill, CHECK (match or null). Column kept for the Ryder Cup trigger (0146).
 

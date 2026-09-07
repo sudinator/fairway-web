@@ -18,6 +18,7 @@ import {
   matchStrokesFor,
   matchProgress,
   matchLeadLabel,
+  trifectaRowState,
   matchAllowance,
   applyAllowance,
   fourballStatus,
@@ -72,6 +73,7 @@ import {
   ShortDateInput,
   Avatar,
 } from "@/components/ui";
+import type { TrifectaRowSide } from "@/lib/golf";
 import type { Game, Player } from "@/lib/game-types";
 import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
 import { HScroll } from "@/components/hscroll";
@@ -1073,6 +1075,43 @@ export function TeamClinchLine({ aPts, bPts, unclaimed, aName, bName, metric, sh
   );
 }
 
+
+// ── Trifecta contest row ─────────────────────────────────────────────────────────────────────────
+// One row per contest (two singles + the team leg). Names are separate spans so the row can SAY who
+// is ahead: settled → winner bold gold, loser muted; in progress → leader gold (normal weight);
+// level → both neutral. The margin at the right is always read from the highlighted side, so it is
+// never a "2 DN" the reader has to attribute. Shared by the in-game Results, the Ryder Cup session
+// page and the public live share so all three read the same way (183.1).
+export type TrifectaRowContest = { kind: "single" | "team"; thru: number; lead: number; settled: boolean; result: string };
+const TRIFECTA_NAME_STYLE: Record<TrifectaRowSide, React.CSSProperties> = {
+  // APP_RULES: weights are 500/700/800 only. Won = 800 gold, leading = 700 gold (visibly not a win),
+  // loser muted at 500, everyone else 500 cream.
+  won: { color: C.gold, fontWeight: 800 },
+  leads: { color: C.gold, fontWeight: 700 },
+  lost: { color: C.sage, fontWeight: 500 },
+  trails: { color: C.cream, fontWeight: 500 },
+  level: { color: C.cream, fontWeight: 500 },
+};
+export function TrifectaContestRow({ c, aNames, bNames, prefix, open, onToggle }: {
+  c: TrifectaRowContest; aNames: string; bNames: string; prefix?: string; open: boolean; onToggle: () => void;
+}) {
+  const st = trifectaRowState(c);
+  const label = st.label || "—";
+  return (
+    <div onClick={onToggle} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${C.borderCard}`, cursor: "pointer" }}>
+      <span style={{ color: C.sage, fontSize: 11, width: 12 }}>{open ? "▾" : "▸"}</span>
+      <span style={{ flex: 1, fontSize: 13, color: C.cream, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {prefix ? <span style={{ color: C.sage }}>{prefix}</span> : null}
+        <span style={TRIFECTA_NAME_STYLE[st.aSide]}>{aNames}</span>
+        <span style={{ color: C.sage, margin: "0 5px" }}>v</span>
+        <span style={TRIFECTA_NAME_STYLE[st.bSide]}>{bNames}</span>
+      </span>
+      <span style={{ color: C.sage, fontSize: 11 }}>{c.thru ? `thru ${c.thru}` : "—"}</span>
+      <span style={{ color: C.gold, fontWeight: 800, fontSize: 13, fontFamily: "Georgia, serif", minWidth: 46, textAlign: "right" }}>{label}</span>
+    </div>
+  );
+}
+
 export function FourballView({
   game,
   players,
@@ -1461,7 +1500,6 @@ export function FourballView({
                 {tri.contests.map((c, ci) => {
                   const aNames = c.aIds.map(firstName).join(" & ");
                   const bNames = c.bIds.map(firstName).join(" & ");
-                  const label = c.kind === "team" ? `Team · ${aNames} v ${bNames}` : `${aNames} v ${bNames}`;
                   const key = `${f.id}-${ci}`;
                   const isOpen = openKey === key;
                   const aColor = isTeam ? teamAccent(teams![0].name, 0) : C.birdie;
@@ -1470,12 +1508,7 @@ export function FourballView({
                   const bLabel = c.kind === "team" ? (isTeam ? teamName(playerOf(c.bIds[0])?.team) : "Pair 2") : firstName(c.bIds[0]);
                   return (
                     <React.Fragment key={ci}>
-                      <div onClick={() => setOpenKey(isOpen ? null : key)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${C.borderCard}`, cursor: "pointer" }}>
-                        <span style={{ color: C.sage, fontSize: 11, width: 12 }}>{isOpen ? "▾" : "▸"}</span>
-                        <span style={{ flex: 1, color: C.cream, fontSize: 13 }}>{label}</span>
-                        <span style={{ color: C.sage, fontSize: 11 }}>{c.thru ? `thru ${c.thru}` : "—"}</span>
-                        <span style={{ color: C.gold, fontWeight: 800, fontSize: 13, fontFamily: "Georgia, serif", minWidth: 46, textAlign: "right" }}>{c.thru ? (c.result || matchLeadLabel(c.lead)) : "—"}</span>
-                      </div>
+                      <TrifectaContestRow c={c} aNames={aNames} bNames={bNames} prefix={c.kind === "team" ? "Team · " : undefined} open={isOpen} onToggle={() => setOpenKey(isOpen ? null : key)} />
                       {isOpen && <HoleDetail rows={c.settled ? c.perHole.slice(0, c.thru) : c.perHole} aLabel={aLabel} bLabel={bLabel} aColor={aColor} bColor={bColor} runningMatch />}
                     </React.Fragment>
                   );
