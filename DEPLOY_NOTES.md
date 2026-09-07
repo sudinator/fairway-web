@@ -1,3 +1,18 @@
+## 185.0.260907 — One colour per stroke basis, and Trifecta finally shows its singles strokes
+
+- **A stroke dot now has one basis, one colour and a written label, on every card.** Before this, orange meant "whatever this format scores off": your full course handicap in Stableford, the match basis in a four-ball. Same dot, different meaning by game.
+  - **Orange** = your course handicap (side games, low-net, posting — and the scoring basis itself in Stableford, stroke and individual skins).
+  - **Teal** = strokes off the player you are playing (singles, team match, 1:1 skins, and alternate shot, where the "opponent" is the other side).
+  - **Purple** = strokes off the foursome's lowest handicap (four-ball, 2v2 skins, and a Trifecta's team leg).
+- **Trifecta shows all three.** Its two singles are 1-v-1 and its team leg is four-ball, so one player can be owed different strokes on the same hole in two contests at once — and the singles basis, which decides two of the three points, was drawn NOWHERE. On the Jul 5 Architects card, BK now sees a purple dot on the 14th (a stroke in the team leg) and no teal one (none against Sachin in his single) — the discrepancy behind the 182.2 bug is now visible to the player.
+- `lib/game-shape.strokeSets()` is the single source: it returns every basis in play for a player on a hole, each with a label. The personal card, its legend, the group scorecard's cells, its legend and its player headers all render from it.
+- **Each basis is a light/dark PAIR** — measured, not assumed. No single hex is legible on both the cream scorecard and the dark green header. This also names something that was already true and undocumented: the group legend's `#9A4A08` was always the light-ground orange.
+- **Two defects the measurements exposed:** the group scorecard's second dot row used `C.indivDot`, a dark-ground colour, at **1.83:1** on cream cells — effectively invisible; and the personal card's legend was suppressed in match mode, so a singles match drew a second colour with no key at all. Both fixed.
+- **The match-basis Stableford box is gone** from the group scorecard. It showed points computed on a relative basis — not a number anyone scores. Points are off the course handicap.
+- Guard `ci/check_stroke_dot_bases.py`: dots come from `strokeSets`, the legacy `C.dot`/`C.indivDot` are not used for stroke dots, each basis is defined as a pair, and no basis is returned unlabelled. Negative-tested.
+- Fixture `lib/stroke-sets.test.ts`: 81 assertions holding every drawn dot to the engine that scores that contest, including the singles dots against `computeTrifecta`'s own nets hole for hole.
+- No migration. 0150 remains current.
+
 ## 184.1.260906 — One close-out rule; the share page scrolls; the winner is labelled as the winner
 
 - **Close-out freeze in the in-game cards.** `matchStatus` and `fourballStatus` now take thru/lead/result from `matchCloseoutStatus`, the rule `competition.ts`, `computeTrifecta` and `lib/live-scoring.ts` already used. A decided match freezes at its margin instead of counting on. Confirmed on staging 571157: the four-ball card read **8 UP** at the 9th on a match won **5 & 3 at the 6th** — handicaps were right, the running count was being displayed. After 184.0 the public share page was more correct than the app for this; both agree now. Hole statistics (aWins/bWins/halves) stay full-round counts — they are stats, not match state.

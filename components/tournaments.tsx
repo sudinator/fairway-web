@@ -47,7 +47,7 @@ import {
   type BetSplit,
   markerOwnsMyRow,
   mergeBackupRow } from "@/lib/golf";
-import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes } from "@/lib/game-shape";
+import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, strokeSets } from "@/lib/game-shape";
 import { decideSetupChange, type SetupAction, type SetupDecision } from "@/lib/game-setup-policy";
 import { applyTeamGroupSlotMove, balancedTeamGroups, randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
@@ -3761,8 +3761,12 @@ function GameRoom({
                 fairway: me.fairways?.[i] ?? null,
                 penalties: me.penalties?.[i] ?? null,
                 sand: me.sand?.[i] ?? null,
+                // ONE source for every dot drawn on this card: lib/game-shape.strokeSets returns each
+                // basis in play with a written label. A Trifecta has three (your single off your
+                // opponent, the team leg off the foursome low, your course handicap); before 185.0
+                // the singles basis was drawn nowhere even though it decides two of the three points.
+                sets: strokeSets(game, me, m.si, players),
                 recv: dotStrokes(game, me, m.si, players),
-                // Individual (full playing handicap) strokes — the low-net / Stableford side game.
                 indRecv: fullStrokes(game, me, m.si),
                 // If I receive none but my opponent does, show the holes where I give a stroke.
                 gives: game.game_type === "match" && (matchAllow ?? 0) === 0 && oppAllow != null

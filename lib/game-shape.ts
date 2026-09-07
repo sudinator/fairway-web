@@ -1,7 +1,7 @@
 // Pure game-shape + stroke logic. No React. Single source of truth for "what mode
 // is this game", plus the stroke-dot basis that MUST match golf.ts scoring.
 // Unit-tested in game-shape.test.ts.
-import { applyAllowance, matchAllowance, matchStrokesFor, strokesReceived, allocateStrokes, courseHandicapExact } from "./golf";
+import { applyAllowance, matchAllowance, matchStrokesFor, strokesReceived, allocateStrokes, courseHandicapExact, trifectaSingles } from "./golf";
 import { altShotTeamHandicap, altShotMatchStrokes } from "./alt-shot";
 
 /**
@@ -252,4 +252,120 @@ export function dotStrokes(
 // "course hcp" / blue-dot basis; the match's own allowance %% lives only in dotStrokes.
 export function fullStrokes(game: DotGame, p: ShapePlayer, si: number | null): number {
   return recvByRank(game, si, applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), 100));
+}
+
+// ---------------------------------------------------------------------------------------------
+// STROKE SETS — the single source for every stroke dot the app draws (185.0).
+//
+// A player can be receiving strokes on more than one basis at once. A Trifecta is the extreme:
+// the singles are 1-v-1 (strokes off the OPPONENT), the team leg is four-ball (off the FOURSOME'S
+// LOWEST), and the full course handicap still drives side games and posting — three different
+// numbers on the same hole for the same player. Before 185.0 the card drew the team-leg basis and
+// the course handicap and showed the singles basis NOWHERE, even though two of the three points
+// are decided by it.
+//
+// Every surface renders from this function, so a dot cannot exist without a basis and a label, and
+// the same basis is the same colour everywhere. `dotStrokes`/`fullStrokes` remain for callers that
+// only need one number; both are expressible through this.
+export type StrokeBasisKey = "course" | "opponent" | "group_low" | "alt_side";
+export type StrokeSet = {
+  key: StrokeBasisKey;
+  /** Strokes this player RECEIVES on this hole under this basis. */
+  strokes: number;
+  /** Strokes this player GIVES on this hole (pair bases only; the lower handicap plays scratch). */
+  gives: number;
+  /** Human label naming the basis — "v Michael", "off Karan", "course hcp". Never empty. */
+  label: string;
+};
+
+const nameOf = (p: ShapePlayer | undefined, fallback = "opponent"): string => {
+  const n = (p as { display_name?: string | null } | undefined)?.display_name;
+  return (n || "").trim().split(" ")[0] || fallback;
+};
+
+/** Strokes between two players on one hole, pair basis (lower plays scratch). */
+function pairStrokes(game: DotGame, me: ShapePlayer, opp: ShapePlayer | undefined, si: number | null) {
+  const allowance = game.allowance_pct ?? 100;
+  const { a, b } = matchAllowance(
+    chBasis(me, game.course_par, game.holes_meta?.length),
+    opp ? chBasis(opp, game.course_par, game.holes_meta?.length) : null,
+    allowance,
+  );
+  const holes = allocHoles(game);
+  return { strokes: matchStrokesFor(a, si, holes), gives: matchStrokesFor(b, si, holes) };
+}
+
+/** Strokes off the foursome's lowest playing handicap on one hole (four-ball rule). */
+function groupLowStrokes(game: DotGame, me: ShapePlayer, allPlayers: ShapePlayer[], si: number | null) {
+  const allowance = game.allowance_pct ?? 100;
+  const key = pkey(me);
+  const fs = (game.foursomes || []).find((f) => [...f.a, ...f.b].includes(key));
+  let group = allPlayers;
+  if (fs) {
+    const ids = new Set([...fs.a, ...fs.b]);
+    group = allPlayers.filter((x) => ids.has(pkey(x)));
+  }
+  const active = group.filter((x) => !x.no_show);
+  const ref = active.length ? active : group;
+  const mine = applyAllowance(chBasis(me, game.course_par, game.holes_meta?.length), allowance);
+  let lowP = ref[0];
+  let low = Infinity;
+  for (const x of ref) {
+    const v = applyAllowance(chBasis(x, game.course_par, game.holes_meta?.length), allowance);
+    if (v < low) { low = v; lowP = x; }
+  }
+  return {
+    strokes: matchStrokesFor(Math.max(0, mine - low), si, allocHoles(game)),
+    lowName: nameOf(lowP, "low"),
+  };
+}
+
+/**
+ * Every stroke set in play for this player on this hole, match-relevant bases first and the
+ * course handicap last. Sets with no strokes are still returned so a surface can render a
+ * consistent legend; callers filter on `strokes`/`gives` when drawing.
+ */
+export function strokeSets(
+  game: DotGame,
+  p: ShapePlayer,
+  si: number | null,
+  allPlayers: ShapePlayer[],
+): StrokeSet[] {
+  const basis = shapeOf(game).dotBasis;
+  const key = pkey(p);
+  const course: StrokeSet = { key: "course", strokes: fullStrokes(game, p, si), gives: 0, label: "course hcp" };
+
+  // Alternate shot: one ball per side, so there is no individual score to give a course-handicap
+  // dot any meaning here. The side handicap is a pair basis with SIDES instead of players.
+  if (basis === "alt_shot_side") {
+    return [{ key: "alt_side", strokes: dotStrokes(game, p, si, allPlayers), gives: 0, label: "your side" }];
+  }
+
+  if (basis === "relative_pair") {
+    const pr = (game.pairings || []).find((x) => x.a === key || x.b === key);
+    const opp = pr ? allPlayers.find((x) => pkey(x) === (pr.a === key ? pr.b : pr.a)) : undefined;
+    const { strokes, gives } = pairStrokes(game, p, opp, si);
+    return [{ key: "opponent", strokes, gives, label: `v ${nameOf(opp)}` }, course];
+  }
+
+  if (basis === "relative_foursome") {
+    const { strokes, lowName } = groupLowStrokes(game, p, allPlayers, si);
+    const teamLeg: StrokeSet = { key: "group_low", strokes, gives: 0, label: `off ${lowName}` };
+    // A TRIFECTA also has a 1-v-1 single inside the same foursome, scored off the OPPONENT.
+    if (game.game_type === "trifecta") {
+      const fs = (game.foursomes || []).find((f) => [...f.a, ...f.b].includes(key));
+      let opp: ShapePlayer | undefined;
+      if (fs) {
+        const pairs = trifectaSingles(fs.a, fs.b, !!(fs as { swap?: boolean }).swap);
+        const mine = pairs.find(([a, b]) => a === key || b === key);
+        if (mine) opp = allPlayers.find((x) => pkey(x) === (mine[0] === key ? mine[1] : mine[0]));
+      }
+      const { strokes: sStrokes, gives } = pairStrokes(game, p, opp, si);
+      return [{ key: "opponent", strokes: sStrokes, gives, label: `v ${nameOf(opp)}` }, teamLeg, course];
+    }
+    return [teamLeg, course];
+  }
+
+  // Stableford, stroke play, individual skins: the course handicap IS the scoring basis.
+  return [course];
 }

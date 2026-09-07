@@ -1,3 +1,15 @@
+## v185.0 staging checks — stroke dots
+
+- [ ] Trifecta (641032 or 557495), player card: THREE dot colours where applicable — teal "v <opponent>", purple "off <low>", orange "course hcp" — and the legend names all three.
+- [ ] Jul 5 Architects card as BK: hole 14 shows purple only (team leg), NO teal — he gets no stroke in his single.
+- [ ] Singles match card: teal + orange, and the legend is now visible (it was suppressed in match mode).
+- [ ] Four-ball card: purple + orange.
+- [ ] Stableford / stroke / individual skins: orange only, labelled "course hcp".
+- [ ] Alternate shot: teal ("your side"), unchanged arithmetic.
+- [ ] Group scorecard: cell dots readable on the cream cells (the course-handicap row was 1.83:1 before), legend names each basis, player headers show a line per basis.
+- [ ] Group scorecard: only ONE Stableford corner box now (course handicap). The match-basis box is gone.
+- [ ] Solo round card: orange only.
+
 ## v184.1 staging checks
 
 - [ ] 571157 in the APP: Group 1 reads 5 & 3 (was 8 UP); Group 2 halved. Share link unchanged.

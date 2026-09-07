@@ -489,6 +489,12 @@ export type EntryHole = {
   strokes: number | null; putts: number | null; fairway: "hit" | "miss" | "left" | "right" | null;
   penalties?: number | null;
   sand?: boolean | null; // greenside bunker this hole
+  /**
+   * Every stroke basis in play for this player on this hole, from lib/game-shape.strokeSets.
+   * ONE source: a dot cannot be drawn without a basis and a written label (185.0). Optional so
+   * legacy callers that only supply recv/indRecv still render their single set.
+   */
+  sets?: { key: "course" | "opponent" | "group_low" | "alt_side"; strokes: number; gives: number; label: string }[];
   recv: number; // handicap strokes received on this hole (relative/match basis for match & trifecta)
   indRecv?: number; // individual (full playing handicap) strokes — low-net / Stableford side game
   gives?: number; // strokes GIVEN on this hole (match play, lower-handicap player)
@@ -663,11 +669,29 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     if (par < 4) return;
     onSet(i, { fairway: cur == null ? "hit" : cur === "hit" ? "left" : cur === "left" ? "right" : null });
   };
-  const anyStroke = holes.some((h) => h.recv > 0 || (h.gives || 0) > 0 || (showIndivDots && (h.indRecv || 0) > 0));
+  // Basis → colour, one mapping for every surface (185.0). Light-ground variants: these rows are
+  // cream, where the old C.dot was 3.00:1 and C.indivDot only 1.83:1 — the second set was barely
+  // visible on this card at all.
+  const BASIS_COLOR: Record<string, string> = {
+    course: C.basisCourse, opponent: C.basisOpponent, group_low: C.basisGroupLow, alt_side: C.basisOpponent,
+  };
+  /** The sets this hole actually draws, in basis order, skipping ones with nothing to show. */
+  const setsOf = (h: EntryHole) => (h.sets && h.sets.length
+    ? h.sets
+    : [
+        { key: "opponent" as const, strokes: h.recv || 0, gives: h.gives || 0, label: matchStrokeLabel || "match" },
+        ...(showIndivDots ? [{ key: "course" as const, strokes: h.indRecv || 0, gives: 0, label: "course hcp" }] : []),
+      ]).filter((x) => x.strokes > 0 || x.gives > 0);
+  /** Stableford points are always scored off the COURSE handicap, never a match-relative basis. */
+  const courseRecv = (h: EntryHole) => {
+    const c = (h.sets || []).find((x) => x.key === "course");
+    return c ? c.strokes : (showIndivDots ? (h.indRecv || 0) : (h.recv || 0));
+  };
+  const anyStroke = holes.some((h) => setsOf(h).length > 0);
   const hasDots = anyStroke && hasHandicap;
   // Stableford is scored on the INDIVIDUAL (full course handicap) strokes on relative games
   // (match/four-ball/trifecta), matching the group scorecard; otherwise the game's own recv.
-  const sfRecv = (h: EntryHole) => (showIndivDots ? (h.indRecv || 0) : (h.recv || 0));
+  const sfRecv = (h: EntryHole) => courseRecv(h);
   const headStyle: React.CSSProperties = { color: C.faint, fontSize: 11, letterSpacing: 0.5, fontWeight: 700, textTransform: "uppercase" };
 
   const block = (from: number, to: number, label: string) => {
@@ -728,16 +752,17 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
                   return <div key="op" style={{ textAlign: "center", color: col, fontWeight: 800, fontSize: 15 }}>{ov ?? "·"}</div>;
                 })()] : []),
                 ...(hasDots ? [(() => {
-                  const relDots = h.recv > 0 ? "\u2022".repeat(Math.min(h.recv, 3)) : ((h.gives || 0) > 0 ? "\u25e6".repeat(Math.min(h.gives || 0, 3)) : "");
-                  const relColor = (h.gives || 0) > 0 ? C.sage : C.dot;
-                  const ind = h.indRecv || 0;
-                  if (showIndivDots && ind > 0) {
-                    return <div key="d" style={{ textAlign: "center", lineHeight: 1.04 }}>
-                      {relDots ? <div style={{ color: relColor, fontWeight: 800, fontSize: 14, letterSpacing: 1 }}>{relDots}</div> : null}
-                      <div style={{ color: C.indivDot, fontWeight: 800, fontSize: 14, letterSpacing: 1 }}>{"\u2022".repeat(Math.min(ind, 3))}</div>
-                    </div>;
-                  }
-                  return <div key="d" style={{ textAlign: "center", color: relColor, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{relDots}</div>;
+                  // One line per basis, coloured by basis and explained by name in the legend below.
+                  // Filled = strokes received; hollow = strokes GIVEN (pair bases, lower plays scratch).
+                  const rows = setsOf(h);
+                  if (!rows.length) return <div key="d" />;
+                  return <div key="d" style={{ textAlign: "center", lineHeight: 1.04 }}>
+                    {rows.map((r) => (
+                      <div key={r.key} style={{ color: r.gives > 0 && r.strokes === 0 ? C.sage : BASIS_COLOR[r.key], fontWeight: 800, fontSize: rows.length > 2 ? 13 : 14, letterSpacing: 1 }}>
+                        {r.strokes > 0 ? "\u2022".repeat(Math.min(r.strokes, 3)) : "\u25e6".repeat(Math.min(r.gives, 3))}
+                      </div>
+                    ))}
+                  </div>;
                 })()] : []),
                 <div key="sc" style={{ textAlign: "center" }}>
                   {h.strokes
@@ -839,7 +864,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           <span style={{ fontSize: 16, fontWeight: 800 }}>{h.n}</span>
           <span style={{ fontSize: 12, color: C.sage, fontWeight: 500, flex: 1, marginLeft: 10 }}>Par <b style={{ color: "#EDE7D4" }}>{h.par}</b>{yds ? <> · <b style={{ color: "#EDE7D4" }}>{yds}</b> yds</> : null} · S.I. <b style={{ color: "#EDE7D4" }}>{h.si ?? "–"}</b></span>
           <span style={{ fontSize: 11, color: "#EDE7D4", fontWeight: 700, whiteSpace: "nowrap" }}>
-            {h.recv > 0 ? <>you <span style={{ color: C.dot, fontSize: 13, letterSpacing: 1 }}>{"•".repeat(Math.min(h.recv, 3))}</span></> : <span style={{ color: C.sage }}>—</span>}
+            {h.recv > 0 ? <>you <span style={{ color: C.basisOpponent, fontSize: 13, letterSpacing: 1 }}>{"•".repeat(Math.min(h.recv, 3))}</span></> : <span style={{ color: C.sage }}>—</span>}
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "flex-end", padding: "5px 4px 6px", gap: 3 }}>
@@ -919,20 +944,29 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           </div>
         );
       })()}
-      {!matchMode && anyStroke && hasHandicap && (
-        <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>
-          {showIndivDots
-            ? <><span style={{ color: C.dot }}>&#9679;</span> match strokes ({matchStrokeLabel}) &middot; <span style={{ color: C.indivDot }}>&#9679;</span> individual strokes (low-net / Stableford side game)</>
-            : (holes.some((h) => h.recv > 0)
-                ? "\u2022 filled dots show the handicap strokes you receive on that hole."
-                : "\u25e6 hollow dots show the holes where you give your opponent a stroke.")}
-        </div>
-      )}
+      {anyStroke && hasHandicap && (() => {
+        // Every basis drawn above is NAMED here — in a Trifecta that is three different numbers on
+        // the same hole (your single, the team leg, your course handicap), and colour alone cannot
+        // say which is which. The legend shows a basis only if some hole actually draws it.
+        // Rendered in match mode too: before 185.0 it was suppressed there, so a singles match drew
+        // a second colour with no key at all.
+        const seen = new Map<string, string>();
+        for (const h of holes) for (const r of setsOf(h)) if (!seen.has(r.key)) seen.set(r.key, r.label);
+        const givesOnly = holes.every((h) => setsOf(h).every((r) => r.strokes === 0));
+        return (
+          <div style={{ color: C.gold, fontSize: 12, marginTop: 8, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {Array.from(seen.entries()).map(([key, label]) => (
+              <span key={key}><span style={{ color: BASIS_COLOR[key] }}>&#9679;</span> {label}</span>
+            ))}
+            {givesOnly ? <span><span style={{ color: C.sage }}>&#9702;</span> you give a stroke</span> : null}
+          </div>
+        );
+      })()}
       {matchMode && hasHandicap && (() => {
         const totRecv = holes.reduce((sum, h) => sum + (h.recv || 0), 0);
         const totGives = holes.reduce((sum, h) => sum + (h.gives || 0), 0);
         let body: React.ReactNode;
-        if (totRecv > 0) body = <>You get <b style={{ color: "#fff" }}>{totRecv}</b> <span style={{ color: C.dot, letterSpacing: 1 }}>{"●".repeat(Math.min(totRecv, 6))}</span> · opponent plays scratch</>;
+        if (totRecv > 0) body = <>You get <b style={{ color: "#fff" }}>{totRecv}</b> <span style={{ color: C.basisOpponentDark, letterSpacing: 1 }}>{"●".repeat(Math.min(totRecv, 6))}</span> · opponent plays scratch</>;
         else if (totGives > 0) body = <>Opponent gets <b style={{ color: "#fff" }}>{totGives}</b> · you play scratch</>;
         else body = <>Level match — no strokes given</>;
         return (
@@ -1056,7 +1090,9 @@ export function ScoreViewCard({ round }: { round: Round }) {
               </div>
               {GridRow([
                 <div key="p" style={{ textAlign: "center", color: C.parBlue, fontWeight: 700, fontSize: 14 }}>{h.par}</div>,
-                ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: C.dot, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{recv > 0 ? "•".repeat(Math.min(recv, 3)) : ""}</div>] : []),
+                // Solo round: one basis only (your course handicap), so orange is correct here under
+                // the 185.0 scheme and there is no second set to show.
+                ...(hasDots ? [<div key="d" style={{ textAlign: "center", color: C.basisCourse, fontWeight: 800, fontSize: 15, letterSpacing: 1 }}>{recv > 0 ? "•".repeat(Math.min(recv, 3)) : ""}</div>] : []),
                 <div key="sc" style={{ textAlign: "center" }}><ScoreMark hole={h} /></div>,
                 ...(hasFw ? [<div key="fw" style={{ textAlign: "center", fontWeight: 800, fontSize: 13, color: h.fairway === "hit" ? C.greenMid : h.fairway === "miss" ? C.birdie : C.faint }}>{h.par < 4 ? "—" : h.fairway === "hit" ? "✓" : h.fairway === "left" ? "L" : h.fairway === "right" ? "R" : h.fairway === "miss" ? "✗" : "·"}</div>] : []),
                 ...(hasPutts ? [(() => { const girHit = h.putts != null && h.strokes != null && (h.strokes - h.putts) <= (h.par - 2); return <div key="gir" style={{ textAlign: "center", fontWeight: 800, fontSize: 13, color: h.putts == null ? C.faint : girHit ? C.greenMid : C.birdie }}>{h.putts == null ? "·" : girHit ? "✓" : "✗"}</div>; })()] : []),

@@ -10,6 +10,25 @@ export const C = {
   faint: "#676253", line: "#D8D2BE",
   birdie: "#B83A2E", bogey: "#2E5AB8", gold: "#C9A227", sage: "#B2CBBD",
   dot: "#E8730C", parBlue: "#1E3A8A", indivDot: "#8FC4EE",
+  // STROKE-DOT BASES (185.0). Three bases exist in the system and each gets ONE colour, used the
+  // same way on every surface, always named in words in the legend. Before this, orange meant
+  // "whatever this format scores off" — the full course handicap in Stableford, the match basis in
+  // a four-ball — so the same dot meant different things depending on the game.
+  //   basisCourse   — your full course handicap (side games, low-net, posting; the scoring basis
+  //                   itself in Stableford / stroke / individual skins)
+  //   basisOpponent — strokes off the player you are playing (singles, team match, 1:1 skins, and
+  //                   alternate shot, where the "opponent" is the other SIDE)
+  //   basisGroupLow — strokes off the lowest handicap in the foursome (four-ball, 2v2 skins, and a
+  //                   Trifecta's team leg)
+  // Each is a PAIR. Dots render on the cream scorecard AND on dark green card rows, and no single
+  // hex is legible on both — measured, not assumed. The `Dark` variants are for green grounds.
+  // (This also names what was already true: the group card legend's #9A4A08 was the light-ground
+  // orange all along, undocumented, and read as a second inconsistent orange.)
+  basisCourse: "#9A4A08", basisCourseDark: "#E8730C",        // 6.15:1 on card / 4.09:1 on green
+  // Teal-blue, NOT the navy #2E5AB8: that is C.bogey, and a bogey score box sits two columns from
+  // this dot — caught in the first render, where both were the same blue.
+  basisOpponent: "#0E6E9E", basisOpponentDark: "#8FC4EE",    // 5.51:1 on card / 6.71:1 on green
+  basisGroupLow: "#7A5BB0", basisGroupLowDark: "#B49AE0",    // 5.22:1 on card / 5.13:1 on green
   // APP_RULES #25 — EDITABLE FIELDS ONLY. C.cream was tried at 177.59 and measured
   // 1.09:1 against C.card: literally invisible as a field. This reads as a filled-in
   // slot. C.line on it is only 1.18:1, so fields get their own deeper border too.
