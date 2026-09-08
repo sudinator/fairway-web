@@ -1,3 +1,28 @@
+## 186.2.260907 — Stableford points box goes neutral; palette back to six values
+
+- The Stableford points box on the group scorecard no longer borrows the course-handicap hue. Points are always scored off the course handicap and the orange circle in the same cell already says so, so tinting the box repeated the information in colour — and cost a fourth colour value, because 11px TEXT needs 4.5:1 where a 6px dot needs 3.0.
+- `basisCourseInk` / `basisCourseInkDark` are gone. The stroke-basis palette is back to **six values: three bases × two grounds, no exceptions** — and no asymmetry where one basis had a text variant and the others didn't purely because of which basis this one box happened to print.
+- New named token `C.cellChip` (`#F4F0E1`) for a quiet chip on a scorecard cell, documented in DISPLAY_RULES.md. Naming it also retired three pre-existing colour literals, so the palette baseline shrank (76 → 73 off-palette uses).
+- No migration. 0150 remains current.
+
+## 186.1.260907 — Stroke-dot colours lightened to match the dark-row set
+
+- The cream-card dot colours are now the **lightest weight of each hue that still clears the 3.0:1 non-text minimum**, so the two grounds read as one scheme rather than a deep set and a pastel set: course handicap `#E37116` (3.02:1), opponent `#6F8EE2` (3.02:1), foursome low `#10A47C` (3.03:1). Dark rows unchanged.
+- Using the dark-row pastels themselves on the cream cells was measured at 1.98–2.42:1 — below the floor, and the same range as the `C.indivDot` dots found invisible on those cells in 185.0. This keeps their character without that.
+- **A distinction the contrast guard caught:** the Stableford corner box prints the basis colour as 11px TEXT, which needs 4.5:1, not the 3.0 that applies to a dot. Lightening the orange dropped it to 2.78:1 on the peach fill and 2.56:1 on the green summary row. The box now uses its own text-weight pair, `basisCourseInk` `#8A3F06` (6.60:1) / `basisCourseInkDark` `#FFB877` (4.76:1). One pre-existing low-contrast site was fixed along the way.
+- No migration. 0150 remains current.
+
+## 186.0.260907 — Stroke bases get a shape each, not just a colour
+
+- **Each stroke basis now has its own SHAPE**, with colour reinforcing rather than carrying the meaning: **circle** = your course handicap, **triangle** = strokes off your opponent, **square** = strokes off the foursome's lowest. A **hollow** glyph is the same basis in the giving direction — a hollow triangle is "you give your opponent a stroke here".
+- Why: colour alone cannot separate three categories at 6px. Searching the full hue wheel and both standard colour-blind-safe palettes (Okabe-Ito, IBM), the best achievable trio reached ΔE ~12 under protanopia/deuteranopia simulation against the ~35 needed. The 185.0 purple was also only ΔE 39/32 from the blue in normal vision, which is why three dots read as two.
+- **New colours**, tuned to ~6:1 on the cream card and ~5–6:1 on dark rows, ΔE 82 (cream) / 92 (green) apart: course handicap `#A24700` / `#FF7F19`, opponent `#375CBD` / `#7DA1FF`, foursome low `#007052` / `#14CC9A`.
+- **Group scorecard dots move to fixed slots down the left edge** — top / middle / bottom — instead of stacking from the top-left, where three bases bunched into the corner of a 44px cell. Position becomes a third cue that does not depend on hue at all.
+- `strokeGlyph()` in components/ui.tsx is the single glyph definition; the personal card, its legend, the group scorecard cells, its legend, its player headers and the public share card all draw from it.
+- **A defect this exposed:** the group scorecard's `cellSets` filtered on `strokes > 0`, so it never drew "you give a stroke here" at all — only the personal card did. Gives-only sets now render as hollow glyphs.
+- **Guard `ci/check_stroke_dot_bases.py` now DISCOVERS dot-drawing surfaces** instead of using a hand-written list, and requires every one of them to use `strokeGlyph`. The 185.0 list was written from an audit that had missed the public share card, which then shipped drawing its own hardcoded dot. Negative-tested by removing the triangle and by reverting the share card to plain dots.
+- No migration. 0150 remains current.
+
 ## 185.1.260907 — Share-page scorecard: alignment, nine-hole layout, and the stroke bases
 
 - **The score row was not aligned with its own hole numbers.** The Hole, Par and Points cells used the shared centred cell style; the Score cell was written inline with its own padding and NO text-align, so it fell back to left. Scores and their stroke dots sat left of the hole numbers above them. All four rows now use the same cell style.

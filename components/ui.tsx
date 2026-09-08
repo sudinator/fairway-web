@@ -618,6 +618,29 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
   );
 }
 
+/**
+ * The stroke-dot glyph for one basis. ONE definition for every surface — the personal card, the
+ * group scorecard and the public share card all draw this, so a basis looks the same everywhere.
+ *
+ * Shape carries the meaning and colour reinforces it: no trio of hues separates three categories at
+ * 6px for colour-blind readers (measured — the best available trio reaches dE ~12 against the ~35
+ * needed), and shape also survives greyscale and a phone screen in sunlight.
+ *   circle = course handicap   triangle = off your opponent   square = off the foursome low
+ * `gives` outlines the SAME shape instead of filling it: a hollow triangle is "you give a stroke".
+ */
+export function strokeGlyph(key: string, color: string, gives = false, i: number | string = 0) {
+  if (key === "opponent" || key === "alt_side") {
+    return (
+      // 7px tall against the 6px circle/square, so nudged 1px down to sit on the same optical line.
+      <svg key={i} width={8} height={7} viewBox="0 0 8 7" style={{ display: "block", position: "relative", top: 1 }} aria-hidden>
+        <polygon points="4,0.5 7.5,6.5 0.5,6.5" fill={gives ? "none" : color} stroke={color} strokeWidth={gives ? 1.2 : 0} strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  const base: React.CSSProperties = { width: 6, height: 6, display: "block", borderRadius: key === "group_low" ? 1 : 999 };
+  return <span key={i} style={gives ? { ...base, border: `1.2px solid ${color}` } : { ...base, background: color }} />;
+}
+
 export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false, strokeSixes = false, uncap = false, showIndivDots = false, matchStrokeLabel = "team match", scoreLocked = false, lockedByName, onActiveHole, resumeHole }: {
   holes: EntryHole[];
   hasHandicap: boolean;
@@ -758,8 +781,10 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
                   if (!rows.length) return <div key="d" />;
                   return <div key="d" style={{ textAlign: "center", lineHeight: 1.04 }}>
                     {rows.map((r) => (
-                      <div key={r.key} style={{ color: r.gives > 0 && r.strokes === 0 ? C.sage : BASIS_COLOR[r.key], fontWeight: 800, fontSize: rows.length > 2 ? 13 : 14, letterSpacing: 1 }}>
-                        {r.strokes > 0 ? "\u2022".repeat(Math.min(r.strokes, 3)) : "\u25e6".repeat(Math.min(r.gives, 3))}
+                      <div key={r.key} style={{ display: "flex", gap: 2, justifyContent: "center", marginTop: 1 }}>
+                        {Array.from({ length: Math.min(Math.max(r.strokes, r.gives), 3) }).map((_, d) =>
+                          strokeGlyph(r.key, BASIS_COLOR[r.key], r.strokes === 0 && r.gives > 0, d),
+                        )}
                       </div>
                     ))}
                   </div>;
@@ -956,9 +981,9 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
         return (
           <div style={{ color: C.gold, fontSize: 12, marginTop: 8, display: "flex", gap: 10, flexWrap: "wrap" }}>
             {Array.from(seen.entries()).map(([key, label]) => (
-              <span key={key}><span style={{ color: BASIS_COLOR[key] }}>&#9679;</span> {label}</span>
+              <span key={key} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>{strokeGlyph(key, BASIS_COLOR[key], false, key)} {label}</span>
             ))}
-            {givesOnly ? <span><span style={{ color: C.sage }}>&#9702;</span> you give a stroke</span> : null}
+            {givesOnly ? <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>{strokeGlyph("opponent", BASIS_COLOR.opponent, true, "g")} you give a stroke</span> : null}
           </div>
         );
       })()}

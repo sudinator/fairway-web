@@ -1,3 +1,50 @@
+## v186.2 staging check
+
+- [ ] Group scorecard: the small points box bottom-right of each cell is neutral (stone fill, dark grey number), not orange.
+- [ ] The same box on the dark green OUT/IN summary row reads clearly.
+- [ ] The three stroke glyphs are unchanged.
+
+## v186.1 staging check
+
+- [ ] Group scorecard on a PHONE, outdoors if possible: all three glyphs visible on the cream cells — the teal square is the one to watch.
+- [ ] Stableford corner box number still reads clearly, on both the peach cell fill and the dark green summary row.
+
+## v186.0 staging checks — stroke dot shapes
+
+- [ ] Trifecta group scorecard: triangle (top), square (middle), circle (bottom) down the left edge of each cell.
+- [ ] Architects Jul 5 hole 7: Sachin shows a HOLLOW triangle (he gives), BK a FILLED one (he receives).
+- [ ] Architects Jul 5 hole 9: BK shows all three — triangle, square, circle.
+- [ ] Personal card: same glyphs stacked in the Hcp column; legend shows each glyph with its label.
+- [ ] Share card: same glyphs and labels as the app.
+- [ ] Legends and player-header lines show the GLYPH, not a generic bullet.
+- [ ] On a phone, in sunlight if possible: the three shapes are distinguishable at arm's length.
+
+## DONE in 186.0 — group scorecard dot layout and colour separation
+
+- [ ] **Three dots crunched into the top-left of the cell.** scorecard-views.tsx stacks the basis rows
+      at `top: 4 + ri * 8, left: 5` — with three bases they bunch in the top-left corner of a 44px
+      cell. Amit's ask: spread them down the LEFT EDGE — top, middle, bottom — so each basis has its
+      own vertical slot and the count per slot stays readable. Cell is `position: relative`, so this
+      is `top: 4` / `top: "50%", transform: translateY(-50%)` / `bottom: 4`, all at `left: 5`.
+      Keep the ORDER stable per format so a player learns "my single is the top one".
+      Note the personal card (ui.tsx) stacks its rows inside a narrow Hcp column instead — check
+      whether the same treatment is needed there or whether the column stacking is fine on a phone.
+- [ ] **Orange and purple are hard to tell apart** on the cream cells at 6px. Measured contrast is
+      fine against the BACKGROUND (basisCourse #9A4A08 6.15:1, basisGroupLow #7A5BB0 5.22:1) but that
+      is the wrong measurement — what matters is separation from EACH OTHER, which was never checked.
+      Options, in order of preference:
+        a. shift the group-low hue further from orange (a bluer purple, or swap group-low to the teal
+           family and opponent to something else) — recompute pairwise separation, not just contrast;
+        b. differentiate by SHAPE as well as colour (filled circle / ring / square), which also
+           survives greyscale and colour-blind readers — the app already uses filled-vs-hollow for
+           receive-vs-give, so shape is an established channel here;
+        c. size or spacing changes only — weakest, probably insufficient at 6px.
+      Whatever is chosen, verify on a real render at phone width with all three bases present
+      (Trifecta, Architects Jul 5 foursome 1 is the fixture), not in the abstract.
+- [ ] While in here: widen ci/check_stroke_dot_bases.py to EVERY file that renders a stroke dot, not
+      the two surfaces named in the 185.0 audit. The share-page card slipped through precisely because
+      the guard's file list was hand-written from an audit that had missed it.
+
 ## v185.1 staging checks — share page scorecard
 
 - [ ] Open a share link, expand a player: Score row and its dots line up under the hole numbers.

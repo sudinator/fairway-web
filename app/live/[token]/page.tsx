@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { GameType } from "@/lib/game-shape";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { Avatar } from "@/components/ui";
+import { Avatar, strokeGlyph } from "@/components/ui";
 import {
   C, allocateStrokes, applyAllowance, stablefordPts,
   matchStatus, fourballStatus, computeTrifecta, clinchState, computeSkins, toParStr,
@@ -416,7 +416,7 @@ function PlayerDetail({ stat, meta, gameType, strokeNet, setsFor }: { stat: PSta
               return (
                 <td key={h.n} style={cCell}>
                   <div style={{ lineHeight: 0, textAlign: "center" }}>{(setsFor ? setsFor(meta[stat.perHole.indexOf(h)]?.si ?? null).filter((r) => r.strokes > 0) : (h.recv > 0 ? [{ key: "course", strokes: h.recv, gives: 0, label: "course hcp" }] : [])).map((r) => (
-                    <div key={r.key} style={{ height: 8, lineHeight: 0 }}>{Array.from({ length: Math.min(r.strokes, 2) }).map((_, d) => <span key={d} style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: BASIS_COLOR[r.key], margin: "0 1px" }} />)}</div>
+                    <div key={r.key} style={{ display: "flex", gap: 2, justifyContent: "center", height: 8 }}>{Array.from({ length: Math.min(r.strokes, 2) }).map((_, d) => strokeGlyph(r.key, BASIS_COLOR[r.key], false, d))}</div>
                   ))}</div>
                   <div style={{ fontWeight: 800, fontSize: 14, color: c }}>{h.gross && h.gross > 0 ? h.gross : "\u00b7"}</div>
                 </td>
@@ -452,7 +452,7 @@ function PlayerDetail({ stat, meta, gameType, strokeNet, setsFor }: { stat: PSta
         for (const m of meta) for (const r of (setsFor ? setsFor(m.si) : [])) if (!seen.has(r.key)) seen.set(r.key, r.label);
         if (!seen.size) seen.set("course", "course hcp");
         return <>{Array.from(seen.entries()).map(([key, label]) => (
-          <span key={key} style={{ marginRight: 10 }}><span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: BASIS_COLOR[key], verticalAlign: "middle" }} /> {label}</span>
+          <span key={key} style={{ marginRight: 10, display: "inline-flex", alignItems: "center", gap: 4 }}>{strokeGlyph(key, BASIS_COLOR[key], false, key)} {label}</span>
         ))}<span>(two dots = two strokes). Score colour: under / par / over.</span></>;
       })()}</div>
     </div>

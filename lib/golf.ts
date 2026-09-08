@@ -7,6 +7,9 @@ export const C = {
   // Scorecard cell: a shade off `card`, so an editable cell reads as a field. Was a literal in
   // three places, which is how a colour drifts — one gets adjusted and the others disagree.
   cell: "#FBFAF4",
+  // Quiet chip on a scorecard cell — the Stableford points box. Named rather than a literal so the
+  // palette stays closed (186.2); the same value already appears elsewhere as a legacy literal.
+  cellChip: "#F4F0E1",
   faint: "#676253", line: "#D8D2BE",
   birdie: "#B83A2E", bogey: "#2E5AB8", gold: "#C9A227", sage: "#B2CBBD",
   dot: "#E8730C", parBlue: "#1E3A8A", indivDot: "#8FC4EE",
@@ -24,11 +27,24 @@ export const C = {
   // hex is legible on both — measured, not assumed. The `Dark` variants are for green grounds.
   // (This also names what was already true: the group card legend's #9A4A08 was the light-ground
   // orange all along, undocumented, and read as a second inconsistent orange.)
-  basisCourse: "#9A4A08", basisCourseDark: "#E8730C",        // 6.15:1 on card / 4.09:1 on green
-  // Teal-blue, NOT the navy #2E5AB8: that is C.bogey, and a bogey score box sits two columns from
-  // this dot — caught in the first render, where both were the same blue.
-  basisOpponent: "#0E6E9E", basisOpponentDark: "#8FC4EE",    // 5.51:1 on card / 6.71:1 on green
-  basisGroupLow: "#7A5BB0", basisGroupLowDark: "#B49AE0",    // 5.22:1 on card / 5.13:1 on green
+  // Chosen from the Okabe-Ito / IBM colour-blind-safe palettes. The cream-card variants are the
+  // LIGHTEST weight of each hue that still clears the 3.0:1 non-text minimum (186.1, Amit's call):
+  // same family as the dark-row pastels rather than a deep second set, so the two grounds look like
+  // one scheme. Using the pastels themselves on cream was measured at 1.98-2.42:1 — below the floor,
+  // and the same range as the C.indivDot dots that were found invisible on these cells in 185.0.
+  // and ~5-6:1 on the dark rows. Mutual separation is dE 82 (cream) / 92 (green) — the earlier
+  // purple sat at 39/32 against the blue, which is why three dots read as two.
+  //
+  // Colour is NOT the only channel. No trio of hues clears the bar for colour-blind readers at 6px
+  // (best achievable was dE ~12 against the ~35 needed), so each basis also has its own SHAPE.
+  // Shape survives greyscale, every CVD type, and a phone screen in sunlight.
+  basisCourse: "#E37116", basisCourseDark: "#FF7F19",        // 3.02:1 cream / 4.93:1 green — circle
+  basisOpponent: "#6F8EE2", basisOpponentDark: "#7DA1FF",    // 3.02:1 cream / 5.00:1 green — triangle
+  basisGroupLow: "#10A47C", basisGroupLowDark: "#14CC9A",    // 3.03:1 cream / 6.02:1 green — square
+  // The Stableford points box is deliberately NEUTRAL, not tinted with the course-handicap hue.
+  // Points are always scored off the course handicap and the orange circle in the same cell already
+  // says so, so the box repeating it in colour bought nothing — and it cost a fourth colour value,
+  // because 11px TEXT needs 4.5:1 where a 6px dot needs 3.0. Six values, three bases, no exception.
   // APP_RULES #25 — EDITABLE FIELDS ONLY. C.cream was tried at 177.59 and measured
   // 1.09:1 against C.card: literally invisible as a field. This reads as a filled-in
   // slot. C.line on it is only 1.18:1, so fields get their own deeper border too.

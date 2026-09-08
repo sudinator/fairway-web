@@ -23,7 +23,19 @@ import re
 import sys
 
 ROOT = Path(__file__).resolve().parent.parent
-DOT_SURFACES = ["components/ui.tsx", "components/game/scorecard-views.tsx"]
+# Discovered, NOT hand-listed. The 185.0 audit hand-wrote this list from surfaces it knew about and
+# missed the public share card entirely, which then shipped drawing its own hardcoded dot.
+def dot_surfaces() -> list[str]:
+    out = []
+    for base in ("components", "app"):
+        for f in sorted((ROOT / base).rglob("*.tsx")):
+            rel = f.relative_to(ROOT).as_posix()
+            if "node_modules" in rel or ".test." in rel:
+                continue
+            src = f.read_text(encoding="utf-8")
+            if "BASIS_COLOR" in src or "strokeGlyph" in src or "strokeSets(" in src:
+                out.append(rel)
+    return out
 TOKENS = ["basisCourse", "basisCourseDark", "basisOpponent", "basisOpponentDark", "basisGroupLow", "basisGroupLowDark"]
 
 
@@ -57,7 +69,10 @@ def main() -> int:
     if "strokeSets(" not in code_lines(tour):
         fails.append("components/tournaments.tsx: must supply the card's stroke sets from strokeSets")
 
-    for rel in DOT_SURFACES:
+    surfaces = dot_surfaces()
+    if len(surfaces) < 3:
+        fails.append(f"expected at least 3 dot-drawing surfaces, found {surfaces} — discovery is broken")
+    for rel in surfaces:
         src = (ROOT / rel).read_text(encoding="utf-8")
         code = code_lines(src)
         # A surface either computes the sets itself or receives them as data. ScoreEntryCard takes
@@ -69,7 +84,23 @@ def main() -> int:
                 line = src.count("\n", 0, src.find(code[max(0, m.start() - 20):m.start() + 10])) + 1
                 fails.append(f"{rel}: legacy dot colour `{legacy}` still used for a stroke dot (line ~{line}) — use a basis token")
 
-    print(f"stroke-dot bases: {len(TOKENS)} tokens, {len(DOT_SURFACES)} dot surfaces checked")
+    # Shape is the primary channel; colour alone cannot separate three bases at 6px for
+    # colour-blind readers. One glyph definition, shared by every surface.
+    ui = (ROOT / "components" / "ui.tsx").read_text(encoding="utf-8")
+    if "export function strokeGlyph(" not in ui:
+        fails.append("components/ui.tsx: strokeGlyph must exist — one glyph definition for every surface")
+    else:
+        g = ui[ui.index("export function strokeGlyph("):][:1600]
+        for need, why in (("polygon", "triangle (off your opponent)"), ("borderRadius: key === \"group_low\" ? 1 : 999", "square vs circle"), ("gives", "hollow variant for strokes GIVEN")):
+            if need not in g:
+                fails.append(f"strokeGlyph is missing the {why}")
+    for rel in surfaces:
+        src = (ROOT / rel).read_text(encoding="utf-8")
+        code = code_lines(src)
+        if "BASIS_COLOR" in code and "strokeGlyph" not in code:
+            fails.append(f"{rel}: draws basis-coloured marks without strokeGlyph — shape must carry the basis, not colour alone")
+
+    print(f"stroke-dot bases: {len(TOKENS)} tokens, {len(surfaces)} dot surfaces discovered")
     for f in fails:
         print("FAIL", f)
     if fails:
