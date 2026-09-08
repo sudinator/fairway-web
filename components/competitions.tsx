@@ -312,7 +312,9 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
   // of gated SECURITY DEFINER function the game link uses, so competitions stays private (0152).
   const setCupShare = async (on: boolean) => {
     const { data, error } = await supabase.rpc("set_competition_share", { p_competition: competition.id, p_on: on });
-    if (error) { setErr(error.message); return; }
+    // THROW so ShareControl can show the reason next to the button. Returning quietly left the
+    // control looking inert when the RPC failed (188.2).
+    if (error) { setErr(error.message); throw new Error(error.message); }
     setCompetition({ ...competition, share_token: (data as string | null) ?? null });
   };
 

@@ -45,7 +45,10 @@ begin
   if not exists (
     select 1 from competitions c
     where c.id = p_competition
-      and (c.created_by = auth.uid() or public.is_admin(auth.uid()))
+      -- is_admin() takes NO arguments and reads auth.uid() itself. Calling it as is_admin(auth.uid())
+      -- raises "function public.is_admin(uuid) does not exist" and the whole call fails, which is
+      -- exactly what happened: the Create live link button did nothing (188.2).
+      and (c.created_by = auth.uid() or public.is_admin())
   ) then
     raise exception 'only the organizer or an admin can share this competition';
   end if;

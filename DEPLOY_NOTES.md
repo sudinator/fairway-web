@@ -1,3 +1,12 @@
+## 188.2.260907 — Create live link did nothing: is_admin() called with an argument
+
+- **The bug.** `set_competition_share` (0152) authorized with `public.is_admin(auth.uid())`. `is_admin()` takes NO arguments and reads `auth.uid()` itself, so Postgres raised "function public.is_admin(uuid) does not exist" and the whole call failed. The migration applied cleanly and the button did nothing.
+- **Fixed** in 0152. RE-APPLY the migration: it is idempotent and only replaces the function.
+- **The UI hid it.** The Cup handler reported the error to a page-level banner far from the button, so the control looked inert with no reason given. `ShareControl` now catches and shows the failure next to the button, and the handler rethrows so it gets there.
+- **The guard could not have caught it, and now can.** `check_migration_authorization` checked that a recognized helper NAME appeared, not that it was called correctly — so `is_admin(auth.uid())` satisfied it. It now verifies call ARITY against the real signatures (`is_admin()` 0 args; `is_group_admin`/`is_group_member` 2 each). This class fails at RUNTIME rather than deploy, which is why it reached staging: it type-checks, it migrates, and then the feature silently does nothing.
+  - The first version of that check used a pattern that excluded parentheses, so `is_admin(auth.uid())` — whose argument is itself a call — matched nothing and the check was inert. Caught by negative-testing it; it now allows one level of nesting and fails on the exact bad call.
+- No new migration; 0152 is amended in place.
+
 ## 188.1.260907 — Cup share toggle in the organizer UI
 
 - The Ryder Cup screen now has a **Create live link / Copy / Stop sharing** control, so the link no longer has to be minted from SQL. Organizer or system admin, matching `set_competition_share`'s own rule.

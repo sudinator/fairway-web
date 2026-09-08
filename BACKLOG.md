@@ -1,3 +1,30 @@
+## v188.2 staging checks
+
+- [ ] RE-APPLY 0152 (idempotent; it only replaces set_competition_share).
+- [ ] Ryder Cup as organizer: Create live link now mints a token and shows the URL.
+- [ ] Copy the link, open logged out: the Cup page loads.
+- [ ] Stop sharing: the link stops resolving.
+- [ ] Sanity: as a NON-organizer, non-admin, the control is not offered at all.
+
+## NEXT — move the Cup live link into the Ryder Cup settings panel
+
+188.1 placed ShareControl just ABOVE the SESSIONS heading, where it reads as part of the sessions
+block rather than as a Cup-level setting. Amit's ask: put it under Ryder Cup settings, reachable
+once the Cup has begun.
+
+Note it is ALREADY reachable after play starts — the control is gated on `manage` only, not on
+`locked` or on competition.status — so this is placement, not visibility.
+
+- [ ] Move the `{manage && <ShareControl ... path="live/cup" />}` block from just above the SESSIONS
+      Eyebrow into the scoring-contract panel (components/competitions.tsx ~line 443, the
+      `background: C.greenLight` card that holds "IF THE RYDER CUP FINISHES LEVEL"), below the tie-rule
+      select. That panel stays on screen in both draft and locked states, which is exactly the
+      requirement.
+- [ ] Keep it OUTSIDE any `!locked` condition — the link must work during and after play. The tie-rule
+      select next to it IS disabled when locked; the share control must not inherit that.
+- [ ] Check on a phone: that panel is already dense, so the control may need to collapse to a single
+      row (link + copy) once a token exists rather than the full three-part layout.
+
 ## v188.1 staging checks — end-to-end Cup link
 
 - [ ] Apply 0151 and 0152 if not already.

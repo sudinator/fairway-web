@@ -81,6 +81,29 @@ def main() -> int:
                 failures.append(f"{rel}: SECURITY DEFINER granted to an app role but has no auth.uid() "
                                 f"check or recognized authorization helper")
 
+            # 3b) Authorization helpers must be called with the RIGHT NUMBER OF ARGUMENTS.
+            #     The name-only check above is satisfied by `is_admin(auth.uid())`, which does not
+            #     exist — is_admin() takes none and reads auth.uid() itself. Postgres raises at RUNTIME,
+            #     so it type-checks, deploys, and then the feature silently does nothing (0152: the
+            #     Create live link button). Signatures, from 0136:
+            #       is_admin()                                  0 args
+            #       is_group_admin(group_uuid, user_uuid)       2 args
+            #       is_group_member(group_uuid, user_uuid)      2 args
+            HELPER_ARITY = {"is_admin": 0, "is_group_admin": 2, "is_group_member": 2}
+            for hname, want in HELPER_ARITY.items():
+                # Arguments can themselves be calls — auth.uid() — so allow ONE level of nesting.
+                # A pattern that excluded parens silently matched nothing and the check was inert.
+                for hm in re.finditer(rf"\b{hname}\s*\(((?:[^()]|\([^()]*\))*)\)", low):
+                    inner = hm.group(1).strip()
+                    got = 0 if not inner else inner.count(",") + 1
+                    # A definition line (create function is_admin(...)) declares, not calls.
+                    before = low[max(0, hm.start() - 40):hm.start()]
+                    if "function public." in before or "function " in before:
+                        continue
+                    if got != want:
+                        failures.append(f"{rel}: calls {hname}() with {got} argument(s); it takes {want} "
+                                        f"— this fails at RUNTIME, not at deploy")
+
             # 4) Hand-rolled admin/membership check on group_members without status='active'
             #    (the exact 0125 bug). If the migration queries group_members with role='admin' or a
             #    user_id auth match but never filters status and never uses the canonical helpers, flag.

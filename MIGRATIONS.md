@@ -1,3 +1,6 @@
+## 188.2.260907 — re-apply 0152
+is_admin() called with an argument; amended in place. Idempotent.
+
 ## 188.1.260907 — no migration
 Cup share toggle in the organizer UI. 0152 remains current.
 
