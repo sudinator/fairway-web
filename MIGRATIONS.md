@@ -1,3 +1,6 @@
+## 187.1.260907 — no migration
+Stroke glyph box alignment. 0151 remains current.
+
 ## 187.0.260907 — migration 0151
 Alternate Shot side scores and guest players in the live-share payload. Replaces get_live_scorecard; no schema change.
 

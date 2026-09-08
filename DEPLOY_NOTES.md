@@ -1,3 +1,10 @@
+## 187.1.260907 — Stroke glyphs align by construction
+
+- The three stroke glyphs have different natural heights — a 7px triangle against a 6px circle and square — so the rows sat fractionally out of line down each cell. 186.0 patched it by nudging the triangle one pixel, which only moved the discrepancy rather than removing it.
+- Every glyph now renders inside an identical 8×8 box and centres within it, so the vertical rhythm is the same whatever the shape. The per-shape offset is gone.
+- `lib/trifecta-results-row.test.tsx` asserts every glyph box is the same size with the same centring, and that NO glyph carries an individual offset. Verified to fail on the nudged version.
+- No migration. 0151 remains current.
+
 ## 187.0.260907 — Alternate Shot on the public share page (migration 0151), and guests stop disappearing
 
 - **Alternate Shot can now be shared.** The format was absent from the public page entirely — not a UI gap but a DATA gap: Alternate Shot is one ball per SIDE and its canonical score lives in `game_alt_shot_scores` (0140/0141), which `get_live_scorecard` never returned. Migration 0151 adds `alt_shot_scores` to the payload, preserving NULL as the deliberate clear tombstone so the client can tell "cleared" from "never entered".

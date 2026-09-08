@@ -1,3 +1,8 @@
+## v187.1 staging check
+
+- [ ] Group scorecard, a Trifecta cell with all three glyphs: triangle, square and circle sit on a clean vertical line down the left edge.
+- [ ] Personal card: same, stacked in the Hcp column.
+
 ## v187.0 staging checks — Alternate Shot on the share page
 
 - [ ] Apply 0151. Share an ALTERNATE SHOT game; the matchups block shows each foursome's side match with a margin.
