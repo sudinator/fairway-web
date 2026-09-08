@@ -4,12 +4,15 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type { GameType } from "@/lib/game-shape";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { Avatar } from "@/components/ui";
+import { Avatar, strokeGlyph } from "@/components/ui";
 import {
   C, allocateStrokes, applyAllowance, stablefordPts,
   matchStatus, fourballStatus, computeTrifecta, clinchState, computeSkins, toParStr,
   type FourballMember, type SkinPlayer,
+  trifectaRowState,
 } from "@/lib/golf";
+import { liveLegs, liveStrokeSets, type LiveLeg } from "@/lib/live-scoring";
+import type { TrifectaRowSide } from "@/lib/golf";
 
 export const dynamic = "force-dynamic";
 const supabase = createClient();
@@ -26,7 +29,7 @@ type LiveGame = {
   game_type: GameType;
   status: "active" | "ended"; allowance_pct: number | null;
   team_score_mode: "best_ball" | "aggregate" | null;
-  trifecta_scoring: "per_hole" | "match" | null;
+  trifecta_scoring: "match" | null;
   stroke_basis: "gross" | "net" | null;
   teams: { key: string; name: string }[];
   holes_meta: LiveMeta[]; played_at: string | null; ended_at: string | null;
@@ -110,12 +113,12 @@ function teamScores(game: LiveGame, players: LivePlayer[], pairings: LiveData["p
   } else if (game.game_type === "trifecta") {
     foursomes.forEach((f) => {
       const aIds = (f.a || []).filter(Boolean) as string[]; const bIds = (f.b || []).filter(Boolean) as string[];
-      const tri = computeTrifecta(meta, mkMembers([...aIds, ...bIds]), aIds, bIds, allowance, game.team_score_mode || "best_ball", !!f.swap, game.trifecta_scoring === "match" ? "match" : "per_hole");
+      const tri = computeTrifecta(meta, mkMembers([...aIds, ...bIds]), aIds, bIds, allowance, game.team_score_mode || "best_ball", !!f.swap);
       addPts(pts, teamOf(aIds[0]), tri.aPts); addPts(pts, teamOf(bIds[0]), tri.bPts);
       tri.contests.forEach((c) => {
         const aLive = c.aIds.some((id) => !players.find((p) => p.id === id)?.no_show);
         const bLive = c.bIds.some((id) => !players.find((p) => p.id === id)?.no_show);
-        if (aLive && bLive) unclaimed += (game.trifecta_scoring === "match") ? (c.settled ? 0 : 1) : (meta.length - c.thru);
+        if (aLive && bLive) unclaimed += c.settled ? 0 : 1; // one point per contest, claimed at settle
       });
     });
   } else if (game.game_type === "skins") {
@@ -147,7 +150,7 @@ function summaryText(game: LiveGame, teamRows?: TeamRows["rows"]): string {
     case "fourball": return named
       ? `Four-ball — ${named}. Each foursome (2 v 2) is a match worth a point for the winning team, \u00bd for a halved match — Ryder-Cup style.${allow}`
       : `Four-ball match play — each 2-player side counts its better net ball on every hole; win more holes to win the match.${allow}`;
-    case "trifecta": return `Trifecta${named ? ` — ${named}` : ""} — every 2-v-2 foursome plays three points a hole: two singles (each player vs an opponent) plus a team point (${game.team_score_mode === "aggregate" ? "both partners' nets added" : "the side's better net ball"}). Points roll up to the team total.${allow}`;
+    case "trifecta": return `Trifecta${named ? ` — ${named}` : ""} — every 2-v-2 foursome plays three matches worth one point each: two singles (each player vs one opponent, strokes off that opponent) plus a team match (${game.team_score_mode === "aggregate" ? "both partners' nets added" : "the side's better net ball"}, off the foursome's lowest handicap). Points roll up to the team total.${allow}`;
     case "stroke": return `Stroke play — lowest ${game.stroke_basis === "gross" ? "gross" : "net"} total over the round wins.${allow}`;
     case "skins": return `Skins — the lowest net score on a hole wins the skin; a tied hole carries the pot forward to the next.${allow}`;
     default: return "";
@@ -202,7 +205,12 @@ export default function LiveScorecardPage() {
   }, [load]);
 
   return (
-    <div style={{ minHeight: "100vh", background: C.green, color: C.cream, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif" }}>
+    // The public route renders OUTSIDE .app-shell, and globals.css locks the document for iOS bounce
+    // prevention (html{overflow:hidden}; body{position:fixed;overflow:hidden}) — so this page had no
+    // scrolling element at all and anything below the fold was unreachable on every share link.
+    // It establishes its own scroll container instead of relaxing the global rules, which would
+    // reintroduce rubber-banding in the installed app. overscroll-behavior stops it chaining to body.
+    <div className="live-scroll" style={{ position: "fixed", inset: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", background: C.green, color: C.cream, fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, sans-serif" }}>
       <div style={{ maxWidth: 520, margin: "0 auto", padding: "20px 14px 60px" }}>
         <div style={{ textAlign: "center", paddingTop: 8 }}>
           <span style={{ fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, color: C.cream }}>Birdie</span>
@@ -302,15 +310,13 @@ function Scorecard({ data }: { data: LiveData }) {
               if ((gt === "trifecta" || gt === "match" || gt === "fourball") && ts.rows.length >= 2) {
                 const top = ts.rows[0], bot = ts.rows[1];
                 const unclaimed = gt === "trifecta" ? ts.unclaimed : ts.out;
-                const triMatch = gt === "trifecta" && game.trifecta_scoring === "match";
                 const cs = clinchState(top.scoreNum, bot.scoreNum, unclaimed);
-                const usePoints = gt === "trifecta" && !triMatch;
-                const noun = (n: number) => usePoints ? `point${n === 1 ? "" : "s"}` : `match${n === 1 ? "" : "es"}`;
-                const tail = usePoints ? "unclaimed" : "still out";
+                const noun = (n: number) => `match${n === 1 ? "" : "es"}`;
+                const tail = "still out";
                 return (
                   <>
                     <div style={{ borderTop: "1px solid #E8E2CE", marginTop: 12, paddingTop: 10, textAlign: "center", color: C.faint, fontSize: 12 }}>
-                      {unclaimed > 0 ? <><b style={{ color: C.ink }}>{unclaimed}</b> {noun(unclaimed)} {tail}</> : (usePoints ? "All points played" : "All matches in")}
+                      {unclaimed > 0 ? <><b style={{ color: C.ink }}>{unclaimed}</b> {noun(unclaimed)} {tail}</> : "All matches in"}
                     </div>
                     {(cs.clinched || cs.canTie || cs.decided) && (
                       <div style={{ marginTop: 10, background: cs.canTie ? "#FBF1D2" : cs.decided && !cs.leader ? "#F1EFE6" : "#E2F3E8", border: `1px solid ${cs.canTie ? C.gold : cs.decided && !cs.leader ? C.borderCard : "#5BB98A"}`, borderRadius: 10, padding: "9px 12px", textAlign: "center" }}>
@@ -350,7 +356,7 @@ function Scorecard({ data }: { data: LiveData }) {
             </div>
           )}
           {g.players.map((p, idx) => (
-            <PlayerRow key={p.id} p={p} pos={idx + 1} stat={stats[p.id]} meta={meta} right={rightOf(p)} status={statusFor(p, game, pairings, foursomes, byId, meta, allowance)} gameType={game.game_type} strokeNet={strokeNet} />
+            <PlayerRow key={p.id} p={p} pos={idx + 1} stat={stats[p.id]} meta={meta} right={rightOf(p)} status={statusFor(p, game, pairings, foursomes, byId, meta, allowance)} gameType={game.game_type} strokeNet={strokeNet} setsFor={(si) => liveStrokeSets({ game_type: game.game_type, allowance_pct: game.allowance_pct, team_score_mode: game.team_score_mode, course_par: game.course_par }, Object.fromEntries(Object.entries(byId).map(([k2, v]) => [k2, { id: v.id, ch: v.ch, team: v.team, no_show: v.no_show, scores: v.scores || [], display_name: v.display_name }])), pairings, foursomes, meta, p.id, si)} />
           ))}
         </div>
       ))}
@@ -358,7 +364,7 @@ function Scorecard({ data }: { data: LiveData }) {
   );
 }
 
-function PlayerRow({ p, pos, stat, meta, right, status, gameType, strokeNet }: { p: LivePlayer; pos: number; stat: PStat; meta: LiveMeta[]; right: string; status: string; gameType: string; strokeNet: boolean }) {
+function PlayerRow({ p, pos, stat, meta, right, status, gameType, strokeNet, setsFor }: { p: LivePlayer; pos: number; stat: PStat; meta: LiveMeta[]; right: string; status: string; gameType: string; strokeNet: boolean; setsFor?: (si: number | null) => { key: string; strokes: number; gives: number; label: string }[] }) {
   const [open, setOpen] = useState(false);
   return (
     <div onClick={() => setOpen((o) => !o)} style={{ background: C.card, borderRadius: 14, color: C.ink, padding: "12px 14px", marginTop: 8, cursor: "pointer" }}>
@@ -372,16 +378,27 @@ function PlayerRow({ p, pos, stat, meta, right, status, gameType, strokeNet }: {
       <div style={{ color: C.faint, fontSize: 11, marginTop: 4, marginLeft: 26 }}>
         {stat.thru ? `thru ${stat.thru} · gross ${stat.gross}` : "not started"}{status ? ` · ${status}` : ""}
       </div>
-      {open && <PlayerDetail stat={stat} meta={meta} gameType={gameType} strokeNet={strokeNet} />}
+      {open && <PlayerDetail stat={stat} meta={meta} gameType={gameType} strokeNet={strokeNet} setsFor={setsFor} />}
     </div>
   );
 }
 
-function PlayerDetail({ stat, meta, gameType, strokeNet }: { stat: PStat; meta: LiveMeta[]; gameType: string; strokeNet: boolean }) {
+function PlayerDetail({ stat, meta, gameType, strokeNet, setsFor }: { stat: PStat; meta: LiveMeta[]; gameType: string; strokeNet: boolean; setsFor?: (si: number | null) => { key: string; strokes: number; gives: number; label: string }[] }) {
+  // Same three bases, same colours and the same labels as the app's cards (185.0). This card sits on
+  // a cream panel, so the light-ground variants. Before this it drew ONE hardcoded orange row off the
+  // full course handicap and never showed the basis the match was scored on.
+  const BASIS_COLOR: Record<string, string> = {
+    course: C.basisCourse, opponent: C.basisOpponent, group_low: C.basisGroupLow, alt_side: C.basisOpponent,
+  };
   const lblCell: React.CSSProperties = { textAlign: "left", padding: "3px 6px", fontWeight: 700 };
   const cCell: React.CSSProperties = { textAlign: "center", padding: "3px 4px" };
   const totCell: React.CSSProperties = { textAlign: "center", padding: "3px 6px", fontWeight: 800, color: C.green };
-  const half = Math.ceil(meta.length / 2);
+  // Only an eighteen-hole card splits. A nine renders as a single row of nine: the old
+  // Math.ceil(9/2) gave a 5/4 break labelled OUT and IN, which is wrong on both counts for a
+  // back nine (holes 10-18). "TOT" is the honest label for a single-table card.
+  const splits: [number, number, string][] = meta.length > 9
+    ? [[0, Math.ceil(meta.length / 2), "OUT"], [Math.ceil(meta.length / 2), meta.length, "IN"]]
+    : [[0, meta.length, "TOT"]];
 
   const grid = (from: number, to: number, label: string) => {
     const hs = stat.perHole.slice(from, to);
@@ -397,8 +414,10 @@ function PlayerDetail({ stat, meta, gameType, strokeNet }: { stat: PStat; meta: 
             <tr><td style={lblCell}>Score</td>{hs.map((h) => {
               const c = h.gross == null ? C.faint : h.gross < h.par ? "#1B7A4B" : h.gross === h.par ? "#1E5B8A" : "#C0392B";
               return (
-                <td key={h.n} style={{ padding: "2px 3px" }}>
-                  <div style={{ height: 8, lineHeight: 0 }}>{h.recv > 0 && Array.from({ length: Math.min(h.recv, 2) }).map((_, d) => <span key={d} style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#E8730C", margin: "0 1px" }} />)}</div>
+                <td key={h.n} style={cCell}>
+                  <div style={{ lineHeight: 0, textAlign: "center" }}>{(setsFor ? setsFor(meta[stat.perHole.indexOf(h)]?.si ?? null).filter((r) => r.strokes > 0) : (h.recv > 0 ? [{ key: "course", strokes: h.recv, gives: 0, label: "course hcp" }] : [])).map((r) => (
+                    <div key={r.key} style={{ display: "flex", gap: 2, justifyContent: "center", height: 8 }}>{Array.from({ length: Math.min(r.strokes, 2) }).map((_, d) => strokeGlyph(r.key, BASIS_COLOR[r.key], false, d))}</div>
+                  ))}</div>
                   <div style={{ fontWeight: 800, fontSize: 14, color: c }}>{h.gross && h.gross > 0 ? h.gross : "\u00b7"}</div>
                 </td>
               );
@@ -420,8 +439,7 @@ function PlayerDetail({ stat, meta, gameType, strokeNet }: { stat: PStat; meta: 
 
   return (
     <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 10, borderTop: `1px solid ${C.borderCard}`, paddingTop: 6 }}>
-      {grid(0, half, "OUT")}
-      {meta.length > half && grid(half, meta.length, "IN")}
+      {splits.map(([from, to, label]) => <React.Fragment key={label}>{grid(from, to, label)}</React.Fragment>)}
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 13 }}>
         <span style={{ color: C.faint }}>Gross <b style={{ color: C.ink }}>{stat.gross || "\u00b7"}</b>{stat.thru ? <> · Net <b style={{ color: C.ink }}>{Math.round(stat.net)}</b></> : null}</span>
         {gameType === "stroke"
@@ -429,7 +447,14 @@ function PlayerDetail({ stat, meta, gameType, strokeNet }: { stat: PStat; meta: 
           : <span style={{ color: C.faint }}>Stableford <b style={{ color: C.green }}>{stat.points} pts</b></span>}
       </div>
       {chips.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>{chips.map(([k, v]) => <div key={k} style={{ background: "#F2EEDF", borderRadius: 8, padding: "7px 11px", fontSize: 12 }}>{k} <b style={{ color: C.green }}>{v}</b></div>)}</div>}
-      <div style={{ color: C.faint, fontSize: 11, marginTop: 10, lineHeight: 1.5 }}><span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: "#E8730C", verticalAlign: "middle" }} /> gets a stroke (two = two strokes). Score color: under / par / over. Stats shown only if the player tracked them.</div>
+      <div style={{ color: C.faint, fontSize: 11, marginTop: 10, lineHeight: 1.5 }}>{(() => {
+        const seen = new Map<string, string>();
+        for (const m of meta) for (const r of (setsFor ? setsFor(m.si) : [])) if (!seen.has(r.key)) seen.set(r.key, r.label);
+        if (!seen.size) seen.set("course", "course hcp");
+        return <>{Array.from(seen.entries()).map(([key, label]) => (
+          <span key={key} style={{ marginRight: 10, display: "inline-flex", alignItems: "center", gap: 4 }}>{strokeGlyph(key, BASIS_COLOR[key], false, key)} {label}</span>
+        ))}<span>(two dots = two strokes). Score colour: under / par / over.</span></>;
+      })()}</div>
     </div>
   );
 }
@@ -444,6 +469,22 @@ function matchLabel(st: { thru: number; lead: number; result: string }): { text:
   }
   if (st.lead === 0) return { text: "all square", color: TIE };
   return st.lead > 0 ? { text: `${st.lead} up`, color: WIN } : { text: `${-st.lead} dn`, color: LOSE };
+}
+
+// Every Trifecta leg on this page is labelled from the engine's own contest via the shared
+// trifectaRowState, so the public page can never drift from Results (183.1). Before 183.1 the
+// singles were recomputed here with matchStatus, which is count-based: a match won 4 & 2 on the
+// 16th kept counting and rendered "won 4 UP" at 18 while Results said "4 & 2".
+function contestLabel(c: { thru: number; lead: number; settled: boolean; result: string }): { text: string; color: string; aSide: TrifectaRowSide; bSide: TrifectaRowSide } {
+  const WIN = "#1B7A4B", TIE = "#1E5B8A", NEU = "#8B8775";
+  const st = trifectaRowState(c);
+  if (!c.thru) return { text: "not started", color: NEU, aSide: st.aSide, bSide: st.bSide };
+  if (st.aSide === "level") return { text: c.settled ? "halved" : "all square", color: TIE, aSide: st.aSide, bSide: st.bSide };
+  // Read from the WINNING/LEADING side, never the left player's. 184.0 highlighted the winner's name
+  // but kept the old left-player wording, so a row could show Christopher's name in bold green next
+  // to "lost 4 & 3" — two opposite signals. The highlight says WHO; this says what.
+  const text = c.settled ? `won ${st.label}` : `${st.label.replace(" UP", "")} up`;
+  return { text, color: WIN, aSide: st.aSide, bSide: st.bSide };
 }
 
 function teamLegLabel(lead: number, thru: number, _holes: number, result: string, teamA: string, teamB: string): { text: string; color: string } {
@@ -473,14 +514,32 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
   const nameStyle: React.CSSProperties = { fontWeight: 700, fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
   const cardStyle: React.CSSProperties = { background: C.card, borderRadius: 14, color: C.ink, padding: "12px 14px", marginTop: 8 };
 
-  const Leg = (key: string, first: boolean, leftIds: string[], rightIds: string[], label: { text: string; color: string }, tag?: string) => (
+  const SIDE_EMPHASIS: Record<TrifectaRowSide, React.CSSProperties> = {
+    won: { fontWeight: 800, color: "#1B7A4B" },
+    leads: { fontWeight: 700, color: "#1B7A4B" },
+    lost: { fontWeight: 500, color: "#8B8775" },
+    trails: { fontWeight: 700 },
+    level: { fontWeight: 700 },
+  };
+  const Leg = (key: string, first: boolean, leftIds: string[], rightIds: string[], label: { text: string; color: string }, tag?: string, sides?: { aSide: TrifectaRowSide; bSide: TrifectaRowSide }) => (
     <div key={key} style={{ display: "flex", alignItems: "center", padding: "8px 0", borderTop: first ? "none" : `1px solid ${C.line}` }}>
       {tag && <span style={{ color: C.faint, fontSize: 11, fontWeight: 700, width: 48, flex: "none" }}>{tag}</span>}
-      <span style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>{sq(colorOf(leftIds[0]))}<span style={nameStyle}>{leftIds.map(nm).join(" & ")}</span></span>
+      <span style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>{sq(colorOf(leftIds[0]))}<span style={{ ...nameStyle, ...(sides ? SIDE_EMPHASIS[sides.aSide] : null) }}>{leftIds.map(nm).join(" & ")}</span></span>
       <span style={{ color: "#B8B19A", fontSize: 11, fontWeight: 700, padding: "0 6px", flex: "none" }}>vs</span>
-      <span style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0, justifyContent: "flex-end" }}><span style={{ ...nameStyle, textAlign: "right" }}>{rightIds.map(nm).join(" & ")}</span>{sq(colorOf(rightIds[0]))}</span>
+      <span style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0, justifyContent: "flex-end" }}><span style={{ ...nameStyle, textAlign: "right", ...(sides ? SIDE_EMPHASIS[sides.bSide] : null) }}>{rightIds.map(nm).join(" & ")}</span>{sq(colorOf(rightIds[0]))}</span>
       <span style={{ fontWeight: 800, fontSize: 13, minWidth: 64, textAlign: "right", flex: "none", color: label.color }}>{label.text}</span>
     </div>
+  );
+
+  // Every matchup number on this page comes from lib/live-scoring, which CI holds against the app's
+  // own answers (lib/live-parity.diff.test.ts). Display stays local to this route; arithmetic does not.
+  const legs: LiveLeg[] = liveLegs(
+    { game_type: gt, allowance_pct: game.allowance_pct, team_score_mode: game.team_score_mode },
+    Object.fromEntries(Object.entries(byId).map(([k, v]) => [k, { id: v.id, ch: v.ch, team: v.team, no_show: v.no_show, scores: v.scores || [] }])),
+    pairings,
+    foursomes,
+    meta,
+    allowance,
   );
 
   let body: React.ReactNode = null;
@@ -491,9 +550,9 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
     body = (
       <div style={cardStyle}>
         {prs.map((pr, i) => {
-          const a = byId[pr.a as string], b = byId[pr.b as string];
-          const st = matchStatus(meta, a?.scores || [], b?.scores || [], a?.ch ?? null, b?.ch ?? null, allowance);
-          return Leg(`m${i}`, i === 0, [pr.a as string], [pr.b as string], matchLabel(st));
+          const leg = legs.find((l) => l.aIds[0] === pr.a && l.bIds[0] === pr.b);
+          const lbl = leg ? contestLabel(leg) : { text: "not started", color: "#8B8775", aSide: "level" as TrifectaRowSide, bSide: "level" as TrifectaRowSide };
+          return Leg(`m${i}`, i === 0, [pr.a as string], [pr.b as string], lbl, undefined, lbl);
         })}
       </div>
     );
@@ -502,8 +561,9 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
     body = <>{foursomes.map((f, i) => {
       const aIds = (f.a || []).filter(Boolean) as string[]; const bIds = (f.b || []).filter(Boolean) as string[];
       if (!aIds.length || !bIds.length) return null;
-      const st = fourballStatus(meta, mem([...aIds, ...bIds]), aIds, bIds, allowance);
-      const lbl = teamLegLabel(st.lead, st.thru, meta.length, st.result, teamNameOf(aIds[0]), teamNameOf(bIds[0]));
+      const leg = legs.find((l) => l.kind === "fourball" && l.aIds.join() === aIds.join() && l.bIds.join() === bIds.join());
+      const st = leg || { lead: 0, thru: 0, result: "", settled: false };
+      const lbl = teamLegLabel(st.lead, st.thru, meta.length, st.settled ? st.result : "", teamNameOf(aIds[0]), teamNameOf(bIds[0]));
       return (
         <div key={`f${i}`} style={cardStyle}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontWeight: 800, fontSize: 14 }}><span>{f.name || `Foursome ${i + 1}`}</span><span style={{ color: C.faint, fontSize: 11, fontWeight: 500 }}>{st.thru ? `thru ${st.thru}` : "not started"}</span></div>
@@ -517,20 +577,19 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
     body = <>{foursomes.map((f, i) => {
       const aIds = (f.a || []).filter(Boolean) as string[]; const bIds = (f.b || []).filter(Boolean) as string[];
       if (!aIds.length || !bIds.length) return null;
-      const tri = computeTrifecta(meta, mem([...aIds, ...bIds]), aIds, bIds, allowance, mode, !!f.swap, game.trifecta_scoring === "match" ? "match" : "per_hole");
-      const singles = tri.contests.filter((c) => c.kind === "single");
-      const team = tri.contests.find((c) => c.kind === "team");
+      const mine = legs.filter((l) => l.aIds.every((x) => aIds.includes(x)) && l.bIds.every((x) => bIds.includes(x)));
+      const singles = mine.filter((c) => c.kind === "single");
+      const team = mine.find((c) => c.kind === "team");
+      const tri = { thru: Math.max(0, ...mine.map((c) => c.thru)) };
       return (
         <div key={`t${i}`} style={cardStyle}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontWeight: 800, fontSize: 14 }}><span>{f.name || `Foursome ${i + 1}`}</span><span style={{ color: C.faint, fontSize: 11, fontWeight: 500 }}>{tri.thru ? `thru ${tri.thru}` : "not started"}</span></div>
           {singles.map((c, si) => {
-            const aId = c.aIds[0], bId = c.bIds[0];
-            const a = byId[aId], b = byId[bId];
-            const st = matchStatus(meta, a?.scores || [], b?.scores || [], a?.ch ?? null, b?.ch ?? null, allowance);
-            return Leg(`t${i}s${si}`, si === 0, [aId], [bId], matchLabel(st), "Single");
+            const lbl = contestLabel(c);
+            return Leg(`t${i}s${si}`, si === 0, [c.aIds[0]], [c.bIds[0]], lbl, "Single", lbl);
           })}
           {team && (() => {
-            const lbl = teamLegLabel(team.lead, team.thru, meta.length, "", teamNameOf(aIds[0]), teamNameOf(bIds[0]));
+            const lbl = teamLegLabel(team.lead, team.thru, meta.length, team.settled ? (team.result || "") : "", teamNameOf(aIds[0]), teamNameOf(bIds[0]));
             return (
               <div style={{ background: "#F4F0E1", borderRadius: 8, padding: "8px 10px", marginTop: 8, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span style={{ fontSize: 12, fontWeight: 700 }}>Team point <span style={{ color: C.faint, fontWeight: 500 }}>({mode === "aggregate" ? "aggregate" : "better ball"})</span></span>

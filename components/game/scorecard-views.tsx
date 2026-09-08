@@ -44,7 +44,7 @@ import {
   markerOwnsMyRow,
   mergeBackupRow,
 } from "@/lib/golf";
-import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, altShotSides } from "@/lib/game-shape";
+import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, strokeSets, altShotSides } from "@/lib/game-shape";
 import { randomTeeGroups, teamGroupSlotChoices, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
@@ -69,6 +69,7 @@ import {
   HoleScoreModal,
   ShortDateInput,
   Avatar,
+  strokeGlyph,
 } from "@/components/ui";
 import type { Game, Player } from "@/lib/game-types";
 import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
@@ -117,6 +118,24 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
   // shot records no individual score, so both describe something that never happened.
   const relBasis = shapeOf(game).dotBasis !== "absolute" && game.game_type !== "alt_shot";
   const indRecvFor = (p: Player, si: number | null) => fullStrokes(game, p, si);
+  // ONE source and ONE colour per stroke basis, shared with the personal card (185.0).
+  const BASIS_COLOR: Record<string, string> = {
+    course: C.basisCourse, opponent: C.basisOpponent, group_low: C.basisGroupLow, alt_side: C.basisOpponent,
+  };
+  // Each basis owns a fixed vertical slot down the LEFT EDGE of the cell — top, middle, bottom —
+  // rather than stacking from the top. With three bases an 8px stack bunched them in the corner and
+  // the count per slot became unreadable. A fixed slot also makes POSITION a cue that does not
+  // depend on hue: your single is always the top one.
+  const DOT_SLOT: Record<string, React.CSSProperties> = {
+    opponent: { top: 4 },
+    group_low: { top: "50%", transform: "translateY(-50%)" },
+    course: { bottom: 4 },
+    alt_side: { top: 4 },
+  };
+  const cellSets = (p: Player, si: number | null) =>
+    // A set with only `gives` still draws — as a hollow glyph. Filtering on strokes alone meant the
+    // group card never showed "you give a stroke here", which the personal card has always shown.
+    strokeSets(game, p, si, strokePool).filter((r) => r.strokes > 0 || r.gives > 0);
 
   // Column order + colour. Stableford: alphabetical. Team match: each pairing's
   // two players adjacent, with a divider between matches. Foursome formats: Pair A
@@ -298,26 +317,24 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
                 <div
                   style={{ position: "relative", background: C.cell, borderRadius: 6, height: 56, display: "flex", alignItems: "center", justifyContent: "center", cursor: (isMarker || (c.altSide ? c.altSide.memberIds.some((id) => strokePool.find((x) => x.id === id)?.user_id === user?.id) : p.user_id === user?.id)) ? "pointer" : "default", outline: isMarker ? "1px solid #E6E0CC" : ((c.altSide ? c.altSide.memberIds.some((id) => strokePool.find((x) => x.id === id)?.user_id === user?.id) : p.user_id === user?.id) ? "1px dashed #C9BF9B" : "none") }}
                   onClick={(isMarker || (c.altSide ? c.altSide.memberIds.some((id) => strokePool.find((x) => x.id === id)?.user_id === user?.id) : p.user_id === user?.id)) ? () => { setEdit({ playerId: p.id, holeIdx: i, alt: c.altSide ? { foursomeId: c.altSide.foursomeId, side: c.altSide.side } : undefined }); } : undefined}>
-                  {recv > 0 && (
-                    <div style={{ position: "absolute", top: 4, left: 5, display: "flex", gap: 2 }}>
-                      {Array.from({ length: Math.min(recv, 2) }).map((_, d) => (
-                        <span key={d} style={{ width: 6, height: 6, borderRadius: 999, background: "#E8730C", display: "block" }} />
-                      ))}
+                  {/* One row per stroke basis, from lib/game-shape.strokeSets — the same source and the
+                      same colours as the personal card (185.0). Before this the second row used
+                      C.indivDot, a colour tuned for dark grounds: 1.83:1 on these cream cells, so the
+                      course-handicap dots were effectively invisible here. */}
+                  {cellSets(p, m.si).map((r) => (
+                    <div key={r.key} style={{ position: "absolute", left: 5, display: "flex", gap: 2, ...DOT_SLOT[r.key] }}>
+                      {Array.from({ length: Math.min(Math.max(r.strokes, r.gives), 2) }).map((_, d) =>
+                        strokeGlyph(r.key, BASIS_COLOR[r.key], r.strokes === 0 && r.gives > 0, d),
+                      )}
                     </div>
-                  )}
-                  {indRecv > 0 && (
-                    <div style={{ position: "absolute", bottom: 4, left: 5, display: "flex", gap: 2 }}>
-                      {Array.from({ length: Math.min(indRecv, 2) }).map((_, d) => (
-                        <span key={d} style={{ width: 6, height: 6, borderRadius: 999, background: C.indivDot, display: "block" }} />
-                      ))}
-                    </div>
-                  )}
+                  ))}
                   <span style={{ fontSize: 26, fontWeight: 800, color: gross != null && gross > 0 ? netColor(gross, recv, m.par) : "#C7C2B0" }}>{gross != null && gross > 0 ? gross : m.par}</span>
                   {c.altSide && gross != null && gross > 0 && <span style={{ position: "absolute", bottom: 3, right: 4, color: C.faint, fontSize: 11, fontWeight: 800 }}>net {gross - recv}</span>}
+                  {/* Stableford points are scored off the COURSE handicap. The second box here used to
+                      show points computed on the MATCH basis — a number nobody scores — so it is gone (185.0). */}
                   {!c.altSide && gross != null && gross > 0 && (relBasis ? (
                     <>
-                      <span style={{ position: "absolute", top: 3, right: 3, minWidth: 16, height: 16, padding: "0 2px", border: "1.5px solid #E8730C", borderRadius: 6, background: "#FBEEE2", color: "#9A4A08", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{oPts ?? 0}</span>
-                      <span style={{ position: "absolute", bottom: 3, right: 3, minWidth: 16, height: 16, padding: "0 2px", border: `1.5px solid ${C.indivDot}`, borderRadius: 6, background: "#EAF3FB", color: "#1E5B8A", fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{bPts ?? 0}</span>
+                      <span style={{ position: "absolute", bottom: 3, right: 3, minWidth: 16, height: 16, padding: "0 2px", border: `1.5px solid ${C.borderCard}`, borderRadius: 6, background: C.cellChip, color: C.ink, fontSize: 11, fontWeight: 800, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>{bPts ?? 0}</span>
                     </>
                   ) : (
                     <span style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#fff", fontSize: 11, fontWeight: 800, padding: "0 6px", borderRadius: 6 }}>{oPts ?? 0}</span>
@@ -344,10 +361,11 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
               <div style={{ position: "relative", background: C.greenLight, borderRadius: 6, height: 44, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff" }}>
                 <span style={{ fontSize: 20, fontWeight: 800 }}>{s.g || "–"}</span>
                 {c.altSide && s.g > 0 && <span style={{ position: "absolute", bottom: 2, right: 4, color: C.sage, fontSize: 11, fontWeight: 800 }}>net {s.net}</span>}
+                {/* Second Stableford box removed (185.0): it showed points computed on the MATCH
+                    basis, which is not a number anyone scores. Points are off the course handicap. */}
                 {!c.altSide && s.g > 0 && (relBasis ? (
                   <>
-                    <span style={{ position: "absolute", top: 3, right: 3, minWidth: 15, height: 15, padding: "0 2px", border: "1.5px solid #E8730C", borderRadius: 6, color: C.dot, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.mPts}</span>
-                    <span style={{ position: "absolute", bottom: 3, right: 3, minWidth: 15, height: 15, padding: "0 2px", border: `1.5px solid ${C.indivDot}`, borderRadius: 6, color: C.indivDot, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.cPts}</span>
+                    <span style={{ position: "absolute", bottom: 3, right: 3, minWidth: 15, height: 15, padding: "0 2px", border: `1.5px solid ${C.sage}`, borderRadius: 6, color: C.cream, fontSize: 11, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>{s.cPts}</span>
                   </>
                 ) : (
                   <span style={{ position: "absolute", bottom: 3, right: 4, background: C.green, color: "#E4CF86", fontSize: 11, fontWeight: 800, padding: "0 5px", borderRadius: 6 }}>{s.mPts}</span>
@@ -417,13 +435,31 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
         <span style={{ color: "#7FD0A0", fontSize: 11 }}>● under</span>
         <span style={{ color: "#6FA8DC", fontSize: 11 }}>● par</span>
         <span style={{ color: "#E0796B", fontSize: 11 }}>● over (net)</span>
-        {relBasis
-          ? <>
-              <span style={{ color: "#9A4A08", fontSize: 11 }}>● ▢ match hcp</span>
-              <span style={{ color: C.indivDot, fontSize: 11 }}>● ▢ course hcp</span>
-              <span style={{ color: C.faint, fontSize: 11 }}>dots = strokes · box = net Stableford</span>
-            </>
-          : <span style={{ color: "#9A4A08", fontSize: 11 }}>● gets a stroke · corner = Stableford</span>}
+        {(() => {
+          // Name every basis the cells actually draw. "match hcp" said neither WHOSE strokes nor off
+          // WHOM — one label for two different rules (off your opponent vs off the foursome low), and
+          // a Trifecta has both at once. This legend sits on the dark green header, so it uses the
+          // *Dark* colour variants of the same three bases (185.0).
+          const DARK: Record<string, string> = {
+            course: C.basisCourseDark, opponent: C.basisOpponentDark, group_low: C.basisGroupLowDark, alt_side: C.basisOpponentDark,
+          };
+          // The legend is CARD-WIDE, so its labels must be generic. Building them from strokeSets took
+          // the first player's label and printed one player's opponent as everyone's key — on a
+          // four-player card that is wrong for three of them (641032 read "v Michael"). The per-player
+          // header lines below name each player's own opponent; those stay specific.
+          const GENERIC: Record<string, string> = {
+            opponent: "v opponent", group_low: "off the low", course: "course hcp", alt_side: "your side",
+          };
+          const seen = new Map<string, string>();
+          for (const p of players) for (const m of meta) for (const r of strokeSets(game, p, m.si, strokePool)) if (!seen.has(r.key)) seen.set(r.key, GENERIC[r.key] ?? r.label);
+          if (!seen.size) return null;
+          return <>
+            {Array.from(seen.entries()).map(([key, label]) => (
+              <span key={key} style={{ color: DARK[key], fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}>{strokeGlyph(key, DARK[key], false, key)} {label}</span>
+            ))}
+            <span style={{ color: C.faint, fontSize: 11 }}>dots = strokes &middot; box = net Stableford</span>
+          </>;
+        })()}
       </div>
       <div id="scorecard-sticky" style={{ position: "sticky", top: 0, zIndex: 5, background: C.green, paddingTop: 8, paddingBottom: 10, marginBottom: 4, boxShadow: "0 6px 10px -8px rgba(0,0,0,0.55)" }}>
         {(() => {
@@ -479,8 +515,14 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
                       const matchHcp = meta.reduce((a, m) => a + recvFor(p, m.si), 0);
                       const courseHcp = meta.reduce((a, m) => a + indRecvFor(p, m.si), 0);
                       if (!relBasis) return <div style={{ color: C.sage, fontSize: 11 }}>hcp {matchHcp}</div>;
-                      const line = (color: string, label: string, val: number) => (<div style={{ color: C.sage, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, whiteSpace: "nowrap" }}><span style={{ width: 5, height: 5, borderRadius: 999, background: color, display: "inline-block", flex: "none" }} />{label} {val}</div>);
-                      return <>{line("#E8730C", "match hcp", matchHcp)}{line(C.indivDot, "course hcp", courseHcp)}</>;
+                      const line = (key: string, color: string, label: string, val: number) => (<div style={{ color: C.sage, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, whiteSpace: "nowrap" }}><span style={{ display: "inline-flex", flex: "none" }}>{strokeGlyph(key, color, false, key)}</span>{label} {val}</div>);
+                      // Totals per basis, labelled by basis. Header sits on dark green.
+                      const sets = strokeSets(game, p, null, strokePool);
+                      const totalFor = (key: string) => meta.reduce((a, m) => a + (strokeSets(game, p, m.si, strokePool).find((r) => r.key === key)?.strokes || 0), 0);
+                      const DARKH: Record<string, string> = {
+                        course: C.basisCourseDark, opponent: C.basisOpponentDark, group_low: C.basisGroupLowDark, alt_side: C.basisOpponentDark,
+                      };
+                      return <>{sets.map((r) => line(r.key, DARKH[r.key], r.label, totalFor(r.key)))}</>;
                     })()}
                     {p.tee_name && <div style={{ color: C.sage, fontSize: 11, opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.tee_name}</div>}
                   </>

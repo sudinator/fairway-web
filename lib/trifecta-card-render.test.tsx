@@ -1,9 +1,8 @@
 /**
  * RENDERED CHECK — the Trifecta player card on screen, not the engine in isolation.
  *
- * lib/trifecta-card-scoring.test.ts proves computeTrifecta returns 2UP/5UP for Sachin when told
- * the game is match-scored. ci/check_trifecta_scoring_argument.py proves the card passes that
- * argument. Neither opens the screen. This does: it mounts the real Tournaments → GameRoom →
+ * lib/trifecta-card-scoring.test.ts proves computeTrifecta returns 2UP/5UP for Sachin. Since 183.0
+ * there is one Trifecta rule and no scoring argument to forget; this test still guards the screen. This does: it mounts the real Tournaments → GameRoom →
  * ScoreEntryCard chain with the Jul 5 Architects rows and reads the running strip off the DOM.
  *
  * GameRoom boots from its localStorage snapshot when navigator.onLine is false — the offline cold
@@ -99,12 +98,12 @@ console.log("trifecta card render — Architects Jul 5, Foursome 1");
 const sachin = stripFor(SACHIN, "Sachin Manchanda");
 ok(sachin.every((l) => l != null), "all 18 hole cards rendered for Sachin");
 eq(sachin[12], "1UP", "Sachin's card thru 13 reads 1UP (agrees under both bases)");
-eq(sachin[13], "2UP", "Sachin's card thru 14 reads 2UP — pair basis (Results), not 1UP (four-ball basis, 182.0)");
+eq(sachin[13], "2UP", "Sachin's card thru 14 reads 2UP — pair basis, not the 182.0 four-ball-basis 1UP");
 eq(sachin[17], "5UP", "Sachin's card thru 18 reads 5UP — matches Results 5 UP / 4 & 2, not 4UP");
 // Whole strip must equal what the Results page computes for the same single (match scoring).
 const f1 = game.foursomes[0];
 const members = [...f1.a, ...f1.b].map((uid) => { const r = players.find((q) => q.user_id === uid)!; return { id: uid, gross: r.scores, ch: chBasis(r, 71, 18), noShow: false }; });
-const results = computeTrifecta(HOLES, members, f1.a, f1.b, 90, "aggregate", false, "match");
+const results = computeTrifecta(HOLES, members, f1.a, f1.b, 90, "aggregate", false);
 const single = results.contests.find((c) => c.kind === "single" && c.aIds[0] === SACHIN)!;
 const expected = single.perHole.map((h) => matchLeadLabel(h.aRun - h.bRun));
 eq(sachin.join(" "), expected.join(" "), "Sachin's full 18-hole strip equals the Results-page single hole for hole");

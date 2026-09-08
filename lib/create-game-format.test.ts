@@ -19,7 +19,7 @@ function eq(actual: unknown, expected: unknown, label: string) {
 
 const guided: GuidedFormatState = {
   gameType: "stableford", teamMode: false, skinsTeamStyle: "head_to_head",
-  teamScoreMode: "best_ball", trifectaScoring: "per_hole", strokeBasis: "net",
+  teamScoreMode: "best_ball", strokeBasis: "net",
   skinsMode: "carryover", fmtFamily: "stroke", matchKind: "ind",
 };
 
@@ -57,7 +57,7 @@ eq({ gameType: rt.gameType, fmtFamily: rt.fmtFamily }, { gameType: "stableford",
 rt = apply(rt, selectGuidedFamily(rt, "match"));
 eq({ gameType: rt.gameType, matchKind: rt.matchKind, fmtFamily: rt.fmtFamily }, { gameType: "fourball", matchKind: "team", fmtFamily: "match" }, "round-trip restores team branch selection method");
 
-const base: CreateFormatState = { gameType: "stableford", teamMode: false, skinsTeamStyle: "head_to_head", teamScoreMode: "best_ball", trifectaScoring: "per_hole", strokeBasis: "net", skinsMode: "carryover" };
+const base: CreateFormatState = { gameType: "stableford", teamMode: false, skinsTeamStyle: "head_to_head", teamScoreMode: "best_ball", strokeBasis: "net", skinsMode: "carryover" };
 eq(skinsStyleFromState({ teamMode: false, skinsTeamStyle: "best_ball" }), "individual", "individual ignores stale style");
 eq(skinsStyleFromState({ teamMode: true, skinsTeamStyle: "head_to_head" }), "team_11", "team 1:1 style");
 eq(skinsStyleFromState({ teamMode: true, skinsTeamStyle: "best_ball" }), "team_2v2", "team 2v2 style");
@@ -65,12 +65,13 @@ eq(formatReviewLabel(base), "Stableford", "stableford review");
 eq(formatReviewLabel({ ...base, gameType: "stroke", strokeBasis: "gross" }), "Stroke Play · Gross", "stroke review");
 eq(formatReviewLabel({ ...base, gameType: "match", teamMode: true }), "Match Play · Team", "match review");
 eq(formatReviewLabel({ ...base, gameType: "fourball", teamMode: false, teamScoreMode: "aggregate" }), "Four-ball · Team vs Team · Shootout", "fourball review");
-eq(formatReviewLabel({ ...base, gameType: "trifecta", trifectaScoring: "match" }), "Trifecta · Best ball · Ryder Cup", "trifecta review");
+eq(formatReviewLabel({ ...base, gameType: "trifecta" }), "Trifecta · Best ball · 2 singles + team, 1 pt each", "trifecta review");
 eq(formatReviewLabel({ ...base, gameType: "skins", teamMode: true, skinsTeamStyle: "best_ball", teamScoreMode: "aggregate", skinsMode: "split" }), "Skins · 2 v 2 Best-ball · Aggregate · Halved", "skins review");
 
 const keys = reachableFormatKeys();
-eq(keys.length, 19, "current reachable format shape count");
+// 183.0: Trifecta has one rule, so the two per-hole shapes (trifecta:best_ball:per_hole, trifecta:aggregate:per_hole) are gone: 19 → 17.
+eq(keys.length, 17, "current reachable format shape count");
 eq(new Set(keys).size, keys.length, "historical keys unique");
-for (const required of ["stableford", "stroke:net", "stroke:gross", "match:individual", "match:team", "fourball:team:aggregate", "trifecta:aggregate:match", "skins:individual:split", "skins:team_11:carryover", "skins:team_2v2:aggregate:split"]) eq(keys.includes(required), true, `reachable ${required}`);
+for (const required of ["stableford", "stroke:net", "stroke:gross", "match:individual", "match:team", "fourball:team:aggregate", "trifecta:aggregate", "skins:individual:split", "skins:team_11:carryover", "skins:team_2v2:aggregate:split"]) eq(keys.includes(required), true, `reachable ${required}`);
 
 console.log(`create-game-format: ${n}/${n} assertions passed`);

@@ -1,3 +1,101 @@
+## 186.3.260907 — Group-card legend stops naming one player's opponent; roomier glyph rows
+
+- **DEFECT FIXED: the card-wide legend printed one player's opponent as everyone's.** It built its labels from `strokeSets` and kept the FIRST label it found per basis, so a four-player card read "v Michael" — correct for one player out of four (seen on staging 641032). The legend is card-wide and now reads generically: "v opponent", "off the low", "course hcp". The PER-PLAYER header lines under each player's initials still name that player's own opponent and are unchanged.
+- Introduced in 185.0. The existing fixtures assert the per-player labels, which were always right, so nothing caught it. `lib/trifecta-results-row.test.tsx` now renders the real `GroupScorecard` and asserts the legend element says "v opponent" and names no player; verified to fail on the pre-fix code.
+- **Personal scorecard glyph rows have room.** A Trifecta hole draws three glyph rows in a column sized for one or two, so they bunched. Rows with more than two bases now get their own spacing and a minimum height; one- and two-basis holes keep their current height so nothing else grows.
+- No migration. 0150 remains current.
+
+## 186.2.260907 — Stableford points box goes neutral; palette back to six values
+
+- The Stableford points box on the group scorecard no longer borrows the course-handicap hue. Points are always scored off the course handicap and the orange circle in the same cell already says so, so tinting the box repeated the information in colour — and cost a fourth colour value, because 11px TEXT needs 4.5:1 where a 6px dot needs 3.0.
+- `basisCourseInk` / `basisCourseInkDark` are gone. The stroke-basis palette is back to **six values: three bases × two grounds, no exceptions** — and no asymmetry where one basis had a text variant and the others didn't purely because of which basis this one box happened to print.
+- New named token `C.cellChip` (`#F4F0E1`) for a quiet chip on a scorecard cell, documented in DISPLAY_RULES.md. Naming it also retired three pre-existing colour literals, so the palette baseline shrank (76 → 73 off-palette uses).
+- No migration. 0150 remains current.
+
+## 186.1.260907 — Stroke-dot colours lightened to match the dark-row set
+
+- The cream-card dot colours are now the **lightest weight of each hue that still clears the 3.0:1 non-text minimum**, so the two grounds read as one scheme rather than a deep set and a pastel set: course handicap `#E37116` (3.02:1), opponent `#6F8EE2` (3.02:1), foursome low `#10A47C` (3.03:1). Dark rows unchanged.
+- Using the dark-row pastels themselves on the cream cells was measured at 1.98–2.42:1 — below the floor, and the same range as the `C.indivDot` dots found invisible on those cells in 185.0. This keeps their character without that.
+- **A distinction the contrast guard caught:** the Stableford corner box prints the basis colour as 11px TEXT, which needs 4.5:1, not the 3.0 that applies to a dot. Lightening the orange dropped it to 2.78:1 on the peach fill and 2.56:1 on the green summary row. The box now uses its own text-weight pair, `basisCourseInk` `#8A3F06` (6.60:1) / `basisCourseInkDark` `#FFB877` (4.76:1). One pre-existing low-contrast site was fixed along the way.
+- No migration. 0150 remains current.
+
+## 186.0.260907 — Stroke bases get a shape each, not just a colour
+
+- **Each stroke basis now has its own SHAPE**, with colour reinforcing rather than carrying the meaning: **circle** = your course handicap, **triangle** = strokes off your opponent, **square** = strokes off the foursome's lowest. A **hollow** glyph is the same basis in the giving direction — a hollow triangle is "you give your opponent a stroke here".
+- Why: colour alone cannot separate three categories at 6px. Searching the full hue wheel and both standard colour-blind-safe palettes (Okabe-Ito, IBM), the best achievable trio reached ΔE ~12 under protanopia/deuteranopia simulation against the ~35 needed. The 185.0 purple was also only ΔE 39/32 from the blue in normal vision, which is why three dots read as two.
+- **New colours**, tuned to ~6:1 on the cream card and ~5–6:1 on dark rows, ΔE 82 (cream) / 92 (green) apart: course handicap `#A24700` / `#FF7F19`, opponent `#375CBD` / `#7DA1FF`, foursome low `#007052` / `#14CC9A`.
+- **Group scorecard dots move to fixed slots down the left edge** — top / middle / bottom — instead of stacking from the top-left, where three bases bunched into the corner of a 44px cell. Position becomes a third cue that does not depend on hue at all.
+- `strokeGlyph()` in components/ui.tsx is the single glyph definition; the personal card, its legend, the group scorecard cells, its legend, its player headers and the public share card all draw from it.
+- **A defect this exposed:** the group scorecard's `cellSets` filtered on `strokes > 0`, so it never drew "you give a stroke here" at all — only the personal card did. Gives-only sets now render as hollow glyphs.
+- **Guard `ci/check_stroke_dot_bases.py` now DISCOVERS dot-drawing surfaces** instead of using a hand-written list, and requires every one of them to use `strokeGlyph`. The 185.0 list was written from an audit that had missed the public share card, which then shipped drawing its own hardcoded dot. Negative-tested by removing the triangle and by reverting the share card to plain dots.
+- No migration. 0150 remains current.
+
+## 185.1.260907 — Share-page scorecard: alignment, nine-hole layout, and the stroke bases
+
+- **The score row was not aligned with its own hole numbers.** The Hole, Par and Points cells used the shared centred cell style; the Score cell was written inline with its own padding and NO text-align, so it fell back to left. Scores and their stroke dots sat left of the hole numbers above them. All four rows now use the same cell style.
+- **A nine-hole game renders as one table.** It was split with `Math.ceil(9/2)`, producing a 5/4 break labelled OUT and IN — wrong on both counts for a back nine (holes 10–18). Only an eighteen splits now; a nine shows nine columns and a TOT total.
+- **The share page's per-player scorecard now draws the same stroke bases as the app.** It drew one hardcoded orange row off the full course handicap: the right colour by luck under the 185.0 scheme, but it never showed the basis the match was actually scored on — a four-ball card said "team 3 up" in the header and showed none of the team-leg strokes behind it. It now renders from `lib/live-scoring.liveStrokeSets`, an adapter over the app's own `strokeSets`, with the same colours and the same written labels.
+- This surface was missed by the 185.0 audit, which recorded the share page as drawing no stroke dots at all. It draws them in the expandable per-player card.
+- No migration. 0150 remains current.
+
+## 185.0.260907 — One colour per stroke basis, and Trifecta finally shows its singles strokes
+
+- **A stroke dot now has one basis, one colour and a written label, on every card.** Before this, orange meant "whatever this format scores off": your full course handicap in Stableford, the match basis in a four-ball. Same dot, different meaning by game.
+  - **Orange** = your course handicap (side games, low-net, posting — and the scoring basis itself in Stableford, stroke and individual skins).
+  - **Teal** = strokes off the player you are playing (singles, team match, 1:1 skins, and alternate shot, where the "opponent" is the other side).
+  - **Purple** = strokes off the foursome's lowest handicap (four-ball, 2v2 skins, and a Trifecta's team leg).
+- **Trifecta shows all three.** Its two singles are 1-v-1 and its team leg is four-ball, so one player can be owed different strokes on the same hole in two contests at once — and the singles basis, which decides two of the three points, was drawn NOWHERE. On the Jul 5 Architects card, BK now sees a purple dot on the 14th (a stroke in the team leg) and no teal one (none against Sachin in his single) — the discrepancy behind the 182.2 bug is now visible to the player.
+- `lib/game-shape.strokeSets()` is the single source: it returns every basis in play for a player on a hole, each with a label. The personal card, its legend, the group scorecard's cells, its legend and its player headers all render from it.
+- **Each basis is a light/dark PAIR** — measured, not assumed. No single hex is legible on both the cream scorecard and the dark green header. This also names something that was already true and undocumented: the group legend's `#9A4A08` was always the light-ground orange.
+- **Two defects the measurements exposed:** the group scorecard's second dot row used `C.indivDot`, a dark-ground colour, at **1.83:1** on cream cells — effectively invisible; and the personal card's legend was suppressed in match mode, so a singles match drew a second colour with no key at all. Both fixed.
+- **The match-basis Stableford box is gone** from the group scorecard. It showed points computed on a relative basis — not a number anyone scores. Points are off the course handicap.
+- Guard `ci/check_stroke_dot_bases.py`: dots come from `strokeSets`, the legacy `C.dot`/`C.indivDot` are not used for stroke dots, each basis is defined as a pair, and no basis is returned unlabelled. Negative-tested.
+- Fixture `lib/stroke-sets.test.ts`: 81 assertions holding every drawn dot to the engine that scores that contest, including the singles dots against `computeTrifecta`'s own nets hole for hole.
+- No migration. 0150 remains current.
+
+## 184.1.260906 — One close-out rule; the share page scrolls; the winner is labelled as the winner
+
+- **Close-out freeze in the in-game cards.** `matchStatus` and `fourballStatus` now take thru/lead/result from `matchCloseoutStatus`, the rule `competition.ts`, `computeTrifecta` and `lib/live-scoring.ts` already used. A decided match freezes at its margin instead of counting on. Confirmed on staging 571157: the four-ball card read **8 UP** at the 9th on a match won **5 & 3 at the 6th** — handicaps were right, the running count was being displayed. After 184.0 the public share page was more correct than the app for this; both agree now. Hole statistics (aWins/bWins/halves) stay full-round counts — they are stats, not match state.
+- **The public share page scrolls.** `globals.css` locks the document for iOS bounce prevention and the app's only scroller lives inside `.app-shell`; the public route renders outside it, so it had no scrolling element at all and anything below the fold was unreachable — on every share link, every format, since the bounce-prevention CSS landed. The route now owns its own scroll container (`.live-scroll`); the global lock is untouched, so the installed app still doesn't rubber-band.
+- **The highlighted winner is no longer labelled "lost".** 184.0 highlighted the winner's name but kept wording read from the LEFT player, so a row showed Christopher in bold green next to "lost 4 & 3". The margin now reads from the winning/leading side always — "won 4 & 3", "3 up" — and the highlight says who.
+- Guard `ci/check_live_route_contract.py`: the route must carry its own scroll container, `globals.css` must still lock the body, and the leg label may not phrase from the left player. All three negative-tested.
+- Fixture `lib/closeout-freeze.test.ts`: staging 571157 (both groups) and 268834 (singles), pinning the frozen margins with the old running counts as a fence.
+- No migration. 0150 remains current.
+
+## 184.0.260906 — The public share page is held to the app's answers in CI
+
+- The live share page keeps its own DISPLAY (unauthenticated route, flattened RPC payload, its own palette) but no longer keeps its own arithmetic. Its matchup scoring moves to `lib/live-scoring.ts` (`liveLegs`), and every number the page renders comes from there.
+- `lib/live-parity.diff.test.ts` feeds one game through BOTH paths — the app's `chBasis` + shared engines as `scoring-views.tsx` calls them, and the `get_live_scorecard` payload shape through `liveLegs` — and fails on any disagreement in thru, lead, settled or the close-out result. Layout is not compared; the two are meant to look different.
+- Extracting the scoring corrected two real defects the share page had:
+  - NINE-HOLE games used the raw eighteen-hole handicap for match and four-ball legs, so a shared nine showed roughly double the strokes. `liveCh` halves it, matching `chBasis`.
+  - Singles and four-balls used count-based status, so a decided match kept moving past its close-out. They now freeze through `matchCloseoutStatus`, as the app does.
+- The harness carries a FENCE that reproduces the pre-184.0 live behaviour and asserts the comparison detects it (4 of 5 non-Trifecta fixtures). A parity harness that cannot see a known-bad implementation is not a harness.
+- Guard `ci/check_live_parity_coverage.py`: MatchupsBlock may not call the engines directly, and every format the page renders must have a parity fixture — adding a format to one side without the other fails the build. Both conditions negative-tested.
+- Fixtures are real games: Architects Jul 5 (90%, aggregate), FB 6/21 via staging 641032 (85%, best ball, swap), a mid-round case, singles match at 18 and at 9, four-ball best-ball, aggregate and 9.
+- NOT covered yet, and therefore not claimed: alternate shot and skins are not rendered by MatchupsBlock and have no parity fixtures; guests are still dropped by `get_live_scorecard`'s user-id map before any of this runs. Both remain in BACKLOG.
+- No migration. 0150 remains current.
+
+## 183.1.260906 — Trifecta results say who won; public share page uses the engine
+
+- Results rows (in-game) now name the winner instead of leaving it to be inferred. Settled: winner's names bold gold, loser's muted. In progress: the leading side gold at 700 — visibly not a win — and the margin is always read from the LEADING side, so no row shows a "DN" the reader has to attribute. Team leg gets the same treatment. Team standings line unchanged.
+- Public live share page: Trifecta singles now come from `computeTrifecta`'s own contests. It had been calling `matchStatus()` on the raw pair and discarding the singles the engine had already returned. `matchStatus` is count-based, so a single won 4 & 2 on the 16th kept counting: staging game 641032 rendered "won 4 UP" and "lost 5 UP" on the public page while Results said 4 & 2 and 4 & 3.
+- Public live share page: the Trifecta team leg was passed a hardcoded empty result, so it never showed a close-out either ("Wildcats 1 up" at 18 instead of the settled margin). It now uses its contest's result.
+- Public live share page: the "how it works" blurb still described the per-hole rule removed in 183.0 ("three points a hole"). Rewritten to two singles plus a team match, one point each, with the stroke basis for each.
+- `trifectaRowState` moved into `lib/golf.ts`: ONE rule for who is ahead and what the margin reads, shared by the in-game row and the public row even though their layouts differ.
+- Guard `ci/check_trifecta_one_singles_source.py`: no `matchStatus`/`fourballStatus` inside the live page's Trifecta block, and both renderers must go through `trifectaRowState`. Negative-tested by restoring the old call.
+- Fixtures from staging 641032 (carrying FB 6/21 production scores): `lib/live-trifecta-labels.test.ts` pins the screenshot's wrong labels as a regression fence against the correct ones; `lib/trifecta-results-row.test.tsx` renders the real row and reads weight and colour per side off the DOM.
+- No migration. 0150 remains current.
+
+## 183.0.260906 — One Trifecta rule (migration 0150)
+
+- Trifecta is now exactly one game: two genuine 1-v-1 singles matches plus a four-ball, each worth one point, decided as matches (½ each if halved). Singles strokes are the difference between the two players in that single; the team match plays off the foursome's lowest handicap. Confirmed with the organizer; already how every Trifecta in production was scored.
+- Removes the per-hole Trifecta variant ("1 hole = 1 pt": one net per player off the foursome low, three points a hole). Zero production games ever used it, and its existence as a second engine path is what produced the 182.0 card/Results disagreement when a caller fell into it by default. `computeTrifecta` loses its `scoring` argument and the `TrifectaScoring` type; the create form and in-game setup lose the scoring picker; the setup policy loses `set_trifecta_scoring`; the live share page loses its per-hole wording.
+- Migration 0150: `games.trifecta_scoring` default `per_hole` → `match`, backfill (expected: none), CHECK constraint `match`-or-null. The column stays because the Ryder Cup contract trigger (0146) requires it and the live RPC returns it.
+- `lib/game-setup-policy.ts`: the setup-change switch gains an exhaustive `default` that BLOCKS unknown actions. Found because the old policy test passed the removed action and the switch silently returned `undefined`.
+- Guard `ci/check_trifecta_single_rule.py` replaces `check_trifecta_scoring_argument.py`: no `per_hole` in production source, 7-parameter `computeTrifecta`, no call with more, `trifecta_scoring` only ever written as `"match"`. Negative-tested three ways.
+- Fixtures: `lib/trifecta-card-scoring.test.ts` now pins the one answer for both real games (Architects Jul 5, Sachin v BK 5 UP / 4 & 2; FB 6/21, Gaurav v Masud 5 DN / 4 & 3) with the old per-hole numbers as a regression fence. `lib/trifecta-card-render.test.tsx` unchanged in intent: the real card reads 2UP / 5UP.
+- Ratchets recommitted downward: reachable format shapes 19 → 17; design-scale and resolved-contrast baselines lower after the two pickers were removed.
+
 ## 182.2.260906 — Trifecta player card scores Ryder Cup singles on the pair basis
 
 - Fixes the player's own scorecard running strip for Ryder Cup ("match") Trifecta games. The card called the shared Trifecta engine without the scoring argument, so it defaulted to per-hole and scored the two singles on the Four-Ball basis (strokes off the foursome's low). Under Ryder Cup scoring a single is a 1-v-1 and strokes are the difference between those two players — which is what the Results page and the Cup tally already used.

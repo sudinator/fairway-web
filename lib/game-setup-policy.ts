@@ -26,7 +26,6 @@ export type SetupAction =
   | { type: "set_skins_mode"; mode: "carryover" | "split" }
   | { type: "set_skins_style"; style: "individual" | "team_11" | "team_2v2" }
   | { type: "set_match_team"; on: boolean }
-  | { type: "set_trifecta_scoring"; mode: "per_hole" | "match" }
   | { type: "set_leg_config" }
   | { type: "set_pairings" }
   | { type: "set_foursomes" };
@@ -228,13 +227,6 @@ export function decideSetupChange({ game, players, action }: SetupPolicyContext)
       if (current === action.on || !anyScores) return allow();
       return block("Match structure is frozen once scoring starts. An individual match cannot become a team match, or vice versa, mid-round.");
     }
-    case "set_trifecta_scoring": {
-      if (!anyScores) return allow();
-      return requireConfirm(
-        "Change Trifecta scoring?",
-        "The same foursomes and gross scorecards are kept, but points already played will be recalculated under the new Trifecta scoring rule.",
-      );
-    }
     case "set_leg_config": {
       if (!anyScores) return allow();
       return requireConfirm(
@@ -249,6 +241,12 @@ export function decideSetupChange({ game, players, action }: SetupPolicyContext)
     case "set_foursomes": {
       if (!anyScores) return allow();
       return block("Foursomes are frozen once scoring starts. Existing scores must stay attached to the teams and foursomes that played them.");
+    }
+    default: {
+      // Exhaustive: an action the type system does not know about (e.g. one removed from the union, or
+      // a stale caller) is refused rather than silently returning undefined.
+      const never: never = action;
+      return block(`Unknown setup change ${String((never as { type?: unknown }).type ?? "?")}.`);
     }
   }
 }

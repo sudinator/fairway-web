@@ -24,7 +24,7 @@ for (let i = 0; i < 4000; i++) {
     allowancePct: pick([50, 85, 100] as const), gameType: pick(TYPES) as GameTypeOpt,
     teamMode: R() < 0.5, team1: pick(["", "Reds", "  A  "]), team2: pick(["", "Blues"]),
     skinsTeamStyle: pick(["head_to_head", "best_ball"] as const), teamScoreMode: pick(["best_ball", "aggregate"] as const),
-    trifectaScoring: pick(["per_hole", "match"] as const), strokeBasis: pick(["net", "gross"] as const),
+    strokeBasis: pick(["net", "gross"] as const),
     skinsMode: pick(["carryover", "split", "halved"] as const), flightsSupported: R() < 0.5,
     flightMode: pick(["off", "oneoff", "season"] as const), flightBands: R() < 0.5 ? [{ key: "A", name: "A", hi: 12 }, { key: "B", name: "B", hi: null }] as any : null,
   };

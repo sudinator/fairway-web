@@ -169,6 +169,12 @@ makes it work — and cream would then compete with gold and win nothing.
   reads as a field. Added at 178.0; it had been a literal in three places, which is how a
   colour drifts: one gets adjusted and the others silently disagree.
 
+### C.cellChip (186.2)
+`#F4F0E1` — a quiet chip sitting on a scorecard cell. Currently the Stableford points box, which is
+deliberately NEUTRAL: points are always scored off the course handicap and the orange circle in the
+same cell already says so. Tinting the box with the basis hue bought nothing and cost a fourth colour
+value, because 11px text needs 4.5:1 where a 6px dot needs 3.0.
+
 ## Part 5 — The scales
 
 Five scales. Nothing outside them.

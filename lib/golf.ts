@@ -7,9 +7,44 @@ export const C = {
   // Scorecard cell: a shade off `card`, so an editable cell reads as a field. Was a literal in
   // three places, which is how a colour drifts — one gets adjusted and the others disagree.
   cell: "#FBFAF4",
+  // Quiet chip on a scorecard cell — the Stableford points box. Named rather than a literal so the
+  // palette stays closed (186.2); the same value already appears elsewhere as a legacy literal.
+  cellChip: "#F4F0E1",
   faint: "#676253", line: "#D8D2BE",
   birdie: "#B83A2E", bogey: "#2E5AB8", gold: "#C9A227", sage: "#B2CBBD",
   dot: "#E8730C", parBlue: "#1E3A8A", indivDot: "#8FC4EE",
+  // STROKE-DOT BASES (185.0). Three bases exist in the system and each gets ONE colour, used the
+  // same way on every surface, always named in words in the legend. Before this, orange meant
+  // "whatever this format scores off" — the full course handicap in Stableford, the match basis in
+  // a four-ball — so the same dot meant different things depending on the game.
+  //   basisCourse   — your full course handicap (side games, low-net, posting; the scoring basis
+  //                   itself in Stableford / stroke / individual skins)
+  //   basisOpponent — strokes off the player you are playing (singles, team match, 1:1 skins, and
+  //                   alternate shot, where the "opponent" is the other SIDE)
+  //   basisGroupLow — strokes off the lowest handicap in the foursome (four-ball, 2v2 skins, and a
+  //                   Trifecta's team leg)
+  // Each is a PAIR. Dots render on the cream scorecard AND on dark green card rows, and no single
+  // hex is legible on both — measured, not assumed. The `Dark` variants are for green grounds.
+  // (This also names what was already true: the group card legend's #9A4A08 was the light-ground
+  // orange all along, undocumented, and read as a second inconsistent orange.)
+  // Chosen from the Okabe-Ito / IBM colour-blind-safe palettes. The cream-card variants are the
+  // LIGHTEST weight of each hue that still clears the 3.0:1 non-text minimum (186.1, Amit's call):
+  // same family as the dark-row pastels rather than a deep second set, so the two grounds look like
+  // one scheme. Using the pastels themselves on cream was measured at 1.98-2.42:1 — below the floor,
+  // and the same range as the C.indivDot dots that were found invisible on these cells in 185.0.
+  // and ~5-6:1 on the dark rows. Mutual separation is dE 82 (cream) / 92 (green) — the earlier
+  // purple sat at 39/32 against the blue, which is why three dots read as two.
+  //
+  // Colour is NOT the only channel. No trio of hues clears the bar for colour-blind readers at 6px
+  // (best achievable was dE ~12 against the ~35 needed), so each basis also has its own SHAPE.
+  // Shape survives greyscale, every CVD type, and a phone screen in sunlight.
+  basisCourse: "#E37116", basisCourseDark: "#FF7F19",        // 3.02:1 cream / 4.93:1 green — circle
+  basisOpponent: "#6F8EE2", basisOpponentDark: "#7DA1FF",    // 3.02:1 cream / 5.00:1 green — triangle
+  basisGroupLow: "#10A47C", basisGroupLowDark: "#14CC9A",    // 3.03:1 cream / 6.02:1 green — square
+  // The Stableford points box is deliberately NEUTRAL, not tinted with the course-handicap hue.
+  // Points are always scored off the course handicap and the orange circle in the same cell already
+  // says so, so the box repeating it in colour bought nothing — and it cost a fourth colour value,
+  // because 11px TEXT needs 4.5:1 where a 6px dot needs 3.0. Six values, three bases, no exception.
   // APP_RULES #25 — EDITABLE FIELDS ONLY. C.cream was tried at 177.59 and measured
   // 1.09:1 against C.card: literally invisible as a field. This reads as a filled-in
   // slot. C.line on it is only 1.18:1, so fields get their own deeper border too.
@@ -440,29 +475,25 @@ export function matchStatus(
   allowancePct: number = 100
 ): { thru: number; lead: number; aWins: number; bWins: number; halves: number; result: string } {
   const allow = matchAllowance(chA, chB, allowancePct);
-  let lead = 0, thru = 0, aWins = 0, bWins = 0, halves = 0;
+  let aWins = 0, bWins = 0, halves = 0;
   holes.forEach((h, i) => {
     const ga = grossA[i], gb = grossB[i];
     if (ga == null || gb == null || ga <= 0 || gb <= 0) return;
-    thru++;
     const ah = asAllocHoles(holes);
     const netA = ga - matchStrokesFor(allow.a, h.si, ah);
     const netB = gb - matchStrokesFor(allow.b, h.si, ah);
-    if (netA < netB) { lead++; aWins++; }
-    else if (netB < netA) { lead--; bWins++; }
+    if (netA < netB) aWins++;
+    else if (netB < netA) bWins++;
     else halves++;
   });
-  const remaining = holes.length - thru;
-  let result = "";
-  if (Math.abs(lead) > remaining && thru > 0) {
-    // Match decided: "X & Y" (up by X with Y to play, before the last counted hole)
-    const upBy = Math.abs(lead);
-    result = remaining === 0 ? `${upBy} UP` : `${upBy} & ${remaining}`;
-  } else if (remaining === 0 && thru > 0) {
-    // Went the full distance without an early close-out: a level finish is a
-    // halve ("AS"), otherwise the final margin. (Mirrors fourballStatus.)
-    result = lead === 0 ? "AS" : `${Math.abs(lead)} UP`;
-  }
+  // thru/lead/result come from the ONE close-out rule, so a decided match freezes at its margin:
+  // 5 & 3 stays 5 & 3 even if the remaining holes are scored. Before 184.1 this counted every played
+  // hole, so the in-game card showed "8 UP" on a match won 5 & 3 at the 6th (staging 571157).
+  // aWins/bWins/halves stay full-round counts — they are hole statistics, not match state.
+  const { thru, lead, result } = matchCloseoutStatus(
+    matchProgress(holes, grossA, grossB, chA, chB, allowancePct),
+    holes.length,
+  );
   return { thru, lead, aWins, bWins, halves, result };
 }
 
@@ -743,21 +774,12 @@ export function fourballStatus(
   mode: "best_ball" | "aggregate" = "best_ball",
 ): { thru: number; lead: number; result: string } {
   const prog = fourballProgress(holes, members, aIds, bIds, allowancePct, mode);
-  const played = prog.filter((p) => p != null) as number[];
-  const thru = played.length;
-  const lead = played.length ? played[played.length - 1] : 0;
-  const remaining = holes.length - thru;
-  let result = "";
+  // One close-out rule, shared with singles, Trifecta, the Cup tally and the public share page.
+  const c = matchCloseoutStatus(prog, holes.length);
+  const { thru, lead } = c;
+  let result = c.result;
   if (thru === 0) result = "Not started";
-  else if (Math.abs(lead) > remaining) {
-    // Match decided early: "X & Y".
-    const up = Math.abs(lead);
-    result = remaining === 0 ? (lead === 0 ? "Halved" : `${up} UP`) : `${up} & ${remaining}`;
-  } else if (thru === holes.length) {
-    result = lead === 0 ? "Halved" : `${Math.abs(lead)} UP`;
-  } else {
-    result = lead === 0 ? "All square" : `${Math.abs(lead)} UP`;
-  }
+  else if (!result) result = lead === 0 ? "All square" : `${Math.abs(lead)} UP`; // still in progress
   return { thru, lead, result };
 }
 
@@ -772,7 +794,6 @@ export function fourballStatus(
 // BOTH partners' nets. Points: win = 1, halve = ½.
 
 export type TrifectaMode = "best_ball" | "aggregate";
-export type TrifectaScoring = "per_hole" | "match"; // per-hole points vs Ryder-Cup 1pt-per-match
 
 // Per-hole detail for a contest, so the UI can show "how we got there".
 // aNet/bNet are the contest-relevant nets (single: the two players; team
@@ -788,8 +809,8 @@ export type TrifectaContest = {
   aPts: number;
   bPts: number;
   thru: number;
-  settled: boolean; // match scoring: contest decided/finished; per-hole: all holes played
-  result: string; // match scoring: mathematical close-out label; otherwise empty
+  settled: boolean; // contest decided (mathematical close-out) or finished
+  result: string; // close-out label ("4 & 2", "1 UP", "Halved"); empty until settled
   perHole: ContestHole[];
 };
 export type TrifectaResult = {
@@ -813,6 +834,26 @@ export function trifectaSingles(aIds: string[], bIds: string[], swap = false): [
   return [];
 }
 
+/**
+ * Who is ahead in a Trifecta contest, and by what margin, as a display-ready state.
+ * ONE source for every renderer: the in-game Results row and the public live share row have
+ * different layouts but must agree on who is winning and what the margin is. `result` is the
+ * close-out label ("4 & 2") once settled; before that the margin is reported from the LEADER's
+ * side so no renderer has to show a "DN" the reader must attribute (183.1).
+ */
+export type TrifectaRowSide = "won" | "lost" | "leads" | "trails" | "level";
+export function trifectaRowState(c: { thru: number; lead: number; settled: boolean; result: string }): { aSide: TrifectaRowSide; bSide: TrifectaRowSide; label: string } {
+  if (!c.thru) return { aSide: "level", bSide: "level", label: "" };
+  if (c.settled) {
+    if (c.lead > 0) return { aSide: "won", bSide: "lost", label: c.result || matchLeadLabel(c.lead) };
+    if (c.lead < 0) return { aSide: "lost", bSide: "won", label: c.result || matchLeadLabel(-c.lead) };
+    return { aSide: "level", bSide: "level", label: c.result || "Halved" };
+  }
+  if (c.lead > 0) return { aSide: "leads", bSide: "trails", label: `${c.lead} UP` };
+  if (c.lead < 0) return { aSide: "trails", bSide: "leads", label: `${-c.lead} UP` };
+  return { aSide: "level", bSide: "level", label: "AS" };
+}
+
 export function computeTrifecta(
   holes: MatchHoleMeta[],
   members: FourballMember[],
@@ -821,24 +862,17 @@ export function computeTrifecta(
   allowancePct: number = 100,
   mode: TrifectaMode = "best_ball",
   swap = false,
-  scoring: TrifectaScoring = "per_hole",
 ): TrifectaResult {
+  // ONE Trifecta rule (confirmed with the organizer, Sep 2026): two genuine 1-v-1 singles plus a
+  // four-ball. Each contest is worth one point, decided as a match. There is no per-hole variant;
+  // the former "per_hole" scoring (one net per player off the foursome low, three points a hole)
+  // was never played in production and was removed in 183.0.
+  //
+  // Team-leg nets: every player relative to the foursome's low (the four-ball rule).
   const nets = fourballNets(holes, members, allowancePct);
   const singles = trifectaSingles(aIds, bIds, swap);
   // A short-handed side forces best-ball on the team leg.
   const teamMode: TrifectaMode = aIds.length === 1 || bIds.length === 1 ? "best_ball" : mode;
-
-  const tally = (perHole: (number | null)[]): { aPts: number; bPts: number; thru: number; lead: number } => {
-    let aPts = 0, bPts = 0, thru = 0, lead = 0;
-    for (const r of perHole) {
-      if (r == null) continue;
-      thru++;
-      if (r > 0) { aPts += 1; lead++; }
-      else if (r < 0) { bPts += 1; lead--; }
-      else { aPts += 0.5; bPts += 0.5; }
-    }
-    return { aPts, bPts, thru, lead };
-  };
 
   const contests: TrifectaContest[] = [];
 
@@ -854,34 +888,25 @@ export function computeTrifecta(
       }
       return { hole: h.n, aNet, bNet, r, aRun, bRun };
     });
-    const results = perHole.map((d) => d.r);
-    if (scoring === "match") {
-      // Ryder-Cup: the contest is worth ONE point, decided by the match over 18
-      // (½ each if halved). No points until the match is settled.
-      let runningLead = 0;
-      const progress = results.map((r) => {
-        if (r == null) return null;
-        if (r > 0) runningLead++;
-        else if (r < 0) runningLead--;
-        return runningLead;
-      });
-      const closeout = matchCloseoutStatus(progress, holes.length);
-      const { lead, thru, decided: settled, result } = closeout;
-      let aPts = 0, bPts = 0;
-      if (settled) { if (lead > 0) aPts = 1; else if (lead < 0) bPts = 1; else { aPts = 0.5; bPts = 0.5; } }
-      return { kind, aIds: aIdsC, bIds: bIdsC, aPts, bPts, thru, lead, settled, result, perHole };
-    }
-    const t = tally(results);
-    return { kind, aIds: aIdsC, bIds: bIdsC, ...t, settled: t.thru === holes.length, result: "", perHole };
+    // The contest is worth ONE point, decided by the match over the round (½ each if halved).
+    // No points until the match is settled; the margin freezes at the mathematical close-out.
+    let runningLead = 0;
+    const progress = perHole.map((d) => {
+      if (d.r == null) return null;
+      if (d.r > 0) runningLead++;
+      else if (d.r < 0) runningLead--;
+      return runningLead;
+    });
+    const { lead, thru, decided: settled, result } = matchCloseoutStatus(progress, holes.length);
+    let aPts = 0, bPts = 0;
+    if (settled) { if (lead > 0) aPts = 1; else if (lead < 0) bPts = 1; else { aPts = 0.5; bPts = 0.5; } }
+    return { kind, aIds: aIdsC, bIds: bIdsC, aPts, bPts, thru, lead, settled, result, perHole };
   };
 
   for (const [aId, bId] of singles) {
-    // A Ryder-Cup Trifecta single is a genuine 1-v-1 match: strokes are
-    // allocated relative to the lower handicap in that pair. The legacy
-    // per-hole Trifecta game keeps its established four-player allocation.
-    const singlesNets = scoring === "match"
-      ? fourballNets(holes, members.filter((m) => m.id === aId || m.id === bId), allowancePct)
-      : nets;
+    // A Trifecta single is a genuine 1-v-1 match: strokes are the difference between THESE TWO
+    // players, allocated on the hardest holes — not the foursome basis the team leg uses.
+    const singlesNets = fourballNets(holes, members.filter((m) => m.id === aId || m.id === bId), allowancePct);
     const pairs = holes.map((_, i) => ({ aNet: singlesNets[aId]?.[i] ?? null, bNet: singlesNets[bId]?.[i] ?? null }));
     contests.push(buildContest("single", [aId], [bId], pairs));
   }

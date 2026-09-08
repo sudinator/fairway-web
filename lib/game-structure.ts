@@ -17,7 +17,7 @@ export function buildFormatPatch(game: Game, next: Game["game_type"]): Record<st
   if ((next === "fourball" || next === "alt_shot") && !Array.isArray(game.foursomes)) patch.foursomes = [];
   if (next === "alt_shot") patch.leg_config = { scheme: "none", metric: "net", points: {} };
   if (next === "trifecta" && !game.team_score_mode) patch.team_score_mode = "best_ball";
-  if (next === "trifecta" && !game.trifecta_scoring) patch.trifecta_scoring = "per_hole";
+  if (next === "trifecta" && game.trifecta_scoring !== "match") patch.trifecta_scoring = "match"; // the only Trifecta rule (183.0)
   if (next === "stroke" && !game.stroke_basis) patch.stroke_basis = "net";
   return patch;
 }

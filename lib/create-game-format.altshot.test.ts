@@ -16,7 +16,7 @@ const eq = <T,>(n: string, a: T, b: T) => {
 
 const base = {
   gameType: "fourball" as never, teamMode: true, skinsTeamStyle: "head_to_head" as const,
-  teamScoreMode: "aggregate" as const, trifectaScoring: "per_hole" as const,
+  teamScoreMode: "aggregate" as const,
   strokeBasis: "net" as const, skinsMode: "carryover" as const,
   fmtFamily: "match" as const, matchKind: "team" as const,
 };

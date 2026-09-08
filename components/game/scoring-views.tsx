@@ -18,6 +18,7 @@ import {
   matchStrokesFor,
   matchProgress,
   matchLeadLabel,
+  trifectaRowState,
   matchAllowance,
   applyAllowance,
   fourballStatus,
@@ -72,6 +73,7 @@ import {
   ShortDateInput,
   Avatar,
 } from "@/components/ui";
+import type { TrifectaRowSide } from "@/lib/golf";
 import type { Game, Player } from "@/lib/game-types";
 import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
 import { HScroll } from "@/components/hscroll";
@@ -1073,6 +1075,43 @@ export function TeamClinchLine({ aPts, bPts, unclaimed, aName, bName, metric, sh
   );
 }
 
+
+// ── Trifecta contest row ─────────────────────────────────────────────────────────────────────────
+// One row per contest (two singles + the team leg). Names are separate spans so the row can SAY who
+// is ahead: settled → winner bold gold, loser muted; in progress → leader gold (normal weight);
+// level → both neutral. The margin at the right is always read from the highlighted side, so it is
+// never a "2 DN" the reader has to attribute. Shared by the in-game Results, the Ryder Cup session
+// page and the public live share so all three read the same way (183.1).
+export type TrifectaRowContest = { kind: "single" | "team"; thru: number; lead: number; settled: boolean; result: string };
+const TRIFECTA_NAME_STYLE: Record<TrifectaRowSide, React.CSSProperties> = {
+  // APP_RULES: weights are 500/700/800 only. Won = 800 gold, leading = 700 gold (visibly not a win),
+  // loser muted at 500, everyone else 500 cream.
+  won: { color: C.gold, fontWeight: 800 },
+  leads: { color: C.gold, fontWeight: 700 },
+  lost: { color: C.sage, fontWeight: 500 },
+  trails: { color: C.cream, fontWeight: 500 },
+  level: { color: C.cream, fontWeight: 500 },
+};
+export function TrifectaContestRow({ c, aNames, bNames, prefix, open, onToggle }: {
+  c: TrifectaRowContest; aNames: string; bNames: string; prefix?: string; open: boolean; onToggle: () => void;
+}) {
+  const st = trifectaRowState(c);
+  const label = st.label || "—";
+  return (
+    <div onClick={onToggle} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${C.borderCard}`, cursor: "pointer" }}>
+      <span style={{ color: C.sage, fontSize: 11, width: 12 }}>{open ? "▾" : "▸"}</span>
+      <span style={{ flex: 1, fontSize: 13, color: C.cream, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {prefix ? <span style={{ color: C.sage }}>{prefix}</span> : null}
+        <span style={TRIFECTA_NAME_STYLE[st.aSide]}>{aNames}</span>
+        <span style={{ color: C.sage, margin: "0 5px" }}>v</span>
+        <span style={TRIFECTA_NAME_STYLE[st.bSide]}>{bNames}</span>
+      </span>
+      <span style={{ color: C.sage, fontSize: 11 }}>{c.thru ? `thru ${c.thru}` : "—"}</span>
+      <span style={{ color: C.gold, fontWeight: 800, fontSize: 13, fontFamily: "Georgia, serif", minWidth: 46, textAlign: "right" }}>{label}</span>
+    </div>
+  );
+}
+
 export function FourballView({
   game,
   players,
@@ -1237,7 +1276,6 @@ export function FourballView({
   // Trifecta: each foursome contributes its singles + team points to the team totals.
   const isTrifecta = game.game_type === "trifecta";
   const teamScoreMode: "best_ball" | "aggregate" = game.team_score_mode === "aggregate" ? "aggregate" : "best_ball";
-  const triScoring: "per_hole" | "match" = game.trifecta_scoring === "match" ? "match" : "per_hole";
   const trifectaStandings = (() => {
     if (!isTeam || !isTrifecta) return null;
     const pts: Record<string, number> = { A: 0, B: 0 };
@@ -1245,7 +1283,7 @@ export function FourballView({
       if (!f.a.length || !f.b.length) return;
       const ta = playerOf(f.a[0])?.team, tb = playerOf(f.b[0])?.team;
       if (!ta || !tb || ta === tb) return;
-      const r = computeTrifecta(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap, triScoring);
+      const r = computeTrifecta(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap);
       pts[ta] = (pts[ta] ?? 0) + r.aPts;
       pts[tb] = (pts[tb] ?? 0) + r.bPts;
     });
@@ -1262,12 +1300,12 @@ export function FourballView({
       if (!f.a.length || !f.b.length) return;
       const ta = playerOf(f.a[0])?.team, tb = playerOf(f.b[0])?.team;
       if (!ta || !tb || ta === tb) return;
-      const r = computeTrifecta(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap, triScoring);
+      const r = computeTrifecta(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap);
       r.contests.forEach((c) => {
         const aLive = c.aIds.some((id) => !playerOf(id)?.no_show);
         const bLive = c.bIds.some((id) => !playerOf(id)?.no_show);
         if (!aLive || !bLive) return;
-        rem += triScoring === "match" ? (c.settled ? 0 : 1) : game.holes_meta.length - c.thru;
+        rem += c.settled ? 0 : 1; // one point per contest
       });
     });
     return rem;
@@ -1403,7 +1441,7 @@ export function FourballView({
           </div>
           {isTeam && standPts && teams && (
             isTrifecta
-              ? <TeamClinchLine aPts={standPts.A} bPts={standPts.B} unclaimed={trifectaUnclaimed ?? 0} aName={teams[0].name} bName={teams[1].name} metric={triScoring === "match" ? "matches" : "points"} />
+              ? <TeamClinchLine aPts={standPts.A} bPts={standPts.B} unclaimed={trifectaUnclaimed ?? 0} aName={teams[0].name} bName={teams[1].name} metric="matches" />
               : teamStandings ? <TeamClinchLine aPts={teamStandings.decidedPts.A} bPts={teamStandings.decidedPts.B} unclaimed={teamStandings.out} aName={teams[0].name} bName={teams[1].name} metric="matches" /> : null
           )}
         </div>
@@ -1429,10 +1467,10 @@ export function FourballView({
           ? `${teamName(playerOf(lead > 0 ? f.a[0] : f.b[0])?.team)} ${Math.abs(lead)} UP`
           : `${isAltShot ? (lead > 0 ? "Pair 1" : "Pair 2") : `${firstName(lead > 0 ? f.a[0] : f.b[0])}'s pair`} ${Math.abs(lead)} UP`;
         const matchDecided = !!st && st.thru > 0 && (st.thru === game.holes_meta.length || Math.abs(st.lead) > game.holes_meta.length - st.thru);
-        const tri = isTrifecta && full ? computeTrifecta(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap, triScoring) : null;
-        // Match scoring (Ryder Cup): show the LIVE provisional match tally (who currently
-        // leads each contest) rather than 0–0 until matches settle.
-        const triTally = tri && triScoring === "match"
+        const tri = isTrifecta && full ? computeTrifecta(game.holes_meta, ms, f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap) : null;
+        // Show the LIVE provisional match tally (who currently leads each contest) rather than
+        // 0–0 until matches settle.
+        const triTally = tri
           ? tri.contests.reduce((acc: { a: number; b: number }, c) => { if (c.thru) { if (c.lead > 0) acc.a += 1; else if (c.lead < 0) acc.b += 1; else { acc.a += 0.5; acc.b += 0.5; } } return acc; }, { a: 0, b: 0 })
           : null;
         return (
@@ -1462,7 +1500,6 @@ export function FourballView({
                 {tri.contests.map((c, ci) => {
                   const aNames = c.aIds.map(firstName).join(" & ");
                   const bNames = c.bIds.map(firstName).join(" & ");
-                  const label = c.kind === "team" ? `Team · ${aNames} v ${bNames}` : `${aNames} v ${bNames}`;
                   const key = `${f.id}-${ci}`;
                   const isOpen = openKey === key;
                   const aColor = isTeam ? teamAccent(teams![0].name, 0) : C.birdie;
@@ -1471,13 +1508,8 @@ export function FourballView({
                   const bLabel = c.kind === "team" ? (isTeam ? teamName(playerOf(c.bIds[0])?.team) : "Pair 2") : firstName(c.bIds[0]);
                   return (
                     <React.Fragment key={ci}>
-                      <div onClick={() => setOpenKey(isOpen ? null : key)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${C.borderCard}`, cursor: "pointer" }}>
-                        <span style={{ color: C.sage, fontSize: 11, width: 12 }}>{isOpen ? "▾" : "▸"}</span>
-                        <span style={{ flex: 1, color: C.cream, fontSize: 13 }}>{label}</span>
-                        <span style={{ color: C.sage, fontSize: 11 }}>{c.thru ? `thru ${c.thru}` : "—"}</span>
-                        <span style={{ color: C.gold, fontWeight: 800, fontSize: 13, fontFamily: "Georgia, serif", minWidth: 46, textAlign: "right" }}>{triScoring === "match" ? (c.thru ? (c.result || matchLeadLabel(c.lead)) : "—") : `${fmtPts(c.aPts)}–${fmtPts(c.bPts)}`}</span>
-                      </div>
-                      {isOpen && <HoleDetail rows={triScoring === "match" && c.settled ? c.perHole.slice(0, c.thru) : c.perHole} aLabel={aLabel} bLabel={bLabel} aColor={aColor} bColor={bColor} runningMatch={triScoring === "match"} />}
+                      <TrifectaContestRow c={c} aNames={aNames} bNames={bNames} prefix={c.kind === "team" ? "Team · " : undefined} open={isOpen} onToggle={() => setOpenKey(isOpen ? null : key)} />
+                      {isOpen && <HoleDetail rows={c.settled ? c.perHole.slice(0, c.thru) : c.perHole} aLabel={aLabel} bLabel={bLabel} aColor={aColor} bColor={bColor} runningMatch />}
                     </React.Fragment>
                   );
                 })}

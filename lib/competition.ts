@@ -214,7 +214,7 @@ export function scoreCompetitionGame(game: Game, players: Player[], altShotScore
       });
       if (game.game_type === "trifecta") {
         if (f.a.length !== 2 || f.b.length !== 2) continue;
-        const tri = computeTrifecta(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, "best_ball", !!f.swap, "match");
+        const tri = computeTrifecta(game.holes_meta, members, f.a, f.b, game.allowance_pct ?? 100, "best_ball", !!f.swap);
         for (let contestIndex = 0; contestIndex < tri.contests.length; contestIndex++) {
           const contest = tri.contests[contestIndex];
           let runningLead = 0;

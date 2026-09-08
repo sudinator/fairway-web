@@ -79,8 +79,7 @@ for (const gt of GAME_TYPES) {
     code: "ABC", activeGroupId: "g1", name: "", courseName: "C", coursePar: 72,
     matchDate: "2026-08-26", allowancePct: 50, courseHoles: [],
     teamMode: true, team1: "Red", team2: "Blue",
-    skinsTeamStyle: "best_ball" as const, teamScoreMode: "best_ball" as const,
-    trifectaScoring: "per_hole" as const, strokeBasis: "net" as const,
+    skinsTeamStyle: "best_ball" as const, teamScoreMode: "best_ball" as const, strokeBasis: "net" as const,
     skinsMode: "carryover" as const, flightsSupported: false, flightMode: "off" as const,
   };
   for (const gt of GAME_TYPES) {

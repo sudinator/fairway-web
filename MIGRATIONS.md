@@ -1,3 +1,33 @@
+## 186.3.260907 — no migration
+Legend label scope and personal-card glyph row spacing. 0150 remains current.
+
+## 186.2.260907 — no migration
+Stableford box colour and a named chip token. 0150 remains current.
+
+## 186.1.260907 — no migration
+Stroke-dot colour weights and Stableford box text colour. 0150 remains current.
+
+## 186.0.260907 — no migration
+Stroke-dot shapes, colours and slot layout. Display only. 0150 remains current.
+
+## 185.1.260907 — no migration
+Share-page scorecard layout and stroke bases. 0150 remains current.
+
+## 185.0.260907 — no migration
+Stroke-dot basis scheme and Trifecta singles strokes. Display + lib only. 0150 remains current.
+
+## 184.1.260906 — no migration
+Close-out unification and two live-route display fixes. 0150 remains current.
+
+## 184.0.260906 — no migration
+Live-share scoring extraction and CI parity harness. 0150 remains current.
+
+## 183.1.260906 — no migration
+Results/live-share display and the live page's Trifecta singles source. 0150 remains current.
+
+## 183.0.260906 — migration 0150
+Trifecta single rule: `games.trifecta_scoring` default → 'match', backfill, CHECK (match or null). Column kept for the Ryder Cup trigger (0146).
+
 ## 182.2.260906 — no migration
 Trifecta player-card scoring correction only; TypeScript, rendered test and CI guard. 182.1 was never deployed. 0149 remains current.
 
@@ -23,7 +53,7 @@ Regenerate after shipping (adds new files, keeps ticks and the notes block):
 Confirm database-applied state with:
 `select id, applied_at from public.schema_migrations order by id;`
 
-Total: 134 migrations. Unchecked = not yet confirmed applied in this checklist.
+Total: 135 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -161,6 +191,7 @@ Total: 134 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [ ] 0147_ryder_cup_trifecta_draft_groups.sql
 - [ ] 0148_delete_competition_session_game.sql
 - [ ] 0149_change_game_match_length.sql
+- [ ] 0150_trifecta_single_rule.sql
 
 <!-- NOTES:START -->
 

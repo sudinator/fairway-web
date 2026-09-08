@@ -5,10 +5,14 @@
  * Found on device: Sachin's own card showed him 4 UP over BK at the finish while the Results
  * page and the Cup tally said 5 UP (4 & 2). The two disagreed from the 14th on.
  *
- * Mechanism: computeTrifecta takes a `scoring` argument. Under "match" each single is a 1-v-1 and
- * strokes are the DIFFERENCE BETWEEN THOSE TWO PLAYERS. Under "per_hole" (the default when the
- * argument is omitted) singles use the four-ball basis — everyone relative to the foursome's low.
+ * Mechanism (182.x): computeTrifecta had a `scoring` argument. Under "match" each single was a 1-v-1
+ * and strokes were the DIFFERENCE BETWEEN THOSE TWO PLAYERS. Under "per_hole" (the default when the
+ * argument was omitted) singles used the four-ball basis — everyone relative to the foursome's low.
  * The card path in tournaments.tsx omitted the argument, so it scored the singles as four-ball.
+ *
+ * 183.0 removed the per-hole variant entirely (never played in production; one Trifecta rule: two
+ * genuine 1-v-1 singles plus a four-ball, one point each). The former per-hole numbers are kept here
+ * as a REGRESSION FENCE: the engine must never produce them again.
  * Same 3-stroke gap, delivered on different holes: on SI 4 (hole 14) BK receives a stroke under
  * the foursome basis and none under the pair basis. Sachin 3, BK 4: Results scores it a Sachin
  * win (3 v 4); the card scored it a halve (3 v 3).
@@ -16,8 +20,7 @@
  * Rules confirmed with Amit (Sep 2026): singles = strokes off the lower of the two, allowance
  * applied first; team leg = strokes off the lowest of the four. Both already what the engine does.
  *
- * Both answers are pinned: the wrong one so a regression is recognised as THIS bug, the right one
- * so the card path can be held to it.
+ * The right answer is pinned as the single truth; the old wrong numbers are asserted NOT to appear.
  */
 import { computeTrifecta, matchLeadLabel } from "./golf";
 import { chBasis } from "./game-shape";
@@ -28,7 +31,7 @@ const eq = <T,>(n: string, a: T, b: T) => {
   else { fail++; fails.push(`FAIL ${n}\n     expected ${String(b)}\n     actual   ${String(a)}`); }
 };
 
-// games row (verbatim: holes_meta, course_par 71, allowance_pct 90, team_score_mode aggregate, trifecta_scoring match)
+// games row (verbatim: holes_meta, course_par 71, allowance_pct 90, team_score_mode aggregate)
 const HOLES = [
   { n: 1, si: 11, par: 5 }, { n: 2, si: 13, par: 3 }, { n: 3, si: 5, par: 5 }, { n: 4, si: 7, par: 4 },
   { n: 5, si: 9, par: 4 }, { n: 6, si: 17, par: 3 }, { n: 7, si: 3, par: 4 }, { n: 8, si: 15, par: 3 },
@@ -39,7 +42,6 @@ const HOLES = [
 const COURSE_PAR = 71;
 const ALLOWANCE = 90;
 const TEAM_MODE = "aggregate" as const;
-const TRIFECTA_SCORING = "match" as const;
 
 // game_players rows (verbatim handicap_index, slope, rating, course_handicap, scores)
 type Row = { id: string; name: string; handicap_index: number; slope: number; rating: number; course_handicap: number; scores: number[] };
@@ -64,15 +66,12 @@ const runFor = (res: ReturnType<typeof computeTrifecta>, me: string) => {
   return mine.perHole.map((h) => (h.aNet == null || h.bNet == null) ? "" : matchLeadLabel(iAmA ? h.aRun - h.bRun : h.bRun - h.aRun));
 };
 
-// ── The wrong answer, pinned: scoring argument omitted (the card path before the fix) ───────────
-const cardBefore = computeTrifecta(HOLES, members, A, B, ALLOWANCE, TEAM_MODE, false);
-const sachinBefore = runFor(cardBefore, SACHIN.id);
-eq("WRONG (omitted scoring) Sachin thru 14", sachinBefore[13], "1UP");
-eq("WRONG (omitted scoring) Sachin final", sachinBefore[17], "4UP");
-
-// ── The right answer: what Results / the Cup tally compute, and what the card must show ────────
-const results = computeTrifecta(HOLES, members, A, B, ALLOWANCE, TEAM_MODE, false, TRIFECTA_SCORING);
+// ── The one answer: every caller (card, Results, Cup tally, live share) gets this ─────────────────
+const results = computeTrifecta(HOLES, members, A, B, ALLOWANCE, TEAM_MODE, false);
 const sachinAfter = runFor(results, SACHIN.id);
+// Regression fence: the 182.0 card numbers (four-ball basis in the singles) must never come back.
+eq("FENCE Sachin thru 14 is not the old four-ball-basis 1UP", sachinAfter[13] !== "1UP", true);
+eq("FENCE Sachin final is not the old four-ball-basis 4UP", sachinAfter[17] !== "4UP", true);
 eq("RIGHT Sachin thru 13 (still agrees)", sachinAfter[12], "1UP");
 eq("RIGHT Sachin thru 14 (H14 won, not halved)", sachinAfter[13], "2UP");
 eq("RIGHT Sachin final", sachinAfter[17], "5UP");
@@ -80,18 +79,42 @@ const sb = results.contests.find((c) => c.kind === "single" && c.aIds[0] === SAC
 eq("RIGHT match result label", sb.result, "4 & 2");
 eq("RIGHT hole 14 won by Sachin", sb.perHole[13].r, 1);
 eq("RIGHT hole 14 nets 3 v 4 (BK gets no stroke on SI 4 off Sachin)", `${sb.perHole[13].aNet}-${sb.perHole[13].bNet}`, "3-4");
-const wrongSb = cardBefore.contests.find((c) => c.kind === "single" && c.aIds[0] === SACHIN.id)!;
-eq("WRONG hole 14 halved on the card (BK stroked off Karan's low)", wrongSb.perHole[13].r, 0);
-eq("WRONG hole 14 nets 3 v 3 on the card", `${wrongSb.perHole[13].aNet}-${wrongSb.perHole[13].bNet}`, "3-3");
+// Full strip pinned so any future change to singles allocation is visible hole by hole.
+eq("Sachin full strip", sachinAfter.join(" "), "1DN AS 1DN 2DN 2DN 1DN 1DN AS 1DN 1DN 1DN AS 1UP 2UP 3UP 4UP 4UP 5UP");
+// Team leg still plays off the foursome low: Karan+Sachin v Ashutosh+BK, aggregate.
+const teamLeg = results.contests.find((c) => c.kind === "team")!;
+eq("team leg kind present", !!teamLeg, true);
+eq("Karan v Ashutosh result", results.contests.find((c) => c.kind === "single" && c.aIds[0] === KARAN.id)!.result, "3 & 1");
 
-// The divergence is exactly holes 14-18 — so a future change that moves it is visible.
-const differing = HOLES.map((h, i) => (sachinBefore[i] !== sachinAfter[i] ? h.n : null)).filter((n): n is number => n != null);
-eq("divergence holes", differing.join(","), "14,15,16,17,18");
-
-// Foursome-immune control: Karan v Ashutosh (Karan is the low both ways) agrees under both bases.
-eq("control Karan v Ashutosh identical under both bases",
-  runFor(cardBefore, KARAN.id).join("|"), runFor(results, KARAN.id).join("|"));
+// ── Second real game: "FB 6/21", game 2eeb134a-f40e-4c51-a3ad-d866e0016eed ──────────────────────
+// Different course (par 70, SI order differs), 85% allowance, best-ball team leg. Karan + Gaurav vs
+// Amit + Masud. Karan was the foursome low AND Amit's opponent, so Karan v Amit agreed under both
+// bases (4 & 2 either way). Gaurav v Masud did not: Masud (18.66) was the opponent but Karan (13.81)
+// was the low, so the card showed Gaurav 4DN at the finish where Results said 5DN (4 & 3), with six
+// holes differing (6-9, 17, 18). Broadens the pin beyond one course and one allowance.
+{
+  const H2 = [
+    { n: 1, si: 5, par: 4 }, { n: 2, si: 11, par: 3 }, { n: 3, si: 7, par: 4 }, { n: 4, si: 13, par: 4 },
+    { n: 5, si: 17, par: 3 }, { n: 6, si: 1, par: 4 }, { n: 7, si: 15, par: 4 }, { n: 8, si: 9, par: 4 },
+    { n: 9, si: 3, par: 4 }, { n: 10, si: 10, par: 4 }, { n: 11, si: 8, par: 4 }, { n: 12, si: 2, par: 4 },
+    { n: 13, si: 6, par: 4 }, { n: 14, si: 18, par: 3 }, { n: 15, si: 16, par: 5 }, { n: 16, si: 4, par: 4 },
+    { n: 17, si: 12, par: 3 }, { n: 18, si: 14, par: 5 },
+  ];
+  const KARAN2: Row = { id: "bbe388ee-dc27-4272-b450-a9f230563e38", name: "Karan", handicap_index: 9, slope: 137, rating: 72.9, course_handicap: 14, scores: [4, 5, 5, 4, 4, 5, 5, 5, 4, 5, 5, 4, 6, 3, 6, 4, 4, 5] };
+  const GAURAV: Row = { id: "9b8c13c0-c65b-43b0-a38d-d75ae6ac3d28", name: "Gaurav", handicap_index: 23, slope: 135, rating: 70.9, course_handicap: 28, scores: [6, 6, 5, 7, 4, 6, 5, 5, 6, 6, 6, 8, 6, 5, 7, 6, 5, 7] };
+  const AMIT: Row = { id: "66cccf4b-bc8e-4895-a4ca-a33e61d2a79b", name: "Amit", handicap_index: 11, slope: 137, rating: 72.9, course_handicap: 16, scores: [5, 4, 5, 6, 5, 6, 5, 5, 5, 5, 5, 5, 5, 4, 6, 6, 4, 5] };
+  const MASUD: Row = { id: "9efce746-9fc0-42db-b1c0-946dbb1382b0", name: "Masud", handicap_index: 13, slope: 137, rating: 72.9, course_handicap: 19, scores: [4, 4, 6, 6, 4, 6, 5, 7, 4, 6, 6, 6, 4, 3, 6, 7, 4, 6] };
+  const A2 = [KARAN2.id, GAURAV.id], B2 = [AMIT.id, MASUD.id];
+  const m2 = [KARAN2, GAURAV, AMIT, MASUD].map((r) => ({ id: r.id, gross: r.scores, ch: chBasis(r, 70, H2.length), noShow: false }));
+  const after2 = computeTrifecta(H2, m2, A2, B2, 85, "best_ball", false);
+  const gA = runFor(after2, GAURAV.id);
+  eq("6/21 Gaurav final", gA[17], "5DN");
+  eq("6/21 FENCE Gaurav final is not the old four-ball-basis 4DN", gA[17] !== "4DN", true);
+  const gm = after2.contests.find((c) => c.kind === "single" && c.aIds[0] === GAURAV.id)!;
+  eq("6/21 Gaurav v Masud result label", gm.result, "4 & 3");
+  eq("6/21 Karan v Amit result", after2.contests.find((c) => c.kind === "single" && c.aIds[0] === KARAN2.id)!.result, "4 & 2");
+}
 
 // ── Report ─────────────────────────────────────────────────────────────────────────────────────
-console.log(`trifecta-card-scoring (Architects Jul 5 fixture): ${pass} passed, ${fail} failed`);
+console.log(`trifecta-card-scoring (Architects Jul 5 + FB 6/21 fixtures): ${pass} passed, ${fail} failed`);
 if (fail) { for (const f of fails) console.log(f); process.exit(1); }

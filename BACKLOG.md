@@ -1,3 +1,233 @@
+## v186.3 staging check
+
+- [ ] 641032 group scorecard: the legend at the top reads "v opponent", NOT "v Michael".
+- [ ] The per-player lines under each player's initials still name that player's own opponent.
+- [ ] Personal card on a Trifecta hole with three bases: the three glyphs have room, not bunched.
+
+## NEXT — Ryder Cup public share page (scoped with Amit, Sep 7)
+
+Decisions taken:
+- Show **scores and handicaps**, same depth as the game share page.
+- **Sessions render INLINE** — no leaving the Cup page to see a session's matches.
+- **Live during play** — must handle sessions not yet started and sessions with no linked game.
+- **Organizer or system admin** creates the link, matching the game share link.
+
+What exists already:
+- `lib/competition.ts` computes session tallies and Cup standings, alt shot included. The maths is done.
+- Share tokens exist ONLY on `games` (0018). Competitions have none, so a Cup cannot be shared at all today.
+- `get_live_scorecard` (0047) returns no alt-shot side scores — the reason alt shot cannot render on the
+  share page is a DATA gap, not a UI gap.
+
+Work:
+- [ ] Migration: `share_token` on `competitions` (same pattern as 0018) + `get_live_competition(token)`
+      security-definer RPC returning the Cup, its sessions, each linked game and its match states.
+      Extend `get_live_scorecard` to return `alt_shot_scores`.
+- [ ] Alt shot branch in the game share page's MatchupsBlock (the coverage guard already fails the build
+      for a rendered format with no parity fixture, so this is enforced).
+- [ ] New public route `/live/cup/[token]`: standings on top, each session inline with its matches.
+- [ ] Parity fixtures for alt shot and for Cup standings, holding the public numbers to competition.ts.
+- [ ] Watch the guest gap: `get_live_scorecard`'s user_id map drops guests. A Cup RPC written the same
+      way inherits the same bug — fix it in the new RPC rather than copying it.
+
+## DONE in 186.3 — two stroke-label/layout fixes found on 641032
+
+- [ ] **DEFECT: the group-card legend prints one player's opponent as everyone's.** The legend builds its
+      labels by walking players and taking the FIRST label per basis, so on 641032 it reads "v Michael" —
+      true for exactly one of four players. The legend is card-wide and must be GENERIC: "v opponent",
+      "off the low", "course hcp". The PER-PLAYER header lines under the initials already use each
+      player's own label ("v Michael", "v Amit") and are correct — leave those alone.
+      Introduced by me in 185.0; the fixtures assert the per-player labels, not the legend, which is why
+      no test caught it. Add an assertion that the legend label is generic.
+- [ ] **Personal scorecard rows are too tight with three glyph rows.** The Hcp column now stacks up to
+      three glyphs in a row height sized for one or two, so they bunch. Increase the row height (and the
+      per-glyph spacing) when a hole draws more than two bases. Check on a phone — that is where it is
+      worst — and keep the two-basis and one-basis cases at their current height so nothing else grows.
+
+## v186.2 staging check
+
+- [ ] Group scorecard: the small points box bottom-right of each cell is neutral (stone fill, dark grey number), not orange.
+- [ ] The same box on the dark green OUT/IN summary row reads clearly.
+- [ ] The three stroke glyphs are unchanged.
+
+## v186.1 staging check
+
+- [ ] Group scorecard on a PHONE, outdoors if possible: all three glyphs visible on the cream cells — the teal square is the one to watch.
+- [ ] Stableford corner box number still reads clearly, on both the peach cell fill and the dark green summary row.
+
+## v186.0 staging checks — stroke dot shapes
+
+- [ ] Trifecta group scorecard: triangle (top), square (middle), circle (bottom) down the left edge of each cell.
+- [ ] Architects Jul 5 hole 7: Sachin shows a HOLLOW triangle (he gives), BK a FILLED one (he receives).
+- [ ] Architects Jul 5 hole 9: BK shows all three — triangle, square, circle.
+- [ ] Personal card: same glyphs stacked in the Hcp column; legend shows each glyph with its label.
+- [ ] Share card: same glyphs and labels as the app.
+- [ ] Legends and player-header lines show the GLYPH, not a generic bullet.
+- [ ] On a phone, in sunlight if possible: the three shapes are distinguishable at arm's length.
+
+## DONE in 186.0 — group scorecard dot layout and colour separation
+
+- [ ] **Three dots crunched into the top-left of the cell.** scorecard-views.tsx stacks the basis rows
+      at `top: 4 + ri * 8, left: 5` — with three bases they bunch in the top-left corner of a 44px
+      cell. Amit's ask: spread them down the LEFT EDGE — top, middle, bottom — so each basis has its
+      own vertical slot and the count per slot stays readable. Cell is `position: relative`, so this
+      is `top: 4` / `top: "50%", transform: translateY(-50%)` / `bottom: 4`, all at `left: 5`.
+      Keep the ORDER stable per format so a player learns "my single is the top one".
+      Note the personal card (ui.tsx) stacks its rows inside a narrow Hcp column instead — check
+      whether the same treatment is needed there or whether the column stacking is fine on a phone.
+- [ ] **Orange and purple are hard to tell apart** on the cream cells at 6px. Measured contrast is
+      fine against the BACKGROUND (basisCourse #9A4A08 6.15:1, basisGroupLow #7A5BB0 5.22:1) but that
+      is the wrong measurement — what matters is separation from EACH OTHER, which was never checked.
+      Options, in order of preference:
+        a. shift the group-low hue further from orange (a bluer purple, or swap group-low to the teal
+           family and opponent to something else) — recompute pairwise separation, not just contrast;
+        b. differentiate by SHAPE as well as colour (filled circle / ring / square), which also
+           survives greyscale and colour-blind readers — the app already uses filled-vs-hollow for
+           receive-vs-give, so shape is an established channel here;
+        c. size or spacing changes only — weakest, probably insufficient at 6px.
+      Whatever is chosen, verify on a real render at phone width with all three bases present
+      (Trifecta, Architects Jul 5 foursome 1 is the fixture), not in the abstract.
+- [ ] While in here: widen ci/check_stroke_dot_bases.py to EVERY file that renders a stroke dot, not
+      the two surfaces named in the 185.0 audit. The share-page card slipped through precisely because
+      the guard's file list was hand-written from an audit that had missed it.
+
+## v185.1 staging checks — share page scorecard
+
+- [ ] Open a share link, expand a player: Score row and its dots line up under the hole numbers.
+- [ ] A NINE-hole game shows ONE table of nine holes with a TOT total — not a 5/4 OUT/IN split.
+- [ ] An 18-hole game still splits OUT / IN.
+- [ ] Four-ball share card: purple (team, off the low) AND orange (course hcp) dots, both named in the legend under the card.
+- [ ] Trifecta share card: teal / purple / orange as applicable.
+- [ ] Stableford share card: orange only, "course hcp".
+
+## v185.0 staging checks — stroke dots
+
+- [ ] Trifecta (641032 or 557495), player card: THREE dot colours where applicable — teal "v <opponent>", purple "off <low>", orange "course hcp" — and the legend names all three.
+- [ ] Jul 5 Architects card as BK: hole 14 shows purple only (team leg), NO teal — he gets no stroke in his single.
+- [ ] Singles match card: teal + orange, and the legend is now visible (it was suppressed in match mode).
+- [ ] Four-ball card: purple + orange.
+- [ ] Stableford / stroke / individual skins: orange only, labelled "course hcp".
+- [ ] Alternate shot: teal ("your side"), unchanged arithmetic.
+- [ ] Group scorecard: cell dots readable on the cream cells (the course-handicap row was 1.83:1 before), legend names each basis, player headers show a line per basis.
+- [ ] Group scorecard: only ONE Stableford corner box now (course handicap). The match-basis box is gone.
+- [ ] Solo round card: orange only.
+
+## v184.1 staging checks
+
+- [ ] 571157 in the APP: Group 1 reads 5 & 3 (was 8 UP); Group 2 halved. Share link unchanged.
+- [ ] 268834 in the APP: all four singles read the frozen margins (3 & 2, 5 & 4, 2 & 1, 3 & 1).
+- [ ] Any share link on a PHONE: scrolls to the bottom, and does not rubber-band past the ends.
+- [ ] The installed app still does not rubber-band (the global lock was deliberately left alone).
+- [ ] 641032 share link: rows read "won 4 & 2" / "won 4 & 3" next to the highlighted winner — no "lost".
+- [ ] An 18-hole match decided early: app and share link both hold the margin after later holes are scored.
+
+## Banked from 184.0 staging testing — ALL THREE FIXED IN 184.1
+
+- [x] **In-game match and four-ball cards ignore the close-out freeze.** FIXED 184.1. CONFIRMED on staging 571157
+      (nine-hole four-ball, Group 1 DeShawn+Amit v Christopher+Michael): the app shows **8 UP** at the
+      9th where the match was decided **5 & 3 at the 6th**. Handicaps are correct — 8 is the running
+      count, not a stroke error. `components/game/scoring-views.tsx` uses count-based `matchStatus`
+      (singles and team match cards) and `fourballStatus` (four-ball card); `competition.ts`,
+      `computeTrifecta` and now `lib/live-scoring.ts` all use `matchCloseoutStatus`, which freezes.
+      So after 184.0 the PUBLIC SHARE PAGE is more correct than the app for these formats — the share
+      link reads 5 & 3, the app reads 8 UP.
+      Fix: route the in-game cards through `matchCloseoutStatus` too (or have matchStatus/fourballStatus
+      delegate to it), so there is one close-out rule. Watch the "AS" vs "Halved" wording difference —
+      `competition.ts` currently string-patches around it; that patch should go away with the fix.
+      Real-data fixtures available: 571157 Group 1 (5 & 3 thru 6, app shows 8 UP) and Group 2 (halved
+      thru 9); 268834 all four singles pairings.
+      Extend the live/app parity harness to cover this once fixed — it did NOT catch this because the
+      harness compares the live path against the ENGINE contract, not against what scoring-views draws.
+
+
+- [x] **Live share page does not scroll.** FIXED 184.1. `app/globals.css` locks the document for iOS bounce
+      prevention (`html{overflow:hidden}`, `body{position:fixed;overflow:hidden}`); the only scroller
+      is the inner container inside home.tsx's `.app-shell`. The public route renders its own
+      `minHeight:100vh` div straight into that fixed body, so anything below the fold is unreachable.
+      Affects EVERY share link with more than a screenful, all formats — predates 183/184 work.
+      Fix: give the public route its own scroll container (`position:fixed; inset:0; overflow-y:auto;
+      -webkit-overflow-scrolling:touch; overscroll-behavior:contain`) and drop the `minHeight:100vh`.
+      Do NOT relax the global rules — that reintroduces bounce in the installed app.
+      Needs a check that the live route establishes its own scroll context.
+- [x] **Live row contradicts itself: highlighted winner labelled "lost".** FIXED 184.1. 184.0 added
+      winner-highlighting driven by who actually won, but kept the page's old wording, which reads
+      from the LEFT player's perspective. Amit (left) v Christopher (right): Christopher's name is
+      green and bold, and the margin next to it says "lost 4 & 3". Two opposite signals in one row.
+      Fix: phrase the margin from the WINNING/LEADING side always — "won 4 & 3", "3 up" — in green,
+      and let the highlight say who. Never "lost", never "dn". Matches the in-game row, which shows
+      the bare margin and lets the highlight carry the winner. Rendered test on the 641032 rows.
+
+## v184.0 Live share page held to the app's answers
+
+- [x] Extract the live page's matchup scoring to lib/live-scoring.ts; page renders from it.
+- [x] Parity harness (app path vs live path) over real games, with a fence proving it detects the old behaviour.
+- [x] Coverage guard: no direct engine calls in MatchupsBlock; every rendered format has a fixture.
+- [x] Fixed en route: nine-hole handicap halving and close-out freeze on the live page's match and four-ball legs.
+- [ ] Staging: share a NINE-hole match and a nine-hole four-ball; strokes and margins must match the app.
+- [ ] Alternate shot is not rendered by the live page at all (no branch, and the RPC returns no side scores). Add the format, then a parity fixture.
+- [ ] Skins is not rendered by MatchupsBlock; SkinsCarry is a separate path with no parity fixture.
+- [ ] Guests are dropped from pairings/foursomes by the user_id map in get_live_scorecard (0047) before scoring runs — a DB-side fix, not reachable from the harness.
+- [ ] The Stableford/leaderboard side of the live page (computePlayer) is not in the parity harness yet; only matchup legs are.
+
+## v183.1 Trifecta results readability + one singles source
+
+- [x] In-game Results row names the winner (bold gold / muted); leader styled distinctly from winner.
+- [x] Live share page singles come from computeTrifecta, not a second matchStatus computation.
+- [x] Live share team leg shows its close-out result; stale per-hole blurb rewritten.
+- [x] trifectaRowState lives in lib/golf.ts; guard keeps both renderers on it.
+- [ ] Staging: reload the 641032 share link — singles read "won 4 & 2" / "lost 4 & 3", team leg shows its close-out, blurb no longer says "three points a hole".
+- [ ] Not addressed: the live page's `match` and `fourball` blocks still use count-based matchStatus/fourballStatus, so a decided singles match or four-ball outside Trifecta can still drift past close-out on the public page. Same class of bug, different formats — needs its own real-data check.
+
+## Admin: read-only "view card as player" in Games oversight
+
+Raised 182.2: the personal scorecard is bound to the signed-in user's own game_players row, so a
+System Admin inspecting a game sees Results and the group scorecard but never another player's card.
+The 182.2 Trifecta strip bug lived only on that screen and was invisible to the organizer for months;
+verifying the fix on Staging required signing in as a test player, which is not possible for every
+account. Proposal: is_admin-gated, read-only render of any player's ScoreEntryCard from Games
+oversight (no score entry, no stats edits, logged like other oversight actions).
+
+- [ ] Decide whether this belongs to super-admin only or also to the game organizer (support use vs
+      privacy: a player's card shows their own strokes and side-game position).
+- [ ] Render the existing ScoreEntryCard with `myRow` = the chosen player, all handlers disabled.
+- [ ] Rendered test: admin viewing Sachin's Jul 5 card reads 5UP at 18.
+
+## v183.0 One Trifecta rule
+
+- [x] Rule confirmed with Amit: Trifecta = two 1-v-1 singles + four-ball, one point each; per-hole variant removed (zero production games used it).
+- [x] Engine, all call sites, create form, in-game picker, policy action, live page, migration 0150, guard, fixtures.
+- [ ] Staging: create a Trifecta — the format step shows one description and no scoring toggle; Results for game 557495 (Architects replay) unchanged at R.K. v Lex 5 UP / 4 & 2.
+
+## Stroke dots — show the basis each contest is actually scored off (found 182.2, Architects Jul 5 replay)
+
+Raised by Amit after the 182.2 reproduction: on a Ryder Cup Trifecta the player card shows team-leg
+dots (orange, foursome basis) and course-handicap dots (blue, full playing handicap) but nothing for
+the SINGLES, which decide two of the three points and are scored off the pair basis. R.K. on the 9th
+saw an orange dot (team leg: stroke off Marcus) with no indication that in his single v Lex he gets
+nothing there; the 14th is the mirror case for Lex.
+
+Principle: every contest the format scores gets its own labelled stroke set; the full course handicap
+stays because side games (TGC sixes, low-net/Stableford pot) and posting are scored off it, but it is
+the side-game basis, not the match basis, and must be labelled as such.
+
+- [ ] Trifecta: add a SINGLES dot set (pair basis) alongside the team-leg dots; label
+      "singles v <opponent>", "team leg", "course hcp (side games)". (183.0 removed per-hole, so no branching.)
+- [ ] The singles dot must be a first-class basis in `dotStrokes`/`shapeOf` and covered by the
+      scoring-matrix test (card draws == result uses). NOT an inline calculation on the card: that
+      would be a third implementation of the pair basis.
+- [ ] Group scorecard legend reads "match hcp / course hcp" for every relative format. Rename per
+      format: singles match → "v opponent"; four-ball / 2v2 skins → "four-ball (off low)"; 1:1 team
+      skins → "v opponent"; trifecta → both "singles" and "team leg". Personal card `matchStrokeLabel`
+      already varies by format; the group card legend does not.
+- [ ] Singles match personal card: blue course-hcp dots are drawn (showIndivDots is true for every
+      relative basis) but the legend that explains them is suppressed in matchMode — the Match strokes
+      box only explains the orange/hollow dots. Either label the blue dots or hide them in singles.
+- [ ] Group scorecard net colour (under/par/over) uses the MATCH-basis recv on relative formats, so a
+      "net par" cell in a singles match means "level with your opponent's strokes", not net par vs the
+      course. Decide which the colour should mean and label it.
+- [ ] Audit each format's card and group card against the table in the 182.2 review before building;
+      alternate shot already models "the dot means the SIDE gets a stroke here" and is the pattern to
+      follow.
+
 ## v182.2 Trifecta card uses Ryder Cup singles basis
 
 - [x] Pin the Architects Jul 5 Foursome 1 rows (Sachin v BK) as a real-data fixture: wrong card answer (1UP thru 14, 4UP) and correct result (2UP thru 14, 5UP, 4 & 2).

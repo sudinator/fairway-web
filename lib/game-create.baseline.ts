@@ -40,7 +40,7 @@ export function buildGamePayload(o: GamePayloadOpts) {
         : null,
     foursomes: o.gameType === "fourball" || o.gameType === "trifecta" || (o.gameType === "skins" && o.teamMode && o.skinsTeamStyle === "best_ball") ? [] : null,
     team_score_mode: o.gameType === "trifecta" || o.gameType === "fourball" || (o.gameType === "skins" && o.teamMode && o.skinsTeamStyle === "best_ball") ? o.teamScoreMode : "best_ball",
-    trifecta_scoring: o.gameType === "trifecta" ? o.trifectaScoring : null,
+    trifecta_scoring: o.gameType === "trifecta" ? "match" : null, // 183.0: baseline tracks the one rule so the differential stays meaningful
     stroke_basis: o.gameType === "stroke" ? o.strokeBasis : null,
     skins_mode: o.gameType === "skins" ? o.skinsMode : null,
     flight_mode: o.flightsSupported ? o.flightMode : "off",

@@ -17,7 +17,6 @@ export type SetupDraft = {
   /** 18 / front9 / back9. Optional: drafts written before this existed resume as 18. */
   matchLength?: "18" | "front9" | "back9";
   teamScoreMode: string;
-  trifectaScoring: string;
   strokeBasis: string;
   fmtFamily: string;
   matchKind: string;
