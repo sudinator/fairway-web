@@ -1,5 +1,5 @@
 {
-  "total": 189976,
+  "total": 189983,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -45,6 +45,6 @@
     "stroke rounding": 24,
     "sync/column tests": 6,
     "trifecta card render": 8,
-    "trifecta results row": 10
+    "trifecta results row": 17
   }
 }

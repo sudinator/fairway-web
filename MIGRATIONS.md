@@ -1,3 +1,6 @@
+## 186.3.260907 — no migration
+Legend label scope and personal-card glyph row spacing. 0150 remains current.
+
 ## 186.2.260907 — no migration
 Stableford box colour and a named chip token. 0150 remains current.
 

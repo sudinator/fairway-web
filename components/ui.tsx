@@ -779,9 +779,13 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
                   // Filled = strokes received; hollow = strokes GIVEN (pair bases, lower plays scratch).
                   const rows = setsOf(h);
                   if (!rows.length) return <div key="d" />;
-                  return <div key="d" style={{ textAlign: "center", lineHeight: 1.04 }}>
+                  // Three bases (a Trifecta) in a column sized for one or two bunched the glyphs
+                  // together. Give each glyph row its own breathing space instead of stacking tight;
+                  // one- and two-basis holes keep their current height so nothing else grows.
+                  const roomy = rows.length > 2;
+                  return <div key="d" style={{ textAlign: "center", lineHeight: 1.04, display: "flex", flexDirection: "column", gap: roomy ? 4 : 1, justifyContent: "center", minHeight: roomy ? 34 : undefined }}>
                     {rows.map((r) => (
-                      <div key={r.key} style={{ display: "flex", gap: 2, justifyContent: "center", marginTop: 1 }}>
+                      <div key={r.key} style={{ display: "flex", gap: 3, justifyContent: "center" }}>
                         {Array.from({ length: Math.min(Math.max(r.strokes, r.gives), 3) }).map((_, d) =>
                           strokeGlyph(r.key, BASIS_COLOR[r.key], r.strokes === 0 && r.gives > 0, d),
                         )}

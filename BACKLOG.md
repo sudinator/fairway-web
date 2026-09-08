@@ -1,3 +1,48 @@
+## v186.3 staging check
+
+- [ ] 641032 group scorecard: the legend at the top reads "v opponent", NOT "v Michael".
+- [ ] The per-player lines under each player's initials still name that player's own opponent.
+- [ ] Personal card on a Trifecta hole with three bases: the three glyphs have room, not bunched.
+
+## NEXT — Ryder Cup public share page (scoped with Amit, Sep 7)
+
+Decisions taken:
+- Show **scores and handicaps**, same depth as the game share page.
+- **Sessions render INLINE** — no leaving the Cup page to see a session's matches.
+- **Live during play** — must handle sessions not yet started and sessions with no linked game.
+- **Organizer or system admin** creates the link, matching the game share link.
+
+What exists already:
+- `lib/competition.ts` computes session tallies and Cup standings, alt shot included. The maths is done.
+- Share tokens exist ONLY on `games` (0018). Competitions have none, so a Cup cannot be shared at all today.
+- `get_live_scorecard` (0047) returns no alt-shot side scores — the reason alt shot cannot render on the
+  share page is a DATA gap, not a UI gap.
+
+Work:
+- [ ] Migration: `share_token` on `competitions` (same pattern as 0018) + `get_live_competition(token)`
+      security-definer RPC returning the Cup, its sessions, each linked game and its match states.
+      Extend `get_live_scorecard` to return `alt_shot_scores`.
+- [ ] Alt shot branch in the game share page's MatchupsBlock (the coverage guard already fails the build
+      for a rendered format with no parity fixture, so this is enforced).
+- [ ] New public route `/live/cup/[token]`: standings on top, each session inline with its matches.
+- [ ] Parity fixtures for alt shot and for Cup standings, holding the public numbers to competition.ts.
+- [ ] Watch the guest gap: `get_live_scorecard`'s user_id map drops guests. A Cup RPC written the same
+      way inherits the same bug — fix it in the new RPC rather than copying it.
+
+## DONE in 186.3 — two stroke-label/layout fixes found on 641032
+
+- [ ] **DEFECT: the group-card legend prints one player's opponent as everyone's.** The legend builds its
+      labels by walking players and taking the FIRST label per basis, so on 641032 it reads "v Michael" —
+      true for exactly one of four players. The legend is card-wide and must be GENERIC: "v opponent",
+      "off the low", "course hcp". The PER-PLAYER header lines under the initials already use each
+      player's own label ("v Michael", "v Amit") and are correct — leave those alone.
+      Introduced by me in 185.0; the fixtures assert the per-player labels, not the legend, which is why
+      no test caught it. Add an assertion that the legend label is generic.
+- [ ] **Personal scorecard rows are too tight with three glyph rows.** The Hcp column now stacks up to
+      three glyphs in a row height sized for one or two, so they bunch. Increase the row height (and the
+      per-glyph spacing) when a hole draws more than two bases. Check on a phone — that is where it is
+      worst — and keep the two-basis and one-basis cases at their current height so nothing else grows.
+
 ## v186.2 staging check
 
 - [ ] Group scorecard: the small points box bottom-right of each cell is neutral (stone fill, dark grey number), not orange.

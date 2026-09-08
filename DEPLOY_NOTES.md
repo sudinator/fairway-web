@@ -1,3 +1,10 @@
+## 186.3.260907 — Group-card legend stops naming one player's opponent; roomier glyph rows
+
+- **DEFECT FIXED: the card-wide legend printed one player's opponent as everyone's.** It built its labels from `strokeSets` and kept the FIRST label it found per basis, so a four-player card read "v Michael" — correct for one player out of four (seen on staging 641032). The legend is card-wide and now reads generically: "v opponent", "off the low", "course hcp". The PER-PLAYER header lines under each player's initials still name that player's own opponent and are unchanged.
+- Introduced in 185.0. The existing fixtures assert the per-player labels, which were always right, so nothing caught it. `lib/trifecta-results-row.test.tsx` now renders the real `GroupScorecard` and asserts the legend element says "v opponent" and names no player; verified to fail on the pre-fix code.
+- **Personal scorecard glyph rows have room.** A Trifecta hole draws three glyph rows in a column sized for one or two, so they bunched. Rows with more than two bases now get their own spacing and a minimum height; one- and two-basis holes keep their current height so nothing else grows.
+- No migration. 0150 remains current.
+
 ## 186.2.260907 — Stableford points box goes neutral; palette back to six values
 
 - The Stableford points box on the group scorecard no longer borrows the course-handicap hue. Points are always scored off the course handicap and the orange circle in the same cell already says so, so tinting the box repeated the information in colour — and cost a fourth colour value, because 11px TEXT needs 4.5:1 where a 6px dot needs 3.0.

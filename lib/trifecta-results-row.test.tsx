@@ -12,6 +12,7 @@
 import { renderScreen, eq, report } from "./screen-harness";
 import * as React from "react";
 import { TrifectaContestRow } from "@/components/game/scoring-views";
+import { GroupScorecard } from "@/components/game/scorecard-views";
 import { computeTrifecta, C } from "@/lib/golf";
 import { chBasis } from "@/lib/game-shape";
 
@@ -67,5 +68,37 @@ eq(r3.margin, "3 UP", "in-progress margin is read from the leader's side");
 const teamC = tri.contests.find((c) => c.kind === "team")!;
 const r4 = readRow(teamC, "Chris & Amit", "Christopher & Michael");
 eq(r4.styleOf("Chris & Amit"), `800/${GOLD}`, "team leg highlights the winning pair");
+
+// ── Card-wide legend must be GENERIC ─────────────────────────────────────────────────────────────
+// The legend built its labels from strokeSets and took the FIRST player's, so a four-player card
+// printed one player's opponent as everyone's key (641032 read "v Michael", true for one of four).
+// The per-player header lines stay specific; this one must not name anybody.
+{
+  const HOLES2 = HOLES;
+  const players = Object.values(R).map((r, i) => ({
+    id: r.id, user_id: r.id, display_name: r.id, handicap_index: r.handicap_index, slope: r.slope,
+    rating: r.rating, course_handicap: r.course_handicap, team: i < 2 ? "A" : "B", no_show: false,
+    scores: r.scores, putts: [], fairways: [], penalties: [], sand: [], tee_name: "White", bets: true,
+  })) as never[];
+  const game = {
+    id: "g", game_type: "trifecta", course_par: 70, allowance_pct: 85, team_score_mode: "best_ball",
+    holes_meta: HOLES2, pairings: [], teams: [{ key: "A" }, { key: "B" }],
+    foursomes: [{ id: "g1", name: "Group 1", swap: true, a: ["Chris", "Amit"], b: ["Christopher", "Michael"] }],
+    status: "active",
+  } as never;
+  const s = renderScreen(<GroupScorecard game={game} players={players} allPlayers={players} user={{ id: "Amit" }} isMarker={false} markerName={null} onTakeOver={() => {}} onRelease={() => {}} onSetHole={() => {}} />);
+  // Scope to the LEGEND element itself. A text slice also catches the per-player header lines, which
+  // legitimately name each player's own opponent — those must stay specific.
+  const legendTail = Array.from(s.el.querySelectorAll("span")).find((e) => (e.textContent || "").includes("dots = strokes"));
+  const legend = legendTail?.parentElement;
+  eq(!!legend, true, "legend element found");
+  const legendZone = legend?.textContent || "";
+  eq(legendZone.includes("v opponent"), true, "legend says 'v opponent', not a player's name");
+  for (const name of ["v Michael", "v Christopher", "v Chris", "v Amit"]) {
+    eq(legendZone.includes(name), false, `legend does not name a specific opponent (${name})`);
+  }
+  eq(legendZone.includes("off the low"), true, "legend names the four-ball basis generically");
+  s.unmount();
+}
 
 report("trifecta results row");

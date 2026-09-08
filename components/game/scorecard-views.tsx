@@ -443,8 +443,15 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
           const DARK: Record<string, string> = {
             course: C.basisCourseDark, opponent: C.basisOpponentDark, group_low: C.basisGroupLowDark, alt_side: C.basisOpponentDark,
           };
+          // The legend is CARD-WIDE, so its labels must be generic. Building them from strokeSets took
+          // the first player's label and printed one player's opponent as everyone's key — on a
+          // four-player card that is wrong for three of them (641032 read "v Michael"). The per-player
+          // header lines below name each player's own opponent; those stay specific.
+          const GENERIC: Record<string, string> = {
+            opponent: "v opponent", group_low: "off the low", course: "course hcp", alt_side: "your side",
+          };
           const seen = new Map<string, string>();
-          for (const p of players) for (const m of meta) for (const r of strokeSets(game, p, m.si, strokePool)) if (!seen.has(r.key)) seen.set(r.key, r.label);
+          for (const p of players) for (const m of meta) for (const r of strokeSets(game, p, m.si, strokePool)) if (!seen.has(r.key)) seen.set(r.key, GENERIC[r.key] ?? r.label);
           if (!seen.size) return null;
           return <>
             {Array.from(seen.entries()).map(([key, label]) => (
