@@ -1,3 +1,15 @@
+## 187.3.260907 — Alternate Shot scorecards are per SIDE on the share page
+
+- The public page listed a scorecard per PLAYER for Alternate Shot, every one reading "not started". Those rows were empty by construction, not stale: Alternate Shot is one ball per SIDE and the score lives in `game_alt_shot_scores`, so an individual player row has nothing in it and never will.
+- The page now renders one card per side: both partners' names, the side's gross per hole from the canonical store, the side handicap from `altShotSides`, and the side's net. Only the RECEIVING side shows strokes — the other plays scratch — allocated on the hardest holes.
+- Stableford points are suppressed for this format; a one-ball match does not score them, and the footer reads "One ball per side" instead of a points total.
+- The per-player and per-side rows now share one card style, so they look identical and the style is defined once rather than duplicated.
+- No migration. 0151 remains current.
+
+## Still open
+
+The leaderboard ordering above the cards still ranks by individual score, which is meaningless for this format — it is currently just the side cards in foursome order. Tracked in BACKLOG. The parity harness compares matchup legs only, so scorecards and leaderboards remain outside it; extending it is tracked with the same item.
+
 ## 187.2.260907 — Alternate Shot close-out in the app, and Alternate Shot standings on the share page
 
 - **The app's Alternate Shot card kept counting past the decision.** 184.1 unified the close-out for `matchStatus` and `fourballStatus` and MISSED `altShotStatus` — two of three. Reported on staging 248110: the app read "4 UP" where the share page, which goes through `matchCloseoutStatus` in `lib/live-scoring`, correctly read the close-out. All three status functions now share one rule.

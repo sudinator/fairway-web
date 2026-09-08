@@ -1,3 +1,6 @@
+## 187.3.260907 — no migration
+Alternate Shot side scorecards on the share page. 0151 remains current.
+
 ## 187.2.260907 — no migration
 Alternate Shot close-out unification and share-page standings. 0151 remains current.
 

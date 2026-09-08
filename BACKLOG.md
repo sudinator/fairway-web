@@ -1,3 +1,10 @@
+## v187.3 staging checks
+
+- [ ] 248110 share link: Scorecards shows TWO cards per foursome (one per side), named "A & B", not four player cards reading "not started".
+- [ ] Expanding a side card shows the side's gross per hole and its net; no Stableford points row.
+- [ ] Only the receiving side shows stroke dots, on the hardest holes; the other side shows none.
+- [ ] The side handicap in the row subtitle matches the app's Strokes panel for that game.
+
 ## v187.2 staging checks
 
 - [ ] 248110 in the APP: the Alternate Shot card shows the close-out (e.g. 3 & 2), not a running "4 UP".
@@ -12,7 +19,7 @@ for a format where nobody plays their own ball. Alternate Shot posts ONE score p
 (game_alt_shot_scores, 0140/0141), so the per-player rows have nothing in them by construction —
 they are not stale, they are empty and always will be.
 
-- [ ] Render one card per SIDE for alt_shot, not per player: side name from the two partners
+- [x] DONE 187.3: Render one card per SIDE for alt_shot, not per player: side name from the two partners
       ("Amit Sud & Chris O'Neal"), the side's gross per hole, the side handicap from altShotSides,
       and the side's net. The existing PlayerDetail grid is the right shape — it needs a side-shaped
       input rather than a LivePlayer.
