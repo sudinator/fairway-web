@@ -12,7 +12,11 @@
  * things to quietly fix during an extraction.
  */
 import { strokeSets } from "./game-shape";
+import { altShotSides } from "./game-shape";
+import { readAltShotSideScores } from "./alt-shot-scores";
+import { canonicalAltShotGross } from "./alt-shot-side-scores";
 import {
+  altShotProgress,
   matchProgress,
   fourballProgress,
   computeTrifecta,
@@ -33,6 +37,21 @@ export type LiveScoringGame = {
   game_type: string;
   allowance_pct: number | null;
   team_score_mode: "best_ball" | "aggregate" | null;
+  course_par?: number | null;
+};
+
+/**
+ * One row of game_alt_shot_scores as get_live_scorecard returns it (0151). The RPC omits game_id —
+ * the token already scopes the payload to one game — so it is optional here; canonicalAltShotGross
+ * only ever reads foursome_id / side / hole_index / strokes.
+ */
+export type LiveAltShotScore = {
+  game_id?: string;
+  foursome_id: string;
+  side: "a" | "b";
+  hole_index: number;
+  /** NULL is a deliberate clear tombstone (0141), not "no score". */
+  strokes: number | null;
 };
 
 /** One matchup leg, in the same vocabulary computeTrifecta uses, so the two paths are comparable. */
@@ -79,6 +98,7 @@ export function liveLegs(
   foursomes: { id: string; name: string; swap: boolean; a: (string | null)[]; b: (string | null)[] }[],
   meta: LiveScoringMeta[],
   allowance: number,
+  altShotScores: LiveAltShotScore[] = [],
 ): LiveLeg[] {
   const holes = meta.length;
   const m = asMeta(meta);
@@ -109,6 +129,30 @@ export function liveLegs(
         const progress = fourballProgress(m, mem([...aIds, ...bIds]), aIds, bIds, allowance, mode);
         return fromProgress(progress, aIds, bIds, "fourball");
       });
+  }
+
+  // ALTERNATE SHOT: one ball per SIDE. The side handicap and the canonical gross both come from the
+  // same helpers the app uses — altShotSides is the single source for the side handicap, and
+  // canonicalAltShotGross prefers the side-owned store (0140/0141) over the legacy fan-out onto the
+  // player rows. Before 0151 the share page had no side scores at all and could not draw this format.
+  if (game.game_type === "alt_shot") {
+    return foursomes
+      .filter((f) => f.a.filter(Boolean).length === 2 && f.b.filter(Boolean).length === 2)
+      .map((f) => {
+        const aIds = f.a.filter(Boolean) as string[], bIds = f.b.filter(Boolean) as string[];
+        const rows = [...aIds, ...bIds].map((id) => byId[id]);
+        if (rows.some((r) => !r)) return null;
+        const shapeGame = { game_type: "alt_shot", course_par: game.course_par ?? null, allowance_pct: game.allowance_pct, holes_meta: meta, foursomes } as never;
+        const shapePlayers = Object.values(byId).map((p) => ({ id: p.id, user_id: p.id, course_handicap: p.ch, team: p.team, no_show: p.no_show })) as never;
+        const sides = altShotSides(shapeGame, shapePlayers, { id: f.id, a: aIds, b: bIds } as never);
+        const aLegacy = readAltShotSideScores(byId[aIds[0]].scores, byId[aIds[1]].scores, holes);
+        const bLegacy = readAltShotSideScores(byId[bIds[0]].scores, byId[bIds[1]].scores, holes);
+        const aGross = canonicalAltShotGross(altShotScores as never, f.id, "a", holes, aLegacy.gross);
+        const bGross = canonicalAltShotGross(altShotScores as never, f.id, "b", holes, bLegacy.gross);
+        const progress = altShotProgress(m, { ids: aIds, chs: [sides.aCh, 0], gross: aGross } as never, { ids: bIds, chs: [sides.bCh, 0], gross: bGross } as never);
+        return fromProgress(progress, aIds, bIds, "team");
+      })
+      .filter((x): x is LiveLeg => x != null);
   }
 
   if (game.game_type === "trifecta") {

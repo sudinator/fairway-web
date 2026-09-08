@@ -1,3 +1,11 @@
+## v187.0 staging checks — Alternate Shot on the share page
+
+- [ ] Apply 0151. Share an ALTERNATE SHOT game; the matchups block shows each foursome's side match with a margin.
+- [ ] The margin matches the app's own Results for the same game.
+- [ ] Clear a hole's side score in the app; the share page shows it as unplayed, not as the old value.
+- [ ] Share a game with a GUEST in a foursome: the guest appears and their side is no longer dropped.
+- [ ] A nine-hole Alternate Shot: strokes and margin match the app.
+
 ## v186.3 staging check
 
 - [ ] 641032 group scorecard: the legend at the top reads "v opponent", NOT "v Michael".

@@ -1,3 +1,6 @@
+## 187.0.260907 — migration 0151
+Alternate Shot side scores and guest players in the live-share payload. Replaces get_live_scorecard; no schema change.
+
 ## 186.3.260907 — no migration
 Legend label scope and personal-card glyph row spacing. 0150 remains current.
 
@@ -53,7 +56,7 @@ Regenerate after shipping (adds new files, keeps ticks and the notes block):
 Confirm database-applied state with:
 `select id, applied_at from public.schema_migrations order by id;`
 
-Total: 135 migrations. Unchecked = not yet confirmed applied in this checklist.
+Total: 136 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -192,6 +195,7 @@ Total: 135 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [ ] 0148_delete_competition_session_game.sql
 - [ ] 0149_change_game_match_length.sql
 - [ ] 0150_trifecta_single_rule.sql
+- [ ] 0151_live_alt_shot_and_guests.sql
 
 <!-- NOTES:START -->
 

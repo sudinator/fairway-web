@@ -11,7 +11,7 @@ import {
   type FourballMember, type SkinPlayer,
   trifectaRowState,
 } from "@/lib/golf";
-import { liveLegs, liveStrokeSets, type LiveLeg } from "@/lib/live-scoring";
+import { liveLegs, liveStrokeSets, type LiveLeg, type LiveAltShotScore } from "@/lib/live-scoring";
 import type { TrifectaRowSide } from "@/lib/golf";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +38,8 @@ type LiveData = {
   game: LiveGame; players: LivePlayer[];
   pairings: { a: string | null; b: string | null }[];
   foursomes: { id: string; name: string; swap: boolean; a: (string | null)[]; b: (string | null)[] }[];
+  /** Alternate Shot side-owned scores (0151). Absent on payloads from before that migration. */
+  alt_shot_scores?: LiveAltShotScore[];
 };
 
 const TEAM_COLOR: Record<string, string> = {
@@ -150,6 +152,7 @@ function summaryText(game: LiveGame, teamRows?: TeamRows["rows"]): string {
     case "fourball": return named
       ? `Four-ball — ${named}. Each foursome (2 v 2) is a match worth a point for the winning team, \u00bd for a halved match — Ryder-Cup style.${allow}`
       : `Four-ball match play — each 2-player side counts its better net ball on every hole; win more holes to win the match.${allow}`;
+    case "alt_shot": return `Alternate Shot${named ? ` — ${named}` : ""} — one ball per side: partners alternate shots, so each side posts a single score per hole. Strokes are the difference between the two SIDES (each side plays off half its partners’ combined handicap), and the lower side plays scratch.${allow}`;
     case "trifecta": return `Trifecta${named ? ` — ${named}` : ""} — every 2-v-2 foursome plays three matches worth one point each: two singles (each player vs one opponent, strokes off that opponent) plus a team match (${game.team_score_mode === "aggregate" ? "both partners' nets added" : "the side's better net ball"}, off the foursome's lowest handicap). Points roll up to the team total.${allow}`;
     case "stroke": return `Stroke play — lowest ${game.stroke_basis === "gross" ? "gross" : "net"} total over the round wins.${allow}`;
     case "skins": return `Skins — the lowest net score on a hole wins the skin; a tied hole carries the pot forward to the next.${allow}`;
@@ -235,6 +238,7 @@ function SectionTitle({ children }: { children: string }) {
 
 function Scorecard({ data }: { data: LiveData }) {
   const { game, players, pairings, foursomes } = data;
+  const altShotScores = data.alt_shot_scores || [];
   const meta = game.holes_meta || [];
   const allowance = game.allowance_pct ?? 100;
   const byId = useMemo(() => Object.fromEntries(players.map((p) => [p.id, p])), [players]);
@@ -343,7 +347,7 @@ function Scorecard({ data }: { data: LiveData }) {
         </>
       )}
 
-      <MatchupsBlock game={game} byId={byId} pairings={pairings} foursomes={foursomes} meta={meta} allowance={allowance} />
+      <MatchupsBlock game={game} byId={byId} pairings={pairings} foursomes={foursomes} meta={meta} allowance={allowance} altShotScores={altShotScores} />
       <SkinsCarry game={game} players={players} meta={meta} allowance={allowance} />
 
       <SectionTitle>Scorecards</SectionTitle>
@@ -496,13 +500,13 @@ function teamLegLabel(lead: number, thru: number, _holes: number, result: string
   return { text: `${(lead > 0 ? teamA : teamB) || "Team"} ${Math.abs(lead)} up`, color: WIN };
 }
 
-function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
+function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance, altShotScores }: {
   game: LiveGame; byId: Record<string, LivePlayer>;
   pairings: LiveData["pairings"]; foursomes: LiveData["foursomes"];
-  meta: LiveMeta[]; allowance: number;
+  meta: LiveMeta[]; allowance: number; altShotScores: LiveAltShotScore[];
 }) {
   const gt = game.game_type;
-  if (gt !== "match" && gt !== "fourball" && gt !== "trifecta") return null;
+  if (gt !== "match" && gt !== "fourball" && gt !== "trifecta" && gt !== "alt_shot") return null;
   const teams = game.teams || [];
   const tColor: Record<string, string> = {}; const tName: Record<string, string> = {};
   teams.forEach((t, i) => { tColor[t.key] = teamColor(t.name, i); tName[t.key] = t.name; });
@@ -540,6 +544,7 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
     foursomes,
     meta,
     allowance,
+    altShotScores,
   );
 
   let body: React.ReactNode = null;
@@ -568,6 +573,25 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
         <div key={`f${i}`} style={cardStyle}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontWeight: 800, fontSize: 14 }}><span>{f.name || `Foursome ${i + 1}`}</span><span style={{ color: C.faint, fontSize: 11, fontWeight: 500 }}>{st.thru ? `thru ${st.thru}` : "not started"}</span></div>
           {Leg(`f${i}r`, true, aIds, bIds, lbl)}
+        </div>
+      );
+    })}</>;
+  } else if (gt === "alt_shot") {
+    // One ball per SIDE: no individual matchups to draw and no per-player strokes. The side handicap
+    // is the difference between the two sides and both partners share it. The leg comes from
+    // lib/live-scoring, which reads the side-owned store (0140/0141) exposed to this page by 0151 —
+    // before that the format could not be shown publicly at all.
+    if (!foursomes.length) return null;
+    body = <>{foursomes.map((f, i) => {
+      const aIds = (f.a || []).filter(Boolean) as string[]; const bIds = (f.b || []).filter(Boolean) as string[];
+      if (!aIds.length || !bIds.length) return null;
+      const leg = legs.find((l) => l.kind === "team" && l.aIds.join() === aIds.join() && l.bIds.join() === bIds.join());
+      const st = leg || { lead: 0, thru: 0, result: "", settled: false };
+      const lbl = teamLegLabel(st.lead, st.thru, meta.length, st.settled ? st.result : "", teamNameOf(aIds[0]), teamNameOf(bIds[0]));
+      return (
+        <div key={`as${i}`} style={cardStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontWeight: 800, fontSize: 14 }}><span>{f.name || `Foursome ${i + 1}`}</span><span style={{ color: C.faint, fontSize: 11, fontWeight: 500 }}>{st.thru ? `thru ${st.thru}` : "not started"}</span></div>
+          {Leg(`as${i}r`, true, aIds, bIds, lbl)}
         </div>
       );
     })}</>;

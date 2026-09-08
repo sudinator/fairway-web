@@ -1,3 +1,18 @@
+## 187.0.260907 — Alternate Shot on the public share page (migration 0151), and guests stop disappearing
+
+- **Alternate Shot can now be shared.** The format was absent from the public page entirely — not a UI gap but a DATA gap: Alternate Shot is one ball per SIDE and its canonical score lives in `game_alt_shot_scores` (0140/0141), which `get_live_scorecard` never returned. Migration 0151 adds `alt_shot_scores` to the payload, preserving NULL as the deliberate clear tombstone so the client can tell "cleared" from "never entered".
+- **Guests stop disappearing from the public page.** `v_umap` mapped `user_id → game_players.id` and filtered out null user_ids — but a guest HAS no user_id; their key in `pairings`/`foursomes` is the row id itself. Every guest resolved to null and was silently dropped, so a guest in a four-ball made that whole side vanish. The map now carries both keys.
+- Client: `lib/live-scoring.ts` gains the Alternate Shot leg, using the same `altShotSides` / `canonicalAltShotGross` helpers the app uses — no second implementation of the side handicap. Three parity fixtures added (18 holes, nine holes, and a cleared hole); the harness now holds 68 comparisons across 11 fixtures. The coverage guard confirms every rendered format has one.
+
+## Two guard weaknesses found while doing it
+
+- **`check_migration_authorization` matched on comments, not code.** A migration whose header merely MENTIONS `auth.uid()` satisfied the "contains a real auth predicate" rule — including this one, whose header explains why it legitimately has none. That is exactly the failure the guard was written to catch (0125 documented "active member" while its body did not filter status), reproduced inside the guard itself. It now strips SQL comments before the mechanical checks; rule 1, which looks FOR a comment, reads the raw text.
+- **No category for a token-scoped public read.** The guard assumed every privileged function authenticates, but a share link is anonymous by design and its authorization IS the unguessable token. Rather than bypass the rule, the guard gained a deliberately narrow exemption: the function must take `p_token`, reject short or absent tokens, and look the row up BY that token. Both conditions negative-tested; no existing migration is affected.
+
+## Run order
+
+Migration 0151 before the app deploys. Without it the client simply sees no `alt_shot_scores` and renders Alternate Shot as not started — no error, but no data.
+
 ## 186.3.260907 — Group-card legend stops naming one player's opponent; roomier glyph rows
 
 - **DEFECT FIXED: the card-wide legend printed one player's opponent as everyone's.** It built its labels from `strokeSets` and kept the FIRST label it found per basis, so a four-player card read "v Michael" — correct for one player out of four (seen on staging 641032). The legend is card-wide and now reads generically: "v opponent", "off the low", "course hcp". The PER-PLAYER header lines under each player's initials still name that player's own opponent and are unchanged.
