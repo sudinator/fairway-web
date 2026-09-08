@@ -1,3 +1,25 @@
+## 188.1.260907 — Cup share toggle in the organizer UI
+
+- The Ryder Cup screen now has a **Create live link / Copy / Stop sharing** control, so the link no longer has to be minted from SQL. Organizer or system admin, matching `set_competition_share`'s own rule.
+- `ShareControl` is now shared between the game's live scorecard and the Cup link rather than duplicated: one component, two paths. The wording, the copy affordance and the revoke button cannot drift apart between them, and a fix to one is a fix to both.
+- `Competition` carries `share_token`; the screen already selected `*`, so no query change.
+- No migration. 0152 remains current.
+
+## 188.0.260907 — Ryder Cup live share link (migration 0152)
+
+- **New public route `/live/cup/<token>`**: a whole team competition on one page — overall standings, then every session INLINE with its matches. No leaving the page to follow a session.
+- **Sets the context before the numbers.** The page opens with what the competition IS: how many players and the split, how many sessions and matches, the total points available, and what each team needs to win — reading the tie rule, so a "retains on a tie" competition says who needs what. Each session names its format and explains it in a line ("One ball per side, partners alternating shots. One point per match.").
+- **Not-started sessions still appear, and still open.** A session with no linked game, or a linked game with no scores, renders as "not started" and expands, so a viewer can see who is playing and what the format is before a ball is struck.
+- **Migration 0152**: `share_token` on `competitions`; `set_competition_share` (organizer OR system admin, per the product decision) to mint or clear it; `get_live_competition(token)` returning the Cup plus every session's linked game, players, pairings, foursomes and Alternate Shot side scores — the same per-game shape `get_live_scorecard` returns, so the page reuses `lib/live-scoring` for every format and inherits the existing parity harness rather than growing a second scoring path.
+  - The player map carries BOTH user_id and row-id keys from the start, so guests are not dropped. That bug had to be fixed retroactively in 0151; not repeated here.
+  - The read is a token-scoped public endpoint with the `-- AUTHORIZATION:` contract the 187.0 guard now enforces on evidence rather than on a comment.
+- **`lib/live-competition.ts`** turns match states into Cup points using exactly `lib/competition.ts`'s rule — projected counts every started match to whoever leads (half each if level), decided counts only settled matches, both scaled by `points_per_match` — and takes its clinch targets from `competitionSchedule`, so the public page cannot drift from the in-app Cup view.
+- **`lib/live-competition.diff.test.ts`** — 32 assertions: settled and in-progress sessions, `points_per_match` scaling, ORIENTATION (flipping which side of a foursome team A sits on must not move the point), both not-started shapes, roster de-duplication across sessions, the planned denominator before any game exists, and a retain tie rule lowering one team's bar only.
+
+## Run order and a gap
+
+Migration 0152 before the app deploys. **There is no share button yet** — `set_competition_share` must be called to mint a token, so for now the link is created from SQL. The toggle is the top item in BACKLOG.
+
 ## 187.3.260907 — Alternate Shot scorecards are per SIDE on the share page
 
 - The public page listed a scorecard per PLAYER for Alternate Shot, every one reading "not started". Those rows were empty by construction, not stale: Alternate Shot is one ball per SIDE and the score lives in `game_alt_shot_scores`, so an individual player row has nothing in it and never will.

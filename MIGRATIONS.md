@@ -1,3 +1,9 @@
+## 188.1.260907 — no migration
+Cup share toggle in the organizer UI. 0152 remains current.
+
+## 188.0.260907 — migration 0152
+Competition share token, set_competition_share, get_live_competition. Adds one column; two new functions.
+
 ## 187.3.260907 — no migration
 Alternate Shot side scorecards on the share page. 0151 remains current.
 
@@ -65,7 +71,7 @@ Regenerate after shipping (adds new files, keeps ticks and the notes block):
 Confirm database-applied state with:
 `select id, applied_at from public.schema_migrations order by id;`
 
-Total: 136 migrations. Unchecked = not yet confirmed applied in this checklist.
+Total: 137 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -205,6 +211,7 @@ Total: 136 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [ ] 0149_change_game_match_length.sql
 - [ ] 0150_trifecta_single_rule.sql
 - [ ] 0151_live_alt_shot_and_guests.sql
+- [ ] 0152_competition_share.sql
 
 <!-- NOTES:START -->
 

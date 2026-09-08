@@ -1,3 +1,36 @@
+## v188.1 staging checks — end-to-end Cup link
+
+- [ ] Apply 0151 and 0152 if not already.
+- [ ] Open a Ryder Cup as organizer: "Ryder Cup live link" control appears above SESSIONS. Non-organizers do not see it.
+- [ ] Create link, copy it, open logged OUT in another browser.
+- [ ] Context line: right player count and split, session and match counts, total points, and the target to win.
+- [ ] Team scores: both rosters listed, leader in gold, "needs N more" correct.
+- [ ] Each session inline with its matches; winning side bolded, margin read from the winner.
+- [ ] A session with no linked game shows "not started" and still expands.
+- [ ] An Alternate Shot session shows one row per side and agrees with the app.
+- [ ] Stop sharing: the link stops resolving.
+
+## v188.0 staging checks — Cup live link
+
+- [ ] Apply 0152. Mint a token:  select public.set_competition_share('<competition_id>', true);
+- [ ] Open /live/cup/<token> logged OUT. The context line reads the right player count, split, session and match counts, total points and target.
+- [ ] Team scores show both rosters and the leader in gold; "needs N more" is right.
+- [ ] Each session shows its matches inline, with the winning side bolded and the margin read from the winner.
+- [ ] A session with no linked game shows "not started" and still expands.
+- [ ] An Alternate Shot session shows one row per side, matching the app.
+- [ ] Revoke:  select public.set_competition_share('<competition_id>', false);  the link stops resolving.
+
+## DONE in 188.1 — Cup share toggle in the organizer UI
+
+188.0 ships the route and the RPCs but NOT a button. `set_competition_share(competition_id, true)`
+must be called to mint a token, so today the link can only be created from SQL. Add the same
+share toggle the game room has to the Cup screen (organizer or admin, matching the RPC's rule),
+showing the /live/cup/<token> URL with a copy action.
+
+- [ ] Toggle + copy in components/competitions.tsx, gated on organizer-or-admin.
+- [ ] Revoking must clear the token (the RPC already does; the UI needs to offer it).
+- [ ] While unset, show nothing rather than a dead link.
+
 ## v187.3 staging checks
 
 - [ ] 248110 share link: Scorecards shows TWO cards per foursome (one per side), named "A & B", not four player cards reading "not started".
