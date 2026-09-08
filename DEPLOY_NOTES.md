@@ -1,3 +1,15 @@
+## 187.2.260907 — Alternate Shot close-out in the app, and Alternate Shot standings on the share page
+
+- **The app's Alternate Shot card kept counting past the decision.** 184.1 unified the close-out for `matchStatus` and `fourballStatus` and MISSED `altShotStatus` — two of three. Reported on staging 248110: the app read "4 UP" where the share page, which goes through `matchCloseoutStatus` in `lib/live-scoring`, correctly read the close-out. All three status functions now share one rule.
+  - `lib/alt-shot-simulation.test.ts` asserted the old running-count contract across 5,000 matches, so it failed on the fix — correctly. It now asserts the close-out contract, and separately asserts that UNDECIDED matches still report the live running values, so the freeze cannot hide a regression behind an always-equal comparison. 181,751 assertions green.
+  - `lib/closeout-freeze.test.ts` gains an Alternate Shot case constructed to reproduce the reported shape: the side wins 5 up with 3 to play then loses the last two, so the running count (4) falls BELOW the decided margin (5 & 3). Both pinned.
+- **Alternate Shot showed 0–0 on the public standings.** `teamScores` had no branch for the format, so it fell through to summing per-player Stableford points — and an Alternate Shot player has no individual score, by construction. Match, Four-Ball and Alternate Shot standings now come from the same `liveLegs` the matchups block draws, removing a second set of engine calls from that function at the same time.
+- No migration. 0151 remains current.
+
+## Known, not fixed here
+
+The share page still lists a scorecard per PLAYER for Alternate Shot, all reading "not started", and ranks the leaderboard by individual score. Both are wrong for a one-ball format and need side-shaped cards. Tracked at the top of BACKLOG.md. The parity harness did not catch it because it compares matchup legs only — extending it is part of that work.
+
 ## 187.1.260907 — Stroke glyphs align by construction
 
 - The three stroke glyphs have different natural heights — a 7px triangle against a 6px circle and square — so the rows sat fractionally out of line down each cell. 186.0 patched it by nudging the triangle one pixel, which only moved the discrepancy rather than removing it.

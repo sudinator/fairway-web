@@ -1,3 +1,6 @@
+## 187.2.260907 — no migration
+Alternate Shot close-out unification and share-page standings. 0151 remains current.
+
 ## 187.1.260907 — no migration
 Stroke glyph box alignment. 0151 remains current.
 

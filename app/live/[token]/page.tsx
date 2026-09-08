@@ -86,7 +86,7 @@ function addPts(m: Record<string, number>, k: string | null | undefined, v: numb
 
 type TeamRows = { rows: { key: string; name: string; color: string; members: string[]; scoreNum: number; scoreLabel: string }[]; out: number; unclaimed: number; isSkins: boolean };
 
-function teamScores(game: LiveGame, players: LivePlayer[], pairings: LiveData["pairings"], foursomes: LiveData["foursomes"], byId: Record<string, LivePlayer>, meta: LiveMeta[], allowance: number): TeamRows | null {
+function teamScores(game: LiveGame, players: LivePlayer[], pairings: LiveData["pairings"], foursomes: LiveData["foursomes"], byId: Record<string, LivePlayer>, meta: LiveMeta[], allowance: number, altShotScores: LiveAltShotScore[] = []): TeamRows | null {
   const teams = (game.teams || []).filter((t) => t && t.key);
   const anyTeamed = players.some((p) => p.team);
   if (teams.length < 2 || !anyTeamed) return null;
@@ -97,20 +97,22 @@ function teamScores(game: LiveGame, players: LivePlayer[], pairings: LiveData["p
   const mkMembers = (ids: (string | null)[]): FourballMember[] =>
     ids.filter(Boolean).map((id) => { const q = byId[id as string]; return { id: id as string, gross: q?.scores || [], ch: q?.ch ?? null, noShow: !!q?.no_show }; });
 
-  if (game.game_type === "match") {
-    pairings.forEach((pr) => {
-      const a = pr.a ? byId[pr.a] : null, b = pr.b ? byId[pr.b] : null; if (!a || !b) return;
-      const st = matchStatus(meta, a.scores || [], b.scores || [], a.ch, b.ch, allowance);
-      if (st.result !== "") { if (st.lead === 0) { addPts(pts, a.team, .5); addPts(pts, b.team, .5); } else if (st.lead > 0) addPts(pts, a.team, 1); else addPts(pts, b.team, 1); }
-      else out++;
-    });
-  } else if (game.game_type === "fourball") {
-    foursomes.forEach((f) => {
-      const aIds = (f.a || []).filter(Boolean) as string[]; const bIds = (f.b || []).filter(Boolean) as string[];
-      const st = fourballStatus(meta, mkMembers([...aIds, ...bIds]), aIds, bIds, allowance);
-      const remaining = meta.length - st.thru; const decided = st.thru > 0 && (remaining === 0 || Math.abs(st.lead) > remaining);
-      if (decided) { if (st.lead === 0) { addPts(pts, teamOf(aIds[0]), .5); addPts(pts, teamOf(bIds[0]), .5); } else if (st.lead > 0) addPts(pts, teamOf(aIds[0]), 1); else addPts(pts, teamOf(bIds[0]), 1); }
-      else out++;
+  // Match, Four-Ball and Alternate Shot standings all come from the SAME legs the matchups block
+  // draws, via lib/live-scoring — not a second set of engine calls here. Alternate Shot had no branch
+  // at all and fell through to summing per-player Stableford points; an Alternate Shot player has no
+  // individual score, so a decided match showed 0-0 on the public standings (staging 248110).
+  if (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "alt_shot") {
+    const legs = liveLegs(
+      { game_type: game.game_type, allowance_pct: game.allowance_pct, team_score_mode: game.team_score_mode, course_par: game.course_par },
+      Object.fromEntries(Object.entries(byId).map(([k, v]) => [k, { id: v.id, ch: v.ch, team: v.team, no_show: v.no_show, scores: v.scores || [] }])),
+      pairings, foursomes, meta, allowance, altShotScores,
+    );
+    legs.forEach((leg) => {
+      if (!leg.settled) { out++; return; }
+      const aT = teamOf(leg.aIds[0]), bT = teamOf(leg.bIds[0]);
+      if (leg.lead === 0) { addPts(pts, aT, .5); addPts(pts, bT, .5); }
+      else if (leg.lead > 0) addPts(pts, aT, 1);
+      else addPts(pts, bT, 1);
     });
   } else if (game.game_type === "trifecta") {
     foursomes.forEach((f) => {
@@ -243,7 +245,7 @@ function Scorecard({ data }: { data: LiveData }) {
   const allowance = game.allowance_pct ?? 100;
   const byId = useMemo(() => Object.fromEntries(players.map((p) => [p.id, p])), [players]);
   const ended = game.status === "ended";
-  const ts = useMemo(() => teamScores(game, players, pairings, foursomes, byId, meta, allowance), [game, players, pairings, foursomes, byId, meta, allowance]);
+  const ts = useMemo(() => teamScores(game, players, pairings, foursomes, byId, meta, allowance, altShotScores), [game, players, pairings, foursomes, byId, meta, allowance]);
   const stats = useMemo(() => { const m: Record<string, PStat> = {}; players.forEach((p) => { m[p.id] = computePlayer(p, meta, allowance); }); return m; }, [players, meta, allowance]);
 
   const isStab = game.game_type === "stableford";

@@ -1,3 +1,28 @@
+## v187.2 staging checks
+
+- [ ] 248110 in the APP: the Alternate Shot card shows the close-out (e.g. 3 & 2), not a running "4 UP".
+- [ ] 248110 share link: TEAM SCORES now shows the points, not 0-0.
+- [ ] The share page's matchup margin and the app's card agree.
+- [ ] Known and NOT fixed yet: the share page's per-player scorecards for alt shot still read "not started".
+
+## NEXT — Alternate Shot scorecards on the share page must be TEAM cards
+
+Reported on staging 248110: the share page lists a scorecard per PLAYER, all reading "not started",
+for a format where nobody plays their own ball. Alternate Shot posts ONE score per SIDE per hole
+(game_alt_shot_scores, 0140/0141), so the per-player rows have nothing in them by construction —
+they are not stale, they are empty and always will be.
+
+- [ ] Render one card per SIDE for alt_shot, not per player: side name from the two partners
+      ("Amit Sud & Chris O'Neal"), the side's gross per hole, the side handicap from altShotSides,
+      and the side's net. The existing PlayerDetail grid is the right shape — it needs a side-shaped
+      input rather than a LivePlayer.
+- [ ] The leaderboard rows above the cards have the same problem: they rank players by individual
+      gross/points, which for alt shot is always zero. Rank SIDES, or suppress the leaderboard for
+      this format and show the matchups only.
+- [ ] Extend the parity harness beyond legs: it currently compares matchup legs only, so a scorecard
+      or leaderboard that shows nothing is invisible to it. That is why this shipped in 187.0.
+- [ ] Same question for the Cup page: an Alternate Shot session inline must show side cards too.
+
 ## v187.1 staging check
 
 - [ ] Group scorecard, a Trifecta cell with all three glyphs: triangle, square and circle sit on a clean vertical line down the left edge.
