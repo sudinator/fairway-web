@@ -178,6 +178,20 @@ begin
   ) q;
 
   return jsonb_build_object(
+    -- The Cup's OWN roster: one row per person with a fixed A/B team, from competition_players.
+    -- Deriving the roster from session player rows counts each human once PER SESSION, because
+    -- game_players.id is a different row each time — a 6-a-side Cup reported "24 players, 12 v 12"
+    -- on the public page (188.4).
+    'players', coalesce((
+      select jsonb_agg(jsonb_build_object(
+               'user_id',        cp.user_id,
+               'display_name',   cp.display_name,
+               'avatar_url',     cp.avatar_url,
+               'team_key',       cp.team_key,
+               'handicap_index', cp.handicap_index
+             ) order by cp.team_key, cp.display_name)
+      from competition_players cp where cp.competition_id = c.id
+    ), '[]'::jsonb),
     'competition', jsonb_build_object(
       'name',            c.name,
       'location',        c.location,

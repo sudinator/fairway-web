@@ -1,3 +1,42 @@
+## v188.5 staging check
+
+- [ ] Cup link: a team named "Red" has a RED dot; "Blue" is blue.
+- [ ] Header and session dates read "Sep 7, 2026", not "2026-09-07".
+- [ ] The context box explains that a match is worth its points however it is won, and halves split.
+- [ ] Before play: no "needs N more" on either team. After a match settles: it appears, and the two teams differ.
+- [ ] Scores line up in a column and 0 reads as a zero.
+
+## v188.4 staging check
+
+- [ ] RE-APPLY 0152, then reload the Cup link: the context line reads the true player count and split (e.g. "12 players, 6 v 6").
+- [ ] Each team lists each person ONCE.
+- [ ] A player on the Cup roster who is not in any session yet still appears in their team's list.
+
+## v188.3 staging check
+
+- [ ] A Cup with a match in progress: the row shows "thru N" under the margin.
+- [ ] A finished match: the row shows "final - thru N" at the deciding hole.
+- [ ] Session header reads "N of M finished" once play has started.
+
+## NEXT — Cup page presentation (from the first live look, Sep 7)
+
+- [x] FIXED 188.4: **ROSTER IS DOUBLED — real bug.** The page showed "24 players, 12 v 12" for a 6-a-side Cup and
+      listed every name twice. liveCupContext de-duplicates on player id, but the payload's id is
+      `game_players.id`, which is a DIFFERENT row per session for the same human — so each person
+      counts once per session they appear in. Do NOT patch the de-duplication: the Cup already has
+      `competition_players`, a stable roster with fixed A/B membership. Return that from
+      get_live_competition and build the roster from it.
+- [x] FIXED 188.5: **Say it is match play.** The page never states the format of the COMPETITION — that each match
+      is worth a point however it is won, and a halved match splits it. A viewer who has not seen a
+      Ryder Cup cannot infer that from the numbers.
+- [x] FIXED 188.5: **Team colours are hardcoded** blue/orange, so a team called "Red" gets an orange dot. Derive
+      from the team name with the app's existing teamAccent().
+- [x] FIXED 188.5: **Dates render raw ISO** ("2026-09-07") in the header and every session. Format them.
+- [x] FIXED 188.5: "needs 6.5 more" shows on BOTH teams before a ball is struck. Before play, state the target once;
+      "needs N" earns its place once points are on the board.
+- [x] FIXED 188.5: The score numeral in Georgia at that size makes 0 look like a letter O. Tabular figures, or a
+      different face for the score.
+
 ## v188.2 staging checks
 
 - [ ] RE-APPLY 0152 (idempotent; it only replaces set_competition_share).

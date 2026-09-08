@@ -3,8 +3,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import { C } from "@/lib/golf";
-import { liveCupContext, type LiveCupSession, type LiveCupMatch } from "@/lib/live-competition";
+import { C, fmtDate } from "@/lib/golf";
+import { teamAccent } from "@/lib/game-colors";
+import { liveCupContext, type LiveCupSession, type LiveCupMatch, type LiveCupPlayer } from "@/lib/live-competition";
 
 export const dynamic = "force-dynamic";
 const supabase = createClient();
@@ -17,6 +18,8 @@ type LiveCup = {
     schedule_status: string; completed_at: string | null;
   };
   sessions: LiveCupSession[];
+  /** The Cup's own roster (competition_players). Absent on payloads from before 0152 was amended. */
+  players?: LiveCupPlayer[];
 };
 
 const FORMAT_LABEL: Record<string, string> = {
@@ -42,6 +45,10 @@ function MatchRow({ m, nameOf, aColor, bColor }: {
     : m.settled ? (m.lead === 0 ? "halved" : `won ${m.result || `${Math.abs(m.lead)} UP`}`)
     : (m.lead === 0 ? "all square" : `${Math.abs(m.lead)} up`);
   const color = !m.started ? C.faint : m.lead === 0 ? "#1E5B8A" : "#1B7A4B";
+  // How far along, and whether it is over. A margin alone tells a viewer who is ahead but not
+  // whether there are five holes left to change it — and a decided match reads as merely "ahead"
+  // without saying it is finished. The close-out `thru` is the DECIDING hole, not holes played.
+  const sub = !m.started ? "" : m.settled ? `final \u00b7 thru ${m.thru}` : `thru ${m.thru}`;
   const w = (side: "a" | "b") => (m.lead === 0 || !m.started ? 500 : ((side === "a") === (m.lead > 0) ? 800 : 500));
   const c = (side: "a" | "b") => (m.lead === 0 || !m.started ? C.ink : ((side === "a") === (m.lead > 0) ? C.ink : "#8B8775"));
   return (
@@ -55,7 +62,10 @@ function MatchRow({ m, nameOf, aColor, bColor }: {
         {m.rightIds.map(nameOf).join(" & ")}
       </span>
       <span style={{ width: 8, height: 8, borderRadius: 999, background: bColor, flex: "none" }} />
-      <span style={{ color, fontSize: 12, fontWeight: 700, minWidth: 78, textAlign: "right" }}>{text}</span>
+      <span style={{ minWidth: 86, textAlign: "right", lineHeight: 1.25 }}>
+        <span style={{ display: "block", color, fontSize: 12, fontWeight: 700 }}>{text}</span>
+        {sub ? <span style={{ display: "block", color: C.faint, fontSize: 11 }}>{sub}</span> : null}
+      </span>
     </div>
   );
 }
@@ -74,7 +84,7 @@ export default function CupLivePage() {
 
   useEffect(() => { void load(); const t = setInterval(() => void load(), 45000); return () => clearInterval(t); }, [load]);
 
-  const ctx = useMemo(() => (data ? liveCupContext(data.sessions, data.competition.tie_rule) : null), [data]);
+  const ctx = useMemo(() => (data ? liveCupContext(data.sessions, data.competition.tie_rule, data.players) : null), [data]);
 
   if (state === "loading") return <Shell><div style={{ color: C.sage, padding: 20 }}>Loading&hellip;</div></Shell>;
   if (state === "missing" || !data || !ctx) {
@@ -82,7 +92,9 @@ export default function CupLivePage() {
   }
 
   const cup = data.competition;
-  const aColor = "#5AA9E6", bColor = "#E0915B";
+  // Colour from the team NAME, using the same map the app uses. Hardcoding position colours meant
+  // a team called "Red" rendered with an orange dot (188.5).
+  const aColor = teamAccent(cup.team_a_name, 0), bColor = teamAccent(cup.team_b_name, 1);
   const nameById: Record<string, string> = {};
   for (const s of data.sessions) for (const p of s.players) nameById[p.id] = (p as { display_name?: string | null }).display_name || "\u2014";
   const nameOf = (id: string) => nameById[id] || "\u2014";
@@ -96,7 +108,7 @@ export default function CupLivePage() {
         </div>
         <div style={{ fontSize: 22, fontWeight: 800, marginTop: 4, fontFamily: "Georgia, serif" }}>{cup.name}</div>
         <div style={{ color: C.sage, fontSize: 12, marginTop: 4 }}>
-          {[cup.location, cup.start_date].filter(Boolean).join(" \u00b7 ")}
+          {[cup.location, cup.start_date ? fmtDate(cup.start_date) : null].filter(Boolean).join(" \u00b7 ")}
         </div>
       </div>
 
@@ -107,6 +119,8 @@ export default function CupLivePage() {
           <b>{data.sessions.length} session{data.sessions.length === 1 ? "" : "s"}</b> &mdash;{" "}
           <b>{ctx.plannedMatches} matches</b> worth <b>{fmtPts(ctx.schedule.totalPoints)} points</b> in total.
           {" "}
+          {" "}Every match is worth its points however it is won &mdash; a one-hole win counts the same
+          as a rout &mdash; and a halved match splits them.{" "}
           {cup.tie_rule === "shared"
             ? <>First to <b>{fmtPts(ctx.schedule.teamATarget)}</b> wins; {fmtPts(ctx.schedule.totalPoints / 2)}&ndash;{fmtPts(ctx.schedule.totalPoints / 2)} and the cup is shared.</>
             : <>{cup.tie_rule === "team_a_retains" ? cup.team_a_name : cup.team_b_name} retains on a tie, so they need <b>{fmtPts(cup.tie_rule === "team_a_retains" ? ctx.schedule.teamATarget : ctx.schedule.teamBTarget)}</b> and {cup.tie_rule === "team_a_retains" ? cup.team_b_name : cup.team_a_name} needs <b>{fmtPts(cup.tie_rule === "team_a_retains" ? ctx.schedule.teamBTarget : ctx.schedule.teamATarget)}</b> to take it.</>}
@@ -121,12 +135,14 @@ export default function CupLivePage() {
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ width: 11, height: 11, borderRadius: 999, background: colr, flex: "none" }} />
               <span style={{ flex: 1, fontWeight: 800, fontSize: 16, color: leader && leader !== key ? "#8B8775" : C.ink }}>{name}</span>
-              <span style={{ fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 24, color: leader === key ? C.gold : C.ink }}>{fmtPts(pts)}</span>
+              <span style={{ fontFamily: "Georgia, serif", fontVariantNumeric: "tabular-nums lining-nums", fontWeight: 800, fontSize: 24, color: leader === key ? C.gold : C.ink }}>{fmtPts(pts)}</span>
             </div>
             <div style={{ color: C.faint, fontSize: 11, marginTop: 3, marginLeft: 19, lineHeight: 1.5 }}>
               {roster.map((r) => r.name).join(" \u00b7 ") || "\u2014"}
             </div>
-            {needed > 0 && ctx.pointsRemaining > 0 && (
+            {/* Before a ball is struck both teams "need" the same target, which is just the target
+                restated twice. It earns its place once points are on the board. */}
+            {needed > 0 && ctx.pointsRemaining > 0 && (ctx.total.decidedA + ctx.total.decidedB) > 0 && (
               <div style={{ color: "#8A6D12", fontSize: 12, fontWeight: 700, marginTop: 4, marginLeft: 19 }}>
                 needs {fmtPts(needed)} more
               </div>
@@ -170,7 +186,7 @@ function SessionCard({ s, sc, nameOf, aColor, bColor, aName, bName }: {
         <span style={{ fontWeight: 800, fontSize: 15 }}>{s.name}</span>
         <span style={{ color: C.faint, fontSize: 12 }}>{FORMAT_LABEL[s.format] || s.format}</span>
         <span style={{ flex: 1 }} />
-        <span style={{ fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 15 }}>
+        <span style={{ fontFamily: "Georgia, serif", fontVariantNumeric: "tabular-nums lining-nums", fontWeight: 800, fontSize: 15 }}>
           {sc.notStarted ? <span style={{ color: C.faint, fontSize: 12, fontFamily: "inherit" }}>not started</span>
             : <>{fmtPts(sc.projectedA)}&ndash;{fmtPts(sc.projectedB)}</>}
         </span>
@@ -178,8 +194,10 @@ function SessionCard({ s, sc, nameOf, aColor, bColor, aName, bName }: {
       </div>
       <div style={{ color: C.faint, fontSize: 11, marginTop: 3 }}>
         {planned} match{planned === 1 ? "" : "es"} &middot; {fmtPts(s.points_per_match)} point{s.points_per_match === 1 ? "" : "s"} each
-        {s.play_date ? ` \u00b7 ${s.play_date}` : ""}
-        {sc.decidedCount > 0 ? ` \u00b7 ${sc.decidedCount} of ${sc.matchCount} decided` : ""}
+        {s.play_date ? ` \u00b7 ${fmtDate(s.play_date)}` : ""}
+        {sc.matchCount > 0 && !sc.notStarted
+          ? ` \u00b7 ${sc.decidedCount} of ${sc.matchCount} finished`
+          : ""}
       </div>
       {open && (
         <>

@@ -114,24 +114,39 @@ export function liveCupSessionScore(s: LiveCupSession): LiveCupSessionScore {
  * known from the moment the schedule is locked, before any child game exists, so the page can say
  * "18 points available" on day one rather than counting up as games appear.
  */
+export type LiveCupPlayer = {
+  user_id: string; display_name: string; avatar_url?: string | null;
+  team_key: "A" | "B"; handicap_index?: number | null;
+};
+
 export function liveCupContext(
   sessions: LiveCupSession[],
   tieRule: "shared" | "team_a_retains" | "team_b_retains" = "shared",
+  cupPlayers?: LiveCupPlayer[],
 ) {
   const { scores, total } = liveCupStandings(sessions);
   const schedule = competitionSchedule(
     sessions.map((s) => ({ planned_match_count: s.planned_match_count ?? 0, points_per_match: s.points_per_match })) as never,
     tieRule,
   );
-  // Roster: every distinct player across the sessions, by Cup team. A player appears in several
-  // sessions; count them once.
-  const seen = new Map<string, { id: string; name: string; team: string | null }>();
-  for (const s of sessions) {
-    for (const p of s.players) {
-      if (!seen.has(p.id)) seen.set(p.id, { id: p.id, name: (p as { display_name?: string | null }).display_name || "", team: p.team ?? null });
-    }
-  }
-  const roster = Array.from(seen.values());
+  // Roster comes from the Cup's OWN player list (competition_players), which has one row per person
+  // with a fixed A/B team. Deriving it from session player rows counted each human once PER SESSION,
+  // because game_players.id differs per session — a 6-a-side Cup read "24 players, 12 v 12" (188.4).
+  // The fallback de-duplicates by NAME rather than id, so a payload from before 0152 was amended
+  // still reports a sane count instead of a doubled one.
+  const roster: { id: string; name: string; team: string | null; handicapIndex: number | null }[] =
+    cupPlayers && cupPlayers.length
+      ? cupPlayers.map((p) => ({ id: p.user_id, name: p.display_name || "", team: p.team_key ?? null, handicapIndex: p.handicap_index ?? null }))
+      : (() => {
+          const byName = new Map<string, { id: string; name: string; team: string | null; handicapIndex: number | null }>();
+          for (const s of sessions) {
+            for (const p of s.players) {
+              const name = (p as { display_name?: string | null }).display_name || p.id;
+              if (!byName.has(name)) byName.set(name, { id: p.id, name, team: p.team ?? null, handicapIndex: null });
+            }
+          }
+          return Array.from(byName.values());
+        })();
   return {
     scores,
     total,

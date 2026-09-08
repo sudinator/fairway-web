@@ -1,3 +1,34 @@
+## 188.5.260907 — Cup page presentation: colours, dates, and saying what the format is
+
+- **Team colours come from the team NAME**, via the same `teamAccent` map the app uses. They were hardcoded by position, so a team called "Red" rendered with an orange dot.
+- **Dates are formatted** through the existing `fmtDate` rather than printed as raw ISO ("2026-09-07") in the header and on every session.
+- **The page says what kind of competition this is.** It now states that every match is worth its points however it is won — a one-hole win counts the same as a rout — and that a halved match splits them. A viewer who has not followed a Ryder Cup cannot infer that from the numbers alone.
+- **"needs N more" is silent until points are on the board.** Before a ball is struck both teams need exactly the target, so showing it on both rows was the target restated twice rather than information.
+- **Tabular lining figures on the scores**, so a 0 in Georgia no longer reads as a letter O.
+- Both helpers reused rather than rewritten: `teamAccent` from lib/game-colors and `fmtDate` from lib/golf.
+- No migration. 0152 remains current (re-apply it if 188.4 has not been deployed yet).
+
+## 188.4.260907 — Cup roster was counted once per session ("24 players, 12 v 12" for a 6-a-side Cup)
+
+- **The bug.** The public Cup page derived its roster from the session player rows and de-duplicated on player id — but that id is `game_players.id`, a DIFFERENT row per session for the same person. Every player was therefore counted once per session they appeared in, and every name was listed that many times. A 6-a-side Cup across two sessions read "24 players, 12 v 12".
+- **The fix is the right source, not better de-duplication.** A Cup already has `competition_players`: one row per person with a fixed A/B team and their handicap index. `get_live_competition` now returns it and the page builds the roster from that. A player on the Cup roster who has not been put in a session yet is now counted too, which the old approach could never do.
+- **RE-APPLY migration 0152** — amended in place, idempotent, replaces the function only.
+- A fallback remains for payloads from before the amendment: it de-duplicates by NAME rather than id, so an un-migrated deployment reports a sane count rather than a doubled one.
+- `lib/live-competition.diff.test.ts` pins it: the roster must not scale with the session count, the Cup roster is used verbatim when supplied, teams split correctly, the handicap index comes through, and a rostered player with no session yet still counts.
+- No new migration.
+
+## 188.3.260907 — Cup match rows show how far along, and whether they are over
+
+- Each match row now carries a second line: **`thru N`** while a match is in progress, and **`final · thru N`** once it is decided. A margin alone told a viewer who was ahead but not whether five holes remained to change it, and a decided match read as merely "ahead" rather than finished.
+- `thru` on a settled match is the DECIDING hole, not holes played — the close-out rule this codebase now applies everywhere.
+- Session headers read "N of M finished" once play starts, instead of only when something is already decided.
+- `lib/live-competition.diff.test.ts` pins the three states a row can be in — unplayed (thru 0, not started), in progress (thru = holes played, not settled), settled (settled, close-out label, thru within the round).
+- No migration. 0152 remains current.
+
+## Known, from the first live look
+
+The page reports the roster doubled (each player counted once per session, because the payload's id is a per-session `game_players.id`); it never says the competition is match play; team colours are hardcoded rather than read from the team name; and dates render as raw ISO. All tracked at the top of BACKLOG — the roster one is a real bug and needs the RPC to return `competition_players` rather than better de-duplication.
+
 ## 188.2.260907 — Create live link did nothing: is_admin() called with an argument
 
 - **The bug.** `set_competition_share` (0152) authorized with `public.is_admin(auth.uid())`. `is_admin()` takes NO arguments and reads `auth.uid()` itself, so Postgres raised "function public.is_admin(uuid) does not exist" and the whole call failed. The migration applied cleanly and the button did nothing.

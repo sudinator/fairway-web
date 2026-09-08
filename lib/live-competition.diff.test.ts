@@ -110,7 +110,26 @@ eq("total match count ignores the unlinked session", cup.total.matchCount, 2);
   eq("planned matches counted from the schedule", ctx.plannedMatches, 18);
   eq("outright target is more than half", ctx.schedule.teamATarget, 9.5);
   eq("both teams need the same under a shared tie rule", ctx.schedule.teamATarget, ctx.schedule.teamBTarget);
-  eq("roster de-duplicates across sessions", ctx.roster.length, 4);
+  // THE BUG: the roster used to be derived from session player rows, where the same human has a
+  // different game_players.id per session — so a 6-a-side Cup reported 24 players (188.4). These
+  // sessions share the same four people, so ANY correct roster is 4, never 8 or 12.
+  eq("roster is not multiplied by the session count", ctx.roster.length, 4);
+  eq("fallback de-duplicates by name when no Cup roster is supplied", ctx.roster.length < 4 * three.length, true);
+
+  // With the Cup's own roster the count is exact and carries the fixed team and handicap index.
+  const cupRoster = [
+    { user_id: "u1", display_name: "Chris", team_key: "A" as const, handicap_index: 9 },
+    { user_id: "u2", display_name: "Amit", team_key: "A" as const, handicap_index: 23 },
+    { user_id: "u3", display_name: "Christopher", team_key: "B" as const, handicap_index: 13 },
+    { user_id: "u4", display_name: "Michael", team_key: "B" as const, handicap_index: 11 },
+  ];
+  const withRoster = liveCupContext(three, "shared", cupRoster);
+  eq("Cup roster is used verbatim", withRoster.roster.length, 4);
+  eq("teams split 2 and 2", `${withRoster.teamA.length}/${withRoster.teamB.length}`, "2/2");
+  eq("handicap index comes through", withRoster.roster.find((r) => r.name === "Amit")?.handicapIndex, 23);
+  // A player in the Cup roster but not yet in any session must still be counted.
+  const bench = liveCupContext(three, "shared", [...cupRoster, { user_id: "u5", display_name: "Bench", team_key: "B" as const, handicap_index: 5 }]);
+  eq("a rostered player with no session yet still counts", bench.roster.length, 5);
   eq("team A roster", ctx.teamA.map((r) => r.name).sort().join(","), "Amit,Chris");
   eq("team B roster", ctx.teamB.map((r) => r.name).sort().join(","), "Christopher,Michael");
   eq("points remaining starts from the planned total", ctx.pointsRemaining, 18 - (ctx.total.decidedA + ctx.total.decidedB));
@@ -120,6 +139,44 @@ eq("total match count ignores the unlinked session", cup.total.matchCount, 2);
   const retain = liveCupContext(three, "team_a_retains");
   eq("holder retains on a tie", retain.schedule.teamATarget, 9);
   eq("challenger still needs outright", retain.schedule.teamBTarget, 9.5);
+}
+
+// ── A match must carry thru AND settled, so the page can say how far along and whether it is over ─
+{
+  const done = liveCupSessionScore(session({})).matches[0];
+  eq("settled match reports settled", done.settled, true);
+  // thru is the DECIDING hole. This fixture happens to go the distance, so it is 18; the point is
+  // that it is a real hole number within the round, not a count that can run past the decision.
+  eq("settled match reports a hole within the round", done.thru > 0 && done.thru <= 18, true);
+  eq("settled match has a close-out label", done.result !== "", true);
+
+  const mid = liveCupSessionScore(session({
+    players: [CHRIS, AMIT, CHRISTOPHER, MICHAEL].map((p) => ({ ...p, scores: p.scores.map((v, i) => (i < 12 ? v : null)) })) as never,
+  })).matches[0];
+  eq("in-progress match is not settled", mid.settled, false);
+  eq("in-progress match reports holes played", mid.thru, 12);
+  eq("in-progress match has started", mid.started, true);
+
+  const none = liveCupSessionScore(session({
+    players: [CHRIS, AMIT, CHRISTOPHER, MICHAEL].map((p) => ({ ...p, scores: [] })) as never,
+  })).matches[0];
+  eq("unplayed match reports thru 0", none.thru, 0);
+  eq("unplayed match has not started", none.started, false);
+}
+
+// ── "needs N more" must be silent before a ball is struck ───────────────────────────────────────
+// With nothing decided, both teams need exactly the target, so showing it twice is the target
+// restated rather than information. The page suppresses it until points are on the board; this pins
+// the condition it keys off.
+{
+  const fresh = liveCupContext([session({
+    id: "z", players: [CHRIS, AMIT, CHRISTOPHER, MICHAEL].map((p) => ({ ...p, scores: [] })) as never,
+  })], "shared");
+  eq("nothing decided before play", fresh.total.decidedA + fresh.total.decidedB, 0);
+  eq("both teams need the same before play", fresh.neededA, fresh.neededB);
+  const played = liveCupContext([session({})], "shared");
+  eq("once a match settles, something is decided", played.total.decidedA + played.total.decidedB > 0, true);
+  eq("and the two teams now need different amounts", played.neededA !== played.neededB, true);
 }
 
 console.log(`live cup parity: ${pass} passed, ${fail} failed`);

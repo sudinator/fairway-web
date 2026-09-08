@@ -1,3 +1,12 @@
+## 188.5.260907 — no migration
+Cup page presentation. 0152 remains current.
+
+## 188.4.260907 — re-apply 0152
+Competition roster added to the public payload. Amended in place; idempotent.
+
+## 188.3.260907 — no migration
+Cup match row progress and final state. 0152 remains current.
+
 ## 188.2.260907 — re-apply 0152
 is_admin() called with an argument; amended in place. Idempotent.
 
