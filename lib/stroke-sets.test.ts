@@ -78,5 +78,33 @@ const stableford = { ...(tri as object), game_type: "stableford", foursomes: [] 
 eq("stableford has one basis", strokeSets(stableford, BK as never, 1, ALL as never).map((r) => r.key).join(","), "course");
 eq("stableford basis is named", strokeSets(stableford, BK as never, 1, ALL as never)[0].label, "course hcp");
 
+// ── No opponent means NO match basis ────────────────────────────────────────────────────────────
+// A single-player round, or anyone before the pairings are set, was shown a triangle labelled
+// "v opponent" for a match that does not exist — its strokes computed against a null handicap.
+// The only basis such a player has is their own course handicap.
+{
+  const solo = { game_type: "match", course_par: 71, allowance_pct: 100, holes_meta: HOLES,
+    pairings: [], teams: [], foursomes: [] } as never;
+  const me = { id: "solo", user_id: "solo", display_name: "Solo", handicap_index: 12, slope: 129,
+    rating: 71.5, course_handicap: 14, no_show: false } as never;
+  const sets = strokeSets(solo, me, 1, [me]);
+  eq("solo round returns ONE basis", sets.length, 1);
+  eq("and it is the course handicap", sets[0].key, "course");
+  eq("no phantom opponent set", sets.some((x) => x.key === "opponent"), false);
+
+  // The same player once a matchup exists gets both bases back.
+  const opp = { id: "opp", user_id: "opp", display_name: "Opp", handicap_index: 4, slope: 129,
+    rating: 71.5, course_handicap: 5, no_show: false } as never;
+  const paired = { ...(solo as object), pairings: [{ a: "solo", b: "opp" }] } as never;
+  const both = strokeSets(paired, me, 1, [me, opp]);
+  eq("paired player gets the match basis back", both.map((x) => x.key).join(","), "opponent,course");
+
+  // A four-ball with nobody else in the foursome has no low ball to play off either.
+  const lonelyFB = { game_type: "fourball", course_par: 71, allowance_pct: 85, team_score_mode: "best_ball",
+    holes_meta: HOLES, pairings: [], teams: [], foursomes: [{ id: "f", name: "F", swap: false, a: ["solo"], b: [] }] } as never;
+  const fbSets = strokeSets(lonelyFB, me, 1, [me]);
+  eq("lone four-ball player returns only the course basis", fbSets.map((x) => x.key).join(","), "course");
+}
+
 console.log(`stroke sets (Architects Jul 5 fixture): ${pass} passed, ${fail} failed`);
 if (fail) { console.error(fails.slice(0, 8).join("\n")); process.exit(1); }

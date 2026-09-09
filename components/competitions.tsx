@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
 import { Avatar, Eyebrow, ShortDateInput, btn, inputStyle } from "@/components/ui";
+import { ShareControl } from "@/components/game/scorecard-views";
 import { clearAllGameScores, clearActiveGame, loadActiveGame } from "@/lib/draft";
 import { failureMessage } from "@/lib/errors";
 import type { Game, GameSeed, Player } from "@/lib/game-types";
@@ -307,6 +308,16 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
     setScheduleBusy(false); if (error) { setErr(error.message); return; } await load();
   };
 
+  // Organizer or system admin: mint / revoke the Cup's public live link. Goes through the same kind
+  // of gated SECURITY DEFINER function the game link uses, so competitions stays private (0152).
+  const setCupShare = async (on: boolean) => {
+    const { data, error } = await supabase.rpc("set_competition_share", { p_competition: competition.id, p_on: on });
+    // THROW so ShareControl can show the reason next to the button. Returning quietly left the
+    // control looking inert when the RPC failed (188.2).
+    if (error) { setErr(error.message); throw new Error(error.message); }
+    setCompetition({ ...competition, share_token: (data as string | null) ?? null });
+  };
+
   const changeTieRule = async (tieRule: Competition["tie_rule"]) => {
     setScheduleBusy(true); setErr(null);
     const { error } = await supabase.from("competitions").update({ tie_rule: tieRule }).eq("id", competition.id);
@@ -420,6 +431,16 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
         </div>)}
       </div>
 
+
+      {manage && (
+        <ShareControl
+          onShare={setCupShare}
+          token={competition.share_token ?? null}
+          path="live/cup"
+          title={"\u26f3 Ryder Cup live link"}
+          blurb={"One public page for the whole Cup \u2014 standings, every session and its matches, no login needed. Anyone with the link can follow along but cannot change anything. Stays live for 3 days after the Cup is completed."}
+        />
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 22, marginBottom: 12 }}><Eyebrow style={{ marginTop: 0, marginBottom: 0 }}>SESSIONS</Eyebrow><div style={{ flex: 1 }} />{manage && !locked ? <button onClick={() => { setAdding((v) => !v); setEditingSessionId(null); }} style={{ ...btn(false), fontSize: 12, padding: "8px 12px", flexShrink: 0 }}>{adding ? "Cancel" : "＋ Add session"}</button> : null}</div>
       <div style={{ background: C.greenLight, borderRadius: 12, padding: 12, marginBottom: 10, border: `1px solid ${locked ? "#5BD08A" : C.gold}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}><div style={{ flex: 1 }}><div style={{ color: C.cream, fontWeight: 800, fontSize: 13 }}>{locked ? "Ryder Cup scoring contract" : "Build the Ryder Cup scoring contract"}</div><div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{sessions?.length || 0} sessions · {plannedMatchCount} matches · {fmtCompetitionPoints(schedule.totalPoints)} total points</div></div>{manage ? <button disabled={scheduleBusy || (!locked && !sessions?.length)} onClick={locked ? reopenSchedule : lockSchedule} style={{ ...btn(!locked), fontSize: 11, padding: "8px 12px", opacity: scheduleBusy ? .6 : 1 }}>{locked ? "Reopen schedule" : "Review & lock"}</button> : null}</div>

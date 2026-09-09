@@ -1,3 +1,51 @@
+## 190.2.260907 — no migration
+Singles match card layout. 0154 remains current.
+
+## 190.1.260907 — no migration
+Match card labelling and column consistency. 0154 remains current.
+
+## 190.0.260907 — migration 0154
+Manual course handicaps for solo rounds. Columns only; no new functions.
+
+## 189.2.260907 — re-apply 0153
+Restores 0149's full match-length contract, which the first cut of 0153 had dropped. Idempotent.
+
+## 189.1.260907 — no migration
+Manual course handicap simulation. 0153 remains current.
+
+## 189.0.260907 — migration 0153
+Manual course handicaps: source column, audit columns, and clearing them on a hole-count change.
+
+## 188.5.260907 — no migration
+Cup page presentation. 0152 remains current.
+
+## 188.4.260907 — re-apply 0152
+Competition roster added to the public payload. Amended in place; idempotent.
+
+## 188.3.260907 — no migration
+Cup match row progress and final state. 0152 remains current.
+
+## 188.2.260907 — re-apply 0152
+is_admin() called with an argument; amended in place. Idempotent.
+
+## 188.1.260907 — no migration
+Cup share toggle in the organizer UI. 0152 remains current.
+
+## 188.0.260907 — migration 0152
+Competition share token, set_competition_share, get_live_competition. Adds one column; two new functions.
+
+## 187.3.260907 — no migration
+Alternate Shot side scorecards on the share page. 0151 remains current.
+
+## 187.2.260907 — no migration
+Alternate Shot close-out unification and share-page standings. 0151 remains current.
+
+## 187.1.260907 — no migration
+Stroke glyph box alignment. 0151 remains current.
+
+## 187.0.260907 — migration 0151
+Alternate Shot side scores and guest players in the live-share payload. Replaces get_live_scorecard; no schema change.
+
 ## 186.3.260907 — no migration
 Legend label scope and personal-card glyph row spacing. 0150 remains current.
 
@@ -53,7 +101,7 @@ Regenerate after shipping (adds new files, keeps ticks and the notes block):
 Confirm database-applied state with:
 `select id, applied_at from public.schema_migrations order by id;`
 
-Total: 135 migrations. Unchecked = not yet confirmed applied in this checklist.
+Total: 139 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -192,6 +240,10 @@ Total: 135 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [ ] 0148_delete_competition_session_game.sql
 - [ ] 0149_change_game_match_length.sql
 - [ ] 0150_trifecta_single_rule.sql
+- [ ] 0151_live_alt_shot_and_guests.sql
+- [ ] 0152_competition_share.sql
+- [ ] 0153_manual_course_handicap.sql
+- [ ] 0154_round_manual_course_handicap.sql
 
 <!-- NOTES:START -->
 

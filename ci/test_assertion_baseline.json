@@ -1,5 +1,5 @@
 {
-  "total": 189983,
+  "total": 270507,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -8,7 +8,7 @@
     "alt shot scores": 49,
     "alt shot scoring": 30,
     "alt shot side score model": 5006,
-    "alt shot simulation": 178103,
+    "alt shot simulation": 181751,
     "badges": 75,
     "bucket-model": 34,
     "card": 11,
@@ -29,6 +29,9 @@
     "grouping tests": 297,
     "hole result consistency": 981,
     "legs": 30,
+    "live cup parity": 49,
+    "manual course handicap": 17,
+    "manual handicap simulation": 76807,
     "match length": 49,
     "match length picker": 18,
     "nine-hole handicap": 15,
@@ -45,6 +48,6 @@
     "stroke rounding": 24,
     "sync/column tests": 6,
     "trifecta card render": 8,
-    "trifecta results row": 17
+    "trifecta results row": 20
   }
 }

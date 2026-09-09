@@ -94,6 +94,8 @@ export type Round = {
   course_par: number | null;
   handicap_index: number | null;
   course_handicap: number | null;
+  /** See game_players.course_handicap_source (0153/0154). "manual" is used as given and not halved. */
+  course_handicap_source?: "derived" | "manual" | null;
   played_at: string;
   gross_score?: number | null; // for gross-only historical rounds (no per-hole detail)
   ai_analysis?: string | null; // saved AI coach summary, persists once generated
@@ -1513,15 +1515,14 @@ export function altShotStatus(
   a: AltShotSideInput,
   b: AltShotSideInput,
 ): { thru: number; lead: number; result: string } {
-  const prog = altShotProgress(holes, a, b);
-  const played = prog.filter((p) => p != null) as number[];
-  const thru = played.length;
-  const lead = thru ? played[played.length - 1] : 0;
-  const remaining = holes.length - thru;
-  let result: string;
+  // ONE close-out rule, shared with singles, four-ball, Trifecta, the Cup tally and the public share
+  // page. 184.1 unified matchStatus and fourballStatus and MISSED this one, so an Alternate Shot card
+  // kept counting past the decision: staging 248110 read "4 UP" in the app on a match won 3 & 2,
+  // while the share page (which goes through matchCloseoutStatus) read it correctly.
+  const c = matchCloseoutStatus(altShotProgress(holes, a, b), holes.length);
+  const { thru, lead } = c;
+  let result = c.result;
   if (thru === 0) result = "Not started";
-  else if (Math.abs(lead) > remaining) result = remaining === 0 ? `${Math.abs(lead)} UP` : `${Math.abs(lead)} & ${remaining}`;
-  else if (thru === holes.length) result = lead === 0 ? "Halved" : `${Math.abs(lead)} UP`;
-  else result = lead === 0 ? "All square" : `${Math.abs(lead)} UP`;
+  else if (!result) result = lead === 0 ? "All square" : `${Math.abs(lead)} UP`; // still in progress
   return { thru, lead, result };
 }

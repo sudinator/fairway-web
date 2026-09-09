@@ -2521,6 +2521,23 @@ function GameRoom({
 
   // Organizer: update a player's tee from the unified setup roster. This recalculates
   // course handicap from that player's handicap index using the selected tee rating/slope.
+  /**
+   * Manual course handicap (0153). The number entered IS the course handicap for THIS game and its
+   * hole count — used as given, not halved for a nine — and it feeds every basis including the side
+   * games and posting, because GHIN is the source of truth. Passing null returns the player to the
+   * derived figure.
+   */
+  const setManualHandicap = async (p: Player, value: number | null) => {
+    if (!game) return;
+    const holes = game.holes_meta?.length === 9 ? 9 : 18;
+    if (!allowSetupChange({ type: "set_manual_handicap", playerName: p.display_name, value, holes })) return;
+    const patch = value == null
+      ? { course_handicap_source: "derived", course_handicap_set_by: null, course_handicap_set_at: null }
+      : { course_handicap: value, course_handicap_source: "manual", course_handicap_set_by: user?.id ?? null, course_handicap_set_at: new Date().toISOString() };
+    await supabase.from("game_players").update(patch).eq("id", p.id);
+    await load();
+  };
+
   const setPlayerTee = async (p: Player, teeName: string) => {
     if (!game || !allowSetupChange({ type: "set_tee", player: p, teeName })) return;
     const tee = courseTees.find((t) => t.name === teeName);
@@ -3258,7 +3275,7 @@ function GameRoom({
       {roomTab === "setup" && isOrganizer && (() => {
         const panelProps = {
           game, players, user,
-          onOverride: overridePlayerHandicap, courseTees, onSetTee: setPlayerTee,
+          onOverride: overridePlayerHandicap, courseTees, onSetTee: setPlayerTee, onSetManualHandicap: setManualHandicap,
           onRemove: removePlayer, onToggleNoShow: toggleNoShow, onSetTeam: setPlayerTeam, onRenameTeams: renameTeams,
           onRename: renameGame, onDelete: deleteGame,
           canDelete: !completedGame, deleteRestriction: "Only a system admin can delete a completed game. Posted own-ball rounds remain in player history; Alternate Shot rounds are removed.",

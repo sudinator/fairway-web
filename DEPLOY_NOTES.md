@@ -1,3 +1,227 @@
+## 190.2.260907 — The singles match card, rebuilt (the point of this release)
+
+The individual match card in Results named the same two players seven times between them, in four different phrasings, and its two columns wrapped into each other on a phone.
+
+- **One row per player.** Avatar, name, that player's strokes, and the margin. Each player's facts sit on their own row, so **each name appears once** and nothing can wrap oddly — the name cell ellipsises instead.
+- **The margin sits beside the LEADER only.** A "0" next to the trailing player says nothing. Once decided it shows the close-out ("3 & 2") rather than a running count.
+- **All square shows "AS" in gold beside the first player**, rather than adding a line, so every state is the same height.
+- **The header carries progress alone**: "thru 7", or **"match complete on hole 16"** once decided, plus the format. The old header repeated the leader's name in front of the margin and again in a holes-won tally.
+- **"tap for progression" is gone.** The caret and `aria-expanded` are the affordance; the instruction was sitting at the same prominence as the score.
+
+## A guard that tested the copy, not the behaviour
+
+Removing "tap for progression" failed a contract asserting that literal string. Its intent is "the progression panel opens", so it now asserts the WIRING — `onClick={toggleProgress}` and `aria-expanded={openProgress === idx}` — rather than the words. Negative-tested by breaking all four toggle wirings; an earlier attempt broke only one of four and passed, which is why the tightened version checks the attribute rather than the identifier's presence.
+
+No migration. 0154 remains current.
+
+## 190.1.260907 — Five fixes to the match cards, from real screenshots
+
+All five were visible in staging screenshots; none needed new behaviour, only saying the same thing consistently.
+
+- **`HOLENET` ran together.** The HOLE column is exactly the width of its own text, so the NET column started flush against it. The header and rows now carry a gap.
+- **The alternate-shot card showed two numbers for one match.** The header read the close-out (`4 & 2`) while the row below read the running margin (`Red 4 UP`), with nothing to reconcile them. The row now reads **"match complete on hole 16"** once decided, instead of `thru 16`.
+- **The four-ball headline contradicted its own caption.** `Blue 0 – Red 1` sat above "Projected from current foursomes · 0–0 decided", so a reader could not tell which figure was the score. The caption now names the headline: **"Projected — if every match finished as it stands · 0–0 decided so far"**.
+- **The right-hand column meant two different things.** Four-ball showed a running tally (`2½–0½`) under `SCORE`; alternate shot showed match state (`2DN`) under `MATCH`. Two wins and a halve IS 2 UP, so the tally was the same information in a less useful form. Both now show the match state under `MATCH`, matching the singles card, and the `runningMatch` switch that chose between them is gone.
+- **"Wildcats needs 1½ match points"** → "Wildcats **need**". A team name is plural.
+
+Left alone deliberately: the `Bo's` / `Amit's` versus `Red` / `Blue` wording in the WON column, which reads correctly in each context.
+
+## A note on how this was reviewed
+
+An earlier pass in this session presented hand-copied JSX fragments as renders of the current app. They were not — they were reconstructions, and they misrepresented what the app looks like. The redesign proposed on the back of them was largely already shipped. The five fixes above came from actual screenshots, and the four-ball fix is verified against a server render of the real `FourballView` component. Items inside the tap-to-expand hole panel cannot be server-rendered and were verified by inspection.
+
+No migration. 0154 remains current.
+
+## 190.0.260907 — Solo rounds get the same handicap rule as games (migration 0154), and no phantom opponent
+
+- **A solo round had no way to override its handicap.** A posted round lives in `rounds`, not `game_players`, so 0153 never reached it — and a posted round is exactly what feeds a player's handicap, which makes GHIN parity matter more here than in a casual game. Migration 0154 adds the same `course_handicap_source` and audit columns to `rounds`, with the same semantics: used as given, not halved for a nine.
+- **A round was also scoring off its own rule.** `manage.tsx` read `rounds.course_handicap` directly, so a round never went through `chBasis` — no manual override, and no nine-hole halving of a derived figure either. Round strokes now go through `chBasis`, so one function serves rounds and games alike.
+- **The round editor gains the field**, labelled with the round's own hole count exactly as the game one is.
+- **`ci/check_handicap_single_source.py` now covers `components/manage.tsx`.** Its absence from that list is precisely why a round kept its own rule unnoticed.
+
+## Phantom opponent on an unpaired player
+
+- A player with no matchup — a single-player round, or anyone before the pairings are set — was shown a **triangle labelled "v opponent"** for a match that does not exist, with strokes computed against a null handicap. `strokeSets` now returns only the course-handicap basis (orange circle) when there is no opponent, and likewise when a foursome has nobody else in it. Pinned with assertions, including that a paired player gets the match basis back.
+
+## Two colour traps caught by the ratchets
+
+The new round field first used `C.sage` on a cream card — 1.7:1, the same trap that made the group scorecard's second dot row invisible. It now uses the light-ground pair.
+
+## Run order
+
+Migration 0154 before the app deploys. 0153 must already be applied (re-apply it if you have not since 189.2).
+
+## 189.2.260907 — HOTFIX: 0153 had silently weakened the match-length function
+
+CI's fresh-database rebuild failed on `assert-match-length-roundtrip.sql` with "Non-organizer unexpectedly changed match length". **RE-APPLY migration 0153.**
+
+- **What actually happened.** 0153 needed to add three columns to one UPDATE inside `change_game_match_length_before_scoring`. Instead of editing 0149's function minimally, I rewrote it from its behaviour — and the rewrite dropped things I had not noticed were there:
+  - the `auth.uid() is null` authentication check;
+  - validation that holes_meta entries are objects with positive `n` and `par`, and that hole numbers are UNIQUE;
+  - the `alt_shot_scoring_started_at` and `game_alt_shot_scores` checks, so a game with alternate-shot scores could have had its hole count changed;
+  - row locking on `game_players`;
+  - resetting `clock_end` and `group_locked`;
+  - the revoke from `anon`;
+  - and every error message, which is what CI actually tripped on.
+- **Authorization was never open** — a non-organizer was still blocked. But the assertion matches on the exact phrase 'Only the game organizer', so a reworded message made a successful denial look like a hole.
+- **The fix**: 0153 now carries 0149's function body verbatim, differing only by the three added lines that clear the manual handicap. Verified by diffing the two definitions — 8 changed lines, all of them the intended addition.
+
+## New guard: ci/check_sql_assertion_messages.py
+
+The SQL assertions catch an exception and match on `position('text' in sqlerrm)`. That coupling is invisible from TypeScript and only surfaces in a full database rebuild. This checks every such string is still raised by **the function that assertion calls** — scoped to the LATEST definition of that function, since only the last one survives a rebuild.
+
+Two earlier versions of this guard were false comfort and were rejected: concatenating all migrations let an old copy of the message satisfy it, and checking "some function raises it" passed because another function legitimately uses the same wording. It now reproduces the exact CI failure with no database.
+
+## 189.1.260907 — Manual course handicap simulation: 4,000 games, 76,807 assertions
+
+- `lib/manual-handicap-simulation.test.ts` covers every combination of format (singles, four-ball, alternate shot, Trifecta, Stableford), hole count (9 and 18, front and back), allowance, and a random MIX of manual and derived players in the same game.
+- It asserts PROPERTIES rather than expected numbers, because a leak hides in the combinations nobody thought to write down:
+  1. **Used as given** — a manual figure is exactly what was entered, on 9 holes and on 18.
+  2. **Equivalence** — a manual player and a derived player who land on the same figure must score identically: same strokes, same net, same match result, same Stableford. This is what catches `course_handicap_source` affecting anything beyond the value.
+  3. **Nine-hole equivalence** — manual N on a nine equals derived 2N on a nine, pinning the two halves of the rule against each other rather than against a hardcoded expectation.
+  4. **Allowance still bites**, identically for both sources.
+  5. **No cross-contamination** — making one player manual moves nobody else's strokes.
+  6. **Round trip** — set then clear returns exactly to derived, no residue.
+  7. **Every basis** — match, team leg and course-handicap dots all read it.
+- Alternate Shot is checked by equivalence against derived twins rather than by reimplementing the side formula in the test. Modelling it there would only prove my copy agrees with itself.
+- **Verified to have teeth.** Two breaks were injected into `chBasis` and both were caught loudly: halving a manual figure on a nine produced 14,024 failures, ignoring the source flag produced 29,511.
+- Seed fixed at 0x5A17C so any CI failure is reproducible.
+- No migration. 0153 remains current.
+
+## One correction while writing it
+
+The cross-contamination invariant failed 22 times out of 4,000 — my test, not the code. It flipped a player to manual using a ROUNDED figure, which changes that player's handicap; if they were the group low, everyone's strokes legitimately move. The invariant is about whether the source flag leaks, so the figure is now held exactly constant.
+
+## 189.0.260907 — Manual course handicaps (migration 0153)
+
+- The organizer or a system admin can enter a player's **course handicap** for a game directly — typically from GHIN, which is the source of truth — instead of it being derived from index, slope and rating.
+- **Semantics, decided with the organizer:**
+  - Used **as given**: no re-derivation.
+  - **NOT halved on a nine.** The number entered IS the nine-hole figure. This is the rule worth guarding hardest, because a halving error does not look like an error — the match simply plays a stroke or two light and the result stays plausible.
+  - **Allowance still applies** (85% four-ball, 90% Trifecta). Allowance belongs to the format, not the player, so baking it into the stored value would strand it if the allowance later changed.
+  - **Feeds every basis** — match, team leg, side games and posting — because GHIN is the source of truth for the handicap, not a match-day override.
+- **One place, one rule.** `chBasis` short-circuits on a manual figure, so every scorer, the public share page, the Cup page and the stroke dots inherit it without a second code path.
+- **Migration 0153**: `course_handicap_source` (`derived`/`manual`) with a CHECK, plus `course_handicap_set_by` / `set_at` so a handicap change in a money game is attributable. It also replaces `change_game_match_length_before_scoring` to CLEAR manual handicaps when the hole count changes — they are specific to a hole count, and scaling them would invent a number nobody typed.
+- **The UI is the safeguard.** The field is labelled with the game's own hole count ("9-hole course handicap"), shows the derived figure as a placeholder and states whether the player is currently manual or derived. Setup policy treats entry mid-round like an allowance change (confirm, because it rewrites strokes on holes already played), and changing the hole count now warns that manual handicaps will be cleared.
+- **`ci/check_handicap_single_source.py`**: no scorer may call `courseHandicapExact` or read `course_handicap` directly — everything goes through `chBasis`, or manual handicaps are silently ignored at that call site.
+- **`lib/manual-handicap.test.ts`** — 17 assertions, with the nine-hole rule fenced both ways: the manual figure must equal what was entered and must NOT be half of it, while a row without the marker halves exactly as before.
+
+## Three corrections to the new guard, worth recording
+
+It reported wrong line numbers (deleting comments shifted every offset); it treated `??` as a type annotation, so the exact bad pattern slipped through its own negative test; and it flagged the Cup roster's handicap index, which is display-only. The last mattered most — a guard with false positives collects exceptions until it is inert — so it now matches only the read that can actually cause the bug.
+
+## Run order
+
+Migration 0153 before the app deploys.
+
+## 188.5.260907 — Cup page presentation: colours, dates, and saying what the format is
+
+- **Team colours come from the team NAME**, via the same `teamAccent` map the app uses. They were hardcoded by position, so a team called "Red" rendered with an orange dot.
+- **Dates are formatted** through the existing `fmtDate` rather than printed as raw ISO ("2026-09-07") in the header and on every session.
+- **The page says what kind of competition this is.** It now states that every match is worth its points however it is won — a one-hole win counts the same as a rout — and that a halved match splits them. A viewer who has not followed a Ryder Cup cannot infer that from the numbers alone.
+- **"needs N more" is silent until points are on the board.** Before a ball is struck both teams need exactly the target, so showing it on both rows was the target restated twice rather than information.
+- **Tabular lining figures on the scores**, so a 0 in Georgia no longer reads as a letter O.
+- Both helpers reused rather than rewritten: `teamAccent` from lib/game-colors and `fmtDate` from lib/golf.
+- No migration. 0152 remains current (re-apply it if 188.4 has not been deployed yet).
+
+## 188.4.260907 — Cup roster was counted once per session ("24 players, 12 v 12" for a 6-a-side Cup)
+
+- **The bug.** The public Cup page derived its roster from the session player rows and de-duplicated on player id — but that id is `game_players.id`, a DIFFERENT row per session for the same person. Every player was therefore counted once per session they appeared in, and every name was listed that many times. A 6-a-side Cup across two sessions read "24 players, 12 v 12".
+- **The fix is the right source, not better de-duplication.** A Cup already has `competition_players`: one row per person with a fixed A/B team and their handicap index. `get_live_competition` now returns it and the page builds the roster from that. A player on the Cup roster who has not been put in a session yet is now counted too, which the old approach could never do.
+- **RE-APPLY migration 0152** — amended in place, idempotent, replaces the function only.
+- A fallback remains for payloads from before the amendment: it de-duplicates by NAME rather than id, so an un-migrated deployment reports a sane count rather than a doubled one.
+- `lib/live-competition.diff.test.ts` pins it: the roster must not scale with the session count, the Cup roster is used verbatim when supplied, teams split correctly, the handicap index comes through, and a rostered player with no session yet still counts.
+- No new migration.
+
+## 188.3.260907 — Cup match rows show how far along, and whether they are over
+
+- Each match row now carries a second line: **`thru N`** while a match is in progress, and **`final · thru N`** once it is decided. A margin alone told a viewer who was ahead but not whether five holes remained to change it, and a decided match read as merely "ahead" rather than finished.
+- `thru` on a settled match is the DECIDING hole, not holes played — the close-out rule this codebase now applies everywhere.
+- Session headers read "N of M finished" once play starts, instead of only when something is already decided.
+- `lib/live-competition.diff.test.ts` pins the three states a row can be in — unplayed (thru 0, not started), in progress (thru = holes played, not settled), settled (settled, close-out label, thru within the round).
+- No migration. 0152 remains current.
+
+## Known, from the first live look
+
+The page reports the roster doubled (each player counted once per session, because the payload's id is a per-session `game_players.id`); it never says the competition is match play; team colours are hardcoded rather than read from the team name; and dates render as raw ISO. All tracked at the top of BACKLOG — the roster one is a real bug and needs the RPC to return `competition_players` rather than better de-duplication.
+
+## 188.2.260907 — Create live link did nothing: is_admin() called with an argument
+
+- **The bug.** `set_competition_share` (0152) authorized with `public.is_admin(auth.uid())`. `is_admin()` takes NO arguments and reads `auth.uid()` itself, so Postgres raised "function public.is_admin(uuid) does not exist" and the whole call failed. The migration applied cleanly and the button did nothing.
+- **Fixed** in 0152. RE-APPLY the migration: it is idempotent and only replaces the function.
+- **The UI hid it.** The Cup handler reported the error to a page-level banner far from the button, so the control looked inert with no reason given. `ShareControl` now catches and shows the failure next to the button, and the handler rethrows so it gets there.
+- **The guard could not have caught it, and now can.** `check_migration_authorization` checked that a recognized helper NAME appeared, not that it was called correctly — so `is_admin(auth.uid())` satisfied it. It now verifies call ARITY against the real signatures (`is_admin()` 0 args; `is_group_admin`/`is_group_member` 2 each). This class fails at RUNTIME rather than deploy, which is why it reached staging: it type-checks, it migrates, and then the feature silently does nothing.
+  - The first version of that check used a pattern that excluded parentheses, so `is_admin(auth.uid())` — whose argument is itself a call — matched nothing and the check was inert. Caught by negative-testing it; it now allows one level of nesting and fails on the exact bad call.
+- No new migration; 0152 is amended in place.
+
+## 188.1.260907 — Cup share toggle in the organizer UI
+
+- The Ryder Cup screen now has a **Create live link / Copy / Stop sharing** control, so the link no longer has to be minted from SQL. Organizer or system admin, matching `set_competition_share`'s own rule.
+- `ShareControl` is now shared between the game's live scorecard and the Cup link rather than duplicated: one component, two paths. The wording, the copy affordance and the revoke button cannot drift apart between them, and a fix to one is a fix to both.
+- `Competition` carries `share_token`; the screen already selected `*`, so no query change.
+- No migration. 0152 remains current.
+
+## 188.0.260907 — Ryder Cup live share link (migration 0152)
+
+- **New public route `/live/cup/<token>`**: a whole team competition on one page — overall standings, then every session INLINE with its matches. No leaving the page to follow a session.
+- **Sets the context before the numbers.** The page opens with what the competition IS: how many players and the split, how many sessions and matches, the total points available, and what each team needs to win — reading the tie rule, so a "retains on a tie" competition says who needs what. Each session names its format and explains it in a line ("One ball per side, partners alternating shots. One point per match.").
+- **Not-started sessions still appear, and still open.** A session with no linked game, or a linked game with no scores, renders as "not started" and expands, so a viewer can see who is playing and what the format is before a ball is struck.
+- **Migration 0152**: `share_token` on `competitions`; `set_competition_share` (organizer OR system admin, per the product decision) to mint or clear it; `get_live_competition(token)` returning the Cup plus every session's linked game, players, pairings, foursomes and Alternate Shot side scores — the same per-game shape `get_live_scorecard` returns, so the page reuses `lib/live-scoring` for every format and inherits the existing parity harness rather than growing a second scoring path.
+  - The player map carries BOTH user_id and row-id keys from the start, so guests are not dropped. That bug had to be fixed retroactively in 0151; not repeated here.
+  - The read is a token-scoped public endpoint with the `-- AUTHORIZATION:` contract the 187.0 guard now enforces on evidence rather than on a comment.
+- **`lib/live-competition.ts`** turns match states into Cup points using exactly `lib/competition.ts`'s rule — projected counts every started match to whoever leads (half each if level), decided counts only settled matches, both scaled by `points_per_match` — and takes its clinch targets from `competitionSchedule`, so the public page cannot drift from the in-app Cup view.
+- **`lib/live-competition.diff.test.ts`** — 32 assertions: settled and in-progress sessions, `points_per_match` scaling, ORIENTATION (flipping which side of a foursome team A sits on must not move the point), both not-started shapes, roster de-duplication across sessions, the planned denominator before any game exists, and a retain tie rule lowering one team's bar only.
+
+## Run order and a gap
+
+Migration 0152 before the app deploys. **There is no share button yet** — `set_competition_share` must be called to mint a token, so for now the link is created from SQL. The toggle is the top item in BACKLOG.
+
+## 187.3.260907 — Alternate Shot scorecards are per SIDE on the share page
+
+- The public page listed a scorecard per PLAYER for Alternate Shot, every one reading "not started". Those rows were empty by construction, not stale: Alternate Shot is one ball per SIDE and the score lives in `game_alt_shot_scores`, so an individual player row has nothing in it and never will.
+- The page now renders one card per side: both partners' names, the side's gross per hole from the canonical store, the side handicap from `altShotSides`, and the side's net. Only the RECEIVING side shows strokes — the other plays scratch — allocated on the hardest holes.
+- Stableford points are suppressed for this format; a one-ball match does not score them, and the footer reads "One ball per side" instead of a points total.
+- The per-player and per-side rows now share one card style, so they look identical and the style is defined once rather than duplicated.
+- No migration. 0151 remains current.
+
+## Still open
+
+The leaderboard ordering above the cards still ranks by individual score, which is meaningless for this format — it is currently just the side cards in foursome order. Tracked in BACKLOG. The parity harness compares matchup legs only, so scorecards and leaderboards remain outside it; extending it is tracked with the same item.
+
+## 187.2.260907 — Alternate Shot close-out in the app, and Alternate Shot standings on the share page
+
+- **The app's Alternate Shot card kept counting past the decision.** 184.1 unified the close-out for `matchStatus` and `fourballStatus` and MISSED `altShotStatus` — two of three. Reported on staging 248110: the app read "4 UP" where the share page, which goes through `matchCloseoutStatus` in `lib/live-scoring`, correctly read the close-out. All three status functions now share one rule.
+  - `lib/alt-shot-simulation.test.ts` asserted the old running-count contract across 5,000 matches, so it failed on the fix — correctly. It now asserts the close-out contract, and separately asserts that UNDECIDED matches still report the live running values, so the freeze cannot hide a regression behind an always-equal comparison. 181,751 assertions green.
+  - `lib/closeout-freeze.test.ts` gains an Alternate Shot case constructed to reproduce the reported shape: the side wins 5 up with 3 to play then loses the last two, so the running count (4) falls BELOW the decided margin (5 & 3). Both pinned.
+- **Alternate Shot showed 0–0 on the public standings.** `teamScores` had no branch for the format, so it fell through to summing per-player Stableford points — and an Alternate Shot player has no individual score, by construction. Match, Four-Ball and Alternate Shot standings now come from the same `liveLegs` the matchups block draws, removing a second set of engine calls from that function at the same time.
+- No migration. 0151 remains current.
+
+## Known, not fixed here
+
+The share page still lists a scorecard per PLAYER for Alternate Shot, all reading "not started", and ranks the leaderboard by individual score. Both are wrong for a one-ball format and need side-shaped cards. Tracked at the top of BACKLOG.md. The parity harness did not catch it because it compares matchup legs only — extending it is part of that work.
+
+## 187.1.260907 — Stroke glyphs align by construction
+
+- The three stroke glyphs have different natural heights — a 7px triangle against a 6px circle and square — so the rows sat fractionally out of line down each cell. 186.0 patched it by nudging the triangle one pixel, which only moved the discrepancy rather than removing it.
+- Every glyph now renders inside an identical 8×8 box and centres within it, so the vertical rhythm is the same whatever the shape. The per-shape offset is gone.
+- `lib/trifecta-results-row.test.tsx` asserts every glyph box is the same size with the same centring, and that NO glyph carries an individual offset. Verified to fail on the nudged version.
+- No migration. 0151 remains current.
+
+## 187.0.260907 — Alternate Shot on the public share page (migration 0151), and guests stop disappearing
+
+- **Alternate Shot can now be shared.** The format was absent from the public page entirely — not a UI gap but a DATA gap: Alternate Shot is one ball per SIDE and its canonical score lives in `game_alt_shot_scores` (0140/0141), which `get_live_scorecard` never returned. Migration 0151 adds `alt_shot_scores` to the payload, preserving NULL as the deliberate clear tombstone so the client can tell "cleared" from "never entered".
+- **Guests stop disappearing from the public page.** `v_umap` mapped `user_id → game_players.id` and filtered out null user_ids — but a guest HAS no user_id; their key in `pairings`/`foursomes` is the row id itself. Every guest resolved to null and was silently dropped, so a guest in a four-ball made that whole side vanish. The map now carries both keys.
+- Client: `lib/live-scoring.ts` gains the Alternate Shot leg, using the same `altShotSides` / `canonicalAltShotGross` helpers the app uses — no second implementation of the side handicap. Three parity fixtures added (18 holes, nine holes, and a cleared hole); the harness now holds 68 comparisons across 11 fixtures. The coverage guard confirms every rendered format has one.
+
+## Two guard weaknesses found while doing it
+
+- **`check_migration_authorization` matched on comments, not code.** A migration whose header merely MENTIONS `auth.uid()` satisfied the "contains a real auth predicate" rule — including this one, whose header explains why it legitimately has none. That is exactly the failure the guard was written to catch (0125 documented "active member" while its body did not filter status), reproduced inside the guard itself. It now strips SQL comments before the mechanical checks; rule 1, which looks FOR a comment, reads the raw text.
+- **No category for a token-scoped public read.** The guard assumed every privileged function authenticates, but a share link is anonymous by design and its authorization IS the unguessable token. Rather than bypass the rule, the guard gained a deliberately narrow exemption: the function must take `p_token`, reject short or absent tokens, and look the row up BY that token. Both conditions negative-tested; no existing migration is affected.
+
+## Run order
+
+Migration 0151 before the app deploys. Without it the client simply sees no `alt_shot_scores` and renders Alternate Shot as not started — no error, but no data.
+
 ## 186.3.260907 — Group-card legend stops naming one player's opponent; roomier glyph rows
 
 - **DEFECT FIXED: the card-wide legend printed one player's opponent as everyone's.** It built its labels from `strokeSets` and kept the FIRST label it found per basis, so a four-player card read "v Michael" — correct for one player out of four (seen on staging 641032). The legend is card-wide and now reads generically: "v opponent", "off the low", "course hcp". The PER-PLAYER header lines under each player's initials still name that player's own opponent and are unchanged.

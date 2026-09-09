@@ -11,7 +11,7 @@
  * 184.1 makes matchStatus and fourballStatus delegate thru/lead/result to matchCloseoutStatus, so
  * there is one close-out rule. The running counts are pinned here as a fence.
  */
-import { matchStatus, fourballStatus, matchProgress, fourballProgress, type FourballMember } from "./golf";
+import { matchStatus, fourballStatus, altShotStatus, altShotProgress, matchProgress, fourballProgress, type FourballMember } from "./golf";
 import { chBasis } from "./game-shape";
 
 let pass = 0, fail = 0; const fails: string[] = [];
@@ -81,5 +81,28 @@ eq("268834 Christopher v BoLi result (B side wins)", m2.result, "5 & 4");
 eq("268834 Christopher v BoLi lead FROZEN and negative", m2.lead, -5);
 eq("268834 Christopher v BoLi thru FROZEN", m2.thru, 5);
 
-console.log(`close-out freeze (571157 + 268834 fixtures): ${pass} passed, ${fail} failed`);
+// ── ALTERNATE SHOT (shape reported on staging 248110) ─────────────────────────────────────────────────────────────
+// 184.1 unified matchStatus and fourballStatus and MISSED altShotStatus, so the app's Alternate Shot
+// card kept counting past the decision: it read "4 UP" where the share page — which goes through
+// matchCloseoutStatus in lib/live-scoring — correctly read "3 & 2". Both are now the same rule.
+{
+  const H = H9.map((h, i) => ({ n: i + 1, si: h.si, par: h.par }));
+  // A side match decided 3 & 2 at the 7th, with the last two holes still scored.
+  const aG = [4, 5, 4, 4, 5, 4, 4, 6, 6];
+  const bG = [5, 5, 5, 5, 6, 5, 5, 4, 4];
+  const A = { ids: ["a1", "a2"], chs: [0, 0], gross: aG };
+  const B = { ids: ["b1", "b2"], chs: [0, 0], gross: bG };
+  const st = altShotStatus(H, A as never, B as never);
+  const running = altShotProgress(H, A as never, B as never).filter((x): x is number => x != null);
+  // Constructed to reproduce the SHAPE reported on staging 248110 (app "4 UP" vs share page's
+  // close-out) — not that game's rows, which were not pulled. The side wins 5 up with 3 to play and
+  // then loses the last two, so the running count falls BELOW the decided margin: 4, not 5.
+  eq("alt shot result is the close-out", st.result, "5 & 3");
+  eq("alt shot lead is FROZEN at the decision", st.lead, 5);
+  eq("alt shot thru is FROZEN at the deciding hole", st.thru, 6);
+  eq("FENCE the running count the app used to show", running[running.length - 1], 4);
+  eq("FENCE frozen lead is not the running count", st.lead !== running[running.length - 1], true);
+}
+
+console.log(`close-out freeze (571157 + 268834 + 248110 fixtures): ${pass} passed, ${fail} failed`);
 if (fail) { console.error(fails.join("\n")); process.exit(1); }

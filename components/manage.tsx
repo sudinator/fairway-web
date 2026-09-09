@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { HScroll } from "@/components/hscroll";
 import { createClient } from "@/lib/supabase";
+import { chBasis } from "@/lib/game-shape";
 import { pushGate, subscribeToPush, unsubscribeFromPush, currentPermission, syncPushSubscription } from "@/lib/push";
 import { C, titleCaseName, Round, Hole, strokesReceived, stablefordPts, toParStr, fmtDate, played, strokesOf, validateStrokeIndexes, dedupeHoles, TGC_GROUP_ID, effectiveGroupId, runningHandicap, handicapRounds, adjustedGross, roundDifferential, nextRoundOutlook } from "@/lib/golf";
 import capabilities from "@/lib/capabilities.json";
@@ -33,6 +34,21 @@ async function notify(userId: string, message: string) {
 }
 
 // "3h ago" style relative time.
+/**
+ * The course handicap a ROUND is scored off. Delegates to chBasis so a round obeys the same rules a
+ * game does: a manual figure is used as given and is NOT halved for a nine, while a derived one is.
+ * A round carries its own index/slope/rating, so chBasis can still derive when nothing was entered.
+ */
+const roundCh = (r: Round, holeCount: number) =>
+  chBasis(
+    {
+      handicap_index: r.handicap_index, slope: r.slope, rating: r.rating,
+      course_handicap: r.course_handicap, course_handicap_source: r.course_handicap_source,
+    },
+    r.course_par,
+    holeCount,
+  );
+
 function timeAgo(iso: string | null): string {
   if (!iso) return "never";
   const s = Math.floor((Date.now() - +new Date(iso)) / 1000);
@@ -1728,13 +1744,30 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
     const merged: Round[] = rs.map((r: any) => ({
       ...r,
       holes: dedupeHoles(byRound[r.id] || []).sort((a, b) => a.hole_number - b.hole_number)
-        .map((h, _i, all) => ({ ...h, recv: strokesReceived(h.stroke_index, r.course_handicap, all) })),
+        // Through chBasis, exactly as a game does (0154). Reading r.course_handicap directly meant a
+        // round had its own handicap rule: no manual override, and no nine-hole halving of a derived
+        // figure. One function now serves rounds and games alike.
+        .map((h, _i, all) => ({ ...h, recv: strokesReceived(h.stroke_index, roundCh(r, all.length), all) })),
     }));
     setRounds(merged);
   }, [player.id]);
   useEffect(() => { load(); }, [load]);
 
-  const openRound = (r: Round) => { setEditing(r); setHoles(r.holes.map((h) => ({ ...h }))); setMsg(null); };
+  const openRound = (r: Round) => { setEditing(r); setHoles(r.holes.map((h) => ({ ...h }))); setMsg(null); setChEdit(null); };
+
+  /** Set or clear a round's manual course handicap, mirroring the game-side control (0154). */
+  const saveRoundHandicap = async (value: number | null) => {
+    if (!editing) return;
+    const patch = value == null
+      ? { course_handicap_source: "derived", course_handicap_set_by: null, course_handicap_set_at: null }
+      : { course_handicap: value, course_handicap_source: "manual", course_handicap_set_by: player.id, course_handicap_set_at: new Date().toISOString() };
+    const { error } = await supabase.from("rounds").update(patch).eq("id", editing.id);
+    if (error) { setMsg(error.message); return; }
+    setChEdit(null);
+    await load();
+    setMsg("Course handicap updated.");
+  };
+  const [chEdit, setChEdit] = useState<string | null>(null);
   const setHole = (i: number, patch: Partial<Hole>) => setHoles((hs) => hs.map((h, j) => (j === i ? { ...h, ...patch } : h)));
 
   const saveRound = async () => {
@@ -1771,6 +1804,37 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
           ⚠ Admin mode — you are editing another player's official scores. They will be notified.
         </div>
         <div style={{ color: C.sage, fontSize: 13, marginTop: 10 }}>{editing.course}{editing.tee_name ? ` · ${editing.tee_name}` : ""} · {fmtDate(editing.played_at)}</div>
+        {(() => {
+          // Manual course handicap for a ROUND (0154). Labelled with the round's own hole count: the
+          // number entered IS the figure for that many holes and is used as given, so an 18-hole
+          // number typed against a nine is wrong by a factor of two and looks entirely plausible.
+          const holes = editing.holes?.length === 9 ? 9 : 18;
+          const isManual = editing.course_handicap_source === "manual";
+          const derived = Math.round(chBasis({ ...editing, course_handicap_source: "derived" }, editing.course_par, holes));
+          return (
+            <div style={{ background: C.card, borderRadius: 12, padding: 12, marginTop: 10 }}>
+              <label style={{ color: C.faint, fontSize: 11, letterSpacing: 1 }}>{holes}-HOLE COURSE HANDICAP</label>
+              <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
+                <input
+                  inputMode="decimal"
+                  placeholder={String(derived)}
+                  value={chEdit ?? (isManual && editing.course_handicap != null ? String(editing.course_handicap) : "")}
+                  onChange={(e) => { const v = e.target.value; if (v === "" || /^-?\d*\.?\d*$/.test(v)) setChEdit(v); }}
+                  style={{ ...inputStyle, padding: "8px 12px", width: 74, textAlign: "center" }}
+                />
+                <button style={btn(true)} onClick={() => saveRoundHandicap(chEdit === "" || chEdit == null ? null : Number(chEdit))}>
+                  {chEdit === "" ? "Clear" : "Set"}
+                </button>
+                {/* This card is CREAM. C.sage and C.gold are tuned for the dark green ground and
+                    measure 1.7:1 and ~2.3:1 here — the same trap that made the group scorecard's
+                    second dot row invisible. Ink and faint are the light-ground pair. */}
+                <span style={{ color: isManual ? C.ink : C.faint, fontWeight: isManual ? 700 : 400, fontSize: 12 }}>
+                  {isManual ? `manual \u00b7 used as entered for ${holes} holes` : `derived: ${derived}`}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
         <div style={{ background: C.card, borderRadius: 12, padding: 12, marginTop: 10 }}>
           <div style={{ display: "grid", gridTemplateColumns: "44px 40px 1fr 1fr", gap: 6, padding: "0 2px 6px", color: C.faint, fontSize: 11, letterSpacing: 1, fontWeight: 700, borderBottom: `1px solid ${C.borderCard}` }}>
             <div>HOLE</div><div style={{ textAlign: "center" }}>PAR</div><div style={{ textAlign: "center" }}>SCORE</div><div style={{ textAlign: "center" }}>PUTTS</div>

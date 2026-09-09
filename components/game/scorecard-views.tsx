@@ -881,22 +881,45 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
   );
 }
 
-// Organizer control to publish / revoke the public live-scorecard link.
-export function ShareControl({ game, onShare }: { game: Game; onShare: (on: boolean) => Promise<void> }) {
+/**
+ * Organizer control to publish / revoke a public live link. Used for a GAME's live scorecard and for
+ * a Ryder Cup's whole-competition link (188.1) — one control, two paths, so the wording, the copy
+ * affordance and the revoke button cannot drift apart between them.
+ */
+export function ShareControl({ game, onShare, token, path = "live", title, blurb }: {
+  game?: Game;
+  onShare: (on: boolean) => Promise<void>;
+  /** Explicit token, for callers that are not a Game (a competition). Overrides game.share_token. */
+  token?: string | null;
+  /** URL segment under /: "live" for a game, "live/cup" for a competition. */
+  path?: string;
+  title?: string;
+  blurb?: string;
+}) {
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
-  const shared = !!game.share_token;
-  const link = shared && typeof window !== "undefined" ? `${window.location.origin}/live/${game.share_token}` : "";
-  const toggle = async (on: boolean) => { setBusy(true); try { await onShare(on); } finally { setBusy(false); } };
+  const tok = token !== undefined ? token : game?.share_token ?? null;
+  const shared = !!tok;
+  const link = shared && typeof window !== "undefined" ? `${window.location.origin}/${path}/${tok}` : "";
+  const [failed, setFailed] = useState<string | null>(null);
+  // Surface failures HERE. The Cup handler reported errors to a page-level banner far from this
+  // button, so when the RPC failed the control simply did nothing and gave no reason (188.2).
+  const toggle = async (on: boolean) => {
+    setBusy(true); setFailed(null);
+    try { await onShare(on); }
+    catch (e) { setFailed(e instanceof Error ? e.message : "Couldn't update the link. Try again."); }
+    finally { setBusy(false); }
+  };
   const copy = async () => {
     try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
   };
   return (
     <div style={{ marginTop: 10, padding: "12px 14px", background: C.greenLight, borderRadius: 8 }}>
-      <div style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>📡 Live scorecard link</div>
-      <div style={{ color: C.sage, fontSize: 11, marginTop: 4, lineHeight: 1.5 }}>
-        Share a read-only live scorecard with anyone — no login needed. They can follow the action but can&apos;t join or change scores. Stays live for 3 days after the game ends.
-      </div>
+      <div style={{ color: C.cream, fontWeight: 700, fontSize: 13 }}>{title || "\u26f3 Live scorecard link"}</div>
+      <div style={{ color: C.sage, fontSize: 11, marginTop: 4, lineHeight: 1.5 }}>{blurb || "Share a read-only live scorecard with anyone \u2014 no login needed. They can follow the action but can\u2019t join or change scores. Stays live for 3 days after the game ends."}</div>
+      {failed && (
+        <div style={{ color: C.overRedDark, fontSize: 12, marginTop: 8, fontWeight: 700 }}>{failed}</div>
+      )}
       {!shared ? (
         <button disabled={busy} onClick={() => toggle(true)}
           style={{ ...btn(true), marginTop: 10, fontSize: 13, display: "block", opacity: busy ? 0.62 : 1 }}>

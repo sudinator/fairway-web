@@ -11,7 +11,10 @@ import {
   type FourballMember, type SkinPlayer,
   trifectaRowState,
 } from "@/lib/golf";
-import { liveLegs, liveStrokeSets, type LiveLeg } from "@/lib/live-scoring";
+import { liveLegs, liveStrokeSets, type LiveLeg, type LiveAltShotScore } from "@/lib/live-scoring";
+import { altShotSides } from "@/lib/game-shape";
+import { readAltShotSideScores } from "@/lib/alt-shot-scores";
+import { canonicalAltShotGross } from "@/lib/alt-shot-side-scores";
 import type { TrifectaRowSide } from "@/lib/golf";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +41,8 @@ type LiveData = {
   game: LiveGame; players: LivePlayer[];
   pairings: { a: string | null; b: string | null }[];
   foursomes: { id: string; name: string; swap: boolean; a: (string | null)[]; b: (string | null)[] }[];
+  /** Alternate Shot side-owned scores (0151). Absent on payloads from before that migration. */
+  alt_shot_scores?: LiveAltShotScore[];
 };
 
 const TEAM_COLOR: Record<string, string> = {
@@ -84,7 +89,7 @@ function addPts(m: Record<string, number>, k: string | null | undefined, v: numb
 
 type TeamRows = { rows: { key: string; name: string; color: string; members: string[]; scoreNum: number; scoreLabel: string }[]; out: number; unclaimed: number; isSkins: boolean };
 
-function teamScores(game: LiveGame, players: LivePlayer[], pairings: LiveData["pairings"], foursomes: LiveData["foursomes"], byId: Record<string, LivePlayer>, meta: LiveMeta[], allowance: number): TeamRows | null {
+function teamScores(game: LiveGame, players: LivePlayer[], pairings: LiveData["pairings"], foursomes: LiveData["foursomes"], byId: Record<string, LivePlayer>, meta: LiveMeta[], allowance: number, altShotScores: LiveAltShotScore[] = []): TeamRows | null {
   const teams = (game.teams || []).filter((t) => t && t.key);
   const anyTeamed = players.some((p) => p.team);
   if (teams.length < 2 || !anyTeamed) return null;
@@ -95,20 +100,22 @@ function teamScores(game: LiveGame, players: LivePlayer[], pairings: LiveData["p
   const mkMembers = (ids: (string | null)[]): FourballMember[] =>
     ids.filter(Boolean).map((id) => { const q = byId[id as string]; return { id: id as string, gross: q?.scores || [], ch: q?.ch ?? null, noShow: !!q?.no_show }; });
 
-  if (game.game_type === "match") {
-    pairings.forEach((pr) => {
-      const a = pr.a ? byId[pr.a] : null, b = pr.b ? byId[pr.b] : null; if (!a || !b) return;
-      const st = matchStatus(meta, a.scores || [], b.scores || [], a.ch, b.ch, allowance);
-      if (st.result !== "") { if (st.lead === 0) { addPts(pts, a.team, .5); addPts(pts, b.team, .5); } else if (st.lead > 0) addPts(pts, a.team, 1); else addPts(pts, b.team, 1); }
-      else out++;
-    });
-  } else if (game.game_type === "fourball") {
-    foursomes.forEach((f) => {
-      const aIds = (f.a || []).filter(Boolean) as string[]; const bIds = (f.b || []).filter(Boolean) as string[];
-      const st = fourballStatus(meta, mkMembers([...aIds, ...bIds]), aIds, bIds, allowance);
-      const remaining = meta.length - st.thru; const decided = st.thru > 0 && (remaining === 0 || Math.abs(st.lead) > remaining);
-      if (decided) { if (st.lead === 0) { addPts(pts, teamOf(aIds[0]), .5); addPts(pts, teamOf(bIds[0]), .5); } else if (st.lead > 0) addPts(pts, teamOf(aIds[0]), 1); else addPts(pts, teamOf(bIds[0]), 1); }
-      else out++;
+  // Match, Four-Ball and Alternate Shot standings all come from the SAME legs the matchups block
+  // draws, via lib/live-scoring — not a second set of engine calls here. Alternate Shot had no branch
+  // at all and fell through to summing per-player Stableford points; an Alternate Shot player has no
+  // individual score, so a decided match showed 0-0 on the public standings (staging 248110).
+  if (game.game_type === "match" || game.game_type === "fourball" || game.game_type === "alt_shot") {
+    const legs = liveLegs(
+      { game_type: game.game_type, allowance_pct: game.allowance_pct, team_score_mode: game.team_score_mode, course_par: game.course_par },
+      Object.fromEntries(Object.entries(byId).map(([k, v]) => [k, { id: v.id, ch: v.ch, team: v.team, no_show: v.no_show, scores: v.scores || [] }])),
+      pairings, foursomes, meta, allowance, altShotScores,
+    );
+    legs.forEach((leg) => {
+      if (!leg.settled) { out++; return; }
+      const aT = teamOf(leg.aIds[0]), bT = teamOf(leg.bIds[0]);
+      if (leg.lead === 0) { addPts(pts, aT, .5); addPts(pts, bT, .5); }
+      else if (leg.lead > 0) addPts(pts, aT, 1);
+      else addPts(pts, bT, 1);
     });
   } else if (game.game_type === "trifecta") {
     foursomes.forEach((f) => {
@@ -150,6 +157,7 @@ function summaryText(game: LiveGame, teamRows?: TeamRows["rows"]): string {
     case "fourball": return named
       ? `Four-ball — ${named}. Each foursome (2 v 2) is a match worth a point for the winning team, \u00bd for a halved match — Ryder-Cup style.${allow}`
       : `Four-ball match play — each 2-player side counts its better net ball on every hole; win more holes to win the match.${allow}`;
+    case "alt_shot": return `Alternate Shot${named ? ` — ${named}` : ""} — one ball per side: partners alternate shots, so each side posts a single score per hole. Strokes are the difference between the two SIDES (each side plays off half its partners’ combined handicap), and the lower side plays scratch.${allow}`;
     case "trifecta": return `Trifecta${named ? ` — ${named}` : ""} — every 2-v-2 foursome plays three matches worth one point each: two singles (each player vs one opponent, strokes off that opponent) plus a team match (${game.team_score_mode === "aggregate" ? "both partners' nets added" : "the side's better net ball"}, off the foursome's lowest handicap). Points roll up to the team total.${allow}`;
     case "stroke": return `Stroke play — lowest ${game.stroke_basis === "gross" ? "gross" : "net"} total over the round wins.${allow}`;
     case "skins": return `Skins — the lowest net score on a hole wins the skin; a tied hole carries the pot forward to the next.${allow}`;
@@ -235,11 +243,12 @@ function SectionTitle({ children }: { children: string }) {
 
 function Scorecard({ data }: { data: LiveData }) {
   const { game, players, pairings, foursomes } = data;
+  const altShotScores = data.alt_shot_scores || [];
   const meta = game.holes_meta || [];
   const allowance = game.allowance_pct ?? 100;
   const byId = useMemo(() => Object.fromEntries(players.map((p) => [p.id, p])), [players]);
   const ended = game.status === "ended";
-  const ts = useMemo(() => teamScores(game, players, pairings, foursomes, byId, meta, allowance), [game, players, pairings, foursomes, byId, meta, allowance]);
+  const ts = useMemo(() => teamScores(game, players, pairings, foursomes, byId, meta, allowance, altShotScores), [game, players, pairings, foursomes, byId, meta, allowance]);
   const stats = useMemo(() => { const m: Record<string, PStat> = {}; players.forEach((p) => { m[p.id] = computePlayer(p, meta, allowance); }); return m; }, [players, meta, allowance]);
 
   const isStab = game.game_type === "stableford";
@@ -264,6 +273,38 @@ function Scorecard({ data }: { data: LiveData }) {
   const fmtLabel: Record<string, string> = { stableford: "Stableford", stroke: "Stroke play", match: "Singles match play", fourball: "Four-ball match play", skins: "Skins", trifecta: "Trifecta" };
   const teamFmt: Record<string, string> = { match: "Team match play", fourball: "Four-ball", trifecta: "Trifecta", skins: "Team skins", stableford: "Team Stableford", stroke: "Stroke play" };
   const label = ts ? teamFmt[game.game_type] : fmtLabel[game.game_type];
+
+  // ALTERNATE SHOT: one card per SIDE. A per-player card is empty by construction here — there is no
+  // individual ball — which is why the public page showed every player as "not started" (248110).
+  const altSides = useMemo(() => {
+    if (game.game_type !== "alt_shot") return [];
+    const holes = meta.length;
+    const allocHoles = meta.map((m) => ({ hole_number: m.n, stroke_index: m.si }));
+    const shapeGame = { game_type: "alt_shot", course_par: game.course_par, allowance_pct: game.allowance_pct, holes_meta: meta, foursomes } as never;
+    const shapePlayers = players.map((q) => ({ id: q.id, user_id: q.id, course_handicap: q.ch, team: q.team, no_show: q.no_show })) as never;
+    const out: { key: string; title: string; color: string | null; stat: PStat; ch: number | null }[] = [];
+    for (const f of foursomes) {
+      for (const side of ["a", "b"] as const) {
+        const ids = ((side === "a" ? f.a : f.b) || []).filter(Boolean) as string[];
+        if (ids.length !== 2) continue;
+        const sides = altShotSides(shapeGame, shapePlayers, { id: f.id, a: (f.a || []).filter(Boolean), b: (f.b || []).filter(Boolean) } as never);
+        const legacy = readAltShotSideScores(byId[ids[0]]?.scores || [], byId[ids[1]]?.scores || [], holes);
+        const gross = canonicalAltShotGross(altShotScores as never, f.id, side, holes, legacy.gross);
+        // Only the side that receives gets strokes, on the hardest holes — the other plays scratch.
+        const receiving = sides.receiving === side;
+        const alloc = receiving && sides.strokes > 0 ? allocateStrokes(allocHoles, sides.strokes) : {};
+        const recvPerHole = meta.map((m) => (alloc as Record<number, number>)[m.n] || 0);
+        out.push({
+          key: `${f.id}:${side}`,
+          title: ids.map((id) => byId[id]?.display_name || "\u2014").join(" & "),
+          color: byId[ids[0]]?.team ? (ts?.rows.find((r) => r.key === byId[ids[0]].team)?.color ?? null) : null,
+          stat: computeSideStat(gross, recvPerHole, meta),
+          ch: side === "a" ? sides.aCh : sides.bCh,
+        });
+      }
+    }
+    return out;
+  }, [game, meta, foursomes, players, byId, altShotScores, ts]);
 
   const groups = ts
     ? ts.rows.map((r) => ({ title: r.name, color: r.color, players: sortPlayers(players.filter((p) => p.team === r.key)) }))
@@ -343,11 +384,15 @@ function Scorecard({ data }: { data: LiveData }) {
         </>
       )}
 
-      <MatchupsBlock game={game} byId={byId} pairings={pairings} foursomes={foursomes} meta={meta} allowance={allowance} />
+      <MatchupsBlock game={game} byId={byId} pairings={pairings} foursomes={foursomes} meta={meta} allowance={allowance} altShotScores={altShotScores} />
       <SkinsCarry game={game} players={players} meta={meta} allowance={allowance} />
 
       <SectionTitle>Scorecards</SectionTitle>
-      {groups.map((g, gi) => (
+      {game.game_type === "alt_shot" ? altSides.map((sd) => (
+        <SideRow key={sd.key} title={sd.title} colorDot={sd.color} stat={sd.stat} meta={meta}
+          right={sd.stat.thru ? String(sd.stat.gross) : "\u2014"}
+          status={sd.ch != null ? `side hcp ${Math.round(sd.ch)}` : ""} />
+      )) : groups.map((g, gi) => (
         <div key={gi}>
           {g.title && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "14px 2px 4px" }}>
@@ -364,10 +409,53 @@ function Scorecard({ data }: { data: LiveData }) {
   );
 }
 
+/**
+ * ALTERNATE SHOT scorecards are per SIDE, not per player. One ball per side means a player row has
+ * no score in it — by construction, not because the data is stale — so the public page listed every
+ * player as "not started" (staging 248110). This builds a PStat-shaped card for a side: the side's
+ * gross from the canonical store, the side's strokes from altShotSides (only the receiving side gets
+ * any), and net. Stableford points are meaningless for a one-ball match and are suppressed.
+ */
+function computeSideStat(gross: (number | null)[], recvPerHole: number[], meta: LiveMeta[]): PStat {
+  let g = 0, parPlayed = 0, thru = 0, net = 0;
+  const perHole = meta.map((m, i) => {
+    const v = gross[i] ?? null;
+    const recv = recvPerHole[i] || 0;
+    if (v != null && v > 0) { g += v; parPlayed += m.par; thru++; net += v - recv; }
+    return { n: m.n, par: m.par, gross: v, recv, pts: null };
+  });
+  return { gross: g, net, thru, toPar: g - parPlayed, points: 0, perHole, fairways: null, gir: null, putts: null, penalties: null };
+}
+
+/** One expandable scorecard row on the public page. Shared by the per-player and per-SIDE rows so
+ *  the two look identical and the padding literal exists once, not once per component. */
+const SCORE_ROW_CARD: React.CSSProperties = { background: C.card, borderRadius: 12, padding: "12px 14px", marginBottom: 8, cursor: "pointer" };
+
+function SideRow({ title, colorDot, stat, meta, right, status, setsFor }: {
+  title: string; colorDot: string | null; stat: PStat; meta: LiveMeta[]; right: string; status: string;
+  setsFor?: (si: number | null) => { key: string; strokes: number; gives: number; label: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div onClick={() => setOpen((o) => !o)} style={SCORE_ROW_CARD}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        {colorDot ? <span style={{ width: 11, height: 11, borderRadius: 6, background: colorDot, display: "inline-block", flex: "none" }} /> : null}
+        <span style={{ flex: 1, color: C.ink, fontWeight: 800, fontSize: 15, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{title}</span>
+        <span style={{ color: C.ink, fontWeight: 800, fontSize: 15 }}>{right}</span>
+        <span style={{ color: C.faint }}>{open ? "\u25b4" : "\u25be"}</span>
+      </div>
+      <div style={{ color: C.faint, fontSize: 11, marginTop: 4, marginLeft: colorDot ? 21 : 0 }}>
+        {stat.thru ? `thru ${stat.thru} \u00b7 gross ${stat.gross}` : "not started"}{status ? ` \u00b7 ${status}` : ""}
+      </div>
+      {open && <PlayerDetail stat={stat} meta={meta} gameType="alt_shot" strokeNet={false} setsFor={setsFor} />}
+    </div>
+  );
+}
+
 function PlayerRow({ p, pos, stat, meta, right, status, gameType, strokeNet, setsFor }: { p: LivePlayer; pos: number; stat: PStat; meta: LiveMeta[]; right: string; status: string; gameType: string; strokeNet: boolean; setsFor?: (si: number | null) => { key: string; strokes: number; gives: number; label: string }[] }) {
   const [open, setOpen] = useState(false);
   return (
-    <div onClick={() => setOpen((o) => !o)} style={{ background: C.card, borderRadius: 14, color: C.ink, padding: "12px 14px", marginTop: 8, cursor: "pointer" }}>
+    <div onClick={() => setOpen((o) => !o)} style={{ ...SCORE_ROW_CARD, borderRadius: 14, color: C.ink }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span style={{ width: 16, color: C.faint, fontWeight: 700 }}>{pos}</span>
         <Avatar src={p.avatar_url} name={p.display_name} size={28} />
@@ -422,7 +510,7 @@ function PlayerDetail({ stat, meta, gameType, strokeNet, setsFor }: { stat: PSta
                 </td>
               );
             })}<td style={totCell}>{grossSum || "\u00b7"}</td></tr>
-            {gameType !== "stroke" && (
+            {gameType !== "stroke" && gameType !== "alt_shot" && (
             <tr style={{ background: "#F4F0E1" }}><td style={{ ...lblCell, background: "transparent" }}>Points</td>{hs.map((h) => <td key={h.n} style={{ ...cCell, color: C.green, fontWeight: 700 }}>{h.gross && h.gross > 0 ? (h.pts ?? 0) : "\u00b7"}</td>)}<td style={{ ...cCell, color: C.green, fontWeight: 800 }}>{ptsSum}</td></tr>
             )}
           </tbody>
@@ -442,7 +530,9 @@ function PlayerDetail({ stat, meta, gameType, strokeNet, setsFor }: { stat: PSta
       {splits.map(([from, to, label]) => <React.Fragment key={label}>{grid(from, to, label)}</React.Fragment>)}
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontSize: 13 }}>
         <span style={{ color: C.faint }}>Gross <b style={{ color: C.ink }}>{stat.gross || "\u00b7"}</b>{stat.thru ? <> · Net <b style={{ color: C.ink }}>{Math.round(stat.net)}</b></> : null}</span>
-        {gameType === "stroke"
+        {gameType === "alt_shot"
+          ? <span style={{ color: C.faint }}>One ball per side</span>
+          : gameType === "stroke"
           ? <span style={{ color: C.faint }}>Counts <b style={{ color: C.green }}>{strokeNet ? "net" : "gross"}</b></span>
           : <span style={{ color: C.faint }}>Stableford <b style={{ color: C.green }}>{stat.points} pts</b></span>}
       </div>
@@ -496,13 +586,13 @@ function teamLegLabel(lead: number, thru: number, _holes: number, result: string
   return { text: `${(lead > 0 ? teamA : teamB) || "Team"} ${Math.abs(lead)} up`, color: WIN };
 }
 
-function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
+function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance, altShotScores }: {
   game: LiveGame; byId: Record<string, LivePlayer>;
   pairings: LiveData["pairings"]; foursomes: LiveData["foursomes"];
-  meta: LiveMeta[]; allowance: number;
+  meta: LiveMeta[]; allowance: number; altShotScores: LiveAltShotScore[];
 }) {
   const gt = game.game_type;
-  if (gt !== "match" && gt !== "fourball" && gt !== "trifecta") return null;
+  if (gt !== "match" && gt !== "fourball" && gt !== "trifecta" && gt !== "alt_shot") return null;
   const teams = game.teams || [];
   const tColor: Record<string, string> = {}; const tName: Record<string, string> = {};
   teams.forEach((t, i) => { tColor[t.key] = teamColor(t.name, i); tName[t.key] = t.name; });
@@ -540,6 +630,7 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
     foursomes,
     meta,
     allowance,
+    altShotScores,
   );
 
   let body: React.ReactNode = null;
@@ -568,6 +659,25 @@ function MatchupsBlock({ game, byId, pairings, foursomes, meta, allowance }: {
         <div key={`f${i}`} style={cardStyle}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontWeight: 800, fontSize: 14 }}><span>{f.name || `Foursome ${i + 1}`}</span><span style={{ color: C.faint, fontSize: 11, fontWeight: 500 }}>{st.thru ? `thru ${st.thru}` : "not started"}</span></div>
           {Leg(`f${i}r`, true, aIds, bIds, lbl)}
+        </div>
+      );
+    })}</>;
+  } else if (gt === "alt_shot") {
+    // One ball per SIDE: no individual matchups to draw and no per-player strokes. The side handicap
+    // is the difference between the two sides and both partners share it. The leg comes from
+    // lib/live-scoring, which reads the side-owned store (0140/0141) exposed to this page by 0151 —
+    // before that the format could not be shown publicly at all.
+    if (!foursomes.length) return null;
+    body = <>{foursomes.map((f, i) => {
+      const aIds = (f.a || []).filter(Boolean) as string[]; const bIds = (f.b || []).filter(Boolean) as string[];
+      if (!aIds.length || !bIds.length) return null;
+      const leg = legs.find((l) => l.kind === "team" && l.aIds.join() === aIds.join() && l.bIds.join() === bIds.join());
+      const st = leg || { lead: 0, thru: 0, result: "", settled: false };
+      const lbl = teamLegLabel(st.lead, st.thru, meta.length, st.settled ? st.result : "", teamNameOf(aIds[0]), teamNameOf(bIds[0]));
+      return (
+        <div key={`as${i}`} style={cardStyle}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontWeight: 800, fontSize: 14 }}><span>{f.name || `Foursome ${i + 1}`}</span><span style={{ color: C.faint, fontSize: 11, fontWeight: 500 }}>{st.thru ? `thru ${st.thru}` : "not started"}</span></div>
+          {Leg(`as${i}r`, true, aIds, bIds, lbl)}
         </div>
       );
     })}</>;

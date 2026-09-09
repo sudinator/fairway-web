@@ -1,3 +1,194 @@
+## v190.2 staging check
+
+- [ ] Individual match in Results: each player on their own row, each name ONCE.
+- [ ] Margin beside the leader only; nothing beside the trailing player.
+- [ ] All square: gold "AS" beside the first player, no extra line.
+- [ ] Decided match: header reads "match complete on hole N" and the margin shows the close-out.
+- [ ] Tapping the card still opens MATCH PROGRESSION.
+
+## v190.1 staging checks
+
+- [ ] Expand a four-ball or alt-shot hole panel: "HOLE" and "NET" are separated.
+- [ ] Same panel: the right column reads MATCH state (1UP / 2DN / AS) in BOTH four-ball and alt shot.
+- [ ] A decided alt-shot match: the row reads "match complete on hole N", and agrees with the header's close-out.
+- [ ] Four-ball session header: the caption names the projection and the decided figure separately.
+- [ ] A team with a plural name reads "need", not "needs".
+
+## v190.0 staging checks
+
+- [ ] Apply 0154. Open a solo round in the editor: a "18-HOLE COURSE HANDICAP" field appears (or 9-hole for a nine).
+- [ ] Enter a figure: strokes on the round card change to match it; the label reads "manual - used as entered".
+- [ ] NINE-hole round: enter 12, confirm strokes are based on 12 and NOT 6.
+- [ ] Clear it: the round returns to the derived figure.
+- [ ] Start a round as a SINGLE player: stroke marks are orange CIRCLES labelled "course hcp" - no triangle, no "v opponent".
+- [ ] Once a matchup is set in a real match, the triangle returns.
+
+## v189.2 staging check
+
+- [ ] RE-APPLY 0153 (idempotent; it replaces the function).
+- [ ] Confirm a non-organizer still cannot change match length, and that a game with alternate-shot scores cannot either.
+- [ ] Then run the 189.0 manual-handicap checklist.
+
+## v189.1 staging check
+
+- [ ] Nothing new to click; this release is test coverage only. Deploy alongside 189.0 and run the 189.0 checklist.
+
+## v189.0 staging checks — manual course handicaps
+
+- [ ] Apply 0153. In an 18-hole game the field reads "18-hole course handicap"; in a nine it reads "9-hole".
+- [ ] Enter a manual figure: the row says "manual - used as entered for N holes", and the derived figure no longer applies.
+- [ ] NINE-HOLE, the important one: enter 12 on a nine. Strokes must be based on 12, NOT 6. Check the stroke dots.
+- [ ] Allowance still bites: with 85%, a manual 12 plays off 10.
+- [ ] Side games and posting use the manual figure too (course-handicap dots, Stableford points).
+- [ ] Clear the field: the player returns to the derived figure.
+- [ ] Change the hole count on an unscored game with manual handicaps: a confirm warns they will be cleared, and they are.
+- [ ] Enter one mid-round: a confirm warns that strokes on played holes will be recalculated.
+- [ ] A non-organizer does not see the field.
+
+## v188.5 staging check
+
+- [ ] Cup link: a team named "Red" has a RED dot; "Blue" is blue.
+- [ ] Header and session dates read "Sep 7, 2026", not "2026-09-07".
+- [ ] The context box explains that a match is worth its points however it is won, and halves split.
+- [ ] Before play: no "needs N more" on either team. After a match settles: it appears, and the two teams differ.
+- [ ] Scores line up in a column and 0 reads as a zero.
+
+## v188.4 staging check
+
+- [ ] RE-APPLY 0152, then reload the Cup link: the context line reads the true player count and split (e.g. "12 players, 6 v 6").
+- [ ] Each team lists each person ONCE.
+- [ ] A player on the Cup roster who is not in any session yet still appears in their team's list.
+
+## v188.3 staging check
+
+- [ ] A Cup with a match in progress: the row shows "thru N" under the margin.
+- [ ] A finished match: the row shows "final - thru N" at the deciding hole.
+- [ ] Session header reads "N of M finished" once play has started.
+
+## NEXT — Cup page presentation (from the first live look, Sep 7)
+
+- [x] FIXED 188.4: **ROSTER IS DOUBLED — real bug.** The page showed "24 players, 12 v 12" for a 6-a-side Cup and
+      listed every name twice. liveCupContext de-duplicates on player id, but the payload's id is
+      `game_players.id`, which is a DIFFERENT row per session for the same human — so each person
+      counts once per session they appear in. Do NOT patch the de-duplication: the Cup already has
+      `competition_players`, a stable roster with fixed A/B membership. Return that from
+      get_live_competition and build the roster from it.
+- [x] FIXED 188.5: **Say it is match play.** The page never states the format of the COMPETITION — that each match
+      is worth a point however it is won, and a halved match splits it. A viewer who has not seen a
+      Ryder Cup cannot infer that from the numbers.
+- [x] FIXED 188.5: **Team colours are hardcoded** blue/orange, so a team called "Red" gets an orange dot. Derive
+      from the team name with the app's existing teamAccent().
+- [x] FIXED 188.5: **Dates render raw ISO** ("2026-09-07") in the header and every session. Format them.
+- [x] FIXED 188.5: "needs 6.5 more" shows on BOTH teams before a ball is struck. Before play, state the target once;
+      "needs N" earns its place once points are on the board.
+- [x] FIXED 188.5: The score numeral in Georgia at that size makes 0 look like a letter O. Tabular figures, or a
+      different face for the score.
+
+## v188.2 staging checks
+
+- [ ] RE-APPLY 0152 (idempotent; it only replaces set_competition_share).
+- [ ] Ryder Cup as organizer: Create live link now mints a token and shows the URL.
+- [ ] Copy the link, open logged out: the Cup page loads.
+- [ ] Stop sharing: the link stops resolving.
+- [ ] Sanity: as a NON-organizer, non-admin, the control is not offered at all.
+
+## NEXT — move the Cup live link into the Ryder Cup settings panel
+
+188.1 placed ShareControl just ABOVE the SESSIONS heading, where it reads as part of the sessions
+block rather than as a Cup-level setting. Amit's ask: put it under Ryder Cup settings, reachable
+once the Cup has begun.
+
+Note it is ALREADY reachable after play starts — the control is gated on `manage` only, not on
+`locked` or on competition.status — so this is placement, not visibility.
+
+- [ ] Move the `{manage && <ShareControl ... path="live/cup" />}` block from just above the SESSIONS
+      Eyebrow into the scoring-contract panel (components/competitions.tsx ~line 443, the
+      `background: C.greenLight` card that holds "IF THE RYDER CUP FINISHES LEVEL"), below the tie-rule
+      select. That panel stays on screen in both draft and locked states, which is exactly the
+      requirement.
+- [ ] Keep it OUTSIDE any `!locked` condition — the link must work during and after play. The tie-rule
+      select next to it IS disabled when locked; the share control must not inherit that.
+- [ ] Check on a phone: that panel is already dense, so the control may need to collapse to a single
+      row (link + copy) once a token exists rather than the full three-part layout.
+
+## v188.1 staging checks — end-to-end Cup link
+
+- [ ] Apply 0151 and 0152 if not already.
+- [ ] Open a Ryder Cup as organizer: "Ryder Cup live link" control appears above SESSIONS. Non-organizers do not see it.
+- [ ] Create link, copy it, open logged OUT in another browser.
+- [ ] Context line: right player count and split, session and match counts, total points, and the target to win.
+- [ ] Team scores: both rosters listed, leader in gold, "needs N more" correct.
+- [ ] Each session inline with its matches; winning side bolded, margin read from the winner.
+- [ ] A session with no linked game shows "not started" and still expands.
+- [ ] An Alternate Shot session shows one row per side and agrees with the app.
+- [ ] Stop sharing: the link stops resolving.
+
+## v188.0 staging checks — Cup live link
+
+- [ ] Apply 0152. Mint a token:  select public.set_competition_share('<competition_id>', true);
+- [ ] Open /live/cup/<token> logged OUT. The context line reads the right player count, split, session and match counts, total points and target.
+- [ ] Team scores show both rosters and the leader in gold; "needs N more" is right.
+- [ ] Each session shows its matches inline, with the winning side bolded and the margin read from the winner.
+- [ ] A session with no linked game shows "not started" and still expands.
+- [ ] An Alternate Shot session shows one row per side, matching the app.
+- [ ] Revoke:  select public.set_competition_share('<competition_id>', false);  the link stops resolving.
+
+## DONE in 188.1 — Cup share toggle in the organizer UI
+
+188.0 ships the route and the RPCs but NOT a button. `set_competition_share(competition_id, true)`
+must be called to mint a token, so today the link can only be created from SQL. Add the same
+share toggle the game room has to the Cup screen (organizer or admin, matching the RPC's rule),
+showing the /live/cup/<token> URL with a copy action.
+
+- [ ] Toggle + copy in components/competitions.tsx, gated on organizer-or-admin.
+- [ ] Revoking must clear the token (the RPC already does; the UI needs to offer it).
+- [ ] While unset, show nothing rather than a dead link.
+
+## v187.3 staging checks
+
+- [ ] 248110 share link: Scorecards shows TWO cards per foursome (one per side), named "A & B", not four player cards reading "not started".
+- [ ] Expanding a side card shows the side's gross per hole and its net; no Stableford points row.
+- [ ] Only the receiving side shows stroke dots, on the hardest holes; the other side shows none.
+- [ ] The side handicap in the row subtitle matches the app's Strokes panel for that game.
+
+## v187.2 staging checks
+
+- [ ] 248110 in the APP: the Alternate Shot card shows the close-out (e.g. 3 & 2), not a running "4 UP".
+- [ ] 248110 share link: TEAM SCORES now shows the points, not 0-0.
+- [ ] The share page's matchup margin and the app's card agree.
+- [ ] Known and NOT fixed yet: the share page's per-player scorecards for alt shot still read "not started".
+
+## NEXT — Alternate Shot scorecards on the share page must be TEAM cards
+
+Reported on staging 248110: the share page lists a scorecard per PLAYER, all reading "not started",
+for a format where nobody plays their own ball. Alternate Shot posts ONE score per SIDE per hole
+(game_alt_shot_scores, 0140/0141), so the per-player rows have nothing in them by construction —
+they are not stale, they are empty and always will be.
+
+- [x] DONE 187.3: Render one card per SIDE for alt_shot, not per player: side name from the two partners
+      ("Amit Sud & Chris O'Neal"), the side's gross per hole, the side handicap from altShotSides,
+      and the side's net. The existing PlayerDetail grid is the right shape — it needs a side-shaped
+      input rather than a LivePlayer.
+- [ ] The leaderboard rows above the cards have the same problem: they rank players by individual
+      gross/points, which for alt shot is always zero. Rank SIDES, or suppress the leaderboard for
+      this format and show the matchups only.
+- [ ] Extend the parity harness beyond legs: it currently compares matchup legs only, so a scorecard
+      or leaderboard that shows nothing is invisible to it. That is why this shipped in 187.0.
+- [ ] Same question for the Cup page: an Alternate Shot session inline must show side cards too.
+
+## v187.1 staging check
+
+- [ ] Group scorecard, a Trifecta cell with all three glyphs: triangle, square and circle sit on a clean vertical line down the left edge.
+- [ ] Personal card: same, stacked in the Hcp column.
+
+## v187.0 staging checks — Alternate Shot on the share page
+
+- [ ] Apply 0151. Share an ALTERNATE SHOT game; the matchups block shows each foursome's side match with a margin.
+- [ ] The margin matches the app's own Results for the same game.
+- [ ] Clear a hole's side score in the app; the share page shows it as unplayed, not as the old value.
+- [ ] Share a game with a GUEST in a foursome: the guest appears and their side is no longer dropped.
+- [ ] A nine-hole Alternate Shot: strokes and margin match the app.
+
 ## v186.3 staging check
 
 - [ ] 641032 group scorecard: the legend at the top reads "v opponent", NOT "v Michael".

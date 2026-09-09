@@ -98,6 +98,17 @@ eq(r4.styleOf("Chris & Amit"), `800/${GOLD}`, "team leg highlights the winning p
     eq(legendZone.includes(name), false, `legend does not name a specific opponent (${name})`);
   }
   eq(legendZone.includes("off the low"), true, "legend names the four-ball basis generically");
+
+  // Every stroke glyph must occupy an IDENTICAL box. The shapes have different natural heights
+  // (7px triangle vs 6px circle/square), so without a fixed box the rows sit fractionally out of
+  // line down the cell — visible on a real card, and not fixable by nudging one shape a pixel.
+  const boxes = Array.from(s.el.querySelectorAll("span")).filter((e) => e.style.width === "8px" && e.style.height === "8px");
+  eq(boxes.length > 0, true, "stroke glyphs render inside a fixed box");
+  const sizes = new Set(boxes.map((e) => `${e.style.width}x${e.style.height}|${e.style.alignItems}|${e.style.justifyContent}`));
+  eq(sizes.size, 1, "every glyph box is the same size and centres its shape identically");
+  // And no glyph carries a per-shape offset — that was the old 1px nudge on the triangle.
+  const nudged = Array.from(s.el.querySelectorAll("svg")).filter((e) => (e as unknown as HTMLElement).style.top);
+  eq(nudged.length, 0, "no glyph is nudged individually; the box does the aligning");
   s.unmount();
 }
 

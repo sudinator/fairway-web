@@ -21,6 +21,8 @@ export type Competition = {
   schedule_locked_by?: string | null;
   schedule_revision: number;
   tie_rule: "shared" | "team_a_retains" | "team_b_retains";
+  /** Public live-link token (0152). Null when the Cup is not shared. */
+  share_token?: string | null;
 };
 
 export type CompetitionPlayer = {

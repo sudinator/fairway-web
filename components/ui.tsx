@@ -629,16 +629,28 @@ export function HoleScoreModal({ title, par, si, yardage, strokes, putts, fairwa
  * `gives` outlines the SAME shape instead of filling it: a hollow triangle is "you give a stroke".
  */
 export function strokeGlyph(key: string, color: string, gives = false, i: number | string = 0) {
+  // EVERY glyph occupies the same 8x8 box and centres inside it. The shapes have different natural
+  // heights — a 7px triangle against a 6px circle and square — so drawing them bare left the rows
+  // fractionally out of line, and nudging one by a pixel only moved the problem. A fixed box makes
+  // the vertical rhythm identical by construction, whatever the shape.
+  const BOX: React.CSSProperties = {
+    width: 8, height: 8, display: "inline-flex", alignItems: "center", justifyContent: "center", flex: "none", lineHeight: 0,
+  };
   if (key === "opponent" || key === "alt_side") {
     return (
-      // 7px tall against the 6px circle/square, so nudged 1px down to sit on the same optical line.
-      <svg key={i} width={8} height={7} viewBox="0 0 8 7" style={{ display: "block", position: "relative", top: 1 }} aria-hidden>
-        <polygon points="4,0.5 7.5,6.5 0.5,6.5" fill={gives ? "none" : color} stroke={color} strokeWidth={gives ? 1.2 : 0} strokeLinejoin="round" />
-      </svg>
+      <span key={i} style={BOX}>
+        <svg width={8} height={7} viewBox="0 0 8 7" style={{ display: "block" }} aria-hidden>
+          <polygon points="4,0.5 7.5,6.5 0.5,6.5" fill={gives ? "none" : color} stroke={color} strokeWidth={gives ? 1.2 : 0} strokeLinejoin="round" />
+        </svg>
+      </span>
     );
   }
-  const base: React.CSSProperties = { width: 6, height: 6, display: "block", borderRadius: key === "group_low" ? 1 : 999 };
-  return <span key={i} style={gives ? { ...base, border: `1.2px solid ${color}` } : { ...base, background: color }} />;
+  const shape: React.CSSProperties = { width: 6, height: 6, display: "block", borderRadius: key === "group_low" ? 1 : 999 };
+  return (
+    <span key={i} style={BOX}>
+      <span style={gives ? { ...shape, border: `1.2px solid ${color}` } : { ...shape, background: color }} />
+    </span>
+  );
 }
 
 export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false, strokeSixes = false, uncap = false, showIndivDots = false, matchStrokeLabel = "team match", scoreLocked = false, lockedByName, onActiveHole, resumeHole }: {

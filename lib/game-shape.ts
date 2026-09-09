@@ -81,7 +81,17 @@ export function shapeOf(game: ShapeGame): GameShape {
 }
 
 export const chBasis = (
-  p: { handicap_index?: number | null; slope?: number | null; rating?: number | null; course_handicap: number | null },
+  p: {
+    handicap_index?: number | null; slope?: number | null; rating?: number | null; course_handicap: number | null;
+    /**
+     * "manual" means course_handicap was entered by the organizer as the authoritative COURSE
+     * HANDICAP for this game — typically taken from GHIN — rather than derived from index, slope
+     * and rating. It is used as given: no re-derivation, and NO nine-hole halving, because on a
+     * nine the number entered IS the nine-hole figure. Allowance still applies, since that is a
+     * property of the format and not of the player.
+     */
+    course_handicap_source?: "derived" | "manual" | null;
+  },
   coursePar: number | null | undefined,
   /**
    * Holes actually being played. Omit for 18 — every existing caller does, and omitting it keeps
@@ -89,6 +99,12 @@ export const chBasis = (
    */
   holeCount?: number | null,
 ): number => {
+  // A manual figure short-circuits the whole chain: it is already the course handicap for THIS
+  // course and THIS number of holes. Halving it on a nine would be an adjustment to a number the
+  // organizer entered deliberately, and the error is invisible in the result — the match simply
+  // plays a stroke or two light.
+  if (p.course_handicap_source === "manual" && p.course_handicap != null) return p.course_handicap;
+
   const exact =
     p.handicap_index != null && p.slope != null && p.rating != null && coursePar != null
       ? courseHandicapExact(p.handicap_index, p.slope, p.rating, coursePar)
@@ -344,11 +360,20 @@ export function strokeSets(
   if (basis === "relative_pair") {
     const pr = (game.pairings || []).find((x) => x.a === key || x.b === key);
     const opp = pr ? allPlayers.find((x) => pkey(x) === (pr.a === key ? pr.b : pr.a)) : undefined;
+    // NO OPPONENT, no 1-v-1. A player with no matchup yet — a solo round, or anyone before the
+    // pairings are set — was being shown a triangle labelled "v opponent" for a match that does not
+    // exist, computed against a null handicap. Their only real basis is their course handicap.
+    if (!opp) return [course];
     const { strokes, gives } = pairStrokes(game, p, opp, si);
     return [{ key: "opponent", strokes, gives, label: `v ${nameOf(opp)}` }, course];
   }
 
   if (basis === "relative_foursome") {
+    // Same rule for the group bases: with nobody else in the foursome there is no low ball to play
+    // off, so the only meaningful basis is the player's own course handicap.
+    const fsFor = (game.foursomes || []).find((f) => [...f.a, ...f.b].includes(key));
+    const others = fsFor ? [...fsFor.a, ...fsFor.b].filter((x) => x !== key) : allPlayers.filter((x) => pkey(x) !== key).map(pkey);
+    if (!others.length) return [course];
     const { strokes, lowName } = groupLowStrokes(game, p, allPlayers, si);
     const teamLeg: StrokeSet = { key: "group_low", strokes, gives: 0, label: `off ${lowName}` };
     // A TRIFECTA also has a 1-v-1 single inside the same foursome, scored off the OPPONENT.

@@ -14,9 +14,11 @@
  * Fixtures are real games wherever we have them. A format with no case here is NOT covered, and
  * ci/check_live_parity_coverage.py fails the build if a format the live page renders has no case.
  */
-import { computeTrifecta, matchProgress, fourballProgress, matchCloseoutStatus, type FourballMember, type MatchHoleMeta } from "./golf";
-import { chBasis } from "./game-shape";
-import { liveLegs, type LiveLeg, type LiveScoringPlayer } from "./live-scoring";
+import { computeTrifecta, matchProgress, fourballProgress, altShotProgress, matchCloseoutStatus, type FourballMember, type MatchHoleMeta } from "./golf";
+import { chBasis, altShotSides } from "./game-shape";
+import { readAltShotSideScores } from "./alt-shot-scores";
+import { canonicalAltShotGross } from "./alt-shot-side-scores";
+import { liveLegs, type LiveLeg, type LiveScoringPlayer, type LiveAltShotScore } from "./live-scoring";
 
 let compared = 0, mismatches = 0; const details: string[] = [];
 const report = (ctx: string, field: string, app: unknown, live: unknown) => {
@@ -31,7 +33,9 @@ type FixPlayer = {
 };
 type Fixture = {
   label: string;
-  game_type: "match" | "fourball" | "trifecta";
+  game_type: "match" | "fourball" | "trifecta" | "alt_shot";
+  /** Alternate Shot only: the side-owned store, as get_live_scorecard returns it (0151). */
+  alt_shot_scores?: LiveAltShotScore[];
   course_par: number;
   allowance_pct: number;
   team_score_mode: "best_ball" | "aggregate";
@@ -122,6 +126,36 @@ const FIXTURES: Fixture[] = [
     players: [P_FB.chris, P_FB.amit, P_FB.christopher, P_FB.michael].map(nine),
     foursomes: [{ id: "g1", name: "Group 1", swap: false, a: ["chris", "amit"], b: ["christopher", "michael"] }],
   },
+  {
+    label: "Alternate shot · 18 · side-owned scores",
+    game_type: "alt_shot", course_par: 70, allowance_pct: 50, team_score_mode: "best_ball", holes: H18_FRANCIS,
+    players: [P_FB.chris, P_FB.amit, P_FB.christopher, P_FB.michael],
+    foursomes: [{ id: "g1", name: "Group 1", swap: false, a: ["chris", "amit"], b: ["christopher", "michael"] }],
+    alt_shot_scores: H18_FRANCIS.flatMap((h, i) => ([
+      { foursome_id: "g1", side: "a" as const, hole_index: i, strokes: [5,4,5,4,4,5,5,4,4,5,5,4,5,3,6,5,4,5][i] },
+      { foursome_id: "g1", side: "b" as const, hole_index: i, strokes: [5,4,6,5,4,6,5,5,5,5,6,5,5,4,6,6,4,6][i] },
+    ])),
+  },
+  {
+    label: "Alternate shot · NINE holes",
+    game_type: "alt_shot", course_par: 70, allowance_pct: 50, team_score_mode: "best_ball", holes: FRONT9,
+    players: [P_FB.chris, P_FB.amit, P_FB.christopher, P_FB.michael].map(nine),
+    foursomes: [{ id: "g1", name: "Group 1", swap: false, a: ["chris", "amit"], b: ["christopher", "michael"] }],
+    alt_shot_scores: FRONT9.flatMap((h, i) => ([
+      { foursome_id: "g1", side: "a" as const, hole_index: i, strokes: [5,4,5,4,4,5,5,4,4][i] },
+      { foursome_id: "g1", side: "b" as const, hole_index: i, strokes: [5,4,6,5,4,6,5,5,5][i] },
+    ])),
+  },
+  {
+    label: "Alternate shot · a CLEARED hole (null tombstone, 0141)",
+    game_type: "alt_shot", course_par: 70, allowance_pct: 50, team_score_mode: "best_ball", holes: FRONT9,
+    players: [P_FB.chris, P_FB.amit, P_FB.christopher, P_FB.michael].map(nine),
+    foursomes: [{ id: "g1", name: "Group 1", swap: false, a: ["chris", "amit"], b: ["christopher", "michael"] }],
+    alt_shot_scores: FRONT9.flatMap((h, i) => ([
+      { foursome_id: "g1", side: "a" as const, hole_index: i, strokes: i === 3 ? null : [5,4,5,4,4,5,5,4,4][i] },
+      { foursome_id: "g1", side: "b" as const, hole_index: i, strokes: [5,4,6,5,4,6,5,5,5][i] },
+    ])),
+  },
 ];
 
 // ── APP path: chBasis + the shared engines, as scoring-views calls them ──────────────────────────
@@ -147,6 +181,18 @@ function appLegs(f: Fixture): LiveLeg[] {
       return closeout(fourballProgress(m, mem([...aIds, ...bIds]), aIds, bIds, f.allowance_pct, f.team_score_mode), aIds, bIds, "fourball");
     });
   }
+  if (f.game_type === "alt_shot") {
+    return (f.foursomes || []).map((fs) => {
+      const aIds = fs.a.filter(Boolean) as string[], bIds = fs.b.filter(Boolean) as string[];
+      const shapePlayers = f.players.map((p) => ({ id: p.id, user_id: p.id, course_handicap: p.course_handicap, handicap_index: p.handicap_index, slope: p.slope, rating: p.rating, team: p.team, no_show: false }));
+      const sides = altShotSides({ game_type: "alt_shot", course_par: f.course_par, allowance_pct: f.allowance_pct, holes_meta: f.holes } as never, shapePlayers as never, { a: aIds, b: bIds });
+      const aLeg = readAltShotSideScores(byId[aIds[0]].scores, byId[aIds[1]].scores, f.holes.length);
+      const bLeg = readAltShotSideScores(byId[bIds[0]].scores, byId[bIds[1]].scores, f.holes.length);
+      const aG = canonicalAltShotGross((f.alt_shot_scores || []) as never, fs.id, "a", f.holes.length, aLeg.gross);
+      const bG = canonicalAltShotGross((f.alt_shot_scores || []) as never, fs.id, "b", f.holes.length, bLeg.gross);
+      return closeout(altShotProgress(m, { ids: aIds, chs: [sides.aCh, 0], gross: aG } as never, { ids: bIds, chs: [sides.bCh, 0], gross: bG } as never), aIds, bIds, "team");
+    });
+  }
   const out: LiveLeg[] = [];
   for (const fs of f.foursomes || []) {
     const aIds = fs.a.filter(Boolean) as string[], bIds = fs.b.filter(Boolean) as string[];
@@ -169,12 +215,13 @@ function liveFrom(f: Fixture): LiveLeg[] {
     }]),
   );
   return liveLegs(
-    { game_type: f.game_type, allowance_pct: f.allowance_pct, team_score_mode: f.team_score_mode },
+    { game_type: f.game_type, allowance_pct: f.allowance_pct, team_score_mode: f.team_score_mode, course_par: f.course_par },
     byId,
     f.pairings || [],
     f.foursomes || [],
     f.holes.map((h) => ({ n: h.n, par: h.par, si: h.si })),
     f.allowance_pct,
+    f.alt_shot_scores || [],
   );
 }
 

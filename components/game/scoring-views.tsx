@@ -603,7 +603,7 @@ export function MatchView({
             </div>
           </div>
           <div style={{ color: C.cream, opacity: 0.7, fontSize: 11, textAlign: "center", marginTop: 8 }}>
-            Projected from current match states · {fmtPts(teamStandings.decidedPts.A)}–{fmtPts(teamStandings.decidedPts.B)} decided
+            Projected — if every match finished as it stands · {fmtPts(teamStandings.decidedPts.A)}–{fmtPts(teamStandings.decidedPts.B)} decided so far
           </div>
           {teams && teamStandings && (
             <TeamClinchLine aPts={teamStandings.decidedPts.A} bPts={teamStandings.decidedPts.B} unclaimed={teamStandings.out} aName={teams[0].name} bName={teams[1].name} metric="matches" />
@@ -882,30 +882,43 @@ export function MatchView({
               border: iAmIn ? `1px solid ${C.gold}` : "none",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", color: C.cream, fontWeight: 700, fontSize: 15 }}>
-                  <Avatar src={pa.avatar_url} name={pa.display_name} size={24} />
-                  <span>{pa.display_name}</span>
-                  <span style={{ color: C.sage, fontWeight: 500 }}>vs</span>
-                  <Avatar src={pb.avatar_url} name={pb.display_name} size={24} />
-                  <span>{pb.display_name}</span>
-                </div>
-                <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
-                  thru {st.thru} · {pa.display_name}{" "}
-                  {allow.a === 0 ? "scratch" : `+${allow.a}`}, {pb.display_name}{" "}
-                  {allow.b === 0 ? "scratch" : `+${allow.b}`}
-                </div>
+            {/* Block, not flex: the organizer's remove-pairing button below now stacks under the
+                rows instead of competing with them for width. */}
+            <div>
+            {/* One row per player. The card used to name Amit four times and Chris three: the pair
+                line, the margin ("Amit Sud 2 UP"), the holes-won tally and the handicap line all
+                repeated them, and the two columns wrapped into each other on a phone. Each player's
+                own facts now sit on their own row, so nothing repeats and nothing can wrap oddly.
+                The margin sits beside the LEADER only — a "0" next to the trailing player says
+                nothing — and the header carries progress alone. */}
+            <button type="button" onClick={toggleProgress} aria-expanded={openProgress === idx}
+              style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 2 }}>
+                <span style={{ color: C.sage, fontSize: 11 }}>
+                  {st.thru === 0 ? "not started" : st.result ? `match complete on hole ${game.holes_meta[st.thru - 1]?.n ?? st.thru}` : `thru ${st.thru}`}
+                </span>
+                <span style={{ color: C.sage, fontSize: 11 }}>· Singles</span>
+                <span style={{ flex: 1 }} />
+                <span style={{ color: C.gold, fontSize: 11 }}>{openProgress === idx ? "▴" : "▾"}</span>
               </div>
-              <button type="button" onClick={toggleProgress} aria-expanded={openProgress === idx} style={{ textAlign: "right", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                <div style={{ color: st.result ? C.overRedDark : C.cream, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>
-                  {statusText} <span style={{ color: C.gold, fontSize: 11 }}>{openProgress === idx ? "▴" : "▾"}</span>
-                </div>
-                <div style={{ color: C.sage, fontSize: 11 }}>
-                  {pa.display_name} {st.aWins}–{st.bWins} {pb.display_name}
-                  {st.halves ? ` · ${st.halves} halved` : ""} · tap for progression
-                </div>
-              </button>
+              {([[pa, allow.a, "a"], [pb, allow.b, "b"]] as const).map(([p, strokes, side], i) => {
+                const ahead = st.lead === 0 ? false : (side === "a") === (st.lead > 0);
+                // All square shows AS once, beside the first player, rather than adding a line.
+                const margin = st.lead === 0 ? (side === "a" && st.thru > 0 ? "AS" : "") : ahead ? (st.result || `${Math.abs(st.lead)} UP`) : "";
+                return (
+                  <div key={side} style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 5, paddingBottom: 5, borderTop: i === 1 ? `1px solid ${C.borderGreen}` : undefined }}>
+                    <Avatar src={p.avatar_url} name={p.display_name} size={26} />
+                    <span style={{ flex: 1, color: ahead ? C.cream : C.sage, fontWeight: ahead ? 800 : 500, fontSize: 15, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {p.display_name}
+                    </span>
+                    <span style={{ color: C.sage, fontSize: 12 }}>{strokes === 0 ? "scratch" : `+${strokes}`}</span>
+                    <span style={{ minWidth: 56, textAlign: "right", color: C.gold, fontWeight: 800, fontSize: 15, fontFamily: "Georgia, serif", fontVariantNumeric: "tabular-nums lining-nums" }}>
+                      {margin}
+                    </span>
+                  </div>
+                );
+              })}
+            </button>
               {isCreator && editing && (
                 <button
                   disabled={matchupsBlocked}
@@ -1148,13 +1161,17 @@ export function FourballView({
   // Which contest line is expanded (one at a time): key is `${foursomeId}-${ci}`.
   const [openKey, setOpenKey] = useState<string | null>(null);
   // Hole-by-hole detail panel for an expanded contest line.
-  const HoleDetail = ({ rows, aLabel, bLabel, aColor, bColor, runningMatch = false }: { rows: ContestHole[]; aLabel: string; bLabel: string; aColor: string; bColor: string; runningMatch?: boolean }) => {
+  // Every contest shows the MATCH STATE in the right-hand column. Four-ball used to show a running
+  // tally ("2 1/2-1/2") under a SCORE header while alternate shot showed "2DN" under MATCH — the same
+  // information in two forms, on two cards a reader compares side by side. The `runningMatch` switch
+  // that chose between them is gone.
+  const HoleDetail = ({ rows, aLabel, bLabel, aColor, bColor }: { rows: ContestHole[]; aLabel: string; bLabel: string; aColor: string; bColor: string }) => {
     const played = rows.filter((d) => d.r != null);
     if (!played.length) return <div style={{ background: "#F1EFE6", borderRadius: 8, padding: "8px 10px", margin: "2px 0 6px", color: C.faint, fontSize: 11 }}>No holes scored yet.</div>;
     return (
       <div style={{ background: "#F1EFE6", borderRadius: 8, padding: "6px 10px", margin: "2px 0 6px" }}>
         <div style={{ display: "flex", color: C.faint, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: "3px 0" }}>
-          <span style={{ width: 34 }}>HOLE</span><span style={{ flex: 1 }}>NET</span><span style={{ width: 60, textAlign: "center" }}>WON</span><span style={{ width: 52, textAlign: "right" }}>{runningMatch ? "MATCH" : "SCORE"}</span>
+          <span style={{ width: 34 }}>HOLE</span><span style={{ flex: 1 }}>NET</span><span style={{ width: 60, textAlign: "center" }}>WON</span><span style={{ width: 52, textAlign: "right" }}>MATCH</span>
         </div>
         {played.map((d) => {
           const aWon = d.r === 1, bWon = d.r === -1;
@@ -1169,7 +1186,7 @@ export function FourballView({
                 <span style={{ color: bWon ? "#1A7A3C" : C.ink, fontWeight: bWon ? 700 : 400 }}>{d.bNet}</span>
               </span>
               <span style={{ width: 60, textAlign: "center", color: wonColor, fontWeight: aWon || bWon ? 700 : 400, fontSize: 11 }}>{wonLabel}</span>
-              <span style={{ width: 52, textAlign: "right", color: C.faint }}>{runningMatch ? matchLeadLabel(d.aRun - d.bRun) : `${fmtPts(d.aRun)}–${fmtPts(d.bRun)}`}</span>
+              <span style={{ width: 52, textAlign: "right", color: C.faint }}>{matchLeadLabel(d.aRun - d.bRun)}</span>
             </div>
           );
         })}
@@ -1437,7 +1454,7 @@ export function FourballView({
           <div style={{ color: C.sage, fontSize: 11, textAlign: "center", marginTop: 6 }}>
             {isTrifecta
               ? `Three points per hole · ${teamScoreMode === "aggregate" ? "team point on aggregate net (both balls)" : "team point on best net ball"}`
-              : `Projected from current foursomes · ${fmtPts(teamStandings!.decidedPts.A)}–${fmtPts(teamStandings!.decidedPts.B)} decided`}
+              : `Projected — if every match finished as it stands · ${fmtPts(teamStandings!.decidedPts.A)}–${fmtPts(teamStandings!.decidedPts.B)} decided so far`}
           </div>
           {isTeam && standPts && teams && (
             isTrifecta
@@ -1509,7 +1526,7 @@ export function FourballView({
                   return (
                     <React.Fragment key={ci}>
                       <TrifectaContestRow c={c} aNames={aNames} bNames={bNames} prefix={c.kind === "team" ? "Team · " : undefined} open={isOpen} onToggle={() => setOpenKey(isOpen ? null : key)} />
-                      {isOpen && <HoleDetail rows={c.settled ? c.perHole.slice(0, c.thru) : c.perHole} aLabel={aLabel} bLabel={bLabel} aColor={aColor} bColor={bColor} runningMatch />}
+                      {isOpen && <HoleDetail rows={c.settled ? c.perHole.slice(0, c.thru) : c.perHole} aLabel={aLabel} bLabel={bLabel} aColor={aColor} bColor={bColor} />}
                     </React.Fragment>
                   );
                 })}
@@ -1532,9 +1549,14 @@ export function FourballView({
                   <div onClick={() => setOpenKey(isOpen ? null : key)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${C.borderCard}`, cursor: "pointer" }}>
                     <span style={{ color: C.sage, fontSize: 11, width: 12 }}>{isOpen ? "▾" : "▸"}</span>
                     <span style={{ flex: 1, color: C.cream, fontSize: 12 }}>{leadText}</span>
-                    <span style={{ color: C.sage, fontSize: 11 }}>thru {st.thru}</span>
+                    {/* Once decided, say so and name the hole it ended on. The header already shows
+                        the close-out ("4 & 2") while this row shows the running margin ("Red 4 UP"),
+                        so without this the same card carries two numbers and no explanation. */}
+                    <span style={{ color: C.sage, fontSize: 11 }}>
+                      {matchDecided ? `match complete on hole ${game.holes_meta[st.thru - 1]?.n ?? st.thru}` : `thru ${st.thru}`}
+                    </span>
                   </div>
-                  {isOpen && <HoleDetail rows={detail} aLabel={isAltShot ? (isTeam ? teamName(playerOf(f.a[0])?.team) : "Pair 1") : firstName(f.a[0]) + "'s"} bLabel={isAltShot ? (isTeam ? teamName(playerOf(f.b[0])?.team) : "Pair 2") : firstName(f.b[0]) + "'s"} aColor={C.birdie} bColor={C.bogey} runningMatch={isAltShot} />}
+                  {isOpen && <HoleDetail rows={detail} aLabel={isAltShot ? (isTeam ? teamName(playerOf(f.a[0])?.team) : "Pair 1") : firstName(f.a[0]) + "'s"} bLabel={isAltShot ? (isTeam ? teamName(playerOf(f.b[0])?.team) : "Pair 2") : firstName(f.b[0]) + "'s"} aColor={C.birdie} bColor={C.bogey} />}
                 </div>
               );
             })()}

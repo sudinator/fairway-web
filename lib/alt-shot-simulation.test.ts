@@ -6,7 +6,7 @@
  * contracts together. The seed is fixed so CI failures are reproducible.
  */
 import { altShotSides } from "./game-shape";
-import { altShotHoleDetail, altShotProgress, altShotStatus } from "./golf";
+import { altShotHoleDetail, altShotProgress, altShotStatus, matchCloseoutStatus } from "./golf";
 import { readAltShotSideScores } from "./alt-shot-scores";
 
 let pass = 0, fail = 0; const fails: string[] = [];
@@ -61,9 +61,22 @@ for (let t = 0; t < 5000; t++) {
   const status = altShotStatus(holes as never, A as never, B as never);
   const complete = detail.filter((d) => d.r != null);
   const lead = complete.reduce((sum, d) => sum + (d.r ?? 0), 0);
-  ok(`case ${t}: thru agrees`, status.thru === complete.length);
-  ok(`case ${t}: lead agrees`, status.lead === lead);
-  ok(`case ${t}: status label agrees`, status.result === expectedResult(lead, complete.length, n));
+  // altShotStatus reports the MATCH state, which freezes at the close-out: a match won 3 & 2 stays
+  // 3 & 2 even if the remaining holes are scored (187.2 — 184.1 unified matchStatus and
+  // fourballStatus and missed this one, so the app read "4 UP" on staging 248110 where the share
+  // page read 3 & 2). The running count is still exactly altShotProgress, which is unchanged.
+  const frozen = matchCloseoutStatus(progress, holes.length);
+  ok(`case ${t}: thru is the close-out thru`, status.thru === frozen.thru);
+  ok(`case ${t}: lead is the close-out lead`, status.lead === frozen.lead);
+  // Undecided matches must still report the live running values — otherwise the freeze could be
+  // hiding a real regression behind an always-equal comparison.
+  if (!frozen.decided) {
+    ok(`case ${t}: undecided thru is holes played`, status.thru === complete.length);
+    ok(`case ${t}: undecided lead is the running lead`, status.lead === lead);
+  }
+  // The label is the close-out label: computed from the FROZEN margin and the holes remaining AT the
+  // deciding hole, not from a running count over every hole scored.
+  ok(`case ${t}: status label agrees`, status.result === expectedResult(frozen.lead, frozen.thru, n));
   for (let i = 0; i < n; i++) {
     ok(`case ${t}/hole ${i}: progress agrees`, progress[i] === (detail[i].r == null ? null : detail[i].aRun - detail[i].bRun));
     if (detail[i].r != null) {
