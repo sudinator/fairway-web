@@ -1,3 +1,6 @@
+## 189.2.260907 — re-apply 0153
+Restores 0149's full match-length contract, which the first cut of 0153 had dropped. Idempotent.
+
 ## 189.1.260907 — no migration
 Manual course handicap simulation. 0153 remains current.
 

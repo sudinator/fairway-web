@@ -55,44 +55,63 @@ create or replace function public.change_game_match_length_before_scoring(
 language plpgsql
 security definer
 set search_path = public
-as $function$
+as $$
 declare
   v_game public.games%rowtype;
   v_n integer;
   v_blank jsonb;
-  v_scored integer;
 begin
-  if p_holes_meta is null or jsonb_typeof(p_holes_meta) <> 'array' then
-    raise exception 'holes_meta must be a json array' using errcode = '22023';
+  if auth.uid() is null then
+    raise exception 'Authentication required';
   end if;
 
-  select * into v_game from public.games where id = p_game for update;
-  if v_game.id is null then
-    raise exception 'game not found' using errcode = 'P0002';
+  select * into v_game
+    from public.games
+   where id = p_game
+   for update;
+
+  if not found then raise exception 'Game not found'; end if;
+  if v_game.created_by is distinct from auth.uid() then
+    raise exception 'Only the game organizer can change the number of holes';
   end if;
-  if v_game.created_by <> auth.uid() then
-    raise exception 'only the organizer can change the hole selection' using errcode = '42501';
-  end if;
-  if v_game.status = 'ended' then
-    raise exception 'ended games cannot change hole selection' using errcode = '23514';
+  if coalesce(v_game.status, 'active') = 'ended' then
+    raise exception 'Ended games cannot change the number of holes';
   end if;
 
-  select count(*) into v_scored
-    from public.game_players gp
-   where gp.game_id = p_game
-     and exists (
-       select 1 from jsonb_array_elements(coalesce(gp.scores, '[]'::jsonb)) s
-        where s is not null and jsonb_typeof(s) = 'number'
-     );
-  if v_scored > 0 then
-    raise exception 'scores already exist for this game' using errcode = '23514';
+  if p_holes_meta is null
+     or jsonb_typeof(p_holes_meta) <> 'array'
+     or jsonb_array_length(p_holes_meta) not in (9, 18)
+     or exists (
+       select 1
+         from jsonb_array_elements(p_holes_meta) h
+        where jsonb_typeof(h) <> 'object'
+           or coalesce((h->>'n')::integer, 0) <= 0
+           or coalesce((h->>'par')::integer, 0) <= 0
+     )
+     or (
+       select count(distinct h->>'n')
+         from jsonb_array_elements(p_holes_meta) h
+     ) <> jsonb_array_length(p_holes_meta) then
+    raise exception 'Valid unique metadata for 9 or 18 holes is required';
+  end if;
+
+  perform 1 from public.game_players where game_id = p_game for update;
+
+  if v_game.alt_shot_scoring_started_at is not null
+     or exists (
+       select 1
+         from public.game_players gp,
+              lateral jsonb_array_elements(coalesce(gp.scores, '[]'::jsonb)) s(value)
+        where gp.game_id = p_game
+          and s.value <> 'null'::jsonb
+     )
+     or exists (
+       select 1 from public.game_alt_shot_scores ass where ass.game_id = p_game
+     ) then
+    raise exception 'The number of holes is locked once scoring begins';
   end if;
 
   v_n := jsonb_array_length(p_holes_meta);
-  if v_n not in (9, 18) then
-    raise exception 'holes_meta must describe 9 or 18 holes' using errcode = '22023';
-  end if;
-
   select coalesce(jsonb_agg(null::jsonb), '[]'::jsonb)
     into v_blank
     from generate_series(1, v_n);
@@ -108,18 +127,22 @@ begin
          penalties = v_blank,
          sand = v_blank,
          clock_start = null,
-         -- A manual course handicap is specific to a hole count. Switching between 18 and a nine
-         -- makes every stored figure wrong, and wrong invisibly, so they are cleared and must be
-         -- re-entered rather than scaled (0153).
+         clock_end = null,
+         group_locked = false,
+         -- A manual course handicap is entered FOR a hole count (0153). Switching between 18 and a
+         -- nine makes every stored figure wrong, and wrong invisibly, so they are cleared and must
+         -- be re-entered rather than scaled: a nine-hole GHIN figure is not always half the 18.
          course_handicap_source = 'derived',
          course_handicap_set_by = null,
          course_handicap_set_at = null
    where game_id = p_game;
 end;
-$function$;
+$$;
 
-revoke all on function public.change_game_match_length_before_scoring(uuid, jsonb) from public;
-grant execute on function public.change_game_match_length_before_scoring(uuid, jsonb) to authenticated;
+revoke all on function public.change_game_match_length_before_scoring(uuid,jsonb)
+  from public, anon;
+grant execute on function public.change_game_match_length_before_scoring(uuid,jsonb)
+  to authenticated;
 
 select public.record_migration('0153_manual_course_handicap');
 

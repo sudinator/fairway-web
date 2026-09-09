@@ -1,3 +1,24 @@
+## 189.2.260907 — HOTFIX: 0153 had silently weakened the match-length function
+
+CI's fresh-database rebuild failed on `assert-match-length-roundtrip.sql` with "Non-organizer unexpectedly changed match length". **RE-APPLY migration 0153.**
+
+- **What actually happened.** 0153 needed to add three columns to one UPDATE inside `change_game_match_length_before_scoring`. Instead of editing 0149's function minimally, I rewrote it from its behaviour — and the rewrite dropped things I had not noticed were there:
+  - the `auth.uid() is null` authentication check;
+  - validation that holes_meta entries are objects with positive `n` and `par`, and that hole numbers are UNIQUE;
+  - the `alt_shot_scoring_started_at` and `game_alt_shot_scores` checks, so a game with alternate-shot scores could have had its hole count changed;
+  - row locking on `game_players`;
+  - resetting `clock_end` and `group_locked`;
+  - the revoke from `anon`;
+  - and every error message, which is what CI actually tripped on.
+- **Authorization was never open** — a non-organizer was still blocked. But the assertion matches on the exact phrase 'Only the game organizer', so a reworded message made a successful denial look like a hole.
+- **The fix**: 0153 now carries 0149's function body verbatim, differing only by the three added lines that clear the manual handicap. Verified by diffing the two definitions — 8 changed lines, all of them the intended addition.
+
+## New guard: ci/check_sql_assertion_messages.py
+
+The SQL assertions catch an exception and match on `position('text' in sqlerrm)`. That coupling is invisible from TypeScript and only surfaces in a full database rebuild. This checks every such string is still raised by **the function that assertion calls** — scoped to the LATEST definition of that function, since only the last one survives a rebuild.
+
+Two earlier versions of this guard were false comfort and were rejected: concatenating all migrations let an old copy of the message satisfy it, and checking "some function raises it" passed because another function legitimately uses the same wording. It now reproduces the exact CI failure with no database.
+
 ## 189.1.260907 — Manual course handicap simulation: 4,000 games, 76,807 assertions
 
 - `lib/manual-handicap-simulation.test.ts` covers every combination of format (singles, four-ball, alternate shot, Trifecta, Stableford), hole count (9 and 18, front and back), allowance, and a random MIX of manual and derived players in the same game.

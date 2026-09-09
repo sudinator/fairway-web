@@ -1,3 +1,9 @@
+## v189.2 staging check
+
+- [ ] RE-APPLY 0153 (idempotent; it replaces the function).
+- [ ] Confirm a non-organizer still cannot change match length, and that a game with alternate-shot scores cannot either.
+- [ ] Then run the 189.0 manual-handicap checklist.
+
 ## v189.1 staging check
 
 - [ ] Nothing new to click; this release is test coverage only. Deploy alongside 189.0 and run the 189.0 checklist.
