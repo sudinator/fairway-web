@@ -1,3 +1,21 @@
+## 190.1.260907 — Five fixes to the match cards, from real screenshots
+
+All five were visible in staging screenshots; none needed new behaviour, only saying the same thing consistently.
+
+- **`HOLENET` ran together.** The HOLE column is exactly the width of its own text, so the NET column started flush against it. The header and rows now carry a gap.
+- **The alternate-shot card showed two numbers for one match.** The header read the close-out (`4 & 2`) while the row below read the running margin (`Red 4 UP`), with nothing to reconcile them. The row now reads **"match complete on hole 16"** once decided, instead of `thru 16`.
+- **The four-ball headline contradicted its own caption.** `Blue 0 – Red 1` sat above "Projected from current foursomes · 0–0 decided", so a reader could not tell which figure was the score. The caption now names the headline: **"Projected — if every match finished as it stands · 0–0 decided so far"**.
+- **The right-hand column meant two different things.** Four-ball showed a running tally (`2½–0½`) under `SCORE`; alternate shot showed match state (`2DN`) under `MATCH`. Two wins and a halve IS 2 UP, so the tally was the same information in a less useful form. Both now show the match state under `MATCH`, matching the singles card, and the `runningMatch` switch that chose between them is gone.
+- **"Wildcats needs 1½ match points"** → "Wildcats **need**". A team name is plural.
+
+Left alone deliberately: the `Bo's` / `Amit's` versus `Red` / `Blue` wording in the WON column, which reads correctly in each context.
+
+## A note on how this was reviewed
+
+An earlier pass in this session presented hand-copied JSX fragments as renders of the current app. They were not — they were reconstructions, and they misrepresented what the app looks like. The redesign proposed on the back of them was largely already shipped. The five fixes above came from actual screenshots, and the four-ball fix is verified against a server render of the real `FourballView` component. Items inside the tap-to-expand hole panel cannot be server-rendered and were verified by inspection.
+
+No migration. 0154 remains current.
+
 ## 190.0.260907 — Solo rounds get the same handicap rule as games (migration 0154), and no phantom opponent
 
 - **A solo round had no way to override its handicap.** A posted round lives in `rounds`, not `game_players`, so 0153 never reached it — and a posted round is exactly what feeds a player's handicap, which makes GHIN parity matter more here than in a casual game. Migration 0154 adds the same `course_handicap_source` and audit columns to `rounds`, with the same semantics: used as given, not halved for a nine.

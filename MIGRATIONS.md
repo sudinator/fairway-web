@@ -1,3 +1,6 @@
+## 190.1.260907 — no migration
+Match card labelling and column consistency. 0154 remains current.
+
 ## 190.0.260907 — migration 0154
 Manual course handicaps for solo rounds. Columns only; no new functions.
 

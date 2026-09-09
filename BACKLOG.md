@@ -1,3 +1,11 @@
+## v190.1 staging checks
+
+- [ ] Expand a four-ball or alt-shot hole panel: "HOLE" and "NET" are separated.
+- [ ] Same panel: the right column reads MATCH state (1UP / 2DN / AS) in BOTH four-ball and alt shot.
+- [ ] A decided alt-shot match: the row reads "match complete on hole N", and agrees with the header's close-out.
+- [ ] Four-ball session header: the caption names the projection and the decided figure separately.
+- [ ] A team with a plural name reads "need", not "needs".
+
 ## v190.0 staging checks
 
 - [ ] Apply 0154. Open a solo round in the editor: a "18-HOLE COURSE HANDICAP" field appears (or 9-hole for a nine).
