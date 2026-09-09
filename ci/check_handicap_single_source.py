@@ -25,6 +25,9 @@ SCORERS = [
     "lib/competition.ts", "lib/live-scoring.ts", "lib/live-competition.ts",
     "lib/player-scoring.ts", "lib/segments.ts", "lib/alt-shot.ts",
     "components/game/scoring-views.tsx", "components/game/scorecard-views.tsx",
+    # Solo rounds score too. Its absence from this list is why a round kept its own handicap rule —
+    # reading rounds.course_handicap directly, so no manual override and no nine-hole halving (0154).
+    "components/manage.tsx",
 ]
 # A READ, not a declaration. `handicap_index?: number | null` in a type is fine; `p.handicap_index`
 # used in an expression is not. Requires a leading dot and no following colon.
@@ -63,8 +66,18 @@ def main() -> int:
             continue
         checked += 1
         src = f.read_text(encoding="utf-8")
-        for m in RAW.finditer(code_only(src)):
+        code = code_only(src)
+        for m in RAW.finditer(code):
             line = src.count("\n", 0, m.start()) + 1
+            # The enclosing call, not just the line: an argument object passed to chBasis spans
+            # several lines, so a single-line window reported the helper's own body as a violation.
+            lstart = code.rfind("\n", 0, m.start()) + 1
+            stmt = code[max(0, lstart - 400) : code.find("\n", m.start())]
+            # Two legitimate reads that are not scoring:
+            #   * passing the raw columns INTO chBasis (that is the whole point of the helper);
+            #   * a form control displaying the stored value for editing.
+            if "chBasis(" in stmt or "value=" in stmt or "placeholder=" in stmt:
+                continue
             fails.append(f"{rel}:~{line}: reads `{m.group(0).strip('(')}` directly — go through chBasis, "
                          f"or manual course handicaps (0153) are silently ignored here")
 

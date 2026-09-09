@@ -94,6 +94,8 @@ export type Round = {
   course_par: number | null;
   handicap_index: number | null;
   course_handicap: number | null;
+  /** See game_players.course_handicap_source (0153/0154). "manual" is used as given and not halved. */
+  course_handicap_source?: "derived" | "manual" | null;
   played_at: string;
   gross_score?: number | null; // for gross-only historical rounds (no per-hole detail)
   ai_analysis?: string | null; // saved AI coach summary, persists once generated

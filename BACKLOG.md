@@ -1,3 +1,12 @@
+## v190.0 staging checks
+
+- [ ] Apply 0154. Open a solo round in the editor: a "18-HOLE COURSE HANDICAP" field appears (or 9-hole for a nine).
+- [ ] Enter a figure: strokes on the round card change to match it; the label reads "manual - used as entered".
+- [ ] NINE-hole round: enter 12, confirm strokes are based on 12 and NOT 6.
+- [ ] Clear it: the round returns to the derived figure.
+- [ ] Start a round as a SINGLE player: stroke marks are orange CIRCLES labelled "course hcp" - no triangle, no "v opponent".
+- [ ] Once a matchup is set in a real match, the triangle returns.
+
 ## v189.2 staging check
 
 - [ ] RE-APPLY 0153 (idempotent; it replaces the function).

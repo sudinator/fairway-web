@@ -1,3 +1,6 @@
+## 190.0.260907 — migration 0154
+Manual course handicaps for solo rounds. Columns only; no new functions.
+
 ## 189.2.260907 — re-apply 0153
 Restores 0149's full match-length contract, which the first cut of 0153 had dropped. Idempotent.
 
@@ -92,7 +95,7 @@ Regenerate after shipping (adds new files, keeps ticks and the notes block):
 Confirm database-applied state with:
 `select id, applied_at from public.schema_migrations order by id;`
 
-Total: 138 migrations. Unchecked = not yet confirmed applied in this checklist.
+Total: 139 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -234,6 +237,7 @@ Total: 138 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [ ] 0151_live_alt_shot_and_guests.sql
 - [ ] 0152_competition_share.sql
 - [ ] 0153_manual_course_handicap.sql
+- [ ] 0154_round_manual_course_handicap.sql
 
 <!-- NOTES:START -->
 

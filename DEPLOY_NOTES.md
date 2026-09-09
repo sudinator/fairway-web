@@ -1,3 +1,22 @@
+## 190.0.260907 — Solo rounds get the same handicap rule as games (migration 0154), and no phantom opponent
+
+- **A solo round had no way to override its handicap.** A posted round lives in `rounds`, not `game_players`, so 0153 never reached it — and a posted round is exactly what feeds a player's handicap, which makes GHIN parity matter more here than in a casual game. Migration 0154 adds the same `course_handicap_source` and audit columns to `rounds`, with the same semantics: used as given, not halved for a nine.
+- **A round was also scoring off its own rule.** `manage.tsx` read `rounds.course_handicap` directly, so a round never went through `chBasis` — no manual override, and no nine-hole halving of a derived figure either. Round strokes now go through `chBasis`, so one function serves rounds and games alike.
+- **The round editor gains the field**, labelled with the round's own hole count exactly as the game one is.
+- **`ci/check_handicap_single_source.py` now covers `components/manage.tsx`.** Its absence from that list is precisely why a round kept its own rule unnoticed.
+
+## Phantom opponent on an unpaired player
+
+- A player with no matchup — a single-player round, or anyone before the pairings are set — was shown a **triangle labelled "v opponent"** for a match that does not exist, with strokes computed against a null handicap. `strokeSets` now returns only the course-handicap basis (orange circle) when there is no opponent, and likewise when a foursome has nobody else in it. Pinned with assertions, including that a paired player gets the match basis back.
+
+## Two colour traps caught by the ratchets
+
+The new round field first used `C.sage` on a cream card — 1.7:1, the same trap that made the group scorecard's second dot row invisible. It now uses the light-ground pair.
+
+## Run order
+
+Migration 0154 before the app deploys. 0153 must already be applied (re-apply it if you have not since 189.2).
+
 ## 189.2.260907 — HOTFIX: 0153 had silently weakened the match-length function
 
 CI's fresh-database rebuild failed on `assert-match-length-roundtrip.sql` with "Non-organizer unexpectedly changed match length". **RE-APPLY migration 0153.**
