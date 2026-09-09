@@ -1,3 +1,11 @@
+## v190.2 staging check
+
+- [ ] Individual match in Results: each player on their own row, each name ONCE.
+- [ ] Margin beside the leader only; nothing beside the trailing player.
+- [ ] All square: gold "AS" beside the first player, no extra line.
+- [ ] Decided match: header reads "match complete on hole N" and the margin shows the close-out.
+- [ ] Tapping the card still opens MATCH PROGRESSION.
+
 ## v190.1 staging checks
 
 - [ ] Expand a four-ball or alt-shot hole panel: "HOLE" and "NET" are separated.

@@ -22,7 +22,13 @@ checks = [
     ('leg editor lives in setup workspace format', 'LegConfigEditor' in ws and 'onSetLegConfig' in ws),
     ('old external leg editor removed', 'setupTab === "format" && isOrganizer && !isEnded && (game.game_type === "match"' not in trn),
     ('off suppresses group results', 'game.game_type === "alt_shot" || cfg.scheme === "none"' in seg),
-    ('match progression is clickable', 'tap for progression' in score and 'MATCH PROGRESSION' in score and 'setOpenProgress' in score),
+    # Assert the AFFORDANCE, not the copy. This used to require the literal words "tap for
+    # progression"; that string was instructional chrome sitting at the same prominence as the
+    # score, and removing it in 190.2 failed a guard whose real intent is "the panel opens". The
+    # caret plus aria-expanded is the affordance, and setOpenProgress is the mechanism.
+    ('match progression is clickable',
+     'MATCH PROGRESSION' in score and 'setOpenProgress' in score
+     and 'onClick={toggleProgress}' in score and 'aria-expanded={openProgress === idx}' in score),
     ('match progression shows both net scores', 'pa.display_name.split(" ")[0]} NET' in score and 'pb.display_name.split(" ")[0]} NET' in score and 'Net scores drive the running match position' in score),
 ]
 for label, ok in checks:

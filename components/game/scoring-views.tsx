@@ -882,30 +882,43 @@ export function MatchView({
               border: iAmIn ? `1px solid ${C.gold}` : "none",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", color: C.cream, fontWeight: 700, fontSize: 15 }}>
-                  <Avatar src={pa.avatar_url} name={pa.display_name} size={24} />
-                  <span>{pa.display_name}</span>
-                  <span style={{ color: C.sage, fontWeight: 500 }}>vs</span>
-                  <Avatar src={pb.avatar_url} name={pb.display_name} size={24} />
-                  <span>{pb.display_name}</span>
-                </div>
-                <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
-                  thru {st.thru} · {pa.display_name}{" "}
-                  {allow.a === 0 ? "scratch" : `+${allow.a}`}, {pb.display_name}{" "}
-                  {allow.b === 0 ? "scratch" : `+${allow.b}`}
-                </div>
+            {/* Block, not flex: the organizer's remove-pairing button below now stacks under the
+                rows instead of competing with them for width. */}
+            <div>
+            {/* One row per player. The card used to name Amit four times and Chris three: the pair
+                line, the margin ("Amit Sud 2 UP"), the holes-won tally and the handicap line all
+                repeated them, and the two columns wrapped into each other on a phone. Each player's
+                own facts now sit on their own row, so nothing repeats and nothing can wrap oddly.
+                The margin sits beside the LEADER only — a "0" next to the trailing player says
+                nothing — and the header carries progress alone. */}
+            <button type="button" onClick={toggleProgress} aria-expanded={openProgress === idx}
+              style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 2 }}>
+                <span style={{ color: C.sage, fontSize: 11 }}>
+                  {st.thru === 0 ? "not started" : st.result ? `match complete on hole ${game.holes_meta[st.thru - 1]?.n ?? st.thru}` : `thru ${st.thru}`}
+                </span>
+                <span style={{ color: C.sage, fontSize: 11 }}>· Singles</span>
+                <span style={{ flex: 1 }} />
+                <span style={{ color: C.gold, fontSize: 11 }}>{openProgress === idx ? "▴" : "▾"}</span>
               </div>
-              <button type="button" onClick={toggleProgress} aria-expanded={openProgress === idx} style={{ textAlign: "right", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                <div style={{ color: st.result ? C.overRedDark : C.cream, fontWeight: 800, fontSize: 16, fontFamily: "Georgia, serif" }}>
-                  {statusText} <span style={{ color: C.gold, fontSize: 11 }}>{openProgress === idx ? "▴" : "▾"}</span>
-                </div>
-                <div style={{ color: C.sage, fontSize: 11 }}>
-                  {pa.display_name} {st.aWins}–{st.bWins} {pb.display_name}
-                  {st.halves ? ` · ${st.halves} halved` : ""} · tap for progression
-                </div>
-              </button>
+              {([[pa, allow.a, "a"], [pb, allow.b, "b"]] as const).map(([p, strokes, side], i) => {
+                const ahead = st.lead === 0 ? false : (side === "a") === (st.lead > 0);
+                // All square shows AS once, beside the first player, rather than adding a line.
+                const margin = st.lead === 0 ? (side === "a" && st.thru > 0 ? "AS" : "") : ahead ? (st.result || `${Math.abs(st.lead)} UP`) : "";
+                return (
+                  <div key={side} style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 5, paddingBottom: 5, borderTop: i === 1 ? `1px solid ${C.borderGreen}` : undefined }}>
+                    <Avatar src={p.avatar_url} name={p.display_name} size={26} />
+                    <span style={{ flex: 1, color: ahead ? C.cream : C.sage, fontWeight: ahead ? 800 : 500, fontSize: 15, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {p.display_name}
+                    </span>
+                    <span style={{ color: C.sage, fontSize: 12 }}>{strokes === 0 ? "scratch" : `+${strokes}`}</span>
+                    <span style={{ minWidth: 56, textAlign: "right", color: C.gold, fontWeight: 800, fontSize: 15, fontFamily: "Georgia, serif", fontVariantNumeric: "tabular-nums lining-nums" }}>
+                      {margin}
+                    </span>
+                  </div>
+                );
+              })}
+            </button>
               {isCreator && editing && (
                 <button
                   disabled={matchupsBlocked}

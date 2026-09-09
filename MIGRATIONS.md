@@ -1,3 +1,6 @@
+## 190.2.260907 — no migration
+Singles match card layout. 0154 remains current.
+
 ## 190.1.260907 — no migration
 Match card labelling and column consistency. 0154 remains current.
 

@@ -1,3 +1,19 @@
+## 190.2.260907 — The singles match card, rebuilt (the point of this release)
+
+The individual match card in Results named the same two players seven times between them, in four different phrasings, and its two columns wrapped into each other on a phone.
+
+- **One row per player.** Avatar, name, that player's strokes, and the margin. Each player's facts sit on their own row, so **each name appears once** and nothing can wrap oddly — the name cell ellipsises instead.
+- **The margin sits beside the LEADER only.** A "0" next to the trailing player says nothing. Once decided it shows the close-out ("3 & 2") rather than a running count.
+- **All square shows "AS" in gold beside the first player**, rather than adding a line, so every state is the same height.
+- **The header carries progress alone**: "thru 7", or **"match complete on hole 16"** once decided, plus the format. The old header repeated the leader's name in front of the margin and again in a holes-won tally.
+- **"tap for progression" is gone.** The caret and `aria-expanded` are the affordance; the instruction was sitting at the same prominence as the score.
+
+## A guard that tested the copy, not the behaviour
+
+Removing "tap for progression" failed a contract asserting that literal string. Its intent is "the progression panel opens", so it now asserts the WIRING — `onClick={toggleProgress}` and `aria-expanded={openProgress === idx}` — rather than the words. Negative-tested by breaking all four toggle wirings; an earlier attempt broke only one of four and passed, which is why the tightened version checks the attribute rather than the identifier's presence.
+
+No migration. 0154 remains current.
+
 ## 190.1.260907 — Five fixes to the match cards, from real screenshots
 
 All five were visible in staging screenshots; none needed new behaviour, only saying the same thing consistently.
