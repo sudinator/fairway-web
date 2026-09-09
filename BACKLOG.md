@@ -1,3 +1,19 @@
+## v189.1 staging check
+
+- [ ] Nothing new to click; this release is test coverage only. Deploy alongside 189.0 and run the 189.0 checklist.
+
+## v189.0 staging checks — manual course handicaps
+
+- [ ] Apply 0153. In an 18-hole game the field reads "18-hole course handicap"; in a nine it reads "9-hole".
+- [ ] Enter a manual figure: the row says "manual - used as entered for N holes", and the derived figure no longer applies.
+- [ ] NINE-HOLE, the important one: enter 12 on a nine. Strokes must be based on 12, NOT 6. Check the stroke dots.
+- [ ] Allowance still bites: with 85%, a manual 12 plays off 10.
+- [ ] Side games and posting use the manual figure too (course-handicap dots, Stableford points).
+- [ ] Clear the field: the player returns to the derived figure.
+- [ ] Change the hole count on an unscored game with manual handicaps: a confirm warns they will be cleared, and they are.
+- [ ] Enter one mid-round: a confirm warns that strokes on played holes will be recalculated.
+- [ ] A non-organizer does not see the field.
+
 ## v188.5 staging check
 
 - [ ] Cup link: a team named "Red" has a RED dot; "Blue" is blue.

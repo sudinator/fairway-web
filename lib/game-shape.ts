@@ -81,7 +81,17 @@ export function shapeOf(game: ShapeGame): GameShape {
 }
 
 export const chBasis = (
-  p: { handicap_index?: number | null; slope?: number | null; rating?: number | null; course_handicap: number | null },
+  p: {
+    handicap_index?: number | null; slope?: number | null; rating?: number | null; course_handicap: number | null;
+    /**
+     * "manual" means course_handicap was entered by the organizer as the authoritative COURSE
+     * HANDICAP for this game — typically taken from GHIN — rather than derived from index, slope
+     * and rating. It is used as given: no re-derivation, and NO nine-hole halving, because on a
+     * nine the number entered IS the nine-hole figure. Allowance still applies, since that is a
+     * property of the format and not of the player.
+     */
+    course_handicap_source?: "derived" | "manual" | null;
+  },
   coursePar: number | null | undefined,
   /**
    * Holes actually being played. Omit for 18 — every existing caller does, and omitting it keeps
@@ -89,6 +99,12 @@ export const chBasis = (
    */
   holeCount?: number | null,
 ): number => {
+  // A manual figure short-circuits the whole chain: it is already the course handicap for THIS
+  // course and THIS number of holes. Halving it on a nine would be an adjustment to a number the
+  // organizer entered deliberately, and the error is invisible in the result — the match simply
+  // plays a stroke or two light.
+  if (p.course_handicap_source === "manual" && p.course_handicap != null) return p.course_handicap;
+
   const exact =
     p.handicap_index != null && p.slope != null && p.rating != null && coursePar != null
       ? courseHandicapExact(p.handicap_index, p.slope, p.rating, coursePar)

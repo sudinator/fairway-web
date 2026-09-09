@@ -22,6 +22,7 @@ export type SetupAction =
   | { type: "set_format"; target: GameType }
   | { type: "set_match_length"; length: "18" | "front9" | "back9" }
   | { type: "set_allowance"; pct: number }
+  | { type: "set_manual_handicap"; playerName: string; value: number | null; holes: number }
   | { type: "set_team_score_mode"; mode: "best_ball" | "aggregate" }
   | { type: "set_skins_mode"; mode: "carryover" | "split" }
   | { type: "set_skins_style"; style: "individual" | "team_11" | "team_2v2" }
@@ -84,7 +85,17 @@ export function decideSetupChange({ game, players, action }: SetupPolicyContext)
   // holes_meta, so shortening an 18-hole game to a nine after someone has played the 12th would
   // orphan those entries. Not a tidiness judgement — the data would be wrong.
   if (action.type === "set_match_length") {
-    return anyScores ? block("The number of holes is locked once scoring begins.") : allow();
+    if (anyScores) return block("The number of holes is locked once scoring begins.");
+    // Manual course handicaps are entered FOR a hole count. Switching between 18 and a nine makes
+    // every one of them wrong, and wrong invisibly, so 0153 clears them — which the organizer must
+    // be told before it happens, not after they wonder where the numbers went.
+    if (players.some((p) => (p as { course_handicap_source?: string | null }).course_handicap_source === "manual")) {
+      return requireConfirm(
+        "Change the number of holes?",
+        "Manual course handicaps were entered for the current hole count, so they will be cleared and must be entered again. No scores exist yet, so nothing else is lost.",
+      );
+    }
+    return allow();
   }
 
   switch (action.type) {
@@ -201,6 +212,20 @@ export function decideSetupChange({ game, players, action }: SetupPolicyContext)
       return requireConfirm(
         `Change the handicap allowance to ${action.pct}%?`,
         "This recalculates received strokes and net standings for holes already scored. Gross scores are not changed.",
+      );
+    }
+    case "set_manual_handicap": {
+      // Same class of change as the allowance: it rewrites received strokes on every hole already
+      // played, without touching a single gross score. The confirm names the HOLE COUNT because a
+      // manual figure is specific to it — an 18-hole number typed into a nine-hole game is wrong by
+      // a factor of two and looks entirely plausible in the result (0153).
+      if (!anyScores) return allow();
+      const what = action.value == null
+        ? `Clear the manual handicap for ${action.playerName}?`
+        : `Set ${action.playerName}'s ${action.holes}-hole course handicap to ${action.value}?`;
+      return requireConfirm(
+        what,
+        "This recalculates received strokes and net standings for holes already scored, and it feeds the side games and posting too. Gross scores are not changed.",
       );
     }
     case "set_team_score_mode": {

@@ -1,3 +1,9 @@
+## 189.1.260907 — no migration
+Manual course handicap simulation. 0153 remains current.
+
+## 189.0.260907 — migration 0153
+Manual course handicaps: source column, audit columns, and clearing them on a hole-count change.
+
 ## 188.5.260907 — no migration
 Cup page presentation. 0152 remains current.
 
@@ -83,7 +89,7 @@ Regenerate after shipping (adds new files, keeps ticks and the notes block):
 Confirm database-applied state with:
 `select id, applied_at from public.schema_migrations order by id;`
 
-Total: 137 migrations. Unchecked = not yet confirmed applied in this checklist.
+Total: 138 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -224,6 +230,7 @@ Total: 137 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [ ] 0150_trifecta_single_rule.sql
 - [ ] 0151_live_alt_shot_and_guests.sql
 - [ ] 0152_competition_share.sql
+- [ ] 0153_manual_course_handicap.sql
 
 <!-- NOTES:START -->
 

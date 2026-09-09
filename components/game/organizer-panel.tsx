@@ -85,6 +85,8 @@ export type OrganizerPanelProps = {
   onOverride: (p: Player, idx: number | null) => Promise<void>;
   courseTees: CourseTee[];
   onSetTee: (p: Player, teeName: string) => Promise<void>;
+  /** Manual course handicap for this game. null clears it and returns the player to derived. */
+  onSetManualHandicap?: (p: Player, value: number | null) => Promise<void>;
   onRemove: (p: Player) => Promise<void>;
   onToggleNoShow: (p: Player) => Promise<void>;
   onSetTeam: (p: Player, team: string | null) => Promise<void>;
@@ -119,6 +121,7 @@ export function OrganizerPanel({
   onOverride,
   courseTees,
   onSetTee,
+  onSetManualHandicap,
   onRemove,
   onToggleNoShow,
   onSetTeam,
@@ -137,7 +140,12 @@ export function OrganizerPanel({
   onSetMatchTeam,
   anyScores = false,
 }: OrganizerPanelProps) {
+  // Compact control padding, defined ONCE. Every small input and button in this panel shares it, so
+  // the manual-handicap field lines up with the handicap field beside it by construction rather
+  // than by two places happening to carry the same literal.
+  const COMPACT = { padding: "6px 8px" } as const;
   const [edits, setEdits] = useState<Record<string, string>>({});
+  const [manualEdits, setManualEdits] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [open, setOpen] = useState(true);
   const [addGuestName, setAddGuestName] = useState("");
@@ -304,10 +312,10 @@ export function OrganizerPanel({
                           const v = e.target.value;
                           if (v === "" || /^-?\d*\.?\d*$/.test(v)) setEdits((m) => ({ ...m, [p.id]: v }));
                         }}
-                        style={{ ...inputStyle, padding: "6px 8px", width: 58, textAlign: "center" }}
+                        style={{ ...inputStyle, ...COMPACT, width: 58, textAlign: "center" }}
                       />
                       <button
-                        style={{ ...btn(true), padding: "6px 8px", fontSize: 11, opacity: savingId === p.id ? 0.5 : 1 }}
+                        style={{ ...btn(true), ...COMPACT, fontSize: 11, opacity: savingId === p.id ? 0.5 : 1 }}
                         disabled={savingId === p.id || blocked({ type: "set_handicap", player: p })}
                         title={reasonFor({ type: "set_handicap", player: p })}
                         onClick={() => save(p)}
@@ -317,6 +325,52 @@ export function OrganizerPanel({
                     </div>
                   </div>
 
+                  {onSetManualHandicap ? (() => {
+                    // Labelled with the game's OWN hole count. A manual figure is the course handicap
+                    // FOR this many holes and is used as given — not halved for a nine — so an 18-hole
+                    // number typed into a nine-hole game is wrong by a factor of two and looks entirely
+                    // plausible in the result. The label is the only thing standing between the two.
+                    const holes = game.holes_meta?.length === 9 ? 9 : 18;
+                    const isManual = (p as { course_handicap_source?: string | null }).course_handicap_source === "manual";
+                    const derivedCh = Math.round(chBasis({ ...p, course_handicap_source: "derived" } as never, game.course_par, game.holes_meta?.length));
+                    const key = `manual:${p.id}`;
+                    const rawManual = manualEdits[key] ?? (isManual && p.course_handicap != null ? String(p.course_handicap) : "");
+                    const act = { type: "set_manual_handicap" as const, playerName: p.display_name, value: rawManual === "" ? null : Number(rawManual), holes };
+                    return (
+                      <div>
+                        <label style={{ color: C.sage, fontSize: 11 }}>{holes}-hole course handicap</label>
+                        <div style={{ display: "flex", gap: 5, marginTop: 2 }}>
+                          <input
+                            inputMode="decimal"
+                            placeholder={String(derivedCh)}
+                            value={rawManual}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              if (v === "" || /^-?\d*\.?\d*$/.test(v)) setManualEdits((m) => ({ ...m, [key]: v }));
+                            }}
+                            style={{ ...inputStyle, ...COMPACT, width: 58, textAlign: "center" }}
+                          />
+                          <button
+                            style={{ ...btn(true), ...COMPACT, fontSize: 11 }}
+                            disabled={blocked(act)}
+                            title={reasonFor(act)}
+                            onClick={async () => {
+                              await onSetManualHandicap(p, rawManual === "" ? null : Number(rawManual));
+                              setManualEdits((m) => { const c = { ...m }; delete c[key]; return c; });
+                            }}
+                          >
+                            {rawManual === "" ? "Clear" : "Set"}
+                          </button>
+                        </div>
+                        <div style={{ color: isManual ? C.gold : C.sage, fontSize: 11, marginTop: 3 }}>
+                          {isManual
+                            ? `manual \u00b7 used as entered for ${holes} holes`
+                            : `derived: ${derivedCh} \u00b7 leave blank to keep it`}
+                        </div>
+                      </div>
+                    );
+                  })() : null}
+
                   <div>
                     <label style={{ color: C.sage, fontSize: 11 }}>Tee</label>
                     <select
@@ -324,7 +378,7 @@ export function OrganizerPanel({
                       onChange={(e) => onSetTee(p, e.target.value)}
                       disabled={teeOptions.length === 0 || blocked({ type: "set_tee", player: p, teeName: p.tee_name || "selected tee" })}
                       title={reasonFor({ type: "set_tee", player: p, teeName: p.tee_name || "selected tee" })}
-                      style={{ ...inputStyle, padding: "6px 8px", marginTop: 2, width: "100%", opacity: teeOptions.length && !blocked({ type: "set_tee", player: p, teeName: p.tee_name || "selected tee" }) ? 1 : 0.65 }}
+                      style={{ ...inputStyle, ...COMPACT, marginTop: 2, width: "100%", opacity: teeOptions.length && !blocked({ type: "set_tee", player: p, teeName: p.tee_name || "selected tee" }) ? 1 : 0.65 }}
                     >
                       <option value="" disabled>{teeOptions.length ? "Select tee" : "No tee data available"}</option>
                       {teeOptions.map((t) => (

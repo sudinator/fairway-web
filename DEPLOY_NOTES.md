@@ -1,3 +1,45 @@
+## 189.1.260907 — Manual course handicap simulation: 4,000 games, 76,807 assertions
+
+- `lib/manual-handicap-simulation.test.ts` covers every combination of format (singles, four-ball, alternate shot, Trifecta, Stableford), hole count (9 and 18, front and back), allowance, and a random MIX of manual and derived players in the same game.
+- It asserts PROPERTIES rather than expected numbers, because a leak hides in the combinations nobody thought to write down:
+  1. **Used as given** — a manual figure is exactly what was entered, on 9 holes and on 18.
+  2. **Equivalence** — a manual player and a derived player who land on the same figure must score identically: same strokes, same net, same match result, same Stableford. This is what catches `course_handicap_source` affecting anything beyond the value.
+  3. **Nine-hole equivalence** — manual N on a nine equals derived 2N on a nine, pinning the two halves of the rule against each other rather than against a hardcoded expectation.
+  4. **Allowance still bites**, identically for both sources.
+  5. **No cross-contamination** — making one player manual moves nobody else's strokes.
+  6. **Round trip** — set then clear returns exactly to derived, no residue.
+  7. **Every basis** — match, team leg and course-handicap dots all read it.
+- Alternate Shot is checked by equivalence against derived twins rather than by reimplementing the side formula in the test. Modelling it there would only prove my copy agrees with itself.
+- **Verified to have teeth.** Two breaks were injected into `chBasis` and both were caught loudly: halving a manual figure on a nine produced 14,024 failures, ignoring the source flag produced 29,511.
+- Seed fixed at 0x5A17C so any CI failure is reproducible.
+- No migration. 0153 remains current.
+
+## One correction while writing it
+
+The cross-contamination invariant failed 22 times out of 4,000 — my test, not the code. It flipped a player to manual using a ROUNDED figure, which changes that player's handicap; if they were the group low, everyone's strokes legitimately move. The invariant is about whether the source flag leaks, so the figure is now held exactly constant.
+
+## 189.0.260907 — Manual course handicaps (migration 0153)
+
+- The organizer or a system admin can enter a player's **course handicap** for a game directly — typically from GHIN, which is the source of truth — instead of it being derived from index, slope and rating.
+- **Semantics, decided with the organizer:**
+  - Used **as given**: no re-derivation.
+  - **NOT halved on a nine.** The number entered IS the nine-hole figure. This is the rule worth guarding hardest, because a halving error does not look like an error — the match simply plays a stroke or two light and the result stays plausible.
+  - **Allowance still applies** (85% four-ball, 90% Trifecta). Allowance belongs to the format, not the player, so baking it into the stored value would strand it if the allowance later changed.
+  - **Feeds every basis** — match, team leg, side games and posting — because GHIN is the source of truth for the handicap, not a match-day override.
+- **One place, one rule.** `chBasis` short-circuits on a manual figure, so every scorer, the public share page, the Cup page and the stroke dots inherit it without a second code path.
+- **Migration 0153**: `course_handicap_source` (`derived`/`manual`) with a CHECK, plus `course_handicap_set_by` / `set_at` so a handicap change in a money game is attributable. It also replaces `change_game_match_length_before_scoring` to CLEAR manual handicaps when the hole count changes — they are specific to a hole count, and scaling them would invent a number nobody typed.
+- **The UI is the safeguard.** The field is labelled with the game's own hole count ("9-hole course handicap"), shows the derived figure as a placeholder and states whether the player is currently manual or derived. Setup policy treats entry mid-round like an allowance change (confirm, because it rewrites strokes on holes already played), and changing the hole count now warns that manual handicaps will be cleared.
+- **`ci/check_handicap_single_source.py`**: no scorer may call `courseHandicapExact` or read `course_handicap` directly — everything goes through `chBasis`, or manual handicaps are silently ignored at that call site.
+- **`lib/manual-handicap.test.ts`** — 17 assertions, with the nine-hole rule fenced both ways: the manual figure must equal what was entered and must NOT be half of it, while a row without the marker halves exactly as before.
+
+## Three corrections to the new guard, worth recording
+
+It reported wrong line numbers (deleting comments shifted every offset); it treated `??` as a type annotation, so the exact bad pattern slipped through its own negative test; and it flagged the Cup roster's handicap index, which is display-only. The last mattered most — a guard with false positives collects exceptions until it is inert — so it now matches only the read that can actually cause the bug.
+
+## Run order
+
+Migration 0153 before the app deploys.
+
 ## 188.5.260907 — Cup page presentation: colours, dates, and saying what the format is
 
 - **Team colours come from the team NAME**, via the same `teamAccent` map the app uses. They were hardcoded by position, so a team called "Red" rendered with an orange dot.

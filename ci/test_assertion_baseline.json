@@ -1,5 +1,5 @@
 {
-  "total": 193683,
+  "total": 270507,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -30,6 +30,8 @@
     "hole result consistency": 981,
     "legs": 30,
     "live cup parity": 49,
+    "manual course handicap": 17,
+    "manual handicap simulation": 76807,
     "match length": 49,
     "match length picker": 18,
     "nine-hole handicap": 15,
