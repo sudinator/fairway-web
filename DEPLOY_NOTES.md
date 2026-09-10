@@ -1,3 +1,13 @@
+## 190.3.260907 — `next build` no longer requires live Supabase credentials
+
+- **The symptom.** Dependabot's pull request failed CI with "@supabase/ssr: Your project's URL and API key are required" while prerendering "/". Nothing was wrong with the repo or the secrets: GitHub deliberately withholds Actions secrets from Dependabot pull requests, so the two env vars arrived EMPTY and static generation died.
+- **The cause.** Roughly thirty modules do `const supabase = createClient()` at module scope, and `createClient()` built the client eagerly. Merely importing one of those modules therefore called `createBrowserClient` and threw when the vars were absent — so a production build depended on live credentials being present, even though nothing talks to Supabase at build time.
+- **The fix**, in one place. `createClient()` now returns a lazy proxy that constructs the real client on first property access. Runtime behaviour is unchanged — every real call happens in an effect or a handler, in the browser, where the values exist — but importing a module no longer needs them. A missing value still throws, at the point of use, where the message names the actual call rather than a page being prerendered.
+- **Verified the way it failed**: `next build` with `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` unset now compiles and generates all six pages. Before this change that is exactly the command that failed.
+- **`ci/check_build_needs_no_secrets.py`** keeps it that way: `createClient()` must defer construction, and must not return `createBrowserClient(...)` directly. Negative-tested by restoring the old body.
+
+No migration. 0154 remains current.
+
 ## 190.2.260907 — The singles match card, rebuilt (the point of this release)
 
 The individual match card in Results named the same two players seven times between them, in four different phrasings, and its two columns wrapped into each other on a phone.
