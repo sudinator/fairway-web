@@ -1,3 +1,21 @@
+## 190.4.260907 — The New round screen: no phantom match, and a manual course handicap
+
+Both reported on production. Both are in `components/round-editor.tsx`, the "New round" flow — a
+third path I had missed. 190.0 fixed the solo case for GAMES and 0154 added the field to the round
+EDITOR, but the screen you actually score a new round on was neither of those.
+
+- **A solo round drew a blue TRIANGLE labelled "team match".** `round-editor.tsx` passes `recv` and no `sets`, and `ScoreEntryCard`'s fallback assumed an OPPONENT basis. A round has no opponent, and those strokes are simply the player's course handicap. The fallback now uses the course basis — orange circle, "course hcp" — unless the caller actually names a match. Pinned in `lib/stroke-sets.test.ts`, including that a real match caller still gets the opponent basis.
+- **There was no way to override the handicap while scoring a round.** The field existed only in the round editor for an already-recorded round. It is now on the New round screen itself, labelled with that round's hole count, and it outranks both the stored value and any rating/slope edit — a manual figure is authoritative, not an input to a derivation. `course_handicap_source` is persisted with the round so `chBasis` honours it on every later read.
+
+## Why this took three attempts
+
+There are three screens that show stroke marks, not two: the game card, the round editor, and the
+New round flow. I fixed the first two and asserted the third was covered without checking, twice.
+`ci/check_handicap_single_source.py` covers `manage.tsx` but not `round-editor.tsx` — widening it
+is the obvious follow-up, and is in BACKLOG.
+
+No migration. 0154 remains current.
+
 ## 190.3.260907 — `next build` no longer requires live Supabase credentials
 
 - **The symptom.** Dependabot's pull request failed CI with "@supabase/ssr: Your project's URL and API key are required" while prerendering "/". Nothing was wrong with the repo or the secrets: GitHub deliberately withholds Actions secrets from Dependabot pull requests, so the two env vars arrived EMPTY and static generation died.

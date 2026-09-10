@@ -714,7 +714,13 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   const setsOf = (h: EntryHole) => (h.sets && h.sets.length
     ? h.sets
     : [
-        { key: "opponent" as const, strokes: h.recv || 0, gives: h.gives || 0, label: matchStrokeLabel || "match" },
+        // A caller that supplies only `recv` and no `sets` is a SOLO ROUND — round-editor.tsx is the
+        // only one left — and those strokes ARE the player's course handicap. Defaulting to the
+        // opponent basis drew a triangle labelled "team match" on a round with no opponent at all.
+        // Only treat it as a match basis when the caller actually names one.
+        matchStrokeLabel
+          ? { key: "opponent" as const, strokes: h.recv || 0, gives: h.gives || 0, label: matchStrokeLabel }
+          : { key: "course" as const, strokes: h.recv || 0, gives: h.gives || 0, label: "course hcp" },
         ...(showIndivDots ? [{ key: "course" as const, strokes: h.indRecv || 0, gives: 0, label: "course hcp" }] : []),
       ]).filter((x) => x.strokes > 0 || x.gives > 0);
   /** Stableford points are always scored off the COURSE handicap, never a match-relative basis. */
