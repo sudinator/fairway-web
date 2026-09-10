@@ -1,3 +1,8 @@
+## v190.3 staging check
+
+- [ ] The app still signs in and loads data normally (the client is built on first use, not at import).
+- [ ] Dependabot's next PR should now pass CI without secrets.
+
 ## v190.2 staging check
 
 - [ ] Individual match in Results: each player on their own row, each name ONCE.

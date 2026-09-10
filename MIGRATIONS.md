@@ -1,3 +1,6 @@
+## 190.3.260907 — no migration
+Lazy Supabase client so the build needs no credentials. 0154 remains current.
+
 ## 190.2.260907 — no migration
 Singles match card layout. 0154 remains current.
 
