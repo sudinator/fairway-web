@@ -1,3 +1,18 @@
+## 190.5.260907 — The solo round's triangle: the actual cause was a default parameter
+
+Third attempt, and this one is verified by rendering the component rather than by reading it.
+
+- **The cause.** `ScoreEntryCard` declared `matchStrokeLabel = "team match"` as a DEFAULT PARAMETER. Every caller therefore looked like a team match whether or not it was one. 190.4 made the stroke basis depend on that prop — `matchStrokeLabel ? opponent : course` — which is always truthy when the prop defaults, so the fix could not fire and the solo round kept drawing a blue triangle labelled "team match".
+- **The fix.** The prop has no default. It is undefined unless a caller passes it, and the basis follows from that. A default that asserts a fact about the caller is a lie the caller never told.
+- **Verified by execution**: the real `ScoreEntryCard` rendered with `round-editor.tsx`'s exact props produces **zero triangles, zero "team match", ten circles, and a legend reading "course hcp"**. Previous attempts were verified by reading the diff, which is why they shipped broken twice.
+- `lib/stroke-sets.test.ts` asserts the prop has no default, and fails if it is restored.
+
+## Why the first two attempts missed it
+
+190.0 fixed `strokeSets` for games. 190.4 fixed the card's fallback. Both were correct changes to the wrong layer: the value being tested was supplied by a default three hundred lines away, and I never executed the path to see what the prop actually held. Reading tells you what code should do; only running it tells you what it does.
+
+No migration. 0154 remains current.
+
 ## 190.4.260907 — The New round screen: no phantom match, and a manual course handicap
 
 Both reported on production. Both are in `components/round-editor.tsx`, the "New round" flow — a

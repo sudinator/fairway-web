@@ -120,6 +120,14 @@ eq("stableford basis is named", strokeSets(stableford, BK as never, 1, ALL as ne
   eq("solo round falls back to the course basis", fallback(holes[0]).key, "course");
   eq("and is labelled course hcp, not a match", fallback(holes[0]).label, "course hcp");
   eq("a real match caller still gets the opponent basis", fallback(holes[0], "Trifecta").key, "opponent");
+  // THE ACTUAL BUG, three attempts running: ScoreEntryCard defaulted matchStrokeLabel to
+  // "team match", so `matchStrokeLabel ? opponent : course` was ALWAYS truthy and a solo round
+  // still drew a triangle. A default that asserts a fact about the caller is a lie the caller
+  // never told. The prop must have no default.
+  const ui = require("fs").readFileSync(__dirname + "/../components/ui.tsx", "utf8") as string;
+  const sig = ui.slice(ui.indexOf("export function ScoreEntryCard("), ui.indexOf("export function ScoreEntryCard(") + 900);
+  eq("matchStrokeLabel has NO default", /matchStrokeLabel\s*=/.test(sig), false);
+  eq("and is still an accepted prop", ui.includes("matchStrokeLabel?: string;"), true);
 }
 
 console.log(`stroke sets (Architects Jul 5 fixture): ${pass} passed, ${fail} failed`);

@@ -1,3 +1,6 @@
+## 190.5.260907 — no migration
+Removed the misleading matchStrokeLabel default. 0154 remains current.
+
 ## 190.4.260907 — no migration
 New round screen: course-handicap basis and manual override. 0154 remains current.
 

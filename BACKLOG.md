@@ -1,3 +1,8 @@
+## v190.5 check
+
+- [ ] New round: stroke marks are ORANGE CIRCLES, legend reads "course hcp". No triangle, no "team match".
+- [ ] A real match card (singles/four-ball/Trifecta) still shows its own basis labels correctly.
+
 ## v190.4 staging/production check
 
 - [ ] New round: stroke marks are ORANGE CIRCLES labelled "course hcp". No triangle, no "team match".
