@@ -1,3 +1,21 @@
+## v190.5 check
+
+- [ ] New round: stroke marks are ORANGE CIRCLES, legend reads "course hcp". No triangle, no "team match".
+- [ ] A real match card (singles/four-ball/Trifecta) still shows its own basis labels correctly.
+
+## v190.4 staging/production check
+
+- [ ] New round: stroke marks are ORANGE CIRCLES labelled "course hcp". No triangle, no "team match".
+- [ ] New round: an "18-HOLE COURSE HANDICAP" field appears (or 9-hole on a nine).
+- [ ] Enter a figure: the stroke marks change to match it immediately.
+- [ ] Finish the round, reopen it: the manual figure persisted and still drives the strokes.
+- [ ] Leave it blank: the derived figure is used, exactly as before.
+
+## NEXT
+
+- [ ] Widen ci/check_handicap_single_source.py to components/round-editor.tsx. Its absence is why the
+      New round screen kept its own handicap path through three releases.
+
 ## v190.3 staging check
 
 - [ ] The app still signs in and loads data normally (the client is built on first use, not at import).

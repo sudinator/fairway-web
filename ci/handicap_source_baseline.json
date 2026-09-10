@@ -1,0 +1,10 @@
+{
+  "known": [
+    "components/game/leader-row.tsx",
+    "components/home.tsx",
+    "components/round-detail.tsx",
+    "components/share-card.tsx",
+    "lib/badges.ts",
+    "lib/setup-summary.ts"
+  ]
+}

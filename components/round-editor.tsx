@@ -54,6 +54,8 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   const initialSlopeText = round.slope == null ? "" : String(round.slope);
   const [ratingText, setRatingText] = useState(initialRatingText);
   const [slopeText, setSlopeText] = useState(initialSlopeText);
+  /** Manual course handicap being typed. null = untouched; "" = cleared back to derived. */
+  const [chEdit, setChEdit] = useState<string | null>(null);
   const ratingSlopeEdited = isRecordedFinal && (ratingText !== initialRatingText || slopeText !== initialSlopeText);
   const ratingTrim = ratingText.trim();
   const slopeTrim = slopeText.trim();
@@ -404,7 +406,13 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     : baseLive;
   const effectiveRating = ratingSlopeEdited && !ratingSlopeError ? parsedRating : round.rating;
   const effectiveSlope = ratingSlopeEdited && !ratingSlopeError ? parsedSlope : round.slope;
-  const effectiveCourseHandicap = ratingSlopeEdited && !ratingSlopeError ? live.course_handicap : round.course_handicap;
+  // A manual figure is the authoritative course handicap for THIS round and hole count (0154):
+  // used as given, never re-derived and never halved. It therefore outranks both the stored value
+  // and any rating/slope edit, which only matter when the handicap is being derived.
+  const manualCh = chEdit !== null ? (chEdit === "" ? null : Number(chEdit))
+    : (round.course_handicap_source === "manual" ? round.course_handicap : null);
+  const effectiveCourseHandicap = manualCh != null ? manualCh
+    : ratingSlopeEdited && !ratingSlopeError ? live.course_handicap : round.course_handicap;
   const anyPlayed = holes.some((h) => h.strokes);
   const metadataOnlyGrossEdit = isRecordedFinal && isGrossOnly(round) && !anyPlayed && ratingSlopeEdited;
   const canSave = anyPlayed || metadataOnlyGrossEdit;
@@ -452,6 +460,9 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
           rating: effectiveRating,
           slope: effectiveSlope,
           course_handicap: effectiveCourseHandicap,
+          // Persist WHICH source that figure came from, so chBasis honours it on every later read
+          // (0154): manual is used as given and is not halved for a nine.
+          course_handicap_source: manualCh != null ? "manual" : "derived",
         }).eq("id", roundId);
         if (roundUpdateError) throw roundUpdateError;
       } else {
@@ -581,6 +592,30 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
           ) : null}
         </div>
       )}
+      {(() => {
+        // The number entered IS the course handicap for this round's hole count — typically from
+        // GHIN — so the field names that hole count. Entering an 18-hole figure against a nine is
+        // wrong by a factor of two and looks entirely plausible in the result.
+        const nHoles = holes.length === 9 ? 9 : 18;
+        const isManual = manualCh != null;
+        return (
+          <div style={{ background: C.card, borderRadius: 12, padding: 12, marginBottom: 10 }}>
+            <label style={{ color: C.faint, fontSize: 11, letterSpacing: 1 }}>{nHoles}-HOLE COURSE HANDICAP</label>
+            <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
+              <input
+                inputMode="decimal"
+                placeholder={round.course_handicap != null ? String(round.course_handicap) : "\u2014"}
+                value={chEdit ?? (isManual && round.course_handicap != null ? String(round.course_handicap) : "")}
+                onChange={(e) => { const v = e.target.value; if (v === "" || /^-?\d*\.?\d*$/.test(v)) setChEdit(v); }}
+                style={{ ...inputStyle, padding: "8px 12px", width: 74, textAlign: "center" }}
+              />
+              <span style={{ color: isManual ? C.ink : C.faint, fontWeight: isManual ? 700 : 400, fontSize: 12 }}>
+                {isManual ? "manual \u00b7 used as entered, saved with the round" : "leave blank to use the derived figure"}
+              </span>
+            </div>
+          </div>
+        );
+      })()}
       <div style={{ color: C.gold, fontSize: 12, marginBottom: 10 }}>
         {isRecordedFinal
           ? "Edit the round below, then tap Save changes. Historical rating/slope corrections affect only this recorded round."

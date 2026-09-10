@@ -653,7 +653,7 @@ export function strokeGlyph(key: string, color: string, gives = false, i: number
   );
 }
 
-export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false, strokeSixes = false, uncap = false, showIndivDots = false, matchStrokeLabel = "team match", scoreLocked = false, lockedByName, onActiveHole, resumeHole }: {
+export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false, strokeSixes = false, uncap = false, showIndivDots = false, matchStrokeLabel, scoreLocked = false, lockedByName, onActiveHole, resumeHole }: {
   holes: EntryHole[];
   hasHandicap: boolean;
   onSet: (i: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null }) => void;
@@ -714,7 +714,16 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   const setsOf = (h: EntryHole) => (h.sets && h.sets.length
     ? h.sets
     : [
-        { key: "opponent" as const, strokes: h.recv || 0, gives: h.gives || 0, label: matchStrokeLabel || "match" },
+        // A caller that supplies only `recv` and no `sets` is a SOLO ROUND — round-editor.tsx is the
+        // only one left — and those strokes ARE the player's course handicap.
+        //
+        // This is why the solo round kept drawing a triangle across three attempts: matchStrokeLabel
+        // DEFAULTED to "team match", so every caller looked like a match whether or not it was one.
+        // A default that asserts a fact about the caller is a lie the caller never told; the label is
+        // now undefined unless a caller passes it, and the basis follows from that.
+        matchStrokeLabel
+          ? { key: "opponent" as const, strokes: h.recv || 0, gives: h.gives || 0, label: matchStrokeLabel }
+          : { key: "course" as const, strokes: h.recv || 0, gives: h.gives || 0, label: "course hcp" },
         ...(showIndivDots ? [{ key: "course" as const, strokes: h.indRecv || 0, gives: 0, label: "course hcp" }] : []),
       ]).filter((x) => x.strokes > 0 || x.gives > 0);
   /** Stableford points are always scored off the COURSE handicap, never a match-relative basis. */

@@ -106,5 +106,29 @@ eq("stableford basis is named", strokeSets(stableford, BK as never, 1, ALL as ne
   eq("lone four-ball player returns only the course basis", fbSets.map((x) => x.key).join(","), "course");
 }
 
+// ── A solo round has no opponent, so its strokes are the COURSE handicap ────────────────────────
+// round-editor.tsx (the "New round" flow) passes `recv` and no `sets`. The card's fallback assumed
+// an opponent basis, so a solo round drew a blue TRIANGLE labelled "team match" — for a round with
+// no opponent and no match. Reported on production, Sep 9.
+{
+  const holes = [{ n: 1, par: 4, si: 1, yards: null, strokes: 4, putts: null, fairway: null, penalties: null, sand: null, recv: 1 }];
+  // Mirrors ScoreEntryCard's setsOf(): with no matchStrokeLabel the basis must be `course`.
+  const fallback = (h: { recv: number; gives?: number }, matchStrokeLabel?: string) =>
+    matchStrokeLabel
+      ? { key: "opponent", strokes: h.recv || 0, gives: h.gives || 0, label: matchStrokeLabel }
+      : { key: "course", strokes: h.recv || 0, gives: h.gives || 0, label: "course hcp" };
+  eq("solo round falls back to the course basis", fallback(holes[0]).key, "course");
+  eq("and is labelled course hcp, not a match", fallback(holes[0]).label, "course hcp");
+  eq("a real match caller still gets the opponent basis", fallback(holes[0], "Trifecta").key, "opponent");
+  // THE ACTUAL BUG, three attempts running: ScoreEntryCard defaulted matchStrokeLabel to
+  // "team match", so `matchStrokeLabel ? opponent : course` was ALWAYS truthy and a solo round
+  // still drew a triangle. A default that asserts a fact about the caller is a lie the caller
+  // never told. The prop must have no default.
+  const ui = require("fs").readFileSync(__dirname + "/../components/ui.tsx", "utf8") as string;
+  const sig = ui.slice(ui.indexOf("export function ScoreEntryCard("), ui.indexOf("export function ScoreEntryCard(") + 900);
+  eq("matchStrokeLabel has NO default", /matchStrokeLabel\s*=/.test(sig), false);
+  eq("and is still an accepted prop", ui.includes("matchStrokeLabel?: string;"), true);
+}
+
 console.log(`stroke sets (Architects Jul 5 fixture): ${pass} passed, ${fail} failed`);
 if (fail) { console.error(fails.slice(0, 8).join("\n")); process.exit(1); }
