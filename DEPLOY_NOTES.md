@@ -1,3 +1,28 @@
+## 192.7.260907 — Stop inferring what the provider does; look at it
+
+Six releases were spent reasoning about the GolfCourseAPI from the *shape of our failures* — a drift message, a silent job, a swallowed status — without once seeing what it actually returns. Amit's point, and he is right: establish ground truth first, then check every assumption against it at once.
+
+`/api/courses?raw=1` (admin only) returns the provider's response **untouched**: the URL requested, the HTTP status, content-type, `retry-after`, and the first 4000 characters of the body. It never echoes the API key.
+
+One call answers every assumption our code makes at the same time:
+
+- search returns `{ courses: [...] }`
+- each course has `id`, `club_name`, `course_name`
+- `location` is an object with city/state/country, or a flat string
+- detail returns `{ course: {...} }` with `tees` grouped by gender
+- `id` compares as a string
+
+Any of those could have moved; we have been testing them one at a time through symptoms.
+
+Usage, signed in as an admin:
+
+```js
+fetch('/api/courses?raw=1&q=fiddler').then(async r => console.log(await r.text()));
+fetch('/api/courses?raw=1&id=vqbyfsjx').then(async r => console.log(await r.text()));
+```
+
+No new migration; 0155 still required.
+
 ## 192.6.260907 — The course proxy threw away the reason it failed
 
 All 19 yardage lookups failed at once, and `/api/courses` returned `502 {"error":"Course service error"}` for every one. The app then labelled each as *"likely a stale/wrong id"* — the one explanation that cannot be true when every id fails simultaneously.

@@ -1,3 +1,11 @@
+## v192.7 — get ground truth on the course API
+
+- [ ] Deploy, then as an ADMIN in the browser console:
+        fetch('/api/courses?raw=1&q=fiddler').then(async r => console.log(await r.text()))
+        fetch('/api/courses?raw=1&id=vqbyfsjx').then(async r => console.log(await r.text()))
+- [ ] Paste both outputs. One pass then checks the envelope, field names, id type, location shape
+      and tees grouping together, instead of one symptom per release.
+
 ## v192.6 — find out what the provider is actually doing
 
 - [ ] Deploy, then in the browser console while signed in:
