@@ -37,13 +37,29 @@ type CoursePlan = {
 
 type LibRow = { id: string; name: string; external_id: string | null; data: Course };
 
+/** Why a lookup failed, straight from the proxy. Null when it succeeded. */
+let lastLookupError: string | null = null;
+
 async function fetchApiCourse(extId: string): Promise<Course | null> {
   try {
     const res = await fetch(`/api/courses?id=${encodeURIComponent(extId)}`);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // Report what the PROXY said. Discarding it here is why every failure was labelled "likely a
+      // stale/wrong id" \u2014 a guess that happened to be wrong: on 2026-09-09 all 19 lookups failed
+      // because the provider's DAILY quota was exhausted, and the ids were all perfectly good.
+      let why = `HTTP ${res.status}`;
+      try {
+        const body = await res.json();
+        if (body?.error) why = String(body.error);
+      } catch { /* non-JSON body: the status alone is the best we have */ }
+      lastLookupError = why;
+      return null;
+    }
+    lastLookupError = null;
     const j = await res.json();
     return (j.course || null) as Course | null;
-  } catch {
+  } catch (e: unknown) {
+    lastLookupError = e instanceof Error ? e.message : "Network error";
     return null;
   }
 }
@@ -94,7 +110,7 @@ export function YardageBackfill() {
       if (!extId) { out.push({ id: row.id, name: row.name, externalId: null, status: "skip", note: "Custom course (no golfcourseapi id) — use the editor below", tees: [] }); continue; }
       const api = await fetchApiCourse(String(extId));
       await new Promise((r) => setTimeout(r, 200));
-      if (!api) { out.push({ id: row.id, name: row.name, externalId: String(extId), status: "error", note: `Lookup failed for id ${extId} (likely a stale/wrong id) — use the editor below to re-look-up`, tees: [] }); continue; }
+      if (!api) { out.push({ id: row.id, name: row.name, externalId: String(extId), status: "error", note: `Lookup failed for id ${extId}: ${lastLookupError ?? "unknown error"}. If the id is wrong, use the editor below to re-look-up`, tees: [] }); continue; }
       const apiTees = api.tees || [];
       const teeReports: TeeReport[] = [];
       let anyFill = false;

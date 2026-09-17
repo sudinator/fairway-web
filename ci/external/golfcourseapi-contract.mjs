@@ -76,6 +76,21 @@ async function json(url) {
     }
 
     if (res.status === 429) {
+      // A DAILY quota is not a transient rate limit and must not be retried: the provider tells us
+      // how long with Retry-After, and it is hours. Treating the two alike burned four backoffs and
+      // then reported CONTRACT DRIFT \u2014 sending a reader hunting for a provider change that had not
+      // happened. Observed 2026-09-09: 429, retry-after 67453, body {"error":"daily usage limit
+      // exceeded"}.
+      const raSec = Number(res.headers.get("retry-after"));
+      const bodyText = await res.clone().text().catch(() => "");
+      const daily = /daily/i.test(bodyText) || (Number.isFinite(raSec) && raSec > 15 * 60);
+      if (daily) {
+        const hrs = Number.isFinite(raSec) ? ` Resets in about ${(raSec / 3600).toFixed(1)} hours.` : "";
+        monitorProblem(
+          `${url} -> HTTP 429, DAILY QUOTA EXHAUSTED.${hrs} The key is valid and the contract is ` +
+          `not implicated \u2014 nothing to fix, wait for the reset. Body: ${bodyText.trim().slice(0, 200)}`
+        );
+      }
       if (attempt >= MAX_RETRIES) {
         monitorProblem(
           `${url} -> HTTP 429 after ${MAX_RETRIES + 1} attempts. The API key is valid — this is a ` +

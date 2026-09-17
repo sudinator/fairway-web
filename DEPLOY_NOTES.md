@@ -1,3 +1,31 @@
+## 192.8.260907 — It was a daily quota. Two diagnostics that hid it.
+
+The raw passthrough added in 192.7 gave ground truth in one call:
+
+```
+status 429  retry-after 67453  {"error": "daily usage limit exceeded"}
+```
+
+Nothing was broken. Valid key, no contract drift, all course ids good — the free tier's **daily** allowance was spent. That single response explains every symptom at once: all 19 backfill lookups failing, the CI contract reporting drift, and the run that sat for nearly three minutes.
+
+Six releases were spent inferring this from the shape of the failures. The provider had been saying it plainly the whole time; two of our own diagnostics were discarding the message.
+
+### The contract script treated a daily quota as a transient rate limit
+
+It retried 429 four times with second-scale backoff, then fell through and reported **CONTRACT DRIFT** — sending a reader hunting for a provider change that had not happened. A daily quota is now recognised immediately, from `Retry-After` being longer than fifteen minutes or the body naming it, and reported as a MONITOR PROBLEM with the reset time:
+
+> `HTTP 429, DAILY QUOTA EXHAUSTED. Resets in about 18.7 hours. The key is valid and the contract is not implicated — nothing to fix, wait for the reset.`
+
+### The yardage backfill invented a cause
+
+`fetchApiCourse` did `if (!res.ok) return null`, throwing away both the status and the proxy's message, and the caller then labelled every failure *"likely a stale/wrong id"*. With all 19 ids failing simultaneously that was the one explanation that could not be true. It now reports what the proxy actually said.
+
+## The pattern, for the record
+
+Five failures this session were failures of diagnosis, not logic: a drift message printing values identical to its fixtures, a guard matching a comment instead of code, a monitor with no output, an error handler discarding the status it held, and a UI substituting a theory for the reason. Each cost several rounds of guessing at something the system already knew.
+
+No new migration; 0155 still required.
+
 ## 192.7.260907 — Stop inferring what the provider does; look at it
 
 Six releases were spent reasoning about the GolfCourseAPI from the *shape of our failures* — a drift message, a silent job, a swallowed status — without once seeing what it actually returns. Amit's point, and he is right: establish ground truth first, then check every assumption against it at once.

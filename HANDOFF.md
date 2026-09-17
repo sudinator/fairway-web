@@ -108,6 +108,21 @@ not silently. Verify with `https://birdienumnum.vercel.app/api/courses?q=francis
 - Sister app "Fairway Card" (separate repo, `fairway-web-eosin.vercel.app`) is occasionally referenced —
   not this project.
 
+## 2b. Environments
+
+| | URL |
+|---|---|
+| **Production** | `https://birdienumnum.vercel.app` |
+| **Staging** | `https://birdienumnum-git-staging-amit-sud-s-projects.vercel.app` |
+
+Staging is the Vercel branch deployment of `staging`, not a separate project, and it carries a
+STAGING ribbon in the corner. Both were previously undocumented here, which cost real time: a
+screenshot showing a bug is ambiguous about which environment produced it, and a fix can be
+verified against the wrong one.
+
+The staging Supabase database is separate from production and is reached through
+`BNN_STAGING_SUPABASE_URL`; migrations must be applied to each independently.
+
 ## 3. Deploy flow (staging first)
 1. Start from a clean `staging` branch synchronized from `main`.
 2. Apply the reviewed candidate/overlay to `staging`; inspect the exact changed-file set before commit.

@@ -1,3 +1,10 @@
+## v192.8 — after the quota resets (roughly 19h from 2026-09-09 ~13:00 UTC)
+
+- [ ] Re-run External API Contracts. It should pass; if it 429s again it now says DAILY QUOTA plainly.
+- [ ] Re-run the yardage backfill preview. Failures now name the real reason.
+- [ ] Consider whether the free tier is sufficient: the contract monitor alone makes 31 requests a week,
+      and the backfill makes one per course. A paid tier or a longer cache would avoid competing for quota.
+
 ## v192.7 — get ground truth on the course API
 
 - [ ] Deploy, then as an ADMIN in the browser console:
