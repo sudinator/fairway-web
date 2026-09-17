@@ -1,3 +1,115 @@
+## 192.8.260907 — It was a daily quota. Two diagnostics that hid it.
+
+The raw passthrough added in 192.7 gave ground truth in one call:
+
+```
+status 429  retry-after 67453  {"error": "daily usage limit exceeded"}
+```
+
+Nothing was broken. Valid key, no contract drift, all course ids good — the free tier's **daily** allowance was spent. That single response explains every symptom at once: all 19 backfill lookups failing, the CI contract reporting drift, and the run that sat for nearly three minutes.
+
+Six releases were spent inferring this from the shape of the failures. The provider had been saying it plainly the whole time; two of our own diagnostics were discarding the message.
+
+### The contract script treated a daily quota as a transient rate limit
+
+It retried 429 four times with second-scale backoff, then fell through and reported **CONTRACT DRIFT** — sending a reader hunting for a provider change that had not happened. A daily quota is now recognised immediately, from `Retry-After` being longer than fifteen minutes or the body naming it, and reported as a MONITOR PROBLEM with the reset time:
+
+> `HTTP 429, DAILY QUOTA EXHAUSTED. Resets in about 18.7 hours. The key is valid and the contract is not implicated — nothing to fix, wait for the reset.`
+
+### The yardage backfill invented a cause
+
+`fetchApiCourse` did `if (!res.ok) return null`, throwing away both the status and the proxy's message, and the caller then labelled every failure *"likely a stale/wrong id"*. With all 19 ids failing simultaneously that was the one explanation that could not be true. It now reports what the proxy actually said.
+
+## The pattern, for the record
+
+Five failures this session were failures of diagnosis, not logic: a drift message printing values identical to its fixtures, a guard matching a comment instead of code, a monitor with no output, an error handler discarding the status it held, and a UI substituting a theory for the reason. Each cost several rounds of guessing at something the system already knew.
+
+No new migration; 0155 still required.
+
+## 192.7.260907 — Stop inferring what the provider does; look at it
+
+Six releases were spent reasoning about the GolfCourseAPI from the *shape of our failures* — a drift message, a silent job, a swallowed status — without once seeing what it actually returns. Amit's point, and he is right: establish ground truth first, then check every assumption against it at once.
+
+`/api/courses?raw=1` (admin only) returns the provider's response **untouched**: the URL requested, the HTTP status, content-type, `retry-after`, and the first 4000 characters of the body. It never echoes the API key.
+
+One call answers every assumption our code makes at the same time:
+
+- search returns `{ courses: [...] }`
+- each course has `id`, `club_name`, `course_name`
+- `location` is an object with city/state/country, or a flat string
+- detail returns `{ course: {...} }` with `tees` grouped by gender
+- `id` compares as a string
+
+Any of those could have moved; we have been testing them one at a time through symptoms.
+
+Usage, signed in as an admin:
+
+```js
+fetch('/api/courses?raw=1&q=fiddler').then(async r => console.log(await r.text()));
+fetch('/api/courses?raw=1&id=vqbyfsjx').then(async r => console.log(await r.text()));
+```
+
+No new migration; 0155 still required.
+
+## 192.6.260907 — The course proxy threw away the reason it failed
+
+All 19 yardage lookups failed at once, and `/api/courses` returned `502 {"error":"Course service error"}` for every one. The app then labelled each as *"likely a stale/wrong id"* — the one explanation that cannot be true when every id fails simultaneously.
+
+**The status was known and discarded.** The route throws `Course lookup failed (${res.status})`, and the catch replaced it with a fixed string. So a rejected key (401), a rate limit (429) and a provider outage (503) were indistinguishable from the browser, from the logs, and from the admin screen.
+
+Now the response says which it was:
+
+- 401/403 → *"The course provider rejected our API key. Regenerate it at golfcourseapi.com and update GOLF_API_KEY."*
+- 429 → *"The course provider is rate limiting. Try again shortly."*, returned as 429 rather than 502
+- 5xx → *"The course provider is down. Try again later."*
+- The raw upstream status is included as `upstream_status` for anyone reading the JSON.
+
+A missing key already returned a clear 500, which is how we know the key is present: this was a 502.
+
+## The pattern, stated plainly
+
+Four failures in this session were failures of DIAGNOSIS, not of logic: a contract message printing values identical to its fixtures, a guard matching a comment instead of code, a monitor with no output, and now an error handler discarding the status it had in hand. Each cost several rounds of guessing at something the system already knew.
+
+No new migration; 0155 still required.
+
+## 192.5.260907 — The contract monitor now shows its work
+
+A run sat silent for nearly three minutes and looked hung. It was not: the script printed **nothing** until it finished, so a slow run and a dead one were indistinguishable.
+
+The free tier throttles. 31 requests with 1.5s / 3s / 6s / 12s backoffs can legitimately take ten minutes, and watching a silent step for three of them is reasonable grounds to conclude something is wrong.
+
+- **Progress lines**: every request logs `[42s] 12/31 ok /search?...`, and every rate-limit logs `[51s] 429 on /courses/... - backing off 6.0s (attempt 2)`.
+- **A wall-clock budget** of six minutes, after which it exits as a MONITOR PROBLEM naming the request it gave up on — explicitly not contract drift.
+- The success line now reports elapsed time and request count.
+
+## Why this keeps happening
+
+Three separate failures this session came from a monitor that could not be read: a drift message printing values that looked identical to the fixtures, a guard matching on a comment rather than code, and now a job with no output. Each cost several runs of guessing. The diagnostics were the defect, not the thing being diagnosed.
+
+No behaviour change to the app. No new migration; 0155 still required.
+
+## 192.4.260907 — The contract failure message was unreadable
+
+The GolfCourseAPI contract kept failing on the three Fiddler's Elbow courses with values that looked **identical** to the fixtures:
+
+```
+- Forest: search metadata drifted (club='Fiddler's Elbow Country Club', name='Forest', location='Bedminster, NJ, United States')
+```
+
+191.1 loosened the CLUB comparison, so the club is no longer what fails. `course name` and `location` remain strict by design — they identify WHICH course a stored ID points at. One of those must differ by a character the log cannot render: a curly apostrophe, a non-breaking space, a trailing space.
+
+The message now **names the field that drifted** and prints both values escaped with their code points:
+
+```
+- Forest: search metadata drifted
+    location: got "Bedminster, NJ, United States" [42 65 ... a0 4e 4a ...]
+             want "Bedminster, NJ, United States" [42 65 ... 20 4e 4a ...]
+```
+
+A failure you cannot read is a failure you cannot act on. Three runs were spent guessing at this; the next one will say.
+
+No behaviour change to the app. No new migration; 0155 still required.
+
 ## 192.3.260907 — The share card names the PLAYING handicap
 
 The shared card allocates strokes off the playing handicap (course handicap x allowance) but printed the **course** handicap, so on an 85% game the number on the card did not match the dots beside it.

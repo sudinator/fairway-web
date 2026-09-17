@@ -38,8 +38,10 @@ export async function GET(request: Request) {
   // Per-user volume cap on this metered upstream proxy. Global admins get headroom for the
   // explicit "Refresh all facilities" maintenance workflow; ordinary interactive use stays capped.
   // Identity is server-derived (auth.uid()) inside the RPC — a client can't limit as someone else.
+  let isAdmin = false;
   try {
     const { data: admin } = await supabase.rpc("is_admin");
+    isAdmin = !!admin;
     const limit = admin ? 1000 : 120;
     const { data: rl } = await supabase.rpc("bump_rate_limit", { p_bucket: "courses", p_limit: limit, p_window_seconds: 3600 });
     if (rl && (rl as any).allowed === false) {
@@ -56,13 +58,38 @@ export async function GET(request: Request) {
     );
   }
 
+  // ---- RAW DIAGNOSTIC (admin only) ----
+  // Returns the provider's response UNTOUCHED, with its status and headers. Six releases were spent
+  // inferring what the provider does from the shape of our failures; one raw response answers every
+  // assumption at once — the envelope, the field names, the id type, the location shape, the tees
+  // grouping. Admin-gated because it exposes upstream detail, and it never echoes the API key.
+  if (new URL(request.url).searchParams.get("raw") === "1") {
+    if (!isAdmin) return NextResponse.json({ error: "Admins only." }, { status: 403 });
+    const target = id
+      ? `${BASE}/courses/${encodeURIComponent(normalizeCourseProviderId(id) || id)}`
+      : `${BASE}/search?search_query=${encodeURIComponent((q || "").trim())}`;
+    try {
+      const res = await fetch(target, { headers, signal: AbortSignal.timeout(COURSE_TIMEOUT_MS) });
+      const text = await res.text();
+      return NextResponse.json({
+        requested: target,
+        status: res.status,
+        content_type: res.headers.get("content-type"),
+        retry_after: res.headers.get("retry-after"),
+        body_head: text.slice(0, 4000),
+      });
+    } catch (e: any) {
+      return NextResponse.json({ requested: target, threw: e?.name ?? "Error", message: e?.message ?? String(e) });
+    }
+  }
+
   try {
     // ---- Detail mode ----
     if (id) {
       const providerId = normalizeCourseProviderId(id);
       if (!providerId) return NextResponse.json({ error: "Invalid course id." }, { status: 400 });
       const res = await fetch(`${BASE}/courses/${encodeURIComponent(providerId)}`, { headers, signal: AbortSignal.timeout(COURSE_TIMEOUT_MS) });
-      if (!res.ok) throw new Error(`Course lookup failed (${res.status})`);
+      if (!res.ok) throw Object.assign(new Error(`Course lookup failed (${res.status})`), { upstream: res.status });
       const data = await res.json();
       return NextResponse.json({ course: normalizeCourse(data.course || data) });
     }
@@ -76,7 +103,7 @@ export async function GET(request: Request) {
       if (hit) return NextResponse.json(hit);
 
       const res = await fetch(`${BASE}/search?search_query=${encodeURIComponent(query)}`, { headers, signal: AbortSignal.timeout(COURSE_TIMEOUT_MS) });
-      if (!res.ok) throw new Error(`Search failed (${res.status})`);
+      if (!res.ok) throw Object.assign(new Error(`Search failed (${res.status})`), { upstream: res.status });
       const data = await res.json();
       const courses = (data.courses || []).slice(0, 15).flatMap((c: any) => {
         const providerId = normalizeCourseProviderId(c.id);
@@ -97,7 +124,26 @@ export async function GET(request: Request) {
   } catch (e: any) {
     const aborted = e?.name === "TimeoutError" || e?.name === "AbortError";
     console.error("courses upstream failure:", e?.message);
-    return NextResponse.json({ error: aborted ? "Course service timed out." : "Course service error" }, { status: aborted ? 504 : 502 });
+    if (aborted) {
+      return NextResponse.json({ error: "Course service timed out." }, { status: 504 });
+    }
+    // Say WHAT the provider returned. The status was already known here and was being thrown away:
+    // a rejected key (401), a rate limit (429) and an outage (503) all surfaced as the same
+    // "Course service error", and the app then guessed "likely a stale/wrong id" — which, when all
+    // 19 lookups fail at once, is the one explanation that cannot be true.
+    const upstream = typeof e?.upstream === "number" ? e.upstream : null;
+    const reason =
+      upstream === 401 || upstream === 403
+        ? "The course provider rejected our API key. Regenerate it at golfcourseapi.com and update GOLF_API_KEY."
+        : upstream === 429
+          ? "The course provider is rate limiting. Try again shortly."
+          : upstream && upstream >= 500
+            ? "The course provider is down. Try again later."
+            : "Course service error";
+    return NextResponse.json(
+      { error: reason, upstream_status: upstream },
+      { status: upstream === 429 ? 429 : 502 },
+    );
   }
 }
 

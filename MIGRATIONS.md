@@ -1,3 +1,18 @@
+## 192.8.260907 — no new migration
+Daily-quota recognition and honest backfill errors. 0155 still required.
+
+## 192.7.260907 — no new migration
+Admin raw passthrough for provider diagnosis. 0155 still required.
+
+## 192.6.260907 — no new migration
+Course proxy reports the upstream failure reason. 0155 still required.
+
+## 192.5.260907 — no new migration
+Contract monitor progress output. 0155 still required.
+
+## 192.4.260907 — no new migration
+Diagnostic contract failure message. 0155 still required.
+
 ## 192.3.260907 — no new migration
 Share card labels the playing handicap. 0155 still required.
 

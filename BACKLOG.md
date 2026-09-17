@@ -1,3 +1,37 @@
+## v192.8 — after the quota resets (roughly 19h from 2026-09-09 ~13:00 UTC)
+
+- [ ] Re-run External API Contracts. It should pass; if it 429s again it now says DAILY QUOTA plainly.
+- [ ] Re-run the yardage backfill preview. Failures now name the real reason.
+- [ ] Consider whether the free tier is sufficient: the contract monitor alone makes 31 requests a week,
+      and the backfill makes one per course. A paid tier or a longer cache would avoid competing for quota.
+
+## v192.7 — get ground truth on the course API
+
+- [ ] Deploy, then as an ADMIN in the browser console:
+        fetch('/api/courses?raw=1&q=fiddler').then(async r => console.log(await r.text()))
+        fetch('/api/courses?raw=1&id=vqbyfsjx').then(async r => console.log(await r.text()))
+- [ ] Paste both outputs. One pass then checks the envelope, field names, id type, location shape
+      and tees grouping together, instead of one symptom per release.
+
+## v192.6 — find out what the provider is actually doing
+
+- [ ] Deploy, then in the browser console while signed in:
+        fetch('/api/courses?id=vqbyfsjx').then(async r => console.log(r.status, await r.text()))
+- [ ] The message now names the cause. If it says the key was rejected, regenerate at golfcourseapi.com
+      and update GOLF_API_KEY in Vercel AND the GitHub secret — they are independent copies.
+- [ ] The yardage backfill's "likely a stale/wrong id" text should be reworded to report the real
+      reason too; it is currently a guess baked into the message.
+
+## v192.5 — read the contract run
+
+- [ ] Re-run External API Contracts. It now prints progress, so you can see it working.
+- [ ] If it fails, the message names the field and shows code points. Send me that block.
+
+## v192.4 — read the contract failure
+
+- [ ] Merge, then re-run External API Contracts.
+- [ ] The failure now names the field and shows code points. Send me that output and I will fix the fixture.
+
 ## v192.3 check
 
 - [ ] Share game 328330: rows read "plays 10 (CH 12 @ 85%)" and the number matches the dots.
