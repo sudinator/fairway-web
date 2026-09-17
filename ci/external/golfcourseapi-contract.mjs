@@ -39,11 +39,28 @@ const GAP_MS = 400;
 const MAX_RETRIES = 4;
 let lastCall = 0;
 
+// The run prints NOTHING until it finishes, so a slow run and a hung one look identical. With the
+// free tier throttling, 31 requests with 1.5/3/6/12s backoffs can take ten minutes, and a reader
+// watching a silent step for three minutes reasonably concludes it is stuck. Progress lines and a
+// wall-clock budget make the difference legible.
+const START = Date.now();
+const BUDGET_MS = 6 * 60 * 1000;
+const elapsed = () => `${((Date.now() - START) / 1000).toFixed(0)}s`;
+let calls = 0;
+
 async function json(url) {
   const wait = GAP_MS - (Date.now() - lastCall);
   if (wait > 0) await sleep(wait);
 
+  calls++;
+  const label = url.replace(BASE, "");
   for (let attempt = 0; ; attempt++) {
+    if (Date.now() - START > BUDGET_MS) {
+      monitorProblem(
+        `gave up after ${elapsed()} on request ${calls} (${label}). The provider is throttling hard ` +
+        `or is slow; this is not contract drift. Re-run, or raise BUDGET_MS.`
+      );
+    }
     lastCall = Date.now();
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 12000);
@@ -67,7 +84,9 @@ async function json(url) {
       }
       // Respect Retry-After when the server sends one; otherwise back off exponentially.
       const ra = Number(res.headers.get("retry-after"));
-      await sleep(Number.isFinite(ra) && ra > 0 ? ra * 1000 : 1500 * 2 ** attempt);
+      const back = Number.isFinite(ra) && ra > 0 ? ra * 1000 : 1500 * 2 ** attempt;
+      console.log(`  [${elapsed()}] 429 on ${label} - backing off ${(back / 1000).toFixed(1)}s (attempt ${attempt + 1})`);
+      await sleep(back);
       continue;
     }
 
@@ -85,10 +104,12 @@ async function json(url) {
     }
 
     if (!res.ok) throw new Error(`${url} -> HTTP ${res.status}`);
+    console.log(`  [${elapsed()}] ${calls}/31 ok ${label}`);
     return await res.json();
   }
 }
 
+console.log(`Checking ${golden.length} golden fixtures against ${BASE} ...`);
 const failures = [];
 for (const fixture of golden) {
   let courses = byQuery.get(fixture.query);
@@ -154,4 +175,4 @@ if (failures.length) {
   console.error("CONTRACT DRIFT: the GolfCourseAPI response changed.\n- " + failures.join("\n- "));
   process.exit(EXIT_DRIFT);
 }
-console.log(`GolfCourseAPI contract OK for ${golden.length} golden course fixtures across ${byQuery.size} searches.`);
+console.log(`GolfCourseAPI contract OK for ${golden.length} golden course fixtures across ${byQuery.size} searches (${elapsed()}, ${calls} requests).`);

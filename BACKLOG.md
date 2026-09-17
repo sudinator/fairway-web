@@ -1,3 +1,8 @@
+## v192.5 — read the contract run
+
+- [ ] Re-run External API Contracts. It now prints progress, so you can see it working.
+- [ ] If it fails, the message names the field and shows code points. Send me that block.
+
 ## v192.4 — read the contract failure
 
 - [ ] Merge, then re-run External API Contracts.

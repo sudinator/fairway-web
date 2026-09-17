@@ -1,3 +1,19 @@
+## 192.5.260907 — The contract monitor now shows its work
+
+A run sat silent for nearly three minutes and looked hung. It was not: the script printed **nothing** until it finished, so a slow run and a dead one were indistinguishable.
+
+The free tier throttles. 31 requests with 1.5s / 3s / 6s / 12s backoffs can legitimately take ten minutes, and watching a silent step for three of them is reasonable grounds to conclude something is wrong.
+
+- **Progress lines**: every request logs `[42s] 12/31 ok /search?...`, and every rate-limit logs `[51s] 429 on /courses/... - backing off 6.0s (attempt 2)`.
+- **A wall-clock budget** of six minutes, after which it exits as a MONITOR PROBLEM naming the request it gave up on — explicitly not contract drift.
+- The success line now reports elapsed time and request count.
+
+## Why this keeps happening
+
+Three separate failures this session came from a monitor that could not be read: a drift message printing values that looked identical to the fixtures, a guard matching on a comment rather than code, and now a job with no output. Each cost several runs of guessing. The diagnostics were the defect, not the thing being diagnosed.
+
+No behaviour change to the app. No new migration; 0155 still required.
+
 ## 192.4.260907 — The contract failure message was unreadable
 
 The GolfCourseAPI contract kept failing on the three Fiddler's Elbow courses with values that looked **identical** to the fixtures:
