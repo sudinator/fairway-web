@@ -1,3 +1,24 @@
+## 192.6.260907 — The course proxy threw away the reason it failed
+
+All 19 yardage lookups failed at once, and `/api/courses` returned `502 {"error":"Course service error"}` for every one. The app then labelled each as *"likely a stale/wrong id"* — the one explanation that cannot be true when every id fails simultaneously.
+
+**The status was known and discarded.** The route throws `Course lookup failed (${res.status})`, and the catch replaced it with a fixed string. So a rejected key (401), a rate limit (429) and a provider outage (503) were indistinguishable from the browser, from the logs, and from the admin screen.
+
+Now the response says which it was:
+
+- 401/403 → *"The course provider rejected our API key. Regenerate it at golfcourseapi.com and update GOLF_API_KEY."*
+- 429 → *"The course provider is rate limiting. Try again shortly."*, returned as 429 rather than 502
+- 5xx → *"The course provider is down. Try again later."*
+- The raw upstream status is included as `upstream_status` for anyone reading the JSON.
+
+A missing key already returned a clear 500, which is how we know the key is present: this was a 502.
+
+## The pattern, stated plainly
+
+Four failures in this session were failures of DIAGNOSIS, not of logic: a contract message printing values identical to its fixtures, a guard matching a comment instead of code, a monitor with no output, and now an error handler discarding the status it had in hand. Each cost several rounds of guessing at something the system already knew.
+
+No new migration; 0155 still required.
+
 ## 192.5.260907 — The contract monitor now shows its work
 
 A run sat silent for nearly three minutes and looked hung. It was not: the script printed **nothing** until it finished, so a slow run and a dead one were indistinguishable.

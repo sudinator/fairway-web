@@ -1,3 +1,12 @@
+## v192.6 — find out what the provider is actually doing
+
+- [ ] Deploy, then in the browser console while signed in:
+        fetch('/api/courses?id=vqbyfsjx').then(async r => console.log(r.status, await r.text()))
+- [ ] The message now names the cause. If it says the key was rejected, regenerate at golfcourseapi.com
+      and update GOLF_API_KEY in Vercel AND the GitHub secret — they are independent copies.
+- [ ] The yardage backfill's "likely a stale/wrong id" text should be reworded to report the real
+      reason too; it is currently a guess baked into the message.
+
 ## v192.5 — read the contract run
 
 - [ ] Re-run External API Contracts. It now prints progress, so you can see it working.

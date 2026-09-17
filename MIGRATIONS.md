@@ -1,3 +1,6 @@
+## 192.6.260907 — no new migration
+Course proxy reports the upstream failure reason. 0155 still required.
+
 ## 192.5.260907 — no new migration
 Contract monitor progress output. 0155 still required.
 

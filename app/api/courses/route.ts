@@ -62,7 +62,7 @@ export async function GET(request: Request) {
       const providerId = normalizeCourseProviderId(id);
       if (!providerId) return NextResponse.json({ error: "Invalid course id." }, { status: 400 });
       const res = await fetch(`${BASE}/courses/${encodeURIComponent(providerId)}`, { headers, signal: AbortSignal.timeout(COURSE_TIMEOUT_MS) });
-      if (!res.ok) throw new Error(`Course lookup failed (${res.status})`);
+      if (!res.ok) throw Object.assign(new Error(`Course lookup failed (${res.status})`), { upstream: res.status });
       const data = await res.json();
       return NextResponse.json({ course: normalizeCourse(data.course || data) });
     }
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
       if (hit) return NextResponse.json(hit);
 
       const res = await fetch(`${BASE}/search?search_query=${encodeURIComponent(query)}`, { headers, signal: AbortSignal.timeout(COURSE_TIMEOUT_MS) });
-      if (!res.ok) throw new Error(`Search failed (${res.status})`);
+      if (!res.ok) throw Object.assign(new Error(`Search failed (${res.status})`), { upstream: res.status });
       const data = await res.json();
       const courses = (data.courses || []).slice(0, 15).flatMap((c: any) => {
         const providerId = normalizeCourseProviderId(c.id);
@@ -97,7 +97,26 @@ export async function GET(request: Request) {
   } catch (e: any) {
     const aborted = e?.name === "TimeoutError" || e?.name === "AbortError";
     console.error("courses upstream failure:", e?.message);
-    return NextResponse.json({ error: aborted ? "Course service timed out." : "Course service error" }, { status: aborted ? 504 : 502 });
+    if (aborted) {
+      return NextResponse.json({ error: "Course service timed out." }, { status: 504 });
+    }
+    // Say WHAT the provider returned. The status was already known here and was being thrown away:
+    // a rejected key (401), a rate limit (429) and an outage (503) all surfaced as the same
+    // "Course service error", and the app then guessed "likely a stale/wrong id" — which, when all
+    // 19 lookups fail at once, is the one explanation that cannot be true.
+    const upstream = typeof e?.upstream === "number" ? e.upstream : null;
+    const reason =
+      upstream === 401 || upstream === 403
+        ? "The course provider rejected our API key. Regenerate it at golfcourseapi.com and update GOLF_API_KEY."
+        : upstream === 429
+          ? "The course provider is rate limiting. Try again shortly."
+          : upstream && upstream >= 500
+            ? "The course provider is down. Try again later."
+            : "Course service error";
+    return NextResponse.json(
+      { error: reason, upstream_status: upstream },
+      { status: upstream === 429 ? 429 : 502 },
+    );
   }
 }
 
