@@ -1,3 +1,22 @@
+## v192.2 check
+
+- [ ] Nothing new to click — comment only. Deploy with 192.1 and run its check.
+
+## v192.1 check
+
+- [ ] Game 328330 (or any Stableford at 85%): the dots on the card match the panel and the points.
+- [ ] Christopher: 10 dots, not 12.
+- [ ] A game at 100% allowance is unchanged.
+
+## v192.0 checks — manual handicaps, end to end
+
+- [ ] Apply 0155.
+- [ ] Set a manual course handicap. The figure shown ABOVE the scorecards now matches the one used in it.
+- [ ] The Strokes panel, the stroke dots and the group card all agree on the same number.
+- [ ] Share that game: the public page uses the manual figure too (it was deriving).
+- [ ] A Ryder Cup session with a manual handicap: same on the Cup page.
+- [ ] A player with NO manual handicap is unchanged throughout.
+
 ## v191.1 check
 
 - [ ] Re-run the external-api-contracts workflow: it should pass.

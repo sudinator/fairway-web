@@ -1,3 +1,42 @@
+## 192.2.260907 — Comment correction: the sixes side game follows the game's allowance
+
+No behaviour change. 192.1 made `fullStrokes` honour the game's allowance, which was right for all three of its callers — the group card dots, the personal card dots, and the sixes side game (confirmed with Amit: the side game uses the game allowance).
+
+The call site in `segment-views.tsx` still carried the comment *"full playing handicap, not the match-relative basis"*, which now described the opposite of what the code does. That comment is why the 100% was hardcoded in the first place: **"full" was doing double duty** — it meant "not relative to an opponent", and got implemented as "not allowanced" as well. Those are different ideas, and conflating them put the dots out of step with the points they sit beside.
+
+The comment now says what the code does and records why the conflation happened.
+
+## 192.1.260907 — Stroke dots ignored the game's allowance
+
+Found on staging game 328330: a Stableford at **85%** off a manual course handicap of **12** showed **10** in the panel and scored **10** strokes for points — but drew **12 dots** on the card.
+
+- **The cause.** `fullStrokes` — the course-handicap basis, which drives side games, posting and Stableford points — called `applyAllowance(..., 100)`, hardcoding a full allowance instead of using the game's. `lib/player-scoring.playerHoles` allowances correctly, so the points and the dots disagreed.
+- **This predates manual handicaps and affects every allowanced game.** Entering a round number simply made the mismatch legible: 12 dots against 10 points is obvious, 17 against 16 is not.
+- **Verified:** at 85% the card now draws 10 dots, at 100% it draws 12, and every hole's dot equals what `playerHoles` allocates for the points.
+- `lib/stroke-sets.test.ts` pins the dot count per allowance and asserts dot-by-dot agreement with the points allocation, with a fence on the old 12-at-85% behaviour.
+
+## Correction to the 192.0 notes
+
+192.0 claimed the `Player` type omitting `course_handicap_source` caused manual handicaps to be ignored in the client. **That was wrong.** TypeScript types are erased at runtime and `select("*")` returns the column, so `chBasis` did see `"manual"` — which is why the dots were the right *count* all along. The "manual 12 scored as 18.87" measurement came from a hand-built object with the field deliberately omitted; it demonstrated how `chBasis` behaves without the field, not what the app does. Adding the field to the type is correct for type-safety and changes nothing at runtime.
+
+**Migration 0155 stands on its own** and is still required: both public RPCs derive `ch` from index/slope/rating with no reference to `course_handicap_source`, which is readable directly from the SQL.
+
+## 192.0.260907 — Manual course handicaps were ignored almost everywhere (migration 0155)
+
+You reported that the group scorecard honoured a manual handicap but the figure above it did not. The split was the clue, and the truth is the opposite of what it looked like: **the surfaces that read the raw column happened to be right, and every surface that correctly used `chBasis` was wrong.**
+
+- **The cause.** `chBasis` only prefers a manual figure when `course_handicap_source` reaches it. The `Player` type in `lib/game-types.ts` declared `course_handicap` but **not** `course_handicap_source`, so the field was dropped on the way from the database into every component. `chBasis` saw no source, fell through to the index/slope/rating chain, and discarded the entered number. Measured: **a manual 12 scored as 18.87.**
+- **The same bug in SQL.** `get_live_scorecard` (0151) and `get_live_competition` (0152) derive `ch` from index, slope and rating *whenever those exist* — which for anyone with a handicap index is always — so the public share page and the Cup page ignored manual handicaps too. **Migration 0155** makes both prefer a manual figure, matching `chBasis`.
+- **`select("*")` already returned the column**; only the TypeScript type was dropping it, which is why nothing failed loudly.
+
+## New guard
+
+`ci/check_live_manual_handicap.py`: any SQL that derives a playing handicap from index/slope/rating must prefer a manual `course_handicap`, and the manual branch must come BEFORE the derivation. Discovers the functions rather than listing them, and checks only the LATEST definition of each, since that is what a rebuild produces. Negative-tested by removing the branch — it fires on both functions.
+
+## Run order
+
+**Migration 0155 before the app deploys.** Without it the client will honour manual handicaps while the share and Cup pages still ignore them — the two would disagree.
+
 ## 191.1.260907 — GolfCourseAPI contract: stop failing on the provider's capitalisation
 
 The external-API contract workflow failed with CONTRACT DRIFT on three Fiddler's Elbow courses. The drift was **one character**: the provider had been returning `Fiddler'S Elbow Country Club` — their own title-casing bug — and fixed it to `Fiddler's`. Course IDs, course names and locations were all unchanged, so nothing the app uses had moved.

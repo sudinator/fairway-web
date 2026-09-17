@@ -266,8 +266,21 @@ export function dotStrokes(
 // Stableford side game): each player's own strokes vs the course at 100% (no match
 // allowance, no relative subtraction), regardless of the game's format. This is the
 // "course hcp" / blue-dot basis; the match's own allowance %% lives only in dotStrokes.
+/**
+ * Strokes on the COURSE-HANDICAP basis: the side games, posting, and Stableford points.
+ *
+ * The game's allowance applies here. This hardcoded 100%, so on any game with an allowance below
+ * full the dots disagreed with the points they were meant to explain: a Stableford at 85% off a
+ * course handicap of 12 scored 10 strokes (lib/player-scoring.playerHoles allowances correctly) but
+ * drew 12 dots. Reported on staging game 328330. The bug predates manual handicaps and affects
+ * every allowanced game; entering a round number simply made the mismatch legible.
+ */
 export function fullStrokes(game: DotGame, p: ShapePlayer, si: number | null): number {
-  return recvByRank(game, si, applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), 100));
+  return recvByRank(
+    game,
+    si,
+    applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100),
+  );
 }
 
 // ---------------------------------------------------------------------------------------------

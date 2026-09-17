@@ -1,3 +1,12 @@
+## 192.2.260907 — no new migration
+Comment correction only. 0155 still required.
+
+## 192.1.260907 — no new migration
+Stroke dots honour the game's allowance. 0155 still required.
+
+## 192.0.260907 — migration 0155
+Public RPCs prefer a manual course handicap. Replaces two functions; no schema change.
+
 ## 191.1.260907 — no migration
 GolfCourseAPI contract tolerance. 0154 remains current.
 
@@ -116,7 +125,7 @@ Regenerate after shipping (adds new files, keeps ticks and the notes block):
 Confirm database-applied state with:
 `select id, applied_at from public.schema_migrations order by id;`
 
-Total: 139 migrations. Unchecked = not yet confirmed applied in this checklist.
+Total: 140 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -259,6 +268,7 @@ Total: 139 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [ ] 0152_competition_share.sql
 - [ ] 0153_manual_course_handicap.sql
 - [ ] 0154_round_manual_course_handicap.sql
+- [ ] 0155_live_manual_course_handicap.sql
 
 <!-- NOTES:START -->
 

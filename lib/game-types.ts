@@ -46,6 +46,14 @@ export type Player = {
   slope: number | null;
   tee_name: string | null;
   course_handicap: number | null;
+  /**
+   * Where course_handicap came from (0153). WITHOUT this field chBasis cannot tell a manual figure
+   * from a derived one, so it falls through to the index/slope/rating chain and the entered number
+   * is silently ignored: a manual 12 scored as 18.87. The type dropping it was the reason manual
+   * handicaps worked on surfaces that read the raw column and failed on every surface that
+   * correctly used chBasis — the exact opposite of what you would expect.
+   */
+  course_handicap_source?: "derived" | "manual" | null;
   scores: (number | null)[]; // strokes per hole
   putts: (number | null)[]; // putts per hole
   fairways: ("hit" | "miss" | "left" | "right" | null)[]; // fairway result per hole (par 4/5)
