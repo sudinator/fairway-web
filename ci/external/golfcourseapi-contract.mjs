@@ -112,7 +112,17 @@ for (const fixture of golden) {
     : [loc?.city ?? found.city ?? found.club_city, loc?.state ?? found.state ?? found.club_state, loc?.country ?? found.country ?? found.club_country]
         .filter(Boolean).join(", ");
 
-  if (actualClub !== fixture.club || actualName !== fixture.name || actualLocation !== fixture.location) {
+  // The CLUB name is compared loosely: case-insensitively, with whitespace and apostrophes
+  // normalised. What this contract protects is that the course ID still resolves to the same
+  // course; the club's display string is cosmetic and the provider edits it. It failed the build
+  // once already on "Fiddler'S Elbow" becoming "Fiddler's Elbow" — their title-casing bug, fixed —
+  // which changed nothing the app uses. A guard that fails on a capital letter gets ignored, and an
+  // ignored guard catches nothing.
+  //
+  // Course name and location stay STRICT: those identify WHICH course a stored ID points at, and a
+  // change there is a real remap worth stopping the build for.
+  const loose = (v) => String(v ?? "").toLowerCase().replace(/[\u2018\u2019']/g, "'").replace(/\s+/g, " ").trim();
+  if (loose(actualClub) !== loose(fixture.club) || actualName !== fixture.name || actualLocation !== fixture.location) {
     failures.push(`${fixture.name}: search metadata drifted (club='${actualClub}', name='${actualName}', location='${actualLocation}')`);
   }
 

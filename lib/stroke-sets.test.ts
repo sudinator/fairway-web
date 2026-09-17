@@ -12,7 +12,7 @@
  * Data: Architects Jul 5 Foursome 1 (Karan + Sachin v Ashutosh + BK, 90%, aggregate).
  */
 import { strokeSets, chBasis, fullStrokes, dotStrokes } from "./game-shape";
-import { matchAllowance, matchStrokesFor, computeTrifecta } from "./golf";
+import { matchAllowance, matchStrokesFor, computeTrifecta, allocateStrokes, applyAllowance } from "./golf";
 
 let pass = 0, fail = 0; const fails: string[] = [];
 const eq = <T,>(n: string, a: T, b: T) => {
@@ -128,6 +128,32 @@ eq("stableford basis is named", strokeSets(stableford, BK as never, 1, ALL as ne
   const sig = ui.slice(ui.indexOf("export function ScoreEntryCard("), ui.indexOf("export function ScoreEntryCard(") + 900);
   eq("matchStrokeLabel has NO default", /matchStrokeLabel\s*=/.test(sig), false);
   eq("and is still an accepted prop", ui.includes("matchStrokeLabel?: string;"), true);
+}
+
+// ── The dots must equal the strokes the POINTS are scored off ───────────────────────────────────
+// Staging 328330: a Stableford at 85% off a manual course handicap of 12 scored 10 strokes but drew
+// 12 dots, because fullStrokes hardcoded a 100% allowance. The bug predates manual handicaps and
+// affected every allowanced game; a round manual number simply made it legible.
+{
+  const H9 = Array.from({ length: 9 }, (_, i) => ({ n: i + 1, par: 4, si: i * 2 + 1 }));
+  const cr = { id: "cr", user_id: "cr", display_name: "Christopher", handicap_index: 29.7, slope: 137,
+    rating: 73.5, course_handicap: 12, course_handicap_source: "manual", no_show: false } as never;
+  const at = (pct: number) => {
+    const g = { game_type: "stableford", course_par: 70, allowance_pct: pct, holes_meta: H9,
+      pairings: [], teams: [], foursomes: [] } as never;
+    return H9.reduce((sum, h) => sum + fullStrokes(g, cr, h.si), 0);
+  };
+  eq("85% allowance draws the allowanced strokes", at(85), 10);
+  eq("100% allowance draws the full figure", at(100), 12);
+  eq("FENCE the old behaviour drew 12 at 85%", at(85) !== 12, true);
+  // And the dots must equal what playerHoles allocates for the points.
+  const g85 = { game_type: "stableford", course_par: 70, allowance_pct: 85, holes_meta: H9,
+    pairings: [], teams: [], foursomes: [] } as never;
+  const alloc = allocateStrokes(H9.map((h) => ({ hole_number: h.n, stroke_index: h.si })),
+    applyAllowance(chBasis(cr, 70, 9), 85));
+  for (const h of H9) {
+    eq(`h${h.n} dot equals the points allocation`, fullStrokes(g85, cr, h.si), alloc[h.n] || 0);
+  }
 }
 
 console.log(`stroke sets (Architects Jul 5 fixture): ${pass} passed, ${fail} failed`);

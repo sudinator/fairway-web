@@ -1,3 +1,99 @@
+## 192.3.260907 — The share card names the PLAYING handicap
+
+The shared card allocates strokes off the playing handicap (course handicap x allowance) but printed the **course** handicap, so on an 85% game the number on the card did not match the dots beside it.
+
+Both handicap displays on the card now show the playing figure and name it, with the arithmetic visible rather than implied:
+
+- Player rows read **`plays 10 (CH 12 @ 85%)`**.
+- The roster block shows the playing figure with `plays · CH 12 @ 85%` beneath it.
+- When the allowance makes no difference — 3 x 85% rounds back to 3 — the parenthetical is omitted, so a 100% game reads simply `plays 3`.
+
+Verified against staging game 328330's actual handicaps: Christopher `plays 10 (CH 12 @ 85%)`, Bo Li `plays 5 (CH 6 @ 85%)`, Amit `plays 3`.
+
+This is the display half of the same confusion 192.1 fixed in the dots: a figure presented without saying which handicap it is.
+
+No new migration. 0155 still required.
+
+## 192.2.260907 — Comment correction: the sixes side game follows the game's allowance
+
+No behaviour change. 192.1 made `fullStrokes` honour the game's allowance, which was right for all three of its callers — the group card dots, the personal card dots, and the sixes side game (confirmed with Amit: the side game uses the game allowance).
+
+The call site in `segment-views.tsx` still carried the comment *"full playing handicap, not the match-relative basis"*, which now described the opposite of what the code does. That comment is why the 100% was hardcoded in the first place: **"full" was doing double duty** — it meant "not relative to an opponent", and got implemented as "not allowanced" as well. Those are different ideas, and conflating them put the dots out of step with the points they sit beside.
+
+The comment now says what the code does and records why the conflation happened.
+
+## 192.1.260907 — Stroke dots ignored the game's allowance
+
+Found on staging game 328330: a Stableford at **85%** off a manual course handicap of **12** showed **10** in the panel and scored **10** strokes for points — but drew **12 dots** on the card.
+
+- **The cause.** `fullStrokes` — the course-handicap basis, which drives side games, posting and Stableford points — called `applyAllowance(..., 100)`, hardcoding a full allowance instead of using the game's. `lib/player-scoring.playerHoles` allowances correctly, so the points and the dots disagreed.
+- **This predates manual handicaps and affects every allowanced game.** Entering a round number simply made the mismatch legible: 12 dots against 10 points is obvious, 17 against 16 is not.
+- **Verified:** at 85% the card now draws 10 dots, at 100% it draws 12, and every hole's dot equals what `playerHoles` allocates for the points.
+- `lib/stroke-sets.test.ts` pins the dot count per allowance and asserts dot-by-dot agreement with the points allocation, with a fence on the old 12-at-85% behaviour.
+
+## Correction to the 192.0 notes
+
+192.0 claimed the `Player` type omitting `course_handicap_source` caused manual handicaps to be ignored in the client. **That was wrong.** TypeScript types are erased at runtime and `select("*")` returns the column, so `chBasis` did see `"manual"` — which is why the dots were the right *count* all along. The "manual 12 scored as 18.87" measurement came from a hand-built object with the field deliberately omitted; it demonstrated how `chBasis` behaves without the field, not what the app does. Adding the field to the type is correct for type-safety and changes nothing at runtime.
+
+**Migration 0155 stands on its own** and is still required: both public RPCs derive `ch` from index/slope/rating with no reference to `course_handicap_source`, which is readable directly from the SQL.
+
+## 192.0.260907 — Manual course handicaps were ignored almost everywhere (migration 0155)
+
+You reported that the group scorecard honoured a manual handicap but the figure above it did not. The split was the clue, and the truth is the opposite of what it looked like: **the surfaces that read the raw column happened to be right, and every surface that correctly used `chBasis` was wrong.**
+
+- **The cause.** `chBasis` only prefers a manual figure when `course_handicap_source` reaches it. The `Player` type in `lib/game-types.ts` declared `course_handicap` but **not** `course_handicap_source`, so the field was dropped on the way from the database into every component. `chBasis` saw no source, fell through to the index/slope/rating chain, and discarded the entered number. Measured: **a manual 12 scored as 18.87.**
+- **The same bug in SQL.** `get_live_scorecard` (0151) and `get_live_competition` (0152) derive `ch` from index, slope and rating *whenever those exist* — which for anyone with a handicap index is always — so the public share page and the Cup page ignored manual handicaps too. **Migration 0155** makes both prefer a manual figure, matching `chBasis`.
+- **`select("*")` already returned the column**; only the TypeScript type was dropping it, which is why nothing failed loudly.
+
+## New guard
+
+`ci/check_live_manual_handicap.py`: any SQL that derives a playing handicap from index/slope/rating must prefer a manual `course_handicap`, and the manual branch must come BEFORE the derivation. Discovers the functions rather than listing them, and checks only the LATEST definition of each, since that is what a rebuild produces. Negative-tested by removing the branch — it fires on both functions.
+
+## Run order
+
+**Migration 0155 before the app deploys.** Without it the client will honour manual handicaps while the share and Cup pages still ignore them — the two would disagree.
+
+## 191.1.260907 — GolfCourseAPI contract: stop failing on the provider's capitalisation
+
+The external-API contract workflow failed with CONTRACT DRIFT on three Fiddler's Elbow courses. The drift was **one character**: the provider had been returning `Fiddler'S Elbow Country Club` — their own title-casing bug — and fixed it to `Fiddler's`. Course IDs, course names and locations were all unchanged, so nothing the app uses had moved.
+
+- **Fixtures corrected** to the provider's current value.
+- **The club name is now compared loosely** — case-insensitive, with whitespace and apostrophes normalised. What this contract exists to protect is that a stored course ID still resolves to the same course; the club's display string is cosmetic and the provider edits it. A guard that fails the build and opens an admin alert over a capital letter gets ignored, and an ignored guard catches nothing.
+- **Course name and location stay STRICT.** Those identify WHICH course an ID points at, and a change there is a real remap worth stopping the build for.
+- Verified against the drift shapes that matter: the exact failure, a curly apostrophe, stray whitespace and all-caps all pass; a dropped apostrophe or a different club still fail.
+
+No migration. 0154 remains current.
+
+## 191.0.260907 — The share card halved manual handicaps; half-stroke engine (not yet reachable)
+
+### Share card: a manual handicap showed HALF the strokes
+
+`components/share-card.tsx` reimplemented the nine-hole halving — in TWO places — instead of going through `chBasis`. A manual course handicap is entered as the figure for that hole count and must not be halved, so on a nine-hole game the shared image showed **half** the strokes. Measured before and after:
+
+| | Old share card | Now |
+|---|---|---|
+| Manual 12, nine holes | **6** | **12** |
+| Manual 12, eighteen | 12 | 12 |
+| Derived, nine holes | 10 | **9** |
+| Derived, eighteen | 19 | 19 |
+
+The derived nine also moves, from 10 to 9, because `chBasis` halves the EXACT figure (19.11 / 2 = 9.55 -> 9) rather than the already-rounded one (19 / 2 = 9.5 -> 10). Rounding once at the end is the Rule 6.2a order and matches every other surface.
+
+The card's displayed handicap now shows what the player actually plays off, rather than the stored 18-hole column — it was printing 19 for someone playing off 9.
+
+`components/share-card.tsx` is off the handicap debt baseline entirely: 6 files -> 5.
+
+### Half-stroke handicap difference — engine and simulation only
+
+A per-game option to keep a half stroke rather than rounding it away. **Not reachable from the app yet**: no caller passes the setting, there is no column and no UI. Shipped now because the engine is proven and the wiring is the next step.
+
+- **ADDITIVE, by design.** The Rules' whole-stroke answer never moves; a half is added only where the exact difference justifies one. Measured over 200,000 pairs: 87.6% identical to the Rules figure, 12.4% Rules-plus-0.5, **0% anything else**.
+- **The first design was rejected by its own simulation.** Rounding the difference instead of each side moved **4.6% of matches by a FULL stroke with no half involved**, because course handicaps are exact to several decimals (index 14 off 134/70.4 is 15.0018, not 15). That is a different rounding philosophy, not extra precision, and it would have changed ordinary singles matches rather than the alternate-shot case this exists for.
+- **Existing behaviour is untouched**, verified rather than asserted: across 200,000 pairs, calling `matchAllowance` without the new argument differs from the pre-change implementation in **0** cases, including per-hole strokes.
+- `lib/half-stroke-simulation.test.ts` — 168,914 assertions over 5,000 matches; confirmed to reject the discarded design with 1,553 failures.
+
+No migration. 0154 remains current.
+
 ## 190.5.260907 — The solo round's triangle: the actual cause was a default parameter
 
 Third attempt, and this one is verified by rendering the component rather than by reading it.

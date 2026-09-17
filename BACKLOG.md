@@ -1,3 +1,47 @@
+## v192.3 check
+
+- [ ] Share game 328330: rows read "plays 10 (CH 12 @ 85%)" and the number matches the dots.
+- [ ] A 100% game reads just "plays N" with no parenthetical.
+
+## v192.2 check
+
+- [ ] Nothing new to click — comment only. Deploy with 192.1 and run its check.
+
+## v192.1 check
+
+- [ ] Game 328330 (or any Stableford at 85%): the dots on the card match the panel and the points.
+- [ ] Christopher: 10 dots, not 12.
+- [ ] A game at 100% allowance is unchanged.
+
+## v192.0 checks — manual handicaps, end to end
+
+- [ ] Apply 0155.
+- [ ] Set a manual course handicap. The figure shown ABOVE the scorecards now matches the one used in it.
+- [ ] The Strokes panel, the stroke dots and the group card all agree on the same number.
+- [ ] Share that game: the public page uses the manual figure too (it was deriving).
+- [ ] A Ryder Cup session with a manual handicap: same on the Cup page.
+- [ ] A player with NO manual handicap is unchanged throughout.
+
+## v191.1 check
+
+- [ ] Re-run the external-api-contracts workflow: it should pass.
+- [ ] Close the admin alert issue it opened, if one is still open.
+
+## v191.0 check
+
+- [ ] Share a NINE-hole game where someone has a manual handicap: the strokes on the image match the app, not half of them.
+- [ ] The handicap printed on the share card is what the player plays off for that many holes.
+- [ ] An 18-hole share card is unchanged.
+
+## NEXT — finish the half-stroke option
+
+- [ ] Migration: games.handicap_rounding ('whole' default / 'half') + setup-policy confirm for changing it mid-round.
+- [ ] Thread the setting through every scorer, AND a guard that fails if a scoring path calls matchAllowance
+      without it — a caller that forgets silently falls back to 'whole', which is the exact shape of the
+      Trifecta bug that started all this.
+- [ ] The half glyph, rendered for approval before it ships.
+- [ ] The setting in the UI beside allowance.
+
 ## v190.5 check
 
 - [ ] New round: stroke marks are ORANGE CIRCLES, legend reads "course hcp". No triangle, no "team match".

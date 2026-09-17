@@ -221,7 +221,11 @@ export function GroupSegmentSummary({ game, players }: { game: Game; players: Pl
         const g = p.scores?.[i];
         if (g == null || g <= 0) continue;
         holes++;
-        const recv = fullStrokes(game, p, meta[i].si); // individual side game: full playing handicap, not the match-relative basis
+        // The player's OWN handicap rather than their strokes relative to an opponent, and it
+        // follows the GAME'S allowance like everything else. "Full" here once meant both "not
+        // relative" and "not allowanced"; conflating those is how fullStrokes came to hardcode
+        // 100%, which made the stroke dots disagree with the points beside them (192.1).
+        const recv = fullStrokes(game, p, meta[i].si);
         nSum += g - recv;
         pSum += stablefordPts(g, meta[i].par, recv) || 0;
         parSum += meta[i].par;
