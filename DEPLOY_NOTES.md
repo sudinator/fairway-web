@@ -1,3 +1,25 @@
+## 192.4.260907 — The contract failure message was unreadable
+
+The GolfCourseAPI contract kept failing on the three Fiddler's Elbow courses with values that looked **identical** to the fixtures:
+
+```
+- Forest: search metadata drifted (club='Fiddler's Elbow Country Club', name='Forest', location='Bedminster, NJ, United States')
+```
+
+191.1 loosened the CLUB comparison, so the club is no longer what fails. `course name` and `location` remain strict by design — they identify WHICH course a stored ID points at. One of those must differ by a character the log cannot render: a curly apostrophe, a non-breaking space, a trailing space.
+
+The message now **names the field that drifted** and prints both values escaped with their code points:
+
+```
+- Forest: search metadata drifted
+    location: got "Bedminster, NJ, United States" [42 65 ... a0 4e 4a ...]
+             want "Bedminster, NJ, United States" [42 65 ... 20 4e 4a ...]
+```
+
+A failure you cannot read is a failure you cannot act on. Three runs were spent guessing at this; the next one will say.
+
+No behaviour change to the app. No new migration; 0155 still required.
+
 ## 192.3.260907 — The share card names the PLAYING handicap
 
 The shared card allocates strokes off the playing handicap (course handicap x allowance) but printed the **course** handicap, so on an 85% game the number on the card did not match the dots beside it.

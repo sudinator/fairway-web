@@ -1,3 +1,8 @@
+## v192.4 — read the contract failure
+
+- [ ] Merge, then re-run External API Contracts.
+- [ ] The failure now names the field and shows code points. Send me that output and I will fix the fixture.
+
 ## v192.3 check
 
 - [ ] Share game 328330: rows read "plays 10 (CH 12 @ 85%)" and the number matches the dots.

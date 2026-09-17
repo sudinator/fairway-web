@@ -122,8 +122,18 @@ for (const fixture of golden) {
   // Course name and location stay STRICT: those identify WHICH course a stored ID points at, and a
   // change there is a real remap worth stopping the build for.
   const loose = (v) => String(v ?? "").toLowerCase().replace(/[\u2018\u2019']/g, "'").replace(/\s+/g, " ").trim();
-  if (loose(actualClub) !== loose(fixture.club) || actualName !== fixture.name || actualLocation !== fixture.location) {
-    failures.push(`${fixture.name}: search metadata drifted (club='${actualClub}', name='${actualName}', location='${actualLocation}')`);
+  // Name WHICH field drifted, and show it escaped with its code points. The previous message
+  // printed all three values, which rendered identically to the fixture when the difference was an
+  // invisible character — a curly apostrophe, a non-breaking space, a trailing space. A failure you
+  // cannot read is a failure you cannot act on.
+  const show = (v) =>
+    `${JSON.stringify(v)} [${[...String(v)].map((c) => c.codePointAt(0).toString(16)).join(" ")}]`;
+  const diffs = [];
+  if (loose(actualClub) !== loose(fixture.club)) diffs.push(`club: got ${show(actualClub)} want ${show(fixture.club)}`);
+  if (actualName !== fixture.name) diffs.push(`course name: got ${show(actualName)} want ${show(fixture.name)}`);
+  if (actualLocation !== fixture.location) diffs.push(`location: got ${show(actualLocation)} want ${show(fixture.location)}`);
+  if (diffs.length) {
+    failures.push(`${fixture.name}: search metadata drifted\n    ${diffs.join("\n    ")}`);
   }
 
   try {
