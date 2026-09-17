@@ -1,3 +1,8 @@
+## v192.3 check
+
+- [ ] Share game 328330: rows read "plays 10 (CH 12 @ 85%)" and the number matches the dots.
+- [ ] A 100% game reads just "plays N" with no parenthetical.
+
 ## v192.2 check
 
 - [ ] Nothing new to click — comment only. Deploy with 192.1 and run its check.

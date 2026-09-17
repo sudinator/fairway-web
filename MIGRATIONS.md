@@ -1,3 +1,6 @@
+## 192.3.260907 — no new migration
+Share card labels the playing handicap. 0155 still required.
+
 ## 192.2.260907 — no new migration
 Comment correction only. 0155 still required.
 

@@ -239,7 +239,7 @@ export function ShareGameModal({ game, players, courseTees, onClose }: { game: a
       const r = { holes } as unknown as Round;
       const puttsT = holes.reduce((s, h) => s + (h.putts || 0), 0);
       const played = holes.some((h) => h.strokes != null);
-      return { id: p.id, name: p.display_name || "Player", hcp: ch, holes, gross, net, pts, gir: girStats([r]), fw: firStats([r]), puttsT, played };
+      return { id: p.id, name: p.display_name || "Player", hcp: Math.round(ch), playing, holes, gross, net, pts, gir: girStats([r]), fw: firStats([r]), puttsT, played };
     });
   }, [players, courseTees, game]);
 
@@ -323,7 +323,10 @@ export function ShareGameModal({ game, players, courseTees, onClose }: { game: a
             {board.map((r, i) => (
               <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "7px 11px", borderBottom: i < board.length - 1 ? "1px solid #EEE8D6" : "none" }}>
                 <span style={{ width: 14, color: C.faint, fontWeight: 800, fontSize: 13 }}>{i + 1}</span>
-                <span style={{ flex: 1, fontWeight: 800, fontSize: 14, color: C.ink }}>{r.name} <span style={{ color: C.faint, fontWeight: 500, fontSize: 11 }}>· hcp {r.hcp}</span></span>
+                <span style={{ flex: 1, fontWeight: 800, fontSize: 14, color: C.ink }}>{r.name} {/* The card allocates strokes off the PLAYING handicap (course handicap x allowance), so
+                      it says so. Showing only the course handicap meant the number printed on the
+                      card did not match the dots beside it on an 85% game. */}
+                  <span style={{ color: C.faint, fontWeight: 500, fontSize: 11 }}>· plays {r.playing}{r.playing !== r.hcp ? ` (CH ${r.hcp} @ ${game.allowance_pct ?? 100}%)` : ""}</span></span>
                 <span style={{ fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 16, color: i === 0 ? "#1f8f54" : C.faint }}>{stab ? `${r.pts} pts` : `net ${r.net}`}</span>
               </div>
             ))}

@@ -1,3 +1,19 @@
+## 192.3.260907 — The share card names the PLAYING handicap
+
+The shared card allocates strokes off the playing handicap (course handicap x allowance) but printed the **course** handicap, so on an 85% game the number on the card did not match the dots beside it.
+
+Both handicap displays on the card now show the playing figure and name it, with the arithmetic visible rather than implied:
+
+- Player rows read **`plays 10 (CH 12 @ 85%)`**.
+- The roster block shows the playing figure with `plays · CH 12 @ 85%` beneath it.
+- When the allowance makes no difference — 3 x 85% rounds back to 3 — the parenthetical is omitted, so a 100% game reads simply `plays 3`.
+
+Verified against staging game 328330's actual handicaps: Christopher `plays 10 (CH 12 @ 85%)`, Bo Li `plays 5 (CH 6 @ 85%)`, Amit `plays 3`.
+
+This is the display half of the same confusion 192.1 fixed in the dots: a figure presented without saying which handicap it is.
+
+No new migration. 0155 still required.
+
 ## 192.2.260907 — Comment correction: the sixes side game follows the game's allowance
 
 No behaviour change. 192.1 made `fullStrokes` honour the game's allowance, which was right for all three of its callers — the group card dots, the personal card dots, and the sixes side game (confirmed with Amit: the side game uses the game allowance).
