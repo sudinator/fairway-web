@@ -1,3 +1,18 @@
+## v191.0 check
+
+- [ ] Share a NINE-hole game where someone has a manual handicap: the strokes on the image match the app, not half of them.
+- [ ] The handicap printed on the share card is what the player plays off for that many holes.
+- [ ] An 18-hole share card is unchanged.
+
+## NEXT — finish the half-stroke option
+
+- [ ] Migration: games.handicap_rounding ('whole' default / 'half') + setup-policy confirm for changing it mid-round.
+- [ ] Thread the setting through every scorer, AND a guard that fails if a scoring path calls matchAllowance
+      without it — a caller that forgets silently falls back to 'whole', which is the exact shape of the
+      Trifecta bug that started all this.
+- [ ] The half glyph, rendered for approval before it ships.
+- [ ] The setting in the UI beside allowance.
+
 ## v190.5 check
 
 - [ ] New round: stroke marks are ORANGE CIRCLES, legend reads "course hcp". No triangle, no "team match".

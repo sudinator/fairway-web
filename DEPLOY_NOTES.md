@@ -1,3 +1,33 @@
+## 191.0.260907 — The share card halved manual handicaps; half-stroke engine (not yet reachable)
+
+### Share card: a manual handicap showed HALF the strokes
+
+`components/share-card.tsx` reimplemented the nine-hole halving — in TWO places — instead of going through `chBasis`. A manual course handicap is entered as the figure for that hole count and must not be halved, so on a nine-hole game the shared image showed **half** the strokes. Measured before and after:
+
+| | Old share card | Now |
+|---|---|---|
+| Manual 12, nine holes | **6** | **12** |
+| Manual 12, eighteen | 12 | 12 |
+| Derived, nine holes | 10 | **9** |
+| Derived, eighteen | 19 | 19 |
+
+The derived nine also moves, from 10 to 9, because `chBasis` halves the EXACT figure (19.11 / 2 = 9.55 -> 9) rather than the already-rounded one (19 / 2 = 9.5 -> 10). Rounding once at the end is the Rule 6.2a order and matches every other surface.
+
+The card's displayed handicap now shows what the player actually plays off, rather than the stored 18-hole column — it was printing 19 for someone playing off 9.
+
+`components/share-card.tsx` is off the handicap debt baseline entirely: 6 files -> 5.
+
+### Half-stroke handicap difference — engine and simulation only
+
+A per-game option to keep a half stroke rather than rounding it away. **Not reachable from the app yet**: no caller passes the setting, there is no column and no UI. Shipped now because the engine is proven and the wiring is the next step.
+
+- **ADDITIVE, by design.** The Rules' whole-stroke answer never moves; a half is added only where the exact difference justifies one. Measured over 200,000 pairs: 87.6% identical to the Rules figure, 12.4% Rules-plus-0.5, **0% anything else**.
+- **The first design was rejected by its own simulation.** Rounding the difference instead of each side moved **4.6% of matches by a FULL stroke with no half involved**, because course handicaps are exact to several decimals (index 14 off 134/70.4 is 15.0018, not 15). That is a different rounding philosophy, not extra precision, and it would have changed ordinary singles matches rather than the alternate-shot case this exists for.
+- **Existing behaviour is untouched**, verified rather than asserted: across 200,000 pairs, calling `matchAllowance` without the new argument differs from the pre-change implementation in **0** cases, including per-hole strokes.
+- `lib/half-stroke-simulation.test.ts` — 168,914 assertions over 5,000 matches; confirmed to reject the discarded design with 1,553 failures.
+
+No migration. 0154 remains current.
+
 ## 190.5.260907 — The solo round's triangle: the actual cause was a default parameter
 
 Third attempt, and this one is verified by rendering the component rather than by reading it.

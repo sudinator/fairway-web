@@ -1,3 +1,6 @@
+## 191.0.260907 — no migration
+Share-card handicap fix and the half-stroke engine. 0154 remains current.
+
 ## 190.5.260907 — no migration
 Removed the misleading matchStrokeLabel default. 0154 remains current.
 

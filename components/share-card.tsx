@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { buildSetupSummary, dominantTee } from "@/lib/setup-summary";
 import { toPng } from "html-to-image";
 import { C, Hole, Round, stablefordPts, allocateStrokes, applyAllowance, fmtDate, girStats, firStats, fracPct } from "@/lib/golf";
+import { chBasis } from "@/lib/game-shape";
 import { ScoreMark, btn, backdropDismiss } from "@/components/ui";
 import { createClient } from "@/lib/supabase";
 import { loadCoursesForGroup, type CourseTee } from "@/lib/courses";
@@ -106,11 +107,10 @@ export function ShareScorecardModal({ game, player, onClose }: { game: any; play
 
   const { round, gross, net, pts, dateStr, statsTxt, hasDetail } = useMemo(() => {
     const meta = (game.holes_meta || []) as { n: number; par: number; si: number | null }[];
-    // Halve for a nine before the allowance — same gap as the live view. The share card is the
-    // image that leaves the app, so a wrong stroke count travels furthest.
-    const raw = player.course_handicap ?? 0;
-    const ch = meta.length === 9 ? raw / 2 : raw;
-    const playing = applyAllowance(ch, game.allowance_pct ?? 100);
+    // Through chBasis, like every other scorer. This file reimplemented the nine-hole halving in
+    // TWO places, so it halved a MANUAL course handicap — a figure entered as the nine-hole number
+    // already — and showed half the strokes on the image that leaves the app (0153/0154).
+    const playing = applyAllowance(chBasis(player, game.course_par, meta.length), game.allowance_pct ?? 100);
     const alloc = allocateStrokes(meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })), playing);
     const myTee = courseTees.find((t) => t.name === player.tee_name);
     const holes: Hole[] = meta.map((m, i) => ({
@@ -221,9 +221,8 @@ export function ShareGameModal({ game, players, courseTees, onClose }: { game: a
 
   const rows = useMemo(() => {
     return (players || []).filter((p: any) => !p.no_show).map((p: any) => {
-      // Halve for a nine, as above. Two stroke paths in this file; fixing one and not the other
-      // is exactly how the allocators diverged.
-      const ch = meta.length === 9 ? (p.course_handicap ?? 0) / 2 : (p.course_handicap ?? 0);
+      // The second stroke path in this file. Both now go through chBasis, so there is one rule.
+      const ch = chBasis(p, game.course_par, meta.length);
       const playing = applyAllowance(ch, game.allowance_pct ?? 100);
       const alloc = allocateStrokes(meta.map((m) => ({ hole_number: m.n, stroke_index: m.si })), playing);
       const tee = (courseTees || []).find((t) => t.name === p.tee_name);
@@ -499,7 +498,12 @@ export function ShareLineupModal({
                 </div>
                 <div style={{ textAlign: "right", flex: "none" }}>
                   <div style={{ color: C.green, fontSize: 17, fontWeight: 800, fontFamily: "Georgia, serif" }}>
-                    {p.course_handicap ?? "\u2014"}
+                    {/* The figure the player actually plays off, not the stored 18-hole one: on
+                        a nine a derived handicap halves and a manual one does not, so printing
+                        the raw column showed 19 for someone playing off 9. */}
+                    {p.course_handicap != null
+                      ? Math.round(chBasis(p, game.course_par, (game.holes_meta || []).length))
+                      : "\u2014"}
                   </div>
                   <div style={{ color: "#676253", fontSize: 11 }}>idx {p.handicap_index ?? "\u2014"}</div>
                 </div>
