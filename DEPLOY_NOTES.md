@@ -1,3 +1,14 @@
+## 191.1.260907 — GolfCourseAPI contract: stop failing on the provider's capitalisation
+
+The external-API contract workflow failed with CONTRACT DRIFT on three Fiddler's Elbow courses. The drift was **one character**: the provider had been returning `Fiddler'S Elbow Country Club` — their own title-casing bug — and fixed it to `Fiddler's`. Course IDs, course names and locations were all unchanged, so nothing the app uses had moved.
+
+- **Fixtures corrected** to the provider's current value.
+- **The club name is now compared loosely** — case-insensitive, with whitespace and apostrophes normalised. What this contract exists to protect is that a stored course ID still resolves to the same course; the club's display string is cosmetic and the provider edits it. A guard that fails the build and opens an admin alert over a capital letter gets ignored, and an ignored guard catches nothing.
+- **Course name and location stay STRICT.** Those identify WHICH course an ID points at, and a change there is a real remap worth stopping the build for.
+- Verified against the drift shapes that matter: the exact failure, a curly apostrophe, stray whitespace and all-caps all pass; a dropped apostrophe or a different club still fail.
+
+No migration. 0154 remains current.
+
 ## 191.0.260907 — The share card halved manual handicaps; half-stroke engine (not yet reachable)
 
 ### Share card: a manual handicap showed HALF the strokes

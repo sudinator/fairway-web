@@ -1,3 +1,8 @@
+## v191.1 check
+
+- [ ] Re-run the external-api-contracts workflow: it should pass.
+- [ ] Close the admin alert issue it opened, if one is still open.
+
 ## v191.0 check
 
 - [ ] Share a NINE-hole game where someone has a manual handicap: the strokes on the image match the app, not half of them.
