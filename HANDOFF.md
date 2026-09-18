@@ -130,9 +130,11 @@ The free tier allows **35 requests per DAY**, shared by the app and CI. The cont
 the last seven days; a full pass takes about a week and then idles. A successful `/api/courses`
 lookup records itself as a verification, so app traffic reduces the monitor's work.
 
-`BNN_SUPABASE_URL` and `BNN_SUPABASE_SERVICE_KEY` are **repository** secrets pointing at
-**production** on every branch, because the ledger is shared with the app and the app's
-verifications land in production.
+The monitor reads the ledger with the EXISTING `BNN_PRODUCTION_SUPABASE_URL` and
+`BNN_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY` secrets rather than a duplicate pair. Those are
+**environment** secrets, so the job declares `environment: production` — without that they resolve
+to empty strings silently, which is exactly how a Dependabot pull request once looked like a code
+failure. The ledger is production's because the app's verifications land there.
 
 When debugging, use `/api/courses?raw=1` (admin only) — ONE request, the provider's response
 untouched. Do not re-run the contract workflow repeatedly: each run spends ten of the day's budget.

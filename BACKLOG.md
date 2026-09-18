@@ -1,3 +1,12 @@
+## v192.11 — deploy order
+
+1. [ ] 0156 to STAGING; deploy; search + SELECT a course; confirm a course_api_checks row. (DONE — 5wng1nrq recorded.)
+2. [ ] PR staging -> main.
+3. [ ] 0156 to PRODUCTION.
+4. [ ] NO new secrets needed. Confirm the `production` GitHub environment allows the branch the
+       workflow runs from (main), or the credentials arrive empty.
+5. [ ] Run External API Contracts ONCE: expect "Checked 10 of 18".
+
 ## v192.10 — deploy order (staging first, including migrations)
 
 1. [ ] Apply 0156 to the STAGING Supabase.
