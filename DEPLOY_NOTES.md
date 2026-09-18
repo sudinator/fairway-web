@@ -1,3 +1,15 @@
+## 192.11.260917 — Reuse the production secrets that already exist
+
+192.10 asked for two NEW repository secrets. That was wrong on both counts: the repo already has
+production Supabase credentials, and they are **environment** secrets, not repository ones.
+
+- The contract job now declares `environment: production` and maps the existing
+  `BNN_PRODUCTION_SUPABASE_URL` / `BNN_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY`. **Nothing new to create**, and one fewer service-role key to rotate.
+- Without the `environment:` line those secrets resolve to **empty strings with no warning** — the exact behaviour that made a Dependabot pull request look like a code failure. The script then refuses to run and says so, rather than checking all 18 fixtures and spending the day's quota.
+- The admin alert text was stale in two ways: it claimed the workflow declares no environment (it now does), and that the monitor makes 31 requests (it makes ten). It now names the daily quota explicitly, says not to re-run the workflow while it is exhausted, and points at `/api/courses?raw=1` as the one-request way to check.
+
+No new migration; 0156 still required.
+
 ## 192.10.260917 — Record where the course ledger secrets point
 
 No code change. The contract workflow's `BNN_SUPABASE_URL` / `BNN_SUPABASE_SERVICE_KEY` point at **production on every branch**, deliberately: the ledger is shared with the app, and the app's verifications land in production, so a staging-scoped copy would drift from the thing it describes.

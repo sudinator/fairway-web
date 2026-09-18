@@ -15,6 +15,11 @@ permissions:
 jobs:
   golfcourseapi:
     runs-on: ubuntu-latest
+    # The ledger lives in PRODUCTION (it is shared with the app, whose verifications land there), and
+    # the production credentials are ENVIRONMENT secrets on this repo — so this job must declare the
+    # environment or they resolve to empty strings with no warning. That silent-blank behaviour is
+    # what made a Dependabot pull request look like a code failure for twenty minutes.
+    environment: production
     steps:
       - uses: actions/checkout@v4
 
@@ -29,14 +34,13 @@ jobs:
           # The freshness ledger (0156). Without these the job refuses to run rather than checking
           # every fixture and blowing the daily quota.
           #
-          # These point at PRODUCTION, on every branch, deliberately. The ledger is shared with the
-          # APP, and the app's verifications land in production; a staging-scoped copy would drift
-          # from the thing it is meant to describe. They are REPOSITORY secrets, not environment
-          # secrets: this workflow declares no `environment:`, and environment-scoped secrets
-          # resolve to empty strings without warning, which is how a Dependabot PR once failed for
-          # twenty minutes of misdiagnosis.
-          BNN_SUPABASE_URL: ${{ secrets.BNN_SUPABASE_URL }}
-          BNN_SUPABASE_SERVICE_KEY: ${{ secrets.BNN_SUPABASE_SERVICE_KEY }}
+          # Reuses the EXISTING production secrets rather than adding a duplicate pair to rotate.
+          # They are environment-scoped, hence `environment: production` on this job above. If the
+          # production environment restricts deployment branches, a run from another branch gets
+          # blanks — the script then refuses to run and says so, rather than checking all 18 and
+          # spending the day's quota.
+          BNN_SUPABASE_URL: ${{ secrets.BNN_PRODUCTION_SUPABASE_URL }}
+          BNN_SUPABASE_SERVICE_KEY: ${{ secrets.BNN_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           set +e
           node ci/external/golfcourseapi-contract.mjs
@@ -71,11 +75,15 @@ jobs:
                 ? [
                     'Usual causes, in order:',
                     '',
-                    '1. `GOLF_API_KEY` missing or rejected. It is a REPOSITORY secret (Settings -> Secrets and',
-                    '   variables -> Actions). This workflow declares no `environment:`, so environment-scoped',
-                    '   secrets are invisible to it. A separate copy lives in Vercel for the app itself.',
-                    '2. Rate limit (HTTP 429). The monitor makes 31 requests; the free tier limits throughput.',
-                    '3. Provider outage (HTTP 5xx).',
+                    '1. `GOLF_API_KEY` missing or rejected. Repository secret (Settings -> Secrets and',
+                    '   variables -> Actions). A separate copy lives in Vercel for the app itself.',
+                    '2. DAILY QUOTA (HTTP 429, Retry-After in hours). The free tier allows 35 requests A DAY,',
+                    '   shared with the app. Nothing to fix: wait for the reset. Do NOT re-run the workflow,',
+                    '   which spends ten more. Use /api/courses?raw=1 (admin, ONE request) to check on it.',
+                    '3. Ledger unreachable. This job runs in the `production` environment to read the',
+                    '   BNN_PRODUCTION_* secrets; if that environment restricts branches, they arrive empty',
+                    '   and the job refuses to run rather than checking all 18 and spending the budget.',
+                    '4. Provider outage (HTTP 5xx).',
                     '',
                     'Read the step log for the exact reason. Do NOT change application code for this.',
                   ].join('\n')

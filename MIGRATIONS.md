@@ -1,3 +1,6 @@
+## 192.11.260917 — no new migration
+Contract job reuses the existing production secrets. 0156 still required.
+
 ## 192.10.260917 — no new migration
 Documentation of the ledger secret scope. 0156 still required.
 
