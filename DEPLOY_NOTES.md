@@ -1,3 +1,29 @@
+## 192.9.260917 — Ten course checks a day (migration 0156)
+
+The provider's free tier allows **35 requests per day**. The contract monitor made **31 in one run** — 89% of the budget — so one scheduled run left four for the entire app, and any manual re-run exceeded the limit outright. On 17 September four manual runs plus a 19-request backfill exhausted the quota; the 429 was reported as CONTRACT DRIFT and six releases went into hunting a provider change that had never happened.
+
+- **Ten a day, oldest first**, skipping anything verified in the last seven days. A full pass over the 18 fixtures takes about a week and then idles. The schedule moves from weekly to daily.
+- **The ledger lives in production Supabase** (`course_api_checks`, 0156) so the APP shares it: a successful `/api/courses` lookup IS a verification and is recorded, which means ordinary traffic *reduces* what the monitor must do rather than competing with it.
+- **The monitor refuses to run without the ledger** rather than silently checking all 18 and blowing the day's quota.
+- **Honest reporting**: "Checked 10 of 18 (oldest first); 8 verified within 7 days." A clean run no longer implies the whole API was verified.
+
+## Two real bugs, found by executing the SQL rather than reading it
+
+Postgres 16 was installed in the sandbox and the migration run against it. Both would have shipped otherwise:
+
+1. **`provider_id` was both a column and an OUT parameter**, making `on conflict (provider_id)` ambiguous. The function *created* perfectly well and failed at **runtime**. Renamed to `out_` prefixes.
+2. **Two concurrent claims took the SAME ten rows.** `on conflict do update` orders the writes but not the SELECT: under READ COMMITTED both runs snapshot before either commits. Measured overlap **10 of 10**. A transaction-scoped advisory lock fixed it; measured overlap is now **0**, with the second run correctly taking the remaining 8. Verified the lock is doing the work by removing it and watching the overlap return.
+
+`ci/assert-course-api-checks.sql` pins all of it — budget, remainder, idling, ageing, oldest-first, the 35 cap, retention of last-known values when a lookup fails, and the permission boundary — and runs in the fresh-database rebuild.
+
+## A guard that misread a string literal
+
+`check_legacy_migration_prereqs` parsed the advisory-lock key `'course_api_checks.claim'` as a column reference and reported a missing column. String contents are data, not identifiers; the masking helper already existed and simply was not applied to that check. Negative-tested: a genuinely missing column still fails.
+
+## Deploy
+
+Migration 0156, then add `BNN_SUPABASE_URL` and `BNN_SUPABASE_SERVICE_KEY` as GitHub repository secrets. Until they exist the workflow fails with an explicit message rather than running unrationed.
+
 ## 192.8.260907 — It was a daily quota. Two diagnostics that hid it.
 
 The raw passthrough added in 192.7 gave ground truth in one call:

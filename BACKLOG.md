@@ -1,3 +1,78 @@
+## v192.9 checks
+
+- [ ] Apply 0156 to PRODUCTION (the app shares this ledger, so it must be the production database).
+- [ ] Add GitHub repository secrets BNN_SUPABASE_URL and BNN_SUPABASE_SERVICE_KEY.
+- [ ] Run External API Contracts ONCE. It should report "Checked 10 of 18". That is 10 requests.
+- [ ] Run it a second time the same day: it should take the remaining 8, then report nothing due.
+- [ ] Search a course in the app, then check course_api_checks has a row for it with last_status ok.
+
+## NEXT SESSION — ration the GolfCourseAPI to 10 checks a day (agreed Sep 17)
+
+THE CONSTRAINT, discovered the hard way: the free tier allows **35 requests per DAY**. The contract
+monitor makes **31 in a single run** — 89% of the daily budget. One scheduled run leaves four
+requests for the entire app; any manual re-run exceeds the limit outright. On Sep 17 four manual
+runs plus a 19-request yardage backfill exhausted the quota, the provider returned
+`429 {"error":"daily usage limit exceeded"}` with `retry-after: 67453`, and the monitor reported it
+as CONTRACT DRIFT. Six releases were then spent hunting a provider change that had never happened.
+
+DESIGN, decided with Amit:
+- **10 requests per day**, automatically, leaving 25 for the app and for ad-hoc debugging.
+- **Rolling**: each run takes the fixtures checked longest ago until the budget is spent. A full pass
+  over 18 fixtures completes in about a week, then idles.
+- **Skip anything verified within 7 days.**
+- **State in PRODUCTION Supabase** (Amit's choice over a committed file or the Actions cache), so the
+  app and CI share one freshness record.
+- **The app writes to it too**: a live `/api/courses` lookup IS a verification, so app traffic
+  REDUCES monitor load instead of competing with it. This is the part that actually protects the
+  budget, since app searches are the larger consumer over time.
+
+WORK:
+- [ ] Migration 0156: table `course_api_checks` — `provider_id` (pk), `last_checked_at`,
+      `last_status` (ok/drift/error), last-seen `club_name` / `course_name` / `location` so drift is
+      reported as a diff, and `note`. Plus a claim RPC: "give me the 10 stalest not checked in 7 days
+      and mark them claimed", server-side so two concurrent runs cannot take the same ten.
+- [ ] A service-role key as a new GitHub secret for the contract workflow, which today has no
+      Supabase credentials at all. Amit has approved this explicitly — it is a powerful key in CI.
+- [ ] `/api/courses` records each successful lookup as a verification.
+- [ ] Honest reporting. Today's heading "CONTRACT DRIFT: the GolfCourseAPI response changed" is a
+      claim about the whole API. Once only 10 of 18 are checked it must say so both ways:
+      "Checked 10 of 18 (oldest first). 10 OK. 8 not due." and on failure
+      "Checked 10 of 18. DRIFT on 1: Forest — location: got ... want ...".
+      A monitor that overstates what it verified is one you will misread later.
+- [ ] Document the 35/day limit in HANDOFF.md next to the key. Nobody knew, which is why nobody was
+      rationing.
+
+NOT decided: whether a "re-check this course now" control belongs in the admin UI. The 25 spare
+requests currently cover app searches and debugging.
+
+DEBUGGING RULE at this tier: one request at a time. Reach for `/api/courses?raw=1` (admin-only,
+returns the provider's response untouched) before anything that fans out.
+
+## NEXT DROP — version hygiene (two small fixes, agreed Sep 17)
+
+- [ ] **The date segment in package.json is stale.** It reads 260907 while the app correctly reports
+      260917. scripts/write-version.mjs auto-stamps today's Eastern date into lib/app-version.ts and
+      public/app-version.json at build time and deliberately does NOT write back to package.json — so
+      that segment is inert, and it drifted because every version bump hand-copied the previous date
+      forward. Ten days of releases all read 260907.
+      Fix: stamp it correctly, AND make ci/check_version_ledger.py require package.json's date segment
+      to equal today's Eastern date. A field the build overwrites but humans hand-edit will always
+      drift; either it is checked or it should not be there.
+
+- [ ] **Stop bumping FEATURE for fixes.** DEPLOY_NOTES.md line ~2594 states the rule plainly:
+      "FEATURE bumps on a new feature; EDIT counts refinements within that feature and resets to 0 on
+      a FEATURE bump." It was not followed. 191.0, 191.1 and 192.0 were all bug fixes — a share-card
+      halving fix, a CI tolerance change, and an RPC fix — and should have been 190.6, 190.7, 190.8.
+      The last legitimate FEATURE bumps were 188.0 (Cup live link), 189.0 (manual handicaps) and
+      190.0 (round handicaps). We would be at ~190.16 rather than 192.8.
+      The trigger that was wrongly used: "has a migration" or "feels significant". The actual test:
+      CAN A USER DO SOMETHING THEY COULD NOT BEFORE? A migration is not a feature. An engine with no
+      UI is not a feature until it is reachable.
+      Going forward (history stays as shipped, per Amit): next fix is 192.9; the half-stroke option
+      takes 193.0 when it becomes reachable.
+      Consider a guard, if it can be made precise without being noisy: a FEATURE bump must be
+      accompanied by a DEPLOY_NOTES entry naming something newly possible.
+
 ## v192.8 — after the quota resets (roughly 19h from 2026-09-09 ~13:00 UTC)
 
 - [ ] Re-run External API Contracts. It should pass; if it 429s again it now says DAILY QUOTA plainly.

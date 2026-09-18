@@ -2,7 +2,10 @@ name: External API Contracts
 
 on:
   schedule:
-    - cron: '17 13 * * 1'
+    # DAILY now, not weekly. The job checks ten courses a run and skips anything verified in the
+    # last seven days, so a full pass over the golden set takes about a week and then idles. Weekly
+    # runs of the whole set used 31 of the provider's 35 daily requests in one go (0156).
+    - cron: '17 13 * * *'
   workflow_dispatch:
 
 permissions:
@@ -23,6 +26,10 @@ jobs:
         id: contract
         env:
           GOLF_API_KEY: ${{ secrets.GOLF_API_KEY }}
+          # The freshness ledger (0156). Without these the job refuses to run rather than checking
+          # every fixture and blowing the daily quota.
+          BNN_SUPABASE_URL: ${{ secrets.BNN_SUPABASE_URL }}
+          BNN_SUPABASE_SERVICE_KEY: ${{ secrets.BNN_SUPABASE_SERVICE_KEY }}
         run: |
           set +e
           node ci/external/golfcourseapi-contract.mjs
