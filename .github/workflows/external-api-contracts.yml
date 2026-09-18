@@ -28,6 +28,13 @@ jobs:
           GOLF_API_KEY: ${{ secrets.GOLF_API_KEY }}
           # The freshness ledger (0156). Without these the job refuses to run rather than checking
           # every fixture and blowing the daily quota.
+          #
+          # These point at PRODUCTION, on every branch, deliberately. The ledger is shared with the
+          # APP, and the app's verifications land in production; a staging-scoped copy would drift
+          # from the thing it is meant to describe. They are REPOSITORY secrets, not environment
+          # secrets: this workflow declares no `environment:`, and environment-scoped secrets
+          # resolve to empty strings without warning, which is how a Dependabot PR once failed for
+          # twenty minutes of misdiagnosis.
           BNN_SUPABASE_URL: ${{ secrets.BNN_SUPABASE_URL }}
           BNN_SUPABASE_SERVICE_KEY: ${{ secrets.BNN_SUPABASE_SERVICE_KEY }}
         run: |

@@ -1,3 +1,13 @@
+## v192.10 — deploy order (staging first, including migrations)
+
+1. [ ] Apply 0156 to the STAGING Supabase.
+2. [ ] Deploy 192.10 to staging. Search a course; confirm a row appears in course_api_checks.
+3. [ ] PR staging -> main.
+4. [ ] Apply 0156 to PRODUCTION.
+5. [ ] Add repository secrets BNN_SUPABASE_URL and BNN_SUPABASE_SERVICE_KEY pointing at PRODUCTION.
+6. [ ] Run External API Contracts ONCE: expect "Checked 10 of 18". A second run the same day should
+       take the remaining 8, and a third should report nothing due.
+
 ## v192.9 checks
 
 - [ ] Apply 0156 to PRODUCTION (the app shares this ledger, so it must be the production database).

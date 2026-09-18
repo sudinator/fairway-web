@@ -1,3 +1,6 @@
+## 192.10.260917 — no new migration
+Documentation of the ledger secret scope. 0156 still required.
+
 ## 192.9.260917 — migration 0156
 Course-check ledger and daily claim RPC. New table, two functions.
 

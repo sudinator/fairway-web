@@ -1,3 +1,11 @@
+## 192.10.260917 — Record where the course ledger secrets point
+
+No code change. The contract workflow's `BNN_SUPABASE_URL` / `BNN_SUPABASE_SERVICE_KEY` point at **production on every branch**, deliberately: the ledger is shared with the app, and the app's verifications land in production, so a staging-scoped copy would drift from the thing it describes.
+
+They are **repository** secrets, not environment secrets. This workflow declares no `environment:`, and environment-scoped secrets resolve to empty strings with no warning — which is how a Dependabot pull request failed and cost a long misdiagnosis.
+
+Recorded in the workflow itself and in HANDOFF.md alongside the 35-requests-per-day budget and the rule that `/api/courses?raw=1` is the one-request tool to reach for when debugging.
+
 ## 192.9.260917 — Ten course checks a day (migration 0156)
 
 The provider's free tier allows **35 requests per day**. The contract monitor made **31 in one run** — 89% of the budget — so one scheduled run left four for the entire app, and any manual re-run exceeded the limit outright. On 17 September four manual runs plus a 19-request backfill exhausted the quota; the 429 was reported as CONTRACT DRIFT and six releases went into hunting a provider change that had never happened.
