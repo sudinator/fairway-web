@@ -251,7 +251,11 @@ def main():
             # Fully-qualified table.column references are safe to resolve without
             # guessing SQL alias scope. Alias-heavy function bodies remain covered by
             # the executable fresh-database replay and the historical baseline contract.
-            for mm in QUALIFIED_COLUMN.finditer(stmt):
+            # Mask string literals first: their CONTENTS are data, not identifiers. An advisory-lock
+            # key like 'course_api_checks.claim' was being read as a column reference and reported as
+            # a missing prior column (0156). The helper already existed; this check simply was not
+            # using it.
+            for mm in QUALIFIED_COLUMN.finditer(mask_single_quoted(stmt)):
                 table, col = mm.group(1).lower(), mm.group(2).lower()
                 if table in created_relations and table in columns:
                     counts['column_dependencies'] += 1

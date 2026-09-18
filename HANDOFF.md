@@ -123,6 +123,20 @@ verified against the wrong one.
 The staging Supabase database is separate from production and is reached through
 `BNN_STAGING_SUPABASE_URL`; migrations must be applied to each independently.
 
+## 2c. GolfCourseAPI budget
+
+The free tier allows **35 requests per DAY**, shared by the app and CI. The contract monitor claims
+**ten courses a day** from `course_api_checks` (0156), oldest first, skipping anything verified in
+the last seven days; a full pass takes about a week and then idles. A successful `/api/courses`
+lookup records itself as a verification, so app traffic reduces the monitor's work.
+
+`BNN_SUPABASE_URL` and `BNN_SUPABASE_SERVICE_KEY` are **repository** secrets pointing at
+**production** on every branch, because the ledger is shared with the app and the app's
+verifications land in production.
+
+When debugging, use `/api/courses?raw=1` (admin only) — ONE request, the provider's response
+untouched. Do not re-run the contract workflow repeatedly: each run spends ten of the day's budget.
+
 ## 3. Deploy flow (staging first)
 1. Start from a clean `staging` branch synchronized from `main`.
 2. Apply the reviewed candidate/overlay to `staging`; inspect the exact changed-file set before commit.

@@ -1,3 +1,9 @@
+## 192.10.260917 — no new migration
+Documentation of the ledger secret scope. 0156 still required.
+
+## 192.9.260917 — migration 0156
+Course-check ledger and daily claim RPC. New table, two functions.
+
 ## 192.8.260907 — no new migration
 Daily-quota recognition and honest backfill errors. 0155 still required.
 
@@ -143,7 +149,7 @@ Regenerate after shipping (adds new files, keeps ticks and the notes block):
 Confirm database-applied state with:
 `select id, applied_at from public.schema_migrations order by id;`
 
-Total: 140 migrations. Unchecked = not yet confirmed applied in this checklist.
+Total: 141 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -287,6 +293,7 @@ Total: 140 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [ ] 0153_manual_course_handicap.sql
 - [ ] 0154_round_manual_course_handicap.sql
 - [ ] 0155_live_manual_course_handicap.sql
+- [ ] 0156_course_api_checks.sql
 
 <!-- NOTES:START -->
 

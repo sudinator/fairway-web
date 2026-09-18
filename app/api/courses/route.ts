@@ -91,7 +91,21 @@ export async function GET(request: Request) {
       const res = await fetch(`${BASE}/courses/${encodeURIComponent(providerId)}`, { headers, signal: AbortSignal.timeout(COURSE_TIMEOUT_MS) });
       if (!res.ok) throw Object.assign(new Error(`Course lookup failed (${res.status})`), { upstream: res.status });
       const data = await res.json();
-      return NextResponse.json({ course: normalizeCourse(data.course || data) });
+      const course = normalizeCourse(data.course || data);
+      // A successful lookup IS a verification of this course, so record it. The contract monitor
+      // skips anything checked within seven days, which means ordinary app traffic REDUCES what the
+      // monitor has to do rather than competing with it for the provider's 35 requests a day (0156).
+      // Best-effort: a failure here must never break a course lookup the user asked for.
+      void supabase
+        .rpc("record_course_api_check", {
+          p_provider_id: providerId,
+          p_status: "ok",
+          p_club_name: course?.club ?? null,
+          p_course_name: course?.name ?? null,
+          p_location: course?.location ?? null,
+        })
+        .then(({ error }) => { if (error) console.error("record_course_api_check:", error.message); });
+      return NextResponse.json({ course });
     }
 
     // ---- Search mode ----

@@ -24,7 +24,66 @@ if (!key) {
   );
 }
 
-const golden = JSON.parse(await readFile(new URL("./golfcourseapi-golden.json", import.meta.url), "utf8"));
+const allGolden = JSON.parse(await readFile(new URL("./golfcourseapi-golden.json", import.meta.url), "utf8"));
+
+// ── Daily budget ────────────────────────────────────────────────────────────────────────────────
+// The free tier allows 35 requests per DAY. This monitor once checked all 18 fixtures in one run —
+// 31 requests, 89% of the budget — which left four for the entire app and meant any manual re-run
+// exceeded the limit. On 2026-09-17 that is exactly what happened, and the resulting 429 was
+// reported as CONTRACT DRIFT, sending a reader hunting for a provider change that never occurred.
+//
+// So: ten courses a day, oldest first, skipping anything verified in the last seven days. A full
+// pass takes about a week and then idles. The freshness ledger lives in Supabase (0156) and the APP
+// writes to it too — a successful /api/courses lookup IS a verification — so ordinary traffic
+// reduces this job's work instead of competing with it.
+const DAILY_BUDGET = Number(process.env.COURSE_CHECK_BUDGET ?? 10);
+const SUPABASE_URL = process.env.BNN_SUPABASE_URL;
+const SERVICE_KEY = process.env.BNN_SUPABASE_SERVICE_KEY;
+
+async function rpc(fn, body) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    method: "POST",
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`${fn} -> HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
+  return await res.json();
+}
+
+let golden = allGolden;
+let skipped = 0;
+if (SUPABASE_URL && SERVICE_KEY) {
+  try {
+    const claimed = await rpc("claim_course_api_checks", {
+      p_ids: allGolden.map((f) => f.id),
+      p_limit: DAILY_BUDGET,
+    });
+    const due = new Set((claimed ?? []).map((r) => r.provider_id));
+    golden = allGolden.filter((f) => due.has(f.id));
+    skipped = allGolden.length - golden.length;
+  } catch (e) {
+    monitorProblem(
+      `could not claim today's batch from Supabase (${e?.message ?? e}). Set BNN_SUPABASE_URL and ` +
+      `BNN_SUPABASE_SERVICE_KEY, or set COURSE_CHECK_BUDGET to run without the ledger. Refusing to ` +
+      `check all ${allGolden.length} fixtures, which would exceed the provider's 35/day limit.`
+    );
+  }
+} else {
+  monitorProblem(
+    "BNN_SUPABASE_URL / BNN_SUPABASE_SERVICE_KEY are not set, so the freshness ledger is " +
+    "unavailable and this job cannot tell which courses are due. Checking all fixtures would use " +
+    "31 of the provider's 35 daily requests. Add the secrets (0156)."
+  );
+}
+
+if (golden.length === 0) {
+  console.log(`Nothing due: all ${allGolden.length} fixtures were verified within the last 7 days.`);
+  process.exit(0);
+}
 const BASE = "https://api.golfcourseapi.com/v1";
 const headers = { Authorization: `Key ${key}` };
 const byQuery = new Map();
@@ -124,7 +183,7 @@ async function json(url) {
   }
 }
 
-console.log(`Checking ${golden.length} golden fixtures against ${BASE} ...`);
+console.log(`Checking ${golden.length} of ${allGolden.length} fixtures (oldest first, budget ${DAILY_BUDGET}/day); ${skipped} verified within 7 days.`);
 const failures = [];
 for (const fixture of golden) {
   let courses = byQuery.get(fixture.query);
@@ -186,8 +245,37 @@ for (const fixture of golden) {
   }
 }
 
+// Record what happened, so tomorrow's run skips these and picks up the next oldest.
+if (SUPABASE_URL && SERVICE_KEY) {
+  for (const fixture of golden) {
+    const failed = failures.find((f) => f.startsWith(`${fixture.name}:`));
+    try {
+      await rpc("record_course_api_check", {
+        p_provider_id: fixture.id,
+        p_status: failed ? "drift" : "ok",
+        p_club_name: fixture.club,
+        p_course_name: fixture.name,
+        p_location: fixture.location,
+        p_note: failed ? failed.slice(0, 500) : null,
+      });
+    } catch (e) {
+      console.error(`  could not record result for ${fixture.id}: ${e?.message ?? e}`);
+    }
+  }
+}
+
 if (failures.length) {
-  console.error("CONTRACT DRIFT: the GolfCourseAPI response changed.\n- " + failures.join("\n- "));
+  // Say what was actually checked. "The GolfCourseAPI response changed" is a claim about the whole
+  // API; this job now sees a tenth of it per run, and a monitor that overstates its coverage is one
+  // you will misread later.
+  console.error(
+    `CONTRACT DRIFT in ${failures.length} of the ${golden.length} fixture(s) checked today ` +
+    `(${skipped} not due).\n- ` + failures.join("\n- ")
+  );
   process.exit(EXIT_DRIFT);
 }
-console.log(`GolfCourseAPI contract OK for ${golden.length} golden course fixtures across ${byQuery.size} searches (${elapsed()}, ${calls} requests).`);
+console.log(
+  `GolfCourseAPI contract OK for the ${golden.length} fixture(s) checked today across ` +
+  `${byQuery.size} searches (${elapsed()}, ${calls} requests). ${skipped} not due; ` +
+  `${allGolden.length} in the golden set.`
+);
