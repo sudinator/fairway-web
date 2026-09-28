@@ -1,3 +1,43 @@
+## 192.13.260918 — Ran the whole monitor end to end. Found three more bugs.
+
+Amit's point, and it was right: these failures were all locally observable and kept reaching production. `ci/external/contract-harness.mjs` now runs the ENTIRE script against a PostgREST-shaped stub backed by a **real Postgres**, plus a stub provider that can be told to drift or to return a daily quota. The provider base is overridable (`GOLF_API_BASE`) so the whole run can be exercised without spending quota — the absence of that is why a malformed ledger URL reached production.
+
+### Three bugs it found, none visible by reading
+
+1. **The monitor could not record its own results.** `record_course_api_check` required `auth.uid()`, but the monitor authenticates with a SERVICE-ROLE key and has no user. Every result failed "sign in required": the ledger filled with claim placeholders and **no findings** — drift would have been detected and then discarded. Ledger read `18 rows, 0 ok`.
+2. **`current_user` is the function OWNER inside SECURITY DEFINER, not the caller.** The first fix checked `current_user <> 'service_role'` and still failed. Measured: called as service_role it reads `postgres`. The caller's role is visible only via `current_setting('role')`.
+3. **The budget counted COURSES, not requests.** Each course costs up to two provider requests (a search and a detail), so a "budget of 10" spent **20**, and two runs in a day spent 33 of the 35 allowance — straight back to the original problem. Default is now 5 courses ≈ 10 requests.
+
+### Verified by execution, not assertion
+
+| | |
+|---|---|
+| Rolling schedule | 5 of 18, then the next 5, then nothing due |
+| Cost per run | exactly 10 requests |
+| Results recorded | 10 rows, 10 ok, 0 placeholders |
+| Real drift | detected, field named, code points shown, exit 1, persisted as `drift` |
+| Daily quota | recognised immediately, no retries, exit 2 |
+| Trailing-slash ledger URL | normalised (the harness uses one deliberately) |
+
+No new migration, but **0156 changed** — re-apply it. The `record_course_api_check` role check is different.
+
+## 192.12.260918 — The ledger URL, and a 404 that did not mean what it looked like
+
+The first production run failed with:
+
+```
+claim_course_api_checks -> HTTP 404 {"code":"PGRST125","message":"Invalid path specified in request URL"}
+```
+
+PGRST125 is PostgREST rejecting the **path**, not the function — so this was never "the migration is missing", which is how it reads. The likeliest cause is a trailing slash on the URL secret producing `https://host//rest/v1/rpc/...`.
+
+- The URL is now normalised: trailing slashes stripped, whitespace trimmed, and a `/rest/v1` suffix tolerated if the secret already carries one. Verified against five shapes, all resolving to the same path.
+- **The error now names the path it tried.** A bare 404 cannot distinguish "function not deployed" from "URL malformed", and those have completely different fixes.
+
+The run did fail safely: it refused to proceed and spent **zero** provider requests, which is the behaviour the rationing exists for. The three secrets also resolved (`***` in the log), confirming the `environment: production` mapping works.
+
+No new migration; 0156 still required.
+
 ## 192.11.260917 — Reuse the production secrets that already exist
 
 192.10 asked for two NEW repository secrets. That was wrong on both counts: the repo already has

@@ -1,3 +1,9 @@
+## 192.13.260918 — RE-APPLY 0156
+record_course_api_check must accept the service-role monitor, not only signed-in users.
+
+## 192.12.260918 — no new migration
+Ledger URL normalisation. 0156 still required.
+
 ## 192.11.260917 — no new migration
 Contract job reuses the existing production secrets. 0156 still required.
 

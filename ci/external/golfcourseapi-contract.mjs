@@ -36,12 +36,25 @@ const allGolden = JSON.parse(await readFile(new URL("./golfcourseapi-golden.json
 // pass takes about a week and then idles. The freshness ledger lives in Supabase (0156) and the APP
 // writes to it too — a successful /api/courses lookup IS a verification — so ordinary traffic
 // reduces this job's work instead of competing with it.
-const DAILY_BUDGET = Number(process.env.COURSE_CHECK_BUDGET ?? 10);
-const SUPABASE_URL = process.env.BNN_SUPABASE_URL;
+// COURSES per day, not requests. Each course costs up to TWO provider requests — one search and one
+// detail lookup — so five courses is about ten requests, which is the intended daily spend against a
+// 35/day allowance shared with the app. Measured: ten courses cost 20 requests, and two runs in a
+// day cost 33, which is the whole budget. Counting fixtures and calling it a request budget is how
+// that was missed.
+const DAILY_BUDGET = Number(process.env.COURSE_CHECK_BUDGET ?? 5);
+// Tolerate a trailing slash, and a URL that already carries the REST path. A secret ending in "/"
+// produced "https://host//rest/v1/rpc/..." and PostgREST answered 404 PGRST125 "Invalid path
+// specified in request URL" — a failure about the URL, not about the function, which is easy to
+// misread as "the migration is missing".
+const SUPABASE_URL = (process.env.BNN_SUPABASE_URL ?? "")
+  .trim()
+  .replace(/\/+$/, "")
+  .replace(/\/rest\/v1$/, "");
 const SERVICE_KEY = process.env.BNN_SUPABASE_SERVICE_KEY;
 
 async function rpc(fn, body) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+  const url = `${SUPABASE_URL}/rest/v1/rpc/${fn}`;
+  const res = await fetch(url, {
     method: "POST",
     headers: {
       apikey: SERVICE_KEY,
@@ -50,7 +63,14 @@ async function rpc(fn, body) {
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`${fn} -> HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok) {
+    // Name the path that was tried. Without it a 404 is indistinguishable between "the function is
+    // not deployed" and "the URL is malformed", which are very different fixes.
+    throw new Error(
+      `${fn} -> HTTP ${res.status} at ${url.replace(/^(https:\/\/[^/]+)/, "$1")} ` +
+      `${(await res.text()).slice(0, 200)}`
+    );
+  }
   return await res.json();
 }
 
@@ -84,7 +104,10 @@ if (golden.length === 0) {
   console.log(`Nothing due: all ${allGolden.length} fixtures were verified within the last 7 days.`);
   process.exit(0);
 }
-const BASE = "https://api.golfcourseapi.com/v1";
+// Overridable so the whole run can be exercised end to end against a stub — the provider half and
+// the ledger half together. Without this the only way to test the script was to spend real quota,
+// which is how a malformed ledger URL reached production.
+const BASE = (process.env.GOLF_API_BASE ?? "https://api.golfcourseapi.com/v1").replace(/\/+$/, "");
 const headers = { Authorization: `Key ${key}` };
 const byQuery = new Map();
 

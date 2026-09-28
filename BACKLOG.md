@@ -1,3 +1,18 @@
+## v192.13
+
+- [ ] RE-APPLY 0156 (the role check in record_course_api_check changed; the old one blocks the monitor).
+- [ ] Then run External API Contracts once: expect "Checking 5 of 18", 10 requests.
+- [ ] Confirm rows land with last_status 'ok' and no 'claimed, awaiting result' notes:
+        select provider_id, last_status, note from public.course_api_checks order by last_checked_at desc limit 6;
+
+## v192.12 — re-run the contract
+
+- [ ] Deploy, then run External API Contracts once.
+- [ ] If it still 404s, the message now prints the path it tried. Check BNN_PRODUCTION_SUPABASE_URL
+      has no trailing slash and no path, and confirm 0156 is applied to PRODUCTION:
+        select id from public.schema_migrations where id like '0156%';
+- [ ] Expect "Checked 10 of 18 (oldest first...)".
+
 ## v192.11 — deploy order
 
 1. [ ] 0156 to STAGING; deploy; search + SELECT a course; confirm a course_api_checks row. (DONE — 5wng1nrq recorded.)
