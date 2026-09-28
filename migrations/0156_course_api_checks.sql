@@ -79,18 +79,10 @@ security definer
 set search_path = public
 as $function$
 begin
-  -- SECURITY DEFINER runs with the owner's rights, so it must confirm who is calling. TWO callers
-  -- are legitimate: the app, as a signed-in user, and the contract monitor, which authenticates with
-  -- a SERVICE-ROLE key and therefore has no auth.uid() at all.
-  --
-  -- Requiring auth.uid() alone silently broke the monitor: every result it tried to record failed
-  -- with "sign in required", so the ledger filled with claim placeholders and NO findings — drift
-  -- would have been detected and then thrown away. Found by running the monitor end to end against
-  -- a real database, not by reading it.
-  -- current_user is the function OWNER inside SECURITY DEFINER, never the caller — measured:
-  -- called as service_role it still reads "postgres". The caller's role is visible only through
-  -- current_setting('role'), which is what PostgREST sets from the key's JWT.
-  if auth.uid() is null and coalesce(current_setting('role', true), '') <> 'service_role' then
+  -- SECURITY DEFINER runs with the owner's rights, so it must confirm it has a caller of its own.
+  -- EXECUTE is granted to authenticated only, but a definer function should not rely solely on the
+  -- grant: verify the session identity here too.
+  if auth.uid() is null then
     raise exception 'sign in required' using errcode = '42501';
   end if;
   if p_provider_id is null or length(trim(p_provider_id)) = 0 then
@@ -118,7 +110,7 @@ end;
 $function$;
 
 revoke all on function public.record_course_api_check(text, text, text, text, text, text) from public;
-grant execute on function public.record_course_api_check(text, text, text, text, text, text) to authenticated, service_role;
+grant execute on function public.record_course_api_check(text, text, text, text, text, text) to authenticated;
 
 -- ── The monitor claims its daily batch ───────────────────────────────────────────────────────────
 create or replace function public.claim_course_api_checks(
