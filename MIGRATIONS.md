@@ -1,3 +1,11 @@
+## 192.15.260928 — migration 0157 (manifest regenerated)
+record_course_api_check must accept the SERVICE-ROLE monitor, not only signed-in users. 0156 is
+unchanged from its released form: a migration already on main is immutable, and the earlier
+instruction to "re-apply 0156" was wrong. 0157 is the replacement.
+
+## 192.12.260918 — no new migration
+Ledger URL normalisation. 0156 still required.
+
 ## 192.11.260917 — no new migration
 Contract job reuses the existing production secrets. 0156 still required.
 
@@ -152,7 +160,7 @@ Regenerate after shipping (adds new files, keeps ticks and the notes block):
 Confirm database-applied state with:
 `select id, applied_at from public.schema_migrations order by id;`
 
-Total: 141 migrations. Unchecked = not yet confirmed applied in this checklist.
+Total: 142 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -297,6 +305,7 @@ Total: 141 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [ ] 0154_round_manual_course_handicap.sql
 - [ ] 0155_live_manual_course_handicap.sql
 - [ ] 0156_course_api_checks.sql
+- [ ] 0157_course_api_check_service_role.sql
 
 <!-- NOTES:START -->
 
