@@ -1,3 +1,21 @@
+## 192.14.260928 — Migration 0157 replaces the edit to 0156
+
+192.13 changed `migrations/0156_course_api_checks.sql` after it was already on main. That is
+forbidden: `ci/check_migration_immutability.py` compares every migration on the branch against main
+byte for byte, because an applied migration cannot be retracted and two databases built from the
+same history must come out identical. The guard caught it, correctly.
+
+- **0156 is restored to its released form** and must not be touched again.
+- **Migration 0157** carries the change: `record_course_api_check` must accept the SERVICE-ROLE
+  monitor as well as signed-in users. Without it the monitor claims its daily batch, fails to record
+  the results with "sign in required", and the ledger fills with placeholders while real drift is
+  discarded.
+- `MIGRATIONS.md` gains the 0157 checklist line, which is the "manifest is stale" failure.
+- The notes no longer say "RE-APPLY 0156" — the instruction the guard exists to forbid.
+
+192.13 was deployed to staging, so this ships as a new EDIT rather than a reissue: no two builds
+share a version string.
+
 ## 192.13.260918 — Ran the whole monitor end to end. Found three more bugs.
 
 Amit's point, and it was right: these failures were all locally observable and kept reaching production. `ci/external/contract-harness.mjs` now runs the ENTIRE script against a PostgREST-shaped stub backed by a **real Postgres**, plus a stub provider that can be told to drift or to return a daily quota. The provider base is overridable (`GOLF_API_BASE`) so the whole run can be exercised without spending quota — the absence of that is why a malformed ledger URL reached production.
@@ -19,7 +37,7 @@ Amit's point, and it was right: these failures were all locally observable and k
 | Daily quota | recognised immediately, no retries, exit 2 |
 | Trailing-slash ledger URL | normalised (the harness uses one deliberately) |
 
-No new migration, but **0156 changed** — re-apply it. The `record_course_api_check` role check is different.
+**Migration 0157** carries the `record_course_api_check` role change. 0156 is untouched: it is already on main, and a released migration is immutable — `ci/check_migration_immutability.py` compares every migration on the branch against main byte for byte. An earlier draft of these notes said "re-apply 0156", which was the wrong instruction and the guard correctly rejected it.
 
 ## 192.12.260918 — The ledger URL, and a 404 that did not mean what it looked like
 

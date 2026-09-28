@@ -1,5 +1,7 @@
-## 192.13.260918 — RE-APPLY 0156
-record_course_api_check must accept the service-role monitor, not only signed-in users.
+## 192.14.260928 — migration 0157
+record_course_api_check must accept the SERVICE-ROLE monitor, not only signed-in users. 0156 is
+unchanged from its released form: a migration already on main is immutable, and the earlier
+instruction to "re-apply 0156" was wrong. 0157 is the replacement.
 
 ## 192.12.260918 — no new migration
 Ledger URL normalisation. 0156 still required.
@@ -303,6 +305,7 @@ Total: 141 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [ ] 0154_round_manual_course_handicap.sql
 - [ ] 0155_live_manual_course_handicap.sql
 - [ ] 0156_course_api_checks.sql
+- [ ] 0157_course_api_check_service_role.sql
 
 <!-- NOTES:START -->
 

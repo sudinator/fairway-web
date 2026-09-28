@@ -1,6 +1,7 @@
-## v192.13
+## v192.14
 
-- [ ] RE-APPLY 0156 (the role check in record_course_api_check changed; the old one blocks the monitor).
+- [ ] Apply 0157 (the role check in record_course_api_check; without it the monitor cannot record results).
+- [ ] 0156 is UNCHANGED from its released form. Never edit a migration already on main.
 - [ ] Then run External API Contracts once: expect "Checking 5 of 18", 10 requests.
 - [ ] Confirm rows land with last_status 'ok' and no 'claimed, awaiting result' notes:
         select provider_id, last_status, note from public.course_api_checks order by last_checked_at desc limit 6;
