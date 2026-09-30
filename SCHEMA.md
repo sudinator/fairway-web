@@ -1,3 +1,7 @@
+## 192.18.260930 — Personal round JSON input contract (0160)
+
+Replaces only save_personal_round(uuid,jsonb,boolean,boolean). Its SECURITY INVOKER authorization, grants, transaction locks and persistence semantics are unchanged. jsonb_populate_record now receives explicit maps of consumed fields, so unused JSON row identities are not coerced to database UUIDs. p_round_id and authenticated identity remain authoritative. No schema columns or stored records are changed; discard_personal_round is unchanged.
+
 ## 192.17.260930 — Personal round persistence (0159)
 
 `save_personal_round(uuid,jsonb,boolean,boolean)` atomically writes a personal round and its holes. SECURITY INVOKER preserves RLS; identity/club/game fields on existing rows remain unchanged. Background requests cannot alter final rounds. Stable client UUIDs and a transaction advisory lock serialize requests/retries for a round. Total-only historical corrections preserve the server gross total without creating holes. `discard_personal_round(uuid)` atomically deletes only the caller's in-progress personal round and its holes. Execute is granted only to authenticated, with public/anon revoked. No schema columns or existing records are changed.

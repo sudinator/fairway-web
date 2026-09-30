@@ -1,3 +1,9 @@
+## 192.18.260930 — New-round payload conversion fix (candidate)
+
+Fixes 22P02 when saving a new round. RoundSetup sends id=""; 0159 passed the entire JSON object through the rounds row type and tried to convert that ignored value to UUID. Follow-up migration 0160 parses only consumed round/hole fields. Separate p_round_id and auth.uid() remain authoritative. The 0159 migration is unchanged; authorization, atomic rollback, Cancel and recovery semantics are unchanged. Database regression tests now include empty round/hole IDs and forged unused identity fields.
+
+Candidate only. Apply 0160 to staging only after GitHub's fresh-database/CI gates pass. See RELEASE_VERIFICATION_192.18.md. Live staging save/recovery checks remain required; production is unchanged.
+
 ## 192.17.260930 — Personal round Save/Cancel and recovery (candidate)
 
 Completed-round edits remain local until Save changes. Explicit save and live-round backup use transactional RPC 0159; any hole/metadata failure rolls back the entire request. Drafts use round/session UUIDs rather than course names. Discard is scoped to one in-progress personal round and retains the draft if the server operation fails. Finish waits for an admitted backup before finalizing; late backups cannot modify a final round. Manual course handicaps persist on immediate Finish, and clearing an override restores the derived figure.

@@ -1,3 +1,7 @@
+## 192.18.260930 — New-round payload hotfix candidate
+
+Follow-up migration 0160 fixes UUID conversion of the unused id="" field sent for new rounds. See RELEASE_VERIFICATION_192.18.md. Supersedes 192.17; this changed-files bundle assumes 192.17 is already present.
+
 ## 192.17.260930 — Personal round persistence candidate
 
 Round editor now uses migration 0159 for atomic saves/discards. Historical edits are local until explicit Save changes. See RELEASE_VERIFICATION_192.17.md; this candidate is not cleared for deployment.

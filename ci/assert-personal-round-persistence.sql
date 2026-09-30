@@ -8,7 +8,7 @@ do $$
 declare
   v_id uuid := '15900000-0000-0000-0000-000000000010';
   v_other uuid := '15900000-0000-0000-0000-000000000011';
-  v_payload jsonb := '{"course":"Test course","tee_name":"Blue","rating":72,"slope":113,"course_par":72,"handicap_index":12,"course_handicap":20,"course_handicap_source":"manual","played_at":"2026-09-29","holes":[{"hole_number":1,"par":4,"stroke_index":1,"strokes":5,"putts":2},{"hole_number":2,"par":4,"stroke_index":2,"strokes":6,"putts":2}]}';
+  v_payload jsonb := '{"id":"","user_id":"ignored-client-identity","game_id":"ignored-client-game","course":"Test course","tee_name":"Blue","rating":72,"slope":113,"course_par":72,"handicap_index":12,"course_handicap":20,"course_handicap_source":"manual","played_at":"2026-09-29","holes":[{"id":"","round_id":"ignored-client-round","hole_number":1,"par":4,"stroke_index":1,"strokes":5,"putts":2},{"hole_number":2,"par":4,"stroke_index":2,"strokes":6,"putts":2}]}';
   v_result jsonb;
 begin
   perform public.save_personal_round(v_id,v_payload,false,false);
@@ -16,6 +16,9 @@ begin
   if (select count(*) from public.rounds where id=v_id) <> 1 or
      (select count(*) from public.holes where round_id=v_id) <> 2 then
     raise exception 'FAIL: backup retry duplicated records'; end if;
+  if (select user_id from public.rounds where id=v_id) <> auth.uid()
+     or (select game_id from public.rounds where id=v_id) is not null then
+    raise exception 'FAIL: ignored JSON identity altered ownership or game linkage'; end if;
   -- A later invalid hole must roll back the earlier valid write and metadata changes.
   begin
     perform public.save_personal_round(v_id,jsonb_set(jsonb_set(v_payload,'{holes,0,strokes}','7'),'{holes,1,par}','-1'),true,false);

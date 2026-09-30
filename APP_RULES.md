@@ -1,3 +1,4 @@
+<!-- 192.18: RPC JSON parsing must map only consumed fields; fixture payloads must include frontend identity placeholders, not simplified database-only objects. -->
 <!-- 192.17: historical score edits remain local until Save changes; explicit personal-round save/discard are atomic; draft identity is round/session UUID, never course name. -->
 <!-- 192.16: profile privilege enforcement -->
 Browser-created profiles must start without system admin or owner privileges. Browser admin promotions/demotions are owner-only and audited atomically. Browser owner-marker and profile-identity changes are forbidden; trusted database maintenance is separate from browser authorization.

@@ -1,3 +1,7 @@
+## v192.18 — New-round staging blocker
+
+192.17 staging report: save of a new personal round returns 22P02. Reproduced from the exact empty id field supplied by RoundSetup. Fixed in candidate 0160 with UI-shaped database regression fixtures. Staging confirmation is outstanding. R1–R3/H2 remain under release validation. Approval workflow and G1/H1 remain deferred.
+
 ## v192.17 — Round persistence candidate and deferred work
 
 R1–R3 and editor-side H2 implemented in candidate; release gates remain outstanding. Pending-access approval workflow stays deferred. Next separate release: game offline recovery (G1) and nine-hole game posting (H1). Then structural partial operations, club-admin handicap writes, failed reads, push retries and stale card/badge clearing. Member since remains pending. Existing feature backlog items require current-code verification before rebuilding.
