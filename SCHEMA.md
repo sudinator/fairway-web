@@ -1,3 +1,7 @@
+## 192.20.260930 — No database contract change
+
+No schema, RPC, RLS, grant or migration changes. CI checks the authenticated caller's lack of internal-posting EXECUTE via has_function_privilege and retains the outsider/posting behavior assertions. Migration 0161 remains unchanged.
+
 ## 192.19.260930 — Game posting contract (0161)
 
 Replaces post_game_rounds_internal(uuid,boolean) and post_group_rounds(uuid,integer). Manual course_handicap is copied as entered for both nine and eighteen holes; derived nine-hole handicaps retain existing scaling. Both paths copy course_handicap_source/course_handicap_set_by/course_handicap_set_at on insert/update/conflict. Existing authorization and format exclusion remain; internal execution stays revoked from browser roles. No columns, backfill, or existing records change merely by applying the migration.

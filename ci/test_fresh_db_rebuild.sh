@@ -4,10 +4,27 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(mktemp -d)"
 cleanup() {
+  local result=$?
+  # Preserve database evidence BEFORE cleanup removes the temporary container.
+  # Keep normal successful runs quiet; diagnostics must not mask the test status.
+  if [ "$result" -ne 0 ]; then
+    echo "::group::Fresh database failure diagnostics"
+    local db_project_id=""
+    if [ -f "$TMP/supabase/config.toml" ]; then
+      db_project_id=$(sed -n 's/^project_id = "\(.*\)"/\1/p' "$TMP/supabase/config.toml")
+    fi
+    if [ -n "$db_project_id" ] && command -v docker >/dev/null 2>&1; then
+      local db_container="supabase_db_$db_project_id"
+      docker inspect --format 'Database {{.Name}}: status={{.State.Status}} oom_killed={{.State.OOMKilled}} exit_code={{.State.ExitCode}} error={{.State.Error}}' "$db_container" || true
+      docker logs --tail 100 "$db_container" 2>&1 || true
+    fi
+    echo "::endgroup::"
+  fi
   if [ -d "$TMP/supabase" ]; then
     (cd "$TMP" && supabase stop --no-backup >/dev/null 2>&1) || true
   fi
   rm -rf "$TMP"
+  return "$result"
 }
 trap cleanup EXIT
 

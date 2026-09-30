@@ -1,3 +1,7 @@
+## v192.20 — Fresh-database CI blocker
+
+192.19 GitHub rebuild lost its connection during the final permission-denial probe after the posting matrix completed. Backend cause unconfirmed. Candidate changes that probe to current-caller ACL verification and adds failure diagnostics; GitHub confirmation pending. 192.19 device-test plan remains outstanding. Production stays deferred; existing audit findings remain open.
+
 ## v192.19 — Game recovery/posting candidate and remaining audit work
 
 G1/H1 implemented in candidate; GitHub fresh-database and staging/device validation remain required before closure. User reports 192.18 staging tests good; 22P02 appeared once then stopped. Production remains deferred. Remaining review: cross-device score-write/reset concurrency (inferred from the existing server contract), structural partial operations/game creation atomicity, club-admin handicap writes, failed-read behavior outside GameRoom, push retries, stale card/badge clearing. Approval workflow and Member since remain deferred. Existing feature backlog still requires current-code verification.

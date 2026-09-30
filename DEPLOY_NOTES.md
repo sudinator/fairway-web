@@ -1,3 +1,9 @@
+## 192.20.260930 — Fresh-database CI assertion correction (candidate)
+
+GitHub's 192.19 fresh-Supabase run completed the posting matrix and outsider group call, then lost its database connection at the deliberate internal-RPC permission-denial subtransaction. The screenshot does not establish the backend cause. Replace that redundant raise/catch probe with an actual-current-user ACL check; retain the full posting matrix, explicit role privileges, authenticated outsider group call and stored-data assertion. Failure cleanup now prints database container state/OOM flag and recent server logs before removing it, preserving the failing exit status.
+
+No migration or application behavior changes; 0161 and earlier migrations remain byte-identical. This changed-files bundle assumes 192.19. Re-run GitHub CI/fresh-database checks; live staging tests and production deferral remain in force. See RELEASE_VERIFICATION_192.20.md. No new SQL to apply.
+
 ## 192.19.260930 — Game offline recovery and manual-handicap posting (candidate)
 
 G1: three-way recovery preserves local score corrections, deletions and all four peripheral stats against confirmed server watermarks. Failed/zero-row writes remain pending; per-player queues prevent older requests from landing after newer edits. Cold reads seed server watermarks and never acknowledge a local merge. Reconnect reads reset/marker state before draining; resets block new writes and await admitted writes. Failed reads retain saved data. Legacy backups without a watermark can recover gaps only.

@@ -123,11 +123,15 @@ select set_config('bnn.test_posting_game',
 select set_config('request.jwt.claim.sub','16100000-0000-0000-0000-000000000002',true);
 set local role authenticated;
 select public.post_group_rounds(current_setting('bnn.test_posting_game')::uuid,1);
+-- Check the actual caller's ACL directly. Do not intentionally raise/catch
+-- permission errors in this large fixture transaction; that probe lost the
+-- database connection in GitHub's Supabase run. The backend cause is unconfirmed.
 do $$ begin
- begin
-  perform public.post_game_rounds_internal(current_setting('bnn.test_posting_game')::uuid,false);
-  raise exception 'FAIL: authenticated caller executed internal posting';
- exception when insufficient_privilege then null; end;
+ if current_user <> 'authenticated' then
+  raise exception 'FAIL: outsider test did not run as authenticated'; end if;
+ if has_function_privilege(current_user,
+      'public.post_game_rounds_internal(uuid,boolean)','execute') then
+  raise exception 'FAIL: authenticated caller has internal posting execution'; end if;
 end $$;
 reset role;
 do $$ begin

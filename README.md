@@ -1,3 +1,7 @@
+## 192.20.260930 — Fresh-database CI correction
+
+Changes a CI permission probe to direct current-caller privilege verification and captures server diagnostics on rebuild failure. No new migration; 0161 unchanged. See RELEASE_VERIFICATION_192.20.md. Bundle assumes 192.19. GitHub/staging confirmation remains required.
+
 ## 192.19.260930 — Game recovery/posting candidate
 
 Game score recovery now keeps offline corrections/deletions/stat edits pending until confirmed. Migration 0161 preserves manual game handicaps and their source/audit snapshots when posting rounds. See RELEASE_VERIFICATION_192.19.md for proof and staging checks. Changed-files bundle assumes 192.18; production remains deferred.
