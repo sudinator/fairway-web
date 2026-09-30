@@ -10,17 +10,23 @@ import type { Round } from "@/lib/golf";
 
 const KEY = "bnn_round_draft_v1";
 
-export function saveDraft(round: Round): void {
+export function sameDraftRound(a: Round, b: Round): boolean {
+  const aId = a.id || a.draft_session_id;
+  const bId = b.id || b.draft_session_id;
+  return !!aId && aId === bId;
+}
+
+export function saveDraft(round: Round, force = false): void {
   try {
     if (typeof window === "undefined") return;
     // Safety: never overwrite an existing draft that HAS scores with one that has
     // NONE (e.g. a transient empty state after a remount). Losing entered scores is
     // far worse than keeping a slightly stale draft.
     const incomingScored = (round.holes || []).some((h) => h.strokes != null);
-    if (!incomingScored) {
+    if (!force && !incomingScored) {
       const existing = loadDraft();
       const existingScored = (existing?.round?.holes || []).some((h: any) => h.strokes != null);
-      if (existingScored && existing?.round?.course === round.course) return;
+      if (existingScored && existing && sameDraftRound(existing.round, round)) return;
     }
     window.localStorage.setItem(KEY, JSON.stringify({ savedAt: Date.now(), round }));
   } catch {
@@ -42,9 +48,13 @@ export function loadDraft(): { savedAt: number; round: Round } | null {
   }
 }
 
-export function clearDraft(): void {
+export function clearDraft(roundId?: string): void {
   try {
     if (typeof window === "undefined") return;
+    if (roundId) {
+      const existing = loadDraft();
+      if (existing && (existing.round.id || existing.round.draft_session_id) !== roundId) return;
+    }
     window.localStorage.removeItem(KEY);
     window.localStorage.removeItem(DHKEY);
   } catch {}

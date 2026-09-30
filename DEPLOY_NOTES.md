@@ -1,3 +1,9 @@
+## 192.17.260930 — Personal round Save/Cancel and recovery (candidate)
+
+Completed-round edits remain local until Save changes. Explicit save and live-round backup use transactional RPC 0159; any hole/metadata failure rolls back the entire request. Drafts use round/session UUIDs rather than course names. Discard is scoped to one in-progress personal round and retains the draft if the server operation fails. Finish waits for an admitted backup before finalizing; late backups cannot modify a final round. Manual course handicaps persist on immediate Finish, and clearing an override restores the derived figure.
+
+Candidate only. See RELEASE_VERIFICATION_192.17.md for executed checks and outstanding full Supabase/GitHub/Vercel/staging gates. Apply 0159 to staging before the candidate frontend; no production changes have been made.
+
 ## 192.16.260929 — Profile privilege boundaries (candidate)
 
 Migration 0158 guards INSERT and UPDATE, reserves browser admin changes to the owner, forbids browser owner and profile-identity changes, and audits successful browser admin changes exactly once. Safe profile creation/editing, ban administration, and trusted service provisioning remain supported. No existing profiles change. Historical migrations remain immutable.

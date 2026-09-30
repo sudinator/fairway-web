@@ -1,3 +1,7 @@
+## 192.17.260930 — Personal round persistence candidate
+
+Round editor now uses migration 0159 for atomic saves/discards. Historical edits are local until explicit Save changes. See RELEASE_VERIFICATION_192.17.md; this candidate is not cleared for deployment.
+
 ## 192.16.260929 — Security candidate
 
 New migration 0158 enforces profile privilege boundaries on inserts and updates. See RELEASE_VERIFICATION_192.16.md for evidence and outstanding release gates. This package is not yet cleared for production.

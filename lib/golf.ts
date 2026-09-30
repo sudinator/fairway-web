@@ -85,6 +85,8 @@ export type Hole = {
 
 export type Round = {
   id: string;
+  /** Stable local identity before an in-progress round reaches the server. */
+  draft_session_id?: string;
   group_id?: string | null;
   group_name?: string | null;
   course: string;

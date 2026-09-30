@@ -181,7 +181,7 @@ export function Home({ session }: { session: any }) {
   const [draftRound, setDraftRound] = useState<Round | null>(null);
   const refreshDraft = useCallback(() => {
     const d = loadDraft();
-    setDraftRound(d && draftHasScores(d.round) ? d.round : null);
+    setDraftRound(d && (!d.round.id || d.round.status === "in_progress") && draftHasScores(d.round) ? d.round : null);
   }, []);
   // Keep the resume banner in sync: re-check storage on mount and whenever we
   // leave the editor (stage changes), so the banner appears/disappears correctly.
@@ -276,7 +276,7 @@ export function Home({ session }: { session: any }) {
       return;
     }
     const d = loadDraft();
-    if (d && draftHasScores(d.round)) {
+    if (d && (!d.round.id || d.round.status === "in_progress") && draftHasScores(d.round)) {
       setResumeChecked(true);
       setStage({ round: d.round });
       return;

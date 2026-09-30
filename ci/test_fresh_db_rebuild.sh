@@ -41,6 +41,9 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-core-rls-behavior.sql"
 # Profile insert/update privilege boundary, owner RPC and exactly-once audit.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-profile-privileges.sql"
 
+# Atomic personal-round save/discard, authenticated RLS and rollback proof.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-personal-round-persistence.sql"
+
 # Execute the full configured-game length round trip, score lock and reset/re-entry behavior.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-match-length-roundtrip.sql"
 

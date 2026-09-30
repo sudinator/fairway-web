@@ -1,3 +1,7 @@
+## v192.17 — Round persistence candidate and deferred work
+
+R1–R3 and editor-side H2 implemented in candidate; release gates remain outstanding. Pending-access approval workflow stays deferred. Next separate release: game offline recovery (G1) and nine-hole game posting (H1). Then structural partial operations, club-admin handicap writes, failed reads, push retries and stale card/badge clearing. Member since remains pending. Existing feature backlog items require current-code verification before rebuilding.
+
 ## v192.16 — Security candidate and audit follow-ups
 
 - [ ] Clear full release gates and staging validation for migration 0158 (profile INSERT privileges, owner-only admin changes and audit).

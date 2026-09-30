@@ -1,3 +1,7 @@
+## 192.17.260930 — Personal round persistence (0159)
+
+`save_personal_round(uuid,jsonb,boolean,boolean)` atomically writes a personal round and its holes. SECURITY INVOKER preserves RLS; identity/club/game fields on existing rows remain unchanged. Background requests cannot alter final rounds. Stable client UUIDs and a transaction advisory lock serialize requests/retries for a round. Total-only historical corrections preserve the server gross total without creating holes. `discard_personal_round(uuid)` atomically deletes only the caller's in-progress personal round and its holes. Execute is granted only to authenticated, with public/anon revoked. No schema columns or existing records are changed.
+
 ## 192.16.260929 — Profile privilege boundaries (0158)
 
 trg_guard_profile_privileged now runs BEFORE INSERT OR UPDATE. Browser profile inserts cannot grant admin/owner. Only the owner can change another non-owner admin flag; browser owner and profile-identity changes are forbidden. Admin changes produce an atomic activity_log entry through the trigger; admin_set_system_admin retains its interface and delegates audit to that trigger. Trusted service_role/direct database maintenance retain provisioning. Ban checks and blocklist insert trigger remain in place. No column or existing-data changes.
