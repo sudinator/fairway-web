@@ -1,3 +1,11 @@
+## 192.19.260930 — Game offline recovery and manual-handicap posting (candidate)
+
+G1: three-way recovery preserves local score corrections, deletions and all four peripheral stats against confirmed server watermarks. Failed/zero-row writes remain pending; per-player queues prevent older requests from landing after newer edits. Cold reads seed server watermarks and never acknowledge a local merge. Reconnect reads reset/marker state before draining; resets block new writes and await admitted writes. Failed reads retain saved data. Legacy backups without a watermark can recover gaps only.
+
+H1: follow-up migration 0161 preserves the authoritative manual handicap, source and setter/time snapshot on game and tee-group posting, including reposts. Derived nine-hole handicaps still halve; nine-hole rating/par/slope behavior is unchanged. No automatic history backfill. Historical migrations remain unchanged.
+
+Apply to staging after full GitHub CI/fresh-database gates; run the staging checklist in RELEASE_VERIFICATION_192.19.md. This changed-files ZIP assumes 192.18. Production remains deferred until the remaining audit findings and release gates are closed.
+
 ## 192.18.260930 — New-round payload conversion fix (candidate)
 
 Fixes 22P02 when saving a new round. RoundSetup sends id=""; 0159 passed the entire JSON object through the rounds row type and tried to convert that ignored value to UUID. Follow-up migration 0160 parses only consumed round/hole fields. Separate p_round_id and auth.uid() remain authoritative. The 0159 migration is unchanged; authorization, atomic rollback, Cancel and recovery semantics are unchanged. Database regression tests now include empty round/hole IDs and forged unused identity fields.

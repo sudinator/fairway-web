@@ -1384,32 +1384,30 @@ export function markerOwnsMyRow(opts: {
 }
 
 
-// Reconcile one player's DB row against this device's local backup for that row.
-// The DB value wins where present; the backup fills any hole the DB is missing
-// (a score lost to a screen lock or no signal). This recovers scores, putts,
-// fairways, penalties and sand. `changed` is true when the backup adds at least
-// one scored hole the DB lacked — the signal to push the merged row back to the
-// DB. The backup is never used to remove data, only to fill gaps.
+// Three-way recovery: only local changes since the last confirmed server snapshot
+// override remote cells, including deliberate nulls. Legacy backups without a
+// watermark can safely fill gaps only; their prior value cannot be inferred.
 export function mergeBackupRow(
   db: { scores?: any[]; putts?: any[]; fairways?: any[]; penalties?: any[]; sand?: any[] },
   backup: { scores?: any[]; putts?: any[]; fairways?: any[]; penalties?: any[]; sand?: any[] },
   n: number,
+  watermark?: { scores?: any[]; putts?: any[]; fairways?: any[]; penalties?: any[]; sand?: any[] } | null,
 ): { merged: { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] }; changed: boolean } {
-  const mergeArr = (d: any[] | undefined, l: any[] | undefined) =>
+  let changed = false;
+  const mergeArr = (col: "scores" | "putts" | "fairways" | "penalties" | "sand") =>
     Array.from({ length: n }, (_, i) => {
-      const dv = d?.[i] ?? null;
-      return dv != null ? dv : (l?.[i] ?? null);
+      const remote = db[col]?.[i] ?? null;
+      const local = backup[col]?.[i] ?? null;
+      const base = watermark?.[col]?.[i] ?? null;
+      const value = watermark ? (local !== base ? local : remote) : (remote ?? local);
+      if (value !== remote) changed = true;
+      return value;
     });
   const merged = {
-    scores: mergeArr(db.scores, backup.scores),
-    putts: mergeArr(db.putts, backup.putts),
-    fairways: mergeArr(db.fairways, backup.fairways),
-    penalties: mergeArr(db.penalties, backup.penalties),
-    sand: mergeArr(db.sand, backup.sand),
+    scores: mergeArr("scores"), putts: mergeArr("putts"), fairways: mergeArr("fairways"),
+    penalties: mergeArr("penalties"), sand: mergeArr("sand"),
   };
-  const dbCount = (db.scores || []).filter((s) => s != null).length;
-  const mergedCount = merged.scores.filter((s) => s != null).length;
-  return { merged, changed: mergedCount > dbCount };
+  return { merged, changed };
 }
 
 
@@ -1440,7 +1438,8 @@ export function titleCaseName(s: string): string {
 
 // NOTE: a nineHoleBasis() helper lived here and was removed at 177.96.
 // The nine-hole halving happens ONCE, at WRITE time, in migration 0139_nine_hole_round_basis.sql:
-// a posted nine stores rating, par and course_handicap already halved (slope untouched — it is a
+// a posted nine stores rating and derived course_handicap already halved (manual CH preserved),
+// and par summed from selected holes (0161). Slope is untouched — it is a
 // ratio, not a stroke count). Every reader therefore uses round.rating as-is.
 // An exported helper that halves a rating, sitting beside code that must not halve, is a trap: it
 // looks like the sanctioned way and reintroduces the double halve. It did exactly that — a 2.43

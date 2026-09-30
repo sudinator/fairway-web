@@ -185,6 +185,7 @@ export function saveGameScores(
   playerId: string,
   data: { scores: any[]; putts: any[]; fairways: any[]; penalties?: any[]; sand?: any[] },
   force = false,
+  observedAt?: number,
 ): void {
   try {
     if (typeof window === "undefined") return;
@@ -200,7 +201,7 @@ export function saveGameScores(
         if (existing && (existing.scores || []).some((s) => s != null)) return;
       }
     }
-    window.localStorage.setItem(gameScoreKey(gameId, playerId), JSON.stringify({ at: Date.now(), ...data }));
+    window.localStorage.setItem(gameScoreKey(gameId, playerId), JSON.stringify({ at: observedAt ?? (force ? Date.now() : loadGameScores(gameId, playerId)?.at ?? Date.now()), ...data }));
   } catch {}
 }
 
@@ -380,6 +381,8 @@ export function rowPendingHoles(
   const n = Math.max(
     backup.scores?.length || 0, backup.putts?.length || 0, backup.fairways?.length || 0,
     backup.penalties?.length || 0, backup.sand?.length || 0,
+    w.scores?.length || 0, w.putts?.length || 0, w.fairways?.length || 0,
+    w.penalties?.length || 0, w.sand?.length || 0,
   );
   let c = 0;
   for (let i = 0; i < n; i++) {
@@ -389,8 +392,8 @@ export function rowPendingHoles(
       (backup.fairways?.[i] ?? null) !== (w.fairways?.[i] ?? null) ||
       (backup.penalties?.[i] ?? null) !== (w.penalties?.[i] ?? null) ||
       (backup.sand?.[i] ?? null) !== (w.sand?.[i] ?? null);
-    // Only count a hole as pending if it actually has a score locally.
-    if (diff && (backup.scores?.[i] ?? null) != null) c++;
+    // Deletions and stats-only edits also require server confirmation.
+    if (diff) c++;
   }
   return c;
 }

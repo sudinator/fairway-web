@@ -1,3 +1,7 @@
+## v192.19 — Game recovery/posting candidate and remaining audit work
+
+G1/H1 implemented in candidate; GitHub fresh-database and staging/device validation remain required before closure. User reports 192.18 staging tests good; 22P02 appeared once then stopped. Production remains deferred. Remaining review: cross-device score-write/reset concurrency (inferred from the existing server contract), structural partial operations/game creation atomicity, club-admin handicap writes, failed-read behavior outside GameRoom, push retries, stale card/badge clearing. Approval workflow and Member since remain deferred. Existing feature backlog still requires current-code verification.
+
 ## v192.18 — New-round staging blocker
 
 192.17 staging report: save of a new personal round returns 22P02. Reproduced from the exact empty id field supplied by RoundSetup. Fixed in candidate 0160 with UI-shaped database regression fixtures. Staging confirmation is outstanding. R1–R3/H2 remain under release validation. Approval workflow and G1/H1 remain deferred.

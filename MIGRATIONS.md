@@ -164,7 +164,7 @@ Regenerate after shipping (adds new files, keeps ticks and the notes block):
 Confirm database-applied state with:
 `select id, applied_at from public.schema_migrations order by id;`
 
-Total: 145 migrations. Unchecked = not yet confirmed applied in this checklist.
+Total: 146 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -313,6 +313,7 @@ Total: 145 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [ ] 0158_profile_privilege_boundaries.sql
 - [ ] 0159_personal_round_persistence.sql
 - [ ] 0160_personal_round_payload_contract.sql
+- [ ] 0161_game_round_manual_handicap.sql
 
 <!-- NOTES:START -->
 

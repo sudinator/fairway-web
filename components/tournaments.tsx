@@ -1,4 +1,5 @@
 "use client";
+import { createGameScoreWriter } from "@/lib/game-score-sync";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { readAltShotSideScores } from "@/lib/alt-shot-scores";
@@ -63,7 +64,6 @@ import { autoSplitFlights, flightForIndex, flightRangeLabel, flightTagColor, typ
 // once caused a NOT-NULL violation on `bets`; these columns carry the same risk.
 import { logActivity } from "@/lib/activity";
 import { saveActiveGame, loadActiveGame, clearActiveGame, saveGameScores, loadGameScores, clearGameScores, clearAllGameScores, saveGameSnapshot, loadGameSnapshot, saveSyncedWatermark, loadSyncedWatermark, clearSyncedWatermark, rowPendingHoles } from "@/lib/draft";
-import { changedCols, pickCols } from "@/lib/sync-cols";
 import {
   btn,
   inputStyle,
@@ -1495,6 +1495,13 @@ function GameRoom({
   const [competitionLink, setCompetitionLink] = useState<{ competition_id: string; name: string } | null>(null);
   const [savingHole, setSavingHole] = useState<number | null>(null);
   const [syncState, setSyncState] = useState<"idle" | "saving" | "retry" | "synced" | "error">("idle");
+  const scoreRevisionRef = React.useRef(0);
+  const loadRequestRef = React.useRef(0);
+  const recoveryReadyRef = React.useRef(false);
+  const scoreWriterRef = React.useRef<ReturnType<typeof createGameScoreWriter> | null>(null);
+  const resettingRef = React.useRef(false);
+  const gameRef = React.useRef<Game | null>(game);
+  gameRef.current = game;
   // Connectivity flag. Ownership changes (marker takeover / hand-off / switching to
   // self-scoring) and finishing are FROZEN while offline: they can't be coordinated
   // across devices without the server, and allowing them would break the single-
@@ -1511,7 +1518,11 @@ function GameRoom({
     return () => { cancelled = true; };
   }, [gameId]);
   useEffect(() => {
-    const upd = () => setOffline(typeof navigator !== "undefined" && navigator.onLine === false);
+    const upd = () => {
+      const off = typeof navigator !== "undefined" && navigator.onLine === false;
+      if (off) recoveryReadyRef.current = false;
+      setOffline(off);
+    };
     upd();
     window.addEventListener("online", upd);
     window.addEventListener("offline", upd);
@@ -1676,6 +1687,9 @@ function GameRoom({
   const [shareGame, setShareGame] = useState(false);
 
   const load = useCallback(async () => {
+    if (resettingRef.current || scoreWriterRef.current?.busy) return;
+    const request = ++loadRequestRef.current;
+    const revision = scoreRevisionRef.current;
     // Boot the room from the local snapshot (merged with this device's per-hole
     // backups). Used for an offline cold launch, and as a fallback if a live fetch fails.
     const bootFromSnapshot = (): boolean => {
@@ -1685,8 +1699,8 @@ function GameRoom({
       const mergedPlayers = (snap.players || []).map((p: any) => {
         const backup = loadGameScores(gameId, p.id);
         if (!backup) return p;
-        const { merged } = mergeBackupRow(p, backup, n0);
-        saveGameScores(gameId, p.id, merged);
+        const { merged } = mergeBackupRow(p, backup, n0, loadSyncedWatermark(gameId, p.id));
+        saveGameScores(gameId, p.id, merged, true, backup.at);
         return { ...p, ...merged };
       });
       setGame(snap.game as any);
@@ -1704,37 +1718,47 @@ function GameRoom({
     // Offline: don't await fetches that will just hang for seconds — boot from the
     // snapshot straight away.
     if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      recoveryReadyRef.current = false;
       if (bootFromSnapshot()) return;
       setLoading(false);
       return;
     }
-    const { data: g } = await supabase
+    try {
+    const { data: g, error: gameError } = await supabase
       .from("games")
       .select("*")
       .eq("id", gameId)
       .single();
-    const { data: ps } = await supabase
+    const { data: ps, error: playersError } = await supabase
       .from("game_players")
       .select("*")
       .eq("game_id", gameId);
-    const { count: postedRounds } = await supabase
+    if (request !== loadRequestRef.current || revision !== scoreRevisionRef.current || scoreWriterRef.current?.busy) return;
+    if (gameError || playersError || !g || !ps) {
+      recoveryReadyRef.current = false;
+      if (!gameRef.current) bootFromSnapshot();
+      setSyncState("error");
+      setLoading(false);
+      return;
+    }
+    const { count: postedRounds, error: postedError } = await supabase
       .from("rounds")
       .select("id", { count: "exact", head: true })
       .eq("game_id", gameId)
       .is("deleted_at", null);
-    setPostedRoundCount(postedRounds || 0);
-    const { data: altRows } = await supabase
+    if (!postedError) setPostedRoundCount(postedRounds || 0);
+    const { data: altRows, error: altError } = await supabase
       .from("game_alt_shot_scores")
       .select("game_id,foursome_id,side,hole_index,strokes,updated_at,updated_by")
       .eq("game_id", gameId);
-    let loadedAlt = (altRows || []) as AltShotScoreRow[];
+    if (request !== loadRequestRef.current || revision !== scoreRevisionRef.current || scoreWriterRef.current?.busy) return;
+    let loadedAlt = (altRows || loadGameSnapshot(gameId)?.altShotScores || []) as AltShotScoreRow[];
     const altResetAt = (g as any)?.scores_reset_at ? new Date((g as any).scores_reset_at).getTime() : 0;
     for (const d of loadAltShotDrafts(gameId)) {
       if (altResetAt && d.at < altResetAt) { clearAltShotDraft(gameId, d.foursomeId, d.side, d.holeIndex); continue; }
       loadedAlt = upsertAltShotScoreLocal(loadedAlt, gameId, d.foursomeId, d.side, d.holeIndex, d.strokes);
     }
-    setAltShotScores(loadedAlt);
-    if (!g) { if (bootFromSnapshot()) return; }
+    if (!altError) setAltShotScores(loadedAlt);
     // Defensively normalize: a freshly created or legacy game may have null
     // pairings/teams/holes_meta, which would crash the match views downstream.
     const safeGame = g
@@ -1747,33 +1771,28 @@ function GameRoom({
         }
       : g;
     setGame(safeGame as any);
-    // Reconcile against the local backups. A score lost to a screen lock or no
-    // signal lives in this device's backup; merge it into any hole the DB is
-    // missing and push the result back. We reconcile EVERY row this device has a
-    // backup for — so in group scoring, the marker recovers the OTHER players'
-    // offline-entered scores too, not just their own. A backup only ever fills
-    // gaps; it never removes data. (Pushing another player's row needs marker
-    // rights server-side; a failed push is swallowed and the backup is kept.)
+    // Reconcile against the last CONFIRMED server snapshot, preserving local
+    // corrections, deletions and stats. A read confirms remote data only. The
+    // role-aware outbox below uploads pending edits after these rows are installed.
     const n = (safeGame as any)?.holes_meta?.length || 18;
     const resetAt = (safeGame as any)?.scores_reset_at ? new Date((safeGame as any).scores_reset_at).getTime() : 0;
     const reconciled: any[] = [];
-    for (const p of (ps || [])) {
-      const backup = loadGameScores(gameId, p.id);
-      if (!backup) { reconciled.push(p); continue; }
-      // A backup saved before the organizer's last reset is stale — discard it
-      // so a reset can't be undone by this device's pre-reset memory.
-      if (resetAt && (backup.at ?? 0) < resetAt) { clearGameScores(gameId, p.id); clearSyncedWatermark(gameId, p.id); reconciled.push(p); continue; }
-      const { merged, changed } = mergeBackupRow(p, backup, n);
-      let row = p;
-      if (changed) {
-        row = { ...p, ...merged };
-        try { await supabase.from("game_players").update(merged).eq("id", p.id); } catch {}
+    for (const p of ps) {
+      let backup = loadGameScores(gameId, p.id);
+      if (backup && resetAt && backup.at < resetAt) {
+        clearGameScores(gameId, p.id);
+        clearSyncedWatermark(gameId, p.id);
+        backup = null;
       }
-      // Keep the backup in lockstep with the reconciled truth, and mark it synced.
-      saveGameScores(gameId, p.id, merged);
-      saveSyncedWatermark(gameId, p.id, merged as any);
-      reconciled.push(row);
+      const { merged } = mergeBackupRow(p, backup || p, n, backup ? loadSyncedWatermark(gameId, p.id) : null);
+      saveGameScores(gameId, p.id, merged, true, backup?.at ?? Date.now());
+      // Never acknowledge the local merge here: the fetch confirmed only p.
+      const confirmed = mergeBackupRow(p, p, n).merged;
+      saveSyncedWatermark(gameId, p.id, confirmed);
+      reconciled.push({ ...p, ...merged });
     }
+    gameRef.current = safeGame as any;
+    playersRef.current = reconciled;
     let mine = reconciled.find((p: any) => p.user_id === user.id) || null;
     setPlayers(reconciled);
     setMe(mine);
@@ -1781,6 +1800,14 @@ function GameRoom({
     if (mine && mine.course_handicap == null && (safeGame as any)?.holes_meta?.length)
       setNeedsSetup(true);
     setLoading(false);
+    recoveryReadyRef.current = true;
+    return true;
+    } catch {
+      recoveryReadyRef.current = false;
+      if (!gameRef.current) bootFromSnapshot();
+      setSyncState("error");
+      setLoading(false);
+    }
   }, [gameId, user.id]);
   useEffect(() => {
     load();
@@ -1908,7 +1935,7 @@ function GameRoom({
   }, []);
   const recomputePending = React.useCallback(() => { setPendingHoles(countPending()); }, [countPending]);
   // Durable outbox drain: push every row whose local backup differs from its synced
-  // watermark (full last-write-wins per row — safe under the single-writer model),
+  // watermark (only changed columns, under the existing single-writer model),
   // then mark it synced. Triggered on reconnect, foreground, a slow poll, and manual
   // Sync now — so recovery never depends on the browser’s online event firing.
   const drainingRef = React.useRef(false);
@@ -1942,7 +1969,7 @@ function GameRoom({
       return;
     }
     setSyncing(true);
-    try { await drainOutbox(); await load(); } finally { setSyncing(false); }
+    try { if (await load()) await drainOutbox(); } finally { setSyncing(false); }
   };
   // True when someone ELSE is the marker for my group — then the marker owns my
   // row and this device must never write it (a stale background flush would
@@ -1961,52 +1988,44 @@ function GameRoom({
   // stats but never its score. Individual scoring returns false (you own your own row).
   const scoreLockedForRow = React.useCallback((rowId: string): boolean => {
     const row = playersRef.current.find((p) => p.id === rowId);
-    if (!row) return false;
-    if (teeGroupsInUse && row.tee_group != null) {
+    if (!row) return true;
+    if (playersRef.current.some(p => p.tee_group != null) && row.tee_group != null) {
       const mk = playersRef.current.find((p) => p.tee_group === row.tee_group && p.is_marker);
-      return !!mk && mk.user_id !== user.id;
+      if (mk) return mk.user_id !== user.id;
     }
-    if (game?.marker_user_id) return game.marker_user_id !== user.id;
+    if (gameRef.current?.marker_user_id) return gameRef.current.marker_user_id !== user.id;
     return false;
-  }, [teeGroupsInUse, game?.marker_user_id, user.id]);
-  // Advance the synced watermark for exactly the columns we just pushed (merge, don't
-  // replace) so untouched columns don't later look dirty and get needlessly rewritten.
-  const advanceWatermark = (gid: string, rowId: string, bundle: any, cols: string[]) => {
-    const prev = loadSyncedWatermark(gid, rowId) || { scores: [], putts: [], fairways: [], penalties: [], sand: [] };
-    saveSyncedWatermark(gid, rowId, { ...prev, ...pickCols(bundle, cols as any) } as any);
-  };
-  // Push a row's changes column-scoped + role-aware. Marker/self → direct update of the
-  // changed columns. Non-marker on their own row → stats-only via the save_hole_stats
-  // chokepoint (server refuses to write the score). Returns true if something was written
-  // (or nothing needed writing). LWW per column.
-  const pushRowCols = async (rowId: string, bundle: any, clock?: Record<string, unknown>): Promise<boolean> => {
-    const gid = gameIdRef.current;
-    const locked = scoreLockedForRow(rowId);
-    let cols = changedCols(bundle, loadSyncedWatermark(gid, rowId));
-    if (locked) cols = cols.filter((c) => c !== "scores");
-    if (!cols.length) return true;
-    if (locked) {
-      const { error } = await supabase.rpc("save_hole_stats", {
-        p_player: rowId,
-        p_putts: cols.includes("putts") ? bundle.putts : null,
-        p_fairways: cols.includes("fairways") ? bundle.fairways : null,
-        p_penalties: cols.includes("penalties") ? bundle.penalties : null,
-        p_sand: cols.includes("sand") ? bundle.sand : null,
-      });
-      if (error) return false;
-    } else {
-      const body = { ...pickCols(bundle, cols), ...(clock || {}) };
-      const { error } = await supabase.from("game_players").update(body).eq("id", rowId);
-      if (error) return false;
-    }
-    advanceWatermark(gid, rowId, bundle, cols);
-    return true;
+  }, [user.id]);
+  // Shared writer serializes each row and acknowledges only confirmed writes.
+  if (!scoreWriterRef.current) scoreWriterRef.current = createGameScoreWriter({
+    backup: rowId => loadGameScores(gameIdRef.current, rowId),
+    watermark: rowId => loadSyncedWatermark(gameIdRef.current, rowId),
+    confirm: (rowId, bundle) => saveSyncedWatermark(gameIdRef.current, rowId, bundle),
+    locked: rowId => scoreLockedForRow(rowId),
+    paused: () => !recoveryReadyRef.current || resettingRef.current || (typeof navigator !== "undefined" && !navigator.onLine),
+    revision: () => { scoreRevisionRef.current++; },
+    send: async (rowId, body, locked, clock) => {
+      if (locked) {
+        const { error } = await supabase.rpc("save_hole_stats", {
+          p_player: rowId, p_putts: body.putts ?? null, p_fairways: body.fairways ?? null,
+          p_penalties: body.penalties ?? null, p_sand: body.sand ?? null,
+        });
+        if (error) return false;
+        // The void stats RPC must also produce a visible, matching stored row.
+        const { data, error: readError } = await supabase.from("game_players").select("id,putts,fairways,penalties,sand").eq("id", rowId).maybeSingle();
+        return !readError && !!data && Object.entries(body).every(([col, value]) => JSON.stringify(data[col]) === JSON.stringify(value));
+      }
+      const { data, error } = await supabase.from("game_players").update({ ...body, ...(clock || {}) }).eq("id", rowId).select("id,scores,putts,fairways,penalties,sand").maybeSingle();
+      return !error && !!data && Object.entries(body).every(([col, value]) => JSON.stringify(data[col]) === JSON.stringify(value));
+    },
+  });
+  const pushRowCols = async (rowId: string, _bundle: any, clock?: Record<string, unknown>): Promise<boolean> => {
+    const ok = await scoreWriterRef.current!.write(rowId, clock);
+    recomputePending();
+    if (!ok) setSyncState("error");
+    return ok;
   };
   pushRowColsRef.current = pushRowCols;
-  // Set true for the duration of a score reset so the background flush can't
-  // re-write the old scores (a PWA confirm() can fire visibilitychange/blur,
-  // which would otherwise flush the stale row right back over the reset).
-  const resettingRef = React.useRef(false);
   useEffect(() => {
     const flush = () => {
       if (resettingRef.current) return;       // a reset is in progress; don't write
@@ -2017,7 +2036,7 @@ function GameRoom({
       saveGameScores(gid, m.id, bundle);              // synchronous local backup, always lands
       // Best-effort network flush of only my changed columns; if a marker owns my score
       // it goes stats-only through the chokepoint (pushRowCols handles the routing).
-      void pushRowCols(m.id, bundle);
+      void pushRowColsRef.current(m.id, bundle);
     };
     const onVis = () => { if (document.visibilityState === "hidden") flush(); };
     document.addEventListener("visibilitychange", onVis);
@@ -2033,19 +2052,19 @@ function GameRoom({
   }, []);
 
   // When the device comes back online, reload — which reconciles every backed-up
-  // row and pushes any holes the DB is missing (offline entries) back up. This
+  // row against its confirmed watermark, then drains pending changes. This
   // syncs without needing to reopen the game.
   useEffect(() => {
-    // Reconnect: push my dirty rows FIRST (authoritative), then reload to pull others'.
-    const onOnline = () => { drainOutbox().then(() => load()); };
+    // Reconnect: read current reset/ownership state before admitting recovered edits.
+    const onOnline = () => { load().then(ready => { if (ready) return drainOutbox(); }); };
     // Foreground / focus: covers cases where the 'online' event never fires.
-    const onVis = () => { if (document.visibilityState === "visible") drainOutbox(); };
-    const onFocus = () => { drainOutbox(); };
+    const onVis = () => { if (document.visibilityState === "visible") load().then(ready => { if (ready) return drainOutbox(); }); };
+    const onFocus = () => { load().then(ready => { if (ready) return drainOutbox(); }); };
     window.addEventListener("online", onOnline);
     document.addEventListener("visibilitychange", onVis);
     window.addEventListener("focus", onFocus);
     // Slow poll: drainOutbox is a cheap local check when nothing's dirty / offline.
-    const iv = window.setInterval(() => { drainOutbox(); }, 20000);
+    const iv = window.setInterval(() => { load().then(ready => { if (ready) return drainOutbox(); }); }, 20000);
     return () => {
       window.removeEventListener("online", onOnline);
       document.removeEventListener("visibilitychange", onVis);
@@ -2054,7 +2073,7 @@ function GameRoom({
     };
   }, [drainOutbox, load]);
   // Recompute the pending count whenever the players (and thus their scores) change.
-  useEffect(() => { recomputePending(); }, [players, recomputePending]);
+  useEffect(() => { recomputePending(); void drainOutbox(); }, [players, recomputePending, drainOutbox]);
 
   // Build a player's per-hole Hole[] (with strokes received) for scoring math.
   const playerHoles = (p: Player): Hole[] => PS.playerHoles(p, game);
@@ -2134,6 +2153,7 @@ function GameRoom({
     // network write below gets frozen. Reconciled to the DB on next load.
     if (game) saveGameScores(game.id, me.id, { scores, putts, fairways, penalties, sand }, true);
     setSavingHole(holeIdx);
+    scoreRevisionRef.current++;
     lastEditRef.current = Date.now();
     await pushScores(me.id, { scores, putts, fairways, penalties, sand, ...clockPatch });
     lastEditRef.current = Date.now();
@@ -2174,6 +2194,7 @@ function GameRoom({
     // offline/lock entry for any player is recoverable. Synced back on reopen /
     // reconnect (see load()).
     if (game) saveGameScores(game.id, playerId, { scores, putts, fairways, penalties, sand }, true);
+    scoreRevisionRef.current++;
     lastEditRef.current = Date.now();
     await pushScores(playerId, { scores, putts, fairways, penalties, sand, ...clockPatch });
     lastEditRef.current = Date.now();
@@ -2833,6 +2854,8 @@ function GameRoom({
     resettingRef.current = true;
     const ok = confirm(`Reset "${game.name}"? This clears every player's scores, putts, fairways, penalties/sand and the round clock, and reopens the game if it was ended. Players, teams, and matchups are kept. Use this to wipe test scores.`);
     if (!ok) { resettingRef.current = false; return; }
+    await scoreWriterRef.current?.idle();
+    scoreRevisionRef.current++;
     const n = game.holes_meta?.length ?? 18;
     const blank = {
       scores: Array(n).fill(null),

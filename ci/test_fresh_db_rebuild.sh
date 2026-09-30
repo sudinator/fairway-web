@@ -44,6 +44,9 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-profile-privileges.sql"
 # Atomic personal-round save/discard, authenticated RLS and rollback proof.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-personal-round-persistence.sql"
 
+# 192.19: game posting preserves manual handicaps on both insert/repost paths.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-game-round-manual-handicap.sql"
+
 # Execute the full configured-game length round trip, score lock and reset/re-entry behavior.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-match-length-roundtrip.sql"
 

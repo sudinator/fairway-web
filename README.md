@@ -1,3 +1,7 @@
+## 192.19.260930 — Game recovery/posting candidate
+
+Game score recovery now keeps offline corrections/deletions/stat edits pending until confirmed. Migration 0161 preserves manual game handicaps and their source/audit snapshots when posting rounds. See RELEASE_VERIFICATION_192.19.md for proof and staging checks. Changed-files bundle assumes 192.18; production remains deferred.
+
 ## 192.18.260930 — New-round payload hotfix candidate
 
 Follow-up migration 0160 fixes UUID conversion of the unused id="" field sent for new rounds. See RELEASE_VERIFICATION_192.18.md. Supersedes 192.17; this changed-files bundle assumes 192.17 is already present.
