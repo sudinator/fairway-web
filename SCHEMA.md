@@ -1,3 +1,7 @@
+## 192.16.260929 — Profile privilege boundaries (0158)
+
+trg_guard_profile_privileged now runs BEFORE INSERT OR UPDATE. Browser profile inserts cannot grant admin/owner. Only the owner can change another non-owner admin flag; browser owner and profile-identity changes are forbidden. Admin changes produce an atomic activity_log entry through the trigger; admin_set_system_admin retains its interface and delegates audit to that trigger. Trusted service_role/direct database maintenance retain provisioning. Ban checks and blocklist insert trigger remain in place. No column or existing-data changes.
+
 ## 183.0.260906 — Trifecta single rule (migration 0150)
 `games.trifecta_scoring`: default 'match' (was 'per_hole'); CHECK `games_trifecta_scoring_single_rule` (null or 'match'). No other change.
 

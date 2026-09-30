@@ -1,0 +1,1 @@
+PASS: actual migration applied twice; authenticated RLS insert/update, owner RPC, direct owner audit, ban permissions, metadata spoof, service role and rollback scenarios

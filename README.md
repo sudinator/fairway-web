@@ -1,3 +1,7 @@
+## 192.16.260929 — Security candidate
+
+New migration 0158 enforces profile privilege boundaries on inserts and updates. See RELEASE_VERIFICATION_192.16.md for evidence and outstanding release gates. This package is not yet cleared for production.
+
 ## 179.7.260902 staging corrective — integration VAPID wiring
 
 The multi-session team competition is now called **Ryder Cup** throughout the interface. The Games screen explains the difference between a one-round Game and a multi-session Ryder Cup. Games launched from a Ryder Cup session begin with Group Results, money-game participation, and hole contests off; organizers can opt into them afterward. No migration is required beyond 0143.

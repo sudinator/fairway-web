@@ -1,3 +1,6 @@
+<!-- 192.16: profile privilege enforcement -->
+Browser-created profiles must start without system admin or owner privileges. Browser admin promotions/demotions are owner-only and audited atomically. Browser owner-marker and profile-identity changes are forbidden; trusted database maintenance is separate from browser authorization.
+
 # Birdie Num Num — Global App Rules
 
 The standing invariants for this app. These apply everywhere unless a rule explicitly scopes

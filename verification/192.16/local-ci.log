@@ -1,0 +1,608 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fairway-card@192.16.260929 ci
+> node scripts/check-deps.mjs || true; npm run lint:hooks && npx tsc --noEmit && npm test && npm run test:setup-nav && npm run guards:lifecycle && npm run guards && npm run build
+
+
+=== dependency currency ===
+  next                       installed ^16.3.0      latest ?            registry unreachable
+  react                      installed ^19.2.8      latest ?            registry unreachable
+  react-dom                  installed ^19.2.8      latest ?            registry unreachable
+  @supabase/supabase-js      installed ^2.45.4      latest ?            registry unreachable
+  @supabase/ssr              installed ^0.5.2       latest ?            registry unreachable
+  typescript                 installed ^5           latest ?            registry unreachable
+
+(dependency check: registry unreachable for some packages — network-restricted build, skipping)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fairway-card@192.16.260929 lint:hooks
+> eslint app components lib --max-warnings=0
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fairway-card@192.16.260929 test
+> { rm -rf .testout && tsc lib/setup-summary.test.ts lib/setup-summary.ts lib/alt-shot-scores.test.ts lib/alt-shot-scores.ts lib/alt-shot-side-scores.test.ts lib/alt-shot-side-scores.ts lib/alt-shot-simulation.test.ts lib/create-game-format.altshot.test.ts lib/setup-draft-lifecycle.test.ts lib/format-rules.test.ts lib/hole-result-consistency.test.ts lib/scoring-matrix.test.ts lib/trifecta-card-scoring.test.ts lib/live-trifecta-labels.test.ts lib/live-parity.diff.test.ts lib/live-competition.diff.test.ts lib/manual-handicap.test.ts lib/manual-handicap-simulation.test.ts lib/half-stroke-simulation.test.ts lib/closeout-freeze.test.ts lib/stroke-sets.test.ts lib/alt-shot-scoring.test.ts lib/alt-shot.test.ts lib/alt-shot.ts lib/match-length.test.ts lib/match-length.ts lib/nine-hole-payload.test.ts lib/nine-hole-handicap.test.ts lib/stroke-rounding.test.ts lib/stroke-agreement.test.ts lib/all-allocators.test.ts lib/nine-hole-posting.test.ts lib/game-type-coverage.test.ts lib/game-shape.test.ts lib/game-shape.ts lib/game-setup-policy.test.ts lib/game-setup-policy.ts lib/game-structure.test.ts lib/game-structure.ts lib/game-tee-assignment.test.ts lib/game-tee-assignment.ts lib/golf.ts lib/golf.test.ts lib/money.test.ts lib/money-scenarios.test.ts lib/bucket-model.test.ts lib/money.ts lib/legs.test.ts lib/legs.ts lib/grouping.ts lib/grouping.test.ts lib/sync-cols.ts lib/sync.test.ts lib/badges.ts lib/badges.test.ts lib/card.ts lib/card.test.ts lib/contests.ts lib/contests.test.ts lib/game-types.ts lib/competition.ts lib/competition.test.ts lib/player-scoring.ts lib/player-scoring.baseline.ts lib/player-scoring.test.ts lib/player-scoring.diff.test.ts lib/finish-gaps.ts lib/finish-gaps.baseline.ts lib/finish-gaps.test.ts lib/finish-gaps.diff.test.ts lib/segments.ts lib/segments.baseline.ts lib/segments.test.ts lib/segments.diff.test.ts lib/game-utils.ts lib/game-utils.baseline.ts lib/game-utils.test.ts lib/game-utils.diff.test.ts lib/flights.ts lib/game-create.ts lib/game-create.baseline.ts lib/game-create.test.ts lib/game-create.diff.test.ts lib/create-game-format.ts lib/create-game-format.test.ts lib/handicap-allowance.ts lib/handicap-allowance.test.ts lib/game-setup-draft.ts lib/game-setup-draft.test.ts lib/chart-helpers.ts lib/chart-helpers.test.ts lib/ai-sanitize.ts lib/ai-sanitize.test.ts lib/ai-contract.ts lib/ai-contract.test.ts lib/ttl-cache.ts lib/ttl-cache.test.ts lib/course-provider-id.ts lib/course-provider-id.test.ts lib/courses.ts lib/courses-order.test.ts lib/errors.ts lib/errors.test.ts lib/course-source-review.ts lib/course-source-review.test.ts lib/flights.ts lib/flights-tagcolor.baseline.ts lib/flights-tagcolor.diff.test.ts lib/round-stats.ts lib/round-stats.baseline.ts lib/round-stats.diff.test.ts lib/round-stat-completeness.test.ts --module commonjs --target es2020 --esModuleInterop --skipLibCheck --outDir .testout --rootDir lib && node .testout/setup-summary.test.js && node .testout/setup-draft-lifecycle.test.js && node .testout/format-rules.test.js && node .testout/hole-result-consistency.test.js && node .testout/scoring-matrix.test.js && node .testout/trifecta-card-scoring.test.js && node .testout/live-trifecta-labels.test.js && node .testout/live-parity.diff.test.js && node .testout/live-competition.diff.test.js && node .testout/manual-handicap.test.js && node .testout/manual-handicap-simulation.test.js && node .testout/half-stroke-simulation.test.js && node .testout/closeout-freeze.test.js && node .testout/stroke-sets.test.js && node .testout/alt-shot-scoring.test.js && node .testout/alt-shot.test.js && node .testout/alt-shot-scores.test.js && node .testout/alt-shot-side-scores.test.js && node .testout/alt-shot-simulation.test.js && node .testout/create-game-format.altshot.test.js && node .testout/match-length.test.js && node .testout/nine-hole-payload.test.js && node .testout/nine-hole-handicap.test.js && node .testout/stroke-rounding.test.js && node .testout/stroke-agreement.test.js && node .testout/all-allocators.test.js && node .testout/nine-hole-posting.test.js && node .testout/competition.test.js && node .testout/game-type-coverage.test.js && node .testout/game-shape.test.js && node .testout/game-setup-policy.test.js && node .testout/game-structure.test.js && node .testout/game-tee-assignment.test.js && node .testout/golf.test.js && node .testout/money.test.js && node .testout/money-scenarios.test.js && node .testout/bucket-model.test.js && node .testout/legs.test.js && node .testout/grouping.test.js && node .testout/sync.test.js && node .testout/badges.test.js && node .testout/card.test.js && node .testout/contests.test.js && node .testout/player-scoring.test.js && node .testout/player-scoring.diff.test.js && node .testout/finish-gaps.test.js && node .testout/finish-gaps.diff.test.js && node .testout/segments.test.js && node .testout/segments.diff.test.js && node .testout/game-utils.test.js && node .testout/game-utils.diff.test.js && node .testout/game-create.test.js && node .testout/game-create.diff.test.js && node .testout/create-game-format.test.js && node .testout/handicap-allowance.test.js && node .testout/game-setup-draft.test.js && node .testout/chart-helpers.test.js && node .testout/ai-sanitize.test.js && node .testout/ai-contract.test.js && node .testout/ttl-cache.test.js && node .testout/course-provider-id.test.js && node .testout/courses-order.test.js && node .testout/errors.test.js && node .testout/course-source-review.test.js && node .testout/flights-tagcolor.diff.test.js && node .testout/round-stats.diff.test.js && node .testout/round-stat-completeness.test.js && npx tsc lib/component-render.test.tsx lib/test-render.ts lib/test-dom.ts lib/golf.ts --outDir .testout-ui --module commonjs --target ES2020 --jsx react-jsx --esModuleInterop --skipLibCheck --moduleResolution node && node .testout-ui/component-render.test.js && rm -rf .testout-screens && tsc -p tsconfig.screens.json && node ci/patch_test_aliases.mjs .testout-screens && node .testout-screens/lib/screens.test.js && node .testout-screens/lib/trifecta-card-render.test.js && node .testout-screens/lib/trifecta-results-row.test.js && node .testout-screens/lib/format-picker.test.js && node .testout-screens/lib/match-length-picker.test.js; } > .test-report.txt 2>&1; rc=$?; cat .test-report.txt; exit $rc
+
+setup summary: 31 passed, 0 failed
+setup draft lifecycle: 10 passed, 0 failed
+format rules: 34 passed, 0 failed
+hole result consistency: 981 passed, 0 failed
+scoring matrix: 3698 passed, 0 failed
+trifecta-card-scoring (Architects Jul 5 + FB 6/21 fixtures): 15 passed, 0 failed
+live trifecta labels (641032 fixture): 14 passed, 0 failed
+  fence: pre-184.0 live behaviour detected on 7 of 8 non-Trifecta fixture(s)
+live/app parity: 68 field comparisons across 11 fixture(s), 0 mismatch(es)
+live cup parity: 49 passed, 0 failed
+manual course handicap: 17 passed, 0 failed
+manual handicap simulation: 76807 passed, 0 failed (4000 deterministic games, seed 0x5A17C)
+half-stroke simulation: 168914 passed, 0 failed (5000 deterministic matches, seed 0x9F17E)
+close-out freeze (571157 + 268834 + 248110 fixtures): 21 passed, 0 failed
+stroke sets (Architects Jul 5 fixture): 103 passed, 0 failed
+alt shot scoring: 30 passed, 0 failed
+alt shot: 73 passed, 0 failed
+alt shot scores: 49 passed, 0 failed
+alt shot side score model: 5006 passed, 0 failed
+alt shot simulation: 181751 passed, 0 failed (5000 deterministic matches, seed 0x17812)
+create-game format: 12 passed, 0 failed
+match length: 49 passed, 0 failed
+nine-hole payload: 12 passed, 0 failed
+nine-hole handicap: 15 passed, 0 failed
+stroke rounding: 24 passed, 0 failed
+stroke agreement: 38 passed, 0 failed
+all allocators: 253 passed, 0 failed
+nine-hole posting: 20 passed, 0 failed
+ok 1 - formats common golf point fractions
+ok 2 - labels supported cup formats
+ok 3 - singles match awards one point to winning competition team
+ok 4 - reversed stored pairing still renders Cup Team A on the left
+ok 5 - all-square completed Singles splits the Cup point
+ok 6 - competition totals combine sessions
+ok 7 - locked schedule denominator comes from planned sessions, not created games
+ok 8 - Cup outlook distinguishes an outright path from a share-only path
+ok 9 - Four-Ball awards the existing game result into the Cup score
+ok 10 - Four-Ball normalizes Cup Team A to the left when the stored foursome is reversed
+ok 11 - a running Four-Ball match is projected but is not counted complete
+ok 12 - post-clinch Four-Ball holes cannot rewrite a 5 & 3 result as 2 UP
+ok 13 - Alternate Shot aggregates canonical side-owned scores without copying player scores
+ok 14 - Ryder Cup Trifecta expands each foursome into two Singles and one Four-Ball match
+ok 15 - Ryder Cup Trifecta Singles allocate strokes within each head-to-head pair
+ok 16 - game 645502 freezes all nine Trifecta contests at mathematical close-out
+competition: 16 passed, 0 failed
+game type coverage: 89 passed, 0 failed
+
+=== game-shape.test ===
+PASS 97  FAIL 0
+All assertions passed.
+
+=== game-setup-policy.test ===
+PASS 53  FAIL 0
+All assertions passed.
+game-structure differential: 40000 randomized assertions + fixed transition matrix PASS
+game-tee-assignment: 5011/5011 assertions passed
+golf/computeBetting tests: PASS 53  FAIL 0
+
+=== money.test ===
+PASS 97  FAIL 0
+All assertions passed.
+
+=== money.test ===
+PASS 141  FAIL 0
+
+=== money-scenarios ===
+Scenarios exercised:
+  1. W1: add expenses to an event, each ower settles → event fully settled
+  2. W2: settle an event, then unmark → returns EXACTLY to pre-payment state
+  3. W3: settle event E, move a settled expense to event F → coverage follows the expense; both correct
+  4. W4: owe in two events, settle only one → settled/open are independent (dispute preserved)
+  5. W5: net-creditor member (owed overall) owes a share in another event → must NOT show phantom 'covered'
+  6. W6: everyone globally square (net 0) via untagged payments → every event shows settled
+  7. W7: settle → unmark → settle again → coverage restored, event settled
+  8. W8: guest expense — settling resolves to the guest's sponsor
+  9. W9: multi-payer expense — ower settles; allocations/coverage consistent
+  10. W10: settle event, then increase an expense → event shows the new shortfall (not settled)
+  11. W11: settle event, move a settled expense to Ungrouped → coverage leaves; source stays consistent
+  12. WF: 1500 random action sequences (add/settle/unmark/move/close/reopen) — invariants hold after EVERY step
+  13. RT: 1500 random states — the settle OFFER equals true remaining, and paying it squares the member exactly (never over)
+  14. XC: a member in two clubs — each club's balances/simplify are fully independent (no cross-club netting)
+
+PASS 125  FAIL 0
+
+bucket-model: 34 passed, 0 failed
+legs: PASS 30  FAIL 0
+grouping tests: PASS 297  FAIL 0
+sync/column tests: PASS 6  FAIL 0
+badges: 75 passed, 0 failed
+card: 11 passed, 0 failed
+contests: 26 passed, 0 failed
+player-scoring: 63 passed, 0 failed
+player-scoring DIFF (old vs new): 60429 comparisons, 0 mismatches
+OLD and NEW are IDENTICAL across every path.
+finish-gaps: 18 passed, 0 failed
+finish-gaps DIFF (old vs new): 7490 comparisons, 0 mismatches
+OLD and NEW are IDENTICAL across every path.
+segments: 20 passed, 0 failed
+segments DIFF (old vs new): 13867 comparisons, 0 mismatches
+OLD and NEW are IDENTICAL across every path.
+game-utils: 21 passed, 0 failed
+game-utils DIFF (old vs new): 12003 comparisons, 0 mismatches
+OLD and NEW are IDENTICAL across every path.
+game-create: 64 passed, 0 failed
+game-create DIFF (old vs new): 9000 comparisons, 0 mismatches
+OLD and NEW are IDENTICAL across every path.
+create-game-format: 41/41 assertions passed
+HANDICAP_ALLOWANCE_PASS 8/8 assertions
+game-setup-draft: 2009/2009 assertions passed
+chart-helpers: 10 passed, 0 failed
+ai-sanitize: 11 passed, 0 failed
+ai-contract tests passed
+ttl-cache tests passed
+PASS: current provider id accepted: vqbyfsjx
+PASS: current provider id accepted: 1wewazqg
+PASS: current provider id accepted: p69gkgne
+PASS: current provider id accepted: vvg9vsa7
+PASS: current provider id accepted: fjk8jxy3
+PASS: current provider id accepted: 5wng1nrq
+PASS: current provider id accepted: 6ep6g28a
+PASS: current provider id accepted: vm2kn2bz
+PASS: current provider id accepted: zr1d76hs
+PASS: current provider id accepted: x8xdjb3z
+PASS: current provider id accepted: svcsvbhv
+PASS: current provider id accepted: tdcw9a0j
+PASS: current provider id accepted: dm2xnm4k
+PASS: current provider id accepted: npjk17jn
+PASS: current provider id accepted: sh98rvpq
+PASS: current provider id accepted: j8wp0c0t
+PASS: current provider id accepted: sq8txgf0
+PASS: current provider id accepted: chepnead
+PASS: legacy numeric provider id accepted
+PASS: trimmed provider id normalized
+PASS: unsafe provider id rejected: ""
+PASS: unsafe provider id rejected: " "
+PASS: unsafe provider id rejected: "../../etc"
+PASS: unsafe provider id rejected: "abc/def"
+PASS: unsafe provider id rejected: "abc?x=1"
+PASS: unsafe provider id rejected: "abc#frag"
+PASS: unsafe provider id rejected: "abc def"
+PASS: unsafe provider id rejected: "abc%2Fdef"
+PASS: unsafe provider id rejected: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+PASS: safe helper matches normalized fixtures
+course ordering: 4 passed, 0 failed
+[Couldn't save the pairing] 42501 { code: '42501' }
+[Couldn't save] 42501 {
+  code: '42501',
+  message: 'new row violates row-level security policy for table "games"'
+}
+failure messages: 24 passed, 0 failed
+course source review transition: PASS
+flightTagColor DIFF (old vs new): 5012 comparisons, 0 mismatches
+OLD and NEW are IDENTICAL across every path.
+roundStats DIFF (old vs new): 6000 comparisons, 0 mismatches
+OLD and NEW are IDENTICAL across every path.
+round stat completeness: 8 passed, 0 failed
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+component render: 17 passed, 0 failed
+patched 24 file(s) in .testout-screens
+  accepted contrast exceptions in use: #C9A227 on #1B5A46 (3.34:1), #C9A227 on #16503D (3.86:1)
+screen render: 67 passed, 0 failed
+trifecta card render — Architects Jul 5, Foursome 1
+trifecta card render: 8 passed, 0 failed
+Each child in a list should have a unique "key" prop.
+
+Check the render method of `GroupScorecard`. See https://react.dev/link/warning-keys for more information.
+trifecta results row: 20 passed, 0 failed
+format picker: 25 passed, 0 failed
+match length picker: 18 passed, 0 failed
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fairway-card@192.16.260929 test:setup-nav
+> NEXT_PUBLIC_SUPABASE_URL=https://example.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=placeholder node .testout-screens/lib/game-setup-workspace.test.js
+
+game setup workspace navigation: 23 passed, 0 failed
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fairway-card@192.16.260929 guards:lifecycle
+> python3 ci/check_course_handicap_source_181_13.py && python3 ci/check_match_length_management_182_0.py && python3 ci/check_game_lifecycle_contract.py
+
+181.13 Course Handicap source contract: PASS (5/5)
+Match-length management contract: PASS (11/11)
+PASS: organizer deletion rejects ended or posted Games
+PASS: system-admin Game deletion is authenticated and anon-denied
+PASS: system-admin deletion removes only Alternate Shot history
+PASS: system-admin Game deletion is transactionally audited
+PASS: completed Ryder Cup deletion is system-admin-only
+PASS: system-admin oversight RPC is bounded and read-only
+PASS: system admins get SELECT-only game-player inspection
+PASS: live RLS contract includes system-admin inspection policy
+PASS: fresh database behavior proves admin visibility and deletion preservation
+PASS: fresh database creates auth principals before FK-protected Ryder Cup fixtures
+PASS: fresh database keeps ordinary and system-admin identities separate
+PASS: Admin home exposes searchable Games oversight
+PASS: Admin inspection opens existing Game without joining and returns to oversight
+PASS: Game room labels system-admin actions explicitly
+PASS: organizer UI hides completed Game deletion
+PASS: Ryder Cup UI distinguishes system admin from other managers
+game lifecycle contract: PASS (16/16)
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fairway-card@192.16.260929 guards
+> python3 ci/check_scoring_input_contract.py && python3 ci/check_trifecta_single_rule.py && python3 ci/check_trifecta_one_singles_source.py && python3 ci/check_live_parity_coverage.py && python3 ci/check_live_route_contract.py && python3 ci/check_stroke_dot_bases.py && python3 ci/check_handicap_single_source.py && python3 ci/check_live_manual_handicap.py && python3 ci/check_build_needs_no_secrets.py && python3 ci/check_sql_assertion_messages.py && python3 ci/check_single_altshot_source.py && python3 ci/check_altshot_view_contract.py && python3 ci/check_altshot_team_card_contract.py && python3 ci/check_team_play_altshot_contract.py && python3 ci/check_team_setup_results_regression.py && python3 ci/check_team_match_ryder_results.py && python3 ci/check_competition_contract.py && python3 ci/check_competitive_assignment_contract.py && python3 ci/check_react_hook_order_source.py && python3 ci/check_draft_not_resurrected.py && python3 ci/check_setup_reachable.py && python3 ci/check_nine_hole_basis.py && python3 ci/check_single_stroke_allocator.py && python3 ci/check_no_build_artifacts.py && python3 ci/check_legacy_migration_prereqs.py && python3 ci/check_db_extension_prereqs.py && python3 ci/check_migration_ledger_contract.py && python3 ci/check_migration_manifest.py && python3 ci/check_migration_parity_contract.py && python3 ci/check_migration_immutability.py && python3 ci/check_core_rls_helpers.py && python3 ci/check_core_rls_baseline.py && python3 ci/check_core_rls_source_closure.py && python3 ci/check_ci_runtime_contract.py && python3 ci/check_fresh_db_ci_contract.py && python3 ci/check_vapid_contract.py && python3 ci/check_reactive_time_contract.py && python3 ci/check_round_analysis_state_contract.py && python3 ci/check_env_hygiene.py && python3 ci/check-jsx-escapes.py && python3 ci/check-min-fontsize.py && python3 ci/check-global-rules.py && python3 ci/check-chart-overflow.py && python3 ci/check-date-inputs.py && python3 ci/check-bottom-sheets.py && python3 ci/check-safe-area-frames.py && python3 ci/check-contrast.py && python3 ci/check-popup-close.py && python3 ci/check_migration_authorization.py && python3 ci/check_course_schema_contract.py && python3 ci/workflow_fault_simulation.py && python3 ci/check_integration_contract.py && python3 ci/check_effect_suppressions.py && python3 ci/check_bet_atomicity_contract.py && python3 ci/check_player_tee_setup_contract.py && python3 ci/check_course_provider_id_contract.py && python3 ci/check_extraction_reachability.py && python3 ci/check_extracted_state_hygiene.py && python3 ci/check_extracted_import_debt.py && python3 ci/check_pwa_update_contract.py && python3 ci/check_staging_environment_marker.py && python3 ci/check_course_source_transparency.py && python3 ci/check_dashboard_putts_round_contract.py && python3 ci/check_round_rating_slope_correction.py && python3 ci/check_game_setup_workspace_contract.py && python3 ci/check_game_setup_policy_contract.py && python3 ci/check_game_course_change_contract.py && python3 ci/check_game_control_center_polish.py && python3 ci/check_create_game_draft_contract.py && python3 ci/check_create_game_state_inventory.py && python3 ci/check_game_structure_contract.py && python3 ci/check_create_game_workspace_contract.py && python3 ci/check_create_game_tee_inheritance.py && python3 ci/check_create_game_resume_and_betting_scope.py && python3 ci/check_create_game_format_selection.py && python3 ci/check-design-scale.py && python3 ci/check-palette-closure.py && python3 ci/check-overlay-contract.py && python3 ci/check_resolved_contrast.py && python3 ci/check_version_ledger.py && python3 ci/computed_colour_matrix.py . && python3 ci/check_tap_targets.py && python3 ci/check_shell_geometry.py && python3 ci/check_test_assertions.py && python3 ci/verify_release.py .
+
+scoring input contract: PASS (match engines use exact basis; alt-shot uses canonical side handicaps)
+computeTrifecta production call sites checked: 7
+PASS one Trifecta rule: no per-hole variant, no scoring argument, column only written as "match"
+PASS Trifecta singles have one source (computeTrifecta) and one label rule (trifectaRowState)
+live parity coverage: rendered=['alt_shot', 'fourball', 'match', 'trifecta'] covered=['alt_shot', 'fourball', 'match', 'trifecta']
+PASS live page renders from lib/live-scoring and every rendered format has a parity fixture
+PASS live route owns its scroll container and labels from the winning side
+stroke-dot bases: 6 tokens, 4 dot surfaces discovered
+PASS every stroke dot comes from strokeSets with one basis, one colour and a label
+handicap single source: 31 file(s) touch a handicap, 23 checked, 8 exempt with a stated reason
+known debt: 5 file(s) still reading a raw handicap
+live manual handicap: 2 handicap-deriving function(s) checked
+PASS the Supabase client is constructed lazily; `next build` needs no credentials
+SQL assertion messages: 2 matched string(s) checked
+single alt-shot source: PASS (side handicaps computed only in lib/game-shape.ts)
+PASS FourballView identifies alternate shot explicitly
+PASS Alternate shot match summary uses altShotStatus
+PASS Alternate shot hole detail uses altShotHoleDetail
+PASS Alternate shot reads duplicated partner rows safely
+PASS Alternate shot surfaces partner-row conflicts
+PASS Alternate shot has its own results heading
+PASS Scorecard running line reads both partner rows
+PASS Play header identifies alternate shot
+PASS Play subtitle identifies one-ball match play
+PASS Alternate shot conflicts block group finish
+PASS Alternate shot conflicts block game end
+PASS alternate shot collapses duplicated partner rows into side columns
+PASS alternate shot card names the team not the clicked player
+PASS alternate shot card shows side playing handicap
+PASS alternate shot score cells show side net rather than Stableford points
+PASS alternate shot modal hides individual stat entry
+PASS alternate shot modal writes only the side score
+PASS alternate shot group segment component hard-stops if called
+PASS alternate shot does not render individual group segment side game
+PASS alternate shot does not render an individual personal scorecard
+PASS alternate shot six-hole individual board remains gated off
+PASS Match and Trifecta retain explicit matchup contract
+PASS Four-Ball/Alternate Shot use matchups only for legacy no-team games
+PASS new Four-Ball/Alternate Shot/Trifecta games create two teams
+PASS team Four-Ball/Alternate Shot expose Groups setup
+PASS Alternate Shot first-driver selection is persisted and consumed
+PASS live Alternate Shot write path no longer fans a score into player rows
+PASS live Alternate Shot scoring writes through canonical side-score RPC
+PASS scorecard and results read canonical side-owned scores
+PASS 0140 creates and records canonical side-score store
+PASS score reset clears side scores and scoring-start marker
+PASS Alternate Shot and Ryder Cup session side games default off
+PASS team Four-Ball/Alternate Shot derive contests from Teams + Groups
+PASS 0141 persists explicit clear tombstones for legacy-score masking
+PASS canonical side-score model represents clear as a persisted null override
+team-play/Alternate Shot contract: 14/14 PASS
+Team/setup/results regression contract: PASS (8/8)
+Team Match Ryder results contract: PASS (10 source + 7 model cases)
+PASS: 0142 records itself
+PASS: competition parent/roster/session tables exist
+PASS: session base supports original team match engines
+PASS: 0146 adds contract-bound Ryder Cup Trifecta sessions
+PASS: 0147 permits draft Trifecta groups but caps both sides at two
+PASS: child session links to ordinary game
+PASS: RLS enabled on all competition tables
+PASS: competition policies call canonical two-argument group helpers
+PASS: system admin retains Cup read/update visibility outside membership
+PASS: removed organizers cannot mutate Cup structure unless system admin
+PASS: Cup creation is atomic through one database RPC
+PASS: Cup creation RPC validates active club roster and both teams
+PASS: Cup teams require distinct names and canonical A/B child keys
+PASS: cup entry lives inside Games surface
+PASS: cup child game reuses CreateGame seed
+PASS: Cup organizer opt-out contract exists in shared player-row builder
+PASS: team assignment is inherited into child game rows
+PASS: aggregation uses canonical existing scoring engines
+PASS: UI exposes Four-Ball Alternate Shot Singles and Trifecta sessions
+PASS: Ryder Cup Trifecta uses one scorecard with fixed match and best-ball contracts
+PASS: Ryder Cup Trifecta exposes team groups and synchronizes their foursomes
+PASS: Trifecta session planning converts foursomes into three matches
+PASS: one match row keeps teams left/right with centered result
+PASS: linked Cup games keep persistent team contract
+PASS: roster trigger handles DELETE without touching NEW
+PASS: competition score normalizes Team A to left
+PASS: Cup score refreshes live while open
+PASS: 0143 records locked schedule contract
+PASS: locked schedule changes require explicit audited reopen
+PASS: Cup denominator and clinch copy use planned schedule
+PASS: Cup game handoff links an existing planned session
+PASS: weighted Cup points use golf quarter fractions
+PASS: Cup outcome separates outright and share-only paths
+PASS: Singles outlook uses match points and long names wrap
+PASS: 0145 records the Ryder Cup lifecycle contract
+PASS: Ryder Cup lifecycle RPCs are authenticated and permission checked
+PASS: Ryder Cup deletion is atomic across linked games and parent
+PASS: Ryder Cup deletion preserves own-ball rounds and removes shared-ball rounds
+PASS: Ryder Cup UI exposes rename and explicit format-aware deletion
+PASS: successful Ryder Cup deletion exits detail and reloads the parent list
+PASS: deleted Ryder Cup links use zero-row-safe loading and friendly copy
+PASS: Ryder Cup navigation title is singular while list grammar remains plural
+PASS: 0148 preserves the planned session while deleting its linked game
+PASS: 0148 permits only authenticated Cup managers
+PASS: 0148 preserves own-ball history and removes Alternate Shot shared-ball rounds
+PASS: linked-game delete UI uses the dedicated RPC and surfaces failure
+PASS: Ryder Cup roster shows live team count and index balance
+competition contract: PASS (47/47)
+competitive assignment contract: PASS (32/32)
+React hook-order source guard: PASS (76 hook-using function components checked)
+draft not resurrected: PASS (saves stop at creation, guard set before the clear)
+setup reachability: PASS (3 foursome format(s), all have an editor)
+nine-hole basis: PASS (halved once at write time; slope untouched; read side does not halve)
+single stroke allocator: PASS (one implementation; callers pass their hole list)
+build artifacts: PASS (no compiled output beside the sources)
+Historical migration dependency closure: PASS
+ - scanned all 156 globally ordered migrations, not a sampled subset
+ - relation dependencies checked: 1280 across 49 repo-created relations
+ - function dependencies checked: 656 across 157 repo-created functions
+ - policy dependency operations checked: 168
+ - explicit column-state operations checked: 114
+ - executable column dependencies checked: 199
+ - custom type dependencies checked: 0 across 0 repo-created types
+ - historical pre-0034 auth helpers, pre-0017 notification policy, and out-of-band baseline columns are reconstructed in 0001
+ - extension ordering is independently enforced by check_db_extension_prereqs.py
+ - disposable fresh-database execution remains the authoritative final proof
+DB extension prerequisite contract: PASS
+ bootstrap extensions: citext
+Migration ledger contract: PASS (45 migrations checked)
+Migration manifest check: PASS (MIGRATIONS.md matches committed migration files)
+Migration parity contract: PASS (10/10)
+Migration immutability: SKIP (only enforced on pull requests targeting main)
+Core RLS helper baseline contract: PASS
+ - exact Production helper definitions: 6
+Core RLS baseline contract: PASS
+ - exact Production policies: 60
+ - RLS tables: 12
+ - table grants: exact exported privilege set for anon/authenticated
+Core RLS source-closure contract: PASS
+ - core tables: 12
+ - policy helper functions: is_admin, is_game_member, is_group_admin, is_group_member, is_tee_group_marker, shares_active_club
+CI runtime contract: PASS (Node 22 pinned in .nvmrc + package engines; duplicate app build removed)
+Fresh DB CI contract: PASS
+VAPID source contract: PASS
+Reactive-time contract: PASS
+Round analysis state contract: PASS
+Environment hygiene: PASS (27 referenced variables documented)
+PASS — no escapes in JSX text
+font-size check passed: no shipped font under 11px
+global-rules: pass
+Mobile fit contract: PASS (full-width padded boxes are border-box; match tables use HScroll)
+chart-overflow check: clean
+date-input check passed: all date fields are iOS-safe
+bottom-sheet check passed: all bottom popups clear the safe area
+safe-area frame check passed: fixed bordered frames respect the top notch
+contrast check passed: no element mixes same-family background and text
+popup-close check passed: every BottomSheet has an onClose (× close control)
+migration authorization guard: ok
+Authorization hardening contract: PASS (migration, client, CI secret boundary, negative tests)
+COURSE SCHEMA CONTRACT: PASS
+WORKFLOW FAULT SIMULATION: PASS (50087 checks; 50,000 randomized RSVP operations)
+STAGING INTEGRATION CONTRACT: PASS
+EFFECT SUPPRESSION GUARD: PASS (0 react-hooks/exhaustive-deps suppressions)
+BET ATOMICITY CONTRACT: PASS (0134 runtime ambiguity regression covered)
+PASS: player tee selector always rendered
+PASS: tee options merge player snapshots
+PASS: yardage is not a tee-selection prerequisite
+PASS: handicap override uses the player tee only
+PASS: handicap override does not borrow another player tee
+PASS: course lookup has global fallback
+PASS: async course lookup captures narrowed identifiers
+PASS: tee change still recalculates course handicap
+PASS: tee change still persists player tee snapshot
+PASS: detail endpoint validates opaque provider id
+PASS: search endpoint normalizes returned provider id
+PASS: detail endpoint URL-encodes provider id
+PASS: numeric-only course id validation removed
+PASS: manage course search ids are strings
+PASS: round setup search ids are strings
+PASS: yardage lookup ids are strings
+PASS: facility refresh validates provider id through shared helper
+PASS: new course writes canonical external_id
+PASS: Francis Byrne golden id is permanent regression fixture
+Extraction reachability: PASS (16 critical contract links)
+Extracted-state hygiene: PASS
+Unused-symbol debt ratchet: WARNING (advisory; does not block release)
+ - app/join/[code]/page.tsx: unused-symbol debt increased 0 -> 1
+ - app/live/[token]/page.tsx: unused-symbol debt increased 0 -> 2
+ - app/page.tsx: unused-symbol debt increased 0 -> 1
+ - components/competitions.tsx: unused-symbol debt increased 0 -> 1
+ - components/feedback.tsx: unused-symbol debt increased 0 -> 1
+ - components/game/format-picker.tsx: unused-symbol debt increased 0 -> 1
+ - components/game/game-list.tsx: unused-symbol debt increased 57 -> 58
+ - components/game/leader-row.tsx: unused-symbol debt increased 0 -> 1
+ - components/game/match-length-picker.tsx: unused-symbol debt increased 0 -> 1
+ - components/game/setup/game-setup-workspace.tsx: unused-symbol debt increased 0 -> 1
+ - components/groups.tsx: unused-symbol debt increased 0 -> 1
+ - components/help-search.tsx: unused-symbol debt increased 0 -> 1
+ - components/round-editor.tsx: debt improved 24 -> 21; lower ci/unused_symbol_baseline.json so the improvement cannot regress
+ - components/round-setup.tsx: unused-symbol debt increased 30 -> 31
+ - components/rounds-list.tsx: debt improved 20 -> 18; lower ci/unused_symbol_baseline.json so the improvement cannot regress
+ - components/toast.tsx: unused-symbol debt increased 0 -> 1
+ - components/tournaments.tsx: unused-symbol debt increased 40 -> 41
+ - components/ui.tsx: unused-symbol debt increased 11 -> 12
+ - components/yardage-backfill.tsx: unused-symbol debt increased 0 -> 1
+ - lib/alt-shot-scoring.test.ts: unused-symbol debt increased 0 -> 1
+ - lib/format-picker.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/game-shape.ts: unused-symbol debt increased 0 -> 1
+ - lib/golf.ts: unused-symbol debt increased 1 -> 2
+ - lib/grouping.ts: unused-symbol debt increased 0 -> 1
+ - lib/legs.test.ts: debt improved 1 -> 0; lower ci/unused_symbol_baseline.json so the improvement cannot regress
+ - lib/live-parity.diff.test.ts: unused-symbol debt increased 0 -> 3
+ - lib/manual-handicap-simulation.test.ts: unused-symbol debt increased 0 -> 2
+ - lib/release-check.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/scoring-matrix.test.ts: unused-symbol debt increased 0 -> 1
+ - lib/screens.test.tsx: unused-symbol debt increased 0 -> 2
+ - lib/stroke-agreement.test.ts: unused-symbol debt increased 0 -> 1
+ - lib/trifecta-card-render.test.tsx: unused-symbol debt increased 0 -> 1
+ - lib/trifecta-results-row.test.tsx: unused-symbol debt increased 0 -> 2
+PASS: service worker version is app-version based, not build-id based
+PASS: service worker uses cache-first shell behavior
+PASS: register-sw prompt is version-driven
+PASS: register-sw does not treat waiting worker alone as an update
+PASS: help checker compares deployed version, not waiting worker
+PASS: service-worker activation remains explicit
+staging environment marker contract: PASS
+course source transparency contract: PASS
+PASS: dashboard label is Putts / round
+PASS: dashboard whole-round eligibility uses shared helper
+PASS: dashboard aggregate averages total putts across eligible rounds
+PASS: old Putts / hole card removed
+PASS: shared helper requires 18 played + 18 putt holes
+PASS: near-complete putt nudge threshold is 15-17
+PASS: round list names exact missing putt holes
+PASS: round list explains dashboard eligibility
+PASS: existing round-detail reminder reuses shared completeness helper
+PASS: fairway completeness remains par-3 aware
+dashboard putts/round contract: PASS
+Historical rating/slope correction contract: PASS (13 checks)
+Game setup workspace contract: PASS (35 boundary links + no DB ownership)
+Game setup transition-policy contract: PASS (31 source links + pure policy)
+Game course-change contract: PASS (18 source links)
+GAME_CONTROL_CENTER_POLISH_PASS: destructive-action wording and format-aware overview summary are locked
+CREATE_GAME_DRAFT_CONTRACT_PASS 9 checks
+CREATE_GAME_STATE_INVENTORY_PASS 38 state cells + 5 refs classified
+game structure contract: PASS (11 runtime links, 11 pure helpers)
+Create Game workspace contract PASS (13/13)
+CREATE_GAME_TEE_INHERITANCE_PASS 12/12 checks
+CREATE_GAME_RESUME_BETTING_SCOPE_PASS 11/11 checks
+CREATE_GAME_FORMAT_SELECTION_PASS 17/17 checks
+design scale: PASS (641 known off-scale use(s), none new)
+palette closure: PASS (73 known off-palette use(s) across 37 value(s), none new; 33 tokens, 12 allowlisted)
+overlay contract: PASS (0 undefined-overrides; 9 known hand-rolled overlay(s), none new)
+resolved contrast: PASS (14 known sub-threshold site(s), none new)
+version ledger: PASS (package.json 192.16.260929 matches DEPLOY_NOTES 192.16.260929 — Profile privilege bou)
+
+ptsColor()  Stableford points   (13px, needs 4.5:1)
+   ok    no score     #676253  on scorecard cell               #FBFAF4    5.82:1
+   ok    more than 2  #1A7A3C  on scorecard cell               #FBFAF4    5.16:1
+   ok    exactly 2    #2E5AB8  on scorecard cell               #FBFAF4    6.14:1
+   ok    under 2      #B83A2E  on scorecard cell               #FBFAF4    5.45:1
+
+flightTagColor()  flight tag fill   (11px, needs 4.5:1)
+   ok    A            #5AA9E6  on dark ink on the tag          #06251A    6.41:1
+   ok    B            #C9A227  on dark ink on the tag          #06251A    6.74:1
+   ok    C            #8FE0B0  on dark ink on the tag          #06251A   10.45:1
+   ok    D            #E0915B  on dark ink on the tag          #06251A    6.50:1
+   ok    other        #B2CBBD  on dark ink on the tag          #06251A    9.45:1
+
+colorFor()  player accent   (11px, needs 4.5:1)
+   ok    even index   #A3C6F5  on scorecard header strip       #1B5A46    4.60:1
+   ok    odd index    #E0C25E  on scorecard header strip       #1B5A46    4.64:1
+
+dashboard d.c  stat bars   (12px, needs 4.5:1)
+   ok    blue         #38BDF8  on C.green text on the bar itself #0E3B2E    5.82:1
+   ok    green        #4ADE80  on C.green text on the bar itself #0E3B2E    7.16:1
+   ok    purple       #C77DFF  on C.green text on the bar itself #0E3B2E    4.64:1
+   ok    red          #FB7185  on C.green text on the bar itself #0E3B2E    4.63:1
+
+KIND_COLOR  bug chip   (12px, needs 4.5:1)
+   ok    white on red #FFFFFF  on bug chip                     #B83A2E    5.70:1
+
+KIND_COLOR  wish chip   (12px, needs 4.5:1)
+   ok    white on blue #FFFFFF  on wish chip                    #2E5AB8    6.42:1
+
+KIND_COLOR  question chip   (12px, needs 4.5:1)
+   ok    dark on gold #0E3B2E  on question chip                #C9A227    5.16:1
+
+leader-row relCol / col  net vs par   (15px, needs 4.5:1)
+   ok    no thru      #B2CBBD  on leader row                   #1B5A46    4.69:1
+   ok    no thru      #B2CBBD  on own row                      #16503D    5.41:1
+   ok    under        #7FD6A3  on leader row                   #1B5A46    4.64:1
+   ok    under        #7FD6A3  on own row                      #16503D    5.36:1
+   ok    over         #F8BBB2  on leader row                   #1B5A46    4.91:1
+   ok    over         #F8BBB2  on own row                      #16503D    5.67:1
+   ok    level        #B2CBBD  on leader row                   #1B5A46    4.69:1
+   ok    level        #B2CBBD  on own row                      #16503D    5.41:1
+
+achievements col  hole vs par   (12px, needs 4.5:1)
+   ok    no score     #B2CBBD  on achievements panel           #1B5A46    4.69:1
+   ok    under        #7FD6A3  on achievements panel           #1B5A46    4.64:1
+   ok    over         #A3C6F5  on achievements panel           #1B5A46    4.60:1
+   ok    level        #F7F3E8  on achievements panel           #1B5A46    7.29:1
+
+catVerdict vcol  vs peers   (11px, needs 4.5:1)
+   ok    strength     #8FE0B0  on compare panel                #1B5A46    5.18:1
+   ok    on par       #F0C97B  on compare panel                #1B5A46    5.14:1
+   ok    focus here   #FFB3BC  on compare panel                #1B5A46    4.78:1
+
+==========================================================================
+33 combinations checked · 0 below threshold
+tap targets: PASS (0 known under 24px, none new)
+shell geometry: PASS (6 device profiles, nav fits and labels visible on all)
+test assertions: PASS (439421 across 49 suite(s), none lost)
+=== 177.69 · agreed fixes ===
+  PASS  no C.birdie text on a green surface
+  PASS  C.overRedDark readable on green (4.91:1)
+  PASS  C.overRedDark in use at 77 sites
+  PASS  no success button using C.underDark
+  PASS  6 success buttons restored to mint (found 6)
+  PASS  mint carries dark text (9.36:1)
+
+=== earlier releases · still holding ===
+  PASS  177.67 body weight 500
+  PASS  177.65 color-scheme declared
+  PASS  177.65 focus ring
+  PASS  177.67 weights are 500/700/800 (found [500, 700, 800])
+  PASS  177.67 radii are 6 values (found [6, 8, 10, 12, 14, 999])
+  PASS  177.61 C.field
+  PASS  177.61 C.faint / C.sage
+  PASS  177.59 end-game undefined-override fix
+  PASS  177.59 copy-summary fix
+  PASS  177.59 pill radius 999
+  PASS  177.67 btn() roles
+
+=== regression checks ===
+  PASS  no mangled token names from scripted edits
+  PASS  version parses (192.16.260929)
+  PASS  DEPLOY_NOTES newest entry is 192.16.260929
+
+20 passed, 0 failed
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fairway-card@192.16.260929 prebuild
+> node scripts/check-vapid-key.mjs && node scripts/write-version.mjs
+
+VAPID contract: PASS (service worker and build environment agree)
+Wrote app version 192.16.260929 (local-20260930030903)
+
+> fairway-card@192.16.260929 build
+> next build
+
+▲ Next.js 16.3.0 (Turbopack)
+✓ Running next.config.mjs took 10ms
+- Experiments (use with caution):
+  · cpus: 1
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 2.2s
+  Running TypeScript ...
+  Finished TypeScript in 4.6s ...
+  Collecting page data using 1 worker ...
+  Generating static pages using 1 worker (0/6) ...
+  Generating static pages using 1 worker (1/6) 
+  Generating static pages using 1 worker (2/6) 
+  Generating static pages using 1 worker (4/6) 
+✓ Generating static pages using 1 worker (6/6) in 244ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/analyze-round
+├ ƒ /api/courses
+├ ƒ /api/push
+├ ƒ /auth/callback
+├ ƒ /join/[code]
+├ ƒ /live/[token]
+├ ƒ /live/cup/[token]
+└ ƒ /organize/[gameId]
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

@@ -1,3 +1,12 @@
+## v192.16 — Security candidate and audit follow-ups
+
+- [ ] Clear full release gates and staging validation for migration 0158 (profile INSERT privileges, owner-only admin changes and audit).
+- [ ] Fix RoundEditor Cancel/save failures and cross-round draft identity.
+- [ ] Fix offline score recovery, correction/deletion synchronization and false success states.
+- [ ] Preserve manual nine-hole handicaps during posting and editing.
+- [ ] Make game creation atomic; review club-admin handicap updates that affect zero rows.
+- [ ] Players page: show Member since next to each player.
+
 ## v192.15
 
 - [ ] Apply 0157 (the role check in record_course_api_check; without it the monitor cannot record results).
