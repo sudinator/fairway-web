@@ -653,7 +653,8 @@ export function strokeGlyph(key: string, color: string, gives = false, i: number
   );
 }
 
-export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false, strokeSixes = false, uncap = false, showIndivDots = false, matchStrokeLabel, scoreLocked = false, lockedByName, onActiveHole, resumeHole }: {
+export function ScoreEntryCard({ readOnly = false, holes, hasHandicap, onSet, savingHole, showFairway = true, showPutts = true, showPenalties = true, opp, oppLabel, matchRun, matchMode = false, showSixes = false, strokeSixes = false, uncap = false, showIndivDots = false, matchStrokeLabel, scoreLocked = false, lockedByName, onActiveHole, resumeHole }: {
+  readOnly?: boolean;
   holes: EntryHole[];
   hasHandicap: boolean;
   onSet: (i: number, patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null }) => void;
@@ -682,7 +683,8 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   // mount forces the dropdowns to re-render so they show their saved value.
   const [hydrated, setHydrated] = React.useState(false);
   const [edit, setEdit] = React.useState<number | null>(null); // hole index whose editor popup is open
-  const openEdit = (i: number) => { setEdit(i); onActiveHole?.(i); };
+  React.useEffect(() => { if (readOnly) setEdit(null); }, [readOnly]);
+  const openEdit = (i: number) => { if (readOnly) return; setEdit(i); onActiveHole?.(i); };
   const nextHole = () => { if (edit == null) return; const ni = edit + 1; if (ni < holes.length) openEdit(ni); else setEdit(null); };
   const restoredRef = React.useRef(false);
   React.useEffect(() => {
@@ -702,6 +704,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
   }, []);
   const cycleFw = (i: number, cur: "hit" | "miss" | "left" | "right" | null, par: number) => {
     if (par < 4) return;
+    if (readOnly) return;
     onSet(i, { fairway: cur == null ? "hit" : cur === "hit" ? "left" : cur === "left" ? "right" : null });
   };
   // Basis → colour, one mapping for every surface (185.0). Light-ground variants: these rows are
@@ -782,7 +785,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
           const maxPutts = h.strokes != null && h.strokes > 0 ? Math.min(h.strokes, 6) : 6;
           const pts = stablefordPts(h.strokes, h.par, sfRecv(h));
           return (
-            <div key={i} id={`sehole-${i}`} onClick={() => openEdit(i)} style={{ borderBottom: `1px solid ${C.borderCard}`, paddingBottom: 5, marginTop: j === 0 ? 0 : 4, borderRadius: 8, background: edit === i ? "#EDF3EE" : "transparent", cursor: "pointer" }}>
+            <div key={i} id={`sehole-${i}`} onClick={() => openEdit(i)} style={{ borderBottom: `1px solid ${C.borderCard}`, paddingBottom: 5, marginTop: j === 0 ? 0 : 4, borderRadius: 8, background: edit === i ? "#EDF3EE" : "transparent", cursor: readOnly ? "default" : "pointer" }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 6, padding: "0 2px", flexWrap: "wrap" }}>
                 <span style={{ color: C.ink, fontWeight: 800, fontSize: 14 }}>Hole {h.n}</span>
                 <span style={{ color: C.faint, fontSize: 11, fontWeight: 500 }}>{h.yards ? <>· <b style={{ color: C.green }}>{h.yards}</b> yds </> : null}· S.I. {h.si ?? "–"}</span>
@@ -909,7 +912,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
     const runCol = run === "" ? C.faint : run === "AS" ? C.ink : (run.includes("UP") || run.includes("↑")) ? C.greenMid : C.birdie;
     const yds = h.yards ?? null;
     return (
-      <div key={h.n} id={`sehole-${i}`} onClick={() => openEdit(i)} style={{ background: C.card, border: `1px solid ${edit === i ? C.gold : C.borderCard}`, borderRadius: 12, overflow: "hidden", cursor: "pointer" }}>
+      <div key={h.n} id={`sehole-${i}`} onClick={() => openEdit(i)} style={{ background: C.card, border: `1px solid ${edit === i ? C.gold : C.borderCard}`, borderRadius: 12, overflow: "hidden", cursor: readOnly ? "default" : "pointer" }}>
         <div style={{ background: C.green, color: C.cream, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 12px" }}>
           <span style={{ fontSize: 16, fontWeight: 800 }}>{h.n}</span>
           <span style={{ fontSize: 12, color: C.sage, fontWeight: 500, flex: 1, marginLeft: 10 }}>Par <b style={{ color: "#EDE7D4" }}>{h.par}</b>{yds ? <> · <b style={{ color: "#EDE7D4" }}>{yds}</b> yds</> : null} · S.I. <b style={{ color: "#EDE7D4" }}>{h.si ?? "–"}</b></span>
@@ -1054,7 +1057,7 @@ export function ScoreEntryCard({ holes, hasHandicap, onSet, savingHole, showFair
         </div>
       )}
 
-      {edit != null && holes[edit] && (() => {
+      {!readOnly && edit != null && holes[edit] && (() => {
         const h = holes[edit!];
         return (
           <HoleScoreModal

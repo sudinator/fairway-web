@@ -37,10 +37,12 @@ async function createUser(label, isAdmin = false) {
   if (error || !data.user) throw new Error(`Could not create ${label}: ${error?.message}`);
   createdUserIds.push(data.user.id);
   await service.from("profiles").upsert({ id: data.user.id, email, display_name: `BNN ${label} ${suffix}`, is_admin: isAdmin });
-  const client = createClient(STAGING_URL, ANON, { auth: { persistSession: false, autoRefreshToken: false } });
+  const scoringToken = crypto.randomUUID();
+  const client = createClient(STAGING_URL, ANON, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { "x-bnn-scoring-device": scoringToken } } });
   const signed = await client.auth.signInWithPassword({ email, password });
   if (signed.error) throw new Error(`Could not sign in ${label}: ${signed.error.message}`);
-  return { id: data.user.id, email, client };
+  expectNoError(await client.rpc("claim_scoring_device", { p_token: scoringToken }), "test account acquires primary device");
+  return { id: data.user.id, email, client, scoringToken };
 }
 async function addMember(groupId, user, role = "member") {
   expectNoError(await service.from("group_members").insert({ group_id: groupId, user_id: user.id, email: user.email, role, status: "active" }), `seed ${role} membership`);
@@ -230,6 +232,29 @@ try {
   expectNoError(await alice.client.rpc("save_alt_shot_side_score", { p_game: altGame.id, p_foursome_id: "alt-group-1", p_side: "a", p_hole_index: 1, p_strokes: null }), "clearing a legacy Alternate Shot hole succeeds");
   const clearRow = expectNoError(await service.from("game_alt_shot_scores").select("strokes").eq("game_id", altGame.id).eq("foursome_id", "alt-group-1").eq("side", "a").eq("hole_index", 1).single(), "inspect Alternate Shot clear tombstone");
   ok(clearRow.strokes == null, "clear persists a canonical NULL tombstone instead of deleting the override");
+
+
+  // Same real account, second device: opening is passive, transfer fences direct and
+  // SECURITY DEFINER writes, and a foreground/queued old write cannot follow takeover.
+  const secondToken = crypto.randomUUID();
+  const secondDevice = createClient(STAGING_URL, ANON, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { "x-bnn-scoring-device": secondToken } } });
+  expectNoError(await secondDevice.auth.signInWithPassword({ email: alice.email, password }), "sign into second device for same scorer");
+  const passiveDevice = expectNoError(await secondDevice.rpc("claim_scoring_device", { p_token: secondToken }), "second device can inspect scoring ownership");
+  ok(passiveDevice.active === false, "opening desktop does not steal phone scoring");
+  const oldWrite = alice.client.rpc("save_alt_shot_side_score", { p_game: altGame.id, p_foursome_id: "alt-group-1", p_side: "a", p_hole_index: 0, p_strokes: 7 }).then(result => result);
+  const transferred = expectNoError(await secondDevice.rpc("claim_scoring_device", { p_token: secondToken, p_takeover: true }), "explicit desktop takeover succeeds");
+  ok(transferred.active === true, "second device is now primary");
+  const racingOld = await oldWrite;
+  ok(!racingOld.error || racingOld.error.message.includes("Scoring is active on another device"), "in-flight old write commits before transfer or is fenced");
+  expectNoError(await secondDevice.rpc("save_alt_shot_side_score", { p_game: altGame.id, p_foursome_id: "alt-group-1", p_side: "a", p_hole_index: 0, p_strokes: 3 }), "new primary saves side score");
+  const lateOld = await alice.client.rpc("save_alt_shot_side_score", { p_game: altGame.id, p_foursome_id: "alt-group-1", p_side: "a", p_hole_index: 0, p_strokes: 9 });
+  ok(!!lateOld.error?.message.includes("Scoring is active on another device"), "old device retry cannot overwrite new primary");
+  const alicePlayer = expectNoError(await service.from("game_players").select("id").eq("game_id", altGame.id).eq("user_id", alice.id).single(), "find own row for second-device stats gate");
+  const staleStats = await alice.client.from("game_players").update({ putts: [4,4] }).eq("id", alicePlayer.id);
+  ok(!!staleStats.error?.message.includes("Scoring is active on another device"), "old device direct own stats are fenced too");
+  const finalSide = expectNoError(await alice.client.from("game_alt_shot_scores").select("strokes").eq("game_id", altGame.id).eq("side", "a").eq("hole_index", 0).single(), "old device can still view new scores");
+  ok(finalSide.strokes === 3, "latest new-primary score is retained");
+  expectNoError(await alice.client.rpc("claim_scoring_device", { p_token: alice.scoringToken, p_takeover: true }), "return test account to original device");
 
   expectNoError(await admin.client.rpc("reset_game_scores", { p_game: altGame.id }), "organizer reset clears canonical Alternate Shot scoring");
   const afterAltReset = await service.from("game_alt_shot_scores").select("game_id", { count: "exact", head: true }).eq("game_id", altGame.id);

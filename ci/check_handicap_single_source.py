@@ -27,6 +27,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # Every file that mentions a handicap is examined. A file may only be skipped if it is named here
 # WITH A REASON, so adding a new screen fails the guard by default instead of passing silently.
 EXEMPT = {
+    "lib/draft.ts": "compares stored handicap/source in personalRoundFingerprint for backup acknowledgement; never derives or scores a handicap",
     "lib/golf.ts": "defines courseHandicapExact and the allowance primitives chBasis composes",
     "lib/game-shape.ts": "defines chBasis itself",
     "lib/player-scoring.baseline.ts": "frozen baseline copy, compared against by a differential test",

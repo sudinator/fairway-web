@@ -1,3 +1,7 @@
+## 193.0 — Primary scoring device
+
+0162 adds private RLS-enabled scoring_devices(user_id, token, claimed_at), authenticated account-scoped claim_scoring_device(uuid,uuid,boolean), and write triggers on rounds, holes, game_players, game_alt_shot_scores and games (scoring control/status fields). No direct app grants on the token table. Existing authorization still applies. x-bnn-scoring-device matches the requesting account token; advisory transaction lock namespace 162 serializes transfer/write. Trusted jobs with no end-user auth.uid retain their existing permissions. End-user round/holes mutations and game scoring/status/reset/marker changes are guarded.
+
 ## 192.20.260930 — No database contract change
 
 No schema, RPC, RLS, grant or migration changes. CI checks the authenticated caller's lack of internal-posting EXECUTE via has_function_privilege and retains the outsider/posting behavior assertions. Migration 0161 remains unchanged.

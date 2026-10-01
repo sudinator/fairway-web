@@ -4,6 +4,8 @@ insert into auth.users(id) values('15900000-0000-0000-0000-000000000001'),('1590
 insert into public.profiles(id,display_name) values('15900000-0000-0000-0000-000000000001','Round owner'),('15900000-0000-0000-0000-000000000002','Other member');
 set local role authenticated;
 select set_config('request.jwt.claim.sub','15900000-0000-0000-0000-000000000001',true);
+select public.claim_scoring_device('16200000-0000-0000-0000-000000000010',null,false);
+select set_config('request.headers','{"x-bnn-scoring-device":"16200000-0000-0000-0000-000000000010"}',true);
 do $$
 declare
   v_id uuid := '15900000-0000-0000-0000-000000000010';
@@ -61,12 +63,16 @@ begin
     raise exception 'FAIL: discard affected a different round at the same course'; end if;
   perform public.save_personal_round(v_other,v_payload,false,false);
   perform set_config('request.jwt.claim.sub','15900000-0000-0000-0000-000000000002',true);
+perform public.claim_scoring_device('16200000-0000-0000-0000-000000000010',null,false);
+perform set_config('request.headers','{"x-bnn-scoring-device":"16200000-0000-0000-0000-000000000010"}',true);
   begin
     perform public.save_personal_round(v_id,v_payload,true,false);
     raise exception 'FAIL: edited another users round';
   exception when insufficient_privilege or unique_violation then null; end;
   perform public.discard_personal_round(v_other);
   perform set_config('request.jwt.claim.sub','15900000-0000-0000-0000-000000000001',true);
+perform public.claim_scoring_device('16200000-0000-0000-0000-000000000010',null,false);
+perform set_config('request.headers','{"x-bnn-scoring-device":"16200000-0000-0000-0000-000000000010"}',true);
   if not exists(select 1 from public.rounds where id=v_other) then
     raise exception 'FAIL: another user discarded a hidden round'; end if;
 end $$;

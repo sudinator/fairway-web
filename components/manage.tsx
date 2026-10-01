@@ -1,5 +1,7 @@
 "use client";
 
+import { useScoringDevice } from "@/components/scoring-device";
+import { isPrimaryScoringDevice } from "@/lib/scoring-device";
 import React, { useEffect, useState, useCallback } from "react";
 import { HScroll } from "@/components/hscroll";
 import { createClient } from "@/lib/supabase";
@@ -1727,6 +1729,7 @@ export function NotificationsScreen({ user, onNavigate }: { user: any; onNavigat
 // Lets an admin browse a player's rounds and edit hole scores/putts.
 // Saving notifies both the player and the admin.
 function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; onBack: () => void }) {
+  const primary = useScoringDevice() === "primary";
   const [rounds, setRounds] = useState<Round[] | null>(null);
   const [editing, setEditing] = useState<Round | null>(null);
   const [holes, setHoles] = useState<Hole[]>([]);
@@ -1757,7 +1760,7 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
 
   /** Set or clear a round's manual course handicap, mirroring the game-side control (0154). */
   const saveRoundHandicap = async (value: number | null) => {
-    if (!editing) return;
+    if (!editing || !isPrimaryScoringDevice()) return;
     const patch = value == null
       ? { course_handicap_source: "derived", course_handicap_set_by: null, course_handicap_set_at: null }
       : { course_handicap: value, course_handicap_source: "manual", course_handicap_set_by: player.id, course_handicap_set_at: new Date().toISOString() };
@@ -1768,10 +1771,10 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
     setMsg("Course handicap updated.");
   };
   const [chEdit, setChEdit] = useState<string | null>(null);
-  const setHole = (i: number, patch: Partial<Hole>) => setHoles((hs) => hs.map((h, j) => (j === i ? { ...h, ...patch } : h)));
+  const setHole = (i: number, patch: Partial<Hole>) => { if (isPrimaryScoringDevice()) setHoles((hs) => hs.map((h, j) => (j === i ? { ...h, ...patch } : h))); };
 
   const saveRound = async () => {
-    if (!editing) return;
+    if (!editing || !isPrimaryScoringDevice()) return;
     setSaving(true); setMsg(null);
     try {
       for (const h of holes) {
@@ -1822,7 +1825,7 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
                   onChange={(e) => { const v = e.target.value; if (v === "" || /^-?\d*\.?\d*$/.test(v)) setChEdit(v); }}
                   style={{ ...inputStyle, padding: "8px 12px", width: 74, textAlign: "center" }}
                 />
-                <button style={btn(true)} onClick={() => saveRoundHandicap(chEdit === "" || chEdit == null ? null : Number(chEdit))}>
+                <button style={btn(true)} disabled={!primary} onClick={() => saveRoundHandicap(chEdit === "" || chEdit == null ? null : Number(chEdit))}>
                   {chEdit === "" ? "Clear" : "Set"}
                 </button>
                 {/* This card is CREAM. C.sage and C.gold are tuned for the dark green ground and
@@ -1885,7 +1888,7 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
         {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>{msg}</div>}
         <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
           <button style={btn(false)} onClick={() => setEditing(null)}>Cancel</button>
-          <button style={{ ...btn(true), opacity: saving ? 0.62 : 1 }} disabled={saving} onClick={saveRound}>{saving ? "Saving…" : "Save changes"}</button>
+          <button style={{ ...btn(true), opacity: saving ? 0.62 : 1 }} disabled={saving || !primary} onClick={saveRound}>{saving ? "Saving…" : "Save changes"}</button>
         </div>
       </div>
     );

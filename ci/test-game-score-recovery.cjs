@@ -33,7 +33,7 @@ function adapter(mode='ok'){
   if(mode==='throw')throw Error('network');
   return{data:mode==='zero'?null:{id:'p',...base,...sent},error:mode==='error'?{message:'denied'}:null};
  }};return q}};
- return{send:compileArrow(sendCallback,{supabase:client}),get stats(){return stats}};
+ return{send:compileArrow(sendCallback,{supabase:client,isDeviceRejection:()=>false,markScoringDeviceRevoked:()=>{}}),get stats(){return stats}};
 }
 const code=ts.transpileModule('const load='+callback+'; return load;',{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;
 function room(server,opts={}){
@@ -43,7 +43,7 @@ function room(server,opts={}){
   if(opts.duringRead){const fn=opts.duringRead;opts.duringRead=null;fn(scoreRevisionRef);}
   const response=table==='games'?{data:{id:'g',holes_meta:[{n:1,par:4},{n:2,par:4}],scores_reset_at:opts.resetAt}}:table==='game_players'?{data:copy(server),error:opts.failRead?{message:'denied'}:null}:table==='rounds'?{count:0}:{data:[]};return Promise.resolve(response).then(resolve,reject);
  },update(){throw Error('load must not upload')}};return q;}};
- const env={...draft,...require(path.join(repo,'lib/alt-shot-side-scores.ts')),mergeBackupRow,supabase:client,gameId:'g',user:{id:'u'},scoreRevisionRef,recoveryReadyRef:{current:false},loadRequestRef:{current:0},scoreWriterRef:{current:null},resettingRef:{current:false},gameRef,playersRef:{current:[]},navigator,setGame:v=>state.game=v,setPlayers:v=>state.players=v,setMe:()=>{},setAltShotScores:()=>{},setCourseTees:()=>{},setNeedsSetup:()=>{},setLoading:()=>{},setPostedRoundCount:()=>{},setSyncState:v=>state.sync=v};
+ const env={isPrimaryScoringDevice:()=>opts.viewer!==true,deviceState:opts.viewer?"viewer":"primary",...draft,...require(path.join(repo,'lib/alt-shot-side-scores.ts')),mergeBackupRow,supabase:client,gameId:'g',user:{id:'u'},scoreRevisionRef,recoveryReadyRef:{current:false},loadRequestRef:{current:0},scoreWriterRef:{current:null},resettingRef:{current:false},gameRef,playersRef:{current:[]},navigator,setGame:v=>state.game=v,setPlayers:v=>state.players=v,setMe:()=>{},setAltShotScores:()=>{},setCourseTees:()=>{},setNeedsSetup:()=>{},setLoading:()=>{},setPostedRoundCount:()=>{},setSyncState:v=>state.sync=v};
  return{load:Function(...Object.keys(env),code)(...Object.values(env)),state};
 }
 function seed(b=local,w=base){window.localStorage.clear();draft.saveGameScores('g','p',b,true,100);if(w)draft.saveSyncedWatermark('g','p',w);}
@@ -72,5 +72,6 @@ t=writer();t.locked=true;assert.equal(await t.w.write('p'),false);assert.ok(t.se
 t=writer();let release;t.hold=new Promise(r=>release=r);const first=t.w.write('p');await Promise.resolve();await Promise.resolve();assert.equal(t.sends.length,1);t.backup={...local,scores:[3,null]};const second=t.w.write('p');await Promise.resolve();assert.equal(t.sends.length,1);release();assert.equal(await first,false);assert.equal(await second,true);assert.deepEqual(t.wm.scores,[3,null]);assert.deepEqual(t.sends[1].body.scores,[3,null]);await t.w.idle();assert.equal(t.w.busy,false);
 t=writer();t.paused=true;assert.equal(await t.w.write('p'),false);assert.equal(t.sends.length,0);
 assert.ok(source.includes('.select("id,scores,putts,fairways,penalties,sand").maybeSingle()'));assert.ok(source.includes('void pushRowColsRef.current(m.id, bundle)'));assert.ok(source.includes('await scoreWriterRef.current?.idle()'));
+seed();r=room([{id:'p',user_id:'u',...base}],{viewer:true});await r.load();assert.deepEqual(r.state.players[0].scores,base.scores,'viewer shows server, not stale local backup');assert.deepEqual(draft.loadGameScores('g','p').scores,local.scores,'viewer preserves pending recovery');assert.deepEqual(draft.loadSyncedWatermark('g','p').scores,base.scores,'viewer never acknowledges pending work');
 console.log('PASS: actual load + sync helpers: corrections/deletions/all stats, remote edits, legacy, cold launch, denied/thrown/late reads, reset, rejected writes, marker permissions, concurrent writes and queue freshness');dom.window.close();
 })().catch(e=>{console.error(e);dom.window.close();process.exitCode=1});

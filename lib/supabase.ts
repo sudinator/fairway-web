@@ -1,5 +1,7 @@
 "use client";
 
+import { scoringDeviceToken, markScoringDeviceRevoked } from "./scoring-device";
+
 import { createBrowserClient } from "@supabase/ssr";
 
 /**
@@ -25,6 +27,19 @@ export function createClient() {
     (real ??= createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { global: { fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
+        const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+        const token = scoringDeviceToken();
+        if (token) headers.set("x-bnn-scoring-device", token);
+        const response = await fetch(input, { ...init, headers });
+        if (!response.ok) {
+          try {
+            const failure = await response.clone().json();
+            if (failure?.message?.includes("Scoring is active on another device")) markScoringDeviceRevoked();
+          } catch { /* Preserve the original HTTP response. */ }
+        }
+        return response;
+      } } },
     ));
   return new Proxy({} as Client, {
     get(_target, prop, receiver) {

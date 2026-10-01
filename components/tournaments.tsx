@@ -1,4 +1,6 @@
 "use client";
+import { useScoringDevice } from "@/components/scoring-device";
+import { isPrimaryScoringDevice, isDeviceRejection, markScoringDeviceRevoked } from "@/lib/scoring-device";
 import { createGameScoreWriter } from "@/lib/game-score-sync";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
@@ -1485,6 +1487,8 @@ function GameRoom({
   onBack: () => void;
   onOpenCompetition: (id: string) => void;
 }) {
+  const deviceState = useScoringDevice();
+  const primary = deviceState === "primary";
   const [game, setGame] = useState<Game | null>(null);
   const paceNow = useNowTick();
   const [players, setPlayers] = useState<Player[]>([]);
@@ -1623,6 +1627,7 @@ function GameRoom({
     : (game?.marker_user_id ? (players.find((p) => p.user_id === game.marker_user_id) || null) : null);
   const canClaimViewed = !gameEnded && !viewedGroupLocked && !!myRow && !myRow.is_guest && !!myRow.user_id && myRow.tee_group != null && myRow.tee_group === viewGroup;
   const claimGroupMarker = async () => {
+    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
     if (!game || !myRow) return;
     if (!requireOnline("You're offline. Changing who keeps score needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.")) return;
     setCardView(true);
@@ -1632,6 +1637,7 @@ function GameRoom({
     load();
   };
   const releaseGroupMarker = async () => {
+    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
     if (!game || !myRow) return;
     if (!requireOnline("You're offline. Changing who keeps score needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.")) return;
     setPlayers((ps) => ps.map((p) => (p.id === myRow.id ? { ...p, is_marker: false } : p))); // optimistic
@@ -1658,6 +1664,7 @@ function GameRoom({
   };
 
   const finishMyGroup = async () => {
+    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
     if (!game || !myRow?.tee_group) return;
     if (!requireOnline("You're offline. Finishing needs a connection — do it back at the clubhouse. Keep playing; scores are saved on this phone.")) return;
     // Push everything entered offline BEFORE recording the round, so the round is
@@ -1687,6 +1694,7 @@ function GameRoom({
   const [shareGame, setShareGame] = useState(false);
 
   const load = useCallback(async () => {
+    if (deviceState === "checking") recoveryReadyRef.current = false;
     if (resettingRef.current || scoreWriterRef.current?.busy) return;
     const request = ++loadRequestRef.current;
     const revision = scoreRevisionRef.current;
@@ -1698,7 +1706,7 @@ function GameRoom({
       const n0 = snap.game?.holes_meta?.length || 18;
       const mergedPlayers = (snap.players || []).map((p: any) => {
         const backup = loadGameScores(gameId, p.id);
-        if (!backup) return p;
+        if (!backup || !isPrimaryScoringDevice()) return p;
         const { merged } = mergeBackupRow(p, backup, n0, loadSyncedWatermark(gameId, p.id));
         saveGameScores(gameId, p.id, merged, true, backup.at);
         return { ...p, ...merged };
@@ -1706,7 +1714,7 @@ function GameRoom({
       setGame(snap.game as any);
       setPlayers(mergedPlayers);
       let offlineAlt = (snap.altShotScores || []) as AltShotScoreRow[];
-      for (const d of loadAltShotDrafts(gameId)) offlineAlt = upsertAltShotScoreLocal(offlineAlt, gameId, d.foursomeId, d.side, d.holeIndex, d.strokes);
+      for (const d of isPrimaryScoringDevice() ? loadAltShotDrafts(gameId) : []) offlineAlt = upsertAltShotScoreLocal(offlineAlt, gameId, d.foursomeId, d.side, d.holeIndex, d.strokes);
       setAltShotScores(offlineAlt);
       const mineOff = mergedPlayers.find((p: any) => p.user_id === user.id) || null;
       setMe(mineOff);
@@ -1754,7 +1762,7 @@ function GameRoom({
     if (request !== loadRequestRef.current || revision !== scoreRevisionRef.current || scoreWriterRef.current?.busy) return;
     let loadedAlt = (altRows || loadGameSnapshot(gameId)?.altShotScores || []) as AltShotScoreRow[];
     const altResetAt = (g as any)?.scores_reset_at ? new Date((g as any).scores_reset_at).getTime() : 0;
-    for (const d of loadAltShotDrafts(gameId)) {
+    for (const d of isPrimaryScoringDevice() ? loadAltShotDrafts(gameId) : []) {
       if (altResetAt && d.at < altResetAt) { clearAltShotDraft(gameId, d.foursomeId, d.side, d.holeIndex); continue; }
       loadedAlt = upsertAltShotScoreLocal(loadedAlt, gameId, d.foursomeId, d.side, d.holeIndex, d.strokes);
     }
@@ -1778,6 +1786,7 @@ function GameRoom({
     const resetAt = (safeGame as any)?.scores_reset_at ? new Date((safeGame as any).scores_reset_at).getTime() : 0;
     const reconciled: any[] = [];
     for (const p of ps) {
+      if (!isPrimaryScoringDevice()) { reconciled.push(p); continue; }
       let backup = loadGameScores(gameId, p.id);
       if (backup && resetAt && backup.at < resetAt) {
         clearGameScores(gameId, p.id);
@@ -1800,15 +1809,15 @@ function GameRoom({
     if (mine && mine.course_handicap == null && (safeGame as any)?.holes_meta?.length)
       setNeedsSetup(true);
     setLoading(false);
-    recoveryReadyRef.current = true;
-    return true;
+    recoveryReadyRef.current = isPrimaryScoringDevice();
+    return isPrimaryScoringDevice();
     } catch {
       recoveryReadyRef.current = false;
       if (!gameRef.current) bootFromSnapshot();
       setSyncState("error");
       setLoading(false);
     }
-  }, [gameId, user.id]);
+  }, [gameId, user.id, deviceState]);
   useEffect(() => {
     load();
   }, [load]);
@@ -1942,7 +1951,7 @@ function GameRoom({
   // Set after pushRowCols is defined below; lets this memoized drain always use the latest.
   const pushRowColsRef = React.useRef<(rowId: string, bundle: any, clock?: Record<string, unknown>) => Promise<boolean>>(async () => true);
   const drainOutbox = React.useCallback(async (): Promise<number> => {
-    if (typeof navigator !== "undefined" && navigator.onLine === false) return 0;
+    if (!isPrimaryScoringDevice() || (typeof navigator !== "undefined" && navigator.onLine === false)) return 0;
     if (drainingRef.current) return 0;
     drainingRef.current = true;
     let pushed = 0;
@@ -2002,7 +2011,7 @@ function GameRoom({
     watermark: rowId => loadSyncedWatermark(gameIdRef.current, rowId),
     confirm: (rowId, bundle) => saveSyncedWatermark(gameIdRef.current, rowId, bundle),
     locked: rowId => scoreLockedForRow(rowId),
-    paused: () => !recoveryReadyRef.current || resettingRef.current || (typeof navigator !== "undefined" && !navigator.onLine),
+    paused: () => !isPrimaryScoringDevice() || !recoveryReadyRef.current || resettingRef.current || (typeof navigator !== "undefined" && !navigator.onLine),
     revision: () => { scoreRevisionRef.current++; },
     send: async (rowId, body, locked, clock) => {
       if (locked) {
@@ -2010,12 +2019,14 @@ function GameRoom({
           p_player: rowId, p_putts: body.putts ?? null, p_fairways: body.fairways ?? null,
           p_penalties: body.penalties ?? null, p_sand: body.sand ?? null,
         });
+        if (isDeviceRejection(error)) markScoringDeviceRevoked();
         if (error) return false;
         // The void stats RPC must also produce a visible, matching stored row.
         const { data, error: readError } = await supabase.from("game_players").select("id,putts,fairways,penalties,sand").eq("id", rowId).maybeSingle();
         return !readError && !!data && Object.entries(body).every(([col, value]) => JSON.stringify(data[col]) === JSON.stringify(value));
       }
       const { data, error } = await supabase.from("game_players").update({ ...body, ...(clock || {}) }).eq("id", rowId).select("id,scores,putts,fairways,penalties,sand").maybeSingle();
+      if (isDeviceRejection(error)) markScoringDeviceRevoked();
       return !error && !!data && Object.entries(body).every(([col, value]) => JSON.stringify(data[col]) === JSON.stringify(value));
     },
   });
@@ -2107,6 +2118,7 @@ function GameRoom({
       return b ? bundleOf(b as any) : bundleOf(firstBody);
     };
     for (let n = 0; n < 4; n++) {
+      if (!isPrimaryScoringDevice()) return;
       setSyncState(n === 0 ? "saving" : "retry");
       const okd = await pushRowCols(rowId, n === 0 ? bundleOf(firstBody) : freshest(), n === 0 ? clock : undefined);
       if (okd) {
@@ -2130,7 +2142,7 @@ function GameRoom({
       sand?: boolean | null;
     },
   ) => {
-    if (!me) return;
+    if (!me || !isPrimaryScoringDevice()) return;
     const n = game?.holes_meta.length || 18;
     const scores = [...(me.scores || Array(n).fill(null))];
     const putts = [...(me.putts || Array(n).fill(null))];
@@ -2170,7 +2182,7 @@ function GameRoom({
     patch: { strokes?: number | null; putts?: number | null; fairway?: "hit" | "miss" | "left" | "right" | null; penalties?: number | null; sand?: boolean | null },
   ) => {
     const target = players.find((p) => p.id === playerId);
-    if (!game || !target) return;
+    if (!game || !target || !isPrimaryScoringDevice()) return;
     const n = game.holes_meta.length || 18;
     const scores = [...(target.scores || Array(n).fill(null))];
     const putts = [...(target.putts || Array(n).fill(null))];
@@ -2204,13 +2216,14 @@ function GameRoom({
 
 
   const setAltShotSideHole = async (foursomeId: string, side: AltShotScoreSide, holeIdx: number, strokes: number | null) => {
-    if (!game || game.game_type !== "alt_shot") return;
+    if (!game || game.game_type !== "alt_shot" || !isPrimaryScoringDevice()) return;
     setAltShotScores((rows) => upsertAltShotScoreLocal(rows, game.id, foursomeId, side, holeIdx, strokes));
     const draft = { foursomeId, side, holeIndex: holeIdx, strokes, at: Date.now() };
     saveAltShotDraft(game.id, draft);
     if (typeof navigator !== "undefined" && navigator.onLine === false) { setSyncState("retry"); return; }
     setSyncState("saving");
     const { error } = await supabase.rpc("save_alt_shot_side_score", { p_game: game.id, p_foursome_id: foursomeId, p_side: side, p_hole_index: holeIdx, p_strokes: strokes });
+    if (isDeviceRejection(error)) markScoringDeviceRevoked();
     if (error) { setSyncState("error"); return; }
     clearAltShotDraft(game.id, foursomeId, side, holeIdx);
     setSyncState("synced");
@@ -2221,11 +2234,14 @@ function GameRoom({
     if (!game || game.game_type !== "alt_shot") return;
     const flush = async () => {
       if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+      if (!isPrimaryScoringDevice()) return;
       const resetAt = game.scores_reset_at ? new Date(game.scores_reset_at).getTime() : 0;
       const drafts = loadAltShotDrafts(game.id);
       for (const d of drafts) {
+        if (!isPrimaryScoringDevice()) return;
         if (resetAt && d.at < resetAt) { clearAltShotDraft(game.id, d.foursomeId, d.side, d.holeIndex); continue; }
         const { error } = await supabase.rpc("save_alt_shot_side_score", { p_game: game.id, p_foursome_id: d.foursomeId, p_side: d.side, p_hole_index: d.holeIndex, p_strokes: d.strokes });
+        if (isDeviceRejection(error)) markScoringDeviceRevoked();
         if (!error) clearAltShotDraft(game.id, d.foursomeId, d.side, d.holeIndex);
       }
       if (drafts.length) load();
@@ -2238,6 +2254,7 @@ function GameRoom({
     // Claim / release the group scorecard (the "marker"). Uses a SECURITY DEFINER
   // RPC so only a group member can claim, and only the marker can release.
   const takeOverScoring = async () => {
+    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
     if (!game) return;
     if (!requireOnline("You're offline. Changing who keeps score needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.")) return;
     setGame({ ...game, marker_user_id: user.id }); // optimistic
@@ -2245,6 +2262,7 @@ function GameRoom({
     await supabase.rpc("claim_marker", { p_game_id: game.id });
   };
   const releaseScoring = async () => {
+    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
     if (!game) return;
     if (!requireOnline("You're offline. Changing who keeps score needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.")) return;
     setGame({ ...game, marker_user_id: null });
@@ -2259,6 +2277,7 @@ function GameRoom({
   // until that final release, so individual cards stay hidden the whole time and
   // no two devices ever write the same row (the no-dupe-write invariant).
   const everyoneScoresOwn = async () => {
+    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
     if (!game) { setCardView(false); return; }
     if (!requireOnline("You're offline. Changing who keeps score needs a connection — reconnect at the clubhouse first. Keep playing; scores are saved on this phone.")) return;
     // Disband group scoring: clear BOTH marker mechanisms (a game can carry a
@@ -2771,6 +2790,7 @@ function GameRoom({
 
   // Organizer: end the game — freezes scores and shows final results.
   const endGame = async () => {
+    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
     if (!game) return;
     if (!requireOnline("You're offline. Finishing needs a connection — do it back at the clubhouse. Keep playing; scores are saved on this phone.")) return;
     // Drain offline holes before ending, so every player's recorded round is complete.
@@ -2815,10 +2835,12 @@ function GameRoom({
     return gaps;
   };
   const requestEndGame = async () => {
+    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
     if (!game) return;
     setFinishPrompt({ kind: "game", gaps: computeFinishGaps(players) });
   };
   const requestFinishGroup = async () => {
+    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
     if (!game || myRow?.tee_group == null) return;
     const scope = players.filter((pl) => pl.tee_group === myRow.tee_group);
     setFinishPrompt({ kind: "group", teeGroup: myRow.tee_group ?? undefined, gaps: computeFinishGaps(scope) });
@@ -2847,6 +2869,7 @@ function GameRoom({
   // touch any rounds already posted to players' history (if the game was ended
   // and scores recorded, remove those from each player's Rounds tab separately).
   const resetScores = async () => {
+    if (!isPrimaryScoringDevice()) { alert("Make this device primary to manage scoring."); return; }
     if (!game) return;
     // Suppress the background flush BEFORE confirm() — in a standalone PWA the
     // confirm dialog can fire visibilitychange/blur, which would otherwise flush
@@ -3500,7 +3523,7 @@ function GameRoom({
           </div>
           {offline
             ? <div style={{ color: C.gold, fontSize: 11.5, marginTop: 10 }}>Offline — you can switch back to self-scoring once you reconnect.</div>
-            : <button onClick={everyoneScoresOwn} style={{ ...btn(false), fontSize: 12, padding: "7px 12px", marginTop: 10 }}>Everyone scores their own</button>}
+            : <button disabled={!primary} onClick={everyoneScoresOwn} style={{ ...btn(false), fontSize: 12, padding: "7px 12px", marginTop: 10 }}>Everyone scores their own</button>}
         </div>
       )}
       {roomTab === "play" && cardView ? (
@@ -3529,14 +3552,15 @@ function GameRoom({
                 <div style={{ color: C.gold, fontSize: 12 }}>Offline — pick a scorer once you’re back in range. For now, keep entering on whatever card you already have.</div>
               ) : (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button onClick={claimGroupMarker} style={{ ...btn(true), flex: 1, minWidth: 130, fontSize: 13 }}>I'll keep score</button>
-                  <button onClick={everyoneScoresOwn} style={{ ...btn(false), flex: 1, minWidth: 130, fontSize: 13 }}>We'll each score our own</button>
+                  <button disabled={!primary} onClick={claimGroupMarker} style={{ ...btn(true), flex: 1, minWidth: 130, fontSize: 13 }}>I'll keep score</button>
+                  <button disabled={!primary} onClick={everyoneScoresOwn} style={{ ...btn(false), flex: 1, minWidth: 130, fontSize: 13 }}>We'll each score our own</button>
                 </div>
               )}
             </div>
           )}
           <GroupScorecard game={game} players={cardPlayers} allPlayers={players} user={user} courseTees={courseTees}
-            isMarker={cardCanEdit}
+            readOnly={!primary}
+            isMarker={primary && cardCanEdit}
             markerName={viewedMarkerPlayer?.display_name ?? null}
             onTakeOver={takeOverScoring}
             onRelease={releaseScoring}
@@ -3546,7 +3570,7 @@ function GameRoom({
             teeMode={teeGroupsInUse}
             groupLabel={viewGroup != null ? `Group ${viewGroup}` : ""}
             groupLocked={viewedGroupLocked || gameEnded}
-            canClaim={canClaimViewed}
+            canClaim={primary && canClaimViewed}
             onClaimGroup={claimGroupMarker}
             onReleaseGroup={releaseGroupMarker}
             offline={offline}
@@ -3769,6 +3793,7 @@ function GameRoom({
                 : "Tap a hole and pick your strokes — it saves instantly. Others' scores update automatically; ⟳ Refresh forces it."}
           </div>
           <ScoreEntryCard
+            readOnly={!primary}
             holes={(() => {
               // In match play, dots reflect the RELATIVE allowance (strokes given/received
               // vs. the opponent), not full course handicap. Stroke-play uses full allocation.

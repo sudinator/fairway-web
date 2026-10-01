@@ -1,3 +1,7 @@
+## Release 193.0
+
+One primary scoring device per account across personal rounds and games (including Ryder Cup games). A second instance can view and explicitly transfer control. Staging requires migration 0162; reload both devices online after upgrading. See TEST_PLAN_193.0.md for phone/desktop and offline gates.
+
 ## 192.20.260930 — Fresh-database CI correction
 
 Changes a CI permission probe to direct current-caller privilege verification and captures server diagnostics on rebuild failure. No new migration; 0161 unchanged. See RELEASE_VERIFICATION_192.20.md. Bundle assumes 192.19. GitHub/staging confirmation remains required.

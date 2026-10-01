@@ -4,6 +4,8 @@ insert into auth.users(id) values
  ('16100000-0000-0000-0000-000000000001'),
  ('16100000-0000-0000-0000-000000000002');
 select set_config('request.jwt.claim.sub','16100000-0000-0000-0000-000000000001',true);
+select public.claim_scoring_device('16200000-0000-0000-0000-000000000010',null,false);
+select set_config('request.headers','{"x-bnn-scoring-device":"16200000-0000-0000-0000-000000000010"}',true);
 
 do $$
 declare
@@ -121,6 +123,8 @@ end $$;
 select set_config('bnn.test_posting_game',
  (select game_id::text from public.rounds limit 1),true);
 select set_config('request.jwt.claim.sub','16100000-0000-0000-0000-000000000002',true);
+select public.claim_scoring_device('16200000-0000-0000-0000-000000000010',null,false);
+select set_config('request.headers','{"x-bnn-scoring-device":"16200000-0000-0000-0000-000000000010"}',true);
 set local role authenticated;
 select public.post_group_rounds(current_setting('bnn.test_posting_game')::uuid,1);
 -- Check the actual caller's ACL directly. Do not intentionally raise/catch

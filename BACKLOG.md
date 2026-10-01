@@ -1,3 +1,7 @@
+## 193.0 primary-device scope
+
+Implemented account-level primary scoring with server fencing, phone-first viewing/explicit transfer, pending-work isolation and recovery downloads. Staging device verification and GitHub fresh database/integration jobs remain release gates. Full simultaneous scoring is intentionally unsupported. Existing broader audit bugs are still separate work; production is not cleared.
+
 ## v192.20 — Fresh-database CI blocker
 
 192.19 GitHub rebuild lost its connection during the final permission-denial probe after the posting matrix completed. Backend cause unconfirmed. Candidate changes that probe to current-caller ACL verification and adds failure diagnostics; GitHub confirmation pending. 192.19 device-test plan remains outstanding. Production stays deferred; existing audit findings remain open.

@@ -1,5 +1,7 @@
 "use client";
 
+import { useScoringDevice } from "@/components/scoring-device";
+import { isPrimaryScoringDevice, isDeviceRejection, markScoringDeviceRevoked } from "@/lib/scoring-device";
 import React, { useEffect, useState, useCallback } from "react";
 import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
@@ -10,14 +12,17 @@ import {
   girStats, firStats, pct, fracPct, holeBuckets, avgByPar, roundDifferential, runningHandicap, threePuttsPerRound, estimatedStablefordPts, hasEstimatedStableford, stablefordDisplay, withHistoricalRatingSlopeCorrection,
 } from "@/lib/golf";
 import { buildCustomCourse, linkCourseToGroup, loadCoursesForGroup } from "@/lib/courses";
-import { saveDraft, loadDraft, clearDraft, draftHasScores, saveDraftHole, sameDraftRound, saveEditorDraft, loadEditorDraft, clearEditorDraft } from "@/lib/draft";
+import { saveDraft, loadDraft, clearDraft, draftHasScores, saveDraftHole, sameDraftRound, saveEditorDraft, loadEditorDraft, clearEditorDraft, personalDraftIsPending, savePersonalRoundAck, personalRoundFingerprint } from "@/lib/draft";
 import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark, ShortDateInput } from "@/components/ui";
 import { buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
 
 const supabase = createClient();
 
-export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSaved: () => void; onCancel: () => void }) {
+export function RoundEditor({ round: suppliedRound, onSaved, onCancel }: { round: Round; onSaved: () => void; onCancel: () => void }) {
+  const [round, setServerRound] = useState(suppliedRound);
+  const deviceState = useScoringDevice();
+  const primary = deviceState === "primary";
   const isRecordedFinal = !!round.id && (round.status ?? "final") !== "in_progress";
   const [sessionId] = useState(() => round.id || round.draft_session_id || crypto.randomUUID());
   const editKey = `round:${sessionId}`;
@@ -31,7 +36,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   const initialHoles = React.useMemo<Hole[]>(() => {
     if (recovered) return recovered.round.holes;
     const d = loadDraft();
-    return !isRecordedFinal && d && sameDraftRound(d.round, { ...round, draft_session_id: sessionId })
+    return primary && !isRecordedFinal && d && personalDraftIsPending(d.round) && sameDraftRound(d.round, { ...round, draft_session_id: sessionId })
       ? d.round.holes : round.holes || [];
   }, []);
   const [holes, setHoles] = useState<Hole[]>(initialHoles);
@@ -77,6 +82,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   // Single source of truth = `holes` state. A ref mirrors it for the lock/flush
   // handler to read synchronously; written only inside setHole.
   const holesRef = React.useRef<Hole[]>(initialHoles);
+  const editRevisionRef = React.useRef(0);
   const touchedRef = React.useRef(false); // has the user entered anything?
 
   // If this round has no per-hole data at all (a gross-only round gaining detail),
@@ -138,7 +144,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   roundRef.current = round;
 
   const persistDraft = (currentHoles: Hole[]) => {
-    if (discardedRef.current) return;
+    if (discardedRef.current || !isPrimaryScoringDevice()) return;
     if (isRecordedFinal) {
       saveEditorDraft(editKey, { round: { ...round, holes: currentHoles }, playDate, ratingText, slopeText, chEdit });
     } else {
@@ -150,21 +156,27 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
 
   // Serialize backups; Finish/Discard stop admission and wait for all admitted writes.
   const backgroundSave = useCallback((currentHoles: Hole[]) => {
-    if (isRecordedFinal || discardedRef.current || savingRef.current) return;
+    if (isRecordedFinal || discardedRef.current || savingRef.current || !isPrimaryScoringDevice() || !touchedRef.current) return;
     const snapshot = { ...roundRef.current, holes: currentHoles };
     backgroundPromiseRef.current = backgroundPromiseRef.current.then(async () => {
-      if (discardedRef.current || savingRef.current) return;
+      if (discardedRef.current || savingRef.current || !isPrimaryScoringDevice()) return;
       try {
         const { error } = await supabase.rpc("save_personal_round", {
           p_round_id: sessionId, p_round: snapshot, p_final: false, p_metadata_only: false,
         });
+        if (isDeviceRejection(error)) markScoringDeviceRevoked();
+        if (!error) {
+          editRevisionRef.current++;
+          savePersonalRoundAck({ ...snapshot, id: sessionId });
+          touchedRef.current = personalRoundFingerprint({ ...roundRef.current, holes: holesRef.current }) !== personalRoundFingerprint(snapshot);
+        }
         if (!discardedRef.current) setBgSaveFailed(!!error);
       } catch { if (!discardedRef.current) setBgSaveFailed(true); }
     });
   }, [isRecordedFinal, sessionId]);
 
   const scheduleBackgroundSave = (currentHoles: Hole[]) => {
-    if (isRecordedFinal || discardedRef.current || savingRef.current) return;
+    if (isRecordedFinal || discardedRef.current || savingRef.current || !isPrimaryScoringDevice() || !touchedRef.current) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => backgroundSave(currentHoles), 1500);
   };
@@ -252,8 +264,9 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   };
 
   const setHole = (i: number, patch: Partial<Hole>) => {
-    if (savingRef.current || discardedRef.current) return;
+    if (savingRef.current || discardedRef.current || !isPrimaryScoringDevice()) return;
     touchedRef.current = true;
+    editRevisionRef.current++;
     // Build next from the latest committed holes, then save it SYNCHRONOUSLY,
     // right here, before returning — so the write lands in storage immediately
     // and can't be lost to a screen lock a moment later. We read the freshest
@@ -274,7 +287,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   useEffect(() => {
     const flush = (via: string) => {
       if (discardedRef.current || savingRef.current) return; // finished/discarded — never resurrect it
-      if (holesRef.current.some((h) => h.strokes != null)) {
+      if (touchedRef.current && isPrimaryScoringDevice()) {
         dbg("flush", sidRef.current, { via, hasDbId: !!round.id });
         persistDraft(holesRef.current);
         backgroundSave(holesRef.current); // best-effort server write too
@@ -327,7 +340,9 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     )[h.hole_number] || 0 })),
   };
   useEffect(() => {
-    if (touchedRef.current || recovered || chEdit !== null || ratingSlopeEdited || playDate !== round.played_at) persistDraft(holes);
+    if (!isPrimaryScoringDevice()) return;
+    if (chEdit !== null || ratingSlopeEdited || playDate !== String(round.played_at).slice(0,10)) { touchedRef.current = true; editRevisionRef.current++; }
+    if (touchedRef.current || recovered) persistDraft(holes);
   }, [holes, playDate, ratingText, slopeText, chEdit]);
   roundRef.current = { ...round, played_at: playDate, rating: effectiveRating, slope: effectiveSlope,
     course_handicap: effectiveCourseHandicap, course_handicap_source: manualCh != null ? "manual" : "derived" };
@@ -337,7 +352,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   const gir = girStats([live]), fir = firStats([live]);
 
   const save = async () => {
-    if (savingRef.current) return;
+    if (savingRef.current || !isPrimaryScoringDevice()) return;
     if (manualCh != null && !Number.isFinite(manualCh)) { setErr("Enter a valid course handicap."); return; }
     if (ratingSlopeEdited && ratingSlopeError) { setErr(ratingSlopeError); return; }
     if (!confirmPastDate()) return;
@@ -357,6 +372,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
       const { data: result, error: saveError } = await supabase.rpc("save_personal_round", {
         p_round_id: sessionId, p_round: payload, p_final: true, p_metadata_only: metadataOnly,
       });
+      if (isDeviceRejection(saveError)) markScoringDeviceRevoked();
       if (saveError || !result) throw saveError || new Error("Round save was not confirmed");
       const wasFinal = result.was_final === true;
       // Log "Completed a round" only on the FIRST finalization — not on later edits/re-saves of an
@@ -382,7 +398,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   };
 
   const cancel = async () => {
-    if (savingRef.current) return;
+    if (savingRef.current || !isPrimaryScoringDevice()) return;
     if (!isRecordedFinal && draftHasScores({ ...round, holes }) && !confirm("Discard this in-progress round? Your entered scores will be cleared.")) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     if (isRecordedFinal) {
@@ -396,6 +412,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     try {
       await backgroundPromiseRef.current;
       const { error } = await supabase.rpc("discard_personal_round", { p_round_id: sessionId });
+      if (isDeviceRejection(error)) markScoringDeviceRevoked();
       if (error) throw error;
       discardedRef.current = true;
       clearDraft(sessionId);
@@ -406,6 +423,48 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
     }
   };
 
+  useEffect(() => {
+    let stopped = false;
+    const refresh = async () => {
+      if (savingRef.current || discardedRef.current) return;
+      try {
+        const draft = loadDraft();
+        const pending = deviceState === "primary" && draft && sameDraftRound(draft.round, { ...roundRef.current, id: sessionId }) && personalDraftIsPending(draft.round);
+        if (pending && !isRecordedFinal && !touchedRef.current) {
+          holesRef.current = draft.round.holes; setHoles(draft.round.holes);
+          setPlayDate(String(draft.round.played_at).slice(0,10));
+          setChEdit(draft.round.course_handicap_source === "manual" ? String(draft.round.course_handicap) : null);
+          touchedRef.current = true;
+        }
+        if (isRecordedFinal && deviceState === "primary" && !touchedRef.current) {
+          const edit = loadEditorDraft<{ round: Round; playDate: string; ratingText: string; slopeText: string; chEdit: string | null }>(editKey);
+          if (edit?.round.id === sessionId) {
+            holesRef.current = edit.round.holes; setHoles(edit.round.holes);
+            setPlayDate(edit.playDate); setRatingText(edit.ratingText); setSlopeText(edit.slopeText); setChEdit(edit.chEdit);
+            touchedRef.current = true;
+          }
+        }
+        if (navigator.onLine === false) return;
+        const requestRevision = editRevisionRef.current;
+        const { data: server, error } = await supabase.from("rounds").select("*").eq("id", sessionId).maybeSingle();
+        if (error || !server || stopped) return;
+        const { data: serverHoles, error: holesError } = await supabase.from("holes").select("*").eq("round_id", sessionId).order("hole_number");
+        if (holesError || !serverHoles || stopped || savingRef.current || requestRevision !== editRevisionRef.current) return;
+        if (isPrimaryScoringDevice() && touchedRef.current) { if (!isRecordedFinal) backgroundSave(holesRef.current); return; }
+        const fresh = { ...server, holes: serverHoles } as Round;
+        setServerRound(fresh); holesRef.current = fresh.holes; setHoles(fresh.holes);
+        setPlayDate(String(fresh.played_at).slice(0,10)); setRatingText(fresh.rating == null ? "" : String(fresh.rating));
+        setSlopeText(fresh.slope == null ? "" : String(fresh.slope)); setChEdit(null);
+      } catch { /* Keep the current card and local recovery on failed reads. */ }
+    };
+    void refresh();
+    const visible = () => { if (document.visibilityState === "visible") void refresh(); };
+    window.addEventListener("online", refresh); window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", visible);
+    const timer = window.setInterval(refresh, 20000);
+    return () => { stopped = true; window.clearInterval(timer); window.removeEventListener("online", refresh); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", visible); };
+  }, [deviceState, sessionId, editKey, isRecordedFinal, backgroundSave]);
+
   // Only ask for a correction reason if the user actually changed course info
   // (hole pars or stroke indexes) — not when editing scores/putts/fairways.
   const courseInfoChanged = (() => {
@@ -415,7 +474,8 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
   })();
 
   return (
-    <fieldset disabled={saving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+    <div>
+    <fieldset disabled={saving || !primary} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
       <div style={{ color: C.sage, fontSize: 13, marginBottom: 10 }}>
         {round.course}{round.tee_name ? ` · ${round.tee_name} tees${effectiveRating != null && effectiveSlope != null ? ` (${effectiveRating}/${effectiveSlope})` : ""}` : ""}
         {effectiveCourseHandicap != null ? ` · course handicap ${effectiveCourseHandicap}` : " · no course handicap"}
@@ -492,6 +552,7 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
           : "Scores save to this device as you tap — lock your phone or close the app and you'll come right back to this scorecard. Tap Finish round when you're done to record it."}
       </div>
       <ScoreEntryCard
+        readOnly={!primary}
         holes={(() => {
           const alloc = allocateStrokes(holes.map((h) => ({ hole_number: h.hole_number, stroke_index: h.stroke_index })), effectiveCourseHandicap);
           return holes.map((h) => ({
@@ -545,6 +606,8 @@ export function RoundEditor({ round, onSaved, onCancel }: { round: Round; onSave
       </div>
       {favMsg && <div style={{ color: C.gold, fontSize: 12, marginTop: 8, textAlign: "right" }}>{favMsg}</div>}
     </fieldset>
+    {!primary && <button style={{ ...btn(false), marginTop: 12 }} onClick={onCancel}>Close scorecard</button>}
+    </div>
   );
 }
 

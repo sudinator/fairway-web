@@ -77,7 +77,8 @@ import { useNowTick } from "@/lib/use-now-tick";
 
 const supabase = createClient();
 
-export function GroupScorecard({ game, players, allPlayers, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, altShotScores = [], onSetAltShotScore, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup, groupLocked = false, onMarkOut, courseTees = [], offline = false }: {
+export function GroupScorecard({ readOnly = false, game, players, allPlayers, user, isMarker, markerName, onTakeOver, onRelease, onSetHole, altShotScores = [], onSetAltShotScore, teeMode = false, groupLabel = "", canClaim = false, onClaimGroup, onReleaseGroup, groupLocked = false, onMarkOut, courseTees = [], offline = false }: {
+  readOnly?: boolean;
   game: Game; players: Player[];
   /** Every player in the game. `players` is filtered by tee group for DISPLAY; stroke bases
    *  that need the opposing side (alternate shot) must see the whole field. */
@@ -95,6 +96,7 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
   offline?: boolean;
 }) {
   const [edit, setEdit] = useState<{ playerId: string; holeIdx: number; alt?: { foursomeId: string; side: AltShotScoreSide } } | null>(null);
+  useEffect(() => { if (readOnly) setEdit(null); }, [readOnly]);
   const paceNow = useNowTick();
   const allowance = game.allowance_pct ?? 100;
   const meta = game.holes_meta;
@@ -315,8 +317,8 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
               <div key={p.id + i} style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ color: colorFor(p), fontSize: 11, fontWeight: 700, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 3 }}>{p.display_name}</div>
                 <div
-                  style={{ position: "relative", background: C.cell, borderRadius: 6, height: 56, display: "flex", alignItems: "center", justifyContent: "center", cursor: (isMarker || (c.altSide ? c.altSide.memberIds.some((id) => strokePool.find((x) => x.id === id)?.user_id === user?.id) : p.user_id === user?.id)) ? "pointer" : "default", outline: isMarker ? "1px solid #E6E0CC" : ((c.altSide ? c.altSide.memberIds.some((id) => strokePool.find((x) => x.id === id)?.user_id === user?.id) : p.user_id === user?.id) ? "1px dashed #C9BF9B" : "none") }}
-                  onClick={(isMarker || (c.altSide ? c.altSide.memberIds.some((id) => strokePool.find((x) => x.id === id)?.user_id === user?.id) : p.user_id === user?.id)) ? () => { setEdit({ playerId: p.id, holeIdx: i, alt: c.altSide ? { foursomeId: c.altSide.foursomeId, side: c.altSide.side } : undefined }); } : undefined}>
+                  style={{ position: "relative", background: C.cell, borderRadius: 6, height: 56, display: "flex", alignItems: "center", justifyContent: "center", cursor: !readOnly && (isMarker || (c.altSide ? c.altSide.memberIds.some((id) => strokePool.find((x) => x.id === id)?.user_id === user?.id) : p.user_id === user?.id)) ? "pointer" : "default", outline: readOnly ? "none" : isMarker ? "1px solid #E6E0CC" : ((c.altSide ? c.altSide.memberIds.some((id) => strokePool.find((x) => x.id === id)?.user_id === user?.id) : p.user_id === user?.id) ? "1px dashed #C9BF9B" : "none") }}
+                  onClick={!readOnly && (isMarker || (c.altSide ? c.altSide.memberIds.some((id) => strokePool.find((x) => x.id === id)?.user_id === user?.id) : p.user_id === user?.id)) ? () => { setEdit({ playerId: p.id, holeIdx: i, alt: c.altSide ? { foursomeId: c.altSide.foursomeId, side: c.altSide.side } : undefined }); } : undefined}>
                   {/* One row per stroke basis, from lib/game-shape.strokeSets — the same source and the
                       same colours as the personal card (185.0). Before this the second row used
                       C.indivDot, a colour tuned for dark grounds: 1.83:1 on these cream cells, so the
@@ -382,7 +384,9 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
 
   return (
     <div style={{ marginTop: 16 }}>
-      {offline ? (
+      {readOnly ? (
+        <div style={{ color: C.gold, fontSize: 12, marginBottom: 8 }}>Viewing scores — scoring is available on your primary device.</div>
+      ) : offline ? (
         <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#3A2A12", border: `0.5px solid ${C.gold}`, borderRadius: 10, padding: "8px 12px", marginBottom: 8 }}>
           <span style={{ fontSize: 14 }}>📴</span>
           <span style={{ color: "#E4CF86", fontSize: 12, flex: 1 }}>Offline — you can’t change who’s scoring until you reconnect. The current scorer can keep entering; everything saves on this phone.</span>
@@ -543,7 +547,7 @@ export function GroupScorecard({ game, players, allPlayers, user, isMarker, mark
         return nodes;
       })()}
 
-      {edit && (() => {
+      {!readOnly && edit && (() => {
         const p = players.find((x) => x.id === edit.playerId);
         const m = meta[edit.holeIdx];
         if (!p || !m) return null;

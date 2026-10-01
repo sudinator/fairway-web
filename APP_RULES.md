@@ -1,4 +1,9 @@
 <!-- 192.20: fresh-database failure cleanup captures server/container diagnostics before teardown and preserves the failing exit status; privilege assertions verify the actual test role. -->
+
+## Primary scoring device (193.0)
+
+One active device per authenticated scorer account covers personal rounds, game-player scores/stats, markers and Alternate Shot, including Ryder Cup games. Opening a second instance never steals control. Transfer requires an online, explicit Make this device primary action. Database guards reject old/headerless writes under the same transaction lock as transfer; tokens supplement existing RLS/RPC rights. No inactivity expiry: confirmed primary scoring stays usable offline. Pending work is token-isolated, preserved after revocation, and archived before takeover starts from server scores. Legacy unscoped drafts are archived on the first online activation; upgrade online before relying on offline scoring.
+
 <!-- 192.19: game recovery uses confirmed server watermarks; any field deletion is pending; no acknowledgement on failed/zero-row writes; per-row requests serialize. Manual game handicaps/source/audit snapshots survive posting without nine-hole scaling. -->
 <!-- 192.18: RPC JSON parsing must map only consumed fields; fixture payloads must include frontend identity placeholders, not simplified database-only objects. -->
 <!-- 192.17: historical score edits remain local until Save changes; explicit personal-round save/discard are atomic; draft identity is round/session UUID, never course name. -->

@@ -74,6 +74,8 @@ insert into public.competition_sessions(
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub','11111111-1111-1111-1111-111111111111',true);
+select public.claim_scoring_device('16200000-0000-0000-0000-000000000010',null,false);
+select set_config('request.headers','{"x-bnn-scoring-device":"16200000-0000-0000-0000-000000000010"}',true);
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.email','rls-a@example.test',true);
 select set_config('request.jwt.claims','{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated","email":"rls-a@example.test"}',true);
@@ -204,6 +206,8 @@ insert into public.holes(id,round_id,hole_number,par) values
  ('a7100000-0000-0000-0000-000000000003','a7000000-0000-0000-0000-000000000003',1,4);
 set local role authenticated;
 select set_config('request.jwt.claim.sub','33333333-3333-3333-3333-333333333333',true);
+select public.claim_scoring_device('16200000-0000-0000-0000-000000000010',null,false);
+select set_config('request.headers','{"x-bnn-scoring-device":"16200000-0000-0000-0000-000000000010"}',true);
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claim.email','rls-admin@example.test',true);
 select set_config('request.jwt.claims','{"sub":"33333333-3333-3333-3333-333333333333","role":"authenticated","email":"rls-admin@example.test"}',true);

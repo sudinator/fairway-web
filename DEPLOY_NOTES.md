@@ -1,3 +1,9 @@
+## 193.0.260930 — One primary scoring device per account
+
+Phone-first: a second instance stays view-only and offers Make this device primary. Explicit transfer covers personal rounds, individual/marker game scores and stats, and Alternate Shot (also Ryder Cup games). New 0162 database triggers fence old and headerless clients; transfer and writes serialize on the scorer account. Existing scoring permissions remain required. Known primary works offline; transferred-away work is retained/downloadable and is never automatically replayed after takeover. Personal viewers refresh saved scores and never flush stale local cards.
+
+Apply migration 0162 to staging before deploying the code, then reload both devices online. Old builds cannot score after the migration until updated. Legacy unscoped local drafts are archived for download on initial activation. Check saved scores before the upgrade. Do not deploy to production yet. See TEST_PLAN_193.0.md and RELEASE_VERIFICATION_193.0.md.
+
 ## 192.20.260930 — Fresh-database CI assertion correction (candidate)
 
 GitHub's 192.19 fresh-Supabase run completed the posting matrix and outsider group call, then lost its database connection at the deliberate internal-RPC permission-denial subtransaction. The screenshot does not establish the backend cause. Replace that redundant raise/catch probe with an actual-current-user ACL check; retain the full posting matrix, explicit role privileges, authenticated outsider group call and stored-data assertion. Failure cleanup now prints database container state/OOM flag and recent server logs before removing it, preserving the failing exit status.

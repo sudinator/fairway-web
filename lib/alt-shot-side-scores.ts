@@ -1,3 +1,4 @@
+import { scoringStorage } from "./scoring-device";
 export type AltShotScoreSide = "a" | "b";
 
 export type AltShotScoreRow = {
@@ -54,7 +55,7 @@ const key = (gameId: string) => `bnn:altshot-side-drafts:${gameId}`;
 export function loadAltShotDrafts(gameId: string): AltShotScoreDraft[] {
   if (typeof localStorage === "undefined") return [];
   try {
-    const raw = JSON.parse(localStorage.getItem(key(gameId)) || "[]");
+    const raw = JSON.parse(scoringStorage().getItem(key(gameId)) || "[]");
     return Array.isArray(raw) ? raw : [];
   } catch { return []; }
 }
@@ -63,16 +64,16 @@ export function saveAltShotDraft(gameId: string, draft: AltShotScoreDraft): void
   if (typeof localStorage === "undefined") return;
   const rows = loadAltShotDrafts(gameId).filter((d) => !(d.foursomeId === draft.foursomeId && d.side === draft.side && d.holeIndex === draft.holeIndex));
   rows.push(draft);
-  localStorage.setItem(key(gameId), JSON.stringify(rows));
+  scoringStorage().setItem(key(gameId), JSON.stringify(rows));
 }
 
 export function clearAltShotDraft(gameId: string, foursomeId: string, side: AltShotScoreSide, holeIndex: number): void {
   if (typeof localStorage === "undefined") return;
   const rows = loadAltShotDrafts(gameId).filter((d) => !(d.foursomeId === foursomeId && d.side === side && d.holeIndex === holeIndex));
-  if (rows.length) localStorage.setItem(key(gameId), JSON.stringify(rows));
-  else localStorage.removeItem(key(gameId));
+  if (rows.length) scoringStorage().setItem(key(gameId), JSON.stringify(rows));
+  else scoringStorage().removeItem(key(gameId));
 }
 
 export function clearAllAltShotDrafts(gameId: string): void {
-  if (typeof localStorage !== "undefined") localStorage.removeItem(key(gameId));
+  if (typeof localStorage !== "undefined") scoringStorage().removeItem(key(gameId));
 }
