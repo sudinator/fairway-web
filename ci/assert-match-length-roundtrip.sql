@@ -31,11 +31,15 @@ insert into public.game_players(
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub','49000000-0000-0000-0000-000000000001',true);
+select public.claim_scoring_device('16200000-0000-0000-0000-000000000010',null,false);
+select set_config('request.headers','{"x-bnn-scoring-device":"16200000-0000-0000-0000-000000000010"}',true);
 select set_config('request.jwt.claim.role','authenticated',true);
 select set_config('request.jwt.claims','{"sub":"49000000-0000-0000-0000-000000000001","role":"authenticated"}',true);
 
 -- A different authenticated player cannot mutate the organizer's game.
 select set_config('request.jwt.claim.sub','49000000-0000-0000-0000-000000000002',true);
+select public.claim_scoring_device('16200000-0000-0000-0000-000000000010',null,false);
+select set_config('request.headers','{"x-bnn-scoring-device":"16200000-0000-0000-0000-000000000010"}',true);
 select set_config('request.jwt.claims','{"sub":"49000000-0000-0000-0000-000000000002","role":"authenticated"}',true);
 do $$
 declare denied boolean := false;
@@ -52,6 +56,8 @@ begin
   if not denied then raise exception 'Non-organizer unexpectedly changed match length'; end if;
 end $$;
 select set_config('request.jwt.claim.sub','49000000-0000-0000-0000-000000000001',true);
+select public.claim_scoring_device('16200000-0000-0000-0000-000000000010',null,false);
+select set_config('request.headers','{"x-bnn-scoring-device":"16200000-0000-0000-0000-000000000010"}',true);
 select set_config('request.jwt.claims','{"sub":"49000000-0000-0000-0000-000000000001","role":"authenticated"}',true);
 
 -- Front nine → 18.
@@ -99,9 +105,7 @@ begin
 end $$;
 
 -- Once a score exists the same RPC must reject the change.
-update public.game_players
-   set scores = '[5,null,null,null,null,null,null,null,null]'::jsonb
- where id = '49000000-0000-0000-0000-000000000101';
+select public.save_game_score_bundle('49000000-0000-0000-0000-000000000101',0,'{"scores":[5,null,null,null,null,null,null,null,null]}');
 
 do $$
 declare denied boolean := false;

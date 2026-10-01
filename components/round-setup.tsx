@@ -1,5 +1,7 @@
 "use client";
 
+import { useScoringDevice } from "@/components/scoring-device";
+import { isPrimaryScoringDevice } from "@/lib/scoring-device";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 import {
@@ -32,6 +34,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   onCancel: () => void;
 }) {
   // Restore any in-progress setup saved before a phone lock / background (12h TTL).
+  const primary = useScoringDevice() === "primary";
   const [restored] = useState<any>(() => loadEditorDraft("round-setup"));
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState<Course | null>(() => restored?.picked ?? null);
@@ -353,6 +356,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   };
 
   const start = async () => {
+    if (!isPrimaryScoringDevice()) return;
     if (!picked || !tee) return;
     // Guard against duplicate rounds: if the player is already in an ACTIVE game (being scored by
     // the group) at this course, logging a separate round here just duplicates what the game posts.
@@ -410,6 +414,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   const [grossSaving, setGrossSaving] = useState(false);
   const [grossErr, setGrossErr] = useState<string | null>(null);
   const startGross = async () => {
+    if (!isPrimaryScoringDevice()) return;
     if (!picked || !tee) return;
     const g = parseInt(grossStr, 10);
     if (!g || g < 18 || g > 200) { setGrossErr("Enter a valid total score (e.g. 86)."); return; }
@@ -749,9 +754,9 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
               </button>
             )}
             {grossMode ? (
-              <button style={{ ...btn(true), opacity: grossSaving ? 0.5 : 1 }} disabled={grossSaving} onClick={startGross}>{grossSaving ? "Saving…" : "Save round"}</button>
+              <button style={{ ...btn(true), opacity: grossSaving ? 0.5 : 1 }} disabled={grossSaving || !primary} onClick={startGross}>{grossSaving ? "Saving…" : "Save round"}</button>
             ) : (
-              <button style={btn(true)} onClick={start}>Continue to scorecard ›</button>
+              <button style={btn(true)} disabled={!primary} onClick={start}>Continue to scorecard ›</button>
             )}
           </div>
           {favMsg && <div style={{ color: C.gold, fontSize: 12, marginTop: 8 }}>{favMsg}</div>}

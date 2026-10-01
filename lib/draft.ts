@@ -1,3 +1,4 @@
+import { scoringStorage } from "./scoring-device";
 // In-progress round draft, stored in the browser's localStorage.
 // localStorage writes are SYNCHRONOUS — they complete before the phone can lock
 // or the tab can be evicted, so an in-progress round survives a lock or refresh
@@ -10,19 +11,25 @@ import type { Round } from "@/lib/golf";
 
 const KEY = "bnn_round_draft_v1";
 
-export function saveDraft(round: Round): void {
+export function sameDraftRound(a: Round, b: Round): boolean {
+  const aId = a.id || a.draft_session_id;
+  const bId = b.id || b.draft_session_id;
+  return !!aId && aId === bId;
+}
+
+export function saveDraft(round: Round, force = false): void {
   try {
     if (typeof window === "undefined") return;
     // Safety: never overwrite an existing draft that HAS scores with one that has
     // NONE (e.g. a transient empty state after a remount). Losing entered scores is
     // far worse than keeping a slightly stale draft.
     const incomingScored = (round.holes || []).some((h) => h.strokes != null);
-    if (!incomingScored) {
+    if (!force && !incomingScored) {
       const existing = loadDraft();
       const existingScored = (existing?.round?.holes || []).some((h: any) => h.strokes != null);
-      if (existingScored && existing?.round?.course === round.course) return;
+      if (existingScored && existing && sameDraftRound(existing.round, round)) return;
     }
-    window.localStorage.setItem(KEY, JSON.stringify({ savedAt: Date.now(), round }));
+    scoringStorage().setItem(KEY, JSON.stringify({ savedAt: Date.now(), round }));
   } catch {
     // Storage can be unavailable (private mode, quota). Fail silently — DB save on
     // Finish is still the backstop.
@@ -32,7 +39,7 @@ export function saveDraft(round: Round): void {
 export function loadDraft(): { savedAt: number; round: Round } | null {
   try {
     if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem(KEY);
+    const raw = scoringStorage().getItem(KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed?.round) return null;
@@ -42,11 +49,15 @@ export function loadDraft(): { savedAt: number; round: Round } | null {
   }
 }
 
-export function clearDraft(): void {
+export function clearDraft(roundId?: string): void {
   try {
     if (typeof window === "undefined") return;
-    window.localStorage.removeItem(KEY);
-    window.localStorage.removeItem(DHKEY);
+    if (roundId) {
+      const existing = loadDraft();
+      if (existing && (existing.round.id || existing.round.draft_session_id) !== roundId) return;
+    }
+    scoringStorage().removeItem(KEY);
+    scoringStorage().removeItem(DHKEY);
   } catch {}
 }
 
@@ -54,12 +65,12 @@ export function clearDraft(): void {
 // round id so a lock/refresh returns them to it (same option-3 restore as the group card).
 const DHKEY = "bnn_draft_hole_v1";
 export function saveDraftHole(roundKey: string, holeIdx: number): void {
-  try { if (typeof window === "undefined") return; window.localStorage.setItem(DHKEY, JSON.stringify({ roundKey, holeIdx })); } catch {}
+  try { if (typeof window === "undefined") return; scoringStorage().setItem(DHKEY, JSON.stringify({ roundKey, holeIdx })); } catch {}
 }
 export function loadDraftHole(roundKey: string): number | null {
   try {
     if (typeof window === "undefined") return null;
-    const p = JSON.parse(window.localStorage.getItem(DHKEY) || "null");
+    const p = JSON.parse(scoringStorage().getItem(DHKEY) || "null");
     return p?.roundKey === roundKey && typeof p.holeIdx === "number" ? p.holeIdx : null;
   } catch { return null; }
 }
@@ -70,12 +81,12 @@ export function loadDraftHole(roundKey: string): number | null {
 // synchronous localStorage write is what survives an involuntary background (no warning is
 // possible then — beforeunload doesn't fire on mobile lock).
 export function saveEditorDraft(key: string, data: unknown): void {
-  try { if (typeof window === "undefined") return; window.localStorage.setItem("bnn_edit_" + key, JSON.stringify({ at: Date.now(), data })); } catch {}
+  try { if (typeof window === "undefined") return; scoringStorage().setItem("bnn_edit_" + key, JSON.stringify({ at: Date.now(), data })); } catch {}
 }
 export function loadEditorDraft<T = any>(key: string, maxAgeMs = 12 * 60 * 60 * 1000): T | null {
   try {
     if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem("bnn_edit_" + key);
+    const raw = scoringStorage().getItem("bnn_edit_" + key);
     if (!raw) return null;
     const p = JSON.parse(raw);
     if (!p || !("data" in p)) return null;
@@ -84,7 +95,7 @@ export function loadEditorDraft<T = any>(key: string, maxAgeMs = 12 * 60 * 60 * 
   } catch { return null; }
 }
 export function clearEditorDraft(key: string): void {
-  try { if (typeof window === "undefined") return; window.localStorage.removeItem("bnn_edit_" + key); } catch {}
+  try { if (typeof window === "undefined") return; scoringStorage().removeItem("bnn_edit_" + key); } catch {}
 }
 
 // --- Active course edit (Manage → Courses) resume marker ---
@@ -93,12 +104,12 @@ export function clearEditorDraft(key: string): void {
 // is persisted separately by the editor's form-draft; this just restores the navigation.
 const CEKEY = "bnn_active_course_edit_v1";
 export function saveActiveCourseEdit(v: unknown): void {
-  try { if (typeof window === "undefined") return; window.localStorage.setItem(CEKEY, JSON.stringify({ at: Date.now(), v })); } catch {}
+  try { if (typeof window === "undefined") return; scoringStorage().setItem(CEKEY, JSON.stringify({ at: Date.now(), v })); } catch {}
 }
 export function loadActiveCourseEdit<T = any>(maxAgeMs = 12 * 60 * 60 * 1000): T | null {
   try {
     if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem(CEKEY);
+    const raw = scoringStorage().getItem(CEKEY);
     if (!raw) return null;
     const p = JSON.parse(raw);
     if (typeof p?.at === "number" && Date.now() - p.at > maxAgeMs) return null;
@@ -106,7 +117,7 @@ export function loadActiveCourseEdit<T = any>(maxAgeMs = 12 * 60 * 60 * 1000): T
   } catch { return null; }
 }
 export function clearActiveCourseEdit(): void {
-  try { if (typeof window === "undefined") return; window.localStorage.removeItem(CEKEY); } catch {}
+  try { if (typeof window === "undefined") return; scoringStorage().removeItem(CEKEY); } catch {}
 }
 
 // True if the draft has at least one hole with a score entered.
@@ -126,8 +137,8 @@ export function saveActiveGame(gameId: string, tab: "play" | "setup"): void {
     // Preserve a previously-saved holeIdx for the SAME game so re-entering the room
     // (which calls this) doesn't wipe where the user was scoring.
     let holeIdx: number | undefined;
-    try { const p = JSON.parse(window.localStorage.getItem(GKEY) || "null"); if (p?.gameId === gameId && typeof p.holeIdx === "number") holeIdx = p.holeIdx; } catch {}
-    window.localStorage.setItem(GKEY, JSON.stringify({ gameId, tab, holeIdx, at: Date.now() }));
+    try { const p = JSON.parse(scoringStorage().getItem(GKEY) || "null"); if (p?.gameId === gameId && typeof p.holeIdx === "number") holeIdx = p.holeIdx; } catch {}
+    scoringStorage().setItem(GKEY, JSON.stringify({ gameId, tab, holeIdx, at: Date.now() }));
   } catch {}
 }
 
@@ -138,15 +149,15 @@ export function saveActiveHole(gameId: string, holeIdx: number): void {
   try {
     if (typeof window === "undefined") return;
     let tab: "play" | "setup" = "play";
-    try { const p = JSON.parse(window.localStorage.getItem(GKEY) || "null"); if (p?.gameId === gameId && p.tab === "setup") tab = "setup"; } catch {}
-    window.localStorage.setItem(GKEY, JSON.stringify({ gameId, tab, holeIdx, at: Date.now() }));
+    try { const p = JSON.parse(scoringStorage().getItem(GKEY) || "null"); if (p?.gameId === gameId && p.tab === "setup") tab = "setup"; } catch {}
+    scoringStorage().setItem(GKEY, JSON.stringify({ gameId, tab, holeIdx, at: Date.now() }));
   } catch {}
 }
 
 export function loadActiveGame(): { gameId: string; tab: "play" | "setup"; holeIdx?: number } | null {
   try {
     if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem(GKEY);
+    const raw = scoringStorage().getItem(GKEY);
     if (!raw) return null;
     const p = JSON.parse(raw);
     if (!p?.gameId) return null;
@@ -157,7 +168,7 @@ export function loadActiveGame(): { gameId: string; tab: "play" | "setup"; holeI
 export function clearActiveGame(): void {
   try {
     if (typeof window === "undefined") return;
-    window.localStorage.removeItem(GKEY);
+    scoringStorage().removeItem(GKEY);
   } catch {}
 }
 
@@ -175,6 +186,8 @@ export function saveGameScores(
   playerId: string,
   data: { scores: any[]; putts: any[]; fairways: any[]; penalties?: any[]; sand?: any[] },
   force = false,
+  observedAt?: number,
+  scoringVersion?: number,
 ): void {
   try {
     if (typeof window === "undefined") return;
@@ -190,27 +203,27 @@ export function saveGameScores(
         if (existing && (existing.scores || []).some((s) => s != null)) return;
       }
     }
-    window.localStorage.setItem(gameScoreKey(gameId, playerId), JSON.stringify({ at: Date.now(), ...data }));
+    scoringStorage().setItem(gameScoreKey(gameId, playerId), JSON.stringify({ scoringVersion: scoringVersion ?? loadGameScores(gameId, playerId)?.scoringVersion, at: observedAt ?? (force ? Date.now() : loadGameScores(gameId, playerId)?.at ?? Date.now()), ...data }));
   } catch {}
 }
 
 export function loadGameScores(
   gameId: string,
   playerId: string,
-): { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[]; at: number } | null {
+): { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[]; at: number; scoringVersion?: number } | null {
   try {
     if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem(gameScoreKey(gameId, playerId));
+    const raw = scoringStorage().getItem(gameScoreKey(gameId, playerId));
     if (!raw) return null;
     const p = JSON.parse(raw);
-    return { scores: p.scores || [], putts: p.putts || [], fairways: p.fairways || [], penalties: p.penalties || [], sand: p.sand || [], at: typeof p.at === "number" ? p.at : 0 };
+    return { scoringVersion: Number.isInteger(p.scoringVersion) ? p.scoringVersion : undefined, scores: p.scores || [], putts: p.putts || [], fairways: p.fairways || [], penalties: p.penalties || [], sand: p.sand || [], at: typeof p.at === "number" ? p.at : 0 };
   } catch { return null; }
 }
 
 export function clearGameScores(gameId: string, playerId: string): void {
   try {
     if (typeof window === "undefined") return;
-    window.localStorage.removeItem(gameScoreKey(gameId, playerId));
+    scoringStorage().removeItem(gameScoreKey(gameId, playerId));
   } catch {}
 }
 
@@ -222,19 +235,19 @@ export function clearAllGameScores(gameId: string): void {
     if (typeof window === "undefined") return;
     const prefix = `bnn_game_scores_${gameId}_`;
     const keys: string[] = [];
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const k = window.localStorage.key(i);
+    for (let i = 0; i < scoringStorage().length; i++) {
+      const k = scoringStorage().key(i);
       if (k && k.startsWith(prefix)) keys.push(k);
     }
-    keys.forEach((k) => window.localStorage.removeItem(k));
+    keys.forEach((k) => scoringStorage().removeItem(k));
     // Drop watermarks for this game too, so a reset can't leave "already synced" markers.
     const wmPrefix = `bnn_game_wm_${gameId}_`;
     const wmKeys: string[] = [];
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const k = window.localStorage.key(i);
+    for (let i = 0; i < scoringStorage().length; i++) {
+      const k = scoringStorage().key(i);
       if (k && k.startsWith(wmPrefix)) wmKeys.push(k);
     }
-    wmKeys.forEach((k) => window.localStorage.removeItem(k));
+    wmKeys.forEach((k) => scoringStorage().removeItem(k));
     clearGameSnapshot(gameId);
   } catch {}
 }
@@ -249,7 +262,7 @@ export function aiUsesLeft(): number {
   try {
     if (typeof window === "undefined") return AI_DAILY_LIMIT;
     const today = new Date().toISOString().slice(0, 10);
-    const raw = window.localStorage.getItem(AI_KEY);
+    const raw = scoringStorage().getItem(AI_KEY);
     const p = raw ? JSON.parse(raw) : null;
     if (!p || p.day !== today) return AI_DAILY_LIMIT;
     return Math.max(0, AI_DAILY_LIMIT - (p.count || 0));
@@ -260,10 +273,10 @@ export function recordAiUse(): void {
   try {
     if (typeof window === "undefined") return;
     const today = new Date().toISOString().slice(0, 10);
-    const raw = window.localStorage.getItem(AI_KEY);
+    const raw = scoringStorage().getItem(AI_KEY);
     const p = raw ? JSON.parse(raw) : null;
     const count = p && p.day === today ? (p.count || 0) + 1 : 1;
-    window.localStorage.setItem(AI_KEY, JSON.stringify({ day: today, count }));
+    scoringStorage().setItem(AI_KEY, JSON.stringify({ day: today, count }));
   } catch {}
 }
 
@@ -278,18 +291,18 @@ export function saveGameSnapshot(gameId: string, partial: { game?: any; players?
   try {
     if (typeof window === "undefined") return;
     const existing = loadGameSnapshot(gameId) || {};
-    window.localStorage.setItem(gameSnapKey(gameId), JSON.stringify({ ...existing, ...partial, at: Date.now() }));
+    scoringStorage().setItem(gameSnapKey(gameId), JSON.stringify({ ...existing, ...partial, at: Date.now() }));
   } catch {}
 }
 export function loadGameSnapshot(gameId: string): { game?: any; players?: any[]; courseTees?: any[]; courseHoles?: any[]; altShotScores?: any[]; at?: number } | null {
   try {
     if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem(gameSnapKey(gameId));
+    const raw = scoringStorage().getItem(gameSnapKey(gameId));
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 }
 export function clearGameSnapshot(gameId: string): void {
-  try { if (typeof window === "undefined") return; window.localStorage.removeItem(gameSnapKey(gameId)); } catch {}
+  try { if (typeof window === "undefined") return; scoringStorage().removeItem(gameSnapKey(gameId)); } catch {}
 }
 
 // --- App boot cache (profile + groups + active group) for offline cold-launch ---
@@ -299,11 +312,11 @@ export function saveAppBootCache(data: { profile?: any; groups?: any[]; activeGr
   try {
     if (typeof window === "undefined") return;
     const existing = loadAppBootCache() || {};
-    window.localStorage.setItem(BOOT_KEY, JSON.stringify({ ...existing, ...data, at: Date.now() }));
+    scoringStorage().setItem(BOOT_KEY, JSON.stringify({ ...existing, ...data, at: Date.now() }));
   } catch {}
 }
 export function loadAppBootCache(): { profile?: any; groups?: any[]; activeGroupId?: string | null; at?: number } | null {
-  try { if (typeof window === "undefined") return null; const raw = window.localStorage.getItem(BOOT_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  try { if (typeof window === "undefined") return null; const raw = scoringStorage().getItem(BOOT_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
 }
 
 // --- Last session identity (so a cold offline launch renders without a live token) ---
@@ -311,11 +324,11 @@ const SESS_KEY = "bnn_last_session_v1";
 export function saveLastSession(user: any): void {
   try {
     if (typeof window === "undefined" || !user) return;
-    window.localStorage.setItem(SESS_KEY, JSON.stringify({ user: { id: user.id, email: user.email, user_metadata: user.user_metadata }, at: Date.now() }));
+    scoringStorage().setItem(SESS_KEY, JSON.stringify({ user: { id: user.id, email: user.email, user_metadata: user.user_metadata }, at: Date.now() }));
   } catch {}
 }
 export function loadLastSession(): { user: any } | null {
-  try { if (typeof window === "undefined") return null; const raw = window.localStorage.getItem(SESS_KEY); const p = raw ? JSON.parse(raw) : null; return p?.user ? { user: p.user } : null; } catch { return null; }
+  try { if (typeof window === "undefined") return null; const raw = scoringStorage().getItem(SESS_KEY); const p = raw ? JSON.parse(raw) : null; return p?.user ? { user: p.user } : null; } catch { return null; }
 }
 
 // True when the browser reports no connectivity. Best-effort signal only.
@@ -335,7 +348,7 @@ export function saveSyncedWatermark(
 ): void {
   try {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(wmKey(gameId, rowId), JSON.stringify({
+    scoringStorage().setItem(wmKey(gameId, rowId), JSON.stringify({
       scores: data.scores || [], putts: data.putts || [], fairways: data.fairways || [],
       penalties: data.penalties || [], sand: data.sand || [],
     }));
@@ -346,13 +359,13 @@ export function saveSyncedWatermark(
 export function clearSyncedWatermark(gameId: string, rowId: string): void {
   try {
     if (typeof window === "undefined") return;
-    window.localStorage.removeItem(wmKey(gameId, rowId));
+    scoringStorage().removeItem(wmKey(gameId, rowId));
   } catch {}
 }
 export function loadSyncedWatermark(gameId: string, rowId: string): { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[] } | null {
   try {
     if (typeof window === "undefined") return null;
-    const raw = window.localStorage.getItem(wmKey(gameId, rowId));
+    const raw = scoringStorage().getItem(wmKey(gameId, rowId));
     if (!raw) return null;
     const p = JSON.parse(raw);
     return { scores: p.scores || [], putts: p.putts || [], fairways: p.fairways || [], penalties: p.penalties || [], sand: p.sand || [] };
@@ -370,6 +383,8 @@ export function rowPendingHoles(
   const n = Math.max(
     backup.scores?.length || 0, backup.putts?.length || 0, backup.fairways?.length || 0,
     backup.penalties?.length || 0, backup.sand?.length || 0,
+    w.scores?.length || 0, w.putts?.length || 0, w.fairways?.length || 0,
+    w.penalties?.length || 0, w.sand?.length || 0,
   );
   let c = 0;
   for (let i = 0; i < n; i++) {
@@ -379,8 +394,8 @@ export function rowPendingHoles(
       (backup.fairways?.[i] ?? null) !== (w.fairways?.[i] ?? null) ||
       (backup.penalties?.[i] ?? null) !== (w.penalties?.[i] ?? null) ||
       (backup.sand?.[i] ?? null) !== (w.sand?.[i] ?? null);
-    // Only count a hole as pending if it actually has a score locally.
-    if (diff && (backup.scores?.[i] ?? null) != null) c++;
+    // Deletions and stats-only edits also require server confirmation.
+    if (diff) c++;
   }
   return c;
 }
@@ -391,11 +406,28 @@ export function rowPendingHoles(
 export function clearAllLocalState(): void {
   try {
     if (typeof window === "undefined") return;
-    const doomed: string[] = [];
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const k = window.localStorage.key(i);
-      if (k && (k.startsWith("bnn_") || k.startsWith("bnn-"))) doomed.push(k);
-    }
-    doomed.forEach((k) => window.localStorage.removeItem(k));
+    const raw = window.localStorage;
+    const keys = Array.from({ length: raw.length }, (_, i) => raw.key(i)!);
+    for (const key of keys) if (key.startsWith("bnn_") || key.startsWith("bnn-") || key.startsWith("bnn:")) raw.removeItem(key);
+    const session = window.sessionStorage;
+    const sessionKeys = Array.from({ length: session.length }, (_, i) => session.key(i)!);
+    for (const key of sessionKeys) if (key.startsWith("bnn_primary_")) session.removeItem(key);
   } catch {}
+}
+
+// A confirmed backup is a display cache, not unsynced work. Only actual edits may
+// outrank a later server read on the same primary device.
+export function personalRoundFingerprint(round: Round): string {
+  return JSON.stringify([round.played_at?.slice(0,10), round.rating, round.slope,
+    round.course_handicap, round.course_handicap_source,
+    round.holes.map(h => [h.hole_number,h.strokes,h.putts,h.fairway,h.penalties ?? 0,h.sand ?? false])]);
+}
+export function savePersonalRoundAck(round: Round): void {
+  scoringStorage().setItem("bnn_round_sync_v1", JSON.stringify({ id: round.id || round.draft_session_id, signature: personalRoundFingerprint(round) }));
+}
+export function personalDraftIsPending(round: Round): boolean {
+  try {
+    const ack = JSON.parse(scoringStorage().getItem("bnn_round_sync_v1") || "null");
+    return ack?.id !== (round.id || round.draft_session_id) || ack.signature !== personalRoundFingerprint(round);
+  } catch { return true; }
 }

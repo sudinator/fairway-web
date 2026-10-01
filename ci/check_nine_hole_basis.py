@@ -15,7 +15,7 @@ job proves the migration APPLIES; this proves it says the right thing.
 THE RULE
   rating          -> halved for an exact nine (no per-nine rating exists to use)
   course_par      -> SUMMED from holes_meta, never halved
-  course_handicap -> halved
+  course_handicap -> derived halved; manual preserved
   slope           -> NEVER halved. It is a RATIO on the 55-155 scale, not a stroke count. A
                      published 9-hole Slope for a hard nine is still ~140, not ~70. Halving it
                      applies the difficulty adjustment twice: 3.5 strokes too few on a 113 course,
@@ -30,7 +30,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MIG = ROOT / "migrations" / "0139_nine_hole_round_basis.sql"
+MIG = ROOT / "migrations" / "0161_game_round_manual_handicap.sql"
 
 failures: list[str] = []
 
@@ -48,7 +48,7 @@ for field, pattern in [
     # Par is SUMMED from holes_meta, never halved: a back nine is commonly par 35 or 37, and half
     # of 71 is 36 — wrong on both. holes_meta carries every hole's real par.
     ("course_par", r"course_par\s*(?:=\s*)?case when n = 9 then\s*parsum"),
-    ("course_handicap", r"course_handicap\s*(?:=\s*)?case when n = 9 then\s*round\(\s*pl\.course_handicap\s*/\s*2"),
+    ("course_handicap", r"course_handicap\s*(?:=\s*)?case when n = 9 and coalesce\(pl\.course_handicap_source, 'derived'\) <> 'manual' then\s*round\(\s*pl\.course_handicap\s*/\s*2"),
 ]:
     n = len(re.findall(pattern, code))
     # Two posting functions, each with an INSERT and an UPDATE path = 4 sites... but the INSERT

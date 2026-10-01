@@ -1,3 +1,7 @@
+## 192.16.260929 — migration 0158
+
+Apply 0158_profile_privilege_boundaries.sql to staging first. It closes privileged profile INSERT and non-owner direct admin updates. Existing accounts are unchanged. Do not edit or reapply earlier migrations. Full release gates remain required.
+
 ## 192.15.260928 — migration 0157 (manifest regenerated)
 record_course_api_check must accept the SERVICE-ROLE monitor, not only signed-in users. 0156 is
 unchanged from its released form: a migration already on main is immutable, and the earlier
@@ -160,7 +164,7 @@ Regenerate after shipping (adds new files, keeps ticks and the notes block):
 Confirm database-applied state with:
 `select id, applied_at from public.schema_migrations order by id;`
 
-Total: 142 migrations. Unchecked = not yet confirmed applied in this checklist.
+Total: 148 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -306,6 +310,12 @@ Total: 142 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [ ] 0155_live_manual_course_handicap.sql
 - [ ] 0156_course_api_checks.sql
 - [ ] 0157_course_api_check_service_role.sql
+- [ ] 0158_profile_privilege_boundaries.sql
+- [ ] 0159_personal_round_persistence.sql
+- [ ] 0160_personal_round_payload_contract.sql
+- [ ] 0161_game_round_manual_handicap.sql
+- [ ] 0162_primary_scoring_device.sql
+- [ ] 0163_game_reset_fencing.sql
 
 <!-- NOTES:START -->
 

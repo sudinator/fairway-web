@@ -1,5 +1,6 @@
 "use client";
 
+import { ScoringDeviceNotice, usePrimaryScoringDevice } from "@/components/scoring-device";
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
@@ -144,6 +145,7 @@ function ViewportDiag() {
 }
 
 export function Home({ session }: { session: any }) {
+  const scoringDevice = usePrimaryScoringDevice(session.user.id);
   const [rounds, setRounds] = useState<Round[]>([]);
   const [badgeSync, setBadgeSync] = useState(0);
   const [dbInProgress, setDbInProgress] = useState<Round | null>(null);
@@ -181,7 +183,7 @@ export function Home({ session }: { session: any }) {
   const [draftRound, setDraftRound] = useState<Round | null>(null);
   const refreshDraft = useCallback(() => {
     const d = loadDraft();
-    setDraftRound(d && draftHasScores(d.round) ? d.round : null);
+    setDraftRound(d && (!d.round.id || d.round.status === "in_progress") && draftHasScores(d.round) ? d.round : null);
   }, []);
   // Keep the resume banner in sync: re-check storage on mount and whenever we
   // leave the editor (stage changes), so the banner appears/disappears correctly.
@@ -265,7 +267,7 @@ export function Home({ session }: { session: any }) {
   // On open, resume an in-progress round straight into the scorecard.
   // Priority: an active game → this device's round draft → the server's in-progress round.
   useEffect(() => {
-    if (resumeChecked) return;
+    if (resumeChecked || scoringDevice === "checking") return;
     // A tee-time deep link takes priority over resuming a round/game.
     if (deepTeeId) { setResumeChecked(true); return; }
     // If the user was in a game room, reopen the Games tab so it can restore the room.
@@ -276,7 +278,7 @@ export function Home({ session }: { session: any }) {
       return;
     }
     const d = loadDraft();
-    if (d && draftHasScores(d.round)) {
+    if (d && (!d.round.id || d.round.status === "in_progress") && draftHasScores(d.round)) {
       setResumeChecked(true);
       setStage({ round: d.round });
       return;
@@ -303,7 +305,7 @@ export function Home({ session }: { session: any }) {
     if (dbInProgress && draftHasScores(dbInProgress)) {
       setStage({ round: dbInProgress });
     }
-  }, [resumeChecked, loading, dbInProgress, deepTeeId]);
+  }, [resumeChecked, loading, dbInProgress, deepTeeId, scoringDevice]);
 
   const user = session.user;
   const displayName = profile?.display_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "Golfer";
@@ -686,6 +688,7 @@ export function Home({ session }: { session: any }) {
       <InstallHint />
       <PullToRefresh scrollEl={scrollRef} onRefresh={async () => { await Promise.all([loadProfile(), loadGroups(), loadRounds()]); }}>
       <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 24px" }}>
+      <ScoringDeviceNotice userId={session.user.id} />
       {/* Line 1: logo + active club (display only — change it in the Clubs tab) */}
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
         <Wordmark width={150} />

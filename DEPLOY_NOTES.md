@@ -1,3 +1,53 @@
+## 193.2.260930 — CI-only posting fixture correction (UNVERIFIED candidate)
+
+The fresh-database handicap-posting fixture now calls begin_game_score_write(gid,0) before both scored-player INSERT sites. New games start at version 0; primary-device and reset guards stay enabled. The isolated PostgreSQL runner also executes migration 0161 and the actual posting fixture alongside 0162/0163. Application behavior and all migration bytes are unchanged from 193.1.
+
+Reproduced the original BN163 failure, then passed the corrected 48-case posting matrix and reset/setup assertions locally. Complete GitHub fresh Supabase reconstruction and CI must rerun on the existing draft PR before any merge or deployment.
+
+## 193.1.260930 — Reset version fencing (UNVERIFIED candidate)
+
+Migration 0163 adds a per-game scoring version. Versioned player/stat and Alternate Shot writes serialize with organizer/admin resets; stale writes are rejected, keeping existing scoring permissions and primary-device enforcement. Durable drafts retain their original version. Reset failure no longer clears unsynced local drafts. Stale-write rejection refreshes from the server before scoring resumes. Historical migrations remain unchanged.
+
+NOT READY FOR DEPLOYMENT. Complete fresh-database, concurrency, browser, local CI and staging gates against the final revision before delivery. Production stays deferred. Older game-scoring clients need a reload after 0163; production migration/deployment coordination is mandatory.
+
+## 193.0.260930 — One primary scoring device per account
+
+Phone-first: a second instance stays view-only and offers Make this device primary. Explicit transfer covers personal rounds, individual/marker game scores and stats, and Alternate Shot (also Ryder Cup games). New 0162 database triggers fence old and headerless clients; transfer and writes serialize on the scorer account. Existing scoring permissions remain required. Known primary works offline; transferred-away work is retained/downloadable and is never automatically replayed after takeover. Personal viewers refresh saved scores and never flush stale local cards.
+
+Apply migration 0162 to staging before deploying the code, then reload both devices online. Old builds cannot score after the migration until updated. Legacy unscoped local drafts are archived for download on initial activation. Check saved scores before the upgrade. Do not deploy to production yet. See TEST_PLAN_193.0.md and RELEASE_VERIFICATION_193.0.md.
+
+## 192.20.260930 — Fresh-database CI assertion correction (candidate)
+
+GitHub's 192.19 fresh-Supabase run completed the posting matrix and outsider group call, then lost its database connection at the deliberate internal-RPC permission-denial subtransaction. The screenshot does not establish the backend cause. Replace that redundant raise/catch probe with an actual-current-user ACL check; retain the full posting matrix, explicit role privileges, authenticated outsider group call and stored-data assertion. Failure cleanup now prints database container state/OOM flag and recent server logs before removing it, preserving the failing exit status.
+
+No migration or application behavior changes; 0161 and earlier migrations remain byte-identical. This changed-files bundle assumes 192.19. Re-run GitHub CI/fresh-database checks; live staging tests and production deferral remain in force. See RELEASE_VERIFICATION_192.20.md. No new SQL to apply.
+
+## 192.19.260930 — Game offline recovery and manual-handicap posting (candidate)
+
+G1: three-way recovery preserves local score corrections, deletions and all four peripheral stats against confirmed server watermarks. Failed/zero-row writes remain pending; per-player queues prevent older requests from landing after newer edits. Cold reads seed server watermarks and never acknowledge a local merge. Reconnect reads reset/marker state before draining; resets block new writes and await admitted writes. Failed reads retain saved data. Legacy backups without a watermark can recover gaps only.
+
+H1: follow-up migration 0161 preserves the authoritative manual handicap, source and setter/time snapshot on game and tee-group posting, including reposts. Derived nine-hole handicaps still halve; nine-hole rating/par/slope behavior is unchanged. No automatic history backfill. Historical migrations remain unchanged.
+
+Apply to staging after full GitHub CI/fresh-database gates; run the staging checklist in RELEASE_VERIFICATION_192.19.md. This changed-files ZIP assumes 192.18. Production remains deferred until the remaining audit findings and release gates are closed.
+
+## 192.18.260930 — New-round payload conversion fix (candidate)
+
+Fixes 22P02 when saving a new round. RoundSetup sends id=""; 0159 passed the entire JSON object through the rounds row type and tried to convert that ignored value to UUID. Follow-up migration 0160 parses only consumed round/hole fields. Separate p_round_id and auth.uid() remain authoritative. The 0159 migration is unchanged; authorization, atomic rollback, Cancel and recovery semantics are unchanged. Database regression tests now include empty round/hole IDs and forged unused identity fields.
+
+Candidate only. Apply 0160 to staging only after GitHub's fresh-database/CI gates pass. See RELEASE_VERIFICATION_192.18.md. Live staging save/recovery checks remain required; production is unchanged.
+
+## 192.17.260930 — Personal round Save/Cancel and recovery (candidate)
+
+Completed-round edits remain local until Save changes. Explicit save and live-round backup use transactional RPC 0159; any hole/metadata failure rolls back the entire request. Drafts use round/session UUIDs rather than course names. Discard is scoped to one in-progress personal round and retains the draft if the server operation fails. Finish waits for an admitted backup before finalizing; late backups cannot modify a final round. Manual course handicaps persist on immediate Finish, and clearing an override restores the derived figure.
+
+Candidate only. See RELEASE_VERIFICATION_192.17.md for executed checks and outstanding full Supabase/GitHub/Vercel/staging gates. Apply 0159 to staging before the candidate frontend; no production changes have been made.
+
+## 192.16.260929 — Profile privilege boundaries (candidate)
+
+Migration 0158 guards INSERT and UPDATE, reserves browser admin changes to the owner, forbids browser owner and profile-identity changes, and audits successful browser admin changes exactly once. Safe profile creation/editing, ban administration, and trusted service provisioning remain supported. No existing profiles change. Historical migrations remain immutable.
+
+Candidate only: see RELEASE_VERIFICATION_192.16.md. Full Node 22, Supabase fresh rebuild, and staging browser/integration gates must pass before production.
+
 ## 192.15.260928 — MIGRATIONS.md regenerated properly
 
 `MIGRATIONS.md` is GENERATED by `ci/gen-migrations-checklist.py`, and

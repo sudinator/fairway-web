@@ -1,3 +1,37 @@
+## 193.2.260930 — CI-only posting fixture correction (UNVERIFIED candidate)
+
+The fresh-database handicap-posting fixture now calls begin_game_score_write(gid,0) before both scored-player INSERT sites. New games start at version 0; primary-device and reset guards stay enabled. The isolated PostgreSQL runner also executes migration 0161 and the actual posting fixture alongside 0162/0163. Application behavior and all migration bytes are unchanged from 193.1.
+
+Reproduced the original BN163 failure, then passed the corrected 48-case posting matrix and reset/setup assertions locally. Complete GitHub fresh Supabase reconstruction and CI must rerun on the existing draft PR before any merge or deployment.
+
+## 193.1 reset fencing — UNVERIFIED candidate
+
+Per-game scoring_version and versioned player/stat/Alternate Shot RPCs fence pre-reset writes. Reset locks serialize writes and resets. Testing requirement copied into APP_RULES.md. Required automated release gates have not yet completed; do not deploy.
+
+## Release 193.0
+
+One primary scoring device per account across personal rounds and games (including Ryder Cup games). A second instance can view and explicitly transfer control. Staging requires migration 0162; reload both devices online after upgrading. See TEST_PLAN_193.0.md for phone/desktop and offline gates.
+
+## 192.20.260930 — Fresh-database CI correction
+
+Changes a CI permission probe to direct current-caller privilege verification and captures server diagnostics on rebuild failure. No new migration; 0161 unchanged. See RELEASE_VERIFICATION_192.20.md. Bundle assumes 192.19. GitHub/staging confirmation remains required.
+
+## 192.19.260930 — Game recovery/posting candidate
+
+Game score recovery now keeps offline corrections/deletions/stat edits pending until confirmed. Migration 0161 preserves manual game handicaps and their source/audit snapshots when posting rounds. See RELEASE_VERIFICATION_192.19.md for proof and staging checks. Changed-files bundle assumes 192.18; production remains deferred.
+
+## 192.18.260930 — New-round payload hotfix candidate
+
+Follow-up migration 0160 fixes UUID conversion of the unused id="" field sent for new rounds. See RELEASE_VERIFICATION_192.18.md. Supersedes 192.17; this changed-files bundle assumes 192.17 is already present.
+
+## 192.17.260930 — Personal round persistence candidate
+
+Round editor now uses migration 0159 for atomic saves/discards. Historical edits are local until explicit Save changes. See RELEASE_VERIFICATION_192.17.md; this candidate is not cleared for deployment.
+
+## 192.16.260929 — Security candidate
+
+New migration 0158 enforces profile privilege boundaries on inserts and updates. See RELEASE_VERIFICATION_192.16.md for evidence and outstanding release gates. This package is not yet cleared for production.
+
 ## 179.7.260902 staging corrective — integration VAPID wiring
 
 The multi-session team competition is now called **Ryder Cup** throughout the interface. The Games screen explains the difference between a one-round Game and a multi-session Ryder Cup. Games launched from a Ryder Cup session begin with Group Results, money-game participation, and hole contests off; organizers can opt into them afterward. No migration is required beyond 0143.

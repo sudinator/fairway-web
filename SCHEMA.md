@@ -1,3 +1,35 @@
+## 193.2 — CI-only correction
+
+No database schema or migration changes from 193.1. The handicap-posting fixture establishes the required new-game version-0 context before scored inserts.
+
+## 193.1 reset fencing — UNVERIFIED candidate
+
+Per-game scoring_version and versioned player/stat/Alternate Shot RPCs fence pre-reset writes. Reset locks serialize writes and resets. Testing requirement copied into APP_RULES.md. Required automated release gates have not yet completed; do not deploy.
+
+## 193.0 — Primary scoring device
+
+0162 adds private RLS-enabled scoring_devices(user_id, token, claimed_at), authenticated account-scoped claim_scoring_device(uuid,uuid,boolean), and write triggers on rounds, holes, game_players, game_alt_shot_scores and games (scoring control/status fields). No direct app grants on the token table. Existing authorization still applies. x-bnn-scoring-device matches the requesting account token; advisory transaction lock namespace 162 serializes transfer/write. Trusted jobs with no end-user auth.uid retain their existing permissions. End-user round/holes mutations and game scoring/status/reset/marker changes are guarded.
+
+## 192.20.260930 — No database contract change
+
+No schema, RPC, RLS, grant or migration changes. CI checks the authenticated caller's lack of internal-posting EXECUTE via has_function_privilege and retains the outsider/posting behavior assertions. Migration 0161 remains unchanged.
+
+## 192.19.260930 — Game posting contract (0161)
+
+Replaces post_game_rounds_internal(uuid,boolean) and post_group_rounds(uuid,integer). Manual course_handicap is copied as entered for both nine and eighteen holes; derived nine-hole handicaps retain existing scaling. Both paths copy course_handicap_source/course_handicap_set_by/course_handicap_set_at on insert/update/conflict. Existing authorization and format exclusion remain; internal execution stays revoked from browser roles. No columns, backfill, or existing records change merely by applying the migration.
+
+## 192.18.260930 — Personal round JSON input contract (0160)
+
+Replaces only save_personal_round(uuid,jsonb,boolean,boolean). Its SECURITY INVOKER authorization, grants, transaction locks and persistence semantics are unchanged. jsonb_populate_record now receives explicit maps of consumed fields, so unused JSON row identities are not coerced to database UUIDs. p_round_id and authenticated identity remain authoritative. No schema columns or stored records are changed; discard_personal_round is unchanged.
+
+## 192.17.260930 — Personal round persistence (0159)
+
+`save_personal_round(uuid,jsonb,boolean,boolean)` atomically writes a personal round and its holes. SECURITY INVOKER preserves RLS; identity/club/game fields on existing rows remain unchanged. Background requests cannot alter final rounds. Stable client UUIDs and a transaction advisory lock serialize requests/retries for a round. Total-only historical corrections preserve the server gross total without creating holes. `discard_personal_round(uuid)` atomically deletes only the caller's in-progress personal round and its holes. Execute is granted only to authenticated, with public/anon revoked. No schema columns or existing records are changed.
+
+## 192.16.260929 — Profile privilege boundaries (0158)
+
+trg_guard_profile_privileged now runs BEFORE INSERT OR UPDATE. Browser profile inserts cannot grant admin/owner. Only the owner can change another non-owner admin flag; browser owner and profile-identity changes are forbidden. Admin changes produce an atomic activity_log entry through the trigger; admin_set_system_admin retains its interface and delegates audit to that trigger. Trusted service_role/direct database maintenance retain provisioning. Ban checks and blocklist insert trigger remain in place. No column or existing-data changes.
+
 ## 183.0.260906 — Trifecta single rule (migration 0150)
 `games.trifecta_scoring`: default 'match' (was 'per_hole'); CHECK `games_trifecta_scoring_single_rule` (null or 'match'). No other change.
 

@@ -1,3 +1,42 @@
+## 193.2.260930 — CI-only posting fixture correction (UNVERIFIED candidate)
+
+The fresh-database handicap-posting fixture now calls begin_game_score_write(gid,0) before both scored-player INSERT sites. New games start at version 0; primary-device and reset guards stay enabled. The isolated PostgreSQL runner also executes migration 0161 and the actual posting fixture alongside 0162/0163. Application behavior and all migration bytes are unchanged from 193.1.
+
+Reproduced the original BN163 failure, then passed the corrected 48-case posting matrix and reset/setup assertions locally. Complete GitHub fresh Supabase reconstruction and CI must rerun on the existing draft PR before any merge or deployment.
+
+## 193.1 reset fencing — UNVERIFIED candidate
+
+Per-game scoring_version and versioned player/stat/Alternate Shot RPCs fence pre-reset writes. Reset locks serialize writes and resets. Testing requirement copied into APP_RULES.md. Required automated release gates have not yet completed; do not deploy.
+
+## 193.0 primary-device scope
+
+Implemented account-level primary scoring with server fencing, phone-first viewing/explicit transfer, pending-work isolation and recovery downloads. Staging device verification and GitHub fresh database/integration jobs remain release gates. Full simultaneous scoring is intentionally unsupported. Existing broader audit bugs are still separate work; production is not cleared.
+
+## v192.20 — Fresh-database CI blocker
+
+192.19 GitHub rebuild lost its connection during the final permission-denial probe after the posting matrix completed. Backend cause unconfirmed. Candidate changes that probe to current-caller ACL verification and adds failure diagnostics; GitHub confirmation pending. 192.19 device-test plan remains outstanding. Production stays deferred; existing audit findings remain open.
+
+## v192.19 — Game recovery/posting candidate and remaining audit work
+
+G1/H1 implemented in candidate; GitHub fresh-database and staging/device validation remain required before closure. User reports 192.18 staging tests good; 22P02 appeared once then stopped. Production remains deferred. Remaining review: cross-device score-write/reset concurrency (inferred from the existing server contract), structural partial operations/game creation atomicity, club-admin handicap writes, failed-read behavior outside GameRoom, push retries, stale card/badge clearing. Approval workflow and Member since remain deferred. Existing feature backlog still requires current-code verification.
+
+## v192.18 — New-round staging blocker
+
+192.17 staging report: save of a new personal round returns 22P02. Reproduced from the exact empty id field supplied by RoundSetup. Fixed in candidate 0160 with UI-shaped database regression fixtures. Staging confirmation is outstanding. R1–R3/H2 remain under release validation. Approval workflow and G1/H1 remain deferred.
+
+## v192.17 — Round persistence candidate and deferred work
+
+R1–R3 and editor-side H2 implemented in candidate; release gates remain outstanding. Pending-access approval workflow stays deferred. Next separate release: game offline recovery (G1) and nine-hole game posting (H1). Then structural partial operations, club-admin handicap writes, failed reads, push retries and stale card/badge clearing. Member since remains pending. Existing feature backlog items require current-code verification before rebuilding.
+
+## v192.16 — Security candidate and audit follow-ups
+
+- [ ] Clear full release gates and staging validation for migration 0158 (profile INSERT privileges, owner-only admin changes and audit).
+- [ ] Fix RoundEditor Cancel/save failures and cross-round draft identity.
+- [ ] Fix offline score recovery, correction/deletion synchronization and false success states.
+- [ ] Preserve manual nine-hole handicaps during posting and editing.
+- [ ] Make game creation atomic; review club-admin handicap updates that affect zero rows.
+- [ ] Players page: show Member since next to each player.
+
 ## v192.15
 
 - [ ] Apply 0157 (the role check in record_course_api_check; without it the monitor cannot record results).

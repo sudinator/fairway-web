@@ -4,10 +4,27 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(mktemp -d)"
 cleanup() {
+  local result=$?
+  # Preserve database evidence BEFORE cleanup removes the temporary container.
+  # Keep normal successful runs quiet; diagnostics must not mask the test status.
+  if [ "$result" -ne 0 ]; then
+    echo "::group::Fresh database failure diagnostics"
+    local db_project_id=""
+    if [ -f "$TMP/supabase/config.toml" ]; then
+      db_project_id=$(sed -n 's/^project_id = "\(.*\)"/\1/p' "$TMP/supabase/config.toml")
+    fi
+    if [ -n "$db_project_id" ] && command -v docker >/dev/null 2>&1; then
+      local db_container="supabase_db_$db_project_id"
+      docker inspect --format 'Database {{.Name}}: status={{.State.Status}} oom_killed={{.State.OOMKilled}} exit_code={{.State.ExitCode}} error={{.State.Error}}' "$db_container" || true
+      docker logs --tail 100 "$db_container" 2>&1 || true
+    fi
+    echo "::endgroup::"
+  fi
   if [ -d "$TMP/supabase" ]; then
     (cd "$TMP" && supabase stop --no-backup >/dev/null 2>&1) || true
   fi
   rm -rf "$TMP"
+  return "$result"
 }
 trap cleanup EXIT
 
@@ -37,6 +54,22 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-core-rls-live.sql"
 
 # Disposable-only behavioral proof: execute real authorization outcomes under authenticated RLS.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-core-rls-behavior.sql"
+
+# Profile insert/update privilege boundary, owner RPC and exactly-once audit.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-profile-privileges.sql"
+
+# Atomic personal-round save/discard, authenticated RLS and rollback proof.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-personal-round-persistence.sql"
+
+# Primary-device gate across personal/game scores, stats and SECURITY DEFINER Alternate Shot.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-primary-scoring-device.sql"
+
+# Reset fencing: real SQL outcomes plus separate-connection concurrency barriers.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-game-reset-fencing.sql"
+BNN_RESET_TEST_DATABASE_URL="$DB_URL" python3 "$ROOT/ci/test-game-reset-concurrency.py"
+
+# 192.19: game posting preserves manual handicaps on both insert/repost paths.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-game-round-manual-handicap.sql"
 
 # Execute the full configured-game length round trip, score lock and reset/re-entry behavior.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-match-length-roundtrip.sql"
