@@ -1,3 +1,7 @@
+## 193.2 — CI-only correction
+
+No database schema or migration changes from 193.1. The handicap-posting fixture establishes the required new-game version-0 context before scored inserts.
+
 ## 193.1 reset fencing — UNVERIFIED candidate
 
 Per-game scoring_version and versioned player/stat/Alternate Shot RPCs fence pre-reset writes. Reset locks serialize writes and resets. Testing requirement copied into APP_RULES.md. Required automated release gates have not yet completed; do not deploy.

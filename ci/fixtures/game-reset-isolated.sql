@@ -15,8 +15,12 @@ create table public.game_players(id uuid primary key,game_id uuid references pub
  tee_group smallint,is_marker boolean default false,group_locked boolean default false,no_show boolean default false,is_guest boolean default false,
  handicap_index numeric,rating numeric,slope integer,tee_name text,course_handicap integer,team text,
  course_handicap_source text default 'derived',course_handicap_set_by uuid,course_handicap_set_at timestamptz);
-create table public.rounds(id uuid primary key,game_id uuid,user_id uuid,ai_analysis jsonb,status text);
-create table public.holes(id uuid primary key,round_id uuid references public.rounds(id),strokes integer);
+create table public.rounds(id uuid primary key default gen_random_uuid(),game_id uuid,user_id uuid,ai_analysis jsonb,status text,
+ course text,tee_name text,rating numeric,slope integer,course_par integer,handicap_index numeric,course_handicap integer,
+ course_handicap_source text,course_handicap_set_by uuid,course_handicap_set_at timestamptz,group_id uuid,
+ played_at date,gross_score integer,finished_by text,finished_at timestamptz,unique(game_id,user_id));
+create table public.holes(id uuid primary key default gen_random_uuid(),round_id uuid references public.rounds(id),strokes integer,
+ hole_number integer,par integer,stroke_index integer,putts integer,fairway text,penalties integer,sand boolean,yardage integer);
 create table public.schema_migrations(id text primary key,applied_at timestamptz default now());
 create function public.record_migration(p_id text) returns void language sql as $$insert into public.schema_migrations(id) values(p_id) on conflict(id) do nothing$$;
 create function public.is_admin() returns boolean language sql security definer as $$select exists(select 1 from public.profiles where id=auth.uid() and is_admin)$$;

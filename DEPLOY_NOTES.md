@@ -1,3 +1,9 @@
+## 193.2.260930 — CI-only posting fixture correction (UNVERIFIED candidate)
+
+The fresh-database handicap-posting fixture now calls begin_game_score_write(gid,0) before both scored-player INSERT sites. New games start at version 0; primary-device and reset guards stay enabled. The isolated PostgreSQL runner also executes migration 0161 and the actual posting fixture alongside 0162/0163. Application behavior and all migration bytes are unchanged from 193.1.
+
+Reproduced the original BN163 failure, then passed the corrected 48-case posting matrix and reset/setup assertions locally. Complete GitHub fresh Supabase reconstruction and CI must rerun on the existing draft PR before any merge or deployment.
+
 ## 193.1.260930 — Reset version fencing (UNVERIFIED candidate)
 
 Migration 0163 adds a per-game scoring version. Versioned player/stat and Alternate Shot writes serialize with organizer/admin resets; stale writes are rejected, keeping existing scoring permissions and primary-device enforcement. Durable drafts retain their original version. Reset failure no longer clears unsynced local drafts. Stale-write rejection refreshes from the server before scoring resumes. Historical migrations remain unchanged.
