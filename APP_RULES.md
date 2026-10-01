@@ -278,3 +278,17 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
 
 <!-- 178.25.260830: no global rule change; production migration-parity CI URL hardening only. -->
 <!-- 179.3.260902: no global rule change; Cup schedule/scoring contract only. -->
+
+
+## Mandatory automated testing before code delivery (2026-09-30)
+
+**All new or changed executable code must be automatically tested before being presented to Amit as ready to use or deploy.** This is a blocking delivery requirement, not a request for Amit to discover defects manually in staging.
+
+- Run the relevant existing automated tests against the final changed code. Add meaningful regression coverage for new behavior and bug fixes, including failure and recovery paths. A code review, test plan, source-text check, or successful compilation alone does not establish behavior correctness.
+- Run the project's required CI checks, TypeScript/lint checks, and production build before packaging a release. Re-run affected checks after subsequent code changes; evidence must correspond to the delivered revision.
+- Stateful UI changes require automated observable-outcome coverage: action, direct and derived state, rendered values, side effects, cancel/reverse/re-entry, and A -> B -> A where applicable. Use actual components and browser automation when integration across screens, sessions, or network conditions matters; simulated tests must be labeled as such.
+- Database and security changes require execution of the source-controlled migration chain on a disposable fresh database and behavioral checks for the changed contract, permissions, and rejected writes. Isolated SQL fixtures are useful additional evidence but do not replace the fresh-database gate. Concurrency fixes must exercise delayed or concurrent requests across the relevant boundary.
+- Never bypass, weaken, or relabel a failing blocking check to deliver code. If required tooling, source, credentials, or an environment is unavailable, report the exact blocker and the unexecuted checks. Do not present the release as ready; any requested intermediate code must be explicitly marked UNVERIFIED / NOT READY FOR DEPLOYMENT.
+- Every delivery must summarize the tests actually executed, their results, environment and evidence level, and any remaining unexecuted checks. Distinguish EXECUTED, MODELLED, and BROWSER-VALIDATED evidence; do not report a planned or simulated check as a live staging pass.
+- Automate repeatable staging scenarios wherever practical. Manual phone tests supplement automation for physical-device behavior such as operating-system suspension, installed-app reopening, and connectivity transitions; they do not replace automated coverage of behavior that can be tested automatically.
+- Procedure-only documentation edits require a content/diff verification, rather than an unnecessary application test suite.

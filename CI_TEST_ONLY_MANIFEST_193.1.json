@@ -1,0 +1,139 @@
+{
+  "baseline": "193.0.260930",
+  "candidate": "193.1.260930",
+  "status": "CI TEST ONLY / UNVERIFIED / NOT READY FOR DEPLOYMENT",
+  "files": [
+    {
+      "path": "APP_RULES.md",
+      "sha256": "785c80cdb5dd2970e6728d03619fd094ce51d2f571472be4c5e1d8294845e0cc"
+    },
+    {
+      "path": "BACKLOG.md",
+      "sha256": "04d117ec719d061dfcac9993be022151f0a8f978c0e37f720e70e09dfa3e8a68"
+    },
+    {
+      "path": "CI_TEST_ONLY_193.1.md",
+      "sha256": "ca6613b1efff8017c71fc0ec76860a71b0e722b5c3ca6907cc6f5fca2dff6b4c"
+    },
+    {
+      "path": "DEPLOY_NOTES.md",
+      "sha256": "6f4694ce5e86c3cb2c27bcf5c705544f609dafd917d713c9998029ddcff3fa0b"
+    },
+    {
+      "path": "MIGRATIONS.md",
+      "sha256": "37217c8bd99abe9a9bba0fe96375fc6e60e18fb06bb94b15112eed58ab96937d"
+    },
+    {
+      "path": "README.md",
+      "sha256": "4c6ae0d865902ba6d34efdbd72a4f8958c9e562327d86ded7ea7c36e4da3303e"
+    },
+    {
+      "path": "RELEASE_VERIFICATION_193.1.md",
+      "sha256": "162794c5818b40a24f1025aef175a00f2b122b966975580487e178c359ffe65b"
+    },
+    {
+      "path": "SCHEMA.md",
+      "sha256": "5b3d6c5e7c945b4a790ed9f8532a8a11b285dc4afbcb57fc80c0c962eae092a0"
+    },
+    {
+      "path": "ci/assert-game-reset-fencing.sql",
+      "sha256": "df7e0df5e71d29f2e06aa2bcd9896758a34475a1d8ff94bda46af864850cd59a"
+    },
+    {
+      "path": "ci/assert-match-length-roundtrip.sql",
+      "sha256": "8dcc2d07ecaf319ed05e7fae96ca27814f4719c25da19a9ff094c6c12e54c1e1"
+    },
+    {
+      "path": "ci/assert-primary-scoring-device.sql",
+      "sha256": "a0baaaabfa16ce8b19ba92b6aa8e48b43dc35e1446b6303f1a9a87bebba63836"
+    },
+    {
+      "path": "ci/check_reset_setup_contract.py",
+      "sha256": "51f1b6db291463e29b661a9b9eb6f677ab125f7325fb6f98853781326d3c1dc9"
+    },
+    {
+      "path": "ci/check_team_play_altshot_contract.py",
+      "sha256": "81b3d1447f1e84bdb83f7f8e8b03b1c892df2c19261893a33d366d82b4ab4071"
+    },
+    {
+      "path": "ci/fixtures/game-reset-isolated.sql",
+      "sha256": "acb0b8317be190a66552d2083db7c63880344a20364a8ff3c03031c58e34cb49"
+    },
+    {
+      "path": "ci/integration/staging.mjs",
+      "sha256": "9ea497f1dd9027f751b7b871cbe5ba23d62d5d1bb95ad100fa2b03a01654466d"
+    },
+    {
+      "path": "ci/test-game-reset-concurrency.py",
+      "sha256": "bcd5b77629e0784bed39e60a45b924d33f9688b238b5374761011b99205ac3ac"
+    },
+    {
+      "path": "ci/test-game-reset-isolated.cjs",
+      "sha256": "5bc82efd5f54cf8785bdc85777f33d6a5ede57fe38d36ce4c5f236e04e09e9c3"
+    },
+    {
+      "path": "ci/test-game-reset.cjs",
+      "sha256": "c9b7922724eb5deba1711a07f0289579bbcc4c2f36feb1c3af37cef991e6976c"
+    },
+    {
+      "path": "ci/test-game-score-recovery.cjs",
+      "sha256": "a6f4736e4a3bec9d34e436d77e08a23d88ded24215f42f895d9d7721b85bad0f"
+    },
+    {
+      "path": "ci/test_fresh_db_rebuild.sh",
+      "sha256": "ad569236c899e9f854c1a2a3980e4cf100627771f43f5b9c827d00bc6b704aa7"
+    },
+    {
+      "path": "components/tournaments.tsx",
+      "sha256": "b3725d3dc05ba23a306bc4758f2b0ba951522adaab5b48a79dcee78b4ff47c8a"
+    },
+    {
+      "path": "lib/alt-shot-side-scores.ts",
+      "sha256": "fbe698d4e6e40d16c154bccc0514d21b653f41cf8be8928b97dfaac7355408f2"
+    },
+    {
+      "path": "lib/app-version.ts",
+      "sha256": "dc9758e68fc7f531d8af318e02cfe9140ab133842ed015c7f7e0ebe198389233"
+    },
+    {
+      "path": "lib/draft.ts",
+      "sha256": "949b425919b80ee95f79cf82df77b838ba3faa933ac058f7f777084598d5d323"
+    },
+    {
+      "path": "lib/game-types.ts",
+      "sha256": "bf98cac00fbafb03230152e2f3f24e0e64d3b5e40c2ea7b0e1596db3567f39bf"
+    },
+    {
+      "path": "migrations/0163_game_reset_fencing.sql",
+      "sha256": "b6a959e6dd63f07839c87e887a98302791ffe606e4783787e4ccc5bbaa4de415"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "3fa6564985ec1b40c5eb330c5547c30e3e5458dbcc0bd8c95324f395140a069b"
+    },
+    {
+      "path": "package.json",
+      "sha256": "cc6df75b550e8d736aa0be0e5878a4ca509948dd8109da975698098b88fc0420"
+    },
+    {
+      "path": "public/app-version.json",
+      "sha256": "f8ef552f479d82ebe15cee11c00f8208105bee4637908d9190d1959afd5e0c15"
+    },
+    {
+      "path": "public/sw.js",
+      "sha256": "3731ec7fd08ebf88c14d40c59450fdf9ea9bef52de9596c68adf6322fa99f8f1"
+    },
+    {
+      "path": "verification/193.1/fresh-db-blocker.log",
+      "sha256": "bd50a71ba7be4f08ee139aac55bebefd54d912d468cc95d57fb3253ca295816e"
+    },
+    {
+      "path": "verification/193.1/isolated-sql.log",
+      "sha256": "95c2dc25ff31df954d751e8aeb44008b38a19b18d346057d0fe6642ea58efedc"
+    },
+    {
+      "path": "verification/193.1/local-ci.log",
+      "sha256": "df2f6939294dc1f399ab1d4187792cc00d65e5f28c7b23430d68ed5b931375eb"
+    }
+  ]
+}

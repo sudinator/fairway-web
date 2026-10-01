@@ -8,6 +8,7 @@ import type { GameType } from "./game-shape";
 
 export type Game = {
   id: string;
+  scoring_version?: number;
   group_id?: string | null;
   code: string;
   name: string;

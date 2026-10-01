@@ -1706,15 +1706,17 @@ function GameRoom({
       const n0 = snap.game?.holes_meta?.length || 18;
       const mergedPlayers = (snap.players || []).map((p: any) => {
         const backup = loadGameScores(gameId, p.id);
-        if (!backup || !isPrimaryScoringDevice()) return p;
+        if (!backup || !isPrimaryScoringDevice() || (backup.scoringVersion ?? 0) !== (snap.game.scoring_version ?? 0)) return p;
         const { merged } = mergeBackupRow(p, backup, n0, loadSyncedWatermark(gameId, p.id));
-        saveGameScores(gameId, p.id, merged, true, backup.at);
+        saveGameScores(gameId, p.id, merged, true, backup.at, backup.scoringVersion);
         return { ...p, ...merged };
       });
       setGame(snap.game as any);
       setPlayers(mergedPlayers);
       let offlineAlt = (snap.altShotScores || []) as AltShotScoreRow[];
-      for (const d of isPrimaryScoringDevice() ? loadAltShotDrafts(gameId) : []) offlineAlt = upsertAltShotScoreLocal(offlineAlt, gameId, d.foursomeId, d.side, d.holeIndex, d.strokes);
+      for (const d of isPrimaryScoringDevice() ? loadAltShotDrafts(gameId) : []) {
+        if ((d.scoringVersion ?? 0) === (snap.game.scoring_version ?? 0)) offlineAlt = upsertAltShotScoreLocal(offlineAlt, gameId, d.foursomeId, d.side, d.holeIndex, d.strokes);
+      }
       setAltShotScores(offlineAlt);
       const mineOff = mergedPlayers.find((p: any) => p.user_id === user.id) || null;
       setMe(mineOff);
@@ -1763,7 +1765,7 @@ function GameRoom({
     let loadedAlt = (altRows || loadGameSnapshot(gameId)?.altShotScores || []) as AltShotScoreRow[];
     const altResetAt = (g as any)?.scores_reset_at ? new Date((g as any).scores_reset_at).getTime() : 0;
     for (const d of isPrimaryScoringDevice() ? loadAltShotDrafts(gameId) : []) {
-      if (altResetAt && d.at < altResetAt) { clearAltShotDraft(gameId, d.foursomeId, d.side, d.holeIndex); continue; }
+      if (((d.scoringVersion ?? 0) !== (g.scoring_version ?? 0)) || (altResetAt && d.at < altResetAt)) { clearAltShotDraft(gameId, d.foursomeId, d.side, d.holeIndex); continue; }
       loadedAlt = upsertAltShotScoreLocal(loadedAlt, gameId, d.foursomeId, d.side, d.holeIndex, d.strokes);
     }
     if (!altError) setAltShotScores(loadedAlt);
@@ -1788,13 +1790,13 @@ function GameRoom({
     for (const p of ps) {
       if (!isPrimaryScoringDevice()) { reconciled.push(p); continue; }
       let backup = loadGameScores(gameId, p.id);
-      if (backup && resetAt && backup.at < resetAt) {
+      if (backup && (((backup.scoringVersion ?? 0) !== (safeGame.scoring_version ?? 0)) || (resetAt && backup.at < resetAt))) {
         clearGameScores(gameId, p.id);
         clearSyncedWatermark(gameId, p.id);
         backup = null;
       }
       const { merged } = mergeBackupRow(p, backup || p, n, backup ? loadSyncedWatermark(gameId, p.id) : null);
-      saveGameScores(gameId, p.id, merged, true, backup?.at ?? Date.now());
+      saveGameScores(gameId, p.id, merged, true, backup?.at ?? Date.now(), backup?.scoringVersion ?? (safeGame.scoring_version ?? 0));
       // Never acknowledge the local merge here: the fetch confirmed only p.
       const confirmed = mergeBackupRow(p, p, n).merged;
       saveSyncedWatermark(gameId, p.id, confirmed);
@@ -1820,6 +1822,19 @@ function GameRoom({
   }, [gameId, user.id, deviceState]);
   useEffect(() => {
     load();
+  }, [load]);
+  useEffect(() => {
+    let alive = true;
+    const reloadAfterReset = async () => {
+      recoveryReadyRef.current = false;
+      await scoreWriterRef.current?.idle();
+      if (alive) {
+        await load();
+        alert("The organizer reset this game's scores. Earlier edits were not saved. The scorecard has been refreshed; reconnect if it could not load.");
+      }
+    };
+    window.addEventListener("bnn-game-reset-rejected", reloadAfterReset);
+    return () => { alive = false; window.removeEventListener("bnn-game-reset-rejected", reloadAfterReset); };
   }, [load]);
 
   useEffect(() => {
@@ -2014,19 +2029,16 @@ function GameRoom({
     paused: () => !isPrimaryScoringDevice() || !recoveryReadyRef.current || resettingRef.current || (typeof navigator !== "undefined" && !navigator.onLine),
     revision: () => { scoreRevisionRef.current++; },
     send: async (rowId, body, locked, clock) => {
-      if (locked) {
-        const { error } = await supabase.rpc("save_hole_stats", {
-          p_player: rowId, p_putts: body.putts ?? null, p_fairways: body.fairways ?? null,
-          p_penalties: body.penalties ?? null, p_sand: body.sand ?? null,
-        });
-        if (isDeviceRejection(error)) markScoringDeviceRevoked();
-        if (error) return false;
-        // The void stats RPC must also produce a visible, matching stored row.
-        const { data, error: readError } = await supabase.from("game_players").select("id,putts,fairways,penalties,sand").eq("id", rowId).maybeSingle();
-        return !readError && !!data && Object.entries(body).every(([col, value]) => JSON.stringify(data[col]) === JSON.stringify(value));
-      }
-      const { data, error } = await supabase.from("game_players").update({ ...body, ...(clock || {}) }).eq("id", rowId).select("id,scores,putts,fairways,penalties,sand").maybeSingle();
+      const backup = loadGameScores(gameIdRef.current, rowId);
+      const { data, error } = await supabase.rpc("save_game_score_bundle", {
+        p_player: rowId, p_version: backup?.scoringVersion ?? (gameRef.current?.scoring_version ?? 0),
+        p_patch: { ...body, ...(!locked ? clock || {} : {}) }, p_stats_only: locked,
+      });
       if (isDeviceRejection(error)) markScoringDeviceRevoked();
+      if (error?.code === "BN163") {
+        recoveryReadyRef.current = false;
+        window.dispatchEvent(new Event("bnn-game-reset-rejected"));
+      }
       return !error && !!data && Object.entries(body).every(([col, value]) => JSON.stringify(data[col]) === JSON.stringify(value));
     },
   });
@@ -2044,7 +2056,7 @@ function GameRoom({
       if (!m) return;
       const gid = gameIdRef.current;
       const bundle = { scores: m.scores || [], putts: m.putts || [], fairways: m.fairways || [], penalties: m.penalties || [], sand: m.sand || [] };
-      saveGameScores(gid, m.id, bundle);              // synchronous local backup, always lands
+      saveGameScores(gid, m.id, bundle, false, undefined, gameRef.current?.scoring_version ?? 0);              // synchronous local backup, always lands
       // Best-effort network flush of only my changed columns; if a marker owns my score
       // it goes stats-only through the chokepoint (pushRowCols handles the routing).
       void pushRowColsRef.current(m.id, bundle);
@@ -2163,7 +2175,7 @@ function GameRoom({
     setPlayers((ps) => ps.map((p) => (p.id === me.id ? updated : p)));
     // Synchronous local backup FIRST — survives an immediate lock even if the
     // network write below gets frozen. Reconciled to the DB on next load.
-    if (game) saveGameScores(game.id, me.id, { scores, putts, fairways, penalties, sand }, true);
+    if (game) saveGameScores(game.id, me.id, { scores, putts, fairways, penalties, sand }, true, undefined, game.scoring_version ?? 0);
     setSavingHole(holeIdx);
     scoreRevisionRef.current++;
     lastEditRef.current = Date.now();
@@ -2205,7 +2217,7 @@ function GameRoom({
     // device writes (not just the marker's own) — with penalties/sand — so an
     // offline/lock entry for any player is recoverable. Synced back on reopen /
     // reconnect (see load()).
-    if (game) saveGameScores(game.id, playerId, { scores, putts, fairways, penalties, sand }, true);
+    if (game) saveGameScores(game.id, playerId, { scores, putts, fairways, penalties, sand }, true, undefined, game.scoring_version ?? 0);
     scoreRevisionRef.current++;
     lastEditRef.current = Date.now();
     await pushScores(playerId, { scores, putts, fairways, penalties, sand, ...clockPatch });
@@ -2218,13 +2230,16 @@ function GameRoom({
   const setAltShotSideHole = async (foursomeId: string, side: AltShotScoreSide, holeIdx: number, strokes: number | null) => {
     if (!game || game.game_type !== "alt_shot" || !isPrimaryScoringDevice()) return;
     setAltShotScores((rows) => upsertAltShotScoreLocal(rows, game.id, foursomeId, side, holeIdx, strokes));
-    const draft = { foursomeId, side, holeIndex: holeIdx, strokes, at: Date.now() };
+    const draft = { foursomeId, side, holeIndex: holeIdx, strokes, at: Date.now(), scoringVersion: game.scoring_version ?? 0 };
     saveAltShotDraft(game.id, draft);
     if (typeof navigator !== "undefined" && navigator.onLine === false) { setSyncState("retry"); return; }
     setSyncState("saving");
-    const { error } = await supabase.rpc("save_alt_shot_side_score", { p_game: game.id, p_foursome_id: foursomeId, p_side: side, p_hole_index: holeIdx, p_strokes: strokes });
+    const { error } = await supabase.rpc("save_alt_shot_score_fenced", { p_game: game.id, p_version: draft.scoringVersion, p_foursome_id: foursomeId, p_side: side, p_hole_index: holeIdx, p_strokes: strokes });
     if (isDeviceRejection(error)) markScoringDeviceRevoked();
-    if (error) { setSyncState("error"); return; }
+    if (error) {
+      if (error.code === "BN163") { recoveryReadyRef.current = false; window.dispatchEvent(new Event("bnn-game-reset-rejected")); }
+      setSyncState("error"); return;
+    }
     clearAltShotDraft(game.id, foursomeId, side, holeIdx);
     setSyncState("synced");
     window.setTimeout(() => setSyncState((cur) => cur === "synced" ? "idle" : cur), 1200);
@@ -2239,9 +2254,10 @@ function GameRoom({
       const drafts = loadAltShotDrafts(game.id);
       for (const d of drafts) {
         if (!isPrimaryScoringDevice()) return;
-        if (resetAt && d.at < resetAt) { clearAltShotDraft(game.id, d.foursomeId, d.side, d.holeIndex); continue; }
-        const { error } = await supabase.rpc("save_alt_shot_side_score", { p_game: game.id, p_foursome_id: d.foursomeId, p_side: d.side, p_hole_index: d.holeIndex, p_strokes: d.strokes });
+        if (((d.scoringVersion ?? 0) !== (game.scoring_version ?? 0)) || (resetAt && d.at < resetAt)) { clearAltShotDraft(game.id, d.foursomeId, d.side, d.holeIndex); continue; }
+        const { error } = await supabase.rpc("save_alt_shot_score_fenced", { p_game: game.id, p_version: d.scoringVersion ?? (game.scoring_version ?? 0), p_foursome_id: d.foursomeId, p_side: d.side, p_hole_index: d.holeIndex, p_strokes: d.strokes });
         if (isDeviceRejection(error)) markScoringDeviceRevoked();
+        if (error?.code === "BN163") { recoveryReadyRef.current = false; window.dispatchEvent(new Event("bnn-game-reset-rejected")); return; }
         if (!error) clearAltShotDraft(game.id, d.foursomeId, d.side, d.holeIndex);
       }
       if (drafts.length) load();
@@ -2249,7 +2265,7 @@ function GameRoom({
     void flush();
     window.addEventListener("online", flush);
     return () => window.removeEventListener("online", flush);
-  }, [game?.id, game?.game_type, load]);
+  }, [game?.id, game?.game_type, game?.scoring_version, load]);
 
     // Claim / release the group scorecard (the "marker"). Uses a SECURITY DEFINER
   // RPC so only a group member can claim, and only the marker can release.
@@ -2891,15 +2907,6 @@ function GameRoom({
       group_locked: false,
       no_show: false,
     };
-    // Optimistically clear local state so meRef goes blank immediately (so even a
-    // stray flush would only ever write blanks) and the UI updates without a wait.
-    setPlayers((ps) => ps.map((p) => ({ ...p, ...blank })));
-    setMe((m) => (m ? { ...m, ...blank } : m));
-    // Clear EVERY local score backup for this game on this device — including any
-    // rows a marker backed up for other players — so a pre-game test wipe leaves
-    // nothing to resurface. (Only this device; other devices keep theirs, which
-    // protects any real scores they hold.)
-    clearAllGameScores(game.id);
     try {
       // Server-side reset: a SECURITY DEFINER RPC clears EVERY player's scores,
       // putts, fairways, penalties/sand and round clock in one statement. The old
@@ -2908,14 +2915,16 @@ function GameRoom({
       // every other device drops its pre-reset local backups on next load.
       const { error } = await supabase.rpc("reset_game_scores", { p_game: game.id });
       if (error) throw error;
+      setPlayers((ps) => ps.map((p) => ({ ...p, ...blank })));
+      setMe((m) => (m ? { ...m, ...blank } : m));
+      clearAllGameScores(game.id);
+      clearAllAltShotDrafts(game.id);
       await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_reset", group_id: (game as any).group_id || null, summary: `Reset scores for "${game.name}"` });
     } catch (e) {
       alert("Couldn't reset the game — make sure you're the organizer. If this keeps happening, the reset_game_scores database function may not be installed yet.");
     } finally {
       resettingRef.current = false;
-      // Re-sync to DB truth whether the reset succeeded OR failed — the UI was
-      // optimistically blanked before the RPC, so on failure this restores the
-      // real (un-wiped) scores rather than leaving a misleading empty card.
+      // Failed resets retain the card and local drafts; confirmed resets reload the new version.
       await load();
     }
   };

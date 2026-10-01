@@ -211,10 +211,10 @@ try {
   const directAltWrite = await alice.client.from("game_alt_shot_scores").insert({ game_id: altGame.id, foursome_id: "alt-group-1", side: "a", hole_index: 0, strokes: 5 });
   ok(!!directAltWrite.error, "Alternate Shot direct browser score insert is blocked");
 
-  expectNoError(await alice.client.rpc("save_alt_shot_side_score", { p_game: altGame.id, p_foursome_id: "alt-group-1", p_side: "a", p_hole_index: 0, p_strokes: 5 }), "Side A player can score Side A");
-  const opponentWrite = await alice.client.rpc("save_alt_shot_side_score", { p_game: altGame.id, p_foursome_id: "alt-group-1", p_side: "b", p_hole_index: 0, p_strokes: 4 });
+  expectNoError(await alice.client.rpc("save_alt_shot_score_fenced", { p_game: altGame.id, p_version: 0, p_foursome_id: "alt-group-1", p_side: "a", p_hole_index: 0, p_strokes: 5 }), "Side A player can score Side A");
+  const opponentWrite = await alice.client.rpc("save_alt_shot_score_fenced", { p_game: altGame.id, p_version: 0, p_foursome_id: "alt-group-1", p_side: "b", p_hole_index: 0, p_strokes: 4 });
   ok(!!opponentWrite.error, "ordinary Side A player cannot overwrite Side B");
-  expectNoError(await charlie.client.rpc("save_alt_shot_side_score", { p_game: altGame.id, p_foursome_id: "alt-group-1", p_side: "b", p_hole_index: 0, p_strokes: 4 }), "Side B player can score Side B");
+  expectNoError(await charlie.client.rpc("save_alt_shot_score_fenced", { p_game: altGame.id, p_version: 0, p_foursome_id: "alt-group-1", p_side: "b", p_hole_index: 0, p_strokes: 4 }), "Side B player can score Side B");
 
   const sideRows = expectNoError(await alice.client.from("game_alt_shot_scores").select("foursome_id,side,hole_index,strokes").eq("game_id", altGame.id).eq("hole_index", 0).order("side"), "read canonical Alternate Shot side scores");
   ok(sideRows.length === 2 && sideRows[0].side === "a" && sideRows[0].strokes === 5 && sideRows[1].side === "b" && sideRows[1].strokes === 4, "exactly one canonical score per side/hole persists");
@@ -229,7 +229,7 @@ try {
   // canonical side/hole. 0141 must persist an explicit NULL tombstone rather than deleting the
   // row, otherwise the old player score would become visible again in the application fallback.
   expectNoError(await service.from("game_players").update({ scores: [null, 6] }).eq("game_id", altGame.id).in("user_id", [alice.id, bob.id]), "seed historical duplicated Alternate Shot score");
-  expectNoError(await alice.client.rpc("save_alt_shot_side_score", { p_game: altGame.id, p_foursome_id: "alt-group-1", p_side: "a", p_hole_index: 1, p_strokes: null }), "clearing a legacy Alternate Shot hole succeeds");
+  expectNoError(await alice.client.rpc("save_alt_shot_score_fenced", { p_game: altGame.id, p_version: 0, p_foursome_id: "alt-group-1", p_side: "a", p_hole_index: 1, p_strokes: null }), "clearing a legacy Alternate Shot hole succeeds");
   const clearRow = expectNoError(await service.from("game_alt_shot_scores").select("strokes").eq("game_id", altGame.id).eq("foursome_id", "alt-group-1").eq("side", "a").eq("hole_index", 1).single(), "inspect Alternate Shot clear tombstone");
   ok(clearRow.strokes == null, "clear persists a canonical NULL tombstone instead of deleting the override");
 
@@ -241,22 +241,26 @@ try {
   expectNoError(await secondDevice.auth.signInWithPassword({ email: alice.email, password }), "sign into second device for same scorer");
   const passiveDevice = expectNoError(await secondDevice.rpc("claim_scoring_device", { p_token: secondToken }), "second device can inspect scoring ownership");
   ok(passiveDevice.active === false, "opening desktop does not steal phone scoring");
-  const oldWrite = alice.client.rpc("save_alt_shot_side_score", { p_game: altGame.id, p_foursome_id: "alt-group-1", p_side: "a", p_hole_index: 0, p_strokes: 7 }).then(result => result);
+  const oldWrite = alice.client.rpc("save_alt_shot_score_fenced", { p_game: altGame.id, p_version: 0, p_foursome_id: "alt-group-1", p_side: "a", p_hole_index: 0, p_strokes: 7 }).then(result => result);
   const transferred = expectNoError(await secondDevice.rpc("claim_scoring_device", { p_token: secondToken, p_takeover: true }), "explicit desktop takeover succeeds");
   ok(transferred.active === true, "second device is now primary");
   const racingOld = await oldWrite;
   ok(!racingOld.error || racingOld.error.message.includes("Scoring is active on another device"), "in-flight old write commits before transfer or is fenced");
-  expectNoError(await secondDevice.rpc("save_alt_shot_side_score", { p_game: altGame.id, p_foursome_id: "alt-group-1", p_side: "a", p_hole_index: 0, p_strokes: 3 }), "new primary saves side score");
-  const lateOld = await alice.client.rpc("save_alt_shot_side_score", { p_game: altGame.id, p_foursome_id: "alt-group-1", p_side: "a", p_hole_index: 0, p_strokes: 9 });
+  expectNoError(await secondDevice.rpc("save_alt_shot_score_fenced", { p_game: altGame.id, p_version: 0, p_foursome_id: "alt-group-1", p_side: "a", p_hole_index: 0, p_strokes: 3 }), "new primary saves side score");
+  const lateOld = await alice.client.rpc("save_alt_shot_score_fenced", { p_game: altGame.id, p_version: 0, p_foursome_id: "alt-group-1", p_side: "a", p_hole_index: 0, p_strokes: 9 });
   ok(!!lateOld.error?.message.includes("Scoring is active on another device"), "old device retry cannot overwrite new primary");
   const alicePlayer = expectNoError(await service.from("game_players").select("id").eq("game_id", altGame.id).eq("user_id", alice.id).single(), "find own row for second-device stats gate");
   const staleStats = await alice.client.from("game_players").update({ putts: [4,4] }).eq("id", alicePlayer.id);
-  ok(!!staleStats.error?.message.includes("Scoring is active on another device"), "old device direct own stats are fenced too");
+  ok(staleStats.error?.code === "BN163", "legacy direct stats cannot bypass the reset fence");
   const finalSide = expectNoError(await alice.client.from("game_alt_shot_scores").select("strokes").eq("game_id", altGame.id).eq("side", "a").eq("hole_index", 0).single(), "old device can still view new scores");
   ok(finalSide.strokes === 3, "latest new-primary score is retained");
   expectNoError(await alice.client.rpc("claim_scoring_device", { p_token: alice.scoringToken, p_takeover: true }), "return test account to original device");
 
   expectNoError(await admin.client.rpc("reset_game_scores", { p_game: altGame.id }), "organizer reset clears canonical Alternate Shot scoring");
+  const staleAfterReset = await alice.client.rpc("save_alt_shot_score_fenced", { p_game: altGame.id, p_version: 0, p_foursome_id: "alt-group-1", p_side: "a", p_hole_index: 0, p_strokes: 8 });
+  ok(staleAfterReset.error?.code === "BN163", "pre-reset side score rejected after organizer reset");
+  const staleBundle = await alice.client.rpc("save_game_score_bundle", { p_player: alicePlayer.id, p_version: 0, p_patch: { putts: [4,4] }, p_stats_only: true });
+  ok(staleBundle.error?.code === "BN163", "pre-reset own stats rejected after organizer reset");
   const afterAltReset = await service.from("game_alt_shot_scores").select("game_id", { count: "exact", head: true }).eq("game_id", altGame.id);
   ok(!afterAltReset.error, `verify Alternate Shot score reset${afterAltReset.error ? ` — ${afterAltReset.error.message}` : ""}`);
   ok((afterAltReset.count ?? 0) === 0, "reset removes all canonical Alternate Shot side scores");

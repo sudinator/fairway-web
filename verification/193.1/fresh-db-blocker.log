@@ -1,0 +1,3 @@
+ci/test_fresh_db_rebuild.sh: line 32: supabase: command not found
+::group::Fresh database failure diagnostics
+::endgroup::

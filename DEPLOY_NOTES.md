@@ -1,3 +1,9 @@
+## 193.1.260930 — Reset version fencing (UNVERIFIED candidate)
+
+Migration 0163 adds a per-game scoring version. Versioned player/stat and Alternate Shot writes serialize with organizer/admin resets; stale writes are rejected, keeping existing scoring permissions and primary-device enforcement. Durable drafts retain their original version. Reset failure no longer clears unsynced local drafts. Stale-write rejection refreshes from the server before scoring resumes. Historical migrations remain unchanged.
+
+NOT READY FOR DEPLOYMENT. Complete fresh-database, concurrency, browser, local CI and staging gates against the final revision before delivery. Production stays deferred. Older game-scoring clients need a reload after 0163; production migration/deployment coordination is mandatory.
+
 ## 193.0.260930 — One primary scoring device per account
 
 Phone-first: a second instance stays view-only and offers Make this device primary. Explicit transfer covers personal rounds, individual/marker game scores and stats, and Alternate Shot (also Ryder Cup games). New 0162 database triggers fence old and headerless clients; transfer and writes serialize on the scorer account. Existing scoring permissions remain required. Known primary works offline; transferred-away work is retained/downloadable and is never automatically replayed after takeover. Personal viewers refresh saved scores and never flush stale local cards.

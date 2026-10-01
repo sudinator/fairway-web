@@ -1,3 +1,7 @@
+## 193.1 reset fencing — UNVERIFIED candidate
+
+Per-game scoring_version and versioned player/stat/Alternate Shot RPCs fence pre-reset writes. Reset locks serialize writes and resets. Testing requirement copied into APP_RULES.md. Required automated release gates have not yet completed; do not deploy.
+
 ## 193.0 primary-device scope
 
 Implemented account-level primary scoring with server fencing, phone-first viewing/explicit transfer, pending-work isolation and recovery downloads. Staging device verification and GitHub fresh database/integration jobs remain release gates. Full simultaneous scoring is intentionally unsupported. Existing broader audit bugs are still separate work; production is not cleared.
