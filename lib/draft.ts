@@ -187,6 +187,7 @@ export function saveGameScores(
   data: { scores: any[]; putts: any[]; fairways: any[]; penalties?: any[]; sand?: any[] },
   force = false,
   observedAt?: number,
+  scoringVersion?: number,
 ): void {
   try {
     if (typeof window === "undefined") return;
@@ -202,20 +203,20 @@ export function saveGameScores(
         if (existing && (existing.scores || []).some((s) => s != null)) return;
       }
     }
-    scoringStorage().setItem(gameScoreKey(gameId, playerId), JSON.stringify({ at: observedAt ?? (force ? Date.now() : loadGameScores(gameId, playerId)?.at ?? Date.now()), ...data }));
+    scoringStorage().setItem(gameScoreKey(gameId, playerId), JSON.stringify({ scoringVersion: scoringVersion ?? loadGameScores(gameId, playerId)?.scoringVersion, at: observedAt ?? (force ? Date.now() : loadGameScores(gameId, playerId)?.at ?? Date.now()), ...data }));
   } catch {}
 }
 
 export function loadGameScores(
   gameId: string,
   playerId: string,
-): { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[]; at: number } | null {
+): { scores: any[]; putts: any[]; fairways: any[]; penalties: any[]; sand: any[]; at: number; scoringVersion?: number } | null {
   try {
     if (typeof window === "undefined") return null;
     const raw = scoringStorage().getItem(gameScoreKey(gameId, playerId));
     if (!raw) return null;
     const p = JSON.parse(raw);
-    return { scores: p.scores || [], putts: p.putts || [], fairways: p.fairways || [], penalties: p.penalties || [], sand: p.sand || [], at: typeof p.at === "number" ? p.at : 0 };
+    return { scoringVersion: Number.isInteger(p.scoringVersion) ? p.scoringVersion : undefined, scores: p.scores || [], putts: p.putts || [], fairways: p.fairways || [], penalties: p.penalties || [], sand: p.sand || [], at: typeof p.at === "number" ? p.at : 0 };
   } catch { return null; }
 }
 

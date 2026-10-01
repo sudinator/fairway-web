@@ -1,3 +1,13 @@
+## 193.2.260930 — CI-only posting fixture correction (UNVERIFIED candidate)
+
+The fresh-database handicap-posting fixture now calls begin_game_score_write(gid,0) before both scored-player INSERT sites. New games start at version 0; primary-device and reset guards stay enabled. The isolated PostgreSQL runner also executes migration 0161 and the actual posting fixture alongside 0162/0163. Application behavior and all migration bytes are unchanged from 193.1.
+
+Reproduced the original BN163 failure, then passed the corrected 48-case posting matrix and reset/setup assertions locally. Complete GitHub fresh Supabase reconstruction and CI must rerun on the existing draft PR before any merge or deployment.
+
+## 193.1 reset fencing — UNVERIFIED candidate
+
+Per-game scoring_version and versioned player/stat/Alternate Shot RPCs fence pre-reset writes. Reset locks serialize writes and resets. Testing requirement copied into APP_RULES.md. Required automated release gates have not yet completed; do not deploy.
+
 ## Release 193.0
 
 One primary scoring device per account across personal rounds and games (including Ryder Cup games). A second instance can view and explicitly transfer control. Staging requires migration 0162; reload both devices online after upgrading. See TEST_PLAN_193.0.md for phone/desktop and offline gates.

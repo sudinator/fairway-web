@@ -105,9 +105,7 @@ begin
 end $$;
 
 -- Once a score exists the same RPC must reject the change.
-update public.game_players
-   set scores = '[5,null,null,null,null,null,null,null,null]'::jsonb
- where id = '49000000-0000-0000-0000-000000000101';
+select public.save_game_score_bundle('49000000-0000-0000-0000-000000000101',0,'{"scores":[5,null,null,null,null,null,null,null,null]}');
 
 do $$
 declare denied boolean := false;

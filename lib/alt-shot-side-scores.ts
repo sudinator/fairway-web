@@ -17,6 +17,7 @@ export type AltShotScoreDraft = {
   holeIndex: number;
   strokes: number | null;
   at: number;
+  scoringVersion?: number;
 };
 
 export function canonicalAltShotGross(

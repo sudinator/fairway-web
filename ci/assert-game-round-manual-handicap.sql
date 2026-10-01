@@ -25,6 +25,8 @@ begin
             jsonb_agg(5 order by i) into meta,vals from generate_series(1,n) i;
      insert into public.games(id,code,name,course,course_par,holes_meta,game_type,status,created_by)
       values(gid,left(replace(gid::text,'-',''),12),'Posting regression','Posting course',71,meta,'stroke','active',uid);
+     -- Newly created game: establish the authenticated version-0 write context.
+     perform public.begin_game_score_write(gid,0);
      insert into public.game_players(id,game_id,user_id,display_name,tee_name,rating,slope,handicap_index,
        course_handicap,course_handicap_source,course_handicap_set_by,course_handicap_set_at,tee_group,
        scores,putts,fairways,penalties,sand)
@@ -107,6 +109,8 @@ begin
   gid:=gen_random_uuid();
   insert into public.games(id,code,name,course,course_par,holes_meta,game_type,status,created_by)
    values(gid,left(replace(gid::text,'-',''),12),'No post','Course',72,meta,source,'active',uid);
+  -- Excluded formats still obey the score-write guard during fixture setup.
+  perform public.begin_game_score_write(gid,0);
   insert into public.game_players(id,game_id,user_id,display_name,tee_group,scores)
    values(gen_random_uuid(),gid,uid,'Player',1,case when source='stroke' then '[]'::jsonb else vals end);
   perform public.post_game_rounds_internal(gid,false); perform public.post_group_rounds(gid,1);

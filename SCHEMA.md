@@ -1,3 +1,11 @@
+## 193.2 — CI-only correction
+
+No database schema or migration changes from 193.1. The handicap-posting fixture establishes the required new-game version-0 context before scored inserts.
+
+## 193.1 reset fencing — UNVERIFIED candidate
+
+Per-game scoring_version and versioned player/stat/Alternate Shot RPCs fence pre-reset writes. Reset locks serialize writes and resets. Testing requirement copied into APP_RULES.md. Required automated release gates have not yet completed; do not deploy.
+
 ## 193.0 — Primary scoring device
 
 0162 adds private RLS-enabled scoring_devices(user_id, token, claimed_at), authenticated account-scoped claim_scoring_device(uuid,uuid,boolean), and write triggers on rounds, holes, game_players, game_alt_shot_scores and games (scoring control/status fields). No direct app grants on the token table. Existing authorization still applies. x-bnn-scoring-device matches the requesting account token; advisory transaction lock namespace 162 serializes transfer/write. Trusted jobs with no end-user auth.uid retain their existing permissions. End-user round/holes mutations and game scoring/status/reset/marker changes are guarded.

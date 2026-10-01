@@ -1,0 +1,70 @@
+{
+  "apply_over": "193.1",
+  "status": "CI TEST ONLY; NOT READY FOR DEPLOYMENT",
+  "files": [
+    {
+      "path": "ci/assert-game-round-manual-handicap.sql",
+      "sha256": "bc2e14139b12d44363a684b11f3f473157aeb7ff495c91bb4e8be74038da71c0"
+    },
+    {
+      "path": "ci/fixtures/game-reset-isolated.sql",
+      "sha256": "39831a04d2912b4b9e9bb43d7da6f0afe0c1bc96c21e1443441609c2676addfc"
+    },
+    {
+      "path": "ci/test-game-reset-isolated.cjs",
+      "sha256": "d8f9c0d2eaf6b1fce41977942d6766178dfaf036c63af26667ade2f9a3abf13e"
+    },
+    {
+      "path": "package.json",
+      "sha256": "ffaf50741f3c63a0a0303b6610c7f08cad9ffb956f5074d8e2afbc0435510669"
+    },
+    {
+      "path": "package-lock.json",
+      "sha256": "528adceec9e79c6b18455287d7e22f3cf6cd4c60b9b3d3a4daa1c588ec623eaa"
+    },
+    {
+      "path": "lib/app-version.ts",
+      "sha256": "b09de7debcdef0a5d1a9f63ca4f70334a8d39621ddc4fb6ade17e523ae65dfdd"
+    },
+    {
+      "path": "public/app-version.json",
+      "sha256": "fe9a3ac14bf885a07450d66225771147423c3c3a0b66e25f5b7f2465559ac21e"
+    },
+    {
+      "path": "public/sw.js",
+      "sha256": "72a3560e047aa564fdf05e96a53de6a76fb0d2f2b31499e28b1311925dfa443a"
+    },
+    {
+      "path": "DEPLOY_NOTES.md",
+      "sha256": "502937cf44fb06feede8121afb93b6480124cec030af0ffc0b0819a7fe9dc160"
+    },
+    {
+      "path": "README.md",
+      "sha256": "843b7253c273560e1a37305505c77de6c1d8357393d7909cbec1190fc6be8c42"
+    },
+    {
+      "path": "BACKLOG.md",
+      "sha256": "64ab33c2b28668d9174a5dc1ebdf5c6766ff2ecb49369958db53215e255af8b2"
+    },
+    {
+      "path": "SCHEMA.md",
+      "sha256": "f945f11a573d3b78744757f665a4b4492138f4b0f6af0d83045579a1be34a81d"
+    },
+    {
+      "path": "CI_TEST_ONLY_193.2.md",
+      "sha256": "cd3f8c858a5800f4444260e6ffee4da894dada207fe5b95f0ca3c389cb229004"
+    },
+    {
+      "path": "RELEASE_VERIFICATION_193.2.md",
+      "sha256": "ce87d1372a2b4bf9c5e833af187b607027369a3398c81dea7f9aa0bfb8715adb"
+    },
+    {
+      "path": "verification/193.2/local-ci.log",
+      "sha256": "6c872ab362c871519e588588f116baa4b2099652a5e343ee320b6cf8ba823345"
+    },
+    {
+      "path": "verification/193.2/isolated-sql.log",
+      "sha256": "3ea5b931822b14cf7a0a20a0d6ec6ed4467be1d72d05e736b649b503cea2e749"
+    }
+  ]
+}

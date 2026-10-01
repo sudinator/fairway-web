@@ -22,18 +22,19 @@ function walk(n){
   if(name==='load'&&t?.includes('bootFromSnapshot'))callback=t;
   if(name==='scoreLockedForRow')lockCallback=t;
  }
- if(ts.isPropertyAssignment(n)&&n.name.getText(parsed)==='send'&&n.initializer.getText(parsed).includes('save_hole_stats'))sendCallback=n.initializer.getText(parsed);
+ if(ts.isPropertyAssignment(n)&&n.name.getText(parsed)==='send'&&n.initializer.getText(parsed).includes('save_game_score_bundle'))sendCallback=n.initializer.getText(parsed);
  ts.forEachChild(n,walk);
 }
 walk(parsed);assert.ok(callback);assert.ok(sendCallback);assert.ok(lockCallback);
 function compileArrow(text,env){const js=ts.transpileModule('const fn='+text+'; return fn;',{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;return Function(...Object.keys(env),js)(...Object.values(env));}
 function adapter(mode='ok'){
- let sent,stats=0;
- const client={async rpc(){stats++;return{error:mode==='rpc-error'?{message:'denied'}:null}},from(){const q={update(body){sent=copy(body);return q},eq(){return q},select(){return q},maybeSingle:async()=>{
+ let stats=0, sent, version, resetEvents=0;
+ const client={async rpc(name,args){assert.equal(name,'save_game_score_bundle');stats++;sent=copy(args.p_patch);version=args.p_version;
   if(mode==='throw')throw Error('network');
-  return{data:mode==='zero'?null:{id:'p',...base,...sent},error:mode==='error'?{message:'denied'}:null};
- }};return q}};
- return{send:compileArrow(sendCallback,{supabase:client,isDeviceRejection:()=>false,markScoringDeviceRevoked:()=>{}}),get stats(){return stats}};
+  return{data:mode==='zero'?null:{id:'p',...base,...sent},error:['error','rpc-error','reset'].includes(mode)?{message:'denied',code:mode==='reset'?'BN163':'42501'}:null};
+ }};
+ const env={supabase:client,isDeviceRejection:()=>false,markScoringDeviceRevoked:()=>{},loadGameScores:()=>({scoringVersion:7}),gameIdRef:{current:'g'},gameRef:{current:{scoring_version:8}},recoveryReadyRef:{current:true},window:{dispatchEvent(){resetEvents++}},Event:window.Event};
+ return{send:compileArrow(sendCallback,env),get stats(){return stats},get version(){return version},get resetEvents(){return resetEvents},env};
 }
 const code=ts.transpileModule('const load='+callback+'; return load;',{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText;
 function room(server,opts={}){
@@ -41,7 +42,7 @@ function room(server,opts={}){
  const client={from(table){const q={select(){return q},eq(){return q},single(){return q},is(){return q},then(resolve,reject){
   if(opts.throwRead)return Promise.reject(Error('Injected network failure')).then(resolve,reject);
   if(opts.duringRead){const fn=opts.duringRead;opts.duringRead=null;fn(scoreRevisionRef);}
-  const response=table==='games'?{data:{id:'g',holes_meta:[{n:1,par:4},{n:2,par:4}],scores_reset_at:opts.resetAt}}:table==='game_players'?{data:copy(server),error:opts.failRead?{message:'denied'}:null}:table==='rounds'?{count:0}:{data:[]};return Promise.resolve(response).then(resolve,reject);
+  const response=table==='games'?{data:{id:'g',holes_meta:[{n:1,par:4},{n:2,par:4}],scores_reset_at:opts.resetAt,scoring_version:opts.version??0}}:table==='game_players'?{data:copy(server),error:opts.failRead?{message:'denied'}:null}:table==='rounds'?{count:0}:{data:[]};return Promise.resolve(response).then(resolve,reject);
  },update(){throw Error('load must not upload')}};return q;}};
  const env={isPrimaryScoringDevice:()=>opts.viewer!==true,deviceState:opts.viewer?"viewer":"primary",...draft,...require(path.join(repo,'lib/alt-shot-side-scores.ts')),mergeBackupRow,supabase:client,gameId:'g',user:{id:'u'},scoreRevisionRef,recoveryReadyRef:{current:false},loadRequestRef:{current:0},scoreWriterRef:{current:null},resettingRef:{current:false},gameRef,playersRef:{current:[]},navigator,setGame:v=>state.game=v,setPlayers:v=>state.players=v,setMe:()=>{},setAltShotScores:()=>{},setCourseTees:()=>{},setNeedsSetup:()=>{},setLoading:()=>{},setPostedRoundCount:()=>{},setSyncState:v=>state.sync=v};
  return{load:Function(...Object.keys(env),code)(...Object.values(env)),state};
@@ -56,6 +57,7 @@ seed();let a=room([{id:'p',user_id:'u',...base}]);await a.load();assert.deepEqua
 for(const opts of [{failRead:true},{throwRead:true}]){seed();a=room([{id:'p',user_id:'u',...base}],opts);await a.load();assert.deepEqual(draft.loadGameScores('g','p').scores,[4,null]);assert.deepEqual(draft.loadSyncedWatermark('g','p'),base);assert.equal(a.state.sync,'error');}
 seed();a=room([{id:'p',user_id:'u',...base}],{duringRead:ref=>ref.current++});await a.load();assert.deepEqual(a.state.players,[],'stale read rejected');assert.deepEqual(draft.loadSyncedWatermark('g','p'),base);
 seed();a=room([{id:'p',user_id:'u',...bundle([null,null])}],{resetAt:new Date(200).toISOString()});await a.load();assert.deepEqual(a.state.players[0].scores,[null,null]);assert.equal(pending(draft.loadGameScores('g','p'),draft.loadSyncedWatermark('g','p')),0);
+seed();draft.saveGameScores('g','p',local,true,999999,0);a=room([{id:'p',user_id:'u',...bundle([null,null])}],{version:1});await a.load();assert.deepEqual(a.state.players[0].scores,[null,null],'version beats fast device clock');assert.equal(draft.loadGameScores('g','p').scoringVersion,1);
 seed(base,null);a=room([{id:'p',user_id:'u',...base}]);await a.load();assert.equal(pending(draft.loadGameScores('g','p'),draft.loadSyncedWatermark('g','p')),0,'baseline seeded');
 seed();draft.saveGameSnapshot('g',{game:{id:'g',holes_meta:[{},{}]},players:[{id:'p',user_id:'u',...base}]});navigator.onLine=false;a=room([]);await a.load();assert.deepEqual(a.state.players[0].scores,[4,null]);assert.equal(draft.loadGameScores('g','p').at,100);assert.deepEqual(draft.loadSyncedWatermark('g','p'),base);navigator.onLine=true;
 // Exercise the actual adapter: Supabase errors and silent zero rows are failures.
@@ -71,7 +73,8 @@ t=writer({send:async()=>{throw Error('offline')}});assert.equal(await t.w.write(
 t=writer();t.locked=true;assert.equal(await t.w.write('p'),false);assert.ok(t.sends[0].locked);assert.ok(!('scores' in t.sends[0].body));assert.deepEqual(t.wm.scores,base.scores);assert.deepEqual(t.wm.putts,local.putts);
 t=writer();let release;t.hold=new Promise(r=>release=r);const first=t.w.write('p');await Promise.resolve();await Promise.resolve();assert.equal(t.sends.length,1);t.backup={...local,scores:[3,null]};const second=t.w.write('p');await Promise.resolve();assert.equal(t.sends.length,1);release();assert.equal(await first,false);assert.equal(await second,true);assert.deepEqual(t.wm.scores,[3,null]);assert.deepEqual(t.sends[1].body.scores,[3,null]);await t.w.idle();assert.equal(t.w.busy,false);
 t=writer();t.paused=true;assert.equal(await t.w.write('p'),false);assert.equal(t.sends.length,0);
-assert.ok(source.includes('.select("id,scores,putts,fairways,penalties,sand").maybeSingle()'));assert.ok(source.includes('void pushRowColsRef.current(m.id, bundle)'));assert.ok(source.includes('await scoreWriterRef.current?.idle()'));
+assert.ok(source.includes('p_stats_only: locked'));assert.ok(source.includes('p_version: backup?.scoringVersion'));assert.ok(source.includes('void pushRowColsRef.current(m.id, bundle)'));assert.ok(source.includes('await scoreWriterRef.current?.idle()'));
 seed();r=room([{id:'p',user_id:'u',...base}],{viewer:true});await r.load();assert.deepEqual(r.state.players[0].scores,base.scores,'viewer shows server, not stale local backup');assert.deepEqual(draft.loadGameScores('g','p').scores,local.scores,'viewer preserves pending recovery');assert.deepEqual(draft.loadSyncedWatermark('g','p').scores,base.scores,'viewer never acknowledges pending work');
+adapterTest=adapter('reset');assert.equal(await adapterTest.send('p',{scores:[4]},false),false);assert.equal(adapterTest.version,7,'original durable version, not new game version');assert.equal(adapterTest.resetEvents,1);assert.equal(adapterTest.env.recoveryReadyRef.current,false);
 console.log('PASS: actual load + sync helpers: corrections/deletions/all stats, remote edits, legacy, cold launch, denied/thrown/late reads, reset, rejected writes, marker permissions, concurrent writes and queue freshness');dom.window.close();
 })().catch(e=>{console.error(e);dom.window.close();process.exitCode=1});

@@ -1,0 +1,2 @@
+PASS: actual handicap-posting fixture with reset fencing: 48 posting cases, conflict/repost/manual metadata, excluded formats and outsider ACL
+PASS: EXECUTED actual 0163 twice in PostgreSQL/PGlite with authenticated RLS; current/stale/absent version, direct and legacy RPC bypass denial, own-stats permission, player/side clearing, organizer/admin repeated resets, version rewind denial, anonymous grants, 9/18/back-nine setup round trip
