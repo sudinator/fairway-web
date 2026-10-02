@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 195.0.261001
+## Current candidate: 195.1.261001
+
+- RULE, added after 195.0 failed CI on a modelled fixture: **before handing over any drop that adds a migration or a `ci/assert-*.sql` file, run `BNN_SCRATCH_DATABASE_URL=... bash ci/test_fresh_db_local.sh`** and quote its output. It replays all committed migrations on real PostgreSQL and runs the rebuild's assertion files in CI's order. An isolated fixture is a convenience for iterating, never evidence.
+
+## Superseded: 195.0.261001
 
 - Migration 0165: every notification rewritten with specifics (see DEPLOY_NOTES). `ci/assert-notifications.sql` asserts exact text; run `BNN_SCRATCH_DATABASE_URL=... bash ci/test-notifications-isolated.sh` for a 5-second local check, and it also runs inside the fresh-database rebuild.
 - Courses shows a "Needs review" section for club admins (pending GolfCourseAPI changes); Admin shows sign-up dates. Apply 0165 before the code on each environment.

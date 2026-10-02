@@ -2,6 +2,14 @@
 -- Expected texts are asserted EXACTLY: a notification is product copy, and a regression that drops
 -- the person's name or the club turns "Amit Sud joined Pine Valley Hackers" back into "A new golfer
 -- joined your club", which is what this file exists to prevent.
+-- Start clean even after a previous crashed run left fixture rows behind (same statements as the
+-- cleanup at the end).
+delete from notifications where user_id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003'); delete from tee_time_rsvps where tee_time_id = '77777777-0000-0000-0000-000000000007'; delete from tee_times where id = '77777777-0000-0000-0000-000000000007'; delete from settlements where group_id = 'dddddddd-0000-0000-0000-000000000004'; delete from expense_shares where expense_id in ('99999999-0000-0000-0000-000000000009','88888888-0000-0000-0000-000000000008'); delete from expense_payers where expense_id in ('99999999-0000-0000-0000-000000000009','88888888-0000-0000-0000-000000000008'); delete from expenses where id in ('99999999-0000-0000-0000-000000000009','88888888-0000-0000-0000-000000000008'); delete from group_events where id = '55555555-0000-0000-0000-000000000005';
+delete from friction_items where signature like 'ci165:%'; delete from course_freshness where course_id = '66666666-0000-0000-0000-000000000006'; delete from favorite_courses where id = '66666666-0000-0000-0000-000000000006';
+delete from game_players where game_id = 'ffffffff-0000-0000-0000-000000000006'; delete from games where id = 'ffffffff-0000-0000-0000-000000000006';
+delete from group_members where group_id in ('dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005'); delete from groups where id in ('dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005'); delete from profiles where id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003');
+delete from auth.users where id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003');
+
 do $$
 declare
   a uuid := 'aaaaaaaa-0000-0000-0000-000000000001';
@@ -14,6 +22,7 @@ declare
   ex2 uuid := '88888888-0000-0000-0000-000000000008';
   tt uuid := '77777777-0000-0000-0000-000000000007';
   fc uuid := '66666666-0000-0000-0000-000000000006';
+  ev uuid := '55555555-0000-0000-0000-000000000005';
   m text; d text; n integer;
   procedure_label text := 'NOTIFICATIONS';
 begin
@@ -21,6 +30,8 @@ begin
   insert into auth.users(id,email,created_at) values (a,'amit.sud@example.com', now()-interval '30 days'),(b,'bob@example.com', now()-interval '30 days'),(c,'newguy@example.com', now());
   insert into profiles(id,display_name,email,is_admin) values (a,'Amit Sud','amit.sud@example.com',true),(b,'Bob Jones','bob@example.com',false),(c,null,null,false);
   insert into groups(id,name) values (g,'Pine Valley Hackers'),(g2,'Sunday Swingers');
+  -- 0121: every payment lives in a money Bucket (group_events); seed the club's General one.
+  insert into group_events(id,group_id,name,event_type,status,is_general) values (ev,g,'General','manual','open',true) on conflict (id) do nothing;
   insert into group_members(group_id,user_id,email,role) values (g,a,'amit.sud@example.com','admin'),(g,b,'bob@example.com','member');
   delete from notifications;
 
@@ -66,12 +77,12 @@ begin
   delete from notifications;
 
   -- Charge and payment name the people and the club.
-  insert into expenses(id,group_id,created_by,payer_user_id,description,amount_cents) values (ex2,g,a,a,'Greens fees, Oct 4',5000);
+  insert into expenses(id,group_id,created_by,payer_user_id,description,amount_cents,event_id) values (ex2,g,a,a,'Greens fees, Oct 4',5000,ev);
   insert into expense_shares(expense_id,user_id,share_cents) values (ex2,b,2500),(ex2,a,2500);
   select message into m from notifications where user_id = b and type = 'money_owed';
   if m <> '$25.00 charge from Amit Sud: "Greens fees, Oct 4" (Pine Valley Hackers).' then raise exception 'charge text: %', m; end if;
   if exists (select 1 from notifications where user_id = a and type = 'money_owed') then raise exception 'payer charged themselves'; end if;
-  insert into settlements(group_id,from_user_id,to_user_id,amount_cents,method) values (g,b,a,2500,'Venmo');
+  insert into settlements(group_id,from_user_id,to_user_id,amount_cents,method,event_id) values (g,b,a,2500,'Venmo',ev);
   select message into m from notifications where user_id = a and type = 'money_paid';
   if m <> 'Bob Jones paid you $25.00 by Venmo (Pine Valley Hackers).' then raise exception 'paid text: %', m; end if;
   delete from notifications;
@@ -100,8 +111,8 @@ end $$;
 
 -- Bet: the DEFERRED trigger sees payers and shares written after the expense row.
 begin;
-insert into expenses(id,group_id,created_by,payer_user_id,description,amount_cents,source_game_id,source_kind)
-  values ('99999999-0000-0000-0000-000000000009','dddddddd-0000-0000-0000-000000000004','aaaaaaaa-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000001','Nassau',3600,'ffffffff-0000-0000-0000-000000000006','tgc_bet');
+insert into expenses(id,group_id,created_by,payer_user_id,description,amount_cents,source_game_id,source_kind,event_id)
+  values ('99999999-0000-0000-0000-000000000009','dddddddd-0000-0000-0000-000000000004','aaaaaaaa-0000-0000-0000-000000000001','aaaaaaaa-0000-0000-0000-000000000001','Nassau',3600,'ffffffff-0000-0000-0000-000000000006','tgc_bet','55555555-0000-0000-0000-000000000005');
 insert into expense_payers(expense_id,user_id,paid_cents) values ('99999999-0000-0000-0000-000000000009','aaaaaaaa-0000-0000-0000-000000000001',3600);
 insert into expense_shares(expense_id,user_id,share_cents) values ('99999999-0000-0000-0000-000000000009','bbbbbbbb-0000-0000-0000-000000000002',1200),('99999999-0000-0000-0000-000000000009','cccccccc-0000-0000-0000-000000000003',2400);
 commit;
@@ -125,7 +136,7 @@ begin
 end $$;
 
 -- Course freshness: the admin notice names the course and summarises the diff; detail lists it.
-insert into favorite_courses(id,group_id,name) values ('66666666-0000-0000-0000-000000000006','dddddddd-0000-0000-0000-000000000004','Pinch Brook Golf Course')
+insert into favorite_courses(id,group_id,name,user_id,data) values ('66666666-0000-0000-0000-000000000006','dddddddd-0000-0000-0000-000000000004','Pinch Brook Golf Course','aaaaaaaa-0000-0000-0000-000000000001','{"name":"Pinch Brook Golf Course","tees":[],"holes":[]}'::jsonb)
   on conflict (id) do nothing;
 begin;
 set local role authenticated;
@@ -156,14 +167,14 @@ begin
   if (select count(*) from pg_proc where proname = 'create_notification') <> 1 then raise exception 'create_notification has more than one overload (PGRST203)'; end if;
   delete from notifications;
   -- The 0092 sweep's generic admin notice is enriched on insert with the first flags by name.
-  insert into friction_items(kind, subject_user, detail) values ('dup_day', 'bbbbbbbb-0000-0000-0000-000000000002', 'x'), ('integrity', 'cccccccc-0000-0000-0000-000000000003', 'par missing on 3 holes'), ('dup_game', 'aaaaaaaa-0000-0000-0000-000000000001', 'y');
+  insert into friction_items(signature, kind, subject_user, detail) values ('ci165:1', 'dup_day', 'bbbbbbbb-0000-0000-0000-000000000002', 'x'), ('ci165:2', 'integrity', 'cccccccc-0000-0000-0000-000000000003', 'par missing on 3 holes'), ('ci165:3', 'dup_game', 'aaaaaaaa-0000-0000-0000-000000000001', 'y');
   insert into notifications(user_id, message, type, link) values ('aaaaaaaa-0000-0000-0000-000000000001', '3 new data-integrity flags to review', 'friction', '/');
   if (select message from notifications where type = 'friction') <> '3 new data-integrity flags: Bob Jones — two rounds on one day; newguy — par missing on 3 holes and 1 more' then
     raise exception 'friction notice not enriched: %', (select message from notifications where type = 'friction');
   end if;
   insert into notifications(user_id, message, type, link) values ('aaaaaaaa-0000-0000-0000-000000000001', 'unrelated friction text', 'friction', '/');
   if (select message from notifications where message like 'unrelated%') <> 'unrelated friction text' then raise exception 'trigger rewrote a message it should not touch'; end if;
-  delete from friction_items where subject_user in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003');
+  delete from friction_items where signature like 'ci165:%';
   delete from notifications;
 end $$;
 
@@ -189,8 +200,8 @@ end $$;
 rollback;
 
 -- Clean up the fixture rows so later assertions start from an empty ledger.
-delete from notifications where user_id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003'); delete from tee_time_rsvps where tee_time_id = '77777777-0000-0000-0000-000000000007'; delete from tee_times where id = '77777777-0000-0000-0000-000000000007'; delete from settlements where group_id = 'dddddddd-0000-0000-0000-000000000004'; delete from expense_shares where expense_id in ('99999999-0000-0000-0000-000000000009','88888888-0000-0000-0000-000000000008'); delete from expense_payers where expense_id in ('99999999-0000-0000-0000-000000000009','88888888-0000-0000-0000-000000000008'); delete from expenses where id in ('99999999-0000-0000-0000-000000000009','88888888-0000-0000-0000-000000000008');
-delete from course_freshness where course_id = '66666666-0000-0000-0000-000000000006'; delete from favorite_courses where id = '66666666-0000-0000-0000-000000000006';
+delete from notifications where user_id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003'); delete from tee_time_rsvps where tee_time_id = '77777777-0000-0000-0000-000000000007'; delete from tee_times where id = '77777777-0000-0000-0000-000000000007'; delete from settlements where group_id = 'dddddddd-0000-0000-0000-000000000004'; delete from expense_shares where expense_id in ('99999999-0000-0000-0000-000000000009','88888888-0000-0000-0000-000000000008'); delete from expense_payers where expense_id in ('99999999-0000-0000-0000-000000000009','88888888-0000-0000-0000-000000000008'); delete from expenses where id in ('99999999-0000-0000-0000-000000000009','88888888-0000-0000-0000-000000000008'); delete from group_events where id = '55555555-0000-0000-0000-000000000005';
+delete from friction_items where signature like 'ci165:%'; delete from course_freshness where course_id = '66666666-0000-0000-0000-000000000006'; delete from favorite_courses where id = '66666666-0000-0000-0000-000000000006';
 delete from game_players where game_id = 'ffffffff-0000-0000-0000-000000000006'; delete from games where id = 'ffffffff-0000-0000-0000-000000000006';
 delete from group_members where group_id in ('dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005'); delete from groups where id in ('dddddddd-0000-0000-0000-000000000004','eeeeeeee-0000-0000-0000-000000000005'); delete from profiles where id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003');
 delete from auth.users where id in ('aaaaaaaa-0000-0000-0000-000000000001','bbbbbbbb-0000-0000-0000-000000000002','cccccccc-0000-0000-0000-000000000003');
