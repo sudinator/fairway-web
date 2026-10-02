@@ -30,9 +30,20 @@ import { FeedbackForm, type FeedbackPrefill } from "@/components/feedback";
 
 const supabase = createClient();
 
-// Create an in-app notification for a user.
-async function notify(userId: string, message: string) {
-  try { await supabase.rpc("create_notification", { p_recipient: userId, p_message: message }); } catch {}
+// Create an in-app notification for a user. `detail` is the optional second line (0165).
+async function notify(userId: string, message: string, detail?: string | null, groupId?: string | null) {
+  try { await supabase.rpc("create_notification", { p_recipient: userId, p_message: message, p_detail: detail ?? null, p_group_id: groupId ?? null }); } catch {}
+}
+// The signed-in person's name as a notification should say it: display name, else email prefix.
+// Cached per user id; a notification that says "an admin" when the admin's name is one query
+// away is the pattern 0165 removed.
+const labelCache = new Map<string, string>();
+async function myLabel(user: { id: string; email?: string | null }): Promise<string> {
+  const hit = labelCache.get(user.id); if (hit) return hit;
+  let name = "";
+  try { const { data } = await supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle(); name = (data?.display_name || "").trim(); } catch { /* fall through */ }
+  if (!name) name = (user.email || "").split("@")[0] || "An admin";
+  labelCache.set(user.id, name); return name;
 }
 
 // "3h ago" style relative time.
@@ -1195,7 +1206,24 @@ function RoundSaveDiag() {
   );
 }
 
+type SignupRow = { user_id: string; display_name: string | null; email: string | null; signed_up_at: string; last_sign_in: string | null; clubs: string | null; first_club_at: string | null };
+const fmtDay = (iso: string | null | undefined) => iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
+
 function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?: boolean }) {
+  // When each member signed up for BNN (auth.users.created_at, via admin_member_signups 0165) and
+  // when they joined each club. One call; keyed by user id for the player rows below.
+  const [signups, setSignups] = useState<SignupRow[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase.rpc("admin_member_signups");
+        if (!cancelled) setSignups(error ? [] : ((data || []) as SignupRow[]));
+      } catch { if (!cancelled) setSignups([]); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const signupById = React.useMemo(() => new Map((signups || []).map((r) => [r.user_id, r])), [signups]);
   const [profiles, setProfiles] = useState<any[] | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -1260,7 +1288,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
     await supabase.from("group_members").insert({
       group_id: groupId, user_id: p.id, email: (p.email || "").toLowerCase(), role: "member", status: "active",
     });
-    await notify(p.id, `An admin added you to a club.`);
+    await notify(p.id, `${await myLabel(user)} added you to ${allGroups.find((x) => x.id === groupId)?.name || "a club"}.`, null, groupId);
     await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "member_added", group_id: groupId, target_user_id: p.id, summary: `Added ${p.display_name || p.email} to a group` });
     await load();
   };
@@ -1268,7 +1296,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
   const removeFromGroup = async (p: any, m: any, groupName: string) => {
     if (!confirm(`Remove ${p.display_name || p.email} from "${groupName}"?`)) return;
     await supabase.from("group_members").update({ status: "removed" }).eq("id", m.id);
-    await notify(p.id, `An admin removed you from "${groupName}".`);
+    await notify(p.id, `${await myLabel(user)} removed you from ${groupName}.`, null, m.group_id);
     await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "member_removed", group_id: m.group_id, target_user_id: p.id, summary: `Removed ${p.display_name || p.email} from "${groupName}"` });
     await load();
   };
@@ -1325,7 +1353,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
   // Approve a pending group request → it becomes active and appears for its members.
   const approveGroup = async (g: any) => {
     await supabase.from("groups").update({ status: "active" }).eq("id", g.id);
-    if (g.created_by) await notify(g.created_by, `Your club "${g.name}" was approved. It's now active.`);
+    if (g.created_by) await notify(g.created_by, `Your club "${g.name}" was approved by ${await myLabel(user)}. It's now active.`, null, g.id);
     await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "group_approved", group_id: g.id, summary: `Approved the club "${g.name}"` });
     await load();
   };
@@ -1334,7 +1362,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
   const declineGroup = async (g: any) => {
     if (!confirm(`Decline the club request "${g.name}"?`)) return;
     await supabase.from("groups").update({ status: "declined" }).eq("id", g.id);
-    if (g.created_by) await notify(g.created_by, `Your club request "${g.name}" was declined.`);
+    if (g.created_by) await notify(g.created_by, `Your club request "${g.name}" was declined by ${await myLabel(user)}.`);
     await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "group_declined", summary: `Declined the group request "${g.name}"` });
     await load();
   };
@@ -1346,7 +1374,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
       supabase.from("favorite_courses").update({ deleted: false, deleted_by: null, deleted_at: null }).eq("id", c.id),
       "Couldn't restore this course"))) return;
     if (c.deleted_by && c.deleted_by !== user.id) {
-      await notify(c.deleted_by, `An admin restored the course "${c.name}" you deleted.`);
+      await notify(c.deleted_by, `${await myLabel(user)} restored the course "${c.name}" you deleted.`);
     }
     await load();
   };
@@ -1366,8 +1394,8 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
       "Couldn't save this player's handicap"))) { setSavingId(null); return; }
     // Notify both the player and the admin.
     const who = p.display_name || "a player";
-    await notify(p.id, `Your handicap index was set to ${idx ?? "—"} by an admin.`);
-    await notify(user.id, `You changed ${who}'s handicap index to ${idx ?? "—"}.`);
+    await notify(p.id, `${await myLabel(user)} set your handicap index to ${idx ?? "—"}${p.handicap_index != null ? ` (was ${p.handicap_index})` : ""}.`);
+    await notify(user.id, `You changed ${who}'s handicap index to ${idx ?? "—"}${p.handicap_index != null ? ` (was ${p.handicap_index})` : ""}.`);
     await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "handicap_changed", target_user_id: p.id, summary: `Set ${who}'s handicap index to ${idx ?? "—"}` });
     setSavingId(null);
     await load();
@@ -1407,6 +1435,17 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
           <div style={{ color: C.sage, fontSize: 11 }}>Active 7d</div>
         </div>
       </div>
+      {signups && signups.length > 0 && (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 10 }}>
+          <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1.2 }}>RECENT SIGN-UPS</div>
+          {signups.slice(0, 5).map((r) => (
+            <div key={r.user_id} style={{ color: C.cream, fontSize: 12.5, marginTop: 6, lineHeight: 1.45 }}>
+              <b>{r.display_name || (r.email || "").split("@")[0] || "Golfer"}</b>
+              <span style={{ color: C.sage }}> · joined BNN {fmtDay(r.signed_up_at)}{r.clubs ? ` · ${r.clubs}` : " · no club yet"}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <div style={{ color: C.sage, fontSize: 12, marginTop: 10 }}>Adjust any player's handicap; they (and you) get a notification. To edit a player's scores, use “Edit scores” to enter admin mode on their rounds.</div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
@@ -1432,6 +1471,8 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
             </div>
             <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
               Handicap: {p.handicap_index != null ? p.handicap_index : "—"}
+              {signupById.get(p.id) ? ` · Joined BNN ${fmtDay(signupById.get(p.id)!.signed_up_at)}` : ""}
+              {signupById.get(p.id)?.last_sign_in ? ` · Last sign-in ${fmtDay(signupById.get(p.id)!.last_sign_in)}` : ""}
             </div>
             {(() => {
               const mine = memberships.filter((m) => m.user_id === p.id);
@@ -1643,6 +1684,7 @@ export function NotificationBell({ user, onSeeAll, onNavigate }: { user: any; on
               <span style={{ width: 7, height: 7, borderRadius: 6, background: n.read ? "transparent" : C.gold, marginTop: 5, flexShrink: 0 }} />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ color: n.read ? "#CFC9B4" : C.cream, fontSize: 13, lineHeight: 1.4, fontWeight: n.read ? 500 : 800 }}>{n.message}</div>
+                {n.detail ? <div style={{ color: "#CFC9B4", fontSize: 12, lineHeight: 1.4, marginTop: 3, whiteSpace: "pre-line", display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{n.detail}</div> : null}
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{fmtNotifTime(n.created_at)}</div>
               </div>
               {n.link ? <span style={{ color: C.sage, fontSize: 18, alignSelf: "center", flexShrink: 0 }}>›</span> : null}
@@ -1708,6 +1750,7 @@ export function NotificationsScreen({ user, onNavigate }: { user: any; onNavigat
               <span style={{ width: 8, height: 8, borderRadius: 6, background: n.read ? "transparent" : C.gold, marginTop: 6, flexShrink: 0 }} />
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ color: n.read ? C.sage : C.cream, fontSize: 14, lineHeight: 1.4, fontWeight: n.read ? 500 : 800 }}>{n.message}</div>
+                {n.detail ? <div style={{ color: C.sage, fontSize: 12.5, lineHeight: 1.45, marginTop: 4, whiteSpace: "pre-line" }}>{n.detail}</div> : null}
                 <div style={{ color: C.sage, fontSize: 11, marginTop: 3 }}>{notifWhen(n.created_at)}</div>
               </div>
               {n.link ? <span style={{ color: C.sage, fontSize: 20, alignSelf: "center", flexShrink: 0 }}>›</span> : null}
@@ -1784,8 +1827,18 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
         if (error) throw error;
       }
       const who = player.display_name || "the player";
-      await notify(player.id, `An admin edited your scores for ${editing.course} (${fmtDate(editing.played_at)}).`);
-      await notify(admin.id, `You edited ${who}'s scores for ${editing.course} (${fmtDate(editing.played_at)}).`);
+      // Say WHICH holes changed and from what: the player can check the card against it.
+      const changes = holes.flatMap((h) => {
+        const o = editing.holes.find((x) => x.hole_number === h.hole_number);
+        const parts: string[] = [];
+        if (o && (o.strokes ?? null) !== (h.strokes ?? null)) parts.push(`${o.strokes ?? "—"}→${h.strokes ?? "—"}`);
+        if (o && (o.putts ?? null) !== (h.putts ?? null)) parts.push(`putts ${o.putts ?? "—"}→${h.putts ?? "—"}`);
+        return parts.length ? [`hole ${h.hole_number}: ${parts.join(", ")}`] : [];
+      });
+      const detail = changes.length ? changes.join("; ") : "no hole values changed";
+      const adminName = await myLabel(admin);
+      await notify(player.id, `${adminName} edited your scores for ${editing.course} (${fmtDate(editing.played_at)}): ${changes.length} hole${changes.length === 1 ? "" : "s"} changed.`, detail);
+      await notify(admin.id, `You edited ${who}'s scores for ${editing.course} (${fmtDate(editing.played_at)}).`, detail);
       setMsg("Saved & player notified ✓");
       await load();
       setEditing(null);

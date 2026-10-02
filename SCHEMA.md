@@ -1,3 +1,7 @@
+## 195.0 — notifications detail (0165)
+
+`notifications.detail text` added. New helpers `person_label(uuid)` (authenticated) and `usd(integer)`; `enrich_friction_notification()` BEFORE INSERT trigger on notifications. `create_notification(uuid,text,uuid,text,text,text)` replaces the 5-argument form. `trg_notify_bet_posted` is now a deferrable, initially deferred constraint trigger. New `admin_member_signups()` (is_admin-gated, reads auth.users). Trigger functions notify_group_member, notify_game_added, notify_game_finished, notify_bet_posted, notify_money_owed, notify_money_paid, notify_tee_new, and functions send_tee_reminders, record_course_freshness redefined; recipients unchanged.
+
 ## 194.0 — course_api_checks outcomes (0164)
 
 `course_api_checks` gains `last_success_at timestamptz` (set when status is ok or drift; freshness and the course view read it) and `last_http_status integer`. `last_status` check widened to ok | drift | error | claimed. New service-role function `release_course_api_claims(text[], text) returns integer`; new authenticated read function `course_api_status(text[])`. `record_course_api_check` gains `p_http_status integer default null`; the 6-argument overload is dropped.

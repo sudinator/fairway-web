@@ -64,6 +64,9 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-personal-round-persiste
 # Primary-device gate across personal/game scores, stats and SECURITY DEFINER Alternate Shot.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-primary-scoring-device.sql"
 
+# 0165: every notification writer executed on real rows; exact message text asserted.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-notifications.sql"
+
 # Reset fencing: real SQL outcomes plus separate-connection concurrency barriers.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-game-reset-fencing.sql"
 BNN_RESET_TEST_DATABASE_URL="$DB_URL" python3 "$ROOT/ci/test-game-reset-concurrency.py"

@@ -14,6 +14,7 @@ import { logActivity } from "@/lib/activity";
 import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreViewCard, Wordmark, ShortDateInput, useUnsavedGuard, UnsavedChangesSheet, BottomSheet } from "@/components/ui";
 import { buildCourseChangeSummary, hasMaterialCourseChanges, applyFreshness } from "@/lib/course-diff";
 import { checkCourseFreshness, type FreshnessResult } from "@/lib/course-freshness";
+import { FreshnessDiffList } from "@/components/course-freshness-diff";
 import { loadEditorDraft, saveEditorDraft, clearEditorDraft } from "@/lib/draft";
 
 const supabase = createClient();
@@ -782,18 +783,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
           <div style={{ color: C.sage, fontSize: 13, lineHeight: 1.5, marginBottom: 12 }}>
             The golf course database now has different data for <b style={{ color: C.cream }}>{picked?.name}</b> than what&apos;s stored. Review the changes:
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 14, maxHeight: 260, overflowY: "auto" }}>
-            {freshness.diff.tees.map((t) => (
-              <div key={t.name} style={{ background: C.green, borderRadius: 10, padding: "8px 10px" }}>
-                <div style={{ color: C.gold, fontWeight: 800, fontSize: 12, letterSpacing: 1, marginBottom: 4 }}>{t.name}</div>
-                {t.ratingChanged && <div style={{ color: C.cream, fontSize: 12.5 }}>Rating: {t.ratingFrom ?? "—"} → <b>{t.ratingTo ?? "—"}</b></div>}
-                {t.slopeChanged && <div style={{ color: C.cream, fontSize: 12.5 }}>Slope: {t.slopeFrom ?? "—"} → <b>{t.slopeTo ?? "—"}</b></div>}
-                {t.yardageChanges.map((y) => (
-                  <div key={y.hole} style={{ color: C.sage, fontSize: 12.5 }}>Hole {y.hole}: {y.from ?? "—"} → <b style={{ color: C.cream }}>{y.to ?? "—"}</b> yds</div>
-                ))}
-              </div>
-            ))}
-          </div>
+          <div style={{ marginBottom: 14 }}><FreshnessDiffList diff={freshness.diff} /></div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <button onClick={() => { if (freshness.apiCourse) playWithFresh(freshness.apiCourse, true); setFreshness(null); }} style={{ ...btn(true), width: "100%" }}>Play this round with the updated data</button>
             <button onClick={applyFreshToLibrary} style={{ ...btn(false), width: "100%" }}>Update the stored course (applies for everyone)</button>
