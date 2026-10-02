@@ -1554,6 +1554,8 @@ function GameRoom({
   // current scores. Show a room-level banner (visible right after an edit) and
   // notify the organizer once per session.
   const [betStale, setBetStale] = useState(false);
+  const [betStaleDetail, setBetStaleDetail] = useState("");
+  const onBetStale = useCallback((stale: boolean, detail?: string) => { setBetStale(stale); setBetStaleDetail(detail || ""); }, []);
   const betStaleNotified = React.useRef(false);
   // #7: once the winnings are corrected (no longer stale), allow a fresh notification
   // for any future staleness episode — while still never spamming within one episode.
@@ -1575,10 +1577,10 @@ function GameRoom({
         await supabase.from("group_activity").insert({ group_id: game.group_id, actor_user_id: user.id, action: "bet_stale", summary: `a score change means the posted bet winnings for "${game.name || game.course || "the game"}" need re-posting`, meta: { game_id: game.id } });
       } catch { /* log is best-effort */ }
       if (organizerId && organizerId !== user.id) {
-        try { await supabase.rpc("create_notification", { p_recipient: organizerId, p_message: `${editorName} changed a score in "${game.name || game.course || "a game"}" — the posted bet winnings need re-posting.`, p_group_id: game.group_id }); } catch { /* best-effort */ }
+        try { await supabase.rpc("create_notification", { p_recipient: organizerId, p_message: `${editorName} changed a score in "${game.name || game.course || "a game"}" after the bets were posted — re-post the winnings.`, p_detail: betStaleDetail || null, p_group_id: game.group_id }); } catch { /* best-effort */ }
       }
     })();
-  }, [betStale, game, players, user.id]);
+  }, [betStale, betStaleDetail, game, players, user.id]);
   // Which step of the setup flow is showing: players & tees, teams, matchups, groups.
   const [setupTab, setSetupTab] = useState<SetupTab>(() => initialSetupTab || "overview");
   const [cardView, setCardView] = useState(false); // show the whole-group vertical scorecard
@@ -3754,7 +3756,7 @@ function GameRoom({
               game={game}
               user={user}
               canPost={game.created_by === user.id || !!isAdmin}
-              onBetStale={setBetStale}
+              onBetStale={onBetStale}
               onToggleBets={toggleBets}
             />
           )}

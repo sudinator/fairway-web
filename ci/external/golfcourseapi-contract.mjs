@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 
 // Exit codes are meaningful, because the alert issue this opens tells a human where to look:
 //   0  contract OK       — every course claimed today was fetched and matched its fixture.
@@ -14,18 +14,30 @@ import { readFile } from "node:fs/promises";
 //   * a result is recorded for each course IMMEDIATELY after it is checked, with the real HTTP status;
 //   * an abort records the course in flight and RELEASES the ones never reached, with the reason;
 //   * a failure to record is itself a monitor problem and fails the run — it was silently swallowed.
+// WHAT IS CHECKED (196.1): the LIBRARY, not a fixture file. Every non-deleted favorite_courses row
+// with a provider id is a course someone chose to play, so that is the set worth re-verifying; a
+// course that was looked up once and never saved needs no monitor. The set is read from the
+// database at the start of each run, so it grows and shrinks with the library. Each course costs
+// ONE request (the detail lookup); the former search step is gone, which halves the spend.
+//   ok     the id still resolves to a course payload with tees (metadata differences are noted,
+//          not failed: members correct names and the provider edits its casing)
+//   drift  the id resolves to a DIFFERENT course, or the payload no longer carries tees
+//   error  the provider did not answer with content (4xx/5xx/timeout), recorded with the status
+// golfcourseapi-golden.json remains only as the harness's stub data.
 const EXIT_DRIFT = 1;
 const EXIT_MONITOR = 2;
 
 const key = process.env.GOLF_API_KEY;
-const allGolden = JSON.parse(await readFile(new URL("./golfcourseapi-golden.json", import.meta.url), "utf8"));
+let allGolden = []; // filled from the library below; the name is kept so the rest of the file reads unchanged
 
 // ── Daily budget ────────────────────────────────────────────────────────────────────────────────
 // The free tier allows 35 requests per DAY, shared with the app. COURSES per day, not requests:
 // each course costs up to two provider requests (one search per distinct query, one detail lookup),
 // so five courses is about ten requests. Measured: ten courses cost 20 requests, and two runs in a
 // day cost 33, which is the whole budget.
-const DAILY_BUDGET = Number(process.env.COURSE_CHECK_BUDGET ?? 5);
+// One request per course now, so eight courses a day is eight requests against the 35 shared with
+// the app: a 20-course library is re-verified every three days, a 50-course one every week.
+const DAILY_BUDGET = Number(process.env.COURSE_CHECK_BUDGET ?? 8);
 // Tolerate a trailing slash, and a URL that already carries the REST path. A secret ending in "/"
 // produced "https://host//rest/v1/rpc/..." and PostgREST answered 404 PGRST125.
 const SUPABASE_URL = (process.env.BNN_SUPABASE_URL ?? "")
@@ -34,6 +46,7 @@ const SUPABASE_URL = (process.env.BNN_SUPABASE_URL ?? "")
   .replace(/\/rest\/v1$/, "");
 const SERVICE_KEY = process.env.BNN_SUPABASE_SERVICE_KEY;
 const BASE = (process.env.GOLF_API_BASE ?? "https://api.golfcourseapi.com/v1").replace(/\/+$/, "");
+export const PAYLOAD_DIR = process.env.COURSE_PAYLOAD_DIR ?? ".course-detail";
 
 const START = Date.now();
 const BUDGET_MS = 6 * 60 * 1000;
@@ -131,9 +144,31 @@ if (!key) {
 if (!SUPABASE_URL || !SERVICE_KEY) {
   await monitorProblem(
     "BNN_SUPABASE_URL / BNN_SUPABASE_SERVICE_KEY are not set, so the freshness ledger is unavailable " +
-    "and this job cannot tell which courses are due. Checking all fixtures would use 31 of the " +
-    "provider's 35 daily requests. The job declares `environment: production` to read them (0156)."
+    "and this job cannot tell which courses exist or are due. The job declares `environment: production` to read them (0156)."
   );
+}
+
+// ── The set: every library course with a provider id ────────────────────────────────────────────
+async function restGet(path) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } });
+  if (!res.ok) throw new Error(`${path} -> HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
+  return await res.json();
+}
+try {
+  const rows = await restGet("favorite_courses?deleted=eq.false&external_id=not.is.null&select=id,name,location,external_id,data&order=name");
+  const byId = new Map();
+  for (const r of rows ?? []) {
+    const id = String(r.external_id ?? "").trim();
+    if (!id || byId.has(id)) continue;
+    byId.set(id, { id, name: r.name ?? "", club: r.data?.club ?? "", location: r.location ?? r.data?.location ?? "" });
+  }
+  allGolden = [...byId.values()];
+} catch (e) {
+  await monitorProblem(`could not read the course library from Supabase (${e?.message ?? e}).`);
+}
+if (allGolden.length === 0) {
+  console.log("The library has no courses with a provider id; nothing to verify.");
+  process.exit(0);
 }
 
 // ── Claim today's batch ─────────────────────────────────────────────────────────────────────────
@@ -149,12 +184,12 @@ try {
 } catch (e) {
   await monitorProblem(
     `could not claim today's batch from Supabase (${e?.message ?? e}). Refusing to check all ` +
-    `${allGolden.length} fixtures, which would exceed the provider's 35/day limit.`
+    `${allGolden.length} library courses, which would exceed the provider's 35/day limit.`
   );
 }
 
 if (golden.length === 0) {
-  console.log(`Nothing due: all ${allGolden.length} fixtures were successfully verified within the last 7 days.`);
+  console.log(`Nothing due: all ${allGolden.length} library courses were successfully verified within the last 7 days.`);
   process.exit(0);
 }
 
@@ -165,7 +200,7 @@ const GAP_MS = 400;
 const MAX_RETRIES = 4;
 let lastCall = 0;
 let calls = 0;
-const expectedCalls = new Set(golden.map((f) => f.query)).size + golden.length;
+const expectedCalls = golden.length;
 
 // Thrown for a provider answer that is final for THIS course but not for the run (a 404 on one
 // detail id, say). Carries the status so the outcome records what the provider actually said.
@@ -238,46 +273,42 @@ async function json(url) {
 }
 
 // ── The checks ──────────────────────────────────────────────────────────────────────────────────
-console.log(`Checking ${golden.length} of ${allGolden.length} fixtures (least recently attempted first, budget ${DAILY_BUDGET}/day); ${skipped} not due.`);
-const byQuery = new Map();
+console.log(`Checking ${golden.length} of ${allGolden.length} library courses (least recently attempted first, budget ${DAILY_BUDGET}/day); ${skipped} not due.`);
 const loose = (v) => String(v ?? "").toLowerCase().replace(/[\u2018\u2019']/g, "'").replace(/\s+/g, " ").trim();
-const show = (v) => `${JSON.stringify(v)} [${[...String(v)].map((c) => c.codePointAt(0).toString(16)).join(" ")}]`;
+const providerLocation = (c) => {
+  const loc = c?.location;
+  return typeof loc === "string" ? loc
+    : [loc?.city ?? c?.city ?? c?.club_city, loc?.state ?? c?.state ?? c?.club_state, loc?.country ?? c?.country ?? c?.club_country].filter(Boolean).join(", ");
+};
 
 for (const fixture of golden) {
   try {
-    let courses = byQuery.get(fixture.query);
-    if (!courses) {
-      const data = await json(`${BASE}/search?search_query=${encodeURIComponent(fixture.query)}`);
-      courses = Array.isArray(data?.courses) ? data.courses : [];
-      byQuery.set(fixture.query, courses);
-    }
-    const drift = [];
-    const found = courses.find((c) => String(c?.id ?? "") === fixture.id);
-    if (!found) {
-      drift.push(`expected id ${fixture.id} not returned by search '${fixture.query}'`);
-    } else {
-      const actualClub = String(found.club_name ?? "");
-      const actualName = String(found.course_name ?? found.club_name ?? "");
-      const loc = found.location;
-      const actualLocation = typeof loc === "string"
-        ? loc
-        : [loc?.city ?? found.city ?? found.club_city, loc?.state ?? found.state ?? found.club_state, loc?.country ?? found.country ?? found.club_country]
-            .filter(Boolean).join(", ");
-      // Club name is compared loosely (the provider edits its title-casing); course name and
-      // location stay strict because they identify WHICH course a stored id points at.
-      if (loose(actualClub) !== loose(fixture.club)) drift.push(`club: got ${show(actualClub)} want ${show(fixture.club)}`);
-      if (actualName !== fixture.name) drift.push(`course name: got ${show(actualName)} want ${show(fixture.name)}`);
-      if (actualLocation !== fixture.location) drift.push(`location: got ${show(actualLocation)} want ${show(fixture.location)}`);
-    }
-
     const detail = await json(`${BASE}/courses/${encodeURIComponent(fixture.id)}`);
     const course = detail?.course ?? detail;
-    if (!course || String(course.id ?? "") !== fixture.id) drift.push(`detail lookup no longer returns id ${fixture.id}`);
-    if (!course?.tees || typeof course.tees !== "object") drift.push(`detail payload no longer contains tees`);
+    // Keep the payload for course-freshness-sync.mjs, which diffs it against the stored library
+    // course. Same request, second use: no extra provider traffic (0166).
+    try {
+      await mkdir(PAYLOAD_DIR, { recursive: true });
+      await writeFile(`${PAYLOAD_DIR}/${fixture.id}.json`, JSON.stringify(course));
+    } catch (e) { console.error(`  could not save payload for ${fixture.id}: ${e?.message ?? e}`); }
+
+    const drift = [];
+    if (!course || String(course.id ?? "") !== fixture.id) drift.push(`detail lookup returned id ${course?.id ?? "none"}, not ${fixture.id}`);
+    if (!course?.tees || typeof course.tees !== "object") drift.push("detail payload no longer contains tees");
+    // Metadata is INFORMATION, not a failure: a member may have corrected the stored name, and
+    // the provider edits its title-casing. Rating/slope/yardage changes are the freshness sync's job.
+    const info = [];
+    const pClub = String(course?.club_name ?? ""), pName = String(course?.course_name ?? course?.club_name ?? ""), pLoc = providerLocation(course);
+    // Only when the provider actually supplied a value: an absent field is not a difference.
+    if (pClub && fixture.club && loose(pClub) !== loose(fixture.club)) info.push(`club "${pClub}" vs stored "${fixture.club}"`);
+    if (pName && fixture.name && loose(pName) !== loose(fixture.name)) info.push(`name "${pName}" vs stored "${fixture.name}"`);
+    if (pLoc && fixture.location && loose(pLoc) !== loose(fixture.location)) info.push(`location "${pLoc}" vs stored "${fixture.location}"`);
+    // Record what the provider says now, so the ledger carries current names.
+    fixture.club = pClub || fixture.club; fixture.name = pName || fixture.name; fixture.location = pLoc || fixture.location;
 
     outcomes.set(fixture.id, drift.length
       ? { status: "drift", http: 200, note: drift.join("; ") }
-      : { status: "ok", http: 200, note: null });
+      : { status: "ok", http: 200, note: info.length ? `metadata differs: ${info.join("; ")}` : null });
   } catch (e) {
     if (e instanceof ProviderError) {
       outcomes.set(fixture.id, { status: "error", http: e.status, note: e.message });
@@ -293,7 +324,7 @@ const drifted = golden.filter((f) => outcomes.get(f.id)?.status === "drift");
 const errored = golden.filter((f) => outcomes.get(f.id)?.status === "error");
 if (drifted.length) {
   await finish(EXIT_DRIFT,
-    `CONTRACT DRIFT in ${drifted.length} of the ${golden.length} fixture(s) checked today (${skipped} not due).\n- ` +
+    `CONTRACT DRIFT in ${drifted.length} of the ${golden.length} library course(s) checked today (${skipped} not due).\n- ` +
     drifted.map((f) => `${f.name}: ${outcomes.get(f.id).note}`).join("\n- "));
 }
 if (errored.length) {
@@ -303,5 +334,5 @@ if (errored.length) {
     errored.map((f) => `${f.name}: ${outcomes.get(f.id).note}`).join("\n- "));
 }
 await finish(0,
-  `GolfCourseAPI contract OK for the ${golden.length} fixture(s) checked today across ` +
-  `${byQuery.size} searches (${elapsed()}, ${calls} requests). ${skipped} not due; ${allGolden.length} in the golden set.`);
+  `GolfCourseAPI OK for the ${golden.length} library course(s) checked today ` +
+  `(${elapsed()}, ${calls} requests). ${skipped} not due; ${allGolden.length} in the library.`);

@@ -17,3 +17,8 @@ CHANGES.md
 .testout-screens/
 .testout-rel/
 .test-report.txt
+
+# Daily monitor scratch (0166)
+.course-detail/
+.freshness-build/
+.freshness-tsconfig.json

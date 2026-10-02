@@ -2,9 +2,10 @@ name: External API Contracts
 
 on:
   schedule:
-    # DAILY now, not weekly. The job checks ten courses a run and skips anything verified in the
-    # last seven days, so a full pass over the golden set takes about a week and then idles. Weekly
-    # runs of the whole set used 31 of the provider's 35 daily requests in one go (0156).
+    # Daily. The set is the course LIBRARY (favorite_courses with a provider id), read at run time,
+    # so it follows what members save (196.1). Eight courses a run, one request each, skipping
+    # anything successfully verified in the last seven days: a 20-course library is re-verified
+    # every three days inside the provider's 35 requests/day shared with the app.
     - cron: '17 13 * * *'
   workflow_dispatch:
 
@@ -26,13 +27,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
+          cache: npm
+
+      # The freshness step compiles lib/course-diff.ts with the repo's TypeScript.
+      - run: npm ci --no-audit --no-fund
 
       - name: Verify GolfCourseAPI contract
         id: contract
         env:
           GOLF_API_KEY: ${{ secrets.GOLF_API_KEY }}
-          # The freshness ledger (0156). Without these the job refuses to run rather than checking
-          # every fixture and blowing the daily quota.
+          # The library and the freshness ledger (0156, 196.1). Without these the job refuses to run.
           #
           # Reuses the EXISTING production secrets rather than adding a duplicate pair to rotate.
           # They are environment-scoped, hence `environment: production` on this job above. If the
@@ -55,6 +59,16 @@ jobs:
           # matched its fixture — nothing less.
           exit $code
 
+      - name: Diff fetched courses against the stored library (course freshness)
+        # Runs even when the contract step failed: payloads saved before a quota/outage are still
+        # worth diffing, and this step spends no provider requests. Its own failure (ledger down)
+        # fails the job and is reported below as a monitor problem.
+        if: always()
+        env:
+          BNN_SUPABASE_URL: ${{ secrets.BNN_PRODUCTION_SUPABASE_URL }}
+          BNN_SUPABASE_SERVICE_KEY: ${{ secrets.BNN_PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
+        run: node ci/external/course-freshness-sync.mjs
+
       - name: Open or update admin alert issue
         if: failure()
         uses: actions/github-script@v7
@@ -73,7 +87,7 @@ jobs:
             const body = [
               monitorProblem
                 ? '**The monitor could not run.** This is NOT evidence that the GolfCourseAPI contract changed.'
-                : '**The GolfCourseAPI contract drifted.** The provider response no longer matches the golden fixtures.',
+                : '**The GolfCourseAPI contract drifted.** A stored provider id resolved to a different course, or the payload lost its tees.',
               '',
               monitorProblem
                 ? [
@@ -83,20 +97,20 @@ jobs:
                     '   variables -> Actions). A separate copy lives in Vercel for the app itself.',
                     '2. DAILY QUOTA (HTTP 429, Retry-After in hours). The free tier allows 35 requests A DAY,',
                     '   shared with the app. Nothing to fix: wait for the reset. Do NOT re-run the workflow,',
-                    '   which spends ten more. Use /api/courses?raw=1 (admin, ONE request) to check on it.',
+                    '   which spends eight more. Use /api/courses?raw=1 (admin, ONE request) to check on it.',
                     '3. Ledger unreachable. This job runs in the `production` environment to read the',
                     '   BNN_PRODUCTION_* secrets; if that environment restricts branches, they arrive empty',
-                    '   and the job refuses to run rather than checking all 18 and spending the budget.',
+                    '   and the job refuses to run rather than checking the whole library and spending the budget.',
                     '4. Provider outage (HTTP 5xx).',
                     '5. One course id answered 404 or another 4xx. It is recorded as `error` with the',
                     '   status and retried on the next run; if it persists the provider removed the id',
-                    '   and the golden fixture needs updating.',
+                    '   and the library course should be re-linked to the right provider course.',
                     '6. A ledger write failed. Courses may read `claimed` until the next run re-queues them.',
                     '',
                     'Read the "Outcomes recorded" table in the step log for the per-course status and',
                     'HTTP code. Do NOT change application code for this.',
                   ].join('\n')
-                : 'Check provider ids, search/detail response shape, and required fields before changing application code.',
+                : 'Check the named course in Courses (its provider id) and the detail response shape before changing application code.',
               '',
               `Workflow: ${context.workflow}`,
               `Run: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,

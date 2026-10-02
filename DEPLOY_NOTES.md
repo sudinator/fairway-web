@@ -1,3 +1,31 @@
+## 196.2.261002 — Freshness sync runs from any working directory (fresh-database CI fix)
+
+196.1's fresh-database rebuild failed in GitHub inside the harness's `freshness` mode: `ci/test_fresh_db_rebuild.sh` works from a scratch directory (`cd "$TMP"` for the Supabase CLI), and `course-freshness-sync.mjs` resolved `lib/course-diff.ts` and `npx tsc` against the current directory. From `/tmp`, `npx tsc` fetched an unrelated registry package named "tsc". The local replay had never changed directory, so it could not reproduce this.
+
+Fixes: the sync resolves everything from the repo root (derived from its own path) and uses the repo's TypeScript by path, failing with a plain message if it is not installed; the monitor no longer reports an empty provider field as a metadata difference; `ci/test_fresh_db_local.sh` now runs from a scratch directory exactly as the CI script does. Negative-tested: with the chdir removed and cwd=/tmp the harness fails with the explicit message; restored, it passes from /tmp. Full local chain green from the scratch directory: 164 migrations, 11/11 assertions, 5/5 harness modes.
+
+No application or migration changes from 196.1.
+
+## 196.1.261002 — The monitor verifies the course library, not a fixture file
+
+The daily GolfCourseAPI check now reads its set from `favorite_courses` (every non-deleted course with a provider id) at the start of each run, so it follows what members save: add a course to the library and it enters the rotation; delete it and it leaves. `golfcourseapi-golden.json` is no longer the source of truth — it survives only as the harness's stub data. Each course costs ONE request (the detail lookup; the search step is gone), so the budget rises to eight courses a day: a 20-course library is re-verified every three days, a 50-course one every week, inside the 35/day shared with the app.
+
+What the verdicts mean now: `ok` — the id still resolves to a payload with tees (name/club/location differences are recorded in the note, not failed, because members correct names and the provider edits its casing); `drift` — the id resolves to a different course or the payload lost its tees; `error` — no content, with the HTTP status. Rating, slope and yardage changes remain the freshness sync's job (196.0), which now naturally covers the whole library because it diffs whatever the monitor fetched.
+
+Harness seeds a library of the 18 stub ids for every mode; drift mode remaps one id. Verified on the local full-chain replay: ok 10/18 → 8 not due; drift exit 1 naming the course; freshness flags the seeded change. No migration.
+
+## 196.0.261002 — Device liveness heartbeat; scheduled course-freshness check; bet-stale notice names the money
+
+**Migration 0166.**
+- *Heartbeat.* `scoring_devices.last_seen_at`; the primary's existing 20-second check now refreshes it. A device whose holder has been silent for six hours takes the lease without a prompt and the result carries `superseded: true`; the client treats that like a takeover (starts from server scores, archives any old local outbox, never replays it). A live holder fences exactly as before; explicit takeover is unchanged. Six hours covers a phone scoring offline through a full round; yesterday's laptop never prompts today's phone.
+- *Scheduled freshness.* `record_course_freshness_internal` is now the ONE body; `record_course_freshness` (member, unchanged gate) and new `record_course_freshness_system` (service_role, by provider id) both call it. The daily monitor saves each detail payload it already fetched and `ci/external/course-freshness-sync.mjs` diffs it against the stored library course with the app's own `lib/course-diff.ts` (compiled with tsc, @/ alias patched) and `lib/course-normalize.ts` — extracted byte-for-byte from `/api/courses/route.ts`, which now imports it. Changes land as `pending` with the same admin notification and the same Courses "Needs review" entry, with no extra provider requests. Workflow step runs even when the contract step failed.
+
+**Bet-stale notice.** The organizer is told how the money moved, per member: "Bob: posted +$12.00, now +$8.00; Amit: posted -$12.00, now -$8.00" (the scoring change itself is not an event the app holds; its effect is).
+
+Verified on the local full-chain replay (163 migrations): 0166 applied twice; `assert-primary-scoring-device.sql` extended (heartbeat refresh, 5h59 still fenced, 6h01 superseded, holder fenced after, takeover works); harness mode `freshness` seeds a stored course that differs by one yardage and asserts `pending:1` plus the exact admin notice; both rebuild scripts run it. Device controller test extended (idle holder superseded silently, superseding device archives its stale outbox, fenced holder keeps unsynced work, live holder still fences).
+
+Deploy: 0166 to staging, deploy, confirm New Round still works and the phone/laptop behaviour; 0166 to production before merging. The first scheduled run after the merge diffs the five courses it checks that day; nothing changes in the library without an admin's decision.
+
 ## 195.1.261001 — Rebuild assertion fixed against the real chain; local full-chain replay added
 
 195.0's fresh-database rebuild failed in GitHub at `ci/assert-notifications.sql`: `settlements.event_id` is NOT NULL since 0121 (money Buckets), and the assertion had only been executed against a fixture modelled from the 0001 baseline. Three real-schema facts were missing from that fixture: `settlements.event_id`, `favorite_courses.user_id` NOT NULL, `friction_items.signature` NOT NULL. The assertion now seeds the club's General bucket and passes event ids, user ids and signatures; the fixture was corrected to match; the file starts with its own cleanup so a crashed run cannot poison the next.
