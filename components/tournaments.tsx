@@ -716,17 +716,9 @@ function CreateGame({
           throw new Error(`The game was not linked to the Ryder Cup session: ${linkErr?.message || "the session was already linked or no longer exists"}`);
         }
       }
-      for (const row of seededRows) {
-        if (row.user_id && row.user_id !== user.id) {
-          try {
-            await supabase.rpc("create_notification", {
-              p_recipient: row.user_id,
-              p_message: `You've been added to the game "${game.name}". Open the Games tab to enter your scores (code ${game.code}).`,
-              p_group_id: activeGroupId,
-            });
-          } catch {}
-        }
-      }
+      // Each seeded player is told by the database trigger notify_game_added (0165), which names
+      // the organizer, course, format, code and the player's tees. The client copy of that message
+      // was removed so nobody is told twice.
       // Lean Create owns the core game only. Persisted structure stays authoritative in
       // Manage Game, so formats that need teams/matchups/foursomes hand off there.
       const destination = seed?.competitionSession
@@ -2385,7 +2377,7 @@ function GameRoom({
       try {
         await supabase.rpc("create_notification", {
           p_recipient: p.user_id,
-          p_message: `Your handicap for "${game.name}" was set to ${idxVal ?? "—"} (course handicap ${ch ?? "—"}) by the organizer.`,
+          p_message: `${players.find((x) => x.user_id === user.id)?.display_name || "The organizer"} set your handicap for "${game.name}" to ${idxVal ?? "—"} (course handicap ${ch ?? "—"}${p.course_handicap != null && p.course_handicap !== ch ? `, was ${p.course_handicap}` : ""}).`,
         });
       } catch {}
     }
@@ -2671,7 +2663,7 @@ function GameRoom({
       try {
         await supabase.rpc("create_notification", {
           p_recipient: p.user_id,
-          p_message: `You were removed from the game "${game.name}" by the organizer.`,
+          p_message: `${players.find((x) => x.user_id === user.id)?.display_name || "The organizer"} removed you from the game "${game.name}"${game.course ? ` (${game.course})` : ""}.`,
         });
       } catch {}
     }

@@ -103,6 +103,7 @@ export async function GET(request: Request) {
           p_club_name: course?.club ?? null,
           p_course_name: course?.name ?? null,
           p_location: course?.location ?? null,
+          p_http_status: 200,
         })
         .then(({ error }) => { if (error) console.error("record_course_api_check:", error.message); });
       return NextResponse.json({ course });

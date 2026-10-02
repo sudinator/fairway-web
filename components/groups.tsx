@@ -131,8 +131,17 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
       if (mErr) throw mErr;
       // Notify every app admin that a request is waiting.
       const { data: admins } = await supabase.from("profiles").select("id").eq("is_admin", true);
+      const { data: meProf } = await supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
+      const requester = (meProf?.display_name || "").trim() || (user.email || "").split("@")[0] || "A member";
       for (const a of admins || []) {
-        try { await supabase.rpc("create_notification", { p_recipient: a.id, p_message: `New club request: "${name}" from ${user.email}. Approve or decline it in the admin panel.` }); } catch {}
+        try {
+          await supabase.rpc("create_notification", {
+            p_recipient: a.id,
+            p_message: `Club request: "${name}" from ${requester} (${user.email}). Approve or decline it in Admin.`,
+            p_detail: newNote.trim() ? `Their note: ${newNote.trim()}` : null,
+            p_link: "/?tab=admin",
+          });
+        } catch {}
       }
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "A member", action: "group_requested", summary: `Requested a new club "${name}"` });
       setNewGroup(""); setNewNote("");
