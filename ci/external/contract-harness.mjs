@@ -35,6 +35,17 @@ const ledger = createServer(async (req, res) => {
   for await (const c of req) body += c;
   const send = (code, obj) => { res.writeHead(code, { "content-type": "application/json" }); res.end(JSON.stringify(obj)); };
 
+  // PostgREST table read used by the monitor: the library set.
+  if ((req.url ?? "") === "/rest/v1/favorite_courses?deleted=eq.false&external_id=not.is.null&select=id,name,location,external_id,data&order=name") {
+    const out = sql(`select coalesce(json_agg(json_build_object('id', id, 'name', name, 'location', location, 'external_id', external_id, 'data', data) order by name), '[]')::text from public.favorite_courses where coalesce(deleted,false) = false and external_id is not null;`);
+    return send(200, JSON.parse(out || "[]"));
+  }
+  // PostgREST table read used by the freshness sync: favorite_courses by external_id.
+  const fm = /^\/rest\/v1\/favorite_courses\?external_id=eq\.([\w%]+)&deleted=eq\.false&select=id,name,data$/.exec(req.url ?? "");
+  if (fm) {
+    const out = sql(`select coalesce(json_agg(json_build_object('id', id, 'name', name, 'data', data)), '[]')::text from public.favorite_courses where external_id = '${decodeURIComponent(fm[1]).replace(/'/g, "''")}' and coalesce(deleted, false) = false;`);
+    return send(200, JSON.parse(out || "[]"));
+  }
   // PostgREST rejects anything that is not a known route with exactly this shape.
   const m = /^\/rest\/v1\/rpc\/(\w+)$/.exec(req.url ?? "");
   if (!m) {
@@ -68,6 +79,11 @@ const ledger = createServer(async (req, res) => {
         `${q(args.p_club_name)}, ${q(args.p_course_name)}, ${q(args.p_location)}, ${q(args.p_note)}, ${hs});`
       );
       return send(200, null);
+    }
+    if (fn === "record_course_freshness_system") {
+      const q = (v) => (v == null ? "null" : `'${String(typeof v === "object" ? JSON.stringify(v) : v).replace(/'/g, "''")}'`);
+      const out = sql(`set local role service_role; select public.record_course_freshness_system(${q(args.p_provider_id)}, ${q(args.p_api_data)}::jsonb, ${q(args.p_diff)}::jsonb, ${args.p_has_changes ? "true" : "false"});`);
+      return send(200, Number(out.trim().split("\n").pop()));
     }
     if (fn === "release_course_api_claims") {
       releaseCalls++;
@@ -104,7 +120,7 @@ const provider = createServer((req, res) => {
     return send(200, {
       courses: hits.map((f) => ({
         id: f.id,
-        club_name: MODE === "drift" && f.id === target ? "Totally Different Club" : f.club,
+        club_name: f.club,
         course_name: f.name,
         location: { city: f.location.split(",")[0].trim(), state: "NJ", country: "United States" },
       })),
@@ -114,10 +130,35 @@ const provider = createServer((req, res) => {
   if (dm) {
     const f = golden.find((g) => g.id === dm[1]);
     if (!f || (MODE === "detail404" && f.id === target)) return send(404, { error: "not found" });
-    return send(200, { course: { id: f.id, club_name: f.club, course_name: f.name, tees: { male: [] } } });
+    if (MODE === "drift" && f.id === target) return send(200, { course: { id: "remapped", club_name: f.club, course_name: f.name, tees: { male: [] } } });
+    // One tee with nine holes so the freshness sync has something to compare. In 'freshness' mode
+    // the harness seeds a stored course whose hole 1 differs, so exactly one yardage change results.
+    const holes = Array.from({ length: 9 }, (_, i) => ({ par: 4, handicap: i + 1, yardage: 350 + i }));
+    return send(200, { course: { id: f.id, club_name: f.club, course_name: f.name, tees: { male: [{ tee_name: "Blue", course_rating: 70.1, slope_rating: 125, par_total: 36, holes }] } } });
   }
   return send(404, { error: "unknown path" });
 });
+
+// The monitor's set is the LIBRARY (196.1). Seed one library course per golden id so the stub
+// provider (which serves the golden ids) has something to answer for. Removed at the end.
+const HG = "16670000-0000-0000-0000-000000000001", HU = "16670000-0000-0000-0000-000000000002";
+sql(`insert into auth.users(id,email) values ('${HU}','harness-lib@example.com') on conflict (id) do nothing;
+     insert into public.profiles(id,display_name) values ('${HU}','Harness Library') on conflict (id) do nothing;
+     insert into public.groups(id,name) values ('${HG}','Harness Library Club') on conflict (id) do nothing;
+     insert into public.group_members(group_id,user_id,email,role,status) values ('${HG}','${HU}','harness-lib@example.com','admin','active') on conflict do nothing;
+     delete from public.favorite_courses where group_id = '${HG}';`);
+for (const f of golden) {
+  const q = (v) => `'${String(v).replace(/'/g, "''")}'`;
+  sql(`insert into public.favorite_courses(group_id,user_id,name,external_id,location,data) values ('${HG}','${HU}',${q(f.name)},${q(f.id)},${q(f.location)},
+       jsonb_build_object('name',${q(f.name)},'club',${q(f.club)},'location',${q(f.location)},'externalId',${q(f.id)},'tees','[]'::jsonb,'holes','[]'::jsonb));`);
+}
+function dropLibrary() {
+  sql(`delete from public.course_freshness where course_id in (select id from public.favorite_courses where group_id = '${HG}');
+       delete from public.notifications where user_id = '${HU}';
+       delete from public.favorite_courses where group_id = '${HG}';
+       delete from public.group_members where group_id = '${HG}'; delete from public.groups where id = '${HG}';
+       delete from public.profiles where id = '${HU}'; delete from auth.users where id = '${HU}';`);
+}
 
 await new Promise((r) => ledger.listen(54611, r));
 await new Promise((r) => provider.listen(54612, r));
@@ -131,6 +172,7 @@ const env = {
   BNN_SUPABASE_URL: "http://127.0.0.1:54611/",
   BNN_SUPABASE_SERVICE_KEY: "harness",
   COURSE_CHECK_BUDGET: process.env.COURSE_CHECK_BUDGET ?? "10",
+  COURSE_PAYLOAD_DIR: `/tmp/bnn-course-detail-${process.pid}`,
 };
 
 if (process.env.HARNESS_SERVE_ONLY === "1") {
@@ -149,6 +191,21 @@ const run = await new Promise((resolve) => {
   child.stderr.on("data", (d) => { stderr += d; });
   child.on("close", (status) => resolve({ status, stdout, stderr }));
 });
+let syncRun = null;
+if (MODE === "freshness") {
+  // Seed a club, an admin, and a stored copy of the FIRST claimed course whose hole 1 is 999 yards.
+  // Make the library's stored copy of the first claimed course differ from the provider by one yardage.
+  sql(`update public.favorite_courses set data = jsonb_set(data, '{tees}', '[{"name":"Blue","rating":70.1,"slope":125,"par":36,"yardages":[999,351,352,353,354,355,356,357,358]}]'::jsonb) where group_id = '${HG}' and external_id = '${target}';
+       delete from public.course_freshness where course_id in (select id from public.favorite_courses where group_id = '${HG}');
+       delete from public.notifications where user_id = '${HU}';`);
+  syncRun = await new Promise((resolve) => {
+    const child = spawn("node", [new URL("./course-freshness-sync.mjs", import.meta.url).pathname], { env });
+    let stdout = "", stderr = "";
+    child.stdout.on("data", (d) => { stdout += d; });
+    child.stderr.on("data", (d) => { stderr += d; });
+    child.on("close", (status) => resolve({ status, stdout, stderr }));
+  });
+}
 ledger.close(); provider.close();
 
 console.log("──── script output ────");
@@ -157,6 +214,17 @@ console.log("──── harness ────");
 console.log(`exit=${run.status}  claim_calls=${claimCalls}  record_calls=${recordCalls}  release_calls=${releaseCalls}  provider_calls=${providerCalls}`);
 console.log(`ledger: ${sql("select coalesce(string_agg(last_status||':'||coalesce(last_http_status::text,'-'), ' ' order by provider_id), '') from public.course_api_checks;")}`);
 console.log(`ledger rows now: ${sql("select count(*) from public.course_api_checks;")}`);
+if (syncRun) {
+  console.log("──── freshness sync ────");
+  console.log((syncRun.stdout + syncRun.stderr).trim());
+  const status = sql(`select status || ':' || coalesce(jsonb_array_length(diff->'tees'->0->'yardageChanges')::text, '-') from public.course_freshness where course_id = (select id from public.favorite_courses where group_id = '${HG}' and external_id = '${target}');`);
+  const notice = sql(`select message from public.notifications where user_id = '${HU}' and type = 'course_change' order by created_at desc limit 1;`);
+  console.log(`course_freshness: ${status}  notification: ${notice}`);
+  if (syncRun.status !== 0 || status !== "pending:1" || !/GolfCourseAPI now lists different data/.test(notice)) {
+    console.error("HARNESS FAIL: scheduled freshness did not flag the seeded change"); process.exit(1);
+  }
+}
+dropLibrary();
 const want = process.env.HARNESS_EXPECT_EXIT;
 if (want !== undefined && Number(want) !== run.status) { console.error(`HARNESS FAIL: expected exit ${want}, got ${run.status}`); process.exit(1); }
 process.exit(want !== undefined ? 0 : (run.status === 0 ? 0 : 1));

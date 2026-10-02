@@ -2,11 +2,9 @@
 
 ## 194.0 — follow-ups
 
-- Primary device: add a heartbeat (`scoring_devices.last_seen_at`) and an idle timeout so a device whose last claim is stale is superseded silently; today the prompt still appears after scoring from another device even when that device is closed.
-- Course API: `course_freshness` (0124, user-triggered diff) and `course_api_checks` (0156/0164, provider ledger) are two systems with two timestamps. Consider having the 0124 check record into the ledger as well, so one table answers "when did the provider last answer". The freshness check itself still runs only from New Round; a scheduled check (inside the 35/day budget) would surface changes without anyone playing.
-- Notifications: the bet-stale notice ("X changed a score, winnings need re-posting") still does not say whose score or which hole; the signal is a boolean today.
+- Course API: `course_freshness` (0124, user-triggered diff) and `course_api_checks` (0156/0164, provider ledger) are two systems with two timestamps. Consider having the 0124 check record into the ledger as well, so one table answers "when did the provider last answer".
 - Notifications: the team-format game-final message points at the app for the match result rather than stating it; stating it needs the scoring engines, not SQL.
-- Golden fixture upkeep: a persistent 404 on one id now reads `error 404` daily in the Outcomes table; that is the signal to update `ci/external/golfcourseapi-golden.json`.
+- A persistent `error 404` on one library course in the Outcomes table means the provider removed that id; re-link the course in Courses to the right provider course.
 
 ## 193.2.260930 — CI-only posting fixture correction (UNVERIFIED candidate)
 

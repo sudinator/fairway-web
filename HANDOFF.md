@@ -6,7 +6,15 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 195.1.261001
+## Current candidate: 196.1.261002
+
+- The GolfCourseAPI monitor's set is the LIBRARY (favorite_courses with external_id), read per run; one request per course; budget 8/day. The golden JSON is harness stub data only.
+
+## Previous: 196.0.261002
+
+- 0166: device heartbeat (6h idle supersession), scheduled course freshness via the daily monitor (one shared body with the New Round path), bet-stale notice carries the per-member money movement. Full-chain local replay run before packaging; see DEPLOY_NOTES.
+
+## Previous: 195.1.261001
 
 - RULE, added after 195.0 failed CI on a modelled fixture: **before handing over any drop that adds a migration or a `ci/assert-*.sql` file, run `BNN_SCRATCH_DATABASE_URL=... bash ci/test_fresh_db_local.sh`** and quote its output. It replays all committed migrations on real PostgreSQL and runs the rebuild's assertion files in CI's order. An isolated fixture is a convenience for iterating, never evidence.
 

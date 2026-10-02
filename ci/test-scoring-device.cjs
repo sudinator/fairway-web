@@ -3,14 +3,17 @@ const assert=require('node:assert/strict'),fs=require('fs'),path=require('path')
 const repo=path.resolve(__dirname,'..'),req=Module.createRequire(path.join(repo,'package.json')),ts=req('typescript');
 const source=ts.transpileModule(fs.readFileSync(path.join(repo,'lib/scoring-device.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
 function storage(){const map=new Map();return{get length(){return map.size},key:i=>[...map.keys()][i]??null,getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,String(v)),removeItem:k=>map.delete(k),clear:()=>map.clear()};}
-const shared=storage(),leases=new Map();let online=true,fail=false;
+const shared=storage(),leases=new Map();let online=true,fail=false,holderIdle=false;
 Object.defineProperty(globalThis,'navigator',{value:{get onLine(){return online}},configurable:true});
 function tab(session=storage()){
  const m=new Module('device-controller',module);m._compile(source,'device-controller.js');
  const window={localStorage:shared,sessionStorage:session,location:{reload(){window.reloads++}},reloads:0};
  return{api:m.exports,window,async check(takeover=false,uid='u1'){global.window=window;await m.exports.checkScoringDevice(client,uid,takeover)},use(){global.window=window;return m.exports}};
 }
-const client={async rpc(name,args){assert.equal(name,'claim_scoring_device');if(fail)return{data:null,error:{message:'offline'}};const current=leases.get('u1');const active=!current||current===args.p_token||current===args.p_previous||args.p_takeover;if(active)leases.set('u1',args.p_token);return{data:{active,resumed:!!current&&current===args.p_previous},error:null};}};
+const client={async rpc(name,args){assert.equal(name,'claim_scoring_device');if(fail)return{data:null,error:{message:'offline'}};const current=leases.get('u1');let active=!current||current===args.p_token||current===args.p_previous||args.p_takeover;let superseded=false;
+ // 0166: a holder silent for the idle window is superseded without asking.
+ if(!active&&holderIdle){active=true;superseded=true;}
+ if(active)leases.set('u1',args.p_token);if(current!==args.p_token&&active)holderIdle=false;return{data:{active,resumed:!!current&&current===args.p_previous,...(superseded?{superseded:true}:{})},error:null};}};
 (async()=>{
  const phone=tab();await phone.check();assert.equal(phone.api.scoringDeviceState(),'primary');
  const phoneToken=phone.api.scoringDeviceToken();phone.use().scoringStorage().setItem('bnn_round_draft_v1','phone offline score 4');
@@ -39,6 +42,18 @@ const client={async rpc(name,args){assert.equal(name,'claim_scoring_device');if(
  mobile.api.releaseScoringDeviceRuntime(); /* the app is killed: its runtime can no longer answer */ const closedOnline=tab();closedOnline.window.localStorage=mobile.window.localStorage;await closedOnline.check();assert.equal(closedOnline.api.scoringDeviceState(),'primary','193.3: the same installation relaunched online (sessionStorage lost) resumes silently, no prompt');assert.equal(closedOnline.window.reloads,0,'a silent resume does not reload');assert.notEqual(closedOnline.api.scoringDeviceToken(),mobileToken,'resume rotates the token so the dead runtime is fenced');assert.equal(closedOnline.use().scoringStorage().getItem('bnn_round_draft_v1'),'same mobile pending 7','known installation resume retains its still-current pending work');assert.equal(leases.get('u1'),closedOnline.api.scoringDeviceToken());
  const otherDevice=tab();otherDevice.window.localStorage=storage();await otherDevice.check();assert.equal(otherDevice.api.scoringDeviceState(),'viewer','a different device still gets the prompt');assert.equal(leases.get('u1'),closedOnline.api.scoringDeviceToken(),'a different device opening never takes the lease');
  const strangerInstall=tab();strangerInstall.window.localStorage=storage();strangerInstall.window.localStorage.setItem('bnn_primary_scoring_owner_v1',JSON.stringify({user:'u1',token:'stale-token-from-last-month'}));await strangerInstall.check();assert.equal(strangerInstall.api.scoringDeviceState(),'viewer','an installation whose remembered token is no longer the lease stays a viewer');
+ // 0166: the holder (closedOnline) goes silent; a different device opened later takes over without a prompt
+ // and starts clean (its old outbox archived, not replayed); the old holder is fenced when it returns.
+ closedOnline.use().scoringStorage().setItem('bnn_round_draft_v1','holder work before going silent');
+ const idleLaptop=tab();idleLaptop.window.localStorage=storage();idleLaptop.window.localStorage.setItem('bnn_primary_scoring_owner_v1',JSON.stringify({user:'u1',token:'laptop-old-token'}));
+ idleLaptop.window.localStorage.setItem('bnn_device_scores:u1:laptop-old-token:bnn_round_draft_v1','laptop stale outbox from last month');
+ holderIdle=true;await idleLaptop.check();assert.equal(idleLaptop.api.scoringDeviceState(),'primary','idle holder is superseded silently');assert.equal(idleLaptop.window.reloads,0);
+ assert.equal(idleLaptop.use().scoringStorage().getItem('bnn_round_draft_v1'),null,'superseding device never replays its own stale outbox');
+ assert.ok(idleLaptop.window.localStorage.getItem('bnn_scoring_recovery_v1').includes('laptop stale outbox from last month'),'stale outbox archived for download');
+ await closedOnline.check();assert.equal(closedOnline.api.scoringDeviceState(),'viewer','silent holder is fenced when it returns');
+ assert.equal(closedOnline.use().scoringStorage().getItem('bnn_round_draft_v1'),'holder work before going silent','fenced holder keeps its unsynced work');
+ holderIdle=false;const liveLaptop2=tab();liveLaptop2.window.localStorage=storage();await liveLaptop2.check();assert.equal(liveLaptop2.api.scoringDeviceState(),'viewer','a live holder still fences every other device');
+ await closedOnline.check(true);assert.equal(closedOnline.api.scoringDeviceState(),'primary','explicit takeover still works');
  // Execute the shipped Supabase fetch adapter: capture a token at request time,
  // preserve auth headers, retain the response, and surface database fencing.
  const httpModule=new Module('device-http',module);httpModule.require=id=>id==='./scoring-device'?closedOnline.api:id==='@supabase/ssr'?{createBrowserClient:(_url,_key,options)=>({send:options.global.fetch})}:require(id);

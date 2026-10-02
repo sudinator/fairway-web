@@ -81,3 +81,39 @@ do $$ begin
  if has_table_privilege('authenticated','public.scoring_devices','update') or has_table_privilege('authenticated','public.scoring_devices','select') then raise exception 'FAIL: device token table exposed'; end if;
 end $$;
 rollback;
+
+-- 0166: heartbeat and idle supersession. A live holder fences; a holder silent for six hours is
+-- superseded without a prompt and the result says so; an explicit takeover still works.
+begin;
+insert into auth.users(id) values ('16600000-0000-0000-0000-000000000001') on conflict do nothing;
+insert into public.profiles(id,display_name) values ('16600000-0000-0000-0000-000000000001','Idle scorer') on conflict do nothing;
+select set_config('request.jwt.claim.sub','16600000-0000-0000-0000-000000000001',true);
+do $$
+declare phone uuid := '16600000-0000-0000-0000-000000000010'; laptop uuid := '16600000-0000-0000-0000-000000000011'; r jsonb; seen2 timestamptz;
+begin
+  execute 'set local role authenticated';
+  if (public.claim_scoring_device(phone)->>'active') <> 'true' then raise exception 'FAIL: first claim'; end if;
+  if (public.claim_scoring_device(laptop)->>'active') <> 'false' then raise exception 'FAIL: live holder did not fence'; end if;
+  execute 'reset role';
+  -- now() is fixed inside one transaction (production calls are separate transactions), so wind the
+  -- heartbeat back and check the holder's next check-in brings it to now().
+  update public.scoring_devices set last_seen_at = now() - interval '1 minute' where user_id='16600000-0000-0000-0000-000000000001';
+  execute 'set local role authenticated';
+  perform public.claim_scoring_device(phone);
+  execute 'reset role';
+  select last_seen_at into seen2 from public.scoring_devices where user_id='16600000-0000-0000-0000-000000000001';
+  if seen2 <> now() then raise exception 'FAIL: holder check-in did not refresh last_seen_at'; end if;
+  update public.scoring_devices set last_seen_at = now() - interval '5 hours 59 minutes' where user_id='16600000-0000-0000-0000-000000000001';
+  execute 'set local role authenticated';
+  if (public.claim_scoring_device(laptop)->>'active') <> 'false' then raise exception 'FAIL: superseded inside the idle window'; end if;
+  execute 'reset role';
+  update public.scoring_devices set last_seen_at = now() - interval '6 hours 1 minute' where user_id='16600000-0000-0000-0000-000000000001';
+  execute 'set local role authenticated';
+  r := public.claim_scoring_device(laptop);
+  if (r->>'active') <> 'true' or (r->>'superseded') is distinct from 'true' then raise exception 'FAIL: idle holder not superseded: %', r; end if;
+  if (public.claim_scoring_device(phone)->>'active') <> 'false' then raise exception 'FAIL: superseded holder was not fenced'; end if;
+  if (public.claim_scoring_device(phone,null,true)->>'active') <> 'true' then raise exception 'FAIL: explicit takeover after supersession'; end if;
+  execute 'reset role';
+  raise notice 'PRIMARY_DEVICE_HEARTBEAT_PASS heartbeat advances, 6h idle supersedes silently, live holder fences, takeover works';
+end $$;
+rollback;

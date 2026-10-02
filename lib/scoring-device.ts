@@ -140,10 +140,14 @@ export async function checkScoringDevice(client: Client, uid: string, takeover =
       initialized = true;
       if (!data.active) { publish("viewer"); return; }
       const oldOwner = owner();
-      if (!wasInitialized && !takeover) resumeBackups(previous);
+      // The server superseded a holder that had been silent for its idle window (0166). This device
+      // did not resume anything; it starts from the server's scores like a takeover, so any outbox
+      // it kept from an earlier session is archived, never replayed.
+      const superseded = data.superseded === true;
+      if (!wasInitialized && !takeover && !superseded) resumeBackups(previous);
       // A successful takeover starts from the current server scores. Old pending work
       // remains downloadable, but can never become an automatic stale outbox.
-      if (takeover || (!previous && !wasInitialized) || (oldOwner?.user === uid && oldOwner.token !== token && oldOwner.token !== previous)) archiveScoringBackups(true);
+      if (takeover || superseded || (!previous && !wasInitialized) || (oldOwner?.user === uid && oldOwner.token !== token && oldOwner.token !== previous)) archiveScoringBackups(true);
       // Explicitly resuming this same installation's still-current server token
       // recovers its own pending mobile work. A transfer from a different device
       // never replays the old local outbox.

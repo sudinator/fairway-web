@@ -1,3 +1,7 @@
+## 196.0 — heartbeat and scheduled freshness (0166)
+
+`scoring_devices.last_seen_at timestamptz not null default now()`. `claim_scoring_device` refreshes it on the holder's check-in and supersedes a holder silent for 6 hours (result adds `superseded: true`). `record_course_freshness_internal(uuid,jsonb,jsonb,boolean)` (no grants) is the single body; `record_course_freshness` delegates after its member gate; new `record_course_freshness_system(text,jsonb,jsonb,boolean) returns integer` is service_role only.
+
 ## 195.0 — notifications detail (0165)
 
 `notifications.detail text` added. New helpers `person_label(uuid)` (authenticated) and `usd(integer)`; `enrich_friction_notification()` BEFORE INSERT trigger on notifications. `create_notification(uuid,text,uuid,text,text,text)` replaces the 5-argument form. `trg_notify_bet_posted` is now a deferrable, initially deferred constraint trigger. New `admin_member_signups()` (is_admin-gated, reads auth.users). Trigger functions notify_group_member, notify_game_added, notify_game_finished, notify_bet_posted, notify_money_owed, notify_money_paid, notify_tee_new, and functions send_tee_reminders, record_course_freshness redefined; recipients unchanged.

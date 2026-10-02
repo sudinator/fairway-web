@@ -702,7 +702,7 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
   game: Game;
   user: { id: string };
   canPost: boolean;
-  onBetStale?: (stale: boolean) => void;
+  onBetStale?: (stale: boolean, detail?: string) => void;
   onToggleBets?: (playerId: string, on: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -914,8 +914,19 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
     for (const k of keys) { if ((postedNets[k] || 0) !== (liveNetsCents[k] || 0)) return true; }
     return false;
   })();
-  useEffect(() => { onBetStale?.(needsUpdate); }, [needsUpdate]);
   const nameOfUid = (uid: string) => players.find((p) => p.user_id === uid)?.display_name || "someone";
+  // What the organizer needs to know is how the money moved: per member, posted vs live. The
+  // scoring change itself is not an event we hold; the result of it is (0166).
+  const staleDetail = (() => {
+    if (!needsUpdate || !postedNets) return "";
+    const fmt = (c: number) => `${c < 0 ? "-" : "+"}$${(Math.abs(c) / 100).toFixed(2)}`;
+    const keys = new Set([...Object.keys(postedNets), ...Object.keys(liveNetsCents)]);
+    return Array.from(keys)
+      .filter((k) => (postedNets[k] || 0) !== (liveNetsCents[k] || 0))
+      .map((k) => `${nameOfUid(k)}: posted ${fmt(postedNets[k] || 0)}, now ${fmt(liveNetsCents[k] || 0)}`)
+      .join("; ");
+  })();
+  useEffect(() => { onBetStale?.(needsUpdate, staleDetail); }, [needsUpdate, staleDetail]);
   // Per-bettor old -> new change, for the re-post preview.
   const repostDeltas = (() => {
     if (!postedNets) return [] as { uid: string; name: string; oldC: number; newC: number }[];
