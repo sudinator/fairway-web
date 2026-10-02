@@ -46,9 +46,13 @@ jobs:
           node ci/external/golfcourseapi-contract.mjs
           code=$?
           echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          # 2 = monitor problem (missing key, rate limit, outage). 1 = real contract drift.
-          # Both fail the job, but the alert issue below reports them differently so nobody
-          # goes hunting for a provider change that never happened.
+          # 2 = monitor problem (missing key, quota, outage, a 404 on one id, or a ledger write that
+          # failed). 1 = real contract drift: the provider answered 200 and the content disagrees.
+          # Both fail the job, but the alert issue below reports them differently so nobody goes
+          # hunting for a provider change that never happened. Every course claimed by a run gets a
+          # recorded outcome on EVERY exit path (0164); read the "Outcomes recorded" table in the
+          # step log. A green run means every course checked today resolved with HTTP 200 and
+          # matched its fixture — nothing less.
           exit $code
 
       - name: Open or update admin alert issue
@@ -84,8 +88,13 @@ jobs:
                     '   BNN_PRODUCTION_* secrets; if that environment restricts branches, they arrive empty',
                     '   and the job refuses to run rather than checking all 18 and spending the budget.',
                     '4. Provider outage (HTTP 5xx).',
+                    '5. One course id answered 404 or another 4xx. It is recorded as `error` with the',
+                    '   status and retried on the next run; if it persists the provider removed the id',
+                    '   and the golden fixture needs updating.',
+                    '6. A ledger write failed. Courses may read `claimed` until the next run re-queues them.',
                     '',
-                    'Read the step log for the exact reason. Do NOT change application code for this.',
+                    'Read the "Outcomes recorded" table in the step log for the per-course status and',
+                    'HTTP code. Do NOT change application code for this.',
                   ].join('\n')
                 : 'Check provider ids, search/detail response shape, and required fields before changing application code.',
               '',

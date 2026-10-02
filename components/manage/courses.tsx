@@ -9,6 +9,7 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, LabelList } from "rec
 import { write } from "@/lib/db-write";
 import { buildCustomCourse, Course, CourseHole, courseLabel, findExistingCourseId, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { normalizeCourseProviderId } from "@/lib/course-provider-id";
+import { describeCourseApiFreshness, loadCourseApiStatus, type CourseApiStatusRow } from "@/lib/course-api-status";
 import { buildCourseRatingTexts, buildCourseSourceView, shouldShowCourseCorrectionReason, type CourseSourceMode } from "@/lib/course-source-review";
 import { logActivity } from "@/lib/activity";
 import { diagEnabled, setDiagEnabled, reproduceBug, setReproduceBug, getDiagLog, clearDiagLog } from "@/lib/debuglog";
@@ -681,6 +682,17 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
   const [reason, setReason] = useState("");
   const initialCourseRef = React.useRef<Course>(JSON.parse(JSON.stringify(course)));
 
+  // When this course was last ANSWERED by GolfCourseAPI (0164). One read, one sentence, from the
+  // single formatter in lib/course-api-status.ts; never from a claim or a failed attempt.
+  const providerIdForStatus = existingId ? normalizeCourseProviderId(course.externalId) : null;
+  const [apiStatus, setApiStatus] = useState<CourseApiStatusRow | null | undefined>(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    if (!providerIdForStatus) { setApiStatus(null); return; }
+    void loadCourseApiStatus(supabase, [providerIdForStatus]).then((m) => { if (!cancelled) setApiStatus(m.get(providerIdForStatus) ?? null); });
+    return () => { cancelled = true; };
+  }, [providerIdForStatus]);
+
   const setName = (name: string) => setCourse({ ...course, name });
   const setLoc = (location: string) => setCourse({ ...course, location });
   const updateTee = (i: number, patch: any) => setCourse({ ...course, tees: course.tees.map((t, j) => j === i ? { ...t, ...patch } : t) });
@@ -804,6 +816,14 @@ export function CourseForm({ user, activeGroupId, course, setCourse, existingId,
           Changes save immediately for this group and are submitted to an app admin for global approval before other groups see them.
         </div>
       )}
+      {existingId && providerIdForStatus && apiStatus !== undefined && (() => {
+        const f = describeCourseApiFreshness(apiStatus);
+        return (
+          <div data-course-api-freshness style={{ color: f.attention ? C.gold : C.sage, fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
+            {f.text}
+          </div>
+        );
+      })()}
       {!existingId && providerSource && (
         <div style={{ marginTop: 10, border: `1px solid ${providerSource.stored ? C.gold : C.borderCard}`, borderRadius: 10, padding: 10, background: providerSource.stored ? C.greenMid : C.greenLight }}>
           <div style={{ color: providerSource.stored ? C.cream : C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1.2 }}>
