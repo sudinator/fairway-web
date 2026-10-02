@@ -1,3 +1,11 @@
+## 196.2.261002 — Freshness sync runs from any working directory (fresh-database CI fix)
+
+196.1's fresh-database rebuild failed in GitHub inside the harness's `freshness` mode: `ci/test_fresh_db_rebuild.sh` works from a scratch directory (`cd "$TMP"` for the Supabase CLI), and `course-freshness-sync.mjs` resolved `lib/course-diff.ts` and `npx tsc` against the current directory. From `/tmp`, `npx tsc` fetched an unrelated registry package named "tsc". The local replay had never changed directory, so it could not reproduce this.
+
+Fixes: the sync resolves everything from the repo root (derived from its own path) and uses the repo's TypeScript by path, failing with a plain message if it is not installed; the monitor no longer reports an empty provider field as a metadata difference; `ci/test_fresh_db_local.sh` now runs from a scratch directory exactly as the CI script does. Negative-tested: with the chdir removed and cwd=/tmp the harness fails with the explicit message; restored, it passes from /tmp. Full local chain green from the scratch directory: 164 migrations, 11/11 assertions, 5/5 harness modes.
+
+No application or migration changes from 196.1.
+
 ## 196.1.261002 — The monitor verifies the course library, not a fixture file
 
 The daily GolfCourseAPI check now reads its set from `favorite_courses` (every non-deleted course with a provider id) at the start of each run, so it follows what members save: add a course to the library and it enters the rotation; delete it and it leaves. `golfcourseapi-golden.json` is no longer the source of truth — it survives only as the harness's stub data. Each course costs ONE request (the detail lookup; the search step is gone), so the budget rises to eight courses a day: a 20-course library is re-verified every three days, a 50-course one every week, inside the 35/day shared with the app.

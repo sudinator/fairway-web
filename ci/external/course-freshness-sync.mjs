@@ -10,9 +10,18 @@
 // Exit codes: 0 done (changes or not); 2 the ledger or the build was unavailable. It never spends a
 // provider request and never changes a stored course; it only records what differs.
 import { readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Everything below is relative to the REPO ROOT, never to the caller's working directory. The
+// fresh-database rebuild runs from a scratch directory (cd "$TMP" for the Supabase CLI); from
+// there "lib/course-diff.ts" does not exist and `npx tsc` resolves a stranger's package. That is
+// how 196.0 failed in CI after passing a local replay that never changed directory.
+const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+process.chdir(REPO);
 
 const PAYLOAD_DIR = process.env.COURSE_PAYLOAD_DIR ?? ".course-detail";
 const SUPABASE_URL = (process.env.BNN_SUPABASE_URL ?? "").trim().replace(/\/+$/, "").replace(/\/rest\/v1$/, "");
@@ -37,7 +46,13 @@ await writeFile(TSCONFIG, JSON.stringify({
     baseUrl: ".", paths: { "@/*": ["./*"] }, outDir: OUT, rootDir: "." },
   files: ["lib/course-normalize.ts", "lib/course-diff.ts", "lib/courses.ts", "lib/course-provider-id.ts"],
 }));
-const tsc = spawnSync("npx", ["tsc", "-p", TSCONFIG], { encoding: "utf8" });
+// The repo's OWN TypeScript, by path. `npx tsc` without node_modules installed resolves a different
+// registry package called "tsc" ("This is not the tsc command you are looking for") — which is how
+// this step failed in the fresh-database CI job, where nothing had run npm ci. If TypeScript is
+// not installed, say exactly that.
+const TSC = resolve("node_modules", "typescript", "bin", "tsc");
+if (!existsSync(TSC)) { await rm(TSCONFIG, { force: true }); fail(`TypeScript is not installed at ${TSC}; run npm ci first (the workflow job must install dependencies before this step).`); }
+const tsc = spawnSync("node", [TSC, "-p", TSCONFIG], { encoding: "utf8" });
 await rm(TSCONFIG, { force: true });
 if (tsc.status !== 0) fail(`could not compile lib/course-diff.ts: ${(tsc.stdout + tsc.stderr).slice(0, 500)}`);
 const patch = spawnSync("node", ["ci/patch_test_aliases.mjs", OUT], { encoding: "utf8" });

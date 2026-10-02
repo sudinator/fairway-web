@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 196.1.261002
+## Current candidate: 196.2.261002
+
+- RULE (second CI failure of this stretch, 196.1): the local full-chain replay must mirror CI's ENVIRONMENT as well as its database — it now runs from a scratch working directory like `test_fresh_db_rebuild.sh`. When a script is added to a CI job, run it the way that job runs it: same cwd, same installed state. "It passed locally" with a different cwd is not evidence.
+
+## Previous: 196.1.261002
 
 - The GolfCourseAPI monitor's set is the LIBRARY (favorite_courses with external_id), read per run; one request per course; budget 8/day. The golden JSON is harness stub data only.
 

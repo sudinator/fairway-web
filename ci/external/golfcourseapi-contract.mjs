@@ -299,9 +299,10 @@ for (const fixture of golden) {
     // the provider edits its title-casing. Rating/slope/yardage changes are the freshness sync's job.
     const info = [];
     const pClub = String(course?.club_name ?? ""), pName = String(course?.course_name ?? course?.club_name ?? ""), pLoc = providerLocation(course);
-    if (fixture.club && loose(pClub) !== loose(fixture.club)) info.push(`club "${pClub}" vs stored "${fixture.club}"`);
-    if (fixture.name && loose(pName) !== loose(fixture.name)) info.push(`name "${pName}" vs stored "${fixture.name}"`);
-    if (fixture.location && loose(pLoc) !== loose(fixture.location)) info.push(`location "${pLoc}" vs stored "${fixture.location}"`);
+    // Only when the provider actually supplied a value: an absent field is not a difference.
+    if (pClub && fixture.club && loose(pClub) !== loose(fixture.club)) info.push(`club "${pClub}" vs stored "${fixture.club}"`);
+    if (pName && fixture.name && loose(pName) !== loose(fixture.name)) info.push(`name "${pName}" vs stored "${fixture.name}"`);
+    if (pLoc && fixture.location && loose(pLoc) !== loose(fixture.location)) info.push(`location "${pLoc}" vs stored "${fixture.location}"`);
     // Record what the provider says now, so the ledger carries current names.
     fixture.club = pClub || fixture.club; fixture.name = pName || fixture.name; fixture.location = pLoc || fixture.location;
 

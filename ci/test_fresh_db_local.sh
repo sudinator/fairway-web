@@ -11,6 +11,10 @@
 # cron.database_name set to the scratch database name below (bnn_local_chain).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Run from a scratch directory exactly as ci/test_fresh_db_rebuild.sh does (cd "$TMP"), so anything
+# that silently depends on the working directory fails HERE, not in GitHub. 196.0's freshness sync
+# did exactly that.
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT; cd "$TMP"
 ADMIN_URL="${BNN_SCRATCH_DATABASE_URL:?set BNN_SCRATCH_DATABASE_URL to a superuser connection on a scratch server}"
 DB="bnn_local_chain"
 # pg_cron's launcher keeps a session on cron.database_name; end it so the drop can proceed (it reconnects).
