@@ -6,7 +6,14 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current staging candidate: 179.7.260902
+## Current candidate: 194.0.261001
+
+- Migration 0164 fixes the course-API ledger: a claim is no longer counted as a verification (freshness = `last_success_at`); stranded claims are released by the monitor; every exit path records an outcome with the real HTTP status; the course view shows "Last verified against GolfCourseAPI". Apply 0164 to production BEFORE merging — the new monitor calls functions that only exist after it.
+- Same-device relaunch no longer prompts "make this device primary" (localStorage owner token presented online; duplicate tabs detected via BroadcastChannel). Server liveness is still a backlog item.
+- Verified locally: migration applied twice to a real PostgreSQL 16, `ci/assert-course-api-checks.sql` green (and it now exercises the stranded-claim case it used to mask), harness modes ok/drift/midquota/quota/keyrejected/detail404/ledgerdown with expected exit codes, device test red-then-green.
+- Run GitHub CI (fresh-database rebuild now also runs the harness) before staging.
+
+## Previous staging candidate: 179.7.260902
 
 - v179.7 corrects the manual Staging integration workflow so its build receives the same public VAPID-key input as normal CI.
 - The previous v179.6 manual run stopped before `npm run test:staging`; it created no temporary integration users or records.
@@ -96,7 +103,7 @@ Sensitive (write-only) and GolfCourseAPI does not display an existing key.
 | Where | Why | Notes |
 |---|---|---|
 | **Vercel** env var `GOLF_API_KEY` | the app's course search (`app/api/courses/route.ts`) | Sensitive, Production + Preview. Changing it requires a REDEPLOY |
-| **GitHub** repository secret `GOLF_API_KEY` | the weekly contract monitor | must be a REPOSITORY secret — the workflow declares no `environment:` |
+| **GitHub** repository secret `GOLF_API_KEY` | the weekly contract monitor | repository secret is fine; the workflow declares `environment: production` for the ledger secrets and still reads repository secrets |
 | **Password manager** | so it can be recovered | the step that was skipped |
 
 Account is at golfcourseapi.com — free, sign-in is by emailed link, no password.

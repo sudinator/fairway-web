@@ -75,6 +75,33 @@ export function downloadScoringRecovery() {
   const url = URL.createObjectURL(blob), a = document.createElement("a");
   a.href = url; a.download = "BNN-saved-scores.json"; a.click(); URL.revokeObjectURL(url);
 }
+// Same-browser liveness. Two tabs of one browser share localStorage, so the owner token alone
+// cannot tell "the app was relaunched" from "a second tab was opened". A primary tab answers pings
+// on a per-user channel; a tab that gets an answer carrying the owner's token is a duplicate.
+const CHANNEL = (uid: string) => `bnn_scoring_device_${uid}`;
+let siblings: BroadcastChannel | null = null;
+function listenForSiblings(uid: string) {
+  if (typeof BroadcastChannel === "undefined") return;
+  siblings?.close();
+  siblings = new BroadcastChannel(CHANNEL(uid));
+  (siblings as unknown as { unref?: () => void }).unref?.();
+  siblings.onmessage = (e: MessageEvent) => {
+    if (e.data?.type === "ping" && state === "primary") siblings?.postMessage({ type: "alive", token });
+  };
+}
+function liveSiblingTab(uid: string, ownerToken: string): Promise<boolean> {
+  if (typeof BroadcastChannel === "undefined") return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const ch = new BroadcastChannel(CHANNEL(uid));
+    (ch as unknown as { unref?: () => void }).unref?.();
+    const done = (alive: boolean) => { clearTimeout(timer); ch.close(); resolve(alive); };
+    const timer = setTimeout(() => done(false), 250);
+    ch.onmessage = (e: MessageEvent) => { if (e.data?.type === "alive" && e.data.token === ownerToken) done(true); };
+    ch.postMessage({ type: "ping" });
+  });
+}
+// Test and teardown hook: a runtime that will no longer answer pings (the tab is closing).
+export function releaseScoringDeviceRuntime() { siblings?.close(); siblings = null; }
 type Client = { rpc: (name: string, args: Record<string, unknown>) => PromiseLike<{ data: any; error: any }> };
 export async function checkScoringDevice(client: Client, uid: string, takeover = false): Promise<void> {
   if (!uid || typeof window === "undefined") return;
@@ -82,9 +109,18 @@ export async function checkScoringDevice(client: Client, uid: string, takeover =
   if (userId !== uid) {
     userId = uid; initialized = false; publish("checking");
     try { previous = window.sessionStorage.getItem(`bnn_primary_tab_${uid}`); } catch { previous = null; }
-    // A fully closed mobile app may lose sessionStorage. Its known primary can
-    // still reopen offline; server fencing applies on reconnection.
-    if (!previous && navigator.onLine === false && owner()?.user === uid) previous = owner()!.token;
+    // A fully closed mobile app loses sessionStorage (iOS discards it for a standalone PWA on
+    // every cold launch). The installation's identity survives in localStorage: the token of its
+    // last successful claim. Present that as the previous token ONLINE as well as offline, so the
+    // same phone reopening resumes silently instead of asking "make this device primary?" on
+    // every launch. The server still decides: it resumes only if that token is the one it holds,
+    // so a different device - whose localStorage holds a different or no token - still sees the
+    // prompt. Before 193.3 this was offline-only and every relaunch presented as a second device.
+    // ...unless the previous runtime is still ALIVE in another tab of this same browser. Then this
+    // is a duplicate tab, not a relaunch: it stays a viewer and the open tab keeps scoring. A live
+    // tab answers a BroadcastChannel ping within 250ms; a killed app cannot.
+    if (!previous && owner()?.user === uid && !(await liveSiblingTab(uid, owner()!.token))) previous = owner()!.token;
+    listenForSiblings(uid);
     token = navigator.onLine === false && previous ? previous : crypto.randomUUID();
   }
   if (navigator.onLine === false) {

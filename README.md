@@ -1,3 +1,7 @@
+## 194.0.261001 — Course API ledger made honest; silent same-device resume; "last verified" on courses
+
+**Course API monitor (migration 0164).** Production ledger showed 17 of 18 golden courses as `error` / "claimed, awaiting result" across four runs (9/28-9/30), and the 10/01 scheduled run printed "Nothing due: all 18 fixtures were verified within the last 7 days" and went green. Cause, reproduced on a real Postgres: `claim_course_api_checks` decided freshness from `last_checked_at` alone, so a claim placeholder left by a run that died mid-flight counted as a verification for a week. The CI assertion file masked it by flipping `last_status='ok'` by hand between simulated days.
+
 ## 193.2.260930 — CI-only posting fixture correction (UNVERIFIED candidate)
 
 The fresh-database handicap-posting fixture now calls begin_game_score_write(gid,0) before both scored-player INSERT sites. New games start at version 0; primary-device and reset guards stay enabled. The isolated PostgreSQL runner also executes migration 0161 and the actual posting fixture alongside 0162/0163. Application behavior and all migration bytes are unchanged from 193.1.

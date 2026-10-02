@@ -78,6 +78,16 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-match-length-roundtrip.
 # retention of last-known values, and the permission boundary.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-course-api-checks.sql"
 
+# 0164: the WHOLE monitor script against a PostgREST-shaped ledger stub backed by this database and
+# a stub provider. Every exit path must leave a recorded outcome: a clean week, a mid-run daily
+# quota (checked courses recorded, unreached ones released), drift, and a dead ledger.
+for mode_and_exit in ok:0 midquota:2 drift:1 ledgerdown:2; do
+  HARNESS_DB_URL="$DB_URL" HARNESS_MODE="${mode_and_exit%%:*}" HARNESS_EXPECT_EXIT="${mode_and_exit##*:}" COURSE_CHECK_BUDGET=5 \
+    node "$ROOT/ci/external/contract-harness.mjs"
+  psql "$DB_URL" -X -q -v ON_ERROR_STOP=1 -c "update public.course_api_checks set last_success_at = last_success_at - interval '8 days', last_checked_at = last_checked_at - interval '8 days', last_status = case when last_status = 'claimed' then 'error' else last_status end;"
+done
+psql "$DB_URL" -X -q -v ON_ERROR_STOP=1 -c "delete from public.course_api_checks;"
+
 # Fresh rebuild must contain the six helper functions used by the core RLS policy graph.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
 do $$

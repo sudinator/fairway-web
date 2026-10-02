@@ -1,3 +1,9 @@
+## 194.0 — follow-ups
+
+- Primary device: add a heartbeat (`scoring_devices.last_seen_at`) and an idle timeout so a device whose last claim is stale is superseded silently; today the prompt still appears after scoring from another device even when that device is closed.
+- Course API: `course_freshness` (0124, user-triggered diff) and `course_api_checks` (0156/0164, provider ledger) are two systems with two timestamps. Consider having the 0124 check record into the ledger as well, so one table answers "when did the provider last answer".
+- Golden fixture upkeep: a persistent 404 on one id now reads `error 404` daily in the Outcomes table; that is the signal to update `ci/external/golfcourseapi-golden.json`.
+
 ## 193.2.260930 — CI-only posting fixture correction (UNVERIFIED candidate)
 
 The fresh-database handicap-posting fixture now calls begin_game_score_write(gid,0) before both scored-player INSERT sites. New games start at version 0; primary-device and reset guards stay enabled. The isolated PostgreSQL runner also executes migration 0161 and the actual posting fixture alongside 0162/0163. Application behavior and all migration bytes are unchanged from 193.1.

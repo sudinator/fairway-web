@@ -1,3 +1,7 @@
+## 194.0 — course_api_checks outcomes (0164)
+
+`course_api_checks` gains `last_success_at timestamptz` (set when status is ok or drift; freshness and the course view read it) and `last_http_status integer`. `last_status` check widened to ok | drift | error | claimed. New service-role function `release_course_api_claims(text[], text) returns integer`; new authenticated read function `course_api_status(text[])`. `record_course_api_check` gains `p_http_status integer default null`; the 6-argument overload is dropped.
+
 ## 193.2 — CI-only correction
 
 No database schema or migration changes from 193.1. The handicap-posting fixture establishes the required new-game version-0 context before scored inserts.
