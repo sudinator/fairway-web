@@ -18,8 +18,9 @@ declare
 begin
   -- clean start (also after a crashed run)
   delete from notifications where user_id in (app, ca, mem);
-  delete from course_freshness where course_id in (c1, c2);
-  delete from favorite_courses where id in (c1, c2);
+  delete from course_freshness where course_id in (c1, c2, '16700000-0000-0000-0000-000000000023');
+  delete from group_courses where course_id in (c1, c2, '16700000-0000-0000-0000-000000000023');
+  delete from favorite_courses where id in (c1, c2, '16700000-0000-0000-0000-000000000023');
   delete from group_members where group_id in (ga, gb);
   delete from groups where id in (ga, gb);
   delete from profiles where id in (app, ca, mem);
@@ -31,9 +32,12 @@ begin
   insert into group_members(group_id,user_id,email,role,status) values
     (ga,app,'app@example.com','admin','active'),(ga,ca,'ca@example.com','admin','active'),(ga,mem,'mem@example.com','member','active'),
     (gb,app,'app@example.com','admin','active');
+  -- THE PRODUCTION CASE (0168): group_id is NULL (legacy column, cleared by club delete/merge); the
+  -- course belongs to club A through the group_courses link. c2 keeps the legacy column only.
   insert into favorite_courses(id,group_id,user_id,name,external_id,data) values
-    (c1,ga,app,'Course One','rev00001','{"name":"Course One","tees":[{"name":"Blue","rating":70.1,"slope":125,"par":36,"yardages":[999]}],"holes":[],"corrected":true}'),
+    (c1,null,app,'Course One','rev00001','{"name":"Course One","tees":[{"name":"Blue","rating":70.1,"slope":125,"par":36,"yardages":[999]}],"holes":[],"corrected":true}'),
     (c2,gb,app,'Course Two','rev00002','{"name":"Course Two","tees":[],"holes":[]}');
+  insert into group_courses(group_id,course_id,added_by) values (ga,c1,app);
 
   -- First detection: pending + one notice per club admin.
   execute 'set local role service_role';
@@ -62,7 +66,16 @@ begin
   select count(*) into n from notifications where type = 'course_change' and user_id = ca;
   if n <> 2 then raise exception 'new diff did not notify again (% notices)', n; end if;
 
-  raise notice 'COURSE_REVIEWS_REOPEN_PASS same diff keeps the decision, a new diff reopens and notifies';
+  -- An UNLINKED course (no club at all) is recorded and notifies the app admins instead of failing.
+  delete from notifications where user_id = app and type = 'course_change';
+  insert into favorite_courses(id,group_id,user_id,name,external_id,data) values
+    ('16700000-0000-0000-0000-000000000023',null,app,'Course Three','rev00003','{"name":"Course Three","tees":[],"holes":[]}');
+  execute 'set local role service_role';
+  perform public.record_course_freshness_system('rev00003', api1, diff1, true);
+  execute 'reset role';
+  if (select status from course_freshness where course_id = '16700000-0000-0000-0000-000000000023') <> 'pending' then raise exception 'unlinked course not recorded'; end if;
+  if (select count(*) from notifications where user_id = app and type = 'course_change') <> 1 then raise exception 'unlinked course did not notify the app admin'; end if;
+  raise notice 'COURSE_REVIEWS_REOPEN_PASS same diff keeps the decision, a new diff reopens and notifies, null group_id works via links';
 end $$;
 
 -- Queue scoping and apply, as each caller.
@@ -71,8 +84,9 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', '16700000-0000-0000-0000-000000000001', true);
 do $$ declare n integer; begin
   select count(*) into n from public.pending_course_reviews();
-  if n <> 2 then raise exception 'app admin sees % pending, expected 2 across both clubs', n; end if;
-  if (select count(distinct club_name) from public.pending_course_reviews()) <> 2 then raise exception 'club names missing from the queue'; end if;
+  if n <> 3 then raise exception 'app admin sees % pending, expected 3 (two clubs + one unlinked)', n; end if;
+  if (select club_name from public.pending_course_reviews() where course_name = 'Course Three') <> 'No club' then raise exception 'unlinked course club label wrong'; end if;
+  if (select club_name from public.pending_course_reviews() where course_name = 'Course One') <> 'Club A' then raise exception 'linked club not resolved through group_courses'; end if;
 end $$;
 select set_config('request.jwt.claim.sub', '16700000-0000-0000-0000-000000000002', true);
 do $$ declare n integer; r record; begin
@@ -85,6 +99,10 @@ select set_config('request.jwt.claim.sub', '16700000-0000-0000-0000-000000000003
 do $$ begin
   if (select count(*) from public.pending_course_reviews()) <> 0 then raise exception 'member can see the queue'; end if;
   begin
+    perform public.set_course_freshness_status('16700000-0000-0000-0000-000000000021', 'dismissed');
+    raise exception 'member dismissed a review';
+  exception when insufficient_privilege then null; end;
+  begin
     perform public.apply_course_freshness('16700000-0000-0000-0000-000000000021');
     raise exception 'member applied a course update';
   exception when insufficient_privilege then null; end;
@@ -92,6 +110,7 @@ end $$;
 -- Club admin applies their club's course (not the app admin): this is the right 0167 widened.
 select set_config('request.jwt.claim.sub', '16700000-0000-0000-0000-000000000002', true);
 select public.apply_course_freshness('16700000-0000-0000-0000-000000000021');
+select public.set_course_freshness_status('16700000-0000-0000-0000-000000000021', 'applied');  -- dismiss/apply status path on a null-group course
 do $$ begin
   begin
     perform public.apply_course_freshness('16700000-0000-0000-0000-000000000022');
@@ -108,8 +127,9 @@ end $$;
 
 -- cleanup
 delete from notifications where user_id in ('16700000-0000-0000-0000-000000000001','16700000-0000-0000-0000-000000000002','16700000-0000-0000-0000-000000000003');
-delete from course_freshness where course_id in ('16700000-0000-0000-0000-000000000021','16700000-0000-0000-0000-000000000022');
-delete from favorite_courses where id in ('16700000-0000-0000-0000-000000000021','16700000-0000-0000-0000-000000000022');
+delete from course_freshness where course_id in ('16700000-0000-0000-0000-000000000021','16700000-0000-0000-0000-000000000022','16700000-0000-0000-0000-000000000023');
+delete from group_courses where course_id in ('16700000-0000-0000-0000-000000000021','16700000-0000-0000-0000-000000000022','16700000-0000-0000-0000-000000000023');
+delete from favorite_courses where id in ('16700000-0000-0000-0000-000000000021','16700000-0000-0000-0000-000000000022','16700000-0000-0000-0000-000000000023');
 delete from group_members where group_id in ('16700000-0000-0000-0000-000000000011','16700000-0000-0000-0000-000000000012');
 delete from groups where id in ('16700000-0000-0000-0000-000000000011','16700000-0000-0000-0000-000000000012');
 delete from profiles where id in ('16700000-0000-0000-0000-000000000001','16700000-0000-0000-0000-000000000002','16700000-0000-0000-0000-000000000003');

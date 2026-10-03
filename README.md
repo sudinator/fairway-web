@@ -1,3 +1,7 @@
+## 197.1.261003 — Course ownership follows the club links, not the legacy group_id
+
+Production, 2026-10-03: the scheduled freshness sync failed on Banks (Forsgate) with "course not found". The row exists; `favorite_courses.group_id` is a legacy column that club delete/merge sets to NULL, while courses are shared records attached to clubs through `group_courses`. Every freshness function since 0124 derived the owning club from that column, so a null-group course could not be recorded, reviewed, dismissed or applied, and the error text was false.
+
 ## 197.0.261002 — Course update queue: every club, reopens on new changes, one server-side apply
 
 On 2026-10-02 the scheduled sync flagged three courses and the Courses "Needs review" section showed one. The section (195.0) queried only the ACTIVE club's courses; the other two were pending in other clubs the same admin runs. Reading the code for the fix exposed two more defects: a review once dismissed or applied never returned to pending when the provider changed the course AGAIN (0124), and "Update stored course" was a client-side table write that RLS allows only to the app admin — it worked for the app admin and failed silently for any other club admin.

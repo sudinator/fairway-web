@@ -1,3 +1,7 @@
+## 197.1 — course owner groups (0168)
+
+New `course_owner_groups(uuid) returns setof uuid` (authenticated): group_courses links ∪ legacy favorite_courses.group_id. record_course_freshness, record_course_freshness_internal, pending_course_reviews, apply_course_freshness and set_course_freshness_status derive club membership/admin rights from it; none fails on a null group_id.
+
 ## 197.0 — course review queue (0167)
 
 `record_course_freshness_internal` reopens on a changed diff. New `pending_course_reviews()` (authenticated; scoped by is_admin / is_group_admin) and `apply_course_freshness(uuid)` (authenticated; app admin or owning-club admin; writes course_freshness.api_data into favorite_courses.data, status applied).

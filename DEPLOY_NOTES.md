@@ -1,3 +1,11 @@
+## 197.1.261003 — Course ownership follows the club links, not the legacy group_id
+
+Production, 2026-10-03: the scheduled freshness sync failed on Banks (Forsgate) with "course not found". The row exists; `favorite_courses.group_id` is a legacy column that club delete/merge sets to NULL, while courses are shared records attached to clubs through `group_courses`. Every freshness function since 0124 derived the owning club from that column, so a null-group course could not be recorded, reviewed, dismissed or applied, and the error text was false.
+
+Migration 0168 adds `course_owner_groups(course)` (the linked clubs, plus the legacy column while set) and rebuilds `record_course_freshness`, `record_course_freshness_internal`, `pending_course_reviews`, `apply_course_freshness` and `set_course_freshness_status` on it: admins of every linked club are notified once each; the app admins are notified for a course linked to no club; the queue shows every linked club ("Club A, Club B") or "No club"; apply and dismiss are allowed to the app admin or an admin of any linked club. `ci/assert-course-reviews.sql` now seeds the production shape (group_id null, linked through group_courses) plus an unlinked course — red on 0167 with the exact production error, green on 0168.
+
+Deploy: 0168 to staging → code → 0168 to production → merge. Banks will be diffed on its next turn in the rotation; the admin notice and queue entry follow automatically. No client changes.
+
 ## 197.0.261002 — Course update queue: every club, reopens on new changes, one server-side apply
 
 On 2026-10-02 the scheduled sync flagged three courses and the Courses "Needs review" section showed one. The section (195.0) queried only the ACTIVE club's courses; the other two were pending in other clubs the same admin runs. Reading the code for the fix exposed two more defects: a review once dismissed or applied never returned to pending when the provider changed the course AGAIN (0124), and "Update stored course" was a client-side table write that RLS allows only to the app admin — it worked for the app admin and failed silently for any other club admin.

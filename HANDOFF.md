@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 197.0.261002
+## Current candidate: 197.1.261003
+
+- 0168: freshness functions key on group_courses links (favorite_courses.group_id is legacy and may be null). Apply 0168 before the code on each environment.
+
+## Previous: 197.0.261002
 
 - 0167: cross-club course review queue; reopen on new diff; apply via RPC (club admins included). Apply 0167 before the code on each environment.
 
