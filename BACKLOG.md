@@ -2,6 +2,7 @@
 
 ## 194.0 — follow-ups
 
+- Course API: a badge on the Courses tab with the pending-review count would make the queue visible without opening Courses.
 - Course API: `course_freshness` (0124, user-triggered diff) and `course_api_checks` (0156/0164, provider ledger) are two systems with two timestamps. Consider having the 0124 check record into the ledger as well, so one table answers "when did the provider last answer".
 - Notifications: the team-format game-final message points at the app for the match result rather than stating it; stating it needs the scoring engines, not SQL.
 - A persistent `error 404` on one library course in the Outcomes table means the provider removed that id; re-link the course in Courses to the right provider course.

@@ -1,3 +1,19 @@
+## 197.0.261002 — Course update queue: every club, reopens on new changes, one server-side apply
+
+On 2026-10-02 the scheduled sync flagged three courses and the Courses "Needs review" section showed one. The section (195.0) queried only the ACTIVE club's courses; the other two were pending in other clubs the same admin runs. Reading the code for the fix exposed two more defects: a review once dismissed or applied never returned to pending when the provider changed the course AGAIN (0124), and "Update stored course" was a client-side table write that RLS allows only to the app admin — it worked for the app admin and failed silently for any other club admin.
+
+Migration 0167: `record_course_freshness_internal` reopens a review when the diff changes (same diff keeps the decision; new diff is pending again and admins are notified again); `pending_course_reviews()` is the queue — app admin sees every pending course in every club, club admin sees their clubs, members nothing, each row carrying the club name; `apply_course_freshness(course)` is the one authorised apply (app admin or admin of the owning club), used by the Courses queue and the New Round sheet alike.
+
+Courses now shows **COURSE UPDATES TO REVIEW (N)** at the top with club names, independent of the selected club. Full chain: `ci/assert-course-reviews.sql` — red on the 0166 functions at the reopen case, green on 0167; scoping asserted as app admin, club admin and member; apply asserted to write the provider data and to refuse a member and a foreign-club admin.
+
+Deploy: 0167 to staging → code → 0167 to production before merging. On production the two courses flagged today will appear in the queue immediately after deploy; nothing needs re-running.
+
+## 196.3.261002 — "Last verified" relative wording counts calendar days
+
+The course view said "Last verified against GolfCourseAPI Oct 1 (today)" on the morning of Oct 2: the date was the local calendar day, the word was a rolling 24-hour window, and a course verified at 22:17 the night before satisfied both. The relative label now counts calendar days from local midnight, the same clock the date uses, so it reads "Oct 1 (yesterday)", then "3 days ago", "2 weeks ago" (from 14 days), and plain days again past 60. Regression test fixes the exact case and runs in New York, UTC, Tokyo and Honolulu; the old implementation fails it.
+
+Client-only; no migration.
+
 ## 196.2.261002 — Freshness sync runs from any working directory (fresh-database CI fix)
 
 196.1's fresh-database rebuild failed in GitHub inside the harness's `freshness` mode: `ci/test_fresh_db_rebuild.sh` works from a scratch directory (`cd "$TMP"` for the Supabase CLI), and `course-freshness-sync.mjs` resolved `lib/course-diff.ts` and `npx tsc` against the current directory. From `/tmp`, `npx tsc` fetched an unrelated registry package named "tsc". The local replay had never changed directory, so it could not reproduce this.

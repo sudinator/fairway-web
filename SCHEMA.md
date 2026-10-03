@@ -1,3 +1,7 @@
+## 197.0 — course review queue (0167)
+
+`record_course_freshness_internal` reopens on a changed diff. New `pending_course_reviews()` (authenticated; scoped by is_admin / is_group_admin) and `apply_course_freshness(uuid)` (authenticated; app admin or owning-club admin; writes course_freshness.api_data into favorite_courses.data, status applied).
+
 ## 196.0 — heartbeat and scheduled freshness (0166)
 
 `scoring_devices.last_seen_at timestamptz not null default now()`. `claim_scoring_device` refreshes it on the holder's check-in and supersedes a holder silent for 6 hours (result adds `superseded: true`). `record_course_freshness_internal(uuid,jsonb,jsonb,boolean)` (no grants) is the single body; `record_course_freshness` delegates after its member gate; new `record_course_freshness_system(text,jsonb,jsonb,boolean) returns integer` is service_role only.

@@ -15,6 +15,7 @@ import { btn, inputStyle, Eyebrow, StatCard, NumPicker, ScoreEntryCard, ScoreVie
 import { buildCourseChangeSummary, hasMaterialCourseChanges, applyFreshness } from "@/lib/course-diff";
 import { checkCourseFreshness, type FreshnessResult } from "@/lib/course-freshness";
 import { FreshnessDiffList } from "@/components/course-freshness-diff";
+import { notifyError } from "@/components/toast";
 import { loadEditorDraft, saveEditorDraft, clearEditorDraft } from "@/lib/draft";
 
 const supabase = createClient();
@@ -334,8 +335,12 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   }, [freshness, isGroupAdmin]);
   const applyFreshToLibrary = async () => {
     if (!freshness?.apiCourse || !loadedFavId) return;
-    await supabase.from("favorite_courses").update({ data: freshness.apiCourse }).eq("id", loadedFavId);
-    await supabase.rpc("set_course_freshness_status", { p_course_id: loadedFavId, p_status: "applied" }).then(() => {}, () => {});
+    // One implementation of "update the stored course from the provider": apply_course_freshness
+    // (0167) authorises (app admin or admin of the owning club) and writes the recorded provider
+    // data. The former client-side table UPDATE was allowed by RLS only to the app admin and
+    // failed silently for every other club admin.
+    const { error } = await supabase.rpc("apply_course_freshness", { p_course_id: loadedFavId });
+    if (error) { notifyError(`Couldn't update the stored course: ${error.message}`); return; }
     playWithFresh(freshness.apiCourse, true);
     setFreshness(null);
   };

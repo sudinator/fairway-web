@@ -29,10 +29,16 @@ function fmtDate(iso: string, now: Date): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", ...(sameYear ? {} : { year: "numeric" }) });
 }
 
+// Calendar days in the viewer's local time zone, the same clock fmtDate uses. A rolling 24-hour
+// window produced "Oct 1 (today)" on the morning of Oct 2 for a course verified at 22:17 the
+// night before: the date and the word disagreed. Counting from local midnight keeps them aligned.
 function ago(iso: string, now: Date): string {
-  const days = Math.floor((now.getTime() - new Date(iso).getTime()) / 86_400_000);
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((startOfDay(now) - startOfDay(new Date(iso))) / 86_400_000);
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";
+  if (days < 14) return `${days} days ago`;
+  if (days < 60) return `${Math.floor(days / 7)} weeks ago`;
   return `${days} days ago`;
 }
 
