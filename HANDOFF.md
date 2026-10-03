@@ -6,7 +6,15 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 196.2.261002
+## Current candidate: 197.0.261002
+
+- 0167: cross-club course review queue; reopen on new diff; apply via RPC (club admins included). Apply 0167 before the code on each environment.
+
+## Previous: 196.3.261002
+
+- Course view relative date counts local calendar days (was a 24h window). Client only.
+
+## Previous: 196.2.261002
 
 - RULE (second CI failure of this stretch, 196.1): the local full-chain replay must mirror CI's ENVIRONMENT as well as its database — it now runs from a scratch working directory like `test_fresh_db_rebuild.sh`. When a script is added to a CI job, run it the way that job runs it: same cwd, same installed state. "It passed locally" with a different cwd is not evidence.
 

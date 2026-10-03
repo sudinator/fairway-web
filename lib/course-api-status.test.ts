@@ -22,12 +22,12 @@ assert(!r.text.includes("Sep 30"), "a claim time leaked into the display");
 // A failed attempt with no prior success says so, with the provider's status.
 r = describeCourseApiFreshness(row({ last_status: "error", last_checked_at: "2026-09-28T18:00:00Z", last_http_status: 429 }), now);
 assert(r.text.startsWith("Not yet verified"), r.text);
-assert(r.text.includes("2 days ago") && r.text.includes("HTTP 429"), r.text);
+assert(r.text.includes("3 days ago") && r.text.includes("HTTP 429"), r.text);
 assertEqual(r.attention, true);
 
 // Success is dated from last_success_at, never last_checked_at.
 r = describeCourseApiFreshness(row({ last_status: "ok", last_success_at: "2026-09-09T12:00:00Z", last_checked_at: "2026-09-09T12:00:00Z", last_http_status: 200 }), now);
-assert(r.text.includes("Sep 9") && r.text.includes("22 days ago"), r.text);
+assert(r.text.includes("Sep 9") && r.text.includes("3 weeks ago"), r.text);
 assertEqual(r.attention, false);
 assertEqual(r.verifiedAt, "2026-09-09T12:00:00Z");
 
@@ -38,9 +38,26 @@ assert(!r.text.includes("Oct 1"), "a failed attempt was shown as the verificatio
 assertEqual(r.attention, true);
 
 // Drift is a successful fetch with changed content.
+// 13:00Z on the 1st viewed at 15:00Z the same day: "today" wherever both fall on one local date
+// (New York, UTC), "yesterday" where midnight sits between them (Tokyo). The test is zone-aware
+// because the function is; the fixed assumption was itself a zone bug.
 r = describeCourseApiFreshness(row({ last_status: "drift", last_success_at: "2026-10-01T13:00:00Z", last_checked_at: "2026-10-01T13:00:00Z", last_http_status: 200 }), now);
-assert(r.text.includes("today") && r.text.includes("listing has changed"), r.text);
+assert(r.text.includes(new Date("2026-10-01T13:00:00Z").toDateString() === now.toDateString() ? "(today)" : "(yesterday)") && r.text.includes("listing has changed"), r.text);
 assertEqual(r.attention, true);
+
+// THE BUG AMIT SAW: verified 2026-10-01 22:17 ET (02:17Z on the 2nd), viewed the next morning.
+// Whatever the viewer's zone, the relative word must agree with the calendar date shown.
+{
+  const verified = "2026-10-02T02:17:53Z";
+  const morning = new Date("2026-10-02T14:00:00Z"); // 10:00 ET, 14:00 UTC
+  const out = describeCourseApiFreshness(row({ last_status: "ok", last_success_at: verified, last_checked_at: verified, last_http_status: 200 }), morning);
+  const sameLocalDay = new Date(verified).toDateString() === morning.toDateString();
+  if (sameLocalDay) assert(out.text.includes("(today)"), out.text);           // UTC viewer: Oct 2, today
+  else assert(out.text.includes("(yesterday)") && !out.text.includes("today"), out.text); // ET viewer: Oct 1, yesterday
+}
+// Week wording once the count stops being useful as days.
+r = describeCourseApiFreshness(row({ last_status: "ok", last_success_at: "2026-09-10T12:00:00Z", last_checked_at: "2026-09-10T12:00:00Z", last_http_status: 200 }), now);
+assert(r.text.includes("3 weeks ago"), r.text);
 
 // Loader: dedupes, drops blanks, never throws.
 (async () => {

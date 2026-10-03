@@ -137,51 +137,41 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   const [busyId, setBusyId] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
-  // ── Courses whose GolfCourseAPI listing has changed, awaiting a club admin's decision (0165) ──
-  // Before this section the only place an admin could see or act on a pending change was the New
-  // Round sheet, so a course nobody happened to play stayed pending for weeks (Pinch Brook: Aug 29
-  // to Oct 1). This lists every course_freshness row with status 'pending' among this club's
-  // courses and offers the same two decisions the sheet offers, through the same RPC.
-  type PendingReview = { course_id: string; checked_at: string; diff: FreshnessDiff; api_data: Course | null };
-  const [isGroupAdmin, setIsGroupAdmin] = useState(false);
-  const [pendingReviews, setPendingReviews] = useState<PendingReview[]>([]);
-  const loadPendingReviews = useCallback(async (ids: string[]) => {
-    if (!ids.length) { setPendingReviews([]); return; }
+  // ── Course review queue (0167) ───────────────────────────────────────────────────────────────
+  // Every course whose GolfCourseAPI listing has changed and awaits a decision, across EVERY club
+  // this person administers (the app admin sees all clubs). Server-side RPC does the scoping and
+  // carries the club name; apply goes through the one server function the New Round sheet also
+  // uses. The 195.0 version listed only the active club's courses, so two of three flagged courses
+  // were invisible on 2026-10-02.
+  type PendingReview = { course_id: string; course_name: string; club_name: string; group_id: string; provider_id: string | null; checked_at: string; diff: FreshnessDiff; api_data: Course | null; corrected: boolean };
+  const [pendingReviews, setPendingReviews] = useState<PendingReview[] | null>(null);
+  const loadPendingReviews = useCallback(async () => {
     try {
-      const { data } = await supabase.from("course_freshness")
-        .select("course_id, checked_at, diff, api_data, status, has_changes")
-        .in("course_id", ids).eq("status", "pending").eq("has_changes", true);
-      setPendingReviews(((data || []) as any[]).filter((r) => r.diff?.tees?.length).map((r) => ({ course_id: r.course_id, checked_at: r.checked_at, diff: r.diff as FreshnessDiff, api_data: (r.api_data as Course) || null })));
+      const { data, error } = await supabase.rpc("pending_course_reviews");
+      if (error) { setPendingReviews([]); return; }
+      setPendingReviews(((data || []) as any[]).filter((r) => r.diff?.tees?.length).map((r) => ({ ...r, diff: r.diff as FreshnessDiff, api_data: (r.api_data as Course) || null })));
     } catch { setPendingReviews([]); }
   }, []);
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase.from("group_members").select("role").eq("group_id", activeGroupId).eq("user_id", user.id).eq("status", "active").maybeSingle();
-      if (!cancelled) setIsGroupAdmin(data?.role === "admin");
-    })();
-    return () => { cancelled = true; };
-  }, [activeGroupId, user.id]);
-  useEffect(() => { void loadPendingReviews((groupCourses || []).map((c) => c.id)); }, [groupCourses, loadPendingReviews]);
+  useEffect(() => { void loadPendingReviews(); }, [loadPendingReviews, groupCourses]);
 
-  const applyPendingReview = async (r: PendingReview, c: LibCourse) => {
-    if (!r.api_data) return;
-    const corrected = !!c.data?.corrected;
-    if (!confirm(`Update "${courseCardTitle(c)}" with the GolfCourseAPI data for everyone?${corrected ? "\n\nThis course carries hand corrections (par, stroke index or tee edits). Updating replaces the whole stored record with the provider's version; those corrections will be lost." : ""}`)) return;
-    setBusyId(c.id); setMsg(null);
-    if (!(await write(supabase.from("favorite_courses").update({ data: r.api_data }).eq("id", c.id), "Couldn't update the stored course"))) { setBusyId(null); return; }
-    await supabase.rpc("set_course_freshness_status", { p_course_id: c.id, p_status: "applied" }).then(() => {}, () => {});
-    await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_api_update_applied", group_id: activeGroupId, summary: `Applied GolfCourseAPI changes to "${courseCardTitle(c)}"` });
+  const applyPendingReview = async (r: PendingReview) => {
+    if (!confirm(`Update "${r.course_name}" (${r.club_name}) with the GolfCourseAPI data for everyone?${r.corrected ? "\n\nThis course carries hand corrections (par, stroke index or tee edits). Updating replaces the whole stored record with the provider's version; those corrections will be lost." : ""}`)) return;
+    setBusyId(r.course_id); setMsg(null);
+    const { error } = await supabase.rpc("apply_course_freshness", { p_course_id: r.course_id });
+    if (error) { setBusyId(null); setMsg(`Couldn't update "${r.course_name}": ${error.message}`); return; }
+    await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_api_update_applied", group_id: r.group_id, summary: `Applied GolfCourseAPI changes to "${r.course_name}"` });
     setBusyId(null);
-    setMsg(`"${courseCardTitle(c)}" now matches GolfCourseAPI.`);
+    setMsg(`"${r.course_name}" now matches GolfCourseAPI.`);
+    await loadPendingReviews();
     await load();
   };
-  const dismissPendingReview = async (r: PendingReview, c: LibCourse) => {
-    setBusyId(c.id); setMsg(null);
-    await supabase.rpc("set_course_freshness_status", { p_course_id: c.id, p_status: "dismissed" }).then(() => {}, () => {});
-    await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_api_update_dismissed", group_id: activeGroupId, summary: `Kept stored data for "${courseCardTitle(c)}" despite GolfCourseAPI changes` });
+  const dismissPendingReview = async (r: PendingReview) => {
+    setBusyId(r.course_id); setMsg(null);
+    const { error } = await supabase.rpc("set_course_freshness_status", { p_course_id: r.course_id, p_status: "dismissed" });
+    if (error) { setBusyId(null); setMsg(`Couldn't dismiss "${r.course_name}": ${error.message}`); return; }
+    await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_api_update_dismissed", group_id: r.group_id, summary: `Kept stored data for "${r.course_name}" despite GolfCourseAPI changes` });
     setBusyId(null);
-    setPendingReviews((xs) => xs.filter((x) => x.course_id !== r.course_id));
+    setPendingReviews((xs) => (xs || []).filter((x) => x.course_id !== r.course_id));
   };
   const [pendingEdits, setPendingEdits] = useState<CourseEditRequest[]>([]);
   const [myName, setMyName] = useState<string>("Someone");
@@ -493,29 +483,25 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
 
       {msg && <div style={{ color: C.gold, fontSize: 12, marginTop: 10 }}>{msg}</div>}
 
-      {isGroupAdmin && pendingReviews.length > 0 && (
+      {pendingReviews && pendingReviews.length > 0 && (
         <div data-course-review-section style={{ background: C.greenMid, border: `1px solid ${C.gold}`, borderRadius: 14, padding: 14, marginTop: 14 }}>
-          <Eyebrow>NEEDS REVIEW · COURSE DATA CHANGED AT THE SOURCE ({pendingReviews.length})</Eyebrow>
+          <Eyebrow>COURSE UPDATES TO REVIEW ({pendingReviews.length})</Eyebrow>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
-            GolfCourseAPI now lists different ratings, slopes or yardages for these courses. Nothing changes until you decide. Updating applies for everyone in the app; keeping current hides this until the data changes again.
+            GolfCourseAPI now lists different ratings, slopes or yardages for these courses, across every club you administer. Nothing changes until you decide. Updating applies for everyone in the app; keeping current hides this until the data changes again.
           </div>
-          {pendingReviews.map((r) => {
-            const c = (groupCourses || []).find((x) => x.id === r.course_id);
-            if (!c) return null;
-            return (
-              <div key={r.course_id} style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 10 }}>
-                <div style={{ color: C.cream, fontWeight: 800 }}>{courseCardTitle(c)}</div>
-                <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>
-                  Checked {formatDateTime(r.checked_at)}{c.data?.corrected ? " · this course carries hand corrections" : ""}
-                </div>
-                <div style={{ marginTop: 10 }}><FreshnessDiffList diff={r.diff} maxHeight={220} /></div>
-                <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                  <button style={{ ...btn(true), fontSize: 12, opacity: busyId === c.id ? 0.5 : 1 }} disabled={busyId === c.id || !r.api_data} onClick={() => applyPendingReview(r, c)}>Update stored course (applies for everyone)</button>
-                  <button style={{ ...btn(false), fontSize: 12, opacity: busyId === c.id ? 0.5 : 1 }} disabled={busyId === c.id} onClick={() => dismissPendingReview(r, c)}>Keep current — ignore for now</button>
-                </div>
+          {pendingReviews.map((r) => (
+            <div key={r.course_id} style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 10 }}>
+              <div style={{ color: C.cream, fontWeight: 800 }}>{r.course_name}</div>
+              <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>
+                {r.club_name} · checked {formatDateTime(r.checked_at)}{r.corrected ? " · this course carries hand corrections" : ""}
               </div>
-            );
-          })}
+              <div style={{ marginTop: 10 }}><FreshnessDiffList diff={r.diff} maxHeight={220} /></div>
+              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                <button style={{ ...btn(true), fontSize: 12, opacity: busyId === r.course_id ? 0.5 : 1 }} disabled={busyId === r.course_id || !r.api_data} onClick={() => applyPendingReview(r)}>Update stored course (applies for everyone)</button>
+                <button style={{ ...btn(false), fontSize: 12, opacity: busyId === r.course_id ? 0.5 : 1 }} disabled={busyId === r.course_id} onClick={() => dismissPendingReview(r)}>Keep current — ignore for now</button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
