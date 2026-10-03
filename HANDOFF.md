@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 197.1.261003
+## Current candidate: 197.2.261003
+
+- RULE: CI helper processes never choose fixed ports; bind 0 and pass the assigned port on. The runner shares the network namespace with the Supabase CLI stack, whose ports change with the CLI version — a collision the local replay cannot reproduce.
+
+## Previous: 197.1.261003
 
 - 0168: freshness functions key on group_courses links (favorite_courses.group_id is legacy and may be null). Apply 0168 before the code on each environment.
 

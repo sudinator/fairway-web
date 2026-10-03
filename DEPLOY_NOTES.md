@@ -1,3 +1,9 @@
+## 197.2.261003 — Harness binds OS-assigned ports (fresh-database CI fix)
+
+197.1's fresh-database rebuild failed in GitHub with `listen EADDRINUSE :::54612`: the harness's stub provider port was already taken on the runner, where the Supabase CLI's Docker stack also listens and whose port set moved between CLI versions. The local replay runs on plain PostgreSQL and cannot see that stack, so this class of failure is invisible to it; fixed port numbers had already collided once before (54321/54322). The harness now binds both stubs to port 0 and passes the OS-assigned ports to the monitor and the sync. Reproduced locally by occupying both former ports and running the harness: exit 0.
+
+No application or migration changes from 197.1.
+
 ## 197.1.261003 — Course ownership follows the club links, not the legacy group_id
 
 Production, 2026-10-03: the scheduled freshness sync failed on Banks (Forsgate) with "course not found". The row exists; `favorite_courses.group_id` is a legacy column that club delete/merge sets to NULL, while courses are shared records attached to clubs through `group_courses`. Every freshness function since 0124 derived the owning club from that column, so a null-group course could not be recorded, reviewed, dismissed or applied, and the error text was false.

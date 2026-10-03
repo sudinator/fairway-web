@@ -160,23 +160,28 @@ function dropLibrary() {
        delete from public.profiles where id = '${HU}'; delete from auth.users where id = '${HU}';`);
 }
 
-await new Promise((r) => ledger.listen(54611, r));
-await new Promise((r) => provider.listen(54612, r));
+// Never choose a port. The CI runner also hosts the Supabase CLI's Docker stack, whose port set
+// changes between CLI versions; two fixed choices have already collided with it (54321/54322, then
+// 54612: "listen EADDRINUSE"). Bind to 0, take whatever the OS hands out, and tell the child.
+await new Promise((r) => ledger.listen(0, "127.0.0.1", r));
+await new Promise((r) => provider.listen(0, "127.0.0.1", r));
+const LEDGER_PORT = ledger.address().port;
+const PROVIDER_PORT = provider.address().port;
 
 // Deliberately give the ledger URL a TRAILING SLASH — the shape that produced PGRST125 in
 // production. If normalisation regresses, this harness fails the same way.
 const env = {
   ...process.env,
   GOLF_API_KEY: "harness",
-  GOLF_API_BASE: "http://127.0.0.1:54612",
-  BNN_SUPABASE_URL: "http://127.0.0.1:54611/",
+  GOLF_API_BASE: `http://127.0.0.1:${PROVIDER_PORT}`,
+  BNN_SUPABASE_URL: `http://127.0.0.1:${LEDGER_PORT}/`,
   BNN_SUPABASE_SERVICE_KEY: "harness",
   COURSE_CHECK_BUDGET: process.env.COURSE_CHECK_BUDGET ?? "10",
   COURSE_PAYLOAD_DIR: `/tmp/bnn-course-detail-${process.pid}`,
 };
 
 if (process.env.HARNESS_SERVE_ONLY === "1") {
-  console.log("stubs listening: ledger :54611, provider :54612");
+  console.log(`stubs listening: ledger :${LEDGER_PORT}, provider :${PROVIDER_PORT}`);
   console.log(`GOLF_API_BASE=${env.GOLF_API_BASE} BNN_SUPABASE_URL=${env.BNN_SUPABASE_URL}`);
   setInterval(() => {}, 1 << 30);
 } else {
