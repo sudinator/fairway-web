@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 199.2.261005
+## Current candidate: 199.3.261005 (HOTFIX)
+
+- Bottom nav hidden in portrait: the keyboard heuristic fired without a keyboard. Gate is now focused-editable AND viewport shrunk. Any future viewport heuristic must be gated on a signal iOS cannot move.
+
+## Previous: 199.2.261005
 
 - Server-side code never formats a wall-clock time for display: Vercel runs in UTC. Format on the device, or in SQL with `at time zone 'America/New_York'`.
 

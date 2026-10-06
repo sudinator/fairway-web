@@ -1,3 +1,7 @@
+## 199.3.261005 — Bottom nav no longer hidden by a false keyboard detection (portrait, iOS)
+
+The bottom nav disappeared in portrait (fine in landscape) on both staging and production, with no layout file changed since July. Cause: `ViewportSync` inferred "keyboard open" from `100lvh − visualViewport.height > 180px`, and the stylesheet hides the nav and grows the shell to full height while that attribute is set. In portrait the phone now reports a gap above 180 with no keyboard — iOS's viewport reporting moved under a fixed pixel threshold. The attribute is now set only while an editable element (text-like input, textarea, contenteditable) has focus AND the viewport has shrunk; without focus the gap is ignored. Focus changes re-evaluate the attribute. `lib/viewport-editable.ts` is the one definition of "summons the keyboard", unit-tested (the dashboard-with-nothing-focused case is the regression). `ci/check_shell_geometry.py` passes on all six device profiles. Client-only; no migration. Hotfix — ship ahead of everything else.
+
 ## 199.2.261005 — Test push body no longer carries a server-zone clock
 
 The test push said "sent 2:38am" at 10:38pm ET: the body was formatted on the server, which runs in UTC. The body now carries no time (the device stamps the notification itself). Audited the other server-side writers: SQL notifications format with `at time zone 'America/New_York'`; the delivery/attempt logs and admin lists are formatted on the device. Client-only change; no migration.
