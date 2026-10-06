@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 199.1.261005
+## Current candidate: 199.2.261005
+
+- Server-side code never formats a wall-clock time for display: Vercel runs in UTC. Format on the device, or in SQL with `at time zone 'America/New_York'`.
+
+## Previous: 199.1.261005
 
 - 0172 push delivery log; `/api/push/test`; shared sender `lib/push-send.ts`. Apply 0172 before the code.
 

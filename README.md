@@ -1,3 +1,7 @@
+## 199.2.261005 — Test push body no longer carries a server-zone clock
+
+The test push said "sent 2:38am" at 10:38pm ET: the body was formatted on the server, which runs in UTC. The body now carries no time (the device stamps the notification itself). Audited the other server-side writers: SQL notifications format with `at time zone 'America/New_York'`; the delivery/attempt logs and admin lists are formatted on the device. Client-only change; no migration.
+
 ## 199.1.261005 — Push delivery log and a test-push button
 
 "Have I ever been sent a push?" had no answer in the app: the webhook decided and sent, and kept nothing. Migration 0172 adds `push_delivery_log`, written on every webhook call — the notification, recipient, type, what the preference decided (push / in-app / off), endpoints tried, delivered and failed, and a result note ("1 delivered to the push service, 0 failed"; "not pushed: this type is set to inapp"; "endpoint gone (410), removed"). The sender is now one shared module (`lib/push-send.ts`) used by the webhook route and by the new `/api/push/test`, which sends a test push to the caller's own enrolled devices (one a minute).

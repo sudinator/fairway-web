@@ -29,7 +29,9 @@ export async function POST() {
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
   const out = await sendPushToUser(admin, {
     userId: user.id,
-    payload: { title: "Birdie Num Num test", body: `Test push sent ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}. If you can read this, push works on this device.`, link: "/?tab=notifications", tag: "test" },
+    // No clock in the body: this runs on the server (UTC on Vercel) and a formatted time read
+    // "2:38am" to a person for whom it was 10:38pm. The device stamps the notification itself.
+    payload: { title: "Birdie Num Num test", body: "Test push from Birdie Num Num. If you can read this, push works on this device.", link: "/?tab=notifications", tag: "test" },
     vapidPub, vapidPriv,
     log: { type: "test", delivery: "test" },
   });
