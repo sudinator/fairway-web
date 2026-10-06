@@ -19,9 +19,10 @@ const FAILED: FreshnessResult = { hasChanges: false, diff: null, apiCourse: null
 // this never blocks starting a round.
 export async function checkCourseFreshness(
   supabase: any,
-  opts: { courseId: string; externalId: string; stored: Course },
+  opts: { courseId: string; externalId: string; stored: Course; force?: boolean },
 ): Promise<FreshnessResult> {
-  const { courseId, externalId, stored } = opts;
+  // force: skip the 24-hour cache (an admin pressing "Refresh from API now"; one provider request).
+  const { courseId, externalId, stored, force = false } = opts;
   try {
     const { data: row } = await supabase
       .from("course_freshness")
@@ -29,7 +30,7 @@ export async function checkCourseFreshness(
       .eq("course_id", courseId)
       .maybeSingle();
 
-    const cached = row?.checked_at && Date.now() - new Date(row.checked_at).getTime() < DAY_MS;
+    const cached = !force && row?.checked_at && Date.now() - new Date(row.checked_at).getTime() < DAY_MS;
     if (cached) {
       return { hasChanges: !!row.has_changes, diff: row.diff || null, apiCourse: row.api_data || null, status: row.status || "none", checkState: "ok" };
     }

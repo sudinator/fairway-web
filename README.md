@@ -1,3 +1,15 @@
+## 199.1.261005 — Push delivery log and a test-push button
+
+"Have I ever been sent a push?" had no answer in the app: the webhook decided and sent, and kept nothing. Migration 0172 adds `push_delivery_log`, written on every webhook call — the notification, recipient, type, what the preference decided (push / in-app / off), endpoints tried, delivered and failed, and a result note ("1 delivered to the push service, 0 failed"; "not pushed: this type is set to inapp"; "endpoint gone (410), removed"). The sender is now one shared module (`lib/push-send.ts`) used by the webhook route and by the new `/api/push/test`, which sends a test push to the caller's own enrolled devices (one a minute).
+
+## 199.0.261005 — Course data: act on each course; API attempt log; course-change notices can be pushed
+
+**Course data actions (Admin).** Each row now has: *Refresh from API now* (one provider request; records the attempt, diffs against the stored data and records the review exactly as New Round and the nightly sync do — the shared checker gained a `force` option to skip its 24-hour cache); *Update stored course* and *Keep current* when provider changes are pending (same server functions as the Courses queue); *Approve corrections in Courses* when member edits await global approval; and *Changes & attempt log*, which shows the pending per-tee diff and the last 20 provider attempts.
+
+## 198.1.261005 — Push device health: failing vs dormant, devices named, dead endpoints pruned
+
+Admin → Analytics → Notifications showed "1 failing / stale device — Amit Sud, fails 0, last seen Aug 22". The row was a dead iPhone endpoint: iOS dropped the phone's web-push subscription some time after Aug 22 and re-enrolled it under a new endpoint on Oct 1; the old row lingers until a push to it returns 410, and none had been attempted. The tile counted it as a problem device and the drill-down could not say what it was.
+
 ## 198.0.261005 — Admin · Course data: every course, its verification, pending updates and pending corrections, on one screen
 
 Until now the state of a course was spread across three places: the course editor (last API verification, one course at a time), the queue at the top of Courses (pending provider updates, shown only when non-empty) and Pending edits (member corrections awaiting global approval). Admin now has a **Course data** card. One row per library course: linked clubs ("No club" flagged), hand-corrected marker, when GolfCourseAPI last answered and the last attempt's outcome, when the stored data was last compared with the provider and whether that review is pending/dismissed/applied with the change count, and member corrections awaiting global approval with the age of the oldest. A summary line gives the totals and a button opens Courses to act. Default filter "Needs attention": pending updates, pending corrections, failed/drifted last attempt, never verified, or no club.

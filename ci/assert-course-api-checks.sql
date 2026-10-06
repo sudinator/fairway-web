@@ -192,3 +192,40 @@ begin
   end if;
   raise notice 'COURSE_API_CHECKS_PERMS_PASS claim/release are service-role only, record and status are authenticated, table is denied';
 end $$;
+
+-- 0171: every recorded outcome and every released claim lands in the attempt log; the admin reader
+-- is gated; retention is per provider.
+do $$
+declare adm uuid := '17100000-0000-0000-0000-000000000001'; n integer;
+begin
+  delete from public.course_api_check_log where provider_id like 'ci_log%';
+  delete from public.course_api_checks where provider_id like 'ci_log%';
+  delete from profiles where id = adm; delete from auth.users where id = adm;
+  insert into auth.users(id,email) values (adm,'log-admin@x.com'); insert into profiles(id,display_name,is_admin) values (adm,'Log Admin',true);
+  execute 'set local role service_role';
+  perform public.record_course_api_check('ci_log1','error',null,null,null,'HTTP 429 daily quota',429);
+  perform public.record_course_api_check('ci_log1','ok','Club','Course','Town',null,200);
+  perform public.claim_course_api_checks(array['ci_log2'], 1);
+  perform public.release_course_api_claims(array['ci_log2'], 'HTTP 401 key rejected');
+  execute 'reset role';
+  select count(*) into n from public.course_api_check_log where provider_id = 'ci_log1';
+  if n <> 2 then raise exception 'log rows for ci_log1: %, expected 2', n; end if;
+  if (select note from public.course_api_check_log where provider_id = 'ci_log2') <> 'not checked: HTTP 401 key rejected' then raise exception 'release not logged'; end if;
+  if (select source from public.course_api_check_log where provider_id = 'ci_log1' limit 1) <> 'monitor' then raise exception 'source not monitor for service_role'; end if;
+  update public.course_api_check_log set at = now() - interval '91 days' where provider_id = 'ci_log1' and status = 'error';
+  execute 'set local role service_role';
+  perform public.record_course_api_check('ci_log1','ok','Club','Course','Town',null,200);
+  execute 'reset role';
+  if exists (select 1 from public.course_api_check_log where provider_id = 'ci_log1' and status = 'error') then raise exception '91-day row not pruned'; end if;
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.sub', adm::text, true);
+  select count(*) into n from public.admin_course_check_log('ci_log1');
+  if n <> 2 then raise exception 'admin reader returned %', n; end if;
+  perform set_config('request.jwt.claim.sub', '', true);
+  if (select count(*) from public.admin_course_check_log('ci_log1')) <> 0 then raise exception 'unauthenticated read of the log'; end if;
+  execute 'reset role';
+  if has_table_privilege('authenticated', 'public.course_api_check_log', 'select') then raise exception 'authenticated can read the log table'; end if;
+  delete from public.course_api_check_log where provider_id like 'ci_log%'; delete from public.course_api_checks where provider_id like 'ci_log%';
+  delete from profiles where id = adm; delete from auth.users where id = adm;
+  raise notice 'COURSE_API_CHECK_LOG_PASS outcomes and releases logged, 90-day retention, admin-only reader';
+end $$;

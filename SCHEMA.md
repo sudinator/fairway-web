@@ -1,3 +1,15 @@
+## 199.1 — push delivery log (0172)
+
+New table `push_delivery_log` (RLS, service_role only); readers `my_push_delivery_log(integer)` (own rows) and `admin_push_delivery_log(uuid, integer)` (is_admin); `prune_push_subscriptions()` also trims the log to 90 days.
+
+## 199.0 — course API attempt log (0171)
+
+New table `course_api_check_log` (RLS, service_role only), appended by `record_course_api_check` (gains `source`) and `release_course_api_claims`; 90-day retention per provider. New `admin_course_check_log(text, integer)` (is_admin).
+
+## 198.1 — push device health (0170)
+
+New `admin_push_device_stats()` and `admin_push_devices(text)` (is_admin), `prune_push_subscriptions()` (no app grants; pg_cron job `push-subscription-prune` daily 08:41 UTC, deletes push_subscriptions with last_seen older than 60 days).
+
 ## 198.0 — admin course status (0169)
 
 New `admin_course_status()` (is_admin only): one row per non-deleted favorite_courses row joining course_owner_groups, course_api_checks, course_freshness and pending course_change_requests.

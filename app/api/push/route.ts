@@ -4,7 +4,7 @@
 // simply don't push (the row already exists for the in-app bell). Protected by a shared
 // secret header so only the webhook can call it.
 import { NextRequest, NextResponse } from "next/server";
-import webpush from "web-push";
+import { sendPushToUser, logPushDecision } from "@/lib/push-send";
 import { createClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";        // web-push needs Node crypto, not the edge runtime
@@ -21,11 +21,13 @@ const DEFAULT_DELIVERY: Record<string, "push" | "inapp" | "off"> = {
   bet_posted: "inapp",
   game_finished: "inapp",
   group_member: "inapp",
+  course_change: "inapp", // club admins only; they can raise it to push in Notification settings (198.2)
   friction: "push",   // admin-only integrity alert; always push
 };
 
 function titleFor(type: string | null): string {
   switch (type) {
+    case "course_change": return "Course data changed";
     case "money_owed": return "You owe money";
     case "money_paid": return "You got paid";
     case "game_added": return "New game";
@@ -70,52 +72,17 @@ export async function POST(req: NextRequest) {
   const prefs = (prof?.push_prefs as Record<string, string>) || {};
   const delivery = prefs[type ?? ""] ?? (type ? DEFAULT_DELIVERY[type] : undefined) ?? "inapp";
   if (delivery !== "push") {
-    return NextResponse.json({ ok: true, delivery }, { status: 200 });   // in-app only / off
+    // In-app only / off: no send, but the decision is logged so the recipient can see why.
+    await logPushDecision(admin, { notificationId: rec.id ?? null, userId: rec.user_id, type, delivery, result: `not pushed: this type is set to ${delivery}` });
+    return NextResponse.json({ ok: true, delivery }, { status: 200 });
   }
 
-  // 4) Fetch the recipient's active subscriptions.
-  const { data: subs } = await admin
-    .from("push_subscriptions")
-    .select("id, endpoint, p256dh, auth, fail_count")
-    .eq("user_id", rec.user_id)
-    .eq("disabled", false);
-  if (!subs || subs.length === 0) return NextResponse.json({ ok: true, sent: 0 }, { status: 200 });
-
-  webpush.setVapidDetails("mailto:support@birdienumnum.app", vapidPub, vapidPriv);
-  const payload = JSON.stringify({
-    title: titleFor(type),
-    body: rec.message || "",
-    link: rec.link || "/",
-    tag: type || undefined,
+  // 4) Send to every enrolled device through the shared sender, which also logs the attempt.
+  const out = await sendPushToUser(admin, {
+    userId: rec.user_id,
+    payload: { title: titleFor(type), body: rec.message || "", link: rec.link || "/", tag: type || undefined },
+    vapidPub, vapidPriv,
+    log: { notificationId: rec.id ?? null, type, delivery: "push" },
   });
-
-  let sent = 0;
-  await Promise.all(subs.map(async (s: any) => {
-    try {
-      await webpush.sendNotification(
-        { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-        payload,
-      );
-      sent++;
-      // A success proves the subscription is healthy — clear accumulated transient failures so
-      // occasional network blips can never add up to a permanent disable.
-      if (typeof s.fail_count === "number" && s.fail_count > 0) {
-        await admin.from("push_subscriptions").update({ fail_count: 0 }).eq("id", s.id);
-      }
-    } catch (err: any) {
-      const code = err?.statusCode;
-      if (code === 404 || code === 410) {
-        // Subscription is dead — remove it.
-        await admin.from("push_subscriptions").delete().eq("id", s.id);
-      } else {
-        // Transient/other — count the failure and disable after repeated trouble.
-        const next = (typeof s.fail_count === "number" ? s.fail_count : 0) + 1;
-        await admin.from("push_subscriptions")
-          .update({ fail_count: next, disabled: next >= 8 })
-          .eq("id", s.id);
-      }
-    }
-  }));
-
-  return NextResponse.json({ ok: true, sent }, { status: 200 });
+  return NextResponse.json({ ok: true, sent: out.sent, failed: out.failed }, { status: 200 });
 }

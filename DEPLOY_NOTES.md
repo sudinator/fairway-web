@@ -1,3 +1,29 @@
+## 199.1.261005 — Push delivery log and a test-push button
+
+"Have I ever been sent a push?" had no answer in the app: the webhook decided and sent, and kept nothing. Migration 0172 adds `push_delivery_log`, written on every webhook call — the notification, recipient, type, what the preference decided (push / in-app / off), endpoints tried, delivered and failed, and a result note ("1 delivered to the push service, 0 failed"; "not pushed: this type is set to inapp"; "endpoint gone (410), removed"). The sender is now one shared module (`lib/push-send.ts`) used by the webhook route and by the new `/api/push/test`, which sends a test push to the caller's own enrolled devices (one a minute).
+
+Notification settings gain **Send a test push to my devices** and **Your recent pushes** (the caller's last eight log rows). Admin → Analytics → Notifications gains **Recent push deliveries (last 30)**. Readers: `my_push_delivery_log` (own rows), `admin_push_delivery_log` (is_admin, optional user filter). The nightly prune trims the log to 90 days. Asserted on the full chain: both readers gated, no cross-user leakage, 91-day rows pruned, table denied to app roles.
+
+Deploy: 0172 to staging → code → 0172 to production → merge. The log starts at deploy. First check: Notification settings → Send a test push — the result line says whether the push service accepted it, and the phone should show it within seconds.
+
+## 199.0.261005 — Course data: act on each course; API attempt log; course-change notices can be pushed
+
+**Course data actions (Admin).** Each row now has: *Refresh from API now* (one provider request; records the attempt, diffs against the stored data and records the review exactly as New Round and the nightly sync do — the shared checker gained a `force` option to skip its 24-hour cache); *Update stored course* and *Keep current* when provider changes are pending (same server functions as the Courses queue); *Approve corrections in Courses* when member edits await global approval; and *Changes & attempt log*, which shows the pending per-tee diff and the last 20 provider attempts.
+
+**Attempt log (migration 0171).** `course_api_check_log` keeps every recorded outcome — ok, drift, error, released claim — with HTTP status, note and source (monitor or app), 90 days per course; `record_course_api_check` and `release_course_api_claims` append to it; `admin_course_check_log(provider)` is the is_admin reader. The ledger's one-row-per-course view is unchanged. Asserted on the full chain: outcomes and releases logged, retention pruned, reader gated, table denied to app roles.
+
+**Push.** `course_change` is now a listed notification type (default in-app) so a club admin can raise it to push; previously it was in-app only with no way to change that. Pushes still go to every enrolled device of the user; the four push-by-default types are unchanged.
+
+Deploy: 0171 to staging → code → 0171 to production → merge. The attempt log starts at deploy; it has no history before it.
+
+## 198.1.261005 — Push device health: failing vs dormant, devices named, dead endpoints pruned
+
+Admin → Analytics → Notifications showed "1 failing / stale device — Amit Sud, fails 0, last seen Aug 22". The row was a dead iPhone endpoint: iOS dropped the phone's web-push subscription some time after Aug 22 and re-enrolled it under a new endpoint on Oct 1; the old row lingers until a push to it returns 410, and none had been attempted. The tile counted it as a problem device and the drill-down could not say what it was.
+
+Migration 0170: `admin_push_device_stats()` counts **failing** (disabled or 3+ failures) and **dormant** (not seen 14+ days, no failures) separately, per endpoint and per user; `admin_push_devices(kind)` names the device (platform, iPhone/Android/Mac/Windows with iOS version, enrolled and last-seen dates, whether the user has a current device); `prune_push_subscriptions()` runs nightly (08:41 UTC) and deletes endpoints not seen for 60 days — a live device re-enrols itself on its next app open, a dead one stops inflating the count and costing a wasted send. The Notifications panel shows two tiles instead of one. Asserted on the full chain with the production shape (old + new iPhone endpoint for one user, a failing Windows endpoint for another): classification, drill-down text, admin gating, prune removes only the 60-day-old row, cron job scheduled.
+
+Deploy: 0170 to staging → code → 0170 to production → merge. Amit's Aug 22 endpoint is pruned on the first nightly run after that (it is past 60 days).
+
 ## 198.0.261005 — Admin · Course data: every course, its verification, pending updates and pending corrections, on one screen
 
 Until now the state of a course was spread across three places: the course editor (last API verification, one course at a time), the queue at the top of Courses (pending provider updates, shown only when non-empty) and Pending edits (member corrections awaiting global approval). Admin now has a **Course data** card. One row per library course: linked clubs ("No club" flagged), hand-corrected marker, when GolfCourseAPI last answered and the last attempt's outcome, when the stored data was last compared with the provider and whether that review is pending/dismissed/applied with the change count, and member corrections awaiting global approval with the age of the oldest. A summary line gives the totals and a button opens Courses to act. Default filter "Needs attention": pending updates, pending corrections, failed/drifted last attempt, never verified, or no club.

@@ -14,6 +14,9 @@ import { write, writeAll } from "@/lib/db-write";
 import { failureMessage } from "@/lib/errors";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
+import { checkCourseFreshness } from "@/lib/course-freshness";
+import { FreshnessDiffList } from "@/components/course-freshness-diff";
+import type { FreshnessDiff } from "@/lib/course-diff";
 import { diagEnabled, setDiagEnabled, reproduceBug, setReproduceBug, getDiagLog, clearDiagLog } from "@/lib/debuglog";
 import { AdminFeedbackTab } from "@/components/feedback";
 import { btn, inputStyle, Eyebrow, NumPicker, Avatar, BottomSheet, DifferentialSheet } from "@/components/ui";
@@ -90,6 +93,7 @@ const NOTIF_TYPES: { key: string; label: string; def: "push" | "inapp" | "off"; 
   { key: "bet_posted", label: "A bet is posted in your game", def: "inapp", live: true },
   { key: "game_finished", label: "Game finished / results", def: "inapp", live: true },
   { key: "group_member", label: "New member joins your club", def: "inapp", live: true },
+  { key: "course_change", label: "Course data changed at GolfCourseAPI (club admins)", def: "inapp", live: true },
 ];
 
 function PushToggle({ user, profile }: { user: any; profile: any }) {
@@ -98,6 +102,13 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [prefs, setPrefs] = useState<Record<string, string>>((profile?.push_prefs as Record<string, string>) || {});
+  // Test push (0172): proves VAPID keys, the subscription rows and the push service from the device
+  // in hand. The result names what happened at each step; "delivered to the push service" means
+  // Apple/Google accepted it — the device shows it within seconds unless Focus/Do Not Disturb holds it.
+  const [testing, setTesting] = useState(false);
+  const [myLog, setMyLog] = useState<Array<{ at: string; type: string | null; delivery: string; endpoints: number; sent: number; failed: number; result: string | null }> | null>(null);
+  const loadMyLog = useCallback(async () => { try { const { data } = await supabase.rpc("my_push_delivery_log", { p_limit: 8 }); setMyLog((data || []) as any); } catch { setMyLog([]); } }, []);
+  useEffect(() => { void loadMyLog(); }, [loadMyLog]);
   useEffect(() => {
     const g = pushGate(); setGate(g);
     // Reflect the true server state: on = a live browser subscription that's actually saved.
@@ -122,6 +133,17 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
     else setMsg("Couldn't turn on notifications — please try again.");
   };
   const disable = async () => { setBusy(true); await unsubscribeFromPush(); setOn(false); setBusy(false); setMsg("Notifications are off for this device."); };
+  const sendTest = async () => {
+    setTesting(true); setMsg(null);
+    try {
+      const r = await fetch("/api/push/test", { method: "POST" });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) setMsg(j?.error || "Couldn't send a test push.");
+      else if (j.endpoints === 0) setMsg("No enrolled devices on your account — turn notifications on above, then test again.");
+      else setMsg(`Test push: ${j.result}. ${j.sent > 0 ? "It should appear on your enrolled device(s) within a few seconds." : ""}`);
+    } catch { setMsg("Couldn't reach the server to send a test push."); }
+    setTesting(false); await loadMyLog();
+  };
 
   const setPref = async (key: string, val: "push" | "inapp" | "off") => {
     const next = { ...prefs, [key]: val };
@@ -183,7 +205,19 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
           </button>
         </>
       )}
+      <button onClick={sendTest} disabled={testing} style={{ ...btn(false), marginTop: 8, fontSize: 13, opacity: testing ? 0.62 : 1 }}>Send a test push to my devices</button>
       {msg && <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>{msg}</div>}
+      {myLog && myLog.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1.2, marginBottom: 4 }}>YOUR RECENT PUSHES</div>
+          {myLog.map((l, i) => (
+            <div key={i} style={{ color: l.sent > 0 ? C.cream : C.sage, fontSize: 12, lineHeight: 1.5 }}>
+              {new Date(l.at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · {l.type || "—"} · {l.result}
+            </div>
+          ))}
+        </div>
+      )}
+      {myLog && myLog.length === 0 && <div style={{ color: C.sage, fontSize: 12, marginTop: 10 }}>No push has been attempted to you since the delivery log began.</div>}
 
       {gate !== "unconfigured" && (
         <div style={{ marginTop: 14, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 10 }}>
@@ -505,8 +539,11 @@ function StatDrawerHost() {
   useEffect(() => {
     _openDrill = (p) => {
       setPayload(p); setOpen(true); setRows(null); setErr(null);
-      supabase.rpc("admin_stat_users", { p_stat: p.stat, p_arg: p.arg ?? null, p_date: p.date ?? null })
-        .then(({ data, error }: any) => { if (error) setErr(failureMessage("Couldn't stat drawer host", error)); else setRows(data || []); });
+      // push_* stats come from admin_push_devices (0170), same row shape; everything else from the shared engine.
+      const call = p.stat.startsWith("push_")
+        ? supabase.rpc("admin_push_devices", { p_kind: p.stat })
+        : supabase.rpc("admin_stat_users", { p_stat: p.stat, p_arg: p.arg ?? null, p_date: p.date ?? null });
+      call.then(({ data, error }: any) => { if (error) setErr(failureMessage("Couldn't stat drawer host", error)); else setRows(data || []); });
     };
     return () => { _openDrill = null; };
   }, []);
@@ -1217,20 +1254,59 @@ type AdminCourseRow = {
   freshness_checked_at: string | null; freshness_status: string | null; freshness_changes: number | null;
   pending_requests: number | null; oldest_request_at: string | null;
 };
+type CheckLogRow = { at: string; status: string; http_status: number | null; note: string | null; source: string };
 function AdminCourseData({ onOpenCourses }: { onOpenCourses?: () => void }) {
   const [rows, setRows] = useState<AdminCourseRow[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "attention">("attention");
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const { data, error } = await supabase.rpc("admin_course_status");
-      if (cancelled) return;
-      if (error) { setErr(error.message); setRows([]); return; }
-      setRows((data || []) as AdminCourseRow[]);
-    })();
-    return () => { cancelled = true; };
+  const [busy, setBusy] = useState<string | null>(null);
+  const [flash, setFlash] = useState<Record<string, string>>({});
+  const [open, setOpen] = useState<Record<string, { diff: FreshnessDiff | null; log: CheckLogRow[] | null }>>({});
+  const load = useCallback(async () => {
+    const { data, error } = await supabase.rpc("admin_course_status");
+    if (error) { setErr(error.message); setRows([]); return; }
+    setRows((data || []) as AdminCourseRow[]);
   }, []);
+  useEffect(() => { void load(); }, [load]);
+  const say = (id: string, m: string) => setFlash((f) => ({ ...f, [id]: m }));
+
+  // Refresh from API now: ONE provider request. The route records the attempt in the ledger (and
+  // the 0171 log); the shared freshness checker then diffs the payload against the stored data and
+  // records the review, exactly as New Round and the nightly sync do.
+  const refreshNow = async (r: AdminCourseRow) => {
+    if (!r.provider_id) return;
+    setBusy(r.course_id); say(r.course_id, "");
+    try {
+      const { data: fc } = await supabase.from("favorite_courses").select("data").eq("id", r.course_id).maybeSingle();
+      const res = await checkCourseFreshness(supabase, { courseId: r.course_id, externalId: r.provider_id, stored: (fc?.data as Course) || ({ name: r.course_name, tees: [], holes: [] } as unknown as Course), force: true });
+      if (res.checkState !== "ok") say(r.course_id, "The provider did not answer — see the attempt log below.");
+      else say(r.course_id, res.hasChanges ? `Provider data differs (${res.status}) — review below.` : "Verified: stored data matches the provider.");
+      await logActivity(supabase, { actor_id: (await supabase.auth.getUser()).data.user?.id || "", actor_name: "admin", action: "course_api_manual_refresh", group_id: null, summary: `Manual GolfCourseAPI refresh for "${r.course_name}"` });
+    } finally {
+      setBusy(null); await load(); await openDetails(r, true);
+    }
+  };
+  const openDetails = async (r: AdminCourseRow, keepOpen = false) => {
+    if (open[r.course_id] && !keepOpen) { setOpen((o) => { const n = { ...o }; delete n[r.course_id]; return n; }); return; }
+    const [{ data: cf }, { data: log }] = await Promise.all([
+      supabase.from("course_freshness").select("diff, has_changes, status").eq("course_id", r.course_id).maybeSingle(),
+      r.provider_id ? supabase.rpc("admin_course_check_log", { p_provider_id: r.provider_id, p_limit: 20 }) : Promise.resolve({ data: [] as CheckLogRow[] }),
+    ]);
+    setOpen((o) => ({ ...o, [r.course_id]: { diff: cf?.has_changes && cf?.diff?.tees?.length ? (cf.diff as FreshnessDiff) : null, log: (log || []) as CheckLogRow[] } }));
+  };
+  const apply = async (r: AdminCourseRow) => {
+    if (!confirm(`Update "${r.course_name}" with the GolfCourseAPI data for everyone?${r.corrected ? "\n\nThis course carries hand corrections; updating replaces the whole stored record with the provider's version." : ""}`)) return;
+    setBusy(r.course_id);
+    const { error } = await supabase.rpc("apply_course_freshness", { p_course_id: r.course_id });
+    say(r.course_id, error ? `Couldn't update: ${error.message}` : "Stored course now matches the provider.");
+    setBusy(null); await load(); await openDetails(r, true);
+  };
+  const dismiss = async (r: AdminCourseRow) => {
+    setBusy(r.course_id);
+    const { error } = await supabase.rpc("set_course_freshness_status", { p_course_id: r.course_id, p_status: "dismissed" });
+    say(r.course_id, error ? `Couldn't dismiss: ${error.message}` : "Kept the stored data; you'll be told if the provider changes it again.");
+    setBusy(null); await load(); await openDetails(r, true);
+  };
   const needsAttention = (r: AdminCourseRow) =>
     r.freshness_status === "pending" || (r.pending_requests || 0) > 0 || r.last_check_status === "error" || r.last_check_status === "drift" || (!!r.provider_id && !r.last_verified_at) || r.clubs === "No club";
   const shown = (rows || []).filter((r) => filter === "all" || needsAttention(r));
@@ -1286,8 +1362,56 @@ function AdminCourseData({ onOpenCourses }: { onOpenCourses?: () => void }) {
             ) : <div>Custom course — no provider id, not verified against GolfCourseAPI.</div>}
             {(r.pending_requests || 0) > 0 && <div style={{ color: C.gold }}><b>{r.pending_requests} member correction{r.pending_requests === 1 ? "" : "s"} awaiting global approval</b> (oldest {ago(r.oldest_request_at)})</div>}
           </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+            {r.provider_id && <button style={{ ...btn(false), fontSize: 12, opacity: busy === r.course_id ? 0.5 : 1 }} disabled={busy === r.course_id} onClick={() => refreshNow(r)}>Refresh from API now (1 request)</button>}
+            {r.freshness_status === "pending" && <button style={{ ...btn(true), fontSize: 12, opacity: busy === r.course_id ? 0.5 : 1 }} disabled={busy === r.course_id} onClick={() => apply(r)}>Update stored course</button>}
+            {r.freshness_status === "pending" && <button style={{ ...btn(false), fontSize: 12, opacity: busy === r.course_id ? 0.5 : 1 }} disabled={busy === r.course_id} onClick={() => dismiss(r)}>Keep current</button>}
+            {(r.pending_requests || 0) > 0 && onOpenCourses && <button style={{ ...btn(true), fontSize: 12 }} onClick={onOpenCourses}>Approve corrections in Courses</button>}
+            <button style={{ ...btn(false), fontSize: 12 }} onClick={() => openDetails(r)}>{open[r.course_id] ? "Hide details" : "Changes & attempt log"}</button>
+          </div>
+          {flash[r.course_id] && <div style={{ color: C.gold, fontSize: 12.5, marginTop: 8 }}>{flash[r.course_id]}</div>}
+          {open[r.course_id] && (
+            <div style={{ marginTop: 10 }}>
+              {open[r.course_id].diff ? (
+                <>
+                  <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1.2, marginBottom: 6 }}>PROVIDER CHANGES AWAITING REVIEW</div>
+                  <FreshnessDiffList diff={open[r.course_id].diff!} maxHeight={200} />
+                </>
+              ) : <div style={{ color: C.sage, fontSize: 12.5 }}>No provider changes awaiting review.</div>}
+              <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1.2, margin: "10px 0 6px" }}>API ATTEMPTS (LAST 20, 90 DAYS)</div>
+              {(open[r.course_id].log || []).length === 0 && <div style={{ color: C.sage, fontSize: 12.5 }}>No attempts recorded since the log began.</div>}
+              {(open[r.course_id].log || []).map((l, i) => (
+                <div key={i} style={{ color: l.status === "ok" ? C.sage : C.gold, fontSize: 12.5, lineHeight: 1.5 }}>
+                  {new Date(l.at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · <b>{l.status}</b>{l.http_status ? ` ${l.http_status}` : ""} · {l.source}{l.note ? ` — ${l.note}` : ""}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
+    </div>
+  );
+}
+
+
+// Recent push deliveries (0172): what the webhook decided and what the push service answered.
+function AdminPushDeliveries() {
+  const [rows, setRows] = useState<Array<{ at: string; user_name: string; type: string | null; delivery: string; endpoints: number; sent: number; failed: number; result: string | null }> | null>(null);
+  const [show, setShow] = useState(false);
+  useEffect(() => { if (!show) return; supabase.rpc("admin_push_delivery_log", { p_user: null, p_limit: 30 }).then(({ data }: any) => setRows((data || []) as any), () => setRows([])); }, [show]);
+  return (
+    <div style={{ marginTop: 10 }}>
+      <button style={{ ...btn(false), fontSize: 12 }} onClick={() => setShow((v) => !v)}>{show ? "Hide recent push deliveries" : "Recent push deliveries (last 30)"}</button>
+      {show && rows && rows.length === 0 && <div style={{ color: C.sage, fontSize: 12.5, marginTop: 6 }}>Nothing logged yet — the log starts with this release.</div>}
+      {show && rows && rows.length > 0 && (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 8 }}>
+          {rows.map((l, i) => (
+            <div key={i} style={{ color: l.sent > 0 ? C.cream : C.sage, fontSize: 12.5, lineHeight: 1.55 }}>
+              {new Date(l.at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · <b>{l.user_name}</b> · {l.type || "—"} · {l.delivery} · {l.result}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -2229,6 +2353,9 @@ function AdminExtraStats() {
   useEffect(() => {
     supabase.rpc("get_admin_extra_stats").then(({ data, error }: any) => {
       if (error) setErr(failureMessage("Couldn't save the entry", error)); else setX(data);
+      // Push device health (0170): failing (delivery trouble) and dormant (not seen 14+ days) are
+      // different problems and are counted separately.
+      supabase.rpc("admin_push_device_stats").then(({ data: ph }: any) => { if (ph) setX((prev: any) => ({ ...(prev || {}), push: ph })); }, () => {});
     });
   }, []);
   if (err || !x) return null; // supplementary; stays hidden until 0091 is deployed
@@ -2267,8 +2394,10 @@ function AdminExtraStats() {
         {tile(x.notif_on ?? 0, "Notifications on", "notif_on", "Has an active push device")}
         {tile(x.notif_off ?? 0, "Off / none", "notif_off", "No active push device")}
       </div>
-      <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-        {tile(x.failing_subs ?? 0, "Failing / stale devices", "failing_subs", "Push not being delivered")}
+      <AdminPushDeliveries />
+      <div style={{ display: "flex", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
+        {tile(x.push?.failing_endpoints ?? 0, "Failing devices", "push_failing", "3+ delivery failures or disabled")}
+        {tile(x.push?.dormant_endpoints ?? 0, "Dormant endpoints", "push_dormant", `Not seen 14+ days · ${x.push?.dormant_users ?? 0} user${(x.push?.dormant_users ?? 0) === 1 ? "" : "s"} with no current device · pruned after ${x.push?.prune_after_days ?? 60} days`)}
       </div>
       {mutedTypes.length ? (
         <>
