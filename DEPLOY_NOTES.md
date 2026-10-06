@@ -1,3 +1,11 @@
+## 198.0.261005 — Admin · Course data: every course, its verification, pending updates and pending corrections, on one screen
+
+Until now the state of a course was spread across three places: the course editor (last API verification, one course at a time), the queue at the top of Courses (pending provider updates, shown only when non-empty) and Pending edits (member corrections awaiting global approval). Admin now has a **Course data** card. One row per library course: linked clubs ("No club" flagged), hand-corrected marker, when GolfCourseAPI last answered and the last attempt's outcome, when the stored data was last compared with the provider and whether that review is pending/dismissed/applied with the change count, and member corrections awaiting global approval with the age of the oldest. A summary line gives the totals and a button opens Courses to act. Default filter "Needs attention": pending updates, pending corrections, failed/drifted last attempt, never verified, or no club.
+
+Migration 0169 adds `admin_course_status()` (is_admin only; it reads course_api_checks, which app roles cannot). Asserted on the full chain (`ci/assert-admin-course-status.sql`): verification, freshness and correction columns populated for a seeded course; a member gets no rows.
+
+Deploy: 0169 to staging → code → 0169 to production → merge.
+
 ## 197.2.261003 — Harness binds OS-assigned ports (fresh-database CI fix)
 
 197.1's fresh-database rebuild failed in GitHub with `listen EADDRINUSE :::54612`: the harness's stub provider port was already taken on the runner, where the Supabase CLI's Docker stack also listens and whose port set moved between CLI versions. The local replay runs on plain PostgreSQL and cannot see that stack, so this class of failure is invisible to it; fixed port numbers had already collided once before (54321/54322). The harness now binds both stubs to port 0 and passes the OS-assigned ports to the monitor and the sync. Reproduced locally by occupying both former ports and running the harness: exit 0.

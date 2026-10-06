@@ -70,6 +70,9 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-notifications.sql"
 # 0167: course review queue (reopen on new diff, cross-club scoping, server-side apply).
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-course-reviews.sql"
 
+# 0169: Admin course-status view.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-admin-course-status.sql"
+
 # Reset fencing: real SQL outcomes plus separate-connection concurrency barriers.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-game-reset-fencing.sql"
 BNN_RESET_TEST_DATABASE_URL="$DB_URL" python3 "$ROOT/ci/test-game-reset-concurrency.py"

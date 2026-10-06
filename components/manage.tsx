@@ -1206,6 +1206,92 @@ function RoundSaveDiag() {
   );
 }
 
+
+// ── Admin · Course data (0169) ────────────────────────────────────────────────────────────────────
+// One row per library course: clubs, last provider verification, last data comparison and its
+// review state, pending member corrections. Replaces hunting across the course editor, the queue
+// at the top of Courses, and Pending edits.
+type AdminCourseRow = {
+  course_id: string; course_name: string; clubs: string; provider_id: string | null; corrected: boolean;
+  last_verified_at: string | null; last_check_at: string | null; last_check_status: string | null; last_check_note: string | null;
+  freshness_checked_at: string | null; freshness_status: string | null; freshness_changes: number | null;
+  pending_requests: number | null; oldest_request_at: string | null;
+};
+function AdminCourseData({ onOpenCourses }: { onOpenCourses?: () => void }) {
+  const [rows, setRows] = useState<AdminCourseRow[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"all" | "attention">("attention");
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.rpc("admin_course_status");
+      if (cancelled) return;
+      if (error) { setErr(error.message); setRows([]); return; }
+      setRows((data || []) as AdminCourseRow[]);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+  const needsAttention = (r: AdminCourseRow) =>
+    r.freshness_status === "pending" || (r.pending_requests || 0) > 0 || r.last_check_status === "error" || r.last_check_status === "drift" || (!!r.provider_id && !r.last_verified_at) || r.clubs === "No club";
+  const shown = (rows || []).filter((r) => filter === "all" || needsAttention(r));
+  const ago = (iso: string | null) => {
+    if (!iso) return "never";
+    const d = new Date(iso); const now = new Date();
+    const sod = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const days = Math.round((sod(now) - sod(d)) / 86_400_000);
+    const when = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    return `${when} (${days <= 0 ? "today" : days === 1 ? "yesterday" : `${days}d ago`})`;
+  };
+  const counts = {
+    pendingApi: (rows || []).filter((r) => r.freshness_status === "pending").length,
+    pendingReq: (rows || []).reduce((n, r) => n + (r.pending_requests || 0), 0),
+    unverified: (rows || []).filter((r) => !!r.provider_id && !r.last_verified_at).length,
+    noProvider: (rows || []).filter((r) => !r.provider_id).length,
+  };
+  return (
+    <div>
+      {err && <div style={{ color: C.gold, fontSize: 12 }}>Couldn't load course status: {err}</div>}
+      {rows && (
+        <div style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginBottom: 10, color: C.cream, fontSize: 13, lineHeight: 1.6 }}>
+          <b>{rows.length}</b> courses in the library · <b>{counts.pendingApi}</b> with provider updates to review · <b>{counts.pendingReq}</b> member correction{counts.pendingReq === 1 ? "" : "s"} awaiting global approval · <b>{counts.unverified}</b> never verified · <b>{counts.noProvider}</b> custom (no provider id)
+          {(counts.pendingApi > 0 || counts.pendingReq > 0) && onOpenCourses && (
+            <div style={{ marginTop: 6 }}><button style={{ ...btn(true), fontSize: 12 }} onClick={onOpenCourses}>Open Courses to review</button></div>
+          )}
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+        <button style={{ ...btn(filter === "attention"), fontSize: 12 }} onClick={() => setFilter("attention")}>Needs attention ({(rows || []).filter(needsAttention).length})</button>
+        <button style={{ ...btn(filter === "all"), fontSize: 12 }} onClick={() => setFilter("all")}>All courses</button>
+      </div>
+      {rows && shown.length === 0 && <div style={{ color: C.sage, fontSize: 13 }}>{filter === "attention" ? "Nothing needs attention." : "No courses."}</div>}
+      {shown.map((r) => (
+        <div key={r.course_id} data-admin-course-row style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ color: C.cream, fontWeight: 800 }}>{r.course_name}{r.corrected ? <span style={{ color: C.sage, fontWeight: 500 }}> · hand-corrected</span> : null}</div>
+            <div style={{ color: r.clubs === "No club" ? C.gold : C.sage, fontSize: 12 }}>{r.clubs}</div>
+          </div>
+          <div style={{ color: C.sage, fontSize: 12.5, marginTop: 6, lineHeight: 1.55 }}>
+            {r.provider_id ? (
+              <>
+                <div>API verified: <span style={{ color: r.last_verified_at ? C.cream : C.gold }}>{ago(r.last_verified_at)}</span>
+                  {r.last_check_status && r.last_check_status !== "ok" && <span style={{ color: C.gold }}> · last attempt {r.last_check_status}{r.last_check_note ? ` — ${r.last_check_note}` : ""}</span>}
+                </div>
+                <div>Data compared: {ago(r.freshness_checked_at)}
+                  {r.freshness_status === "pending" && <span style={{ color: C.gold }}> · <b>{r.freshness_changes} change{r.freshness_changes === 1 ? "" : "s"} awaiting review</b></span>}
+                  {r.freshness_status === "dismissed" && <span> · changes dismissed</span>}
+                  {r.freshness_status === "applied" && <span> · provider data applied</span>}
+                  {r.freshness_status === "none" && <span> · matches provider</span>}
+                </div>
+              </>
+            ) : <div>Custom course — no provider id, not verified against GolfCourseAPI.</div>}
+            {(r.pending_requests || 0) > 0 && <div style={{ color: C.gold }}><b>{r.pending_requests} member correction{r.pending_requests === 1 ? "" : "s"} awaiting global approval</b> (oldest {ago(r.oldest_request_at)})</div>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 type SignupRow = { user_id: string; display_name: string | null; email: string | null; signed_up_at: string; last_sign_in: string | null; clubs: string | null; first_club_at: string | null };
 const fmtDay = (iso: string | null | undefined) => iso ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
 
@@ -2549,6 +2635,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
       case "oversight": title = "Clubs oversight"; panel = <AdminGroupsTab user={user} onEnterGroup={onEnterGroup} onExitGroup={onExitGroup} onGroupsChanged={onGroupsChanged} />; break;
       case "users": title = "Users"; panel = <AdminUsersTab user={user} isOwner={!!profile?.is_owner} />; break;
       case "players": title = "Player admin"; panel = <AdminPanel user={user} showAnalytics={false} />; break;
+      case "coursedata": title = "Course data"; panel = <AdminCourseData onOpenCourses={() => onGoto("courses")} />; break;
       case "feedback": title = "Feedback"; panel = <AdminFeedbackTab />; break;
       case "sandbaggers": title = "Sandbaggers"; panel = <AdminSandbaggers />; break;
       case "systools": title = "System tools"; panel = <SystemTools user={user} />; break;
@@ -2592,6 +2679,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
             <Card icon="🧑‍🤝‍🧑" name="Users" cap="Global roster, suspend, merge" onClick={() => setView("users")} />
             <Card icon="🗂" name="Player admin" cap="Handicaps, scores, memberships, courses" onClick={() => setView("players")} />
             <Card icon="💬" name="Feedback" cap="User-submitted feedback" onClick={() => setView("feedback")} badge={todos.new_feedback} />
+            <Card icon="⛳" name="Course data" cap="API verification, pending updates, corrections awaiting approval" onClick={() => setView("coursedata")} />
             <Card icon="🚩" name="Sandbaggers" cap="Entered index vs scoring (18+ rounds)" onClick={() => setView("sandbaggers")} />
             <Card icon="🩺" name="Diagnostics" cap="Round-save log & reproduce toggle" onClick={() => setView("diagnostics")} />
             <Card icon="🔧" name="System tools" cap="Test account, yardage backfill" onClick={() => setView("systools")} />

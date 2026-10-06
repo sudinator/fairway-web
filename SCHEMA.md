@@ -1,3 +1,7 @@
+## 198.0 — admin course status (0169)
+
+New `admin_course_status()` (is_admin only): one row per non-deleted favorite_courses row joining course_owner_groups, course_api_checks, course_freshness and pending course_change_requests.
+
 ## 197.1 — course owner groups (0168)
 
 New `course_owner_groups(uuid) returns setof uuid` (authenticated): group_courses links ∪ legacy favorite_courses.group_id. record_course_freshness, record_course_freshness_internal, pending_course_reviews, apply_course_freshness and set_course_freshness_status derive club membership/admin rights from it; none fails on a null group_id.
