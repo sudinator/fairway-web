@@ -292,3 +292,9 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
 - Every delivery must summarize the tests actually executed, their results, environment and evidence level, and any remaining unexecuted checks. Distinguish EXECUTED, MODELLED, and BROWSER-VALIDATED evidence; do not report a planned or simulated check as a live staging pass.
 - Automate repeatable staging scenarios wherever practical. Manual phone tests supplement automation for physical-device behavior such as operating-system suspension, installed-app reopening, and connectivity transitions; they do not replace automated coverage of behavior that can be tested automatically.
 - Procedure-only documentation edits require a content/diff verification, rather than an unnecessary application test suite.
+
+## Viewport and the bottom nav (standing rule, 199.4)
+
+- The installed app's shell is sized to the **layout viewport** (`window.innerHeight`), never `visualViewport.height`, which iOS leaves stale in Home Screen apps (readout 2026-10-05: innerHeight 894, visualVP_h 611, no keyboard — the nav sat 283 px above the bottom). A Safari tab uses the visual viewport to follow the toolbar. `lib/viewport-height.ts` is the one decision; `ci/check_shell_geometry.py` fails the build if `--app-h` is sized from the visual viewport again.
+- Keyboard handling (`data-kb`) is gated on a **focused editable element** (`lib/viewport-editable.ts`), never on a pixel gap alone.
+- Any display or viewport change is verified on the device with VIEWPORT DIAG (Admin → Diagnostics): installed → `appH_var == innerHeight` and `navBottom == innerHeight`. The readout from any incident goes into the release note. A screenshot is not evidence.

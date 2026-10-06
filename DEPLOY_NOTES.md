@@ -1,3 +1,19 @@
+## 199.5.261006 — Confirmed on device; diagnostic compares against the shell's own reference
+
+On-device readout after 199.4 (installed, portrait): `appH_var 894px · shellH 894 · navBottom 894 · navTop 844` with iOS still reporting `visualVP_h 611` — the stale value is present and no longer matters. Fix confirmed. The diagnostic's `navBottom_vs_visible` still compared the nav to the visual viewport and read −283 in red while the nav was flush; it now compares against the height the shell is sized to (layout viewport when installed, visual viewport in a tab). `visualVP_h` stays on the panel for diagnosis. The rule is recorded in APP_RULES.md, HANDOFF.md and the project memory. Client-only; no migration.
+
+## 199.4.261005 — Installed app sizes its shell to the layout viewport, not iOS's stale visual viewport
+
+The diagnostic readout from the phone (installed, portrait, no keyboard): `innerHeight 894 · visualVP_h 611 · appH_var 611px · shellH 611 · navBottom 611`. The nav was rendered — 283px above the bottom of the screen, because the shell was sized to a visual viewport iOS had left stale. 199.3's keyboard-gate change was necessary (that stale value also tripped the keyboard heuristic and hid the nav outright) but did not address the shell height, and my explanation of the earlier screenshot was wrong on that point.
+
+History: 177.79 sized the shell to the visual viewport so a Safari TAB follows the toolbar; correct there, never needed in the installed app, which has no toolbar — and where iOS is known to leave `visualViewport.height` stale. 177.86/177.88 reasoned about the keyboard and left this assumption in place. `lib/viewport-height.ts` is now the one decision: installed → `innerHeight` (the layout viewport, 894 in the readout); Safari tab → `visualViewport.height`. Unit-tested on the exact readout. `ci/check_shell_geometry.py` gains a source guard that fails if ViewportSync sizes `--app-h` straight from the visual viewport again (negative-tested). Client-only; no migration. Replaces 199.3 as the hotfix — ship this one.
+
+Verify on the phone: Admin → Diagnostics on, Dashboard in portrait: `appH_var` must equal `innerHeight` (894 on this device) and `navBottom` must equal `innerHeight`. Then open a text field: nav hides while typing, returns on dismiss.
+
+## 199.3.261005 — Bottom nav no longer hidden by a false keyboard detection (portrait, iOS)
+
+The bottom nav disappeared in portrait (fine in landscape) on both staging and production, with no layout file changed since July. Cause: `ViewportSync` inferred "keyboard open" from `100lvh − visualViewport.height > 180px`, and the stylesheet hides the nav and grows the shell to full height while that attribute is set. In portrait the phone now reports a gap above 180 with no keyboard — iOS's viewport reporting moved under a fixed pixel threshold. The attribute is now set only while an editable element (text-like input, textarea, contenteditable) has focus AND the viewport has shrunk; without focus the gap is ignored. Focus changes re-evaluate the attribute. `lib/viewport-editable.ts` is the one definition of "summons the keyboard", unit-tested (the dashboard-with-nothing-focused case is the regression). `ci/check_shell_geometry.py` passes on all six device profiles. Client-only; no migration. Hotfix — ship ahead of everything else.
+
 ## 199.2.261005 — Test push body no longer carries a server-zone clock
 
 The test push said "sent 2:38am" at 10:38pm ET: the body was formatted on the server, which runs in UTC. The body now carries no time (the device stamps the notification itself). Audited the other server-side writers: SQL notifications format with `at time zone 'America/New_York'`; the delivery/attempt logs and admin lists are formatted on the device. Client-only change; no migration.

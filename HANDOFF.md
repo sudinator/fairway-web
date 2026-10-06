@@ -6,7 +6,19 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 199.2.261005
+## Current candidate: 199.5.261006 (199.4 confirmed on device)
+
+- Diag's navBottom_vs_visible now uses the shell's reference height. Rule recorded in APP_RULES.md.
+
+## Previous: 199.4.261005
+
+- RULE: the installed app's shell height comes from the layout viewport (`innerHeight`), never `visualViewport.height`, which iOS leaves stale in Home Screen apps. `lib/viewport-height.ts` is the one decision; `check_shell_geometry.py` guards it. Any viewport change is verified with the on-device VIEWPORT DIAG readout (Admin → Diagnostics), never from a screenshot alone — and the readout from each incident is pasted into the release note.
+
+## Previous: 199.3.261005
+
+- Bottom nav hidden in portrait: the keyboard heuristic fired without a keyboard. Gate is now focused-editable AND viewport shrunk. Any future viewport heuristic must be gated on a signal iOS cannot move.
+
+## Previous: 199.2.261005
 
 - Server-side code never formats a wall-clock time for display: Vercel runs in UTC. Format on the device, or in SQL with `at time zone 'America/New_York'`.
 

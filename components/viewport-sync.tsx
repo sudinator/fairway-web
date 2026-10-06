@@ -1,5 +1,7 @@
 "use client";
 import { useEffect } from "react";
+import { isEditable } from "@/lib/viewport-editable";
+import { appShellHeight, isStandalone } from "@/lib/viewport-height";
 
 // Publishes the live *usable* viewport height as the CSS var --app-h. In a browser tab this
 // tracks Safari's toolbar as it grows/shrinks (visualViewport fires on resize + scroll), so the
@@ -37,7 +39,8 @@ export function ViewportSync() {
   useEffect(() => {
     const vv = window.visualViewport;
     const set = () => {
-      const h = Math.round(vv?.height ?? window.innerHeight);
+      // Installed app: the layout viewport; Safari tab: the visual viewport. See lib/viewport-height.
+      const h = appShellHeight({ standalone: isStandalone(), innerHeight: window.innerHeight, visualHeight: vv?.height });
       if (h <= 0) return;
       const root = document.documentElement;
       root.style.setProperty("--app-h", `${h}px`);
@@ -60,8 +63,16 @@ export function ViewportSync() {
       // An ATTRIBUTE rather than a CSS custom property: a style query would need Safari 18+ and
       // behaves unpredictably when the property is unregistered. This is visible in the inspector
       // and a test can read it.
+      //
+      // 199.3: the gap alone is no longer trusted. On 2026-10-05 a phone in PORTRAIT reported a
+      // gap above 180 with no keyboard (landscape was fine), so the nav vanished on the dashboard
+      // in both environments; the code had not changed since July — iOS's viewport reporting had.
+      // A soft keyboard exists only while an editable element has focus, so that is the gate iOS
+      // cannot move: the attribute is set only when something is being typed into AND the
+      // viewport has shrunk. Without focus the gap is irrelevant and the nav stays.
       const glass = measureLvh();
-      if (glass > 0 && glass - h > 180) root.setAttribute("data-kb", "open");
+      const typing = isEditable(document.activeElement);
+      if (typing && glass > 0 && glass - h > 180) root.setAttribute("data-kb", "open");
       else root.removeAttribute("data-kb");
     };
     set();
@@ -72,12 +83,19 @@ export function ViewportSync() {
     const onRotate = () => { lvhCache = 0; onChange(); };
     window.addEventListener("resize", onChange);
     window.addEventListener("orientationchange", onRotate);
+    // Focus changes are the other half of the keyboard signal: re-evaluate when a field gains or
+    // loses focus (iOS resizes the visual viewport a frame or two later, so the resize listener
+    // above completes the pair).
+    document.addEventListener("focusin", onChange);
+    document.addEventListener("focusout", onChange);
     vv?.addEventListener("resize", onChange);
     vv?.addEventListener("scroll", onChange);
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onChange);
       window.removeEventListener("orientationchange", onRotate);
+      document.removeEventListener("focusin", onChange);
+      document.removeEventListener("focusout", onChange);
       vv?.removeEventListener("resize", onChange);
       vv?.removeEventListener("scroll", onChange);
     };

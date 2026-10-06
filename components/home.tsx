@@ -81,7 +81,11 @@ function ViewportDiag() {
       navH: nr ? Math.round(nr.height) : -1,
       navTop: nr ? Math.round(nr.top) : -1,
       navBottom,
-      navBottom_vs_visible: nr ? (vv ? Math.round(vv.height) : inner) - navBottom : -1,
+      // The reference is the height the shell is SIZED to (199.4): the layout viewport when
+      // installed, the visual viewport in a Safari tab. Comparing against the visual viewport in
+      // installed mode read −283 on 2026-10-06 while the nav was flush — iOS's stale value, not a
+      // layout fault. visualVP_h is still shown above for that diagnosis.
+      navBottom_vs_visible: nr ? (standalone ? inner : (vv ? Math.round(vv.height) : inner)) - navBottom : -1,
     });
   };
 
