@@ -4,7 +4,8 @@
  *
  *  - Browser tab: Safari's toolbar grows and shrinks the visible area as you scroll, so any
  *    fixed height hides the nav behind the toolbar. We track the LIVE visible height published
- *    by ViewportSync as --app-h (visualViewport.height), which follows the toolbar.
+ *    by ViewportSync as --app-h: visualViewport.height in a Safari tab (follows the toolbar);
+ *    window.innerHeight in the INSTALLED app, where iOS leaves the visual viewport stale (199.4).
  *
  *  - Installed (display-mode: standalone): the viewport IS stable, and this file used to claim
  *    "100lvh is the true full-screen height". That was wrong on a notched iPhone. Measured on

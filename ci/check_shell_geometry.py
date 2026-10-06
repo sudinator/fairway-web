@@ -235,3 +235,24 @@ if fails:
     sys.exit(1)
 
 print(f"shell geometry: PASS ({len(results)} device profiles, nav fits and labels visible on all)")
+
+
+# 199.4: the installed app must size the shell to the LAYOUT viewport. iOS leaves
+# visualViewport.height stale in Home Screen apps (measured 611 against innerHeight 894 with no
+# keyboard, 2026-10-05); a shell sized to it parks the nav mid-screen. ViewportSync must take its
+# height from lib/viewport-height.appShellHeight, which decides per context, and that function
+# must prefer innerHeight when standalone. Source-level guard against reintroducing vv.height.
+vs = (ROOT / "components" / "viewport-sync.tsx").read_text(encoding="utf-8")
+vh = (ROOT / "lib" / "viewport-height.ts").read_text(encoding="utf-8")
+problems = []
+if "appShellHeight(" not in vs:
+    problems.append("components/viewport-sync.tsx no longer sizes --app-h through lib/viewport-height.appShellHeight")
+if re.search(r"Math\.round\(\s*vv\?\.height\s*\?\?\s*window\.innerHeight\s*\)", vs):
+    problems.append("components/viewport-sync.tsx sizes --app-h straight from visualViewport.height (the 177.79 form that fails in installed mode)")
+if not re.search(r"if \(m\.standalone\) return inner > 0 \? inner : vv;", vh):
+    problems.append("lib/viewport-height.ts: standalone branch must prefer innerHeight (layout viewport) over the visual viewport")
+if problems:
+    print("shell geometry: FAIL")
+    for pr in problems: print("  " + pr)
+    raise SystemExit(1)
+print("shell geometry: installed app sizes to the layout viewport (199.4 guard) OK")

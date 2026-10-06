@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from "react";
 import { isEditable } from "@/lib/viewport-editable";
+import { appShellHeight, isStandalone } from "@/lib/viewport-height";
 
 // Publishes the live *usable* viewport height as the CSS var --app-h. In a browser tab this
 // tracks Safari's toolbar as it grows/shrinks (visualViewport fires on resize + scroll), so the
@@ -38,7 +39,8 @@ export function ViewportSync() {
   useEffect(() => {
     const vv = window.visualViewport;
     const set = () => {
-      const h = Math.round(vv?.height ?? window.innerHeight);
+      // Installed app: the layout viewport; Safari tab: the visual viewport. See lib/viewport-height.
+      const h = appShellHeight({ standalone: isStandalone(), innerHeight: window.innerHeight, visualHeight: vv?.height });
       if (h <= 0) return;
       const root = document.documentElement;
       root.style.setProperty("--app-h", `${h}px`);
