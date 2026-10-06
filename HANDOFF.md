@@ -6,7 +6,23 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 197.2.261003
+## Current candidate: 199.1.261005
+
+- 0172 push delivery log; `/api/push/test`; shared sender `lib/push-send.ts`. Apply 0172 before the code.
+
+## Previous: 199.0.261005
+
+- 0171 attempt log + Course data row actions (refresh, apply, dismiss, log). Apply 0171 before the code.
+
+## Previous: 198.1.261005
+
+- 0170: push endpoints classified failing vs dormant; nightly 60-day prune. Apply 0170 before the code.
+
+## Previous: 198.0.261005
+
+- 0169 + Admin → Course data screen (all courses, verification, pending updates, pending corrections). Apply 0169 before the code on each environment.
+
+## Previous: 197.2.261003
 
 - RULE: CI helper processes never choose fixed ports; bind 0 and pass the assigned port on. The runner shares the network namespace with the Supabase CLI stack, whose ports change with the CLI version — a collision the local replay cannot reproduce.
 

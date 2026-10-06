@@ -79,6 +79,8 @@ full page reload. This one is user-initiated (you tap to switch), listed for com
 
 ## C. Server-scheduled jobs (pg_cron — run on Supabase, not your device)
 
+- **push-subscription-prune** (daily 08:41 UTC, 0170): deletes push endpoints not seen for 60 days. A device that still uses the app re-enrols itself on its next open; a dead endpoint stops being counted and stops receiving wasted sends.
+
 **C1 · Tee reminders** — every 15 min (`send_tee_reminders`, migration 0074). Inserts reminder
 notifications for upcoming tee times. Only writes notification rows.
 

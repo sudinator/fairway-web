@@ -164,7 +164,7 @@ Regenerate after shipping (adds new files, keeps ticks and the notes block):
 Confirm database-applied state with:
 `select id, applied_at from public.schema_migrations order by id;`
 
-Total: 153 migrations. Unchecked = not yet confirmed applied in this checklist.
+Total: 157 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -321,6 +321,10 @@ Total: 153 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [ ] 0166_device_heartbeat_and_scheduled_freshness.sql
 - [ ] 0167_course_review_queue.sql
 - [ ] 0168_course_owner_groups.sql
+- [ ] 0169_admin_course_status.sql
+- [ ] 0170_push_device_health.sql
+- [ ] 0171_course_api_check_log.sql
+- [ ] 0172_push_delivery_log.sql
 
 <!-- NOTES:START -->
 
