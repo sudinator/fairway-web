@@ -1,3 +1,7 @@
+## 199.5.261006 — Confirmed on device; diagnostic compares against the shell's own reference
+
+On-device readout after 199.4 (installed, portrait): `appH_var 894px · shellH 894 · navBottom 894 · navTop 844` with iOS still reporting `visualVP_h 611` — the stale value is present and no longer matters. Fix confirmed. The diagnostic's `navBottom_vs_visible` still compared the nav to the visual viewport and read −283 in red while the nav was flush; it now compares against the height the shell is sized to (layout viewport when installed, visual viewport in a tab). `visualVP_h` stays on the panel for diagnosis. The rule is recorded in APP_RULES.md, HANDOFF.md and the project memory. Client-only; no migration.
+
 ## 199.4.261005 — Installed app sizes its shell to the layout viewport, not iOS's stale visual viewport
 
 The diagnostic readout from the phone (installed, portrait, no keyboard): `innerHeight 894 · visualVP_h 611 · appH_var 611px · shellH 611 · navBottom 611`. The nav was rendered — 283px above the bottom of the screen, because the shell was sized to a visual viewport iOS had left stale. 199.3's keyboard-gate change was necessary (that stale value also tripped the keyboard heuristic and hid the nav outright) but did not address the shell height, and my explanation of the earlier screenshot was wrong on that point.
