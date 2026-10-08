@@ -30,8 +30,16 @@ for d in PUBLIC_DIRS:
         if not any('className="live-scroll"' in t for t in texts):
             problems.append(f"{page.relative_to(ROOT)}: no live-scroll container (page or its components) — html/body are locked, this page will not scroll")
 
+# The service worker must never cache public share pages: it is cache-first for the installed app
+# shell and only the app shell can tap Update, so a broken public page would be pinned in Safari
+# until the cache name changes (201.2→201.4). Every public route prefix must be in shouldBypass().
+sw = (ROOT / "public" / "sw.js").read_text(encoding="utf-8")
+for prefix in ("/live/", "/lineup/"):
+    if f'url.pathname.startsWith("{prefix}")' not in sw:
+        problems.append(f"public/sw.js: {prefix} is not bypassed by the service worker — a public page would be served cache-first and pinned in Safari")
+
 if problems:
     print("public routes scroll: FAIL")
     for p in problems: print("  " + p)
     sys.exit(1)
-print(f"public routes scroll: PASS ({checked} public page(s) own their scroll container)")
+print(f"public routes scroll: PASS ({checked} public page(s) own their scroll container; service worker bypasses /live/ and /lineup/)")

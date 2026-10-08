@@ -53,7 +53,7 @@ begin
   perform public.record_course_freshness_system('rev00001', api1, diff1, true);
   execute 'reset role';
   select status into st from course_freshness where course_id = c1;
-  if st <> 'dismissed' then raise exception 'same diff changed status to %', st; end if;
+  if st is distinct from 'dismissed' then raise exception 'same diff changed status to %', st; end if;
   select count(*) into n from notifications where type = 'course_change' and user_id = ca;
   if n <> 1 then raise exception 'same diff produced a new notice'; end if;
 
@@ -62,7 +62,7 @@ begin
   perform public.record_course_freshness_system('rev00001', api1, diff2, true);
   execute 'reset role';
   select status into st from course_freshness where course_id = c1;
-  if st <> 'pending' then raise exception 'new diff did not reopen: status %', st; end if;
+  if st is distinct from 'pending' then raise exception 'new diff did not reopen: status %', st; end if;
   select count(*) into n from notifications where type = 'course_change' and user_id = ca;
   if n <> 2 then raise exception 'new diff did not notify again (% notices)', n; end if;
 

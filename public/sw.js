@@ -4,7 +4,7 @@
 // bypass the worker. App-shell requests are cache-first for the lifetime of the active
 // worker; activating a new version creates a new cache and reloads into the new shell.
 
-const SW_VERSION = "201.2.261007";
+const SW_VERSION = "201.5.261008";
 const CACHE = `bnn-shell-${SW_VERSION}`;
 
 self.addEventListener("install", (event) => {
@@ -39,6 +39,11 @@ self.addEventListener("activate", (event) => {
 
 function shouldBypass(url) {
   return (
+    // Public share pages (/live/<token>, /lineup/<token>) are opened from chats, usually in Safari,
+    // where nobody can tap Update. Cache-first pinned a broken /lineup page in Safari across two
+    // fixes (201.2 -> 201.4, 2026-10-08). They are not the installed app shell: always network.
+    url.pathname.startsWith("/live/") ||
+    url.pathname.startsWith("/lineup/") ||
     url.hostname.endsWith("supabase.co") ||
     url.hostname.includes("supabase") ||
     url.pathname.startsWith("/api/") ||

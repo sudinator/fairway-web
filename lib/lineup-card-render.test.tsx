@@ -48,6 +48,7 @@ const wrap = (title: string, note: string, html: string) =>
   ok(t.includes("Live line-up · updates as the organizer changes it"), "page: says it is live");
   ok((s.html.match(/data-lineup-row/g) || []).length === 8, "page: eight players rendered");
   ok(s.html.includes('data-open-app="navigate"') && s.html.includes('href="/?game=LNUP"'), "page (other platforms): the button deep-links to the game");
+  ok(s.html.includes('class="live-scroll"'), "page: owns its scroll container (html/body are locked for the installed app)");
 }
 // 1b. iPhone in Safari: the button is an instruction, not a navigation that would open a second app.
 {
