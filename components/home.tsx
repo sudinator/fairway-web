@@ -175,6 +175,42 @@ export function Home({ session }: { session: any }) {
   // clear it whenever we're not on the money tab so a normal re-entry lands on Balances.
   const [moneyInitialTab, setMoneyInitialTab] = useState<"settle" | "balances" | null>(null);
   useEffect(() => { if (tab !== "money") setMoneyInitialTab(null); }, [tab]);
+  // Game deep link (201.1): /?game=<code> from the live line-up page, a chat share, or a
+  // game_added notification. Resolves the code to a game the signed-in person can see (RLS: a
+  // player or a member of its club), switches to that club if needed, and opens the game room.
+  // Unknown code or not a member: no-op, the Games tab shows as usual. Same shape as the tee-time
+  // deep link below.
+  const [deepGameCode, setDeepGameCode] = useState<string | null>(() => {
+    try { const c = new URLSearchParams(window.location.search).get("game"); return c && /^\d{6}$/.test(c) ? c : null; } catch { return null; }
+  });
+  useEffect(() => {
+    if (!deepGameCode) return;
+    if (groupsLoading) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase.from("games").select("id, group_id").eq("code", deepGameCode).maybeSingle();
+        if (cancelled) return;
+        const gid = (data as any)?.group_id as string | undefined;
+        const id = (data as any)?.id as string | undefined;
+        if (id && gid && groups.some((g) => g.id === gid)) {
+          if (gid !== activeGroupId) {
+            setActiveGroupId(gid);
+            saveAppBootCache({ groups, activeGroupId: gid });
+            supabase.from("profiles").update({ active_group_id: gid }).eq("id", user.id).then(() => {});
+            setProfile((p: any) => (p ? { ...p, active_group_id: gid } : p));
+          }
+          setGameSeed(null); setOpenGameId(id); setTab("games");
+        }
+      } catch { /* unknown code or not visible: stay where we are */ }
+      if (!cancelled) {
+        setDeepGameCode(null);
+        try { const url = new URL(window.location.href); url.searchParams.delete("game"); window.history.replaceState({}, "", url.pathname + url.search); } catch { /* ignore */ }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [deepGameCode, groupsLoading, groups]);
+
   // Tee Times → game handoff (P4): a seed prefills Create Game; openGameId opens an
   // already-linked game. One-shot, cleared when we leave the Games tab (like money).
   const [gameSeed, setGameSeed] = useState<GameSeed | null>(null);
@@ -222,8 +258,10 @@ export function Home({ session }: { session: any }) {
       const q = new URLSearchParams(link.includes("?") ? link.slice(link.indexOf("?") + 1) : "");
       const tt = q.get("tt");
       const t = q.get("tab");
+      const gcode = q.get("game");
       setStage(null); setViewing(null); setMoreOpen(false); setReturnTab(null);
-      if (tt) { setDeepTeeId(tt); setTab("teetimes"); }
+      if (gcode && /^\d{6}$/.test(gcode)) { setDeepGameCode(gcode); setTab("games"); }
+      else if (tt) { setDeepTeeId(tt); setTab("teetimes"); }
       else if (t) {
         const allowed = ["dashboard", "rounds", "games", "courses", "players", "groups", "admin", "help", "profile", "money", "teetimes", "notifications"];
         if (allowed.includes(t)) setTab(t as Tab);

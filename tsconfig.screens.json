@@ -20,6 +20,9 @@
   "files": [
     "lib/screens.test.tsx",
     "lib/trifecta-card-render.test.tsx",
+    "lib/lineup-card-render.test.tsx",
+    "components/share-card.tsx",
+    "components/lineup-view.tsx",
     "lib/trifecta-results-row.test.tsx",
     "components/tournaments.tsx",
     "lib/screen-harness.ts",

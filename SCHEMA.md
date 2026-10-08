@@ -1,3 +1,15 @@
+## 201.2 — organizer notified (0175)
+
+`notify_game_added` redefined: organizer included, worded "You set up …".
+
+## 201.1 — game_added deep link (0174)
+
+`notify_game_added` redefined: link `/?game=<code>`, message ends "Tap to open the game." Recipients unchanged.
+
+## 201.0 — live line-up (0173)
+
+New `get_live_lineup(text) returns jsonb` (anon, authenticated; token-gated; no scores). Uses games.share_token (0018).
+
 ## 199.1 — push delivery log (0172)
 
 New table `push_delivery_log` (RLS, service_role only); readers `my_push_delivery_log(integer)` (own rows) and `admin_push_delivery_log(uuid, integer)` (is_admin); `prune_push_subscriptions()` also trims the log to 90 days.

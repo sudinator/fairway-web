@@ -1,3 +1,19 @@
+## 201.2.261007 — The organizer gets the game notification too
+
+Migration 0175: `notify_game_added` no longer skips the organizer. Every player in the game receives the same notification with the same deep link; the organizer's reads "You set up "Saturday Fourball". Tap to open the game." since "Amit added you" is meaningless to Amit. The owner's reasoning: the organizer is a player too, and receiving it is how they know it went out.
+
+## 201.1.261007 — Game deep link; the line-up page tells the truth about opening the app; game_added opens the game
+
+**Game deep link.** `/?game=<code>` resolves, for a signed-in person, to a game they can see (a player or a member of its club), switches to that club if needed and opens the game room; unknown code or no access → the Games tab as usual. Also honoured when tapped from an in-app notification. Nothing is granted by the link: visibility is the game's existing rule.
+
+## 201.0.261007 — Live line-up link for the chat; per-group card; the line-up card redesign
+
+**Why a link.** A line-up image stops working past one foursome — twenty players make an 1,800px image WhatsApp shrinks to a thumbnail, and it is wrong the moment the organizer swaps a pairing. The line-up is now shared as a **live link** (`/lineup/<token>`) that fits a chat at any size, refreshes itself every 25 seconds and on return to the tab, and goes dark when the game ends ("This game has finished, so the line-up is no longer shown"). It rides the game's existing public `share_token` and the organizer's existing on/off switch, so one decision covers the live scorecard and the line-up.
+
+## 200.0.261007 — Line-up card: tee rating/slope, the allowance arithmetic in full, opponents and strokes
+
+Game setup → Line-up showed each player's team and group, a bold number labelled nothing (the course handicap before any allowance — on a 90% game a player read 15 and played off 14 unknowingly), no slope or rating, and no opponent.
+
 ## 199.5.261006 — Confirmed on device; diagnostic compares against the shell's own reference
 
 On-device readout after 199.4 (installed, portrait): `appH_var 894px · shellH 894 · navBottom 894 · navTop 844` with iOS still reporting `visualVP_h 611` — the stale value is present and no longer matters. Fix confirmed. The diagnostic's `navBottom_vs_visible` still compared the nav to the visual viewport and read −283 in red while the nav was flush; it now compares against the height the shell is sized to (layout viewport when installed, visual viewport in a tab). `visualVP_h` stays on the panel for diagnosis. The rule is recorded in APP_RULES.md, HANDOFF.md and the project memory. Client-only; no migration.
