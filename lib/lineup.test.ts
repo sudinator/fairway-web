@@ -90,4 +90,24 @@ const dan = P("u4", "Dan", 12, 13.0, "B", "White");
   eq(strokesPhrase(-2), "you give 2 strokes", "giving");
   eq(strokesPhrase(0), "level", "level");
 }
+// The production case (2026-10-08): index 14 on slope 131 / rating 71 / par 72 is 15.2 unrounded; the engine
+// applies the allowance to 15.2 (13.7 → 14), so the arithmetic line must print 15.2, not 15.
+{
+  const amitDerived = { id: "u1", user_id: "u1", display_name: "Amit", handicap_index: 14, slope: 131, rating: 71, course_handicap: 15, team: "A", tee_name: "Blue" };
+  const l = buildLineup({ game_type: "stableford", allowance_pct: 90, course_par: 72, holes_meta: H }, [amitDerived], tees);
+  const a = l.rows[0];
+  eq(a.courseHandicapExact, 15.2, "exact CH shown as the engine uses it");
+  eq(a.playingExact, 13.7, "13.7, not 13.5");
+  eq(a.playingHandicap, 14, "plays off 14");
+  eq(a.courseHandicap, 15, "the whole-number CH is still available for the 100% label");
+  assert(buildLineupText({ game_type: "stableford", allowance_pct: 90, course_par: 72, holes_meta: H }, l).includes("CH 15.2 × 90% = 13.7 → PH 14"), "text prints the exact input");
+}
+// Groups come in the game's order, not the alphabetical order of their first player.
+{
+  const g5 = { id: "u9", user_id: "u9", display_name: "Aaron Zed", course_handicap: 9, handicap_index: 9, team: "A", tee_name: "Blue" };
+  const game = { game_type: "fourball", allowance_pct: 100, course_par: 72, holes_meta: H,
+    foursomes: [{ id: "f1", name: "Group 1", a: ["u1"], b: ["u2"] }, { id: "f2", name: "Group 2", a: ["u3"], b: ["u4"] }, { id: "f3", name: "Group 3", a: ["u9"], b: [] }] };
+  const l = buildLineup(game, [amit, bob, carl, dan, g5], tees);
+  eq(l.groups.join("|"), "Group 1|Group 2|Group 3", "game order, although Aaron Zed (Group 3) sorts first alphabetically");
+}
 console.log("lineup tests passed");

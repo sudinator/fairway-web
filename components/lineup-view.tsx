@@ -60,7 +60,9 @@ export function LiveLineupView({ data, err, platform = "other" }: { data: any; e
   const rows = needle ? lineup.rows.filter((r) => r.name.toLowerCase().includes(needle)) : lineup.rows;
   // Group the rows by foursome/group so a player sees their own group together.
   const groups = new Map<string, LineupRow[]>();
+  for (const g of lineup.groups) groups.set(g, []);
   for (const r of rows) { const k = r.group || "Players"; if (!groups.has(k)) groups.set(k, []); groups.get(k)!.push(r); }
+  for (const [k, v] of Array.from(groups.entries())) if (!v.length) groups.delete(k);
   const asOf = data.as_of ? new Date(data.as_of).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : null;
 
   return shell(
@@ -114,7 +116,7 @@ export function LiveLineupView({ data, err, platform = "other" }: { data: any; e
                   <div style={{ color: "#676253", fontSize: 12, marginTop: 6 }}>
                     {r.courseHandicap == null ? `Index ${r.index ?? "—"} · course handicap not set`
                       : pct === 100 ? `Index ${r.index ?? "—"} → Course Handicap ${r.courseHandicap}`
-                      : `Index ${r.index ?? "—"} → Course Handicap ${r.courseHandicap} × ${pct}% = ${r.playingExact} → plays off ${r.playingHandicap}`}
+                      : `Index ${r.index ?? "—"} → Course Handicap ${r.courseHandicapExact} × ${pct}% = ${r.playingExact} → plays off ${r.playingHandicap}`}
                     {r.contests.filter((c) => c.strokes).map((c, i) => <div key={i}>{c.label}: {c.basis}</div>)}
                   </div>
                 ) : <div style={{ color: "#676253", fontSize: 11, marginTop: 4 }}>Tap for the handicap arithmetic</div>}

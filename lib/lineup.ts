@@ -42,7 +42,10 @@ export type LineupRow = {
   group: string | null;            // foursome name or "Grp N"
   tee: string | null; rating: number | null; slope: number | null;
   index: number | null;
-  courseHandicap: number | null;   // chBasis
+  courseHandicap: number | null;   // chBasis, rounded — the whole-number figure a golfer calls their course handicap
+  courseHandicapExact: number | null; // chBasis as the engine uses it (unrounded; 15.2, not 15). The
+                                      // arithmetic line prints THIS, because 15 × 90% is 13.5 and the
+                                      // engine's answer is 13.7 — a card that shows 15 lies about its input.
   allowancePct: number;
   playingExact: number | null;     // CH × allowance, unrounded
   playingHandicap: number | null;  // the figure actually played off
@@ -54,6 +57,10 @@ export type Lineup = {
   tees: { name: string; rating: number | null; slope: number | null }[];
   allowancePct: number;
   rows: LineupRow[];
+  /** Group names in the GAME'S order (foursomes as the organizer arranged them, then tee groups
+   *  numerically, then "Players"). The picker and the page use this; deriving the order from the
+   *  alphabetical player list put Group 1 last whenever its first player sorted late. */
+  groups: string[];
 };
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -152,6 +159,7 @@ export function buildLineup(game: LineupGame, players: LineupPlayer[], courseTee
         tee: p.tee_name ?? null, rating: tee?.rating ?? null, slope: tee?.slope ?? null,
         index: p.handicap_index ?? null,
         courseHandicap: ch != null ? Math.round(ch) : null,
+        courseHandicapExact: ch != null ? r1(ch) : null,
         allowancePct: allowance,
         playingExact: ch != null ? r1(applyAllowanceExact(ch, allowance)) : null,
         playingHandicap: ch != null ? applyAllowance(ch, allowance) : null,
@@ -160,7 +168,12 @@ export function buildLineup(game: LineupGame, players: LineupPlayer[], courseTee
       };
     });
 
-  return { tees, allowancePct: allowance, rows };
+  const groupOrder: string[] = [];
+  for (const f of game.foursomes || []) if (f.name && !groupOrder.includes(f.name)) groupOrder.push(f.name);
+  const teeGroups = Array.from(new Set(players.map((p) => p.tee_group).filter((x): x is number => x != null))).sort((a, b) => a - b).map((n) => `Grp ${n}`);
+  for (const g of teeGroups) if (!groupOrder.includes(g)) groupOrder.push(g);
+  for (const r of rows) { const g = r.group || "Players"; if (!groupOrder.includes(g)) groupOrder.push(g); }
+  return { tees, allowancePct: allowance, rows, groups: groupOrder };
 }
 
 /** "you get 3 strokes" / "you give 2" / "level" — the words a golfer uses. */
@@ -185,7 +198,7 @@ export function buildLineupText(game: LineupGame, lineup: Lineup): string {
     const bits = [r.teamName, r.group, r.tee ? `${r.tee} tees` : null].filter(Boolean).join(" \u00b7 ");
     const hcp = r.courseHandicap == null ? "CH \u2014"
       : lineup.allowancePct === 100 ? `CH ${r.courseHandicap} (idx ${r.index ?? "\u2014"})`
-      : `CH ${r.courseHandicap} \u00d7 ${lineup.allowancePct}% = ${r.playingExact} \u2192 PH ${r.playingHandicap} (idx ${r.index ?? "\u2014"})`;
+      : `CH ${r.courseHandicapExact} \u00d7 ${lineup.allowancePct}% = ${r.playingExact} \u2192 PH ${r.playingHandicap} (idx ${r.index ?? "\u2014"})`;
     lines.push(`${r.name}${bits ? ` \u2014 ${bits}` : ""}${r.noShow ? " \u00b7 no-show" : ""}`);
     lines.push(`  ${hcp}`);
     for (const c of r.contests) {

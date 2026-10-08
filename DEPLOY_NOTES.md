@@ -1,3 +1,9 @@
+## 201.6.261008 — Line-up arithmetic prints the course handicap the engine actually uses; groups in game order
+
+Production screenshot (2026-10-08): "Index 14 → Course Handicap 15 × 90% = 13.7 → plays off 14". 15 × 0.9 is 13.5. The engine applies the allowance to the UNROUNDED course handicap (15.2 from index 14 on slope 131; `chBasis` is deliberately unrounded — "rounding belongs at the end of the chain", 181.13), and the card printed the rounded one. The card and the text export now print the exact figure: "Course Handicap 15.2 × 90% = 13.7 → plays off 14". Whether WHS wants the course handicap rounded BEFORE the allowance (Rule 6.2a says it does) is a scoring decision for the owner, flagged in BACKLOG; the card no longer misstates its input either way.
+
+The group picker and the page listed groups in the alphabetical order of their first player (Group 1 last). `buildLineup` now returns `groups` in the game's own order — foursomes as arranged, then tee groups numerically; both surfaces use it. Tests for both. Client-only; no migration.
+
 ## 201.5.261008 — Public share pages are never served from the service-worker cache; link previews name the game
 
 **Why the scroll fix did not reach the phone.** `public/sw.js` is cache-first for every same-origin request, including `/lineup/<token>`. Safari's worker cached the broken 201.2 page on first open; 201.3 and 201.4 downloaded a *waiting* worker that, by design, activates only when someone taps Update — and a public page has no Update button. Safari kept serving the cached page. `/live/<token>` had the same exposure. Public share routes are now in `shouldBypass()` — always network, never cached — and `ci/check_public_routes_scroll.py` fails the build if either prefix leaves the bypass list (negative-tested). The page footer shows the build version so "which build is this phone on" is answerable from the screen.
