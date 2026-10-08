@@ -298,3 +298,12 @@ run any new migration manually in the Supabase SQL editor (see MIGRATIONS.md).
 - The installed app's shell is sized to the **layout viewport** (`window.innerHeight`), never `visualViewport.height`, which iOS leaves stale in Home Screen apps (readout 2026-10-05: innerHeight 894, visualVP_h 611, no keyboard — the nav sat 283 px above the bottom). A Safari tab uses the visual viewport to follow the toolbar. `lib/viewport-height.ts` is the one decision; `ci/check_shell_geometry.py` fails the build if `--app-h` is sized from the visual viewport again.
 - Keyboard handling (`data-kb`) is gated on a **focused editable element** (`lib/viewport-editable.ts`), never on a pixel gap alone.
 - Any display or viewport change is verified on the device with VIEWPORT DIAG (Admin → Diagnostics): installed → `appH_var == innerHeight` and `navBottom == innerHeight`. The readout from any incident goes into the release note. A screenshot is not evidence.
+
+## Public routes (share links) and scrolling (standing rule, 201.3)
+
+- Public share routes are **bypassed by the service worker** (`shouldBypass()` in `public/sw.js`): the worker is cache-first and only the installed app can tap Update, so a cached public page is pinned in Safari for every visitor. They also carry **server-side metadata** (`layout.tsx` + `generateMetadata`) so chat previews name the game, and show `APP_VERSION` in the footer.
+- `html`/`body` are locked (`overflow: hidden`, `body { position: fixed }`) for iOS bounce prevention. Any page rendered outside `.app-shell` — `/live`, `/lineup`, any future share link — must own its scroll container: `className="live-scroll"` (position fixed, inset 0, overflow-y auto). Without it the page does not scroll and taps below the fold hit nothing. `ci/check_public_routes_scroll.py` enforces it.
+
+## Lessons become guards (standing rule, 201.4)
+
+- An incident that could recur becomes an executable guard — in `npm run guards` or the full-chain assertions — negative-tested with a deliberate violation, in the release that fixes it. A comment or release note explains the why; it never carries the enforcement. Current set: `ci/check_recurrence_guards.py` (server time formatting, NULL-safe SQL assertions, `is_admin()` arity, OS-assigned CI ports), `ci/check_public_routes_scroll.py`, `ci/assert-no-rpc-overloads.sql`, `ci/check_shell_geometry.py` (layout-viewport rule).

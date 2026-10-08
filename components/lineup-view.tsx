@@ -5,6 +5,8 @@
 import React, { useState } from "react";
 import { C } from "@/lib/golf";
 import { buildLineup, strokesPhrase, type LineupRow } from "@/lib/lineup";
+import { lineupTitle } from "@/lib/lineup-meta";
+import { APP_VERSION } from "@/lib/app-version";
 
 // Where the "open the app" button leads depends on the platform, and the page must say the truth:
 //   ios-browser  — iOS gives web apps no way to claim their links, so a tap from WhatsApp always lands
@@ -24,11 +26,15 @@ export function detectLineupPlatform(): LineupPlatform {
 
 export function LiveLineupView({ data, err, platform = "other" }: { data: any; err: string | null; platform?: LineupPlatform }) {
   const [q, setQ] = useState("");
+  React.useEffect(() => { try { if (data) document.title = lineupTitle(data); } catch { /* ignore */ } }, [data]);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const shell = (inner: React.ReactNode) => (
-    // Safe areas via padding tokens the ratchet knows; the live scorecard page uses the same shape.
-    <div style={{ minHeight: "100dvh", background: C.green, color: C.cream, paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)", fontFamily: "-apple-system, Segoe UI, Roboto, sans-serif" }}>
-      <div style={{ maxWidth: 480, margin: "0 auto", padding: "16px" }}>{inner}</div>
+    // PUBLIC ROUTE RULE (app/globals.css, "live-scroll"): html/body are locked (overflow hidden,
+    // body position:fixed) so the installed app never rubber-bands. A page outside .app-shell must
+    // therefore be its own scroll container, as /live/[token] is. 201.2 shipped this page without
+    // one: nothing scrolled and taps below the fold hit nothing (production, 2026-10-07).
+    <div className="live-scroll" style={{ position: "fixed", inset: 0, overflowY: "auto", WebkitOverflowScrolling: "touch", overscrollBehavior: "contain", background: C.green, color: C.cream, fontFamily: "-apple-system, Segoe UI, Roboto, sans-serif" }}>
+      <div style={{ maxWidth: 480, margin: "0 auto", padding: "16px", paddingTop: "max(16px, env(safe-area-inset-top, 0px))", paddingBottom: "max(16px, env(safe-area-inset-bottom, 0px))" }}>{inner}</div>
     </div>
   );
 
@@ -121,6 +127,7 @@ export function LiveLineupView({ data, err, platform = "other" }: { data: any; e
       <div style={{ textAlign: "center", color: C.sage, fontSize: 12, marginTop: 24, lineHeight: 1.6 }}>
         Live line-up · updates as the organizer changes it{asOf ? ` · as of ${asOf}` : ""}
         <div style={{ marginTop: 10 }}><OpenAppButton code={data.code} platform={platform} /></div>
+        <div style={{ marginTop: 10, fontSize: 11, opacity: 0.7 }} data-lineup-version>Birdie Num Num {APP_VERSION}</div>
       </div>
     </>
   );

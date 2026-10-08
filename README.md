@@ -1,3 +1,15 @@
+## 201.5.261008 — Public share pages are never served from the service-worker cache; link previews name the game
+
+**Why the scroll fix did not reach the phone.** `public/sw.js` is cache-first for every same-origin request, including `/lineup/<token>`. Safari's worker cached the broken 201.2 page on first open; 201.3 and 201.4 downloaded a *waiting* worker that, by design, activates only when someone taps Update — and a public page has no Update button. Safari kept serving the cached page. `/live/<token>` had the same exposure. Public share routes are now in `shouldBypass()` — always network, never cached — and `ci/check_public_routes_scroll.py` fails the build if either prefix leaves the bypass list (negative-tested). The page footer shows the build version so "which build is this phone on" is answerable from the screen.
+
+## 201.4.261008 — Recurrence audit: every past incident that could recur now has an executable guard
+
+The owner's observation after 201.3 ("we have run into this issue before when creating web links, but it seems we don't learn from past experiences") was correct, and the pattern is specific: lessons recorded as prose — a comment in globals.css, a release note — only work if read at the right moment. The fixes that held this week were the ones that became guards (JSX escapes, design scale, contrast, migration authorization, shell geometry). This release audits DEPLOY_NOTES from 177.x and converts the remaining recurrence-prone classes into guards, each negative-tested with a deliberate violation.
+
+## 201.3.261007 — Live line-up page scrolls (hotfix)
+
+Production, 2026-10-07: the line-up link opened but would not scroll and nothing below the fold could be tapped. `app/globals.css` locks `html`/`body` (overflow hidden, body position:fixed) so the installed app never rubber-bands; a page rendered outside the app shell must own its scroll container — the `/live` page does, with `.live-scroll`, after the identical failure at 184.1 — and the new page did not. It now uses the same container. `ci/check_public_routes_scroll.py` (new, in `npm run guards`) fails the build for any page under `app/live` or `app/lineup` without one; negative-tested. The render test asserts the container. Client-only; no migration.
+
 ## 201.2.261007 — The organizer gets the game notification too
 
 Migration 0175: `notify_game_added` no longer skips the organizer. Every player in the game receives the same notification with the same deep link; the organizer's reads "You set up "Saturday Fourball". Tap to open the game." since "Amit added you" is meaningless to Amit. The owner's reasoning: the organizer is a player too, and receiving it is how they know it went out.

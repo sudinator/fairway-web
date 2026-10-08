@@ -6,7 +6,19 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 201.2.261007
+## Current candidate: 201.5.261008
+
+- RULE: public share routes (/live/, /lineup/, any future one) are bypassed by the service worker and carry server-side metadata (a layout.tsx with generateMetadata). Guarded in ci/check_public_routes_scroll.py. A public page shows APP_VERSION in its footer.
+
+## Previous: 201.4.261008
+
+- RULE: every incident that could recur becomes an executable guard (npm run guards or the full chain), negative-tested, in the release that fixes it. Prose in notes/APP_RULES explains; it never enforces. See ci/check_recurrence_guards.py and ci/assert-no-rpc-overloads.sql for the current set.
+
+## Previous: 201.3.261007 (HOTFIX)
+
+- RULE: any page outside .app-shell (public share routes) owns its scroll container (`className="live-scroll"`); html/body are locked. Guarded by ci/check_public_routes_scroll.py. Second occurrence (184.1, 201.2) — read globals.css before adding a route.
+
+## Previous: 201.2.261007
 
 - 0175 organizer gets game_added. RULE for SQL assertions: compare with `is distinct from` / `is null or not like`; a NULL never raises.
 

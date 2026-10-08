@@ -101,7 +101,7 @@ begin
   update public.course_api_checks set last_success_at = now() - interval '9 days',  last_checked_at = now() - interval '9 days'  where provider_id = 'ci2';
   select string_agg(out_provider_id, ',' order by out_last_checked_at asc) into first_two
     from public.claim_course_api_checks(ids, 10);
-  if first_two <> 'ci1,ci2' then raise exception 'oldest-first gave %, expected ci1,ci2', first_two; end if;
+  if first_two is distinct from 'ci1,ci2' then raise exception 'oldest-first gave %, expected ci1,ci2', first_two; end if;
 
   -- The limit is capped at the provider's daily allowance, whatever the caller asks for.
   delete from public.course_api_checks where provider_id like 'ci%';
