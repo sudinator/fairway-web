@@ -1,3 +1,7 @@
+## 201.6 — decision needed
+
+- **Allowance basis.** `chBasis` returns the unrounded course handicap and `applyAllowance` rounds once at the end (index 14 on slope 131 → 15.2 → ×90% = 13.7 → 14). WHS Rule 6.2a rounds the Course Handicap to a whole number first (15 → ×90% = 13.5 → 14 here, but the two can differ by a stroke elsewhere). Owner to decide; a change touches every format's stroke allocation and needs the differential simulation rerun.
+
 ## 199.5 — follow-ups (added 2026-10-07)
 
 - **Admin → Players: clubs panel for players outside the admin's own clubs.** `group_members_select_visible` (0137) has no `is_admin()` clause (insert/update got one in 0144), so the app admin sees a player's memberships only for clubs they share; others read "Not in any club" and the Add-to-club dropdown is built from that incomplete view. Fix: migration 0173 adds `public.is_admin()` to the select policy, asserted on the full chain (app admin sees memberships of a club they are not in; a member still sees only their clubs). Also surface the CLUBS list on the expanded player row instead of behind *Manage*. Works today only because Amit is a member of every club.

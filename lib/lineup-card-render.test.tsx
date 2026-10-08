@@ -40,7 +40,7 @@ const wrap = (title: string, note: string, html: string) =>
   const t = s.text;
   ok(t.includes("Blue tees · 71.2 / 134") && t.includes("White tees · 69 / 130"), "page: tees with rating/slope");
   ok(t.includes("90% allowance — Playing Handicap = Course Handicap × 0.9, rounded (.5 up)"), "page: allowance rule");
-  ok(t.includes("GROUP 1") && t.includes("GROUP 2"), "page: grouped by foursome");
+  ok(t.includes("GROUP 1") && t.includes("GROUP 2") && t.indexOf("GROUP 1") < t.indexOf("GROUP 2"), "page: grouped by foursome, in the game's order");
   ok(t.includes("Singles vs Bob Jones — you get 9 strokes"), "page: Amit's single");
   ok(t.includes("Four-ball with Carl Diaz vs Bob Jones & Dan Lee — you get 9 strokes"), "page: Amit's team leg");
   ok(t.includes("Singles vs Amit Sud — you give 9 strokes"), "page: Bob gives");

@@ -431,7 +431,7 @@ export function ShareLineupModal({
   const pct = lineup.allowancePct;
 
   // Groups: foursomes when the format has them, else tee groups, else everyone as one card.
-  const groupNames = Array.from(new Set(lineup.rows.map((r) => r.group || "Players")));
+  const groupNames = lineup.groups;
   const myKey = currentUserId || null;
   const myGroup = myKey ? (lineup.rows.find((r) => r.key === myKey)?.group || null) : null;
   const [groupName, setGroupName] = useState<string>(myGroup || groupNames[0] || "Players");
@@ -495,7 +495,7 @@ export function ShareLineupModal({
                   <div style={{ color: "#676253", fontSize: 11, marginTop: 6 }}>
                     {r.courseHandicap == null ? `Index ${r.index ?? "—"} · course handicap not set`
                       : pct === 100 ? `Index ${r.index ?? "—"} → Course Handicap ${r.courseHandicap}`
-                      : `Index ${r.index ?? "—"} → Course Handicap ${r.courseHandicap} × ${pct}% = ${r.playingExact} → plays off ${r.playingHandicap}`}
+                      : `Index ${r.index ?? "—"} → Course Handicap ${r.courseHandicapExact} × ${pct}% = ${r.playingExact} → plays off ${r.playingHandicap}`}
                   </div>
                   {r.contests.map((c, i) => (
                     <div key={i} style={{ marginTop: 6, padding: "4px 10px", background: "rgba(0,0,0,0.05)", borderRadius: 6, color: C.green, fontSize: 12 }}>
