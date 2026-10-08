@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { buildSetupSummary, dominantTee } from "@/lib/setup-summary";
+import { buildLineup, buildLineupText, strokesPhrase } from "@/lib/lineup";
 import { toPng } from "html-to-image";
 import { C, Hole, Round, stablefordPts, allocateStrokes, applyAllowance, fmtDate, girStats, firStats, fracPct } from "@/lib/golf";
 import { chBasis } from "@/lib/game-shape";
@@ -418,114 +418,104 @@ function SoloScoreGrid({ round }: { round: Round }) {
  * arranged two ways rather than two independent renderings that can disagree.
  */
 export function ShareLineupModal({
-  game, players, onClose,
-}: { game: any; players: any[]; onClose: () => void }) {
+  game, players, courseTees = [], currentUserId, linkControl, onClose,
+}: { game: any; players: any[]; courseTees?: CourseTee[]; currentUserId?: string | null; linkControl?: React.ReactNode; onClose: () => void }) {
+  // 201.0: the line-up is shared as a LIVE LINK first (it fits a chat at any size and stays
+  // correct as the organizer changes pairings; it goes dark when the game ends). The image is a
+  // per-group card — one foursome fits a WhatsApp thumbnail; twenty players never did.
   const cardRef = useRef<HTMLDivElement>(null);
-  const dom = dominantTee(players || []);
-  // Alphabetical: finding yourself is the job, and it matches the text version.
-  const rows = [...(players || [])].sort((a: any, b: any) =>
-    String(a.display_name).localeCompare(String(b.display_name)));
-  // Tee groups are only worth a column when they actually differ.
-  const showGroup = new Set(rows.map((p: any) => p.tee_group ?? null)).size > 1;
-
+  const lineup = buildLineup(game, players || [], courseTees || []);
   const teams: { key: string; name: string }[] = Array.isArray(game.teams) ? game.teams : [];
-  // Two team colours, matching the app's team accents. A third would need the palette extending;
-  // the app only supports two teams today.
   const teamColor = (key: string | null | undefined) =>
     key == null ? null : key === (teams[0]?.key ?? "A") ? "#B05B5B" : "#5271B0";
+  const pct = lineup.allowancePct;
+
+  // Groups: foursomes when the format has them, else tee groups, else everyone as one card.
+  const groupNames = Array.from(new Set(lineup.rows.map((r) => r.group || "Players")));
+  const myKey = currentUserId || null;
+  const myGroup = myKey ? (lineup.rows.find((r) => r.key === myKey)?.group || null) : null;
+  const [groupName, setGroupName] = useState<string>(myGroup || groupNames[0] || "Players");
+  const groupRows = lineup.rows.filter((r) => (r.group || "Players") === groupName);
 
   const { busy, msg, shareImage, copyText } = useCardExport(
-    cardRef, "lineup", "Line-up",
-    () => buildSetupSummary(game, players),
+    cardRef, `lineup-${groupName.replace(/\s+/g, "-").toLowerCase()}`, `Line-up — ${groupName}`,
+    () => buildLineupText(game, { ...lineup, rows: groupRows }),
   );
-
-  const meta = (game.holes_meta || []) as { n: number }[];
-  const holes = meta.length === 18 || !meta.length
-    ? "18 holes"
-    : `${meta.length} holes (${meta[0]?.n}\u2013${meta[meta.length - 1]?.n})`;
-  const allowance = game.allowance_pct != null && game.allowance_pct !== 100
-    ? ` \u00b7 ${game.allowance_pct}% allowance` : "";
 
   return (
     <div {...backdropDismiss(onClose)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 420, maxHeight: "92vh", overflowY: "auto" }}>
-        <div ref={cardRef} style={{ background: C.green, borderRadius: 14, padding: "16px 14px 14px" }}>
-          <div style={{ textAlign: "center", marginBottom: 12 }}>
-            <div style={{ color: C.gold, fontSize: 11, letterSpacing: 2.4, fontWeight: 700 }}>LINE-UP</div>
-            <div style={{ color: C.cream, fontSize: 19, fontWeight: 800, fontFamily: "Georgia, serif", marginTop: 3 }}>
-              {game.name || "Game"}
-            </div>
-            <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
-              {[game.course, game.played_at].filter(Boolean).join(" \u00b7 ")}
-            </div>
-            <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>{holes}{allowance}</div>
-            {/* The tee once, not on every row. */}
-            {dom ? (
-              <div style={{ color: C.cream, fontSize: 12, fontWeight: 700, marginTop: 6 }}>
-                {dom.exceptions === 0 ? `All playing ${dom.tee} tees` : `${dom.tee} tees unless noted`}
-              </div>
-            ) : null}
-            {/* Team key: colour explained once. Named "Team X" so the swatch is not the only cue —
-                red-vs-blue is the common colour-blindness axis. */}
-            {teams.length ? (
-              <div style={{ marginTop: 8, display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
-                {teams.map((t) => (
-                  <span key={t.key} style={{ display: "inline-flex", alignItems: "center", gap: 5, color: C.sage, fontSize: 11 }}>
-                    <span style={{ width: 14, height: 8, borderRadius: 6, background: teamColor(t.key) as string, display: "inline-block" }} />
-                    Team {t.name || t.key}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
+        {/* The live link: same token and switch as the live scorecard, different page. Rendered by
+            the caller (ShareControl lives in scorecard-views, which imports this file). */}
+        {linkControl ? (
+          <div style={{ background: C.greenMid, borderRadius: 14, padding: "13px 16px", marginBottom: 10 }}>{linkControl}</div>
+        ) : null}
 
-          {rows.map((p: any) => {
-            const col = teamColor(p.team);
-            const bits: string[] = [];
-            if (!dom || p.tee_name !== dom.tee) bits.push(`${p.tee_name || "\u2014"} tees`);
-            if (showGroup && p.tee_group != null) bits.push(`Grp ${p.tee_group}`);
-            if (p.no_show) bits.push("no-show");
-            const sub = bits.join(" \u00b7 ");
-            return (
-              <div key={p.id || p.display_name} style={{
-                display: "flex", alignItems: "center", gap: 10, background: C.cell, borderRadius: 8,
-                padding: sub ? "8px 12px" : "10px 12px", marginBottom: 6,
-                // 6px both sides: two stripes close a shape, so the row reads as a bracketed block
-                // rather than a list item with a coloured edge — and it survives a long name.
-                borderLeft: col ? `6px solid ${col}` : "none",
-                borderRight: col ? `6px solid ${col}` : "none",
-              }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ color: C.green, fontSize: 14, fontWeight: 800 }}>{p.display_name}</div>
-                  {sub ? <div style={{ color: "#676253", fontSize: 11, marginTop: 1 }}>{sub}</div> : null}
+        {/* Per-group card: one foursome per image. */}
+        <div style={{ background: C.greenMid, borderRadius: 14, padding: "13px 16px" }}>
+          <div style={{ color: C.gold, fontSize: 11, letterSpacing: 1.6, fontWeight: 800 }}>GROUP CARD</div>
+          {groupNames.length > 1 ? (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+              {groupNames.map((g) => (
+                <button key={g} onClick={() => setGroupName(g)} style={{ ...btn(g === groupName), fontSize: 12, padding: "8px 12px" }}>{g}{g === myGroup ? " (you)" : ""}</button>
+              ))}
+            </div>
+          ) : null}
+          <div ref={cardRef} style={{ background: C.green, borderRadius: 14, padding: "16px 14px 14px", marginTop: 10 }}>
+            <div style={{ textAlign: "center", marginBottom: 12 }}>
+              <div style={{ color: C.gold, fontSize: 11, letterSpacing: 2.4, fontWeight: 700 }}>LINE-UP · {groupName.toUpperCase()}</div>
+              <div style={{ color: C.cream, fontSize: 19, fontWeight: 800, fontFamily: "Georgia, serif", marginTop: 3 }}>{game.name || "Game"}</div>
+              <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{[game.course, game.played_at].filter(Boolean).join(" · ")}</div>
+              {lineup.tees.length ? (
+                <div style={{ marginTop: 6, display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+                  {lineup.tees.map((t) => (
+                    <span key={t.name} style={{ color: C.cream, fontSize: 12, fontWeight: 700 }}>
+                      {t.name} tees{t.rating != null ? <span style={{ color: C.sage, fontWeight: 500 }}> · {t.rating} / {t.slope ?? "—"}</span> : null}
+                    </span>
+                  ))}
                 </div>
-                <div style={{ textAlign: "right", flex: "none" }}>
-                  <div style={{ color: C.green, fontSize: 17, fontWeight: 800, fontFamily: "Georgia, serif" }}>
-                    {/* The figure the player actually plays off, not the stored 18-hole one: on
-                        a nine a derived handicap halves and a manual one does not, so printing
-                        the raw column showed 19 for someone playing off 9. */}
-                    {p.course_handicap != null
-                      ? Math.round(chBasis(p, game.course_par, (game.holes_meta || []).length))
-                      : "\u2014"}
+              ) : null}
+              {pct !== 100 ? <div style={{ color: C.gold, fontSize: 11, marginTop: 6 }}>{pct}% allowance — Playing Handicap = Course Handicap × {pct / 100}, rounded (.5 up)</div> : null}
+            </div>
+
+            {groupRows.map((r) => {
+              const col = teamColor(r.team);
+              return (
+                <div key={r.key} data-lineup-row style={{ background: C.cell, borderRadius: 8, padding: "8px 12px", marginBottom: 6, borderLeft: col ? `6px solid ${col}` : "none", borderRight: col ? `6px solid ${col}` : "none" }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: C.green, fontSize: 14, fontWeight: 800 }}>{r.name}</div>
+                      <div style={{ color: "#676253", fontSize: 11, marginTop: 1 }}>{[r.tee ? `${r.tee} tees` : null, r.teamName, r.noShow ? "no-show" : null].filter(Boolean).join(" · ")}</div>
+                    </div>
+                    <div style={{ textAlign: "right", flex: "none" }}>
+                      <div style={{ color: C.green, fontSize: 17, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{r.playingHandicap ?? "—"}</div>
+                      <div style={{ color: "#676253", fontSize: 11, letterSpacing: 0.6, marginTop: 2 }}>{pct === 100 ? "COURSE HCP" : "PLAYING HCP"}</div>
+                    </div>
                   </div>
-                  <div style={{ color: "#676253", fontSize: 11 }}>idx {p.handicap_index ?? "\u2014"}</div>
+                  <div style={{ color: "#676253", fontSize: 11, marginTop: 6 }}>
+                    {r.courseHandicap == null ? `Index ${r.index ?? "—"} · course handicap not set`
+                      : pct === 100 ? `Index ${r.index ?? "—"} → Course Handicap ${r.courseHandicap}`
+                      : `Index ${r.index ?? "—"} → Course Handicap ${r.courseHandicap} × ${pct}% = ${r.playingExact} → plays off ${r.playingHandicap}`}
+                  </div>
+                  {r.contests.map((c, i) => (
+                    <div key={i} style={{ marginTop: 6, padding: "4px 10px", background: "rgba(0,0,0,0.05)", borderRadius: 6, color: C.green, fontSize: 12 }}>
+                      <b>{c.label}</b>{c.partner ? ` with ${c.partner}` : ""} vs {c.opponents.join(" & ")} — <b style={{ color: c.strokes == null ? "#676253" : c.strokes > 0 ? "#2E7D32" : c.strokes < 0 ? "#9E4A4A" : C.green }}>{strokesPhrase(c.strokes)}</b>
+                      {c.strokes != null && c.strokes !== 0 ? <span style={{ color: "#676253" }}> ({c.basis})</span> : null}
+                    </div>
+                  ))}
                 </div>
-              </div>
-            );
-          })}
-
-          <div style={{ textAlign: "center", color: C.sage, fontSize: 11, marginTop: 12, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.10)" }}>
-            Check your handicap and tee before we start · <b style={{ color: C.gold }}>Birdie Num Num</b>
+              );
+            })}
+            <div style={{ textAlign: "center", color: C.sage, fontSize: 11, marginTop: 12, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.10)" }}>
+              Check your handicap, tee and opponent before we start · <b style={{ color: C.gold }}>Birdie Num Num</b>
+            </div>
           </div>
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button onClick={shareImage} disabled={busy} style={{ ...btn(true), flex: 1, fontSize: 13 }}>{busy ? "Preparing…" : "📤 Share this group"}</button>
+            <button onClick={copyText} style={{ ...btn(), flex: 1, fontSize: 13 }}>Copy as text</button>
+          </div>
+          {msg ? <div style={{ color: C.sage, fontSize: 11.5, textAlign: "center", marginTop: 6 }}>{msg}</div> : null}
         </div>
-
-        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-          <button onClick={shareImage} disabled={busy} style={{ ...btn(true), flex: 1, fontSize: 13 }}>
-            {busy ? "Preparing\u2026" : "\ud83d\udce4 Share image"}
-          </button>
-          <button onClick={copyText} style={{ ...btn(), flex: 1, fontSize: 13 }}>Copy as text</button>
-        </div>
-        {msg ? <div style={{ color: C.sage, fontSize: 11.5, textAlign: "center", marginTop: 6 }}>{msg}</div> : null}
         <button onClick={onClose} style={{ ...btn("ghost"), width: "100%", marginTop: 8, fontSize: 13 }}>Close</button>
       </div>
     </div>

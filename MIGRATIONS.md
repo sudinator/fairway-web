@@ -164,7 +164,7 @@ Regenerate after shipping (adds new files, keeps ticks and the notes block):
 Confirm database-applied state with:
 `select id, applied_at from public.schema_migrations order by id;`
 
-Total: 157 migrations. Unchecked = not yet confirmed applied in this checklist.
+Total: 160 migrations. Unchecked = not yet confirmed applied in this checklist.
 
 ## Checklist (oldest → newest)
 
@@ -325,6 +325,9 @@ Total: 157 migrations. Unchecked = not yet confirmed applied in this checklist.
 - [ ] 0170_push_device_health.sql
 - [ ] 0171_course_api_check_log.sql
 - [ ] 0172_push_delivery_log.sql
+- [ ] 0173_live_lineup.sql
+- [ ] 0174_game_added_deep_link.sql
+- [ ] 0175_game_added_organizer.sql
 
 <!-- NOTES:START -->
 

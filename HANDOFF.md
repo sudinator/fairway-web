@@ -6,7 +6,23 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 199.5.261006 (199.4 confirmed on device)
+## Current candidate: 201.2.261007
+
+- 0175 organizer gets game_added. RULE for SQL assertions: compare with `is distinct from` / `is null or not like`; a NULL never raises.
+
+## Previous: 201.1.261007
+
+- Game deep link `/?game=<code>` (home.tsx); line-up page button per platform; 0174 notification link. Apply 0173 and 0174 before the code.
+
+## Previous: 201.0.261007
+
+- 0173 live line-up link + per-group card; lib/lineup.ts is the one source for line-up numbers. Apply 0173 before the code.
+
+## Superseded (never shipped): 200.0.261007
+
+- Line-up card rebuilt on lib/lineup.ts (engine arithmetic). Client only.
+
+## Previous: 199.5.261006 (199.4 confirmed on device)
 
 - Diag's navBottom_vs_visible now uses the shell's reference height. Rule recorded in APP_RULES.md.
 

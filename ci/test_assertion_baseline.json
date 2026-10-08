@@ -1,5 +1,5 @@
 {
-  "total": 439421,
+  "total": 439444,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -30,6 +30,7 @@
     "half-stroke simulation": 168914,
     "hole result consistency": 981,
     "legs": 30,
+    "lineup renders": 23,
     "live cup parity": 49,
     "manual course handicap": 17,
     "manual handicap simulation": 76807,

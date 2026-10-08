@@ -3,6 +3,7 @@
 import React from "react";
 import { gameTypeLabel } from "@/lib/game-create";
 import { ShareLineupModal } from "@/components/share-card";
+import type { CourseTee } from "@/lib/courses";
 import { buildSetupSummary } from "@/lib/setup-summary";
 import { C } from "@/lib/golf";
 import { pkey, shapeOf } from "@/lib/game-shape";
@@ -38,6 +39,8 @@ export type GameSetupWorkspaceProps = {
   randomizing: boolean;
   groupOverflow: string[];
   isCompetitionGame?: boolean;
+  /** Tees of the game's course, for rating/slope on the line-up card (200.0). */
+  courseTees?: CourseTee[];
 };
 
 const cardStyle: React.CSSProperties = {
@@ -68,6 +71,7 @@ export function GameSetupWorkspace({
   randomizing,
   groupOverflow,
   isCompetitionGame = false,
+  courseTees = [],
 }: GameSetupWorkspaceProps) {
   // Whether the line-up card is open. Local: presentation, not setup state.
   const [showLineup, setShowLineup] = React.useState(false);
@@ -346,7 +350,10 @@ export function GameSetupWorkspace({
         </div>
       )}
       {showLineup ? (
-        <ShareLineupModal game={game} players={players} onClose={() => setShowLineup(false)} />
+        <ShareLineupModal game={game} players={players} courseTees={courseTees} currentUserId={organizerPanelProps.user?.id ?? null}
+          linkControl={<ShareControl game={game} onShare={organizerPanelProps.onShare} path="lineup" title="Live line-up link"
+            blurb="One link for the chat. It shows every player's tees, playing handicap, opponents and strokes, updates as you change pairings, and stops working when the game ends." />}
+          onClose={() => setShowLineup(false)} />
       ) : null}
     </div>
   );

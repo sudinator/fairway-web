@@ -1,3 +1,45 @@
+## 201.2.261007 — The organizer gets the game notification too
+
+Migration 0175: `notify_game_added` no longer skips the organizer. Every player in the game receives the same notification with the same deep link; the organizer's reads "You set up "Saturday Fourball". Tap to open the game." since "Amit added you" is meaningless to Amit. The owner's reasoning: the organizer is a player too, and receiving it is how they know it went out.
+
+The assertion file's comparisons were NULL-unsafe (`m <> 'text'` with no row is NULL, which never raises) — a missing notification would have passed; the negative test for this release exposed it. All 18 `<>` / `not like` comparisons now use `is distinct from` / `is null or not like`. Red on 0174 ("organizer game_added text: <none>"), green on 0175.
+
+Deploy: 0175 to staging → code → 0175 to production → merge (with 0173/0174 if not yet applied).
+
+## 201.1.261007 — Game deep link; the line-up page tells the truth about opening the app; game_added opens the game
+
+**Game deep link.** `/?game=<code>` resolves, for a signed-in person, to a game they can see (a player or a member of its club), switches to that club if needed and opens the game room; unknown code or no access → the Games tab as usual. Also honoured when tapped from an in-app notification. Nothing is granted by the link: visibility is the game's existing rule.
+
+**Line-up page button, per platform.** iOS gives web apps no way to claim their links, so a tap from WhatsApp lands in Safari even with the app installed; navigating from there would open a SECOND copy of the app in Safari (and trip the primary-device prompt). On iPhone-in-Safari the button is therefore an instruction — "Open the Birdie Num Num app from your Home Screen · Then go to Games — this game is code 312906" — with a small "open it in Safari" link for the uninstalled. Everywhere else (Android WebAPK, desktop, inside the app) "Open in Birdie Num Num" navigates to the game deep link. Asserted in the render test for both states.
+
+**Migration 0174.** `notify_game_added` links to `/?game=<code>` and its message ends "Tap to open the game." — tapping the notification opens the game, not the Games list.
+
+Deploy: 0174 to staging → code → 0174 to production → merge (0173 as well if not yet applied). Check: tap a game_added notification → the game room opens; chat link on an iPhone → the instruction button; on Android → the app opens on the game.
+
+## 201.0.261007 — Live line-up link for the chat; per-group card; the line-up card redesign
+
+**Why a link.** A line-up image stops working past one foursome — twenty players make an 1,800px image WhatsApp shrinks to a thumbnail, and it is wrong the moment the organizer swaps a pairing. The line-up is now shared as a **live link** (`/lineup/<token>`) that fits a chat at any size, refreshes itself every 25 seconds and on return to the tab, and goes dark when the game ends ("This game has finished, so the line-up is no longer shown"). It rides the game's existing public `share_token` and the organizer's existing on/off switch, so one decision covers the live scorecard and the line-up.
+
+**What it shows** — all from `lib/lineup.ts`, the engine's own arithmetic (`chBasis`, `applyAllowance`, `matchAllowance`, `trifectaSingles`, `altShotSides`): every tee in use with rating/slope; the allowance rule stated once; per player the **Playing Handicap** (labelled; COURSE HCP at 100%) with the arithmetic behind a tap — "Index 16.1 → Course Handicap 15 × 90% = 13.5 → plays off 14" (Rule 6.2a, .5 up); each contest with opponent and signed strokes — "Singles vs Bob — you get 9 strokes", "Four-ball with Carl vs Bob & Dan — you get 9 strokes (off the low man, Bob (PH 5))"; grouped by foursome with a find-your-name box. Missing data reads TBD / —, never a guess.
+
+**Migration 0173.** `get_live_lineup(token)` — anon-callable, SECURITY DEFINER, keyed on the token alone; exposes less than the live scorecard: no scores, no putts, no money (asserted). Course tees resolved as the app does (club link by name, else global by exact name).
+
+**Share flow.** Game setup → Line-up: the Live line-up link control on top (same `ShareControl`, `path="lineup"`), below it a **per-group card** — one foursome per image, own group pre-selected — with *Share this group* and *Copy as text*. The full-card image is gone. The former card (bold course handicap with no allowance, no slope/rating, no opponent) is replaced on both surfaces.
+
+**Tests.** `lib/lineup.test.ts` (engine parity, swap, match play, individual formats, missing data); `lib/lineup-card-render.test.tsx` mounts the real page view, the ended state and the group card — 18 DOM assertions — and writes both renders to `.testout-screens/` for review (the two artifacts shown before shipping); `ci/assert-live-lineup.sql` on the full chain. Guards caught and I fixed: literal `\u00b7` escapes in JSX text, a 10px font, two off-scale paddings, a 4.47:1 red.
+
+Deploy: 0173 to staging → code → 0173 to production → merge. Then on game 312906: Line-up → turn the link on → paste it into the chat → confirm it opens without login and goes dark when the game is ended.
+
+## 200.0.261007 — Line-up card: tee rating/slope, the allowance arithmetic in full, opponents and strokes
+
+Game setup → Line-up showed each player's team and group, a bold number labelled nothing (the course handicap before any allowance — on a 90% game a player read 15 and played off 14 unknowingly), no slope or rating, and no opponent.
+
+New `lib/lineup.ts` builds the card's data from the engine's own functions — `chBasis` (course handicap for the holes played), `applyAllowance` (Playing Handicap, Rule 6.2a rounding), `matchAllowance` (1-v-1 strokes), `trifectaSingles` (which single each player plays), `altShotSides` (alternate-shot side handicaps) — so what a player reads before the round is what the scorecard will apply. The card now shows: every tee in use with rating/slope in the header; the allowance rule stated once; per player the big number labelled **PLAYING HCP** (or **COURSE HCP** at 100%) with the arithmetic beneath it — "Index 16.1 → Course Handicap 15 × 90% = 13.5 → plays off 14"; and each contest — "Singles vs Bob — you get 9 strokes (difference of playing handicaps)", "Four-ball with Carl vs Bob & Dan — you get 9 strokes (off the low man, Bob (PH 5))", alternate shot likewise, match play from pairings; individual formats show no contest. Missing data reads TBD / —, never a guess. "Copy as text" carries the same facts. `courseTees` is passed from the game screen through the setup workspace to the card.
+
+Tests: `lib/lineup.test.ts` pins the 90% example (15 → 13.5 → 14), single strokes equal `matchAllowance`, four-ball strokes off the low man, swap flag, match play, stableford (no contests), and missing-CH / missing-tee behaviour. Client-only; no migration.
+
+Not screenshot-rendered: confirm on game 312906 that Amit's row reads the arithmetic and the Bob single.
+
 ## 199.5.261006 — Confirmed on device; diagnostic compares against the shell's own reference
 
 On-device readout after 199.4 (installed, portrait): `appH_var 894px · shellH 894 · navBottom 894 · navTop 844` with iOS still reporting `visualVP_h 611` — the stale value is present and no longer matters. Fix confirmed. The diagnostic's `navBottom_vs_visible` still compared the nav to the visual viewport and read −283 in red while the nav was flush; it now compares against the height the shell is sized to (layout viewport when installed, visual viewport in a tab). `visualVP_h` stays on the panel for diagnosis. The rule is recorded in APP_RULES.md, HANDOFF.md and the project memory. Client-only; no migration.

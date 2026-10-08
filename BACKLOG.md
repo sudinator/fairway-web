@@ -1,3 +1,14 @@
+## 199.5 — follow-ups (added 2026-10-07)
+
+- **Admin → Players: clubs panel for players outside the admin's own clubs.** `group_members_select_visible` (0137) has no `is_admin()` clause (insert/update got one in 0144), so the app admin sees a player's memberships only for clubs they share; others read "Not in any club" and the Add-to-club dropdown is built from that incomplete view. Fix: migration 0173 adds `public.is_admin()` to the select policy, asserted on the full chain (app admin sees memberships of a club they are not in; a member still sees only their clubs). Also surface the CLUBS list on the expanded player row instead of behind *Manage*. Works today only because Amit is a member of every club.
+- **Admin → Users: Wipe button.** `admin_wipe_user` (0032) exists in SQL with no UI. Expose it app-admin-only with type-the-name confirmation; on the Merge confirmation, remind that the duplicate's login must be deleted in Supabase → Authentication → Users (the app never touches `auth.users`).
+- Courses tab: pending-review count badge.
+- Course data: one-tap "remove from library" for "No club" (orphaned shared) courses.
+- Merge `course_api_checks` and `course_freshness` into one verification story.
+- Team-format game-final notification states the match result (needs the client to post it when the organizer ends the game — touches scoring, do in a quiet week).
+- Optional: purge read notifications older than N days (pre-0165 generic text ages out at 90 days anyway).
+- Close the UNVERIFIED 192.19–193.2 entries below: they shipped and were superseded.
+
 ## 195.0 — follow-ups
 
 ## 194.0 — follow-ups
