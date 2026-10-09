@@ -6,7 +6,15 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 201.6.261008
+## Current candidate: 201.8.261008
+
+- 0176: line-up link shows games.played_at (a DATE — never apply `at time zone` to it). Apply 0176 before the code.
+
+## Previous: 201.7.261008
+
+- Picker lists only populated groups. Allowance basis SETTLED: WHS 2024 Rule 6.2a applies the allowance to the UNROUNDED course handicap and rounds once (.5 up) — exactly what the engine does. Do not reopen.
+
+## Previous: 201.6.261008
 
 - Line-up arithmetic uses chBasis's unrounded CH; groups in game order. OPEN QUESTION for Amit: should CH be rounded before the allowance (WHS 6.2a)? Engine currently applies allowance to the unrounded figure.
 

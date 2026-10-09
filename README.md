@@ -1,3 +1,11 @@
+## 201.8.261008 — The line-up link shows the match date, not the day it was created
+
+The link's title and header read today's date for Saturday's game: 0173 returned `created_at` because its author believed games carried no play date. `games.played_at` is the match date (a DATE column; 0110 calls it "the game's MATCH date"). Migration 0176 returns it as `played_on` (YYYY-MM-DD, falling back to created_at in Eastern only when unset); the page, the chat preview and the group card format it on the device as "Sat, Oct 10, 2026" — weekday and year, built as a local date so it cannot shift a day across the UTC boundary. The full-chain assertion seeds a Saturday match created on a Thursday and requires the Saturday; its first run caught an off-by-one in the migration (applying `at time zone` to a DATE in a UTC session yields the previous evening) before it shipped.
+
+## 201.7.261008 — Group picker lists only groups that hold players
+
+201.6's game-order change added every tee-group number ("Grp 1" … "Grp 5") to the picker alongside the named foursomes, so a game whose players all sat in foursomes showed five empty buttons. Only groups that actually contain a player are listed now; tee groups appear only for games without foursomes. Tested both ways. Client-only; no migration.
+
 ## 201.6.261008 — Line-up arithmetic prints the course handicap the engine actually uses; groups in game order
 
 Production screenshot (2026-10-08): "Index 14 → Course Handicap 15 × 90% = 13.7 → plays off 14". 15 × 0.9 is 13.5. The engine applies the allowance to the UNROUNDED course handicap (15.2 from index 14 on slope 131; `chBasis` is deliberately unrounded — "rounding belongs at the end of the chain", 181.13), and the card printed the rounded one. The card and the text export now print the exact figure: "Course Handicap 15.2 × 90% = 13.7 → plays off 14". Whether WHS wants the course handicap rounded BEFORE the allowance (Rule 6.2a says it does) is a scoring decision for the owner, flagged in BACKLOG; the card no longer misstates its input either way.

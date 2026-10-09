@@ -110,4 +110,14 @@ const dan = P("u4", "Dan", 12, 13.0, "B", "White");
   const l = buildLineup(game, [amit, bob, carl, dan, g5], tees);
   eq(l.groups.join("|"), "Group 1|Group 2|Group 3", "game order, although Aaron Zed (Group 3) sorts first alphabetically");
 }
+// Tee-group numbers appear ONLY when a player is actually grouped by them (no foursome). Players who
+// all sit in named foursomes must not produce empty "Grp N" entries (production, 2026-10-08).
+{
+  const withTee = (p: any, n: number) => ({ ...p, tee_group: n });
+  const game = { game_type: "fourball", allowance_pct: 100, course_par: 72, holes_meta: H, foursomes: [{ id: "f1", name: "Group 1", a: ["u1", "u3"], b: ["u2", "u4"] }] };
+  const l = buildLineup(game, [withTee(amit, 1), withTee(bob, 1), withTee(carl, 2), withTee(dan, 2)], tees);
+  eq(l.groups.join("|"), "Group 1", "no empty Grp buttons when everyone is in a foursome");
+  const l2 = buildLineup({ game_type: "stableford", allowance_pct: 100, course_par: 72, holes_meta: H }, [withTee(amit, 2), withTee(bob, 1)], tees);
+  eq(l2.groups.join("|"), "Grp 1|Grp 2", "tee groups used, numerically, when there are no foursomes");
+}
 console.log("lineup tests passed");

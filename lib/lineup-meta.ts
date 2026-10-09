@@ -2,11 +2,21 @@
 // (what iMessage/WhatsApp show when the link is pasted) and by the page's own document.title.
 // Before: every preview read "Birdie Num Num" — the root metadata — so a chat full of links were
 // indistinguishable. Now: "Line-up · Saturday Trifecta · Sat Oct 11".
-export function lineupTitle(d: { ended?: boolean; name?: string | null; played_at?: string | null } | null | undefined): string {
+// "Sat, Oct 10, 2026" from a YYYY-MM-DD match date, built as a LOCAL date so it never shifts a day
+// across the UTC boundary (the 196.3 lesson). Weekday and year included: a link read on Thursday for
+// Saturday's game must not look like today's game.
+export function fmtMatchDate(ymd: string | null | undefined): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd || "");
+  if (!m) return ymd || null;
+  const d = new Date(+m[1], +m[2] - 1, +m[3]);
+  return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+}
+
+export function lineupTitle(d: { ended?: boolean; name?: string | null; played_on?: string | null; played_at?: string | null } | null | undefined): string {
   if (!d) return "Line-up · Birdie Num Num";
   const name = (d.name || "Game").trim();
   if (d.ended) return `${name} · finished · Birdie Num Num`;
-  return ["Line-up", name, d.played_at || null].filter(Boolean).join(" · ");
+  return ["Line-up", name, fmtMatchDate(d.played_on) || d.played_at || null].filter(Boolean).join(" · ");
 }
 
 export function lineupDescription(d: { ended?: boolean; course?: string | null; players?: unknown[]; allowance_pct?: number | null; game_type?: string | null } | null | undefined): string {

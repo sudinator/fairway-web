@@ -13,11 +13,11 @@ begin
   insert into favorite_courses(id,group_id,user_id,name,data) values (fc,grp,org,'Essex County Country Club',
     '{"name":"Essex County Country Club","tees":[{"name":"Blue","rating":71.2,"slope":134,"par":72}],"holes":[]}');
   insert into group_courses(group_id,course_id,added_by) values (grp,fc,org);
-  insert into games(id,code,name,course,game_type,status,group_id,created_by,allowance_pct,course_par,holes_meta,share_token,foursomes,teams)
+  insert into games(id,code,name,course,game_type,status,group_id,created_by,allowance_pct,course_par,holes_meta,share_token,foursomes,teams,played_at)
     values (gid,'LNUP','Saturday Trifecta','Essex County Country Club','trifecta','active',grp,org,90,72,
             '[{"n":1,"par":4,"si":1}]'::jsonb, tok,
             '[{"id":"f1","name":"Group 1","a":["17300000-0000-0000-0000-000000000001"],"b":[]}]'::jsonb,
-            '[{"key":"A","name":"Reds"},{"key":"B","name":"Blues"}]'::jsonb);
+            '[{"key":"A","name":"Reds"},{"key":"B","name":"Blues"}]'::jsonb, '2026-10-10');
   insert into game_players(game_id,user_id,display_name,tee_name,course_handicap,handicap_index,team,scores) values (gid,org,'Organizer','Blue',15,16.1,'A','[4]'::jsonb);
 
   execute 'set local role anon';
@@ -29,6 +29,8 @@ begin
   if (j->'players'->0) ? 'scores' then raise exception 'line-up payload leaks scores'; end if;
   if (j->'course_tees'->0->>'slope')::int <> 134 then raise exception 'course tees not resolved by name: %', j->'course_tees'; end if;
   if jsonb_array_length(j->'foursomes') <> 1 then raise exception 'foursomes missing'; end if;
+  -- 0176: the MATCH date (games.played_at), not the creation time.
+  if (j->>'played_on') is distinct from '2026-10-10' then raise exception 'played_on is % — must be the match date, not created_at', j->>'played_on'; end if;
 
   if public.get_live_lineup('no-such-token-xxxxxxxx') is not null then raise exception 'unknown token returned data'; end if;
   if public.get_live_lineup('short') is not null then raise exception 'short token returned data'; end if;

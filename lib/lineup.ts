@@ -168,10 +168,13 @@ export function buildLineup(game: LineupGame, players: LineupPlayer[], courseTee
       };
     });
 
+  // Only groups that actually hold a player. 201.6 listed every tee-group number as well, so a game
+  // whose twenty players all sat in named foursomes showed five empty "Grp N" buttons too.
+  const present = new Set(rows.map((r) => r.group || "Players"));
   const groupOrder: string[] = [];
-  for (const f of game.foursomes || []) if (f.name && !groupOrder.includes(f.name)) groupOrder.push(f.name);
+  for (const f of game.foursomes || []) if (f.name && present.has(f.name) && !groupOrder.includes(f.name)) groupOrder.push(f.name);
   const teeGroups = Array.from(new Set(players.map((p) => p.tee_group).filter((x): x is number => x != null))).sort((a, b) => a - b).map((n) => `Grp ${n}`);
-  for (const g of teeGroups) if (!groupOrder.includes(g)) groupOrder.push(g);
+  for (const g of teeGroups) if (present.has(g) && !groupOrder.includes(g)) groupOrder.push(g);
   for (const r of rows) { const g = r.group || "Players"; if (!groupOrder.includes(g)) groupOrder.push(g); }
   return { tees, allowancePct: allowance, rows, groups: groupOrder };
 }

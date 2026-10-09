@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { buildLineup, buildLineupText, strokesPhrase } from "@/lib/lineup";
+import { fmtMatchDate } from "@/lib/lineup-meta";
 import { toPng } from "html-to-image";
 import { C, Hole, Round, stablefordPts, allocateStrokes, applyAllowance, fmtDate, girStats, firStats, fracPct } from "@/lib/golf";
 import { chBasis } from "@/lib/game-shape";
@@ -465,7 +466,7 @@ export function ShareLineupModal({
             <div style={{ textAlign: "center", marginBottom: 12 }}>
               <div style={{ color: C.gold, fontSize: 11, letterSpacing: 2.4, fontWeight: 700 }}>LINE-UP · {groupName.toUpperCase()}</div>
               <div style={{ color: C.cream, fontSize: 19, fontWeight: 800, fontFamily: "Georgia, serif", marginTop: 3 }}>{game.name || "Game"}</div>
-              <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{[game.course, game.played_at].filter(Boolean).join(" · ")}</div>
+              <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{[game.course, fmtMatchDate(String(game.played_at || "").slice(0, 10)) || game.played_at].filter(Boolean).join(" · ")}</div>
               {lineup.tees.length ? (
                 <div style={{ marginTop: 6, display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
                   {lineup.tees.map((t) => (
