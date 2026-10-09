@@ -44,7 +44,12 @@ const wrap = (title: string, note: string, html: string) =>
   ok(t.includes("Singles vs Bob Jones — you get 9 strokes"), "page: Amit's single");
   ok(t.includes("Four-ball with Carl Diaz vs Bob Jones & Dan Lee — you get 9 strokes"), "page: Amit's team leg");
   ok(t.includes("Singles vs Amit Sud — you give 9 strokes"), "page: Bob gives");
-  ok(t.includes("Tap for the handicap arithmetic") && !t.includes("× 90% = 13.5"), "page: arithmetic collapsed by default");
+  ok(t.includes("Tap for the handicap arithmetic") && !t.includes("× 90% = 13.7") && !t.includes("× 90% = 13.5"), "page: arithmetic collapsed by default");
+  ok(!s.html.includes("border-left: 6px solid") && s.html.includes("background: rgb(") , "page: team shown as a tinted band, not side bars");
+  ok((s.html.match(/data-arith-toggle/g) || []).length === 8, "page: the toggle is a real button on every row");
+  // Tapping the BUTTON opens the arithmetic; the name is not a tap target.
+  s.click("Tap for the handicap arithmetic");
+  ok(s.text.includes("Hide the handicap arithmetic") && s.text.includes("→ plays off"), "page: tapping the text/chevron control reveals the arithmetic");
   ok(t.includes("Live line-up · updates as the organizer changes it"), "page: says it is live");
   ok((s.html.match(/data-lineup-row/g) || []).length === 8, "page: eight players rendered");
   ok(s.html.includes('data-open-app="navigate"') && s.html.includes('href="/?game=LNUP"'), "page (other platforms): the button deep-links to the game");

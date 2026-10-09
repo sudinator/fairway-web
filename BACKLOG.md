@@ -1,3 +1,7 @@
+## 202.4 — follow-up
+
+- **Organizer-chosen team colours.** Colours are fixed by team order today. A per-team colour setting is small; the line-up band already derives from any colour through `lib/team-tint.ts` (contrast guaranteed); the chip/frame variants and the in-app scorecard bars would need per-colour handling.
+
 ## 202.0 — follow-up
 
 - **Parity job alert.** The live production migration parity job went red for 0176 and nobody noticed because the deploy succeeded. Have it open/update a GitHub issue on failure, as External API Contracts does, so the owner gets a notification. Workflow-only change.

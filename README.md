@@ -1,3 +1,19 @@
+## 202.5.261009 — No box around the arithmetic toggle
+
+iOS draws a bordered pill around any <button> unless its appearance is reset, even with border:none; the "Tap for the handicap arithmetic" control showed one. Reset (appearance none, no outline/shadow/radius, inherited font). The chevron stays. Client-only; no migration.
+
+## 202.4.261009 — Line-up rows: tinted team band behind the name; grey chevron toggle for the arithmetic
+
+Chosen from four rendered options: the team is shown as a **light tint band behind the name row** (option B) instead of 6px side bars — on the public page and the group card alike. The band is a tint of the team colour, not the colour itself (`lib/team-tint.ts`: the colour mixed ~85% into the cream card), so the dark text never changes by team; the test proves ≥ 4.5:1 for the two colours in use and for yellow, violet, grey, gold, black and pure red, which answers "what if the teams were Yellow and Violet". Team colours remain fixed by team order (first red, second blue) and each row still prints the team's name in words, so "Sharks v Jets" reads correctly with the bands as markers.
+
+## 202.3.261009 — Line-up page: the handicap arithmetic opens from a visible button
+
+"Tap for the handicap arithmetic" was plain text; the actual tap target was the player's name row above it, which nobody could know. The arithmetic now opens from a real button under each row — "Show the handicap arithmetic" / "Hide the handicap arithmetic", underlined, 24px tall — and the name is no longer a tap target. The rendered test mounts the page, taps the button and asserts the arithmetic appears. Client-only; no migration.
+
+## 202.2.261009 — One rule for shortening names: first name, then last initial, then full name
+
+A game with three Amits showed three "Amit"s. Twenty-seven separate `split(" ")[0]` sites across seven files each shortened names on their own. `lib/short-names.ts` is now the one rule, decided per set shown: first name; if it collides, first name + last initial ("Amit S", "Amit B"); if that still collides ("Amit S" twice), the full name for those two. Single-word names stay as they are; the comparison ignores case and spacing, the label keeps the person's spelling. The same person is "Amit" in a foursome with no other Amit and "Amit S" on the full leaderboard — what a human would do.
+
 ## 202.1.261008 — Readable links for the live scorecard and competition pages; security dependency bumps
 
 **Links.** Every public link now reads as something. The live scorecard uses the game's slug from 0177 — one slug, one switch, two pages: `/live/bowling-green-golf-club-oct10-7h3k2p` and `/lineup/…` the same. Competitions get their own: `/live/cup/fall-ryder-cup-oct10-m4x8rq`, minted by `set_competition_share` when sharing is turned on and cleared when it is turned off. Tokens keep working, so links already in chats do not break. Migration 0178 redefines `get_live_scorecard` and `get_live_competition` from their 0155 bodies with only the lookup line changed, and both slug makers guarantee the 16-character minimum the readers require (a one-letter course name is padded). Asserted on the full chain: both pages resolve by slug and by token; a guessed competition slug resolves to nothing; revoke clears the slug.

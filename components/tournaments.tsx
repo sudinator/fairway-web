@@ -1,4 +1,5 @@
 "use client";
+import { shortNamer } from "@/lib/short-names";
 import { useScoringDevice } from "@/components/scoring-device";
 import { isPrimaryScoringDevice, isDeviceRejection, markScoringDeviceRevoked } from "@/lib/scoring-device";
 import { createGameScoreWriter } from "@/lib/game-score-sync";
@@ -3874,7 +3875,7 @@ function GameRoom({
               if (!pr) return undefined;
               const oppId = pr.a === myKey ? pr.b : pr.a;
               const oppP = players.find((p) => pkey(p) === oppId);
-              return oppP?.display_name?.split(" ")[0] || "Opp";
+              return shortNamer(players)(oppP, "Opp");
             })()}
             matchRun={(() => {
               if (game.game_type === "match") {

@@ -13,6 +13,10 @@ Each check names the release where the class of bug last shipped. Negative-teste
      resolved to nothing and "Create live link did nothing".
   D. Fixed listen ports in CI helpers (197.1, 197.2): the runner shares its network with the Supabase CLI
      stack, whose ports move between versions. Bind 0.
+  E. Ad-hoc first-name shortening (202.2): `name.split(" ")[0]` scattered across seven files showed three
+     "Amit"s on one scorecard. lib/short-names.ts is the one rule (first name unless it collides, then
+     last initial, then full name); components and lib must go through it. components/player-card.tsx is
+     the documented exception (a single person's own name; no set to collide with).
 """
 import re, sys
 from pathlib import Path
@@ -56,8 +60,16 @@ for f in (ROOT / "ci").rglob("*.mjs"):
         if re.search(r"\.listen\(\s*[1-9]\d*", line):
             problems.append(f"D {f.relative_to(ROOT)}:{i}: fixed listen port in a CI helper — bind 0 (197.2)")
 
+# E. ad-hoc name shortening
+ALLOW_E = {ROOT / "lib" / "short-names.ts", ROOT / "components" / "player-card.tsx"}
+for f in list((ROOT / "components").rglob("*.tsx")) + list((ROOT / "lib").rglob("*.ts")):
+    if f in ALLOW_E or f.name.endswith(".test.ts") or f.name.endswith(".test.tsx"): continue
+    for i, line in enumerate(f.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
+        if re.search(r"\.split\(\s*[\"']\s[\"']\s*\)\s*\[\s*0\s*\]|\.split\(/\\s\+/\)", line) and ("name" in line.lower()):
+            problems.append(f"E {f.relative_to(ROOT)}:{i}: shortens a name by hand — use shortNamer/shortLabels from lib/short-names (202.2)")
+
 if problems:
     print("recurrence guards: FAIL")
     for p in problems: print("  " + p)
     sys.exit(1)
-print("recurrence guards: PASS (server time formatting, NULL-safe assertions, is_admin arity, OS-assigned ports)")
+print("recurrence guards: PASS (server time formatting, NULL-safe assertions, is_admin arity, OS-assigned ports, one name-shortening rule)")
