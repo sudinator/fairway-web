@@ -1,4 +1,5 @@
 "use client";
+import { shortNamer } from "@/lib/short-names";
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { altShotDrivers } from "@/lib/alt-shot";
 import { readAltShotSideScores } from "@/lib/alt-shot-scores";
@@ -95,6 +96,8 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
   courseTees?: CourseTee[];
   offline?: boolean;
 }) {
+  // Names shortened within the GROUP shown (lib/short-names): first name unless it collides here.
+  const shortOf = shortNamer(players);
   const [edit, setEdit] = useState<{ playerId: string; holeIdx: number; alt?: { foursomeId: string; side: AltShotScoreSide } } | null>(null);
   useEffect(() => { if (readOnly) setEdit(null); }, [readOnly]);
   const paceNow = useNowTick();
@@ -297,7 +300,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
                 return (
                   <span key={`tee${fr ? si2 : si2}-${d.driver}`}>
                     <span style={{ color: C.gold }}>{"\u26F3"}</span>{" "}
-                    <b style={{ color: C.cream, fontWeight: 700 }}>{who.display_name.split(" ")[0]}</b> tees off
+                    <b style={{ color: C.cream, fontWeight: 700 }}>{shortOf(who)}</b> tees off
                   </span>
                 );
               }),
@@ -507,7 +510,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
                 {c.altSide ? (
                   <>
                     <div style={{ color: C.cream, fontSize: 13, fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.altSide.name}</div>
-                    <div style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.altSide.memberNames.map((n) => n.split(" ")[0]).join(" / ")}</div>
+                    <div style={{ color: C.sage, fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.altSide.memberNames.map((n) => shortOf(n)).join(" / ")}</div>
                     <div style={{ color: C.sage, fontSize: 11 }}>playing hcp {c.altSide.sideCh == null ? "–" : Number(c.altSide.sideCh.toFixed(2))}</div>
                     <div style={{ color: c.altSide.receiving ? C.gold : C.sage, fontSize: 11, fontWeight: 700 }}>{c.altSide.receiving ? `gets ${c.altSide.matchStrokes}` : "plays scratch"}</div>
                   </>

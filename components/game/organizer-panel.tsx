@@ -1,4 +1,5 @@
 "use client";
+import { shortNamer } from "@/lib/short-names";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { FormatPicker, AllowancePicker } from "@/components/game/format-picker";
 import type { GameType } from "@/lib/game-shape";
@@ -975,7 +976,8 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
   const buildSummary = (): string => {
     const courseName = game?.course || "Round";
     const dateStr = new Date(game?.ended_at || game?.created_at || Date.now()).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-    const shortName = (n: string) => { const parts = (n || "").trim().split(/\s+/); return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}` : (parts[0] || ""); };
+    // One shortening rule (lib/short-names): first name unless it collides among this game's players.
+    const shortName = shortNamer(players);
     const grossOf = (p: Player) => playerHoles(p).reduce((sum, h) => sum + (h.strokes && h.strokes > 0 ? h.strokes : 0), 0);
     const rows = players
       .map((p) => ({ name: p.display_name, total: playerPoints(p), gross: grossOf(p), seg: stablefordBySix(playerHoles(p)) }))

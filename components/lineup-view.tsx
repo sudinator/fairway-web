@@ -7,6 +7,7 @@ import { C } from "@/lib/golf";
 import { buildLineup, strokesPhrase, type LineupRow } from "@/lib/lineup";
 import { lineupTitle, fmtMatchDate } from "@/lib/lineup-meta";
 import { APP_VERSION } from "@/lib/app-version";
+import { tint } from "@/lib/team-tint";
 
 // Where the "open the app" button leads depends on the platform, and the page must say the truth:
 //   ios-browser  — iOS gives web apps no way to claim their links, so a tap from WhatsApp always lands
@@ -24,7 +25,11 @@ export function detectLineupPlatform(): LineupPlatform {
   } catch { return "other"; }
 }
 
-export function LiveLineupView({ data, err, platform = "other" }: { data: any; err: string | null; platform?: LineupPlatform }) {
+// Team-colour treatment of a row (202.4 options): "bars" = 6px side bars (current); "band" = a light
+// red/blue band behind the name row, text stays dark; "frame" = the whole card framed in the team
+// colour, body neutral; "chip" = a small RED/BLUE chip beside the name, no colour elsewhere.
+export type TeamStyle = "bars" | "band" | "frame" | "chip";
+export function LiveLineupView({ data, err, platform = "other", teamStyle = "band" }: { data: any; err: string | null; platform?: LineupPlatform; teamStyle?: TeamStyle }) {
   const [q, setQ] = useState("");
   React.useEffect(() => { try { if (data) document.title = lineupTitle(data); } catch { /* ignore */ } }, [data]);
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -96,10 +101,20 @@ export function LiveLineupView({ data, err, platform = "other" }: { data: any; e
             const col = teamColor(r.team);
             const isOpen = !!open[r.key];
             return (
-              <div key={r.key} data-lineup-row style={{ background: C.cell, borderRadius: 10, padding: "8px 12px", marginBottom: 6, borderLeft: col ? `6px solid ${col}` : "none", borderRight: col ? `6px solid ${col}` : "none" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }} onClick={() => setOpen((o) => ({ ...o, [r.key]: !isOpen }))}>
+              <div key={r.key} data-lineup-row style={{
+                background: C.cell, borderRadius: 10, marginBottom: 6, overflow: "hidden",
+                padding: teamStyle === "band" ? 0 : "8px 12px", paddingBottom: teamStyle === "band" ? 8 : undefined,
+                borderLeft: teamStyle === "bars" && col ? `6px solid ${col}` : "none",
+                borderRight: teamStyle === "bars" && col ? `6px solid ${col}` : "none",
+                border: teamStyle === "frame" && col ? `3px solid ${col}` : undefined,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10,
+                  ...(teamStyle === "band" ? { background: col ? tint(col) : "transparent", padding: "8px 12px", marginBottom: 2 } : {}) }}>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: C.green, fontSize: 15, fontWeight: 800 }}>{r.name}{r.noShow ? <span style={{ color: "#676253", fontWeight: 500 }}> · no-show</span> : null}</div>
+                    <div style={{ color: C.green, fontSize: 15, fontWeight: 800, display: "flex", alignItems: "center", gap: 8 }}>
+                      {teamStyle === "chip" && col ? <span style={{ background: col, color: "#FBFAF4", fontSize: 11, fontWeight: 800, letterSpacing: 1, padding: "4px 10px", borderRadius: 999 }}>{r.team === (teams[0]?.key ?? "A") ? (teams[0]?.name || "A").toUpperCase() : (teams[1]?.name || "B").toUpperCase()}</span> : null}
+                      <span>{r.name}{r.noShow ? <span style={{ color: "#676253", fontWeight: 500 }}> · no-show</span> : null}</span>
+                    </div>
                     <div style={{ color: "#676253", fontSize: 12, marginTop: 1 }}>{[r.tee ? `${r.tee} tees` : null, r.teamName].filter(Boolean).join(" · ")}</div>
                   </div>
                   <div style={{ textAlign: "right", flex: "none" }}>
@@ -108,18 +123,27 @@ export function LiveLineupView({ data, err, platform = "other" }: { data: any; e
                   </div>
                 </div>
                 {r.contests.map((c, i) => (
-                  <div key={i} style={{ marginTop: 6, padding: "4px 10px", background: "rgba(0,0,0,0.05)", borderRadius: 6, color: C.green, fontSize: 13 }}>
+                  <div key={i} style={{ marginTop: 6, marginLeft: teamStyle === "band" ? 12 : 0, marginRight: teamStyle === "band" ? 12 : 0, padding: "4px 10px", background: "rgba(0,0,0,0.05)", borderRadius: 6, color: C.green, fontSize: 13 }}>
                     <b>{c.label}</b>{c.partner ? ` with ${c.partner}` : ""} vs {c.opponents.join(" & ")} — <b style={{ color: c.strokes == null ? "#676253" : c.strokes > 0 ? "#2E7D32" : c.strokes < 0 ? "#9E4A4A" : C.green }}>{strokesPhrase(c.strokes)}</b>
                   </div>
                 ))}
+                {/* The arithmetic toggle is a BUTTON: "Tap for…" was plain text, and the real tap target was
+                    the name row above it, which nobody could know (202.3). */}
+                <button type="button" onClick={() => setOpen((o) => ({ ...o, [r.key]: !isOpen }))} aria-expanded={isOpen}
+                  data-arith-toggle
+                  // appearance:none — iOS draws a bordered pill around any <button> otherwise, even with border:none (202.5).
+                  style={{ marginTop: 6, marginLeft: teamStyle === "band" ? 12 : 0, background: "transparent", border: "none", WebkitAppearance: "none", appearance: "none", outline: "none", boxShadow: "none", padding: 0, font: "inherit", color: "#676253", fontSize: 12, cursor: "pointer", minHeight: 24, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <span aria-hidden style={{ display: "inline-block", width: 14, textAlign: "center", fontSize: 11, transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 120ms" }}>▶</span>
+                  {isOpen ? "Hide the handicap arithmetic" : "Tap for the handicap arithmetic"}
+                </button>
                 {isOpen ? (
-                  <div style={{ color: "#676253", fontSize: 12, marginTop: 6 }}>
+                  <div style={{ color: "#676253", fontSize: 12, marginTop: 4, marginLeft: teamStyle === "band" ? 12 : 0, marginRight: teamStyle === "band" ? 12 : 0 }}>
                     {r.courseHandicap == null ? `Index ${r.index ?? "—"} · course handicap not set`
                       : pct === 100 ? `Index ${r.index ?? "—"} → Course Handicap ${r.courseHandicap}`
                       : `Index ${r.index ?? "—"} → Course Handicap ${r.courseHandicapExact} × ${pct}% = ${r.playingExact} → plays off ${r.playingHandicap}`}
                     {r.contests.filter((c) => c.strokes).map((c, i) => <div key={i}>{c.label}: {c.basis}</div>)}
                   </div>
-                ) : <div style={{ color: "#676253", fontSize: 11, marginTop: 4 }}>Tap for the handicap arithmetic</div>}
+                ) : null}
               </div>
             );
           })}

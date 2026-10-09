@@ -1,7 +1,9 @@
 "use client";
+import { shortNamer } from "@/lib/short-names";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { buildLineup, buildLineupText, strokesPhrase } from "@/lib/lineup";
 import { fmtMatchDate } from "@/lib/lineup-meta";
+import { tint } from "@/lib/team-tint";
 import { toPng } from "html-to-image";
 import { C, Hole, Round, stablefordPts, allocateStrokes, applyAllowance, fmtDate, girStats, firStats, fracPct } from "@/lib/golf";
 import { chBasis } from "@/lib/game-shape";
@@ -216,6 +218,7 @@ const sgCell: React.CSSProperties = { textAlign: "center", fontSize: 11, padding
 const sgTot: React.CSSProperties = { textAlign: "center", width: 28, fontSize: 11, fontWeight: 800, color: C.green, borderLeft: `1px solid ${C.borderCard}` };
 
 export function ShareGameModal({ game, players, courseTees, onClose }: { game: any; players: any[]; courseTees?: CourseTee[]; onClose: () => void }) {
+  const shortOf = shortNamer((players || []).map((p: any) => p?.display_name));
   const cardRef = useRef<HTMLDivElement>(null);
   const meta = (game.holes_meta || []) as { n: number; par: number; si: number | null; yards?: number }[];
   const n = meta.length || 18;
@@ -295,7 +298,7 @@ export function ShareGameModal({ game, players, courseTees, onClose }: { game: a
             let sum = 0;
             return (
               <tr key={r.id} style={{ borderTop: "1px solid #F0EBDA" }}>
-                <td style={{ ...sgNm, color: C.ink, fontWeight: 800 }}>{r.name.split(" ")[0]}</td>
+                <td style={{ ...sgNm, color: C.ink, fontWeight: 800 }}>{shortOf(r.name)}</td>
                 {slice.map((m, idx) => {
                   const i = from + idx; const val = r.holes[i]?.strokes ?? null; if (val != null) sum += val;
                   return <td key={m.n} style={{ ...sgCell, color: scoreColor(val, m.par), fontWeight: (val != null && Math.abs(val - m.par) >= 1) ? 800 : 600 }}>{val ?? "·"}</td>;
@@ -339,7 +342,7 @@ export function ShareGameModal({ game, players, courseTees, onClose }: { game: a
           <div style={{ background: C.card, borderRadius: 12, marginTop: 8, padding: "8px 11px" }}>
             {board.map((r) => (
               <div key={r.id} style={{ color: C.ink, fontSize: 11.5, padding: "2px 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                <b>{r.name.split(" ")[0]}</b> <span style={{ color: C.faint }}>gross {r.gross} · net {r.net} · {r.pts} pts · GIR {fracPct(r.gir)} · FW {fracPct(r.fw)} · {r.puttsT} putts</span>
+                <b>{shortOf(r.name)}</b> <span style={{ color: C.faint }}>gross {r.gross} · net {r.net} · {r.pts} pts · GIR {fracPct(r.gir)} · FW {fracPct(r.fw)} · {r.puttsT} putts</span>
               </div>
             ))}
           </div>
@@ -482,8 +485,9 @@ export function ShareLineupModal({
             {groupRows.map((r) => {
               const col = teamColor(r.team);
               return (
-                <div key={r.key} data-lineup-row style={{ background: C.cell, borderRadius: 8, padding: "8px 12px", marginBottom: 6, borderLeft: col ? `6px solid ${col}` : "none", borderRight: col ? `6px solid ${col}` : "none" }}>
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                <div key={r.key} data-lineup-row style={{ background: C.cell, borderRadius: 8, padding: 0, paddingBottom: 8, marginBottom: 6, overflow: "hidden" }}>
+                  {/* Team shown as a light TINT band behind the name row (lib/team-tint): text stays dark whatever the colour (202.4). */}
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10, background: col ? tint(col) : "transparent", padding: "8px 12px" }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ color: C.green, fontSize: 14, fontWeight: 800 }}>{r.name}</div>
                       <div style={{ color: "#676253", fontSize: 11, marginTop: 1 }}>{[r.tee ? `${r.tee} tees` : null, r.teamName, r.noShow ? "no-show" : null].filter(Boolean).join(" · ")}</div>
@@ -493,13 +497,13 @@ export function ShareLineupModal({
                       <div style={{ color: "#676253", fontSize: 11, letterSpacing: 0.6, marginTop: 2 }}>{pct === 100 ? "COURSE HCP" : "PLAYING HCP"}</div>
                     </div>
                   </div>
-                  <div style={{ color: "#676253", fontSize: 11, marginTop: 6 }}>
+                  <div style={{ color: "#676253", fontSize: 11, marginTop: 6, marginLeft: 12, marginRight: 12 }}>
                     {r.courseHandicap == null ? `Index ${r.index ?? "—"} · course handicap not set`
                       : pct === 100 ? `Index ${r.index ?? "—"} → Course Handicap ${r.courseHandicap}`
                       : `Index ${r.index ?? "—"} → Course Handicap ${r.courseHandicapExact} × ${pct}% = ${r.playingExact} → plays off ${r.playingHandicap}`}
                   </div>
                   {r.contests.map((c, i) => (
-                    <div key={i} style={{ marginTop: 6, padding: "4px 10px", background: "rgba(0,0,0,0.05)", borderRadius: 6, color: C.green, fontSize: 12 }}>
+                    <div key={i} style={{ marginTop: 6, marginLeft: 12, marginRight: 12, padding: "4px 10px", background: "rgba(0,0,0,0.05)", borderRadius: 6, color: C.green, fontSize: 12 }}>
                       <b>{c.label}</b>{c.partner ? ` with ${c.partner}` : ""} vs {c.opponents.join(" & ")} — <b style={{ color: c.strokes == null ? "#676253" : c.strokes > 0 ? "#2E7D32" : c.strokes < 0 ? "#9E4A4A" : C.green }}>{strokesPhrase(c.strokes)}</b>
                       {c.strokes != null && c.strokes !== 0 ? <span style={{ color: "#676253" }}> ({c.basis})</span> : null}
                     </div>

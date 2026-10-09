@@ -1,3 +1,11 @@
+## 202.4 — follow-up
+
+- **Organizer-chosen team colours.** Colours are fixed by team order today. A per-team colour setting is small; the line-up band already derives from any colour through `lib/team-tint.ts` (contrast guaranteed); the chip/frame variants and the in-app scorecard bars would need per-colour handling.
+
+## 202.0 — follow-up
+
+- **Parity job alert.** The live production migration parity job went red for 0176 and nobody noticed because the deploy succeeded. Have it open/update a GitHub issue on failure, as External API Contracts does, so the owner gets a notification. Workflow-only change.
+
 ## 199.5 — follow-ups (added 2026-10-07)
 
 - **Admin → Players: clubs panel for players outside the admin's own clubs.** `group_members_select_visible` (0137) has no `is_admin()` clause (insert/update got one in 0144), so the app admin sees a player's memberships only for clubs they share; others read "Not in any club" and the Add-to-club dropdown is built from that incomplete view. Fix: migration 0173 adds `public.is_admin()` to the select policy, asserted on the full chain (app admin sees memberships of a club they are not in; a member still sees only their clubs). Also surface the CLUBS list on the expanded player row instead of behind *Manage*. Works today only because Amit is a member of every club.

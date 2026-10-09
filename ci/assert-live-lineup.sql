@@ -5,6 +5,7 @@ declare org uuid := '17300000-0000-0000-0000-000000000001'; grp uuid := '1730000
         gid uuid := '17300000-0000-0000-0000-000000000021'; fc uuid := '17300000-0000-0000-0000-000000000031';
         tok text := 'lineup-test-token-0173'; j jsonb;
 begin
+  delete from scoring_devices where user_id = org;
   delete from game_players where game_id = gid; delete from games where id = gid; delete from group_courses where course_id = fc; delete from favorite_courses where id = fc;
   delete from group_members where group_id = grp; delete from groups where id = grp; delete from profiles where id = org; delete from auth.users where id = org;
   insert into auth.users(id,email) values (org,'org@x.com'); insert into profiles(id,display_name) values (org,'Organizer');
@@ -41,7 +42,39 @@ begin
 
   if not has_function_privilege('anon', 'public.get_live_lineup(text)', 'execute') then raise exception 'anon cannot read the line-up link'; end if;
 
+  -- 0177: a readable slug. Minted when the organizer turns sharing on; readable prefix + 6 unguessable
+  -- characters; the read accepts slug or token; the slug is cleared with the token.
+  update games set status = 'active', ended_at = null where id = gid;
+  -- As the organizer, from a claimed scoring device: games updates by a signed-in user are fenced
+  -- by the 0162 device guard unless the request carries the device header, as the app's requests do.
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.sub', org::text, true);
+  perform public.claim_scoring_device('17300000-0000-0000-0000-000000000099');
+  perform set_config('request.headers', '{"x-bnn-scoring-device":"17300000-0000-0000-0000-000000000099"}', true);
+  perform public.set_game_share(gid, true);
+  execute 'reset role';
+  select lineup_slug into tok from games where id = gid;
+  if tok !~ '^essex-county-country-club-oct10-[abcdefghjkmnpqrstuvwxyz23456789]{6}$' then raise exception 'slug shape: %', tok; end if;
+  j := public.get_live_lineup(tok);
+  if j is null or (j->>'ended')::boolean or j->>'code' <> 'LNUP' then raise exception 'slug does not resolve: %', tok; end if;
+  if public.get_live_lineup('essex-county-country-club-oct10-zzzzzz') is not null then raise exception 'a guessed slug with the wrong code resolved'; end if;
+  -- renaming the game does not change a posted link (clear the JWT claim first: with a signed-in
+  -- claim set, a games UPDATE is fenced by the 0162 scoring-device guard)
+  perform set_config('request.jwt.claim.sub', '', true);
+  update games set name = 'Renamed' where id = gid;
+  if (select lineup_slug from games where id = gid) <> tok then raise exception 'slug changed on rename'; end if;
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.sub', org::text, true);
+  perform set_config('request.headers', '{"x-bnn-scoring-device":"17300000-0000-0000-0000-000000000099"}', true);
+  perform public.set_game_share(gid, false);
+  execute 'reset role';
+  perform set_config('request.jwt.claim.sub', '', true);
+  perform set_config('request.headers', '', true);
+  if (select lineup_slug from games where id = gid) is not null then raise exception 'slug survived turning sharing off'; end if;
+  if public.get_live_lineup(tok) is not null then raise exception 'revoked slug still resolves'; end if;
+
+  delete from scoring_devices where user_id = org;
   delete from game_players where game_id = gid; delete from games where id = gid; delete from group_courses where course_id = fc; delete from favorite_courses where id = fc;
   delete from group_members where group_id = grp; delete from groups where id = grp; delete from profiles where id = org; delete from auth.users where id = org;
-  raise notice 'LIVE_LINEUP_PASS token read serves active games only, no scores, tees by name, dark when ended';
+  raise notice 'LIVE_LINEUP_PASS token/slug read serves active games only, no scores, tees by name, dark when ended, slug minted/revoked with sharing';
 end $$;

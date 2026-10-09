@@ -1,3 +1,4 @@
+import { shortNamer } from "./short-names";
 // Pure game-shape + stroke logic. No React. Single source of truth for "what mode
 // is this game", plus the stroke-dot basis that MUST match golf.ts scoring.
 // Unit-tested in game-shape.test.ts.
@@ -307,9 +308,12 @@ export type StrokeSet = {
   label: string;
 };
 
-const nameOf = (p: ShapePlayer | undefined, fallback = "opponent"): string => {
+// Labels name people by the one shortening rule (lib/short-names): first name unless it collides
+// among `all` — three Amits read "Amit S", "Amit B", "Amit Shah", not "Amit" three times.
+const nameOf = (p: ShapePlayer | undefined, fallback = "opponent", all: ShapePlayer[] = []): string => {
   const n = (p as { display_name?: string | null } | undefined)?.display_name;
-  return (n || "").trim().split(" ")[0] || fallback;
+  if (!n) return fallback;
+  return shortNamer(all as unknown as { display_name?: string | null }[])(n, fallback);
 };
 
 /** Strokes between two players on one hole, pair basis (lower plays scratch). */
@@ -345,7 +349,7 @@ function groupLowStrokes(game: DotGame, me: ShapePlayer, allPlayers: ShapePlayer
   }
   return {
     strokes: matchStrokesFor(Math.max(0, mine - low), si, allocHoles(game)),
-    lowName: nameOf(lowP, "low"),
+    lowName: nameOf(lowP, "low", group),
   };
 }
 
@@ -378,7 +382,7 @@ export function strokeSets(
     // exist, computed against a null handicap. Their only real basis is their course handicap.
     if (!opp) return [course];
     const { strokes, gives } = pairStrokes(game, p, opp, si);
-    return [{ key: "opponent", strokes, gives, label: `v ${nameOf(opp)}` }, course];
+    return [{ key: "opponent", strokes, gives, label: `v ${nameOf(opp, "opponent", allPlayers)}` }, course];
   }
 
   if (basis === "relative_foursome") {
@@ -399,7 +403,7 @@ export function strokeSets(
         if (mine) opp = allPlayers.find((x) => pkey(x) === (mine[0] === key ? mine[1] : mine[0]));
       }
       const { strokes: sStrokes, gives } = pairStrokes(game, p, opp, si);
-      return [{ key: "opponent", strokes: sStrokes, gives, label: `v ${nameOf(opp)}` }, teamLeg, course];
+      return [{ key: "opponent", strokes: sStrokes, gives, label: `v ${nameOf(opp, "opponent", allPlayers)}` }, teamLeg, course];
     }
     return [teamLeg, course];
   }

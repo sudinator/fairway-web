@@ -1,4 +1,5 @@
 "use client";
+import { shortNamer } from "@/lib/short-names";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
 import { ContestsSection, ContestHoleChip } from "@/components/contests-view";
@@ -131,7 +132,9 @@ export function SkinsView({ game, players, user, isCreator, mode, onChanged }: {
   const isTeamSkins = shape.skinsStyle === "team_11" || shape.skinsStyle === "team_2v2";
   const isTeamBestBallSkins = shape.skinsStyle === "team_2v2";
   const playerOf = (uid: string) => players.find((p) => pkey(p) === uid) || null;
-  const firstName = (uid: string) => (playerOf(uid)?.display_name || "—").split(" ")[0];
+  // Names shortened by the one rule in lib/short-names: first name unless it collides in this game.
+  const shortOf = shortNamer(players);
+  const firstName = (uid: string) => shortOf(playerOf(uid), "—");
   const teamName = (key: string | null | undefined) => teams?.find((t) => t.key === key)?.name || "—";
   const skinPlayerOf = (uid: string): SkinPlayer | null => {
     const p = playerOf(uid);
@@ -482,6 +485,7 @@ export function MatchView({
   altShotScores?: AltShotScoreRow[];
   onChanged: () => void;
 }) {
+  const shortOf = shortNamer(players);
   const [editing, setEditing] = useState(false);
   const [aSel, setASel] = useState("");
   const [bSel, setBSel] = useState("");
@@ -833,8 +837,8 @@ export function MatchView({
                       <div style={{ minWidth: 330 }}>
                         <div style={{ display: "grid", gridTemplateColumns: "42px minmax(82px, 1fr) minmax(82px, 1fr) 76px", gap: 8, color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: "4px 10px" }}>
                           <span>HOLE</span>
-                          <span>{pa.display_name.split(" ")[0]} NET</span>
-                          <span>{pb.display_name.split(" ")[0]} NET</span>
+                          <span>{shortOf(pa)} NET</span>
+                          <span>{shortOf(pb)} NET</span>
                           <span style={{ textAlign: "right" }}>MATCH</span>
                         </div>
                         {progressionRows.map((row) => {
@@ -947,8 +951,8 @@ export function MatchView({
                     <div style={{ minWidth: 330 }}>
                       <div style={{ display: "grid", gridTemplateColumns: "42px minmax(82px, 1fr) minmax(82px, 1fr) 76px", gap: 8, color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: "4px 10px" }}>
                         <span>HOLE</span>
-                        <span>{pa.display_name.split(" ")[0]} NET</span>
-                        <span>{pb.display_name.split(" ")[0]} NET</span>
+                        <span>{shortOf(pa)} NET</span>
+                        <span>{shortOf(pb)} NET</span>
                         <span style={{ textAlign: "right" }}>MATCH</span>
                       </div>
                       {progressionRows.map((row) => {
@@ -1146,7 +1150,9 @@ export function FourballView({
   const teams = game.teams || null;
   const playerOf = (uid: string) => players.find((p) => pkey(p) === uid) || null;
   const nameOf = (uid: string) => playerOf(uid)?.display_name || "—";
-  const firstName = (uid: string) => (playerOf(uid)?.display_name || "—").split(" ")[0];
+  // Names shortened by the one rule in lib/short-names: first name unless it collides in this game.
+  const shortOf = shortNamer(players);
+  const firstName = (uid: string) => shortOf(playerOf(uid), "—");
   const teamName = (key: string | null | undefined) => teams?.find((t) => t.key === key)?.name || "—";
   const setupPolicy = (action: SetupAction) => decideSetupChange({ game, players, action });
   const foursomeDecision = setupPolicy({ type: "set_foursomes" });
@@ -1580,6 +1586,7 @@ export function FourballView({
 // scorecard dots use, so the panel and the card never disagree.
 export function StrokesSummary({ game, players, collapsible = false, meKey }: { game: Game; players: Player[]; collapsible?: boolean; meKey?: string }) {
   const [open, setOpen] = useState(true);
+  const shortOf = shortNamer(players);
   const [showAll, setShowAll] = useState(false);
   const allowance = game.allowance_pct ?? 100;
   const meta = game.holes_meta || [];
@@ -1655,7 +1662,7 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
       <div style={{ display: "flex", alignItems: "baseline", gap: 8, padding: "3px 0" }}>
         <span style={{ color: C.sage, fontSize: 11, width: 44, flex: "none" }}>{label}</span>
         <span style={{ flex: 1, color: C.cream, fontSize: 13, minWidth: 0 }}>
-          {rows.map((p) => `${p.display_name.split(" ")[0]} ${num(chOf(p))}`).join("  +  ")}
+          {rows.map((p) => `${shortOf(p)} ${num(chOf(p))}`).join("  +  ")}
         </span>
         <span style={{ color: C.gold, fontSize: 14, fontWeight: 800, fontFamily: "Georgia, serif" }}>{num(ch)}</span>
       </div>
@@ -1673,7 +1680,7 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
             <>
               {" \u2192 "}
               <span style={{ color: C.gold, fontWeight: 700 }}>
-                {recvRows.map((p) => p.display_name.split(" ")[0]).join(" & ")} receive {strokes} stroke{strokes === 1 ? "" : "s"}
+                {recvRows.map((p) => shortOf(p)).join(" & ")} receive {strokes} stroke{strokes === 1 ? "" : "s"}
               </span>
               {holesWith.length ? <>, on holes <b style={{ color: C.cream }}>{holesWith.join(", ")}</b></> : null}
               . The other side plays off scratch.

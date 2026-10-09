@@ -1,4 +1,5 @@
 "use client";
+import { shortNamer } from "@/lib/short-names";
 
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
@@ -63,6 +64,7 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
   const [tees, setTees] = useState<TeeTime[]>([]);
   const [rsvps, setRsvps] = useState<Rsvp[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  useEffect(() => { setTeeNameSet(members); }, [members]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"upcoming" | "past" | "cancelled">("upcoming");
   const [screen, setScreen] = useState<"list" | "detail" | "create">("list");
@@ -802,10 +804,11 @@ function DutiesModal({ onClose }: { onClose: () => void }) {
 }
 
 // ---------------- WHATSAPP EXPORT ----------------
-function shortName(n: string) {
-  const p = (n || "").trim().split(/\s+/);
-  return p.length > 1 ? `${p[0]} ${p[p.length - 1][0]}` : (p[0] || "");
-}
+// Names in tee-time text follow the one shortening rule (lib/short-names): first name unless it
+// collides among the club's members. `members` is set by the screen once they are loaded.
+let teeMembers: { display_name?: string | null }[] = [];
+export function setTeeNameSet(m: { display_name?: string | null }[]) { teeMembers = m; }
+function shortName(n: string) { return shortNamer(teeMembers)(n, n); }
 function teeExport(tt: TeeTime, ins: Rsvp[], memberOf: (id: string) => Member | undefined, courseData: Record<string, { slope: number; rating: number; par: number }>, groupName: string): string {
   const cd = courseData[tt.course || ""];
   let cum = 0; const field: Rsvp[] = []; const wait: Rsvp[] = [];

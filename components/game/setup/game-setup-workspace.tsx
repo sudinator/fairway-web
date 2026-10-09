@@ -245,7 +245,7 @@ export function GameSetupWorkspace({
 
           <div style={{ ...cardStyle, marginTop: 10 }}>
             <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>SHARING</div>
-            <ShareControl game={game} onShare={organizerPanelProps.onShare} />
+            <ShareControl game={game} onShare={organizerPanelProps.onShare} token={game.lineup_slug ?? game.share_token ?? null} />
           </div>
 
           <div style={{ ...cardStyle, marginTop: 10 }}>
@@ -351,7 +351,7 @@ export function GameSetupWorkspace({
       )}
       {showLineup ? (
         <ShareLineupModal game={game} players={players} courseTees={courseTees} currentUserId={organizerPanelProps.user?.id ?? null}
-          linkControl={<ShareControl game={game} onShare={organizerPanelProps.onShare} path="lineup" title="Live line-up link"
+          linkControl={<ShareControl game={game} onShare={organizerPanelProps.onShare} path="lineup" token={game.lineup_slug ?? game.share_token ?? null} title="Live line-up link"
             blurb="One link for the chat. It shows every player's tees, playing handicap, opponents and strokes, updates as you change pairings, and stops working when the game ends." />}
           onClose={() => setShowLineup(false)} />
       ) : null}

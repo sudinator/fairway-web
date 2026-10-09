@@ -315,7 +315,9 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
     // THROW so ShareControl can show the reason next to the button. Returning quietly left the
     // control looking inert when the RPC failed (188.2).
     if (error) { setErr(error.message); throw new Error(error.message); }
-    setCompetition({ ...competition, share_token: (data as string | null) ?? null });
+    let slug: string | null = null;
+    if (on) { const { data: c2 } = await supabase.from("competitions").select("share_slug").eq("id", competition.id).maybeSingle(); slug = (c2 as any)?.share_slug ?? null; }
+    setCompetition({ ...competition, share_token: (data as string | null) ?? null, share_slug: slug });
   };
 
   const changeTieRule = async (tieRule: Competition["tie_rule"]) => {
@@ -435,7 +437,7 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
       {manage && (
         <ShareControl
           onShare={setCupShare}
-          token={competition.share_token ?? null}
+          token={competition.share_slug ?? competition.share_token ?? null}
           path="live/cup"
           title={"\u26f3 Ryder Cup live link"}
           blurb={"One public page for the whole Cup \u2014 standings, every session and its matches, no login needed. Anyone with the link can follow along but cannot change anything. Stays live for 3 days after the Cup is completed."}
