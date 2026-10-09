@@ -29,6 +29,7 @@ export type Game = {
   structure_stash?: { teams?: { key: string; name: string }[] | null; foursomes?: { id: string; name: string; a: string[]; b: string[]; swap?: boolean; a_first?: string | null; b_first?: string | null }[] | null; pairings?: { a: string; b: string }[] | null } | null; // last team structure, kept when a format switch hides it so switching back restores it
   trifecta_scoring?: "match" | null; // trifecta: always "match" since 183.0 (two 1-v-1 singles + four-ball, one point each). Column kept; the Ryder Cup trigger (0146) requires it.
   share_token?: string | null; // public live-scorecard token (organizer-set); null = not shared
+  lineup_slug?: string | null; // readable line-up link (0177): course-date-6chars; minted with share_token
   ended_at?: string | null;
   alt_shot_scoring_started_at?: string | null;
   scores_reset_at?: string | null; // when the game was ended (stamped by trigger); drives the 3-day live window

@@ -35,7 +35,8 @@ checks = [
     (workspace, 'setupTab === "matchups"', "Matchups must remain a distinct reachable sub-state"),
     (workspace, 'onSetGameDate: (date: string) => Promise<void>;', "Game section must receive the existing organizer date writer"),
     (workspace, 'onChangeCourse: (course: Course) => Promise<void>;', "Game section must receive the atomic pre-score course-change callback"),
-    (workspace, '<ShareControl game={game} onShare={organizerPanelProps.onShare} />', "live-link control must live in Game"),
+    # 202.1: the control passes the readable slug (falls back to the token for games shared before 0177).
+    (workspace, '<ShareControl game={game} onShare={organizerPanelProps.onShare} token={game.lineup_slug ?? game.share_token ?? null} />', "live-link control must live in Game"),
     (workspace, 'onClick={organizerPanelProps.onReset}', "Reset Scores must live in Game danger zone"),
     (workspace, 'onClick={organizerPanelProps.onDelete}', "Delete Game must live in Game danger zone"),
     (organizer, 'section?: "players" | "teams" | "format";', "OrganizerPanel must expose the separated Format surface"),

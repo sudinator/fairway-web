@@ -2870,7 +2870,12 @@ function GameRoom({
   const setShare = async (on: boolean) => {
     if (!game || !allowSetupChange({ type: "share_live" })) return;
     const { data, error } = await supabase.rpc("set_game_share", { p_game: game.id, p_on: on });
-    if (!error) setGame({ ...game, share_token: (data as string | null) ?? null });
+    if (error) return;
+    // The slug (0177) is minted server-side with the token; read it back so the line-up link control
+    // can show the readable URL immediately.
+    let slug: string | null = null;
+    if (on) { const { data: g2 } = await supabase.from("games").select("lineup_slug").eq("id", game.id).maybeSingle(); slug = (g2 as any)?.lineup_slug ?? null; }
+    setGame({ ...game, share_token: (data as string | null) ?? null, lineup_slug: slug });
   };
 
   // Organizer: wipe all entered scores and the round clock so the game is fresh

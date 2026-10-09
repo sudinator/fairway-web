@@ -6,7 +6,15 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 201.8.261008
+## Current candidate: 202.1.261008
+
+- 0178 readable live/competition links; next 16.3.8, js-yaml 4.3.2, sharp 0.35.5. Apply 0178 before the code. Dependabot security PRs: never merge the bot's commit; take the bumps through a drop.
+
+## Previous: 202.0.261008
+
+- 0177 readable line-up slug. Apply 0177 before the code. Follow-up: parity job should open an issue when red (missed twice this week).
+
+## Previous: 201.8.261008
 
 - 0176: line-up link shows games.played_at (a DATE — never apply `at time zone` to it). Apply 0176 before the code.
 

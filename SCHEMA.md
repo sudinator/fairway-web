@@ -1,3 +1,11 @@
+## 202.1 — readable live links (0178)
+
+`competitions.share_slug text` (partial unique index); `make_competition_slug(uuid)`; `set_competition_share` mints/clears it; `get_live_scorecard` matches games.lineup_slug, `get_live_competition` matches competitions.share_slug, both alongside the token. `make_lineup_slug` redefined with a 16-character minimum.
+
+## 202.0 — readable line-up slug (0177)
+
+`games.lineup_slug text` (partial unique index). `make_lineup_slug(uuid)` (no app grants). `set_game_share` mints/clears it with the token. `get_live_lineup` matches `share_token = p_token or lineup_slug = p_token`.
+
 ## 201.8 — live line-up match date (0176)
 
 `get_live_lineup` returns `played_on` (date) from games.played_at (fallback created_at in Eastern); `played_at` kept as the pre-formatted string.

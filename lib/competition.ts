@@ -23,6 +23,7 @@ export type Competition = {
   tie_rule: "shared" | "team_a_retains" | "team_b_retains";
   /** Public live-link token (0152). Null when the Cup is not shared. */
   share_token?: string | null;
+  share_slug?: string | null; // readable public link (0178): name-date-6chars; minted with share_token
 };
 
 export type CompetitionPlayer = {

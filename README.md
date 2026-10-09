@@ -1,3 +1,11 @@
+## 202.1.261008 — Readable links for the live scorecard and competition pages; security dependency bumps
+
+**Links.** Every public link now reads as something. The live scorecard uses the game's slug from 0177 — one slug, one switch, two pages: `/live/bowling-green-golf-club-oct10-7h3k2p` and `/lineup/…` the same. Competitions get their own: `/live/cup/fall-ryder-cup-oct10-m4x8rq`, minted by `set_competition_share` when sharing is turned on and cleared when it is turned off. Tokens keep working, so links already in chats do not break. Migration 0178 redefines `get_live_scorecard` and `get_live_competition` from their 0155 bodies with only the lookup line changed, and both slug makers guarantee the 16-character minimum the readers require (a one-letter course name is padded). Asserted on the full chain: both pages resolve by slug and by token; a guessed competition slug resolves to nothing; revoke clears the slug.
+
+## 202.0.261008 — Readable line-up links: /lineup/bowling-green-oct10-7h3k2p
+
+The link in the chat read as a jumble (`/lineup/83c53…`). It now reads as the course (or game name) and match date plus six characters from a confusion-free alphabet (no 0/O/1/l/I): `/lineup/bowling-green-golf-club-oct10-7h3k2p`. The words are for reading; the six characters (29^6 ≈ 594 million) are what authorizes — a link anyone could guess from the club's calendar would be a public page, not a share link. Asserted: a guessed slug with the wrong code resolves to nothing.
+
 ## 201.8.261008 — The line-up link shows the match date, not the day it was created
 
 The link's title and header read today's date for Saturday's game: 0173 returned `created_at` because its author believed games carried no play date. `games.played_at` is the match date (a DATE column; 0110 calls it "the game's MATCH date"). Migration 0176 returns it as `played_on` (YYYY-MM-DD, falling back to created_at in Eastern only when unset); the page, the chat preview and the group card format it on the device as "Sat, Oct 10, 2026" — weekday and year, built as a local date so it cannot shift a day across the UTC boundary. The full-chain assertion seeds a Saturday match created on a Thursday and requires the Saturday; its first run caught an off-by-one in the migration (applying `at time zone` to a DATE in a UTC session yields the previous evening) before it shipped.
