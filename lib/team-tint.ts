@@ -1,9 +1,11 @@
-// The ONE way a team colour becomes a background for dark text (202.4): mix it ~85% into the cream
+// The ONE way a team colour becomes a background for dark text (202.4): mix it ~70% into the cream
 // card. A tint that light is pale whatever the hue — pale red, pale blue, pale violet, pale grey —
 // so the dark text never has to change colour by team. Team colours are fixed today (first team red,
 // second blue); if they ever become a setting, every stored colour flows through here and the
 // contrast guard checks the result against the dark text.
-export function tint(hex: string, amount = 0.85, base = "#FBFAF4"): string {
+// amount = how much cream: 0.85 read too light on the phone (202.5); 0.70 is a few shades darker and
+// still clears 4.5:1 for dark text on every tested colour.
+export function tint(hex: string, amount = 0.70, base = "#FBFAF4"): string {
   const h = (x: string) => { const m = /^#?([0-9a-f]{6})$/i.exec(x.trim()); if (!m) return null; const n = parseInt(m[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
   const c = h(hex), b = h(base);
   if (!c || !b) return base;
