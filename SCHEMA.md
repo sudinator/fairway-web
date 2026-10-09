@@ -1,3 +1,7 @@
+## 201.8 — live line-up match date (0176)
+
+`get_live_lineup` returns `played_on` (date) from games.played_at (fallback created_at in Eastern); `played_at` kept as the pre-formatted string.
+
 ## 201.2 — organizer notified (0175)
 
 `notify_game_added` redefined: organizer included, worded "You set up …".

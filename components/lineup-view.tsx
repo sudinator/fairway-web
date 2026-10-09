@@ -5,7 +5,7 @@
 import React, { useState } from "react";
 import { C } from "@/lib/golf";
 import { buildLineup, strokesPhrase, type LineupRow } from "@/lib/lineup";
-import { lineupTitle } from "@/lib/lineup-meta";
+import { lineupTitle, fmtMatchDate } from "@/lib/lineup-meta";
 import { APP_VERSION } from "@/lib/app-version";
 
 // Where the "open the app" button leads depends on the platform, and the page must say the truth:
@@ -70,7 +70,7 @@ export function LiveLineupView({ data, err, platform = "other" }: { data: any; e
       <div style={{ textAlign: "center" }}>
         <div style={{ color: C.gold, fontSize: 11, letterSpacing: 2.4, fontWeight: 700 }}>LINE-UP</div>
         <div style={{ fontSize: 21, fontWeight: 800, fontFamily: "Georgia, serif", marginTop: 3 }}>{data.name || "Game"}</div>
-        <div style={{ color: C.sage, fontSize: 13, marginTop: 2 }}>{[data.course, data.played_at].filter(Boolean).join(" · ")}</div>
+        <div style={{ color: C.sage, fontSize: 13, marginTop: 2 }}>{[data.course, fmtMatchDate(data.played_on) || data.played_at].filter(Boolean).join(" · ")}</div>
         {lineup.tees.length ? (
           <div style={{ marginTop: 8, display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
             {lineup.tees.map((t) => (
