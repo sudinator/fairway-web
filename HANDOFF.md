@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 202.5.261009
+## Current candidate: 202.6.261009
+
+- Team band tint 0.70 cream (Amit's choice, Oct 9).
+
+## Previous: 202.5.261009
 
 - RULE: a text-styled <button> needs appearance:none or iOS boxes it.
 

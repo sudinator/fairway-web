@@ -1,3 +1,7 @@
+## 202.6.261009 — Team band a few shades darker
+
+The 85%-cream tint read too light on the phone. The band is now 30% team colour / 70% cream (red #e5cac6, blue #c8d1e0), chosen from a real render; the contrast test still proves dark text ≥ 4.5:1 on both and on yellow, violet, grey, gold and black. One number in `lib/team-tint.ts`; the public page and the group card both follow it. Client-only; no migration.
+
 ## 202.5.261009 — No box around the arithmetic toggle
 
 iOS draws a bordered pill around any <button> unless its appearance is reset, even with border:none; the "Tap for the handicap arithmetic" control showed one. Reset (appearance none, no outline/shadow/radius, inherited font). The chevron stays. Client-only; no migration.
