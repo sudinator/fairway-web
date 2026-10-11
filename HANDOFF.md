@@ -6,7 +6,15 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 202.6.261009
+## Current candidate: 203.1.261011
+
+- Balance blocked on missing handicaps; Ryder Cup roster balance by index at creation. Balanced session MATCHUPS is a separate backlog item.
+
+## Previous: 203.0.261010
+
+- Balance teams by handicap (lib/balance-teams.ts; Teams tab). Basis = playing handicap via the engine.
+
+## Previous: 202.6.261009
 
 - Team band tint 0.70 cream (Amit's choice, Oct 9).
 

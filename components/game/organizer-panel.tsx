@@ -91,6 +91,8 @@ export type OrganizerPanelProps = {
   onRemove: (p: Player) => Promise<void>;
   onToggleNoShow: (p: Player) => Promise<void>;
   onSetTeam: (p: Player, team: string | null) => Promise<void>;
+  /** Balanced teams by playing handicap (203.0); returns what changed, or null if cancelled/unavailable. */
+  onBalanceTeams?: () => Promise<{ changed: number; summary: string; unrated: string[] } | null>;
   onRenameTeams?: (names: [string, string]) => Promise<void>;
   onRename: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
@@ -126,6 +128,7 @@ export function OrganizerPanel({
   onRemove,
   onToggleNoShow,
   onSetTeam,
+  onBalanceTeams,
   onRenameTeams,
   section = "players",
   eligibleMembers = [],
@@ -145,6 +148,8 @@ export function OrganizerPanel({
   // the manual-handicap field lines up with the handicap field beside it by construction rather
   // than by two places happening to carry the same literal.
   const COMPACT = { padding: "6px 8px" } as const;
+  const [balancing, setBalancing] = useState(false);
+  const [balanceMsg, setBalanceMsg] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [manualEdits, setManualEdits] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -268,6 +273,18 @@ export function OrganizerPanel({
                 {section === "teams" ? "Tap a team to assign each player." : "Set each player's handicap and tee."}
               </span>
             </div>
+            {section === "teams" && onBalanceTeams && teams.length >= 2 && (
+              <div style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <button style={{ ...btn(true), fontSize: 12, opacity: balancing ? 0.6 : 1 }} disabled={balancing}
+                    onClick={async () => { setBalancing(true); setBalanceMsg(null); try { const r = await onBalanceTeams(); if (r) setBalanceMsg(r.unrated.length ? `Set a course handicap for ${r.unrated.join(", ")} first (Players tab), then balance.` : r.changed === 0 ? `Already balanced: ${r.summary}.` : r.summary); } finally { setBalancing(false); } }}>
+                    {balancing ? "Balancing…" : "⚖️ Balance by handicap"}
+                  </button>
+                  <span style={{ color: C.sage, fontSize: 11, flex: 1, minWidth: 160 }}>Splits the field by playing handicap so the sides add up evenly; every player needs a course handicap first; players with scores stay put.</span>
+                </div>
+                {balanceMsg ? <div style={{ color: C.cream, fontSize: 12, marginTop: 8 }}>{balanceMsg}</div> : null}
+              </div>
+            )}
             {orderedPlayers.map((p) => {
               const raw = edits[p.id] ?? (p.handicap_index != null ? String(p.handicap_index) : "");
               return (

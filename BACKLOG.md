@@ -1,3 +1,7 @@
+## 203.1 — follow-up
+
+- **Balanced matchups within a session.** Pair the k-th strongest of one side with the k-th strongest of the other (singles), and for four-ball/foursomes split each side's strong/weak into complementary pairs. Separate from balancing sides; needs a decision on how it coexists with captains' picks and the Trifecta swap rule.
+
 ## 202.4 — follow-up
 
 - **Organizer-chosen team colours.** Colours are fixed by team order today. A per-team colour setting is small; the line-up band already derives from any colour through `lib/team-tint.ts` (contrast guaranteed); the chip/frame variants and the in-app scorecard bars would need per-colour handling.
