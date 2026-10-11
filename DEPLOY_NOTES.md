@@ -1,3 +1,7 @@
+## 203.3.261011 — Ryder Cup roster: "who is playing" back in front of balancing
+
+203.1's Balance by handicap index dealt the whole club roster onto two sides, removing the step where the organizer chooses who is in. Each roster row now has an **In** tick (tapping a team button also marks the player in; untick clears their side), with **Everyone in** and **Clear** shortcuts and a count of who is in. Balance deals only the players who are in, leaves everyone else out, and asks for at least two. Sides can still be set by hand with the team buttons, as before. Client-only; no migration.
+
 ## 203.2.261011 — Team names save as you type; verification-sheet convention retired
 
 **Team names.** On the Teams tab the names now save themselves — 700 ms after the last keystroke and on leaving the box — with "Saving… / Saved" inline and any error shown in place. The "Save names" button is gone: it was redundant, and after the game reloaded (balance, another device) its enabled/disabled check compared stale edits with fresh names and appeared to do nothing. The boxes also follow the game when it reloads under them. `renameTeams` now throws on failure so the panel can show why.

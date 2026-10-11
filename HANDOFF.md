@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 203.2.261011
+## Current candidate: 203.3.261011
+
+- Ryder Cup roster: In tick per player; balance deals only players who are in.
+
+## Previous: 203.2.261011
 
 - Team names save as you type (no Save button); errors shown inline.
 - RETIRED CONVENTIONS: per-release `RELEASE_VERIFICATION_<v>.md` sheets (177.13–193.2) and `WORKFLOW_SIMULATION_REPORT_<v>.md` (49 files) are no longer written. The executed proof for a release lives in its DEPLOY_NOTES entry (chain/assertion/harness counts, preflight timings) and permanently in the guards and assertion files. The 152 historical files moved to `docs/history/`; nothing executable referenced them.

@@ -71,6 +71,9 @@ export function Competitions({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [balanceNote, setBalanceNote] = useState<string | null>(null);
+  // Who is playing (203.3): a player is IN when ticked here or already placed on a side. Balance
+  // deals only the players who are in; the rest stay out, as the A/B toggles always allowed.
+  const [playing, setPlaying] = useState<Record<string, boolean>>({});
 
   const loadList = useCallback(async () => {
     const { data, error } = await supabase.from("competitions").select("*").eq("group_id", activeGroupId).order("start_date", { ascending: false }).order("created_at", { ascending: false });
@@ -123,17 +126,20 @@ export function Competitions({
     // Balanced sides by HANDICAP INDEX (203.1): no course yet at roster time, so the index is the
     // basis; sessions use the playing handicap. Everyone on the roster is dealt (a blank side counts
     // as unassigned); everyone must have an index first — a blank would skew the split.
+    const isIn = (p: Roster) => !!playing[p.id] || assign[p.id] === "A" || assign[p.id] === "B";
+    const inPlayers = roster.filter(isIn);
     const balanceRoster = () => {
-      const missing = roster.filter((p) => p.handicap_index == null).map((p) => p.display_name);
+      if (inPlayers.length < 2) { setBalanceNote("Tick who is playing first, then balance."); return; }
+      const missing = inPlayers.filter((p) => p.handicap_index == null).map((p) => p.display_name);
       if (missing.length) { setBalanceNote(`Set a handicap index for ${missing.join(", ")} first (their profile), then balance.`); return; }
       const r = balanceTeams(
         { allowance_pct: 100, course_par: 72, holes_meta: null, teams: [{ key: "A", name: teamA || "Team 1" }, { key: "B", name: teamB || "Team 2" }] },
-        roster.map((p) => ({ id: p.id, user_id: p.id, display_name: p.display_name, course_handicap: p.handicap_index, handicap_index: p.handicap_index, team: null })),
+        inPlayers.map((p) => ({ id: p.id, user_id: p.id, display_name: p.display_name, course_handicap: p.handicap_index, handicap_index: p.handicap_index, team: null })),
       );
-      const next: Record<string, "A" | "B" | ""> = {};
-      for (const p of roster) next[p.id] = (r.teams.find((t) => t.members.includes(p.display_name))?.key as "A" | "B") || "";
+      const next: Record<string, "A" | "B" | ""> = { ...assign };
+      for (const p of roster) next[p.id] = isIn(p) ? ((r.teams.find((t) => t.members.includes(p.display_name))?.key as "A" | "B") || "") : "";
       setAssign(next);
-      setBalanceNote(balanceSummary(r));
+      setBalanceNote(`${inPlayers.length} playing · ${balanceSummary(r)}`);
     };
     const indexA = handicapTotal(assignedA);
     const indexB = handicapTotal(assignedB);
@@ -169,9 +175,12 @@ export function Competitions({
             <div style={{ color: countBalanced ? C.gold : C.overRedDark, fontSize: 11, fontWeight: 800 }}>{countBalanced ? "BALANCED" : `${Math.abs(assignedA.length - assignedB.length)} PLAYER GAP`}</div>
             <div style={{ minWidth: 0 }}><div style={{ color: teamAccent(teamB || "Team 2", 1), fontSize: 12, fontWeight: 800, overflowWrap: "anywhere" }}>{teamB || "Team 2"}</div><div style={{ color: C.cream, fontSize: 14, fontWeight: 800 }}>{assignedB.length} players · {indexB.toFixed(1)} index</div></div>
           </div>
-          <div style={{ display: "flex", justifyContent: "center", marginTop: 8 }}>
+          <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+            <button style={{ ...btn(false), fontSize: 12 }} onClick={() => setPlaying(Object.fromEntries(roster.map((p) => [p.id, true])))}>Everyone in</button>
+            <button style={{ ...btn(false), fontSize: 12 }} onClick={() => { setPlaying({}); setAssign({}); setBalanceNote(null); }}>Clear</button>
             <button style={{ ...btn(true), fontSize: 12 }} onClick={balanceRoster}>⚖️ Balance by handicap index</button>
           </div>
+          <div style={{ color: C.sage, fontSize: 11, marginTop: 6, textAlign: "center" }}>Tick who is playing ({inPlayers.length} in), then balance — or set sides by hand with the team buttons.</div>
           {balanceNote ? <div style={{ color: C.cream, fontSize: 12, marginTop: 6, textAlign: "center" }}>{balanceNote}</div> : null}
           <div style={{ color: C.sage, fontSize: 11, marginTop: 6, textAlign: "center" }}>Team index difference: {indexDifference.toFixed(1)}. Equal player counts are required; handicap totals help you judge competitive balance.</div>
         </div>
@@ -181,8 +190,15 @@ export function Competitions({
             return <div key={p.id} style={{ background: C.greenLight, borderRadius: 12, padding: "8px 12px", display: "flex", alignItems: "center", gap: 10 }}>
               <Avatar src={p.avatar_url} name={p.display_name} size={30} />
               <div style={{ minWidth: 0, flex: 1 }}><div style={{ color: C.cream, fontSize: 14, fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.display_name}</div><div style={{ color: C.sage, fontSize: 11 }}>{p.handicap_index == null ? "No handicap" : `Index ${p.handicap_index}`}</div></div>
-              <button onClick={() => setAssign((a) => ({ ...a, [p.id]: t === "A" ? "" : "A" }))} style={{ ...btn(false), background: C.greenMid, border: t === "A" ? `2px solid ${C.gold}` : `1px solid ${C.borderGreen}`, padding: "8px 12px", fontSize: 11, color: C.cream }}>{teamA || "Team 1"}</button>
-              <button onClick={() => setAssign((a) => ({ ...a, [p.id]: t === "B" ? "" : "B" }))} style={{ ...btn(false), background: C.greenMid, border: t === "B" ? `2px solid ${C.gold}` : `1px solid ${C.borderGreen}`, padding: "8px 12px", fontSize: 11, color: C.cream }}>{teamB || "Team 2"}</button>
+              {isIn(p) ? (
+                <button onClick={() => { setPlaying((x) => ({ ...x, [p.id]: false })); setAssign((a) => ({ ...a, [p.id]: "" })); }} aria-pressed title="Playing — tap to leave out"
+                  style={{ ...btn(false), background: C.gold, color: C.green, border: `1px solid ${C.gold}`, padding: "8px 12px", fontSize: 12, minWidth: 44 }}>✓ In</button>
+              ) : (
+                <button onClick={() => setPlaying((x) => ({ ...x, [p.id]: true }))} aria-pressed={false} title="Not playing — tap to include"
+                  style={{ ...btn(false), background: C.greenMid, color: C.cream, border: `1px solid ${C.borderCard}`, padding: "8px 12px", fontSize: 12, minWidth: 44 }}>In</button>
+              )}
+              <button onClick={() => { setAssign((a) => ({ ...a, [p.id]: t === "A" ? "" : "A" })); setPlaying((x) => ({ ...x, [p.id]: true })); }} style={{ ...btn(false), background: C.greenMid, border: t === "A" ? `2px solid ${C.gold}` : `1px solid ${C.borderGreen}`, padding: "8px 12px", fontSize: 11, color: C.cream }}>{teamA || "Team 1"}</button>
+              <button onClick={() => { setAssign((a) => ({ ...a, [p.id]: t === "B" ? "" : "B" })); setPlaying((x) => ({ ...x, [p.id]: true })); }} style={{ ...btn(false), background: C.greenMid, border: t === "B" ? `2px solid ${C.gold}` : `1px solid ${C.borderGreen}`, padding: "8px 12px", fontSize: 11, color: C.cream }}>{teamB || "Team 2"}</button>
             </div>;
           })}
         </div>
