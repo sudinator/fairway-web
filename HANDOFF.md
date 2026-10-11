@@ -6,7 +6,12 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 203.1.261011
+## Current candidate: 203.2.261011
+
+- Team names save as you type (no Save button); errors shown inline.
+- RETIRED CONVENTIONS: per-release `RELEASE_VERIFICATION_<v>.md` sheets (177.13–193.2) and `WORKFLOW_SIMULATION_REPORT_<v>.md` (49 files) are no longer written. The executed proof for a release lives in its DEPLOY_NOTES entry (chain/assertion/harness counts, preflight timings) and permanently in the guards and assertion files. The 152 historical files moved to `docs/history/`; nothing executable referenced them.
+
+## Previous: 203.1.261011
 
 - Balance blocked on missing handicaps; Ryder Cup roster balance by index at creation. Balanced session MATCHUPS is a separate backlog item.
 
@@ -166,13 +171,13 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 - v179.6 corrects the v179.5 incremental-package mismatch by including the three v179.4 runtime files required by the v179.5 UI: `lib/competition.ts`, `lib/competition.test.ts`, and `components/game/scoring-views.tsx`.
 - The Vercel failure was a compile-time missing export (`competitionOutcome`), not a database or Node runtime defect.
-- Complete `RELEASE_VERIFICATION_179.7.md` before Production; migration 0143 remains the latest schema change.
+- (historical) 179.7 verification sheet is in docs/history/; migration 0143 was the latest schema change at the time.
 
 - The user-facing multi-session team feature is named **Ryder Cup**; internal `competitions` tables, RPCs, and types intentionally retain their established names.
 - Games explains the distinction in place: a Game is one round/format/scorecard; a Ryder Cup combines several team sessions into one overall match score.
 - A game launched from a Ryder Cup session passes `sideContestsEnabled: false` to both the game payload and player-row builders. This persists `leg_config.scheme = "none"` and `bets = false` for every participant. No `game_contests` rows are created by default.
 - Standalone Game defaults are unchanged. No migration is added beyond 0143.
-- Before Production, complete `RELEASE_VERIFICATION_179.6.md` and obtain product/legal approval for use of the third-party `Ryder Cup` name.
+- (historical) 179.6 verification sheet is in docs/history/; product/legal approval for the third-party `Ryder Cup` name remains the owner's call.
 
 ---
 

@@ -1,3 +1,9 @@
+## 203.2.261011 — Team names save as you type; verification-sheet convention retired
+
+**Team names.** On the Teams tab the names now save themselves — 700 ms after the last keystroke and on leaving the box — with "Saving… / Saved" inline and any error shown in place. The "Save names" button is gone: it was redundant, and after the game reloaded (balance, another device) its enabled/disabled check compared stale edits with fresh names and appeared to do nothing. The boxes also follow the game when it reloads under them. `renameTeams` now throws on failure so the panel can show why.
+
+**Repository hygiene.** The per-release `RELEASE_VERIFICATION_<v>.md` sheets (103 files, 177.13–193.2) and `WORKFLOW_SIMULATION_REPORT_<v>.md` (49 files) stopped being written at 194.0 without being retired; nothing executable read them. The executed proof for a release lives in its DEPLOY_NOTES entry and permanently in the guards and assertion files. All 152 moved to `docs/history/` with a README; two stale HANDOFF pointers fixed; convention recorded as retired. Client-only; no migration.
+
 ## 203.1.261011 — Balancing requires every handicap first; Ryder Cup roster balances by index
 
 **Games.** Balance by handicap now refuses to run while any active player lacks a course handicap, naming them: "Set a course handicap for Dan Lee, Ed Park first (Players tab), then balance." A zero placeholder would have skewed the sides and forced a re-run once the handicap was set.

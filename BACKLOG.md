@@ -1,5 +1,7 @@
 ## 203.1 — follow-up
 
+- ~~Retire the RELEASE_VERIFICATION / WORKFLOW_SIMULATION conventions and move the files to docs/history/~~ — done in 203.2.
+
 - **Balanced matchups within a session.** Pair the k-th strongest of one side with the k-th strongest of the other (singles), and for four-ball/foursomes split each side's strong/weak into complementary pairs. Separate from balancing sides; needs a decision on how it coexists with captains' picks and the Trifecta swap rule.
 
 ## 202.4 — follow-up

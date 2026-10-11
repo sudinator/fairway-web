@@ -158,6 +158,28 @@ export function OrganizerPanel({
   const [addGuestHcp, setAddGuestHcp] = useState("");
   const [addGuestSponsor, setAddGuestSponsor] = useState(""); // sponsor user id; "" -> current user
   const [teamNameEdits, setTeamNameEdits] = useState<[string, string]>([game.teams?.[0]?.name || "Team 1", game.teams?.[1]?.name || "Team 2"]);
+  // Team names save themselves (203.2): on blur, and 700ms after the last keystroke. The former
+  // "Save names" button was redundant and, after a reload of the game (balance, load()), its
+  // enabled/disabled check compared stale edits with fresh names and appeared to do nothing.
+  const [teamNameStatus, setTeamNameStatus] = useState<string | null>(null);
+  const teamNameTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedTeamNames = React.useRef<[string, string]>([game.teams?.[0]?.name || "Team 1", game.teams?.[1]?.name || "Team 2"]);
+  useEffect(() => {
+    // Keep the boxes in step with the game when it reloads under us (balance, another device).
+    const fresh: [string, string] = [game.teams?.[0]?.name || "Team 1", game.teams?.[1]?.name || "Team 2"];
+    if (fresh[0] !== savedTeamNames.current[0] || fresh[1] !== savedTeamNames.current[1]) { savedTeamNames.current = fresh; setTeamNameEdits(fresh); }
+  }, [game.teams]);
+  const commitTeamNames = async (edits: [string, string]) => {
+    if (!onRenameTeams) return;
+    const names: [string, string] = [edits[0].trim() || "Team 1", edits[1].trim() || "Team 2"];
+    if (names[0] === savedTeamNames.current[0] && names[1] === savedTeamNames.current[1]) return;
+    setTeamNameStatus("Saving…");
+    try { await onRenameTeams(names); savedTeamNames.current = names; setTeamNameStatus("Saved"); setTimeout(() => setTeamNameStatus(null), 1500); }
+    catch (e: any) { setTeamNameStatus(`Couldn't save: ${e?.message || "try again"}`); }
+  };
+  const editTeamName = (i: 0 | 1, value: string) => {
+    setTeamNameEdits((prev) => { const next: [string, string] = [...prev] as [string, string]; next[i] = value; if (teamNameTimer.current) clearTimeout(teamNameTimer.current); teamNameTimer.current = setTimeout(() => { void commitTeamNames(next); }, 700); return next; });
+  };
   useEffect(() => { setTeamNameEdits([game.teams?.[0]?.name || "Team 1", game.teams?.[1]?.name || "Team 2"]); }, [game.teams]);
   const currentFormatFamily: FormatFamily =
     game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" ||
@@ -469,16 +491,17 @@ export function OrganizerPanel({
 
           {section === "teams" && teams.length >= 2 && onRenameTeams && (
             <div style={{ background: C.greenLight, borderRadius: 10, padding: 12, marginTop: 12, border: `1px solid ${C.borderGreen}` }}>
-              <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>TEAM NAMES</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>TEAM NAMES</div>
+                <div style={{ flex: 1 }} />
+                {teamNameStatus ? <span style={{ color: teamNameStatus.startsWith("Couldn") ? C.gold : C.sage, fontSize: 11 }}>{teamNameStatus}</span> : <span style={{ color: C.sage, fontSize: 11 }}>Saves as you type</span>}
+              </div>
               <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                {[0, 1].map((i) => (
-                  <input key={teams[i].key} value={teamNameEdits[i]} onChange={(e) => setTeamNameEdits((prev) => { const next: [string, string] = [...prev] as [string, string]; next[i] = e.target.value; return next; })} placeholder={`Team ${i + 1} name`} style={{ ...inputStyle, flex: 1, minWidth: 140 }} />
+                {([0, 1] as const).map((i) => (
+                  <input key={teams[i].key} value={teamNameEdits[i]} onChange={(e) => editTeamName(i, e.target.value)}
+                    onBlur={() => { if (teamNameTimer.current) clearTimeout(teamNameTimer.current); void commitTeamNames(teamNameEdits); }}
+                    placeholder={`Team ${i + 1}`} aria-label={`Team ${i + 1} name`} style={{ ...inputStyle, flex: 1, minWidth: 120 }} />
                 ))}
-                <button
-                  onClick={() => onRenameTeams([teamNameEdits[0].trim() || "Team 1", teamNameEdits[1].trim() || "Team 2"])}
-                  disabled={!teamNameEdits[0].trim() || !teamNameEdits[1].trim() || (teamNameEdits[0].trim() === teams[0].name && teamNameEdits[1].trim() === teams[1].name)}
-                  style={{ ...btn(false), opacity: !teamNameEdits[0].trim() || !teamNameEdits[1].trim() || (teamNameEdits[0].trim() === teams[0].name && teamNameEdits[1].trim() === teams[1].name) ? .5 : 1 }}
-                >Save names</button>
               </div>
             </div>
           )}

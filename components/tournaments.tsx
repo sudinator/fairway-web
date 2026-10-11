@@ -2420,7 +2420,7 @@ function GameRoom({
     if (!game || !Array.isArray(game.teams) || game.teams.length < 2) return;
     const next = game.teams.map((t, i) => i < 2 ? { ...t, name: names[i] } : t);
     const { error } = await supabase.from("games").update({ teams: next }).eq("id", game.id);
-    if (error) { notifyError("Couldn't save team names — please try again."); return; }
+    if (error) { notifyError("Couldn't save team names — please try again."); throw new Error(error.message); }
     setGame({ ...game, teams: next });
   };
 
