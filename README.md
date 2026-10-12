@@ -1,3 +1,15 @@
+## 204.2.261013 — Ending a game with a running clock (BN163); outlook figures in the scorecard face; staging auto-score
+
+**BN163 on End game (staging 718817, ended after 9).** `finish_game_and_post_rounds` closes every still-running round clock; the 0163 reset fence treats that as a score write and requires the score context that only a scorecard established, so ending a game with any clock open failed — hidden at 18 holes because clocks were normally closed by then. Migration 0179 sets the context inside the function for its own write; nothing else changes. Asserted on the full chain: the exact failure on the old function, success on the new.
+
+## 204.1.261012 — Balanced matchups: like plays like, as a starting point captains can edit
+
+What already existed, under a dice: singles has "Build balanced matches" (nearest playing handicap across the teams — like plays like) and the team formats had "Build balanced groups", which EVENED THE FIELD — each team's strongest pair was put against the other's weakest so every group had a similar mix, which is the opposite of a balanced match.
+
+## 204.0.261012 — Match status under the group card; one standings convention; the singles table everywhere
+
+**Group card.** For four-ball, Trifecta and alternate shot, the group's Results card now sits directly under the group scorecard — the same component the Results tab shows, with the group's name header and pair boxes suppressed (the scorecard above already names the four) and headed "Match status". Three contest rows with the gold leader, the points line, nothing new to learn. Placed below, not pinned, so it never covers scores.
+
 ## 203.4.261012 — Balance teams keeps equal numbers
 
 Reported on a real field: with skewed handicaps, Balance by handicap could put more players on one side than the other. The "give the next player to the lighter side" step had no count limit, so a 30 against three 2s went 1 v 3. Equal numbers are the hard rule and now come first: team sizes are fixed up front (equal, or one apart for an odd field), the draft deals only into teams with room — preferring the lighter side among those — and a swap pass then narrows the handicap gap without changing counts. The skewed case gives {30, 2} v {2, 2}, the best possible with two a side. Tests: that case, 60 random fields of 4–20 players all with equal (or one-apart) counts, and a small field where the swap pass finds the best equal split; the old rule fails the new test. Applies to the game Teams tab and the Ryder Cup roster alike. Client-only; no migration.

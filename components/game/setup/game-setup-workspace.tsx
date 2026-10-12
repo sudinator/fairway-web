@@ -34,6 +34,8 @@ export type GameSetupWorkspaceProps = {
   onSetLegConfig?: (cfg: LegConfig) => void;
   getTeeGroupPolicy: (p: Player, group: number | null) => { blocked: boolean; reason?: string };
   onRandomizeGroups: () => Promise<void>;
+  /** 204.1: like-plays-like matchups for team formats; captains edit afterwards. */
+  onBalanceMatchups?: () => Promise<void>;
   canRandomize: boolean;
   randomizeReason: string;
   randomizing: boolean;
@@ -66,6 +68,7 @@ export function GameSetupWorkspace({
   onSetLegConfig,
   getTeeGroupPolicy,
   onRandomizeGroups,
+  onBalanceMatchups,
   canRandomize,
   randomizeReason,
   randomizing,

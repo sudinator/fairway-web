@@ -13,15 +13,17 @@ def need(cond, msg):
     if not cond:
         raise SystemExit(f"TEAM MATCH RYDER RESULTS: FAIL - {msg}")
 
-start = src.find('if (isTeam && teams?.length === 2)')
-end = src.find('\n        return (', start)
-need(start >= 0 and end > start, "team-only Ryder results branch exists")
+# 204.0: the Ryder results table serves ALL singles matches; with teams the headers are the team
+# names, without teams PLAYER / THRU / PLAYER. The block is the table render inside the pairings map.
+start = src.find('const withTeams = isTeam && teams?.length === 2;')
+end = src.find('\n      })}\n', start)
+need(start >= 0 and end > start, "Ryder results table exists for every singles match")
 block = src[start:end]
 
 checks = [
     ('three-column one-row grid', 'gridTemplateColumns: "minmax(0, 1fr) 58px minmax(0, 1fr)"' in block),
-    ('first team fixed left', 'teams[0].name.toUpperCase()' in block),
-    ('second team fixed right', 'teams[1].name.toUpperCase()' in block),
+    ('first team fixed left (PLAYER without teams)', 'teams![0].name.toUpperCase() : "PLAYER"' in block and '{leftHead}' in block),
+    ('second team fixed right (PLAYER without teams)', 'teams![1].name.toUpperCase() : "PLAYER"' in block and '{rightHead}' in block),
     ('legacy reversed pairings normalized', 'reverseTeamDisplay' in src and 'rawA.team === teamBKey && rawB.team === teamAKey' in src),
     ('thru centered', '>THRU</span>' in block and 'textAlign: "center"' in block and '{st.thru}' in block),
     ('all square centered only after play begins', 'const allSquare = st.thru > 0 && st.lead === 0' in block and '>AS<' in block),

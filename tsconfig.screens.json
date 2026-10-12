@@ -20,6 +20,7 @@
   "files": [
     "lib/screens.test.tsx",
     "lib/trifecta-card-render.test.tsx",
+    "lib/results-outlook-render.test.tsx",
     "lib/lineup-card-render.test.tsx",
     "components/share-card.tsx",
     "components/lineup-view.tsx",

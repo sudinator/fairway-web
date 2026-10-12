@@ -6,7 +6,19 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 203.4.261012
+## Current candidate: 204.2.261013
+
+- 0179 finish_game clock fix (BN163). Staging-only auto-score gated on html[data-env] (guard F). Apply 0179 before the code.
+
+## Previous: 204.1.261012
+
+- lib/grouping.balancedTeamMatchups (like v like) beside balancedTeamGroups (even groups). Trifecta swap set so singles are strong v strong.
+
+## Previous: 204.0.261012
+
+- Standings convention: big = decided, line = if ended now, clinch line = still out (all team formats). Singles table for all singles. Embedded group Results card under the scorecard (FourballView onlyFoursomeId/embedded).
+
+## Previous: 203.4.261012
 
 - Balance: equal counts enforced before handicap balance; swap pass. Property-tested over random fields.
 

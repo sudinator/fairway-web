@@ -26,8 +26,9 @@ for path in (ROOT / "components").rglob("*.tsx"):
 scoring = (ROOT / "components/game/scoring-views.tsx").read_text(encoding="utf-8")
 if re.search(r'<div\s+style=\{\{\s*overflowX:\s*"auto"', scoring):
     errors.append("components/game/scoring-views.tsx: match progression must use HScroll")
-if scoring.count("<HScroll>") < 2:
-    errors.append("components/game/scoring-views.tsx: expected both match progression tables inside HScroll")
+# 204.0: one progression table (the Ryder table serves team and no-team singles alike), inside HScroll.
+if scoring.count("<HScroll>") < 1 or scoring.count("MATCH PROGRESSION") < 1:
+    errors.append("components/game/scoring-views.tsx: expected the match progression table inside HScroll")
 
 if errors:
     print("MOBILE FIT CONTRACT: FAIL")
