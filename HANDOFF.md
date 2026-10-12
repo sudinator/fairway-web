@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 204.2.261013
+## Current candidate: 204.3.261013
+
+- Outlook line hidden when nothing is still out.
+
+## Previous: 204.2.261013
 
 - 0179 finish_game clock fix (BN163). Staging-only auto-score gated on html[data-env] (guard F). Apply 0179 before the code.
 

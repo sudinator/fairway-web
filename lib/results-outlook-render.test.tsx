@@ -110,4 +110,11 @@ for (const [label, g, teamed] of formats) {
   ok(!t.text.includes("Level — either side"), "fresh game: no Level sentence at 0–0");
   try { t.unmount(); } catch { /* jsdom */ }
 }
+// 204.3: once every match is decided the outlook line is redundant with the big number — gone.
+{
+  saveGameSnapshot(GAME_ID, { game, players, altShotScores: [] }); // all 18 holes scored, all contests settled
+  const t = renderScreen(<Tournaments session={{ user: { id: SACHIN, user_metadata: { full_name: "Sachin Manchanda" } } }} activeGroupId={GROUP_ID} openGameId={GAME_ID} />);
+  ok(!t.el.querySelector("[data-points-outlook]"), "finished Trifecta: no 'If every match ended now' line");
+  try { t.unmount(); } catch { /* jsdom */ }
+}
 report("results outlook + embedded group card + all formats");
