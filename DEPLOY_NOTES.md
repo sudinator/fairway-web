@@ -1,3 +1,7 @@
+## 204.3.261013 — Outlook line disappears once every match is decided
+
+"If every match ended now" is redundant once nothing is still out — the decided score above it IS the result. Hidden in all three team formats when no match remains open; the rendered test checks a fully scored Trifecta shows no line. Client-only; no migration.
+
 ## 204.2.261013 — Ending a game with a running clock (BN163); outlook figures in the scorecard face; staging auto-score
 
 **BN163 on End game (staging 718817, ended after 9).** `finish_game_and_post_rounds` closes every still-running round clock; the 0163 reset fence treats that as a score write and requires the score context that only a scorecard established, so ending a game with any clock open failed — hidden at 18 holes because clocks were normally closed by then. Migration 0179 sets the context inside the function for its own write; nothing else changes. Asserted on the full chain: the exact failure on the old function, success on the new.

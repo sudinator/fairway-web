@@ -608,7 +608,7 @@ export function MatchView({
             </div>
           </div>
           <div style={{ color: C.cream, opacity: 0.7, fontSize: 11, textAlign: "center", marginTop: 8 }}>
-            <span data-points-outlook>If every match ended now: <b style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 15 }}>{teams?.[0]?.name ?? "A"} {fmtPts(teamStandings.pts.A)} · {teams?.[1]?.name ?? "B"} {fmtPts(teamStandings.pts.B)}</b></span>
+            {teamStandings.out > 0 && <span data-points-outlook>If every match ended now: <b style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 15 }}>{teams?.[0]?.name ?? "A"} {fmtPts(teamStandings.pts.A)} · {teams?.[1]?.name ?? "B"} {fmtPts(teamStandings.pts.B)}</b></span>}
           </div>
           {teams && teamStandings && (
             <TeamClinchLine aPts={teamStandings.decidedPts.A} bPts={teamStandings.decidedPts.B} unclaimed={teamStandings.out} aName={teams[0].name} bName={teams[1].name} metric="matches" />
@@ -1407,12 +1407,12 @@ export function FourballView({
               ? `Three points per hole · ${teamScoreMode === "aggregate" ? "team point on aggregate net (both balls)" : "team point on best net ball"}`
               : (teamScoreMode === "aggregate" ? "Team point on aggregate net (both balls)" : "Team point on best net ball")}
           </div>
-          {isTrifecta && trifectaOutlook && teams && (trifectaOutlook.nowA + trifectaOutlook.nowB > 0) && (
+          {isTrifecta && trifectaOutlook && teams && (trifectaOutlook.nowA + trifectaOutlook.nowB > 0) && trifectaOutlook.open > 0 && (
             <div data-points-outlook style={{ color: C.cream, fontSize: 12, textAlign: "center", marginTop: 8, lineHeight: 1.5 }}>
               If every match ended now: <b style={{ fontFamily: "Georgia, serif", fontSize: 15 }}>{outlookLine(trifectaOutlook, teams[0].name, teams[1].name).replace(/^If every match ended now: /, "")}</b>
             </div>
           )}
-          {!isTrifecta && teamStandings && teams && (teamStandings.pts.A + teamStandings.pts.B > 0) && (
+          {!isTrifecta && teamStandings && teams && (teamStandings.pts.A + teamStandings.pts.B > 0) && teamStandings.out > 0 && (
             <div data-points-outlook style={{ color: C.cream, fontSize: 12, textAlign: "center", marginTop: 8, lineHeight: 1.5 }}>
               If every match ended now: <b style={{ fontFamily: "Georgia, serif", fontSize: 15 }}>{teams[0].name} {fmtPts(teamStandings.pts.A)} · {teams[1].name} {fmtPts(teamStandings.pts.B)}</b>
             </div>
