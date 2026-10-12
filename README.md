@@ -1,3 +1,7 @@
+## 204.2.261013 — Ending a game with a running clock (BN163); outlook figures in the scorecard face; staging auto-score
+
+**BN163 on End game (staging 718817, ended after 9).** `finish_game_and_post_rounds` closes every still-running round clock; the 0163 reset fence treats that as a score write and requires the score context that only a scorecard established, so ending a game with any clock open failed — hidden at 18 holes because clocks were normally closed by then. Migration 0179 sets the context inside the function for its own write; nothing else changes. Asserted on the full chain: the exact failure on the old function, success on the new.
+
 ## 204.1.261012 — Balanced matchups: like plays like, as a starting point captains can edit
 
 What already existed, under a dice: singles has "Build balanced matches" (nearest playing handicap across the teams — like plays like) and the team formats had "Build balanced groups", which EVENED THE FIELD — each team's strongest pair was put against the other's weakest so every group had a similar mix, which is the opposite of a balanced match.

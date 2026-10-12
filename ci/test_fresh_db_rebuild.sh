@@ -85,6 +85,9 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-no-rpc-overloads.sql"
 # 0178: readable live links for the scorecard and competition pages.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-readable-live-links.sql"
 
+# 0179: ending a game closes running clocks without tripping the reset fence.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-finish-game-clocks.sql"
+
 # Reset fencing: real SQL outcomes plus separate-connection concurrency barriers.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-game-reset-fencing.sql"
 BNN_RESET_TEST_DATABASE_URL="$DB_URL" python3 "$ROOT/ci/test-game-reset-concurrency.py"

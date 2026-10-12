@@ -1,6 +1,7 @@
 "use client";
 import { shortNamer } from "@/lib/short-names";
 import { balanceTeams, balanceSummary } from "@/lib/balance-teams";
+import { autoScores, isStagingClient } from "@/lib/auto-score";
 import { useScoringDevice } from "@/components/scoring-device";
 import { isPrimaryScoringDevice, isDeviceRejection, markScoringDeviceRevoked } from "@/lib/scoring-device";
 import { createGameScoreWriter } from "@/lib/game-score-sync";
@@ -2458,6 +2459,25 @@ function GameRoom({
     return { changed: r.assignments.length, summary: balanceSummary(r), unrated: r.unrated };
   };
 
+  // STAGING only (204.2): randomised scores through hole N for every active player, via the same
+  // RPC a scorecard uses — so the reset fence, version and device checks all apply. The organizer
+  // panel only offers it when html[data-env]="staging".
+  const autoScoreThrough = async (through: number): Promise<string> => {
+    if (!game || !isStagingClient()) return "Not available here.";
+    if (!allowSetupChange({ type: "set_handicap", player: players[0] })) return "Blocked.";
+    const holes = (game.holes_meta || []).map((h) => ({ par: h.par }));
+    let n = 0;
+    for (const p of players) {
+      if (p.no_show) continue;
+      const next = autoScores(p.scores as (number | null)[] | null, holes, through);
+      const { error } = await supabase.rpc("save_game_score_bundle", { p_player: p.id, p_version: game.scoring_version ?? 0, p_patch: { scores: next }, p_stats_only: false });
+      if (error) throw new Error(error.message);
+      n++;
+    }
+    await load();
+    return `Scored ${n} player${n === 1 ? "" : "s"} through hole ${through}.`;
+  };
+
   // Organizer: update a player's tee group from the unified setup roster.
   const setPlayerTeeGroup = async (p: Player, group: number | null) => {
     if (!allowSetupChange({ type: "set_tee_group", player: p, group })) return;
@@ -3405,7 +3425,7 @@ function GameRoom({
         const panelProps = {
           game, players, user,
           onOverride: overridePlayerHandicap, courseTees, onSetTee: setPlayerTee, onSetManualHandicap: setManualHandicap,
-          onRemove: removePlayer, onToggleNoShow: toggleNoShow, onSetTeam: setPlayerTeam, onBalanceTeams: balanceTeamsByHandicap, onRenameTeams: renameTeams,
+          onRemove: removePlayer, onToggleNoShow: toggleNoShow, onSetTeam: setPlayerTeam, onBalanceTeams: balanceTeamsByHandicap, onAutoScore: autoScoreThrough, onRenameTeams: renameTeams,
           onRename: renameGame, onDelete: deleteGame,
           canDelete: !completedGame, deleteRestriction: "Only a system admin can delete a completed game. Posted own-ball rounds remain in player history; Alternate Shot rounds are removed.",
           onEnd: requestEndGame, onReopen: reopenGame, onReset: resetScores, onShare: setShare,

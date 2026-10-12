@@ -1,3 +1,13 @@
+## 204.2.261013 — Ending a game with a running clock (BN163); outlook figures in the scorecard face; staging auto-score
+
+**BN163 on End game (staging 718817, ended after 9).** `finish_game_and_post_rounds` closes every still-running round clock; the 0163 reset fence treats that as a score write and requires the score context that only a scorecard established, so ending a game with any clock open failed — hidden at 18 holes because clocks were normally closed by then. Migration 0179 sets the context inside the function for its own write; nothing else changes. Asserted on the full chain: the exact failure on the old function, success on the new.
+
+**Results tab.** The "If every match ended now" figures are bold in the scorecard typeface (Georgia 15), matching the team score above. The "Level — either side needs…" sentence now appears only when points have actually been decided and are equal; at 0–0 it read as a tied match when nothing had been played.
+
+**Staging only: auto-score.** Game setup (Players tab) on staging shows a yellow STAGING ONLY · AUTO-SCORE box: "through hole N" + "Random scores for everyone" fills holes 1–N for every active player with plausible random scores (birdie 8%, par 30%, bogey 36%, double 18%, triple 8%; existing scores kept) through the same RPC a scorecard uses, so every fence and check applies. The layout sets `html[data-env]` from the Vercel branch; the control renders only when it reads "staging", and `check_recurrence_guards.py` F fails the build if that gate is ever removed (negative-tested).
+
+Deploy: 0179 to staging → code → 0179 to production → merge.
+
 ## 204.1.261012 — Balanced matchups: like plays like, as a starting point captains can edit
 
 What already existed, under a dice: singles has "Build balanced matches" (nearest playing handicap across the teams — like plays like) and the team formats had "Build balanced groups", which EVENED THE FIELD — each team's strongest pair was put against the other's weakest so every group had a similar mix, which is the opposite of a balanced match.

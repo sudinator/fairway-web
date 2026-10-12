@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 204.1.261012
+## Current candidate: 204.2.261013
+
+- 0179 finish_game clock fix (BN163). Staging-only auto-score gated on html[data-env] (guard F). Apply 0179 before the code.
+
+## Previous: 204.1.261012
 
 - lib/grouping.balancedTeamMatchups (like v like) beside balancedTeamGroups (even groups). Trifecta swap set so singles are strong v strong.
 

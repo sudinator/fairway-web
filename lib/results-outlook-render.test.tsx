@@ -99,7 +99,15 @@ for (const [label, g, teamed] of formats) {
     ok(!line, `${label}: no standings block`);
     ok(t.el.querySelectorAll("[data-pairing-card]").length === 6 && t.text.includes("PLAYERTHRUPLAYER"), `${label}: the table, headed PLAYER / THRU / PLAYER`);
   }
-  if (label === "singles, teams") ok(t.text.includes("Level — either side needs"), "singles, teams: tie sentence at 1–1");
+  if (label === "singles, teams") ok(t.text.includes("Level — either side needs"), "singles, teams: tie sentence at 1–1 (points decided and equal)");
   try { t.unmount(); } catch { /* jsdom teardown */ }
+}
+// 204.2: at 0–0 with nothing decided, no "Level" sentence — it read as a tied match.
+{
+  const fresh = players.map((p) => ({ ...p, scores: p.scores.map(() => null) }));
+  saveGameSnapshot(GAME_ID, { game: { ...game, game_type: "match", foursomes: [], pairings: pairs.map(([a, b]) => ({ a, b })) }, players: fresh, altShotScores: [] });
+  const t = renderScreen(<Tournaments session={{ user: { id: SACHIN, user_metadata: { full_name: "Sachin Manchanda" } } }} activeGroupId={GROUP_ID} openGameId={GAME_ID} />);
+  ok(!t.text.includes("Level — either side"), "fresh game: no Level sentence at 0–0");
+  try { t.unmount(); } catch { /* jsdom */ }
 }
 report("results outlook + embedded group card + all formats");

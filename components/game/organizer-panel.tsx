@@ -1,5 +1,6 @@
 "use client";
 import { shortNamer } from "@/lib/short-names";
+import { isStagingClient } from "@/lib/auto-score";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { FormatPicker, AllowancePicker } from "@/components/game/format-picker";
 import type { GameType } from "@/lib/game-shape";
@@ -93,6 +94,8 @@ export type OrganizerPanelProps = {
   onSetTeam: (p: Player, team: string | null) => Promise<void>;
   /** Balanced teams by playing handicap (203.0); returns what changed, or null if cancelled/unavailable. */
   onBalanceTeams?: () => Promise<{ changed: number; summary: string; unrated: string[] } | null>;
+  /** STAGING only (204.2): randomised scores through hole N for every player. */
+  onAutoScore?: (through: number) => Promise<string>;
   onRenameTeams?: (names: [string, string]) => Promise<void>;
   onRename: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
@@ -129,6 +132,7 @@ export function OrganizerPanel({
   onToggleNoShow,
   onSetTeam,
   onBalanceTeams,
+  onAutoScore,
   onRenameTeams,
   section = "players",
   eligibleMembers = [],
@@ -149,6 +153,9 @@ export function OrganizerPanel({
   // than by two places happening to carry the same literal.
   const COMPACT = { padding: "6px 8px" } as const;
   const [balancing, setBalancing] = useState(false);
+  const [autoThrough, setAutoThrough] = useState(9);
+  const [autoMsg, setAutoMsg] = useState<string | null>(null);
+  const [autoBusy, setAutoBusy] = useState(false);
   const [balanceMsg, setBalanceMsg] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [manualEdits, setManualEdits] = useState<Record<string, string>>({});
@@ -295,6 +302,20 @@ export function OrganizerPanel({
                 {section === "teams" ? "Tap a team to assign each player." : "Set each player's handicap and tee."}
               </span>
             </div>
+            {section !== "teams" && onAutoScore && isStagingClient() && (
+              <div style={{ background: C.greenMid, border: `2px solid ${C.gold}`, borderRadius: 12, padding: "13px 16px", marginBottom: 10 }}>
+                <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>STAGING ONLY · AUTO-SCORE</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
+                  <label style={{ color: C.cream, fontSize: 12 }}>Through hole <input type="number" min={1} max={18} value={autoThrough} onChange={(e) => setAutoThrough(Math.max(1, Math.min(18, Number(e.target.value) || 1)))} style={{ ...inputStyle, width: 64, marginLeft: 6 }} /></label>
+                  <button style={{ ...btn(true), fontSize: 12, opacity: autoBusy ? 0.6 : 1 }} disabled={autoBusy}
+                    onClick={async () => { setAutoBusy(true); setAutoMsg(null); try { setAutoMsg(await onAutoScore(autoThrough)); } catch (e: any) { setAutoMsg(`Couldn't auto-score: ${e?.message || "try again"}`); } finally { setAutoBusy(false); } }}>
+                    {autoBusy ? "Scoring…" : "🎲 Random scores for everyone"}
+                  </button>
+                  <span style={{ color: C.sage, fontSize: 11, flex: 1, minWidth: 160 }}>Fills holes 1–{autoThrough} with plausible random scores for every player (existing scores kept). Not available in production.</span>
+                </div>
+                {autoMsg ? <div style={{ color: C.cream, fontSize: 12, marginTop: 8 }}>{autoMsg}</div> : null}
+              </div>
+            )}
             {section === "teams" && onBalanceTeams && teams.length >= 2 && (
               <div style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginBottom: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>

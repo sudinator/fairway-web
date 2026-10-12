@@ -1,3 +1,7 @@
+## 204.2 — finish_game sets the score context (0179)
+
+`finish_game_and_post_rounds` redefined: sets `bnn.game_score_context` at the game's scoring_version before closing clocks. No schema change.
+
 ## 202.1 — readable live links (0178)
 
 `competitions.share_slug text` (partial unique index); `make_competition_slug(uuid)`; `set_competition_share` mints/clears it; `get_live_scorecard` matches games.lineup_slug, `get_live_competition` matches competitions.share_slug, both alongside the token. `make_lineup_slug` redefined with a 16-character minimum.
