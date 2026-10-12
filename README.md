@@ -1,3 +1,7 @@
+## 204.1.261012 — Balanced matchups: like plays like, as a starting point captains can edit
+
+What already existed, under a dice: singles has "Build balanced matches" (nearest playing handicap across the teams — like plays like) and the team formats had "Build balanced groups", which EVENED THE FIELD — each team's strongest pair was put against the other's weakest so every group had a similar mix, which is the opposite of a balanced match.
+
 ## 204.0.261012 — Match status under the group card; one standings convention; the singles table everywhere
 
 **Group card.** For four-ball, Trifecta and alternate shot, the group's Results card now sits directly under the group scorecard — the same component the Results tab shows, with the group's name header and pair boxes suppressed (the scorecard above already names the four) and headed "Match status". Three contest rows with the gold leader, the points line, nothing new to learn. Placed below, not pinned, so it never covers scores.

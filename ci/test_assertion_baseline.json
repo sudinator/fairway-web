@@ -1,5 +1,5 @@
 {
-  "total": 439448,
+  "total": 439452,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -26,7 +26,7 @@
     "game-create": 64,
     "game-utils": 21,
     "golf/computeBetting tests": 53,
-    "grouping tests": 297,
+    "grouping tests": 301,
     "half-stroke simulation": 168914,
     "hole result consistency": 981,
     "legs": 30,

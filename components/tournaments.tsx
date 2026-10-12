@@ -54,7 +54,7 @@ import {
   mergeBackupRow } from "@/lib/golf";
 import { pkey, chBasis, shapeOf, dotStrokes, fullStrokes, strokeSets } from "@/lib/game-shape";
 import { decideSetupChange, type SetupAction, type SetupDecision } from "@/lib/game-setup-policy";
-import { applyTeamGroupSlotMove, balancedTeamGroups, randomTeeGroups, type GPlayer } from "@/lib/grouping";
+import { applyTeamGroupSlotMove, balancedTeamGroups, balancedTeamMatchups, randomTeeGroups, type GPlayer } from "@/lib/grouping";
 import { notifyError } from "@/components/toast";
 import { buildLegs, legResult, teamTally, fmtPt, legPoints, DEFAULT_LEG_CONFIG } from "@/lib/legs";
 import type { LegConfig, Leg } from "@/lib/legs";
@@ -2543,6 +2543,55 @@ function GameRoom({
     }
   };
 
+  // Balanced MATCHUPS (204.1): like plays like. Team formats only. Same write path as the dice
+  // button (set_tee_groups → syncTeamPlayFoursomes), then for a Trifecta the swap flag is set per
+  // foursome so the two singles fall strong v strong and weak v weak. Captains edit afterwards as
+  // with any built structure.
+  const balanceMatchups = async () => {
+    if (!game || !canRandomize || !allowSetupChange({ type: "randomize_groups" })) return;
+    const teamFormat = (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta") && Array.isArray(game.teams) && game.teams.length === 2;
+    if (!teamFormat) return;
+    const missing = players.filter((p) => !p.no_show && p.course_handicap == null).map((p) => p.display_name);
+    if (missing.length) { notifyError(`Set a course handicap for ${missing.join(", ")} first, then build matchups.`); return; }
+    const ph = (p: Player) => applyAllowance(chBasis(p, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100);
+    const result = balancedTeamMatchups(
+      players.filter((p) => !p.no_show).map((p) => ({ id: p.id, team: p.team, playingHandicap: ph(p) })),
+      [game.teams![0].key, game.teams![1].key],
+    );
+    const byId = new Map(result.assignments.map((a) => [a.playerId, a.group]));
+    const overflow = result.unassignedIds;
+    setPlayers((prev) => prev.map((p) => (p.no_show ? p : ({ ...p, tee_group: overflow.includes(p.id) ? null : (byId.get(p.id) ?? null) }))));
+    setGroupOverflow(overflow);
+    setRandomizing(true);
+    try {
+      const payload = [...result.assignments.map((a) => ({ player: a.playerId, group: a.group })), ...overflow.map((id) => ({ player: id, group: null }))];
+      const { error } = await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: payload });
+      if (error) throw error;
+      const nextPlayers = players.map((p) => p.no_show ? p : ({ ...p, tee_group: overflow.includes(p.id) ? null : (byId.get(p.id) ?? null) }));
+      const built = deriveTeamFoursomesFromGroups(nextPlayers, game.teams, game.foursomes);
+      // Trifecta: order each foursome's singles strong v strong. Derived sides are in roster order;
+      // swap=false pairs a[0] with b[0]. Choose swap so the stronger A meets the stronger B.
+      const keyOf = (p: Player) => p.user_id ?? p.id;
+      const next = game.game_type === "trifecta"
+        ? built.map((f) => {
+            if (f.a.length !== 2 || f.b.length !== 2) return f;
+            const phOf = (k: string) => { const p = nextPlayers.find((x) => keyOf(x) === k); return p ? ph(p) : 0; };
+            const aStrongFirst = phOf(f.a[0]) <= phOf(f.a[1]);
+            const bStrongFirst = phOf(f.b[0]) <= phOf(f.b[1]);
+            return { ...f, swap: aStrongFirst !== bStrongFirst };
+          })
+        : built;
+      const { error: fErr } = await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
+      if (fErr) throw fErr;
+      setGame({ ...game, foursomes: next });
+    } catch {
+      notifyError("Couldn't save the balanced matchups — please try again.");
+    } finally {
+      setRandomizing(false);
+      await load();
+    }
+  };
+
   // --- Add players / guests after the game has started (forgot someone, a walk-up, etc.) ---
   // Group members in this game's group who aren't in the field yet.
   const [eligibleMembers, setEligibleMembers] = useState<{ id: string; display_name: string; handicap_index: number | null }[]>([]);
@@ -3365,7 +3414,7 @@ function GameRoom({
         } satisfies OrganizerPanelProps;
         const workspaceProps = {
           game, players, setupTab, onSetupTabChange: setSetupTab, organizerPanelProps: panelProps, onSetGameDate: setGameDate, courseOptions, onChangeCourse: changeGameCourse,
-          onSetTeeGroup: setPlayerTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, onSetTrifectaPairing: setTrifectaPairing, onSetLegConfig: setLegConfig, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, canRandomize, randomizeReason,
+          onSetTeeGroup: setPlayerTeeGroup, onSetAltShotFirstDriver: setAltShotFirstDriver, onSetTrifectaPairing: setTrifectaPairing, onSetLegConfig: setLegConfig, getTeeGroupPolicy: (p: Player, group: number | null) => { const d = setupDecision({ type: "set_tee_group", player: p, group }); return { blocked: d.decision === "block", reason: d.decision === "block" ? d.reason : undefined }; }, onRandomizeGroups: randomizeGroups, onBalanceMatchups: balanceMatchups, canRandomize, randomizeReason,
           randomizing, groupOverflow, onSetTeamGroupSlot: setTeamGroupSlot, isCompetitionGame: !!competitionLink,
           courseTees,
         } satisfies React.ComponentProps<typeof GameSetupWorkspace>;

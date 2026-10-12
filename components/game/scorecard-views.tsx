@@ -628,7 +628,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
 }
 
 // Organizer/admin score-change history for a game (reads migration 0042's audit log).
-export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, getTeeGroupPolicy, onRandomize, canRandomize = false, randomizeReason = "", randomizing = false, overflowIds = [] }: {
+export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onBalanceMatchups, getTeeGroupPolicy, onRandomize, canRandomize = false, randomizeReason = "", randomizing = false, overflowIds = [] }: {
   game: Game; players: Player[];
   onSetTeeGroup: (p: Player, group: number | null) => Promise<void>;
   onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
@@ -637,6 +637,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
   getTeeGroupPolicy?: (p: Player, group: number | null) => { blocked: boolean; reason?: string };
   onRandomize?: () => Promise<void>;
   canRandomize?: boolean; randomizeReason?: string; randomizing?: boolean; overflowIds?: string[];
+  onBalanceMatchups?: () => Promise<void>;
 }) {
   const byKey = (k: string) => players.find((p) => pkey(p) === k) || null;
   const groupOptions = Array.from({ length: Math.max(2, Math.ceil(players.length / 2) + 1) }, (_, i) => i + 1);
@@ -674,7 +675,7 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
   const firstGroup = teeGroups.length ? Math.min(...teeGroups) : null;
 
   if (teamGroupsOwnStructure && Array.isArray(game.teams) && game.teams.length === 2) {
-    return <TeamGroupsBuilder game={game} players={players} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} onSetTrifectaPairing={onSetTrifectaPairing} onRandomize={onRandomize} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} />;
+    return <TeamGroupsBuilder game={game} players={players} onSetTeamGroupSlot={onSetTeamGroupSlot} onSetAltShotFirstDriver={onSetAltShotFirstDriver} onSetTrifectaPairing={onSetTrifectaPairing} onBalanceMatchups={onBalanceMatchups} onRandomize={onRandomize} canRandomize={canRandomize} randomizeReason={randomizeReason} randomizing={randomizing} />;
   }
 
   return (
@@ -780,13 +781,14 @@ export function GroupsBuilder({ game, players, onSetTeeGroup, onSetTeamGroupSlot
   );
 }
 
-function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onRandomize, canRandomize, randomizeReason, randomizing }: {
+function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirstDriver, onSetTrifectaPairing, onRandomize, onBalanceMatchups, canRandomize, randomizeReason, randomizing }: {
   game: Game;
   players: Player[];
   onSetTeamGroupSlot?: (current: Player | null, next: Player | null, group: number) => Promise<void>;
   onSetAltShotFirstDriver?: (foursomeId: string, side: "a" | "b", playerKey: string) => Promise<void>;
   onSetTrifectaPairing?: (foursomeId: string, cross: boolean) => Promise<void>;
   onRandomize?: () => Promise<void>;
+  onBalanceMatchups?: () => Promise<void>;
   canRandomize: boolean;
   randomizeReason: string;
   randomizing: boolean;
@@ -835,10 +837,15 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
       {game.game_type === "trifecta" ? <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>Once four players are selected, choose the two Singles matchups inside that group.</div> : null}
       {scoringStarted ? <div style={{ background: "rgba(201,162,39,.12)", border: `1px solid ${C.gold}`, borderRadius: 10, padding: "8px 12px", color: C.cream, fontSize: 11.5, lineHeight: 1.45, marginTop: 10 }}>Groups and Trifecta Singles matchups are locked because scoring has started.</div> : null}
       {onRandomize ? <div style={{ marginTop: 12 }}>
-        <button onClick={() => canRandomize && onRandomize()} disabled={!canRandomize || randomizing} style={{ ...btn(true), fontSize: 13, opacity: canRandomize && !randomizing ? 1 : 0.62 }}>
-          {randomizing ? "Building…" : "🎲 Build balanced groups"}
+        {onBalanceMatchups && (
+          <button onClick={() => canRandomize && onBalanceMatchups()} disabled={!canRandomize || randomizing} style={{ ...btn(true), fontSize: 13, opacity: canRandomize && !randomizing ? 1 : 0.62, marginRight: 8 }}>
+            {randomizing ? "Building…" : "⚖️ Build balanced matchups"}
+          </button>
+        )}
+        <button onClick={() => canRandomize && onRandomize()} disabled={!canRandomize || randomizing} style={{ ...btn(false), fontSize: 13, opacity: canRandomize && !randomizing ? 1 : 0.62 }}>
+          {randomizing ? "Building…" : "🎲 Build even groups"}
         </button>
-        <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>{canRandomize ? "Creates valid 2-v-2 groups and spreads playing handicaps across the matches. You can still change any player below." : randomizeReason}</div>
+        <div style={{ color: C.sage, fontSize: 11, marginTop: 6, lineHeight: 1.45 }}>{canRandomize ? "Balanced matchups: like plays like — each team's strongest pair meets the other's strongest, and in a Trifecta the singles fall strong v strong, weak v weak. Even groups: spreads handicaps so every group is a similar mix. Either is a starting point — captains can still move anyone afterwards." : randomizeReason}</div>
       </div> : null}
 
       <div style={{ marginTop: 12, padding: "8px 12px", borderTop: `1px solid ${C.borderGreen}`, borderBottom: `1px solid ${C.borderGreen}` }}>

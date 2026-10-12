@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 204.0.261012
+## Current candidate: 204.1.261012
+
+- lib/grouping.balancedTeamMatchups (like v like) beside balancedTeamGroups (even groups). Trifecta swap set so singles are strong v strong.
+
+## Previous: 204.0.261012
 
 - Standings convention: big = decided, line = if ended now, clinch line = still out (all team formats). Singles table for all singles. Embedded group Results card under the scorecard (FourballView onlyFoursomeId/embedded).
 
