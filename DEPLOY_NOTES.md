@@ -1,3 +1,13 @@
+## 204.0.261012 — Match status under the group card; one standings convention; the singles table everywhere
+
+**Group card.** For four-ball, Trifecta and alternate shot, the group's Results card now sits directly under the group scorecard — the same component the Results tab shows, with the group's name header and pair boxes suppressed (the scorecard above already names the four) and headed "Match status". Three contest rows with the gold leader, the points line, nothing new to learn. Placed below, not pinned, so it never covers scores.
+
+**One standings convention for every team match format** (singles with teams, four-ball, Trifecta): the big number is points **decided** (gold on the leader); one line beneath — "If every match ended now: USA 5 · Europe 4" — from the same provisional rule the group cards use (leader takes the point, all square splits it); the clinch line carries what is still out. Singles and four-ball previously showed the projected figure big with "decided so far" in small print and used the word "Projected"; both now match Trifecta. When level, the clinch line no longer goes silent: "Level — either side needs 2½ match points to win this session".
+
+**Singles table everywhere.** No-team singles used a tall per-match card; it now uses the same table as team singles, headed PLAYER / THRU / PLAYER, result in gold, Details › for the hole-by-hole progression. The strokes note moves behind Details (the STROKES summary at the top of the tab still shows it for your group). The retired card path is removed.
+
+`lib/points-outlook.ts` is the one outlook arithmetic (decided / if-ended-now / open), tested: a 3-up-with-4-to-play match counts "if ended now" but is not decided. Rendered test mounts the real screen for Trifecta, four-ball, team singles and no-team singles mid-round — 13 assertions. Client-only; no migration.
+
 ## 203.4.261012 — Balance teams keeps equal numbers
 
 Reported on a real field: with skewed handicaps, Balance by handicap could put more players on one side than the other. The "give the next player to the lighter side" step had no count limit, so a 30 against three 2s went 1 v 3. Equal numbers are the hard rule and now come first: team sizes are fixed up front (equal, or one apart for an odd field), the draft deals only into teams with room — preferring the lighter side among those — and a swap pass then narrows the handicap gap without changing counts. The skewed case gives {30, 2} v {2, 2}, the best possible with two a side. Tests: that case, 60 random fields of 4–20 players all with equal (or one-apart) counts, and a small field where the swap pass finds the best equal split; the old rule fails the new test. Applies to the game Teams tab and the Ryder Cup roster alike. Client-only; no migration.

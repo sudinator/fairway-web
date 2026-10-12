@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 203.4.261012
+## Current candidate: 204.0.261012
+
+- Standings convention: big = decided, line = if ended now, clinch line = still out (all team formats). Singles table for all singles. Embedded group Results card under the scorecard (FourballView onlyFoursomeId/embedded).
+
+## Previous: 203.4.261012
 
 - Balance: equal counts enforced before handicap balance; swap pass. Property-tested over random fields.
 

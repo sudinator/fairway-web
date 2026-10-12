@@ -3611,6 +3611,13 @@ function GameRoom({
             offline={offline}
             onMarkOut={toggleNoShow}
           />
+          {/* 204.0: this group's Results card, directly under the scorecard — same component as the
+              Results tab, header and pair boxes suppressed (the scorecard already names the group). */}
+          {(game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot") && (() => {
+            const keys = new Set(cardPlayers.map((p) => pkey(p)));
+            const mineF = (game.foursomes || []).find((f) => f.a.some((k) => keys.has(k)) || f.b.some((k) => keys.has(k)));
+            return mineF ? <FourballView game={game} players={players} user={user} isCreator={game.created_by === user.id} mode="play" altShotScores={altShotScores} onChanged={load} onlyFoursomeId={mineF.id} embedded /> : null;
+          })()}
         </>
       ) : (game.game_type === "fourball" || game.game_type === "trifecta" || game.game_type === "alt_shot") && (roomTab === "play" || (roomTab === "setup" && setupTab === "matchups" && game.game_type !== "trifecta")) ? (
         <FourballView
