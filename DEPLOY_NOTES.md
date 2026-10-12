@@ -1,3 +1,7 @@
+## 203.4.261012 — Balance teams keeps equal numbers
+
+Reported on a real field: with skewed handicaps, Balance by handicap could put more players on one side than the other. The "give the next player to the lighter side" step had no count limit, so a 30 against three 2s went 1 v 3. Equal numbers are the hard rule and now come first: team sizes are fixed up front (equal, or one apart for an odd field), the draft deals only into teams with room — preferring the lighter side among those — and a swap pass then narrows the handicap gap without changing counts. The skewed case gives {30, 2} v {2, 2}, the best possible with two a side. Tests: that case, 60 random fields of 4–20 players all with equal (or one-apart) counts, and a small field where the swap pass finds the best equal split; the old rule fails the new test. Applies to the game Teams tab and the Ryder Cup roster alike. Client-only; no migration.
+
 ## 203.3.261011 — Ryder Cup roster: "who is playing" back in front of balancing
 
 203.1's Balance by handicap index dealt the whole club roster onto two sides, removing the step where the organizer chooses who is in. Each roster row now has an **In** tick (tapping a team button also marks the player in; untick clears their side), with **Everyone in** and **Clear** shortcuts and a count of who is in. Balance deals only the players who are in, leaves everyone else out, and asks for at least two. Sides can still be set by hand with the team buttons, as before. Client-only; no migration.
