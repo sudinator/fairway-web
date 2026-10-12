@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 203.3.261011
+## Current candidate: 203.4.261012
+
+- Balance: equal counts enforced before handicap balance; swap pass. Property-tested over random fields.
+
+## Previous: 203.3.261011
 
 - Ryder Cup roster: In tick per player; balance deals only players who are in.
 

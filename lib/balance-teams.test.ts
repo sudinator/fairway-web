@@ -52,4 +52,27 @@ eq(balanceTeams({ ...G, teams: [{ key: "A", name: "Only" }] }, [P("1","a",10)]).
   const r = balanceTeams(G, [P("1","a",20),P("2","b",null),P("3","c",null)]);
   eq(r.unrated.join(","), "b,c", "every unrated player named, in roster order");
 }
+// THE BUG (2026-10-12): a skewed field. Lighter-side-only dealing put the 30 alone against three 2s.
+// Equal numbers are the hard rule: 2 v 2, and the best split within that is {30,2} v {2,2}.
+{
+  const r = balanceTeams(G, [P("1","big",30),P("2","a",2),P("3","b",2),P("4","c",2)]);
+  eq(r.teams[0].members.length, 2, "two a side"); eq(r.teams[1].members.length, 2, "two a side");
+  eq(Math.max(r.teams[0].total, r.teams[1].total), 32, "best achievable with equal counts");
+}
+// Equal counts on every even field, one apart on every odd field, across random handicaps.
+{
+  let seed = 7; const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  for (let trial = 0; trial < 60; trial++) {
+    const sz = 4 + Math.floor(rnd() * 17);
+    const ps = Array.from({ length: sz }, (_, i) => P(String(i), "p" + i, Math.floor(rnd() * 36)));
+    const r = balanceTeams(G, ps);
+    const diff = Math.abs(r.teams[0].members.length - r.teams[1].members.length);
+    assert(diff === (sz % 2), `field of ${sz}: counts ${r.teams[0].members.length} v ${r.teams[1].members.length}`);
+  }
+}
+// The swap pass never widens a gap and finds the best equal-count split on a small field.
+{
+  const r = balanceTeams(G, [P("1","a",25),P("2","b",10),P("3","c",9),P("4","d",1)]);
+  eq(Math.abs(r.teams[0].total - r.teams[1].total), 7, "{25,1} v {10,9}: the best equal-count split");
+}
 console.log("balance-teams tests passed");
