@@ -91,6 +91,8 @@ export type OrganizerPanelProps = {
   onRemove: (p: Player) => Promise<void>;
   onToggleNoShow: (p: Player) => Promise<void>;
   onSetTeam: (p: Player, team: string | null) => Promise<void>;
+  /** Balanced teams by playing handicap (203.0); returns what changed, or null if cancelled/unavailable. */
+  onBalanceTeams?: () => Promise<{ changed: number; summary: string; unrated: string[] } | null>;
   onRenameTeams?: (names: [string, string]) => Promise<void>;
   onRename: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
@@ -126,6 +128,7 @@ export function OrganizerPanel({
   onRemove,
   onToggleNoShow,
   onSetTeam,
+  onBalanceTeams,
   onRenameTeams,
   section = "players",
   eligibleMembers = [],
@@ -145,6 +148,8 @@ export function OrganizerPanel({
   // the manual-handicap field lines up with the handicap field beside it by construction rather
   // than by two places happening to carry the same literal.
   const COMPACT = { padding: "6px 8px" } as const;
+  const [balancing, setBalancing] = useState(false);
+  const [balanceMsg, setBalanceMsg] = useState<string | null>(null);
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [manualEdits, setManualEdits] = useState<Record<string, string>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -153,6 +158,28 @@ export function OrganizerPanel({
   const [addGuestHcp, setAddGuestHcp] = useState("");
   const [addGuestSponsor, setAddGuestSponsor] = useState(""); // sponsor user id; "" -> current user
   const [teamNameEdits, setTeamNameEdits] = useState<[string, string]>([game.teams?.[0]?.name || "Team 1", game.teams?.[1]?.name || "Team 2"]);
+  // Team names save themselves (203.2): on blur, and 700ms after the last keystroke. The former
+  // "Save names" button was redundant and, after a reload of the game (balance, load()), its
+  // enabled/disabled check compared stale edits with fresh names and appeared to do nothing.
+  const [teamNameStatus, setTeamNameStatus] = useState<string | null>(null);
+  const teamNameTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedTeamNames = React.useRef<[string, string]>([game.teams?.[0]?.name || "Team 1", game.teams?.[1]?.name || "Team 2"]);
+  useEffect(() => {
+    // Keep the boxes in step with the game when it reloads under us (balance, another device).
+    const fresh: [string, string] = [game.teams?.[0]?.name || "Team 1", game.teams?.[1]?.name || "Team 2"];
+    if (fresh[0] !== savedTeamNames.current[0] || fresh[1] !== savedTeamNames.current[1]) { savedTeamNames.current = fresh; setTeamNameEdits(fresh); }
+  }, [game.teams]);
+  const commitTeamNames = async (edits: [string, string]) => {
+    if (!onRenameTeams) return;
+    const names: [string, string] = [edits[0].trim() || "Team 1", edits[1].trim() || "Team 2"];
+    if (names[0] === savedTeamNames.current[0] && names[1] === savedTeamNames.current[1]) return;
+    setTeamNameStatus("Saving…");
+    try { await onRenameTeams(names); savedTeamNames.current = names; setTeamNameStatus("Saved"); setTimeout(() => setTeamNameStatus(null), 1500); }
+    catch (e: any) { setTeamNameStatus(`Couldn't save: ${e?.message || "try again"}`); }
+  };
+  const editTeamName = (i: 0 | 1, value: string) => {
+    setTeamNameEdits((prev) => { const next: [string, string] = [...prev] as [string, string]; next[i] = value; if (teamNameTimer.current) clearTimeout(teamNameTimer.current); teamNameTimer.current = setTimeout(() => { void commitTeamNames(next); }, 700); return next; });
+  };
   useEffect(() => { setTeamNameEdits([game.teams?.[0]?.name || "Team 1", game.teams?.[1]?.name || "Team 2"]); }, [game.teams]);
   const currentFormatFamily: FormatFamily =
     game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" ||
@@ -268,6 +295,18 @@ export function OrganizerPanel({
                 {section === "teams" ? "Tap a team to assign each player." : "Set each player's handicap and tee."}
               </span>
             </div>
+            {section === "teams" && onBalanceTeams && teams.length >= 2 && (
+              <div style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <button style={{ ...btn(true), fontSize: 12, opacity: balancing ? 0.6 : 1 }} disabled={balancing}
+                    onClick={async () => { setBalancing(true); setBalanceMsg(null); try { const r = await onBalanceTeams(); if (r) setBalanceMsg(r.unrated.length ? `Set a course handicap for ${r.unrated.join(", ")} first (Players tab), then balance.` : r.changed === 0 ? `Already balanced: ${r.summary}.` : r.summary); } finally { setBalancing(false); } }}>
+                    {balancing ? "Balancing…" : "⚖️ Balance by handicap"}
+                  </button>
+                  <span style={{ color: C.sage, fontSize: 11, flex: 1, minWidth: 160 }}>Splits the field by playing handicap so the sides add up evenly; every player needs a course handicap first; players with scores stay put.</span>
+                </div>
+                {balanceMsg ? <div style={{ color: C.cream, fontSize: 12, marginTop: 8 }}>{balanceMsg}</div> : null}
+              </div>
+            )}
             {orderedPlayers.map((p) => {
               const raw = edits[p.id] ?? (p.handicap_index != null ? String(p.handicap_index) : "");
               return (
@@ -452,16 +491,17 @@ export function OrganizerPanel({
 
           {section === "teams" && teams.length >= 2 && onRenameTeams && (
             <div style={{ background: C.greenLight, borderRadius: 10, padding: 12, marginTop: 12, border: `1px solid ${C.borderGreen}` }}>
-              <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>TEAM NAMES</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>TEAM NAMES</div>
+                <div style={{ flex: 1 }} />
+                {teamNameStatus ? <span style={{ color: teamNameStatus.startsWith("Couldn") ? C.gold : C.sage, fontSize: 11 }}>{teamNameStatus}</span> : <span style={{ color: C.sage, fontSize: 11 }}>Saves as you type</span>}
+              </div>
               <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                {[0, 1].map((i) => (
-                  <input key={teams[i].key} value={teamNameEdits[i]} onChange={(e) => setTeamNameEdits((prev) => { const next: [string, string] = [...prev] as [string, string]; next[i] = e.target.value; return next; })} placeholder={`Team ${i + 1} name`} style={{ ...inputStyle, flex: 1, minWidth: 140 }} />
+                {([0, 1] as const).map((i) => (
+                  <input key={teams[i].key} value={teamNameEdits[i]} onChange={(e) => editTeamName(i, e.target.value)}
+                    onBlur={() => { if (teamNameTimer.current) clearTimeout(teamNameTimer.current); void commitTeamNames(teamNameEdits); }}
+                    placeholder={`Team ${i + 1}`} aria-label={`Team ${i + 1} name`} style={{ ...inputStyle, flex: 1, minWidth: 120 }} />
                 ))}
-                <button
-                  onClick={() => onRenameTeams([teamNameEdits[0].trim() || "Team 1", teamNameEdits[1].trim() || "Team 2"])}
-                  disabled={!teamNameEdits[0].trim() || !teamNameEdits[1].trim() || (teamNameEdits[0].trim() === teams[0].name && teamNameEdits[1].trim() === teams[1].name)}
-                  style={{ ...btn(false), opacity: !teamNameEdits[0].trim() || !teamNameEdits[1].trim() || (teamNameEdits[0].trim() === teams[0].name && teamNameEdits[1].trim() === teams[1].name) ? .5 : 1 }}
-                >Save names</button>
               </div>
             </div>
           )}

@@ -1,3 +1,27 @@
+## 203.3.261011 — Ryder Cup roster: "who is playing" back in front of balancing
+
+203.1's Balance by handicap index dealt the whole club roster onto two sides, removing the step where the organizer chooses who is in. Each roster row now has an **In** tick (tapping a team button also marks the player in; untick clears their side), with **Everyone in** and **Clear** shortcuts and a count of who is in. Balance deals only the players who are in, leaves everyone else out, and asks for at least two. Sides can still be set by hand with the team buttons, as before. Client-only; no migration.
+
+## 203.2.261011 — Team names save as you type; verification-sheet convention retired
+
+**Team names.** On the Teams tab the names now save themselves — 700 ms after the last keystroke and on leaving the box — with "Saving… / Saved" inline and any error shown in place. The "Save names" button is gone: it was redundant, and after the game reloaded (balance, another device) its enabled/disabled check compared stale edits with fresh names and appeared to do nothing. The boxes also follow the game when it reloads under them. `renameTeams` now throws on failure so the panel can show why.
+
+**Repository hygiene.** The per-release `RELEASE_VERIFICATION_<v>.md` sheets (103 files, 177.13–193.2) and `WORKFLOW_SIMULATION_REPORT_<v>.md` (49 files) stopped being written at 194.0 without being retired; nothing executable read them. The executed proof for a release lives in its DEPLOY_NOTES entry and permanently in the guards and assertion files. All 152 moved to `docs/history/` with a README; two stale HANDOFF pointers fixed; convention recorded as retired. Client-only; no migration.
+
+## 203.1.261011 — Balancing requires every handicap first; Ryder Cup roster balances by index
+
+**Games.** Balance by handicap now refuses to run while any active player lacks a course handicap, naming them: "Set a course handicap for Dan Lee, Ed Park first (Players tab), then balance." A zero placeholder would have skewed the sides and forced a re-run once the handicap was set.
+
+**Ryder Cup.** The roster screen (where sides are assigned once, at creation) gains **⚖️ Balance by handicap index**: the same snake draft, on the handicap index because there is no course yet at roster time; the summary line shows both sides' totals and the difference, and the A/B toggles are set accordingly so the organizer can still adjust before saving. Requires every roster player to have an index, with the same refusal if not. Sessions inherit the sides as before.
+
+Not done, and deliberately: balanced **matchups** inside a session (pairing the k-th strongest of each side). That is a different operation from balancing sides, interacts with captains' picks and the per-format pairing rules, and should be its own button when wanted. Client-only; no migration.
+
+## 203.0.261010 — Balance teams by handicap
+
+Game setup → Teams gains **⚖️ Balance by handicap**. The basis is each player's Playing Handicap for THIS game (the engine's `chBasis` × allowance, rounded — the number the match is played off, not the index). Method: snake draft on descending playing handicap, always handing the next player to the lighter side, so sums and the top-to-bottom spread stay close; ties keep roster order so a re-run gives the same answer. Players who already have a score are locked to their team and counted on it; no-shows are ignored; a player with no course handicap yet is placed last, counts as 0, and is named in the result. One confirmation shows the outcome before anything is written — "Red 61 (avg 12.2) · Blue 60 (avg 12.0) — difference 1 · 6 players will move" — and only players whose team changes are written. The result line stays on screen afterwards.
+
+`lib/balance-teams.ts` is pure and tested: equal sums for an even field, odd counts, 90% allowance basis, locked players honoured, no-shows and unrated handled, already-balanced sides produce no writes. Client-only; no migration.
+
 ## 202.6.261009 — Team band a few shades darker
 
 The 85%-cream tint read too light on the phone. The band is now 30% team colour / 70% cream (red #e5cac6, blue #c8d1e0), chosen from a real render; the contrast test still proves dark text ≥ 4.5:1 on both and on yellow, violet, grey, gold and black. One number in `lib/team-tint.ts`; the public page and the group card both follow it. Client-only; no migration.

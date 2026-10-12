@@ -1,5 +1,6 @@
 "use client";
 import { shortNamer } from "@/lib/short-names";
+import { balanceTeams, balanceSummary } from "@/lib/balance-teams";
 import { useScoringDevice } from "@/components/scoring-device";
 import { isPrimaryScoringDevice, isDeviceRejection, markScoringDeviceRevoked } from "@/lib/scoring-device";
 import { createGameScoreWriter } from "@/lib/game-score-sync";
@@ -2419,7 +2420,7 @@ function GameRoom({
     if (!game || !Array.isArray(game.teams) || game.teams.length < 2) return;
     const next = game.teams.map((t, i) => i < 2 ? { ...t, name: names[i] } : t);
     const { error } = await supabase.from("games").update({ teams: next }).eq("id", game.id);
-    if (error) { notifyError("Couldn't save team names — please try again."); return; }
+    if (error) { notifyError("Couldn't save team names — please try again."); throw new Error(error.message); }
     setGame({ ...game, teams: next });
   };
 
@@ -2431,6 +2432,30 @@ function GameRoom({
     setPlayers(nextPlayers);
     await syncTeamPlayFoursomes(nextPlayers);
     await load();
+  };
+
+  // Organizer: balanced teams by playing handicap (203.0). Same fence per player as a manual
+  // change (allowSetupChange: scored players are locked and simply stay where they are), one
+  // snapshot of the roster, one reload.
+  const balanceTeamsByHandicap = async (): Promise<{ changed: number; summary: string; unrated: string[] } | null> => {
+    if (!game) return null;
+    // Locked = the decision engine would BLOCK a team change (a player who already has a score).
+    const locked = new Set(players.filter((p) => setupDecision({ type: "set_team", player: p, team: null }).decision === "block").map((p) => p.id));
+    const r = balanceTeams(game as never, players as never, locked);
+    if (!r.teams.length) return null;
+    // Every active player needs a course handicap first: a 0 placeholder would skew the sides and
+    // force the organizer to redo the whole exercise once it was set (203.1).
+    if (r.unrated.length) return { changed: 0, summary: "", unrated: r.unrated };
+    if (!r.assignments.length) return { changed: 0, summary: balanceSummary(r), unrated: [] };
+    if (!confirm(`Balance teams by playing handicap?\n\n${balanceSummary(r)}\n\n${r.assignments.length} player${r.assignments.length === 1 ? "" : "s"} will move${locked.size ? `; ${locked.size} with scores stay put` : ""}.`)) return null;
+    for (const a of r.assignments) {
+      await supabase.from("game_players").update({ team: a.team }).eq("id", a.id);
+    }
+    const nextPlayers = players.map((x) => { const a = r.assignments.find((y) => y.id === x.id); return a ? { ...x, team: a.team } : x; });
+    setPlayers(nextPlayers);
+    await syncTeamPlayFoursomes(nextPlayers);
+    await load();
+    return { changed: r.assignments.length, summary: balanceSummary(r), unrated: r.unrated };
   };
 
   // Organizer: update a player's tee group from the unified setup roster.
@@ -3331,7 +3356,7 @@ function GameRoom({
         const panelProps = {
           game, players, user,
           onOverride: overridePlayerHandicap, courseTees, onSetTee: setPlayerTee, onSetManualHandicap: setManualHandicap,
-          onRemove: removePlayer, onToggleNoShow: toggleNoShow, onSetTeam: setPlayerTeam, onRenameTeams: renameTeams,
+          onRemove: removePlayer, onToggleNoShow: toggleNoShow, onSetTeam: setPlayerTeam, onBalanceTeams: balanceTeamsByHandicap, onRenameTeams: renameTeams,
           onRename: renameGame, onDelete: deleteGame,
           canDelete: !completedGame, deleteRestriction: "Only a system admin can delete a completed game. Posted own-ball rounds remain in player history; Alternate Shot rounds are removed.",
           onEnd: requestEndGame, onReopen: reopenGame, onReset: resetScores, onShare: setShare,
