@@ -6,7 +6,19 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 204.3.261013
+## Current candidate: 205.2.261013
+
+- 0181: per-club round counts by rounds.group_id; per-account seen years; wording. Apply 0181 (after 0180) before the code.
+
+## Previous: 205.1.261013
+
+- Season charts: month ticks. Carries 205.0 (apply 0180 first if not yet applied).
+
+## Previous: 205.0.261013
+
+- Season Wrapped. RULE: any stat surface prepares rounds with lib/round-prep (stroke allocation) and applies the Dashboard's exclusions — never a parallel definition. Apply 0180 before the code. Public season link is backlog.
+
+## Previous: 204.3.261013
 
 - Outlook line hidden when nothing is still out.
 

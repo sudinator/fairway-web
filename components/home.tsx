@@ -1,4 +1,6 @@
 "use client";
+import { prepareRound } from "@/lib/round-prep";
+import { SeasonWrappedEntry } from "@/components/season-wrapped";
 
 import { ScoringDeviceNotice, usePrimaryScoringDevice } from "@/components/scoring-device";
 import React, { useEffect, useState, useCallback, useRef } from "react";
@@ -180,6 +182,15 @@ export function Home({ session }: { session: any }) {
   // player or a member of its club), switches to that club if needed, and opens the game room.
   // Unknown code or not a member: no-op, the Games tab shows as usual. Same shape as the tee-time
   // deep link below.
+  // Season Wrapped deep link (205.0): /?wrapped=YYYY from the Dec 31 notification.
+  const [wrappedYear, setWrappedYear] = useState<number | null>(() => {
+    try { const y = Number(new URLSearchParams(window.location.search).get("wrapped")); return y > 2000 && y < 3000 ? y : null; } catch { return null; }
+  });
+  useEffect(() => { if (wrappedYear) setTab("dashboard"); }, [wrappedYear]);
+  const clearWrappedYear = useCallback(() => {
+    setWrappedYear(null);
+    try { const url = new URL(window.location.href); if (url.searchParams.has("wrapped")) { url.searchParams.delete("wrapped"); window.history.replaceState({}, "", url.pathname + url.search); } } catch { /* ignore */ }
+  }, []);
   const [deepGameCode, setDeepGameCode] = useState<string | null>(() => {
     try { const c = new URLSearchParams(window.location.search).get("game"); return c && /^\d{6}$/.test(c) ? c : null; } catch { return null; }
   });
@@ -259,8 +270,10 @@ export function Home({ session }: { session: any }) {
       const tt = q.get("tt");
       const t = q.get("tab");
       const gcode = q.get("game");
+      const wy = Number(q.get("wrapped"));
       setStage(null); setViewing(null); setMoreOpen(false); setReturnTab(null);
-      if (gcode && /^\d{6}$/.test(gcode)) { setDeepGameCode(gcode); setTab("games"); }
+      if (wy > 2000 && wy < 3000) { setWrappedYear(wy); setTab("dashboard"); }
+      else if (gcode && /^\d{6}$/.test(gcode)) { setDeepGameCode(gcode); setTab("games"); }
       else if (tt) { setDeepTeeId(tt); setTab("teetimes"); }
       else if (t) {
         const allowed = ["dashboard", "rounds", "games", "courses", "players", "groups", "admin", "help", "profile", "money", "teetimes", "notifications"];
@@ -504,12 +517,8 @@ export function Home({ session }: { session: any }) {
       .from("holes").select("*").in("round_id", ids.length ? ids : ["none"]);
     const byRound: Record<string, Hole[]> = {};
     (hs || []).forEach((h: any) => { (byRound[h.round_id] ||= []).push(h); });
-    const merged: Round[] = rs.map((r: any) => {
-      const sorted = dedupeHoles(byRound[r.id] || []).sort((a, b) => a.hole_number - b.hole_number);
-      const alloc = allocateStrokes(sorted, r.course_handicap);
-      const holes = sorted.map((h) => ({ ...h, recv: alloc[h.hole_number] || 0 }));
-      return { ...r, group_name: r.groups?.name || null, holes };
-    });
+    // Shared preparation (lib/round-prep): the season summary uses exactly the same step.
+    const merged: Round[] = rs.map((r: any) => prepareRound({ ...r, group_name: r.groups?.name || null, holes: dedupeHoles(byRound[r.id] || []) }) as Round);
     // Keep in-progress rounds out of the normal list (no clutter); surface the most
     // recent one for resume (covers a cleared-storage or different-device case).
     const finished = merged.filter((r: any) => (r.status ?? "final") !== "in_progress");
@@ -913,11 +922,17 @@ export function Home({ session }: { session: any }) {
         ) : loading ? (
           <div style={{ color: C.sage, textAlign: "center", padding: 40 }}>Loading your rounds…</div>
         ) : tab === "dashboard" ? (
+          <>
+          <SeasonWrappedEntry rounds={rounds} userId={user.id} name={displayName} variant="dashboard" openYear={wrappedYear} onOpened={clearWrappedYear} seenYears={(profile?.season_wrapped_seen as number[] | undefined) || []} />
           <Dashboard rounds={rounds} name={displayName} onOpen={setViewing} currentIndex={index} saveIndex={saveIndex}
             userEmail={user?.email || null} userId={user.id} savedCoach={profile?.dashboard_ai || null} onCoachSaved={loadProfile}
             onViewAchievements={() => { setTab("profile"); setTimeout(() => document.getElementById("achievements-wall")?.scrollIntoView({ behavior: "smooth", block: "start" }), 140); }} />
+          </>
         ) : (
+          <>
+          <SeasonWrappedEntry rounds={rounds} userId={user.id} name={displayName} variant="rounds" />
           <RoundsList rounds={rounds} onOpen={setViewing} />
+          </>
         )}
       </div>
       </div>

@@ -1,3 +1,7 @@
+## 205.0 — follow-up
+
+- **Public Season Wrapped link.** A shareable page per golfer per year (readable slug, revocable, like the line-up link). Needs a stored snapshot written when the golfer opts in, since others cannot read their rounds.
+
 ## 203.1 — follow-up
 
 - ~~Retire the RELEASE_VERIFICATION / WORKFLOW_SIMULATION conventions and move the files to docs/history/~~ — done in 203.2.

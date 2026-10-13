@@ -21,12 +21,14 @@ const DEFAULT_DELIVERY: Record<string, "push" | "inapp" | "off"> = {
   bet_posted: "inapp",
   game_finished: "inapp",
   group_member: "inapp",
-  course_change: "inapp", // club admins only; they can raise it to push in Notification settings (198.2)
+  course_change: "inapp",
+  season_wrapped: "push", // Dec 31 Season Wrapped (205.0) // club admins only; they can raise it to push in Notification settings (198.2)
   friction: "push",   // admin-only integrity alert; always push
 };
 
 function titleFor(type: string | null): string {
   switch (type) {
+    case "season_wrapped": return "Your season summary is ready";
     case "course_change": return "Course data changed";
     case "money_owed": return "You owe money";
     case "money_paid": return "You got paid";

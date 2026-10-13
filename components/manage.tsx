@@ -94,6 +94,7 @@ const NOTIF_TYPES: { key: string; label: string; def: "push" | "inapp" | "off"; 
   { key: "game_finished", label: "Game finished / results", def: "inapp", live: true },
   { key: "group_member", label: "New member joins your club", def: "inapp", live: true },
   { key: "course_change", label: "Course data changed at GolfCourseAPI (club admins)", def: "inapp", live: true },
+  { key: "season_wrapped", label: "Your season summary is ready (Dec 31)", def: "push", live: true },
 ];
 
 function PushToggle({ user, profile }: { user: any; profile: any }) {

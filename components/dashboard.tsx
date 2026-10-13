@@ -6,6 +6,7 @@ import {
   ReferenceLine, BarChart, Bar, Rectangle, ComposedChart, Legend,
 } from "recharts";
 import { barShapeValue } from "@/lib/chart-helpers";
+import { FormBars } from "@/components/charts/form-bars";
 import { roundStatCompleteness } from "@/lib/round-stats";
 import {
   C, Round, Hole, courseHandicap, strokesReceived, allocateStrokes, stablefordPts, validateStrokeIndexes,
@@ -381,23 +382,8 @@ export function Dashboard({ rounds, name, onOpen, currentIndex, saveIndex, userE
               <AdaptiveTrend data={diffTrend} valueKey="diff" rollKey="roll" avg={diffFormAvg} lowerBetter domain={diffFormDomain}
                 nameMap={{ diff: "Differential", roll: "5-rd avg" }} fmt={(v: any) => (typeof v === "number" ? v.toFixed(1) : v)} />
             ) : (
-            <ResponsiveContainer>
-              <ComposedChart data={diffTrend} margin={{ top: 5, right: 6, left: -8, bottom: 0 }}>
-                <XAxis dataKey="i" tick={{ fill: C.sage, fontSize: 11 }} axisLine={{ stroke: C.greenMid }} tickLine={false} />
-                <YAxis domain={diffFormDomain} allowDecimals={false} tick={{ fill: C.cream, fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
-                <Tooltip wrapperStyle={{ pointerEvents: "auto" }} cursor={{ fill: "rgba(255,255,255,0.06)" }} content={<ChartTip nameMap={{ diff: "Differential", roll: "5-rd avg" }} fmt={(v: any) => (typeof v === "number" ? v.toFixed(1) : v)} />} />
-                {diffFormAvg != null && <ReferenceLine y={Math.round(diffFormAvg * 10) / 10} stroke={C.sage} strokeDasharray="3 4" />}
-                <Bar dataKey="diff" radius={[3, 3, 0, 0]} maxBarSize={26} shape={(props: any) => {
-                  // Per-bar conditional color (replaces the deprecated <Cell>): at/under form avg = green, over = red.
-                  // recharts sets props.value to the numeric bar value; props.payload is a wrapper (no .diff), so
-                  // fall back through payload.payload.diff only if needed.
-                  const v = barShapeValue(props, "diff");
-                  const good = diffFormAvg != null && v != null && v <= diffFormAvg;
-                  return <Rectangle x={props.x} y={props.y} width={props.width} height={props.height} radius={[3, 3, 0, 0]} fill={good ? "#4ADE80" : "#FB7185"} />;
-                }} />
-                <Line type="monotone" dataKey="roll" stroke={C.cream} strokeWidth={2.5} dot={{ fill: C.cream, r: 3 }} />
-              </ComposedChart>
-            </ResponsiveContainer>
+            <FormBars data={diffTrend.map((t) => ({ ...t, value: t.diff }))} avg={diffFormAvg} domain={diffFormDomain} lowerBetter
+              tooltip={<ChartTip nameMap={{ value: "Differential", roll: "5-rd avg" }} fmt={(v: any) => (typeof v === "number" ? v.toFixed(1) : v)} />} />
             )}
           </DismissableChart>
           <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>
