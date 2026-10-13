@@ -1,5 +1,6 @@
 "use client";
 import { shortNamer } from "@/lib/short-names";
+import { pointsOutlook, outlookLine } from "@/lib/points-outlook";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase";
 import { ContestsSection, ContestHoleChip } from "@/components/contests-view";
@@ -598,16 +599,16 @@ export function MatchView({
           <div style={{ display: "flex", alignItems: "center", marginTop: 10 }}>
             <div style={{ flex: 1, textAlign: "center" }}>
               <div style={{ color: teamAccent(teams![0].name, 0), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![0].name}</div>
-              <div style={{ color: teamStandings.pts.A >= teamStandings.pts.B ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.pts.A)}</div>
+              <div style={{ color: teamStandings.decidedPts.A >= teamStandings.decidedPts.B ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.decidedPts.A)}</div>
             </div>
             <div style={{ color: C.cream, fontSize: 18, opacity: 0.7, padding: "0 8px" }}>–</div>
             <div style={{ flex: 1, textAlign: "center" }}>
               <div style={{ color: teamAccent(teams![1].name, 1), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![1].name}</div>
-              <div style={{ color: teamStandings.pts.B >= teamStandings.pts.A ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.pts.B)}</div>
+              <div style={{ color: teamStandings.decidedPts.B >= teamStandings.decidedPts.A ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.decidedPts.B)}</div>
             </div>
           </div>
           <div style={{ color: C.cream, opacity: 0.7, fontSize: 11, textAlign: "center", marginTop: 8 }}>
-            Projected — if every match finished as it stands · {fmtPts(teamStandings.decidedPts.A)}–{fmtPts(teamStandings.decidedPts.B)} decided so far
+            {teamStandings.out > 0 && <span data-points-outlook>If every match ended now: <b style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 15 }}>{teams?.[0]?.name ?? "A"} {fmtPts(teamStandings.pts.A)} · {teams?.[1]?.name ?? "B"} {fmtPts(teamStandings.pts.B)}</b></span>}
           </div>
           {teams && teamStandings && (
             <TeamClinchLine aPts={teamStandings.decidedPts.A} bPts={teamStandings.decidedPts.B} unclaimed={teamStandings.out} aName={teams[0].name} bName={teams[1].name} metric="matches" />
@@ -776,19 +777,28 @@ export function MatchView({
         const iAmIn = pr.a === myKey || pr.b === myKey;
         const toggleProgress = () => setOpenProgress((v) => v === idx ? null : idx);
 
-        if (isTeam && teams?.length === 2) {
+        {
+          // 204.0: one table for every singles match — with teams (USA | THRU | EUROPE) and without
+          // (PLAYER | THRU | PLAYER). The per-match card that no-team singles used to show put the
+          // same facts (strokes, result, progression) in a taller form; the table scans better with
+          // six matches, and Details › still opens the hole-by-hole progression.
+          const withTeams = isTeam && teams?.length === 2;
+          const leftHead = withTeams ? teams![0].name.toUpperCase() : "PLAYER";
+          const rightHead = withTeams ? teams![1].name.toUpperCase() : "PLAYER";
+          const leftColor = withTeams ? teamAccent(teams![0].name, 0) : C.gold;
+          const rightColor = withTeams ? teamAccent(teams![1].name, 1) : C.gold;
           const leftLeading = st.lead > 0;
           const rightLeading = st.lead < 0;
           const allSquare = st.thru > 0 && st.lead === 0;
           const leftStatus = st.result && st.lead > 0 ? st.result : leftLeading ? `${Math.abs(st.lead)} UP` : "";
           const rightStatus = st.result && st.lead < 0 ? st.result : rightLeading ? `${Math.abs(st.lead)} UP` : "";
           return (
-            <div key={idx}>
+            <div key={idx} data-pairing-card={idx}>
               {idx === 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 58px minmax(0, 1fr)", alignItems: "end", gap: 8, marginTop: 10, padding: "4px 10px", color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 0.7 }}>
-                  <span style={{ color: teamAccent(teams[0].name, 0) }}>{teams[0].name.toUpperCase()}</span>
+                  <span style={{ color: leftColor }}>{leftHead}</span>
                   <span style={{ textAlign: "center" }}>THRU</span>
-                  <span style={{ textAlign: "right", color: teamAccent(teams[1].name, 1) }}>{teams[1].name.toUpperCase()}</span>
+                  <span style={{ textAlign: "right", color: rightColor }}>{rightHead}</span>
                 </div>
               )}
               <div
@@ -808,7 +818,7 @@ export function MatchView({
                     <Avatar src={pa.avatar_url} name={pa.display_name} size={24} />
                     <span style={{ minWidth: 0, overflowWrap: "anywhere", lineHeight: 1.2, fontSize: 14, fontWeight: 800 }}>{pa.display_name}</span>
                   </div>
-                  {leftStatus ? <div style={{ marginTop: 5, color: teamAccent(teams[0].name, 0), fontSize: 14, fontWeight: 800 }}>{leftStatus}</div> : null}
+                  {leftStatus ? <div style={{ marginTop: 5, color: leftColor, fontSize: 14, fontWeight: 800 }}>{leftStatus}</div> : null}
                   <div style={{ marginTop: 4, color: C.gold, fontSize: 11, fontWeight: 700 }}>Details ›</div>
                 </button>
 
@@ -822,7 +832,7 @@ export function MatchView({
                     <span style={{ minWidth: 0, overflowWrap: "anywhere", lineHeight: 1.2, fontSize: 14, fontWeight: 800 }}>{pb.display_name}</span>
                     <Avatar src={pb.avatar_url} name={pb.display_name} size={24} />
                   </div>
-                  {rightStatus ? <div style={{ marginTop: 5, color: teamAccent(teams[1].name, 1), fontSize: 14, fontWeight: 800 }}>{rightStatus}</div> : null}
+                  {rightStatus ? <div style={{ marginTop: 5, color: rightColor, fontSize: 14, fontWeight: 800 }}>{rightStatus}</div> : null}
                   <div style={{ marginTop: 4, color: C.gold, fontSize: 11, fontWeight: 700 }}>Details ›</div>
                 </button>
               </div>
@@ -875,107 +885,8 @@ export function MatchView({
           );
         }
 
-        return (
-          <div
-            key={idx}
-            style={{
-              background: C.greenLight,
-              borderRadius: 12,
-              padding: 14,
-              marginTop: 10,
-              border: iAmIn ? `1px solid ${C.gold}` : "none",
-            }}
-          >
-            {/* Block, not flex: the organizer's remove-pairing button below now stacks under the
-                rows instead of competing with them for width. */}
-            <div>
-            {/* One row per player. The card used to name Amit four times and Chris three: the pair
-                line, the margin ("Amit Sud 2 UP"), the holes-won tally and the handicap line all
-                repeated them, and the two columns wrapped into each other on a phone. Each player's
-                own facts now sit on their own row, so nothing repeats and nothing can wrap oddly.
-                The margin sits beside the LEADER only — a "0" next to the trailing player says
-                nothing — and the header carries progress alone. */}
-            <button type="button" onClick={toggleProgress} aria-expanded={openProgress === idx}
-              style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 2 }}>
-                <span style={{ color: C.sage, fontSize: 11 }}>
-                  {st.thru === 0 ? "not started" : st.result ? `match complete on hole ${game.holes_meta[st.thru - 1]?.n ?? st.thru}` : `thru ${st.thru}`}
-                </span>
-                <span style={{ color: C.sage, fontSize: 11 }}>· Singles</span>
-                <span style={{ flex: 1 }} />
-                <span style={{ color: C.gold, fontSize: 11 }}>{openProgress === idx ? "▴" : "▾"}</span>
-              </div>
-              {([[pa, allow.a, "a"], [pb, allow.b, "b"]] as const).map(([p, strokes, side], i) => {
-                const ahead = st.lead === 0 ? false : (side === "a") === (st.lead > 0);
-                // All square shows AS once, beside the first player, rather than adding a line.
-                const margin = st.lead === 0 ? (side === "a" && st.thru > 0 ? "AS" : "") : ahead ? (st.result || `${Math.abs(st.lead)} UP`) : "";
-                return (
-                  <div key={side} style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 5, paddingBottom: 5, borderTop: i === 1 ? `1px solid ${C.borderGreen}` : undefined }}>
-                    <Avatar src={p.avatar_url} name={p.display_name} size={26} />
-                    <span style={{ flex: 1, color: ahead ? C.cream : C.sage, fontWeight: ahead ? 800 : 500, fontSize: 15, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {p.display_name}
-                    </span>
-                    <span style={{ color: C.sage, fontSize: 12 }}>{strokes === 0 ? "scratch" : `+${strokes}`}</span>
-                    <span style={{ minWidth: 56, textAlign: "right", color: C.gold, fontWeight: 800, fontSize: 15, fontFamily: "Georgia, serif", fontVariantNumeric: "tabular-nums lining-nums" }}>
-                      {margin}
-                    </span>
-                  </div>
-                );
-              })}
-            </button>
-              {isCreator && editing && (
-                <button
-                  disabled={matchupsBlocked}
-                  title={matchupsBlocked && matchupDecision.decision === "block" ? matchupDecision.reason : undefined}
-                  onClick={() => removePairing(idx)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: C.overRedDark,
-                    cursor: "pointer",
-                    marginLeft: 10,
-                    fontWeight: 800,
-                  }}
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-            {openProgress === idx && (
-              <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.borderGreen}` }}>
-                <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1, marginBottom: 7 }}>MATCH PROGRESSION</div>
-                {progressionRows.length === 0 ? (
-                  <div style={{ color: C.sage, fontSize: 12 }}>No holes scored yet.</div>
-                ) : (
-                  <HScroll>
-                    <div style={{ minWidth: 330 }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "42px minmax(82px, 1fr) minmax(82px, 1fr) 76px", gap: 8, color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 0.5, padding: "4px 10px" }}>
-                        <span>HOLE</span>
-                        <span>{shortOf(pa)} NET</span>
-                        <span>{shortOf(pb)} NET</span>
-                        <span style={{ textAlign: "right" }}>MATCH</span>
-                      </div>
-                      {progressionRows.map((row) => {
-                        const aWon = row.aNet < row.bNet;
-                        const bWon = row.bNet < row.aNet;
-                        const label = matchLeadLabel(row.lead);
-                        return (
-                          <div key={row.hole} style={{ display: "grid", gridTemplateColumns: "42px minmax(82px, 1fr) minmax(82px, 1fr) 76px", gap: 8, alignItems: "center", padding: "8px 12px", borderTop: `1px solid ${C.borderGreen}`, color: C.cream, fontSize: 12 }}>
-                            <span style={{ color: C.sage }}>{row.hole}</span>
-                            <span style={{ fontWeight: aWon ? 800 : 500, color: aWon ? C.gold : C.cream }}>{row.aNet}</span>
-                            <span style={{ fontWeight: bWon ? 800 : 500, color: bWon ? C.gold : C.cream }}>{row.bNet}</span>
-                            <span style={{ textAlign: "right", fontWeight: 800, color: label === "AS" ? C.cream : row.lead > 0 ? C.gold : C.sage }}>{label}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </HScroll>
-                )}
-                <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>Net scores drive the running match position. Bold gold marks the lower net on each hole.</div>
-              </div>
-            )}
-          </div>
-        );
+        // (the per-match card this path used to render for no-team singles was retired in 204.0; the table above serves both)
+
       })}
     </div>
   );
@@ -1088,6 +999,15 @@ export function TeamClinchLine({ aPts, bPts, unclaimed, aName, bName, metric, sh
             : `${leadName} wins it with ${cs.needToClinch} more ${noun(cs.needToClinch)}`}
         </div>
       )}
+      {/* 204.2: "Level" only once points have actually been decided and they are equal — at 0–0 it
+          read as if the match were tied, when nothing had been played. */}
+      {showBanner && !cs.decided && !leadName && unclaimed > 0 && (aPts + bPts) > 0 && (
+        <div data-clinch-tie style={{ color: C.gold, fontSize: 12, fontWeight: 700, textAlign: "center", marginTop: 6 }}>
+          {metric === "matches"
+            ? `Level — either side needs ${f(matchPointsNeeded)} match ${matchPointsNeeded <= 1 + 1e-9 ? "point" : "points"} to win this session`
+            : `Level — either side wins it with ${Math.floor(unclaimed / 2) + 1} more ${noun(Math.floor(unclaimed / 2) + 1)}`}
+        </div>
+      )}
     </>
   );
 }
@@ -1137,6 +1057,8 @@ export function FourballView({
   mode = "play",
   altShotScores = [],
   onChanged,
+  onlyFoursomeId = null,
+  embedded = false,
 }: {
   game: Game;
   players: Player[];
@@ -1145,8 +1067,12 @@ export function FourballView({
   mode?: "play" | "setup";
   altShotScores?: AltShotScoreRow[];
   onChanged: () => void;
+  /** 204.0: render ONLY this foursome's results card, without the name header and pair boxes — the
+   *  group scorecard above it already shows who is in the group. */
+  onlyFoursomeId?: string | null;
+  embedded?: boolean;
 }) {
-  const foursomes = game.foursomes || [];
+  const foursomes = (game.foursomes || []).filter((f) => !onlyFoursomeId || f.id === onlyFoursomeId);
   const teams = game.teams || null;
   const playerOf = (uid: string) => players.find((p) => pkey(p) === uid) || null;
   const nameOf = (uid: string) => playerOf(uid)?.display_name || "—";
@@ -1316,6 +1242,22 @@ export function FourballView({
   // remaining holes only count while BOTH sides still have a live (non-no-show)
   // player — a side that can never post can't yield points, so excluding it lets
   // the lead actually clinch.
+  // 204.0: "Decided · if every match ended now · still to play for", across every contest, with the
+  // same provisional rule the foursome cards use (leader takes the point, all square splits it).
+  const trifectaOutlook = (() => {
+    if (!isTeam || !isTrifecta) return null;
+    const cs: { lead: number; thru: number; settled: boolean }[] = [];
+    foursomes.forEach((f) => {
+      if (!f.a.length || !f.b.length) return;
+      const ta = playerOf(f.a[0])?.team, tb = playerOf(f.b[0])?.team;
+      if (!ta || !tb || ta === tb) return;
+      const r = computeTrifecta(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap);
+      // Perspective: A = the first team in the game, whichever side of the foursome it sits on.
+      const flip = ta !== teams?.[0]?.key;
+      r.contests.forEach((c) => cs.push({ lead: flip ? -c.lead : c.lead, thru: c.thru, settled: c.settled }));
+    });
+    return pointsOutlook(cs);
+  })();
   const trifectaUnclaimed = (() => {
     if (!isTeam || !isTrifecta) return null;
     let rem = 0;
@@ -1441,27 +1383,40 @@ export function FourballView({
 
   // Play mode: foursome match cards.
   const standPts = isTrifecta ? trifectaStandings : teamStandings ? teamStandings.pts : null;
+  // 204.0, one convention for every team match format: the big number is points DECIDED; the line
+  // beneath is "if every match ended now"; the clinch line carries what is still out.
+  const bigPts = isTrifecta ? trifectaStandings : teamStandings ? teamStandings.decidedPts : null;
   return (
     <div style={{ marginTop: 16 }}>
       <Eyebrow>{isAltShot ? "ALTERNATE SHOT MATCHES" : isTrifecta ? (teamScoreMode === "aggregate" ? "TRIFECTA · SHOOTOUT" : "TRIFECTA") : (teamScoreMode === "aggregate" ? "FOUR-BALL · SHOOTOUT" : "FOUR-BALL MATCHES")}</Eyebrow>
-      {isTeam && standPts && (
+      {isTeam && standPts && bigPts && (
         <div style={{ background: C.green, borderRadius: 12, padding: 14, marginTop: 12 }}>
           <div style={{ display: "flex", alignItems: "center" }}>
             <div style={{ flex: 1, textAlign: "center" }}>
               <div style={{ color: teamAccent(teams![0].name, 0), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![0].name}</div>
-              <div style={{ color: standPts.A >= standPts.B ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(standPts.A)}</div>
+              <div style={{ color: bigPts.A >= bigPts.B ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(bigPts.A)}</div>
             </div>
             <div style={{ color: C.sage, fontWeight: 800 }}>–</div>
             <div style={{ flex: 1, textAlign: "center" }}>
               <div style={{ color: teamAccent(teams![1].name, 1), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![1].name}</div>
-              <div style={{ color: standPts.B >= standPts.A ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(standPts.B)}</div>
+              <div style={{ color: bigPts.B >= bigPts.A ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(bigPts.B)}</div>
             </div>
           </div>
           <div style={{ color: C.sage, fontSize: 11, textAlign: "center", marginTop: 6 }}>
             {isTrifecta
               ? `Three points per hole · ${teamScoreMode === "aggregate" ? "team point on aggregate net (both balls)" : "team point on best net ball"}`
-              : `Projected — if every match finished as it stands · ${fmtPts(teamStandings!.decidedPts.A)}–${fmtPts(teamStandings!.decidedPts.B)} decided so far`}
+              : (teamScoreMode === "aggregate" ? "Team point on aggregate net (both balls)" : "Team point on best net ball")}
           </div>
+          {isTrifecta && trifectaOutlook && teams && (trifectaOutlook.nowA + trifectaOutlook.nowB > 0) && trifectaOutlook.open > 0 && (
+            <div data-points-outlook style={{ color: C.cream, fontSize: 12, textAlign: "center", marginTop: 8, lineHeight: 1.5 }}>
+              If every match ended now: <b style={{ fontFamily: "Georgia, serif", fontSize: 15 }}>{outlookLine(trifectaOutlook, teams[0].name, teams[1].name).replace(/^If every match ended now: /, "")}</b>
+            </div>
+          )}
+          {!isTrifecta && teamStandings && teams && (teamStandings.pts.A + teamStandings.pts.B > 0) && teamStandings.out > 0 && (
+            <div data-points-outlook style={{ color: C.cream, fontSize: 12, textAlign: "center", marginTop: 8, lineHeight: 1.5 }}>
+              If every match ended now: <b style={{ fontFamily: "Georgia, serif", fontSize: 15 }}>{teams[0].name} {fmtPts(teamStandings.pts.A)} · {teams[1].name} {fmtPts(teamStandings.pts.B)}</b>
+            </div>
+          )}
           {isTeam && standPts && teams && (
             isTrifecta
               ? <TeamClinchLine aPts={standPts.A} bPts={standPts.B} unclaimed={trifectaUnclaimed ?? 0} aName={teams[0].name} bName={teams[1].name} metric="matches" />
@@ -1497,13 +1452,13 @@ export function FourballView({
           ? tri.contests.reduce((acc: { a: number; b: number }, c) => { if (c.thru) { if (c.lead > 0) acc.a += 1; else if (c.lead < 0) acc.b += 1; else { acc.a += 0.5; acc.b += 0.5; } } return acc; }, { a: 0, b: 0 })
           : null;
         return (
-          <div key={f.id} style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 12, border: mine ? `1px solid ${C.gold}` : "none" }}>
+          <div key={f.id} data-group-results={f.id} style={{ background: C.greenLight, borderRadius: 12, padding: 14, marginTop: 12, border: mine && !embedded ? `1px solid ${C.gold}` : "none" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{f.name}{mine ? " · your match" : ""}</div>
+              <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{embedded ? "Match status" : `${f.name}${mine ? " · your match" : ""}`}</div>
               <div style={{ flex: 1 }} />
               <div style={{ color: C.cream, fontWeight: 800, fontSize: 14, fontFamily: "Georgia, serif" }}>{isTrifecta ? (tri ? `${fmtPts(triTally ? triTally.a : tri.aPts)}–${fmtPts(triTally ? triTally.b : tri.bPts)}` : "—") : !st || st.thru === 0 ? "Not started" : matchDecided ? st.result : "Live"}</div>
             </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            {!embedded && <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
               <div style={{ flex: 1, background: C.greenLight, borderRadius: 8, padding: "8px 10px" }}>
                 <div style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>{isTeam ? teamName(playerOf(f.a[0])?.team).toUpperCase() : "PAIR 1"}</div>
                 <div style={{ color: C.cream, fontSize: 13 }}>{f.a.map(firstName).join(" & ") || "—"}</div>
@@ -1512,7 +1467,7 @@ export function FourballView({
                 <div style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>{isTeam ? teamName(playerOf(f.b[0])?.team).toUpperCase() : "PAIR 2"}</div>
                 <div style={{ color: C.cream, fontSize: 13 }}>{f.b.map(firstName).join(" & ") || "—"}</div>
               </div>
-            </div>
+            </div>}
             {isAltShot && alt && alt.conflictHoles.length > 0 && (
               <div style={{ marginTop: 8, background: C.danger, border: `1px solid ${C.overRedDark}`, borderRadius: 8, padding: "8px 12px", color: C.cream, fontSize: 11.5, lineHeight: 1.45 }}>
                 Partner score rows disagree on hole{alt.conflictHoles.length === 1 ? "" : "s"} {alt.conflictHoles.join(", ")}. Those holes are excluded from the match result until the scores agree.

@@ -151,6 +151,36 @@ export function balancedTeamGroups(field: CompetitivePlayer[], teamKeys: [string
   return { assignments, unassignedIds: field.filter((p) => !placed.has(p.id)).map((p) => p.id) };
 }
 
+/**
+ * Balanced MATCHUPS (204.1): like plays like. Within each team, low+high pairs as above; then the
+ * two teams' pairs are matched in the SAME total order — strongest pair v strongest pair — so each
+ * group is a close match rather than an even-paced field. (balancedTeamGroups above matches in
+ * reverse order to even out the GROUPS; both are offered, the organizer chooses.) Within each pair
+ * the stronger player is listed first, so a Trifecta's singles fall strong v strong, weak v weak.
+ */
+export function balancedTeamMatchups(field: CompetitivePlayer[], teamKeys: [string, string]): CompetitiveAssignmentResult & { strongFirst: Record<string, string[]> } {
+  const pairsFor = (key: string) => {
+    const sorted = field.filter((p) => p.team === key).sort(handicapOrder);
+    const pairs: CompetitivePlayer[][] = [];
+    while (sorted.length >= 2) pairs.push([sorted.shift()!, sorted.pop()!]); // [strong, weak]
+    return { pairs, leftovers: sorted };
+  };
+  const a = pairsFor(teamKeys[0]);
+  const b = pairsFor(teamKeys[1]);
+  const pairTotal = (pair: CompetitivePlayer[]) => pair.reduce((n, p) => n + (p.playingHandicap ?? 0), 0);
+  a.pairs.sort((x, y) => pairTotal(x) - pairTotal(y));
+  b.pairs.sort((x, y) => pairTotal(x) - pairTotal(y));
+  const count = Math.min(a.pairs.length, b.pairs.length);
+  const assignments: CompetitiveAssignmentResult["assignments"] = [];
+  const strongFirst: Record<string, string[]> = {};
+  for (let i = 0; i < count; i++) {
+    [...a.pairs[i], ...b.pairs[i]].forEach((p) => assignments.push({ playerId: p.id, group: i + 1 }));
+    strongFirst[String(i + 1)] = [a.pairs[i][0].id, a.pairs[i][1].id, b.pairs[i][0].id, b.pairs[i][1].id];
+  }
+  const placed = new Set(assignments.map((x) => x.playerId));
+  return { assignments, unassignedIds: field.filter((p) => !placed.has(p.id)).map((p) => p.id), strongFirst };
+}
+
 /** Build one-opponent-per-player matchups. Team Singles pairs across the two
  * teams by nearest playing handicap; standalone Singles pairs adjacent players.
  * An odd or imbalanced remainder is left unassigned and remains visible in setup.

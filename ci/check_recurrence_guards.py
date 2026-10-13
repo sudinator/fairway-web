@@ -60,6 +60,15 @@ for f in (ROOT / "ci").rglob("*.mjs"):
         if re.search(r"\.listen\(\s*[1-9]\d*", line):
             problems.append(f"D {f.relative_to(ROOT)}:{i}: fixed listen port in a CI helper — bind 0 (197.2)")
 
+# F. staging-only tooling must stay staging-only (204.2): any component that renders the auto-score
+#    control must gate it on isStagingClient(); the layout must set html[data-env].
+op = (ROOT / "components" / "game" / "organizer-panel.tsx").read_text(encoding="utf-8")
+if "onAutoScore" in op and "isStagingClient()" not in op:
+    problems.append("F components/game/organizer-panel.tsx: auto-score control is not gated on isStagingClient() (204.2)")
+lay = (ROOT / "app" / "layout.tsx").read_text(encoding="utf-8")
+if 'data-env={isStaging ? "staging" : "production"}' not in lay:
+    problems.append("F app/layout.tsx: html[data-env] marker missing — staging-only tooling would leak or vanish (204.2)")
+
 # E. ad-hoc name shortening
 ALLOW_E = {ROOT / "lib" / "short-names.ts", ROOT / "components" / "player-card.tsx"}
 for f in list((ROOT / "components").rglob("*.tsx")) + list((ROOT / "lib").rglob("*.ts")):
@@ -72,4 +81,4 @@ if problems:
     print("recurrence guards: FAIL")
     for p in problems: print("  " + p)
     sys.exit(1)
-print("recurrence guards: PASS (server time formatting, NULL-safe assertions, is_admin arity, OS-assigned ports, one name-shortening rule)")
+print("recurrence guards: PASS (server time formatting, NULL-safe assertions, is_admin arity, OS-assigned ports, one name-shortening rule, staging-only tooling gated)")

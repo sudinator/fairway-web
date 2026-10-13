@@ -1,5 +1,5 @@
 // Unit tests for lib/grouping.ts — run with `npm test`.
-import { applyTeamGroupSlotMove, balancedOneVOne, balancedTeamGroups, buildParties, seatParties, randomTeeGroups, seededRng, teamGroupSlotChoices, GPlayer } from "./grouping";
+import { applyTeamGroupSlotMove, balancedOneVOne, balancedTeamGroups, balancedTeamMatchups, buildParties, seatParties, randomTeeGroups, seededRng, teamGroupSlotChoices, GPlayer } from "./grouping";
 
 let pass = 0, fail = 0; const fails: string[] = [];
 const ok = (name: string, cond: boolean) => { if (cond) pass++; else { fail++; fails.push("FAIL " + name); } };
@@ -84,6 +84,27 @@ eq("9 members -> [3,3,3]", sizes(randomTeeGroups(Array.from({ length: 9 }, (_, i
     eq(`group ${group} has two B`, ids.filter((id) => id.startsWith("b")).length, 2);
   }
   ok("one odd team player remains unassigned", r.unassignedIds.length === 1 && r.unassignedIds[0].startsWith("a"));
+}
+
+// ---- 9b. Balanced MATCHUPS: like plays like (204.1) ----
+{
+  const field = [
+    { id: "a1", team: "A", playingHandicap: 1 }, { id: "a2", team: "A", playingHandicap: 8 },
+    { id: "a3", team: "A", playingHandicap: 12 }, { id: "a4", team: "A", playingHandicap: 20 },
+    { id: "b1", team: "B", playingHandicap: 2 }, { id: "b2", team: "B", playingHandicap: 9 },
+    { id: "b3", team: "B", playingHandicap: 13 }, { id: "b4", team: "B", playingHandicap: 21 },
+  ];
+  const r = balancedTeamMatchups(field, ["A", "B"]);
+  // pairs: A {1,20}=21, {8,12}=20 → sorted asc: {8,12} then {1,20}; B {2,21}=23, {9,13}=22 → {9,13} then {2,21}
+  const g1 = r.assignments.filter((x) => x.group === 1).map((x) => x.playerId).sort();
+  eq("group 1 = the two LOWEST-total pairs, one per team (like v like)", g1, ["a2", "a3", "b2", "b3"]);
+  const g2 = r.assignments.filter((x) => x.group === 2).map((x) => x.playerId).sort();
+  eq("group 2 = the two highest-total pairs", g2, ["a1", "a4", "b1", "b4"]);
+  eq("strong listed first within each pair (Trifecta singles strong v strong)", r.strongFirst["2"], ["a1", "a4", "b1", "b4"]);
+  // Contrast: the even-groups builder puts A's heaviest pair with B's lightest.
+  const even = balancedTeamGroups(field, ["A", "B"]);
+  const e1 = even.assignments.filter((x) => x.group === 1).map((x) => x.playerId).sort();
+  ok("even-groups builder differs (it evens the field, not the match)", JSON.stringify(e1) !== JSON.stringify(g1));
 }
 
 // ---- 10. Balanced 1-v-1 uses every player once and leaves odd player visible ----

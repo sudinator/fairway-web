@@ -34,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const isStaging = process.env.VERCEL_GIT_COMMIT_REF === "staging";
 
   return (
-    <html lang="en">
+    <html lang="en" data-env={isStaging ? "staging" : "production"}>
       <body>
         {isStaging && (
           <>
