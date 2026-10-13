@@ -102,6 +102,43 @@ if (missing.length) {
   process.exit(1);
 }
 
+// ---- Security posture (0182) -------------------------------------------------------------------
+// Every public table must have RLS, and every public table must come from a migration. A table made
+// by hand on production (the course-id reconciliation leftovers, found by Supabase on 2026-10-11)
+// fails this check, naming the table.
+{
+  const allowed = new Set(JSON.parse(fs.readFileSync(new URL('./public_tables.json', import.meta.url), 'utf8')).tables);
+  let posture;
+  const pfix = process.env.BNN_SECURITY_POSTURE_FIXTURE;
+  if (pfix) {
+    posture = JSON.parse(fs.readFileSync(pfix, 'utf8'));
+  } else if (!fixture) {
+    const restBase = canonicalSupabaseRestBase(url);
+    const r = await fetch(`${restBase}/rest/v1/rpc/security_posture`, {
+      method: 'POST',
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: '{}',
+    });
+    if (!r.ok) {
+      console.error(`SECURITY POSTURE: FAIL (${target})`);
+      console.error(`security_posture() returned HTTP ${r.status}: ${(await r.text()).slice(0, 300)} — is 0182 applied?`);
+      process.exit(1);
+    }
+    posture = await r.json();
+  }
+  if (posture) {
+    const noRls = posture.filter((t) => t.rls !== true).map((t) => t.table);
+    const unknown = posture.filter((t) => !allowed.has(t.table)).map((t) => t.table);
+    if (noRls.length || unknown.length) {
+      console.error(`SECURITY POSTURE: FAIL (${target})`);
+      for (const t of noRls) console.error(` - ${t}: Row-Level Security is OFF — anyone with the project URL can read and change it`);
+      for (const t of unknown) console.error(` - ${t}: not created by any migration (made by hand?) — drop it, or add it through a migration`);
+      process.exit(1);
+    }
+    console.log(`SECURITY POSTURE: PASS (${target}) — ${posture.length} public tables, all with RLS, all from migrations`);
+  }
+}
+
 const latest = expected.at(-1) || '(none)';
 console.log(`DATABASE MIGRATION PARITY: PASS (${target})`);
 console.log(` - repository-required ledger migrations present: ${expected.length}`);

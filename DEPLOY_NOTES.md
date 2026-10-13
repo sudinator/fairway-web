@@ -1,3 +1,19 @@
+## 205.3.261013 — Security: two hand-made production tables without RLS; a live guard so it cannot recur
+
+**What Supabase found (2026-10-11).** Two public tables on production with Row-Level Security off: `course_id_pre_reconciliation_snapshot` and `course_id_reconciliation_tmp`. They were not created by any migration — they were made by the one-off course-id reconciliation run by hand on production before 177.20 (Aug 2026) and never dropped. Contents: course reference data only (ids, names, facilities, locations, provider ids, match notes) — no users, scores or emails. RLS was enabled on both on Oct 13 as an immediate fix.
+
+**Fix.** Migration 0182 drops both tables through the audited path, and adds `security_posture()` — a service-role-only inventory of public tables and their RLS flags (names and flags, never data).
+
+**Guard — why the old checks missed it and what changes.** CI proved what the migrations BUILD, never what was actually IN production. Now:
+- `ci/check_live_migration_parity.mjs` (the production job on every merge to main, and staging) also fails if any public table has RLS off, or if a public table exists that no migration created — naming the table.
+- `.github/workflows/production-security.yml` runs the same check every night and opens a GitHub issue (label `security`) when it fails.
+- `ci/public_tables.json` lists every table the migrations create; the full-chain run fails if it drifts from the migrations, both ways.
+- `ci/test_security_posture_check.py` (in `npm run guards`) proves the live check fails on an RLS-off table, a hand-made table with RLS, and RLS switched off on a real table — and passes when clean.
+
+**Rule (HANDOFF).** No schema change on production outside a migration — including one-off fixes: a temporary table is created AND dropped in the same audited migration. The nightly check enforces it.
+
+Deploy: 0182 to staging → code → 0182 to production → merge. The production parity job will then confirm "all with RLS, all from migrations".
+
 ## 205.2.261013 — Season Wrapped: every club, per-account banner, "season summary" wording
 
 **Every club.** A season summary already covered all of a golfer's rounds and games whatever the club; the club card picked one club. It now lists every club the golfer played in that year — the club's rounds and your own, your rank only where top three — and "played most with" across all of them. Migration 0181 also corrects `season_club_stats`: it counts rounds PLAYED IN each club (`rounds.group_id`), where 0180 counted every round by every member, so a golfer in four clubs showed the same 26 rounds in all four (caught on real data before release; the assertion now covers a golfer split across two clubs and fails on the 0180 function).

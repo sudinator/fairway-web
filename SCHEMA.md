@@ -1,3 +1,7 @@
+## 205.3 — Security posture (0182)
+
+Dropped `course_id_pre_reconciliation_snapshot`, `course_id_reconciliation_tmp` (hand-made, RLS off). `security_posture() returns jsonb` (service_role only).
+
 ## 205.2 — Season Wrapped follow-ups (0181)
 
 `profiles.season_wrapped_seen integer[]`; `mark_season_wrapped_seen(integer)` (authenticated, caller only). `season_club_stats` counts rounds by `rounds.group_id`. `send_season_wrapped` wording.
