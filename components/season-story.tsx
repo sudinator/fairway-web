@@ -87,7 +87,18 @@ export function SeasonCardView({ card, name, year }: { card: SeasonCard; name: s
     case "grind": return (<><Eyebrow>THE GRIND</Eyebrow>{card.puttsPerRound && <Big>{card.puttsPerRound.last} putts</Big>}{card.puttsPerRound && <Line dim>per round in your last five, from {card.puttsPerRound.first} in your first five</Line>}{card.fairwayPct != null && <Line>{card.fairwayPct}% of fairways hit</Line>}{card.mostImproved && <Line>{card.mostImproved}</Line>}<SeasonForm points={card.putts} label="putts" /></>);
     case "headToHead": return (<><Eyebrow>HEAD TO HEAD</Eyebrow><Big>{card.won}–{card.lost}{card.halved ? `–${card.halved}` : ""}</Big><Line dim>won–lost{card.halved ? "–halved" : ""} in match play</Line>{card.rival && <Line>Your most-played rival: <b>{card.rival.name}</b> — you {card.rival.won > card.rival.lost ? "lead" : card.rival.won < card.rival.lost ? "trail" : "are level"} {card.rival.won}–{card.rival.lost}{card.rival.halved ? `–${card.rival.halved}` : ""}</Line>}</>);
     case "badges": return (<><Eyebrow>BADGES EARNED</Eyebrow><Big>{card.earned.length}</Big><div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>{card.earned.slice(0, 8).map((b) => <span key={b.key} style={{ background: "rgba(255,255,255,0.08)", borderRadius: 999, padding: "4px 10px", color: C.cream, fontSize: 13 }}>{b.icon} {b.label}</span>)}</div>{card.rarest && <Line dim>Rarest: {card.rarest.icon} {card.rarest.label}</Line>}</>);
-    case "club": return (<><Eyebrow>{card.name.toUpperCase()}</Eyebrow><Big>{card.totalRounds.toLocaleString()} rounds</Big><Line dim>played by the club this year — {card.members} members</Line>{card.myRank && <Line>You were <b style={{ color: C.gold }}>#{card.myRank.rank}</b> in the club for {card.myRank.metric}</Line>}{card.playedWithMost && <Line>Played most with <b>{card.playedWithMost.name}</b> — {card.playedWithMost.rounds} rounds together</Line>}</>);
+    case "club": return (<><Eyebrow>{card.clubs.length === 1 ? card.clubs[0].name.toUpperCase() : "YOUR CLUBS"}</Eyebrow>
+      {card.clubs.length === 1 ? (<><Big>{card.clubs[0].totalRounds.toLocaleString()} rounds</Big><Line dim>played by the club this year — {card.clubs[0].members} members</Line>{card.clubs[0].topThree && <Line>You were <b style={{ color: C.gold }}>#{card.clubs[0].topThree}</b> in the club for rounds played</Line>}</>) : (
+        <div data-season-clubs style={{ marginTop: 6 }}>
+          {card.clubs.map((c) => (
+            <div key={c.name} style={{ paddingTop: 8, paddingBottom: 8, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+              <div style={{ color: C.cream, fontSize: 16, fontWeight: 800 }}>{c.name}</div>
+              <div style={{ color: C.sage, fontSize: 13, marginTop: 2 }}>You played {c.myRounds} of the club's {c.totalRounds} rounds{c.topThree ? <> · <b style={{ color: C.gold }}>#{c.topThree}</b> in the club</> : null}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {card.playedWithMost && <Line>Played most with <b>{card.playedWithMost.name}</b> — {card.playedWithMost.rounds} game{card.playedWithMost.rounds === 1 ? "" : "s"} together</Line>}</>);
     case "closing": return (<><Eyebrow>{year + 1}</Eyebrow><Big>One number</Big><Line>{card.target}.</Line><Line dim>See you on the first tee.</Line></>);
     case "short": return (<><Eyebrow>{year} · {name.toUpperCase()}</Eyebrow><Big>{card.rounds} round{card.rounds === 1 ? "" : "s"}</Big><Line>A short season — the full story starts at five rounds.</Line><Line dim>See you on the first tee in {year + 1}.</Line></>);
   }

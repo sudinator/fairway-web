@@ -41,7 +41,11 @@ const summary = buildSeasonSummary({
     { opponent: "Ashutosh Rathore", result: "won", played_at: "2026-10-10" }, { opponent: "Ashutosh Rathore", result: "lost", played_at: "2026-08-15" }, { opponent: "Ashutosh Rathore", result: "won", played_at: "2026-06-20" },
     { opponent: "Bob Jones", result: "halved", played_at: "2026-07-04" }, { opponent: "Sudhir Sirohy", result: "won", played_at: "2026-09-12" }, { opponent: "Karan Sarin", result: "lost", played_at: "2026-05-30" },
   ],
-  club: { name: "Livingston Early Morning Golfers", totalRounds: 412, members: 23, myRank: [{ metric: "rounds played", rank: 2, of: 23 }, { metric: "index improvement", rank: 9, of: 23 }], playedWithMost: { name: "Sudhir Sirohy", rounds: 11 } },
+  clubs: [
+    { name: "Livingston Early Morning Golfers", totalRounds: 412, members: 23, myRounds: 26, myRank: 2 },
+    { name: "The 19th Hole", totalRounds: 41, members: 11, myRounds: 6, myRank: 9 },
+  ],
+  playedWithMost: { name: "Ashutosh Rathore", rounds: 6 },
 });
 
 const kinds = summary.cards.map((c) => c.kind);
@@ -51,12 +55,14 @@ ok(kinds.includes("index") && kinds.includes("best") && kinds.includes("headToHe
 const best = summary.cards.find((c) => c.kind === "best") as any;
 ok(best.course === "Francis Byrne Golf Course" && best.date === "2026-08-02" && best.differential === 8.9, `best day is Francis Byrne Aug 2 (${best.course} ${best.date} ${best.differential})`);
 const club = summary.cards.find((c) => c.kind === "club") as any;
-ok(club.myRank?.rank === 2 && club.myRank?.metric === "rounds played", "club: only a top-three rank is shown");
+ok(club.clubs.length === 2, "every club the golfer played in is on the card");
+ok(club.clubs[0].topThree === 2 && club.clubs[1].topThree === null, "rank only where top three (#9 hidden)");
 ok(summary.share.badges === (summary.cards.find((c) => c.kind === "badges") as any)?.earned.length, "share card badge count matches");
 ok(!kinds.includes("money" as never), "no money card anywhere");
 const s = renderScreen(<div><SeasonStory summary={summary} autoplay={false} /><div style={{ height: 20 }} /><SeasonShareCard summary={summary} /></div>);
 ok(s.el.querySelectorAll("[data-season-card]").length === summary.cards.length, "every card rendered");
 ok(s.text.includes("26 rounds") && s.text.includes("Francis Byrne"), "headline and best day on screen");
+ok(s.text.includes("The 19th Hole") && s.text.includes("YOUR CLUBS"), "both clubs listed");
 ok(!(s.el.querySelector("[data-season-share]")?.textContent || "").includes("$"), "share card shows no money");
 mkdirSync(".testout-screens", { recursive: true });
 writeFileSync(".testout-screens/season-wrapped.html", `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Season Wrapped 2026 — real components (205.0 mock)</title><style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;background:#0A2A20;font-family:-apple-system,Segoe UI,Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px;gap:12px}.note{color:#CFC9B4;font-size:13px;max-width:402px;line-height:1.5}</style><body><div class="note"><b style="color:#C9A227">Season Wrapped 2026 — the real story and share components</b>, built by lib/season-summary over the engine's own functions. Data: a season shaped like your dashboard (26 rounds, index 8.8 → ${summary.share.indexEnd}, Francis Byrne on Aug 2), not your live rows — I can't reach staging from here. In the app each card fills the screen for six seconds with a progress bar; here they are stacked. The share card is at the bottom; the money card is for you only and is never on it.</div><div style="width:402px;max-width:100%">${s.el.innerHTML}</div></body>`);

@@ -2,7 +2,7 @@
 // Season Wrapped in the app (205.0). Computed on open from the rounds the Dashboard already loaded
 // (prepared, cancelled excluded) plus the golfer's ended games and the club aggregates — one
 // definition, so the summary can never disagree with the Dashboard. Entry points: a Dashboard card
-// (Dec 31 – Jan 31), a row per finished season in Rounds, the Dec 31 notification (/?wrapped=YYYY),
+// (Dec 31 – Jan 31, until the account opens it), a row per finished season in Rounds, the Dec 31 notification (/?wrapped=YYYY),
 // and on staging a permanent preview.
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { C, type Round } from "@/lib/golf";
@@ -26,21 +26,17 @@ async function loadSeason(year: number, rounds: Round[], userId: string, name: s
     games = (gs || []).map((g: any) => ({ ...g, players: (gp || []).filter((p: any) => p.game_id === g.id) }));
   }
   const { matches, playedWith } = seasonMatches(games, userId);
-  let club: any = null;
+  let clubs: { name: string; totalRounds: number; members: number; myRounds: number; myRank: number | null }[] = [];
   try {
     const { data } = await supabase.rpc("season_club_stats", { p_year: year });
-    const clubs = (data || []) as any[];
-    // The club the golfer played most rounds in counts as "your club".
-    const mine = clubs.map((c) => ({ c, mineN: (c.rounds_by_member || []).find((m: any) => m.user_id === userId)?.rounds ?? 0 })).sort((a, b) => b.mineN - a.mineN || b.c.total_rounds - a.c.total_rounds)[0];
-    if (mine && mine.c.total_rounds > 0) {
-      const list = (mine.c.rounds_by_member || []) as { user_id: string; rounds: number }[];
-      const rank = 1 + list.filter((m) => m.rounds > mine.mineN).length;
-      club = { name: mine.c.name, totalRounds: mine.c.total_rounds, members: mine.c.members,
-        myRank: mine.mineN > 0 ? [{ metric: "rounds played", rank, of: mine.c.members }] : [],
-        playedWithMost: playedWith[0] ? { name: playedWith[0].name, rounds: playedWith[0].games } : null };
-    }
-  } catch { /* club card is optional */ }
-  return buildSeasonSummary({ year, name, rounds, matches, club });
+    clubs = ((data || []) as any[]).map((c) => {
+      const list = (c.rounds_by_member || []) as { user_id: string; rounds: number }[];
+      const mine = list.find((m) => m.user_id === userId)?.rounds ?? 0;
+      return { name: c.name, totalRounds: c.total_rounds, members: c.members, myRounds: mine, myRank: mine > 0 ? 1 + list.filter((m) => m.rounds > mine).length : null };
+    });
+  } catch { /* the club card is optional */ }
+  const playedWithMost = playedWith[0] ? { name: playedWith[0].name, rounds: playedWith[0].games } : null;
+  return buildSeasonSummary({ year, name, rounds, matches, clubs, playedWithMost });
 }
 
 export function SeasonWrappedModal({ year, rounds, userId, name, onClose }: { year: number; rounds: Round[]; userId: string; name: string; onClose: () => void }) {
@@ -77,10 +73,21 @@ export function SeasonWrappedModal({ year, rounds, userId, name, onClose }: { ye
 }
 
 /** Dashboard card (Dec 31 – Jan 31; always on staging) and Rounds rows (every finished season). */
-export function SeasonWrappedEntry({ rounds, userId, name, variant, openYear, onOpened }: {
+export function SeasonWrappedEntry({ rounds, userId, name, variant, openYear, onOpened, seenYears = [] }: {
   rounds: Round[]; userId: string; name: string; variant: "dashboard" | "rounds"; openYear?: number | null; onOpened?: () => void;
+  /** Years whose summary this ACCOUNT has opened (profiles.season_wrapped_seen): the banner hides. */
+  seenYears?: number[];
 }) {
-  const [open, setOpen] = useState<number | null>(null);
+  const [open, setOpenRaw] = useState<number | null>(null);
+  const [seenNow, setSeenNow] = useState<number[]>([]);
+  // Opening a summary marks it seen for the account (every device); it then lives under Rounds.
+  const setOpen = (y: number | null) => {
+    setOpenRaw(y);
+    if (y != null && !seenYears.includes(y) && !seenNow.includes(y)) {
+      setSeenNow((s) => [...s, y]);
+      try { void createClient().rpc("mark_season_wrapped_seen", { p_year: y }); } catch { /* best effort */ }
+    }
+  };
   useEffect(() => { if (openYear) { setOpen(openYear); onOpened?.(); } }, [openYear, onOpened]);
   const now = useMemo(() => new Date(), []);
   const staging = isStagingClient();
@@ -91,11 +98,12 @@ export function SeasonWrappedEntry({ rounds, userId, name, variant, openYear, on
   if (variant === "dashboard") {
     const y = live ?? previewYear;
     if (y == null || !rounds.some((r) => (r.played_at || "").startsWith(String(y)))) return modal;
+    if (previewYear == null && (seenYears.includes(y) || seenNow.includes(y))) return modal; // opened: lives under Rounds
     return (
       <>
         <button type="button" data-season-entry onClick={() => setOpen(y)} style={{ ...btn(true), width: "100%", marginTop: 12, padding: "13px 16px", fontSize: 15, textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 22 }}>🏌️</span>
-          <span style={{ flex: 1 }}>Your {y} season is ready{previewYear != null ? " (staging preview)" : ""}</span>
+          <span style={{ flex: 1 }}>Your {y} season summary is ready{previewYear != null ? " (staging preview)" : ""}</span>
           <span>▶</span>
         </button>
         {modal}
@@ -109,7 +117,7 @@ export function SeasonWrappedEntry({ rounds, userId, name, variant, openYear, on
       <div style={{ marginTop: 12 }}>
         {list.map((y) => (
           <button key={y} type="button" data-season-row={y} onClick={() => setOpen(y)} style={{ ...btn(false), width: "100%", marginBottom: 8, padding: "11px 20px", fontSize: 14, textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ flex: 1 }}>⛳ {y} season{y === previewYear ? " (staging preview)" : ""}</span><span style={{ color: C.sage }}>▶</span>
+            <span style={{ flex: 1 }}>⛳ {y} season summary{y === previewYear ? " (staging preview)" : ""}</span><span style={{ color: C.sage }}>▶</span>
           </button>
         ))}
       </div>

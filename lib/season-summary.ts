@@ -16,7 +16,9 @@ export type SeasonInput = {
   /** Match results this year, from games the golfer played: opponent name and whether they won / lost / halved. */
   matches?: { opponent: string; result: "won" | "lost" | "halved"; played_at: string }[];
   /** Club-wide context (optional). */
-  club?: { name: string; totalRounds: number; members: number; myRank?: { metric: string; rank: number; of: number }[]; playedWithMost?: { name: string; rounds: number } | null } | null;
+  /** Every club the golfer belongs to, with the club's rounds that year and the golfer's own (205.2). */
+  clubs?: { name: string; totalRounds: number; members: number; myRounds: number; myRank: number | null }[];
+  playedWithMost?: { name: string; rounds: number } | null;
 };
 
 export type SeasonCard =
@@ -37,7 +39,7 @@ export type SeasonCard =
       putts: { date: string; course: string; value: number }[] }
   | { kind: "headToHead"; won: number; lost: number; halved: number; rival: { name: string; won: number; lost: number; halved: number } | null }
   | { kind: "badges"; earned: { key: string; label: string; icon: string; tier: string }[]; rarest: { key: string; label: string; icon: string; tier: string } | null }
-  | { kind: "club"; name: string; totalRounds: number; members: number; myRank: { metric: string; rank: number; of: number } | null; playedWithMost: { name: string; rounds: number } | null }
+  | { kind: "club"; clubs: { name: string; totalRounds: number; members: number; myRounds: number; topThree: number | null }[]; playedWithMost: { name: string; rounds: number } | null }
   | { kind: "closing"; target: string }
   | { kind: "short"; rounds: number };
 
@@ -173,10 +175,10 @@ export function buildSeasonSummary(input: SeasonInput): SeasonSummary {
   if (earned.length) cards.push({ kind: "badges", earned, rarest });
 
   // Club
-  if (input.club) {
-    const top = (input.club.myRank || []).filter((x) => x.rank <= 3).sort((a, b) => a.rank - b.rank)[0] ?? null;
-    cards.push({ kind: "club", name: input.club.name, totalRounds: input.club.totalRounds, members: input.club.members, myRank: top, playedWithMost: input.club.playedWithMost ?? null });
-  }
+  // Clubs: every club the golfer played rounds in that year; the rank only when top three.
+  const clubs = (input.clubs || []).filter((c) => c.myRounds > 0).sort((a, b) => b.myRounds - a.myRounds || b.totalRounds - a.totalRounds)
+    .map((c) => ({ name: c.name, totalRounds: c.totalRounds, members: c.members, myRounds: c.myRounds, topThree: c.myRank != null && c.myRank <= 3 ? c.myRank : null }));
+  if (clubs.length || input.playedWithMost) cards.push({ kind: "club", clubs, playedWithMost: input.playedWithMost ?? null });
 
   // Closing: the one number to beat
   const target = lowPt ? `Beat your season low index of ${lowPt.index}` : withDiff.length ? `Beat your best differential of ${r1(withDiff.reduce((a, b) => (b.d < a.d ? b : a)).d)}` : `Play more than ${season.length} rounds`;

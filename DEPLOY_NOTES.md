@@ -1,3 +1,13 @@
+## 205.2.261013 — Season Wrapped: every club, per-account banner, "season summary" wording
+
+**Every club.** A season summary already covered all of a golfer's rounds and games whatever the club; the club card picked one club. It now lists every club the golfer played in that year — the club's rounds and your own, your rank only where top three — and "played most with" across all of them. Migration 0181 also corrects `season_club_stats`: it counts rounds PLAYED IN each club (`rounds.group_id`), where 0180 counted every round by every member, so a golfer in four clubs showed the same 26 rounds in all four (caught on real data before release; the assertion now covers a golfer split across two clubs and fails on the 0180 function).
+
+**Banner.** Shown Dec 31 – Jan 31 until the ACCOUNT opens that season's summary, then gone on every device (`profiles.season_wrapped_seen`, written by `mark_season_wrapped_seen(year)` for the caller only); the summary lives on under Rounds, one row per finished season, permanently. Staging keeps its always-on preview.
+
+**Wording.** "Your 2026 season summary is ready" on the banner, the push title and the notification; Rounds rows "2026 season summary".
+
+Deploy: 0181 to staging → code → 0181 to production (with 0180 if not yet applied) → merge.
+
 ## 205.1.261013 — Season charts labelled by month
 
 The season's differential and putts charts numbered every round along the x-axis (1 … 26), which crowded it to unreadable on a phone. They now carry one label per month, at the first round of that month (Apr · May · Jun …); bars stay one per round, in date order. `FormBars` gained optional `ticks` / `tickFormatter`; without them it behaves exactly as before, so the Dashboard's Scoring Form is unchanged. Client-only; no migration.

@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 205.1.261013
+## Current candidate: 205.2.261013
+
+- 0181: per-club round counts by rounds.group_id; per-account seen years; wording. Apply 0181 (after 0180) before the code.
+
+## Previous: 205.1.261013
 
 - Season charts: month ticks. Carries 205.0 (apply 0180 first if not yet applied).
 

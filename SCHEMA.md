@@ -1,3 +1,7 @@
+## 205.2 — Season Wrapped follow-ups (0181)
+
+`profiles.season_wrapped_seen integer[]`; `mark_season_wrapped_seen(integer)` (authenticated, caller only). `season_club_stats` counts rounds by `rounds.group_id`. `send_season_wrapped` wording.
+
 ## 205.0 — Season Wrapped (0180)
 
 `season_club_stats(integer) returns jsonb` (authenticated; caller's active clubs; aggregates only). `send_season_wrapped(integer) returns integer` (no app grants; idempotent per user+year). pg_cron `season-wrapped` '0 14 31 12 *'. Notification type `season_wrapped`.

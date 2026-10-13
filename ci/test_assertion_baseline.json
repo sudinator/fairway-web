@@ -1,5 +1,5 @@
 {
-  "total": 439466,
+  "total": 439470,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -43,8 +43,8 @@
     "round stat completeness": 8,
     "scoring matrix": 3698,
     "screen render": 67,
-    "season entry": 4,
-    "season wrapped": 10,
+    "season entry": 6,
+    "season wrapped": 12,
     "segments": 20,
     "setup draft lifecycle": 10,
     "setup summary": 31,

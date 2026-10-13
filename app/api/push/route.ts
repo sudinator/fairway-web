@@ -28,7 +28,7 @@ const DEFAULT_DELIVERY: Record<string, "push" | "inapp" | "off"> = {
 
 function titleFor(type: string | null): string {
   switch (type) {
-    case "season_wrapped": return "Your season is ready";
+    case "season_wrapped": return "Your season summary is ready";
     case "course_change": return "Course data changed";
     case "money_owed": return "You owe money";
     case "money_paid": return "You got paid";

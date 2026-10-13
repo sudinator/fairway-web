@@ -923,7 +923,7 @@ export function Home({ session }: { session: any }) {
           <div style={{ color: C.sage, textAlign: "center", padding: 40 }}>Loading your rounds…</div>
         ) : tab === "dashboard" ? (
           <>
-          <SeasonWrappedEntry rounds={rounds} userId={user.id} name={displayName} variant="dashboard" openYear={wrappedYear} onOpened={clearWrappedYear} />
+          <SeasonWrappedEntry rounds={rounds} userId={user.id} name={displayName} variant="dashboard" openYear={wrappedYear} onOpened={clearWrappedYear} seenYears={(profile?.season_wrapped_seen as number[] | undefined) || []} />
           <Dashboard rounds={rounds} name={displayName} onOpen={setViewing} currentIndex={index} saveIndex={saveIndex}
             userEmail={user?.email || null} userId={user.id} savedCoach={profile?.dashboard_ai || null} onCoachSaved={loadProfile}
             onViewAchievements={() => { setTab("profile"); setTimeout(() => document.getElementById("achievements-wall")?.scrollIntoView({ behavior: "smooth", block: "start" }), 140); }} />
