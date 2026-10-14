@@ -103,17 +103,18 @@ do $$ begin
     raise exception 'member dismissed a review';
   exception when insufficient_privilege then null; end;
   begin
-    perform public.apply_course_freshness('16700000-0000-0000-0000-000000000021');
+    perform public.apply_course_freshness('16700000-0000-0000-0000-000000000021', (select revision from public.pending_course_reviews() where course_id = '16700000-0000-0000-0000-000000000021'));
     raise exception 'member applied a course update';
   exception when insufficient_privilege then null; end;
 end $$;
 -- Club admin applies their club's course (not the app admin): this is the right 0167 widened.
 select set_config('request.jwt.claim.sub', '16700000-0000-0000-0000-000000000002', true);
-select public.apply_course_freshness('16700000-0000-0000-0000-000000000021');
+-- 0183: approval names the revision the admin reviewed.
+select public.apply_course_freshness('16700000-0000-0000-0000-000000000021', (select revision from public.pending_course_reviews() where course_id = '16700000-0000-0000-0000-000000000021'));
 select public.set_course_freshness_status('16700000-0000-0000-0000-000000000021', 'applied');  -- dismiss/apply status path on a null-group course
 do $$ begin
   begin
-    perform public.apply_course_freshness('16700000-0000-0000-0000-000000000022');
+    perform public.apply_course_freshness('16700000-0000-0000-0000-000000000022', coalesce((select revision from public.pending_course_reviews() where course_id = '16700000-0000-0000-0000-000000000022'), 1));
     raise exception 'club admin applied another club''s course';
   exception when insufficient_privilege then null; end;
 end $$;

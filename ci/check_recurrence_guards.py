@@ -69,6 +69,16 @@ lay = (ROOT / "app" / "layout.tsx").read_text(encoding="utf-8")
 if 'data-env={isStaging ? "staging" : "production"}' not in lay:
     problems.append("F app/layout.tsx: html[data-env] marker missing — staging-only tooling would leak or vanish (204.2)")
 
+# G. a Supabase request builder is LAZY: `void x.rpc(...)` / `void x.from(...)` without a .then in the
+#    same statement sends nothing (review finding 7, 205.4). Await it, or chain .then.
+for src in [p for d in ("app", "components", "lib") for p in (ROOT / d).rglob("*.ts*") if "node_modules" not in p.parts and not p.name.endswith(".test.ts") and not p.name.endswith(".test.tsx")]:
+    text = src.read_text(encoding="utf-8")
+    for m in re.finditer(r"\bvoid\s+[A-Za-z_][\w.()]*\s*\.\s*(rpc|from)\s*\(", text):
+        stmt = text[m.start(): text.find(";", m.end()) if text.find(";", m.end()) > 0 else len(text)]
+        if ".then(" not in stmt:
+            line = text.count("\n", 0, m.start()) + 1
+            problems.append(f"G {src.relative_to(ROOT)}:{line}: discarded Supabase request (lazy builder — nothing is sent); await it or chain .then (205.4)")
+
 # E. ad-hoc name shortening
 ALLOW_E = {ROOT / "lib" / "short-names.ts", ROOT / "components" / "player-card.tsx"}
 for f in list((ROOT / "components").rglob("*.tsx")) + list((ROOT / "lib").rglob("*.ts")):
@@ -81,4 +91,4 @@ if problems:
     print("recurrence guards: FAIL")
     for p in problems: print("  " + p)
     sys.exit(1)
-print("recurrence guards: PASS (server time formatting, NULL-safe assertions, is_admin arity, OS-assigned ports, one name-shortening rule, staging-only tooling gated)")
+print("recurrence guards: PASS (server time formatting, NULL-safe assertions, is_admin arity, OS-assigned ports, one name-shortening rule, staging-only tooling gated, no discarded Supabase requests)")

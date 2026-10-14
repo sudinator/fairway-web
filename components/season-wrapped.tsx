@@ -15,6 +15,12 @@ import { SeasonShareCard } from "@/components/season-share-card";
 import { useCardExport } from "@/components/share-card";
 import { isStagingClient } from "@/lib/auto-score";
 
+/** Mark a season's summary opened for the signed-in account (0181). Awaited by callers. */
+export async function markSeasonSeen(year: number): Promise<{ error: unknown }> {
+  try { const { error } = await createClient().rpc("mark_season_wrapped_seen", { p_year: year }); return { error }; }
+  catch (error) { return { error }; }
+}
+
 async function loadSeason(year: number, rounds: Round[], userId: string, name: string): Promise<SeasonSummary> {
   const supabase = createClient();
   const keptGameIds = new Set(rounds.filter((r) => (r.played_at || "").startsWith(String(year)) && (r as any).game_id).map((r) => (r as any).game_id as string));
@@ -22,7 +28,7 @@ async function loadSeason(year: number, rounds: Round[], userId: string, name: s
   if (keptGameIds.size) {
     const ids = Array.from(keptGameIds);
     const { data: gs } = await supabase.from("games").select("id, game_type, played_at, allowance_pct, course_par, team_score_mode, holes_meta, pairings, foursomes, status").in("id", ids).eq("status", "ended");
-    const { data: gp } = await supabase.from("game_players").select("game_id, user_id, display_name, scores, course_handicap, handicap_index, slope, rating, course_handicap_source").in("game_id", ids);
+    const { data: gp } = await supabase.from("game_players").select("id, game_id, user_id, display_name, scores, course_handicap, handicap_index, slope, rating, course_handicap_source").in("game_id", ids);
     games = (gs || []).map((g: any) => ({ ...g, players: (gp || []).filter((p: any) => p.game_id === g.id) }));
   }
   const { matches, playedWith } = seasonMatches(games, userId);
@@ -83,10 +89,14 @@ export function SeasonWrappedEntry({ rounds, userId, name, variant, openYear, on
   // Opening a summary marks it seen for the account (every device); it then lives under Rounds.
   const setOpen = (y: number | null) => {
     setOpenRaw(y);
-    if (y != null && !seenYears.includes(y) && !seenNow.includes(y)) {
-      setSeenNow((s) => [...s, y]);
-      try { void createClient().rpc("mark_season_wrapped_seen", { p_year: y }); } catch { /* best effort */ }
-    }
+    if (y != null && !seenYears.includes(y) && !seenNow.includes(y)) void markSeen(y);
+  };
+  // A Supabase request builder is LAZY: it only runs when awaited. The 205.2 code discarded it with
+  // `void`, so no request was ever sent and the banner came back (review finding 7, 205.4). Await it,
+  // and record "seen" locally only once the server has it, so another device agrees.
+  const markSeen = async (y: number) => {
+    const { error } = await markSeasonSeen(y);
+    if (!error) setSeenNow((s) => (s.includes(y) ? s : [...s, y]));
   };
   useEffect(() => { if (openYear) { setOpen(openYear); onOpened?.(); } }, [openYear, onOpened]);
   const now = useMemo(() => new Date(), []);

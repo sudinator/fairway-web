@@ -144,10 +144,10 @@ end $$;
 insert into favorite_courses(id,group_id,name,user_id,data) values ('66666666-0000-0000-0000-000000000006','dddddddd-0000-0000-0000-000000000004','Pinch Brook Golf Course','aaaaaaaa-0000-0000-0000-000000000001','{"name":"Pinch Brook Golf Course","tees":[],"holes":[]}'::jsonb)
   on conflict (id) do nothing;
 begin;
-set local role authenticated;
-select set_config('request.jwt.claim.sub', 'aaaaaaaa-0000-0000-0000-000000000001', true);
-select record_course_freshness('66666666-0000-0000-0000-000000000006','{}'::jsonb,
- '{"tees":[{"name":"Blue","slopeTo":112,"ratingTo":63.6,"slopeFrom":115,"ratingFrom":64.2,"slopeChanged":true,"ratingChanged":true,"yardageChanges":[{"to":171,"from":174,"hole":1},{"to":473,"from":476,"hole":2}]},{"name":"White","slopeTo":106,"ratingTo":62.3,"slopeFrom":106,"ratingFrom":62.6,"slopeChanged":false,"ratingChanged":true,"yardageChanges":[{"to":147,"from":157,"hole":1}]}],"hasChanges":true}'::jsonb, true);
+-- 0183: checks are recorded by the server (service role) on behalf of a verified member.
+set local role service_role;
+select record_course_freshness_checked('66666666-0000-0000-0000-000000000006','aaaaaaaa-0000-0000-0000-000000000001','{}'::jsonb,
+ '{"tees":[{"name":"Blue","slopeTo":112,"ratingTo":63.6,"slopeFrom":115,"ratingFrom":64.2,"slopeChanged":true,"ratingChanged":true,"yardageChanges":[{"to":171,"from":174,"hole":1},{"to":473,"from":476,"hole":2}]},{"name":"White","slopeTo":106,"ratingTo":62.3,"slopeFrom":106,"ratingFrom":62.6,"slopeChanged":false,"ratingChanged":true,"yardageChanges":[{"to":147,"from":157,"hole":1}]}],"hasChanges":true}'::jsonb, true, 'ok');
 commit;
 do $$
 declare m text; d text;

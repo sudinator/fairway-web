@@ -1,3 +1,7 @@
+## 206.0 — Course freshness integrity (0183)
+
+`course_freshness`: `revision bigint`, `base_hash text`, `check_state text` (+ trigger). Dropped `record_course_freshness(uuid,jsonb,jsonb,boolean)`. New `record_course_freshness_checked(uuid,uuid,jsonb,jsonb,boolean,text)` (service_role). `apply_course_freshness(uuid,bigint)` replaces `(uuid)`. `pending_course_reviews()` adds revision, check_state.
+
 ## 205.3 — Security posture (0182)
 
 Dropped `course_id_pre_reconciliation_snapshot`, `course_id_reconciliation_tmp` (hand-made, RLS off). `security_posture() returns jsonb` (service_role only).

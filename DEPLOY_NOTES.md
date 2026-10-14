@@ -1,3 +1,25 @@
+## 206.0.261013 — Course freshness: server-side checks, approval of an exact revision, full comparison (review findings 1, 2, 3, 6)
+
+**1 — "API data" could be supplied by an ordinary member (High).** The browser fetched the provider, computed the comparison and handed both to `record_course_freshness`; an admin's approval then wrote that payload into the shared course. That function is REMOVED (0183). The browser now sends only a course id to `POST /api/courses/freshness`; the server reads the stored course, fetches GolfCourseAPI with its own key (`lib/provider-course.ts`, also used by `/api/courses`), validates, compares, and records through `record_course_freshness_checked` — service role only, with the member's club membership verified inside the database.
+
+**2 — Approval not tied to what was reviewed (High).** `apply_course_freshness` now takes the REVISION the admin reviewed and applies only if the review is pending, the revision is current, the check was complete, and the course is unchanged since the check (md5 fingerprint) — under row locks, one transaction. Re-checked, edited, already-applied, incomplete or wrong-club: refused with a reason. All three approval screens pass the revision they displayed.
+
+**3 — Comparison missed meaningful changes (High).** Added tees, removed tees, hole par and stroke-index changes are now changes, and are shown in the review list so nothing is approved unseen. `validateProviderCourse` checks completeness (9/18 holes with par and SI; every tee with rating and slope) first.
+
+**6 — Success reported when nothing was saved (Medium).** Outcomes are distinct: ok · incomplete (nothing to apply, problems named) · provider_error · not_saved. Admin "Refresh from API" says which.
+
+**Proof.** `ci/assert-course-freshness-integrity.sql` replays the reviewer's attacks on the full chain — the browser path gone, an outsider refused even via the server, a stale revision refused, an approval over a newer hand correction refused (correction intact), double-apply refused, a member refused, incomplete data inert — red before 0183, green after. `lib/course-diff-freshness.test.ts`: each previously-missed change detected; incompleteness named. `assert-course-reviews.sql` and `assert-notifications.sql` moved to the new contract. Guard G (recurrence guards): a discarded Supabase request (`void x.rpc(...)` with no `.then`) fails the build — finding 7's mistake cannot recur.
+
+Deploy: 0183 to staging → code → 0183 to production → merge. Until both are live, club admins should not approve course-data updates.
+
+## 205.4.261013 — Season Wrapped: "seen" actually saved; matches against guests counted (review findings 7, 8)
+
+**Finding 7 — opening a summary did not persist "seen".** `void createClient().rpc(...)` discarded a lazy Supabase request builder, so no request was ever sent: the banner returned on reopening and on other devices. Now awaited (`markSeasonSeen`), and "seen" is recorded locally only once the server confirms it. `lib/season-seen-request.test.ts` counts real network calls: the old pattern sends 0, the fix sends exactly 1.
+
+**Finding 8 — matches against guests disappeared.** Season calculations keyed players by `user_id`; guests have none (pairings and foursomes store their game-player row id). Now the app's one player-identity rule (`user_id ?? id`) throughout, and the loader fetches the row id. Test: a completed win against a guest counts, names the guest, and counts in "played with".
+
+Client-only; no migration. Part of a 10-finding external review: 1, 2, 3, 6 (course freshness) → 206.0; 4, 9 (setup writes) → 206.1; 5, 10 (money refresh, push delivery) → 206.2.
+
 ## 205.3.261013 — Security: two hand-made production tables without RLS; a live guard so it cannot recur
 
 **What Supabase found (2026-10-11).** Two public tables on production with Row-Level Security off: `course_id_pre_reconciliation_snapshot` and `course_id_reconciliation_tmp`. They were not created by any migration — they were made by the one-off course-id reconciliation run by hand on production before 177.20 (Aug 2026) and never dropped. Contents: course reference data only (ids, names, facilities, locations, provider ids, match notes) — no users, scores or emails. RLS was enabled on both on Oct 13 as an immediate fix.
