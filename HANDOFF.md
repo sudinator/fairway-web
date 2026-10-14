@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 205.2.261013
+## Current candidate: 205.3.261013
+
+- SECURITY RULE: no schema change on production outside a migration — one-off fixes included. A temporary table is created AND dropped in the same migration. The live parity check (every merge) and the nightly production-security workflow fail on any public table with RLS off or not in ci/public_tables.json. Adding a table = a migration + the list entry (the full chain enforces the list).
+
+## Previous: 205.2.261013
 
 - 0181: per-club round counts by rounds.group_id; per-account seen years; wording. Apply 0181 (after 0180) before the code.
 

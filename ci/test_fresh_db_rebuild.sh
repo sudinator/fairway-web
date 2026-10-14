@@ -91,6 +91,19 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-finish-game-clocks.sql"
 # 0180: Season Wrapped club aggregates and the Dec 31 notification.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-season-wrapped.sql"
 
+# 0182: every public table has RLS; and ci/public_tables.json lists EXACTLY the tables the migrations
+# create (the live parity check uses that list to catch tables made by hand on production).
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-security-posture.sql"
+psql "$DB_URL" -X -tA -c "select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p') order by 1" > /tmp/bnn_chain_tables.txt
+python3 - "$ROOT/ci/public_tables.json" /tmp/bnn_chain_tables.txt <<'PY'
+import json, sys
+listed = set(json.load(open(sys.argv[1]))["tables"]); chain = {l.strip() for l in open(sys.argv[2]) if l.strip()}
+if listed != chain:
+    print("ci/public_tables.json out of sync with the migrations:")
+    print("  created by migrations, not listed:", sorted(chain - listed)); print("  listed, not created:", sorted(listed - chain)); sys.exit(1)
+print(f"public table list: in sync ({len(chain)} tables)")
+PY
+
 # Reset fencing: real SQL outcomes plus separate-connection concurrency barriers.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-game-reset-fencing.sql"
 BNN_RESET_TEST_DATABASE_URL="$DB_URL" python3 "$ROOT/ci/test-game-reset-concurrency.py"
