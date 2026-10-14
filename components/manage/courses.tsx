@@ -143,13 +143,13 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   // carries the club name; apply goes through the one server function the New Round sheet also
   // uses. The 195.0 version listed only the active club's courses, so two of three flagged courses
   // were invisible on 2026-10-02.
-  type PendingReview = { course_id: string; course_name: string; club_name: string; group_id: string; provider_id: string | null; checked_at: string; diff: FreshnessDiff; api_data: Course | null; corrected: boolean };
+  type PendingReview = { revision: number; check_state?: string; course_id: string; course_name: string; club_name: string; group_id: string; provider_id: string | null; checked_at: string; diff: FreshnessDiff; api_data: Course | null; corrected: boolean };
   const [pendingReviews, setPendingReviews] = useState<PendingReview[] | null>(null);
   const loadPendingReviews = useCallback(async () => {
     try {
       const { data, error } = await supabase.rpc("pending_course_reviews");
       if (error) { setPendingReviews([]); return; }
-      setPendingReviews(((data || []) as any[]).filter((r) => r.diff?.tees?.length).map((r) => ({ ...r, diff: r.diff as FreshnessDiff, api_data: (r.api_data as Course) || null })));
+      setPendingReviews(((data || []) as any[]).filter((r) => r.diff?.hasChanges).map((r) => ({ ...r, diff: r.diff as FreshnessDiff, api_data: (r.api_data as Course) || null })));
     } catch { setPendingReviews([]); }
   }, []);
   useEffect(() => { void loadPendingReviews(); }, [loadPendingReviews, groupCourses]);
@@ -157,7 +157,8 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   const applyPendingReview = async (r: PendingReview) => {
     if (!confirm(`Update "${r.course_name}" (${r.club_name}) with the GolfCourseAPI data for everyone?${r.corrected ? "\n\nThis course carries hand corrections (par, stroke index or tee edits). Updating replaces the whole stored record with the provider's version; those corrections will be lost." : ""}`)) return;
     setBusyId(r.course_id); setMsg(null);
-    const { error } = await supabase.rpc("apply_course_freshness", { p_course_id: r.course_id });
+    // Approve exactly the revision on screen (0183): refused if re-checked or edited since.
+    const { error } = await supabase.rpc("apply_course_freshness", { p_course_id: r.course_id, p_revision: r.revision });
     if (error) { setBusyId(null); setMsg(`Couldn't update "${r.course_name}": ${error.message}`); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_api_update_applied", group_id: r.group_id, summary: `Applied GolfCourseAPI changes to "${r.course_name}"` });
     setBusyId(null);

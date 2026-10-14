@@ -19,4 +19,14 @@ eq(wrappedYearOn(new Date(2027, 0, 20)), 2026, "January keeps last year open");
 eq(wrappedYearOn(new Date(2026, 11, 30)), null, "Dec 30: not yet");
 eq(lookbackYears(["2025-06-01", "2026-05-01"], new Date(2026, 9, 13)).join(","), "2025", "mid-season: only finished seasons");
 eq(lookbackYears(["2025-06-01", "2026-05-01"], new Date(2026, 11, 31)).join(","), "2026,2025", "Dec 31: this season too, newest first");
+// Finding 8: a completed win against a GUEST (no user_id; pairings use the row id) counts.
+{
+  const guestGame = { ...g("g3", Array(18).fill(4), Array(18).fill(5)), pairings: [{ a: "me", b: "row-guest" }],
+    players: [{ user_id: "me", display_name: "Me", scores: Array(18).fill(4), course_handicap: 10, course_handicap_source: "manual" },
+              { id: "row-guest", user_id: null, display_name: "Guest Gary", scores: Array(18).fill(5), course_handicap: 10, course_handicap_source: "manual" }] };
+  const rg = seasonMatches([guestGame as any], "me");
+  eq(rg.matches.length, 1, "a match against a guest is counted");
+  eq(rg.matches[0].opponent, "Guest Gary", "guest named as the opponent");
+  eq(rg.playedWith[0]?.name, "Guest Gary", "guests count in played-with");
+}
 console.log("season-matches tests passed");

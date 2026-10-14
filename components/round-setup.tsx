@@ -339,7 +339,8 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
     // (0167) authorises (app admin or admin of the owning club) and writes the recorded provider
     // data. The former client-side table UPDATE was allowed by RLS only to the app admin and
     // failed silently for every other club admin.
-    const { error } = await supabase.rpc("apply_course_freshness", { p_course_id: loadedFavId });
+    if (freshness.revision == null) { notifyError("Re-check the course before updating it."); return; }
+    const { error } = await supabase.rpc("apply_course_freshness", { p_course_id: loadedFavId, p_revision: freshness.revision });
     if (error) { notifyError(`Couldn't update the stored course: ${error.message}`); return; }
     playWithFresh(freshness.apiCourse, true);
     setFreshness(null);

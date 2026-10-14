@@ -13,7 +13,7 @@ export type SeasonGame = {
   team_score_mode?: string | null; holes_meta: any[];
   pairings?: { a: string; b: string }[] | null;
   foursomes?: { a: string[]; b: string[]; swap?: boolean }[] | null;
-  players: { user_id: string | null; display_name: string; scores: (number | null)[] | null; course_handicap?: number | null;
+  players: { id?: string; user_id: string | null; display_name: string; scores: (number | null)[] | null; course_handicap?: number | null;
     handicap_index?: number | null; slope?: number | null; rating?: number | null; course_handicap_source?: string | null }[];
 };
 export type SeasonMatch = { opponent: string; result: "won" | "lost" | "halved"; played_at: string };
@@ -24,9 +24,13 @@ export function seasonMatches(games: SeasonGame[], me: string): { matches: Seaso
   const outcome = (lead: number): SeasonMatch["result"] => (lead > 0 ? "won" : lead < 0 ? "lost" : "halved");
   for (const g of games) {
     const players = g.players || [];
+    // Player identity, as everywhere else in the app (pairings and foursomes store user_id for members
+    // and the game_players row id for guests): key = user_id ?? id. Keying on user_id alone dropped
+    // every match against a guest (review finding 8, 205.4).
+    const key = (p: (typeof players)[number]) => p.user_id ?? p.id ?? "";
     if (!players.some((p) => p.user_id === me)) continue;
-    for (const p of players) if (p.user_id && p.user_id !== me) shared.set(p.display_name, (shared.get(p.display_name) || 0) + 1);
-    const pOf = (uid: string) => players.find((p) => p.user_id === uid);
+    for (const p of players) if (key(p) && p.user_id !== me) shared.set(p.display_name, (shared.get(p.display_name) || 0) + 1);
+    const pOf = (k: string) => players.find((p) => key(p) === k);
     const ch = (p: any) => chBasis(p, g.course_par ?? undefined, g.holes_meta?.length);
     if (g.game_type === "match") {
       for (const pr of g.pairings || []) {
@@ -40,7 +44,7 @@ export function seasonMatches(games: SeasonGame[], me: string): { matches: Seaso
     if (g.game_type === "trifecta") {
       for (const f of g.foursomes || []) {
         if (!f.a.includes(me) && !f.b.includes(me)) continue;
-        const ms = [...f.a, ...f.b].map((uid) => pOf(uid)).filter((p): p is NonNullable<typeof p> => !!p).map((p) => ({ id: p.user_id as string, ch: ch(p), gross: p.scores || [] }));
+        const ms = [...f.a, ...f.b].map((uid) => pOf(uid)).filter((p): p is NonNullable<typeof p> => !!p).map((p) => ({ id: key(p), ch: ch(p), gross: p.scores || [] }));
         const r = computeTrifecta(g.holes_meta, ms, f.a, f.b, g.allowance_pct ?? 100, g.team_score_mode === "aggregate" ? "aggregate" : "best_ball", !!f.swap);
         const iAmA = f.a.includes(me);
         for (const c of r.contests) {

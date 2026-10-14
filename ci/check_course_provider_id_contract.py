@@ -10,7 +10,9 @@ helper_test = (root / "lib/course-provider-id.test.ts").read_text(encoding="utf-
 checks = {
     "detail endpoint validates opaque provider id": "normalizeCourseProviderId(id)" in route,
     "search endpoint normalizes returned provider id": "normalizeCourseProviderId(c.id)" in route,
-    "detail endpoint URL-encodes provider id": "courses/${encodeURIComponent(providerId)}" in route,
+    # 206.0: the detail fetch lives in lib/provider-course.ts (shared with /api/courses/freshness).
+    "detail endpoint URL-encodes provider id": "courses/${encodeURIComponent(providerId)}" in (root / "lib/provider-course.ts").read_text(encoding="utf-8") and "fetchProviderCourse(id)" in route,
+    "shared provider fetch validates the id": "normalizeCourseProviderId(rawId)" in (root / "lib/provider-course.ts").read_text(encoding="utf-8"),
     "numeric-only course id validation removed": r"/^\\d{1,12}$/" not in route and r"/^\\d+$/" not in manage,
     "manage course search ids are strings": "useState<{ id: string; name: string; location: string }[] | null>" in manage,
     "round setup search ids are strings": "useState<{ id: string; club?: string; name: string; location: string }[] | null>" in round_setup,

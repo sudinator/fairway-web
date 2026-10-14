@@ -1280,7 +1280,10 @@ function AdminCourseData({ onOpenCourses }: { onOpenCourses?: () => void }) {
     try {
       const { data: fc } = await supabase.from("favorite_courses").select("data").eq("id", r.course_id).maybeSingle();
       const res = await checkCourseFreshness(supabase, { courseId: r.course_id, externalId: r.provider_id, stored: (fc?.data as Course) || ({ name: r.course_name, tees: [], holes: [] } as unknown as Course), force: true });
-      if (res.checkState !== "ok") say(r.course_id, "The provider did not answer — see the attempt log below.");
+      // 206.0 (finding 6): say what actually happened.
+      if (res.checkState === "provider_error" || res.checkState === "failed") say(r.course_id, `The provider did not answer${res.error ? ` (${res.error})` : ""} — see the attempt log below.`);
+      else if (res.checkState === "incomplete") say(r.course_id, `The provider's data is incomplete — nothing to apply: ${(res.problems || []).slice(0, 3).join("; ")}${(res.problems || []).length > 3 ? "…" : ""}`);
+      else if (res.checkState === "not_saved") say(r.course_id, `Compared, but the result couldn't be saved${res.error ? ` (${res.error})` : ""}.`);
       else say(r.course_id, res.hasChanges ? `Provider data differs (${res.status}) — review below.` : "Verified: stored data matches the provider.");
       await logActivity(supabase, { actor_id: (await supabase.auth.getUser()).data.user?.id || "", actor_name: "admin", action: "course_api_manual_refresh", group_id: null, summary: `Manual GolfCourseAPI refresh for "${r.course_name}"` });
     } finally {
@@ -1290,15 +1293,18 @@ function AdminCourseData({ onOpenCourses }: { onOpenCourses?: () => void }) {
   const openDetails = async (r: AdminCourseRow, keepOpen = false) => {
     if (open[r.course_id] && !keepOpen) { setOpen((o) => { const n = { ...o }; delete n[r.course_id]; return n; }); return; }
     const [{ data: cf }, { data: log }] = await Promise.all([
-      supabase.from("course_freshness").select("diff, has_changes, status").eq("course_id", r.course_id).maybeSingle(),
+      supabase.from("course_freshness").select("diff, has_changes, status, revision").eq("course_id", r.course_id).maybeSingle(),
       r.provider_id ? supabase.rpc("admin_course_check_log", { p_provider_id: r.provider_id, p_limit: 20 }) : Promise.resolve({ data: [] as CheckLogRow[] }),
     ]);
-    setOpen((o) => ({ ...o, [r.course_id]: { diff: cf?.has_changes && cf?.diff?.tees?.length ? (cf.diff as FreshnessDiff) : null, log: (log || []) as CheckLogRow[] } }));
+    // The revision shown here is the one an approval applies (0183): what the admin saw, nothing newer.
+    setOpen((o) => ({ ...o, [r.course_id]: { diff: cf?.has_changes && (cf?.diff as any)?.hasChanges ? (cf.diff as FreshnessDiff) : null, log: (log || []) as CheckLogRow[], revision: (cf as any)?.revision ?? null } }));
   };
   const apply = async (r: AdminCourseRow) => {
     if (!confirm(`Update "${r.course_name}" with the GolfCourseAPI data for everyone?${r.corrected ? "\n\nThis course carries hand corrections; updating replaces the whole stored record with the provider's version." : ""}`)) return;
     setBusy(r.course_id);
-    const { error } = await supabase.rpc("apply_course_freshness", { p_course_id: r.course_id });
+    const revision = (open[r.course_id] as any)?.revision;
+    if (revision == null) { setBusy(null); say(r.course_id, "Open the details and review the changes before applying."); return; }
+    const { error } = await supabase.rpc("apply_course_freshness", { p_course_id: r.course_id, p_revision: revision });
     say(r.course_id, error ? `Couldn't update: ${error.message}` : "Stored course now matches the provider.");
     setBusy(null); await load(); await openDetails(r, true);
   };

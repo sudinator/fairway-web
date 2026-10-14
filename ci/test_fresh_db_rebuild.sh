@@ -94,6 +94,12 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-season-wrapped.sql"
 # 0182: every public table has RLS; and ci/public_tables.json lists EXACTLY the tables the migrations
 # create (the live parity check uses that list to catch tables made by hand on production).
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-security-posture.sql"
+
+# 0183: course freshness — no browser-supplied data; approve an exact revision of an unchanged course.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-course-freshness-integrity.sql"
+
+# 0184: teams, groups and foursomes apply together or not at all.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-game-structure-atomic.sql"
 psql "$DB_URL" -X -tA -c "select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p') order by 1" > /tmp/bnn_chain_tables.txt
 python3 - "$ROOT/ci/public_tables.json" /tmp/bnn_chain_tables.txt <<'PY'
 import json, sys

@@ -1,3 +1,15 @@
+## 206.1.261013 — Money refresh, atomic team balancing, honest push delivery, ordered team-name saves (review findings 5, 4, 10, 9)
+
+**5 — A failed money refresh showed wrong balances (High).** Every money query treated an error as "no rows". Now the balance-critical set (expenses, shares, payers, settlements, allocations) is all-or-nothing: if any fails, nothing on screen is replaced, a notice says the figures are from the last complete refresh (with Retry), and every money action is blocked by the one write gate until a complete refresh succeeds. `lib/money-refresh-render.test.tsx` mounts the real Money screen with the network intercepted: on the ORIGINAL code one failed settlements refresh shows "Amit Sud (you) owes $45 · Karan Sarin is owed $45" for a debt already settled, with no warning; on the fix the settled balances stay, the notice shows, settling is paused, and a good refresh clears it.
+
+## 206.0.261013 — Course freshness: server-side checks, approval of an exact revision, full comparison (review findings 1, 2, 3, 6)
+
+**1 — "API data" could be supplied by an ordinary member (High).** The browser fetched the provider, computed the comparison and handed both to `record_course_freshness`; an admin's approval then wrote that payload into the shared course. That function is REMOVED (0183). The browser now sends only a course id to `POST /api/courses/freshness`; the server reads the stored course, fetches GolfCourseAPI with its own key (`lib/provider-course.ts`, also used by `/api/courses`), validates, compares, and records through `record_course_freshness_checked` — service role only, with the member's club membership verified inside the database.
+
+## 205.4.261013 — Season Wrapped: "seen" actually saved; matches against guests counted (review findings 7, 8)
+
+**Finding 7 — opening a summary did not persist "seen".** `void createClient().rpc(...)` discarded a lazy Supabase request builder, so no request was ever sent: the banner returned on reopening and on other devices. Now awaited (`markSeasonSeen`), and "seen" is recorded locally only once the server confirms it. `lib/season-seen-request.test.ts` counts real network calls: the old pattern sends 0, the fix sends exactly 1.
+
 ## 205.3.261013 — Security: two hand-made production tables without RLS; a live guard so it cannot recur
 
 **What Supabase found (2026-10-11).** Two public tables on production with Row-Level Security off: `course_id_pre_reconciliation_snapshot` and `course_id_reconciliation_tmp`. They were not created by any migration — they were made by the one-off course-id reconciliation run by hand on production before 177.20 (Aug 2026) and never dropped. Contents: course reference data only (ids, names, facilities, locations, provider ids, match notes) — no users, scores or emails. RLS was enabled on both on Oct 13 as an immediate fix.

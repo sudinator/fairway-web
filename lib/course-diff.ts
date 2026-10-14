@@ -195,14 +195,47 @@ export type TeeFreshness = {
   slopeFrom: number | null; slopeTo: number | null; slopeChanged: boolean;
   yardageChanges: { hole: number; from: number | null; to: number | null }[];
 };
-export type FreshnessDiff = { hasChanges: boolean; tees: TeeFreshness[] };
+/** 206.0 (review finding 3): the comparison also covers tees added / removed by the provider and
+ *  hole par and stroke-index changes — 205.x compared only rating, slope and yardages of tees whose
+ *  names matched, so all three read as "unchanged". */
+export type FreshnessDiff = {
+  hasChanges: boolean;
+  tees: TeeFreshness[];
+  teesAdded?: string[];
+  teesRemoved?: string[];
+  holeChanges?: { hole: number; parFrom: number | null; parTo: number | null; siFrom: number | null; siTo: number | null }[];
+};
+
+/** Is a provider course complete enough to compare and apply? Returns the problems (empty = complete).
+ *  An incomplete response is its own outcome — never "unchanged" and never applicable. */
+export function validateProviderCourse(api: Course | null | undefined): string[] {
+  const out: string[] = [];
+  if (!api) return ["no course in the provider's response"];
+  const holes = api.holes || [];
+  if (holes.length !== 18 && holes.length !== 9) out.push(`expected 9 or 18 holes, got ${holes.length}`);
+  holes.forEach((h, i) => {
+    if (!(Number(h.par) >= 3 && Number(h.par) <= 6)) out.push(`hole ${h.n ?? i + 1}: no valid par`);
+    if (h.si == null || !(Number(h.si) >= 1 && Number(h.si) <= 18)) out.push(`hole ${h.n ?? i + 1}: no stroke index`);
+  });
+  const tees = api.tees || [];
+  if (!tees.length) out.push("no tees");
+  for (const t of tees) {
+    if (!normalizeText(t.name)) out.push("a tee with no name");
+    if (!(Number(t.rating) > 50 && Number(t.rating) < 90)) out.push(`tee ${t.name || "?"}: no valid course rating`);
+    if (!(Number(t.slope) >= 55 && Number(t.slope) <= 155)) out.push(`tee ${t.name || "?"}: no valid slope`);
+  }
+  return out;
+}
+
+const teeKey = (n: any) => normalizeText(n).toLowerCase();
 
 export function buildFreshnessDiff(stored: Course, api: Course): FreshnessDiff {
   const out: TeeFreshness[] = [];
   let hasChanges = false;
-  for (const st of stored.tees || []) {
-    const at = (api.tees || []).find((t) => normalizeText(t.name).toLowerCase() === normalizeText(st.name).toLowerCase());
-    if (!at) continue; // no matching tee in the API payload — nothing to compare
+  const apiTees = api.tees || [], storedTees = stored.tees || [];
+  for (const st of storedTees) {
+    const at = apiTees.find((t) => teeKey(t.name) === teeKey(st.name));
+    if (!at) continue; // reported below as removed
     const ratingChanged = !sameValue(st.rating, at.rating);
     const slopeChanged = !sameValue(st.slope, at.slope);
     const yardageChanges: { hole: number; from: number | null; to: number | null }[] = [];
@@ -214,15 +247,21 @@ export function buildFreshnessDiff(stored: Course, api: Course): FreshnessDiff {
     }
     if (ratingChanged || slopeChanged || yardageChanges.length) {
       hasChanges = true;
-      out.push({
-        name: st.name,
-        ratingFrom: st.rating ?? null, ratingTo: at.rating ?? null, ratingChanged,
-        slopeFrom: st.slope ?? null, slopeTo: at.slope ?? null, slopeChanged,
-        yardageChanges,
-      });
+      out.push({ name: st.name, ratingFrom: st.rating ?? null, ratingTo: at.rating ?? null, ratingChanged,
+        slopeFrom: st.slope ?? null, slopeTo: at.slope ?? null, slopeChanged, yardageChanges });
     }
   }
-  return { hasChanges, tees: out };
+  const teesAdded = apiTees.filter((t) => !storedTees.some((s2) => teeKey(s2.name) === teeKey(t.name))).map((t) => t.name);
+  const teesRemoved = storedTees.filter((s2) => !apiTees.some((t) => teeKey(t.name) === teeKey(s2.name))).map((t) => t.name);
+  const holeChanges: NonNullable<FreshnessDiff["holeChanges"]> = [];
+  const nh = Math.max(stored.holes?.length || 0, api.holes?.length || 0);
+  for (let i = 0; i < nh; i++) {
+    const a = stored.holes?.[i], b = api.holes?.[i];
+    const parFrom = a?.par ?? null, parTo = b?.par ?? null, siFrom = a?.si ?? null, siTo = b?.si ?? null;
+    if (!sameValue(parFrom, parTo) || !sameValue(siFrom, siTo)) holeChanges.push({ hole: i + 1, parFrom, parTo, siFrom, siTo });
+  }
+  if (teesAdded.length || teesRemoved.length || holeChanges.length) hasChanges = true;
+  return { hasChanges, tees: out, teesAdded, teesRemoved, holeChanges };
 }
 
 // Apply the API's fresh yardages (and, if asked, rating/slope) onto a stored course, returning a

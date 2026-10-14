@@ -1,62 +1,46 @@
-import { buildFreshnessDiff, type FreshnessDiff } from "@/lib/course-diff";
+import type { FreshnessDiff } from "@/lib/course-diff";
 import type { Course } from "@/lib/courses";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
+// 206.0 (review findings 1, 6): the browser no longer fetches, compares or records provider data.
+// It asks the server (/api/courses/freshness), which does all three with its own key and records
+// through a service-role-only function. The result says what actually happened.
 export type FreshnessResult = {
   hasChanges: boolean;
   diff: FreshnessDiff | null;
   apiCourse: Course | null;
   status: string; // none | pending | dismissed | applied
-  checkState: "ok" | "failed";
+  /** ok: compared and saved · incomplete: provider data missing tees/pars/SI/ratings — nothing to
+   *  apply · provider_error: provider not reached · not_saved: compared but not recorded · failed: no answer */
+  checkState: "ok" | "incomplete" | "provider_error" | "not_saved" | "failed";
+  /** The recorded check's revision — what an admin approves (apply_course_freshness). */
+  revision: number | null;
+  saved: boolean;
+  problems?: string[];
+  error?: string;
 };
 
-const FAILED: FreshnessResult = { hasChanges: false, diff: null, apiCourse: null, status: "none", checkState: "failed" };
+const FAILED: FreshnessResult = { hasChanges: false, diff: null, apiCourse: null, status: "none", checkState: "failed", revision: null, saved: false };
 
-// Daily-throttled upstream freshness check for ONE saved library course. Reads the cached result
-// first; only if it's stale (>24h) or absent does it hit the API, diff, and record the result
-// (which also flags admins on a newly-detected change). Best-effort: any failure returns NONE, so
-// this never blocks starting a round.
+// Daily-throttled freshness check for ONE saved library course (the server caches for 24h unless
+// `force`). Never throws: a failure returns checkState "failed", so it never blocks starting a round.
 export async function checkCourseFreshness(
-  supabase: any,
-  opts: { courseId: string; externalId: string; stored: Course; force?: boolean },
+  _supabase: unknown,
+  opts: { courseId: string; externalId?: string; stored?: Course; force?: boolean },
 ): Promise<FreshnessResult> {
-  // force: skip the 24-hour cache (an admin pressing "Refresh from API now"; one provider request).
-  const { courseId, externalId, stored, force = false } = opts;
   try {
-    const { data: row } = await supabase
-      .from("course_freshness")
-      .select("checked_at, api_data, diff, has_changes, status")
-      .eq("course_id", courseId)
-      .maybeSingle();
-
-    const cached = !force && row?.checked_at && Date.now() - new Date(row.checked_at).getTime() < DAY_MS;
-    if (cached) {
-      return { hasChanges: !!row.has_changes, diff: row.diff || null, apiCourse: row.api_data || null, status: row.status || "none", checkState: "ok" };
-    }
-
-    const res = await fetch(`/api/courses?id=${encodeURIComponent(externalId)}`);
-    if (!res.ok) return FAILED;
-    const data = await res.json();
-    const apiCourse: Course | null = data.course || null;
-    if (!apiCourse) return FAILED;
-
-    const diff = buildFreshnessDiff(stored, apiCourse);
-    // Group ownership is derived SERVER-SIDE by the RPC from the course row (0125) — the client
-    // no longer passes a group id anywhere privileged.
-    await supabase.rpc("record_course_freshness", {
-      p_course_id: courseId, p_api_data: apiCourse, p_diff: diff, p_has_changes: diff.hasChanges,
-    }).then(() => {}, () => {});
-
-    // The RPC PRESERVES an admin's prior dismissed/applied decision — read the resulting status
-    // back rather than assuming "pending", so a dismissal survives the daily re-check.
-    let status = diff.hasChanges ? "pending" : "none";
-    try {
-      const { data: after } = await supabase.from("course_freshness").select("status").eq("course_id", courseId).maybeSingle();
-      if (after?.status) status = after.status;
-    } catch { /* keep the computed fallback */ }
-
-    return { hasChanges: diff.hasChanges, diff: diff.hasChanges ? diff : null, apiCourse, status, checkState: "ok" };
+    const res = await fetch("/api/courses/freshness", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ courseId: opts.courseId, force: !!opts.force }),
+    });
+    const j = await res.json().catch(() => null);
+    if (!j || typeof j !== "object") return FAILED;
+    if (!res.ok && !("checkState" in j)) return { ...FAILED, error: (j as any).error || `HTTP ${res.status}` };
+    const d = (j.diff || null) as FreshnessDiff | null;
+    return {
+      hasChanges: !!j.hasChanges, diff: j.hasChanges ? d : null, apiCourse: (j.apiCourse as Course) || null,
+      status: j.status || "none", checkState: j.checkState || "failed", revision: j.revision ?? null, saved: !!j.saved,
+      problems: j.problems, error: j.error,
+    };
   } catch {
     return FAILED;
   }

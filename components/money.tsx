@@ -28,6 +28,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
   const [screen, setScreen] = useState<"balances" | "add" | "settle" | "log" | "untangle">(initialTab ?? "balances");
   const [deletedExpenses, setDeletedExpenses] = useState<ExpenseRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [guests, setGuests] = useState<GuestRow[]>([]);
   const [expenses, setExpenses] = useState<ExpenseRow[]>([]);
@@ -64,31 +65,43 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
       profs = p2 || [];
     }
     const { data: gRows } = await supabase.from("group_guests").select("id, name, sponsor_user_id, group_id, archived, became_member_id, source_game_id, created_by").eq("group_id", gid);
-    const { data: exp } = await supabase.from("expenses").select("*").eq("group_id", gid).is("deleted_at", null).order("created_at", { ascending: false });
-    const { data: delExp } = await supabase.from("expenses").select("*").eq("group_id", gid).not("deleted_at", "is", null).order("created_at", { ascending: false });
-    setDeletedExpenses((delExp || []) as ExpenseRow[]);
+    // 206.1 (review finding 5): a failed query is NOT "no rows". Every balance-critical query must
+    // succeed, or nothing on screen is replaced — the last complete figures stay, a notice says the
+    // refresh failed, and settling is blocked (requireOnline) until a complete refresh succeeds.
+    const { data: exp, error: expErr } = await supabase.from("expenses").select("*").eq("group_id", gid).is("deleted_at", null).order("created_at", { ascending: false });
+    const { data: delExp, error: delErr } = await supabase.from("expenses").select("*").eq("group_id", gid).not("deleted_at", "is", null).order("created_at", { ascending: false });
     const expIds = (exp || []).map((e: any) => e.id);
-    const { data: sh } = expIds.length
+    const { data: sh, error: shErr } = expIds.length
       ? await supabase.from("expense_shares").select("*").in("expense_id", expIds)
-      : { data: [] as any[] };
-    const { data: py } = expIds.length
+      : { data: [] as any[], error: null };
+    const { data: py, error: pyErr } = expIds.length
       ? await supabase.from("expense_payers").select("*").in("expense_id", expIds)
-      : { data: [] as any[] };
-    const { data: setl } = await supabase.from("settlements").select("*").eq("group_id", gid);
-    const { data: alloc } = await supabase.from("settlement_allocations").select("settlement_id, expense_id, amount_cents").eq("group_id", gid);
-    const { data: act } = await supabase.from("group_activity").select("*").eq("group_id", gid).not("action", "like", "tt%").order("created_at", { ascending: false }).limit(200);
-    const { data: aud } = await supabase.from("money_audit").select("id, expense_id, actor_id, action, snapshot, created_at").eq("group_id", gid).order("created_at", { ascending: true }).limit(1000);
-    const { data: evs } = await supabase.from("group_events").select("*").eq("group_id", gid).order("created_at", { ascending: false });
+      : { data: [] as any[], error: null };
+    const { data: setl, error: setlErr } = await supabase.from("settlements").select("*").eq("group_id", gid);
+    const { data: alloc, error: allocErr } = await supabase.from("settlement_allocations").select("settlement_id, expense_id, amount_cents").eq("group_id", gid);
+    const balanceErr = expErr || shErr || pyErr || setlErr || allocErr;
+    if (balanceErr) {
+      setLoadError("Couldn't refresh the money ledger — showing the last complete figures. Settling is paused until it refreshes.");
+      setLoading(false);
+      return;
+    }
+    if (!delErr) setDeletedExpenses((delExp || []) as ExpenseRow[]);
+    const { data: act, error: actErr } = await supabase.from("group_activity").select("*").eq("group_id", gid).not("action", "like", "tt%").order("created_at", { ascending: false }).limit(200);
+    const { data: aud, error: audErr } = await supabase.from("money_audit").select("id, expense_id, actor_id, action, snapshot, created_at").eq("group_id", gid).order("created_at", { ascending: true }).limit(1000);
+    const { data: evs, error: evsErr } = await supabase.from("group_events").select("*").eq("group_id", gid).order("created_at", { ascending: false });
     setMembers((profs || []).map((p: any) => ({ id: p.id, display_name: p.display_name || "Player", avatar_url: p.avatar_url, venmo_handle: p.venmo_handle, paypal_handle: p.paypal_handle, zelle_handle: p.zelle_handle, phone: p.phone })).sort((a, b) => a.display_name.localeCompare(b.display_name, undefined, { sensitivity: "base" })));
     setGuests(((gRows || []) as GuestRow[]).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })));
+    // All balance-critical data arrived: replace it together.
     setExpenses((exp || []) as ExpenseRow[]);
     setShares((sh || []) as ShareRow[]);
     setSettlements((setl || []) as SettlementRow[]);
     setAllocations((alloc || []) as any[]);
     setPayers((py || []) as PayerRow[]);
-    setActivity((act || []) as any[]);
-    setAuditRows((aud || []) as AuditRow[]);
-    setEvents((evs || []) as EventRow[]);
+    // History panels: keep what is shown if their refresh failed.
+    if (!actErr) setActivity((act || []) as any[]);
+    if (!audErr) setAuditRows((aud || []) as AuditRow[]);
+    if (!evsErr) setEvents((evs || []) as EventRow[]);
+    setLoadError(null);
     setLoading(false);
     onChanged?.();
   }, [gid, onChanged]);
@@ -129,8 +142,10 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
   }, [events, expenses, shares, confirmedSettlements, guests, payers]);
 
   const nameOf = (uid: string) => memberById[uid]?.display_name || "Player";
+  // The ONE gate before any money write: online, and the ledger on screen is complete (206.1).
   const requireOnline = () => {
     if (typeof navigator !== "undefined" && navigator.onLine === false) { alert("You're offline — connect to update the money ledger."); return false; }
+    if (loadError) { alert("The money ledger didn't refresh completely, so balances may be out of date. Pull to refresh, then try again."); void load(); return false; }
     return true;
   };
 
@@ -318,6 +333,12 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
 
   return (
     <div style={{ maxWidth: 520, margin: "0 auto", padding: "0 14px" }}>
+      {loadError && (
+        <div data-money-stale role="alert" style={{ background: C.greenLight, border: `1px solid ${C.gold}`, borderRadius: 12, padding: "8px 12px", marginBottom: 12, display: "flex", gap: 10, alignItems: "center" }}>
+          <span style={{ color: C.cream, fontSize: 13, flex: 1 }}>{loadError}</span>
+          <button type="button" onClick={() => void load()} style={{ background: "transparent", border: `1px solid ${C.gold}`, color: C.gold, borderRadius: 999, padding: "8px 12px", fontSize: 12, fontWeight: 700 }}>Retry</button>
+        </div>
+      )}
       {/* screen switch */}
       <div style={{ display: "flex", background: "#123528", borderRadius: 999, padding: 3, marginBottom: 12 }}>
         {([["balances", "Balances"], ["add", "Add"], ["settle", "Settle"], ["log", "Activity"]] as const).map(([k, label]) => (

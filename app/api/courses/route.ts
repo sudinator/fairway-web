@@ -3,6 +3,7 @@ import { createRouteClient } from "@/lib/supabase-route";
 import { BoundedTtlCache } from "@/lib/ttl-cache";
 import { normalizeCourseProviderId } from "@/lib/course-provider-id";
 import { normalizeCourse, courseLocation } from "@/lib/course-normalize";
+import { fetchProviderCourse } from "@/lib/provider-course";
 
 const COURSE_TIMEOUT_MS = 8000;
 const MIN_QUERY_LEN = 3;
@@ -87,12 +88,12 @@ export async function GET(request: Request) {
   try {
     // ---- Detail mode ----
     if (id) {
-      const providerId = normalizeCourseProviderId(id);
-      if (!providerId) return NextResponse.json({ error: "Invalid course id." }, { status: 400 });
-      const res = await fetch(`${BASE}/courses/${encodeURIComponent(providerId)}`, { headers, signal: AbortSignal.timeout(COURSE_TIMEOUT_MS) });
-      if (!res.ok) throw Object.assign(new Error(`Course lookup failed (${res.status})`), { upstream: res.status });
-      const data = await res.json();
-      const course = normalizeCourse(data.course || data);
+      // One provider fetch for the app (lib/provider-course) — freshness checks use the same one.
+      const fetched = await fetchProviderCourse(id);
+      if (!fetched.ok && fetched.status === 400) return NextResponse.json({ error: fetched.error }, { status: 400 });
+      if (!fetched.ok) throw Object.assign(new Error(fetched.error), { upstream: fetched.status });
+      const providerId = fetched.providerId;
+      const course = fetched.course;
       // A successful lookup IS a verification of this course, so record it. The contract monitor
       // skips anything checked within seven days, which means ordinary app traffic REDUCES what the
       // monitor has to do rather than competing with it for the provider's 35 requests a day (0156).

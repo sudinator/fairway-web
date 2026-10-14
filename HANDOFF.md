@@ -6,7 +6,23 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 205.3.261013
+## Current candidate: 206.1.261013
+
+- RULES: a query error is never "no rows" (money: all-or-nothing, last good data kept); multi-row game setup writes go through apply_game_structure (one transaction); autosaves use lib/latest-saver; the push sender distinguishes lookup / permanent / retryable and retries only undelivered devices.
+- External review of Oct 13: all 10 findings addressed (205.4, 206.0, 206.1).
+
+## Previous: 206.0.261013
+
+- RULE: provider (GolfCourseAPI) data is fetched, validated and compared on the SERVER only; the browser names a course, never supplies its content. Approvals name the reviewed revision.
+- Known stale: ci/test-notifications-isolated.sh (manual, not in CI) applies only 0165 and has failed on game-added wording since 0174; the full-chain assert-notifications.sql is authoritative.
+- Review remaining: 4, 9 → 206.1; 5, 10 → 206.2.
+
+## Previous: 205.4.261013
+
+- RULE: a Supabase request is lazy — never `void client.rpc()/from()`; await it and handle the error.
+- External review (Oct 13), 10 findings: 7, 8 fixed here; 1, 2, 3, 6 → 206.0; 4, 9 → 206.1; 5, 10 → 206.2.
+
+## Previous: 205.3.261013
 
 - SECURITY RULE: no schema change on production outside a migration — one-off fixes included. A temporary table is created AND dropped in the same migration. The live parity check (every merge) and the nightly production-security workflow fail on any public table with RLS off or not in ci/public_tables.json. Adding a table = a migration + the list entry (the full chain enforces the list).
 
