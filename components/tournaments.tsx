@@ -2449,12 +2449,19 @@ function GameRoom({
     if (r.unrated.length) return { changed: 0, summary: "", unrated: r.unrated };
     if (!r.assignments.length) return { changed: 0, summary: balanceSummary(r), unrated: [] };
     if (!confirm(`Balance teams by playing handicap?\n\n${balanceSummary(r)}\n\n${r.assignments.length} player${r.assignments.length === 1 ? "" : "s"} will move${locked.size ? `; ${locked.size} with scores stay put` : ""}.`)) return null;
-    for (const a of r.assignments) {
-      await supabase.from("game_players").update({ team: a.team }).eq("id", a.id);
-    }
+    // 206.1 (review finding 4): teams AND the foursomes built from them are saved in ONE transaction
+    // (apply_game_structure, 0184) — never player by player with failures ignored.
     const nextPlayers = players.map((x) => { const a = r.assignments.find((y) => y.id === x.id); return a ? { ...x, team: a.team } : x; });
-    setPlayers(nextPlayers);
-    await syncTeamPlayFoursomes(nextPlayers);
+    const teamFormat = Array.isArray(game.teams) && game.teams.length === 2 && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta");
+    const foursomes = teamFormat ? deriveTeamFoursomesFromGroups(nextPlayers, game.teams!, game.foursomes) : null;
+    const { error } = await supabase.rpc("apply_game_structure", {
+      p_game: game.id, p_teams: r.assignments.map((a) => ({ player: a.id, team: a.team })), p_groups: [], p_foursomes: foursomes,
+    });
+    if (error) {
+      notifyError(`Couldn't balance the teams — nothing was changed. ${error.message}`);
+      await load();
+      return null;
+    }
     await load();
     return { changed: r.assignments.length, summary: balanceSummary(r), unrated: r.unrated };
   };
@@ -2585,8 +2592,6 @@ function GameRoom({
     setRandomizing(true);
     try {
       const payload = [...result.assignments.map((a) => ({ player: a.playerId, group: a.group })), ...overflow.map((id) => ({ player: id, group: null }))];
-      const { error } = await supabase.rpc("set_tee_groups", { p_game: game.id, p_assignments: payload });
-      if (error) throw error;
       const nextPlayers = players.map((p) => p.no_show ? p : ({ ...p, tee_group: overflow.includes(p.id) ? null : (byId.get(p.id) ?? null) }));
       const built = deriveTeamFoursomesFromGroups(nextPlayers, game.teams, game.foursomes);
       // Trifecta: order each foursome's singles strong v strong. Derived sides are in roster order;
@@ -2601,11 +2606,12 @@ function GameRoom({
             return { ...f, swap: aStrongFirst !== bStrongFirst };
           })
         : built;
-      const { error: fErr } = await supabase.from("games").update({ foursomes: next }).eq("id", game.id);
+      // 206.1 (finding 4): groups and foursomes in ONE transaction (apply_game_structure, 0184).
+      const { error: fErr } = await supabase.rpc("apply_game_structure", { p_game: game.id, p_teams: [], p_groups: payload, p_foursomes: next });
       if (fErr) throw fErr;
       setGame({ ...game, foursomes: next });
     } catch {
-      notifyError("Couldn't save the balanced matchups — please try again.");
+      notifyError("Couldn't save the balanced matchups — nothing was changed. Please try again.");
     } finally {
       setRandomizing(false);
       await load();

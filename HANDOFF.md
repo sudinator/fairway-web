@@ -6,7 +6,12 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 206.0.261013
+## Current candidate: 206.1.261013
+
+- RULES: a query error is never "no rows" (money: all-or-nothing, last good data kept); multi-row game setup writes go through apply_game_structure (one transaction); autosaves use lib/latest-saver; the push sender distinguishes lookup / permanent / retryable and retries only undelivered devices.
+- External review of Oct 13: all 10 findings addressed (205.4, 206.0, 206.1).
+
+## Previous: 206.0.261013
 
 - RULE: provider (GolfCourseAPI) data is fetched, validated and compared on the SERVER only; the browser names a course, never supplies its content. Approvals name the reviewed revision.
 - Known stale: ci/test-notifications-isolated.sh (manual, not in CI) applies only 0165 and has failed on game-added wording since 0174; the full-chain assert-notifications.sql is authoritative.

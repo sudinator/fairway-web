@@ -1,6 +1,7 @@
 "use client";
 import { shortNamer } from "@/lib/short-names";
 import { isStagingClient } from "@/lib/auto-score";
+import { createLatestSaver } from "@/lib/latest-saver";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { FormatPicker, AllowancePicker } from "@/components/game/format-picker";
 import type { GameType } from "@/lib/game-shape";
@@ -176,18 +177,29 @@ export function OrganizerPanel({
     const fresh: [string, string] = [game.teams?.[0]?.name || "Team 1", game.teams?.[1]?.name || "Team 2"];
     if (fresh[0] !== savedTeamNames.current[0] || fresh[1] !== savedTeamNames.current[1]) { savedTeamNames.current = fresh; setTeamNameEdits(fresh); }
   }, [game.teams]);
+  // 206.1 (review finding 9): one save in flight; the newest names always win; "Saved" only when
+  // what was saved is what was last typed (lib/latest-saver).
+  const renameRef = React.useRef(onRenameTeams);
+  renameRef.current = onRenameTeams;
+  const nameSaver = React.useMemo(() => createLatestSaver<[string, string]>(
+    async (names) => { if (!renameRef.current) return; await renameRef.current(names); savedTeamNames.current = names; },
+    (st) => {
+      if (st.status === "saving") setTeamNameStatus("Saving…");
+      else if (st.status === "saved") { setTeamNameStatus("Saved"); setTimeout(() => setTeamNameStatus((cur) => (cur === "Saved" ? null : cur)), 1500); }
+      else if (st.status === "error") setTeamNameStatus(`Couldn't save: ${st.error || "try again"}`);
+    },
+  ), []);
   const commitTeamNames = async (edits: [string, string]) => {
     if (!onRenameTeams) return;
     const names: [string, string] = [edits[0].trim() || "Team 1", edits[1].trim() || "Team 2"];
     if (names[0] === savedTeamNames.current[0] && names[1] === savedTeamNames.current[1]) return;
-    setTeamNameStatus("Saving…");
-    try { await onRenameTeams(names); savedTeamNames.current = names; setTeamNameStatus("Saved"); setTimeout(() => setTeamNameStatus(null), 1500); }
-    catch (e: any) { setTeamNameStatus(`Couldn't save: ${e?.message || "try again"}`); }
+    await nameSaver.request(names);
   };
   const editTeamName = (i: 0 | 1, value: string) => {
     setTeamNameEdits((prev) => { const next: [string, string] = [...prev] as [string, string]; next[i] = value; if (teamNameTimer.current) clearTimeout(teamNameTimer.current); teamNameTimer.current = setTimeout(() => { void commitTeamNames(next); }, 700); return next; });
   };
-  useEffect(() => { setTeamNameEdits([game.teams?.[0]?.name || "Team 1", game.teams?.[1]?.name || "Team 2"]); }, [game.teams]);
+  // (206.1: the unconditional reset that stood here overwrote names typed since the last save
+  // whenever the game reloaded; the effect above already follows genuine outside changes.)
   const currentFormatFamily: FormatFamily =
     game.game_type === "match" || game.game_type === "fourball" || game.game_type === "trifecta" ||
     (game.game_type === "skins" && shapeOf(game).skinsStyle === "team_2v2")

@@ -86,5 +86,12 @@ export async function POST(req: NextRequest) {
     vapidPub, vapidPriv,
     log: { notificationId: rec.id ?? null, type, delivery: "push" },
   });
-  return NextResponse.json({ ok: true, sent: out.sent, failed: out.failed }, { status: 200 });
+  // 206.1 (review finding 10): the status says what happened. 200 = every device reached the push
+  // service, or the outcome is final (no devices, a removed subscription, a rejected key). 503 = the
+  // device lookup failed. 502 = a device still failed after the sender's own retries. The database
+  // webhook does not retry, so these show in its response log for diagnosis; the push_delivery_log
+  // row says the same in words.
+  if (out.lookupFailed) return NextResponse.json({ ok: false, error: out.result }, { status: 503 });
+  if (out.retryableFailed > 0) return NextResponse.json({ ok: false, sent: out.sent, failed: out.failed, retryable: out.retryableFailed, result: out.result }, { status: 502 });
+  return NextResponse.json({ ok: true, sent: out.sent, failed: out.failed, result: out.result }, { status: 200 });
 }
