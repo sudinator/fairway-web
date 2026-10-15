@@ -1,3 +1,19 @@
+## 206.2.261013 — Review follow-ups: manual team moves atomic, guest lookup gated, scheduled check validated, mid-check edits caught, name reversal saved
+
+Second-pass review of 206.1 (Oct 13). Items 1, 3 and 5 completed fixes that 206.x had applied to one path but not a second; 2 and 4 were genuine edge cases.
+
+**5 — manual team move.** `setPlayerTeam` ignored a failed team write and then saved foursomes as if it had succeeded. It now goes through `apply_game_structure` (0184) like the balance buttons: team and foursomes together or not at all.
+
+**3 — guest lookup.** A guest share without its own sponsor is charged to the guest's sponsor from the guest list; that query was not in 206.1's must-succeed set, so a failed lookup dropped the sponsor's debt from the balances. Now gated. `money-refresh-render.test.tsx` adds a legacy guest share: on 206.1 a failed guest lookup drops Amit's $20 with no notice; on 206.2 the debt stays and the notice shows.
+
+**1 — scheduled monthly check.** `course-freshness-sync.mjs` now runs the same `validateProviderCourse`; an incomplete response is recorded as incomplete with nothing to approve (0185: `record_course_freshness_system` takes a check state).
+
+**2 — hand correction during a check.** Both recorders now take the course data the comparison was made against and record only if the course still matches (0185): the app's check answers "edited while being checked — run it again"; the scheduled check skips that course until the next run. This also fixes a scheduled-path flaw found alongside: with two library courses sharing a provider id, one course's comparison was recorded against every course with that id.
+
+**4 — team-name reversal mid-save.** The "already saved" shortcut ran before the save queue, so reverting to the stored name while a save was in flight was skipped and the intermediate name won. The queue now decides (`createLatestSaver` `isStored`, consulted only when idle). Test reproduces the reversal; fails with the old order.
+
+Deploy: 0185 to staging → code → 0185 to production → merge (after 0183, 0184).
+
 ## 206.1.261013 — Money refresh, atomic team balancing, honest push delivery, ordered team-name saves (review findings 5, 4, 10, 9)
 
 **5 — A failed money refresh showed wrong balances (High).** Every money query treated an error as "no rows". Now the balance-critical set (expenses, shares, payers, settlements, allocations) is all-or-nothing: if any fails, nothing on screen is replaced, a notice says the figures are from the last complete refresh (with Retry), and every money action is blocked by the one write gate until a complete refresh succeeds. `lib/money-refresh-render.test.tsx` mounts the real Money screen with the network intercepted: on the ORIGINAL code one failed settlements refresh shows "Amit Sud (you) owes $45 · Karan Sarin is owed $45" for a debt already settled, with no warning; on the fix the settled balances stay, the notice shows, settling is paused, and a good refresh clears it.

@@ -78,11 +78,15 @@ export async function POST(request: Request) {
   const { data: rec, error: rErr } = await admin.rpc("record_course_freshness_checked", {
     p_course_id: courseId, p_actor: user.id, p_api_data: complete ? provider.course : null, p_diff: diff,
     p_has_changes: complete ? (diff as any).hasChanges : false, p_check_state: complete ? "ok" : "incomplete",
+    // 0185: the course exactly as it was read; recording is refused if it changed during the check.
+    p_base_data: course.data ?? null,
   });
   if (rErr) {
     const out: FreshnessOutcome = { providerReached: true, saved: false, checkState: "not_saved", status: row?.status || "none", revision: row?.revision ?? null,
       hasChanges: complete ? (diff as any).hasChanges : false, diff, apiCourse: complete ? provider.course : null, problems: complete ? undefined : problems,
-      error: rErr.code === "42501" ? "Only members of this course's club can check it." : "The check ran but couldn't be saved." };
+      error: rErr.code === "42501" ? "Only members of this course's club can check it."
+        : rErr.code === "40001" ? "The course was edited while it was being checked — run the check again."
+        : "The check ran but couldn't be saved." };
     return NextResponse.json(out, { status: rErr.code === "42501" ? 403 : 200 });
   }
   const r = (rec || {}) as any;

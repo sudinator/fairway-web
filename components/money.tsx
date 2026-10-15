@@ -64,7 +64,9 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
         : { data: [] as any[] };
       profs = p2 || [];
     }
-    const { data: gRows } = await supabase.from("group_guests").select("id, name, sponsor_user_id, group_id, archived, became_member_id, source_game_id, created_by").eq("group_id", gid);
+    // 206.2 (follow-up 3): guests are balance-critical too — a share without its own sponsor is
+    // charged to the guest's sponsor from this list, so a failed lookup would drop that debt.
+    const { data: gRows, error: guestErr } = await supabase.from("group_guests").select("id, name, sponsor_user_id, group_id, archived, became_member_id, source_game_id, created_by").eq("group_id", gid);
     // 206.1 (review finding 5): a failed query is NOT "no rows". Every balance-critical query must
     // succeed, or nothing on screen is replaced — the last complete figures stay, a notice says the
     // refresh failed, and settling is blocked (requireOnline) until a complete refresh succeeds.
@@ -79,7 +81,7 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
       : { data: [] as any[], error: null };
     const { data: setl, error: setlErr } = await supabase.from("settlements").select("*").eq("group_id", gid);
     const { data: alloc, error: allocErr } = await supabase.from("settlement_allocations").select("settlement_id, expense_id, amount_cents").eq("group_id", gid);
-    const balanceErr = expErr || shErr || pyErr || setlErr || allocErr;
+    const balanceErr = guestErr || expErr || shErr || pyErr || setlErr || allocErr;
     if (balanceErr) {
       setLoadError("Couldn't refresh the money ledger — showing the last complete figures. Settling is paused until it refreshes.");
       setLoading(false);

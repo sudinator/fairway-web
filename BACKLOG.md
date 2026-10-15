@@ -1,3 +1,7 @@
+## 206.2 — backlog
+
+- **Choose which API changes to apply.** An approval takes only the changes the admin ticks (e.g. the new slope, not the provider's stroke indexes) and keeps every hand correction it does not touch; still bound to the reviewed revision of an unedited course.
+
 ## 205.0 — follow-up
 
 - **Public Season Wrapped link.** A shareable page per golfer per year (readable slug, revocable, like the line-up link). Needs a stored snapshot written when the golfer opts in, since others cannot read their rounds.

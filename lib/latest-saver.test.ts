@@ -22,5 +22,19 @@ import { createLatestSaver } from "./latest-saver";
   const sv2 = createLatestSaver<string>(async (v) => { s2.push(v); if (fail) { fail = false; throw new Error("network"); } }, () => {});
   const p = sv2.request("A"); void sv2.request("B"); await p; await new Promise((r) => setTimeout(r, 0));
   eq(s2, ["A", "B"], "after a failed save, the newer edit is still sent");
+  // 206.2 follow-up 4: reverting mid-save. Stored "USA"; type "United States" (saving); change back
+  // to "USA" before it finishes. The final stored value must be "USA".
+  {
+    let stored3 = "USA"; const sent3: string[] = []; const res3: (() => void)[] = [];
+    const sv3 = createLatestSaver<string>((v) => { sent3.push(v); return new Promise((r) => res3.push(() => { stored3 = v; r(); })); }, () => {}, undefined, (v) => v === stored3);
+    void sv3.request("USA");                 // equals the stored value, nothing in flight → no save
+    eq(sent3, [], "an unchanged value is not saved");
+    void sv3.request("United States");       // in flight
+    void sv3.request("USA");                 // reverted mid-save → must still be queued
+    res3.shift()!(); await new Promise((r) => setTimeout(r, 0));
+    eq(sent3, ["United States", "USA"], "the reversal is sent after the in-flight save");
+    res3.shift()!(); await new Promise((r) => setTimeout(r, 0));
+    eq(stored3, "USA", "the final stored name is the user's final choice");
+  }
   console.log("latest-saver tests passed");
 })().catch((e) => { console.error(e); process.exit(1); });

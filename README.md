@@ -1,3 +1,7 @@
+## 206.2.261013 — Review follow-ups: manual team moves atomic, guest lookup gated, scheduled check validated, mid-check edits caught, name reversal saved
+
+Second-pass review of 206.1 (Oct 13). Items 1, 3 and 5 completed fixes that 206.x had applied to one path but not a second; 2 and 4 were genuine edge cases.
+
 ## 206.1.261013 — Money refresh, atomic team balancing, honest push delivery, ordered team-name saves (review findings 5, 4, 10, 9)
 
 **5 — A failed money refresh showed wrong balances (High).** Every money query treated an error as "no rows". Now the balance-critical set (expenses, shares, payers, settlements, allocations) is all-or-nothing: if any fails, nothing on screen is replaced, a notice says the figures are from the last complete refresh (with Retry), and every money action is blocked by the one write gate until a complete refresh succeeds. `lib/money-refresh-render.test.tsx` mounts the real Money screen with the network intercepted: on the ORIGINAL code one failed settlements refresh shows "Amit Sud (you) owes $45 · Karan Sarin is owed $45" for a debt already settled, with no warning; on the fix the settled balances stay, the notice shows, settling is paused, and a good refresh clears it.

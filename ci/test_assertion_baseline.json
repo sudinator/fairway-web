@@ -1,5 +1,5 @@
 {
-  "total": 439477,
+  "total": 439479,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -36,7 +36,7 @@
     "manual handicap simulation": 76807,
     "match length": 49,
     "match length picker": 18,
-    "money refresh": 7,
+    "money refresh": 9,
     "nine-hole handicap": 15,
     "nine-hole payload": 12,
     "nine-hole posting": 20,

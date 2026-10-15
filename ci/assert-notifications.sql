@@ -147,7 +147,7 @@ begin;
 -- 0183: checks are recorded by the server (service role) on behalf of a verified member.
 set local role service_role;
 select record_course_freshness_checked('66666666-0000-0000-0000-000000000006','aaaaaaaa-0000-0000-0000-000000000001','{}'::jsonb,
- '{"tees":[{"name":"Blue","slopeTo":112,"ratingTo":63.6,"slopeFrom":115,"ratingFrom":64.2,"slopeChanged":true,"ratingChanged":true,"yardageChanges":[{"to":171,"from":174,"hole":1},{"to":473,"from":476,"hole":2}]},{"name":"White","slopeTo":106,"ratingTo":62.3,"slopeFrom":106,"ratingFrom":62.6,"slopeChanged":false,"ratingChanged":true,"yardageChanges":[{"to":147,"from":157,"hole":1}]}],"hasChanges":true}'::jsonb, true, 'ok');
+ '{"tees":[{"name":"Blue","slopeTo":112,"ratingTo":63.6,"slopeFrom":115,"ratingFrom":64.2,"slopeChanged":true,"ratingChanged":true,"yardageChanges":[{"to":171,"from":174,"hole":1},{"to":473,"from":476,"hole":2}]},{"name":"White","slopeTo":106,"ratingTo":62.3,"slopeFrom":106,"ratingFrom":62.6,"slopeChanged":false,"ratingChanged":true,"yardageChanges":[{"to":147,"from":157,"hole":1}]}],"hasChanges":true}'::jsonb, true, 'ok', (select data from favorite_courses where id = '66666666-0000-0000-0000-000000000006'));
 commit;
 do $$
 declare m text; d text;
