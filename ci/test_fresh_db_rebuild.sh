@@ -103,6 +103,9 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-game-structure-atomic.s
 
 # 0186: course history and restore.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-course-versions.sql"
+
+# 0187: the course status view.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-course-status-view.sql"
 psql "$DB_URL" -X -tA -c "select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p') order by 1" > /tmp/bnn_chain_tables.txt
 python3 - "$ROOT/ci/public_tables.json" /tmp/bnn_chain_tables.txt <<'PY'
 import json, sys

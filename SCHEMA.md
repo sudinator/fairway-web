@@ -1,3 +1,7 @@
+## 207.1 — Course status view (0187)
+
+`course_freshness`: `last_compared_at`, `decision_reason`, `decided_by`, `decided_at` (+ trigger). Attempt status `incomplete`. `dismiss_course_freshness(uuid, bigint, text)` replaces `set_course_freshness_status(uuid, text)`. `admin_course_status()` extended.
+
 ## 207.0 — Course versions (0186)
 
 `course_versions` (RLS; read where the course is readable; no app writes) + trigger `record_course_version` on favorite_courses. `restore_course_version(uuid, integer, text) returns integer` (site admin). review_course_correction / apply_course_freshness tag their changes.

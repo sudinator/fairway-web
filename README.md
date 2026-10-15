@@ -1,3 +1,7 @@
+## 207.1.261013 — Admin → Courses: what data is in use, what's wrong, what to do next
+
+Each course row now leads with one headline (Review required · Latest check failed · Provider data incomplete · Not checked yet · Up to date) and then, separately: **Current data** (when it last changed, how, and by whom — from 207.0's history); **Last compared with the provider** (the last COMPLETE comparison — a failed or incomplete check no longer hides it); **Latest check** (any outcome, with the reason); the **review state** (changes awaiting review with the FULL count; kept as-is with the date and reason; applied; matches); and member corrections awaiting approval. A failure and a pending review are both shown. Filters: Review required · Failed / incomplete · Not checked · All. "Review changes" opens the course; details also hold the History.
+
 ## 207.0.261013 — Course history and restore
 
 Every change to a shared course's content — data, name, facility, location, provider link — is now kept as a version, and a site admin can restore any earlier version as a new one.

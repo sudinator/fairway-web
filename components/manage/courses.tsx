@@ -168,7 +168,9 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   };
   const dismissPendingReview = async (r: PendingReview) => {
     setBusyId(r.course_id); setMsg(null);
-    const { error } = await supabase.rpc("set_course_freshness_status", { p_course_id: r.course_id, p_status: "dismissed" });
+    const reason = window.prompt("Keep the current data. Reason (optional):", "");
+    if (reason === null) return;
+    const { error } = await supabase.rpc("dismiss_course_freshness", { p_course_id: r.course_id, p_revision: r.revision, p_reason: reason || null });
     if (error) { setBusyId(null); setMsg(`Couldn't dismiss "${r.course_name}": ${error.message}`); return; }
     await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_api_update_dismissed", group_id: r.group_id, summary: `Kept stored data for "${r.course_name}" despite GolfCourseAPI changes` });
     setBusyId(null);

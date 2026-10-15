@@ -64,12 +64,23 @@ export async function POST(request: Request) {
   if (rl && (rl as any).allowed === false) return NextResponse.json({ error: "Too many course lookups in a short time — please try again shortly." }, { status: 429 });
 
   const provider = await fetchProviderCourse(providerRaw);
+  // 207.1: every check leaves an attempt record (as the member — logged as 'app'). 206.0 fetched the
+  // provider here without one, so in-app checks were missing from "last check" and the attempt log.
+  const logAttempt = async (status: "ok" | "error" | "incomplete", http: number | null, note: string | null, c?: Course) => {
+    const { error: lErr } = await supabase.rpc("record_course_api_check", {
+      p_provider_id: providerRaw, p_status: status, p_club_name: c?.club ?? null, p_course_name: c?.name ?? null,
+      p_location: c?.location ?? null, p_note: note, p_http_status: http,
+    });
+    if (lErr) console.error("record_course_api_check:", lErr.message);
+  };
   if (!provider.ok) {
+    await logAttempt("error", provider.status || null, provider.error);
     const out: FreshnessOutcome = { providerReached: false, saved: false, checkState: "provider_error", status: row?.status || "none", revision: row?.revision ?? null, hasChanges: false, diff: null, apiCourse: null, error: provider.error };
     return NextResponse.json(out, { status: 200 });
   }
   const problems = validateProviderCourse(provider.course);
   const complete = problems.length === 0;
+  await logAttempt(complete ? "ok" : "incomplete", 200, complete ? null : `incomplete: ${problems.slice(0, 4).join("; ")}`, provider.course);
   const diff = complete ? buildFreshnessDiff(stored, provider.course) : { hasChanges: false, tees: [], incomplete: problems };
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL, serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

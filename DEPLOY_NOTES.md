@@ -1,3 +1,17 @@
+## 207.1.261013 — Admin → Courses: what data is in use, what's wrong, what to do next
+
+Each course row now leads with one headline (Review required · Latest check failed · Provider data incomplete · Not checked yet · Up to date) and then, separately: **Current data** (when it last changed, how, and by whom — from 207.0's history); **Last compared with the provider** (the last COMPLETE comparison — a failed or incomplete check no longer hides it); **Latest check** (any outcome, with the reason); the **review state** (changes awaiting review with the FULL count; kept as-is with the date and reason; applied; matches); and member corrections awaiting approval. A failure and a pending review are both shown. Filters: Review required · Failed / incomplete · Not checked · All. "Review changes" opens the course; details also hold the History.
+
+All wording comes from one pure function, `lib/course-status.ts`, tested against the proposal's acceptance scenarios: successful check, failed check, incomplete response, approval, dismissal, and failure + pending review together.
+
+**Migration 0187.** `course_freshness.last_compared_at` (set only by a complete comparison, by trigger, for every recorder). Attempt log outcome `incomplete`. `dismiss_course_freshness(course, revision, reason?)` — "Keep current data" for the reviewed revision, recording who, when and the optional reason; replaces `set_course_freshness_status`, which also accepted `applied` and could mark a course updated without applying anything (nothing used that; it is gone). `admin_course_status` adds the current version, last complete comparison, check state, revision, keep decision, and the full change count (added/removed tees and hole par/stroke-index changes had been counted as 0).
+
+**Regression fixed (from 206.0).** The in-app freshness route fetched the provider without logging an attempt, so since 206.2 "last check" and the attempt log reflected only the monthly monitor. It logs again (ok / incomplete / error, as the member).
+
+Proof: `ci/assert-course-status-view.sql` on the full chain (added tee counted; current version reported; keep-data refused for a stale revision and recorded with reason and who; an incomplete check leaves the last comparison alone; the old setter gone); `lib/course-status.test.ts`.
+
+Deploy: 0187 to staging → code → 0187 to production → merge (after 0186).
+
 ## 207.0.261013 — Course history and restore
 
 Every change to a shared course's content — data, name, facility, location, provider link — is now kept as a version, and a site admin can restore any earlier version as a new one.

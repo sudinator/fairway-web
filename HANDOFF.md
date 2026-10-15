@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 207.0.261013
+## Current candidate: 207.1.261013
+
+- Admin course row wording lives ONLY in lib/course-status.ts. Next: 207.2 completion recap.
+
+## Previous: 207.0.261013
 
 - Course history: ALL shared-course content changes are versioned by trigger (0186). A function that knows why a change happens sets bnn.course_change (source/reason/ref) immediately before its update; the trigger consumes it.
 - Next: 207.1 Admin → Courses status redesign (uses course_versions for 'last update applied'), then 207.2 completion recap.

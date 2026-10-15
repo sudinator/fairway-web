@@ -49,7 +49,7 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
   const courseDirty = !!picked && !!originalPicked && hasMaterialCourseChanges(originalPicked, picked);
   useUnsavedGuard(courseDirty);
   const dismissFreshness = async () => {
-    if (loadedFavId) await supabase.rpc("set_course_freshness_status", { p_course_id: loadedFavId, p_status: "dismissed" }).then(() => {}, () => {});
+    if (loadedFavId) await supabase.rpc("dismiss_course_freshness", { p_course_id: loadedFavId, p_revision: freshness?.revision ?? -1, p_reason: null }).then(() => {}, () => {});
     setFreshness(null);
   };
   const [teeIdx, setTeeIdx] = useState<number>(() => restored?.teeIdx ?? 0);

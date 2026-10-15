@@ -132,7 +132,7 @@ begin
     raise exception 'record accepted status claimed';
   exception when others then
     execute 'reset role';
-    if position('status must be ok, drift or error' in sqlerrm) = 0 then raise; end if;
+    if position('status must be ok, drift, error or incomplete' in sqlerrm) = 0 then raise; end if;  -- 0187 wording
   end;
 
   delete from public.course_api_checks where provider_id like 'ci%';
