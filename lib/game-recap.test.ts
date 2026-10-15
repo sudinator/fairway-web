@@ -46,14 +46,14 @@ const teams = [{ key: "A", name: "Red" }, { key: "B", name: "Blue" }];
 {
   const guest = { ...pl("row-g", "Guest Gary", all(18, 5)), user_id: null };
   const r = buildRecap(g({ game_type: "match", pairings: [{ a: "u1", b: "row-g" }] }) as any, [pl("u1", "Uma", all(18, 4)), guest] as any);
-  eq(r.headline, "1 singles match played", "no overall winner"); eq(r.personal["row-g"], "Uma beat you 10 & 8", "the guest's own line (closed out)");
+  eq(r.headline, "1 singles match", "no overall winner"); eq(r.personal["row-g"], "Uma beat you 10 & 8", "the guest's own line (closed out)");
   ok(r.personal.u1.startsWith("you beat Guest Gary"), "the member's line names the guest");
 }
 // 7. Skins (individual).
 {
   const a = all(18, 4); a[0] = 3; const b = all(18, 4); b[1] = 3;  const c = all(18, 4); c[2] = 3; c[3] = 3;
   const r = buildRecap(g({ game_type: "skins" }) as any, [pl("a", "Ann", a), pl("b", "Bob", b), pl("c", "Cy", c)] as any);
-  ok(r.headline.startsWith("Skins: Cy won"), `skins winner (${r.headline})`);
+  ok(r.headline === "Cy won 2 skins", `skins winner (${r.headline})`);
 }
 // 8. Corrections: a changed result changes the signature; an unchanged one does not.
 {

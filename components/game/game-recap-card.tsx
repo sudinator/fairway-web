@@ -1,18 +1,18 @@
 "use client";
-// The completed-game recap (207.2): the first thing on a finished game's Play screen. Built ONLY from
-// lib/game-recap (the shared results functions), so it agrees with the Results cards below it and
-// with the completion notification. No money amounts — the money STATUS only.
-import React, { useEffect, useMemo, useState } from "react";
+// The completed-game recap on a finished game's Play screen (207.2), with "Share with the group":
+// every player can send the 9:16 image (RecapBody in share mode) through the phone's share sheet.
+// One recap (lib/game-recap) drives both, so the in-app recap and the image never disagree.
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { C, effectiveGroupId, TGC_GROUP_ID } from "@/lib/golf";
 import { btn } from "@/components/ui";
 import { createClient } from "@/lib/supabase";
-import { pkey } from "@/lib/game-shape";
+import { pkey, chBasis } from "@/lib/game-shape";
 import { buildRecap } from "@/lib/game-recap";
-import { fmtMatchDate } from "@/lib/lineup-meta";
+import { contestLeaderboard, fmtContestValue, type Contest, type ContestEntry } from "@/lib/contests";
+import { useCardExport } from "@/components/share-card";
+import { RecapBody, type RecapContest } from "@/components/game/recap-body";
 import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import type { Game, Player } from "@/lib/game-types";
-
-const FORMAT: Record<string, string> = { match: "Singles match play", fourball: "Four-ball", alt_shot: "Alternate shot", trifecta: "Trifecta", stableford: "Stableford", stroke: "Stroke play", skins: "Skins" };
 
 export function GameRecapCard({ game, players, altShotScores, userId, betStale, competition, onOpenCompetition }: {
   game: Game; players: Player[]; altShotScores: AltShotScoreRow[]; userId: string; betStale: boolean;
@@ -22,35 +22,57 @@ export function GameRecapCard({ game, players, altShotScores, userId, betStale, 
   const supabase = useMemo(() => createClient(), []);
   const hasBet = effectiveGroupId((game as any).group_id) === TGC_GROUP_ID;
   const [posted, setPosted] = useState<boolean | null>(null);
+  const [contests, setContests] = useState<RecapContest[]>([]);
   useEffect(() => {
-    if (!hasBet) return;
     let live = true;
-    supabase.from("expenses").select("id").eq("source_game_id", game.id).eq("source_kind", "tgc_bet").is("deleted_at", null).maybeSingle()
+    if (hasBet) supabase.from("expenses").select("id").eq("source_game_id", game.id).eq("source_kind", "tgc_bet").is("deleted_at", null).maybeSingle()
       .then(({ data, error }) => { if (live && !error) setPosted(!!data); });
+    (async () => {
+      const { data: cs, error } = await supabase.from("game_contests").select("*").eq("game_id", game.id);
+      if (error || !cs?.length) return;
+      const { data: es } = await supabase.from("game_contest_entries").select("*").in("contest_id", cs.map((c: any) => c.id));
+      const out: RecapContest[] = [];
+      (cs as Contest[]).forEach((c) => contestLeaderboard(c, ((es || []) as ContestEntry[]).filter((e) => e.contest_id === c.id && !e.voided))
+        .forEach((w) => { if (w.best) out.push({ label: c.label, hole: w.hole, name: w.best.player_name, value: fmtContestValue(c.unit, w.best.value) }); }));
+      if (live) setContests(out);
+    })();
     return () => { live = false; };
   }, [supabase, game.id, hasBet]);
+
   const me = players.find((p) => p.user_id === userId);
-  const mine = me ? recap.personal[pkey(me)] : null;
-  const holes = game.holes_meta?.length ?? 18;
-  const playedTo = Math.max(0, ...players.map((p) => (p.scores || []).filter((x) => x != null && x > 0).length));
+  const myLine = me ? recap.personal[pkey(me)] ?? null : null;
+  const myScore = (() => {
+    if (!me || !recap.sections.individualStats) return null;
+    const holes = game.holes_meta?.length ?? 18;
+    const sc = (me.scores || []).filter((x): x is number => typeof x === "number" && x > 0);
+    if (sc.length < holes) return null;
+    const gross = sc.reduce((s, x) => s + x, 0), net = gross - Math.round(Number(chBasis(me, game.course_par, holes) ?? 0));
+    const nb = recap.highlights.netBirdies.all.find((r) => r.key === pkey(me));
+    return `You shot ${gross} (net ${net})${nb ? ` · ${nb.birdies} net birdie${nb.birdies === 1 ? "" : "s"}${nb.eagles ? `, ${nb.eagles} net eagle${nb.eagles === 1 ? "" : "s"}` : ""}` : ""}.`;
+  })();
   const money = !hasBet || posted === null ? null : betStale ? "Winnings need review — scores changed after posting" : posted ? "Winnings posted in Money" : "Winnings not posted yet";
+  const changed = (game as any).recap_signature && (game as any).recap_signature !== recap.signature;
+  const shown = { ...game, players_count: players.filter((p) => !p.no_show).length } as Game;
+
+  const shareRef = useRef<HTMLDivElement>(null);
+  const caption = `${game.name || game.course || "Game"} — ${recap.headline} 🏆`;
+  const { busy, msg, shareImage } = useCardExport(shareRef, `recap-${(game as any).code || game.id}`, caption, () => caption);
+
   return (
     <div data-game-recap style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginBottom: 12 }}>
-      <div style={{ color: C.gold, fontSize: 11, letterSpacing: 2, fontWeight: 800 }}>{recap.endedEarly ? "FINAL · ENDED EARLY" : "FINAL"}</div>
-      <div data-recap-headline style={{ color: C.cream, fontFamily: "Georgia, serif", fontSize: 22, fontWeight: 800, marginTop: 4, lineHeight: 1.2 }}>{recap.headline}</div>
-      {mine ? <div style={{ color: C.cream, fontSize: 14, marginTop: 6 }}>{mine.charAt(0).toUpperCase() + mine.slice(1)}.</div> : null}
-      {recap.notes.map((n, i) => <div key={i} style={{ color: C.gold, fontSize: 12.5, marginTop: 4 }}>{n}</div>)}
-      {(game as any).recap_signature && (game as any).recap_signature !== recap.signature ? (
-        <div data-recap-changed style={{ color: C.gold, fontSize: 12.5, marginTop: 4, fontWeight: 700 }}>Results changed since they were announced — scores were corrected.</div>
-      ) : null}
-      <div style={{ color: C.sage, fontSize: 12.5, marginTop: 8 }}>
-        {[game.course, (game as any).played_at ? fmtMatchDate(String((game as any).played_at).slice(0, 10)) : null, FORMAT[game.game_type] || game.game_type,
-          playedTo < holes ? `${playedTo} of ${holes} holes played` : `${holes} holes`].filter(Boolean).join(" · ")}
+      <RecapBody game={shown} recap={recap} mode="app" contests={contests} myLine={myLine} myScore={myScore} money={money} />
+      {changed ? <div data-recap-changed style={{ color: C.gold, fontSize: 12.5, marginTop: 8, fontWeight: 700 }}>Results changed since they were announced — scores were corrected.</div> : null}
+      <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+        <button type="button" data-recap-share onClick={shareImage} disabled={busy} style={{ ...btn(true), flex: 1, fontSize: 14 }}>{busy ? "Preparing…" : "📤 Share with the group"}</button>
+        {competition && onOpenCompetition ? <button type="button" style={{ ...btn(false), fontSize: 13 }} onClick={() => onOpenCompetition(competition.competition_id)}>{competition.name} standings</button> : null}
       </div>
-      {money ? <div data-recap-money style={{ color: betStale ? C.gold : C.sage, fontSize: 12.5, marginTop: 4 }}>{money}</div> : null}
-      {competition && onOpenCompetition ? (
-        <button type="button" style={{ ...btn(false), fontSize: 12, marginTop: 10 }} onClick={() => onOpenCompetition(competition.competition_id)}>View {competition.name} standings</button>
-      ) : null}
+      {msg ? <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>{msg}</div> : null}
+      {/* The share image: the same recap in share mode, 9:16, rendered off-screen and exported as a picture. */}
+      <div aria-hidden style={{ position: "absolute", left: -10000, top: 0 }}>
+        <div ref={shareRef} data-recap-share-image style={{ width: 402, minHeight: 715, boxSizing: "border-box", background: C.green, padding: 16, display: "flex", flexDirection: "column" }}>
+          <RecapBody game={shown} recap={recap} mode="share" contests={contests} />
+        </div>
+      </div>
     </div>
   );
 }

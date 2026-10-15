@@ -22,6 +22,8 @@
     "lib/trifecta-card-render.test.tsx",
     "lib/results-outlook-render.test.tsx",
     "lib/season-render.test.tsx",
+    "lib/game-recap-sections.test.ts",
+    "lib/game-highlights.test.ts",
     "lib/game-recap.test.ts",
     "lib/course-status.test.ts",
     "lib/course-history-render.test.tsx",

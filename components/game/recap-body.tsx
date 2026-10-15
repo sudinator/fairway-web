@@ -1,0 +1,182 @@
+"use client";
+// The game recap's content (207.2) — ONE component for the in-app recap and the share image, so they
+// can never drift apart. mode "share": the 9:16 image for the group (no personal line, no money, top-5
+// net birdies). mode "app": everything, plus the viewer's own day and the full net-birdie list.
+// Every number comes from lib/game-recap (highlights + format sections). Names wrap; nothing truncates.
+import React from "react";
+import { C } from "@/lib/golf";
+import { teamAccent } from "@/lib/game-colors";
+import { fmtMatchDate } from "@/lib/lineup-meta";
+import type { Recap } from "@/lib/game-recap";
+import type { Game } from "@/lib/game-types";
+
+export type RecapContest = { label: string; hole: number; name: string; value: string };
+const FORMAT: Record<string, string> = { match: "Singles", fourball: "Four-ball", alt_shot: "Alternate shot", trifecta: "Trifecta", stableford: "Stableford", stroke: "Stroke play", skins: "Skins" };
+const S = {
+  eye: { color: C.gold, fontSize: 11, letterSpacing: 2, fontWeight: 800 } as React.CSSProperties,
+  th: { color: C.gold, fontSize: 11, fontWeight: 800, letterSpacing: 1.2, marginBottom: 4 } as React.CSSProperties,
+  box: { background: C.greenMid, borderRadius: 10, padding: "8px 12px" } as React.CSSProperties,
+  row: { display: "flex", alignItems: "flex-start", gap: 8, paddingTop: 4, paddingBottom: 4, borderTop: `1px solid ${C.green}`, fontSize: 13, color: C.cream, lineHeight: 1.3 } as React.CSSProperties,
+  pos: { color: C.gold, fontWeight: 800, minWidth: 24 } as React.CSSProperties,
+  name: { flex: 1, minWidth: 0, overflowWrap: "anywhere" } as React.CSSProperties,
+  num: { fontFamily: "Georgia, serif", fontWeight: 800, fontSize: 16, whiteSpace: "nowrap" } as React.CSSProperties,
+  line: { color: C.sage, fontSize: 12.5, lineHeight: 1.4 } as React.CSSProperties,
+};
+const teamColor = (game: Game, key: string | null) => {
+  const teams = Array.isArray(game.teams) ? game.teams : [];
+  const i = teams.findIndex((t: any) => t.key === key);
+  return i >= 0 ? teamAccent(teams[i].name, i) : C.sage;
+};
+const Dot = ({ color }: { color: string }) => <span aria-hidden style={{ display: "inline-block", width: 8, height: 8, borderRadius: 999, background: color, marginRight: 6, marginTop: 4, flexShrink: 0 }} />;
+
+export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, money }: {
+  game: Game; recap: Recap; mode: "share" | "app"; contests?: RecapContest[];
+  myLine?: string | null; myScore?: string | null; money?: string | null;
+}) {
+  const { highlights: h, sections: s } = recap;
+  const share = mode === "share";
+  const live = (game as any).players_count as number | undefined; // set by the caller
+  const meta = [(game as any).played_at ? fmtMatchDate(String((game as any).played_at).slice(0, 10)) : null, FORMAT[game.game_type] || game.game_type, live ? `${live} players` : null].filter(Boolean).join(" · ");
+  const head = recap.headline.match(/^(.*?)([\d½]+–[\d½]+|net \d+|\d+ skins?|\d+ points)$/);
+  const nbRows = share ? h.netBirdies.top : h.netBirdies.all.map((r, i) => ({ pos: String(i + 1), item: r }));
+  return (
+    <div data-recap-body={mode} style={{ display: "flex", flexDirection: "column", gap: 10, color: C.cream }}>
+      <div>
+        <div style={S.eye}>{recap.endedEarly ? "FINAL · ENDED EARLY" : "FINAL"} · {(game.name || game.course || "").toUpperCase()}</div>
+        <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>{meta}</div>
+      </div>
+      <div data-recap-headline style={{ fontFamily: "Georgia, serif", fontSize: 26, fontWeight: 800, lineHeight: 1.15 }}>
+        {head ? <>{head[1]}<span style={{ color: C.gold }}>{head[2]}</span></> : recap.headline}
+      </div>
+      {s.sub ? <div style={{ color: C.sage, fontSize: 13, marginTop: -4 }}>{s.sub}</div> : null}
+      {recap.notes.map((n, i) => <div key={i} style={{ color: C.gold, fontSize: 12.5 }}>{n}</div>)}
+
+      {!share && (myLine || myScore) ? (
+        <div data-recap-you style={S.box}>
+          <div style={S.th}>YOUR DAY</div>
+          {myLine ? <div style={{ fontSize: 14 }}>{myLine.charAt(0).toUpperCase() + myLine.slice(1)}.</div> : null}
+          {myScore ? <div style={{ ...S.line, marginTop: 2 }}>{myScore}</div> : null}
+        </div>
+      ) : null}
+
+      {/* The format's own section */}
+      {s.matches && s.matches.rows.length ? (
+        <div style={S.box} data-recap-matches>
+          <div style={S.th}>{s.matches.title}</div>
+          {s.matches.rows.map((r, i) => (
+            <div key={i} style={S.row}>
+              {r.team ? <Dot color={teamColor(game, r.team)} /> : null}
+              <span style={S.name}>{r.halved ? <>{r.winners.join(" & ")} halved with {r.losers.join(" & ")}</> : <><b>{r.winners.join(" & ")}</b> beat {r.losers.join(" & ")}</>}</span>
+              <span style={{ color: C.gold, fontWeight: 800, whiteSpace: "nowrap" }}>{r.result}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {s.skins && s.skins.length ? (
+        <div style={S.box} data-recap-skins>
+          <div style={S.th}>SKINS WON · {game.holes_meta?.length ?? 18} IN PLAY</div>
+          {s.skins.map((r) => (
+            <div key={r.name} style={S.row}>
+              <span style={S.name}>{r.name}<span style={{ color: C.sage, fontSize: 12 }}> · {r.holes.map((x) => `#${x.n}${x.value > 1 ? ` (${x.value})` : ""}`).join(", ")}</span></span>
+              <span style={S.num}>{r.skins}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {s.skinMatches && s.skinMatches.rows.length ? (
+        <div style={S.box} data-recap-skin-matches>
+          <div style={S.th}>{s.skinMatches.title}</div>
+          {s.skinMatches.rows.map((r, i) => {
+            const aWin = r.aSkins > r.bSkins;
+            return (
+              <div key={i} style={S.row}>
+                {r.winnerTeam ? <Dot color={teamColor(game, r.winnerTeam)} /> : null}
+                <span style={S.name}>{r.winnerTeam ? <><b>{(aWin ? r.a : r.b).join(" & ")}</b> beat {(aWin ? r.b : r.a).join(" & ")}</> : <>{r.a.join(" & ")} and {r.b.join(" & ")} split</>}</span>
+                <span style={S.num}>{Math.max(r.aSkins, r.bSkins)}–{Math.min(r.aSkins, r.bSkins)}</span>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+      {s.leaderboard && !s.flights?.length ? (
+        <div style={S.box} data-recap-leaderboard>
+          <div style={S.th}>LEADERBOARD · {s.leaderboard.basis === "points" ? "POINTS" : s.leaderboard.basis.toUpperCase()}</div>
+          {s.leaderboard.rows.map((r, i) => (
+            <div key={i} style={S.row}><span style={S.pos}>{r.pos}</span><span style={S.name}>{r.item.name}</span>
+              {s.leaderboard!.basis === "net" ? <span style={{ color: C.sage, fontSize: 12, whiteSpace: "nowrap" }}>{r.item.gross} gross</span> : null}
+              <span style={S.num}>{r.item.score}</span></div>
+          ))}
+        </div>
+      ) : null}
+      {s.flights?.map((f) => (
+        <div key={f.name} style={S.box} data-recap-flight>
+          <div style={{ ...S.th, display: "flex", justifyContent: "space-between" }}><span>{f.name.toUpperCase()}</span><span>{f.players} players</span></div>
+          {f.rows.map((r, i) => <div key={i} style={S.row}><span style={S.pos}>{r.pos}</span><span style={S.name}>{r.item.name}</span><span style={S.num}>{r.item.score}</span></div>)}
+        </div>
+      ))}
+      {s.pairs ? (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {([["TOP 3 PAIRS · GROSS", s.pairs.gross], ["TOP 3 PAIRS · NET", s.pairs.net]] as const).map(([t, rows]) => (
+            <div key={t} style={S.box}><div style={S.th}>{t}</div>
+              {rows.map((r, i) => <div key={i} style={S.row}><span style={S.pos}>{r.pos}</span><span style={S.name}>{r.item.names.join(" & ")}</span><span style={S.num}>{r.item.score}</span></div>)}
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {/* Shared sections */}
+      {s.individualStats && !s.leaderboard && h.topGross.length ? (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }} data-recap-top3>
+          {([["TOP 3 GROSS", h.topGross], ["TOP 3 NET", h.topNet]] as const).map(([t, rows]) => (
+            <div key={t} style={S.box}><div style={S.th}>{t}</div>
+              {rows.map((r, i) => <div key={i} style={S.row}><span style={S.pos}>{r.pos}</span><span style={S.name}>{r.item.name}</span><span style={S.num}>{r.item.score}</span></div>)}
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {s.individualStats && h.netBirdies.players ? (
+        <div style={S.box} data-recap-net-birdies>
+          <div style={S.th}>NET BIRDIES &amp; EAGLES{share ? " · TOP 5" : ""}</div>
+          <div style={{ ...S.row, borderTop: "none", color: C.sage, fontSize: 11 }}><span style={S.pos} /><span style={S.name} /><span style={{ width: 52, textAlign: "right" }}>Birdies</span><span style={{ width: 52, textAlign: "right" }}>Eagles</span></div>
+          {nbRows.map((r, i) => (
+            <div key={i} style={S.row}><span style={S.pos}>{r.pos}</span><span style={S.name}>{r.item.name}</span>
+              <span style={{ ...S.num, width: 52, textAlign: "right" }}>{r.item.birdies}</span><span style={{ ...S.num, width: 52, textAlign: "right" }}>{r.item.eagles || "–"}</span></div>
+          ))}
+          <div style={{ color: C.gold, fontSize: 12, fontWeight: 700, marginTop: 4 }}>
+            {h.netBirdies.birdies} net birdie{h.netBirdies.birdies === 1 ? "" : "s"} and {h.netBirdies.eagles} net eagle{h.netBirdies.eagles === 1 ? "" : "s"} by {h.netBirdies.players} player{h.netBirdies.players === 1 ? "" : "s"}{share && h.netBirdies.all.length > h.netBirdies.top.length ? " · full list in the game recap in Birdie Num Num" : ""}
+          </div>
+        </div>
+      ) : null}
+      {s.tiles.length ? (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }} data-recap-tiles>
+          {s.tiles.map((t) => (
+            <div key={t.label} style={{ ...S.box, display: "flex", flexDirection: "column" }}>
+              <span style={{ color: C.sage, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>{t.label}</span>
+              <b style={{ fontSize: 13.5, overflowWrap: "anywhere" }}>{t.who}</b>
+              <span style={{ color: C.gold, fontSize: 12, fontWeight: 700 }}>{t.what}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {s.individualStats ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, textAlign: "center" }} data-recap-scoring>
+          {([["birdies", h.scoring.birdies], ["pars", h.scoring.pars], ["bogeys", h.scoring.bogeys], ["doubles+", h.scoring.doublesPlus]] as const).map(([l, v]) => (
+            <div key={l} style={{ color: C.sage, fontSize: 11 }}><div style={{ ...S.num, fontSize: 20, color: C.cream }}>{v}</div>{l}</div>
+          ))}
+        </div>
+      ) : null}
+      <div style={{ display: "flex", flexDirection: "column", gap: 3 }} data-recap-course>
+        {s.individualStats && (h.fieldNet != null || h.frontBack) ? (
+          <div style={S.line}>{h.fieldNet != null ? <>Field average <b style={{ color: C.cream }}>net {h.fieldNet.toFixed(1)}</b></> : null}{h.fieldNet != null && h.frontBack ? " · " : null}{h.frontBack ? (Math.abs(h.frontBack.front - h.frontBack.back) < 0.05 ? "even front and back" : `${h.frontBack.back < h.frontBack.front ? "back" : "front"} nine ${Math.abs(h.frontBack.front - h.frontBack.back).toFixed(1)} better`) : null}</div>
+        ) : null}
+        {h.toughest ? <div style={S.line}>Toughest: <b style={{ color: C.cream }}>Hole {h.toughest.n}</b> · par {h.toughest.par}{h.toughest.si ? `, stroke index ${h.toughest.si}` : ""} · field averaged <b style={{ color: C.cream }}>{h.toughest.avg.toFixed(1)} ({h.toughest.vsPar >= 0 ? "+" : ""}{h.toughest.vsPar.toFixed(1)})</b>{h.toughest.parsOrBetter === 0 ? " — nobody made par" : ""}</div> : null}
+        {h.easiest && h.easiest.n !== h.toughest?.n ? <div style={S.line}>Easiest: <b style={{ color: C.cream }}>Hole {h.easiest.n}</b> · par {h.easiest.par}{h.easiest.si ? `, stroke index ${h.easiest.si}` : ""} · field averaged <b style={{ color: C.cream }}>{h.easiest.avg.toFixed(1)} ({h.easiest.vsPar >= 0 ? "+" : ""}{h.easiest.vsPar.toFixed(1)})</b>{h.easiest.birdies || h.easiest.pars ? ` — ${h.easiest.birdies} birdie${h.easiest.birdies === 1 ? "" : "s"}, ${h.easiest.pars} par${h.easiest.pars === 1 ? "" : "s"}` : ""}</div> : null}
+        {s.individualStats && h.netEagleHole ? <div style={S.line}>Net eagles: <b style={{ color: C.cream }}>{h.netEagleHole.total}</b> — <b style={{ color: C.cream }}>{h.netEagleHole.count} on hole {h.netEagleHole.n}</b> (par {h.netEagleHole.par}{h.netEagleHole.si ? `, stroke index ${h.netEagleHole.si}` : ""})</div> : null}
+        {contests.length ? <div style={S.line} data-recap-contests>{contests.map((c, i) => <span key={i}>{i ? " · " : ""}{c.label} #{c.hole} <b style={{ color: C.cream }}>{c.name}</b> {c.value}</span>)}</div> : null}
+        {!share && h.roundMinutes ? <div style={S.line}>Round length: <b style={{ color: C.cream }}>{Math.floor(h.roundMinutes / 60)} h {h.roundMinutes % 60} m</b>, first tee to last putt</div> : null}
+        {!share && money ? <div style={{ ...S.line, color: money.includes("review") ? C.gold : C.sage }} data-recap-money>{money}</div> : null}
+      </div>
+      <div style={{ color: C.sage, fontSize: 11, textAlign: "right", marginTop: share ? "auto" : 0 }}>{s.individualStats ? "Net = gross − full course handicap · " : ""}⛳ Birdie Num Num</div>
+    </div>
+  );
+}

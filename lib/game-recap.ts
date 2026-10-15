@@ -8,7 +8,12 @@ import { singlesTeamStandings, foursomeTeamStandings, trifectaResults, skinsTota
 import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import type { Game, Player } from "@/lib/game-types";
 
+import { buildHighlights, type Highlights } from "@/lib/game-highlights";
+import { buildRecapSections, andList, type RecapSections } from "@/lib/game-recap-sections";
+
 export type Recap = {
+  highlights: Highlights;         // the shared sections (top 3, net birdies, group, course)
+  sections: RecapSections;        // the format's own section, sub-line and tiles
   headline: string;               // e.g. "Red beat Blue 3–1"
   endedEarly: boolean;            // matches or scorecards unfinished when the game ended
   notes: string[];                // e.g. "2 matches unfinished — not counted"
@@ -25,7 +30,7 @@ function teamLine(teams: { key: string; name: string }[], a: number, b: number) 
   return a > b ? { headline: `${ta.name} beat ${tb.name} ${pts(a)}–${pts(b)}`, winner: ta.key } : { headline: `${tb.name} beat ${ta.name} ${pts(b)}–${pts(a)}`, winner: tb.key };
 }
 
-export function buildRecap(game: Game, players: Player[], altShotScores: AltShotScoreRow[] = []): Recap {
+function buildRecapCore(game: Game, players: Player[], altShotScores: AltShotScoreRow[]): Omit<Recap, "highlights" | "sections"> & { winner: string | null } {
   const shape = shapeOf(game);
   const teams = (Array.isArray(game.teams) && game.teams.length === 2 ? game.teams : null) as { key: string; name: string }[] | null;
   const holes = game.holes_meta?.length ?? 18;
@@ -45,7 +50,7 @@ export function buildRecap(game: Game, players: Player[], altShotScores: AltShot
     const t = teamLine(teams, a, b);
     if (st.out > 0) notes.push(`${st.out} match${st.out === 1 ? "" : "es"} unfinished — not counted`);
     teamPersonal(t.winner);
-    return { headline: t.headline, endedEarly: st.out > 0, notes, personal, signature: `team:${a}:${b}:${st.out}` };
+    return { headline: t.headline, endedEarly: st.out > 0, notes, personal, signature: `team:${a}:${b}:${st.out}`, winner: t.winner };
   }
   if (teams && game.game_type === "trifecta") {
     const r = trifectaResults(game, players, [teams[0].key, teams[1].key]);
@@ -53,7 +58,7 @@ export function buildRecap(game: Game, players: Player[], altShotScores: AltShot
     const t = teamLine(teams, o.decidedA, o.decidedB);
     if (o.open > 0) notes.push(`${pts(o.open)} point${o.open === 1 ? "" : "s"} from unfinished contests — not counted`);
     teamPersonal(t.winner);
-    return { headline: t.headline, endedEarly: o.open > 0, notes, personal, signature: `trifecta:${o.decidedA}:${o.decidedB}:${o.open}` };
+    return { headline: t.headline, endedEarly: o.open > 0, notes, personal, signature: `trifecta:${o.decidedA}:${o.decidedB}:${o.open}`, winner: t.winner };
   }
   // Individual singles: each player's own match; no invented overall winner.
   if (game.game_type === "match") {
@@ -70,29 +75,35 @@ export function buildRecap(game: Game, players: Player[], altShotScores: AltShot
     });
     if (unfinished) notes.push(`${unfinished} match${unfinished === 1 ? "" : "es"} unfinished`);
     const n = (game.pairings || []).length;
-    return { headline: `${n} singles match${n === 1 ? "" : "es"} played`, endedEarly: unfinished > 0, notes, personal, signature: `singles:${sig.join(",")}` };
+    return { headline: `${n} singles match${n === 1 ? "" : "es"}`, endedEarly: unfinished > 0, notes, personal, signature: `singles:${sig.join(",")}`, winner: null };
+  }
+  if ((game.game_type === "fourball" || game.game_type === "alt_shot") && !teams) {
+    const n = (game.foursomes || []).filter((f: any) => f.a?.length && f.b?.length).length;
+    return { headline: `${n} ${game.game_type === "alt_shot" ? "alternate-shot" : "four-ball"} match${n === 1 ? "" : "es"}`, endedEarly: false, notes, personal, signature: `pairs:${n}`, winner: null };
   }
   if (game.game_type === "skins") {
     const s = skinsTotals(game, players);
     if (s.byTeam && teams) {
       const t = teamLine(teams, s.byTeam[teams[0].key] ?? 0, s.byTeam[teams[1].key] ?? 0);
       teamPersonal(t.winner);
-      return { headline: `Skins: ${t.headline}`, endedEarly: false, notes, personal, signature: `skins-team:${s.byTeam.A}:${s.byTeam.B}` };
+      const [ta, tb] = teams; const sa = s.byTeam[ta.key] ?? 0, sb = s.byTeam[tb.key] ?? 0;
+      const head = sa === sb ? `${ta.name} and ${tb.name} split the skins ${sa}–${sb}` : sa > sb ? `${ta.name} won the skins ${sa}–${sb}` : `${tb.name} won the skins ${sb}–${sa}`;
+      return { headline: head, endedEarly: false, notes, personal, signature: `skins-team:${s.byTeam.A}:${s.byTeam.B}`, winner: t.winner };
     }
     const ranked = live.map((p) => ({ p, n: s.byPlayer[pkey(p)] || 0 })).sort((x, y) => y.n - x.n);
     live.forEach((p) => { const n = s.byPlayer[pkey(p)] || 0; personal[pkey(p)] = `you won ${n} skin${n === 1 ? "" : "s"}`; });
     const top = ranked[0];
     const tied = ranked.filter((r) => r.n === top?.n);
-    const headline = !top || top.n === 0 ? "No skins won" : tied.length > 1 ? `Skins: ${tied.map((r) => r.p.display_name).join(" and ")} tied with ${top.n}` : `Skins: ${top.p.display_name} won ${top.n}`;
+    const headline = !top || top.n === 0 ? "No skins won" : tied.length > 1 ? `${tied.map((r) => r.p.display_name).join(" and ")} shared the lead with ${top.n} skins each` : `${top.p.display_name} won ${top.n} skin${top.n === 1 ? "" : "s"}`;
     if (s.carry > 0) notes.push(`${s.carry} skin${s.carry === 1 ? "" : "s"} carried with no winner`);
-    return { headline, endedEarly: false, notes, personal, signature: `skins:${ranked.map((r) => `${pkey(r.p)}=${r.n}`).join(",")}` };
+    return { headline, endedEarly: false, notes, personal, signature: `skins:${ranked.map((r) => `${pkey(r.p)}=${r.n}`).join(",")}`, winner: null };
   }
   // Stroke play / Stableford: the game's own ranking (lib/player-scoring), finishers only.
   const isStroke = game.game_type === "stroke";
   const finished = live.filter((p) => PS.playerThru(p) >= holes);
   const unfinished = live.filter((p) => PS.playerThru(p) > 0 && PS.playerThru(p) < holes);
   const board = PS.sortLeaderboard(finished, game);
-  const score = (p: Player) => isStroke ? `${PS.strokeTotal(p, game)} ${game.stroke_basis === "gross" ? "gross" : "net"}` : `${PS.playerPoints(p, game)} points`;
+  const score = (p: Player) => isStroke ? `${game.stroke_basis === "gross" ? "" : "net "}${PS.strokeTotal(p, game)}` : `${PS.playerPoints(p, game)} points`;
   board.forEach((p) => {
     const pos = PS.posWithin(p, board, game);
     personal[pkey(p)] = `you finished ${ordinal(pos)} of ${board.length} with ${score(p)}`;
@@ -102,5 +113,20 @@ export function buildRecap(game: Game, players: Player[], altShotScores: AltShot
   const top = board[0];
   const leaders = top ? board.filter((p) => PS.rankVal(p, game) === PS.rankVal(top, game) && (isStroke || PS.playerPoints(p, game) === PS.playerPoints(top, game))) : [];
   const headline = !top ? "No completed scorecards" : leaders.length > 1 ? `${leaders.map((p) => p.display_name).join(" and ")} tied with ${score(top)}` : `${top.display_name} won with ${score(top)}`;
-  return { headline, endedEarly: unfinished.length > 0, notes, personal, signature: `${game.game_type}:${board.map((p) => `${pkey(p)}=${isStroke ? PS.strokeTotal(p, game) : PS.playerPoints(p, game)}`).join(",")}:${unfinished.length}` };
+  return { headline, endedEarly: unfinished.length > 0, notes, personal, winner: null, signature: `${game.game_type}:${board.map((p) => `${pkey(p)}=${isStroke ? PS.strokeTotal(p, game) : PS.playerPoints(p, game)}`).join(",")}:${unfinished.length}` };
+}
+
+/** The recap: headline, personal lines and signature (core), plus the shared highlights and the format's
+ *  own section. Flighted Stableford / stroke play name each flight's winner in the headline. */
+export function buildRecap(game: Game, players: Player[], altShotScores: AltShotScoreRow[] = []): Recap {
+  const core = buildRecapCore(game, players, altShotScores);
+  const highlights = buildHighlights(game, players);
+  const sections = buildRecapSections(game, players, altShotScores, highlights, core.winner != null || Array.isArray(game.teams) ? { winner: core.winner } : null);
+  let headline = core.headline;
+  if (sections.flights?.length) {
+    const winners = sections.flights.map((f) => `${andList(f.rows.filter((r) => r.pos === f.rows[0]?.pos).map((r) => r.item.name))} (${f.name.replace(/^Flight\s*/i, "")})`);
+    headline = `Flight winners: ${winners.join(", ")}`;
+  }
+  const { winner: _w, ...rest } = core; void _w;
+  return { ...rest, headline, highlights, sections };
 }
