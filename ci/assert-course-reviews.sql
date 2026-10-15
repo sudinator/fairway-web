@@ -41,8 +41,8 @@ begin
 
   -- First detection: pending + one notice per club admin.
   execute 'set local role service_role';
-  perform public.record_course_freshness_system('rev00001', api1, diff1, true);
-  perform public.record_course_freshness_system('rev00002', api1, diff1, true);
+  perform public.record_course_freshness_system('rev00001', api1, diff1, true, (select data from favorite_courses where external_id = 'rev00001' and coalesce(deleted,false) = false limit 1), 'ok');
+  perform public.record_course_freshness_system('rev00002', api1, diff1, true, (select data from favorite_courses where external_id = 'rev00002' and coalesce(deleted,false) = false limit 1), 'ok');
   execute 'reset role';
   select count(*) into n from notifications where type = 'course_change' and user_id = ca;
   if n <> 1 then raise exception 'club admin got % notices for first detection, expected 1', n; end if;
@@ -50,7 +50,7 @@ begin
   -- Dismiss c1, re-record the SAME diff: stays dismissed, no new notice.
   update course_freshness set status = 'dismissed' where course_id = c1;
   execute 'set local role service_role';
-  perform public.record_course_freshness_system('rev00001', api1, diff1, true);
+  perform public.record_course_freshness_system('rev00001', api1, diff1, true, (select data from favorite_courses where external_id = 'rev00001' and coalesce(deleted,false) = false limit 1), 'ok');
   execute 'reset role';
   select status into st from course_freshness where course_id = c1;
   if st is distinct from 'dismissed' then raise exception 'same diff changed status to %', st; end if;
@@ -59,7 +59,7 @@ begin
 
   -- A DIFFERENT diff reopens it and notifies again. Before 0167 this stayed dismissed forever.
   execute 'set local role service_role';
-  perform public.record_course_freshness_system('rev00001', api1, diff2, true);
+  perform public.record_course_freshness_system('rev00001', api1, diff2, true, (select data from favorite_courses where external_id = 'rev00001' and coalesce(deleted,false) = false limit 1), 'ok');
   execute 'reset role';
   select status into st from course_freshness where course_id = c1;
   if st is distinct from 'pending' then raise exception 'new diff did not reopen: status %', st; end if;
@@ -71,7 +71,7 @@ begin
   insert into favorite_courses(id,group_id,user_id,name,external_id,data) values
     ('16700000-0000-0000-0000-000000000023',null,app,'Course Three','rev00003','{"name":"Course Three","tees":[],"holes":[]}');
   execute 'set local role service_role';
-  perform public.record_course_freshness_system('rev00003', api1, diff1, true);
+  perform public.record_course_freshness_system('rev00003', api1, diff1, true, (select data from favorite_courses where external_id = 'rev00003' and coalesce(deleted,false) = false limit 1), 'ok');
   execute 'reset role';
   if (select status from course_freshness where course_id = '16700000-0000-0000-0000-000000000023') <> 'pending' then raise exception 'unlinked course not recorded'; end if;
   if (select count(*) from notifications where user_id = app and type = 'course_change') <> 1 then raise exception 'unlinked course did not notify the app admin'; end if;

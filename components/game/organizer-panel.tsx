@@ -188,11 +188,14 @@ export function OrganizerPanel({
       else if (st.status === "saved") { setTeamNameStatus("Saved"); setTimeout(() => setTeamNameStatus((cur) => (cur === "Saved" ? null : cur)), 1500); }
       else if (st.status === "error") setTeamNameStatus(`Couldn't save: ${st.error || "try again"}`);
     },
+    undefined,
+    (names) => names[0] === savedTeamNames.current[0] && names[1] === savedTeamNames.current[1],
   ), []);
   const commitTeamNames = async (edits: [string, string]) => {
     if (!onRenameTeams) return;
     const names: [string, string] = [edits[0].trim() || "Team 1", edits[1].trim() || "Team 2"];
-    if (names[0] === savedTeamNames.current[0] && names[1] === savedTeamNames.current[1]) return;
+    // No "already saved" shortcut here (206.2): the queue decides, so a reversal made while a save
+    // is in flight is still sent.
     await nameSaver.request(names);
   };
   const editTeamName = (i: 0 | 1, value: string) => {

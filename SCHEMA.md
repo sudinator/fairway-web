@@ -1,3 +1,7 @@
+## 206.2 — Course freshness follow-ups (0185)
+
+`record_course_freshness_system(text,jsonb,jsonb,boolean,jsonb,text)` replaces the 4-arg form (base data + check state). `record_course_freshness_checked(...,text,jsonb)` adds `p_base_data`.
+
 ## 206.1 — Atomic game structure (0184)
 
 `apply_game_structure(uuid, jsonb, jsonb, jsonb) returns jsonb` (authenticated; organizer or club admin).

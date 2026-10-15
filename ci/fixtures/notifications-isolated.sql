@@ -63,12 +63,12 @@ create function public.create_notification(p_recipient uuid, p_message text, p_g
 create function public.record_course_freshness(p_course_id uuid, p_api_data jsonb, p_diff jsonb, p_has_changes boolean) returns void language sql as $$ select 1 $$;
 -- 0183 model: the server records a check for a verified member. Here it runs the 0165 writer as that member.
 do $$ begin if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin; end if; end $$;
-create function public.record_course_freshness_checked(p_course_id uuid, p_actor uuid, p_api_data jsonb, p_diff jsonb, p_has_changes boolean, p_check_state text) returns jsonb
+create function public.record_course_freshness_checked(p_course_id uuid, p_actor uuid, p_api_data jsonb, p_diff jsonb, p_has_changes boolean, p_check_state text, p_base_data jsonb) returns jsonb
   language plpgsql security definer as $$
 begin
   perform set_config('request.jwt.claim.sub', p_actor::text, true);
   perform public.record_course_freshness(p_course_id, p_api_data, p_diff, p_has_changes);
   return '{"saved":true}'::jsonb;
 end $$;
-grant execute on function public.record_course_freshness_checked(uuid, uuid, jsonb, jsonb, boolean, text) to service_role;
+grant execute on function public.record_course_freshness_checked(uuid, uuid, jsonb, jsonb, boolean, text, jsonb) to service_role;
 create function public.send_tee_reminders() returns void language sql as $$ select 1 $$;

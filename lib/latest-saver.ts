@@ -4,7 +4,11 @@
 // an earlier completion can never confirm (or overwrite) a later edit.
 export type SaverState<T> = { status: "idle" | "saving" | "saved" | "error"; value: T | null; error?: string };
 
-export function createLatestSaver<T>(save: (v: T) => Promise<void>, onState: (s: SaverState<T>) => void, same: (a: T, b: T) => boolean = (a, b) => JSON.stringify(a) === JSON.stringify(b)) {
+export function createLatestSaver<T>(save: (v: T) => Promise<void>, onState: (s: SaverState<T>) => void, same: (a: T, b: T) => boolean = (a, b) => JSON.stringify(a) === JSON.stringify(b),
+  /** 206.2: "is this already the stored value?" — consulted ONLY when nothing is in flight. While a
+   *  save runs, a request equal to the stored value (an edit reverted mid-save) is still queued, or
+   *  the in-flight intermediate value would win. */
+  isStored?: (v: T) => boolean) {
   let inFlight: T | null = null;
   let pending: T | null = null;
   let latest: T | null = null;
@@ -28,6 +32,7 @@ export function createLatestSaver<T>(save: (v: T) => Promise<void>, onState: (s:
     request(v: T): Promise<void> {
       latest = v;
       if (inFlight !== null) { pending = v; return Promise.resolve(); }
+      if (isStored?.(v)) return Promise.resolve();
       return run(v);
     },
   };

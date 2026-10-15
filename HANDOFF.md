@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 206.1.261013
+## Current candidate: 206.2.261013
+
+- LESSON (second-pass review): a fix to one path is not done until every path with the same shape is found — grep for the pattern, not the instance (two recorders, two team writers, six ledger queries).
+
+## Previous: 206.1.261013
 
 - RULES: a query error is never "no rows" (money: all-or-nothing, last good data kept); multi-row game setup writes go through apply_game_structure (one transaction); autosaves use lib/latest-saver; the push sender distinguishes lookup / permanent / retryable and retries only undelivered devices.
 - External review of Oct 13: all 10 findings addressed (205.4, 206.0, 206.1).

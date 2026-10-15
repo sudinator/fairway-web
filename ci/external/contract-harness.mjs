@@ -82,7 +82,7 @@ const ledger = createServer(async (req, res) => {
     }
     if (fn === "record_course_freshness_system") {
       const q = (v) => (v == null ? "null" : `'${String(typeof v === "object" ? JSON.stringify(v) : v).replace(/'/g, "''")}'`);
-      const out = sql(`set local role service_role; select public.record_course_freshness_system(${q(args.p_provider_id)}, ${q(args.p_api_data)}::jsonb, ${q(args.p_diff)}::jsonb, ${args.p_has_changes ? "true" : "false"});`);
+      const out = sql(`set local role service_role; select public.record_course_freshness_system(${q(args.p_provider_id)}, ${q(args.p_api_data)}::jsonb, ${q(args.p_diff)}::jsonb, ${args.p_has_changes ? "true" : "false"}, ${q(args.p_base_data)}::jsonb, ${q(args.p_check_state ?? "ok")});`);
       return send(200, Number(out.trim().split("\n").pop()));
     }
     if (fn === "release_course_api_claims") {

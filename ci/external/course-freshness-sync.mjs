@@ -59,7 +59,7 @@ const patch = spawnSync("node", ["ci/patch_test_aliases.mjs", OUT], { encoding: 
 if (patch.status !== 0) fail(`alias patch failed: ${(patch.stdout + patch.stderr).slice(0, 300)}`);
 const require = createRequire(import.meta.url);
 const { normalizeCourse } = require(resolve(OUT, "lib", "course-normalize.js"));
-const { buildFreshnessDiff } = require(resolve(OUT, "lib", "course-diff.js"));
+const { buildFreshnessDiff, validateProviderCourse } = require(resolve(OUT, "lib", "course-diff.js"));
 
 const headers = { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, "Content-Type": "application/json" };
 async function rest(path, init) {
@@ -69,7 +69,7 @@ async function rest(path, init) {
   return text ? JSON.parse(text) : null;
 }
 
-let flagged = 0, unchanged = 0, notInLibrary = 0;
+let flagged = 0, unchanged = 0, notInLibrary = 0, incomplete = 0, changedDuring = 0;
 const problems = [];
 for (const f of files) {
   const providerId = f.replace(/\.json$/, "");
@@ -78,11 +78,26 @@ for (const f of files) {
     const api = normalizeCourse(raw?.course ?? raw);
     const rows = await rest(`favorite_courses?external_id=eq.${encodeURIComponent(providerId)}&deleted=eq.false&select=id,name,data`);
     if (!rows?.length) { notInLibrary++; console.log(`  ${providerId}: not in the library, skipped`); continue; }
+    // 0185: the same completeness validation as the app's check. An incomplete response is recorded
+    // as "incomplete" with nothing to approve.
+    const problems_ = validateProviderCourse(api);
     for (const row of rows) {
+      if (problems_.length) {
+        const n = await rest("rpc/record_course_freshness_system", { method: "POST", body: JSON.stringify({
+          p_provider_id: providerId, p_api_data: null, p_diff: { hasChanges: false, tees: [], incomplete: problems_ }, p_has_changes: false,
+          p_base_data: row.data ?? null, p_check_state: "incomplete" }) });
+        incomplete++; console.log(`  ${row.name}: provider data INCOMPLETE (${problems_.slice(0, 3).join("; ")}) — recorded, nothing to approve (${n} row(s))`);
+        continue;
+      }
       const diff = buildFreshnessDiff(row.data ?? { name: row.name, tees: [], holes: [] }, api);
+      // 0185: recorded only against this exact row as compared (it is skipped if edited meanwhile).
       const n = await rest("rpc/record_course_freshness_system", { method: "POST", body: JSON.stringify({
-        p_provider_id: providerId, p_api_data: api, p_diff: diff, p_has_changes: !!diff.hasChanges }) });
-      const changes = (diff.tees || []).reduce((s, t) => s + (t.ratingChanged ? 1 : 0) + (t.slopeChanged ? 1 : 0) + (t.yardageChanges?.length || 0), 0);
+        p_provider_id: providerId, p_api_data: api, p_diff: diff, p_has_changes: !!diff.hasChanges,
+        p_base_data: row.data ?? null, p_check_state: "ok" }) });
+      if (!n) { changedDuring++; console.log(`  ${row.name}: edited during the check — skipped, re-checked next run`); continue; }
+      // Every kind of change the comparison detects (206.0): tee values, tees added/removed, hole par/SI.
+      const changes = (diff.tees || []).reduce((s, t) => s + (t.ratingChanged ? 1 : 0) + (t.slopeChanged ? 1 : 0) + (t.yardageChanges?.length || 0), 0)
+        + (diff.teesAdded?.length || 0) + (diff.teesRemoved?.length || 0) + (diff.holeChanges?.length || 0);
       if (diff.hasChanges) { flagged++; console.log(`  ${row.name}: ${changes} change(s) -> pending review, admins notified (${n} row(s))`); }
       else { unchanged++; console.log(`  ${row.name}: matches the provider`); }
     }
@@ -91,5 +106,5 @@ for (const f of files) {
   }
 }
 await rm(OUT, { recursive: true, force: true });
-console.log(`Freshness sync: ${flagged} flagged, ${unchanged} unchanged, ${notInLibrary} not in library, ${problems.length} problem(s).`);
+console.log(`Freshness sync: ${flagged} flagged, ${unchanged} unchanged, ${incomplete} incomplete, ${changedDuring} edited during the check, ${notInLibrary} not in library, ${problems.length} problem(s).`);
 if (problems.length) { console.error("- " + problems.join("\n- ")); process.exit(2); }

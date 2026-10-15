@@ -19,14 +19,14 @@ begin
 
   -- Finding 1: the browser path is gone, and app roles cannot call the server's recorder.
   if to_regprocedure('public.record_course_freshness(uuid,jsonb,jsonb,boolean)') is not null then raise exception 'browser recorder still exists'; end if;
-  if has_function_privilege('authenticated', 'public.record_course_freshness_checked(uuid,uuid,jsonb,jsonb,boolean,text)', 'execute') then raise exception 'members can call the server recorder'; end if;
+  if has_function_privilege('authenticated', 'public.record_course_freshness_checked(uuid,uuid,jsonb,jsonb,boolean,text,jsonb)', 'execute') then raise exception 'members can call the server recorder'; end if;
 
   -- The server records for a verified member; an outsider is refused even via the service role.
   execute 'set local role service_role';
-  begin perform public.record_course_freshness_checked(crs, out_, good, '{"hasChanges":true,"tees":[1]}', true, 'ok'); ok := false;
+  begin perform public.record_course_freshness_checked(crs, out_, good, '{"hasChanges":true,"tees":[1]}', true, 'ok', (select data from favorite_courses where id = crs)); ok := false;
   exception when others then ok := true; end;
   if not ok then raise exception 'outsider recorded a check'; end if;
-  r := public.record_course_freshness_checked(crs, mem, good, '{"hasChanges":true,"tees":[1]}', true, 'ok');
+  r := public.record_course_freshness_checked(crs, mem, good, '{"hasChanges":true,"tees":[1]}', true, 'ok', (select data from favorite_courses where id = crs));
   execute 'reset role';
   if (r->>'saved')::boolean is not true or (r->>'status') <> 'pending' then raise exception 'check not saved as pending: %', r; end if;
   rev := (r->>'revision')::bigint;
@@ -49,7 +49,7 @@ begin
   -- Re-check (new revision fingerprints the corrected course) → approval of THAT revision applies.
   execute 'reset role';
   execute 'set local role service_role';
-  r := public.record_course_freshness_checked(crs, mem, good, '{"hasChanges":true,"tees":[1]}', true, 'ok');
+  r := public.record_course_freshness_checked(crs, mem, good, '{"hasChanges":true,"tees":[1]}', true, 'ok', (select data from favorite_courses where id = crs));
   execute 'reset role';
   execute 'set local role authenticated';
   perform set_config('request.jwt.claim.sub', adm::text, true);
@@ -66,7 +66,7 @@ begin
 
   -- Finding 6: an incomplete provider response is recorded as such, with nothing to apply.
   execute 'set local role service_role';
-  r := public.record_course_freshness_checked(crs, mem, good, '{"incomplete":["tee Blue: no slope"]}', true, 'incomplete');
+  r := public.record_course_freshness_checked(crs, mem, good, '{"incomplete":["tee Blue: no slope"]}', true, 'incomplete', (select data from favorite_courses where id = crs));
   execute 'reset role';
   if (r->>'check_state') <> 'incomplete' or (select api_data from course_freshness where course_id = crs) is not null then raise exception 'incomplete check kept a payload: %', r; end if;
   execute 'set local role authenticated';
@@ -75,6 +75,19 @@ begin
   if not ok then raise exception 'incomplete check applied'; end if;
   execute 'reset role';
   perform set_config('request.jwt.claim.sub', '', true);
+
+  -- 0185 follow-up 2: a correction made DURING the check (the base no longer matches) is refused.
+  execute 'set local role service_role';
+  begin perform public.record_course_freshness_checked(crs, mem, good, '{"hasChanges":true,"tees":[1]}', true, 'ok', '{"name":"stale read"}'::jsonb); ok := false;
+  exception when others then ok := true; end;
+  if not ok then raise exception 'recorded against a course that changed during the check'; end if;
+  -- 0185 follow-up 1: the SCHEDULED recorder: incomplete → no applicable payload; a stale base → nothing recorded.
+  if public.record_course_freshness_system('prov1', good, '{"hasChanges":true}', true, '{"name":"stale"}'::jsonb, 'ok') <> 0 then raise exception 'scheduled check recorded against a changed course'; end if;
+  if public.record_course_freshness_system('prov1', good, '{"incomplete":["no tees"]}', true, (select data from favorite_courses where id = crs), 'incomplete') <> 1 then raise exception 'scheduled incomplete not recorded'; end if;
+  execute 'reset role';
+  if (select api_data from course_freshness where course_id = crs) is not null or (select check_state from course_freshness where course_id = crs) <> 'incomplete' then
+    raise exception 'scheduled incomplete check kept an applicable payload';
+  end if;
 
   delete from course_freshness where course_id = crs; delete from group_courses where course_id = crs;
   delete from favorite_courses where id = crs; delete from group_members where group_id = grp; delete from groups where id = grp;

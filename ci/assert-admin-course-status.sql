@@ -18,7 +18,8 @@ begin
   execute 'set local role service_role';
   perform public.record_course_api_check('adm00001','ok','Club','Status Course','Town',null,200);
   perform public.record_course_freshness_system('adm00001','{"name":"Status Course","tees":[],"holes":[]}'::jsonb,
-    '{"tees":[{"name":"Blue","ratingChanged":true,"slopeChanged":false,"yardageChanges":[{"hole":1,"from":1,"to":2},{"hole":2,"from":3,"to":4}]}],"hasChanges":true}'::jsonb, true);
+    '{"tees":[{"name":"Blue","ratingChanged":true,"slopeChanged":false,"yardageChanges":[{"hole":1,"from":1,"to":2},{"hole":2,"from":3,"to":4}]}],"hasChanges":true}'::jsonb, true,
+    (select data from favorite_courses where external_id = 'adm00001' and coalesce(deleted,false) = false limit 1), 'ok');
   execute 'reset role';
   insert into course_change_requests(course_id,group_id,submitted_by,proposed_name,proposed_data,status) values (c1,ga,mem,'Status Course','{}'::jsonb,'pending');
 end $$;

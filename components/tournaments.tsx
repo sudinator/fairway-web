@@ -2426,12 +2426,17 @@ function GameRoom({
   };
 
   // Organizer: update a player's team assignment from the unified setup roster.
+  // 206.2 (review follow-up 5): a manual team move saves the player's team AND the foursomes built
+  // from it in ONE transaction (apply_game_structure, 0184) — the same path as the balance buttons.
+  // Before, a failed team write was ignored and the foursomes were saved as if it had succeeded.
   const setPlayerTeam = async (p: Player, team: string | null) => {
-    if (!allowSetupChange({ type: "set_team", player: p, team })) return;
-    await supabase.from("game_players").update({ team }).eq("id", p.id);
+    if (!game || !allowSetupChange({ type: "set_team", player: p, team })) return;
     const nextPlayers = players.map((x) => x.id === p.id ? { ...x, team } : x);
-    setPlayers(nextPlayers);
-    await syncTeamPlayFoursomes(nextPlayers);
+    const teamFormat = Array.isArray(game.teams) && game.teams.length === 2 && (game.game_type === "fourball" || game.game_type === "alt_shot" || game.game_type === "trifecta");
+    const foursomes = teamFormat ? deriveTeamFoursomesFromGroups(nextPlayers, game.teams!, game.foursomes) : null;
+    const { error } = await supabase.rpc("apply_game_structure", { p_game: game.id, p_teams: [{ player: p.id, team }], p_groups: [], p_foursomes: foursomes });
+    if (error) notifyError(`Couldn't move ${p.display_name} — nothing was changed. ${error.message}`);
+    else setPlayers(nextPlayers);
     await load();
   };
 
