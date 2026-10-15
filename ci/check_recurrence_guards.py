@@ -79,6 +79,14 @@ for src in [p for d in ("app", "components", "lib") for p in (ROOT / d).rglob("*
             line = text.count("\n", 0, m.start()) + 1
             problems.append(f"G {src.relative_to(ROOT)}:{line}: discarded Supabase request (lazy builder — nothing is sent); await it or chain .then (205.4)")
 
+# H. createClient() returns a NEW wrapper each call. Created inside a component and listed as a hook
+#    dependency, it changes every render and re-runs the effect forever (207.0: the course-history
+#    panel looped until its rendered test hung). Inside components: useMemo(() => createClient(), []).
+for src in [p for d in ("app", "components") for p in (ROOT / d).rglob("*.tsx") if "node_modules" not in p.parts]:
+    text = src.read_text(encoding="utf-8")
+    if re.search(r"^[ \t]+const supabase = createClient\(\);", text, re.M) and re.search(r"\[[^\]\n]*\bsupabase\b[^\]\n]*\]\s*\)", text):
+        problems.append(f"H {src.relative_to(ROOT)}: createClient() inside a component AND used as a hook dependency — wrap it: useMemo(() => createClient(), []) (207.0)")
+
 # E. ad-hoc name shortening
 ALLOW_E = {ROOT / "lib" / "short-names.ts", ROOT / "components" / "player-card.tsx"}
 for f in list((ROOT / "components").rglob("*.tsx")) + list((ROOT / "lib").rglob("*.ts")):
@@ -91,4 +99,4 @@ if problems:
     print("recurrence guards: FAIL")
     for p in problems: print("  " + p)
     sys.exit(1)
-print("recurrence guards: PASS (server time formatting, NULL-safe assertions, is_admin arity, OS-assigned ports, one name-shortening rule, staging-only tooling gated, no discarded Supabase requests)")
+print("recurrence guards: PASS (server time formatting, NULL-safe assertions, is_admin arity, OS-assigned ports, one name-shortening rule, staging-only tooling gated, no discarded Supabase requests, stable Supabase client in hooks)")

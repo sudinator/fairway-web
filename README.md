@@ -1,3 +1,7 @@
+## 207.0.261013 — Course history and restore
+
+Every change to a shared course's content — data, name, facility, location, provider link — is now kept as a version, and a site admin can restore any earlier version as a new one.
+
 ## 206.2.261013 — Review follow-ups: manual team moves atomic, guest lookup gated, scheduled check validated, mid-check edits caught, name reversal saved
 
 Second-pass review of 206.1 (Oct 13). Items 1, 3 and 5 completed fixes that 206.x had applied to one path but not a second; 2 and 4 were genuine edge cases.

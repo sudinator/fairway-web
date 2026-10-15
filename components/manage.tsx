@@ -15,6 +15,7 @@ import { failureMessage } from "@/lib/errors";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { checkCourseFreshness } from "@/lib/course-freshness";
+import { CourseHistory } from "@/components/course-history";
 import { FreshnessDiffList } from "@/components/course-freshness-diff";
 import type { FreshnessDiff } from "@/lib/course-diff";
 import { diagEnabled, setDiagEnabled, reproduceBug, setReproduceBug, getDiagLog, clearDiagLog } from "@/lib/debuglog";
@@ -1392,6 +1393,7 @@ function AdminCourseData({ onOpenCourses }: { onOpenCourses?: () => void }) {
                   {new Date(l.at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · <b>{l.status}</b>{l.http_status ? ` ${l.http_status}` : ""} · {l.source}{l.note ? ` — ${l.note}` : ""}
                 </div>
               ))}
+              <CourseHistory courseId={r.course_id} clubs={r.clubs || ""} canRestore onRestored={() => void openDetails(r, true)} />
             </div>
           )}
         </div>

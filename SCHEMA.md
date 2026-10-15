@@ -1,3 +1,7 @@
+## 207.0 — Course versions (0186)
+
+`course_versions` (RLS; read where the course is readable; no app writes) + trigger `record_course_version` on favorite_courses. `restore_course_version(uuid, integer, text) returns integer` (site admin). review_course_correction / apply_course_freshness tag their changes.
+
 ## 206.2 — Course freshness follow-ups (0185)
 
 `record_course_freshness_system(text,jsonb,jsonb,boolean,jsonb,text)` replaces the 4-arg form (base data + check state). `record_course_freshness_checked(...,text,jsonb)` adds `p_base_data`.

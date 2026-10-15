@@ -1,3 +1,17 @@
+## 207.0.261013 — Course history and restore
+
+Every change to a shared course's content — data, name, facility, location, provider link — is now kept as a version, and a site admin can restore any earlier version as a new one.
+
+**How it is recorded.** A trigger on the course table (migration 0186) writes a `course_versions` row in the SAME transaction as the change. Eight paths write course data today, three of them directly from the browser (course creation ×3, metadata refresh, yardage backfill ×2) plus member-correction and provider-update approval; the trigger covers all of them and any future one. Approval functions tag their change with its source and reason; anything else is a manual edit by the signed-in person; flag-only updates (vetted, deleted) and club-specific overrides are not versions. Existing courses get a starting snapshot labelled "earlier history unavailable".
+
+**Restore** (`restore_course_version`): site admins only, a reason required, a confirmation naming the clubs that share the course; the restored content becomes a NEW version — nothing in the history is removed. Rounds keep their own course snapshots and are not recalculated. A provider approval pending against the pre-restore course is refused by the 0183 fingerprint check.
+
+**Screen.** Admin → Course data → a course's details → History: newest first, labelled by source, who, and which version is in use; selecting an entry shows its changes using the same comparison as the review screen; older versions offer Restore.
+
+**Proof.** `ci/assert-course-versions.sql` is the proposal's acceptance test on the full chain — apply a provider update, inspect before/after, refuse a member / no-reason / current-version restore, restore, confirm the course is current and the history intact, a historical round unchanged, the stale approval blocked, app roles unable to write history, a manual edit recorded as such. It found a real defect while being written: the source tag leaked to a later write in the same transaction; the trigger now consumes it. `lib/course-history-render.test.tsx` renders the list; it found a second: the panel re-loaded forever because the database client was recreated each render — fixed, and guard H now fails the build on that pattern.
+
+Deploy: 0186 to staging → code → 0186 to production → merge. The starting snapshot is created when 0186 runs.
+
 ## 206.2.261013 — Review follow-ups: manual team moves atomic, guest lookup gated, scheduled check validated, mid-check edits caught, name reversal saved
 
 Second-pass review of 206.1 (Oct 13). Items 1, 3 and 5 completed fixes that 206.x had applied to one path but not a second; 2 and 4 were genuine edge cases.

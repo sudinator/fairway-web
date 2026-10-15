@@ -1,5 +1,5 @@
 {
-  "total": 439479,
+  "total": 439485,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -16,6 +16,7 @@
     "competition": 16,
     "component render": 17,
     "contests": 26,
+    "course history": 6,
     "course ordering": 4,
     "create-game format": 12,
     "failure messages": 24,
