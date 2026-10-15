@@ -117,4 +117,27 @@ for (const [label, g, teamed] of formats) {
   ok(!t.el.querySelector("[data-points-outlook]"), "finished Trifecta: no 'If every match ended now' line");
   try { t.unmount(); } catch { /* jsdom */ }
 }
+// 207.2: a FINISHED game opens on its recap, and the recap's score is the Results block's decided score.
+{
+  saveGameSnapshot(GAME_ID, { game: { ...game, status: "ended" }, players, altShotScores: [] });
+  const t = renderScreen(<Tournaments session={{ user: { id: SACHIN, user_metadata: { full_name: "Sachin Manchanda" } } }} activeGroupId={GROUP_ID} openGameId={GAME_ID} />);
+  const head = t.el.querySelector("[data-recap-headline]")?.textContent || "";
+  ok(!!head, `finished game shows the recap (${head})`);
+  const m = head.match(/(\S+) beat (\S+) ([\d½]+)–([\d½]+)|(\S+) and (\S+) tied ([\d½]+)–([\d½]+)/);
+  ok(!!m, "headline names the result");
+  // The standings block shows "<A> <decidedA> – <B> <decidedB>"; the recap's two numbers must both appear in it.
+  const block = Array.from(t.el.querySelectorAll("div")).map((d) => d.textContent || "").find((x) => /RUNNING SCORE|TEAM MATCH|TRIFECTA/i.test(x) && /–/.test(x)) || "";
+  const nums = m ? [m[3] ?? m[7], m[4] ?? m[8]] : [];
+  ok(nums.every((n) => block.includes(n)), `recap score (${nums.join("–")}) appears in the Results standings`);
+  ok(!t.el.querySelector("[data-recap-money]") || /posted|review/.test(t.el.querySelector("[data-recap-money]")?.textContent || ""), "money status, never an amount");
+  ok(!/\$\d/.test(t.el.querySelector("[data-game-recap]")?.textContent || ""), "no money amounts in the recap");
+  try { t.unmount(); } catch { /* jsdom */ }
+}
+// An ACTIVE game shows no recap.
+{
+  saveGameSnapshot(GAME_ID, { game: { ...game, status: "active" }, players, altShotScores: [] });
+  const t = renderScreen(<Tournaments session={{ user: { id: SACHIN, user_metadata: { full_name: "Sachin Manchanda" } } }} activeGroupId={GROUP_ID} openGameId={GAME_ID} />);
+  ok(!t.el.querySelector("[data-game-recap]"), "an active game shows no recap");
+  try { t.unmount(); } catch { /* jsdom */ }
+}
 report("results outlook + embedded group card + all formats");

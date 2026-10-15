@@ -92,6 +92,7 @@ import { ScoreHistory, SkinsView, MatchView, FourballView, StrokesSummary, Sweep
 import { SegmentBoard, GroupSegmentSummary } from "@/components/game/segment-views";
 import { GameList } from "@/components/game/game-list";
 import * as PS from "@/lib/player-scoring";
+import { GameRecapCard } from "@/components/game/game-recap-card";
 import * as FG from "@/lib/finish-gaps";
 import * as SEG from "@/lib/segments";
 import { LeaderRow } from "@/components/game/leader-row";
@@ -2921,6 +2922,9 @@ function GameRoom({
     // If round posting fails, the game remains active rather than entering a split-brain "ended but not posted" state.
     const { error: finErr } = await supabase.rpc("finish_game_and_post_rounds", { p_game: game.id });
     if (finErr) { alert(failureMessage("Couldn't end the game", finErr)); return; }
+    // 207.2: announce the result (built on the server from the shared results functions). Best effort:
+    // the game is ended either way; a failed announcement can be retried by ending again.
+    try { await fetch(`/api/games/${game.id}/completed`, { method: "POST" }); } catch { /* announcement only */ }
     await logActivity(supabase, { actor_id: user.id, actor_name: displayName, action: "game_ended", group_id: (game as any).group_id || null, summary: `Ended the game "${game.name}"` });
     await load();
   };
@@ -3359,6 +3363,11 @@ function GameRoom({
         </div>
       )}
 
+      {/* 207.2: a finished game opens on its recap — same results functions as the cards below. */}
+      {roomTab === "play" && game.status === "ended" && (
+        <GameRecapCard game={game} players={players} altShotScores={altShotScores} userId={user.id} betStale={betStale}
+          competition={competitionLink} onOpenCompetition={onOpenCompetition} />
+      )}
       {roomTab === "play" && betStale && (
         <div style={{ background: "#5a3a10", border: `1px solid ${C.gold}`, borderRadius: 14, padding: 14, marginTop: 16 }}>
           <div style={{ color: "#f6d98a", fontWeight: 800, fontSize: 14 }}>⚠️ Posted bet winnings are out of date</div>

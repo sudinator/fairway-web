@@ -6,7 +6,12 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 207.1.261013
+## Current candidate: 207.2.261013
+
+- RULE: game results (standings, recap, announcement) come ONLY from lib/game-results + lib/game-recap + lib/player-scoring. No result logic in SQL or in view components.
+- 207.0–207.2 ship together (owner, Oct 13): migrations 0186, 0187, 0188.
+
+## Previous: 207.1.261013
 
 - Admin course row wording lives ONLY in lib/course-status.ts. Next: 207.2 completion recap.
 

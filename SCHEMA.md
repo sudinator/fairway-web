@@ -1,3 +1,7 @@
+## 207.2 — Completion announcements (0188)
+
+Dropped trigger `trg_notify_game_finished`. `games.recap_signature`, `games.recap_announced_at`. `claim_game_recap(uuid, text) returns text` (service_role).
+
 ## 207.1 — Course status view (0187)
 
 `course_freshness`: `last_compared_at`, `decision_reason`, `decided_by`, `decided_at` (+ trigger). Attempt status `incomplete`. `dismiss_course_freshness(uuid, bigint, text)` replaces `set_course_freshness_status(uuid, text)`. `admin_course_status()` extended.

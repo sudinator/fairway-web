@@ -65,20 +65,14 @@ begin
   if (select link from notifications where user_id = a and type = 'game_added') <> '/?game=ABCD' then raise exception 'organizer link'; end if;
   delete from notifications;
 
-  -- Game final, individual: own gross/net and position by net; partial card says thru N.
+  -- 0188 (207.2): ending a game announces NOTHING from SQL. The server (/api/games/[id]/completed) builds
+  -- the recap from the app's results functions — the SQL version ranked Stableford games by net
+  -- strokes ("1st of 2 by net") and could not state team results. Wording: lib/game-recap.test.ts.
   update games set status = 'ended' where id = gm;
-  select message into m from notifications where user_id = a and type = 'game_finished';
-  if m is distinct from '"Saturday Stableford" is final: you shot 37 (net 30), 1st of 2 by net.' then raise exception 'final text (winner): %', m; end if;
-  select message into m from notifications where user_id = b and type = 'game_finished';
-  if m is distinct from '"Saturday Stableford" is final: you shot 46 (net 34), 2nd of 2 by net.' then raise exception 'final text (second): %', m; end if;
-  select message into m from notifications where user_id = c and type = 'game_finished';
-  if m is distinct from '"Saturday Stableford" is final: you were 16 thru 3.' then raise exception 'final text (partial): %', m; end if;
-  delete from notifications;
-  -- Team format: no position claim (the match result lives in the app's scoring engines).
+  if exists (select 1 from notifications where type = 'game_finished') then raise exception 'SQL still announces finished games'; end if;
   update games set status = 'active', game_type = 'fourball' where id = gm;
   update games set status = 'ended' where id = gm;
-  select message into m from notifications where user_id = a and type = 'game_finished';
-  if m is distinct from '"Saturday Stableford" is final: you shot 37 (net 30). Open the game for the match result.' then raise exception 'final text (team): %', m; end if;
+  if exists (select 1 from notifications where type = 'game_finished') then raise exception 'SQL still announces finished team games'; end if;
   delete from notifications;
 
   -- Charge and payment name the people and the club.

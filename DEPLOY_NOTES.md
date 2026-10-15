@@ -1,3 +1,17 @@
+## 207.2.261013 — Game completion recap and announcement
+
+**The recap.** A finished game opens on its recap, at the top of Play: the result headline by format — team formats "Red beat Blue 3–1" (decided points only); Trifecta the same from its contests; individual singles each player's own match ("you beat Karan 3 & 2"), with no invented overall winner; Stableford / stroke play the winner by the game's own ranking; skins the skins outcome — then "Ended early" with what was unfinished (never counted as settled), your own line, course · date · format · holes played, the money STATUS (posted · not posted · needs review — never an amount), a "results changed since they were announced" note after corrections, and for a Cup session a link to its standings.
+
+**One implementation.** The team standings each Results view computed inside its component moved verbatim to `lib/game-results.ts` (singles, four-ball, alternate shot, Trifecta, skins); the Results screens, the recap (`lib/game-recap.ts`) and the announcement all use it. Every existing rendered Results test passed unchanged after the move; a new one checks the finished-game recap's score is the Results standings' decided score.
+
+**The announcement.** The SQL "game is final" notification (0165) is retired (0188): it ranked Stableford games by NET STROKES, could not state team results, and linked to the Games tab. `/api/games/[id]/completed` (organizer or club admin) builds the recap on the server with the same library and notifies each player — "final" the first time; after a reopen and re-end, "results updated" only if the outcome changed; retries announce nothing (`claim_game_recap`, atomic). Links to the game; no money amounts.
+
+**Fixed along the way.** Half points displayed "0½" instead of "½" on the Results screens; one `fmtPoints` formatter now.
+
+Proof: `lib/game-recap.test.ts` (team result, tie, early end not counted, Stableford by points — the case the old SQL got wrong, nine holes, singles with a guest, skins, corrections and signatures); `results-outlook-render.test.tsx` (recap on a finished game matches the standings; none on an active game; no amounts); `ci/assert-game-recap-announce.sql` (old trigger gone, final once, retries silent, changes announced, service role only); `assert-notifications.sql` now proves SQL announces nothing.
+
+Deploy (207.0–207.2 together): 0186 → 0187 → 0188 to staging → code; then production → merge.
+
 ## 207.1.261013 — Admin → Courses: what data is in use, what's wrong, what to do next
 
 Each course row now leads with one headline (Review required · Latest check failed · Provider data incomplete · Not checked yet · Up to date) and then, separately: **Current data** (when it last changed, how, and by whom — from 207.0's history); **Last compared with the provider** (the last COMPLETE comparison — a failed or incomplete check no longer hides it); **Latest check** (any outcome, with the reason); the **review state** (changes awaiting review with the FULL count; kept as-is with the date and reason; applied; matches); and member corrections awaiting approval. A failure and a pending review are both shown. Filters: Review required · Failed / incomplete · Not checked · All. "Review changes" opens the course; details also hold the History.

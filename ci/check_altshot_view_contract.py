@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 from pathlib import Path
+import os
 import sys
 p = Path('components/game/scoring-views.tsx')
 s = p.read_text(encoding='utf-8')
+# 207.2: standings + alt-shot inputs moved to lib/game-results.ts (shared with the recap).
+s = s + open(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'lib', 'game-results.ts'), encoding='utf-8').read()
 t = Path('components/tournaments.tsx').read_text(encoding='utf-8')
 checks = {
     'FourballView identifies alternate shot explicitly': 'const isAltShot = game.game_type === "alt_shot";' in s,
