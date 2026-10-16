@@ -6,7 +6,11 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 207.2.261013
+## Current candidate: 207.3.261015
+
+- 207.3 = 207.2 renumbered (an older 207.2 build was on staging). No code change.
+
+## Previous: 207.2.261013
 
 - RULE: game results (standings, recap, announcement) come ONLY from lib/game-results + lib/game-recap + lib/player-scoring. No result logic in SQL or in view components.
 - 207.0–207.2 ship together (owner, Oct 13): migrations 0186, 0187, 0188.

@@ -1,3 +1,9 @@
+## 207.3.261015 — Version bump for a clean staging deploy (no code change)
+
+Same code as the final 207.2 (the redesigned recap with its three wording fixes). Renumbered so the deployed version is unambiguous: an earlier 207.2 build was found on staging (its recap said "4 singles matches played"). Check: staging should show 207.3.
+
+Deploy: 0186–0188 already on staging (verified, all 10 checks PASS); push code. Production: 0186 → 0187 → 0188, then merge (unchanged from 207.2).
+
 ## 207.2.261013 — Game completion recap and announcement
 
 **The recap (designed with the owner from mocks of the Oct 10 Bowling Green Ryder Cup, every format).** A finished game opens on its recap, at the top of Play, and every player can **Share with the group**: a 9:16 image through the phone's share sheet (image only — no link). One component (`components/game/recap-body.tsx`) renders both, in two modes, so they cannot drift apart.

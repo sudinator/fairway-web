@@ -1,3 +1,7 @@
+## 207.3.261015 — Version bump for a clean staging deploy (no code change)
+
+Same code as the final 207.2 (the redesigned recap with its three wording fixes). Renumbered so the deployed version is unambiguous: an earlier 207.2 build was found on staging (its recap said "4 singles matches played"). Check: staging should show 207.3.
+
 ## 207.2.261013 — Game completion recap and announcement
 
 **The recap.** A finished game opens on its recap, at the top of Play: the result headline by format — team formats "Red beat Blue 3–1" (decided points only); Trifecta the same from its contests; individual singles each player's own match ("you beat Karan 3 & 2"), with no invented overall winner; Stableford / stroke play the winner by the game's own ranking; skins the skins outcome — then "Ended early" with what was unfinished (never counted as settled), your own line, course · date · format · holes played, the money STATUS (posted · not posted · needs review — never an amount), a "results changed since they were announced" note after corrections, and for a Cup session a link to its standings.
