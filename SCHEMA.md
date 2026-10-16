@@ -1,3 +1,15 @@
+## 207.2 — Completion announcements (0188)
+
+Dropped trigger `trg_notify_game_finished`. `games.recap_signature`, `games.recap_announced_at`. `claim_game_recap(uuid, text) returns text` (service_role).
+
+## 207.1 — Course status view (0187)
+
+`course_freshness`: `last_compared_at`, `decision_reason`, `decided_by`, `decided_at` (+ trigger). Attempt status `incomplete`. `dismiss_course_freshness(uuid, bigint, text)` replaces `set_course_freshness_status(uuid, text)`. `admin_course_status()` extended.
+
+## 207.0 — Course versions (0186)
+
+`course_versions` (RLS; read where the course is readable; no app writes) + trigger `record_course_version` on favorite_courses. `restore_course_version(uuid, integer, text) returns integer` (site admin). review_course_correction / apply_course_freshness tag their changes.
+
 ## 206.2 — Course freshness follow-ups (0185)
 
 `record_course_freshness_system(text,jsonb,jsonb,boolean,jsonb,text)` replaces the 4-arg form (base data + check state). `record_course_freshness_checked(...,text,jsonb)` adds `p_base_data`.

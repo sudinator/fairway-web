@@ -77,6 +77,7 @@ import {
 } from "@/components/ui";
 import type { TrifectaRowSide } from "@/lib/golf";
 import type { Game, Player } from "@/lib/game-types";
+import { singlesTeamStandings, foursomeTeamStandings, trifectaResults, membersOf, altShotInputsFor, fmtPoints } from "@/lib/game-results";
 import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
 import { HScroll } from "@/components/hscroll";
 import { addPairing as nextPairingAdd, removePairing as nextPairingRemove, addFoursome as nextFoursomeAdd, removeFoursome as nextFoursomeRemove, renameFoursome as nextFoursomeRename, assignFoursomePlayer, unassignFoursomePlayer, deriveTeeGroupsFromFoursomes } from "@/lib/game-structure";
@@ -560,36 +561,10 @@ export function MatchView({
   };
 
   // Running team points: each decided/leading pairing contributes to a team. Halved = ½ each.
-  const teamStandings = (() => {
-    if (!isTeam) return null;
-    const pts: Record<string, number> = { A: 0, B: 0 };
-    let decidedPts: Record<string, number> = { A: 0, B: 0 };
-    let valid = 0, dec = 0;
-    game.pairings.forEach((pr) => {
-      const pa = playerOf(pr.a), pb = playerOf(pr.b);
-      if (!pa || !pb) return;
-      const st = matchStatus(game.holes_meta, pa.scores || [], pb.scores || [], chBasis(pa, game.course_par, game.holes_meta?.length), chBasis(pb, game.course_par, game.holes_meta?.length), game.allowance_pct ?? 100);
-      // Determine which team each player is on.
-      const ta = pa.team, tb = pb.team;
-      if (!ta || !tb || ta === tb) return; // need a cross-team pairing
-      valid++;
-      const decided = !!st.result;
-      if (decided) dec++;
-      const award = (winnerTeam: string, half: boolean) => {
-        if (half) { pts.A += 0.5; pts.B += 0.5; if (decided) { decidedPts.A += 0.5; decidedPts.B += 0.5; } }
-        else { pts[winnerTeam] += 1; if (decided) decidedPts[winnerTeam] += 1; }
-      };
-      if (st.thru === 0) return; // not started
-      if (st.lead === 0) award("", true);
-      else {
-        const leadTeam = st.lead > 0 ? ta : tb;
-        award(leadTeam, false);
-      }
-    });
-    return { pts, decidedPts, out: valid - dec };
-  })();
+  // 207.2: one implementation (lib/game-results), shared with the completion recap.
+  const teamStandings = isTeam ? singlesTeamStandings(game, players) : null;
 
-  const fmtPts = (n: number) => (n === Math.floor(n) ? String(n) : `${Math.floor(n)}½`);
+  const fmtPts = fmtPoints;
 
   return (
     <div style={{ marginTop: 18 }}>
@@ -973,7 +948,7 @@ export function TeamClinchLine({ aPts, bPts, unclaimed, aName, bName, metric, sh
   const cs = clinchState(aPts, bPts, unclaimed);
   const leadName = cs.leader === "A" ? aName : cs.leader === "B" ? bName : null;
   const hi = Math.max(aPts, bPts), lo = Math.min(aPts, bPts);
-  const f = (n: number) => (n === Math.floor(n) ? String(n) : `${Math.floor(n)}½`);
+  const f = fmtPoints;
   const totalPool = aPts + bPts + unclaimed;
   const outrightTarget = Math.floor((totalPool / 2) * 2 + 1e-9) / 2 + 0.5;
   const matchPointsNeeded = Math.max(0, outrightTarget - hi);
@@ -1169,95 +1144,30 @@ export function FourballView({
   const placed = new Set(foursomes.flatMap((f) => [...f.a, ...f.b]));
   const unplaced = players.filter((p) => !placed.has(pkey(p)));
 
-  const members4 = (f: { a: string[]; b: string[] }): FourballMember[] =>
-    [...f.a, ...f.b].map((uid) => {
-      const p = playerOf(uid);
-      return { id: uid, gross: p?.scores || [], ch: p ? chBasis(p, game.course_par, game.holes_meta?.length) : null, noShow: !!(p as any)?.no_show };
-    });
+  const members4 = (f: { a: string[]; b: string[] }): FourballMember[] => membersOf(game, players, f);
 
   // Ryder-Cup team rollup: each 2-v-2 foursome is worth a point to the winning
   // side's team; a halved foursome is ½ each. Sides must be cross-team.
   const isTeam = shapeOf(game).usesTeams;
   const isAltShot = game.game_type === "alt_shot";
   const holesCount = game.holes_meta?.length ?? 18;
-  const altShotInputs = (f: { a: string[]; b: string[] }) => {
-    if (!isAltShot || f.a.length !== 2 || f.b.length !== 2) return null;
-    const aRows = f.a.map(playerOf);
-    const bRows = f.b.map(playerOf);
-    if (aRows.some((x) => !x) || bRows.some((x) => !x)) return null;
-    const sides = altShotSides(game as never, players as never, f as never);
-    const arLegacy = readAltShotSideScores(aRows[0]!.scores, aRows[1]!.scores, holesCount);
-    const brLegacy = readAltShotSideScores(bRows[0]!.scores, bRows[1]!.scores, holesCount);
-    const aGross = canonicalAltShotGross(altShotScores, (f as any).id, "a", holesCount, arLegacy.gross);
-    const bGross = canonicalAltShotGross(altShotScores, (f as any).id, "b", holesCount, brLegacy.gross);
-    const conflictHoles = altShotScores.some((r) => r.foursome_id === (f as any).id) ? [] : Array.from(new Set([...arLegacy.conflictHoles, ...brLegacy.conflictHoles])).map((i) => game.holes_meta?.[i]?.n ?? i + 1);
-    return {
-      a: { ids: f.a, chs: [sides.aCh, 0], gross: aGross },
-      b: { ids: f.b, chs: [sides.bCh, 0], gross: bGross },
-      conflictHoles,
-    };
-  };
-  const teamStandings = (() => {
-    if (!isTeam) return null;
-    const pts: Record<string, number> = { A: 0, B: 0 };
-    const decidedPts: Record<string, number> = { A: 0, B: 0 };
-    let valid = 0, dec = 0;
-    foursomes.forEach((f) => {
-      if (!f.a.length || !f.b.length) return;
-      const ta = playerOf(f.a[0])?.team, tb = playerOf(f.b[0])?.team;
-      if (!ta || !tb || ta === tb) return; // need a cross-team foursome
-      const alt = altShotInputs(f);
-      if (isAltShot && !alt) return;
-      valid++;
-      const st = isAltShot
-        ? altShotStatus(game.holes_meta, alt!.a as never, alt!.b as never)
-        : fourballStatus(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, game.team_score_mode === "aggregate" ? "aggregate" : "best_ball");
-      if (st.thru === 0) return;
-      const decided = st.thru === holesCount || Math.abs(st.lead) > holesCount - st.thru;
-      if (decided) dec++;
-      if (st.lead === 0) { pts.A += 0.5; pts.B += 0.5; if (decided) { decidedPts.A += 0.5; decidedPts.B += 0.5; } }
-      else { const w = st.lead > 0 ? ta : tb; pts[w] += 1; if (decided) decidedPts[w] += 1; }
-    });
-    return { pts, decidedPts, out: valid - dec };
-  })();
-  const fmtPts = (n: number) => (n === Math.floor(n) ? String(n) : `${Math.floor(n)}½`);
+  const altShotInputs = (f: { a: string[]; b: string[] }) => altShotInputsFor(game, players, altShotScores, f as never);
+  // 207.2: one implementation (lib/game-results), shared with the completion recap.
+  const teamStandings = isTeam ? foursomeTeamStandings(game, players, altShotScores, foursomes) : null;
+  const fmtPts = fmtPoints;
 
   // Trifecta: each foursome contributes its singles + team points to the team totals.
   const isTrifecta = game.game_type === "trifecta";
   const teamScoreMode: "best_ball" | "aggregate" = game.team_score_mode === "aggregate" ? "aggregate" : "best_ball";
-  const trifectaStandings = (() => {
-    if (!isTeam || !isTrifecta) return null;
-    const pts: Record<string, number> = { A: 0, B: 0 };
-    foursomes.forEach((f) => {
-      if (!f.a.length || !f.b.length) return;
-      const ta = playerOf(f.a[0])?.team, tb = playerOf(f.b[0])?.team;
-      if (!ta || !tb || ta === tb) return;
-      const r = computeTrifecta(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap);
-      pts[ta] = (pts[ta] ?? 0) + r.aPts;
-      pts[tb] = (pts[tb] ?? 0) + r.bPts;
-    });
-    return pts;
-  })();
+  const trifectaRes = isTeam && isTrifecta ? trifectaResults(game, players, [teams?.[0]?.key ?? "A", teams?.[1]?.key ?? "B"], foursomes) : null;
+  const trifectaStandings = trifectaRes ? trifectaRes.pts : null;
   // Points still up for grabs across all trifecta foursomes. A contest's
   // remaining holes only count while BOTH sides still have a live (non-no-show)
   // player — a side that can never post can't yield points, so excluding it lets
   // the lead actually clinch.
   // 204.0: "Decided · if every match ended now · still to play for", across every contest, with the
   // same provisional rule the foursome cards use (leader takes the point, all square splits it).
-  const trifectaOutlook = (() => {
-    if (!isTeam || !isTrifecta) return null;
-    const cs: { lead: number; thru: number; settled: boolean }[] = [];
-    foursomes.forEach((f) => {
-      if (!f.a.length || !f.b.length) return;
-      const ta = playerOf(f.a[0])?.team, tb = playerOf(f.b[0])?.team;
-      if (!ta || !tb || ta === tb) return;
-      const r = computeTrifecta(game.holes_meta, members4(f), f.a, f.b, game.allowance_pct ?? 100, teamScoreMode, !!f.swap);
-      // Perspective: A = the first team in the game, whichever side of the foursome it sits on.
-      const flip = ta !== teams?.[0]?.key;
-      r.contests.forEach((c) => cs.push({ lead: flip ? -c.lead : c.lead, thru: c.thru, settled: c.settled }));
-    });
-    return pointsOutlook(cs);
-  })();
+  const trifectaOutlook = trifectaRes ? trifectaRes.outlook : null;
   const trifectaUnclaimed = (() => {
     if (!isTeam || !isTrifecta) return null;
     let rem = 0;

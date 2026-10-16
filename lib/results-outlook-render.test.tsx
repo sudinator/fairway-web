@@ -117,4 +117,39 @@ for (const [label, g, teamed] of formats) {
   ok(!t.el.querySelector("[data-points-outlook]"), "finished Trifecta: no 'If every match ended now' line");
   try { t.unmount(); } catch { /* jsdom */ }
 }
+// 207.2: a FINISHED game opens on its recap, and the recap's score is the Results block's decided score.
+{
+  saveGameSnapshot(GAME_ID, { game: { ...game, status: "ended" }, players, altShotScores: [] });
+  const t = renderScreen(<Tournaments session={{ user: { id: SACHIN, user_metadata: { full_name: "Sachin Manchanda" } } }} activeGroupId={GROUP_ID} openGameId={GAME_ID} />);
+  const head = t.el.querySelector("[data-recap-headline]")?.textContent || "";
+  ok(!!head, `finished game shows the recap (${head})`);
+  const m = head.match(/(\S+) beat (\S+) ([\d½]+)–([\d½]+)|(\S+) and (\S+) tied ([\d½]+)–([\d½]+)/);
+  ok(!!m, "headline names the result");
+  // The standings block shows "<A> <decidedA> – <B> <decidedB>"; the recap's two numbers must both appear in it.
+  const block = Array.from(t.el.querySelectorAll("div")).map((d) => d.textContent || "").find((x) => /RUNNING SCORE|TEAM MATCH|TRIFECTA/i.test(x) && /–/.test(x)) || "";
+  const nums = m ? [m[3] ?? m[7], m[4] ?? m[8]] : [];
+  ok(nums.every((n) => block.includes(n)), `recap score (${nums.join("–")}) appears in the Results standings`);
+  ok(!t.el.querySelector("[data-recap-money]") || /posted|review/.test(t.el.querySelector("[data-recap-money]")?.textContent || ""), "money status, never an amount");
+  ok(!/\$\d/.test(t.el.querySelector("[data-game-recap]")?.textContent || ""), "no money amounts in the recap");
+  // 207.2 recap redesign: one component, two modes.
+  const app = t.el.querySelector('[data-recap-body="app"]'), img = t.el.querySelector('[data-recap-body="share"]');
+  ok(!!app && !!img, "in-app recap and share image both rendered");
+  ok(!!t.el.querySelector("[data-recap-share]"), "Share with the group offered (Sachin is a player, not the organizer)");
+  ok(!!app?.querySelector("[data-recap-you]"), "in-app: Your day");
+  ok(!img?.querySelector("[data-recap-you]") && !img?.querySelector("[data-recap-money]"), "share image: no personal line, no money status");
+  ok(!/\$\d/.test(img?.textContent || ""), "share image: no amounts");
+  ok(!!img?.querySelector("[data-recap-top3]") && !!img?.querySelector("[data-recap-net-birdies]") && !!img?.querySelector("[data-recap-tiles]"), "share image: top 3, net birdies, tiles");
+  const nbImg = img?.querySelectorAll("[data-recap-net-birdies] > div").length ?? 0, nbApp = app?.querySelectorAll("[data-recap-net-birdies] > div").length ?? 0;
+  ok(nbApp >= nbImg, "the app's net-birdie list is at least as long as the image's top 5");
+  ok((img?.textContent || "").includes("Net = gross − full course handicap"), "net footnote on the image");
+  ok(Array.from(img?.querySelectorAll("*") || []).every((e) => (e as HTMLElement).style?.textOverflow !== "ellipsis"), "no name is truncated with an ellipsis");
+  try { t.unmount(); } catch { /* jsdom */ }
+}
+// An ACTIVE game shows no recap.
+{
+  saveGameSnapshot(GAME_ID, { game: { ...game, status: "active" }, players, altShotScores: [] });
+  const t = renderScreen(<Tournaments session={{ user: { id: SACHIN, user_metadata: { full_name: "Sachin Manchanda" } } }} activeGroupId={GROUP_ID} openGameId={GAME_ID} />);
+  ok(!t.el.querySelector("[data-game-recap]"), "an active game shows no recap");
+  try { t.unmount(); } catch { /* jsdom */ }
+}
 report("results outlook + embedded group card + all formats");

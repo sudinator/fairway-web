@@ -1,3 +1,19 @@
+## 207.3.261015 — Version bump for a clean staging deploy (no code change)
+
+Same code as the final 207.2 (the redesigned recap with its three wording fixes). Renumbered so the deployed version is unambiguous: an earlier 207.2 build was found on staging (its recap said "4 singles matches played"). Check: staging should show 207.3.
+
+## 207.2.261013 — Game completion recap and announcement
+
+**The recap.** A finished game opens on its recap, at the top of Play: the result headline by format — team formats "Red beat Blue 3–1" (decided points only); Trifecta the same from its contests; individual singles each player's own match ("you beat Karan 3 & 2"), with no invented overall winner; Stableford / stroke play the winner by the game's own ranking; skins the skins outcome — then "Ended early" with what was unfinished (never counted as settled), your own line, course · date · format · holes played, the money STATUS (posted · not posted · needs review — never an amount), a "results changed since they were announced" note after corrections, and for a Cup session a link to its standings.
+
+## 207.1.261013 — Admin → Courses: what data is in use, what's wrong, what to do next
+
+Each course row now leads with one headline (Review required · Latest check failed · Provider data incomplete · Not checked yet · Up to date) and then, separately: **Current data** (when it last changed, how, and by whom — from 207.0's history); **Last compared with the provider** (the last COMPLETE comparison — a failed or incomplete check no longer hides it); **Latest check** (any outcome, with the reason); the **review state** (changes awaiting review with the FULL count; kept as-is with the date and reason; applied; matches); and member corrections awaiting approval. A failure and a pending review are both shown. Filters: Review required · Failed / incomplete · Not checked · All. "Review changes" opens the course; details also hold the History.
+
+## 207.0.261013 — Course history and restore
+
+Every change to a shared course's content — data, name, facility, location, provider link — is now kept as a version, and a site admin can restore any earlier version as a new one.
+
 ## 206.2.261013 — Review follow-ups: manual team moves atomic, guest lookup gated, scheduled check validated, mid-check edits caught, name reversal saved
 
 Second-pass review of 206.1 (Oct 13). Items 1, 3 and 5 completed fixes that 206.x had applied to one path but not a second; 2 and 4 were genuine edge cases.

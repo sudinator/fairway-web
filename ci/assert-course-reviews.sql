@@ -99,7 +99,7 @@ select set_config('request.jwt.claim.sub', '16700000-0000-0000-0000-000000000003
 do $$ begin
   if (select count(*) from public.pending_course_reviews()) <> 0 then raise exception 'member can see the queue'; end if;
   begin
-    perform public.set_course_freshness_status('16700000-0000-0000-0000-000000000021', 'dismissed');
+    perform public.dismiss_course_freshness('16700000-0000-0000-0000-000000000021', 1, null);  -- 0187
     raise exception 'member dismissed a review';
   exception when insufficient_privilege then null; end;
   begin
@@ -111,7 +111,7 @@ end $$;
 select set_config('request.jwt.claim.sub', '16700000-0000-0000-0000-000000000002', true);
 -- 0183: approval names the revision the admin reviewed.
 select public.apply_course_freshness('16700000-0000-0000-0000-000000000021', (select revision from public.pending_course_reviews() where course_id = '16700000-0000-0000-0000-000000000021'));
-select public.set_course_freshness_status('16700000-0000-0000-0000-000000000021', 'applied');  -- dismiss/apply status path on a null-group course
+-- (0187: the status setter that could mark 'applied' without applying is gone; apply sets it.)
 do $$ begin
   begin
     perform public.apply_course_freshness('16700000-0000-0000-0000-000000000022', coalesce((select revision from public.pending_course_reviews() where course_id = '16700000-0000-0000-0000-000000000022'), 1));

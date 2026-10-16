@@ -1,3 +1,56 @@
+## 207.3.261015 — Version bump for a clean staging deploy (no code change)
+
+Same code as the final 207.2 (the redesigned recap with its three wording fixes). Renumbered so the deployed version is unambiguous: an earlier 207.2 build was found on staging (its recap said "4 singles matches played"). Check: staging should show 207.3.
+
+Deploy: 0186–0188 already on staging (verified, all 10 checks PASS); push code. Production: 0186 → 0187 → 0188, then merge (unchanged from 207.2).
+
+## 207.2.261013 — Game completion recap and announcement
+
+**The recap (designed with the owner from mocks of the Oct 10 Bowling Green Ryder Cup, every format).** A finished game opens on its recap, at the top of Play, and every player can **Share with the group**: a 9:16 image through the phone's share sheet (image only — no link). One component (`components/game/recap-body.tsx`) renders both, in two modes, so they cannot drift apart.
+- **Format section:** team formats — the result, matches grouped by winning team then largest margin; no-team formats — largest margin of victory; singles/four-ball/alternate shot "went to the 18th" lines; "<team>'s only win"; skins — skins won with pot sizes, biggest pot, longest carry, shared-lead wording; team skins 1v1 / 2v2 — head-to-heads or groups with skins scores; stroke play / Stableford — the leaderboard by the game's own basis, flight winners (the stored flight assignment); alternate shot — pair stats instead of individual ones.
+- **Shared sections:** top 3 gross | top 3 net; net birdies & eagles top 5 (separate columns, golf-style ties, eagles break ties; full list in the app); tiles (biggest win, comeback from 2 down — "halved" when it ended square, best net hole: best net, then best actual score, then harder hole, most pars, best group); the group's scoring strip; field average (8+ players) and front v back (18 holes); toughest / easiest hole with par and stroke index; "net eagles — N on hole X" when one hole stands out; side contests; net footnote. Net = gross − full course handicap.
+- **App only:** your day, the full net-birdie list, round length, money status (never amounts).
+- Wording fixed after a staging seed of every format (`staging_seed_all_formats.sql`, outputs only — not in the repo): "none of the N singles went to the 18th" (not "0 of N"); a level team four-ball / alternate shot says how the matches split; three-way ties read "A, B and C".
+- `lib/game-highlights.ts` and `lib/game-recap-sections.ts` reproduced every number of the approved mocks on the real game (checked privately, not committed); their own tests cover each agreed rule.
+
+**One implementation.** The team standings each Results view computed inside its component moved verbatim to `lib/game-results.ts` (singles, four-ball, alternate shot, Trifecta, skins); the Results screens, the recap (`lib/game-recap.ts`) and the announcement all use it. Every existing rendered Results test passed unchanged after the move; a new one checks the finished-game recap's score is the Results standings' decided score.
+
+**The announcement.** The SQL "game is final" notification (0165) is retired (0188): it ranked Stableford games by NET STROKES, could not state team results, and linked to the Games tab. `/api/games/[id]/completed` (organizer or club admin) builds the recap on the server with the same library and notifies each player — "final" the first time; after a reopen and re-end, "results updated" only if the outcome changed; retries announce nothing (`claim_game_recap`, atomic). Links to the game; no money amounts.
+
+**Fixed along the way.** Half points displayed "0½" instead of "½" on the Results screens; one `fmtPoints` formatter now.
+
+Proof: `lib/game-recap.test.ts` (team result, tie, early end not counted, Stableford by points — the case the old SQL got wrong, nine holes, singles with a guest, skins, corrections and signatures); `results-outlook-render.test.tsx` (recap on a finished game matches the standings; none on an active game; no amounts); `ci/assert-game-recap-announce.sql` (old trigger gone, final once, retries silent, changes announced, service role only); `assert-notifications.sql` now proves SQL announces nothing.
+
+Deploy (207.0–207.2 together): 0186 → 0187 → 0188 to staging → code; then production → merge.
+
+## 207.1.261013 — Admin → Courses: what data is in use, what's wrong, what to do next
+
+Each course row now leads with one headline (Review required · Latest check failed · Provider data incomplete · Not checked yet · Up to date) and then, separately: **Current data** (when it last changed, how, and by whom — from 207.0's history); **Last compared with the provider** (the last COMPLETE comparison — a failed or incomplete check no longer hides it); **Latest check** (any outcome, with the reason); the **review state** (changes awaiting review with the FULL count; kept as-is with the date and reason; applied; matches); and member corrections awaiting approval. A failure and a pending review are both shown. Filters: Review required · Failed / incomplete · Not checked · All. "Review changes" opens the course; details also hold the History.
+
+All wording comes from one pure function, `lib/course-status.ts`, tested against the proposal's acceptance scenarios: successful check, failed check, incomplete response, approval, dismissal, and failure + pending review together.
+
+**Migration 0187.** `course_freshness.last_compared_at` (set only by a complete comparison, by trigger, for every recorder). Attempt log outcome `incomplete`. `dismiss_course_freshness(course, revision, reason?)` — "Keep current data" for the reviewed revision, recording who, when and the optional reason; replaces `set_course_freshness_status`, which also accepted `applied` and could mark a course updated without applying anything (nothing used that; it is gone). `admin_course_status` adds the current version, last complete comparison, check state, revision, keep decision, and the full change count (added/removed tees and hole par/stroke-index changes had been counted as 0).
+
+**Regression fixed (from 206.0).** The in-app freshness route fetched the provider without logging an attempt, so since 206.2 "last check" and the attempt log reflected only the monthly monitor. It logs again (ok / incomplete / error, as the member).
+
+Proof: `ci/assert-course-status-view.sql` on the full chain (added tee counted; current version reported; keep-data refused for a stale revision and recorded with reason and who; an incomplete check leaves the last comparison alone; the old setter gone); `lib/course-status.test.ts`.
+
+Deploy: 0187 to staging → code → 0187 to production → merge (after 0186).
+
+## 207.0.261013 — Course history and restore
+
+Every change to a shared course's content — data, name, facility, location, provider link — is now kept as a version, and a site admin can restore any earlier version as a new one.
+
+**How it is recorded.** A trigger on the course table (migration 0186) writes a `course_versions` row in the SAME transaction as the change. Eight paths write course data today, three of them directly from the browser (course creation ×3, metadata refresh, yardage backfill ×2) plus member-correction and provider-update approval; the trigger covers all of them and any future one. Approval functions tag their change with its source and reason; anything else is a manual edit by the signed-in person; flag-only updates (vetted, deleted) and club-specific overrides are not versions. Existing courses get a starting snapshot labelled "earlier history unavailable".
+
+**Restore** (`restore_course_version`): site admins only, a reason required, a confirmation naming the clubs that share the course; the restored content becomes a NEW version — nothing in the history is removed. Rounds keep their own course snapshots and are not recalculated. A provider approval pending against the pre-restore course is refused by the 0183 fingerprint check.
+
+**Screen.** Admin → Course data → a course's details → History: newest first, labelled by source, who, and which version is in use; selecting an entry shows its changes using the same comparison as the review screen; older versions offer Restore.
+
+**Proof.** `ci/assert-course-versions.sql` is the proposal's acceptance test on the full chain — apply a provider update, inspect before/after, refuse a member / no-reason / current-version restore, restore, confirm the course is current and the history intact, a historical round unchanged, the stale approval blocked, app roles unable to write history, a manual edit recorded as such. It found a real defect while being written: the source tag leaked to a later write in the same transaction; the trigger now consumes it. `lib/course-history-render.test.tsx` renders the list; it found a second: the panel re-loaded forever because the database client was recreated each render — fixed, and guard H now fails the build on that pattern.
+
+Deploy: 0186 to staging → code → 0186 to production → merge. The starting snapshot is created when 0186 runs.
+
 ## 206.2.261013 — Review follow-ups: manual team moves atomic, guest lookup gated, scheduled check validated, mid-check edits caught, name reversal saved
 
 Second-pass review of 206.1 (Oct 13). Items 1, 3 and 5 completed fixes that 206.x had applied to one path but not a second; 2 and 4 were genuine edge cases.

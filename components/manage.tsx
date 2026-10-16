@@ -15,6 +15,8 @@ import { failureMessage } from "@/lib/errors";
 import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup, linkCourseToGroup } from "@/lib/courses";
 import { logActivity } from "@/lib/activity";
 import { checkCourseFreshness } from "@/lib/course-freshness";
+import { CourseHistory } from "@/components/course-history";
+import { courseStatus } from "@/lib/course-status";
 import { FreshnessDiffList } from "@/components/course-freshness-diff";
 import type { FreshnessDiff } from "@/lib/course-diff";
 import { diagEnabled, setDiagEnabled, reproduceBug, setReproduceBug, getDiagLog, clearDiagLog } from "@/lib/debuglog";
@@ -1254,12 +1256,16 @@ type AdminCourseRow = {
   last_verified_at: string | null; last_check_at: string | null; last_check_status: string | null; last_check_note: string | null;
   freshness_checked_at: string | null; freshness_status: string | null; freshness_changes: number | null;
   pending_requests: number | null; oldest_request_at: string | null;
+  // 207.1 (0187)
+  last_compared_at: string | null; freshness_check_state: string | null; freshness_revision: number | null;
+  decision_reason: string | null; decided_at: string | null;
+  current_version: number | null; current_version_at: string | null; current_version_source: string | null; current_version_by: string | null;
 };
 type CheckLogRow = { at: string; status: string; http_status: number | null; note: string | null; source: string };
 function AdminCourseData({ onOpenCourses }: { onOpenCourses?: () => void }) {
   const [rows, setRows] = useState<AdminCourseRow[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "attention">("attention");
+  const [filter, setFilter] = useState<"review" | "failed" | "unchecked" | "all">("review");
   const [busy, setBusy] = useState<string | null>(null);
   const [flash, setFlash] = useState<Record<string, string>>({});
   const [open, setOpen] = useState<Record<string, { diff: FreshnessDiff | null; log: CheckLogRow[] | null }>>({});
@@ -1310,13 +1316,24 @@ function AdminCourseData({ onOpenCourses }: { onOpenCourses?: () => void }) {
   };
   const dismiss = async (r: AdminCourseRow) => {
     setBusy(r.course_id);
-    const { error } = await supabase.rpc("set_course_freshness_status", { p_course_id: r.course_id, p_status: "dismissed" });
+    // 207.1: keep current data for the revision on screen, with an optional reason (0187).
+    const rev = (open[r.course_id] as any)?.revision ?? r.freshness_revision;
+    if (rev == null) { setBusy(null); say(r.course_id, "Open the details and review the changes first."); return; }
+    const reason = window.prompt("Keep the current data. Reason (optional) — e.g. \"provider's slope is wrong\":", "") ;
+    if (reason === null) { setBusy(null); return; }
+    const { error } = await supabase.rpc("dismiss_course_freshness", { p_course_id: r.course_id, p_revision: rev, p_reason: reason || null });
     say(r.course_id, error ? `Couldn't dismiss: ${error.message}` : "Kept the stored data; you'll be told if the provider changes it again.");
     setBusy(null); await load(); await openDetails(r, true);
   };
   const needsAttention = (r: AdminCourseRow) =>
     r.freshness_status === "pending" || (r.pending_requests || 0) > 0 || r.last_check_status === "error" || r.last_check_status === "drift" || (!!r.provider_id && !r.last_verified_at) || r.clubs === "No club";
-  const shown = (rows || []).filter((r) => filter === "all" || needsAttention(r));
+  // 207.1: one status function decides what each row says and which filters it falls under.
+  const statusOf = (r: AdminCourseRow) => courseStatus(r, (iso) => ago(iso));
+  const shownRows = () => (rows || []).filter((r) => {
+    if (filter === "all") return true;
+    const st = statusOf(r);
+    return filter === "review" ? st.review : filter === "failed" ? st.failed : st.notChecked;
+  });
   const ago = (iso: string | null) => {
     if (!iso) return "never";
     const d = new Date(iso); const now = new Date();
@@ -1342,39 +1359,35 @@ function AdminCourseData({ onOpenCourses }: { onOpenCourses?: () => void }) {
           )}
         </div>
       )}
-      <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-        <button style={{ ...btn(filter === "attention"), fontSize: 12 }} onClick={() => setFilter("attention")}>Needs attention ({(rows || []).filter(needsAttention).length})</button>
-        <button style={{ ...btn(filter === "all"), fontSize: 12 }} onClick={() => setFilter("all")}>All courses</button>
+      <div data-course-filters style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+        {([["review", "Review required", (r: AdminCourseRow) => statusOf(r).review], ["failed", "Failed / incomplete", (r: AdminCourseRow) => statusOf(r).failed],
+           ["unchecked", "Not checked", (r: AdminCourseRow) => statusOf(r).notChecked], ["all", "All", () => true]] as const).map(([k, label, pred]) => (
+          <button key={k} style={{ ...btn(filter === k), fontSize: 12 }} onClick={() => setFilter(k)}>{label} ({(rows || []).filter(pred).length})</button>
+        ))}
       </div>
-      {rows && shown.length === 0 && <div style={{ color: C.sage, fontSize: 13 }}>{filter === "attention" ? "Nothing needs attention." : "No courses."}</div>}
-      {shown.map((r) => (
+      {rows && shownRows().length === 0 && <div style={{ color: C.sage, fontSize: 13 }}>{filter === "all" ? "No courses." : "Nothing here."}</div>}
+      {shownRows().map((r) => (
         <div key={r.course_id} data-admin-course-row style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginBottom: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
             <div style={{ color: C.cream, fontWeight: 800 }}>{r.course_name}{r.corrected ? <span style={{ color: C.sage, fontWeight: 500 }}> · hand-corrected</span> : null}</div>
             <div style={{ color: r.clubs === "No club" ? C.gold : C.sage, fontSize: 12 }}>{r.clubs}</div>
           </div>
-          <div style={{ color: C.sage, fontSize: 12.5, marginTop: 6, lineHeight: 1.55 }}>
-            {r.provider_id ? (
-              <>
-                <div>API verified: <span style={{ color: r.last_verified_at ? C.cream : C.gold }}>{ago(r.last_verified_at)}</span>
-                  {r.last_check_status && r.last_check_status !== "ok" && <span style={{ color: C.gold }}> · last attempt {r.last_check_status}{r.last_check_note ? ` — ${r.last_check_note}` : ""}</span>}
-                </div>
-                <div>Data compared: {ago(r.freshness_checked_at)}
-                  {r.freshness_status === "pending" && <span style={{ color: C.gold }}> · <b>{r.freshness_changes} change{r.freshness_changes === 1 ? "" : "s"} awaiting review</b></span>}
-                  {r.freshness_status === "dismissed" && <span> · changes dismissed</span>}
-                  {r.freshness_status === "applied" && <span> · provider data applied</span>}
-                  {r.freshness_status === "none" && <span> · matches provider</span>}
-                </div>
-              </>
-            ) : <div>Custom course — no provider id, not verified against GolfCourseAPI.</div>}
-            {(r.pending_requests || 0) > 0 && <div style={{ color: C.gold }}><b>{r.pending_requests} member correction{r.pending_requests === 1 ? "" : "s"} awaiting global approval</b> (oldest {ago(r.oldest_request_at)})</div>}
-          </div>
+          {(() => {
+            const st = statusOf(r);
+            const col = (t?: string) => (t === "action" || t === "problem" ? C.gold : C.sage);
+            return (
+              <div data-course-status={st.tone} style={{ marginTop: 6, lineHeight: 1.55 }}>
+                <div style={{ color: st.tone === "ok" ? C.sage : st.tone === "quiet" ? C.sage : C.gold, fontSize: 13, fontWeight: 800 }}>{st.headline}</div>
+                {st.lines.map((l, k) => <div key={k} style={{ color: col(l.tone), fontSize: 12.5, fontWeight: l.tone ? 700 : 400 }}>{l.text}</div>)}
+              </div>
+            );
+          })()}
           <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
             {r.provider_id && <button style={{ ...btn(false), fontSize: 12, opacity: busy === r.course_id ? 0.5 : 1 }} disabled={busy === r.course_id} onClick={() => refreshNow(r)}>Refresh from API now (1 request)</button>}
             {r.freshness_status === "pending" && <button style={{ ...btn(true), fontSize: 12, opacity: busy === r.course_id ? 0.5 : 1 }} disabled={busy === r.course_id} onClick={() => apply(r)}>Update stored course</button>}
             {r.freshness_status === "pending" && <button style={{ ...btn(false), fontSize: 12, opacity: busy === r.course_id ? 0.5 : 1 }} disabled={busy === r.course_id} onClick={() => dismiss(r)}>Keep current</button>}
             {(r.pending_requests || 0) > 0 && onOpenCourses && <button style={{ ...btn(true), fontSize: 12 }} onClick={onOpenCourses}>Approve corrections in Courses</button>}
-            <button style={{ ...btn(false), fontSize: 12 }} onClick={() => openDetails(r)}>{open[r.course_id] ? "Hide details" : "Changes & attempt log"}</button>
+            <button style={{ ...btn(false), fontSize: 12 }} onClick={() => openDetails(r)}>{open[r.course_id] ? "Hide details" : statusOf(r).review ? "Review changes" : "Details & history"}</button>
           </div>
           {flash[r.course_id] && <div style={{ color: C.gold, fontSize: 12.5, marginTop: 8 }}>{flash[r.course_id]}</div>}
           {open[r.course_id] && (
@@ -1392,6 +1405,7 @@ function AdminCourseData({ onOpenCourses }: { onOpenCourses?: () => void }) {
                   {new Date(l.at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} · <b>{l.status}</b>{l.http_status ? ` ${l.http_status}` : ""} · {l.source}{l.note ? ` — ${l.note}` : ""}
                 </div>
               ))}
+              <CourseHistory courseId={r.course_id} clubs={r.clubs || ""} canRestore onRestored={() => void openDetails(r, true)} />
             </div>
           )}
         </div>
