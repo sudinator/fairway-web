@@ -1,3 +1,13 @@
+## 208.4.261017 — GitHub check fixed: the crash was a known Supabase bug (no app change)
+
+**Cause, confirmed.** 208.3's probe crashed the database the moment an app user called a function that app users have no permission to run. That is a known defect in Supabase's PostgreSQL 17.6 images up to 17.6.1.111 (in its supautils extension): calling a function the caller lacks EXECUTE on crashes the server instead of answering "permission denied" (supabase/postgres #2112, #2366; supabase/cli #6094; fixed in 17.6.1.121). BNN's code and the merge are not involved — the merge runs as the server role, which the bug doesn't affect.
+
+**Changes (tests only).** The merge test checks that app users lack permission on the merge function by asking the database's privilege catalogue instead of attempting the call. New `ci/assert-no-app-call-to-revoked.sql` checks every server-only function stays unreachable by app roles — by privilege, never by calling. Diagnostic probes removed.
+
+**Hosted databases: not affected (checked Oct 17).** The bug's own reproduction (an app role calling a function it lacks EXECUTE on) was run on staging and on production: both answered a clean "permission denied for function", no crash. Only GitHub's check is affected, because the Supabase CLI provisions an older, affected image for local/CI databases.
+
+The merge hold is lifted for staging. Deploy as 208.1 (0189 + 0190 already on staging).
+
 ## 208.3.261017 — Diagnostics, round 2 (no app change)
 
 208.2's run showed the crash happens on PostgreSQL 17.6 (Supabase's image) in the merge test's STEP 6 — after the previews, refusals and remove checks, before the merge itself. Step 6 (a) has an ordinary app user call the server-only merge function, expecting a refusal, then (b) switches back to the admin role. This round:
