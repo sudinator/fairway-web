@@ -6,7 +6,14 @@ how anything works, **open the file and read it** — never answer from assumpti
 
 ---
 
-## Current candidate: 207.3.261015
+## Current candidate: 208.0.261016
+
+- RULE: every new column that refers to an account goes into account_reference_columns (ci/assert-account-merge.sql fails otherwise).
+- RULE: guards are judged by the account/data affected, never by current_user (definer functions run as owner) and never by a session flag.
+- RULE: account changes are server functions that refuse out loud; no browser-side multi-step deletes.
+- RULE: never test a refusal by CALLING a function an app role lacks EXECUTE on — it crashes Supabase PG 17.6 ≤ 17.6.1.111 (supautils). Check has_function_privilege instead.
+
+## Previous: 207.3.261015
 
 - 207.3 = 207.2 renumbered (an older 207.2 build was on staging). No code change.
 

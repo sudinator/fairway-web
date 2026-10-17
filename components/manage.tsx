@@ -16,6 +16,7 @@ import { buildCustomCourse, Course, CourseHole, courseLabel, loadCoursesForGroup
 import { logActivity } from "@/lib/activity";
 import { checkCourseFreshness } from "@/lib/course-freshness";
 import { CourseHistory } from "@/components/course-history";
+import { AdminPlayers } from "@/components/admin-players";
 import { courseStatus } from "@/lib/course-status";
 import { FreshnessDiffList } from "@/components/course-freshness-diff";
 import type { FreshnessDiff } from "@/lib/course-diff";
@@ -97,6 +98,9 @@ const NOTIF_TYPES: { key: string; label: string; def: "push" | "inapp" | "off"; 
   { key: "group_member", label: "New member joins your club", def: "inapp", live: true },
   { key: "course_change", label: "Course data changed at GolfCourseAPI (club admins)", def: "inapp", live: true },
   { key: "season_wrapped", label: "Your season summary is ready (Dec 31)", def: "push", live: true },
+  { key: "signup_pending", label: "New sign-up waiting for approval (admins)", def: "push", live: true },
+  { key: "signup_reminder", label: "A sign-up has waited 7 days (admins)", def: "push", live: true },
+  { key: "signup_admitted", label: "You've been admitted to a club", def: "push", live: true },
 ];
 
 function PushToggle({ user, profile }: { user: any; profile: any }) {
@@ -1557,29 +1561,6 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
   };
 
   // Hard delete: erase the player and all their data permanently.
-  const deletePlayer = async (p: any) => {
-    const typed = prompt(`PERMANENTLY DELETE ${p.display_name || p.email} and ALL their rounds and scores?\n\nThis cannot be undone. Type DELETE to confirm.`);
-    if (typed !== "DELETE") return;
-    // Remove their rounds (and holes cascade if FK set), group memberships, then profile.
-    let { data: rs, error: rE } = await supabase.from("rounds").select("id").eq("user_id", p.id).is("deleted_at", null);
-    if (rE) { const rt = await supabase.from("rounds").select("id").eq("user_id", p.id); rs = rt.data; }
-    const roundIds = (rs || []).map((r: any) => r.id);
-    // Group C: five deletes in sequence. Unchecked, a failure partway left the player's rounds
-    // gone, the log claiming a permanent delete, and the profile still present — with no error.
-    // writeAll stops at the first failure and reports what already went. It cannot roll back;
-    // making this atomic needs the cascade moved into a Postgres function (see BACKLOG).
-    const steps: { op: any; label: string }[] = [];
-    if (roundIds.length) steps.push({ op: supabase.from("holes").delete().in("round_id", roundIds), label: "hole scores" });
-    steps.push({ op: supabase.from("rounds").delete().eq("user_id", p.id), label: "rounds" });
-    steps.push({ op: supabase.from("game_players").delete().eq("user_id", p.id), label: "game entries" });
-    steps.push({ op: supabase.from("group_members").delete().eq("user_id", p.id), label: "club membership" });
-    if (!(await writeAll(steps, "Couldn't delete this player"))) { await load(); return; }
-    if (!(await write(supabase.from("profiles").delete().eq("id", p.id),
-      "Couldn't delete this player's profile"))) { await load(); return; }
-    // Logged only once every delete has actually landed.
-    await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "player_deleted", summary: `Permanently deleted ${p.display_name || p.email}` });
-    await load();
-  };
 
   // Approve a pending group request → it becomes active and appears for its members.
   const approveGroup = async (g: any) => {
@@ -1696,7 +1677,18 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
         <div key={p.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <Avatar src={p.avatar_url} name={p.display_name || p.email || "?"} size={40} />
           <div style={{ flex: 1, minWidth: 180 }}>
-            <div style={{ color: C.cream, fontWeight: 700 }}>{p.display_name || "Golfer"}{p.id === user.id ? " (you)" : ""}{p.is_admin ? " ★" : ""}</div>
+            <div style={{ color: C.cream, fontWeight: 700 }}>{p.display_name || "Golfer"}{p.id === user.id ? " (you)" : ""}{p.is_admin ? " ★" : ""}
+              {p.account_status && p.account_status !== "active" ? (
+                <span data-account-status={p.account_status} style={{ marginLeft: 8, background: p.account_status === "suspended" ? C.gold : p.account_status === "pending" || p.account_status === "new" ? C.greenMid : C.overRedDark,
+                  color: p.account_status === "suspended" ? C.green : p.account_status === "pending" || p.account_status === "new" ? C.sage : C.cream, borderRadius: 999, padding: "4px 10px", fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>{p.account_status}</span>
+              ) : null}
+            </div>
+            {p.account_status && p.account_status !== "active" && p.status_at ? (
+              <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
+                {p.account_status} {new Date(p.status_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}{p.status_reason ? ` · ${p.status_reason}` : ""}
+                {p.account_status === "merged" || p.account_status === "removed" ? " · email blocked — can't sign in to BNN" : ""}
+              </div>
+            ) : null}
             <div style={{ color: C.sage, fontSize: 12 }}>
               {p.email || "no email"}{p.phone ? ` · ${p.phone}` : ""}{p.ghin_number ? ` · GHIN ${p.ghin_number}` : ""}
             </div>
@@ -1787,12 +1779,11 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                             Deactivate (keep data)
                           </button>
                         )}
-                        <button style={{ background: C.danger, color: "#F6DEDB", border: "none", borderRadius: 8, padding: "7px 12px", fontWeight: 700, cursor: "pointer", fontSize: 12 }} onClick={() => deletePlayer(p)}>
-                          Delete permanently
-                        </button>
+                        {/* 208.0: "Delete permanently" removed — it deleted in five browser steps and could half-succeed
+                            silently (it left Vimal's duplicate profile in place). Account actions live in Admin → Users. */}
                       </div>
                       <div style={{ color: C.sage, fontSize: 11, marginTop: 6 }}>
-                        Deactivate removes them from all groups and blocks access but keeps history (reversible). Delete erases the player and all their rounds for good.
+                        Deactivate removes them from all groups and blocks access but keeps history (reversible). To merge a duplicate, suspend or remove an account, use Admin → Users.
                       </div>
                     </div>
                   </>
@@ -3097,158 +3088,19 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
 
 // ================= Master-admin oversight: all users =================
 export function AdminUsersTab({ user, isOwner }: { user: any; isOwner?: boolean }) {
-  const [rows, setRows] = useState<any[] | null>(null);
-  const [q, setQ] = useState("");
-  const [busy, setBusy] = useState<string | null>(null);
-  const [mergeKeep, setMergeKeep] = useState<string | null>(null);
-  const [mergeRemove, setMergeRemove] = useState("");
-  const [preview, setPreview] = useState<any | null>(null);
-
-  const load = async () => {
-    const { data } = await supabase.rpc("admin_list_users");
-    setRows(Array.isArray(data) ? data : []);
-  };
-  useEffect(() => { load(); }, []);
-
-  const setSystemAdmin = async (u: any, make: boolean) => {
-    if (!confirm(make
-      ? `Make ${u.display_name || u.email || "this user"} a system admin? They'll get full system-admin access across the app.`
-      : `Remove system admin from ${u.display_name || u.email || "this user"}? They'll lose all system-admin access.`)) return;
-    setBusy(u.id);
-    try {
-      // The RPC is owner-gated and writes its own audit entry, so no client-side logging here.
-      const { error } = await supabase.rpc("admin_set_system_admin", { p_user: u.id, p_make: make });
-      if (error) { alert(failureMessage("Couldn't update", error)); return; }
-      await load();
-    } finally { setBusy(null); }
-  };
-
-  const shown = (rows || []).filter((r) => {
-    const s = q.trim().toLowerCase();
-    if (!s) return true;
-    return (r.display_name || "").toLowerCase().includes(s) || (r.email || "").toLowerCase().includes(s);
-  });
-
-  const setBanned = async (u: any, banned: boolean) => {
-    if (!confirm(`${banned ? "Suspend" : "Restore"} ${u.display_name || u.email || "this user"}?${banned ? " They'll be blocked from the app until restored." : ""}`)) return;
-    setBusy(u.id);
-    try {
-      const { error } = await supabase.rpc("admin_set_banned", { p_user: u.id, p_banned: banned });
-      if (error) { alert(failureMessage("Couldn't update", error)); return; }
-      await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: banned ? "user_banned" : "user_unbanned", target_user_id: u.id, summary: `${banned ? "Suspended" : "Restored"} ${u.display_name || u.email || "a user"}` });
-      await load();
-    } finally { setBusy(null); }
-  };
-
-  const wipe = async (u: any) => {
-    if (!confirm(`WIPE all data for ${u.display_name || u.email}? Deletes their rounds, stats, memberships and profile. Club games stay (they hold others' data). This CANNOT be undone.`)) return;
-    if (!confirm(`Final confirm — permanently delete ${u.display_name || u.email}'s data?`)) return;
-    setBusy(u.id);
-    try {
-      const { error } = await supabase.rpc("admin_wipe_user", { p_user: u.id });
-      if (error) { alert(failureMessage("Couldn't wipe", error)); return; }
-      await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "user_wiped", target_user_id: u.id, summary: `Wiped data for ${u.display_name || u.email || "a user"}` });
-      await load();
-    } finally { setBusy(null); }
-  };
-
-  const runPreview = async (keepId: string) => {
-    if (!mergeRemove) return;
-    const { data } = await supabase.rpc("admin_merge_users_preview", { p_keep: keepId, p_remove: mergeRemove });
-    setPreview(Array.isArray(data) ? data[0] : data);
-  };
-
-  const doMergeUsers = async (keep: any) => {
-    const rem = (rows || []).find((r) => r.id === mergeRemove);
-    if (!rem) return;
-    if (!confirm(`Merge ${rem.display_name || rem.email} INTO ${keep.display_name || keep.email}? All of ${rem.display_name || rem.email}'s rounds, games and memberships move to ${keep.display_name || keep.email}, then their duplicate profile is deleted. This can't be undone.`)) return;
-    setBusy(keep.id);
-    try {
-      const { error } = await supabase.rpc("admin_merge_users", { p_keep: keep.id, p_remove: mergeRemove });
-      if (error) { alert(failureMessage("Couldn't merge those", error)); return; }
-      await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "Master admin", action: "users_merged", target_user_id: keep.id, summary: `Merged ${rem.display_name || rem.email} into ${keep.display_name || keep.email}` });
-      setMergeKeep(null); setMergeRemove(""); setPreview(null);
-      await load();
-    } finally { setBusy(null); }
-  };
-
+  // 208.0: rebuilt as components/admin-players (sign-up queue, statuses, merge / suspend / restore / remove).
   return (
     <div>
-      <Eyebrow>★ OVERSIGHT · ALL USERS</Eyebrow>
-      <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
-        Every account. Suspend a bad actor, wipe a user&apos;s data on request, or merge two accounts that are the same person (dedup). Merge and wipe are irreversible.{isOwner ? " As the owner, you can also grant or revoke system-admin access (app-wide — separate from club admin). Only you can." : ""}
+      <Eyebrow>★ OVERSIGHT · ALL PLAYERS</Eyebrow>
+      <div style={{ color: C.sage, fontSize: 12, marginTop: 8, marginBottom: 12, lineHeight: 1.5 }}>
+        Every account. A duplicate is <b>merged</b> into the member&apos;s real account; a stranger is <b>rejected</b>; a member who leaves is <b>suspended</b> (history kept);
+        only an account with no activity can be <b>removed</b>.{isOwner ? " As the owner, you can also grant or remove system-admin access." : ""}
       </div>
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or email…"
-        style={{ width: "100%", marginTop: 12, background: C.card, color: C.ink, border: `1px solid ${C.borderCard}`, borderRadius: 10, padding: "9px 12px", fontSize: 14 }} />
-      {rows === null && <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div>}
-      {shown.map((u) => {
-        const banned = !!u.banned;
-        const isSelf = u.id === user.id;
-        return (
-          <div key={u.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 14px", marginTop: 8, opacity: banned ? 0.62 : 1 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-              <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>{u.display_name || "(no name)"}</div>
-              {u.is_owner ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>★ owner</span>
-                : u.is_admin ? <span style={{ color: C.gold, fontSize: 11, fontWeight: 800 }}>★ system admin</span> : null}
-              {banned && <span style={{ color: C.overRedDark, fontSize: 11, fontWeight: 800, textTransform: "uppercase" }}>· suspended</span>}
-            </div>
-            <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>{u.email || "—"}</div>
-            <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
-              {u.group_count} group{u.group_count === 1 ? "" : "s"} · {u.rounds_count} round{u.rounds_count === 1 ? "" : "s"}{u.handicap_index != null ? ` · hcp ${u.handicap_index}` : ""}
-            </div>
-            <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
-              {isOwner && !u.is_owner && !isSelf && (
-                <button disabled={busy === u.id} onClick={() => setSystemAdmin(u, !u.is_admin)}
-                  style={{ background: "transparent", color: u.is_admin ? C.overRedDark : C.sage, border: `1px solid ${u.is_admin ? C.birdie : C.sage}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: "pointer" }}>
-                  {u.is_admin ? "Remove system admin" : "Make system admin"}
-                </button>
-              )}
-              <button disabled={busy === u.id} onClick={() => { setMergeKeep(mergeKeep === u.id ? null : u.id); setMergeRemove(""); setPreview(null); }}
-                style={{ background: "transparent", color: C.sage, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: "pointer" }}>
-                Merge another into this…
-              </button>
-              <button disabled={busy === u.id || isSelf} onClick={() => setBanned(u, !banned)}
-                style={{ background: "transparent", color: banned ? C.sage : C.overRedDark, border: `1px solid ${banned ? C.sage : C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.62 : 1 }}>
-                {banned ? "Restore" : "Suspend"}
-              </button>
-              <button disabled={busy === u.id || isSelf} onClick={() => wipe(u)}
-                style={{ background: "transparent", color: C.overRedDark, border: `1px solid ${C.birdie}`, borderRadius: 8, fontSize: 11, fontWeight: 700, padding: "9px 10px", cursor: isSelf ? "default" : "pointer", opacity: isSelf ? 0.62 : 1 }}>
-                Wipe data
-              </button>
-            </div>
-            {mergeKeep === u.id && (
-              <div style={{ marginTop: 8, background: C.greenLight, borderRadius: 8, padding: 8 }}>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  <span style={{ color: C.sage, fontSize: 12 }}>Merge a duplicate INTO {u.display_name || u.email}:</span>
-                  <select value={mergeRemove} onChange={(e) => { setMergeRemove(e.target.value); setPreview(null); }}
-                    style={{ background: C.card, color: C.ink, border: `1px solid ${C.borderCard}`, borderRadius: 8, fontSize: 12, padding: "5px 8px" }}>
-                    <option value="">Select duplicate…</option>
-                    {(rows || []).filter((r) => r.id !== u.id).map((r) => (
-                      <option key={r.id} value={r.id}>{r.display_name || r.email}</option>
-                    ))}
-                  </select>
-                  <button disabled={!mergeRemove} onClick={() => runPreview(u.id)}
-                    style={{ background: "transparent", color: C.cream, border: `1px solid ${C.sage}`, borderRadius: 8, fontSize: 12, fontWeight: 700, padding: "5px 10px", cursor: "pointer", opacity: mergeRemove ? 1 : 0.62 }}>Preview</button>
-                </div>
-                {preview && (
-                  <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
-                    Will move: {preview.rounds} rounds · {preview.games_organized} games organized · {preview.game_player_rows} score rows · {preview.memberships} memberships. Then the duplicate profile is deleted.
-                    <div style={{ marginTop: 8 }}>
-                      <button disabled={busy === u.id} onClick={() => doMergeUsers(u)}
-                        style={{ background: C.gold, color: C.green, border: "none", borderRadius: 8, fontSize: 12, fontWeight: 800, padding: "6px 12px", cursor: "pointer" }}>Confirm merge</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      <AdminPlayers user={user} isOwner={isOwner} />
     </div>
   );
 }
 
-// ================= Help page =================
 export function HelpPage({ isAdmin, user, displayName, groupId }: { isAdmin: boolean; user: any; displayName: string; groupId: string | null }) {
   const [fbPrefill, setFbPrefill] = useState<FeedbackPrefill>(null);
   const fbRef = React.useRef<HTMLDivElement>(null);

@@ -109,6 +109,18 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-course-status-view.sql"
 
 # 0188: completion announcements.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-game-recap-announce.sql"
+
+# 0189: sign-up approval and the duplicate check.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-account-signup.sql"
+
+# 0190: merge-then-remove, suspend/restore, empty-only remove; the registry covers every account column.
+# 208.2: the database build and extensions, for diagnosing a crash seen at this test on Supabase's image.
+psql "$DB_URL" -X -A -t -c "select version()" || true
+psql "$DB_URL" -X -A -t -c "select string_agg(extname || ' ' || extversion, ', ' order by extname) from pg_extension" || true
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-account-merge.sql"
+
+# 208.4: server-only functions are unreachable by app roles — checked by privilege, never by calling.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-no-app-call-to-revoked.sql"
 psql "$DB_URL" -X -tA -c "select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p') order by 1" > /tmp/bnn_chain_tables.txt
 python3 - "$ROOT/ci/public_tables.json" /tmp/bnn_chain_tables.txt <<'PY'
 import json, sys

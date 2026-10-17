@@ -1,5 +1,6 @@
 "use client";
 
+import { signInWithGoogle } from "@/lib/google-sign-in";
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useRouter } from "next/navigation";
@@ -36,7 +37,7 @@ export default function JoinGroupPage() {
       if (!data.session) {
         if (!cancelled) {
           setState("login");
-          setMessage("Sign in with Google to join this club.");
+          setMessage("Sign in with Google to join this club. Already use Birdie Num Num? Sign in with the same Google account you use there.");
         }
         return;
       }
@@ -45,14 +46,18 @@ export default function JoinGroupPage() {
       setState("joining");
       setMessage("Joining your club…");
 
-      const multi = await supabase.rpc("redeem_group_invite_multi", { code });
-      let groupId = (multi.data as string | null) ?? null;
-      let redeemErr = multi.error;
-      if (!groupId) {
-        const single = await supabase.rpc("redeem_group_invite", { code });
-        groupId = (single.data as string | null) ?? null;
-        redeemErr = single.error ?? redeemErr;
+      // 208.0: one entry point for every sign-in with an invite. Existing members join as before; a NEW
+      // account goes through the duplicate check — if it's held, the home screen shows "Is this you?" or
+      // "Waiting for approval".
+      const acct = await supabase.rpc("begin_account", { p_invite_code: code });
+      const st = (acct.data as any)?.state as string | undefined;
+      if (st === "possible_duplicate" || st === "pending") { window.location.replace("/"); return; }
+      if (st === "blocked") {
+        if (!cancelled) { setState("error"); setMessage("This Google account can't be used with Birdie Num Num. Sign in with the Google account you normally use."); }
+        return;
       }
+      const groupId = ((acct.data as any)?.group_id as string | null) ?? null;
+      const redeemErr = acct.error;
       if (!groupId) {
         if (!cancelled) {
           setState("error");
@@ -97,10 +102,7 @@ export default function JoinGroupPage() {
   const signIn = async () => {
     const tt = (() => { try { return new URLSearchParams(window.location.search).get("tt"); } catch { return null; } })();
     const next = `/join/${code}${tt ? `?tt=${encodeURIComponent(tt)}` : ""}`;
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
-    });
+    await signInWithGoogle({ next, chooseAccount: true });
   };
 
   return (

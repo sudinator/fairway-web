@@ -1,3 +1,51 @@
+## 208.4.261017 — GitHub check fixed: the crash was a known Supabase bug (no app change)
+
+**Cause, confirmed.** 208.3's probe crashed the database the moment an app user called a function that app users have no permission to run. That is a known defect in Supabase's PostgreSQL 17.6 images up to 17.6.1.111 (in its supautils extension): calling a function the caller lacks EXECUTE on crashes the server instead of answering "permission denied" (supabase/postgres #2112, #2366; supabase/cli #6094; fixed in 17.6.1.121). BNN's code and the merge are not involved — the merge runs as the server role, which the bug doesn't affect.
+
+**Changes (tests only).** The merge test checks that app users lack permission on the merge function by asking the database's privilege catalogue instead of attempting the call. New `ci/assert-no-app-call-to-revoked.sql` checks every server-only function stays unreachable by app roles — by privilege, never by calling. Diagnostic probes removed.
+
+**Hosted databases: not affected (checked Oct 17).** The bug's own reproduction (an app role calling a function it lacks EXECUTE on) was run on staging and on production: both answered a clean "permission denied for function", no crash. Only GitHub's check is affected, because the Supabase CLI provisions an older, affected image for local/CI databases.
+
+The merge hold is lifted for staging. Deploy as 208.1 (0189 + 0190 already on staging).
+
+## 208.3.261017 — Diagnostics, round 2 (no app change)
+
+208.2's run showed the crash happens on PostgreSQL 17.6 (Supabase's image) in the merge test's STEP 6 — after the previews, refusals and remove checks, before the merge itself. Step 6 (a) has an ordinary app user call the server-only merge function, expecting a refusal, then (b) switches back to the admin role. This round:
+- splits step 6 into 6a–6d (call, refusal caught with its message, role reset, done);
+- adds two standalone probes before the main test: PROBE_A (app user calls the function inside an error-catching block) and PROBE_B (the same call as a plain statement). If either crashes Supabase's build, an app user calling that function from a browser could restart the database — that is what this round establishes.
+
+**Hold** unchanged: no merges, no production deploy of 208.x until fixed.
+
+## 208.2.261017 — Diagnostics for a database crash in GitHub's check (no app change)
+
+GitHub's fresh-database check (Supabase's own Postgres image, CLI 2.101) crashed with a segmentation fault (signal 11) while running ci/assert-account-merge.sql; the same test passes on plain PostgreSQL. A segfault is a defect in the database build or one of its extensions, triggered by something the merge test does. To find what:
+- the rebuild prints the exact database version and installed extensions before the merge test;
+- the merge test announces each step (MERGE_STEP 1–10, with 7b/7c around the merge itself), so the log shows the last step reached before a crash.
+
+**Hold:** don't run a merge on staging or production until the cause is found and fixed. Everything else in 208.0/208.1 is unaffected (the sign-up and approval checks pass on Supabase's image).
+
+## 208.1.261017 — Fix: "Merge into…" opened off-screen
+
+In Admin → Users, "Merge into…" (and "Duplicate — merge into…" in the sign-up queue) opened the merge panel at the TOP of the list, above every row — so when the row was further down the list, tapping it appeared to do nothing (found on staging, Oct 16). The panel now opens directly under the row or sign-up it belongs to and scrolls into view. `lib/account-gate-render.test.tsx` checks the panel opens inside the tapped row (fails on 208.0, passes now).
+
+No migration. Same deploy as 208.0 (0189 + 0190 already on staging): push the code.
+
+## 208.0.261016 — Sign-up approval, duplicate check, and safe account merge
+
+**Why.** Vimal Narayanan ended up with two BNN accounts (work and personal Google accounts, via two clubs' invite links). The club "Delete permanently" button then half-deleted the duplicate — five browser-side steps, the last blocked by privacy rules without an error, so it reported success while the profile, the session and the email all remained. The old system "merge" (0032) and "wipe" (0038) missed most account references, including the money ledger.
+
+**Owner rules (Oct 16 2026).** One Google account per member (no account linking). A duplicate is always **merged** into the member's real account, then taken out — never just deleted. A stranger is **rejected**. A member who leaves is **suspended** (history kept). Only an account with no activity can be **removed**. Sign-ups with no invite are admitted only by a system admin; possible duplicates who used a club's invite, by that club's admins or a system admin.
+
+**Sign-up (0189).** Every account has a status (new · pending · active · suspended · merged · removed); existing members became active (suspended if banned). `begin_account` — called at first sign-in and from invite links — creates the profile on the server and checks the Google name against members: a match is held and the app asks **"Is this you?"** with the member's masked email ("v•••••@medtrix•••.com"); a clean invite (link or email) joins at once; no invite waits for a system admin. **Waiting for approval** screen; **Admin → Users → New sign-ups** queue; **"N sign-ups waiting"** banner for a club's admins; push notifications; one 7-day reminder (never auto-approves). The automatic default-club join and the personal "Main" club for new accounts are retired. Sign-in buttons open Google's account picker, and the invite page reminds returning members to use the same Google account.
+
+**Accounts (0190).** `account_reference_columns` — a registry of all 75 account-like columns (70 that a merge moves, 5 recorded as not accounts — names, a browser description) (formal links, informal ones such as rounds / game entries / memberships, and player ids inside games.pairings / foursomes / structure_stash); a CI check fails if the schema gains an unclassified one. **Merge** applies the registry in one transaction on the server (`/api/admin/merge-accounts` → `merge_accounts_as`, service role only — merges move rounds, and the primary-scoring-device guard rightly refuses that from a phone); it refuses, with the reason, when both accounts are in the same game or competition, charged in the same expense, or settled with each other; club balances are unchanged. **Suspend / Restore**, **Remove** (empty accounts only — a duplicate is sent to merge, history to suspend). Admin → Users rebuilt (statuses, filters, actions); Player admin shows each account's status; both "Delete permanently" buttons are gone. Old merge and wipe now refuse, naming their replacement.
+
+**Found while building, fixed:** guards first relied on a session flag that can outlive its function → they judge the account being added; an owner-based exemption would have let a new account skip the duplicate check through the old invite functions; email invites claimed memberships by UPDATE, past an INSERT-only guard; a system-admin-only rule on the banned flag (0158) is respected.
+
+**Proof.** `ci/assert-account-signup.sql` (every sign-up rule as an app user hits it, incl. email invites and who may decide), `ci/assert-account-merge.sql` (double-charge and self-settlement refused; every registry reference moved incl. pairings/foursomes; balances unchanged; dedupe; remove/suspend/restore; old merge retired; registry covers the schema). `lib/account-gate-render.test.tsx` (the screens and Admin → Users). Full chain green.
+
+**Deploy — migrations and code TOGETHER.** 0189 blocks new accounts from the old invite functions, which the current app calls; apply 0189 + 0190 and deploy the code in one sitting (staging: 0189, 0190, push; production: 0189, 0190, merge).
+
 ## 207.3.261015 — Version bump for a clean staging deploy (no code change)
 
 Same code as the final 207.2 (the redesigned recap with its three wording fixes). Renumbered so the deployed version is unambiguous: an earlier 207.2 build was found on staging (its recap said "4 singles matches played"). Check: staging should show 207.3.

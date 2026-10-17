@@ -14,6 +14,7 @@ import { Toaster, notifyInfo } from "@/components/toast";
 import { loadDraft, draftHasScores, clearAllLocalState } from "@/lib/draft";
 import { loadActiveGame, saveAppBootCache, loadAppBootCache, loadEditorDraft, loadActiveCourseEdit } from "@/lib/draft";
 import { btn, Wordmark, inputStyle, Eyebrow } from "@/components/ui";
+import { IsThisYou, WaitingForApproval, AccountUnavailable, type AccountGateState } from "@/components/account-gate";
 import Tournaments, { type GameSeed } from "@/components/tournaments";
 import { CoursesLibrary } from "@/components/manage/courses";
 import { ProfilePanel, NotificationBell, NotificationsScreen, PlayersTab, AdminHome, HelpPage } from "@/components/manage";
@@ -164,6 +165,8 @@ export function Home({ session }: { session: any }) {
   const profNudgeLogged = useRef(false);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
+  // 208.0: a new or held account sees a gate screen before anything loads (components/account-gate).
+  const [accountGate, setAccountGate] = useState<AccountGateState | null>(null);
   const [groups, setGroups] = useState<AppGroup[]>([]);
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [groupsLoading, setGroupsLoading] = useState(true);
@@ -415,7 +418,7 @@ export function Home({ session }: { session: any }) {
         is_test: !!m.groups?.is_test,
       })).filter((g: AppGroup) => !!g.id);
 
-    if (!list.length && !(data && data.length)) {
+    if (!list.length && !(data && data.length) && profile?.account_status === "active") {
       // Stranded (or brand-new) — no membership rows at all. First try to land them
       // in the app's designated default group and bring any homeless rounds along.
       const { data: gid } = await supabase.rpc("join_default_group", { p_email: user.email || "" });
@@ -445,7 +448,7 @@ export function Home({ session }: { session: any }) {
       setProfile((p: any) => p ? ({ ...p, active_group_id: next }) : p);
     }
     setGroupsLoading(false);
-  }, [activateEmailInvites, user.id, user.email, profile?.active_group_id]);
+  }, [activateEmailInvites, user.id, user.email, profile?.active_group_id, profile?.account_status]);
 
   // Load (or create) this user's profile: display name, handicap index, GHIN number.
   const loadProfile = useCallback(async () => {
@@ -456,7 +459,18 @@ export function Home({ session }: { session: any }) {
       setProfile(cache?.profile || { id: user.id, display_name: user.user_metadata?.full_name || null, handicap_index: null, ghin_number: null, is_admin: false });
       return;
     }
-    const { data } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
+    let { data } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
+    if (!data || data.account_status === "new" || data.account_status === "pending") {
+      // The server decides: creates the profile if needed, runs the duplicate check, admits invitees.
+      const { data: acct, error: aErr } = await supabase.rpc("begin_account", { p_invite_code: null });
+      if (aErr || !acct) { setAccountGate({ state: "pending", signed_in_as: user.email }); setProfile({ id: user.id }); return; }
+      if ((acct as any).state !== "active") { setAccountGate(acct as AccountGateState); setProfile({ id: user.id }); return; }
+      setAccountGate(null);
+      ({ data } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle());
+    }
+    if (data && ["merged", "removed"].includes(data.account_status)) {
+      setAccountGate({ state: "blocked", reason: data.account_status }); setProfile(data); return;
+    }
     if (data) {
       setProfile(data);
       saveAppBootCache({ profile: data });
@@ -464,16 +478,12 @@ export function Home({ session }: { session: any }) {
       supabase.rpc("mark_active", { p_standalone: (typeof window !== "undefined") && ((window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || (window.navigator as any).standalone === true) }).then(() => {}); // record activity + install mode for analytics
       return;
     }
-    // Only trust a real name from the Google account; never fabricate one from the
-    // email local-part, so group-mates don't see "jsmith123" instead of a name.
-    const googleName = (user.user_metadata?.full_name || user.user_metadata?.name || "").trim();
-    const { data: created } = await supabase.from("profiles")
-      .insert({ id: user.id, display_name: googleName || null, email: user.email, last_active: new Date().toISOString() }).select().maybeSingle();
-    setProfile(created || { id: user.id, display_name: googleName || null, handicap_index: null, ghin_number: null, is_admin: false });
+    // (208.0: profiles are created on the server by begin_account, with the Google name — never by the browser.)
+    setProfile({ id: user.id, display_name: (user.user_metadata?.full_name || user.user_metadata?.name || "").trim() || null, handicap_index: null, ghin_number: null, is_admin: false });
   }, [user.id, user.email, user.user_metadata]);
 
   useEffect(() => { loadProfile(); }, [loadProfile]);
-  useEffect(() => { if (profile) loadGroups(); }, [loadGroups, profile]);
+  useEffect(() => { if (profile && !accountGate) loadGroups(); }, [loadGroups, profile, accountGate]);
 
   // After a group is deleted, clear any pointer to it and reload. loadGroups will
   // fall back to (or create) the "Main" group when the user has none left.
@@ -689,6 +699,10 @@ export function Home({ session }: { session: any }) {
   // switches between the clubs they belong to. (Creation is still request-and-approve
   // until we open up free self-serve creation.)
   const showGroupsTab = true;
+
+  if (accountGate?.state === "possible_duplicate") return <IsThisYou gate={accountGate} onNotMe={() => setAccountGate({ state: "pending", kind: "possible_duplicate", signed_in_as: user.email })} />;
+  if (accountGate?.state === "pending") return <WaitingForApproval gate={accountGate} />;
+  if (accountGate?.state === "blocked") return <AccountUnavailable reason={accountGate.reason} />;
 
   if (groupsLoading) {
     return <div style={{ maxWidth: 1040, margin: "0 auto", padding: "20px 16px 60px", color: C.sage }}>Loading clubs…</div>;

@@ -1,3 +1,27 @@
+## 208.4.261017 — GitHub check fixed: the crash was a known Supabase bug (no app change)
+
+**Cause, confirmed.** 208.3's probe crashed the database the moment an app user called a function that app users have no permission to run. That is a known defect in Supabase's PostgreSQL 17.6 images up to 17.6.1.111 (in its supautils extension): calling a function the caller lacks EXECUTE on crashes the server instead of answering "permission denied" (supabase/postgres #2112, #2366; supabase/cli #6094; fixed in 17.6.1.121). BNN's code and the merge are not involved — the merge runs as the server role, which the bug doesn't affect.
+
+## 208.3.261017 — Diagnostics, round 2 (no app change)
+
+208.2's run showed the crash happens on PostgreSQL 17.6 (Supabase's image) in the merge test's STEP 6 — after the previews, refusals and remove checks, before the merge itself. Step 6 (a) has an ordinary app user call the server-only merge function, expecting a refusal, then (b) switches back to the admin role. This round:
+- splits step 6 into 6a–6d (call, refusal caught with its message, role reset, done);
+- adds two standalone probes before the main test: PROBE_A (app user calls the function inside an error-catching block) and PROBE_B (the same call as a plain statement). If either crashes Supabase's build, an app user calling that function from a browser could restart the database — that is what this round establishes.
+
+## 208.2.261017 — Diagnostics for a database crash in GitHub's check (no app change)
+
+GitHub's fresh-database check (Supabase's own Postgres image, CLI 2.101) crashed with a segmentation fault (signal 11) while running ci/assert-account-merge.sql; the same test passes on plain PostgreSQL. A segfault is a defect in the database build or one of its extensions, triggered by something the merge test does. To find what:
+- the rebuild prints the exact database version and installed extensions before the merge test;
+- the merge test announces each step (MERGE_STEP 1–10, with 7b/7c around the merge itself), so the log shows the last step reached before a crash.
+
+## 208.1.261017 — Fix: "Merge into…" opened off-screen
+
+In Admin → Users, "Merge into…" (and "Duplicate — merge into…" in the sign-up queue) opened the merge panel at the TOP of the list, above every row — so when the row was further down the list, tapping it appeared to do nothing (found on staging, Oct 16). The panel now opens directly under the row or sign-up it belongs to and scrolls into view. `lib/account-gate-render.test.tsx` checks the panel opens inside the tapped row (fails on 208.0, passes now).
+
+## 208.0.261016 — Sign-up approval, duplicate check, and safe account merge
+
+**Why.** Vimal Narayanan ended up with two BNN accounts (work and personal Google accounts, via two clubs' invite links). The club "Delete permanently" button then half-deleted the duplicate — five browser-side steps, the last blocked by privacy rules without an error, so it reported success while the profile, the session and the email all remained. The old system "merge" (0032) and "wipe" (0038) missed most account references, including the money ledger.
+
 ## 207.3.261015 — Version bump for a clean staging deploy (no code change)
 
 Same code as the final 207.2 (the redesigned recap with its three wording fixes). Renumbered so the deployed version is unambiguous: an earlier 207.2 build was found on staging (its recap said "4 singles matches played"). Check: staging should show 207.3.

@@ -1,5 +1,6 @@
 "use client";
 
+import { signInWithGoogle } from "@/lib/google-sign-in";
 import React, { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
@@ -9,10 +10,7 @@ const supabase = createClient();
 
 export function Login() {
   const signIn = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
-    });
+    await signInWithGoogle({ chooseAccount: true });
   };
   return (
     <div style={{ maxWidth: 420, margin: "80px auto", padding: 24, textAlign: "center" }}>

@@ -137,10 +137,10 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
       {s.individualStats && h.netBirdies.players ? (
         <div style={S.box} data-recap-net-birdies>
           <div style={S.th}>NET BIRDIES &amp; EAGLES{share ? " · TOP 5" : ""}</div>
-          <div style={{ ...S.row, borderTop: "none", color: C.sage, fontSize: 11 }}><span style={S.pos} /><span style={S.name} /><span style={{ width: 52, textAlign: "right" }}>Birdies</span><span style={{ width: 52, textAlign: "right" }}>Eagles</span></div>
+          <div style={{ ...S.row, borderTop: "none", color: C.sage, fontSize: 11 }}><span style={S.pos} /><span style={S.name} /><span style={{ width: 60, textAlign: "right" }}>Net birdies</span><span style={{ width: 60, textAlign: "right" }}>Net eagles</span></div>
           {nbRows.map((r, i) => (
             <div key={i} style={S.row}><span style={S.pos}>{r.pos}</span><span style={S.name}>{r.item.name}</span>
-              <span style={{ ...S.num, width: 52, textAlign: "right" }}>{r.item.birdies}</span><span style={{ ...S.num, width: 52, textAlign: "right" }}>{r.item.eagles || "–"}</span></div>
+              <span style={{ ...S.num, width: 60, textAlign: "right" }}>{r.item.birdies}</span><span style={{ ...S.num, width: 60, textAlign: "right" }}>{r.item.eagles || "–"}</span></div>
           ))}
           <div style={{ color: C.gold, fontSize: 12, fontWeight: 700, marginTop: 4 }}>
             {h.netBirdies.birdies} net birdie{h.netBirdies.birdies === 1 ? "" : "s"} and {h.netBirdies.eagles} net eagle{h.netBirdies.eagles === 1 ? "" : "s"} by {h.netBirdies.players} player{h.netBirdies.players === 1 ? "" : "s"}{share && h.netBirdies.all.length > h.netBirdies.top.length ? " · full list in the game recap in Birdie Num Num" : ""}
@@ -176,7 +176,7 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
         {!share && h.roundMinutes ? <div style={S.line}>Round length: <b style={{ color: C.cream }}>{Math.floor(h.roundMinutes / 60)} h {h.roundMinutes % 60} m</b>, first tee to last putt</div> : null}
         {!share && money ? <div style={{ ...S.line, color: money.includes("review") ? C.gold : C.sage }} data-recap-money>{money}</div> : null}
       </div>
-      <div style={{ color: C.sage, fontSize: 11, textAlign: "right", marginTop: share ? "auto" : 0 }}>{s.individualStats ? "Net = gross − full course handicap · " : ""}⛳ Birdie Num Num</div>
+      <div style={{ color: C.sage, fontSize: 11, textAlign: "right", marginTop: share ? "auto" : 0 }}>{s.individualStats ? <>Net uses each player&apos;s full Course Handicap — you against the course. Match results use the game&apos;s allowance.<br /></> : null}⛳ Birdie Num Num</div>
     </div>
   );
 }
