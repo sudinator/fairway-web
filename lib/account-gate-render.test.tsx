@@ -53,6 +53,11 @@ const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 80
   ok(/MERGED/.test(all) && all.includes("into Vimal Narayanan") && all.includes("email blocked — can't sign in to BNN"), "a merged account says so plainly, and where it went");
   ok(/SUSPENDED/.test(all) && all.includes("Left the club") && all.includes("Restore"), "a suspended member: reason and Restore");
   ok(!all.includes("Delete permanently"), "no Delete permanently");
+  // 208.1: "Merge into…" opens the panel UNDER THE ROW that was tapped (it used to open off-screen at the top).
+  p.click("Merge into…"); await settle();
+  const row = p.el.querySelector('[data-player="active"]');
+  ok(!!row?.querySelector("[data-merge-panel]"), "the merge panel opens inside the tapped row");
+  ok(p.el.querySelectorAll("[data-merge-panel]").length === 1, "exactly one merge panel");
   p.unmount();
   report("account gate + admin players");
 })().catch((e) => { console.error(e); process.exit(1); });

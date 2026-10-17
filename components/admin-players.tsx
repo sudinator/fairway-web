@@ -103,6 +103,32 @@ export function AdminPlayers({ user, isOwner }: { user: { id: string }; isOwner?
     } finally { setBusy(null); }
   };
 
+  // The merge panel opens directly under the row (or sign-up) it belongs to, and scrolls into view —
+  // 208.1: it used to open at the top of the list, off-screen from the row that was tapped.
+  const mergePanel = () => (merge ? (
+        <div data-merge-panel ref={(el) => { el?.scrollIntoView?.({ block: "nearest", behavior: "smooth" }); }} style={{ background: C.greenMid, borderRadius: 12, padding: "13px 16px", marginTop: 10 }}>
+          <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>Merge {merge.remove.email} into…</div>
+          <select value={merge.keep} onChange={(e) => setMerge({ ...merge, keep: e.target.value, preview: null })} style={{ ...inputStyle, marginTop: 8 }}>
+            <option value="">Choose the account to keep…</option>
+            {keepChoices.map((k) => <option key={k.id} value={k.id}>{k.display_name} — {k.email} · {k.rounds_count} rounds</option>)}
+          </select>
+          {merge.preview?.error ? <div style={{ color: C.gold, fontSize: 13, marginTop: 8 }}>{merge.preview.error}</div> : null}
+          {merge.preview && !merge.preview.error ? (
+            <div style={{ marginTop: 8, fontSize: 13, color: C.sage }}>
+              {(merge.preview.counts || []).length === 0 ? <div>Nothing to move — the duplicate is empty.</div> : (
+                <div>Moves to {merge.preview.keep?.name}: {(merge.preview.counts as any[]).filter((c) => c.activity).map((c) => `${c.rows} ${String(c.table).replace(/_/g, " ")}`).join(" · ") || "only background records"}</div>
+              )}
+              {(merge.preview.blockers || []).map((b: string, i: number) => <div key={i} style={{ color: C.gold, marginTop: 4 }}>⚠ {b}</div>)}
+              {merge.preview.ok ? <div style={{ marginTop: 4 }}>Club balances don&apos;t change — every expense and settlement moves with him.</div> : null}
+            </div>
+          ) : null}
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button type="button" disabled={!merge.preview?.ok || busy === merge.remove.id} style={{ ...btn(true), fontSize: 13 }} onClick={runMerge}>{busy === merge.remove.id ? "Merging…" : "Merge"}</button>
+            <button type="button" style={{ ...btn(false), fontSize: 13 }} onClick={() => setMerge(null)}>Cancel</button>
+          </div>
+        </div>
+  ) : null);
+
   const counts = useMemo(() => {
     const r = rows || [];
     return { all: r.length, active: r.filter((x) => x.account_status === "active").length, pending: r.filter((x) => x.account_status === "pending").length,
@@ -146,6 +172,7 @@ export function AdminPlayers({ user, isOwner }: { user: { id: string }; isOwner?
                 <button type="button" disabled={busy === p.id} style={{ ...btn(false), fontSize: 12 }} onClick={() => reject(p)}>Reject</button>
               </div>
               {!p.duplicate_acknowledged && p.pending_kind === "possible_duplicate" ? <div style={{ color: C.sage, fontSize: 12, marginTop: 6 }}>They haven&apos;t answered &quot;Is this you?&quot; yet — they may switch to their other Google account.</div> : null}
+              {merge?.remove.id === p.id ? mergePanel() : null}
             </div>
           ))}
         </div>
@@ -159,29 +186,6 @@ export function AdminPlayers({ user, isOwner }: { user: { id: string }; isOwner?
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or email…" style={{ ...inputStyle, marginTop: 12 }} />
       {rows === null ? <div style={{ color: C.sage, marginTop: 14 }}>Loading…</div> : null}
 
-      {merge ? (
-        <div data-merge-panel style={{ background: C.greenMid, borderRadius: 12, padding: "13px 16px", marginTop: 12 }}>
-          <div style={{ color: C.cream, fontWeight: 800, fontSize: 15 }}>Merge {merge.remove.email} into…</div>
-          <select value={merge.keep} onChange={(e) => setMerge({ ...merge, keep: e.target.value, preview: null })} style={{ ...inputStyle, marginTop: 8 }}>
-            <option value="">Choose the account to keep…</option>
-            {keepChoices.map((k) => <option key={k.id} value={k.id}>{k.display_name} — {k.email} · {k.rounds_count} rounds</option>)}
-          </select>
-          {merge.preview?.error ? <div style={{ color: C.gold, fontSize: 13, marginTop: 8 }}>{merge.preview.error}</div> : null}
-          {merge.preview && !merge.preview.error ? (
-            <div style={{ marginTop: 8, fontSize: 13, color: C.sage }}>
-              {(merge.preview.counts || []).length === 0 ? <div>Nothing to move — the duplicate is empty.</div> : (
-                <div>Moves to {merge.preview.keep?.name}: {(merge.preview.counts as any[]).filter((c) => c.activity).map((c) => `${c.rows} ${String(c.table).replace(/_/g, " ")}`).join(" · ") || "only background records"}</div>
-              )}
-              {(merge.preview.blockers || []).map((b: string, i: number) => <div key={i} style={{ color: C.gold, marginTop: 4 }}>⚠ {b}</div>)}
-              {merge.preview.ok ? <div style={{ marginTop: 4 }}>Club balances don&apos;t change — every expense and settlement moves with him.</div> : null}
-            </div>
-          ) : null}
-          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-            <button type="button" disabled={!merge.preview?.ok || busy === merge.remove.id} style={{ ...btn(true), fontSize: 13 }} onClick={runMerge}>{busy === merge.remove.id ? "Merging…" : "Merge"}</button>
-            <button type="button" style={{ ...btn(false), fontSize: 13 }} onClick={() => setMerge(null)}>Cancel</button>
-          </div>
-        </div>
-      ) : null}
 
       {shown.map((u) => {
         const tag = TAG[u.account_status];
@@ -221,6 +225,7 @@ export function AdminPlayers({ user, isOwner }: { user: { id: string }; isOwner?
                 </button>
               ) : null}
             </div>
+            {merge?.remove.id === u.id ? mergePanel() : null}
           </div>
         );
       })}

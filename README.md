@@ -1,3 +1,7 @@
+## 208.1.261017 — Fix: "Merge into…" opened off-screen
+
+In Admin → Users, "Merge into…" (and "Duplicate — merge into…" in the sign-up queue) opened the merge panel at the TOP of the list, above every row — so when the row was further down the list, tapping it appeared to do nothing (found on staging, Oct 16). The panel now opens directly under the row or sign-up it belongs to and scrolls into view. `lib/account-gate-render.test.tsx` checks the panel opens inside the tapped row (fails on 208.0, passes now).
+
 ## 208.0.261016 — Sign-up approval, duplicate check, and safe account merge
 
 **Why.** Vimal Narayanan ended up with two BNN accounts (work and personal Google accounts, via two clubs' invite links). The club "Delete permanently" button then half-deleted the duplicate — five browser-side steps, the last blocked by privacy rules without an error, so it reported success while the profile, the session and the email all remained. The old system "merge" (0032) and "wipe" (0038) missed most account references, including the money ledger.
