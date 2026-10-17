@@ -1,3 +1,7 @@
+## 208.0.261016 — Sign-up approval, duplicate check, and safe account merge
+
+**Why.** Vimal Narayanan ended up with two BNN accounts (work and personal Google accounts, via two clubs' invite links). The club "Delete permanently" button then half-deleted the duplicate — five browser-side steps, the last blocked by privacy rules without an error, so it reported success while the profile, the session and the email all remained. The old system "merge" (0032) and "wipe" (0038) missed most account references, including the money ledger.
+
 ## 207.3.261015 — Version bump for a clean staging deploy (no code change)
 
 Same code as the final 207.2 (the redesigned recap with its three wording fixes). Renumbered so the deployed version is unambiguous: an earlier 207.2 build was found on staging (its recap said "4 singles matches played"). Check: staging should show 207.3.

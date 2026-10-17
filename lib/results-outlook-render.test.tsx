@@ -141,7 +141,8 @@ for (const [label, g, teamed] of formats) {
   ok(!!img?.querySelector("[data-recap-top3]") && !!img?.querySelector("[data-recap-net-birdies]") && !!img?.querySelector("[data-recap-tiles]"), "share image: top 3, net birdies, tiles");
   const nbImg = img?.querySelectorAll("[data-recap-net-birdies] > div").length ?? 0, nbApp = app?.querySelectorAll("[data-recap-net-birdies] > div").length ?? 0;
   ok(nbApp >= nbImg, "the app's net-birdie list is at least as long as the image's top 5");
-  ok((img?.textContent || "").includes("Net = gross − full course handicap"), "net footnote on the image");
+  ok((img?.textContent || "").includes("Net uses each player's full Course Handicap — you against the course. Match results use the game's allowance."), "net footnote on the image (USGA terms)");
+  ok((img?.textContent || "").includes("Net birdies") && (img?.textContent || "").includes("Net eagles"), "columns say Net birdies / Net eagles");
   ok(Array.from(img?.querySelectorAll("*") || []).every((e) => (e as HTMLElement).style?.textOverflow !== "ellipsis"), "no name is truncated with an ellipsis");
   try { t.unmount(); } catch { /* jsdom */ }
 }

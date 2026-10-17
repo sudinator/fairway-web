@@ -4,7 +4,7 @@
 // bypass the worker. App-shell requests are cache-first for the lifetime of the active
 // worker; activating a new version creates a new cache and reloads into the new shell.
 
-const SW_VERSION = "207.3.261015";
+const SW_VERSION = "208.0.261016";
 const CACHE = `bnn-shell-${SW_VERSION}`;
 
 self.addEventListener("install", (event) => {

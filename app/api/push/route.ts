@@ -24,11 +24,17 @@ const DEFAULT_DELIVERY: Record<string, "push" | "inapp" | "off"> = {
   course_change: "inapp",
   season_wrapped: "push", // Dec 31 Season Wrapped (205.0) // club admins only; they can raise it to push in Notification settings (198.2)
   friction: "push",   // admin-only integrity alert; always push
+  signup_pending: "push",   // 208.0 — admins: a new sign-up is waiting for approval
+  signup_reminder: "push",  // 208.0 — admins: someone has waited 7 days
+  signup_admitted: "push",  // 208.0 — the new member: you're in
 };
 
 function titleFor(type: string | null): string {
   switch (type) {
     case "season_wrapped": return "Your season summary is ready";
+    case "signup_pending": return "New sign-up waiting";
+    case "signup_reminder": return "Sign-up still waiting";
+    case "signup_admitted": return "You're in";
     case "course_change": return "Course data changed";
     case "money_owed": return "You owe money";
     case "money_paid": return "You got paid";

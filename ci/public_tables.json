@@ -1,6 +1,7 @@
 {
  "_comment": "Every public table the migrations create (generated from the full chain; kept in sync by ci/test_fresh_db_*.sh). The live parity check fails if production or staging has a public table not in this list, or any public table with RLS off (0182).",
  "tables": [
+  "account_reference_columns",
   "activity_log",
   "ai_usage_daily",
   "ai_usage_global",

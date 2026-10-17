@@ -1,3 +1,7 @@
+## 208.0 — Accounts (0189, 0190)
+
+`profiles`: `account_status` (new|pending|active|suspended|merged|removed; default active for trusted creation — every app sign-up is forced to new), `status_reason`, `status_at`, `status_by`, `merged_into`, `pending_kind`, `pending_group`, `possible_duplicate_of`, `duplicate_acknowledged`, `pending_since`, `pending_reminded_at`; guarded by trigger. `account_reference_columns` (registry). Functions: begin_account, acknowledge_not_duplicate, admit_signup, reject_signup, admin_pending_signups, club_pending_signups, account_merge_preview, merge_accounts_as (service role), set_account_suspended, restore_account, remove_account, account_activity; admin_list_users extended; join_default_group retired; admin_merge_users / admin_wipe_user retired.
+
 ## 207.2 — Completion announcements (0188)
 
 Dropped trigger `trg_notify_game_finished`. `games.recap_signature`, `games.recap_announced_at`. `claim_game_recap(uuid, text) returns text` (service_role).
