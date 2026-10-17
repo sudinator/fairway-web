@@ -1,3 +1,9 @@
+## 208.2.261017 — Diagnostics for a database crash in GitHub's check (no app change)
+
+GitHub's fresh-database check (Supabase's own Postgres image, CLI 2.101) crashed with a segmentation fault (signal 11) while running ci/assert-account-merge.sql; the same test passes on plain PostgreSQL. A segfault is a defect in the database build or one of its extensions, triggered by something the merge test does. To find what:
+- the rebuild prints the exact database version and installed extensions before the merge test;
+- the merge test announces each step (MERGE_STEP 1–10, with 7b/7c around the merge itself), so the log shows the last step reached before a crash.
+
 ## 208.1.261017 — Fix: "Merge into…" opened off-screen
 
 In Admin → Users, "Merge into…" (and "Duplicate — merge into…" in the sign-up queue) opened the merge panel at the TOP of the list, above every row — so when the row was further down the list, tapping it appeared to do nothing (found on staging, Oct 16). The panel now opens directly under the row or sign-up it belongs to and scrolls into view. `lib/account-gate-render.test.tsx` checks the panel opens inside the tapped row (fails on 208.0, passes now).

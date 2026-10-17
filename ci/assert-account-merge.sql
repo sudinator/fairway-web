@@ -17,6 +17,7 @@ begin
   delete from member_badges where user_id in (keep, dupl); delete from group_members where group_id = g; delete from groups where id = g;
   delete from activity_log where target_user_id in (keep, dupl, other, empty); delete from banned_emails where email like '%@merge190.test';
   delete from profiles where id in (sys, keep, dupl, other, empty); delete from auth.users where id in (sys, keep, dupl, other, empty);
+  raise notice 'MERGE_STEP 1: fixtures';
   -- fixtures
   insert into auth.users(id, email) values (sys,'sys@merge190.test'),(keep,'raj@merge190.test'),(dupl,'raj.work@merge190.test'),(other,'sam@merge190.test'),(empty,'test@merge190.test');
   insert into profiles(id, display_name, email, is_admin, account_status, handicap_index) values
@@ -37,6 +38,7 @@ begin
   insert into rounds(user_id, game_id, course, played_at) values (dupl, gm, 'C', '2026-10-01');
   insert into member_badges(user_id, badge_key) values (keep, 'first_birdie'), (dupl, 'first_birdie'), (dupl, 'hot_streak');
 
+  raise notice 'MERGE_STEP 2: preview refuses a double charge';
   -- e1 has shares for BOTH accounts → the preview must refuse (would double-charge Raj)
   execute 'set local role authenticated';
   perform set_config('request.jwt.claim.sub', sys::text, true);
@@ -48,6 +50,7 @@ begin
   begin perform public.merge_accounts_as(sys, keep, dupl, 'Duplicate'); ok := false; exception when others then ok := true; end;
   execute 'reset role';
   if not ok then raise exception 'merge ran despite a blocker'; end if;
+  raise notice 'MERGE_STEP 3: preview refuses a self-settlement';
   -- resolve it (the admin removes the duplicate share), and add a settlement BETWEEN the two → refused
   delete from expense_shares where expense_id = e1 and user_id = keep;
   insert into settlements(group_id, event_id, from_user_id, to_user_id, amount_cents, status) values (g, ev, keep, dupl, 500, 'pending');
@@ -58,12 +61,14 @@ begin
   execute 'reset role';
   delete from settlements where from_user_id = keep and to_user_id = dupl;
 
+  raise notice 'MERGE_STEP 4: balances before';
   -- balances before (paid − owed + received − sent), per person
   select coalesce((select sum(paid_cents) from expense_payers where user_id in (keep, dupl)), 0) - coalesce((select sum(share_cents) from expense_shares where user_id in (keep, dupl)), 0)
        + coalesce((select sum(amount_cents) from settlements where to_user_id in (keep, dupl)), 0) - coalesce((select sum(amount_cents) from settlements where from_user_id in (keep, dupl)), 0) into net_before_keep;
   select coalesce((select sum(paid_cents) from expense_payers where user_id = other), 0) - coalesce((select sum(share_cents) from expense_shares where user_id = other), 0)
        + coalesce((select sum(amount_cents) from settlements where to_user_id = other), 0) - coalesce((select sum(amount_cents) from settlements where from_user_id = other), 0) into net_before_other;
 
+  raise notice 'MERGE_STEP 5: remove refusals';
   -- Remove refuses: a duplicate goes to merge; an account with history goes to suspend
   execute 'set local role authenticated';
   perform set_config('request.jwt.claim.sub', sys::text, true);
@@ -72,18 +77,23 @@ begin
   begin perform public.remove_account(other, 'x'); ok := false; exception when others then ok := sqlerrm like '%Suspend it instead%'; end;
   if not ok then raise exception 'remove did not refuse an account with history'; end if;
   perform public.remove_account(empty, 'Test account');
+  raise notice 'MERGE_STEP 6: merge refused from the app';
   -- a merge can't be run from a phone — even by a system admin — and says so
   -- refused twice over: app users may not call it at all (permission denied); and it checks the session anyway
   begin perform public.merge_accounts_as(sys, keep, dupl, 'x'); ok := false; exception when others then ok := sqlerrm like '%permission denied%' or sqlerrm like '%run on the server%'; end;
   if not ok then raise exception 'merge callable from the app'; end if;
   execute 'reset role';
+  raise notice 'MERGE_STEP 7: merge as the server';
   -- the server runs it (no end-user identity), on behalf of a system admin — and refuses a non-admin actor
   perform set_config('request.jwt.claim.sub', '', true);
   execute 'set local role service_role';
   begin perform public.merge_accounts_as(other, keep, dupl, 'x'); ok := false; exception when others then ok := sqlerrm like '%system admin%'; end;
   if not ok then raise exception 'merge on behalf of a non-admin not refused'; end if;
+  raise notice 'MERGE_STEP 7b: merge_accounts_as starting';
   r := public.merge_accounts_as(sys, keep, dupl, 'Duplicate of Raj Patel');
+  raise notice 'MERGE_STEP 7c: merge_accounts_as returned';
   execute 'reset role';
+  raise notice 'MERGE_STEP 8: suspend / restore';
   -- suspend / restore round trip on Sam
   execute 'set local role authenticated';
   perform set_config('request.jwt.claim.sub', sys::text, true);
@@ -92,6 +102,7 @@ begin
   execute 'reset role';
   perform set_config('request.jwt.claim.sub', '', true);
 
+  raise notice 'MERGE_STEP 9: verify nothing left on the duplicate';
   -- everything moved; nothing left on the duplicate
   for t in select format('%s.%s', table_name, column_name) from account_reference_columns where rule in ('move', 'move_or_refuse', 'move_dedupe', 'delete_duplicate') and to_regclass('public.' || table_name) is not null loop
     execute format('select 1 from public.%I where %I = $1 limit 1', split_part(t, '.', 1), split_part(t, '.', 2)) into ok using dupl;
@@ -110,6 +121,7 @@ begin
   if (select handicap_index from profiles where id = keep) <> 14.2 then raise exception 'kept profile did not fill its blank handicap'; end if;
   if (select account_status from profiles where id = empty) <> 'removed' then raise exception 'empty account not removed'; end if;
   if (select account_status || '/' || coalesce(banned, false)::text from profiles where id = other) <> 'active/false' then raise exception 'suspend/restore round trip failed'; end if;
+  raise notice 'MERGE_STEP 10: old merge retired';
   -- the old merge and wipe refuse
   begin perform public.admin_merge_users(keep, dupl); ok := false; exception when others then ok := sqlerrm like '%replaced by merge_accounts%'; end;
   if not ok then raise exception 'old merge still callable'; end if;
