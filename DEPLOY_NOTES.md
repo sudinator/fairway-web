@@ -1,3 +1,9 @@
+## 208.5.261017 — An automatic game name follows a changed date or course
+
+A game created without a typed name is named "Format / Course / Date". Changing the date (or course) afterwards updated the game but not that name, so the title kept the old date (reported on production, game 445262). Now, when the organizer changes the date or course, an automatic name is rebuilt to match; a name the organizer typed is never touched. The automatic name is recognised by its shape, so a date written differently on another phone still counts. `lib/game-name.test.ts`.
+
+No migration. Existing games are not renamed retroactively — rename one in Setup if needed.
+
 ## 208.4.261017 — GitHub check fixed: the crash was a known Supabase bug (no app change)
 
 **Cause, confirmed.** 208.3's probe crashed the database the moment an app user called a function that app users have no permission to run. That is a known defect in Supabase's PostgreSQL 17.6 images up to 17.6.1.111 (in its supautils extension): calling a function the caller lacks EXECUTE on crashes the server instead of answering "permission denied" (supabase/postgres #2112, #2366; supabase/cli #6094; fixed in 17.6.1.121). BNN's code and the merge are not involved — the merge runs as the server role, which the bug doesn't affect.

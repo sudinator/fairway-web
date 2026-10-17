@@ -46,12 +46,35 @@ export function gameTypeLabel(gameType: GameTypeOpt): string {
   return gameType === "alt_shot" ? "Alternate Shot" : gameType === "match" ? "Match Play" : gameType === "fourball" ? "Four-Ball" : gameType === "skins" ? "Skins" : gameType === "trifecta" ? "Trifecta" : gameType === "stroke" ? "Stroke Play" : "Stableford";
 }
 
+// The automatic game name, "Format / Course / Date", used when the organizer leaves the name blank.
+// TZ-safe date label (noon avoids offset rollover).
+export function autoGameName(gameType: GameTypeOpt, courseName: string, matchDate: string): string {
+  const dateLabel = new Date(String(matchDate).slice(0, 10) + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return `${gameTypeLabel(gameType)} / ${courseName} / ${dateLabel}`;
+}
+
+/**
+ * 208.5: after the date or course changes, the name a game should now have — or null to leave it alone.
+ * Only an AUTOMATIC name is rebuilt: "Format / <current course> / <a date>". The date part is matched by
+ * shape, not exact wording, because dates are written differently on differently set-up phones. A name
+ * the organizer typed is never touched.
+ */
+export function refreshedAutoName(game: { name?: string | null; game_type: string; course?: string | null; played_at?: string | null },
+                                  change: { date?: string; course?: string }): string | null {
+  const name = (game.name || "").trim();
+  const prefix = `${gameTypeLabel(game.game_type as GameTypeOpt)} / ${game.course || ""} / `;
+  if (!name.startsWith(prefix)) return null;
+  const datePart = name.slice(prefix.length);
+  if (!datePart || datePart.includes(" / ") || !/\d/.test(datePart)) return null;
+  const date = change.date || String(game.played_at || "").slice(0, 10);
+  if (!date) return null;
+  const next = autoGameName(game.game_type as GameTypeOpt, change.course ?? game.course ?? "", date);
+  return next === name ? null : next;
+}
+
 // The games-table insert payload (everything except server-side defaults).
 export function buildGamePayload(o: GamePayloadOpts) {
-  const typeLabel = gameTypeLabel(o.gameType);
-  // TZ-safe date label for the auto-generated name (noon avoids offset rollover).
-  const dateLabel = new Date(o.matchDate + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-  const autoName = `${typeLabel} / ${o.courseName} / ${dateLabel}`;
+  const autoName = autoGameName(o.gameType, o.courseName, o.matchDate);
   const holesMeta = o.courseHoles.map((h: any, i: number) => ({
     n: h.n,
     par: h.par,

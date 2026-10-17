@@ -2804,6 +2804,8 @@ function GameRoom({
     if (error) { alert(failureMessage("Couldn't change the course", error)); return; }
     clearAllGameScores(game.id);
     setCourseTees(Array.isArray(course.tees) ? course.tees : []);
+    // 208.5: an automatic "Format / Course / Date" name follows the new course (a typed name is kept).
+    { const nextName = GC.refreshedAutoName(game as any, { course: course.name }); if (nextName) await supabase.from("games").update({ name: nextName }).eq("id", game.id); }
     await load();
     setSetupTab("players");
   };
@@ -2817,6 +2819,9 @@ function GameRoom({
     }
     const { error } = await supabase.rpc("set_game_played_date", { p_game: game.id, p_date: newDate });
     if (error) { alert(failureMessage("Couldn't change the date", error)); return; }
+    // 208.5: an automatic "Format / Course / Date" name follows the new date (a typed name is kept).
+    const nextName = GC.refreshedAutoName(game as any, { date: newDate });
+    if (nextName) await supabase.from("games").update({ name: nextName }).eq("id", game.id);
     await load();
   };
 
