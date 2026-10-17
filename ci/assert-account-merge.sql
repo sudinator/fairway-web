@@ -1,3 +1,28 @@
+-- 208.3 PROBE (diagnostic): an ordinary app user calls the server-only merge function — must be refused,
+-- and must not crash the database. Runs alone, before the main test, so a crash here is unambiguous.
+do $$
+declare r text := 'not refused';
+begin
+  raise notice 'PROBE_A: start';
+  execute 'set local role authenticated';
+  perform set_config('request.jwt.claim.sub', '19000000-0000-0000-0000-0000000000ff', true);
+  raise notice 'PROBE_A: calling merge_accounts_as as an app user';
+  begin
+    perform public.merge_accounts_as('19000000-0000-0000-0000-0000000000ff', '19000000-0000-0000-0000-0000000000fe', '19000000-0000-0000-0000-0000000000fd', null);
+  exception when others then r := sqlerrm;
+  end;
+  raise notice 'PROBE_A: refused with: %', r;
+  execute 'reset role';
+  raise notice 'PROBE_A: done';
+end $$;
+-- PROBE_B: the same call as a plain statement (no exception block) — expected: permission denied, no crash.
+\set ON_ERROR_STOP 0
+set role authenticated;
+select public.merge_accounts_as('19000000-0000-0000-0000-0000000000ff', '19000000-0000-0000-0000-0000000000fe', '19000000-0000-0000-0000-0000000000fd', null);
+reset role;
+\set ON_ERROR_STOP 1
+select 'PROBE_B: database still up after a refused app-user call' as probe_b;
+
 -- 0190 (208.0): merge-then-remove, suspend/restore, empty-only remove, and the registry covering the schema.
 do $$
 declare sys uuid := '19000000-0000-0000-0000-000000000001';
@@ -80,9 +105,12 @@ begin
   raise notice 'MERGE_STEP 6: merge refused from the app';
   -- a merge can't be run from a phone — even by a system admin — and says so
   -- refused twice over: app users may not call it at all (permission denied); and it checks the session anyway
-  begin perform public.merge_accounts_as(sys, keep, dupl, 'x'); ok := false; exception when others then ok := sqlerrm like '%permission denied%' or sqlerrm like '%run on the server%'; end;
+  raise notice 'MERGE_STEP 6a: app user calls merge_accounts_as (role=%, uid=%)', current_setting('role', true), auth.uid();
+  begin perform public.merge_accounts_as(sys, keep, dupl, 'x'); ok := false; exception when others then ok := sqlerrm like '%permission denied%' or sqlerrm like '%run on the server%'; raise notice 'MERGE_STEP 6b: refused with: %', sqlerrm; end;
   if not ok then raise exception 'merge callable from the app'; end if;
+  raise notice 'MERGE_STEP 6c: resetting role';
   execute 'reset role';
+  raise notice 'MERGE_STEP 6d: role reset';
   raise notice 'MERGE_STEP 7: merge as the server';
   -- the server runs it (no end-user identity), on behalf of a system admin — and refuses a non-admin actor
   perform set_config('request.jwt.claim.sub', '', true);
