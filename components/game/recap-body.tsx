@@ -124,6 +124,46 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
         </div>
       ) : null}
 
+      {/* 209.0 order (owner, Oct 2026): how the field played → highlights → standout rounds → top 3 → net birdies */}
+      {s.individualStats ? (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, textAlign: "center" }} data-recap-scoring>
+          {([["birdies", h.scoring.birdies], ["pars", h.scoring.pars], ["bogeys", h.scoring.bogeys], ["doubles+", h.scoring.doublesPlus]] as const).map(([l, v]) => (
+            <div key={l} style={{ color: C.sage, fontSize: 11 }}><div style={{ ...S.num, fontSize: 20, color: C.cream }}>{v}</div>{l}</div>
+          ))}
+        </div>
+      ) : null}
+      <div style={{ display: "flex", flexDirection: "column", gap: 3 }} data-recap-course>
+        {s.individualStats && (h.fieldNet != null || h.frontBack) ? (
+          <div style={S.line}>{h.fieldNet != null ? <>Field average <b style={{ color: C.cream }}>net {h.fieldNet.toFixed(1)}</b></> : null}{h.fieldNet != null && h.frontBack ? " · " : null}{h.frontBack ? (Math.abs(h.frontBack.front - h.frontBack.back) < 0.05 ? "even front and back" : `${h.frontBack.back < h.frontBack.front ? "back" : "front"} nine ${Math.abs(h.frontBack.front - h.frontBack.back).toFixed(1)} better`) : null}</div>
+        ) : null}
+        {h.toughest ? <div style={S.line}>Toughest: <b style={{ color: C.cream }}>Hole {h.toughest.n}</b> · par {h.toughest.par}{h.toughest.si ? `, stroke index ${h.toughest.si}` : ""} · field averaged <b style={{ color: C.cream }}>{h.toughest.avg.toFixed(1)} ({h.toughest.vsPar >= 0 ? "+" : ""}{h.toughest.vsPar.toFixed(1)})</b>{h.toughest.parsOrBetter === 0 ? " — nobody made par" : ""}</div> : null}
+        {h.easiest && h.easiest.n !== h.toughest?.n ? <div style={S.line}>Easiest: <b style={{ color: C.cream }}>Hole {h.easiest.n}</b> · par {h.easiest.par}{h.easiest.si ? `, stroke index ${h.easiest.si}` : ""} · field averaged <b style={{ color: C.cream }}>{h.easiest.avg.toFixed(1)} ({h.easiest.vsPar >= 0 ? "+" : ""}{h.easiest.vsPar.toFixed(1)})</b>{h.easiest.birdies || h.easiest.pars ? ` — ${h.easiest.birdies} birdie${h.easiest.birdies === 1 ? "" : "s"}, ${h.easiest.pars} par${h.easiest.pars === 1 ? "" : "s"}` : ""}</div> : null}
+        {s.individualStats && h.netEagleHole ? <div style={S.line}>Net eagles: <b style={{ color: C.cream }}>{h.netEagleHole.total}</b> — <b style={{ color: C.cream }}>{h.netEagleHole.count} on hole {h.netEagleHole.n}</b> (par {h.netEagleHole.par}{h.netEagleHole.si ? `, stroke index ${h.netEagleHole.si}` : ""})</div> : null}
+        {contests.length ? <div style={S.line} data-recap-contests>{contests.map((c, i) => <span key={i}>{i ? " · " : ""}{c.label} #{c.hole} <b style={{ color: C.cream }}>{c.name}</b> {c.value}</span>)}</div> : null}
+      </div>
+      {s.tiles.length ? (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }} data-recap-tiles>
+          {s.tiles.map((t) => (
+            <div key={t.label} style={{ ...S.box, display: "flex", flexDirection: "column" }}>
+              <span style={{ color: C.sage, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>{t.label}</span>
+              <b style={{ fontSize: 13.5, overflowWrap: "anywhere" }}>{t.who}</b>
+              <span style={{ color: C.gold, fontSize: 12, fontWeight: 700 }}>{t.what}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {s.individualStats && h.standouts && h.standouts.rows.length ? (
+        <div data-recap-standouts style={{ ...S.box, border: `1px solid ${C.gold}` }}>
+          <div style={S.th}>STANDOUT ROUNDS{h.standouts.basis === "field" && h.standouts.fieldGap != null ? <span style={{ color: C.sage, fontWeight: 500, letterSpacing: 0 }}> · best against their handicap, on a course that played {Math.abs(Math.round(h.standouts.fieldGap - 3))} shot{Math.abs(Math.round(h.standouts.fieldGap - 3)) === 1 ? "" : "s"} {h.standouts.fieldGap - 3 >= 0.5 ? "hard" : h.standouts.fieldGap - 3 <= -0.5 ? "easy" : "about normal"}</span> : <span style={{ color: C.sage, fontWeight: 500, letterSpacing: 0 }}> · best against their own handicap</span>}</div>
+          {h.standouts.rows.map((r, i) => (
+            <div key={r.name} style={S.row}><span style={S.name}>{r.name}{r.exceptional ? " · exceptional round" : ""}</span>
+              <span style={{ color: C.gold, fontWeight: 800, whiteSpace: "nowrap" }}>{r.better.toFixed(1)} better{i === 0 && h.standouts!.basis === "field" ? " than the field" : h.standouts!.basis === "own" ? " than handicap" : ""}</span></div>
+          ))}
+          {h.standouts.basis === "field" && h.standouts.fieldGap != null ? (
+            <div style={{ color: C.sage, fontSize: 11, marginTop: 4, lineHeight: 1.4 }}>The field averaged {h.standouts.fieldGap.toFixed(1)} over its handicaps (a normal day is about 3).</div>
+          ) : null}
+        </div>
+      ) : null}
       {/* Shared sections */}
       {s.individualStats && !s.leaderboard && h.topGross.length ? (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }} data-recap-top3>
@@ -147,35 +187,12 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
           </div>
         </div>
       ) : null}
-      {s.tiles.length ? (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }} data-recap-tiles>
-          {s.tiles.map((t) => (
-            <div key={t.label} style={{ ...S.box, display: "flex", flexDirection: "column" }}>
-              <span style={{ color: C.sage, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5 }}>{t.label}</span>
-              <b style={{ fontSize: 13.5, overflowWrap: "anywhere" }}>{t.who}</b>
-              <span style={{ color: C.gold, fontSize: 12, fontWeight: 700 }}>{t.what}</span>
-            </div>
-          ))}
-        </div>
-      ) : null}
-      {s.individualStats ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, textAlign: "center" }} data-recap-scoring>
-          {([["birdies", h.scoring.birdies], ["pars", h.scoring.pars], ["bogeys", h.scoring.bogeys], ["doubles+", h.scoring.doublesPlus]] as const).map(([l, v]) => (
-            <div key={l} style={{ color: C.sage, fontSize: 11 }}><div style={{ ...S.num, fontSize: 20, color: C.cream }}>{v}</div>{l}</div>
-          ))}
-        </div>
-      ) : null}
-      <div style={{ display: "flex", flexDirection: "column", gap: 3 }} data-recap-course>
-        {s.individualStats && (h.fieldNet != null || h.frontBack) ? (
-          <div style={S.line}>{h.fieldNet != null ? <>Field average <b style={{ color: C.cream }}>net {h.fieldNet.toFixed(1)}</b></> : null}{h.fieldNet != null && h.frontBack ? " · " : null}{h.frontBack ? (Math.abs(h.frontBack.front - h.frontBack.back) < 0.05 ? "even front and back" : `${h.frontBack.back < h.frontBack.front ? "back" : "front"} nine ${Math.abs(h.frontBack.front - h.frontBack.back).toFixed(1)} better`) : null}</div>
-        ) : null}
-        {h.toughest ? <div style={S.line}>Toughest: <b style={{ color: C.cream }}>Hole {h.toughest.n}</b> · par {h.toughest.par}{h.toughest.si ? `, stroke index ${h.toughest.si}` : ""} · field averaged <b style={{ color: C.cream }}>{h.toughest.avg.toFixed(1)} ({h.toughest.vsPar >= 0 ? "+" : ""}{h.toughest.vsPar.toFixed(1)})</b>{h.toughest.parsOrBetter === 0 ? " — nobody made par" : ""}</div> : null}
-        {h.easiest && h.easiest.n !== h.toughest?.n ? <div style={S.line}>Easiest: <b style={{ color: C.cream }}>Hole {h.easiest.n}</b> · par {h.easiest.par}{h.easiest.si ? `, stroke index ${h.easiest.si}` : ""} · field averaged <b style={{ color: C.cream }}>{h.easiest.avg.toFixed(1)} ({h.easiest.vsPar >= 0 ? "+" : ""}{h.easiest.vsPar.toFixed(1)})</b>{h.easiest.birdies || h.easiest.pars ? ` — ${h.easiest.birdies} birdie${h.easiest.birdies === 1 ? "" : "s"}, ${h.easiest.pars} par${h.easiest.pars === 1 ? "" : "s"}` : ""}</div> : null}
-        {s.individualStats && h.netEagleHole ? <div style={S.line}>Net eagles: <b style={{ color: C.cream }}>{h.netEagleHole.total}</b> — <b style={{ color: C.cream }}>{h.netEagleHole.count} on hole {h.netEagleHole.n}</b> (par {h.netEagleHole.par}{h.netEagleHole.si ? `, stroke index ${h.netEagleHole.si}` : ""})</div> : null}
-        {contests.length ? <div style={S.line} data-recap-contests>{contests.map((c, i) => <span key={i}>{i ? " · " : ""}{c.label} #{c.hole} <b style={{ color: C.cream }}>{c.name}</b> {c.value}</span>)}</div> : null}
+      {!share ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }} data-recap-app-extra>
         {!share && h.roundMinutes ? <div style={S.line}>Round length: <b style={{ color: C.cream }}>{Math.floor(h.roundMinutes / 60)} h {h.roundMinutes % 60} m</b>, first tee to last putt</div> : null}
         {!share && money ? <div style={{ ...S.line, color: money.includes("review") ? C.gold : C.sage }} data-recap-money>{money}</div> : null}
-      </div>
+        </div>
+      ) : null}
       <div style={{ color: C.sage, fontSize: 11, textAlign: "right", marginTop: share ? "auto" : 0 }}>{s.individualStats ? <>Net uses each player&apos;s full Course Handicap — you against the course. Match results use the game&apos;s allowance.<br /></> : null}⛳ Birdie Num Num</div>
     </div>
   );
