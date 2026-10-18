@@ -1,3 +1,7 @@
+## 209.3 — Round-summary email (0193)
+
+profiles.round_emails (default true). app_settings(key, value). round_email_log. email_ticks (+ pg_cron 'round-email-tick', every 10 min). due_round_emails / record_round_email (service role).
+
 ## 209.1 — Course selective apply (0192)
 
 course_freshness.declined (jsonb). apply_course_freshness_selected_as / remember_course_declines_as (service role). course_review_detail, course_tee_usage (club admin). games.teams[].color (optional palette key).

@@ -1,3 +1,21 @@
+## 209.3.261018 — Round-summary email (owner only while it's honed)
+
+**What.** About an hour after a round, an email from hi.its.birdienumnum@gmail.com. A GAME round (owner): the group's recap first — the recap card's sections in its order (lib/recap-email; the "how the field played" lines are checked word for word against the card on the same game) — then "Your round": position, net birdies, standout; round stats (fairways, greens, putts and three-putts, penalties, average on par 3s/4s/5s, putts per green hit, sand saves, scrambles — the app's own rules, shown only when recorded on most holes); highlights; the scorecard on cream with the app's circles and squares and a net row. A solo round: the same without the group. If the round changes later, an "Updated:" email (at most hourly, within a week); an unchanged round is never resent.
+
+**Who.** Opt-out: on for every member — Profile → Notification settings → Round summary emails, or the signed one-click link in every email. Owner decision: ONLY THE OWNER receives it while it's honed (app_settings.round_emails = {"recipients":"owner"}); "everyone" opens it to all, no release needed.
+
+**How (0193).** profiles.round_emails; app_settings; round_email_log; email_ticks + a 10-minute pg_cron job; due_round_emails / record_round_email (server only). A Supabase Database Webhook on email_ticks INSERT calls /api/round-emails with the push x-webhook-secret. Sends via Gmail (nodemailer 10.0.14, GMAIL_USER / GMAIL_APP_PASSWORD, production only); without the keys (staging) it does nothing. Net uses chBasis (manual course handicaps honoured).
+
+**Setup after deploying to production:** add the Database Webhook (steps in the release message).
+
+## 209.2.261018 — GitHub check back on Supabase CLI 2.101.0 (no app change)
+
+209.1 moved GitHub's fresh-database check to Supabase CLI 2.111.0. Its newer database image no longer grants the server role (service_role) privileges on tables by default, so ci/assert-profile-privileges.sql failed ("permission denied for table profiles"). The hosted staging and production databases were created under the old defaults and DO have those grants — the server reads and writes tables directly (push, course checks) every day — so the newer image matched them worse, not better. Back to 2.101.0, whose grants match the hosted databases; its supautils crash is avoided because tests never call a revoked function (208.4). The rebuild still prints the exact image tag.
+
+Also in the code, not yet connected (209.3): the round-summary email builders (lib/round-email, lib/recap-email) and their tests. Nothing sends email in this release.
+
+Deploy: code only; migrations as 209.1 (0191, 0192).
+
 ## 209.1.261017 — Choose which course changes to apply, team colours, Standout watch
 
 **Choose which provider changes to apply (0192).** A course update now lists each change with its own tick box (per tee: rating, slope, yardages; tees added / removed; per hole: par; and ALL stroke-index changes as one item — providers swap indexes between holes, and taking half a swap breaks handicap strokes). Defaults (owner): a change to something corrected by hand starts unticked ("you corrected this by hand on …" — detected by comparing today's course with the provider's last version in course history); a removed tee starts unticked and shows how often it was played this year; everything else ticked. The server rebuilds the list with the same code (lib/course-merge), builds the merged course, and the database re-checks admin rights, the review revision, that the course wasn't edited since, and a valid stroke-index set before saving; one history version names exactly what was taken. Unticked changes are remembered and not asked about again unless the provider's value changes (the course check skips them). The all-or-nothing "Update stored course" button is gone.
