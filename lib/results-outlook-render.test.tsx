@@ -6,6 +6,8 @@ import { renderScreen, ok, report } from "./screen-harness";
 import * as React from "react";
 import Tournaments from "@/components/tournaments";
 import { saveGameSnapshot } from "@/lib/draft";
+import { buildRecap } from "@/lib/game-recap";
+import { fieldLines } from "@/lib/recap-email";
 const GAME_ID = "51a8ed51-d28d-40ec-bfc0-741d57579415";
 const GROUP_ID = "trifecta-render-group";
 
@@ -143,6 +145,14 @@ for (const [label, g, teamed] of formats) {
   ok(nbApp >= nbImg, "the app's net-birdie list is at least as long as the image's top 5");
   ok((img?.textContent || "").includes("Net uses each player's full Course Handicap — you against the course. Match results use the game's allowance."), "net footnote on the image (USGA terms)");
   ok((img?.textContent || "").includes("Net birdies") && (img?.textContent || "").includes("Net eagles"), "columns say Net birdies / Net eagles");
+  // 209.3: the round-summary email's "how the field played" lines read exactly like the recap card's,
+  // for the same game — the email mirrors the card's wording, and this keeps the two from drifting.
+  {
+    const cardLines = Array.from(img?.querySelector("[data-recap-course]")?.children || [])
+      .filter((el) => !(el as HTMLElement).hasAttribute("data-recap-contests")).map((el) => (el.textContent || "").trim());
+    const emailLines = fieldLines(buildRecap({ ...game, status: "ended" } as any, players as any)).map((l) => l.trim());
+    ok(cardLines.length > 0 && JSON.stringify(cardLines) === JSON.stringify(emailLines), `email field lines match the card (card ${JSON.stringify(cardLines)} vs email ${JSON.stringify(emailLines)})`);
+  }
   // 209.0 order: how the field played → highlights → (standout rounds) → top 3 → net birdies.
   const at = (sel: string) => { const el = img?.querySelector(sel); return el ? Array.from(img!.querySelectorAll("*")).indexOf(el) : -1; };
   const order = ["[data-recap-scoring]", "[data-recap-course]", "[data-recap-tiles]", "[data-recap-top3]", "[data-recap-net-birdies]"].map(at);

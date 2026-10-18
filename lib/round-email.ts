@@ -47,6 +47,8 @@ function mark(strokes: number | null, par: number): string {
 
 export function buildRoundEmail(o: {
   round: EmailRound; holes: Hole[]; firstName?: string | null; game?: EmailGameContext | null;
+  /** 209.3 (owner): a game round shows the GROUP's recap first (lib/recap-email), then the member's own round. */
+  groupHtml?: string | null;
   appUrl: string; recapUrl: string; unsubscribeUrl: string; isUpdate?: boolean;
 }): RoundEmail {
   const holes = [...o.holes].sort((a, b) => a.hole_number - b.hole_number);
@@ -129,7 +131,7 @@ export function buildRoundEmail(o: {
   };
   const card = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background:#F7F3E8;color:#1d2b24;font-size:12px;border-radius:10px;overflow:hidden">${nine(1, "Out")}${nine(10, "In")}</table>`;
 
-  const sub = g ? [g.name, g.headline, g.matchLine].filter(Boolean).map(esc).join(" · ") : [o.round.tee_name ? `${esc(o.round.tee_name)} tees` : null, `course handicap ${ch}`].filter(Boolean).join(" · ");
+  const sub = g ? [g.name, g.headline, o.groupHtml ? null : g.matchLine].filter(Boolean).map(esc).join(" · ") : [o.round.tee_name ? `${esc(o.round.tee_name)} tees` : null, `course handicap ${ch}`].filter(Boolean).join(" · ");
   const html = `<!doctype html><html><body style="margin:0;background:#e9ede9;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#1d2b24">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:20px 10px">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden">
@@ -145,12 +147,14 @@ ${g?.groupHtml ? `<tr><td style="background:#0E3B2E;color:#F7F3E8;padding:20px 2
  <div style="color:#C9A227;font-weight:800;font-size:11px;letter-spacing:2px">${o.isUpdate ? "UPDATED · " : ""}YOUR ROUND · ${day(o.round.played_at)}</div>
  <div style="font-family:Georgia,serif;font-size:23px;font-weight:800;margin:6px 0 4px">${gross} gross · net ${net} at ${esc(o.round.course)}</div>
  <div style="color:#B2CBBD;font-size:13.5px">${sub}</div></td></tr>`}
-<tr><td style="padding:16px 16px 6px">${row(nums)}</td></tr>
+${o.groupHtml ? `<tr><td style="padding:6px 22px 4px"><div style="font-family:Georgia,serif;font-size:17px;font-weight:800;margin-top:10px">The group</div>${o.groupHtml}</td></tr>
+<tr><td style="padding:16px 22px 0"><div style="border-top:2px solid #0E3B2E;padding-top:12px;font-family:Georgia,serif;font-size:17px;font-weight:800">Your round</div>${g?.matchLine ? `<div style="font-size:13px;color:#5d6f66;margin-top:2px">${esc(g.matchLine)}</div>` : ""}</td></tr>` : ""}
+<tr><td style="padding:12px 16px 6px">${row(nums)}</td></tr>
 ${statBlocks.length ? `<tr><td style="padding:6px 22px 0"><div style="font-size:11px;font-weight:800;letter-spacing:1.5px;color:#5d6f66">ROUND STATS</div></td></tr><tr><td style="padding:0 16px">${statBlocks.join("")}</td></tr>` : ""}
 ${highlights.length ? `<tr><td style="padding:12px 22px 0"><div style="font-size:11px;font-weight:800;letter-spacing:1.5px;color:#5d6f66">HIGHLIGHTS</div>${highlights.map((h) => `<div style="font-size:14px;line-height:1.45;margin-top:6px">⛳ ${h}</div>`).join("")}</td></tr>` : ""}
 <tr><td style="padding:14px 22px 0"><div style="font-size:11px;font-weight:800;letter-spacing:1.5px;color:#5d6f66;margin-bottom:6px">YOUR SCORECARD</div>${card}
  <div style="font-size:11px;color:#5d6f66;margin-top:6px">Circle = birdie · square = bogey · double marks for eagle / double bogey — the same as your scorecard in the app</div></td></tr>
-<tr><td style="padding:16px 22px"><a href="${esc(o.recapUrl)}" style="display:block;background:#C9A227;color:#1a1a1a;text-align:center;font-weight:800;padding:12px;border-radius:999px;text-decoration:none;font-size:14.5px">${g ? "Open the full recap" : "Open this round"}</a></td></tr>
+<tr><td style="padding:16px 22px"><a href="${esc(o.recapUrl)}" style="display:block;background:#C9A227;color:#1a1a1a;text-align:center;font-weight:800;padding:12px;border-radius:999px;text-decoration:none;font-size:14.5px">${g ? "Open the full recap" : "Open Birdie Num Num"}</a></td></tr>
 <tr><td style="border-top:1px solid #e3e8e4;padding:14px 22px;font-size:11.5px;color:#5d6f66;line-height:1.5">You're getting this because round summaries are on. <a href="${esc(o.unsubscribeUrl)}" style="color:#5d6f66">Turn off round summaries</a> · <a href="${esc(o.appUrl)}" style="color:#5d6f66">Birdie Num Num</a></td></tr>
 </table></td></tr></table></body></html>`;
 

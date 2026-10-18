@@ -37,4 +37,9 @@ const withGroup = buildRoundEmail({ ...base, holes: holes(18), game: { ...game, 
 ok(withGroup.html.includes("RED BEAT BLUE") || withGroup.html.includes("Red beat Blue 4½–3½"), "the banner carries the group's result");
 ok(withGroup.html.indexOf("group block") > 0 && withGroup.html.indexOf("group block") < withGroup.html.indexOf("YOUR ROUND"), "the group comes first, then YOUR ROUND");
 ok(withGroup.html.indexOf("YOUR ROUND") < withGroup.html.indexOf("ROUND STATS") && withGroup.html.indexOf("ROUND STATS") < withGroup.html.indexOf("YOUR SCORECARD"), "then the member's stats and scorecard");
+// 209.3: a game round shows the group's recap first, then the member's round.
+const grouped = buildRoundEmail({ ...base, holes: holes(18), game: { ...game, matchLine: "you won 2&1" }, groupHtml: "<div>GROUP-RECAP-HERE</div>" });
+ok(grouped.html.indexOf("GROUP-RECAP-HERE") > 0 && grouped.html.indexOf("GROUP-RECAP-HERE") < grouped.html.indexOf("Your round"), "group recap before 'Your round'");
+ok(grouped.html.indexOf("Your round") < grouped.html.indexOf("YOUR SCORECARD"), "the member's round after the group");
+ok(grouped.html.includes("you won 2&amp;1"), "the personal match line sits under 'Your round'");
 console.log("round-email tests passed");

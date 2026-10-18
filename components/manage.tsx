@@ -105,6 +105,17 @@ const NOTIF_TYPES: { key: string; label: string; def: "push" | "inapp" | "off"; 
 ];
 
 function PushToggle({ user, profile }: { user: any; profile: any }) {
+  // 209.3: round-summary emails — on unless the member turns them off (owner decision: opt-out).
+  const [roundEmails, setRoundEmails] = useState<boolean>(profile?.round_emails !== false);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const toggleRoundEmails = async () => {
+    const next = !roundEmails;
+    setEmailBusy(true);
+    const { error } = await supabase.from("profiles").update({ round_emails: next }).eq("id", user.id);
+    setEmailBusy(false);
+    if (error) { alert(`Couldn't save: ${error.message}`); return; }
+    setRoundEmails(next);
+  };
   const [gate, setGate] = useState<ReturnType<typeof pushGate> | null>(null);
   const [on, setOn] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -226,6 +237,17 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
         </div>
       )}
       {myLog && myLog.length === 0 && <div style={{ color: C.sage, fontSize: 12, marginTop: 10 }}>No push has been attempted to you since the delivery log began.</div>}
+
+      <div data-round-emails style={{ marginTop: 14, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 10 }}>
+        <Eyebrow>ROUND SUMMARY EMAILS</Eyebrow>
+        <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 4 }}>
+          An email about an hour after each round: your scorecard and stats — and for a game, the group&apos;s recap. Sent to {user?.email || "your sign-in email"}.
+        </div>
+        <button type="button" onClick={toggleRoundEmails} disabled={emailBusy} aria-pressed={roundEmails}
+          style={{ ...btn(!roundEmails), marginTop: 8, fontSize: 13, opacity: emailBusy ? 0.62 : 1 }}>
+          {emailBusy ? "…" : roundEmails ? "On — turn off round summaries" : "Off — turn on round summaries"}
+        </button>
+      </div>
 
       {gate !== "unconfigured" && (
         <div style={{ marginTop: 14, borderTop: `1px solid ${C.borderGreen}`, paddingTop: 10 }}>
