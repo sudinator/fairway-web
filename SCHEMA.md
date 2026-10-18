@@ -1,3 +1,7 @@
+## 209.1 — Course selective apply (0192)
+
+course_freshness.declined (jsonb). apply_course_freshness_selected_as / remember_course_declines_as (service role). course_review_detail, course_tee_usage (club admin). games.teams[].color (optional palette key).
+
 ## 209.0 — Season Wrapped (0191)
 
 send_season_wrapped: active members only. season_wrapped_preview(integer): read-only dry run (system admin / direct session).

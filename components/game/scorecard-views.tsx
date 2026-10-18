@@ -73,7 +73,7 @@ import {
   strokeGlyph,
 } from "@/components/ui";
 import type { Game, Player } from "@/lib/game-types";
-import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
+import { teamAccent, teamColour, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
 import { useNowTick } from "@/lib/use-now-tick";
 
 const supabase = createClient();
@@ -228,7 +228,7 @@ export function GroupScorecard({ readOnly = false, game, players, allPlayers, us
   const colorFor = (p: Player): string => {
     if (shapeOf(game).usesTeams && Array.isArray(game.teams) && game.teams.length && p.team) {
       const ti = game.teams.findIndex((t) => t.key === p.team);
-      if (ti >= 0) return teamAccent(game.teams[ti].name, ti);
+      if (ti >= 0) return teamColour(game.teams[ti], ti);
     }
     const idx = playerOrder.findIndex((x) => x.id === p.id);
     return idx % 2 === 0 ? C.overDark : "#E0C25E";
@@ -852,7 +852,7 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
         <div style={{ color: C.cream, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>UNASSIGNED PLAYERS</div>
         {teams.map((t, ti) => {
           const rows = unassigned.filter((p) => p.team === t.key);
-          return <div key={t.key} style={{ marginTop: 6, color: C.sage, fontSize: 11.5, lineHeight: 1.4 }}><span style={{ color: teamAccent(t.name, ti), fontWeight: 800 }}>{t.name}:</span> {rows.length ? rows.map(label).join(", ") : "None"}</div>;
+          return <div key={t.key} style={{ marginTop: 6, color: C.sage, fontSize: 11.5, lineHeight: 1.4 }}><span style={{ color: teamColour(t, ti), fontWeight: 800 }}>{t.name}:</span> {rows.length ? rows.map(label).join(", ") : "None"}</div>;
         })}
       </div>
 
@@ -866,7 +866,7 @@ function TeamGroupsBuilder({ game, players, onSetTeamGroupSlot, onSetAltShotFirs
         return <div key={group} style={{ background: C.greenMid, borderRadius: 12, padding: 12, marginTop: 10, border: `1px solid ${ready ? C.gold : C.borderGreen}` }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={{ color: C.cream, fontSize: 15, fontWeight: 800 }}>Group {group}</div><div style={{ marginLeft: "auto", color: ready ? "#FFE08A" : C.sage, fontSize: 11, fontWeight: 800 }}>{ready ? "✓ READY · 2 v 2" : `NEEDS ${Math.max(0, 4 - sides.reduce((n, s) => n + Math.min(2, s.length), 0))} PLAYERS`}</div></div>
           {teams.map((t, ti) => <div key={t.key} style={{ marginTop: 10, paddingTop: 9, borderTop: "1px solid rgba(178,203,189,.22)" }}>
-            <div style={{ display: "flex", color: teamAccent(t.name, ti), fontSize: 12, fontWeight: 800, marginBottom: 7 }}><span>{t.name}</span><span style={{ marginLeft: "auto", color: C.sage, fontSize: 11 }}>{sides[ti].length}/2 selected</span></div>
+            <div style={{ display: "flex", color: teamColour(t, ti), fontSize: 12, fontWeight: 800, marginBottom: 7 }}><span>{t.name}</span><span style={{ marginLeft: "auto", color: C.sage, fontSize: 11 }}>{sides[ti].length}/2 selected</span></div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(145px,1fr))", gap: 7 }}>{selectFor(t.key, group, 0)}{selectFor(t.key, group, 1)}</div>
           </div>)}
           {extras.map((p) => <button key={p.id} disabled={scoringStarted} onClick={() => void onSetTeamGroupSlot?.(p, null, group)} style={{ ...btn(false), width: "100%", marginTop: 7, color: C.overRedDark, fontSize: 11, opacity: scoringStarted ? .62 : 1 }}>Move extra player {p.display_name} to unassigned</button>)}

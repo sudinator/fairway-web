@@ -1,4 +1,5 @@
 "use client";
+import { teamColour } from "@/lib/game-colors";
 import { shortNamer } from "@/lib/short-names";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { buildLineup, buildLineupText, strokesPhrase } from "@/lib/lineup";
@@ -430,8 +431,8 @@ export function ShareLineupModal({
   const cardRef = useRef<HTMLDivElement>(null);
   const lineup = buildLineup(game, players || [], courseTees || []);
   const teams: { key: string; name: string }[] = Array.isArray(game.teams) ? game.teams : [];
-  const teamColor = (key: string | null | undefined) =>
-    key == null ? null : key === (teams[0]?.key ?? "A") ? "#B05B5B" : "#5271B0";
+  // 209.1: the same team colour as everywhere else (the organizer's choice, else the team's name / position).
+  const teamColor = (key: string | null | undefined) => { if (key == null) return null; const i = teams.findIndex((t: any) => t.key === key); return teamColour(teams[i], i < 0 ? 0 : i); };
   const pct = lineup.allowancePct;
 
   // Groups: foursomes when the format has them, else tee groups, else everyone as one card.

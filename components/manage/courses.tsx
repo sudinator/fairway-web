@@ -23,6 +23,7 @@ import { PlayerCard, PeerCardModal, CardVisibilityToggle } from "@/components/pl
 import { resizeToAvatar } from "@/lib/image";
 import { APP_VERSION } from "@/lib/app-version";
 import { courseChangeLines, buildCourseChangeSummary, hasMaterialCourseChanges } from "@/lib/course-diff";
+import { CourseChangePicker } from "@/components/course-change-picker";
 import { loadFormDraft, saveFormDraft, clearFormDraft, draftAgeLabel } from "@/lib/form-draft";
 import { saveActiveCourseEdit, loadActiveCourseEdit, clearActiveCourseEdit, clearAllLocalState } from "@/lib/draft";
 import { FeedbackForm, type FeedbackPrefill } from "@/components/feedback";
@@ -154,28 +155,6 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   }, []);
   useEffect(() => { void loadPendingReviews(); }, [loadPendingReviews, groupCourses]);
 
-  const applyPendingReview = async (r: PendingReview) => {
-    if (!confirm(`Update "${r.course_name}" (${r.club_name}) with the GolfCourseAPI data for everyone?${r.corrected ? "\n\nThis course carries hand corrections (par, stroke index or tee edits). Updating replaces the whole stored record with the provider's version; those corrections will be lost." : ""}`)) return;
-    setBusyId(r.course_id); setMsg(null);
-    // Approve exactly the revision on screen (0183): refused if re-checked or edited since.
-    const { error } = await supabase.rpc("apply_course_freshness", { p_course_id: r.course_id, p_revision: r.revision });
-    if (error) { setBusyId(null); setMsg(`Couldn't update "${r.course_name}": ${error.message}`); return; }
-    await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_api_update_applied", group_id: r.group_id, summary: `Applied GolfCourseAPI changes to "${r.course_name}"` });
-    setBusyId(null);
-    setMsg(`"${r.course_name}" now matches GolfCourseAPI.`);
-    await loadPendingReviews();
-    await load();
-  };
-  const dismissPendingReview = async (r: PendingReview) => {
-    setBusyId(r.course_id); setMsg(null);
-    const reason = window.prompt("Keep the current data. Reason (optional):", "");
-    if (reason === null) return;
-    const { error } = await supabase.rpc("dismiss_course_freshness", { p_course_id: r.course_id, p_revision: r.revision, p_reason: reason || null });
-    if (error) { setBusyId(null); setMsg(`Couldn't dismiss "${r.course_name}": ${error.message}`); return; }
-    await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: "course_api_update_dismissed", group_id: r.group_id, summary: `Kept stored data for "${r.course_name}" despite GolfCourseAPI changes` });
-    setBusyId(null);
-    setPendingReviews((xs) => (xs || []).filter((x) => x.course_id !== r.course_id));
-  };
   const [pendingEdits, setPendingEdits] = useState<CourseEditRequest[]>([]);
   const [myName, setMyName] = useState<string>("Someone");
 
@@ -490,7 +469,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
         <div data-course-review-section style={{ background: C.greenMid, border: `1px solid ${C.gold}`, borderRadius: 14, padding: 14, marginTop: 14 }}>
           <Eyebrow>COURSE UPDATES TO REVIEW ({pendingReviews.length})</Eyebrow>
           <div style={{ color: C.sage, fontSize: 12, marginTop: 6, lineHeight: 1.5 }}>
-            GolfCourseAPI now lists different ratings, slopes or yardages for these courses, across every club you administer. Nothing changes until you decide. Updating applies for everyone in the app; keeping current hides this until the data changes again.
+            GolfCourseAPI now lists different data for these courses, across every club you administer. Nothing changes until you decide: tick the changes to take. Applying updates the course for everyone; what you leave unticked isn't asked about again unless the provider changes it.
           </div>
           {pendingReviews.map((r) => (
             <div key={r.course_id} style={{ background: C.greenLight, borderRadius: 12, padding: "13px 16px", marginTop: 10 }}>
@@ -498,10 +477,12 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
               <div style={{ color: C.sage, fontSize: 12, marginTop: 3 }}>
                 {r.club_name} · checked {formatDateTime(r.checked_at)}{r.corrected ? " · this course carries hand corrections" : ""}
               </div>
-              <div style={{ marginTop: 10 }}><FreshnessDiffList diff={r.diff} maxHeight={220} /></div>
-              <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                <button style={{ ...btn(true), fontSize: 12, opacity: busyId === r.course_id ? 0.5 : 1 }} disabled={busyId === r.course_id || !r.api_data} onClick={() => applyPendingReview(r)}>Update stored course (applies for everyone)</button>
-                <button style={{ ...btn(false), fontSize: 12, opacity: busyId === r.course_id ? 0.5 : 1 }} disabled={busyId === r.course_id} onClick={() => dismissPendingReview(r)}>Keep current — ignore for now</button>
+              <div style={{ marginTop: 10 }}>
+                <CourseChangePicker courseId={r.course_id} courseName={r.course_name} onDone={async (o) => {
+                  await logActivity(supabase, { actor_id: user.id, actor_name: myName, action: o.kind === "applied" ? "course_api_update_applied" : "course_api_update_dismissed",
+                    group_id: r.group_id, summary: o.kind === "applied" ? `Applied ${o.count} selected GolfCourseAPI change${o.count === 1 ? "" : "s"} to "${r.course_name}"` : `Kept stored data for "${r.course_name}"` });
+                  setMsg(o.message); await loadPendingReviews(); await load();
+                }} />
               </div>
             </div>
           ))}

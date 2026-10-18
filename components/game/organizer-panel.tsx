@@ -74,7 +74,7 @@ import {
   Avatar,
 } from "@/components/ui";
 import type { Game, Player } from "@/lib/game-types";
-import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
+import { teamAccent, teamColour, TEAM_COLOR_BY_NAME, nameColour, TEAM_PALETTE } from "@/lib/game-colors";
 import { FormatFamilySelector, type FormatFamily } from "@/components/game/setup/format-family-selector";
 import { MatchLengthPicker } from "@/components/game/match-length-picker";
 import { matchLengthFromHoles, type MatchLength } from "@/lib/match-length";
@@ -98,6 +98,7 @@ export type OrganizerPanelProps = {
   /** STAGING only (204.2): randomised scores through hole N for every player. */
   onAutoScore?: (through: number) => Promise<string>;
   onRenameTeams?: (names: [string, string]) => Promise<void>;
+  onSetTeamColour?: (index: number, colour: string | null) => Promise<void>;
   onRename: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
   canDelete?: boolean;
@@ -135,6 +136,7 @@ export function OrganizerPanel({
   onBalanceTeams,
   onAutoScore,
   onRenameTeams,
+  onSetTeamColour,
   section = "players",
   eligibleMembers = [],
   onAddMember,
@@ -507,7 +509,7 @@ export function OrganizerPanel({
                   <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
                     {teams.map((t, ti) => {
                       const on = p.team === t.key;
-                      const col = teamAccent(t.name, ti);
+                      const col = teamColour(t, ti);
                       return (
                         <button key={t.key} onClick={() => onSetTeam(p, on ? null : t.key)}
                           disabled={blocked({ type: "set_team", player: p, team: on ? null : t.key })}
@@ -539,6 +541,29 @@ export function OrganizerPanel({
                     placeholder={`Team ${i + 1}`} aria-label={`Team ${i + 1} name`} style={{ ...inputStyle, flex: 1, minWidth: 120 }} />
                 ))}
               </div>
+              {onSetTeamColour ? (
+                <div data-team-colours style={{ marginTop: 10 }}>
+                  <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>TEAM COLOURS</div>
+                  {([0, 1] as const).map((i) => {
+                    const t = { ...teams[i], name: teamNameEdits[i] };
+                    const own = nameColour(t.name);
+                    const other = teamColour({ ...teams[1 - i], name: teamNameEdits[1 - i] }, 1 - i);
+                    return (
+                      <div key={teams[i].key} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                        <span style={{ color: teamColour(t, i), fontWeight: 800, fontSize: 13, minWidth: 90 }}>{t.name || `Team ${i + 1}`}</span>
+                        {own ? <span style={{ color: C.sage, fontSize: 12 }}>Colour from the name</span> : TEAM_PALETTE.map((c) => {
+                          const taken = c.hex === other, picked = (teams[i] as { color?: string | null }).color === c.key;
+                          return (
+                            <button key={c.key} type="button" aria-label={`${c.label}${taken ? " (the other team's colour)" : ""}`} aria-pressed={picked} disabled={taken}
+                              onClick={() => void onSetTeamColour(i, picked ? null : c.key)}
+                              style={{ width: 28, height: 28, borderRadius: 999, background: c.hex, border: picked ? `2px solid ${C.cream}` : "2px solid transparent", opacity: taken ? 0.3 : 1, cursor: taken ? "default" : "pointer", padding: 0 }} />
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
           )}
 
@@ -546,7 +571,7 @@ export function OrganizerPanel({
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginTop: 12 }}>
               {teams.map((t, ti) => {
                 const mem = orderedPlayers.filter((p) => p.team === t.key);
-                const accent = teamAccent(t.name, ti);
+                const accent = teamColour(t, ti);
                 return (
                   <div key={t.key} style={{ background: C.greenLight, borderRadius: 10, padding: 12, border: `1px solid ${accent}` }}>
                     <div style={{ color: accent, fontWeight: 800, fontSize: 13 }}>{t.name}</div>

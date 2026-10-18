@@ -2418,6 +2418,15 @@ function GameRoom({
   };
 
 
+  // 209.1: an organizer-chosen team colour (applies only when the team's name isn't itself a colour).
+  const setTeamColour = async (index: number, colour: string | null) => {
+    if (!game || !Array.isArray(game.teams) || !game.teams[index]) return;
+    const next = game.teams.map((t, i) => i === index ? { ...t, color: colour } : t);
+    const { error } = await supabase.from("games").update({ teams: next }).eq("id", game.id);
+    if (error) { notifyError("Couldn't save the team colour — please try again."); return; }
+    setGame({ ...game, teams: next });
+  };
+
   const renameTeams = async (names: [string, string]) => {
     if (!game || !Array.isArray(game.teams) || game.teams.length < 2) return;
     const next = game.teams.map((t, i) => i < 2 ? { ...t, name: names[i] } : t);
@@ -3451,7 +3460,7 @@ function GameRoom({
           game, players, user,
           onOverride: overridePlayerHandicap, courseTees, onSetTee: setPlayerTee, onSetManualHandicap: setManualHandicap,
           onRemove: removePlayer, onToggleNoShow: toggleNoShow, onSetTeam: setPlayerTeam, onBalanceTeams: balanceTeamsByHandicap, onAutoScore: autoScoreThrough, onRenameTeams: renameTeams,
-          onRename: renameGame, onDelete: deleteGame,
+          onRename: renameGame, onDelete: deleteGame, onSetTeamColour: setTeamColour,
           canDelete: !completedGame, deleteRestriction: "Only a system admin can delete a completed game. Posted own-ball rounds remain in player history; Alternate Shot rounds are removed.",
           onEnd: requestEndGame, onReopen: reopenGame, onReset: resetScores, onShare: setShare,
           eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,

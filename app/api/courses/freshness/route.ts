@@ -12,6 +12,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createRouteClient } from "@/lib/supabase-route";
 import { fetchProviderCourse } from "@/lib/provider-course";
 import { buildFreshnessDiff, validateProviderCourse } from "@/lib/course-diff";
+import { changeItems, withoutDeclined } from "@/lib/course-merge";
 import type { Course } from "@/lib/courses";
 
 export const runtime = "nodejs";
@@ -86,15 +87,18 @@ export async function POST(request: Request) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL, serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceKey) return NextResponse.json({ error: "Server isn't configured to record course checks." }, { status: 503 });
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
+  // 209.1: changes the admin declined before are not "new" — unless the provider's value has changed since.
+  const { data: dec } = await admin.from("course_freshness").select("declined").eq("course_id", courseId).maybeSingle();
+  const newChanges = complete ? withoutDeclined(changeItems(stored, provider.course), (dec?.declined as Record<string, unknown>) ?? {}).length > 0 : false;
   const { data: rec, error: rErr } = await admin.rpc("record_course_freshness_checked", {
     p_course_id: courseId, p_actor: user.id, p_api_data: complete ? provider.course : null, p_diff: diff,
-    p_has_changes: complete ? (diff as any).hasChanges : false, p_check_state: complete ? "ok" : "incomplete",
+    p_has_changes: newChanges, p_check_state: complete ? "ok" : "incomplete",
     // 0185: the course exactly as it was read; recording is refused if it changed during the check.
     p_base_data: course.data ?? null,
   });
   if (rErr) {
     const out: FreshnessOutcome = { providerReached: true, saved: false, checkState: "not_saved", status: row?.status || "none", revision: row?.revision ?? null,
-      hasChanges: complete ? (diff as any).hasChanges : false, diff, apiCourse: complete ? provider.course : null, problems: complete ? undefined : problems,
+      hasChanges: newChanges, diff, apiCourse: complete ? provider.course : null, problems: complete ? undefined : problems,
       error: rErr.code === "42501" ? "Only members of this course's club can check it."
         : rErr.code === "40001" ? "The course was edited while it was being checked — run the check again."
         : "The check ran but couldn't be saved." };

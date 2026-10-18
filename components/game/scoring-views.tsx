@@ -78,7 +78,7 @@ import {
 import type { TrifectaRowSide } from "@/lib/golf";
 import type { Game, Player } from "@/lib/game-types";
 import { singlesTeamStandings, foursomeTeamStandings, trifectaResults, membersOf, altShotInputsFor, fmtPoints } from "@/lib/game-results";
-import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
+import { teamAccent, teamColour, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
 import { HScroll } from "@/components/hscroll";
 import { addPairing as nextPairingAdd, removePairing as nextPairingRemove, addFoursome as nextFoursomeAdd, removeFoursome as nextFoursomeRemove, renameFoursome as nextFoursomeRename, assignFoursomePlayer, unassignFoursomePlayer, deriveTeeGroupsFromFoursomes } from "@/lib/game-structure";
 
@@ -440,7 +440,7 @@ function MatchSetupBuilder({ game, players, teams, blocked, blockedReason, onSav
         <div style={{ color: C.cream, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>UNASSIGNED PLAYERS</div>
         {isTeam ? teams!.map((team, index) => {
           const rows = unassigned.filter((p) => p.team === team.key);
-          return <div key={team.key} style={{ marginTop: 6, color: C.sage, fontSize: 11.5, lineHeight: 1.4 }}><span style={{ color: teamAccent(team.name, index), fontWeight: 800 }}>{team.name}:</span> {rows.length ? rows.map(optionLabel).join(", ") : "None"}</div>;
+          return <div key={team.key} style={{ marginTop: 6, color: C.sage, fontSize: 11.5, lineHeight: 1.4 }}><span style={{ color: teamColour(team, index), fontWeight: 800 }}>{team.name}:</span> {rows.length ? rows.map(optionLabel).join(", ") : "None"}</div>;
         }) : <div style={{ marginTop: 6, color: C.sage, fontSize: 11.5, lineHeight: 1.4 }}>{unassigned.length ? unassigned.map(optionLabel).join(", ") : "None"}</div>}
       </div>
 
@@ -455,7 +455,7 @@ function MatchSetupBuilder({ game, players, teams, blocked, blockedReason, onSav
             {(["a", "b"] as const).map((side, sideIndex) => <React.Fragment key={side}>
               {sideIndex === 1 ? <div style={{ color: C.gold, fontSize: 11, fontWeight: 800, textAlign: "center" }}>VS</div> : null}
               <label style={{ minWidth: 0 }}>
-                <span style={{ display: "block", color: isTeam ? teamAccent(teams![sideIndex].name, sideIndex) : C.sage, fontSize: 11, fontWeight: 800, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isTeam ? teams![sideIndex].name : `Player ${sideIndex + 1}`}</span>
+                <span style={{ display: "block", color: isTeam ? teamColour(teams![sideIndex], sideIndex) : C.sage, fontSize: 11, fontWeight: 800, marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{isTeam ? teams![sideIndex].name : `Player ${sideIndex + 1}`}</span>
                 <select aria-label={`Match ${row + 1} player ${sideIndex + 1}`} value={pair[side]} disabled={blocked || busy} onChange={(e) => setSlot(row, side, e.target.value)} style={{ ...inputStyle, width: "100%", minWidth: 0, padding: "8px 12px", fontSize: 11.5 }}>
                   <option value="">Select player…</option>
                   {choicesFor(side, row).map((p) => <option key={pkey(p)} value={pkey(p)}>{optionLabel(p)}</option>)}
@@ -573,12 +573,12 @@ export function MatchView({
           <div style={{ color: C.cream, fontSize: 11, letterSpacing: 2, fontWeight: 800, opacity: 0.8 }}>TEAM MATCH · RUNNING SCORE</div>
           <div style={{ display: "flex", alignItems: "center", marginTop: 10 }}>
             <div style={{ flex: 1, textAlign: "center" }}>
-              <div style={{ color: teamAccent(teams![0].name, 0), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![0].name}</div>
+              <div style={{ color: teamColour(teams![0], 0), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![0].name}</div>
               <div style={{ color: teamStandings.decidedPts.A >= teamStandings.decidedPts.B ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.decidedPts.A)}</div>
             </div>
             <div style={{ color: C.cream, fontSize: 18, opacity: 0.7, padding: "0 8px" }}>–</div>
             <div style={{ flex: 1, textAlign: "center" }}>
-              <div style={{ color: teamAccent(teams![1].name, 1), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![1].name}</div>
+              <div style={{ color: teamColour(teams![1], 1), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![1].name}</div>
               <div style={{ color: teamStandings.decidedPts.B >= teamStandings.decidedPts.A ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(teamStandings.decidedPts.B)}</div>
             </div>
           </div>
@@ -760,8 +760,8 @@ export function MatchView({
           const withTeams = isTeam && teams?.length === 2;
           const leftHead = withTeams ? teams![0].name.toUpperCase() : "PLAYER";
           const rightHead = withTeams ? teams![1].name.toUpperCase() : "PLAYER";
-          const leftColor = withTeams ? teamAccent(teams![0].name, 0) : C.gold;
-          const rightColor = withTeams ? teamAccent(teams![1].name, 1) : C.gold;
+          const leftColor = withTeams ? teamColour(teams![0], 0) : C.gold;
+          const rightColor = withTeams ? teamColour(teams![1], 1) : C.gold;
           const leftLeading = st.lead > 0;
           const rightLeading = st.lead < 0;
           const allSquare = st.thru > 0 && st.lead === 0;
@@ -1303,12 +1303,12 @@ export function FourballView({
         <div style={{ background: C.green, borderRadius: 12, padding: 14, marginTop: 12 }}>
           <div style={{ display: "flex", alignItems: "center" }}>
             <div style={{ flex: 1, textAlign: "center" }}>
-              <div style={{ color: teamAccent(teams![0].name, 0), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![0].name}</div>
+              <div style={{ color: teamColour(teams![0], 0), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![0].name}</div>
               <div style={{ color: bigPts.A >= bigPts.B ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(bigPts.A)}</div>
             </div>
             <div style={{ color: C.sage, fontWeight: 800 }}>–</div>
             <div style={{ flex: 1, textAlign: "center" }}>
-              <div style={{ color: teamAccent(teams![1].name, 1), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![1].name}</div>
+              <div style={{ color: teamColour(teams![1], 1), fontFamily: "Georgia, serif", fontSize: 16, fontWeight: 700 }}>{teams![1].name}</div>
               <div style={{ color: bigPts.B >= bigPts.A ? "#FFE08A" : C.cream, fontSize: 40, fontWeight: 800, fontFamily: "Georgia, serif", lineHeight: 1 }}>{fmtPts(bigPts.B)}</div>
             </div>
           </div>
@@ -1390,8 +1390,8 @@ export function FourballView({
                   const bNames = c.bIds.map(firstName).join(" & ");
                   const key = `${f.id}-${ci}`;
                   const isOpen = openKey === key;
-                  const aColor = isTeam ? teamAccent(teams![0].name, 0) : C.birdie;
-                  const bColor = isTeam ? teamAccent(teams![1].name, 1) : C.bogey;
+                  const aColor = isTeam ? teamColour(teams![0], 0) : C.birdie;
+                  const bColor = isTeam ? teamColour(teams![1], 1) : C.bogey;
                   const aLabel = c.kind === "team" ? (isTeam ? teamName(playerOf(c.aIds[0])?.team) : "Pair 1") : firstName(c.aIds[0]);
                   const bLabel = c.kind === "team" ? (isTeam ? teamName(playerOf(c.bIds[0])?.team) : "Pair 2") : firstName(c.bIds[0]);
                   return (
@@ -1465,7 +1465,7 @@ export function StrokesSummary({ game, players, collapsible = false, meKey }: { 
   const teamColOf = (key: string | null | undefined) => {
     if (!teams || !key) return C.gold;
     const ti = teams.findIndex((t) => t.key === key);
-    return ti >= 0 ? teamAccent(teams[ti].name, ti) : C.gold;
+    return ti >= 0 ? teamColour(teams[ti], ti) : C.gold;
   };
 
   const phStr = (pp: Player) => (pp.course_handicap == null && pp.handicap_index == null ? "\u2014" : String(applyAllowance(chBasis(pp, game.course_par, game.holes_meta?.length), allowance)));

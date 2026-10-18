@@ -17,6 +17,7 @@ import { logActivity } from "@/lib/activity";
 import { checkCourseFreshness } from "@/lib/course-freshness";
 import { CourseHistory } from "@/components/course-history";
 import { AdminPlayers } from "@/components/admin-players";
+import { AdminStandoutWatch } from "@/components/admin-standout-watch";
 import { courseStatus } from "@/lib/course-status";
 import { FreshnessDiffList } from "@/components/course-freshness-diff";
 import type { FreshnessDiff } from "@/lib/course-diff";
@@ -2778,7 +2779,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
       case "players": title = "Player admin"; panel = <AdminPanel user={user} showAnalytics={false} />; break;
       case "coursedata": title = "Course data"; panel = <AdminCourseData onOpenCourses={() => onGoto("courses")} />; break;
       case "feedback": title = "Feedback"; panel = <AdminFeedbackTab />; break;
-      case "sandbaggers": title = "Sandbaggers"; panel = <AdminSandbaggers />; break;
+      case "sandbaggers": title = "Sandbaggers & standout watch"; panel = <><AdminSandbaggers /><div style={{ marginTop: 22 }}><Eyebrow>STANDOUT WATCH</Eyebrow><div style={{ marginTop: 8 }}><AdminStandoutWatch /></div></div></>; break;
       case "systools": title = "System tools"; panel = <SystemTools user={user} />; break;
     }
     return (

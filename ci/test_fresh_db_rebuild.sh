@@ -116,6 +116,8 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-account-signup.sql"
 # 0190: merge-then-remove, suspend/restore, empty-only remove; the registry covers every account column.
 # 208.2: the database build and extensions, for diagnosing a crash seen at this test on Supabase's image.
 psql "$DB_URL" -X -A -t -c "select version()" || true
+# 209.1: the exact Supabase database image (17.6.1.111 has the supautils crash; >= 17.6.1.121 is fixed).
+if command -v docker >/dev/null 2>&1; then docker ps --format '{{.Image}}' | grep -i 'supabase/postgres\|cli/postgres' | sed 's/^/Supabase database image: /' || true; fi
 psql "$DB_URL" -X -A -t -c "select string_agg(extname || ' ' || extversion, ', ' order by extname) from pg_extension" || true
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-account-merge.sql"
 
@@ -124,6 +126,9 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-no-app-call-to-revoked.
 
 # 0191: Season Wrapped to active members only; the dry run.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-season-wrapped-active.sql"
+
+# 0192: apply selected course changes.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-course-selective.sql"
 psql "$DB_URL" -X -tA -c "select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p') order by 1" > /tmp/bnn_chain_tables.txt
 python3 - "$ROOT/ci/public_tables.json" /tmp/bnn_chain_tables.txt <<'PY'
 import json, sys
