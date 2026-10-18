@@ -29,8 +29,10 @@ jobs:
 
       - uses: supabase/setup-cli@v3
         with:
-          # 209.1: newer Supabase image; the rebuild prints the exact tag (fixed builds are >= 17.6.1.121).
-          version: 2.111.0
+          # Kept on 2.101.0 (209.2): its image matches the hosted databases' grants. 2.111.0's newer image no longer
+          # grants service_role on tables by default, unlike staging/production. Its supautils crash is avoided by
+          # never calling a revoked function in tests (208.4). The rebuild prints the exact image tag.
+          version: 2.101.0
 
       - name: Install PostgreSQL client
         run: |
