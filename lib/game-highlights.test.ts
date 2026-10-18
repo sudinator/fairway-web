@@ -1,6 +1,6 @@
 function eq(a: unknown, b: unknown, m: string) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${m}: expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`); }
 function ok(c: unknown, m: string) { if (!c) throw new Error(m); }
-import { buildHighlights, rankTies } from "./game-highlights";
+import { buildHighlights, rankTies, standoutsFrom } from "./game-highlights";
 const H = (n: number) => Array.from({ length: n }, (_, i) => ({ n: i + 1, par: 4, si: i + 1 }));
 const pl = (id: string, name: string, scores: (number | null)[], ch = 0, extra: any = {}) => ({ id, user_id: id, display_name: name, scores, course_handicap: ch, no_show: false, ...extra });
 const game = (holes = H(18)) => ({ id: "g", holes_meta: holes, course_par: holes.length * 4, game_type: "stroke" }) as any;
@@ -47,5 +47,29 @@ eq(rankTies([{ s: 70 }, { s: 71 }, { s: 72 }, { s: 72 }], (x) => x.s, 3).map((r)
   const players = ["a", "b", "c", "d"].map((k) => pl(k, k.toUpperCase(), [7, 3, ...fill(16, 7)], 18));
   eq(buildHighlights(game(), players as any).netEagleHole?.n, 2, "4 net eagles, all on hole 2");
   eq(buildHighlights(game(), players.slice(0, 2) as any).netEagleHole, null, "2 is not a cluster");
+}
+// Standout rounds (209.0). The REAL Bowling Green differentials and indexes (production query, Oct 17), names
+// replaced by labels: field gap 5.1; standouts 3.9, 2.9, 2.9, 2.2 — what the owner approved in the mock.
+{
+  const bg: [number, number][] = [[26.4, 27.6], [9, 11.2], [22, 24.2], [4.9, 7.8], [14, 17.3], [30, 33.7], [6.4, 10.4], [23, 27.6], [23.8, 28.5], [16, 20.7],
+                                  [23.1, 28.5], [23, 28.5], [16, 21.6], [20, 25.9], [16.4, 22.4], [19, 25.9], [21, 28.5], [19, 26.8], [16.8, 25.0], [15, 24.2]];
+  const s = standoutsFrom(bg.map(([index, differential], i) => ({ name: `P${i + 1}`, index, differential })))!;
+  eq(s.basis, "field", "20 players: measured against the field");
+  eq(s.fieldGap, 5.1, "field averaged 5.1 over its handicaps");
+  eq(s.rows.map((r) => `${r.name} ${r.better}`), ["P1 3.9", "P2 2.9", "P3 2.9", "P4 2.2"], "the four standouts, best first");
+  eq(s.rows.some((r) => r.exceptional), false, "no exceptional round that day");
+}
+// Small group: against the player's own index; 7+ below it is "exceptional".
+{
+  const s = standoutsFrom([{ name: "A", index: 20, differential: 17.5 }, { name: "B", index: 10, differential: 2.5 }, { name: "C", index: 15, differential: 18 }])!;
+  eq(s.basis, "own", "under 8 players: own handicap");
+  eq(s.rows.map((r) => [r.name, r.better, r.exceptional]), [["B", 7.5, true], ["A", 2.5, false]], "2+ below own index is a standout; 7+ is exceptional");
+}
+// The differential itself, end to end: adjusted gross capped at net double bogey; 113/slope × (AGS − rating).
+{
+  const holes = Array.from({ length: 18 }, (_, i) => ({ n: i + 1, par: 4, si: i + 1 }));
+  const p = { id: "x", user_id: "x", display_name: "Cap Test", scores: [12, ...Array(17).fill(4)], course_handicap: 0, course_handicap_source: "manual", handicap_index: 0, rating: 72, slope: 113, no_show: false };
+  const h = buildHighlights({ id: "g", holes_meta: holes, course_par: 72, game_type: "stroke" } as any, [p] as any);
+  eq(h.standouts?.rows.length, 0, "a blow-up hole is capped (12 → net double bogey 6): differential 2.0, not 8.0 — no standout");
 }
 console.log("game-highlights tests passed");

@@ -143,6 +143,12 @@ for (const [label, g, teamed] of formats) {
   ok(nbApp >= nbImg, "the app's net-birdie list is at least as long as the image's top 5");
   ok((img?.textContent || "").includes("Net uses each player's full Course Handicap — you against the course. Match results use the game's allowance."), "net footnote on the image (USGA terms)");
   ok((img?.textContent || "").includes("Net birdies") && (img?.textContent || "").includes("Net eagles"), "columns say Net birdies / Net eagles");
+  // 209.0 order: how the field played → highlights → (standout rounds) → top 3 → net birdies.
+  const at = (sel: string) => { const el = img?.querySelector(sel); return el ? Array.from(img!.querySelectorAll("*")).indexOf(el) : -1; };
+  const order = ["[data-recap-scoring]", "[data-recap-course]", "[data-recap-tiles]", "[data-recap-top3]", "[data-recap-net-birdies]"].map(at);
+  ok(order.every((v) => v >= 0) && order.every((v, i) => i === 0 || v > order[i - 1]), `share image in the owner's order (${order.join(" < ")})`);
+  const so = at("[data-recap-standouts]");
+  ok(so === -1 || (so > at("[data-recap-tiles]") && so < at("[data-recap-top3]")), "standout rounds, when shown, sit between the highlights and the top 3");
   ok(Array.from(img?.querySelectorAll("*") || []).every((e) => (e as HTMLElement).style?.textOverflow !== "ellipsis"), "no name is truncated with an ellipsis");
   try { t.unmount(); } catch { /* jsdom */ }
 }

@@ -1,3 +1,13 @@
+## 209.0.261017 — Standout rounds, a new recap order, and Season Wrapped readiness
+
+**Standout rounds** (designed with the owner on the Bowling Green data). Each finished player's Score Differential — USGA method: each hole capped at net double bogey on the full course handicap, then 113/slope × (adjusted gross − rating) — against their Handicap Index. With 8+ scored players, measured against the FIELD's average gap (how the course and conditions played; the idea behind the WHS playing-conditions calculation); smaller groups against the player's own index. Shown when someone beat the field (or their handicap) by 2.0+; "exceptional round" = 7.0+ below their own index (the WHS term). Celebration only — nobody is named for a bad round. Everyone who qualifies is listed, with the context line "The field averaged X over its handicaps (a normal day is about 3)". Verified against the real Bowling Green differentials (field 5.1 over; standouts 3.9, 2.9, 2.9, 2.2), as approved in the mock.
+
+**New recap order** (owner): headline and the format's results → how the field played → highlights → standout rounds → top 3 gross | net → net birdies & eagles. Same in the app and on the shared image.
+
+**Season Wrapped readiness (0191).** The Dec 31 summary goes to ACTIVE members only — a suspended member keeps their rounds, so before this they'd have been pushed a summary they can't open. season_wrapped_preview(year): a read-only dry run of exactly who would be notified (season_wrapped_dry_run.sql). Schedule unchanged: Dec 31, 14:00 UTC (9 am Eastern).
+
+Deploy: staging 0191 → code; production 0191 → merge. In mid-December run the dry run on production.
+
 ## 208.5.261017 — An automatic game name follows a changed date or course
 
 A game created without a typed name is named "Format / Course / Date". Changing the date (or course) afterwards updated the game but not that name, so the title kept the old date (reported on production, game 445262). Now, when the organizer changes the date or course, an automatic name is rebuilt to match; a name the organizer typed is never touched. The automatic name is recognised by its shape, so a date written differently on another phone still counts. `lib/game-name.test.ts`.
