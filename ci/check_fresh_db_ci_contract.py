@@ -14,7 +14,7 @@ extension_guard = (ROOT / 'ci' / 'check_db_extension_prereqs.py').read_text(enco
 errors = []
 
 checks = {
-    'CI installs pinned Supabase CLI': 'supabase/setup-cli@v3' in ci and 'version: 2.101.0' in ci,
+    'CI installs pinned Supabase CLI': 'supabase/setup-cli@v3' in ci and 'version: 2.111.0' in ci,   # 209.1: moved from 2.101.0 deliberately
     'CI installs psql client': 'postgresql-client' in ci,
     'CI runs fresh database reconstruction': 'bash ci/test_fresh_db_rebuild.sh' in ci,
     'fresh rebuild starts a clean Supabase Postgres database': 'supabase db start' in script,

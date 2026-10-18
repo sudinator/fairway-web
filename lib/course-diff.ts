@@ -5,7 +5,7 @@ function normalizeText(v: any): string {
   return String(v ?? "").trim();
 }
 
-function sameValue(a: any, b: any): boolean {
+export function sameValue(a: any, b: any): boolean {
   // Treat null/undefined/""/whitespace as genuinely empty BEFORE any numeric
   // coercion — otherwise JS's Number(null)===0 makes a blank→0 change look
   // unchanged, hiding it from the field-level diff.

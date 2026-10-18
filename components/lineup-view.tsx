@@ -1,4 +1,5 @@
 "use client";
+import { teamColour } from "@/lib/game-colors";
 // Presentational half of the live line-up page (201.0): everything after the fetch. Kept apart from
 // the route so it can be mounted in the render harness with a fixture payload and looked at before
 // shipping, and so the per-group card and this page cannot drift — both draw from lib/lineup.ts.
@@ -59,8 +60,9 @@ export function LiveLineupView({ data, err, platform = "other", teamStyle = "ban
 
   const lineup = buildLineup(data, data.players || [], data.course_tees || []);
   const pct = lineup.allowancePct;
-  const teams: { key: string; name: string }[] = Array.isArray(data.teams) ? data.teams : [];
-  const teamColor = (key: string | null) => key == null ? null : key === (teams[0]?.key ?? "A") ? "#B05B5B" : "#5271B0";
+  const teams: { key: string; name: string; color?: string | null }[] = Array.isArray(data.teams) ? data.teams : [];
+  // 209.1: the same team colour as everywhere else (the organizer's choice, else the team's name / position).
+  const teamColor = (key: string | null) => { if (key == null) return null; const i = teams.findIndex((t) => t.key === key); return teamColour(teams[i], i < 0 ? 0 : i); };
   const needle = q.trim().toLowerCase();
   const rows = needle ? lineup.rows.filter((r) => r.name.toLowerCase().includes(needle)) : lineup.rows;
   // Group the rows by foursome/group so a player sees their own group together.

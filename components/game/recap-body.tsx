@@ -5,7 +5,7 @@
 // Every number comes from lib/game-recap (highlights + format sections). Names wrap; nothing truncates.
 import React from "react";
 import { C } from "@/lib/golf";
-import { teamAccent } from "@/lib/game-colors";
+import { teamAccent, teamColour } from "@/lib/game-colors";
 import { fmtMatchDate } from "@/lib/lineup-meta";
 import type { Recap } from "@/lib/game-recap";
 import type { Game } from "@/lib/game-types";
@@ -25,7 +25,7 @@ const S = {
 const teamColor = (game: Game, key: string | null) => {
   const teams = Array.isArray(game.teams) ? game.teams : [];
   const i = teams.findIndex((t: any) => t.key === key);
-  return i >= 0 ? teamAccent(teams[i].name, i) : C.sage;
+  return i >= 0 ? teamColour(teams[i], i) : C.sage;
 };
 const Dot = ({ color }: { color: string }) => <span aria-hidden style={{ display: "inline-block", width: 8, height: 8, borderRadius: 999, background: color, marginRight: 6, marginTop: 4, flexShrink: 0 }} />;
 

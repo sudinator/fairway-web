@@ -30,6 +30,9 @@ export type Highlights = {
    *  player's Handicap Index. With 8+ scored players, measured against the FIELD's average gap (the course and
    *  conditions — the idea behind the WHS playing-conditions calculation); smaller groups use the player's own
    *  index. Standout = 2.0+ better; "exceptional" = 7.0+ below the player's own index (the WHS term). */
+  /** 209.1: EVERY scored player's comparison with the field (8+ players only; else empty) — for the admin
+   *  Standout watch. Not shown on the recap or any shared card. */
+  fieldRows: { name: string; userId: string | null; better: number }[];
   standouts: {
     basis: "field" | "own";
     fieldGap: number | null;                       // the field's average differential − index (normal ≈ +3)
@@ -54,6 +57,14 @@ const bestOf = (m: Map<string, number>, names: Map<string, string>) => {
   if (max <= 0) return null;
   return { names: Array.from(m.entries()).filter(([, v]) => v === max).map(([k]) => names.get(k) || "?"), count: max };
 };
+
+/** Every player against the field (8+ players), standouts or not. */
+export function fieldComparison(scored: { name: string; userId?: string | null; index: number; differential: number }[]): { name: string; userId: string | null; better: number }[] {
+  if (scored.length < 8) return [];
+  const gaps = scored.map((x) => x.differential - x.index);
+  const fieldGap = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+  return scored.map((x, i) => ({ name: x.name, userId: x.userId ?? null, better: Math.round((fieldGap - gaps[i]) * 10) / 10 }));
+}
 
 /** The comparison step on its own (209.0): differentials and indexes in, standout rounds out. */
 export function standoutsFrom(scored: { name: string; index: number; differential: number }[]): Highlights["standouts"] {
@@ -154,12 +165,13 @@ export function buildHighlights(game: Game, players: Player[]): Highlights {
     const a = (alloc.get(pkey(p)) || {}) as Record<number, number>;
     const ags = holes.reduce((sum, h, i) => sum + Math.min(played(p, i) || 0, h.par + 2 + (a[h.n] || 0)), 0);   // net double bogey cap
     const differential = Math.round(((113 / slope) * (ags - rating)) * 10) / 10;
-    return { name: p.display_name, index: hi, differential, gap: differential - hi };
-  }).filter((x): x is { name: string; index: number; differential: number; gap: number } => !!x);
+    return { name: p.display_name, userId: (p as any).user_id ?? null, index: hi, differential, gap: differential - hi };
+  }).filter((x): x is { name: string; userId: string | null; index: number; differential: number; gap: number } => !!x);
   const standouts = standoutsFrom(scored);
+  const fieldRows = fieldComparison(scored);
 
   return {
-    standouts,
+    standouts, fieldRows,
     finishers: finishers.length, topGross, topNet,
     netBirdies: { top, all, birdies: all.reduce((s, r) => s + r.birdies, 0), eagles: totalEagles, players: all.length },
     scoring, fieldNet, frontBack, toughest, easiest, netEagleHole, bestNetHole,

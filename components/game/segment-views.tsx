@@ -68,7 +68,7 @@ import {
   Avatar,
 } from "@/components/ui";
 import type { Game, Player } from "@/lib/game-types";
-import { teamAccent, TEAM_COLOR_BY_NAME } from "@/lib/game-colors";
+import { teamAccent, TEAM_COLOR_BY_NAME, teamColour } from "@/lib/game-colors";
 
 const supabase = createClient();
 
@@ -210,7 +210,7 @@ export function GroupSegmentSummary({ game, players }: { game: Game; players: Pl
   const hasTeams = teams.length >= 2;
   const teamKey = (p: Player) => p.team || pkey(p);
   const teamName = (k: string) => teams.find((t) => t.key === k)?.name || k;
-  const teamColor = (k: string) => { const i = teams.findIndex((t) => t.key === k); return teamAccent(teams[i]?.name, i < 0 ? 0 : i); };
+  const teamColor = (k: string) => { const i = teams.findIndex((t) => t.key === k); return teamColour(teams[i], i < 0 ? 0 : i); };
 
   const legs: Leg[] = buildLegs(cfg.scheme, n);
 

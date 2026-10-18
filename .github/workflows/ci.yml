@@ -29,7 +29,8 @@ jobs:
 
       - uses: supabase/setup-cli@v3
         with:
-          version: 2.101.0
+          # 209.1: newer Supabase image; the rebuild prints the exact tag (fixed builds are >= 17.6.1.121).
+          version: 2.111.0
 
       - name: Install PostgreSQL client
         run: |
