@@ -1,3 +1,11 @@
+## 209.5.261019 — Cup standings on a session's recap
+
+A Ryder Cup session's recap — in the app, on the shared image, and in the round-summary email — shows the Cup's overall standing after that session, right under the session headline (owner-approved mock): "LIVINGSTON RYDER CUP · AFTER THIS SESSION — Red 9½ – Blue 6½ · 12 points left · Red need 5 more to win, Blue need 8"; once a team has clinched, "🏆 Red have won the Cup — with a session to spare"; after the last session, "FINAL … 🏆 Red won the Livingston Ryder Cup" (or "The Cup is shared" / "🏆 Red retain the …" by the Cup's tie rule). The header also says "Session 3 of 5".
+
+The numbers are the Cup standings page's own (lib/competition): decided points only, counted over this session and the ones before it. lib/cup-load loads a game's Cup the same way the standings page does; lib/cup-standing makes the wording; the recap only displays it. Tests: lib/cup-standing.test.ts (alive, clinched with sessions to spare, final, shared, retained), lib/cup-recap-render.test.tsx.
+
+No migration. Deploy: code only.
+
 ## 209.4.261018 — Team colours redesigned; guests scored by the people playing with them
 
 **Team colours** (owner-approved mock). A colour dot right beside each team name — in the create-game form (all three team-format layouts) and at the top of Setup → Teams (the separate 209.1 colour block is gone). Five clearly different colours: red, blue, gold, purple, green (measured: every pair 41+ apart; pink, teal and orange dropped — orange was ~25 from red and gold). Picking the other team's colour SWAPS the two, announced with Undo — nothing is greyed out. Automatic colours say so ("Blue · automatic"); the automatic second-team colour is now GOLD (was orange — older games' orange second teams turn gold). A team named after a colour keeps it ("Colour from the name"); that colour can't be taken by the other team. One rule (pickTeamColour) behind every screen; tests lib/team-colour.test.ts and the rendered lib/team-colour-render.test.tsx.

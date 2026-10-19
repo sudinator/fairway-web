@@ -6,9 +6,10 @@ import { recapEmailHtml } from "@/lib/recap-email";
 import { chBasis, pkey } from "@/lib/game-shape";
 import type { Game, Player } from "@/lib/game-types";
 import type { EmailGameContext } from "@/lib/round-email";
+import type { CupLine } from "@/lib/cup-standing";
 
 /** The member's game context: the group's result, their line, their net position, their standout. */
-export function gameContextFor(game: Game, players: Player[], userId: string): { context: EmailGameContext; groupHtml: string } | null {
+export function gameContextFor(game: Game, players: Player[], userId: string, cup?: CupLine | null): { context: EmailGameContext; groupHtml: string } | null {
   const me = players.find((p) => (p as any).user_id === userId);
   if (!me) return null;
   const recap = buildRecap(game, players);
@@ -25,7 +26,7 @@ export function gameContextFor(game: Game, players: Player[], userId: string): {
   return {
     context: { name: game.name || "Game", headline: recap.headline, matchLine: recap.personal[pkey(me)] ?? null, position,
       standoutBetter: myStandout ? myStandout.better : null, fieldNote },
-    groupHtml: recapEmailHtml(recap),
+    groupHtml: recapEmailHtml(recap, cup),
   };
 }
 

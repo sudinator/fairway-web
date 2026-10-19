@@ -3,6 +3,7 @@
 // can never drift apart. mode "share": the 9:16 image for the group (no personal line, no money, top-5
 // net birdies). mode "app": everything, plus the viewer's own day and the full net-birdie list.
 // Every number comes from lib/game-recap (highlights + format sections). Names wrap; nothing truncates.
+import type { CupLine } from "@/lib/cup-standing";
 import React from "react";
 import { C } from "@/lib/golf";
 import { teamAccent, teamColour } from "@/lib/game-colors";
@@ -29,14 +30,16 @@ const teamColor = (game: Game, key: string | null) => {
 };
 const Dot = ({ color }: { color: string }) => <span aria-hidden style={{ display: "inline-block", width: 8, height: 8, borderRadius: 999, background: color, marginRight: 6, marginTop: 4, flexShrink: 0 }} />;
 
-export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, money }: {
+export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, money, cup }: {
   game: Game; recap: Recap; mode: "share" | "app"; contests?: RecapContest[];
   myLine?: string | null; myScore?: string | null; money?: string | null;
+  /** 209.5: a Cup session — the Cup's standing after it (lib/cup-standing; numbers made there, shown here). */
+  cup?: CupLine | null;
 }) {
   const { highlights: h, sections: s } = recap;
   const share = mode === "share";
   const live = (game as any).players_count as number | undefined; // set by the caller
-  const meta = [(game as any).played_at ? fmtMatchDate(String((game as any).played_at).slice(0, 10)) : null, FORMAT[game.game_type] || game.game_type, live ? `${live} players` : null].filter(Boolean).join(" · ");
+  const meta = [(game as any).played_at ? fmtMatchDate(String((game as any).played_at).slice(0, 10)) : null, FORMAT[game.game_type] || game.game_type, cup ? `Session ${cup.sessionNo} of ${cup.sessionCount}` : null, live ? `${live} players` : null].filter(Boolean).join(" · ");
   const head = recap.headline.match(/^(.*?)([\d½]+–[\d½]+|net \d+|\d+ skins?|\d+ points)$/);
   const nbRows = share ? h.netBirdies.top : h.netBirdies.all.map((r, i) => ({ pos: String(i + 1), item: r }));
   return (
@@ -50,6 +53,15 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
       </div>
       {s.sub ? <div style={{ color: C.sage, fontSize: 13, marginTop: -4 }}>{s.sub}</div> : null}
       {recap.notes.map((n, i) => <div key={i} style={{ color: C.gold, fontSize: 12.5 }}>{n}</div>)}
+      {cup ? (
+        <div data-recap-cup style={{ ...S.box, border: `1px solid ${C.gold}` }}>
+          <div style={S.th}>{cup.name.toUpperCase()} · {cup.final ? "FINAL" : "AFTER THIS SESSION"}</div>
+          <div style={{ fontFamily: "Georgia, serif", fontSize: 20, fontWeight: 800, marginTop: 2 }}>
+            <span style={{ color: cup.aColour }}>{cup.aName} {cup.a}</span> – <span style={{ color: cup.bColour }}>{cup.bName} {cup.b}</span>
+          </div>
+          <div style={{ color: C.sage, fontSize: 12.5, marginTop: 3 }}>{cup.detail}</div>
+        </div>
+      ) : null}
 
       {!share && (myLine || myScore) ? (
         <div data-recap-you style={S.box}>

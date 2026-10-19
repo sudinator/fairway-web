@@ -9,6 +9,8 @@ import nodemailer from "nodemailer";
 import crypto from "node:crypto";
 import { buildRoundEmail } from "@/lib/round-email";
 import { gameContextFor, unsubscribeToken } from "@/lib/round-email-server";
+import { loadCupForGame } from "@/lib/cup-load";
+import { cupStandingAfter } from "@/lib/cup-standing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,7 +45,10 @@ export async function POST(req: Request) {
           db.from("games").select("*").eq("id", d.game_id).maybeSingle(),
           db.from("game_players").select("*").eq("game_id", d.game_id),
         ]);
-        if (game && players) ctx = gameContextFor(game as any, players as any, d.user_id);
+        // 209.5: a Cup session's email carries the Cup's standing (shared loader + lib/cup-standing).
+        const cupData = game ? await loadCupForGame(db, d.game_id) : null;
+        const cup = cupData ? cupStandingAfter(cupData.competition, cupData.sessions, d.game_id) : null;
+        if (game && players) ctx = gameContextFor(game as any, players as any, d.user_id, cup);
         gameCode = (game as any)?.code ?? null;
       }
       // The app opens a game by its 6-digit code (201.1 deep link); a solo round has no direct link — open the app.

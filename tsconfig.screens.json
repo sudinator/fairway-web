@@ -26,6 +26,8 @@
     "lib/course-merge.test.ts",
     "lib/team-colour.test.ts",
     "lib/team-colour-render.test.tsx",
+    "lib/cup-standing.test.ts",
+    "lib/cup-recap-render.test.tsx",
     "components/team-colour-dot.tsx",
     "lib/standout-watch.test.ts",
     "lib/round-email.test.ts",
