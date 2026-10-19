@@ -1,3 +1,7 @@
+## 210.0.261019 — Head-to-head & partners; club report preview
+
+**Head-to-head & partners** (Profile, owner-approved mock). A member's OWN record only (owner decision): head-to-head from singles — won / lost / halved against each opponent — and partners from four-ball, alternate shot and Trifecta pairs — played, won, points — with "Your best partner". Built on lib/match-outcomes: every finished match, players by account, scored with exactly the recap's functions and "decided" rules (lib/match-outcomes.test.ts checks the winners agree with the recap's). Guests have no account and aren't listed. Hidden until there are finished matches.
+
 ## 209.6.261019 — Cup box follows the Cup's lock (replaces 209.5, which wasn't deployed)
 
 209.5's Cup box ignored whether the Cup's schedule was locked. On an UNLOCKED Cup (schedule still a draft — sessions can be added, removed or resized, so the points total isn't final) it would have worked out "need N more to win", a clinch or a winner from a schedule that could still change — contradicting the Cup standings page, which declares no winner until the schedule is locked. Now, like the standings page: an unlocked Cup's box shows the secured score, "Schedule not locked yet — no winner until it is", and "Session 3" (no "of 5"); a locked Cup is as in 209.5. Tests cover both.
