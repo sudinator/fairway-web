@@ -18,6 +18,8 @@ import { checkCourseFreshness } from "@/lib/course-freshness";
 import { CourseHistory } from "@/components/course-history";
 import { AdminPlayers } from "@/components/admin-players";
 import { AdminStandoutWatch } from "@/components/admin-standout-watch";
+import { HeadToHead } from "@/components/head-to-head";
+import { AdminClubReport } from "@/components/admin-club-report";
 import { courseStatus } from "@/lib/course-status";
 import { FreshnessDiffList } from "@/components/course-freshness-diff";
 import type { FreshnessDiff } from "@/lib/course-diff";
@@ -543,6 +545,8 @@ export function ProfilePanel({ profile, user, onSaved, badgeRefresh = 0, rounds 
       <HandicapSummary rounds={rounds} profile={profile} onOpen={onOpen} />
 
       <AchievementsWall user={user} rounds={rounds} refreshKey={badgeRefresh} />
+
+      <HeadToHead user={user} />
 
       <PushToggle user={user} profile={profile} />
 
@@ -2795,6 +2799,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
       case "operations": title = "Operations"; panel = <OpsMetrics />; break;
       case "games": title = "Games oversight"; panel = <AdminGamesOversight onOpenGame={onOpenGame} />; break;
       case "diagnostics": title = "Diagnostics"; panel = <RoundSaveDiag />; break;
+      case "clubreports": title = "Club reports"; panel = <AdminClubReport />; break;
       case "activity": title = "Activity log"; panel = <ActivityTab />; break;
       case "oversight": title = "Clubs oversight"; panel = <AdminGroupsTab user={user} onEnterGroup={onEnterGroup} onExitGroup={onExitGroup} onGroupsChanged={onGroupsChanged} />; break;
       case "users": title = "Users"; panel = <AdminUsersTab user={user} isOwner={!!profile?.is_owner} />; break;
@@ -2845,6 +2850,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
             <Card icon="💬" name="Feedback" cap="User-submitted feedback" onClick={() => setView("feedback")} badge={todos.new_feedback} />
             <Card icon="⛳" name="Course data" cap="API verification, pending updates, corrections awaiting approval" onClick={() => setView("coursedata")} />
             <Card icon="🚩" name="Sandbaggers" cap="Entered index vs scoring (18+ rounds)" onClick={() => setView("sandbaggers")} />
+            <Card icon="📋" name="Club reports" cap="Preview a club's report for any period" onClick={() => setView("clubreports")} />
             <Card icon="🩺" name="Diagnostics" cap="Round-save log & reproduce toggle" onClick={() => setView("diagnostics")} />
             <Card icon="🔧" name="System tools" cap="Test account, yardage backfill" onClick={() => setView("systools")} />
           </>)}
