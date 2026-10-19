@@ -5,6 +5,7 @@
 // lib/round-email-recap.test.tsx renders both from the same game and checks they read the same.
 import type { Recap } from "@/lib/game-recap";
 import { fmtPoints } from "@/lib/game-results";
+import type { CupLine } from "@/lib/cup-standing";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 const sgn = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}`;
@@ -28,8 +29,13 @@ const ROW = (l: string, r: string, strong = false) => `<tr><td style="padding:5p
 const TABLE = (rows: string) => `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse">${rows}</table>`;
 
 /** The group's recap as email HTML, in the recap card's order. */
-export function recapEmailHtml(r: Recap): string {
+export function recapEmailHtml(r: Recap, cup?: CupLine | null): string {
   const h = r.highlights, s = r.sections, parts: string[] = [];
+  // 0. a Cup session: the Cup's standing after it (209.5 — same wording as the recap card)
+  if (cup) parts.push(`<div style="border:1px solid #C9A227;background:#FBF6E6;border-radius:10px;padding:10px 12px;margin-top:10px">`
+    + `<div style="font-size:11px;font-weight:800;letter-spacing:1.5px;color:#9A7A12">${esc(cup.name.toUpperCase())} · ${cup.final ? "FINAL" : "AFTER THIS SESSION"}</div>`
+    + `<div style="font-family:Georgia,serif;font-size:19px;font-weight:800;margin-top:2px">${esc(cup.aName)} ${esc(cup.a)} – ${esc(cup.bName)} ${esc(cup.b)}</div>`
+    + `<div style="font-size:12.5px;color:#5d6f66;margin-top:3px">${esc(cup.detail)}</div></div>`);
   // 1. the format's own results
   if (s.matches?.rows.length) parts.push(H(s.matches.title.toUpperCase()) + TABLE(s.matches.rows.map((m) =>
     ROW(m.halved ? `${esc(m.winners.join(" & "))} halved with ${esc(m.losers.join(" & "))}` : `${esc(m.winners.join(" & "))} <span style="color:#5d6f66">beat</span> ${esc(m.losers.join(" & "))}`, esc(m.result))).join("")));

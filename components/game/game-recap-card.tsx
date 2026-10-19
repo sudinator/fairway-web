@@ -6,6 +6,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { C, effectiveGroupId, TGC_GROUP_ID } from "@/lib/golf";
 import { btn } from "@/components/ui";
 import { createClient } from "@/lib/supabase";
+import { loadCupForGame } from "@/lib/cup-load";
+import { cupStandingAfter, type CupLine } from "@/lib/cup-standing";
 import { pkey, chBasis } from "@/lib/game-shape";
 import { buildRecap } from "@/lib/game-recap";
 import { contestLeaderboard, fmtContestValue, type Contest, type ContestEntry } from "@/lib/contests";
@@ -38,6 +40,15 @@ export function GameRecapCard({ game, players, altShotScores, userId, betStale, 
     })();
     return () => { live = false; };
   }, [supabase, game.id, hasBet]);
+  // 209.5: a Cup session shows the Cup's standing after it (shared loader + lib/cup-standing — the Cup page's numbers).
+  const [cup, setCup] = useState<CupLine | null>(null);
+  const competitionId = competition?.competition_id ?? null;
+  useEffect(() => {
+    if (!competitionId) { setCup(null); return; }
+    let live = true;
+    void loadCupForGame(supabase, game.id).then((c) => { if (live) setCup(c ? cupStandingAfter(c.competition, c.sessions, game.id) : null); });
+    return () => { live = false; };
+  }, [supabase, game.id, competitionId, players]);
 
   const me = players.find((p) => p.user_id === userId);
   const myLine = me ? recap.personal[pkey(me)] ?? null : null;
@@ -60,7 +71,7 @@ export function GameRecapCard({ game, players, altShotScores, userId, betStale, 
 
   return (
     <div data-game-recap style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginBottom: 12 }}>
-      <RecapBody game={shown} recap={recap} mode="app" contests={contests} myLine={myLine} myScore={myScore} money={money} />
+      <RecapBody game={shown} recap={recap} mode="app" contests={contests} myLine={myLine} myScore={myScore} money={money} cup={cup} />
       {changed ? <div data-recap-changed style={{ color: C.gold, fontSize: 12.5, marginTop: 8, fontWeight: 700 }}>Results changed since they were announced — scores were corrected.</div> : null}
       <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
         <button type="button" data-recap-share onClick={shareImage} disabled={busy} style={{ ...btn(true), flex: 1, fontSize: 14 }}>{busy ? "Preparing…" : "📤 Share with the group"}</button>
@@ -70,7 +81,7 @@ export function GameRecapCard({ game, players, altShotScores, userId, betStale, 
       {/* The share image: the same recap in share mode, 9:16, rendered off-screen and exported as a picture. */}
       <div aria-hidden style={{ position: "absolute", left: -10000, top: 0 }}>
         <div ref={shareRef} data-recap-share-image style={{ width: 402, minHeight: 715, boxSizing: "border-box", background: C.green, padding: 16, display: "flex", flexDirection: "column" }}>
-          <RecapBody game={shown} recap={recap} mode="share" contests={contests} />
+          <RecapBody game={shown} recap={recap} mode="share" contests={contests} cup={cup} />
         </div>
       </div>
     </div>
