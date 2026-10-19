@@ -27,6 +27,7 @@ const DEFAULT_DELIVERY: Record<string, "push" | "inapp" | "off"> = {
   signup_pending: "push",   // 208.0 — admins: a new sign-up is waiting for approval
   signup_reminder: "push",  // 208.0 — admins: someone has waited 7 days
   signup_admitted: "push",  // 208.0 — the new member: you're in
+  club_report: "push",      // 210.1 — your club's report (July 1 / October 1)
 };
 
 function titleFor(type: string | null): string {
@@ -35,6 +36,7 @@ function titleFor(type: string | null): string {
     case "signup_pending": return "New sign-up waiting";
     case "signup_reminder": return "Sign-up still waiting";
     case "signup_admitted": return "You're in";
+    case "club_report": return "Your club report is ready";
     case "course_change": return "Course data changed";
     case "money_owed": return "You owe money";
     case "money_paid": return "You got paid";

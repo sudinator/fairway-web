@@ -6,6 +6,7 @@ import { C } from "@/lib/golf";
 import { Eyebrow } from "@/components/ui";
 import { createClient } from "@/lib/supabase";
 import { matchOutcomes, memberRecord, type H2HRow, type PartnerRow } from "@/lib/match-outcomes";
+import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 import type { Game, Player } from "@/lib/game-types";
 import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 
@@ -14,28 +15,40 @@ const pts = (n: number) => (Math.floor(n) === n ? String(n) : `${Math.floor(n) |
 export function HeadToHead({ user }: { user: { id: string } }) {
   const supabase = useMemo(() => createClient(), []);
   const [rec, setRec] = useState<{ headToHead: H2HRow[]; partners: PartnerRow[] } | null>(null);
+  // 210.2 (review point 9): a failed load is an error with Retry — never "no history", never a partial record.
+  const [err, setErr] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let live = true;
+    setErr(null);
     (async () => {
-      const { data: mine } = await supabase.from("game_players").select("game_id").eq("user_id", user.id);
-      const ids = [...new Set((mine || []).map((r: { game_id: string }) => r.game_id))];
-      if (!ids.length) { if (live) setRec({ headToHead: [], partners: [] }); return; }
-      const games: Game[] = [], players: Player[] = [], alt: AltShotScoreRow[] = [];
-      for (let i = 0; i < ids.length; i += 100) {
-        const chunk = ids.slice(i, i + 100);
-        const [g, p, a] = await Promise.all([
-          supabase.from("games").select("*").in("id", chunk).eq("status", "ended"),
-          supabase.from("game_players").select("*").in("game_id", chunk),
-          supabase.from("game_alt_shot_scores").select("*").in("game_id", chunk),
-        ]);
-        games.push(...((g.data || []) as Game[])); players.push(...((p.data || []) as Player[])); alt.push(...((a.data || []) as AltShotScoreRow[]));
+      try {
+        // Every row, paged (210.2 — review point 8).
+        const mine = await fetchAll<{ game_id: string }>((from, to) => supabase.from("game_players").select("game_id, id").eq("user_id", user.id).order("id").range(from, to));
+        const ids = [...new Set(mine.map((r) => r.game_id))];
+        const [games, players, alt] = ids.length ? await Promise.all([
+          fetchAllIn<Game>(supabase, "games", "id", ids),
+          fetchAllIn<Player>(supabase, "game_players", "game_id", ids),
+          fetchAllIn<AltShotScoreRow>(supabase, "game_alt_shot_scores", "game_id", ids),
+        ]) : [[], [], []] as [Game[], Player[], AltShotScoreRow[]];
+        const ended = games.filter((g) => (g as { status?: string }).status === "ended");
+        const outcomes = ended.flatMap((g) => matchOutcomes(g, players.filter((p) => p.game_id === g.id), alt.filter((x) => x.game_id === g.id)));
+        if (live) setRec(memberRecord(outcomes, user.id));
+      } catch (e) {
+        if (live) setErr(e instanceof Error ? e.message : String(e));   // keep any earlier good result on screen
       }
-      const outcomes = games.flatMap((g) => { try { return matchOutcomes(g, players.filter((p) => p.game_id === g.id), alt.filter((x) => x.game_id === g.id)); } catch { return []; } });
-      if (live) setRec(memberRecord(outcomes, user.id));
     })();
     return () => { live = false; };
-  }, [supabase, user.id]);
+  }, [supabase, user.id, attempt]);
 
+  if (err && !rec) return (
+    <div data-head-to-head-error style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${C.borderGreen}` }}>
+      <Eyebrow>HEAD-TO-HEAD & PARTNERS</Eyebrow>
+      <div style={{ color: C.sage, fontSize: 13, marginTop: 6 }}>Couldn&apos;t load your match history.{" "}
+        <button type="button" onClick={() => setAttempt((a) => a + 1)} style={{ background: "transparent", border: "none", padding: 0, color: C.gold, fontWeight: 800, cursor: "pointer", fontSize: 13 }}>Retry</button>
+      </div>
+    </div>
+  );
   if (!rec) return null;
   if (!rec.headToHead.length && !rec.partners.length) return null;   // nothing to show until there are finished matches
   const best = rec.partners.find((p) => p.played >= 2);

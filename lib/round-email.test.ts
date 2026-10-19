@@ -42,4 +42,12 @@ const grouped = buildRoundEmail({ ...base, holes: holes(18), game: { ...game, ma
 ok(grouped.html.indexOf("GROUP-RECAP-HERE") > 0 && grouped.html.indexOf("GROUP-RECAP-HERE") < grouped.html.indexOf("Your round"), "group recap before 'Your round'");
 ok(grouped.html.indexOf("Your round") < grouped.html.indexOf("YOUR SCORECARD"), "the member's round after the group");
 ok(grouped.html.includes("you won 2&amp;1"), "the personal match line sits under 'Your round'");
+// 210.2 (review point 7): a small group's standout is measured against the player's OWN handicap — never "the field".
+{
+  const small = buildRoundEmail({ ...base, holes: holes(18), game: { ...game, standoutBasis: "own", fieldNote: null } });
+  ok(small.html.includes("better than your handicap") && !small.html.includes("better than the field"), "small group: 'better than your handicap', never 'the field'");
+  ok(small.html.includes("BETTER THAN YOUR HANDICAP"), "the number's label says so too");
+  const big = buildRoundEmail({ ...base, holes: holes(18), game: { ...game, standoutBasis: "field" } });
+  ok(big.html.includes("better than the field"), "8+ players: 'better than the field'");
+}
 console.log("round-email tests passed");

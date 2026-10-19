@@ -1,3 +1,27 @@
+## 210.2.261019 — Hardening from the external review (points 2, 4, 7, 8, 9)
+
+**2 · Club report accuracy.** What counts as a round now follows BNN's handicap rule (owner): fewer than 9 holes with real scores is not a round (never scored / abandoned — an empty or one-score card no longer becomes "best gross 0 / 4"); 9 or more counts, even when marked complete early. Best gross and best net: complete 18-hole rounds only (owner: option A). A missing handicap index is skipped, never read as 0 (no fake "20 → 0" most improved). Alternate shot counts toward games, rounds, attendance and rivalries but feeds no individual scoring award (the scores belong to the pair). Standout rounds stay exactly as the recap computes them (full rounds). Tests reproduce each reported case and fail on 210.1.
+
+**4 · Merge guards (0196).** The merge now refuses — with the reason, changing nothing — to take out the OWNER (ownership moves only by a deliberate transfer), YOUR OWN account, or a SYSTEM ADMIN (remove the role first). Nobody can suspend themselves. ci/assert-merge-guards.sql (fails against the 0190 rules).
+
+**7 · Email wording.** A small group's standout is measured against the player's own handicap; the email now says "better than your handicap" there, and "better than the field" only when the field (8+ players) was used.
+
+**8 · Every row, paged.** lib/fetch-all pages every query (games, players, alternate-shot scores) in a stable order until all rows arrive, and throws on any error. Used by head-to-head, the club report, the Cup loader and Standout watch — no more silent 1,000-row cut-off as history grows.
+
+**9 · Head-to-head errors.** A failed load shows "Couldn't load your match history — Retry", never an empty or partial record.
+
+Deploy: staging 0196 → code; production 0196 → merge.
+
+## 210.1.261019 — Club reports published; whole-number net
+
+**Publishing (0195).** On July 1 (January–June) and October 1 (July–September), 9 am Eastern, each active club with finished games in the period gets its report: built by the 10-minute email tick with the same code as the admin preview (lib/club-report), saved as a FROZEN copy (club_reports.snapshot), shown on the club page ("Club report · July–September 2026 — See the report"), pushed to the club's members ("Your club report is ready"), and emailed. Emails go to THE OWNER ONLY at first (app_settings.club_reports = {"recipients":"owner"}); "everyone" sends to each club's members. Members have their own switch — Profile → Notification settings → Club report emails (on by default) — and a signed one-click turn-off in each email; a round-summary turn-off link can't turn off club reports or vice versa. Members read only their own club's reports. Building and publishing don't need email configured; sending does (production only).
+
+**Whole-number net (owner).** The club report's best net, and the round-summary email's net position and "course handicap" line, now round the course handicap exactly as the recap does (Math.round(chBasis)) — best net showed decimals, and could in principle have picked a different "best net" than the recap's top 3. Test: a fractional course handicap gives a whole-number net.
+
+Tests: ci/assert-club-reports.sql (queued only for clubs with games in the period; frozen copy; members notified once; own club only; owner-only emails, opt-out, everyone mode; server only), unsubscribe kinds, club-report rounding.
+
+Deploy: staging 0195 → code; production 0195 → merge. No email webhook change needed (the 0193 tick handles it).
+
 ## 210.0.261019 — Head-to-head & partners; club report preview
 
 **Head-to-head & partners** (Profile, owner-approved mock). A member's OWN record only (owner decision): head-to-head from singles — won / lost / halved against each opponent — and partners from four-ball, alternate shot and Trifecta pairs — played, won, points — with "Your best partner". Built on lib/match-outcomes: every finished match, players by account, scored with exactly the recap's functions and "decided" rules (lib/match-outcomes.test.ts checks the winners agree with the recap's). Guests have no account and aren't listed. Hidden until there are finished matches.

@@ -6,6 +6,7 @@ import { C } from "@/lib/golf";
 import { createClient } from "@/lib/supabase";
 import { buildHighlights } from "@/lib/game-highlights";
 import { summarizeWatch, WATCH_RULE, type WatchRow } from "@/lib/standout-watch";
+import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 
 export function AdminStandoutWatch() {
   const supabase = useMemo(() => createClient(), []);
@@ -17,15 +18,12 @@ export function AdminStandoutWatch() {
 
   useEffect(() => {
     (async () => {
-      const { data: gs, error } = await supabase.from("games").select("*").eq("status", "ended").gte("played_at", `${year}-01-01`).lte("played_at", `${year}-12-31`);
-      if (error) { setErr(error.message); return; }
-      const ids = (gs || []).map((g: any) => g.id);
-      const players: any[] = [];
-      for (let i = 0; i < ids.length; i += 100) {
-        const { data, error: e2 } = await supabase.from("game_players").select("*").in("game_id", ids.slice(i, i + 100));
-        if (e2) { setErr(e2.message); return; }
-        players.push(...(data || []));
-      }
+      // Every row, paged (210.2 — review point 8).
+      let gs: any[] = [], players: any[] = [];
+      try {
+        gs = await fetchAll<any>((from, to) => supabase.from("games").select("*").eq("status", "ended").gte("played_at", `${year}-01-01`).lte("played_at", `${year}-12-31`).order("id").range(from, to));
+        players = await fetchAllIn<any>(supabase, "game_players", "game_id", gs.map((g) => g.id));
+      } catch (e) { setErr(e instanceof Error ? e.message : String(e)); return; }
       const perGame = (gs || []).map((g: any) => {
         const ps = players.filter((p) => p.game_id === g.id);
         let fieldRows: { name: string; userId: string | null; better: number }[] = [];

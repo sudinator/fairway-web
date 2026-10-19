@@ -19,7 +19,9 @@ export type EmailGameContext = {
   headline?: string | null;       // "Red beat Blue 4½–3½"
   matchLine?: string | null;      // "You and your partner won 2&1"
   position?: { rank: number; of: number } | null;   // net position among finishers
-  standoutBetter?: number | null; // "better than the field" when a standout
+  standoutBetter?: number | null; // how much better, when a standout
+  /** 210.2: what it was measured against — "field" (8+ players) or "own" (the player's handicap). */
+  standoutBasis?: "field" | "own" | null;
   fieldNote?: string | null;      // "on a course that played 2 shots hard"
   sub?: string | null;            // the recap's second line ("6 of 10 singles went to the 18th")
   groupHtml?: string | null;      // the group's recap (lib/recap-email) — shown BEFORE the member's own round
@@ -56,7 +58,7 @@ export function buildRoundEmail(o: {
   const gross = played.reduce((s, h) => s + (h.strokes || 0), 0);
   // Course handicap through chBasis (standing rule): a manual figure is used as given, else the exact one.
   const coursePar = holes.reduce((s, h) => s + (h.par || 0), 0);
-  const ch = chBasis(o.round, coursePar, holes.length >= 18 ? undefined : holes.length);
+  const ch = Math.round(Number(chBasis(o.round, coursePar, holes.length >= 18 ? undefined : holes.length) ?? 0));   // whole number, as the recap
   const alloc = allocateStrokes(holes, ch);
   const netOf = (h: Hole) => (h.strokes == null ? null : h.strokes - (alloc[h.hole_number] || 0));
   const net = played.reduce((s, h) => s + (netOf(h) || 0), 0);
@@ -85,7 +87,9 @@ export function buildRoundEmail(o: {
   const pos = g?.position ? `, ${ordinal(g.position.rank)} of ${g.position.of}` : "";
   const subject = `${o.isUpdate ? "Updated: " : ""}Your round at ${o.round.course} — ${gross} (net ${net})${pos}`;
   const highlights: string[] = [];
-  if (g?.standoutBetter != null) highlights.push(`<b>Standout round</b> — ${g.standoutBetter.toFixed(1)} better than the field against your handicap${g.fieldNote ? `, ${esc(g.fieldNote)}` : ""}.`);
+  if (g?.standoutBetter != null) highlights.push(g.standoutBasis === "own"
+    ? `<b>Standout round</b> — ${g.standoutBetter.toFixed(1)} better than your handicap.`
+    : `<b>Standout round</b> — ${g.standoutBetter.toFixed(1)} better than the field against your handicap${g.fieldNote ? `, ${esc(g.fieldNote)}` : ""}.`);
   const netEagles = netBirdies.filter((h) => (netOf(h) as number) <= h.par - 2);
   if (netEagles.length) highlights.push(`Net eagle${netEagles.length > 1 ? "s" : ""} on ${netEagles.map((h) => h.hole_number).join(", ")}.`);
   if (n === 18) {
@@ -98,7 +102,7 @@ export function buildRoundEmail(o: {
   const box = (v: string, l: string) => `<td style="border:1px solid #e3e8e4;border-radius:12px;padding:10px;text-align:center;width:33%"><div style="font-family:Georgia,serif;font-size:24px;font-weight:800;color:#1d2b24">${v}</div><div style="font-size:11px;color:#5d6f66;letter-spacing:.5px;margin-top:2px">${l}</div></td>`;
   const row = (cells: string[]) => `<table role="presentation" width="100%" cellspacing="6" cellpadding="0" style="border-collapse:separate"><tr>${cells.join("")}</tr></table>`;
   const nums = g?.position
-    ? [box(ordinal(g.position.rank), `NET, OF ${g.position.of}`), box(String(netBirdies.length), "NET BIRDIES"), g.standoutBetter != null ? box(g.standoutBetter.toFixed(1), "BETTER THAN THE FIELD") : box(String(net), "NET")]
+    ? [box(ordinal(g.position.rank), `NET, OF ${g.position.of}`), box(String(netBirdies.length), "NET BIRDIES"), g.standoutBetter != null ? box(g.standoutBetter.toFixed(1), g.standoutBasis === "own" ? "BETTER THAN YOUR HANDICAP" : "BETTER THAN THE FIELD") : box(String(net), "NET")]
     : [box(String(gross), "GROSS"), box(String(net), "NET"), box(String(netBirdies.length), "NET BIRDIES")];
   const statBlocks: string[] = [];
   const statRow1: string[] = [];
