@@ -1,3 +1,9 @@
+## 209.6.261019 — Cup box follows the Cup's lock (replaces 209.5, which wasn't deployed)
+
+209.5's Cup box ignored whether the Cup's schedule was locked. On an UNLOCKED Cup (schedule still a draft — sessions can be added, removed or resized, so the points total isn't final) it would have worked out "need N more to win", a clinch or a winner from a schedule that could still change — contradicting the Cup standings page, which declares no winner until the schedule is locked. Now, like the standings page: an unlocked Cup's box shows the secured score, "Schedule not locked yet — no winner until it is", and "Session 3" (no "of 5"); a locked Cup is as in 209.5. Tests cover both.
+
+Everything else as 209.5. No migration.
+
 ## 209.5.261019 — Cup standings on a session's recap
 
 A Ryder Cup session's recap — in the app, on the shared image, and in the round-summary email — shows the Cup's overall standing after that session, right under the session headline (owner-approved mock): "LIVINGSTON RYDER CUP · AFTER THIS SESSION — Red 9½ – Blue 6½ · 12 points left · Red need 5 more to win, Blue need 8"; once a team has clinched, "🏆 Red have won the Cup — with a session to spare"; after the last session, "FINAL … 🏆 Red won the Livingston Ryder Cup" (or "The Cup is shared" / "🏆 Red retain the …" by the Cup's tie rule). The header also says "Session 3 of 5".

@@ -25,4 +25,11 @@ for (const mode of ["share", "app"] as const) {
 const plain = renderScreen(<RecapBody game={game} recap={buildRecap(game, players)} mode="share" />);
 ok(!plain.el.querySelector("[data-recap-cup]") && !(plain.el.textContent || "").includes("Session "), "a game that isn't a Cup session: no box");
 plain.unmount();
+// 209.6: an unlocked Cup — "Session 3", no "of N".
+{
+  const t = renderScreen(<RecapBody game={game} recap={buildRecap(game, players)} mode="share" cup={{ ...cup, sessionCount: null, detail: "Schedule not locked yet — no winner until it is" }} />);
+  const txt = t.el.textContent || "";
+  ok(txt.includes("Session 3") && !txt.includes("Session 3 of") && txt.includes("Schedule not locked yet — no winner until it is"), "unlocked Cup: score and a plain session number, no winner");
+  t.unmount();
+}
 report("cup on the recap");

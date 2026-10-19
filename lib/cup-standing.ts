@@ -11,7 +11,7 @@ export type CupSession = CompetitionSession & { game: Game | null; players: Play
 export type CupLine = {
   name: string; aName: string; bName: string; aColour: string; bColour: string;
   a: string; b: string;                 // formatted points ("9½")
-  sessionNo: number; sessionCount: number; final: boolean;
+  sessionNo: number; sessionCount: number | null; final: boolean;   // sessionCount null while the schedule isn't locked
   detail: string;                        // "12 points left · Red need 5 more to win, Blue need 8" / "🏆 …"
 };
 
@@ -31,6 +31,12 @@ export function cupStandingAfter(competition: Competition, sessions: CupSession[
   const cur = scores[scores.length - 1];
   const final = idx === ordered.length - 1 && cur.matchCount > 0 && cur.decidedCount === cur.matchCount;
   const spare = ordered.length - (idx + 1);
+  // An UNLOCKED Cup (schedule still a draft): the points total can change, so — like the Cup standings page —
+  // no winner, clinch, shared Cup or "need" is declared; the secured score still shows. (209.6)
+  if (competition.schedule_status !== "locked") {
+    return { name, aName: A, bName: B, aColour: teamAccent(A, 0), bColour: teamAccent(B, 1), a: fmtCompetitionPoints(a), b: fmtCompetitionPoints(b),
+      sessionNo: idx + 1, sessionCount: null, final: false, detail: "Schedule not locked yet — no winner until it is" };
+  }
   let detail: string;
   if (final && out.remainingPoints < 1e-9) {
     if (a > b + 1e-9) detail = `🏆 ${A} won the ${name}`;

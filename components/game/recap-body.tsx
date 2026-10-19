@@ -39,7 +39,7 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
   const { highlights: h, sections: s } = recap;
   const share = mode === "share";
   const live = (game as any).players_count as number | undefined; // set by the caller
-  const meta = [(game as any).played_at ? fmtMatchDate(String((game as any).played_at).slice(0, 10)) : null, FORMAT[game.game_type] || game.game_type, cup ? `Session ${cup.sessionNo} of ${cup.sessionCount}` : null, live ? `${live} players` : null].filter(Boolean).join(" · ");
+  const meta = [(game as any).played_at ? fmtMatchDate(String((game as any).played_at).slice(0, 10)) : null, FORMAT[game.game_type] || game.game_type, cup ? (cup.sessionCount ? `Session ${cup.sessionNo} of ${cup.sessionCount}` : `Session ${cup.sessionNo}`) : null, live ? `${live} players` : null].filter(Boolean).join(" · ");
   const head = recap.headline.match(/^(.*?)([\d½]+–[\d½]+|net \d+|\d+ skins?|\d+ points)$/);
   const nbRows = share ? h.netBirdies.top : h.netBirdies.all.map((r, i) => ({ pos: String(i + 1), item: r }));
   return (
