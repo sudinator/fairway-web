@@ -41,6 +41,8 @@ export type GameSetupDraft = {
   structure: {
     team1: string;
     team2: string;
+    /** 209.4: colours chosen with the names (optional — drafts saved earlier have none). */
+    teamColors?: [string | null, string | null];
   };
   flights: {
     mode: "off" | "oneoff";
@@ -73,6 +75,7 @@ export type GameSetupDraftInput = {
   skinsMode: "carryover" | "split";
   team1: string;
   team2: string;
+  teamColors?: [string | null, string | null];
   flightMode: "off" | "oneoff";
   flightCount: number;
   flightTeeIdx: Record<string, number>;
@@ -106,7 +109,7 @@ export function buildGameSetupDraft(i: GameSetupDraftInput): GameSetupDraft {
       skinsTeamStyle: i.skinsTeamStyle,
       skinsMode: i.skinsMode,
     },
-    structure: { team1: i.team1, team2: i.team2 },
+    structure: { team1: i.team1, team2: i.team2, teamColors: i.teamColors ?? [null, null] },
     flights: { mode: i.flightMode, count: i.flightCount, teeIdxByFlight: i.flightTeeIdx },
     tees: { playerOverrides: i.playerTeeOverrides },
   };
@@ -136,6 +139,8 @@ export function toLegacySetupData(d: GameSetupDraft): LegacySetupData {
     skinsMode: d.format.skinsMode,
     team1: d.structure.team1,
     team2: d.structure.team2,
+    // 209.4: only when colours were chosen, so a draft without them is stored exactly as before.
+    ...(d.structure.teamColors && (d.structure.teamColors[0] || d.structure.teamColors[1]) ? { teamColors: d.structure.teamColors } : {}),
     flightMode: d.flights.mode,
     flightCount: d.flights.count,
     flightTeeIdx: d.flights.teeIdxByFlight,
@@ -167,6 +172,7 @@ export function fromLegacySetupDraft(d: SetupDraft): GameSetupDraft {
     skinsMode: d.skinsMode as "carryover" | "split",
     team1: d.team1,
     team2: d.team2,
+    teamColors: d.teamColors ?? [null, null],
     flightMode: d.flightMode === "oneoff" ? "oneoff" : "off",
     flightCount: d.flightCount && d.flightCount >= 2 && d.flightCount <= 4 ? d.flightCount : 3,
     flightTeeIdx: d.flightTeeIdx || {},

@@ -1,3 +1,7 @@
+## 209.4 — Guest scoring (0194)
+
+game_players UPDATE policy guests_scored_by_their_group (replaces members_update_guests); plays_with_guest(game, tee_group).
+
 ## 209.3 — Round-summary email (0193)
 
 profiles.round_emails (default true). app_settings(key, value). round_email_log. email_ticks (+ pg_cron 'round-email-tick', every 10 min). due_round_emails / record_round_email (service role).

@@ -65,6 +65,12 @@ const legacyExpected = {
 };
 
 eq(toLegacySetupData(buildGameSetupDraft(base)), legacyExpected, "legacy serialization stays identical");
+// 209.4: chosen team colours survive a saved draft; a draft without them is stored exactly as before (above).
+{
+  const withColours = toLegacySetupData(buildGameSetupDraft({ ...base, teamColors: ["gold", "blue"] }));
+  eq(withColours.teamColors, ["gold", "blue"], "team colours are saved with the draft");
+  eq(fromLegacySetupDraft({ v: 1, savedAt: 1, ...withColours } as any).structure.teamColors, ["gold", "blue"], "…and come back when it is reopened");
+}
 eq(buildGameSetupDraft(base).players.handicapOverrides, { p2: 11.3 }, "live handicap overrides are represented in canonical draft");
 
 const legacy: SetupDraft = { v: 1, savedAt: 123, ...legacyExpected };

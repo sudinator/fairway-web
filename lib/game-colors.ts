@@ -10,20 +10,19 @@ export const TEAM_COLOR_BY_NAME: Record<string, string> = {
 
 export const teamAccent = (name: string | null | undefined, index: number): string => {
   const k = (name || "").trim().toLowerCase();
-  return TEAM_COLOR_BY_NAME[k] || (index === 0 ? "#5AA9E6" : "#E0915B");
+  // 209.4 (owner): the automatic second-team colour is gold (was orange — too close to red and gold).
+  return TEAM_COLOR_BY_NAME[k] || (index === 0 ? "#5AA9E6" : "#D8B24A");
 };
 
-/** 209.1: the eight colours an organizer can choose for a team — the app's existing team accents, each
- *  readable on the app's green. No white: it reads as plain text, and as "the white tees". */
+/** The colours an organizer can choose for a team (209.4, owner): five that are clearly different on a phone
+ *  — measured: every pair at least 41 apart in perceived colour. Pink, teal and orange were dropped (orange is
+ *  only ~25 from red and gold). No white: it reads as plain text, and as "the white tees". */
 export const TEAM_PALETTE: { key: string; label: string; hex: string }[] = [
   { key: "red", label: "Red", hex: TEAM_COLOR_BY_NAME.red },
   { key: "blue", label: "Blue", hex: TEAM_COLOR_BY_NAME.blue },
   { key: "gold", label: "Gold", hex: TEAM_COLOR_BY_NAME.gold },
   { key: "purple", label: "Purple", hex: TEAM_COLOR_BY_NAME.purple },
   { key: "green", label: "Green", hex: TEAM_COLOR_BY_NAME.green },
-  { key: "pink", label: "Pink", hex: TEAM_COLOR_BY_NAME.pink },
-  { key: "orange", label: "Orange", hex: TEAM_COLOR_BY_NAME.orange },
-  { key: "teal", label: "Teal", hex: TEAM_COLOR_BY_NAME.teal },
 ];
 
 /** The colour a team's NAME gives it ("Red", "Blue", …), or null when the name isn't a colour. */
@@ -39,3 +38,28 @@ export const teamColour = (team: { name?: string | null; color?: string | null }
   const chosen = TEAM_PALETTE.find((p) => p.key === (team?.color || "").toLowerCase());
   return chosen ? chosen.hex : teamAccent(team?.name, index);
 };
+
+
+type TeamLike = { name?: string | null; color?: string | null };
+/** Is this team's colour automatic (no name colour, nothing chosen)? */
+export const isAutomaticColour = (team: TeamLike | null | undefined): boolean =>
+  !nameColour(team?.name) && !TEAM_PALETTE.some((p) => p.key === (team?.color || "").toLowerCase());
+
+/**
+ * What picking a colour does (209.4, owner): the colour is applied; if it is the OTHER team's colour the two
+ * SWAP (nothing is ever greyed out); a team named after a colour keeps it, so its colour can't be taken.
+ * Returns the colour keys to store for both teams, or null when the pick isn't possible.
+ */
+export function pickTeamColour(teams: [TeamLike, TeamLike], i: 0 | 1, key: string): { colors: [string | null, string | null]; swapped: boolean } | null {
+  const pick = TEAM_PALETTE.find((p) => p.key === key);
+  if (!pick || nameColour(teams[i]?.name)) return null;
+  const o = (1 - i) as 0 | 1;
+  const otherHex = teamColour(teams[o], o);
+  const colors: [string | null, string | null] = [teams[0]?.color ?? null, teams[1]?.color ?? null];
+  colors[i] = pick.key;
+  if (otherHex !== pick.hex) return { colors, swapped: false };
+  if (nameColour(teams[o]?.name)) return null;   // the other team's NAME is this colour
+  const mine = TEAM_PALETTE.find((p) => p.hex === teamColour(teams[i], i));
+  colors[o] = mine ? mine.key : null;
+  return { colors, swapped: true };
+}

@@ -1,4 +1,5 @@
 "use client";
+import { TeamColourDot } from "@/components/team-colour-dot";
 import { shortNamer } from "@/lib/short-names";
 import { isStagingClient } from "@/lib/auto-score";
 import { createLatestSaver } from "@/lib/latest-saver";
@@ -98,7 +99,7 @@ export type OrganizerPanelProps = {
   /** STAGING only (204.2): randomised scores through hole N for every player. */
   onAutoScore?: (through: number) => Promise<string>;
   onRenameTeams?: (names: [string, string]) => Promise<void>;
-  onSetTeamColour?: (index: number, colour: string | null) => Promise<void>;
+  onSetTeamColours?: (colors: [string | null, string | null]) => void | Promise<void>;
   onRename: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
   canDelete?: boolean;
@@ -136,7 +137,7 @@ export function OrganizerPanel({
   onBalanceTeams,
   onAutoScore,
   onRenameTeams,
-  onSetTeamColour,
+  onSetTeamColours,
   section = "players",
   eligibleMembers = [],
   onAddMember,
@@ -535,35 +536,23 @@ export function OrganizerPanel({
                 {teamNameStatus ? <span style={{ color: teamNameStatus.startsWith("Couldn") ? C.gold : C.sage, fontSize: 11 }}>{teamNameStatus}</span> : <span style={{ color: C.sage, fontSize: 11 }}>Saves as you type</span>}
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                {([0, 1] as const).map((i) => (
-                  <input key={teams[i].key} value={teamNameEdits[i]} onChange={(e) => editTeamName(i, e.target.value)}
-                    onBlur={() => { if (teamNameTimer.current) clearTimeout(teamNameTimer.current); void commitTeamNames(teamNameEdits); }}
-                    placeholder={`Team ${i + 1}`} aria-label={`Team ${i + 1} name`} style={{ ...inputStyle, flex: 1, minWidth: 120 }} />
-                ))}
+                {([0, 1] as const).map((i) => {
+                  const input = (
+                    <input value={teamNameEdits[i]} onChange={(e) => editTeamName(i, e.target.value)}
+                      onBlur={() => { if (teamNameTimer.current) clearTimeout(teamNameTimer.current); void commitTeamNames(teamNameEdits); }}
+                      placeholder={`Team ${i + 1}`} aria-label={`Team ${i + 1} name`} style={{ ...inputStyle, width: "100%", minWidth: 120 }} />
+                  );
+                  // 209.4: the colour dot sits right beside the name (owner-approved mock).
+                  return onSetTeamColours ? (
+                    <div key={teams[i].key} style={{ flex: 1, minWidth: 200 }}>
+                      <TeamColourDot index={i} onChange={onSetTeamColours}
+                        teams={[{ name: teamNameEdits[0], color: (teams[0] as { color?: string | null }).color }, { name: teamNameEdits[1], color: (teams[1] as { color?: string | null }).color }]}>
+                        {input}
+                      </TeamColourDot>
+                    </div>
+                  ) : <div key={teams[i].key} style={{ flex: 1, minWidth: 120 }}>{input}</div>;
+                })}
               </div>
-              {onSetTeamColour ? (
-                <div data-team-colours style={{ marginTop: 10 }}>
-                  <div style={{ color: C.sage, fontSize: 11, fontWeight: 800, letterSpacing: 1 }}>TEAM COLOURS</div>
-                  {([0, 1] as const).map((i) => {
-                    const t = { ...teams[i], name: teamNameEdits[i] };
-                    const own = nameColour(t.name);
-                    const other = teamColour({ ...teams[1 - i], name: teamNameEdits[1 - i] }, 1 - i);
-                    return (
-                      <div key={teams[i].key} style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                        <span style={{ color: teamColour(t, i), fontWeight: 800, fontSize: 13, minWidth: 90 }}>{t.name || `Team ${i + 1}`}</span>
-                        {own ? <span style={{ color: C.sage, fontSize: 12 }}>Colour from the name</span> : TEAM_PALETTE.map((c) => {
-                          const taken = c.hex === other, picked = (teams[i] as { color?: string | null }).color === c.key;
-                          return (
-                            <button key={c.key} type="button" aria-label={`${c.label}${taken ? " (the other team's colour)" : ""}`} aria-pressed={picked} disabled={taken}
-                              onClick={() => void onSetTeamColour(i, picked ? null : c.key)}
-                              style={{ width: 28, height: 28, borderRadius: 999, background: c.hex, border: picked ? `2px solid ${C.cream}` : "2px solid transparent", opacity: taken ? 0.3 : 1, cursor: taken ? "default" : "pointer", padding: 0 }} />
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : null}
             </div>
           )}
 
