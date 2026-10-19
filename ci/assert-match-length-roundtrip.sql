@@ -6,6 +6,8 @@ begin;
 insert into auth.users(id) values
   ('49000000-0000-0000-0000-000000000001'),
   ('49000000-0000-0000-0000-000000000002');
+-- 210.3: real members have a profile (begin_account creates it); direct writes need an approved account (0197).
+insert into public.profiles(id, display_name, account_status) values ('49000000-0000-0000-0000-000000000001', 'Test player 1', 'active'), ('49000000-0000-0000-0000-000000000002', 'Test player 2', 'active') on conflict (id) do nothing;
 
 insert into public.games(
   id, code, name, course, course_par, holes_meta, game_type, status,

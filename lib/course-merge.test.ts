@@ -50,4 +50,20 @@ eq(withoutDeclined(items, declined).map((i) => i.key).includes("par:5"), false, 
 const api2: Course = { ...api, holes: api.holes.map((h, i) => (i === 4 ? { ...h, par: 3 } : h)) };
 const again = withoutDeclined(changeItems(stored, api2, lastProvider), declined);
 ok(again.some((i) => i.key === "par:5" && i.apiValue === 3), "…but it is, once the provider's value changes");
+// 210.3 (review point 1): a kept correction stays protected after a partial update.
+{
+  const tee = (rating: number, slope: number) => ({ name: "Blue", rating, slope, par: 72, yardages: yds(400) });
+  const course = (rating: number, slope: number): Course => ({ id: "c", name: "Oak", location: "", tees: [tee(rating, slope)], holes: holes(baseSi) });
+  const provider1 = course(72, 125);                 // 1. the provider says 72
+  const corrected = course(73, 125);                 // 2. corrected by hand to 73
+  const provider2 = course(74, 128);                 // 3. the provider proposes 74, and a slope change
+  const items2 = changeItems(corrected, provider2, provider1);
+  eq(items2.find((i) => i.key === "rating:blue")?.defaultOn, false, "step 3: the 73 is recognised as a hand correction");
+  const afterSlopeOnly = mergeSelected(corrected, provider2, ["slope:blue"], items2);   // 4. accept only the slope
+  eq([afterSlopeOnly.tees[0].rating, afterSlopeOnly.tees[0].slope], [73, 128], "step 4: the 73 is kept, the slope taken");
+  // 5. The provider now says 75. The baseline is the PROVIDER's data as applied (provider2) — not the merged course.
+  const provider3 = course(75, 128);
+  eq(changeItems(afterSlopeOnly, provider3, provider2).find((i) => i.key === "rating:blue")?.handCorrected, true, "step 5: still a hand correction (baseline = what the provider said)");
+  eq(changeItems(afterSlopeOnly, provider3, afterSlopeOnly).find((i) => i.key === "rating:blue")?.handCorrected, false, "…which the old baseline (the merged course) would have missed — the reported bug");
+}
 console.log("course-merge tests passed");

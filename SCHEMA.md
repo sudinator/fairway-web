@@ -1,3 +1,7 @@
+## 210.3 — Approved accounts; provider baseline (0197)
+
+guard_active_account trigger on 14 directly-writable tables. course_freshness.provider_baseline (saved on apply); course_review_detail compares against it.
+
 ## 210.1 — Club reports (0195)
 
 profiles.club_report_emails (default true). club_reports (frozen snapshot per club per period; members read their own club's). club_report_email_log. queue_club_reports / save_club_report / due_club_report_emails / record_club_report_email (service role). pg_cron club-report-h1 (Jul 1), club-report-q3 (Oct 1).
