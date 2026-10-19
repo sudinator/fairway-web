@@ -29,6 +29,8 @@ export type GamePayloadOpts = {
   teamMode: boolean;
   team1: string;
   team2: string;
+  /** 209.4: colours chosen with the names (palette keys), saved on the teams. */
+  teamColors?: [string | null, string | null];
   skinsTeamStyle: string;            // "head_to_head" | "best_ball"
   teamScoreMode: string;
   strokeBasis: string;
@@ -95,8 +97,8 @@ export function buildGamePayload(o: GamePayloadOpts) {
     teams:
       ((o.gameType === "match" || o.gameType === "skins") && o.teamMode) || o.gameType === "fourball" || o.gameType === "alt_shot" || o.gameType === "trifecta"
         ? [
-            { key: "A", name: o.team1.trim() || "Team 1" },
-            { key: "B", name: o.team2.trim() || "Team 2" },
+            { key: "A", name: o.team1.trim() || "Team 1", ...(o.teamColors?.[0] ? { color: o.teamColors[0] } : {}) },
+            { key: "B", name: o.team2.trim() || "Team 2", ...(o.teamColors?.[1] ? { color: o.teamColors[1] } : {}) },
           ]
         : null,
     foursomes: o.gameType === "fourball" || o.gameType === "trifecta" || o.gameType === "alt_shot" || (o.gameType === "skins" && o.teamMode && o.skinsTeamStyle === "best_ball") ? [] : null,

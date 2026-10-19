@@ -63,13 +63,7 @@ begin
      FROM (games g
        JOIN group_members gm ON ((gm.group_id = g.group_id)))
     WHERE ((g.id = game_players.game_id) AND (gm.user_id = auth.uid())))))'::text, null::text),
-      ('game_players'::text, 'members_update_guests'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'UPDATE'::text, '((is_guest = true) AND (EXISTS ( SELECT 1
-     FROM (games g
-       JOIN group_members gm ON ((gm.group_id = g.group_id)))
-    WHERE ((g.id = game_players.game_id) AND (gm.user_id = auth.uid())))))'::text, '((is_guest = true) AND (EXISTS ( SELECT 1
-     FROM (games g
-       JOIN group_members gm ON ((gm.group_id = g.group_id)))
-    WHERE ((g.id = game_players.game_id) AND (gm.user_id = auth.uid())))))'::text),
+      ('game_players'::text, 'guests_scored_by_their_group'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'UPDATE'::text, '((is_guest = true) AND plays_with_guest(game_id, tee_group))'::text, '((is_guest = true) AND plays_with_guest(game_id, tee_group))'::text),
       ('game_players'::text, 'organizer adds players'::text, 'PERMISSIVE'::text, 'public'::text, 'INSERT'::text, null::text, '((auth.uid() = user_id) OR (EXISTS ( SELECT 1
      FROM games g
     WHERE ((g.id = game_players.game_id) AND (g.created_by = auth.uid())))))'::text),

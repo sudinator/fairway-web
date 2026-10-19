@@ -25,6 +25,8 @@ export type SetupDraft = {
   skinsMode: string;
   team1: string;
   team2: string;
+  /** 209.4: colours chosen with the names (optional — drafts saved earlier have none). */
+  teamColors?: [string | null, string | null];
   flightMode?: string;
   flightCount?: number;
   // Create Game tee inheritance (177.50+). Optional so all older saved drafts still load.

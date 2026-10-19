@@ -25,6 +25,8 @@
     "lib/game-name.test.ts",
     "lib/course-merge.test.ts",
     "lib/team-colour.test.ts",
+    "lib/team-colour-render.test.tsx",
+    "components/team-colour-dot.tsx",
     "lib/standout-watch.test.ts",
     "lib/round-email.test.ts",
     "lib/recap-email.ts",

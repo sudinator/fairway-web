@@ -1,4 +1,5 @@
 "use client";
+import { TeamColourDot } from "@/components/team-colour-dot";
 import { shortNamer } from "@/lib/short-names";
 import { balanceTeams, balanceSummary } from "@/lib/balance-teams";
 import { autoScores, isStagingClient } from "@/lib/auto-score";
@@ -318,6 +319,8 @@ function CreateGame({
   const [skinsTeamStyle, setSkinsTeamStyle] = useState<"head_to_head" | "best_ball">("head_to_head");
   const [skinsMode, setSkinsMode] = useState<"carryover" | "split">("carryover");
   const [team1, setTeam1] = useState(seed?.teamNames?.A || "Team 1");
+  // 209.4: team colours chosen with the names (owner-approved mock) — saved with the new game.
+  const [teamColours, setTeamColours] = useState<[string | null, string | null]>([null, null]);
   const [team2, setTeam2] = useState(seed?.teamNames?.B || "Team 2");
 
   const guidedFormatState = (): GuidedFormatState => ({
@@ -510,7 +513,7 @@ function CreateGame({
     setGameType(d.gameType as any); setAllowancePct(d.allowancePct); setAllowanceInput(String(d.allowancePct ?? 100)); setMatchLength((d.matchLength ?? "18") as MatchLength); setTeamScoreMode(d.teamScoreMode as any);
     setStrokeBasis(d.strokeBasis as any); setFmtFamily(d.fmtFamily as any);
     setMatchKind(d.matchKind as any); setTeamMode(d.teamMode); setSkinsTeamStyle(d.skinsTeamStyle as any);
-    setSkinsMode(d.skinsMode as any); setTeam1(d.team1); setTeam2(d.team2);
+    setSkinsMode(d.skinsMode as any); setTeam1(d.team1); setTeam2(d.team2); setTeamColours(d.teamColors ?? [null, null]);
     setFlightMode((d.flightMode as any) === "oneoff" ? "oneoff" : "off");
     setFlightCount(d.flightCount && d.flightCount >= 2 && d.flightCount <= 4 ? d.flightCount : 3);
     setTeeAssignments({ player: d.playerTeeOverrides || {}, flight: d.flightTeeIdx || {} });
@@ -541,11 +544,11 @@ function CreateGame({
     ...toLegacySetupData(buildGameSetupDraft({
       name, matchDate, favName: pickedFav?.name ?? null, teeIdx, idxStr, gameType, allowancePct, matchLength,
       teamScoreMode, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle,
-      skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount,
+      skinsMode, team1, team2, teamColors: teamColours, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount,
       flightTeeIdx: teeAssignments.flight, playerTeeOverrides: teeAssignments.player,
     })),
     createSection,
-  }), [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, matchLength, teamScoreMode, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount, teeAssignments, createSection]);
+  }), [name, matchDate, pickedFav, teeIdx, idxStr, gameType, allowancePct, matchLength, teamScoreMode, strokeBasis, fmtFamily, matchKind, teamMode, skinsTeamStyle, skinsMode, team1, team2, selectedPlayers, guestPlayers, hcpOverrides, flightMode, flightCount, teeAssignments, createSection, teamColours]);
   const latestDraftRef = React.useRef(draftSnapshot);
   latestDraftRef.current = draftSnapshot;
 
@@ -665,7 +668,7 @@ function CreateGame({
         // course's own hole numbers and stroke indexes, so a back nine reads 10-18 and strokes
         // still fall on the course's hardest holes.
         courseHoles: holesForLength(pickedFav.holes, matchLength),
-        teeYardages: tee?.yardages, coursePar, matchDate, allowancePct, gameType, teamMode, team1, team2,
+        teeYardages: tee?.yardages, coursePar, matchDate, allowancePct, gameType, teamMode, team1, team2, teamColors: teamColours,
         skinsTeamStyle, teamScoreMode, strokeBasis, skinsMode, flightsSupported, flightMode, flightBands,
         sideContestsEnabled: !seed?.competitionSession,
       });
@@ -737,6 +740,18 @@ function CreateGame({
       setBusy(false);
     }
   };
+
+  const teamNameFields = ([0, 1] as const).map((i) => {
+    const input = (
+      <input style={{ ...inputStyle, width: "100%", minWidth: 130 }} value={i === 0 ? team1 : team2} disabled={!!seed?.competitionSession}
+        onChange={(e) => (i === 0 ? setTeam1(e.target.value) : setTeam2(e.target.value))} placeholder={`Team ${i + 1} name`} />
+    );
+    return seed?.competitionSession ? <div key={i} style={{ flex: 1, minWidth: 130 }}>{input}</div> : (
+      <div key={i} style={{ flex: 1, minWidth: 200 }}>
+        <TeamColourDot index={i} teams={[{ name: team1, color: teamColours[0] }, { name: team2, color: teamColours[1] }]} onChange={setTeamColours}>{input}</TeamColourDot>
+      </div>
+    );
+  });
 
   return (
     <div style={{ maxWidth: 600 }}>
@@ -1155,8 +1170,7 @@ function CreateGame({
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>Two teams</div>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>{seed?.competitionSession ? "One gross score per golfer feeds two true Singles matches and one Four-Ball match. Singles and Four-Ball strokes are calculated separately." : "Name the two sides, then build the 2-v-2 foursomes after creating. Each foursome plays for three points a hole."}</div>
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} disabled={!!seed?.competitionSession} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
-              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} disabled={!!seed?.competitionSession} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
+              {teamNameFields}
             </div>
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>Team point</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
@@ -1243,8 +1257,7 @@ function CreateGame({
             {(teamMode || gameType === "fourball" || gameType === "alt_shot") && (
               <>
                 <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-                  <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} disabled={!!seed?.competitionSession} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
-                  <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} disabled={!!seed?.competitionSession} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
+                  {teamNameFields}
                 </div>
               </>
             )}
@@ -1256,8 +1269,7 @@ function CreateGame({
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 14 }}>Two teams · skins</div>
             <div style={{ color: C.sage, fontSize: 11, marginTop: 4 }}>Each hole is a skin between the two sides. Name the sides, then build the 2-v-2 foursomes after creating.</div>
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team1} disabled={!!seed?.competitionSession} onChange={(e) => setTeam1(e.target.value)} placeholder="Team 1 name" />
-              <input style={{ ...inputStyle, flex: 1, minWidth: 130 }} value={team2} disabled={!!seed?.competitionSession} onChange={(e) => setTeam2(e.target.value)} placeholder="Team 2 name" />
+              {teamNameFields}
             </div>
             <div style={{ color: C.cream, fontWeight: 700, fontSize: 13, marginTop: 12 }}>Team score</div>
             <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
@@ -2418,12 +2430,12 @@ function GameRoom({
   };
 
 
-  // 209.1: an organizer-chosen team colour (applies only when the team's name isn't itself a colour).
-  const setTeamColour = async (index: number, colour: string | null) => {
-    if (!game || !Array.isArray(game.teams) || !game.teams[index]) return;
-    const next = game.teams.map((t, i) => i === index ? { ...t, color: colour } : t);
+  // 209.4: both teams' chosen colours at once (a pick may swap them — components/team-colour-dot).
+  const setTeamColours = async (colors: [string | null, string | null]) => {
+    if (!game || !Array.isArray(game.teams) || game.teams.length < 2) return;
+    const next = game.teams.map((t, i) => (i < 2 ? { ...t, color: colors[i] } : t));
     const { error } = await supabase.from("games").update({ teams: next }).eq("id", game.id);
-    if (error) { notifyError("Couldn't save the team colour — please try again."); return; }
+    if (error) { notifyError("Couldn't save the team colours — please try again."); return; }
     setGame({ ...game, teams: next });
   };
 
@@ -3460,7 +3472,7 @@ function GameRoom({
           game, players, user,
           onOverride: overridePlayerHandicap, courseTees, onSetTee: setPlayerTee, onSetManualHandicap: setManualHandicap,
           onRemove: removePlayer, onToggleNoShow: toggleNoShow, onSetTeam: setPlayerTeam, onBalanceTeams: balanceTeamsByHandicap, onAutoScore: autoScoreThrough, onRenameTeams: renameTeams,
-          onRename: renameGame, onDelete: deleteGame, onSetTeamColour: setTeamColour,
+          onRename: renameGame, onDelete: deleteGame, onSetTeamColours: setTeamColours,
           canDelete: !completedGame, deleteRestriction: "Only a system admin can delete a completed game. Posted own-ball rounds remain in player history; Alternate Shot rounds are removed.",
           onEnd: requestEndGame, onReopen: reopenGame, onReset: resetScores, onShare: setShare,
           eligibleMembers, onAddMember: addMemberToGame, onAddGuest: addGuestToGame,
