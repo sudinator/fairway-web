@@ -15,7 +15,7 @@ const singles = (id: string, aWins: boolean): { game: Game; players: Player[] } 
   ] as unknown as Player[];
   return { game, players };
 };
-const comp = (tie: Competition["tie_rule"] = "shared") => ({ id: "c", name: "Test Cup", team_a_name: "Violet", team_b_name: "Burgundy", tie_rule: tie } as unknown as Competition);
+const comp = (tie: Competition["tie_rule"] = "shared", locked = true) => ({ id: "c", name: "Test Cup", team_a_name: "Violet", team_b_name: "Burgundy", tie_rule: tie, schedule_status: locked ? "locked" : "draft" } as unknown as Competition);
 const sessions = (wins: boolean[], points = 2): CupSession[] => wins.map((w, i) => {
   const { game, players } = singles(`g${i + 1}`, w);
   return { id: `s${i + 1}`, competition_id: "c", name: `S${i + 1}`, format: "match", session_order: i + 1, play_date: "2026-10-01",
@@ -34,4 +34,13 @@ eq(cupStandingAfter(comp(), five, "not-a-cup-game"), null, "a game that isn't a 
 const tied = sessions([true, false], 1);
 eq(cupStandingAfter(comp("shared"), tied, "g2")!.detail, "The Cup is shared", "a shared Cup");
 eq(cupStandingAfter(comp("team_a_retains"), tied, "g2")!.detail, "🏆 Violet retain the Test Cup", "the holders retain it");
+// 209.6: an UNLOCKED Cup declares nothing (like the Cup standings page) — score only.
+{
+  const draft = comp("shared", false);
+  for (const g of ["g3", "g4", "g5"]) {
+    const c = cupStandingAfter(draft, five, g)!;
+    eq([c.detail, c.sessionCount, c.final], ["Schedule not locked yet — no winner until it is", null, false], `unlocked, after ${g}: no winner, clinch or "need"`);
+  }
+  eq([cupStandingAfter(draft, five, "g4")!.a, cupStandingAfter(draft, five, "g4")!.b], ["6", "2"], "unlocked: the secured score still shows");
+}
 console.log("cup-standing tests passed");
