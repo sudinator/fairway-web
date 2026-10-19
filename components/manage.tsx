@@ -104,12 +104,23 @@ const NOTIF_TYPES: { key: string; label: string; def: "push" | "inapp" | "off"; 
   { key: "signup_pending", label: "New sign-up waiting for approval (admins)", def: "push", live: true },
   { key: "signup_reminder", label: "A sign-up has waited 7 days (admins)", def: "push", live: true },
   { key: "signup_admitted", label: "You've been admitted to a club", def: "push", live: true },
+  { key: "club_report", label: "Your club's report is ready (July 1 / October 1)", def: "push", live: true },
 ];
 
 function PushToggle({ user, profile }: { user: any; profile: any }) {
   // 209.3: round-summary emails — on unless the member turns them off (owner decision: opt-out).
   const [roundEmails, setRoundEmails] = useState<boolean>(profile?.round_emails !== false);
   const [emailBusy, setEmailBusy] = useState(false);
+  // 210.1: club report emails — their own switch, on unless turned off.
+  const [clubEmails, setClubEmails] = useState<boolean>(profile?.club_report_emails !== false);
+  const toggleClubEmails = async () => {
+    const next = !clubEmails;
+    setEmailBusy(true);
+    const { error } = await supabase.from("profiles").update({ club_report_emails: next }).eq("id", user.id);
+    setEmailBusy(false);
+    if (error) { alert(`Couldn't save: ${error.message}`); return; }
+    setClubEmails(next);
+  };
   const toggleRoundEmails = async () => {
     const next = !roundEmails;
     setEmailBusy(true);
@@ -248,6 +259,11 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
         <button type="button" onClick={toggleRoundEmails} disabled={emailBusy} aria-pressed={roundEmails}
           style={{ ...btn(!roundEmails), marginTop: 8, fontSize: 13, opacity: emailBusy ? 0.62 : 1 }}>
           {emailBusy ? "…" : roundEmails ? "On — turn off round summaries" : "Off — turn on round summaries"}
+        </button>
+        <div style={{ color: C.sage, fontSize: 12, lineHeight: 1.5, marginTop: 12 }}>Club report emails — your club&apos;s report on July 1 (January–June) and October 1 (July–September).</div>
+        <button type="button" onClick={toggleClubEmails} disabled={emailBusy} aria-pressed={clubEmails} data-club-report-emails
+          style={{ ...btn(!clubEmails), marginTop: 8, fontSize: 13, opacity: emailBusy ? 0.62 : 1 }}>
+          {emailBusy ? "…" : clubEmails ? "On — turn off club report emails" : "Off — turn on club report emails"}
         </button>
       </div>
 

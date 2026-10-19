@@ -10,11 +10,14 @@ const page = (msg: string) => new Response(`<!doctype html><meta charset="utf-8"
 
 export async function GET(req: Request) {
   const q = new URL(req.url).searchParams, u = q.get("u") || "", t = q.get("t") || "";
-  if (!UUID.test(u) || !validUnsubscribe(u, t)) return page("That link isn't valid. You can turn round summaries off in the app: Profile → Notification settings.");
+  const kind = q.get("k") === "club" ? "club" : "round";   // 210.1: club report emails have their own switch
+  const what = kind === "club" ? "club report emails" : "round summaries";
+  if (!UUID.test(u) || !validUnsubscribe(u, t, kind)) return page(`That link isn't valid. You can turn ${what} off in the app: Profile → Notification settings.`);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return page("Please try again later.");
   const db = createClient(url, key, { auth: { persistSession: false } });
-  const { error } = await db.from("profiles").update({ round_emails: false }).eq("id", u);
-  return page(error ? "Something went wrong — please turn round summaries off in the app: Profile → Notification settings."
-    : "Round summaries are off. You can turn them back on any time in the app: Profile → Notification settings.");
+  const { error } = await db.from("profiles").update(kind === "club" ? { club_report_emails: false } : { round_emails: false }).eq("id", u);
+  const What = what.charAt(0).toUpperCase() + what.slice(1);
+  return page(error ? `Something went wrong — please turn ${what} off in the app: Profile → Notification settings.`
+    : `${What} are off. You can turn them back on any time in the app: Profile → Notification settings.`);
 }

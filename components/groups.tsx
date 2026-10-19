@@ -1,6 +1,7 @@
 "use client";
 
 import { ClubPendingSignups } from "@/components/club-pending-signups";
+import { ClubLatestReport } from "@/components/club-latest-report";
 import React, { useCallback, useEffect, useState } from "react";
 import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
@@ -266,6 +267,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
   return (
     <div>
       {isAdmin && active ? <ClubPendingSignups groupId={active.id} groupName={active.name} /> : null}
+      {active ? <ClubLatestReport groupId={active.id} /> : null}
       <FeatureMirrorControl groups={groups} activeGroupId={activeGroupId} />
       <Eyebrow>CLUBS</Eyebrow>
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>

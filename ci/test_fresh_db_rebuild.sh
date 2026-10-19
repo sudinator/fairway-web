@@ -135,6 +135,12 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-round-email.sql"
 
 # 0194: guests are scored by the people playing with them.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-guest-scoring.sql"
+
+# 0195: publishing club reports.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-club-reports.sql"
+
+# 0196: merge and suspend guards.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-merge-guards.sql"
 psql "$DB_URL" -X -tA -c "select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p') order by 1" > /tmp/bnn_chain_tables.txt
 python3 - "$ROOT/ci/public_tables.json" /tmp/bnn_chain_tables.txt <<'PY'
 import json, sys

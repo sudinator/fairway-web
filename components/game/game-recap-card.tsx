@@ -46,7 +46,9 @@ export function GameRecapCard({ game, players, altShotScores, userId, betStale, 
   useEffect(() => {
     if (!competitionId) { setCup(null); return; }
     let live = true;
-    void loadCupForGame(supabase, game.id).then((c) => { if (live) setCup(c ? cupStandingAfter(c.competition, c.sessions, game.id) : null); });
+    // A failed load shows no Cup box (rather than partial numbers); the recap itself is unaffected.
+    loadCupForGame(supabase, game.id).then((c) => { if (live) setCup(c ? cupStandingAfter(c.competition, c.sessions, game.id) : null); })
+      .catch(() => { if (live) setCup(null); });
     return () => { live = false; };
   }, [supabase, game.id, competitionId, players]);
 

@@ -39,7 +39,14 @@ export function reportPeriods(year: number): ReportPeriod[] {
   ];
 }
 
-const finished = (p: Player, nh: number) => !p.no_show && Array.isArray(p.scores) && p.scores.slice(0, nh).every((v) => v != null && Number(v) > 0);
+// 210.2 — what counts as a round (owner, Oct 19; BNN's handicap rule, lib/golf adjustedGross):
+//   fewer than 9 holes with real scores → not a round (never scored / abandoned); 9+ → a valid round, even if it
+//   was marked complete early. Best gross / best net: complete 18-hole rounds only (owner: option A).
+const validHoles = (p: Player, nh: number) => (Array.isArray(p.scores) ? p.scores.slice(0, nh).filter((v) => v != null && Number(v) > 0).length : 0);
+const isRound = (p: Player, nh: number) => !p.no_show && validHoles(p, nh) >= Math.min(9, nh);
+const isFull18 = (p: Player, nh: number) => nh === 18 && validHoles(p, nh) === 18;
+/** A real handicap reading — a missing index is skipped, never read as 0. */
+const indexOf = (p: Player): number | null => { const v = (p as { handicap_index?: unknown }).handicap_index; if (v == null || v === "") return null; const n = Number(v); return isFinite(n) ? n : null; };
 const weekOf = (d: string) => Math.floor((Date.parse(d + "T12:00:00Z") / 86400000 + 3) / 7);   // Monday-based week number
 
 export function buildClubReport(club: string, period: ReportPeriod, input: ReportGame[]): ClubReport {
@@ -60,22 +67,27 @@ export function buildClubReport(club: string, period: ReportPeriod, input: Repor
     const date = String((game as { played_at?: string }).played_at || "").slice(0, 10);
     const course = game.course || "";
     const holes = (game.holes_meta || []).map((h: { n?: number; par: number; si?: number | null }, i: number) => ({ hole_number: h.n ?? i + 1, par: h.par, stroke_index: h.si ?? null }));
+    // Alternate shot: the scores belong to the PAIR — the round counts (games, rounds, attendance, rivalries)
+    // but feeds no individual scoring statistic. (210.2)
+    const individual = game.game_type !== "alt_shot";
     for (const p of players) {
-      if (!finished(p, nh)) continue;
+      if (!isRound(p, nh)) continue;
       rounds++;
       const uid = (p as { user_id?: string | null }).user_id ?? null;
       const who: Who = { name: p.display_name, userId: uid };
-      const scores = (p.scores as number[]).slice(0, nh).map(Number);
-      const gross = scores.reduce((a, b) => a + b, 0);
-      const ch = chBasis(p, game.course_par, nh >= 18 ? undefined : nh);
+      const raw = (p.scores as (number | null)[]).slice(0, nh);
+      const scores = raw.map((v) => (v != null && Number(v) > 0 ? Number(v) : null));
+      const gross = scores.reduce<number>((a, b) => a + (b ?? 0), 0);
+      // Whole-number course handicap — the recap's own rule (lib/game-highlights: Math.round(chBasis)).
+      const ch = Math.round(Number(chBasis(p, game.course_par, nh >= 18 ? undefined : nh) ?? 0));
       const net = gross - ch;
-      if (nh === 18) {
+      if (individual && isFull18(p, nh)) {
         if (!bestGross || gross < bestGross.score) bestGross = { ...who, score: gross, course, date };
         if (!bestNet || net < bestNet.score) bestNet = { ...who, score: net, course, date };
       }
       const alloc = allocateStrokes(holes, ch);
-      scores.forEach((s, i) => {
-        const h = holes[i]; if (!h) return;
+      if (individual) scores.forEach((s, i) => {
+        const h = holes[i]; if (!h || s == null) return;
         const key = `${course}#${h.hole_number}`;
         const hs = holeStats.get(key) || { course, hole: h.hole_number, par: h.par, over: 0, n: 0, birdies: 0 };
         hs.over += s - h.par; hs.n++; if (s <= h.par - 1) hs.birdies++;
@@ -83,11 +95,13 @@ export function buildClubReport(club: string, period: ReportPeriod, input: Repor
       });
       if (!uid) continue;   // per-member lists: members only (guests have no account)
       members.add(uid);
-      const nb = scores.filter((s, i) => holes[i] && s - (alloc[holes[i].hole_number] || 0) <= holes[i].par - 1).length;
-      const b = netBirdies.get(uid) || { ...who, count: 0 }; b.count += nb; netBirdies.set(uid, b);
+      if (individual) {
+        const nb = scores.filter((s, i) => s != null && holes[i] && s - (alloc[holes[i].hole_number] || 0) <= holes[i].par - 1).length;
+        const b = netBirdies.get(uid) || { ...who, count: 0 }; b.count += nb; netBirdies.set(uid, b);
+      }
       const r = roundsBy.get(uid) || { ...who, count: 0 }; r.count++; roundsBy.set(uid, r);
-      const hi = Number(p.handicap_index);
-      if (isFinite(hi)) {
+      const hi = indexOf(p);
+      if (hi != null) {
         const x = indexBy.get(uid) || { ...who, first: { d: date, v: hi }, last: { d: date, v: hi } };
         if (date < x.first.d) x.first = { d: date, v: hi }; if (date >= x.last.d) x.last = { d: date, v: hi };
         indexBy.set(uid, x);

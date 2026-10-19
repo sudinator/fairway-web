@@ -1,3 +1,7 @@
+## 210.1 — Club reports (0195)
+
+profiles.club_report_emails (default true). club_reports (frozen snapshot per club per period; members read their own club's). club_report_email_log. queue_club_reports / save_club_report / due_club_report_emails / record_club_report_email (service role). pg_cron club-report-h1 (Jul 1), club-report-q3 (Oct 1).
+
 ## 209.4 — Guest scoring (0194)
 
 game_players UPDATE policy guests_scored_by_their_group (replaces members_update_guests); plays_with_guest(game, tee_group).

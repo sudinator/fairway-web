@@ -8,6 +8,8 @@
   "api_rate_limits",
   "app_settings",
   "banned_emails",
+  "club_report_email_log",
+  "club_reports",
   "competition_players",
   "competition_schedule_events",
   "competition_sessions",

@@ -8,4 +8,8 @@ ok(!validUnsubscribe(a, unsubscribeToken(b)), "another member's token doesn't wo
 ok(!validUnsubscribe(a, "0".repeat(32)), "a guessed token is refused");
 ok(!validUnsubscribe(a, unsubscribeToken(a).slice(0, 31) + "x"), "an altered token is refused");
 ok(!validUnsubscribe(a, ""), "no token is refused");
+// 210.1: each kind of email has its own turn-off — a round-summary link can't turn off club reports, and vice versa.
+ok(validUnsubscribe(a, unsubscribeToken(a, "club"), "club"), "a club-report link works for club reports");
+ok(!validUnsubscribe(a, unsubscribeToken(a, "round"), "club"), "a round-summary link can't turn off club reports");
+ok(!validUnsubscribe(a, unsubscribeToken(a, "club"), "round"), "a club-report link can't turn off round summaries");
 console.log("round-email-server tests passed");

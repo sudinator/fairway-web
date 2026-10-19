@@ -30,4 +30,26 @@ eq(r.closestRivalry && [r.closestRivalry.a, r.closestRivalry.b, r.closestRivalry
 eq(r.longestStreak && [r.longestStreak.name, r.longestStreak.weeks], ["Ann", 3], "longest weekly streak: Ann, 3 weeks");
 ok(!JSON.stringify([r.mostRounds, r.mostNetBirdies, r.mostImproved, r.longestStreak, r.closestRivalry]).includes("Gus"), "a guest never appears in a member list");
 eq(buildClubReport("Empty", period, []).games, 0, "an empty period is an empty report, not an error");
+// A derived (fractional) course handicap still gives a whole-number net — the recap's rounding (210.1).
+{
+  const frac = buildClubReport("T", period, [g("gf", "2026-08-01", "stroke", [{ ...pl("zed", "Zed", fill(18, 5), 13.4), course_handicap: null, course_handicap_source: "derived", slope: 127, rating: 71.3 }])]);
+  ok(frac.bestNet && Number.isInteger(frac.bestNet.score), `best net is a whole number (got ${frac.bestNet?.score})`);
+}
+// 210.2 — the review's cases, and the owner's round rules.
+{
+  const nul = (n: number, v: number) => [...fill(n, v), ...fill(18 - n, null as any)];
+  const rep = buildClubReport("T", period, [
+    g("e1", "2026-08-01", "stroke", [pl("emp", "Empty", [], 10), pl("one", "One Score", [4], 10)]),
+    g("e2", "2026-08-08", "stroke", [pl("par", "Partial", nul(14, 3), 10), pl("full", "Full", fill(18, 5), 10)]),
+    g("e3", "2026-08-15", "stroke", [pl("idx", "Index", fill(18, 5), 20)]),
+    g("e4", "2026-08-22", "stroke", [{ ...pl("idx", "Index", fill(18, 5), 0), handicap_index: null }]),
+    g("e5", "2026-08-29", "alt_shot", [pl("alt", "Alt Pair", fill(18, 2), 10)]),
+  ]);
+  ok(!JSON.stringify(rep).includes("Empty") && !JSON.stringify(rep).includes("One Score"), "an empty or one-score card counts nowhere");
+  eq(rep.rounds, 5, "rounds: the 14-hole round, the full round, Index twice, the alt-shot player (not the empty / one-score cards)");
+  ok(rep.mostRounds && rep.mostRounds.name === "Index", "a 14-hole round marked complete still counts towards rounds played");
+  eq(rep.bestGross && [rep.bestGross.name, rep.bestGross.score], ["Full", 90], "best gross: complete 18-hole rounds only — not the 14-hole 42, not the alt-shot pair's 36");
+  eq(rep.mostImproved, null, "a missing index is skipped — no fake '20 → 0'");
+  ok(!JSON.stringify(rep.mostNetBirdies || {}).includes("Alt Pair"), "alternate-shot pair scores never become individual awards");
+}
 console.log("club-report tests passed");
