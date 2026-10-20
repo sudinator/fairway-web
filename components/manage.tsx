@@ -21,6 +21,7 @@ import { AdminPlayers } from "@/components/admin-players";
 import { AdminStandoutWatch } from "@/components/admin-standout-watch";
 import { HeadToHead } from "@/components/head-to-head";
 import { AdminClubReport } from "@/components/admin-club-report";
+import { AdminClubRequests } from "@/components/admin-club-requests";
 import { courseStatus } from "@/lib/course-status";
 import { FreshnessDiffList } from "@/components/course-freshness-diff";
 import type { FreshnessDiff } from "@/lib/course-diff";
@@ -106,6 +107,7 @@ const NOTIF_TYPES: { key: string; label: string; def: "push" | "inapp" | "off"; 
   { key: "signup_reminder", label: "A sign-up has waited 7 days (admins)", def: "push", live: true },
   { key: "signup_admitted", label: "You've been admitted to a club", def: "push", live: true },
   { key: "club_report", label: "Your club's report is ready (July 1 / October 1)", def: "push", live: true },
+  { key: "club_decision", label: "Your club request was approved or declined", def: "push", live: true },
 ];
 
 function PushToggle({ user, profile }: { user: any; profile: any }) {
@@ -1513,7 +1515,6 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
   const [savingId, setSavingId] = useState<string | null>(null);
   const [scoringFor, setScoringFor] = useState<any | null>(null);
   const [deletedCourses, setDeletedCourses] = useState<any[]>([]);
-  const [pendingGroups, setPendingGroups] = useState<any[]>([]);
   const [allGroups, setAllGroups] = useState<any[]>([]);
   const [memberships, setMemberships] = useState<any[]>([]);
   const [manageGroupsFor, setManageGroupsFor] = useState<string | null>(null);
@@ -1556,17 +1557,6 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
     setDeletedCourses(del);
     try { gs = await fetchAll<any>((f, t) => supabase.from("groups").select("id, name, status").neq("status", "declined").order("name").order("id").range(f, t)); } catch { gs = []; }
     setAllGroups(gs.filter((g: any) => (g.status ?? "active") === "active"));
-    // bounded: pending club requests (a handful)
-    const { data: reqs } = await supabase.from("groups").select("id, name, request_note, created_by, status").eq("status", "pending").order("created_at", { ascending: true });
-    const reqList = reqs || [];
-    const reqIds = reqList.map((r: any) => r.created_by).filter(Boolean);
-    let byId: Record<string, any> = {};
-    if (reqIds.length) {
-      // bounded: the requesters of pending club requests (a handful)
-      const { data: ps } = await supabase.from("profiles").select("id, display_name, email").in("id", reqIds);
-      byId = Object.fromEntries((ps || []).map((p: any) => [p.id, p]));
-    }
-    setPendingGroups(reqList.map((r: any) => ({ ...r, requester: byId[r.created_by] || null })));
   }, [query]);
   useEffect(() => { load(); }, [load]);
 
@@ -1615,23 +1605,6 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
   };
 
   // Hard delete: erase the player and all their data permanently.
-
-  // Approve a pending group request → it becomes active and appears for its members.
-  const approveGroup = async (g: any) => {
-    await supabase.from("groups").update({ status: "active" }).eq("id", g.id);
-    if (g.created_by) await notify(g.created_by, `Your club "${g.name}" was approved by ${await myLabel(user)}. It's now active.`, null, g.id);
-    await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "group_approved", group_id: g.id, summary: `Approved the club "${g.name}"` });
-    await load();
-  };
-
-  // Decline a request → mark declined (kept for the record) and notify the requester.
-  const declineGroup = async (g: any) => {
-    if (!confirm(`Decline the club request "${g.name}"?`)) return;
-    await supabase.from("groups").update({ status: "declined" }).eq("id", g.id);
-    if (g.created_by) await notify(g.created_by, `Your club request "${g.name}" was declined by ${await myLabel(user)}.`);
-    await logActivity(supabase, { actor_id: user.id, actor_name: "Admin", action: "group_declined", summary: `Declined the group request "${g.name}"` });
-    await load();
-  };
 
   const restoreCourse = async (c: any) => {
     // Group B: the notify below tells another member their deleted course was restored. Sending
@@ -1853,27 +1826,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
         </button>
       )}
 
-      <div style={{ marginTop: 20 }}>
-        <Eyebrow>★ CLUB REQUESTS{pendingGroups.length ? ` (${pendingGroups.length})` : ""}</Eyebrow>
-        <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
-          New clubs need your approval. Approve to make a club active for its members, or decline the request.
-        </div>
-        {pendingGroups.length === 0 && (
-          <div style={{ background: C.greenLight, borderRadius: 12, padding: 16, marginTop: 8, color: C.sage }}>No pending requests.</div>
-        )}
-        {pendingGroups.map((g) => (
-          <div key={g.id} style={{ background: C.greenLight, borderRadius: 12, padding: "12px 16px", marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <div style={{ flex: 1, minWidth: 180 }}>
-              <div style={{ color: C.cream, fontWeight: 700 }}>{g.name}</div>
-              <div style={{ color: C.sage, fontSize: 12 }}>
-                from {g.requester?.display_name || g.requester?.email || "a member"}{g.request_note ? ` · "${g.request_note}"` : ""}
-              </div>
-            </div>
-            <button style={{ ...btn(true), padding: "7px 12px", fontSize: 12 }} onClick={() => approveGroup(g)}>Approve</button>
-            <button style={{ ...btn(false), padding: "7px 12px", fontSize: 12, color: C.overRedDark }} onClick={() => declineGroup(g)}>Decline</button>
-          </div>
-        ))}
-      </div>
+      <div style={{ marginTop: 20 }}><AdminClubRequests user={user} /></div>
 
       <div style={{ marginTop: 24 }}>
         <Eyebrow>★ DELETED COURSES</Eyebrow>
@@ -2791,6 +2744,9 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
   const isMaster = !!profile?.is_admin;
   const isClubAdmin = activeGroupRole === "admin";
   const [view, setView] = useState<string | null>(null);
+  // 210.8: club requests, counted for the Admin card (admin_club_requests — system admins see every request).
+  const [clubReqCount, setClubReqCount] = useState(0);
+  useEffect(() => { void supabase.rpc("admin_club_requests").then(({ data }: any) => setClubReqCount(Array.isArray(data) ? data.length : 0)); }, [supabase, view]);
   const [todos, setTodos] = useState<any>({});
   useEffect(() => {
     if (!isMaster) return;
@@ -2831,6 +2787,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
       case "games": title = "Games oversight"; panel = <AdminGamesOversight onOpenGame={onOpenGame} />; break;
       case "diagnostics": title = "Diagnostics"; panel = <RoundSaveDiag />; break;
       case "clubreports": title = "Club reports"; panel = <AdminClubReport />; break;
+      case "clubrequests": title = "Club requests"; panel = <AdminClubRequests user={user} onCount={setClubReqCount} />; break;
       case "activity": title = "Activity log"; panel = <ActivityTab />; break;
       case "oversight": title = "Clubs oversight"; panel = <AdminGroupsTab user={user} onEnterGroup={onEnterGroup} onExitGroup={onExitGroup} onGroupsChanged={onGroupsChanged} />; break;
       case "users": title = "Users"; panel = <AdminUsersTab user={user} isOwner={!!profile?.is_owner} />; break;
@@ -2877,6 +2834,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
             <Card icon="📜" name="Activity log" cap="Audit trail across all clubs" onClick={() => setView("activity")} />
             <Card icon="🏟" name="Clubs oversight" cap="Approve clubs, support sessions" onClick={() => setView("oversight")} badge={todos.pending_clubs} />
             <Card icon="🧑‍🤝‍🧑" name="Users" cap="Global roster, suspend, merge" onClick={() => setView("users")} />
+            <Card icon="🏳️" name={`Club requests${clubReqCount ? ` (${clubReqCount})` : ""}`} cap={clubReqCount ? "New clubs waiting for your approval" : "New clubs waiting for approval — none right now"} onClick={() => setView("clubrequests")} />
             <Card icon="🗂" name="Player admin" cap="Handicaps, scores, memberships, courses" onClick={() => setView("players")} />
             <Card icon="💬" name="Feedback" cap="User-submitted feedback" onClick={() => setView("feedback")} badge={todos.new_feedback} />
             <Card icon="⛳" name="Course data" cap="API verification, pending updates, corrections awaiting approval" onClick={() => setView("coursedata")} />

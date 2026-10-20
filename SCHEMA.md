@@ -1,3 +1,7 @@
+## 210.8 — Club requests (0199)
+
+admin_club_requests() / decide_club_request(group, approve) — system admins. guard_group_status (new clubs pending unless system admin; status changes system-admin only). guard_invite_active_club (no invites for a club that isn't active).
+
 ## 210.7 — Email and announcement hardening (0198)
 
 round_email_log.status adds 'skipped'; due_round_emails excludes rounds with no holes and skipped rounds. announce_game_recap(game, signature, final_rows, updated_rows) — claim + notifications in one transaction (service role).

@@ -427,16 +427,9 @@ export function Home({ session }: { session: any }) {
         const { data: gg } = await supabase.from("groups").select("id, name").eq("id", gid as string).single();
         if (gg) list = [{ id: gg.id, name: gg.name, role: "member", status: "active" }];
       }
-      if (!list.length) {
-        // No default configured — fall back to a personal "Main". Guarded by the raw
-        // row count above so an archived-only or transiently-empty result never spawns
-        // a duplicate "Main".
-        const { data: g } = await supabase.from("groups").insert({ name: "Main", created_by: user.id, status: "active" }).select("id, name").single();
-        if (g) {
-          await supabase.from("group_members").insert({ group_id: g.id, user_id: user.id, email: (user.email || "").toLowerCase(), role: "admin", status: "active" });
-          list = [{ id: g.id, name: g.name, role: "admin", status: "active" }];
-        }
-      }
+      // 210.8 (owner): no automatic club. The old fallback created an ACTIVE "Main" club the member ran — a club
+      // that skipped approval and could be renamed and grown. A member with no club joins one by invite, or
+      // requests one (Clubs page) for a system admin to approve.
     }
 
     setGroups(list);
