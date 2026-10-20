@@ -42,12 +42,19 @@ export async function POST(req: Request) {
 
   for (const d of due as { round_id: string; user_id: string; email: string; display_name: string | null; game_id: string | null; last_fingerprint: string | null; ever_sent: boolean }[]) {
     try {
-      const [{ data: round }, { data: holes }] = await Promise.all([
+      const [{ data: round, error: rErr }, { data: holes, error: hErr }] = await Promise.all([
         db.from("rounds").select("*").eq("id", d.round_id).maybeSingle(),
         // bounded: one round's holes (18 at most)
         db.from("holes").select("*").eq("round_id", d.round_id).order("hole_number"),
       ]);
-      if (!round || !holes?.length) continue;
+      // 210.7 (review point 5): nothing disappears silently. A failed read is a FAILURE (retried later); a round
+      // that can't be summarised is SKIPPED with its reason and never picked again.
+      if (rErr || hErr) throw new Error(`couldn't read the round: ${(rErr || hErr)!.message}`);
+      if (!round || !holes?.length) {
+        await db.rpc("record_round_email", { p_round: d.round_id, p_user: d.user_id, p_fingerprint: null, p_kind: d.ever_sent ? "update" : "summary",
+          p_status: "skipped", p_error: !round ? "the round no longer exists" : "no hole-by-hole scores to summarise" });
+        continue;
+      }
       let ctx = null as ReturnType<typeof gameContextFor>;
       let gameCode: string | null = null;
       if (d.game_id) {

@@ -1,6 +1,6 @@
 function eq(a: unknown, b: unknown, m: string) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${m}: expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`); }
 function ok(c: unknown, m: string) { if (!c) throw new Error(m); }
-import { buildClubReport, reportPeriods } from "./club-report";
+import { buildClubReport, reportPeriods, basis, rivalryWaiting, waitingNote } from "./club-report";
 // 210.0: the club report — a small club season.
 const H18 = Array.from({ length: 18 }, (_, i) => ({ n: i + 1, par: 4, si: i + 1 }));
 const fill = (n: number, v: number) => Array(n).fill(v);
@@ -25,8 +25,21 @@ eq(r.bestGross && [r.bestGross.name, r.bestGross.score], ["Gus", 54], "best gros
 eq(r.bestNet && [r.bestNet.name, r.bestNet.score], ["Gus", 54], "best net");
 eq(r.mostRounds && [r.mostRounds.name, r.mostRounds.count], ["Ann", 3], "most rounds");
 ok(r.mostNetBirdies && r.mostNetBirdies.name === "Ann" || r.mostNetBirdies?.name === "Cal", "most net birdies is a member");
-eq(r.mostImproved && [r.mostImproved.name, r.mostImproved.from, r.mostImproved.to], ["Ann", 12, 10.5], "most improved: Ann, index 12 → 10.5 over the period");
-eq(r.closestRivalry && [r.closestRivalry.a, r.closestRivalry.b, r.closestRivalry.aWins, r.closestRivalry.bWins], ["Ann", "Bob", 1, 1], "closest rivalry: Ann v Bob, 1–1");
+eq(r.mostImproved && [r.mostImproved.name, r.mostImproved.from, r.mostImproved.to, basis.improved(r)], ["Ann", 12, 10.5, "over 3 rounds"], "most improved: Ann, index 12 → 10.5, over 3 rounds (3 readings — the minimum)");
+{
+  const two = buildClubReport("Test Club", period, input.slice(0, 2));   // only 2 readings for Ann
+  eq(two.mostImproved, null, "two handicap readings aren't enough for most improved");
+  eq(waitingNote(two), "Most improved needs 3 handicap readings in the period.", "…and the report says what it's waiting for");
+}
+// 210.7 (owner): a rivalry needs 3 matches — Ann v Bob's 2 don't qualify; the report says it's waiting.
+eq(r.closestRivalry, null, "two matches aren't a rivalry yet");
+eq(rivalryWaiting(r), "Not enough matches yet for a rivalry — it needs 3 between the same two players.", "…and the report says what it's waiting for");
+{
+  const third = buildClubReport("Test Club", period, [...input, g("g5", "2026-07-25", "match", [pl("ann", "Ann", fill(18, 4), 10.4), pl("bob", "Bob", fill(18, 4), 14)], { pairings: [{ a: "ann", b: "bob" }] })]);
+  eq(third.closestRivalry && [third.closestRivalry.a, third.closestRivalry.b, third.closestRivalry.aWins, third.closestRivalry.bWins, third.closestRivalry.halved, basis.rivalry(third)],
+    ["Ann", "Bob", 1, 1, 1, "3 matches"], "a third match: Ann v Bob, 1–1, 1 halved · 3 matches");
+  eq(rivalryWaiting(third), null, "nothing waiting once it qualifies");
+}
 eq(r.longestStreak && [r.longestStreak.name, r.longestStreak.weeks], ["Ann", 3], "longest weekly streak: Ann, 3 weeks");
 ok(!JSON.stringify([r.mostRounds, r.mostNetBirdies, r.mostImproved, r.longestStreak, r.closestRivalry]).includes("Gus"), "a guest never appears in a member list");
 eq(buildClubReport("Empty", period, []).games, 0, "an empty period is an empty report, not an error");

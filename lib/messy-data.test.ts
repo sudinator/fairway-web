@@ -1,11 +1,11 @@
 // 210.5 — every statistics feature, through the messy data. Rules that must hold whatever the input.
 function ok(c: unknown, m: string) { if (!c) throw new Error(m); }
 import { messyGames, MESSY_USERS as U } from "./test-fixtures/messy-games";
-import { buildClubReport, reportPeriods } from "./club-report";
+import { buildClubReport, reportPeriods, completedRoundsNote } from "./club-report";
 import { buildRecap } from "./game-recap";
 import { matchOutcomes, memberRecord } from "./match-outcomes";
 import { gameContextFor } from "./round-email-server";
-import { isFullCard, isValidRound, handicapReading, holeScore } from "./round-rules";
+import { isFullCard, isValidRound, handicapReading, holeScore, shortenedNote } from "./round-rules";
 
 /** Every number anywhere in a result is finite. */
 function finite(x: unknown, where: string): void {
@@ -14,7 +14,7 @@ function finite(x: unknown, where: string): void {
   else if (x && typeof x === "object") for (const [k, v] of Object.entries(x)) finite(v, `${where}.${k}`);
 }
 const games = messyGames();
-const memberNames = new Set(["Full Card", "Empty Card", "Single Score", "Fourteen Holes", "No Index", "No Show", "Derived Dee", "String Scores", "Alt A1", "Alt A2", "Alt B1", "Alt B2"]);
+const memberNames = new Set(["Full Card", "Empty Card", "Single Score", "Fourteen Holes", "No Index", "No Show", "Derived Dee", "String Scores", "Alt A1", "Alt A2", "Alt B1", "Alt B2", "Tri One", "Tri Two", "Tri Three", "Tri Four"]);
 
 // round-rules itself
 ok(!isFullCard([], 18) && !isValidRound([], 18) && !isValidRound([4], 18), "an empty or one-score card is not a round");
@@ -28,7 +28,7 @@ const r = buildClubReport("Messy Club", reportPeriods(2026)[1], games.map((g) =>
 finite(r, "club report");
 ok(r.bestGross && r.bestGross.score >= 18 * 4 && Number.isInteger(r.bestGross.score), `best gross comes from a full 18 (got ${JSON.stringify(r.bestGross)})`);
 ok(r.bestNet && Number.isInteger(r.bestNet.score) && r.bestNet.score > 0, `best net is a positive whole number (got ${JSON.stringify(r.bestNet)})`);
-ok(!["Empty Card", "Single Score", "Fourteen Holes", "No Show", "Alt A1", "Alt A2", "Alt B1", "Alt B2"].includes(r.bestGross!.name), `best gross holder must have a full individual card (got ${r.bestGross!.name})`);
+ok(!["Empty Card", "Single Score", "Fourteen Holes", "No Show", "Alt A1", "Alt A2", "Alt B1", "Alt B2", "Tri Two", "Tri Four"].includes(r.bestGross!.name), `best gross holder must have a full individual card (got ${r.bestGross!.name})`);
 for (const k of ["mostRounds", "mostNetBirdies", "mostImproved", "longestStreak"] as const) {
   const who = (r as any)[k]?.name; ok(!who || memberNames.has(who), `${k}: members only (got ${who})`);
   ok(!who || !who.startsWith("Alt") || k === "mostRounds" || k === "longestStreak", `${k}: no alternate-shot pair award (got ${who})`);
@@ -54,5 +54,34 @@ for (const g of games) {
     }
     if (ctx) finite(ctx.context, `email context (${g.note})`);
   }
+}
+// 210.6 (owner): only completed rounds count toward exceptional play — and every place says so.
+{
+  const stroke = games[0];
+  const recap = buildRecap(stroke.game, stroke.players);
+  ok(recap.highlights.shortened.some((s) => s.name === "Fourteen Holes" && s.holes === 14), "the recap knows who played a shortened round");
+  ok(!recap.highlights.topGross.some((t) => t.item.name === "Fourteen Holes"), "a shortened round isn't in the top scores");
+  ok(!recap.highlights.shortened.some((s) => s.name === "Single Score" || s.name === "Empty Card"), "a card under 9 holes isn't a round at all — not 'shortened'");
+  ok(shortenedNote(recap.highlights.shortened) === "Only completed rounds count toward top scores and standout rounds — Fourteen Holes (14 holes) isn't counted.", `the sentence (got ${shortenedNote(recap.highlights.shortened)})`);
+  ok(shortenedNote([]) === null, "no shortened rounds: no sentence");
+  const ctx = gameContextFor(stroke.game, stroke.players, U.fourteen)!;
+  ok(ctx.context.shortenedHoles === 14, "the member's own email knows their round was shortened");
+  ok(ctx.groupHtml.includes("Only completed rounds count toward top scores and standout rounds"), "the group section of the email carries the recap's sentence");
+  ok(gameContextFor(stroke.game, stroke.players, U.full)!.context.shortenedHoles == null, "a full card isn't 'shortened'");
+  ok(r.shortenedRounds >= 1 && completedRoundsNote(r).startsWith("Best scores and standout rounds count completed 18-hole rounds only — "), `the club report states the rule with the count (${completedRoundsNote(r)})`);
+}
+// 210.7 — the real formats: Stableford, skins, Trifecta.
+{
+  const byNote = (s: string) => games.find((g) => g.note.startsWith(s))!;
+  const stab = buildRecap(byNote("Stableford").game, byNote("Stableford").players);
+  ok(!stab.highlights.topGross.some((t) => t.item.name === "Fourteen Holes" || t.item.name === "Single Score"), "Stableford: a shortened or one-score card doesn't rank");
+  ok(stab.highlights.shortened.some((x) => x.name === "Fourteen Holes"), "Stableford: the shortened card is named");
+  const skins = buildRecap(byNote("skins").game, byNote("skins").players);
+  finite(skins, "skins recap (all holes tied, everything carries)");
+  const tri = byNote("Trifecta");
+  const triRecap = buildRecap(tri.game, tri.players);
+  finite(triRecap.highlights, "Trifecta recap highlights");
+  ok(triRecap.highlights.shortened.some((x) => x.name === "Tri Two" && x.holes === 12), "Trifecta: the 12-hole player is named as shortened");
+  for (const o of matchOutcomes(tri.game, tri.players)) ok([...o.a, ...o.b].every((p) => p.userId), "Trifecta outcomes: members only");
 }
 console.log("messy-data tests passed");

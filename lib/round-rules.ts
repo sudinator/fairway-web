@@ -54,3 +54,12 @@ export function handicapReading(v: unknown): number | null {
 export function countsForIndividualStats(gameType: string | null | undefined): boolean {
   return gameType !== "alt_shot";
 }
+
+/** The one sentence that says shortened rounds don't count toward exceptional play (210.6, owner) — used by the
+ *  recap (app and shared image) and the round-summary email, so they read word for word the same. */
+export function shortenedNote(shortened: readonly { name: string; holes: number }[]): string | null {
+  if (!shortened.length) return null;
+  const parts = shortened.map((s, i) => (i === 0 ? `${s.name} (${s.holes} holes)` : `${s.name} (${s.holes})`));
+  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  return `Only completed rounds count toward top scores and standout rounds — ${list} ${shortened.length === 1 ? "isn't" : "aren't"} counted.`;
+}

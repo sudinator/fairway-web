@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { C } from "@/lib/golf";
 import { Eyebrow } from "@/components/ui";
 import { createClient } from "@/lib/supabase";
-import { matchOutcomes, memberRecord, type H2HRow, type PartnerRow } from "@/lib/match-outcomes";
+import { matchOutcomes, memberRecord, BEST_PARTNER_MIN, formatsLabel, type H2HRow, type PartnerRow } from "@/lib/match-outcomes";
 import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 import type { Game, Player } from "@/lib/game-types";
 import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
@@ -51,7 +51,7 @@ export function HeadToHead({ user }: { user: { id: string } }) {
   );
   if (!rec) return null;
   if (!rec.headToHead.length && !rec.partners.length) return null;   // nothing to show until there are finished matches
-  const best = rec.partners.find((p) => p.played >= 2);
+  const best = rec.partners.find((p) => p.played >= BEST_PARTNER_MIN);   // 210.7: enough matches to mean something
   const th: React.CSSProperties = { color: C.sage, fontSize: 11, fontWeight: 700, textAlign: "right", paddingTop: 4, paddingBottom: 4 };
   const td: React.CSSProperties = { borderTop: `1px solid ${C.green}`, paddingTop: 6, paddingBottom: 6, textAlign: "right", fontSize: 13, color: C.cream };
   return (
@@ -74,7 +74,7 @@ export function HeadToHead({ user }: { user: { id: string } }) {
           ))}</tbody>
         </table>
       ) : null}
-      {best ? <div style={{ color: C.cream, fontSize: 13, marginTop: 8 }}>⛳ Your best partner: <b>{best.name}</b> — {best.won} win{best.won === 1 ? "" : "s"} in {best.played}.</div> : null}
+      {best ? <div style={{ color: C.cream, fontSize: 13, marginTop: 8 }} data-best-partner>⛳ Your best partner: <b>{best.name}</b> — {best.won} win{best.won === 1 ? "" : "s"} in {best.played} <span style={{ color: C.sage }}>({formatsLabel(best.formats)})</span></div> : null}
     </div>
   );
 }

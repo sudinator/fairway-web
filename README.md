@@ -1,3 +1,15 @@
+## 210.7.261019 — Real formats in the tests; minimum samples and visible basis; review points 5 and 6
+
+**Messy data, real formats.** The production profile showed BNN's groups play match, skins, Stableford and Trifecta. lib/test-fixtures/messy-games.ts now includes Stableford (a shortened card, a one-score card, a blow-up hole, a guest), skins with carryover (every hole tied, an empty card, a shortened card, a guest) and Trifecta (a 12-hole player and an empty card inside a foursome); every statistics feature runs through them.
+
+## 210.6.261019 — Only completed rounds count toward exceptional play — and it's said plainly
+
+Owner decision (Oct 19, after the production data profile showed 8 of 86 cards were shortened rounds): rounds that stopped early (9+ holes, not every hole) still count as rounds played, but never toward top scores, standout rounds, positions or best scores — and every place that shows exceptional play says so:
+- **Recap** (app and shared image), when a game has shortened rounds: "Only completed rounds count toward top scores and standout rounds — Raj (14 holes) and Sam (12) aren't counted." One sentence (lib/round-rules shortenedNote), used word for word by the round-summary email's group section.
+- **Round-summary email**, for a member whose own round was shortened: "Your round was shortened (14 holes) — only completed rounds count toward positions and standout rounds."
+- **Club report** (club page and email): "Best scores and standout rounds count completed 18-hole rounds only — N shortened rounds this period weren't counted."
+Cards under 9 holes aren't rounds at all and aren't called "shortened". Tests: messy data (who is shortened, top scores, the sentence, the member's email, the club report), rendered recap in both modes, the report view.
+
 ## 210.5.261019 — One definition of a round; messy-data tests; the data profile
 
 **One definition (lib/round-rules).** What a round is now lives in one place, matching BNN's handicap engine and the recap: a hole counts only with a real (positive) score; fewer than 9 holes is not a round; 9+ is a valid round even if marked complete early; a full card has every hole; a missing handicap index is missing, never 0; alternate-shot scores belong to the pair. Used by the club report, the recap highlights (finishers), the round-summary email and the alternate-shot pair totals. This fixed one more instance of the reported bug: the round email's net position counted empty and partial cards in the field ("5th of 7" where only 5 had full cards). Guard ci/check_round_rules.py: statistics code that writes its own completeness check or converts a handicap index directly fails the build (it flags the 210.4 email code).
