@@ -1,3 +1,29 @@
+## 210.11.261020 — The app opens on the dashboard, not a finished game
+
+**The bug.** Opening the app first checked whether the member was last inside a game room (a note saved on the phone) and, if so, reopened Games — which restored that game — without checking whether it had finished. Once a game had been opened, the app kept returning to it after it was completed. (An unfinished solo round, a half-done setup and a course edit already checked that they were genuinely unfinished; only the game room didn't.)
+
+**Fixed (owner: "go to an unfinished game if still in progress, but not all the time").** On opening, the app asks the server for that game's status — it may have been finished on another phone, e.g. the organizer's — and falls back to this phone's copy only when offline. Still being played → it reopens, as before; finished or deleted → the note is forgotten and the app opens on the dashboard. Offline mid-round it still resumes (scoring must work without signal). lib/draft shouldResumeGame + lib/resume-game.test.ts. Everything else on opening (solo rounds, setup, course edits, deep links) is unchanged.
+
+No migration. Deploy: code only.
+
+## 210.10.261020 — Club notifications open the right club
+
+**The bug.** "Your club 'PA-NJ golfers' is approved…" linked to /?tab=manage&manage=groups — a destination the app doesn't understand (it knows ?tab=groups; there is no "manage" tab). Tapping it in the app was ignored (the notification was still marked read); opening it from a phone notification didn't reach Clubs. The approval itself succeeded. The same broken link was on "Your club's report is ready" (0195) and on the held-sign-up notice to club admins (0189, /?tab=manage&manage=members).
+
+**Fixed.** A new link instruction, club=<id>: the app refreshes the member's clubs (a just-approved club isn't in the list yet), selects THAT club, and opens Clubs — so a member who already belongs to another club lands on the right one, ready to invite. The requested club is remembered until it's actually selected, so the app's own startup load can't put the member back on their usual club. Approved → /?tab=groups&club=<id>; declined → /?tab=groups; club report → /?tab=groups&club=<id>; held sign-up → /?tab=groups&club=<id>. Notifications already sent with the broken links are corrected in place (0201) — Jigar's existing approval notice now works.
+
+**Guarded.** lib/app-links.ts is the one description of the links the app understands, used by both ways in (an in-app tap and opening from a phone notification). ci/assert-notification-links.sql reads every link the database's functions send, and every stored notification link, and fails on any the app doesn't know — it names all three old links when they're restored. ci/check_app_tabs_sync.py keeps its tab list equal to the app's. lib/app-links.test.ts.
+
+Deploy: staging 0201 → code; production 0201 → merge.
+
+## 210.9.261019 — A support visit is not a join
+
+The owner entered PA-NJ golfers as a support admin for five seconds, and the club's admin was told "Amit Sud joined PA-NJ golfers." The join notification (0165) treated the temporary support membership (0028) as an ordinary member joining.
+
+**Fixed (0200).** A support visit now tells the club's ADMINS what actually happened — "Amit Sud (BNN admin) looked in on PA-NJ golfers to help with support. Support visits are logged." (type support_visit, push by default, a switch in Notification settings) — and never "joined". Ordinary joins are unchanged, except that support visits never count toward "(already in N other clubs)" and support visitors aren't sent join notifications. Exiting stays silent; the entry / exit activity log is unchanged. ci/assert-support-visit.sql re-enacts the visit through admin_enter_group / admin_exit_group and fails on the 0165 trigger.
+
+Deploy: staging 0200 → code; production 0200 → merge.
+
 ## 210.8.261019 — Club requests you can actually see and approve
 
 **The bug.** A club is visible only to its members and its creator — with no exception for system admins — so Admin's "Club requests" list read clubs directly and was ALWAYS empty for anyone else's request. Jigar Shukla's "PA-NJ golfers" (pending since Oct 20) was invisible to the owner. The old Approve / Decline buttons also didn't check for errors (they could notify "approved" after a failed update).

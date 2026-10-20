@@ -431,3 +431,15 @@ export function personalDraftIsPending(round: Round): boolean {
     return ack?.id !== (round.id || round.draft_session_id) || ack.signature !== personalRoundFingerprint(round);
   } catch { return true; }
 }
+
+/**
+ * Should opening the app return to the game room the member was last in? (210.11, owner: "go to an unfinished game
+ * if still in progress, but not all the time") Only while that game is still being played. `serverStatus` is the
+ * game's status from the server (undefined = couldn't ask, e.g. offline; null = the game no longer exists);
+ * `snapshotStatus` is this phone's saved copy, used only when the server couldn't be asked.
+ */
+export function shouldResumeGame(serverStatus: string | null | undefined, snapshotStatus: string | null | undefined): boolean {
+  if (serverStatus === null) return false;                       // the game no longer exists
+  const status = serverStatus !== undefined ? serverStatus : snapshotStatus;
+  return status !== "ended";                                     // active (or unknown offline) → resume; ended → don't
+}

@@ -1,3 +1,7 @@
+## 210.9 — Support visits (0200)
+
+notify_group_member: is_support rows notify the club's admins (support_visit), never 'joined'; support rows excluded from join counts and recipients.
+
 ## 210.8 — Club requests (0199)
 
 admin_club_requests() / decide_club_request(group, approve) — system admins. guard_group_status (new clubs pending unless system admin; status changes system-admin only). guard_invite_active_club (no invites for a club that isn't active).

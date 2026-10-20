@@ -13,7 +13,7 @@ import { computeBalances, fmtUSD } from "@/lib/money";
 import { logActivity } from "@/lib/activity";
 import { write } from "@/lib/db-write";
 import { Toaster, notifyInfo } from "@/components/toast";
-import { loadDraft, draftHasScores, clearAllLocalState } from "@/lib/draft";
+import { loadDraft, draftHasScores, clearAllLocalState, clearActiveGame, loadGameSnapshot, shouldResumeGame } from "@/lib/draft";
 import { loadActiveGame, saveAppBootCache, loadAppBootCache, loadEditorDraft, loadActiveCourseEdit } from "@/lib/draft";
 import { btn, Wordmark, inputStyle, Eyebrow } from "@/components/ui";
 import { IsThisYou, WaitingForApproval, AccountUnavailable, type AccountGateState } from "@/components/account-gate";
@@ -324,10 +324,31 @@ export function Home({ session }: { session: any }) {
   // given up resolving), so TeeTimes can't prematurely "consume" it against the wrong group.
   const deepReady = !!deepTeeId && deepTeeGroupId !== undefined && (deepTeeGroupId === null || activeGroupId === deepTeeGroupId);
 
-  // On open, resume an in-progress round straight into the scorecard.
-  // Priority: an active game → this device's round draft → the server's in-progress round.
+  // 210.11: the game room the member was last in is only resumed while that game is still being played. Ask the
+  // server (the game may have been finished on another phone); fall back to this phone's copy when offline. A
+  // finished or deleted game is forgotten, so the app opens on the dashboard.
+  const [activeGameChecked, setActiveGameChecked] = useState(false);
   useEffect(() => {
-    if (resumeChecked || scoringDevice === "checking") return;
+    const ag = loadActiveGame();
+    if (!ag) { setActiveGameChecked(true); return; }
+    let live = true;
+    (async () => {
+      let serverStatus: string | null | undefined;
+      try {
+        const { data, error } = await supabase.from("games").select("status").eq("id", ag.gameId).maybeSingle();
+        serverStatus = error ? undefined : data ? ((data as { status?: string | null }).status ?? "active") : null;
+      } catch { serverStatus = undefined; }
+      if (!live) return;
+      if (!shouldResumeGame(serverStatus, loadGameSnapshot(ag.gameId)?.game?.status)) clearActiveGame();
+      setActiveGameChecked(true);
+    })();
+    return () => { live = false; };
+  }, [supabase]);
+
+  // On open, resume an in-progress round straight into the scorecard.
+  // Priority: an active (still-being-played) game → this device's round draft → the server's in-progress round.
+  useEffect(() => {
+    if (resumeChecked || scoringDevice === "checking" || !activeGameChecked) return;
     // A tee-time deep link takes priority over resuming a round/game.
     if (deepTeeId) { setResumeChecked(true); return; }
     // If the user was in a game room, reopen the Games tab so it can restore the room.
@@ -365,7 +386,7 @@ export function Home({ session }: { session: any }) {
     if (dbInProgress && draftHasScores(dbInProgress)) {
       setStage({ round: dbInProgress });
     }
-  }, [resumeChecked, loading, dbInProgress, deepTeeId, scoringDevice]);
+  }, [resumeChecked, loading, dbInProgress, deepTeeId, scoringDevice, activeGameChecked]);
 
   const user = session.user;
   const displayName = profile?.display_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "Golfer";
