@@ -30,8 +30,10 @@ export function GameRecapCard({ game, players, altShotScores, userId, betStale, 
     if (hasBet) supabase.from("expenses").select("id").eq("source_game_id", game.id).eq("source_kind", "tgc_bet").is("deleted_at", null).maybeSingle()
       .then(({ data, error }) => { if (live && !error) setPosted(!!data); });
     (async () => {
+      // bounded: one game's contests
       const { data: cs, error } = await supabase.from("game_contests").select("*").eq("game_id", game.id);
       if (error || !cs?.length) return;
+      // bounded: one game's contest entries
       const { data: es } = await supabase.from("game_contest_entries").select("*").in("contest_id", cs.map((c: any) => c.id));
       const out: RecapContest[] = [];
       (cs as Contest[]).forEach((c) => contestLeaderboard(c, ((es || []) as ContestEntry[]).filter((e) => e.contest_id === c.id && !e.voided))

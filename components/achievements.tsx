@@ -213,6 +213,7 @@ export function AchievementsTeaser({ userId, onViewAll }: { userId: string; onVi
   useEffect(() => {
     let alive = true;
     (async () => {
+      // bounded: one member's badges (a few dozen kinds at most)
       const { data } = await supabase.from("member_badges").select("badge_key,last_earned_at").eq("user_id", userId);
       if (alive) setEarned((data || []) as any);
     })();

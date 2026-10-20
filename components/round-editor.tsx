@@ -448,6 +448,7 @@ export function RoundEditor({ round: suppliedRound, onSaved, onCancel }: { round
         const requestRevision = editRevisionRef.current;
         const { data: server, error } = await supabase.from("rounds").select("*").eq("id", sessionId).maybeSingle();
         if (error || !server || stopped) return;
+        // bounded: one round's holes (18 at most)
         const { data: serverHoles, error: holesError } = await supabase.from("holes").select("*").eq("round_id", sessionId).order("hole_number");
         if (holesError || !serverHoles || stopped || savingRef.current || requestRevision !== editRevisionRef.current) return;
         if (isPrimaryScoringDevice() && touchedRef.current) { if (!isRecordedFinal) backgroundSave(holesRef.current); return; }

@@ -30,13 +30,15 @@ export async function POST(req: Request) {
 
   const [{ data: fc }, { data: cf }, { data: last }] = await Promise.all([
     admin.from("favorite_courses").select("data").eq("id", body.courseId).maybeSingle(),
-    admin.from("course_freshness").select("api_data, revision, declined, status").eq("course_id", body.courseId).maybeSingle(),
+    admin.from("course_freshness").select("api_data, revision, declined, status, provider_baseline").eq("course_id", body.courseId).maybeSingle(),
     admin.from("course_versions").select("data").eq("course_id", body.courseId).in("source", ["provider_update", "initial", "created"]).order("version", { ascending: false }).limit(1).maybeSingle(),
   ]);
   if (!fc?.data || !cf?.api_data) return NextResponse.json({ error: "There's no provider update to review for this course." }, { status: 404 });
   if (cf.revision !== body.revision) return NextResponse.json({ error: "The course was re-checked since you reviewed it — review the latest changes." }, { status: 409 });
   const stored = fc.data as Course, api = cf.api_data as Course;
-  const items = withoutDeclined(changeItems(stored, api, (last?.data as Course) ?? null), (cf.declined as Record<string, unknown>) ?? {});
+  // 210.3 (review point 1): compare against the provider's OWN data as last applied (same as the review screen).
+  const baseline = ((cf as { provider_baseline?: unknown }).provider_baseline as Course | null) ?? ((last?.data as Course) ?? null);
+  const items = withoutDeclined(changeItems(stored, api, baseline), (cf.declined as Record<string, unknown>) ?? {});
 
   if (body.keep) {
     const { error } = await admin.rpc("remember_course_declines_as", { p_actor: user.id, p_course_id: body.courseId, p_declined: declinedFor(items, []) });

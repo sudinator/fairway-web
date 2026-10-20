@@ -3,6 +3,8 @@ begin;
 insert into auth.users(id) values
  ('16100000-0000-0000-0000-000000000001'),
  ('16100000-0000-0000-0000-000000000002');
+-- 210.3: real members have a profile (begin_account creates it); direct writes need an approved account (0197).
+insert into public.profiles(id, display_name, account_status) values ('16100000-0000-0000-0000-000000000001', 'Test player 1', 'active'), ('16100000-0000-0000-0000-000000000002', 'Test player 2', 'active') on conflict (id) do nothing;
 select set_config('request.jwt.claim.sub','16100000-0000-0000-0000-000000000001',true);
 select public.claim_scoring_device('16200000-0000-0000-0000-000000000010',null,false);
 select set_config('request.headers','{"x-bnn-scoring-device":"16200000-0000-0000-0000-000000000010"}',true);

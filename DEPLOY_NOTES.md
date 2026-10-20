@@ -1,3 +1,33 @@
+## 210.5.261019 — One definition of a round; messy-data tests; the data profile
+
+**One definition (lib/round-rules).** What a round is now lives in one place, matching BNN's handicap engine and the recap: a hole counts only with a real (positive) score; fewer than 9 holes is not a round; 9+ is a valid round even if marked complete early; a full card has every hole; a missing handicap index is missing, never 0; alternate-shot scores belong to the pair. Used by the club report, the recap highlights (finishers), the round-summary email and the alternate-shot pair totals. This fixed one more instance of the reported bug: the round email's net position counted empty and partial cards in the field ("5th of 7" where only 5 had full cards). Guard ci/check_round_rules.py: statistics code that writes its own completeness check or converts a handicap index directly fails the build (it flags the 210.4 email code).
+
+**Messy test data (lib/test-fixtures/messy-games.ts) + lib/messy-data.test.ts.** Empty cards, single scores, 14-hole rounds, no index, no-shows, guests, derived fractional course handicaps, string scores, a 9-hole game, alternate shot, a singles match against an empty card, a four-ball with a no-show. Every statistics feature (club report, recap, head-to-head, round email) runs through it, checking rules that must always hold: no non-finite numbers; best gross / net from full 18-hole cards, positive whole numbers; members only in member lists; no alternate-shot individual awards; no "most improved" from a missing index; net position counts full cards only. It fails on the 210.1 club report (best gross 0 from an empty card) and on the 210.4 email (net position).
+
+**Data profile (docs/sql/data_profile.sql, read-only).** Run on production before any statistics feature ships: how big things are getting (largest histories, clubs, ledgers — the next row limit, seen coming) and how messy finished games are (empty / shortened / full cards, missing indexes, guests, no-shows, formats).
+
+No migration. Deploy: code only.
+
+## 210.4.261019 — No silent 1,000-row cut-offs, anywhere
+
+Supabase returns at most 1,000 rows per request — for table reads AND for server functions that return lists. A full audit found the pattern well beyond the review's two loaders, including older code: the home screen loaded ALL of a member's holes in one request (the dashboard and handicap would lose the oldest rounds past ~55 rounds × 18 holes; nobody is near that today — max 30 rounds), the Money screen and the home "you owe" banner read every expense, share, payer, settlement and allocation that way, and the money audit trail read oldest-first with a 1,000 cap (it would have dropped the NEWEST history).
+
+**Fixed — paged with lib/fetch-all, in a stable order, every error a real error:** home (rounds, holes, owe banner), Money (every balance-critical read, the audit trail, events — the 206.1 rule holds: a failed read keeps the last complete figures and pauses settling), Admin → player view, admin membership / deleted-course / club lists, Season Wrapped, starting a round, tee times and RSVPs, feedback, course history, the Cup standings page, the shared course list, the yardage tool, the club pickers, and 22 calls to list-returning server functions (users, sign-ups, course status, sandbaggers, rosters, badges, friction, …) — those page in the function's own order and de-duplicate by key, so every screen keeps its sort. Long id lists are sent in batches of 100, which also avoids over-long requests. A failed owe-banner read keeps the last figure instead of showing "you owe nothing".
+
+**Kept, with the reason written beside each (52):** reads that are naturally small — one game's players, one round's holes, one club's members or course library, one expense's shares, log functions that return only the latest N.
+
+**Guard (CI):** ci/check_paged_reads.py — every list read is paged or carries a `// bounded: <why>` note; a new unpaged read without one fails the build. lib/fetch-all stops with an error after 1,000 pages rather than looping.
+
+No migration. Deploy: code only.
+
+## 210.3.261019 — Review points 1 and 3: approved accounts only; corrections keep their protection
+
+**3 · Only approved accounts change data directly (0197).** Sixteen tables accept direct writes from app users; some row rules checked only "signed in" (a pending account could add a shared course or record its own round by calling the database directly). One rule now guards fourteen of them — activity_log, competition_players, competition_sessions, competitions, favorite_courses, game_players, games, group_courses, group_events, group_invites, group_members, groups, holes, rounds: a direct change by an account that is new, pending, suspended, merged or removed — or has no profile — is refused, whatever the table's own rule allows. Deliberate exceptions: profiles (account fields stay locked, 0189) and notifications (marking one's own as read). Server functions keep their own checks. ci/assert-active-accounts.sql (fails without the rule); two older tests now give their test users profiles, as real members have.
+
+**1 · A kept correction stays protected after a partial update (0197).** A selective apply recorded the MERGED course as the provider's version, so a hand correction you kept looked like provider data and lost its protection at the next update (the review's 72 → 73 → 74 → 75 sequence). Now the provider's own data is saved whenever an update is marked applied (course_freshness.provider_baseline, either apply function), and the review screen and the server route both compare against it; courses applied before 0197 fall back to history. lib/course-merge.test.ts reproduces the sequence (and shows the old baseline missing it).
+
+Deploy: staging 0197 → code; production 0197 → merge.
+
 ## 210.2.261019 — Hardening from the external review (points 2, 4, 7, 8, 9)
 
 **2 · Club report accuracy.** What counts as a round now follows BNN's handicap rule (owner): fewer than 9 holes with real scores is not a round (never scored / abandoned — an empty or one-score card no longer becomes "best gross 0 / 4"); 9 or more counts, even when marked complete early. Best gross and best net: complete 18-hole rounds only (owner: option A). A missing handicap index is skipped, never read as 0 (no fake "20 → 0" most improved). Alternate shot counts toward games, rounds, attendance and rivalries but feeds no individual scoring award (the scores belong to the pair). Standout rounds stay exactly as the recap computes them (full rounds). Tests reproduce each reported case and fail on 210.1.

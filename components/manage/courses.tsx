@@ -1,5 +1,6 @@
 "use client";
 
+import { fetchAll, rpcAll } from "@/lib/fetch-all";
 import React, { useEffect, useState, useCallback } from "react";
 import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
@@ -148,7 +149,7 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
   const [pendingReviews, setPendingReviews] = useState<PendingReview[] | null>(null);
   const loadPendingReviews = useCallback(async () => {
     try {
-      const { data, error } = await supabase.rpc("pending_course_reviews");
+      const { data, error } = await rpcAll(supabase, "pending_course_reviews", undefined, ["course_id", "group_id"]);
       if (error) { setPendingReviews([]); return; }
       setPendingReviews(((data || []) as any[]).filter((r) => r.diff?.hasChanges).map((r) => ({ ...r, diff: r.diff as FreshnessDiff, api_data: (r.api_data as Course) || null })));
     } catch { setPendingReviews([]); }
@@ -194,9 +195,11 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
 
     // Global app library: every non-deleted course saved in Birdie Num Num.
     // Any user can browse this list and add a course to their current group library.
-    const { data: all, error: allErr } = await supabase.from("favorite_courses").select("*").order("name");
+    // 210.4: paged — the shared course list grows with every club.
+    let all: any[] = [], allErr: unknown = null;
+    try { all = await fetchAll<any>((f, t) => supabase.from("favorite_courses").select("*").order("name").order("id").range(f, t)); } catch (e) { allErr = e; }
     if (!allErr) {
-      const allList = sortCourses((all || []).filter((f: any) => !f.deleted).map(toLibCourse));
+      const allList = sortCourses(all.filter((f: any) => !f.deleted).map(toLibCourse));
       setAllCourses(allList);
     } else {
       console.error("global course library refresh failed", allErr);
@@ -220,16 +223,19 @@ export function CoursesLibrary({ user, activeGroupId }: { user: any; activeGroup
 
       let coursesById: Record<string, LibCourse> = {};
       if (courseIds.length) {
+        // bounded: the courses on the pending-review list
         const { data: courses } = await supabase.from("favorite_courses").select("*").in("id", courseIds);
         coursesById = Object.fromEntries((courses || []).map((c: any) => [c.id, toLibCourse(c)]));
       }
       let groupsById: Record<string, any> = {};
       if (groupIds.length) {
+        // bounded: the clubs of the courses on the pending-review list
         const { data: groupRows } = await supabase.from("groups").select("id, name").in("id", groupIds);
         groupsById = Object.fromEntries((groupRows || []).map((g: any) => [g.id, g]));
       }
       let profilesById: Record<string, any> = {};
       if (userIds.length) {
+        // bounded: the people on the pending-review list
         const { data: profileRows } = await supabase.from("profiles").select("id, display_name, email").in("id", userIds);
         profilesById = Object.fromEntries((profileRows || []).map((p: any) => [p.id, p]));
       }

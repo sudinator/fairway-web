@@ -1,4 +1,5 @@
 "use client";
+import { fetchAllIn, rpcAll } from "@/lib/fetch-all";
 import { balanceTeams, balanceSummary } from "@/lib/balance-teams";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
@@ -76,6 +77,7 @@ export function Competitions({
   const [playing, setPlaying] = useState<Record<string, boolean>>({});
 
   const loadList = useCallback(async () => {
+    // bounded: one club's Cups
     const { data, error } = await supabase.from("competitions").select("*").eq("group_id", activeGroupId).order("start_date", { ascending: false }).order("created_at", { ascending: false });
     if (error) { setErr(error.message); return; }
     setCompetitions((data || []) as Competition[]);
@@ -85,7 +87,7 @@ export function Competitions({
   useEffect(() => {
     if (!creating) return;
     (async () => {
-      const rpc = await supabase.rpc("group_roster", { p_group: activeGroupId });
+      const rpc = await rpcAll(supabase, "group_roster", { p_group: activeGroupId }, "id");
       if (rpc.error) { setErr(`Could not load the club roster: ${rpc.error.message}`); return; }
       if (Array.isArray(rpc.data)) {
         const rows = (rpc.data as any[]).map((p) => ({ id: p.id, display_name: p.display_name || "Player", avatar_url: p.avatar_url ?? null, handicap_index: p.handicap_index ?? null }))
@@ -247,7 +249,9 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
     setErr(null);
     const [cRes, rRes, sRes] = await Promise.all([
       supabase.from("competitions").select("*").eq("id", competitionId).maybeSingle(),
+      // bounded: one Cup's players
       supabase.from("competition_players").select("*").eq("competition_id", competitionId).order("display_name"),
+      // bounded: one Cup's sessions
       supabase.from("competition_sessions").select("*").eq("competition_id", competitionId).order("session_order"),
     ]);
     if (cRes.error) { setErr(failureMessage("Could not load this Ryder Cup", cRes.error)); return; }
@@ -261,11 +265,13 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
     const ids = rawSessions.map((s) => s.game_id).filter((x): x is string => !!x);
     let games: Game[] = [], players: Player[] = [], altScores: AltShotScoreRow[] = [], postedRounds: { game_id: string }[] = [];
     if (ids.length) {
+      // 210.4: every row, paged and in id batches (a request stops at 1,000 rows) — the pattern 210.0 copied.
+      const one = async <T,>(read: () => Promise<T[]>) => { try { return { data: await read(), error: null as { message: string } | null }; } catch (e) { return { data: null as T[] | null, error: { message: e instanceof Error ? e.message : String(e) } }; } };
       const [gRes, pRes, aRes, roundRes] = await Promise.all([
-        supabase.from("games").select("*").in("id", ids),
-        supabase.from("game_players").select("*").in("game_id", ids),
-        supabase.from("game_alt_shot_scores").select("*").in("game_id", ids),
-        supabase.from("rounds").select("game_id").in("game_id", ids).is("deleted_at", null),
+        one(() => fetchAllIn<Game>(supabase, "games", "id", ids)),
+        one(() => fetchAllIn<Player>(supabase, "game_players", "game_id", ids)),
+        one(() => fetchAllIn<AltShotScoreRow>(supabase, "game_alt_shot_scores", "game_id", ids)),
+        one(async () => (await fetchAllIn<{ game_id: string; deleted_at: string | null }>(supabase, "rounds", "game_id", ids)).filter((r) => r.deleted_at == null)),
       ]);
       if (gRes.error || pRes.error || aRes.error || roundRes.error) { setErr(gRes.error?.message || pRes.error?.message || aRes.error?.message || roundRes.error?.message || "Could not load Ryder Cup match scores."); return; }
       games = (gRes.data || []) as Game[]; players = (pRes.data || []) as Player[]; altScores = (aRes.data || []) as AltShotScoreRow[]; postedRounds = (roundRes.data || []) as { game_id: string }[];
@@ -390,6 +396,7 @@ function CompetitionDetail({ competitionId, user, canManage, isSystemAdmin, onBa
     if (!confirm(message)) return;
 
     setLifecycleBusy(true); setErr(null);
+    // bounded: returns the one deleted Cup's summary
     const { error } = await supabase.rpc("delete_team_competition", {
       p_competition: competition.id,
     });

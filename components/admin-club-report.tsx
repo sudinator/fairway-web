@@ -1,5 +1,6 @@
 "use client";
 // Admin → Club reports (210.0): preview any club's report for any period, from the real games — sends nothing.
+import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 import React, { useEffect, useMemo, useState } from "react";
 import { C } from "@/lib/golf";
 import { inputStyle } from "@/components/ui";
@@ -15,8 +16,8 @@ export function AdminClubReport() {
   const [clubs, setClubs] = useState<{ id: string; name: string }[]>([]);
   const [club, setClub] = useState(""), [periodKey, setPeriodKey] = useState(periods[periods.length > 1 ? 1 : 0]?.key ?? "");
   const [report, setReport] = useState<ClubReport | null>(null), [err, setErr] = useState<string | null>(null), [busy, setBusy] = useState(false);
-  useEffect(() => { void supabase.from("groups").select("id, name").eq("status", "active").order("name").then(({ data }) => {
-    const list = (data || []) as { id: string; name: string }[]; setClubs(list); if (list[0]) setClub((c) => c || list[0].id); }); }, [supabase]);
+  useEffect(() => { void fetchAll<{ id: string; name: string }>((f, t) => supabase.from("groups").select("id, name").eq("status", "active").order("name").order("id").range(f, t)).then((list) => { setClubs(list); if (list[0]) setClub((c) => c || list[0].id); })
+    .catch((e) => setErr(e instanceof Error ? e.message : String(e))); }, [supabase]);
   useEffect(() => {
     const p = periods.find((x) => x.key === periodKey), c = clubs.find((x) => x.id === club);
     if (!p || !c) return;

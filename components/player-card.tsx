@@ -1,4 +1,5 @@
 "use client";
+import { rpcAll } from "@/lib/fetch-all";
 import { useEffect, useId, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
@@ -197,6 +198,7 @@ export function PlayerCard({ profile, user, rounds = [] }: { profile: any; user:
   useEffect(() => {
     let alive = true;
     (async () => {
+      // bounded: one member's badges (a few dozen kinds at most)
       const { data } = await supabase.from("member_badges").select("badge_key,count,best_value,last_earned_at").eq("user_id", user.id);
       if (alive) setEarned((data || []) as Earned[]);
     })();
@@ -233,8 +235,8 @@ export function PeerCardModal({ member, groupId, viewerUserId, onClose }: { memb
       const p = member.profiles || {};
       const uid = member.user_id;
       const [{ data: badges }, { data: cards }] = await Promise.all([
-        supabase.rpc("group_badges", { p_group: groupId }),
-        supabase.rpc("group_cards", { p_group: groupId }),
+        rpcAll(supabase, "group_badges", { p_group: groupId }, ["user_id", "badge_key"]),
+        rpcAll(supabase, "group_cards", { p_group: groupId }, "user_id"),
       ]);
       if (!alive) return;
       const mine = (badges || []).filter((b: any) => b.user_id === uid);

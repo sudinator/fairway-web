@@ -1,4 +1,5 @@
 "use client";
+import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 import { prepareRound } from "@/lib/round-prep";
 import { SeasonWrappedEntry } from "@/components/season-wrapped";
 
@@ -512,19 +513,24 @@ export function Home({ session }: { session: any }) {
     }
     setLoading(true);
     // Personal views intentionally show this user's rounds across every group.
-    let { data: rs, error: rErr } = await supabase
-      .from("rounds").select("*, groups(name)").eq("user_id", user.id).is("deleted_at", null).order("played_at", { ascending: false });
-    if (rErr) {
+    // 210.4: every row, paged — a single request stops at 1,000 rows (holes reach that at ~55 rounds).
+    let rs: any[] | null = null;
+    try {
+      rs = await fetchAll<any>((from, to) => supabase.from("rounds").select("*, groups(name)").eq("user_id", user.id).is("deleted_at", null)
+        .order("played_at", { ascending: false }).order("id").range(from, to));
+    } catch {
       // The deleted_at column may not exist yet (migration 0058 not run). NEVER blank the
       // rounds list on a query error — fall back to the unfiltered query so every round
       // still loads. Data is never deleted; the filter only hides soft-deleted rows.
-      const retry = await supabase.from("rounds").select("*, groups(name)").eq("user_id", user.id).order("played_at", { ascending: false });
-      rs = retry.data;
+      try {
+        rs = await fetchAll<any>((from, to) => supabase.from("rounds").select("*, groups(name)").eq("user_id", user.id)
+          .order("played_at", { ascending: false }).order("id").range(from, to));
+      } catch { rs = null; }
     }
     if (!rs) { setRounds([]); setLoading(false); return; }
     const ids = rs.map((r: any) => r.id);
-    const { data: hs } = await supabase
-      .from("holes").select("*").in("round_id", ids.length ? ids : ["none"]);
+    let hs: any[] = [];
+    try { hs = await fetchAllIn<any>(supabase, "holes", "round_id", ids); } catch { hs = []; }
     const byRound: Record<string, Hole[]> = {};
     (hs || []).forEach((h: any) => { (byRound[h.round_id] ||= []).push(h); });
     // Shared preparation (lib/round-prep): the season summary uses exactly the same step.
@@ -667,19 +673,19 @@ export function Home({ session }: { session: any }) {
   const loadOwed = useCallback(async () => {
     const gids = groups.map((g) => g.id);
     if (!gids.length) { setOwed({ cents: 0, clubs: [] }); return; }
-    const [{ data: exp }, { data: setl }, { data: gg }] = await Promise.all([
-      supabase.from("expenses").select("id, group_id, payer_user_id, amount_cents").in("group_id", gids).is("deleted_at", null),
-      supabase.from("settlements").select("group_id, from_user_id, to_user_id, amount_cents, status").in("group_id", gids),
-      supabase.from("group_guests").select("id, group_id, sponsor_user_id").in("group_id", gids),
-    ]);
-    const exps = (exp || []) as any[];
-    const expIds = exps.map((e) => e.id);
-    const { data: sh } = expIds.length
-      ? await supabase.from("expense_shares").select("expense_id, user_id, guest_id, sponsor_user_id, share_cents").in("expense_id", expIds)
-      : { data: [] as any[] };
-    const { data: py } = expIds.length
-      ? await supabase.from("expense_payers").select("expense_id, user_id, guest_id, sponsor_user_id, paid_cents").in("expense_id", expIds)
-      : { data: [] as any[] };
+    // 210.4: every row, paged (a request stops at 1,000 rows). A failed read keeps the last good figure —
+    // it never shows "you owe nothing" from missing data.
+    let exp: any[], setl: any[], gg: any[], sh: any[], py: any[];
+    try {
+      [exp, setl, gg] = await Promise.all([
+        fetchAll<any>((from, to) => supabase.from("expenses").select("id, group_id, payer_user_id, amount_cents").in("group_id", gids).is("deleted_at", null).order("id").range(from, to)),
+        fetchAll<any>((from, to) => supabase.from("settlements").select("id, group_id, from_user_id, to_user_id, amount_cents, status").in("group_id", gids).order("id").range(from, to)),
+        fetchAll<any>((from, to) => supabase.from("group_guests").select("id, group_id, sponsor_user_id").in("group_id", gids).order("id").range(from, to)),
+      ]);
+      const ids = exp.map((e) => e.id);
+      [sh, py] = await Promise.all([fetchAllIn<any>(supabase, "expense_shares", "expense_id", ids), fetchAllIn<any>(supabase, "expense_payers", "expense_id", ids)]);
+    } catch { return; }
+    const exps = exp;
     const g2 = (o: Record<string, any[]>, k: string) => (o[k] || (o[k] = []));
     const expBy: Record<string, any[]> = {}; exps.forEach((e) => g2(expBy, e.group_id).push(e));
     const setlBy: Record<string, any[]> = {}; ((setl || []) as any[]).filter((x) => (x.status || "confirmed") === "confirmed").forEach((x) => g2(setlBy, x.group_id).push(x));

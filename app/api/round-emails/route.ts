@@ -34,6 +34,7 @@ export async function POST(req: Request) {
   const mail = nodemailer.createTransport({ service: "gmail", auth: { user, pass: pass.replace(/\s+/g, "") } });
   const clubEmails = await sendClubReportEmails(db, mail, user, appUrl);
 
+  // bounded: function returns at most p_limit (20)
   const { data: due, error } = await db.rpc("due_round_emails", { p_limit: 20 });
   if (error) return NextResponse.json({ error: error.message, reports, clubEmails }, { status: 502 });
   if (!due?.length) return NextResponse.json({ ok: true, sent: 0, reports, clubEmails });
@@ -43,6 +44,7 @@ export async function POST(req: Request) {
     try {
       const [{ data: round }, { data: holes }] = await Promise.all([
         db.from("rounds").select("*").eq("id", d.round_id).maybeSingle(),
+        // bounded: one round's holes (18 at most)
         db.from("holes").select("*").eq("round_id", d.round_id).order("hole_number"),
       ]);
       if (!round || !holes?.length) continue;
@@ -51,6 +53,7 @@ export async function POST(req: Request) {
       if (d.game_id) {
         const [{ data: game }, { data: players }] = await Promise.all([
           db.from("games").select("*").eq("id", d.game_id).maybeSingle(),
+          // bounded: one game's players
           db.from("game_players").select("*").eq("game_id", d.game_id),
         ]);
         // 209.5: a Cup session's email carries the Cup's standing (shared loader + lib/cup-standing).
@@ -96,6 +99,7 @@ async function publishClubReports(db: SupabaseClient): Promise<number> {
 
 /** Email published club reports to whoever receives them (the owner only while it's honed). */
 async function sendClubReportEmails(db: SupabaseClient, mail: ReturnType<typeof nodemailer.createTransport>, from: string, appUrl: string): Promise<{ sent: number; failed: number }> {
+  // bounded: function returns at most p_limit (20)
   const { data: due } = await db.rpc("due_club_report_emails", { p_limit: 20 });
   let sent = 0, failed = 0;
   for (const d of (due || []) as { report_id: string; user_id: string; email: string }[]) {

@@ -4,6 +4,7 @@
 // definition, so the summary can never disagree with the Dashboard. Entry points: a Dashboard card
 // (Dec 31 – Jan 31, until the account opens it), a row per finished season in Rounds, the Dec 31 notification (/?wrapped=YYYY),
 // and on staging a permanent preview.
+import { fetchAllIn } from "@/lib/fetch-all";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { C, type Round } from "@/lib/golf";
 import { btn, BottomSheet } from "@/components/ui";
@@ -27,9 +28,13 @@ async function loadSeason(year: number, rounds: Round[], userId: string, name: s
   let games: SeasonGame[] = [];
   if (keptGameIds.size) {
     const ids = Array.from(keptGameIds);
-    const { data: gs } = await supabase.from("games").select("id, game_type, played_at, allowance_pct, course_par, team_score_mode, holes_meta, pairings, foursomes, status").in("id", ids).eq("status", "ended");
-    const { data: gp } = await supabase.from("game_players").select("id, game_id, user_id, display_name, scores, course_handicap, handicap_index, slope, rating, course_handicap_source").in("game_id", ids);
-    games = (gs || []).map((g: any) => ({ ...g, players: (gp || []).filter((p: any) => p.game_id === g.id) }));
+    // 210.4: every row, paged and in id batches — a season's games and players outgrow one request.
+    let gs: any[] = [], gp: any[] = [];
+    try {
+      const gamesRead = fetchAllIn<any>(supabase, "games", "id", ids), playersRead = fetchAllIn<any>(supabase, "game_players", "game_id", ids);
+      gs = await gamesRead; gp = await playersRead;
+    } catch { gs = []; gp = []; }
+    games = gs.filter((g: any) => g.status === "ended").map((g: any) => ({ ...g, players: gp.filter((p: any) => p.game_id === g.id) }));
   }
   const { matches, playedWith } = seasonMatches(games, userId);
   let clubs: { name: string; totalRounds: number; members: number; myRounds: number; myRank: number | null }[] = [];

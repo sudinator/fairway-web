@@ -1,4 +1,5 @@
 "use client";
+import { rpcAll } from "@/lib/fetch-all";
 import { TeamColourDot } from "@/components/team-colour-dot";
 import { shortNamer } from "@/lib/short-names";
 import { balanceTeams, balanceSummary } from "@/lib/balance-teams";
@@ -407,7 +408,7 @@ function CreateGame({
       // hides other members' profiles rows from non-admins, collapsing the picker
       // to just yourself. Fall back to direct reads if the migration isn't applied.
       let rosterRows: any[] = [];
-      const rpc = await supabase.rpc("group_roster", { p_group: activeGroupId });
+      const rpc = await rpcAll(supabase, "group_roster", { p_group: activeGroupId }, "id");
       if (!rpc.error && Array.isArray(rpc.data)) {
         rosterRows = rpc.data;
       } else {
@@ -2653,9 +2654,11 @@ function GameRoom({
     if (!gid) { setEligibleMembers([]); return; }
     let cancelled = false;
     (async () => {
+      // bounded: one club's active members
       const { data: mem } = await supabase.from("group_members").select("user_id").eq("group_id", gid).eq("status", "active");
       const ids = (mem || []).map((r: any) => r.user_id).filter(Boolean);
       if (!ids.length) { if (!cancelled) setEligibleMembers([]); return; }
+      // bounded: one club's members
       const { data: profs } = await supabase.from("profiles").select("id, display_name, handicap_index").in("id", ids);
       const inGame = new Set(players.map((p) => p.user_id).filter(Boolean) as string[]);
       if (!cancelled) setEligibleMembers((profs || [])

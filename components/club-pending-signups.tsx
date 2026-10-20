@@ -2,6 +2,7 @@
 // "1 sign-up waiting" for a club's admins (208.0). Only possible duplicates who came through THIS club's
 // invite are shown here — sign-ups with no invite go to system admins only. Club admins may admit or reject;
 // merging a duplicate is a system-admin action.
+import { rpcAll } from "@/lib/fetch-all";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { C } from "@/lib/golf";
 import { btn } from "@/components/ui";
@@ -15,7 +16,7 @@ export function ClubPendingSignups({ groupId, groupName }: { groupId: string; gr
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const load = useCallback(async () => {
-    const { data } = await supabase.rpc("club_pending_signups", { p_group: groupId });
+    const { data } = await rpcAll(supabase, "club_pending_signups", { p_group: groupId }, "id");
     setRows((data || []) as Held[]);
   }, [supabase, groupId]);
   useEffect(() => { void load(); }, [load]);

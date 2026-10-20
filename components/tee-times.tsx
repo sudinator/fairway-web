@@ -1,4 +1,5 @@
 "use client";
+import { fetchAll, fetchAllIn, rpcAll } from "@/lib/fetch-all";
 import { shortNamer } from "@/lib/short-names";
 
 import React, { useEffect, useState, useCallback } from "react";
@@ -86,22 +87,27 @@ export function TeeTimes({ user, activeGroupId, activeGroupName, canManage, init
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data: tt } = await supabase.from("tee_times").select("*").eq("group_id", activeGroupId).order("play_date", { ascending: false });
-    const list = (tt || []) as TeeTime[];
+    // 210.4: paged — a club's tee times and RSVPs grow every week.
+    let tt: any[] = [];
+    try { tt = await fetchAll<any>((f, t) => supabase.from("tee_times").select("*").eq("group_id", activeGroupId).order("play_date", { ascending: false }).order("id").range(f, t)); } catch { tt = []; }
+    const list = tt as TeeTime[];
     setTees(list);
     // A tee time linked to a FINISHED game is done regardless of its date — a finalized game supersedes.
     const gameIds = Array.from(new Set(list.map((t) => t.game_id).filter(Boolean))) as string[];
     if (gameIds.length) {
-      const { data: gs } = await supabase.from("games").select("id, status").in("id", gameIds).eq("status", "ended");
-      setEndedGameIds(new Set(((gs || []) as any[]).map((g) => g.id)));
+      let gs: any[] = [];
+      try { gs = (await fetchAllIn<any>(supabase, "games", "id", gameIds)).filter((g: any) => g.status === "ended"); } catch { gs = []; }
+      setEndedGameIds(new Set(gs.map((g) => g.id)));
     } else setEndedGameIds(new Set());
     const ids = list.map((t) => t.id);
     if (ids.length) {
-      const { data: rs } = await supabase.from("tee_time_rsvps").select("*").in("tee_time_id", ids);
-      setRsvps((rs || []) as Rsvp[]);
+      let rs: any[] = [];
+      try { rs = await fetchAllIn<any>(supabase, "tee_time_rsvps", "tee_time_id", ids); } catch { rs = []; }
+      setRsvps(rs as Rsvp[]);
     } else setRsvps([]);
-    const rpc = await supabase.rpc("group_roster", { p_group: activeGroupId });
+    const rpc = await rpcAll(supabase, "group_roster", { p_group: activeGroupId }, "id");
     setMembers(((rpc.data as any[]) || []).map((m) => ({ id: m.id, display_name: m.display_name, avatar_url: m.avatar_url, handicap_index: m.handicap_index })));
+    // bounded: one club's course library
     const { data: fc } = await supabase.from("favorite_courses").select("name, data").eq("group_id", effectiveGroupId(activeGroupId));
     const cmap: Record<string, { slope: number; rating: number; par: number }> = {};
     (fc || []).forEach((row: any) => {
@@ -610,6 +616,7 @@ function CreateForm({ user, groupId, editing, existingSeqs, onCancel, onCreated 
 
   useEffect(() => {
     (async () => {
+      // bounded: one club's course library
       const { data } = await supabase.from("favorite_courses").select("name").eq("group_id", effectiveGroupId(groupId));
       const names = Array.from(new Set(((data as any[]) || []).map((c) => c.name).filter(Boolean)));
       setCourses(names);

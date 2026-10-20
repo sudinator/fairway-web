@@ -3,6 +3,7 @@
 // first, each summarised by the SAME comparison the review screen uses (buildFreshnessDiff), so a
 // change reads identically everywhere. Restore: site admins, a reason required, a confirmation that
 // names the clubs sharing the course; it creates a NEW version — history is never erased.
+import { fetchAll } from "@/lib/fetch-all";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { C } from "@/lib/golf";
 import { btn } from "@/components/ui";
@@ -28,11 +29,14 @@ export function CourseHistory({ courseId, clubs, canRestore, onRestored }: { cou
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
-    const { data, error } = await supabase.from("course_versions").select("version, data, source, actor, reason, ref, created_at, name").eq("course_id", courseId).order("version", { ascending: false });
-    if (error) { setErr("Couldn't load the history."); return; }
-    setRows((data || []) as Version[]);
+    // 210.4: paged — a course's history grows with every change.
+    let data: any[];
+    try { data = await fetchAll<any>((f, t) => supabase.from("course_versions").select("id, version, data, source, actor, reason, ref, created_at, name").eq("course_id", courseId).order("version", { ascending: false }).order("id").range(f, t)); }
+    catch { setErr("Couldn't load the history."); return; }
+    setRows(data as Version[]);
     const ids = Array.from(new Set((data || []).map((r: any) => r.actor).filter(Boolean)));
     if (ids.length) {
+      // bounded: the people named in one course's history
       const { data: ps } = await supabase.from("profiles").select("id, display_name").in("id", ids);
       setNames(Object.fromEntries((ps || []).map((p: any) => [p.id, p.display_name])));
     }

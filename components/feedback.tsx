@@ -1,4 +1,5 @@
 "use client";
+import { fetchAll } from "@/lib/fetch-all";
 import React, { useState, useEffect, useCallback } from "react";
 import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
@@ -141,8 +142,10 @@ export function AdminFeedbackTab() {
   const load = useCallback(async () => {
     setLoading(true);
     const supabase = createClient();
-    const { data } = await supabase.from("feedback").select("*").order("created_at", { ascending: false });
-    setRows((data as Row[]) || []);
+    // 210.4: paged — feedback accumulates.
+    let data: any[] = [];
+    try { data = await fetchAll<any>((f, t) => supabase.from("feedback").select("*").order("created_at", { ascending: false }).order("id").range(f, t)); } catch { data = []; }
+    setRows(data as Row[]);
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);

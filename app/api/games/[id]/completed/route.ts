@@ -33,7 +33,9 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   if (game.status !== "ended") return NextResponse.json({ announced: "not_ended" });
 
   const [{ data: players, error: pErr }, { data: alt, error: aErr }] = await Promise.all([
+    // bounded: one game's players
     supabase.from("game_players").select("*").eq("game_id", id),
+    // bounded: one game's alternate-shot scores (sides × 18 holes)
     supabase.from("game_alt_shot_scores").select("*").eq("game_id", id),
   ]);
   if (pErr || aErr) return NextResponse.json({ error: "Couldn't read the game's scores." }, { status: 502 });

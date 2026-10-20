@@ -11,6 +11,7 @@ import { allocateStrokes } from "@/lib/golf";
 import { chBasis } from "@/lib/game-shape";
 import { buildHighlights } from "@/lib/game-highlights";
 import { matchOutcomes } from "@/lib/match-outcomes";
+import { isValidRound, isFull18 as isFull18Card, handicapReading, countsForIndividualStats, holeScore } from "@/lib/round-rules";
 
 export type ReportPeriod = { key: string; label: string; from: string; to: string };   // dates YYYY-MM-DD inclusive
 export type ReportGame = { game: Game; players: Player[]; altScores?: AltShotScoreRow[] };
@@ -42,11 +43,10 @@ export function reportPeriods(year: number): ReportPeriod[] {
 // 210.2 — what counts as a round (owner, Oct 19; BNN's handicap rule, lib/golf adjustedGross):
 //   fewer than 9 holes with real scores → not a round (never scored / abandoned); 9+ → a valid round, even if it
 //   was marked complete early. Best gross / best net: complete 18-hole rounds only (owner: option A).
-const validHoles = (p: Player, nh: number) => (Array.isArray(p.scores) ? p.scores.slice(0, nh).filter((v) => v != null && Number(v) > 0).length : 0);
-const isRound = (p: Player, nh: number) => !p.no_show && validHoles(p, nh) >= Math.min(9, nh);
-const isFull18 = (p: Player, nh: number) => nh === 18 && validHoles(p, nh) === 18;
-/** A real handicap reading — a missing index is skipped, never read as 0. */
-const indexOf = (p: Player): number | null => { const v = (p as { handicap_index?: unknown }).handicap_index; if (v == null || v === "") return null; const n = Number(v); return isFinite(n) ? n : null; };
+// (210.5: the rules themselves live in lib/round-rules — one definition for every statistic.)
+const isRound = (p: Player, nh: number) => !p.no_show && isValidRound(p.scores, nh);
+const isFull18 = (p: Player, nh: number) => isFull18Card(p.scores, nh);
+const indexOf = (p: Player): number | null => handicapReading((p as { handicap_index?: unknown }).handicap_index);
 const weekOf = (d: string) => Math.floor((Date.parse(d + "T12:00:00Z") / 86400000 + 3) / 7);   // Monday-based week number
 
 export function buildClubReport(club: string, period: ReportPeriod, input: ReportGame[]): ClubReport {
@@ -69,14 +69,14 @@ export function buildClubReport(club: string, period: ReportPeriod, input: Repor
     const holes = (game.holes_meta || []).map((h: { n?: number; par: number; si?: number | null }, i: number) => ({ hole_number: h.n ?? i + 1, par: h.par, stroke_index: h.si ?? null }));
     // Alternate shot: the scores belong to the PAIR — the round counts (games, rounds, attendance, rivalries)
     // but feeds no individual scoring statistic. (210.2)
-    const individual = game.game_type !== "alt_shot";
+    const individual = countsForIndividualStats(game.game_type);
     for (const p of players) {
       if (!isRound(p, nh)) continue;
       rounds++;
       const uid = (p as { user_id?: string | null }).user_id ?? null;
       const who: Who = { name: p.display_name, userId: uid };
       const raw = (p.scores as (number | null)[]).slice(0, nh);
-      const scores = raw.map((v) => (v != null && Number(v) > 0 ? Number(v) : null));
+      const scores = raw.map(holeScore);
       const gross = scores.reduce<number>((a, b) => a + (b ?? 0), 0);
       // Whole-number course handicap — the recap's own rule (lib/game-highlights: Math.round(chBasis)).
       const ch = Math.round(Number(chBasis(p, game.course_par, nh >= 18 ? undefined : nh) ?? 0));

@@ -26,6 +26,7 @@ export function CourseChangePicker({ courseId, courseName, onDone }: {
     (async () => {
       const [{ data: d, error: e1 }, { data: u }] = await Promise.all([
         supabase.rpc("course_review_detail", { p_course_id: courseId }),
+        // bounded: one row per tee of one course
         supabase.rpc("course_tee_usage", { p_course_id: courseId, p_year: new Date().getFullYear() }),
       ]);
       if (!live) return;

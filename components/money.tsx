@@ -1,5 +1,6 @@
 "use client";
 
+import { fetchAll, fetchAllIn, rpcAll } from "@/lib/fetch-all";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { failureMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase";
@@ -53,34 +54,36 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     // from non-admins, collapsing the list to just yourself). Falls back to a direct query if
     // migration 0052 hasn't been run yet.
     let profs: any[] = [];
-    const rpc = await supabase.rpc("group_pay_roster", { p_group: gid });
+    const rpc = await rpcAll(supabase, "group_pay_roster", { p_group: gid }, "id");
     if (!rpc.error && rpc.data) {
       profs = rpc.data as any[];
     } else {
+      // bounded: one club's active members (fallback path)
       const { data: gm } = await supabase.from("group_members").select("user_id, status").eq("group_id", gid).eq("status", "active");
       const ids = (gm || []).map((m: any) => m.user_id).filter(Boolean);
       const { data: p2 } = ids.length
+        // bounded: one club's members
         ? await supabase.from("profiles").select("id, display_name, avatar_url, venmo_handle, paypal_handle, zelle_handle, phone").in("id", ids)
         : { data: [] as any[] };
       profs = p2 || [];
     }
     // 206.2 (follow-up 3): guests are balance-critical too — a share without its own sponsor is
     // charged to the guest's sponsor from this list, so a failed lookup would drop that debt.
-    const { data: gRows, error: guestErr } = await supabase.from("group_guests").select("id, name, sponsor_user_id, group_id, archived, became_member_id, source_game_id, created_by").eq("group_id", gid);
+    // 210.4: every row, paged — a request stops at 1,000 rows. A paging failure is a FAILED read (206.1 rule below).
+    const paged = async <T,>(read: () => Promise<T[]>): Promise<{ data: T[] | null; error: unknown }> => {
+      try { return { data: await read(), error: null }; } catch (e) { return { data: null, error: e || "read failed" }; }
+    };
+    const { data: gRows, error: guestErr } = await paged<any>(() => fetchAll<any>((f, t) => supabase.from("group_guests").select("id, name, sponsor_user_id, group_id, archived, became_member_id, source_game_id, created_by").eq("group_id", gid).order("id").range(f, t)));
     // 206.1 (review finding 5): a failed query is NOT "no rows". Every balance-critical query must
     // succeed, or nothing on screen is replaced — the last complete figures stay, a notice says the
     // refresh failed, and settling is blocked (requireOnline) until a complete refresh succeeds.
-    const { data: exp, error: expErr } = await supabase.from("expenses").select("*").eq("group_id", gid).is("deleted_at", null).order("created_at", { ascending: false });
-    const { data: delExp, error: delErr } = await supabase.from("expenses").select("*").eq("group_id", gid).not("deleted_at", "is", null).order("created_at", { ascending: false });
+    const { data: exp, error: expErr } = await paged<any>(() => fetchAll<any>((f, t) => supabase.from("expenses").select("*").eq("group_id", gid).is("deleted_at", null).order("created_at", { ascending: false }).order("id").range(f, t)));
+    const { data: delExp, error: delErr } = await paged<any>(() => fetchAll<any>((f, t) => supabase.from("expenses").select("*").eq("group_id", gid).not("deleted_at", "is", null).order("created_at", { ascending: false }).order("id").range(f, t)));
     const expIds = (exp || []).map((e: any) => e.id);
-    const { data: sh, error: shErr } = expIds.length
-      ? await supabase.from("expense_shares").select("*").in("expense_id", expIds)
-      : { data: [] as any[], error: null };
-    const { data: py, error: pyErr } = expIds.length
-      ? await supabase.from("expense_payers").select("*").in("expense_id", expIds)
-      : { data: [] as any[], error: null };
-    const { data: setl, error: setlErr } = await supabase.from("settlements").select("*").eq("group_id", gid);
-    const { data: alloc, error: allocErr } = await supabase.from("settlement_allocations").select("settlement_id, expense_id, amount_cents").eq("group_id", gid);
+    const { data: sh, error: shErr } = await paged<any>(() => fetchAllIn<any>(supabase, "expense_shares", "expense_id", expIds));
+    const { data: py, error: pyErr } = await paged<any>(() => fetchAllIn<any>(supabase, "expense_payers", "expense_id", expIds));
+    const { data: setl, error: setlErr } = await paged<any>(() => fetchAll<any>((f, t) => supabase.from("settlements").select("*").eq("group_id", gid).order("id").range(f, t)));
+    const { data: alloc, error: allocErr } = await paged<any>(() => fetchAll<any>((f, t) => supabase.from("settlement_allocations").select("id, settlement_id, expense_id, amount_cents").eq("group_id", gid).order("id").range(f, t)));
     const balanceErr = guestErr || expErr || shErr || pyErr || setlErr || allocErr;
     if (balanceErr) {
       setLoadError("Couldn't refresh the money ledger — showing the last complete figures. Settling is paused until it refreshes.");
@@ -89,8 +92,9 @@ export function MoneyTab({ user, activeGroup, onChanged, initialTab }: { user: {
     }
     if (!delErr) setDeletedExpenses((delExp || []) as ExpenseRow[]);
     const { data: act, error: actErr } = await supabase.from("group_activity").select("*").eq("group_id", gid).not("action", "like", "tt%").order("created_at", { ascending: false }).limit(200);
-    const { data: aud, error: audErr } = await supabase.from("money_audit").select("id, expense_id, actor_id, action, snapshot, created_at").eq("group_id", gid).order("created_at", { ascending: true }).limit(1000);
-    const { data: evs, error: evsErr } = await supabase.from("group_events").select("*").eq("group_id", gid).order("created_at", { ascending: false });
+    // 210.4: the whole audit trail, paged — the old oldest-first 1,000 cap would have dropped the NEWEST history.
+    const { data: aud, error: audErr } = await paged<any>(() => fetchAll<any>((f, t) => supabase.from("money_audit").select("id, expense_id, actor_id, action, snapshot, created_at").eq("group_id", gid).order("created_at", { ascending: true }).order("id").range(f, t)));
+    const { data: evs, error: evsErr } = await paged<any>(() => fetchAll<any>((f, t) => supabase.from("group_events").select("*").eq("group_id", gid).order("created_at", { ascending: false }).order("id").range(f, t)));
     setMembers((profs || []).map((p: any) => ({ id: p.id, display_name: p.display_name || "Player", avatar_url: p.avatar_url, venmo_handle: p.venmo_handle, paypal_handle: p.paypal_handle, zelle_handle: p.zelle_handle, phone: p.phone })).sort((a, b) => a.display_name.localeCompare(b.display_name, undefined, { sensitivity: "base" })));
     setGuests(((gRows || []) as GuestRow[]).sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })));
     // All balance-critical data arrived: replace it together.

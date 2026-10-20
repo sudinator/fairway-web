@@ -15,6 +15,7 @@
 // slope, tee names, external_id, the `corrected` flag, name/location/vetted are
 // never touched.
 
+import { fetchAll } from "@/lib/fetch-all";
 import React, { useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { C } from "@/lib/golf";
@@ -98,9 +99,10 @@ export function YardageBackfill() {
   async function preview() {
     setRunning(true); setApplied(false); setPlans(null);
     setLog(["Loading every saved course…"]);
-    const { data: rws, error } = await supabase.from("favorite_courses").select("id, name, external_id, data").order("name");
-    if (error) { addLog("Could not load courses: " + error.message); setRunning(false); return; }
-    const list = rws || [];
+    // 210.4: paged — every saved course, however many.
+    let list: any[];
+    try { list = await fetchAll<any>((f, t) => supabase.from("favorite_courses").select("id, name, external_id, data").order("name").order("id").range(f, t)); }
+    catch (e) { addLog("Could not load courses: " + (e instanceof Error ? e.message : String(e))); setRunning(false); return; }
     addLog(`Found ${list.length} courses. Looking up yardages…`);
     const out: CoursePlan[] = [];
     for (const row of list) {
@@ -169,9 +171,10 @@ export function YardageBackfill() {
   // ---------- EDITOR ----------
   async function loadRows() {
     setEMsg(null);
-    const { data, error } = await supabase.from("favorite_courses").select("id, name, external_id, data").order("name");
-    if (error) { setEMsg("Could not load courses: " + error.message); return; }
-    setRows((data || []).map((r: any) => ({ id: r.id, name: r.name, external_id: r.external_id, data: (r.data || {}) as Course })));
+    let data: any[];
+    try { data = await fetchAll<any>((f, t) => supabase.from("favorite_courses").select("id, name, external_id, data").order("name").order("id").range(f, t)); }
+    catch (e) { setEMsg("Could not load courses: " + (e instanceof Error ? e.message : String(e))); return; }
+    setRows(data.map((r: any) => ({ id: r.id, name: r.name, external_id: r.external_id, data: (r.data || {}) as Course })));
   }
 
   function selectCourse(id: string) {
