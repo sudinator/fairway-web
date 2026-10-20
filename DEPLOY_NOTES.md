@@ -1,3 +1,17 @@
+## 210.8.261019 — Club requests you can actually see and approve
+
+**The bug.** A club is visible only to its members and its creator — with no exception for system admins — so Admin's "Club requests" list read clubs directly and was ALWAYS empty for anyone else's request. Jigar Shukla's "PA-NJ golfers" (pending since Oct 20) was invisible to the owner. The old Approve / Decline buttons also didn't check for errors (they could notify "approved" after a failed update).
+
+**Fixed (0199).** admin_club_requests() shows system admins every pending request — the club, who asked, their email, when, their note; decide_club_request() approves (→ active) or declines (→ declined) and notifies the requester ("Your club "…" is approved — it's ready. Invite your group from the Clubs page."). Success is reported only when the database confirms it. **Admin → Club requests** is now a card at the top of Admin with a live count (also still in Player admin).
+
+**Enforced in the database.** A club created by anyone other than a system admin always starts pending (whatever the request says); only system admins change a club's status (a requester can't approve their own club); a club that isn't active can't create invites. The automatic "Main" club — an ACTIVE club created for an approved member with no club, which they ran and could rename and grow, skipping approval — is gone: a member joins by invite, or requests a club.
+
+**For the requester.** The Clubs page shows "Your club requests": "PA-NJ golfers — waiting for approval…" or "not approved", instead of nothing.
+
+Tests: ci/assert-club-requests.sql (reproduces the empty direct read; admin sees the request with requester and note; regular members can't list; asking for an active club gives a pending one; the requester can't approve their own club; a pending club can't invite; approve / decline save and notify; no double decisions).
+
+Deploy: staging 0199 → code; production 0199 → merge. Then Admin → Club requests → Approve.
+
 ## 210.7.261019 — Real formats in the tests; minimum samples and visible basis; review points 5 and 6
 
 **Messy data, real formats.** The production profile showed BNN's groups play match, skins, Stableford and Trifecta. lib/test-fixtures/messy-games.ts now includes Stableford (a shortened card, a one-score card, a blow-up hole, a guest), skins with carryover (every hole tied, an empty card, a shortened card, a guest) and Trifecta (a 12-hole player and an empty card inside a foursome); every statistics feature runs through them.

@@ -76,6 +76,14 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
   const [members, setMembers] = useState<Member[] | null>(null);
   const [newGroup, setNewGroup] = useState("");
   const [newNote, setNewNote] = useState("");
+  // 210.8: the member's own club requests and where they stand (a requester can always see their own club).
+  const [myRequests, setMyRequests] = useState<{ id: string; name: string; status: string }[]>([]);
+  const loadMyRequests = useCallback(async () => {
+    // bounded: one member's own club requests (a handful)
+    const { data } = await supabase.from("groups").select("id, name, status").eq("created_by", user.id).in("status", ["pending", "declined"]).order("created_at", { ascending: false });
+    setMyRequests((data || []) as { id: string; name: string; status: string }[]);
+  }, [supabase, user.id]);
+  useEffect(() => { void loadMyRequests(); }, [loadMyRequests]);
   const [renameText, setRenameText] = useState("");
   const [renaming, setRenaming] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
@@ -150,6 +158,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
       await logActivity(supabase, { actor_id: user.id, actor_name: user.email || "A member", action: "group_requested", summary: `Requested a new club "${name}"` });
       setNewGroup(""); setNewNote("");
       setMsg(`Request submitted for "${name}". An admin will review it — you'll be notified when it's approved.`);
+      void loadMyRequests();
     } catch (e: any) {
       setMsg(failureMessage("Couldn't submit request", e));
     } finally { setBusy(false); }
@@ -275,6 +284,17 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
       <div style={{ color: C.sage, fontSize: 12, marginTop: 8 }}>
         Clubs keep games, players, and shared courses limited to the people in that club. Your personal dashboard still includes your own rounds across every club.
       </div>
+
+      {myRequests.length ? (
+        <div data-my-club-requests style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 14 }}>
+          <Eyebrow>YOUR CLUB REQUESTS</Eyebrow>
+          {myRequests.map((r) => (
+            <div key={r.id} style={{ color: C.cream, fontSize: 14, marginTop: 8 }}>
+              <b>{r.name}</b> — <span style={{ color: r.status === "pending" ? C.gold : C.sage }}>{r.status === "pending" ? "waiting for approval. You'll be notified when it's approved — then you can invite your group." : "not approved."}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <div style={{ background: C.greenLight, borderRadius: 14, padding: 16, marginTop: 14 }}>
         <Eyebrow>REQUEST A NEW CLUB</Eyebrow>

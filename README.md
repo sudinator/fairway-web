@@ -1,3 +1,7 @@
+## 210.8.261019 — Club requests you can actually see and approve
+
+**The bug.** A club is visible only to its members and its creator — with no exception for system admins — so Admin's "Club requests" list read clubs directly and was ALWAYS empty for anyone else's request. Jigar Shukla's "PA-NJ golfers" (pending since Oct 20) was invisible to the owner. The old Approve / Decline buttons also didn't check for errors (they could notify "approved" after a failed update).
+
 ## 210.7.261019 — Real formats in the tests; minimum samples and visible basis; review points 5 and 6
 
 **Messy data, real formats.** The production profile showed BNN's groups play match, skins, Stableford and Trifecta. lib/test-fixtures/messy-games.ts now includes Stableford (a shortened card, a one-score card, a blow-up hole, a guest), skins with carryover (every hole tied, an empty card, a shortened card, a guest) and Trifecta (a 12-hole player and an empty card inside a foursome); every statistics feature runs through them.

@@ -147,6 +147,9 @@ psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-active-accounts.sql"
 
 # 0198: round emails never disappear; announcements can be retried.
 psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-email-announce.sql"
+
+# 0199: club requests.
+psql "$DB_URL" -X -v ON_ERROR_STOP=1 -f "$ROOT/ci/assert-club-requests.sql"
 psql "$DB_URL" -X -tA -c "select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p') order by 1" > /tmp/bnn_chain_tables.txt
 python3 - "$ROOT/ci/public_tables.json" /tmp/bnn_chain_tables.txt <<'PY'
 import json, sys
