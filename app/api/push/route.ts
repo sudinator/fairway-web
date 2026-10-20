@@ -29,6 +29,7 @@ const DEFAULT_DELIVERY: Record<string, "push" | "inapp" | "off"> = {
   signup_admitted: "push",  // 208.0 — the new member: you're in
   club_report: "push",      // 210.1 — your club's report (July 1 / October 1)
   club_decision: "push",    // 210.8 — your club request was approved / declined
+  support_visit: "push",    // 210.9 — a BNN admin looked in on your club (club admins)
 };
 
 function titleFor(type: string | null): string {
@@ -39,6 +40,7 @@ function titleFor(type: string | null): string {
     case "signup_admitted": return "You're in";
     case "club_report": return "Your club report is ready";
     case "club_decision": return "Your club request";
+    case "support_visit": return "A BNN admin looked in";
     case "course_change": return "Course data changed";
     case "money_owed": return "You owe money";
     case "money_paid": return "You got paid";

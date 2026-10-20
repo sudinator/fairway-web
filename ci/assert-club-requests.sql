@@ -44,6 +44,9 @@ begin
   perform set_config('request.jwt.claim.sub', '', true);
   if (select status from groups where id = g1) is distinct from 'active' or (select status from groups where id = g2) is distinct from 'declined' then raise exception 'decisions not saved'; end if;
   if (select count(*) from notifications where user_id = req and type = 'club_decision') <> 2 then raise exception 'the requester was not notified of both decisions'; end if;
+  -- 210.10: the approval opens Clubs WITH that club; the decline opens Clubs
+  if not exists (select 1 from notifications where user_id = req and type = 'club_decision' and link = '/?tab=groups&club=' || g1::text) then raise exception 'the approval notification does not open the approved club'; end if;
+  if not exists (select 1 from notifications where user_id = req and type = 'club_decision' and link = '/?tab=groups') then raise exception 'the decline notification does not open Clubs'; end if;
 
   delete from notifications where user_id in (adm, req, other); delete from group_invites where created_by in (adm, req, other);
   delete from group_members where user_id in (adm, req, other); delete from groups where created_by in (adm, req, other);

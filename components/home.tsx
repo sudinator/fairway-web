@@ -1,4 +1,5 @@
 "use client";
+import { parseAppLink } from "@/lib/app-links";
 import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 import { prepareRound } from "@/lib/round-prep";
 import { SeasonWrappedEntry } from "@/components/season-wrapped";
@@ -251,15 +252,21 @@ export function Home({ session }: { session: any }) {
     try { const v = typeof window !== "undefined" ? localStorage.getItem("bnn_dl_tt") : null; if (v) localStorage.removeItem("bnn_dl_tt"); return v; } catch { return null; }
   });
   useEffect(() => { if (deepTeeId) setTab("teetimes"); }, [deepTeeId]);
+  // 210.10: a notification about a club (approved, its report…) links /?tab=groups&club=<id> — refresh the member's
+  // clubs (a just-approved club isn't in the list yet), select that club, and open Clubs.
+  const [deepClubId, setDeepClubId] = useState<string | null>(null);
+  // Remembered until that club is actually selected — so the app's own startup load of clubs (which may finish
+  // after the deep link's refresh) can't put the member back on their usual club.
+  const pendingClubRef = useRef<string | null>(null);
 
   // Deep link from a notification (/?tab=money|games|teetimes…): open that tab once.
   useEffect(() => {
     try {
-      const t = new URLSearchParams(window.location.search).get("tab");
-      const allowed = ["dashboard", "rounds", "games", "courses", "players", "groups", "admin", "help", "profile", "money", "teetimes", "notifications"];
-      if (t && allowed.includes(t)) {
-        setTab(t as Tab);
-        const url = new URL(window.location.href); url.searchParams.delete("tab");
+      const l = parseAppLink(window.location.search);   // lib/app-links — the same reading as an in-app tap
+      if (l.club) setDeepClubId(l.club);
+      if (l.tab) setTab(l.tab as Tab);
+      if (l.tab || l.club) {
+        const url = new URL(window.location.href); url.searchParams.delete("tab"); url.searchParams.delete("club");
         window.history.replaceState({}, "", url.pathname + url.search);
       }
     } catch { /* ignore */ }
@@ -270,19 +277,13 @@ export function Home({ session }: { session: any }) {
   const navigateFromNotif = (link?: string | null) => {
     if (!link) return;
     try {
-      const q = new URLSearchParams(link.includes("?") ? link.slice(link.indexOf("?") + 1) : "");
-      const tt = q.get("tt");
-      const t = q.get("tab");
-      const gcode = q.get("game");
-      const wy = Number(q.get("wrapped"));
+      const l = parseAppLink(link);   // lib/app-links — the same reading as opening from a phone notification
       setStage(null); setViewing(null); setMoreOpen(false); setReturnTab(null);
-      if (wy > 2000 && wy < 3000) { setWrappedYear(wy); setTab("dashboard"); }
-      else if (gcode && /^\d{6}$/.test(gcode)) { setDeepGameCode(gcode); setTab("games"); }
-      else if (tt) { setDeepTeeId(tt); setTab("teetimes"); }
-      else if (t) {
-        const allowed = ["dashboard", "rounds", "games", "courses", "players", "groups", "admin", "help", "profile", "money", "teetimes", "notifications"];
-        if (allowed.includes(t)) setTab(t as Tab);
-      }
+      if (l.club) { setDeepClubId(l.club); setTab("groups"); }
+      else if (l.wrapped) { setWrappedYear(l.wrapped); setTab("dashboard"); }
+      else if (l.game) { setDeepGameCode(l.game); setTab("games"); }
+      else if (l.teeTime) { setDeepTeeId(l.teeTime); setTab("teetimes"); }
+      else if (l.tab) setTab(l.tab as Tab);
     } catch { /* ignore malformed links */ }
   };
 
@@ -433,7 +434,8 @@ export function Home({ session }: { session: any }) {
     }
 
     setGroups(list);
-    const preferred = preferId ?? profile?.active_group_id ?? null;
+    const preferred = preferId ?? pendingClubRef.current ?? profile?.active_group_id ?? null;
+    if (pendingClubRef.current && list.some((g) => g.id === pendingClubRef.current)) pendingClubRef.current = null;   // selected now
     const next = (preferred && list.some((g) => g.id === preferred)) ? preferred : list[0]?.id || null;
     setActiveGroupId(next);
     saveAppBootCache({ groups: list, activeGroupId: next });
@@ -443,6 +445,13 @@ export function Home({ session }: { session: any }) {
     }
     setGroupsLoading(false);
   }, [activateEmailInvites, user.id, user.email, profile?.active_group_id, profile?.account_status]);
+  useEffect(() => {
+    if (!deepClubId || !user?.id) return;
+    const id = deepClubId;
+    pendingClubRef.current = id;
+    setDeepClubId(null);
+    void loadGroups(id).then(() => setTab("groups"));
+  }, [deepClubId, user?.id, loadGroups]);
 
   // Load (or create) this user's profile: display name, handicap index, GHIN number.
   const loadProfile = useCallback(async () => {
