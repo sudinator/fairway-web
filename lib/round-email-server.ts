@@ -7,6 +7,7 @@ import { chBasis, pkey } from "@/lib/game-shape";
 import type { Game, Player } from "@/lib/game-types";
 import type { EmailGameContext } from "@/lib/round-email";
 import type { CupLine } from "@/lib/cup-standing";
+import { isFullCard } from "@/lib/round-rules";
 
 /** The member's game context: the group's result, their line, their net position, their standout. */
 export function gameContextFor(game: Game, players: Player[], userId: string, cup?: CupLine | null): { context: EmailGameContext; groupHtml: string } | null {
@@ -15,7 +16,7 @@ export function gameContextFor(game: Game, players: Player[], userId: string, cu
   const recap = buildRecap(game, players);
   const nh = Array.isArray(game.holes_meta) ? game.holes_meta.length : 18;
   // Net position among finishers, on the full course handicap (the recap's standing rule).
-  const nets = players.filter((p) => !p.no_show && Array.isArray(p.scores) && p.scores.slice(0, nh).every((v) => v != null && Number(v) > 0))
+  const nets = players.filter((p) => !p.no_show && isFullCard(p.scores, nh))
     .map((p) => ({ key: pkey(p), net: (p.scores as number[]).slice(0, nh).reduce((a, b) => a + Number(b), 0) - Math.round(Number(chBasis(p as any, game.course_par, nh >= 18 ? undefined : nh) ?? 0)) }));
   const mine = nets.find((x) => x.key === pkey(me));
   const position = mine ? { rank: 1 + nets.filter((x) => x.net < mine.net).length, of: nets.length } : null;

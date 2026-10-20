@@ -33,6 +33,8 @@
     "lib/club-report-render.test.tsx",
     "lib/fetch-all.test.ts",
     "lib/head-to-head-render.test.tsx",
+    "lib/messy-data.test.ts",
+    "lib/test-fixtures/messy-games.ts",
     "components/head-to-head.tsx",
     "components/team-colour-dot.tsx",
     "lib/standout-watch.test.ts",

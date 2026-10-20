@@ -92,6 +92,7 @@ export function ScoreHistory({ gameId }: { gameId: string }) {
     const next = !open; setOpen(next);
     if (next && rows === null) {
       setLoading(true);
+      // bounded: function returns at most 1,000 (latest edits, by design)
       const { data } = await supabase.rpc("admin_score_audit", { p_game: gameId });
       setRows(Array.isArray(data) ? data : []);
       setLoading(false);

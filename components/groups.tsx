@@ -97,6 +97,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
     const ids = rows.map((m) => m.user_id).filter(Boolean) as string[];
     let profilesById: Record<string, any> = {};
     if (ids.length) {
+      // bounded: one club's members
       const { data: profs } = await supabase.from("profiles").select("id, display_name, handicap_index, phone, ghin_number, avatar_url").in("id", ids);
       profilesById = Object.fromEntries((profs || []).map((p: any) => [p.id, p]));
     }
@@ -132,6 +133,7 @@ export function GroupsPanel({ user, groups, activeGroupId, onGroupsChanged, onAc
       });
       if (mErr) throw mErr;
       // Notify every app admin that a request is waiting.
+      // bounded: system admins (a handful)
       const { data: admins } = await supabase.from("profiles").select("id").eq("is_admin", true);
       const { data: meProf } = await supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
       const requester = (meProf?.display_name || "").trim() || (user.email || "").split("@")[0] || "A member";

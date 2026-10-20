@@ -12,6 +12,10 @@ how anything works, **open the file and read it** — never answer from assumpti
 - RULE: guards are judged by the account/data affected, never by current_user (definer functions run as owner) and never by a session flag.
 - RULE: account changes are server functions that refuse out loud; no browser-side multi-step deletes.
 - STAGING: deliberately sends no push notifications — no notifications webhook in staging's Supabase (owner, Oct 2026). Not a fault; don't "fix" it.
+- RULE: statistics code decides what a round is ONLY through lib/round-rules (ci/check_round_rules.py).
+- RULE: every statistics feature runs through lib/test-fixtures/messy-games (lib/messy-data.test.ts) — add a case when real data surprises us.
+- RULE: before a statistics feature ships, the owner runs docs/sql/data_profile.sql on production and we review it together.
+- RULE: every list read goes through lib/fetch-all (fetchAll / fetchAllIn / rpcAll) or carries `// bounded: <why>` — Supabase caps a request at 1,000 rows (ci/check_paged_reads.py).
 - RULE: a new directly-writable table gets the guard_active_account trigger (0197) — pending / suspended accounts must not write directly.
 - RULE: never test a refusal by CALLING a function an app role lacks EXECUTE on — it crashes Supabase PG 17.6 ≤ 17.6.1.111 (supautils). Check has_function_privilege instead.
 

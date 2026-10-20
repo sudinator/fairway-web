@@ -1,4 +1,5 @@
 "use client";
+import { rpcAll } from "@/lib/fetch-all";
 import { TeamColourDot } from "@/components/team-colour-dot";
 import { shortNamer } from "@/lib/short-names";
 import { isStagingClient } from "@/lib/auto-score";
@@ -826,9 +827,10 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
     (async () => {
       // Member-safe roster (SECURITY DEFINER) first, mirroring the Money tab; fall
       // back to a direct read only if the RPC returns nothing.
-      const rpc = await supabase.rpc("group_pay_roster", { p_group: game.group_id });
+      const rpc = await rpcAll(supabase, "group_pay_roster", { p_group: game.group_id }, "id");
       let ids: string[] = ((rpc.data as any[]) || []).map((r) => r.id).filter(Boolean);
       if (!ids.length) {
+        // bounded: one club's active members
         const { data: mem } = await supabase.from("group_members").select("user_id").eq("group_id", game.group_id).eq("status", "active");
         ids = (mem || []).map((m: any) => m.user_id).filter(Boolean);
       }
@@ -839,7 +841,9 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
       if (alive && exp) {
         setPostedExpense({ id: exp.id, created_at: exp.created_at });
         const [{ data: pys }, { data: shs }] = await Promise.all([
+          // bounded: one expense's payers
           supabase.from("expense_payers").select("user_id, guest_id, sponsor_user_id, paid_cents").eq("expense_id", exp.id),
+          // bounded: one expense's shares
           supabase.from("expense_shares").select("user_id, guest_id, sponsor_user_id, share_cents").eq("expense_id", exp.id),
         ]);
         const nets: Record<string, number> = {};
@@ -942,6 +946,7 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
       const { data: betEventId, error: eventErr } = await supabase.rpc("ensure_game_event", { p_game: game.id });
       if (eventErr) { setPostMsg("Couldn't create the Money event — please try again."); setBusy(false); return; }
       const rows = rpcBetRows(post);
+      // bounded: returns the one expense it saved
       const { data, error } = await supabase.rpc("save_bet_expense_atomic", {
         p_replace_expense: null, p_group: game.group_id, p_game: game.id, p_event: betEventId ?? null,
         p_description: desc, p_amount_cents: post.amount_cents, ...rows,
@@ -960,6 +965,7 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
     setBusy(true); setPostMsg(null);
     try {
       const uids = bettorIds.map((id) => idToUser[id]).filter(Boolean) as string[];
+      // bounded: one club's settlements since this game's bet was posted
       const { data: setl } = await supabase.from("settlements").select("from_user_id, to_user_id, amount_cents, method, created_at").eq("group_id", game.group_id).gte("created_at", postedExpense.created_at);
       const relevant = (setl || []).filter((s: any) => uids.includes(s.from_user_id) || uids.includes(s.to_user_id));
       const nameOf = (uid: string) => players.find((p) => p.user_id === uid)?.display_name || "someone";
@@ -1041,6 +1047,7 @@ export function BettingPanel({ players, playerPoints, playerHoles, ended, game, 
       const { data: betEventId2, error: eventErr } = await supabase.rpc("ensure_game_event", { p_game: game.id });
       if (eventErr) { setPostMsg("Couldn't create the Money event — nothing was changed."); setBusy(false); return; }
       const rows = rpcBetRows(post);
+      // bounded: returns the one expense it saved
       const { data, error } = await supabase.rpc("save_bet_expense_atomic", {
         p_replace_expense: postedExpense.id, p_group: game.group_id, p_game: game.id, p_event: betEventId2 ?? null,
         p_description: desc, p_amount_cents: post.amount_cents, ...rows,

@@ -85,11 +85,13 @@ export function buildCustomCourse(name: string, location: string, par: number, r
 // Group ↔ course is many-to-many via the group_courses link table.
 // Returns the favorite_courses rows linked to a given group (one shared record per course).
 export async function loadCoursesForGroup(supabase: any, groupId: string): Promise<any[]> {
+  // bounded: one club's course library
   const { data: links, error: linksError } = await supabase.from("group_courses").select("course_id").eq("group_id", groupId);
   if (linksError) throw linksError;
   const ids = (links || []).map((l: any) => l.course_id).filter(Boolean);
   if (!ids.length) return [];
 
+  // bounded: one club's course library
   const { data, error: coursesError } = await supabase.from("favorite_courses").select("*").in("id", ids);
   if (coursesError) throw coursesError;
   const rows = (data || []).filter((f: any) => !f.deleted);

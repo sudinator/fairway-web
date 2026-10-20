@@ -5,6 +5,7 @@
 //   member who leaves / misbehaves → SUSPEND (history kept; nobody's balances change)
 //   account with no activity at all → REMOVE
 // Every decision is made by a server function that refuses out loud; this screen shows what it says.
+import { rpcAll } from "@/lib/fetch-all";
 import React, { useEffect, useMemo, useState } from "react";
 import { C } from "@/lib/golf";
 import { btn, inputStyle } from "@/components/ui";
@@ -43,7 +44,7 @@ export function AdminPlayers({ user, isOwner }: { user: { id: string }; isOwner?
 
   const load = async () => {
     const [{ data: u, error: uErr }, { data: p }, { data: g }] = await Promise.all([
-      supabase.rpc("admin_list_users"), supabase.rpc("admin_pending_signups"),
+      rpcAll(supabase, "admin_list_users", undefined, "id"), rpcAll(supabase, "admin_pending_signups", undefined, "id"),
       supabase.from("groups").select("id, name").eq("status", "active").order("name"),
     ]);
     if (uErr) { alert(`Couldn't load players: ${uErr.message}`); return; }

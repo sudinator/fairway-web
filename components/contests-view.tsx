@@ -45,12 +45,14 @@ export function ContestsSection({
   const allHoles = useMemo(() => holesMeta.map((h) => h.n), [holesMeta]);
 
   const load = async () => {
+    // bounded: one game's contests
     const { data: cs, error: e1 } = await supabase.from("game_contests").select("*").eq("game_id", gameId);
     if (e1) { setErr(failureMessage("Couldn't load that", e1)); setLoading(false); return; }
     const list = (cs || []) as Contest[];
     list.sort((a, b) => a.created_at! < b.created_at! ? -1 : 1);
     setContests(list);
     if (list.length) {
+      // bounded: one game's contest entries
       const { data: es } = await supabase.from("game_contest_entries").select("*").in("contest_id", list.map((c) => c.id));
       setEntries((es || []) as ContestEntry[]);
     } else setEntries([]);
@@ -346,9 +348,11 @@ export function ContestHoleChip({ gameId, hole, players, userId, myName, canLogO
   const [openId, setOpenId] = useState<string | null>(null);
 
   const load = async () => {
+    // bounded: one game's contests
     const { data: cs } = await supabase.from("game_contests").select("*").eq("game_id", gameId);
     const apply = ((cs || []) as Contest[]).filter((c) => c.holes.includes(hole));
     if (!apply.length) { setRows([]); return; }
+    // bounded: one game's contest entries
     const { data: es } = await supabase.from("game_contest_entries").select("*").in("contest_id", apply.map((c) => c.id));
     const all = (es || []) as ContestEntry[];
     setRows(apply.map((c) => ({ contest: c, entries: all.filter((e) => e.contest_id === c.id) })));

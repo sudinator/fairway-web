@@ -12,5 +12,8 @@ import { fetchAll } from "./fetch-all";
   let threw = false;
   try { await fetchAll<number>(async (from) => (from === 0 ? { data: rows.slice(0, 1000), error: null } : { data: null, error: { message: "timeout" } })); } catch { threw = true; }
   eq(threw, true, "an error on a later page throws — never a silent partial result");
+  let stopped = false;
+  try { await fetchAll<number>(async () => ({ data: rows.slice(0, 1000), error: null })); } catch (e) { stopped = String(e).includes("not honouring paging"); }
+  eq(stopped, true, "a source that ignores paging stops with an error instead of looping forever");
   console.log("fetch-all tests passed");
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -12,6 +12,7 @@ export async function loadCupForGame(db: SupabaseClient, gameId: string): Promis
   if (!link?.competition_id) return null;
   const [cRes, sRes] = await Promise.all([
     db.from("competitions").select("*").eq("id", link.competition_id).maybeSingle(),
+    // bounded: one Cup's sessions
     db.from("competition_sessions").select("*").eq("competition_id", link.competition_id).order("session_order"),
   ]);
   if (cRes.error || sRes.error || !cRes.data) return null;

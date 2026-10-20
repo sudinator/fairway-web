@@ -10,6 +10,7 @@ import { membersOf, altShotInputsFor, playerLookup } from "@/lib/game-results";
 import { rankTies, type Ranked, type Highlights } from "@/lib/game-highlights";
 import type { AltShotScoreRow } from "@/lib/alt-shot-side-scores";
 import type { Game, Player } from "@/lib/game-types";
+import { isFullCard } from "@/lib/round-rules";
 
 export type MatchRow = { winners: string[]; losers: string[]; result: string; team: string | null; halved: boolean; lead: number; thru: number };
 export type SkinRow = { name: string; holes: { n: number; value: number }[]; skins: number };
@@ -110,7 +111,7 @@ export function buildRecapSections(game: Game, players: Player[], altShotScores:
         if (!st.thru) return;
         const res = (st as any).result || (Math.abs(st.lead) > holes - st.thru ? `${Math.abs(st.lead)} & ${holes - st.thru}` : `${Math.abs(st.lead)} UP`);
         rows.push(toRow(aN, bN, teamA, st.lead, st.thru, res));
-        const g = (x: (number | null)[]) => x.every((v) => v != null) ? (x as number[]).reduce((s, v) => s + v, 0) : null;
+        const g = (x: (number | null)[]) => isFullCard(x, x.length) ? (x as number[]).reduce((s, v) => s + v, 0) : null;
         const ag = g(alt.a.gross as never), bg = g(alt.b.gross as never);
         if (ag != null) pairScores.push({ names: aN, gross: ag, net: ag - Math.round(alt.a.chs[0] as number) });
         if (bg != null) pairScores.push({ names: bN, gross: bg, net: bg - Math.round(alt.b.chs[0] as number) });

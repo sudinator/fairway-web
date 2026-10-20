@@ -1,5 +1,6 @@
 "use client";
 
+import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 import { useScoringDevice } from "@/components/scoring-device";
 import { isPrimaryScoringDevice } from "@/lib/scoring-device";
 import React, { useEffect, useState, useCallback, useRef } from "react";
@@ -372,10 +373,14 @@ export function RoundSetup({ index, saveIndex, activeGroupId, activeGroupName, o
       const { data: au } = await supabase.auth.getUser();
       const uid = au?.user?.id;
       if (uid) {
-        const { data: gp } = await supabase.from("game_players").select("game_id").eq("user_id", uid);
-        const ids = Array.from(new Set((gp || []).map((r: any) => r.game_id).filter(Boolean)));
+        // 210.4: paged — every game a player has ever been in outgrows one request.
+        let gp: any[] = [];
+        try { gp = await fetchAll<any>((f, t) => supabase.from("game_players").select("game_id, id").eq("user_id", uid).order("id").range(f, t)); } catch { gp = []; }
+        const ids = Array.from(new Set(gp.map((r: any) => r.game_id).filter(Boolean))) as string[];
         if (ids.length) {
-          const { data: gs } = await supabase.from("games").select("id, name, course, status").in("id", ids).neq("status", "ended");
+          let all: any[] = [];
+          try { all = await fetchAllIn<any>(supabase, "games", "id", ids); } catch { all = []; }
+          const gs = all.filter((g: any) => g.status !== "ended");
           const norm = (s: string) => (s || "").trim().toLowerCase();
           const label = courseLabel(picked);
           const match = (gs || []).find((g: any) => norm(g.course) === norm(label));

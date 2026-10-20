@@ -54,6 +54,7 @@ export function OrganizerConsole({ gameId }: { gameId: string }) {
     setLoadErr(null);
     const { data: g, error: ge } = await supabase.from("games").select("*").eq("id", gameId).single();
     if (ge || !g) { setLoadErr("Couldn't load that game. Check the link, or that you're signed in as an organizer."); setLoading(false); return; }
+    // bounded: one game's players
     const { data: ps } = await supabase.from("game_players").select("*").eq("game_id", gameId).order("display_name", { ascending: true });
     setGame(g as any);
     setPlayers(((ps as any[]) || []) as GP[]);

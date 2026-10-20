@@ -6,6 +6,7 @@
 import { allocateStrokes } from "@/lib/golf";
 import { pkey, chBasis } from "@/lib/game-shape";
 import type { Game, Player } from "@/lib/game-types";
+import { holeScore, isFullCard } from "@/lib/round-rules";
 
 export type Ranked<T> = { pos: string; item: T }[];
 export type NetBirdieRow = { key: string; name: string; birdies: number; eagles: number };
@@ -82,8 +83,8 @@ export function buildHighlights(game: Game, players: Player[]): Highlights {
   const holes = (game.holes_meta || []) as { n: number; par: number; si: number | null }[];
   const nh = holes.length;
   const live = players.filter((p) => !p.no_show);
-  const played = (p: Player, i: number) => { const x = (p.scores || [])[i]; return typeof x === "number" && x > 0 ? x : null; };
-  const finishers = live.filter((p) => holes.every((_, i) => played(p, i) != null));
+  const played = (p: Player, i: number) => holeScore((p.scores || [])[i]);
+  const finishers = live.filter((p) => isFullCard(p.scores, holes.length));
   const gross = (p: Player) => holes.reduce((s, _, i) => s + (played(p, i) || 0), 0);
   // Through chBasis: honours manual course-handicap overrides (0153) exactly as the match engines do.
   const ch = (p: Player) => Math.round(Number(chBasis(p, game.course_par, nh) ?? 0));

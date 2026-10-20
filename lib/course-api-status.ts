@@ -72,7 +72,7 @@ export async function loadCourseApiStatus(client: Client, providerIds: Array<str
   const out = new Map<string, CourseApiStatusRow>();
   if (!ids.length) return out;
   try {
-    const { data, error } = await client.rpc("course_api_status", { p_provider_ids: ids });
+    const { data, error } = await client.rpc("course_api_status", { p_provider_ids: ids }); // bounded: one row per provider id passed in (the courses on screen)
     if (error || !Array.isArray(data)) return out;
     for (const r of data as CourseApiStatusRow[]) if (r?.provider_id) out.set(r.provider_id, r);
   } catch { /* fall through: empty map */ }

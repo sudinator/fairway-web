@@ -1,5 +1,6 @@
 "use client";
 
+import { fetchAll, fetchAllIn, rpcAll } from "@/lib/fetch-all";
 import { useScoringDevice } from "@/components/scoring-device";
 import { isPrimaryScoringDevice } from "@/lib/scoring-device";
 import React, { useEffect, useState, useCallback } from "react";
@@ -139,6 +140,7 @@ function PushToggle({ user, profile }: { user: any; profile: any }) {
   // Apple/Google accepted it — the device shows it within seconds unless Focus/Do Not Disturb holds it.
   const [testing, setTesting] = useState(false);
   const [myLog, setMyLog] = useState<Array<{ at: string; type: string | null; delivery: string; endpoints: number; sent: number; failed: number; result: string | null }> | null>(null);
+  // bounded: function returns at most 50 (latest deliveries)
   const loadMyLog = useCallback(async () => { try { const { data } = await supabase.rpc("my_push_delivery_log", { p_limit: 8 }); setMyLog((data || []) as any); } catch { setMyLog([]); } }, []);
   useEffect(() => { void loadMyLog(); }, [loadMyLog]);
   useEffect(() => {
@@ -591,8 +593,8 @@ function StatDrawerHost() {
       setPayload(p); setOpen(true); setRows(null); setErr(null);
       // push_* stats come from admin_push_devices (0170), same row shape; everything else from the shared engine.
       const call = p.stat.startsWith("push_")
-        ? supabase.rpc("admin_push_devices", { p_kind: p.stat })
-        : supabase.rpc("admin_stat_users", { p_stat: p.stat, p_arg: p.arg ?? null, p_date: p.date ?? null });
+        ? rpcAll(supabase, "admin_push_devices", { p_kind: p.stat }, ["name", "detail", "tag"])
+        : rpcAll(supabase, "admin_stat_users", { p_stat: p.stat, p_arg: p.arg ?? null, p_date: p.date ?? null }, ["name", "detail", "tag"]);
       call.then(({ data, error }: any) => { if (error) setErr(failureMessage("Couldn't stat drawer host", error)); else setRows(data || []); });
     };
     return () => { _openDrill = null; };
@@ -740,6 +742,7 @@ function AdminPowerUsers() {
 
   useEffect(() => {
     setRows(null); setErr(null);
+    // bounded: function returns the top 25
     supabase.rpc("get_power_users", { p_days: days }).then(({ data, error }: any) => {
       if (error) setErr(failureMessage("Couldn't save the entry", error)); else setRows(data || []);
     });
@@ -750,9 +753,9 @@ function AdminPowerUsers() {
   useEffect(() => {
     const ids = (rows || []).map((r: any) => r.user_id).filter(Boolean);
     if (!ids.length) return;
-    supabase.from("profiles").select("id, avatar_url").in("id", ids).then(({ data }: any) => {
+    fetchAllIn<any>(supabase, "profiles", "id", ids).then((data: any) => {
       if (data) setAvatars(Object.fromEntries(data.map((p: any) => [p.id, p.avatar_url ?? null])));
-    });
+    }).catch(() => { /* avatars are decoration — a failed load just shows initials */ });
   }, [rows]);
 
   const sorted = React.useMemo(() => {
@@ -990,7 +993,7 @@ function OpsMetrics() {
     supabase.rpc("get_ops_metrics").then(({ data, error }: any) => {
       if (error) setErr(failureMessage("Couldn't load these figures", error)); else setM(data);
     });
-    supabase.rpc("admin_stale_games").then(({ data }: any) => {
+    rpcAll(supabase, "admin_stale_games", undefined, "game_id").then(({ data }: any) => {
       if (Array.isArray(data)) setSg(data);
     }, () => {});
   }, []);
@@ -1123,6 +1126,7 @@ function AdminGamesOversight({ onOpenGame }: { onOpenGame: (gameId: string) => v
   const load = useCallback(async (query = appliedSearch, nextStatus = status) => {
     setLoading(true);
     setErr(null);
+    // bounded: function returns at most the requested page (v_limit)
     const { data, error } = await supabase.rpc("admin_game_oversight", {
       p_search: query.trim() || null,
       p_status: nextStatus,
@@ -1317,7 +1321,7 @@ function AdminCourseData({ onOpenCourses }: { onOpenCourses?: () => void }) {
   const [flash, setFlash] = useState<Record<string, string>>({});
   const [open, setOpen] = useState<Record<string, { diff: FreshnessDiff | null; log: CheckLogRow[] | null }>>({});
   const load = useCallback(async () => {
-    const { data, error } = await supabase.rpc("admin_course_status");
+    const { data, error } = await rpcAll(supabase, "admin_course_status", undefined, "course_id");
     if (error) { setErr(error.message); setRows([]); return; }
     setRows((data || []) as AdminCourseRow[]);
   }, []);
@@ -1347,6 +1351,7 @@ function AdminCourseData({ onOpenCourses }: { onOpenCourses?: () => void }) {
     if (open[r.course_id] && !keepOpen) { setOpen((o) => { const n = { ...o }; delete n[r.course_id]; return n; }); return; }
     const [{ data: cf }, { data: log }] = await Promise.all([
       supabase.from("course_freshness").select("diff, has_changes, status, revision").eq("course_id", r.course_id).maybeSingle(),
+      // bounded: function returns at most 100 (latest checks)
       r.provider_id ? supabase.rpc("admin_course_check_log", { p_provider_id: r.provider_id, p_limit: 20 }) : Promise.resolve({ data: [] as CheckLogRow[] }),
     ]);
     // The revision shown here is the one an approval applies (0183): what the admin saw, nothing newer.
@@ -1466,6 +1471,7 @@ function AdminCourseData({ onOpenCourses }: { onOpenCourses?: () => void }) {
 function AdminPushDeliveries() {
   const [rows, setRows] = useState<Array<{ at: string; user_name: string; type: string | null; delivery: string; endpoints: number; sent: number; failed: number; result: string | null }> | null>(null);
   const [show, setShow] = useState(false);
+  // bounded: function returns at most 200 (latest deliveries)
   useEffect(() => { if (!show) return; supabase.rpc("admin_push_delivery_log", { p_user: null, p_limit: 30 }).then(({ data }: any) => setRows((data || []) as any), () => setRows([])); }, [show]);
   return (
     <div style={{ marginTop: 10 }}>
@@ -1495,7 +1501,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
     let cancelled = false;
     (async () => {
       try {
-        const { data, error } = await supabase.rpc("admin_member_signups");
+        const { data, error } = await rpcAll(supabase, "admin_member_signups", undefined, "user_id");
         if (!cancelled) setSignups(error ? [] : ((data || []) as SignupRow[]));
       } catch { if (!cancelled) setSignups([]); }
     })();
@@ -1528,8 +1534,10 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
     setHasMore(page.length === PAGE);
     const ids = merged.map((p: any) => p.id);
     if (ids.length) {
-      const { data: mem } = await supabase.from("group_members").select("id, group_id, user_id, role, status").in("user_id", ids).neq("status", "removed");
-      setMemberships(mem || []);
+      // 210.4: paged — a page of up to 1,000 users can hold more than 1,000 memberships.
+      let mem: any[] = [];
+      try { mem = await fetchAll<any>((f, t) => supabase.from("group_members").select("id, group_id, user_id, role, status").in("user_id", ids).neq("status", "removed").order("id").range(f, t)); } catch { mem = []; }
+      setMemberships(mem);
     }
   }, []);
 
@@ -1542,16 +1550,19 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
 
   const load = useCallback(async () => {
     await loadProfiles(0, query, []);
-    const { data: del } = await supabase.from("favorite_courses").select("*").eq("deleted", true).order("deleted_at", { ascending: false });
-    setDeletedCourses(del || []);
-    // Groups list is small (count of groups, not users) — fine to load fully for the add-to-group picker.
-    const { data: gs } = await supabase.from("groups").select("id, name, status").neq("status", "declined").order("name");
-    setAllGroups((gs || []).filter((g: any) => (g.status ?? "active") === "active"));
+    // 210.4: paged — both lists grow with the system.
+    let del: any[] = [], gs: any[] = [];
+    try { del = await fetchAll<any>((f, t) => supabase.from("favorite_courses").select("*").eq("deleted", true).order("deleted_at", { ascending: false }).order("id").range(f, t)); } catch { del = []; }
+    setDeletedCourses(del);
+    try { gs = await fetchAll<any>((f, t) => supabase.from("groups").select("id, name, status").neq("status", "declined").order("name").order("id").range(f, t)); } catch { gs = []; }
+    setAllGroups(gs.filter((g: any) => (g.status ?? "active") === "active"));
+    // bounded: pending club requests (a handful)
     const { data: reqs } = await supabase.from("groups").select("id, name, request_note, created_by, status").eq("status", "pending").order("created_at", { ascending: true });
     const reqList = reqs || [];
     const reqIds = reqList.map((r: any) => r.created_by).filter(Boolean);
     let byId: Record<string, any> = {};
     if (reqIds.length) {
+      // bounded: the requesters of pending club requests (a handful)
       const { data: ps } = await supabase.from("profiles").select("id, display_name, email").in("id", reqIds);
       byId = Object.fromEntries((ps || []).map((p: any) => [p.id, p]));
     }
@@ -2045,11 +2056,14 @@ function AdminScoreEditor({ admin, player, onBack }: { admin: any; player: any; 
   const [msg, setMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    let { data: rs, error: rE2 } = await supabase.from("rounds").select("*").eq("user_id", player.id).is("deleted_at", null).order("played_at", { ascending: false });
-    if (rE2) { const rt = await supabase.from("rounds").select("*").eq("user_id", player.id).order("played_at", { ascending: false }); rs = rt.data; }
+    // 210.4: every row, paged — a request stops at 1,000 rows (holes reach that at ~55 rounds).
+    let rs: any[] | null = null;
+    try { rs = await fetchAll<any>((f, t) => supabase.from("rounds").select("*").eq("user_id", player.id).is("deleted_at", null).order("played_at", { ascending: false }).order("id").range(f, t)); }
+    catch { try { rs = await fetchAll<any>((f, t) => supabase.from("rounds").select("*").eq("user_id", player.id).order("played_at", { ascending: false }).order("id").range(f, t)); } catch { rs = null; } }
     if (!rs) { setRounds([]); return; }
     const ids = rs.map((r: any) => r.id);
-    const { data: hs } = await supabase.from("holes").select("*").in("round_id", ids.length ? ids : ["none"]);
+    let hs: any[] = [];
+    try { hs = await fetchAllIn<any>(supabase, "holes", "round_id", ids); } catch { hs = []; }
     const byRound: Record<string, Hole[]> = {};
     (hs || []).forEach((h: any) => { (byRound[h.round_id] ||= []).push(h); });
     const merged: Round[] = rs.map((r: any) => ({
@@ -2254,6 +2268,7 @@ export function PlayersTab({ user, activeGroupId, isGroupAdmin, onChanged }: { u
     const ids = rows.map((r: any) => r.user_id).filter(Boolean);
     let profilesById: Record<string, any> = {};
     if (ids.length) {
+      // bounded: one club's members
       const { data: profs } = await supabase.from("profiles").select("id, display_name, handicap_index, phone, ghin_number").in("id", ids);
       profilesById = Object.fromEntries((profs || []).map((p: any) => [p.id, p]));
     }
@@ -2510,8 +2525,8 @@ function AdminDailyReport() {
   useEffect(() => {
     if (!sel) return;
     setActive(null); setRounds(null);
-    supabase.rpc("admin_stat_users", { p_stat: "active_day", p_arg: null, p_date: sel }).then(({ data, error }: any) => { if (error) setGone(true); else setActive(data || []); });
-    supabase.rpc("admin_stat_users", { p_stat: "rounds_day", p_arg: null, p_date: sel }).then(({ data, error }: any) => { if (!error) setRounds(data || []); });
+    rpcAll(supabase, "admin_stat_users", { p_stat: "active_day", p_arg: null, p_date: sel }, ["name", "detail", "tag"]).then(({ data, error }: any) => { if (error) setGone(true); else setActive(data || []); });
+    rpcAll(supabase, "admin_stat_users", { p_stat: "rounds_day", p_arg: null, p_date: sel }, ["name", "detail", "tag"]).then(({ data, error }: any) => { if (!error) setRounds(data || []); });
   }, [sel]);
 
   if (gone) return null;
@@ -2598,7 +2613,7 @@ function FrictionItem({ it, onDone }: { it: any; onDone: () => void }) {
   const expand = async () => {
     const next = !open; setOpen(next);
     if (next && !rounds && isCluster) {
-      const { data } = await supabase.rpc("get_friction_rounds", { p_id: it.id });
+      const { data } = await rpcAll(supabase, "get_friction_rounds", { p_id: it.id }, "round_id");
       const rows = data || []; setRounds(rows);
       const rec = rows.find((r: any) => r.recommended); if (rec) setKeep(rec.round_id);
     }
@@ -2685,7 +2700,7 @@ function AdminFrictionReview() {
   const [gone, setGone] = useState(false);
   const [sweeping, setSweeping] = useState(false);
   const load = useCallback(() => {
-    supabase.rpc("get_friction_items", { p_status: null }).then(({ data, error }: any) => {
+    rpcAll(supabase, "get_friction_items", { p_status: null }, "id").then(({ data, error }: any) => {
       if (error) { setGone(true); return; }
       setItems(data || []);
     });
@@ -2740,7 +2755,7 @@ function AdminSandbaggers() {
   const [rows, setRows] = useState<any[] | null>(null);
   const [err, setErr] = useState(false);
   useEffect(() => {
-    supabase.rpc("admin_sandbaggers").then(({ data, error }: any) => { if (error) setErr(true); else setRows(data || []); });
+    rpcAll(supabase, "admin_sandbaggers", undefined, "user_id").then(({ data, error }: any) => { if (error) setErr(true); else setRows(data || []); });
   }, []);
   if (err) return <div style={{ color: C.sage, fontSize: 13 }}>Couldn’t load — the admin_sandbaggers migration (0101) may not be applied yet.</div>;
   if (!rows) return <div style={{ color: C.sage, fontSize: 13 }}>Loading…</div>;
@@ -2780,7 +2795,7 @@ export function AdminHome({ user, profile, activeGroupName, activeGroupRole, onG
   useEffect(() => {
     if (!isMaster) return;
     supabase.rpc("get_admin_todos").then(({ data }: any) => setTodos((t: any) => ({ ...t, ...(data || {}) })), () => {});
-    supabase.rpc("get_friction_items", { p_status: "open" }).then(
+    rpcAll(supabase, "get_friction_items", { p_status: "open" }, "id").then(
       ({ data }: any) => setTodos((t: any) => ({ ...t, friction_open: (data || []).length })), () => {});
   }, [isMaster]);
 
@@ -2946,9 +2961,10 @@ export function AdminGroupsTab({ user, onEnterGroup, onExitGroup, onGroupsChange
   const load = async () => {
     // Opportunistically clear any forgotten support sessions before showing the overview.
     await supabase.rpc("expire_support_sessions", { p_max_hours: 12 }).then(() => {}, () => {});
-    const { data } = await supabase.rpc("admin_group_overview");
+    const { data } = await rpcAll(supabase, "admin_group_overview", undefined, "group_id");
     const base = Array.isArray(data) ? data : [];
-    const { data: flags } = await supabase.from("groups").select("id, is_test");
+    let flags: any[] = [];
+    try { flags = await fetchAll<any>((f, t) => supabase.from("groups").select("id, is_test").order("id").range(f, t)); } catch { flags = []; }
     const tmap = new Map((flags || []).map((f: any) => [f.id, !!f.is_test]));
     setRows(base.map((r: any) => ({ ...r, is_test: tmap.get(r.group_id) ?? false })));
   };
