@@ -1,6 +1,6 @@
 function eq(a: unknown, b: unknown, m: string) { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${m}: expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`); }
 function ok(c: unknown, m: string) { if (!c) throw new Error(m); }
-import { matchOutcomes, memberRecord } from "./match-outcomes";
+import { matchOutcomes, memberRecord, formatsLabel, BEST_PARTNER_MIN } from "./match-outcomes";
 import { buildRecap } from "./game-recap";
 // 210.0: head-to-head & partners — the recap's own match results, by account.
 const H18 = Array.from({ length: 18 }, (_, i) => ({ n: i + 1, par: 4, si: i + 1 }));
@@ -36,7 +36,9 @@ for (const [g, ps] of [[singles, sp], [fb, fp]] as const) {
 const all = [...matchOutcomes(singles, sp as any), ...matchOutcomes(fb, fp as any)];
 const ann = memberRecord(all, "ann");
 eq(ann.headToHead.map((r) => [r.name, r.won, r.lost, r.halved]), [["Bob", 1, 0, 0]], "Ann's head-to-head: beat Bob in singles (four-ball isn't head-to-head)");
-eq(ann.partners.map((r) => [r.name, r.played, r.won, r.points]), [["Cal", 1, 1, 1]], "Ann's partners: won with Cal");
+eq(ann.partners.map((r) => [r.name, r.played, r.won, r.points, r.formats]), [["Cal", 1, 1, 1, ["fourball"]]], "Ann's partners: won with Cal (four-ball)");
+eq([formatsLabel(["fourball"]), formatsLabel(["fourball", "trifecta"]), formatsLabel(["fourball", "alt_shot", "trifecta"])], ["four-ball", "four-ball and Trifecta", "four-ball, alternate shot and Trifecta"], "the formats a partner record came from, in words");
+eq(BEST_PARTNER_MIN, 3, "best partner needs 3 matches together (owner, Oct 20)");
 const cal = memberRecord(all, "cal");
 eq(cal.headToHead.map((r) => [r.name, r.won, r.lost, r.halved]), [["Dee", 0, 0, 1]], "a halved match counts as halved");
 const bob = memberRecord(all, "bob");

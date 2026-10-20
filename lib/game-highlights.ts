@@ -6,13 +6,16 @@
 import { allocateStrokes } from "@/lib/golf";
 import { pkey, chBasis } from "@/lib/game-shape";
 import type { Game, Player } from "@/lib/game-types";
-import { holeScore, isFullCard } from "@/lib/round-rules";
+import { holeScore, isFullCard, isValidRound, scoredHoles } from "@/lib/round-rules";
 
 export type Ranked<T> = { pos: string; item: T }[];
 export type NetBirdieRow = { key: string; name: string; birdies: number; eagles: number };
 export type HoleStat = { n: number; par: number; si: number | null; avg: number; vsPar: number; birdies: number; pars: number; parsOrBetter: number };
 export type Highlights = {
   finishers: number;
+  /** 210.6 (owner): valid rounds that stopped early (9+ holes, not every hole). They don't count toward top scores
+   *  or standout rounds — "only completed rounds count toward exceptional play" — and the recap says so, by name. */
+  shortened: { name: string; holes: number }[];
   topGross: Ranked<{ name: string; score: number }>;
   topNet: Ranked<{ name: string; score: number; gross: number; ch: number }>;
   netBirdies: { top: Ranked<NetBirdieRow>; all: NetBirdieRow[]; birdies: number; eagles: number; players: number };
@@ -85,6 +88,8 @@ export function buildHighlights(game: Game, players: Player[]): Highlights {
   const live = players.filter((p) => !p.no_show);
   const played = (p: Player, i: number) => holeScore((p.scores || [])[i]);
   const finishers = live.filter((p) => isFullCard(p.scores, holes.length));
+  const shortened = live.filter((p) => isValidRound(p.scores, holes.length) && !isFullCard(p.scores, holes.length))
+    .map((p) => ({ name: p.display_name, holes: scoredHoles(p.scores, holes.length) }));
   const gross = (p: Player) => holes.reduce((s, _, i) => s + (played(p, i) || 0), 0);
   // Through chBasis: honours manual course-handicap overrides (0153) exactly as the match engines do.
   const ch = (p: Player) => Math.round(Number(chBasis(p, game.course_par, nh) ?? 0));
@@ -173,7 +178,7 @@ export function buildHighlights(game: Game, players: Player[]): Highlights {
 
   return {
     standouts, fieldRows,
-    finishers: finishers.length, topGross, topNet,
+    finishers: finishers.length, shortened, topGross, topNet,
     netBirdies: { top, all, birdies: all.reduce((s, r) => s + r.birdies, 0), eagles: totalEagles, players: all.length },
     scoring, fieldNet, frontBack, toughest, easiest, netEagleHole, bestNetHole,
     mostParsOrBetter: bestOf(parsOrBetter, names), mostBirdies: bestOf(birdies, names), bestGroup,

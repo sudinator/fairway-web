@@ -20,6 +20,9 @@ export type EmailGameContext = {
   matchLine?: string | null;      // "You and your partner won 2&1"
   position?: { rank: number; of: number } | null;   // net position among finishers
   standoutBetter?: number | null; // how much better, when a standout
+  /** 210.6: holes played when the member's round stopped early (9+ holes, not all) — it doesn't count toward
+   *  positions or standout rounds, and the email says so. */
+  shortenedHoles?: number | null;
   /** 210.2: what it was measured against — "field" (8+ players) or "own" (the player's handicap). */
   standoutBasis?: "field" | "own" | null;
   fieldNote?: string | null;      // "on a course that played 2 shots hard"
@@ -87,6 +90,7 @@ export function buildRoundEmail(o: {
   const pos = g?.position ? `, ${ordinal(g.position.rank)} of ${g.position.of}` : "";
   const subject = `${o.isUpdate ? "Updated: " : ""}Your round at ${o.round.course} — ${gross} (net ${net})${pos}`;
   const highlights: string[] = [];
+  if (g?.shortenedHoles) highlights.push(`<b>Your round was shortened (${g.shortenedHoles} holes)</b> — only completed rounds count toward positions and standout rounds.`);
   if (g?.standoutBetter != null) highlights.push(g.standoutBasis === "own"
     ? `<b>Standout round</b> — ${g.standoutBetter.toFixed(1)} better than your handicap.`
     : `<b>Standout round</b> — ${g.standoutBetter.toFixed(1)} better than the field against your handicap${g.fieldNote ? `, ${esc(g.fieldNote)}` : ""}.`);

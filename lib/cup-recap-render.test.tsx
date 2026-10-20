@@ -32,4 +32,18 @@ plain.unmount();
   ok(txt.includes("Session 3") && !txt.includes("Session 3 of") && txt.includes("Schedule not locked yet — no winner until it is"), "unlocked Cup: score and a plain session number, no winner");
   t.unmount();
 }
+// 210.6: the recap states that shortened rounds don't count — by name — in the app and on the shared image.
+{
+  // an 18-hole stroke game (this file's Cup game has 3 holes)
+  const g18 = { ...game, game_type: "stroke", pairings: [], course_par: 72, holes_meta: Array.from({ length: 18 }, (_, i) => ({ n: i + 1, par: 4, si: i + 1 })) } as unknown as Game;
+  const short = [
+    { ...players[0], scores: Array(18).fill(4) }, { ...players[1], scores: Array(18).fill(5) },
+    { ...players[1], id: "pc", user_id: "c", display_name: "Cy", scores: [...Array(14).fill(5), null, null, null, null] },
+  ] as unknown as Player[];
+  for (const mode of ["share", "app"] as const) {
+    const t = renderScreen(<RecapBody game={g18} recap={buildRecap(g18, short)} mode={mode} />);
+    ok((t.el.querySelector("[data-recap-shortened]")?.textContent || "").includes("Cy (14 holes) isn't counted"), `${mode}: the shortened-round sentence`);
+    t.unmount();
+  }
+}
 report("cup on the recap");

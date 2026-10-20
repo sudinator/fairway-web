@@ -7,7 +7,7 @@ import { chBasis, pkey } from "@/lib/game-shape";
 import type { Game, Player } from "@/lib/game-types";
 import type { EmailGameContext } from "@/lib/round-email";
 import type { CupLine } from "@/lib/cup-standing";
-import { isFullCard } from "@/lib/round-rules";
+import { isFullCard, isValidRound, scoredHoles } from "@/lib/round-rules";
 
 /** The member's game context: the group's result, their line, their net position, their standout. */
 export function gameContextFor(game: Game, players: Player[], userId: string, cup?: CupLine | null): { context: EmailGameContext; groupHtml: string } | null {
@@ -27,6 +27,7 @@ export function gameContextFor(game: Game, players: Player[], userId: string, cu
   return {
     context: { name: game.name || "Game", headline: recap.headline, matchLine: recap.personal[pkey(me)] ?? null, position,
       standoutBetter: myStandout ? myStandout.better : null, standoutBasis: st?.basis ?? null,
+      shortenedHoles: isValidRound(me.scores, nh) && !isFullCard(me.scores, nh) ? scoredHoles(me.scores, nh) : null,
       fieldNote: st?.basis === "field" ? fieldNote : null },
     groupHtml: recapEmailHtml(recap, cup),
   };

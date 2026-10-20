@@ -6,6 +6,7 @@
 import type { Recap } from "@/lib/game-recap";
 import { fmtPoints } from "@/lib/game-results";
 import type { CupLine } from "@/lib/cup-standing";
+import { shortenedNote } from "@/lib/round-rules";
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 const sgn = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}`;
@@ -68,6 +69,9 @@ export function recapEmailHtml(r: Recap, cup?: CupLine | null): string {
       `<td style="width:50%;vertical-align:top;padding-right:6px">${H(title)}${TABLE(rows.map((x) => ROW(`${esc(x.pos)} &nbsp;${esc(x.item.name)}`, String(x.item.score))).join(""))}</td>`;
     parts.push(`<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr>${col("TOP 3 GROSS", h.topGross)}${col("TOP 3 NET", h.topNet)}</tr></table>`);
   }
+  // 5b. 210.6 (owner): only completed rounds count toward exceptional play — the recap's own sentence
+  const shortNote = shortenedNote(h.shortened);
+  if (shortNote) parts.push(`<div style="font-size:12px;color:#5d6f66;line-height:1.45;margin-top:8px">${esc(shortNote)}</div>`);
   // 6. net birdies & eagles
   if (s.individualStats && h.netBirdies.players) parts.push(H("NET BIRDIES & EAGLES", `top ${Math.min(5, h.netBirdies.top.length)}`)
     + TABLE(`<tr><td style="font-size:11px;color:#5d6f66"></td><td style="font-size:11px;color:#5d6f66;text-align:right">Net birdies · Net eagles</td></tr>`

@@ -21,7 +21,8 @@ with gp as (
   select g.id as game_id, g.game_type, jsonb_array_length(coalesce(g.holes_meta, '[]'::jsonb)) as holes,
          p.user_id, p.no_show, coalesce(p.is_guest, p.user_id is null) as guest, p.handicap_index, p.course_handicap_source,
          (select count(*) from jsonb_array_elements(case when jsonb_typeof(p.scores) = 'array' then p.scores else '[]'::jsonb end) with ordinality e(v, i)
-           where i <= jsonb_array_length(coalesce(g.holes_meta, '[]'::jsonb)) and jsonb_typeof(e.v) = 'number' and (e.v)::numeric > 0) as scored
+           where i <= jsonb_array_length(coalesce(g.holes_meta, '[]'::jsonb))
+             and (case when jsonb_typeof(e.v) = 'number' then (e.v)::numeric end) > 0) as scored   -- empty holes are JSON null: never converted
     from public.games g join public.game_players p on p.game_id = g.id
    where g.status = 'ended'
 )

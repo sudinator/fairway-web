@@ -1,3 +1,7 @@
+## 210.7 — Email and announcement hardening (0198)
+
+round_email_log.status adds 'skipped'; due_round_emails excludes rounds with no holes and skipped rounds. announce_game_recap(game, signature, final_rows, updated_rows) — claim + notifications in one transaction (service role).
+
 ## 210.3 — Approved accounts; provider baseline (0197)
 
 guard_active_account trigger on 14 directly-writable tables. course_freshness.provider_baseline (saved on apply); course_review_detail compares against it.

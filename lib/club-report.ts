@@ -11,7 +11,7 @@ import { allocateStrokes } from "@/lib/golf";
 import { chBasis } from "@/lib/game-shape";
 import { buildHighlights } from "@/lib/game-highlights";
 import { matchOutcomes } from "@/lib/match-outcomes";
-import { isValidRound, isFull18 as isFull18Card, handicapReading, countsForIndividualStats, holeScore } from "@/lib/round-rules";
+import { isValidRound, isFull18 as isFull18Card, isFullCard, handicapReading, countsForIndividualStats, holeScore } from "@/lib/round-rules";
 
 export type ReportPeriod = { key: string; label: string; from: string; to: string };   // dates YYYY-MM-DD inclusive
 export type ReportGame = { game: Game; players: Player[]; altScores?: AltShotScoreRow[] };
@@ -22,13 +22,17 @@ export type ClubReport = {
   bestGross: (Who & { score: number; course: string; date: string }) | null;
   bestNet: (Who & { score: number; course: string; date: string }) | null;
   standouts: { count: number; best: (Who & { better: number; date: string }) | null };
-  mostNetBirdies: (Who & { count: number }) | null;
-  mostImproved: (Who & { from: number; to: number }) | null;
+  mostNetBirdies: (Who & { count: number; rounds?: number }) | null;          // rounds: the basis (210.7)
+  mostImproved: (Who & { from: number; to: number; readings?: number }) | null; // readings: handicap readings in the period
   mostRounds: (Who & { count: number }) | null;
-  toughestCourse: { course: string; fieldGap: number } | null;
-  nemesisHole: { course: string; hole: number; par: number; vsPar: number } | null;
-  mostBirdiedHole: { course: string; hole: number; birdies: number } | null;
-  closestRivalry: { a: string; b: string; aWins: number; bWins: number; halved: number } | null;
+  toughestCourse: { course: string; fieldGap: number; games?: number } | null;
+  nemesisHole: { course: string; hole: number; par: number; vsPar: number; rounds?: number } | null;
+  mostBirdiedHole: { course: string; hole: number; birdies: number; rounds?: number } | null;
+  closestRivalry: { a: string; b: string; aWins: number; bWins: number; halved: number; matches?: number } | null;
+  /** 210.7 (owner): awards held back for lack of play — said once, plainly. */
+  waiting?: { rivalry: boolean; improved: boolean; toughest: boolean };
+  /** 210.6 (owner): valid rounds that stopped early — counted as rounds, never toward best scores or standouts. */
+  shortenedRounds: number;
   longestStreak: (Who & { weeks: number }) | null;
 };
 
@@ -49,14 +53,17 @@ const isFull18 = (p: Player, nh: number) => isFull18Card(p.scores, nh);
 const indexOf = (p: Player): number | null => handicapReading((p as { handicap_index?: unknown }).handicap_index);
 const weekOf = (d: string) => Math.floor((Date.parse(d + "T12:00:00Z") / 86400000 + 3) / 7);   // Monday-based week number
 
+/** Minimum samples before an award appears (owner-approved, Oct 20 2026). */
+export const MIN = { rivalryMatches: 3, improvedReadings: 3, toughestGames: 3, holeRounds: 8, streakWeeks: 3 };
+
 export function buildClubReport(club: string, period: ReportPeriod, input: ReportGame[]): ClubReport {
   const games = input.filter(({ game }) => { const d = String((game as { played_at?: string }).played_at || "").slice(0, 10); return d >= period.from && d <= period.to; });
-  let rounds = 0;
+  let rounds = 0, shortenedRounds = 0;
   const members = new Set<string>();
   let bestGross: ClubReport["bestGross"] = null, bestNet: ClubReport["bestNet"] = null;
   let standoutCount = 0; let bestStandout: ClubReport["standouts"]["best"] = null;
-  const netBirdies = new Map<string, Who & { count: number }>(), roundsBy = new Map<string, Who & { count: number }>();
-  const indexBy = new Map<string, Who & { first: { d: string; v: number }; last: { d: string; v: number } }>();
+  const netBirdies = new Map<string, Who & { count: number; rounds?: number }>(), roundsBy = new Map<string, Who & { count: number }>();
+  const indexBy = new Map<string, Who & { first: { d: string; v: number }; last: { d: string; v: number }; readings: number }>();
   const weeksBy = new Map<string, Who & { weeks: Set<number> }>();
   const courseGaps = new Map<string, number[]>();
   const holeStats = new Map<string, { course: string; hole: number; par: number; over: number; n: number; birdies: number }>();
@@ -73,6 +80,7 @@ export function buildClubReport(club: string, period: ReportPeriod, input: Repor
     for (const p of players) {
       if (!isRound(p, nh)) continue;
       rounds++;
+      if (!isFullCard(p.scores, nh)) shortenedRounds++;
       const uid = (p as { user_id?: string | null }).user_id ?? null;
       const who: Who = { name: p.display_name, userId: uid };
       const raw = (p.scores as (number | null)[]).slice(0, nh);
@@ -97,12 +105,13 @@ export function buildClubReport(club: string, period: ReportPeriod, input: Repor
       members.add(uid);
       if (individual) {
         const nb = scores.filter((s, i) => s != null && holes[i] && s - (alloc[holes[i].hole_number] || 0) <= holes[i].par - 1).length;
-        const b = netBirdies.get(uid) || { ...who, count: 0 }; b.count += nb; netBirdies.set(uid, b);
+        const b = netBirdies.get(uid) || { ...who, count: 0, rounds: 0 }; b.count += nb; b.rounds = (b.rounds || 0) + 1; netBirdies.set(uid, b);
       }
       const r = roundsBy.get(uid) || { ...who, count: 0 }; r.count++; roundsBy.set(uid, r);
       const hi = indexOf(p);
       if (hi != null) {
-        const x = indexBy.get(uid) || { ...who, first: { d: date, v: hi }, last: { d: date, v: hi } };
+        const x = indexBy.get(uid) || { ...who, first: { d: date, v: hi }, last: { d: date, v: hi }, readings: 0 };
+        x.readings++;
         if (date < x.first.d) x.first = { d: date, v: hi }; if (date >= x.last.d) x.last = { d: date, v: hi };
         indexBy.set(uid, x);
       }
@@ -132,29 +141,58 @@ export function buildClubReport(club: string, period: ReportPeriod, input: Repor
   }
 
   const top = <T extends { count: number; name: string }>(m: Map<string, T>) => [...m.values()].filter((x) => x.count > 0).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))[0] ?? null;
-  const improved = [...indexBy.values()].filter((x) => x.first.d < x.last.d && x.last.v < x.first.v - 0.05)
+  const improvers = [...indexBy.values()].filter((x) => x.first.d < x.last.d && x.last.v < x.first.v - 0.05);
+  const improved = improvers.filter((x) => x.readings >= MIN.improvedReadings)
     .sort((a, b) => (b.first.v - b.last.v) - (a.first.v - a.last.v) || a.name.localeCompare(b.name))[0];
-  const toughest = [...courseGaps.entries()].map(([course, g]) => ({ course, fieldGap: Math.round((g.reduce((a, b) => a + b, 0) / g.length) * 10) / 10 }))
+  const toughest = [...courseGaps.entries()].filter(([, g]) => g.length >= MIN.toughestGames)
+    .map(([course, g]) => ({ course, fieldGap: Math.round((g.reduce((a, b) => a + b, 0) / g.length) * 10) / 10, games: g.length }))
     .sort((a, b) => b.fieldGap - a.fieldGap)[0] ?? null;
-  const holesRanked = [...holeStats.values()].filter((h) => h.n >= 8);   // enough rounds to mean something
-  const nemesis = holesRanked.map((h) => ({ course: h.course, hole: h.hole, par: h.par, vsPar: Math.round((h.over / h.n) * 10) / 10 })).sort((a, b) => b.vsPar - a.vsPar)[0] ?? null;
-  const birdied = [...holeStats.values()].filter((h) => h.birdies > 0).sort((a, b) => b.birdies - a.birdies)[0];
-  const rivalry = [...rivalries.values()].map((r) => ({ ...r, played: r.aWins + r.bWins + r.halved, gap: Math.abs(r.aWins - r.bWins) }))
-    .filter((r) => r.played >= 2).sort((x, y) => x.gap - y.gap || y.played - x.played)[0];
+  const holesRanked = [...holeStats.values()].filter((h) => h.n >= MIN.holeRounds);   // enough rounds to mean something
+  const nemesis = holesRanked.map((h) => ({ course: h.course, hole: h.hole, par: h.par, vsPar: Math.round((h.over / h.n) * 10) / 10, rounds: h.n })).sort((a, b) => b.vsPar - a.vsPar)[0] ?? null;
+  const birdied = holesRanked.filter((h) => h.birdies > 0).sort((a, b) => b.birdies - a.birdies)[0];
+  const pairs = [...rivalries.values()].map((r) => ({ ...r, played: r.aWins + r.bWins + r.halved, gap: Math.abs(r.aWins - r.bWins) }));
+  const rivalry = pairs.filter((r) => r.played >= MIN.rivalryMatches).sort((x, y) => x.gap - y.gap || y.played - x.played)[0];
   const streak = [...weeksBy.values()].map((w) => {
     const ws = [...w.weeks].sort((a, b) => a - b); let best = 0, run = 0, prev = -9;
     for (const x of ws) { run = x === prev + 1 ? run + 1 : 1; prev = x; best = Math.max(best, run); }
     return { name: w.name, userId: w.userId, weeks: best };
-  }).filter((x) => x.weeks >= 3).sort((a, b) => b.weeks - a.weeks || a.name.localeCompare(b.name))[0] ?? null;
+  }).filter((x) => x.weeks >= MIN.streakWeeks).sort((a, b) => b.weeks - a.weeks || a.name.localeCompare(b.name))[0] ?? null;
 
   return {
-    club, period, games: games.length, rounds, members: members.size, bestGross, bestNet,
+    club, period, games: games.length, rounds, members: members.size, bestGross, bestNet, shortenedRounds,
     standouts: { count: standoutCount, best: bestStandout },
     mostNetBirdies: top(netBirdies), mostRounds: top(roundsBy),
-    mostImproved: improved ? { name: improved.name, userId: improved.userId, from: improved.first.v, to: improved.last.v } : null,
+    mostImproved: improved ? { name: improved.name, userId: improved.userId, from: improved.first.v, to: improved.last.v, readings: improved.readings } : null,
     toughestCourse: toughest, nemesisHole: nemesis,
-    mostBirdiedHole: birdied ? { course: birdied.course, hole: birdied.hole, birdies: birdied.birdies } : null,
-    closestRivalry: rivalry ? { a: rivalry.a, b: rivalry.b, aWins: rivalry.aWins, bWins: rivalry.bWins, halved: rivalry.halved } : null,
+    mostBirdiedHole: birdied ? { course: birdied.course, hole: birdied.hole, birdies: birdied.birdies, rounds: birdied.n } : null,
+    closestRivalry: rivalry ? { a: rivalry.a, b: rivalry.b, aWins: rivalry.aWins, bWins: rivalry.bWins, halved: rivalry.halved, matches: rivalry.played } : null,
+    waiting: { rivalry: !rivalry && pairs.length > 0, improved: !improved && improvers.length > 0, toughest: !toughest && courseGaps.size > 0 },
     longestStreak: streak,
   };
+}
+
+/** The club report's statement of the rule (210.6, owner) — on the club page and in the email, word for word. */
+export function completedRoundsNote(r: Pick<ClubReport, "shortenedRounds">): string {
+  return `Best scores and standout rounds count completed 18-hole rounds only${r.shortenedRounds ? ` — ${r.shortenedRounds} shortened round${r.shortenedRounds === 1 ? "" : "s"} this period ${r.shortenedRounds === 1 ? "wasn't" : "weren't"} counted.` : "."}`;
+}
+
+const plural = (n: number, one: string, many = one + "s") => `${n} ${n === 1 ? one : many}`;
+/** The basis under each award (210.7, owner-approved mock) — club page and email, word for word. */
+export const basis = {
+  improved: (r: ClubReport) => (r.mostImproved?.readings ? `over ${plural(r.mostImproved.readings, "round")}` : null),
+  netBirdies: (r: ClubReport) => (r.mostNetBirdies?.rounds ? `in ${plural(r.mostNetBirdies.rounds, "round")}` : null),
+  toughest: (r: ClubReport) => (r.toughestCourse?.games ? `over ${plural(r.toughestCourse.games, "game")}` : null),
+  hole: (h: { rounds?: number } | null) => (h?.rounds ? `${plural(h.rounds, "round")} played` : null),
+  rivalry: (r: ClubReport) => (r.closestRivalry?.matches ? plural(r.closestRivalry.matches, "match", "matches") : null),
+};
+/** What the report is waiting for (said once): the rivalry sentence, and the rest. */
+export function rivalryWaiting(r: ClubReport): string | null {
+  return r.waiting?.rivalry ? `Not enough matches yet for a rivalry — it needs ${MIN.rivalryMatches} between the same two players.` : null;
+}
+export function waitingNote(r: ClubReport): string | null {
+  const parts = [r.waiting?.improved ? `Most improved needs ${MIN.improvedReadings} handicap readings in the period` : null,
+    r.waiting?.toughest ? `the toughest course, ${MIN.toughestGames} games there` : null].filter(Boolean) as string[];
+  if (!parts.length) return null;
+  const t = parts.join("; ");
+  return t.charAt(0).toUpperCase() + t.slice(1) + ".";
 }

@@ -3,7 +3,7 @@
 // Called by the app right after ending a game. Builds the recap with the SAME results functions as
 // the Results screen (lib/game-recap) — the notification can never disagree with what players see —
 // and announces it: "final" the first time; after a reopen and re-end, "results updated" only if the
-// outcome changed; otherwise nothing (claim_game_recap, 0188). No money amounts. Links to the game.
+// outcome changed; otherwise nothing (announce_game_recap, 0198 — the claim and the notifications in one transaction). No money amounts. Links to the game.
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createRouteClient } from "@/lib/supabase-route";
@@ -44,14 +44,13 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL, serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceKey) return NextResponse.json({ error: "Server isn't configured to send announcements." }, { status: 503 });
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
-  const { data: claim, error: cErr } = await admin.rpc("claim_game_recap", { p_game: id, p_signature: recap.signature });
-  if (cErr) return NextResponse.json({ error: "Couldn't record the announcement." }, { status: 502 });
-  if (claim !== "final" && claim !== "updated") return NextResponse.json({ announced: claim });
-
+  // 210.7 (review point 6): the announcement and the members' notifications are recorded TOGETHER, in one
+  // database transaction — if the notifications fail, the announcement is undone too, so a retry works.
+  // The wording depends on the outcome, so both versions are prepared first.
   const name = game.name || game.course || "Your game";
-  const rows = ((players || []) as Player[]).filter((p) => p.user_id && !p.no_show).map((p) => {
+  const rowsFor = (kind: "final" | "updated") => ((players || []) as Player[]).filter((p) => p.user_id && !p.no_show).map((p) => {
     const mine = recap.personal[pkey(p)];
-    const lead = claim === "final" ? `"${name}" is final${recap.endedEarly ? " (ended early)" : ""}: ${recap.headline}.` : `"${name}" results updated: ${recap.headline}.`;
+    const lead = kind === "final" ? `"${name}" is final${recap.endedEarly ? " (ended early)" : ""}: ${recap.headline}.` : `"${name}" results updated: ${recap.headline}.`;
     return {
       user_id: p.user_id, group_id: game.group_id ?? null, type: "game_finished",
       message: `${lead}${mine ? ` ${mine.charAt(0).toUpperCase()}${mine.slice(1)}.` : ""} Tap to view results.`,
@@ -59,9 +58,9 @@ export async function POST(_req: Request, ctx: { params: Promise<{ id: string }>
       detail: recap.notes.length ? recap.notes.join(" · ") : null,
     };
   });
-  if (rows.length) {
-    const { error: nErr } = await admin.from("notifications").insert(rows);
-    if (nErr) return NextResponse.json({ error: "Announcement recorded but notifications failed.", announced: claim }, { status: 502 });
-  }
+  const rows = rowsFor("final");
+  const { data: claim, error: cErr } = await admin.rpc("announce_game_recap", { p_game: id, p_signature: recap.signature, p_final: rows, p_updated: rowsFor("updated") });
+  if (cErr) return NextResponse.json({ error: "Couldn't announce the game — please try again." }, { status: 502 });
+  if (claim !== "final" && claim !== "updated") return NextResponse.json({ announced: claim });
   return NextResponse.json({ announced: claim, recipients: rows.length });
 }

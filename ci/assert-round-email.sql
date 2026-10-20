@@ -5,7 +5,7 @@ declare own uuid := '19300000-0000-0000-0000-000000000001'; mem uuid := '1930000
         r_mem uuid := '19300000-0000-0000-0000-000000000013'; r_off uuid := '19300000-0000-0000-0000-000000000014';
         n int; fp text;
 begin
-  delete from round_email_log where user_id in (own, mem, off); delete from rounds where user_id in (own, mem, off);
+  delete from round_email_log where user_id in (own, mem, off); delete from holes where round_id in (select id from rounds where user_id in (own, mem, off)); delete from rounds where user_id in (own, mem, off);
   delete from profiles where id in (own, mem, off); delete from auth.users where id in (own, mem, off);
   insert into auth.users(id, email) values (own, 'own@e193.test'), (mem, 'mem@e193.test'), (off, 'off@e193.test');
   insert into profiles(id, display_name, email, is_owner, account_status, round_emails) values
@@ -15,6 +15,8 @@ begin
     (r_new, own, 'E193', current_date, 'final', now() - interval '10 minutes'),
     (r_mem, mem, 'E193', current_date, 'final', now() - interval '2 hours'),
     (r_off, off, 'E193', current_date, 'final', now() - interval '2 hours');
+  -- 210.7: real rounds have hole-by-hole scores (0198 excludes rounds without any).
+  insert into holes(round_id, hole_number, par, strokes) select x, 1, 4, 4 from unnest(array[r_own, r_new, r_mem, r_off]) x;
   update app_settings set value = '{"recipients": "owner"}' where key = 'round_emails';
 
   -- "owner only": just the owner's round finished over an hour ago
@@ -36,7 +38,7 @@ begin
      or has_function_privilege('authenticated', 'public.record_round_email(uuid,uuid,text,text,text,text)', 'execute') then raise exception 'app users can call round-email functions'; end if;
   if not exists (select 1 from account_reference_columns where table_name = 'round_email_log' and column_name = 'user_id') then raise exception 'merge registry misses round_email_log'; end if;
 
-  delete from round_email_log where user_id in (own, mem, off); delete from rounds where user_id in (own, mem, off);
+  delete from round_email_log where user_id in (own, mem, off); delete from holes where round_id in (select id from rounds where user_id in (own, mem, off)); delete from rounds where user_id in (own, mem, off);
   delete from profiles where id in (own, mem, off); delete from auth.users where id in (own, mem, off);
   raise notice 'ROUND_EMAIL_PASS owner-only by default; an hour after, not twice within the hour; opted-out skipped; everyone mode; server only';
 end $$;

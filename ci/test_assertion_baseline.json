@@ -1,5 +1,5 @@
 {
-  "total": 439510,
+  "total": 439517,
   "suites": {
     "(unnamed suites)": 513,
     "ai-sanitize": 11,
@@ -13,14 +13,14 @@
     "bucket-model": 34,
     "card": 11,
     "chart-helpers": 10,
-    "club report view": 6,
+    "club report view": 11,
     "competition": 16,
     "component render": 17,
     "contests": 26,
     "course history": 6,
     "course ordering": 4,
     "create-game format": 12,
-    "cup on the recap": 6,
+    "cup on the recap": 8,
     "failure messages": 24,
     "finish-gaps": 18,
     "format picker": 25,

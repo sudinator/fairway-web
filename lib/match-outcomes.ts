@@ -59,7 +59,12 @@ export function matchOutcomes(game: Game, players: Player[], altShotScores: AltS
 }
 
 export type H2HRow = { userId: string; name: string; won: number; lost: number; halved: number };
-export type PartnerRow = { userId: string; name: string; played: number; won: number; halved: number; points: number };
+export type PartnerRow = { userId: string; name: string; played: number; won: number; halved: number; points: number; formats: string[] };
+/** Best partner needs at least this many matches together (owner-approved, Oct 20 2026). */
+export const BEST_PARTNER_MIN = 3;
+const FORMAT_NAME: Record<string, string> = { fourball: "four-ball", alt_shot: "alternate shot", trifecta: "Trifecta" };
+/** "four-ball and Trifecta" — the formats a partner record came from. */
+export const formatsLabel = (formats: string[]) => { const n = formats.map((f) => FORMAT_NAME[f] || f); return n.length <= 1 ? n.join("") : `${n.slice(0, -1).join(", ")} and ${n[n.length - 1]}`; };
 
 /** One member's OWN record (owner rule: members see their own record only). Members only — guests have no account. */
 export function memberRecord(outcomes: MatchOutcome[], userId: string): { headToHead: H2HRow[]; partners: PartnerRow[] } {
@@ -78,8 +83,8 @@ export function memberRecord(outcomes: MatchOutcome[], userId: string): { headTo
     } else {
       for (const mate of ours) {
         if (!mate.userId || mate.userId === userId) continue;
-        const r = partners.get(mate.userId) || { userId: mate.userId, name: mate.name, played: 0, won: 0, halved: 0, points: 0 };
-        r.played++; if (res === "won") { r.won++; r.points += 1; } else if (res === "halved") { r.halved++; r.points += 0.5; }
+        const r = partners.get(mate.userId) || { userId: mate.userId, name: mate.name, played: 0, won: 0, halved: 0, points: 0, formats: [] };
+        r.played++; if (!r.formats.includes(o.format)) r.formats.push(o.format); if (res === "won") { r.won++; r.points += 1; } else if (res === "halved") { r.halved++; r.points += 0.5; }
         partners.set(mate.userId, r);
       }
     }

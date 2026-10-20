@@ -3,6 +3,7 @@
 // can never drift apart. mode "share": the 9:16 image for the group (no personal line, no money, top-5
 // net birdies). mode "app": everything, plus the viewer's own day and the full net-birdie list.
 // Every number comes from lib/game-recap (highlights + format sections). Names wrap; nothing truncates.
+import { shortenedNote } from "@/lib/round-rules";
 import type { CupLine } from "@/lib/cup-standing";
 import React from "react";
 import { C } from "@/lib/golf";
@@ -186,6 +187,8 @@ export function RecapBody({ game, recap, mode, contests = [], myLine, myScore, m
           ))}
         </div>
       ) : null}
+      {/* 210.6 (owner): only completed rounds count toward exceptional play — said plainly, by name. */}
+      {shortenedNote(h.shortened) ? <div data-recap-shortened style={{ color: C.sage, fontSize: 12, lineHeight: 1.45 }}>{shortenedNote(h.shortened)}</div> : null}
       {s.individualStats && h.netBirdies.players ? (
         <div style={S.box} data-recap-net-birdies>
           <div style={S.th}>NET BIRDIES &amp; EAGLES{share ? " · TOP 5" : ""}</div>
