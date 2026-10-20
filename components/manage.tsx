@@ -1557,7 +1557,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
     try { del = await fetchAll<any>((f, t) => supabase.from("favorite_courses").select("*").eq("deleted", true).order("deleted_at", { ascending: false }).order("id").range(f, t)); } catch { del = []; }
     setDeletedCourses(del);
     try { gs = await fetchAll<any>((f, t) => supabase.from("groups").select("id, name, status").neq("status", "declined").order("name").order("id").range(f, t)); } catch { gs = []; }
-    setAllGroups(gs.filter((g: any) => (g.status ?? "active") === "active"));
+    setAllGroups(gs);   // 210.12: every club (names for pending ones too); the add-to-club list filters to active
   }, [query]);
   useEffect(() => { load(); }, [load]);
 
@@ -1723,7 +1723,10 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
             <div style={{ color: C.sage, fontSize: 12, marginTop: 2 }}>
               Handicap: {p.handicap_index != null ? p.handicap_index : "—"}
               {signupById.get(p.id) ? ` · Joined BNN ${fmtDay(signupById.get(p.id)!.signed_up_at)}` : ""}
-              {signupById.get(p.id)?.last_sign_in ? ` · Last sign-in ${fmtDay(signupById.get(p.id)!.last_sign_in)}` : ""}
+              {/* 210.12: "last active" = the last time they opened the app (profiles.last_active, saved on every open);
+                  "signed in" = the last time they picked their Google account — BNN keeps people signed in for weeks. */}
+              {p.last_active ? ` · Last active ${fmtDay(p.last_active)}` : ""}
+              {signupById.get(p.id)?.last_sign_in ? ` · signed in ${fmtDay(signupById.get(p.id)!.last_sign_in)}` : ""}
             </div>
             {(() => {
               const mine = memberships.filter((m) => m.user_id === p.id);
@@ -1735,7 +1738,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                     const g = allGroups.find((x) => x.id === m.group_id);
                     return (
                       <span key={m.id} style={{ background: C.greenLight, color: C.cream, borderRadius: 12, padding: "1px 9px", fontSize: 11, fontWeight: 700 }}>
-                        {g?.name || "Club"}{m.role === "admin" ? " ★" : ""}
+                        {g?.name || "Club"}{m.role === "admin" ? " ★" : ""}{g?.status === "pending" ? " (pending)" : ""}
                       </span>
                     );
                   })}
@@ -1772,7 +1775,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                       const g = allGroups.find((x) => x.id === m.group_id);
                       return (
                         <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: `1px solid ${C.borderGreen}` }}>
-                          <span style={{ flex: 1, color: C.cream, fontSize: 13 }}>{g?.name || "Club"}{m.role === "admin" ? " · admin" : ""}</span>
+                          <span style={{ flex: 1, color: C.cream, fontSize: 13 }}>{g?.name || "Club"}{m.role === "admin" ? " · admin" : ""}{g?.status === "pending" ? " · pending approval" : ""}</span>
                           <button style={{ ...btn(false), padding: "9px 10px", fontSize: 11, color: C.overRedDark }} onClick={() => removeFromGroup(p, m, g?.name || "this club")}>Remove</button>
                         </div>
                       );
@@ -1782,7 +1785,7 @@ function AdminPanel({ user, showAnalytics = true }: { user: any; showAnalytics?:
                       <select defaultValue="" onChange={(e) => { if (e.target.value) { addToGroup(p, e.target.value); e.target.value = ""; } }}
                         style={{ ...inputStyle, padding: "6px 8px", fontSize: 12, maxWidth: 180 }}>
                         <option value="">Select…</option>
-                        {allGroups.filter((g) => !myGroupIds.has(g.id)).map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                        {allGroups.filter((g) => !myGroupIds.has(g.id) && (g.status ?? "active") === "active").map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                       </select>
                     </div>
 

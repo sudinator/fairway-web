@@ -96,14 +96,14 @@ begin
       ('group_invites'::text, 'group_invites_admin_update'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'UPDATE'::text, 'is_group_admin(group_id, auth.uid())'::text, 'is_group_admin(group_id, auth.uid())'::text),
       ('group_members'::text, 'ga delete memberships'::text, 'PERMISSIVE'::text, 'public'::text, 'DELETE'::text, '(is_group_admin(group_id, auth.uid()) OR is_admin())'::text, null::text),
       ('group_members'::text, 'group_members_insert_admin_or_self'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'INSERT'::text, null::text, '(is_group_admin(group_id, auth.uid()) OR ((user_id = auth.uid()) AND (role = ''admin''::text) AND (status = ''active''::text)))'::text),
-      ('group_members'::text, 'group_members_select_visible'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'SELECT'::text, '(is_group_member(group_id, auth.uid()) OR (user_id = auth.uid()) OR (lower((email)::text) = lower(COALESCE((auth.jwt() ->> ''email''::text), ''''::text))))'::text, null::text),
+      ('group_members'::text, 'group_members_select_visible'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'SELECT'::text, '(is_group_member(group_id, auth.uid()) OR (user_id = auth.uid()) OR (lower((email)::text) = lower(COALESCE((auth.jwt() ->> ''email''::text), ''''::text))) OR is_admin())'::text, NULL::text),
       ('group_members'::text, 'group_members_update_admin_or_self_invite'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'UPDATE'::text, '(is_group_admin(group_id, auth.uid()) OR (lower((email)::text) = lower(COALESCE((auth.jwt() ->> ''email''::text), ''''::text))))'::text, '(is_group_admin(group_id, auth.uid()) OR (user_id = auth.uid()))'::text),
       ('groups'::text, 'admin updates groups'::text, 'PERMISSIVE'::text, 'public'::text, 'UPDATE'::text, '(EXISTS ( SELECT 1
      FROM profiles p
     WHERE ((p.id = auth.uid()) AND (p.is_admin = true))))'::text, 'true'::text),
       ('groups'::text, 'group admin can delete group'::text, 'PERMISSIVE'::text, 'public'::text, 'DELETE'::text, '(is_group_admin(id, auth.uid()) OR is_admin())'::text, null::text),
       ('groups'::text, 'groups_insert_authenticated'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'INSERT'::text, null::text, '(created_by = auth.uid())'::text),
-      ('groups'::text, 'groups_select_member'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'SELECT'::text, '(is_group_member(id, auth.uid()) OR (created_by = auth.uid()))'::text, null::text),
+      ('groups'::text, 'groups_select_member'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'SELECT'::text, '(is_group_member(id, auth.uid()) OR (created_by = auth.uid()) OR is_admin())'::text, NULL::text),
       ('groups'::text, 'groups_update_admin'::text, 'PERMISSIVE'::text, 'authenticated'::text, 'UPDATE'::text, 'is_group_admin(id, auth.uid())'::text, 'is_group_admin(id, auth.uid())'::text),
       ('holes'::text, 'admin reads all holes'::text, 'PERMISSIVE'::text, 'public'::text, 'SELECT'::text, 'is_admin()'::text, null::text),
       ('holes'::text, 'admin updates all holes'::text, 'PERMISSIVE'::text, 'public'::text, 'UPDATE'::text, 'is_admin()'::text, 'is_admin()'::text),
