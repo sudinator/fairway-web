@@ -108,6 +108,7 @@ const NOTIF_TYPES: { key: string; label: string; def: "push" | "inapp" | "off"; 
   { key: "signup_admitted", label: "You've been admitted to a club", def: "push", live: true },
   { key: "club_report", label: "Your club's report is ready (July 1 / October 1)", def: "push", live: true },
   { key: "club_decision", label: "Your club request was approved or declined", def: "push", live: true },
+  { key: "support_visit", label: "A BNN admin looked in on a club you run (support)", def: "push", live: true },
 ];
 
 function PushToggle({ user, profile }: { user: any; profile: any }) {

@@ -1,3 +1,15 @@
+## 210.11.261020 — The app opens on the dashboard, not a finished game
+
+**The bug.** Opening the app first checked whether the member was last inside a game room (a note saved on the phone) and, if so, reopened Games — which restored that game — without checking whether it had finished. Once a game had been opened, the app kept returning to it after it was completed. (An unfinished solo round, a half-done setup and a course edit already checked that they were genuinely unfinished; only the game room didn't.)
+
+## 210.10.261020 — Club notifications open the right club
+
+**The bug.** "Your club 'PA-NJ golfers' is approved…" linked to /?tab=manage&manage=groups — a destination the app doesn't understand (it knows ?tab=groups; there is no "manage" tab). Tapping it in the app was ignored (the notification was still marked read); opening it from a phone notification didn't reach Clubs. The approval itself succeeded. The same broken link was on "Your club's report is ready" (0195) and on the held-sign-up notice to club admins (0189, /?tab=manage&manage=members).
+
+## 210.9.261019 — A support visit is not a join
+
+The owner entered PA-NJ golfers as a support admin for five seconds, and the club's admin was told "Amit Sud joined PA-NJ golfers." The join notification (0165) treated the temporary support membership (0028) as an ordinary member joining.
+
 ## 210.8.261019 — Club requests you can actually see and approve
 
 **The bug.** A club is visible only to its members and its creator — with no exception for system admins — so Admin's "Club requests" list read clubs directly and was ALWAYS empty for anyone else's request. Jigar Shukla's "PA-NJ golfers" (pending since Oct 20) was invisible to the owner. The old Approve / Decline buttons also didn't check for errors (they could notify "approved" after a failed update).

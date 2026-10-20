@@ -1,4 +1,5 @@
 "use client";
+import { parseAppLink } from "@/lib/app-links";
 import { fetchAll, fetchAllIn } from "@/lib/fetch-all";
 import { prepareRound } from "@/lib/round-prep";
 import { SeasonWrappedEntry } from "@/components/season-wrapped";
@@ -12,7 +13,7 @@ import { computeBalances, fmtUSD } from "@/lib/money";
 import { logActivity } from "@/lib/activity";
 import { write } from "@/lib/db-write";
 import { Toaster, notifyInfo } from "@/components/toast";
-import { loadDraft, draftHasScores, clearAllLocalState } from "@/lib/draft";
+import { loadDraft, draftHasScores, clearAllLocalState, clearActiveGame, loadGameSnapshot, shouldResumeGame } from "@/lib/draft";
 import { loadActiveGame, saveAppBootCache, loadAppBootCache, loadEditorDraft, loadActiveCourseEdit } from "@/lib/draft";
 import { btn, Wordmark, inputStyle, Eyebrow } from "@/components/ui";
 import { IsThisYou, WaitingForApproval, AccountUnavailable, type AccountGateState } from "@/components/account-gate";
@@ -251,15 +252,21 @@ export function Home({ session }: { session: any }) {
     try { const v = typeof window !== "undefined" ? localStorage.getItem("bnn_dl_tt") : null; if (v) localStorage.removeItem("bnn_dl_tt"); return v; } catch { return null; }
   });
   useEffect(() => { if (deepTeeId) setTab("teetimes"); }, [deepTeeId]);
+  // 210.10: a notification about a club (approved, its report…) links /?tab=groups&club=<id> — refresh the member's
+  // clubs (a just-approved club isn't in the list yet), select that club, and open Clubs.
+  const [deepClubId, setDeepClubId] = useState<string | null>(null);
+  // Remembered until that club is actually selected — so the app's own startup load of clubs (which may finish
+  // after the deep link's refresh) can't put the member back on their usual club.
+  const pendingClubRef = useRef<string | null>(null);
 
   // Deep link from a notification (/?tab=money|games|teetimes…): open that tab once.
   useEffect(() => {
     try {
-      const t = new URLSearchParams(window.location.search).get("tab");
-      const allowed = ["dashboard", "rounds", "games", "courses", "players", "groups", "admin", "help", "profile", "money", "teetimes", "notifications"];
-      if (t && allowed.includes(t)) {
-        setTab(t as Tab);
-        const url = new URL(window.location.href); url.searchParams.delete("tab");
+      const l = parseAppLink(window.location.search);   // lib/app-links — the same reading as an in-app tap
+      if (l.club) setDeepClubId(l.club);
+      if (l.tab) setTab(l.tab as Tab);
+      if (l.tab || l.club) {
+        const url = new URL(window.location.href); url.searchParams.delete("tab"); url.searchParams.delete("club");
         window.history.replaceState({}, "", url.pathname + url.search);
       }
     } catch { /* ignore */ }
@@ -270,19 +277,13 @@ export function Home({ session }: { session: any }) {
   const navigateFromNotif = (link?: string | null) => {
     if (!link) return;
     try {
-      const q = new URLSearchParams(link.includes("?") ? link.slice(link.indexOf("?") + 1) : "");
-      const tt = q.get("tt");
-      const t = q.get("tab");
-      const gcode = q.get("game");
-      const wy = Number(q.get("wrapped"));
+      const l = parseAppLink(link);   // lib/app-links — the same reading as opening from a phone notification
       setStage(null); setViewing(null); setMoreOpen(false); setReturnTab(null);
-      if (wy > 2000 && wy < 3000) { setWrappedYear(wy); setTab("dashboard"); }
-      else if (gcode && /^\d{6}$/.test(gcode)) { setDeepGameCode(gcode); setTab("games"); }
-      else if (tt) { setDeepTeeId(tt); setTab("teetimes"); }
-      else if (t) {
-        const allowed = ["dashboard", "rounds", "games", "courses", "players", "groups", "admin", "help", "profile", "money", "teetimes", "notifications"];
-        if (allowed.includes(t)) setTab(t as Tab);
-      }
+      if (l.club) { setDeepClubId(l.club); setTab("groups"); }
+      else if (l.wrapped) { setWrappedYear(l.wrapped); setTab("dashboard"); }
+      else if (l.game) { setDeepGameCode(l.game); setTab("games"); }
+      else if (l.teeTime) { setDeepTeeId(l.teeTime); setTab("teetimes"); }
+      else if (l.tab) setTab(l.tab as Tab);
     } catch { /* ignore malformed links */ }
   };
 
@@ -323,10 +324,31 @@ export function Home({ session }: { session: any }) {
   // given up resolving), so TeeTimes can't prematurely "consume" it against the wrong group.
   const deepReady = !!deepTeeId && deepTeeGroupId !== undefined && (deepTeeGroupId === null || activeGroupId === deepTeeGroupId);
 
-  // On open, resume an in-progress round straight into the scorecard.
-  // Priority: an active game → this device's round draft → the server's in-progress round.
+  // 210.11: the game room the member was last in is only resumed while that game is still being played. Ask the
+  // server (the game may have been finished on another phone); fall back to this phone's copy when offline. A
+  // finished or deleted game is forgotten, so the app opens on the dashboard.
+  const [activeGameChecked, setActiveGameChecked] = useState(false);
   useEffect(() => {
-    if (resumeChecked || scoringDevice === "checking") return;
+    const ag = loadActiveGame();
+    if (!ag) { setActiveGameChecked(true); return; }
+    let live = true;
+    (async () => {
+      let serverStatus: string | null | undefined;
+      try {
+        const { data, error } = await supabase.from("games").select("status").eq("id", ag.gameId).maybeSingle();
+        serverStatus = error ? undefined : data ? ((data as { status?: string | null }).status ?? "active") : null;
+      } catch { serverStatus = undefined; }
+      if (!live) return;
+      if (!shouldResumeGame(serverStatus, loadGameSnapshot(ag.gameId)?.game?.status)) clearActiveGame();
+      setActiveGameChecked(true);
+    })();
+    return () => { live = false; };
+  }, [supabase]);
+
+  // On open, resume an in-progress round straight into the scorecard.
+  // Priority: an active (still-being-played) game → this device's round draft → the server's in-progress round.
+  useEffect(() => {
+    if (resumeChecked || scoringDevice === "checking" || !activeGameChecked) return;
     // A tee-time deep link takes priority over resuming a round/game.
     if (deepTeeId) { setResumeChecked(true); return; }
     // If the user was in a game room, reopen the Games tab so it can restore the room.
@@ -364,7 +386,7 @@ export function Home({ session }: { session: any }) {
     if (dbInProgress && draftHasScores(dbInProgress)) {
       setStage({ round: dbInProgress });
     }
-  }, [resumeChecked, loading, dbInProgress, deepTeeId, scoringDevice]);
+  }, [resumeChecked, loading, dbInProgress, deepTeeId, scoringDevice, activeGameChecked]);
 
   const user = session.user;
   const displayName = profile?.display_name || user.user_metadata?.full_name || user.email?.split("@")[0] || "Golfer";
@@ -433,7 +455,8 @@ export function Home({ session }: { session: any }) {
     }
 
     setGroups(list);
-    const preferred = preferId ?? profile?.active_group_id ?? null;
+    const preferred = preferId ?? pendingClubRef.current ?? profile?.active_group_id ?? null;
+    if (pendingClubRef.current && list.some((g) => g.id === pendingClubRef.current)) pendingClubRef.current = null;   // selected now
     const next = (preferred && list.some((g) => g.id === preferred)) ? preferred : list[0]?.id || null;
     setActiveGroupId(next);
     saveAppBootCache({ groups: list, activeGroupId: next });
@@ -443,6 +466,13 @@ export function Home({ session }: { session: any }) {
     }
     setGroupsLoading(false);
   }, [activateEmailInvites, user.id, user.email, profile?.active_group_id, profile?.account_status]);
+  useEffect(() => {
+    if (!deepClubId || !user?.id) return;
+    const id = deepClubId;
+    pendingClubRef.current = id;
+    setDeepClubId(null);
+    void loadGroups(id).then(() => setTab("groups"));
+  }, [deepClubId, user?.id, loadGroups]);
 
   // Load (or create) this user's profile: display name, handicap index, GHIN number.
   const loadProfile = useCallback(async () => {
