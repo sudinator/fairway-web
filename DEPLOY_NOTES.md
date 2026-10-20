@@ -1,3 +1,11 @@
+## 210.12.261020 — Admin sees every club; "last active" instead of "last sign-in"
+
+**Admin sees every club (0202).** Player admin listed Jigar Shukla in LEMG but not PA-NJ golfers, which he runs. The rules for CHANGING memberships already allowed system admins in every club; the rules for READING clubs and memberships never had the same exception, so five Admin screens silently showed only the owner's own clubs — Player admin (memberships, its add-to-club list), Admin → Users (admit-to-club list), Club reports (club picker), Clubs oversight (test-club markers) and course reviews (club names) — and removing someone from a club the owner isn't in silently did nothing. Now system admins can read every club and membership (matching what they can change); members still see only their own clubs. Pending clubs show by name, marked "(pending)". ci/assert-admin-reads-clubs.sql — fails on the old rules ("a system admin cannot see a club they are not in"); the live security baseline records the two rules' new wording.
+
+**"Last active", not "last sign-in".** Player admin showed "Last sign-in Sep 29" for members who use the app daily: that date is when they last picked their Google account, and BNN keeps people signed in for weeks. It now shows "Last active" — the last time they opened the app (saved on every open) — with "signed in" after it.
+
+Deploy: staging 0202 → code; production 0202 → merge.
+
 ## 210.11.261020 — The app opens on the dashboard, not a finished game
 
 **The bug.** Opening the app first checked whether the member was last inside a game room (a note saved on the phone) and, if so, reopened Games — which restored that game — without checking whether it had finished. Once a game had been opened, the app kept returning to it after it was completed. (An unfinished solo round, a half-done setup and a course edit already checked that they were genuinely unfinished; only the game room didn't.)

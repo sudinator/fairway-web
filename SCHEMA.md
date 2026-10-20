@@ -1,3 +1,7 @@
+## 210.12 — System admins read every club (0202)
+
+groups_select_member / group_members_select_visible gain OR is_admin().
+
 ## 210.9 — Support visits (0200)
 
 notify_group_member: is_support rows notify the club's admins (support_visit), never 'joined'; support rows excluded from join counts and recipients.
